@@ -28,13 +28,24 @@ npm run dev
 
 `start` runs a Docker-backed local Zitadel server and stores runtime data
 under `.zitadel/local/`. It uses `ghcr.io/zitadel/nextgen:latest` unless
-overridden with `--image` or `ZITADEL_LOCAL_IMAGE`. `setup --server local`
-creates a project on that local server, scaffolds `app/login`, `app/register`, and
-`middleware.ts`, writes `.env.local` and `.zitadel/`, and installs dependencies
-with the detected package manager. Pass `--skip-install` to install them
-yourself. The project's default user schema and login flow are provisioned
-server-side at creation time, so the CLI does not scaffold or upload them.
-Open `http://localhost:3000/login` to see the login page.
+overridden with `--image`, `--preview-manifest`, or `ZITADEL_LOCAL_IMAGE`.
+`setup --server local` creates a project on that local server, scaffolds
+`app/login`, `app/register`, and `middleware.ts`, writes `.env.local` and
+`.zitadel/`, and installs dependencies with the detected package manager. Pass
+`--skip-install` to install them yourself. The project's default user schema
+and login flow are provisioned server-side at creation time, so the CLI does
+not scaffold or upload them. Open `http://localhost:3000/login` to see the
+login page.
+
+For a `zitadel-preview` bundle, use the exact manifest URL from the GitHub
+Release so the CLI starts the tested server image and scaffolds the tested SDK
+versions:
+
+```sh
+npx @zitadel/cli@<exact-version> doctor --preview-manifest <manifest-url>
+npx @zitadel/cli@<exact-version> start --preview-manifest <manifest-url>
+npx @zitadel/cli@<exact-version> setup --framework next --server local --preview-manifest <manifest-url>
+```
 
 The default project flow supports password registration/login, passkey
 registration/login, and optional passkey setup after password registration.
@@ -138,7 +149,7 @@ Verify local runtime and project state.
 ```
 USAGE
   $ zitadel doctor [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [--fix]
-    [--image <value>] [--port <value>]
+    [--image <value>] [--port <value>] [--preview-manifest <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -150,6 +161,8 @@ FLAGS
       --fix              Re-apply missing managed files.
       --image=<value>    Container image to check.
       --port=<value>     [default: 8080] Local HTTP port.
+      --preview-manifest=<value>
+                          Path or URL to a zitadel-preview manifest.
       --verbose          Verbose logging.
 
 GLOBAL FLAGS
@@ -280,7 +293,7 @@ Create a Zitadel project and scaffold local auth.
 ```
 USAGE
   $ zitadel setup [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
-    [--framework next] [--renderer react|web-component] [--skip-install]
+    [--framework next] [--renderer react|web-component] [--skip-install] [--preview-manifest <value>]
 
 FLAGS
   -c, --cwd=<value>         Project directory to operate on.
@@ -291,6 +304,8 @@ FLAGS
       --dry-run             Preview without mutating files or the platform.
       --framework=<option>  Framework to target.
                             <options: next>
+      --preview-manifest=<value>
+                            Path or URL to a zitadel-preview manifest.
       --renderer=<option>   Renderer (default: react).
                             <options: react|web-component>
       --skip-install        Do not install dependencies after setup updates package.json.
@@ -313,7 +328,7 @@ Start a local Zitadel server.
 ```
 USAGE
   $ zitadel start [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [--image
-    <value>] [--port <value>]
+    <value>] [--port <value>] [--preview-manifest <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -324,6 +339,8 @@ FLAGS
       --dry-run          Preview without mutating files or the platform.
       --image=<value>    Container image to run.
       --port=<value>     [default: 8080] Local HTTP port.
+      --preview-manifest=<value>
+                          Path or URL to a zitadel-preview manifest.
       --verbose          Verbose logging.
 
 GLOBAL FLAGS

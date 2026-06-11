@@ -15,6 +15,7 @@ import {
 } from "../../lib/local-server/runtime";
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import { createOrca } from "../../lib/orca";
+import { loadPreviewManifest, previewServerImage } from "../../lib/preview-manifest";
 import { hasZitadelConfig } from "../../lib/project";
 import { publicCliCommand } from "../../lib/public-cli";
 import { SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
@@ -40,6 +41,9 @@ export default class Doctor extends BaseCommand {
     fix: Flags.boolean({ description: "Re-apply missing managed files." }),
     image: Flags.string({ description: "Container image to check." }),
     port: Flags.integer({ description: "Local HTTP port.", default: DEFAULT_LOCAL_SERVER_PORT }),
+    "preview-manifest": Flags.string({
+      description: "Path or URL to a zitadel-preview manifest.",
+    }),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -47,7 +51,14 @@ export default class Doctor extends BaseCommand {
     const port = flags.port ?? DEFAULT_LOCAL_SERVER_PORT;
     await this.toMeta(flags, { resolveServer: false, source: localServerUrl(port) });
     const { cwd, dryRun } = this.meta;
-    const image = flags.image ?? this.meta.env.ZITADEL_LOCAL_IMAGE ?? DEFAULT_LOCAL_SERVER_IMAGE;
+    const preview = flags["preview-manifest"]
+      ? await loadPreviewManifest(flags["preview-manifest"], cwd)
+      : undefined;
+    const image =
+      flags.image ??
+      (preview ? previewServerImage(preview) : undefined) ??
+      this.meta.env.ZITADEL_LOCAL_IMAGE ??
+      DEFAULT_LOCAL_SERVER_IMAGE;
     const runtimeChecks = await runLocalRuntimeChecks(cwd, image, port);
     const hasConfig = await hasZitadelConfig(cwd);
     const ctx: CheckContext = { cwd, orca: createOrca(), cliVersion: this.meta.cliVersion, dryRun };
@@ -82,6 +93,12 @@ export default class Doctor extends BaseCommand {
       ok: failed.length === 0,
       image,
       port,
+      preview: preview
+        ? {
+            product: preview.product,
+            manifest: flags["preview-manifest"],
+          }
+        : undefined,
       project: {
         lifecycle: hasConfig ? "configured" : "not-configured",
       },

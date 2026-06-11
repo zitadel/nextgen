@@ -68,6 +68,11 @@ layer, not the envelope.
 - `reset` — stop/remove the managed container and delete local runtime data;
   requires `--force` when non-interactive.
 
+For an external `zitadel-preview` bundle, pass
+`--preview-manifest <path-or-url>` to `doctor`, `start`, and `setup`. The
+manifest pins the server image and SDK package versions that were tested
+together. `zitadel start --image <ref>` remains the explicit image override.
+
 ## Golden path
 
 ```sh
@@ -77,6 +82,14 @@ npx @zitadel/cli@alpha setup --framework next --server local --non-interactive -
 npx @zitadel/cli@alpha doctor --non-interactive --json
 npx @zitadel/cli@alpha plan --non-interactive --json
 npx @zitadel/cli@alpha apply --non-interactive --json
+```
+
+Preview bundle invocation:
+
+```sh
+npx @zitadel/cli@<exact-version> doctor --preview-manifest <manifest-url> --non-interactive --json
+npx @zitadel/cli@<exact-version> start --preview-manifest <manifest-url> --non-interactive --json
+npx @zitadel/cli@<exact-version> setup --framework next --server local --preview-manifest <manifest-url> --non-interactive --json
 ```
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,

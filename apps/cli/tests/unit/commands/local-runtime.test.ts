@@ -125,6 +125,36 @@ describe("local runtime commands", () => {
     expect(dockerCalls.some((args) => args[0] === "pull")).toBe(false);
   });
 
+  it("doctor --preview-manifest checks the manifest image", async () => {
+    const cwd = await tempProject("zitadel-doctor-preview-");
+    const fake = await fakeDocker();
+    const port = await freePort();
+    const manifestPath = await writePreviewManifest(cwd, {
+      serverImage: "ghcr.io/zitadel/nextgen:v0.1.0-alpha.3",
+    });
+
+    const result = await runCliForTest(
+      ["doctor", "--cwd", cwd, "--json", "--port", String(port), "--preview-manifest", manifestPath],
+      {
+        PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: fake.logPath,
+      },
+    );
+
+    expect(result.exitCode).toBe(0);
+    const envelope = parseJson(result.stdout) as {
+      status: string;
+      data: { image: string; preview?: { product: { version: string } } };
+    };
+    expect(envelope.status).toBe("ok");
+    expect(envelope.data.image).toBe("ghcr.io/zitadel/nextgen:v0.1.0-alpha.3");
+    expect(envelope.data.preview?.product.version).toBe("0.1.0");
+
+    const dockerCalls = await readDockerCalls(fake.logPath);
+    expect(dockerCalls).toContainEqual(["image", "inspect", "ghcr.io/zitadel/nextgen:v0.1.0-alpha.3"]);
+    expect(dockerCalls).toContainEqual(["manifest", "inspect", "ghcr.io/zitadel/nextgen:v0.1.0-alpha.3"]);
+  });
+
   it("doctor still fails when existing local runtime metadata is unhealthy", async () => {
     const cwd = await tempProject("zitadel-doctor-runtime-fail-");
     const fake = await fakeDocker();
@@ -207,6 +237,100 @@ describe("local runtime commands", () => {
     expect(dockerCalls).toContainEqual(["image", "inspect", "zitadel-nextgen:test"]);
     expect(dockerCalls.some((args) => args[0] === "pull")).toBe(false);
     expect(dockerCalls.find((args) => args[0] === "run")?.at(-1)).toBe("zitadel-nextgen:test");
+  });
+
+  it("start --preview-manifest uses the manifest image", async () => {
+    const cwd = await tempProject("zitadel-start-preview-");
+    const fake = await fakeDocker();
+    const serverUrl = await startHealthServer();
+    const port = Number(new URL(serverUrl).port);
+    const manifestPath = await writePreviewManifest(cwd, {
+      serverImage: "ghcr.io/zitadel/nextgen:v0.1.0-alpha.3",
+    });
+
+    const result = await runCliForTest(
+      ["start", "--cwd", cwd, "--json", "--port", String(port), "--preview-manifest", manifestPath],
+      {
+        PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: fake.logPath,
+      },
+    );
+
+    expect(result.exitCode).toBe(0);
+    const envelope = parseJson(result.stdout) as {
+      status: string;
+      data: { runtime: { image: string }; next_commands: string[]; preview?: { product: { version: string } } };
+    };
+    expect(envelope.status).toBe("ok");
+    expect(envelope.data.runtime.image).toBe("ghcr.io/zitadel/nextgen:v0.1.0-alpha.3");
+    expect(envelope.data.preview?.product.version).toBe("0.1.0");
+    expect(envelope.data.next_commands).toEqual([
+      `npx @zitadel/cli@alpha setup --server local --preview-manifest ${manifestPath}`,
+    ]);
+
+    const dockerCalls = await readDockerCalls(fake.logPath);
+    expect(dockerCalls.find((args) => args[0] === "run")?.at(-1)).toBe(
+      "ghcr.io/zitadel/nextgen:v0.1.0-alpha.3",
+    );
+  });
+
+  it("start --image overrides --preview-manifest", async () => {
+    const cwd = await tempProject("zitadel-start-preview-image-");
+    const fake = await fakeDocker({ imageExists: true });
+    const serverUrl = await startHealthServer();
+    const port = Number(new URL(serverUrl).port);
+    const manifestPath = await writePreviewManifest(cwd, {
+      serverImage: "ghcr.io/zitadel/nextgen:v0.1.0-alpha.3",
+    });
+
+    const result = await runCliForTest(
+      [
+        "start",
+        "--cwd",
+        cwd,
+        "--json",
+        "--port",
+        String(port),
+        "--preview-manifest",
+        manifestPath,
+        "--image",
+        "zitadel-nextgen:override",
+      ],
+      {
+        PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: fake.logPath,
+      },
+    );
+
+    expect(result.exitCode).toBe(0);
+    const dockerCalls = await readDockerCalls(fake.logPath);
+    expect(dockerCalls.find((args) => args[0] === "run")?.at(-1)).toBe("zitadel-nextgen:override");
+  });
+
+  it("start --preview-manifest replaces an existing container from another image", async () => {
+    const cwd = await tempProject("zitadel-start-preview-replace-");
+    const fake = await fakeDocker({ existingContainerImage: "ghcr.io/zitadel/nextgen:old" });
+    const serverUrl = await startHealthServer();
+    const port = Number(new URL(serverUrl).port);
+    const manifestPath = await writePreviewManifest(cwd, {
+      serverImage: "ghcr.io/zitadel/nextgen:v0.1.0-alpha.3",
+    });
+
+    const result = await runCliForTest(
+      ["start", "--cwd", cwd, "--json", "--port", String(port), "--preview-manifest", manifestPath],
+      {
+        PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: fake.logPath,
+      },
+    );
+
+    expect(result.exitCode).toBe(0);
+    const dockerCalls = await readDockerCalls(fake.logPath);
+    expect(dockerCalls.some((args) => args[0] === "stop")).toBe(true);
+    expect(dockerCalls.some((args) => args[0] === "rm")).toBe(true);
+    expect(dockerCalls.find((args) => args[0] === "run")?.at(-1)).toBe(
+      "ghcr.io/zitadel/nextgen:v0.1.0-alpha.3",
+    );
   });
 
   it("logs without runtime suggests the published start command", async () => {
@@ -313,7 +437,12 @@ async function tempProject(prefix: string): Promise<string> {
 }
 
 async function fakeDocker(
-  options: { dockerAvailable?: boolean; imageExists?: boolean; imageAvailable?: boolean } = {},
+  options: {
+    dockerAvailable?: boolean;
+    existingContainerImage?: string;
+    imageExists?: boolean;
+    imageAvailable?: boolean;
+  } = {},
 ): Promise<{ binDir: string; logPath: string }> {
   const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-docker-"));
   tempDirs.push(binDir);
@@ -344,6 +473,10 @@ if (args[0] === "manifest" && args[1] === "inspect") {
   process.exit(${options.imageAvailable === false ? "1" : "0"});
 }
 if (args[0] === "inspect") {
+  if (${options.existingContainerImage ? "true" : "false"}) {
+    console.log("container-test-id true ${options.existingContainerImage ?? ""}");
+    process.exit(0);
+  }
   process.exit(1);
 }
 if (args[0] === "run") {
@@ -412,4 +545,30 @@ function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
     created_at: "2026-06-09T00:00:00.000Z",
     cli_version: "0.0.0-test",
   };
+}
+
+async function writePreviewManifest(
+  cwd: string,
+  options: { serverImage: string },
+): Promise<string> {
+  const path = join(cwd, "preview.json");
+  await writeFile(
+    path,
+    JSON.stringify({
+      schema_version: 1,
+      product: { name: "zitadel-preview", version: "0.1.0", commit: "abc123" },
+      components: [
+        {
+          kind: "container",
+          name: "ghcr.io/zitadel/nextgen",
+          version: options.serverImage.split(":").at(-1),
+          ref: options.serverImage,
+          digest: `sha256:${"a".repeat(64)}`,
+        },
+        { kind: "npm", name: "@zitadel/cli", version: "0.1.0-alpha.4" },
+        { kind: "npm", name: "@zitadel/sdk-next", version: "0.1.0-alpha.2" },
+      ],
+    }),
+  );
+  return path;
 }

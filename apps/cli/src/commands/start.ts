@@ -22,6 +22,7 @@ import {
   writeRuntimeMetadata,
 } from "../lib/local-server/runtime";
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { loadPreviewManifest, previewServerImage } from "../lib/preview-manifest";
 import { publicCliCommand } from "../lib/public-cli";
 
 const START_TIMEOUT_MS = 90_000;
@@ -31,6 +32,9 @@ export default class Start extends BaseCommand {
   static override flags = {
     image: Flags.string({ description: "Container image to run." }),
     port: Flags.integer({ description: "Local HTTP port.", default: DEFAULT_LOCAL_SERVER_PORT }),
+    "preview-manifest": Flags.string({
+      description: "Path or URL to a zitadel-preview manifest.",
+    }),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -40,8 +44,16 @@ export default class Start extends BaseCommand {
     await this.toMeta(flags, { resolveServer: false, source: serverUrl });
 
     validatePort(port);
-    const image = flags.image ?? this.meta.env.ZITADEL_LOCAL_IMAGE ?? DEFAULT_LOCAL_SERVER_IMAGE;
+    const preview = flags["preview-manifest"]
+      ? await loadPreviewManifest(flags["preview-manifest"], this.meta.cwd)
+      : undefined;
+    const image =
+      flags.image ??
+      (preview ? previewServerImage(preview) : undefined) ??
+      this.meta.env.ZITADEL_LOCAL_IMAGE ??
+      DEFAULT_LOCAL_SERVER_IMAGE;
     const containerName = localContainerName(this.meta.cwd);
+    const previewManifestArg = flags["preview-manifest"];
     if (this.meta.dryRun) {
       return this.emit({
         status: "ok",
@@ -57,7 +69,18 @@ export default class Start extends BaseCommand {
             console: `${serverUrl}/ui/console/`,
             login: `${serverUrl}/ui/login/`,
           },
-          next_commands: [publicCliCommand("start", this.meta.cliVersion)],
+          next_commands: [
+            publicCliCommand(
+              previewManifestArg ? `start --preview-manifest ${previewManifestArg}` : "start",
+              this.meta.cliVersion,
+            ),
+          ],
+          preview: preview
+            ? {
+                product: preview.product,
+                manifest: previewManifestArg,
+              }
+            : undefined,
         },
       });
     }
@@ -65,7 +88,12 @@ export default class Start extends BaseCommand {
     const paths = await ensureLocalState(this.meta.cwd);
 
     const existing = await inspectContainer(containerName);
-    if (existing.exists && existing.running && (await checkLocalServerHealth(serverUrl))) {
+    if (
+      existing.exists &&
+      existing.running &&
+      existing.image === image &&
+      (await checkLocalServerHealth(serverUrl))
+    ) {
       const metadata = metadataFromStart({
         cwdDataDir: paths.dataDir,
         cliVersion: this.meta.cliVersion,
@@ -76,7 +104,10 @@ export default class Start extends BaseCommand {
         serverUrl,
       });
       await writeRuntimeMetadata(this.meta.cwd, metadata);
-      return this.emit({ status: "ok", data: readyData(metadata, true, this.meta.cliVersion) });
+      return this.emit({
+        status: "ok",
+        data: readyData(metadata, true, this.meta.cliVersion, previewManifestArg, preview),
+      });
     }
 
     if (existing.exists) {
@@ -103,7 +134,10 @@ export default class Start extends BaseCommand {
       serverUrl,
     });
     await writeRuntimeMetadata(this.meta.cwd, metadata);
-    return this.emit({ status: "ok", data: readyData(metadata, false, this.meta.cliVersion) });
+    return this.emit({
+      status: "ok",
+      data: readyData(metadata, false, this.meta.cliVersion, previewManifestArg, preview),
+    });
   }
 }
 
@@ -111,7 +145,12 @@ function readyData(
   metadata: ReturnType<typeof metadataFromStart>,
   alreadyRunning: boolean,
   cliVersion: string,
+  previewManifestArg?: string,
+  preview?: Awaited<ReturnType<typeof loadPreviewManifest>>,
 ) {
+  const setupCommand = previewManifestArg
+    ? `setup --server local --preview-manifest ${previewManifestArg}`
+    : "setup --server local";
   return {
     title: alreadyRunning
       ? "Local Zitadel server is already running."
@@ -132,7 +171,13 @@ function readyData(
       "From your app directory, run setup; the CLI will detect the framework or ask when needed.",
       "Setup installs dependencies when needed; then start your app dev server.",
     ],
-    next_commands: [publicCliCommand("setup --server local", cliVersion)],
+    next_commands: [publicCliCommand(setupCommand, cliVersion)],
+    preview: preview
+      ? {
+          product: preview.product,
+          manifest: previewManifestArg,
+        }
+      : undefined,
   };
 }
 

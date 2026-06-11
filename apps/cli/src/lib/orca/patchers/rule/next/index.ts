@@ -118,7 +118,9 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
   ops.push({
     kind: "add-dep",
     name: renderer.dependency.name,
-    version: dependencyVersionForCli(ctx.cliVersion, renderer.dependency.version),
+    version:
+      ctx.dependencyVersions?.[renderer.dependency.name] ??
+      dependencyVersionForCli(ctx.cliVersion, renderer.dependency.version),
   });
   return ops;
 }

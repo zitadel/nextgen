@@ -181,6 +181,52 @@ describe("Next setup integration", () => {
     });
     expect(applyWithEnv.exitCode).toBe(0);
   });
+
+  it("uses exact SDK versions from a preview manifest", async () => {
+    const cwd = await createNextProject();
+    const manifestPath = join(cwd, "preview.json");
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        schema_version: 1,
+        product: { name: "zitadel-preview", version: "0.1.0", commit: "abc123" },
+        components: [
+          {
+            kind: "container",
+            name: "ghcr.io/zitadel/nextgen",
+            version: "v0.1.0-alpha.3",
+            ref: "ghcr.io/zitadel/nextgen:v0.1.0-alpha.3",
+            digest: `sha256:${"a".repeat(64)}`,
+          },
+          { kind: "npm", name: "@zitadel/cli", version: "0.1.0-alpha.4" },
+          { kind: "npm", name: "@zitadel/sdk-next", version: "0.1.0-alpha.2" },
+        ],
+      }),
+    );
+
+    const setup = await cli([
+      "setup",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+      "--preview-manifest",
+      manifestPath,
+    ]);
+
+    expect(setup.exitCode).toBe(0);
+    const setupJson = parseJson(setup.stdout) as {
+      status: string;
+      data: { preview?: { product: { version: string } } };
+    };
+    expect(setupJson.status).toBe("ok");
+    expect(setupJson.data.preview?.product.version).toBe("0.1.0");
+    const packageJson = JSON.parse(await readFile(join(cwd, "package.json"), "utf8")) as {
+      dependencies?: Record<string, string>;
+    };
+    expect(packageJson.dependencies?.["@zitadel/sdk-next"]).toBe("0.1.0-alpha.2");
+  });
 });
 
 async function createNextProject(): Promise<string> {

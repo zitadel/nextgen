@@ -204,6 +204,37 @@ corepack pnpm changeset
 The changesets workflow opens a "Version Packages" PR. Merging that PR versions
 and publishes the affected packages through npm trusted publishing.
 
+### Preview product bundles (`zitadel-preview`)
+
+`zitadel-preview@0.x` is the customer-facing bundle layer for external testers.
+It does not replace the GoReleaser or Changesets workflows; it records the exact
+server image and npm package versions that were tested together.
+
+Release ceremony:
+
+1. Merge normal feature and fix PRs with changesets as usual.
+2. Let [`release-npm.yml`](.github/workflows/release-npm.yml) publish the npm
+   prerelease packages.
+3. Run [`release.yml`](.github/workflows/release.yml) for the server image.
+4. Run [`release-preview.yml`](.github/workflows/release-preview.yml) with:
+   - `preview_version`, for example `0.1.0`;
+   - immutable `server_image`, for example `ghcr.io/zitadel/nextgen:v0.1.0-alpha.3`;
+   - exact `cli_version` and `sdk_next_version`;
+   - optional extra npm packages as JSON.
+
+Follow the short [preview release runbook](docs/runbooks/release-preview.md)
+when cutting a bundle.
+
+The preview workflow creates a draft GitHub Release tagged
+`zitadel-preview-v<version>` with a `zitadel-preview-<version>.json` manifest
+asset and generated tester commands:
+
+```sh
+npx @zitadel/cli@<exact-cli-version> doctor --preview-manifest <manifest-url>
+npx @zitadel/cli@<exact-cli-version> start --preview-manifest <manifest-url>
+npx @zitadel/cli@<exact-cli-version> setup --framework next --server local --preview-manifest <manifest-url>
+```
+
 ### Local development
 
 The devcontainer at [.devcontainer/](.devcontainer/) pins Go 1.26 and a PostgreSQL sidecar.
