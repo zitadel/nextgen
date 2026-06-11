@@ -1,14 +1,14 @@
-# ADR 022: User, Team, Membership, and Lifecycle Ownership
+# ADR 022: User, Team, and Lifecycle Ownership
 
 > **Status:** Accepted
 > **Date:** 2026-06-11
-> **Context:** Project/team/user hierarchy, membership semantics, deletion behavior
+> **Context:** Project/team/user hierarchy, lifecycle ownership, deletion behavior
 
 ## Context
 
 The API hierarchy uses three core resources: projects, teams, and users.
 Projects own the identity namespace. Teams are tenant groupings inside a
-project. Memberships attach users to teams and carry roles.
+project.
 
 That model still leaves important lifecycle questions ambiguous: if a team is
 deleted, are its users deleted too? If a team-owned user creates another team,
@@ -25,15 +25,13 @@ that must be answered by explicit lifecycle policy.
 Users are **project-scoped identities**. A user does not live inside a team.
 
 Teams are **collaboration, data, and lifecycle boundaries**. A team can own
-workspace data, customer-tenant state, billing, team-scoped keys, memberships,
+workspace data, customer-tenant state, billing, team-scoped keys, team rosters,
 and, when policy says so, the lifecycle of managed users.
 
-Memberships are **team presence relationships**. A `team_membership` records
-that a project user belongs to a team, with status, roles, and provisioning
-metadata. It is the roster/status source for invitations, SCIM/JIT membership
-sync, billing seats, `/me/memberships`, and team-scoped management surfaces.
-FGA may consume or mirror memberships as authorization facts, but FGA does not
-replace the membership resource.
+Team participation is **not lifecycle ownership**. It can be represented by a
+team roster/membership resource, by FGA tuples, or by both. Whatever storage
+shape implements team presence, it does not decide who owns the user's
+lifecycle.
 
 FGA is the **authorization decision layer**. It answers whether a principal can
 perform an action on a resource by evaluating memberships, grants, roles,
@@ -72,16 +70,13 @@ verb.
 
 | Operation | Canonical behavior |
 |---|---|
-| Delete team | Deactivate/tombstone the team, revoke team-scoped API keys, and deactivate/remove team memberships. Preserve self-owned users. Deactivate users lifecycle-owned by that team according to policy. Preserve or transfer resources only where a resource-specific policy says so. |
-| Delete user | Deactivate/tombstone the user, revoke sessions, tokens, and credentials, and deactivate memberships. Preserve teams and resources the user created/administered unless an explicit resource-specific cleanup policy applies. |
-| Delete membership | Remove access to that team. Do not delete the user unless that membership is the configured lifecycle-owner relationship and policy calls for deprovisioning. |
+| Delete team | Deactivate/tombstone the team, revoke team-scoped API keys, and remove team access/roster state. Preserve self-owned users. Deactivate users lifecycle-owned by that team according to policy. Preserve or transfer resources only where a resource-specific policy says so. |
+| Delete user | Deactivate/tombstone the user, revoke sessions, tokens, and credentials, and remove team access. Preserve teams and resources the user created/administered unless an explicit resource-specific cleanup policy applies. |
+| Remove user from team | Remove access to that team. Do not delete the user unless that team is the configured lifecycle owner and policy calls for deprovisioning. |
 
-The status of a user is separate from the status of a membership:
-
-| Resource | Example statuses |
-|---|---|
-| User | `active`, `suspended`, `deactivated`, `pending_purge` |
-| Team membership | `pending`, `active`, `inactive`, `removed` |
+The user's lifecycle status is separate from team-presence state. A user can be
+`active`, `suspended`, `deactivated`, or `pending_purge` regardless of whether a
+given team roster entry is pending, active, inactive, or removed.
 
 ## Consequences
 
@@ -96,9 +91,9 @@ The status of a user is separate from the status of a membership:
   A user owned by Team A can create Team B; deprovisioning the user through Team
   A removes that user's access to Team B but does not delete Team B.
 - Current or transitional storage artifacts such as `users.team_id` or
-  team-to-user `ON DELETE CASCADE` constraints are not the canonical N:N
-  membership model. Schema follow-up should align storage with this ADR instead
-  of treating those constraints as product intent.
+  team-to-user `ON DELETE CASCADE` constraints are not canonical lifecycle
+  semantics. Schema follow-up should align storage with this ADR instead of
+  treating those constraints as product intent.
 - Deletion handlers should execute lifecycle services/policies rather than
   relying on raw SQL cascades for managed resources.
 - FGA checks remain necessary before lifecycle mutations, but lifecycle policy
