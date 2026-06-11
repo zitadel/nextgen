@@ -66,7 +66,9 @@ export function ensureArrayItem(parent: any, key: string, item: string): void {
       hint: `Add "${item}" to "${key}" in your config manually.`,
     });
   }
-  const present = Array.from({ length: arr.length as number }, (_unused, i) => arr[i]).includes(item);
+  const present = Array.from({ length: arr.length as number }, (_unused, i) => arr[i]).includes(
+    item,
+  );
   if (!present) {
     arr.push(item);
   }

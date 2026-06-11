@@ -28,7 +28,11 @@ export class VuePatcher extends AbstractRulePatcher implements ViteSupport {
       { kind: "write", path: "src/App.vue", contents: appTemplate() },
       this.viteProxyOp(ctx.framework.devPort),
       { kind: "merge-env", path: ".env.example", entries: { VITE_ZITADEL_PROJECT_ID: "" } },
-      { kind: "merge-env", path: ".env.local", entries: { VITE_ZITADEL_PROJECT_ID: ctx.project.id } },
+      {
+        kind: "merge-env",
+        path: ".env.local",
+        entries: { VITE_ZITADEL_PROJECT_ID: ctx.project.id },
+      },
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
@@ -48,7 +52,8 @@ export class VuePatcher extends AbstractRulePatcher implements ViteSupport {
   protected summary(_ctx: PatchContext): { title: string; detail: string } {
     return {
       title: "Vue (Vite) integration",
-      detail: "Wrote src/App.vue auth entry and merged the /__nextgen dev proxy into vite.config.ts.",
+      detail:
+        "Wrote src/App.vue auth entry and merged the /__nextgen dev proxy into vite.config.ts.",
     };
   }
 }

@@ -33,7 +33,11 @@ export class ReactPatcher extends AbstractRulePatcher implements ViteSupport {
       this.viteProxyOp(ctx.framework.devPort),
       // Vite only exposes VITE_-prefixed vars to client code (import.meta.env).
       { kind: "merge-env", path: ".env.example", entries: { VITE_ZITADEL_PROJECT_ID: "" } },
-      { kind: "merge-env", path: ".env.local", entries: { VITE_ZITADEL_PROJECT_ID: ctx.project.id } },
+      {
+        kind: "merge-env",
+        path: ".env.local",
+        entries: { VITE_ZITADEL_PROJECT_ID: ctx.project.id },
+      },
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,

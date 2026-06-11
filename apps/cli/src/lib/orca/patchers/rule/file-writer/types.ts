@@ -31,7 +31,12 @@ export type FileOp =
       readonly patch: Readonly<Record<string, unknown>>;
     }
   | { readonly kind: "append-gitignore"; readonly entries: ReadonlyArray<string> }
-  | { readonly kind: "add-dep"; readonly name: string; readonly version: string; readonly dev?: boolean }
+  | {
+      readonly kind: "add-dep";
+      readonly name: string;
+      readonly version: string;
+      readonly dev?: boolean;
+    }
   | {
       /**
        * Generic content edit. The file-writer reads the file (passing `undefined`

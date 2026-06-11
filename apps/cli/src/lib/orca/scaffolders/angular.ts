@@ -16,7 +16,16 @@ export class AngularScaffolder extends AbstractCLIScaffolder {
   async scaffold(cwd: string, _framework: string): Promise<void> {
     this.runCommand(
       "npx",
-      ["-y", "@angular/cli@latest", "new", ".", "--defaults", "--style=css", "--ssr=false", "--skip-git"],
+      [
+        "-y",
+        "@angular/cli@latest",
+        "new",
+        ".",
+        "--defaults",
+        "--style=css",
+        "--ssr=false",
+        "--skip-git",
+      ],
       cwd,
     );
     await rm(join(cwd, "src/app/app.ts"), { force: true });

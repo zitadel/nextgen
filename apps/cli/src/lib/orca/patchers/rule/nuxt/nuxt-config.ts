@@ -1,7 +1,11 @@
 import { builders, generateCode, parseModule } from "magicast";
 
 import { ZitadelError } from "../../../../errors";
-import { ensureArrayItem, ensureEditableObject, resolveDefaultExportObject } from "../magicast-config";
+import {
+  ensureArrayItem,
+  ensureEditableObject,
+  resolveDefaultExportObject,
+} from "../magicast-config";
 
 const NUXT_MODULE = "@zitadel/sdk-nuxt/module";
 
