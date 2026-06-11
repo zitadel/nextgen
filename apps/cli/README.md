@@ -3,8 +3,8 @@
 Scaffolds Zitadel auth (login, register, profile, middleware) into a Next.js app.
 
 ```sh
-npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --framework next --server local
+npx @zitadel/cli@preview start
+npx @zitadel/cli@preview setup --framework next --server local
 ```
 
 > **Beta.** This is the **next-generation Zitadel**, a ground-up rewrite of the platform. It is distinct from the established Zitadel at [github.com/zitadel/zitadel](https://github.com/zitadel/zitadel). APIs and CLI flags will change.
@@ -20,15 +20,16 @@ npx @zitadel/cli@alpha setup --framework next --server local
 ```sh
 npx create-next-app@latest my-app
 cd my-app
-npx @zitadel/cli@alpha doctor
-npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --framework next --server local
+npx @zitadel/cli@preview doctor
+npx @zitadel/cli@preview start
+npx @zitadel/cli@preview setup --framework next --server local
 npm run dev
 ```
 
 `start` runs a Docker-backed local Zitadel server and stores runtime data
-under `.zitadel/local/`. It uses `ghcr.io/zitadel/nextgen:latest` unless
-overridden with `--image` or `ZITADEL_LOCAL_IMAGE`. `setup --server local`
+under `.zitadel/local/`. It uses the matching
+`ghcr.io/zitadel/zitadel-preview:<cli-version>` image unless overridden with
+`--image` or `ZITADEL_LOCAL_IMAGE`. `setup --server local`
 creates a project on that local server, scaffolds `app/login`, `app/register`, and
 `middleware.ts`, writes `.env.local` and `.zitadel/`, and installs dependencies
 with the detected package manager. Pass `--skip-install` to install them

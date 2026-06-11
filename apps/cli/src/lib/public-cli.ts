@@ -1,9 +1,9 @@
+import { npmDistTagForVersion } from "./versions";
+
 const CLI_PACKAGE_NAME = "@zitadel/cli";
 
 export function npmDistTagForCliVersion(cliVersion: string): string {
-  const normalized = cliVersion.trim().replace(/^v/, "");
-  const match = normalized.match(/^\d+\.\d+\.\d+-([0-9A-Za-z][0-9A-Za-z-]*)/);
-  return match?.[1] ?? "latest";
+  return npmDistTagForVersion(cliVersion);
 }
 
 export function publicCliCommand(args: string, cliVersion: string): string {

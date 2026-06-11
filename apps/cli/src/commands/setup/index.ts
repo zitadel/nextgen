@@ -10,6 +10,7 @@ import { createOrca, issuerFromPort, type FrameworkFacts, type Orca } from "../.
 import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
+import { resolvePackageVersions } from "../../lib/versions";
 import { installDependenciesForSetup } from "./install";
 import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
 import {
@@ -135,6 +136,10 @@ export default class Setup extends BaseCommand {
       issuer,
       server: answers.server,
       cliVersion: this.meta.cliVersion,
+      dependencyVersions: await resolvePackageVersions(["@zitadel/sdk-next"], {
+        cliRoot: this.config.root,
+        packageJson: this.config.pjson,
+      }),
     };
     consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
     const result = await orca.patcherFor(framework.id).patch(ctx, { cwd, dryRun, force });

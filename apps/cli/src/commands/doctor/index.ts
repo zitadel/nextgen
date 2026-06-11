@@ -4,10 +4,10 @@ import consola from "consola";
 import { ZitadelError } from "../../lib/errors";
 import { dockerAvailable, imageAvailable } from "../../lib/local-server/docker";
 import {
-  DEFAULT_LOCAL_SERVER_IMAGE,
   DEFAULT_LOCAL_SERVER_PORT,
   assertWritableDirectory,
   checkLocalServerHealth,
+  defaultLocalServerImage,
   isPortAvailable,
   localRuntimePaths,
   localServerUrl,
@@ -17,6 +17,7 @@ import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import { createOrca } from "../../lib/orca";
 import { hasZitadelConfig } from "../../lib/project";
 import { publicCliCommand } from "../../lib/public-cli";
+import { resolvePackageVersions } from "../../lib/versions";
 import { SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set(["docker-cli", "image", "state-dir", "port", "runtime"]);
@@ -47,10 +48,22 @@ export default class Doctor extends BaseCommand {
     const port = flags.port ?? DEFAULT_LOCAL_SERVER_PORT;
     await this.toMeta(flags, { resolveServer: false, source: localServerUrl(port) });
     const { cwd, dryRun } = this.meta;
-    const image = flags.image ?? this.meta.env.ZITADEL_LOCAL_IMAGE ?? DEFAULT_LOCAL_SERVER_IMAGE;
+    const image =
+      flags.image ??
+      this.meta.env.ZITADEL_LOCAL_IMAGE ??
+      defaultLocalServerImage(this.meta.cliVersion);
     const runtimeChecks = await runLocalRuntimeChecks(cwd, image, port);
     const hasConfig = await hasZitadelConfig(cwd);
-    const ctx: CheckContext = { cwd, orca: createOrca(), cliVersion: this.meta.cliVersion, dryRun };
+    const ctx: CheckContext = {
+      cwd,
+      orca: createOrca(),
+      cliVersion: this.meta.cliVersion,
+      dependencyVersions: await resolvePackageVersions(["@zitadel/sdk-next"], {
+        cliRoot: this.config.root,
+        packageJson: this.config.pjson,
+      }),
+      dryRun,
+    };
 
     if (hasConfig && flags.fix) {
       const before = await Promise.all(SANITY_CHECKS.map((check) => check.run(ctx)));

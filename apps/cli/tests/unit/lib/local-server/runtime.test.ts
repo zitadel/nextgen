@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   LOCAL_RUNTIME_FILE,
+  defaultLocalServerImage,
   ensureContainerIdentity,
   ensureLocalState,
   localContainerName,
@@ -32,6 +33,15 @@ describe("local server runtime metadata", () => {
 
     expect((await stat(paths.dataDir)).isDirectory()).toBe(true);
     await expect(readFile(join(cwd, ".gitignore"), "utf8")).resolves.toContain(".zitadel/local/");
+  });
+
+  it("derives the preview image from release-like CLI versions", () => {
+    expect(defaultLocalServerImage("0.1.0-alpha.2")).toBe(
+      "ghcr.io/zitadel/zitadel-preview:0.1.0-alpha.2",
+    );
+    expect(defaultLocalServerImage("0.0.0-test")).toBe(
+      "ghcr.io/zitadel/zitadel-preview:preview",
+    );
   });
 
   it("round-trips runtime metadata", async () => {

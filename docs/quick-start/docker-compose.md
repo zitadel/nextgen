@@ -7,10 +7,12 @@ The compose file lives at [`docs/operations/docker-compose.yaml`](../operations/
 By default the stack pulls:
 
 ```text
-ghcr.io/zitadel/nextgen:latest
+ghcr.io/zitadel/zitadel-preview:preview
 ```
 
-Override the tag in `.env` (`NEXTGEN_IMAGE`) when pinning a release or CI snapshot.
+Override the tag in `.env` (`NEXTGEN_IMAGE`) when pinning an immutable preview
+release or CI snapshot. `ghcr.io/zitadel/nextgen` remains a temporary
+compatibility alias while the repository is still named nextgen.
 
 If the image is not published yet, build locally — see [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
@@ -27,7 +29,7 @@ Copy [`env.example`](../operations/env.example) to `.env` in the same directory 
 
 The template exposes:
 
-- `NEXTGEN_IMAGE` — server image tag, defaulting to `ghcr.io/zitadel/nextgen:latest`
+- `NEXTGEN_IMAGE` — server image tag, defaulting to `ghcr.io/zitadel/zitadel-preview:preview`
 - `NEXTGEN_PORT` — local HTTP port, defaulting to `8080`
 
 The compose file sets `NEXTGEN_DATABASE_POSTGRES` for the bundled Postgres

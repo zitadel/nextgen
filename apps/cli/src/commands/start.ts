@@ -12,9 +12,9 @@ import {
   stopAndRemoveContainer,
 } from "../lib/local-server/docker";
 import {
-  DEFAULT_LOCAL_SERVER_IMAGE,
   DEFAULT_LOCAL_SERVER_PORT,
   checkLocalServerHealth,
+  defaultLocalServerImage,
   ensureContainerIdentity,
   ensureLocalState,
   localContainerName,
@@ -40,7 +40,10 @@ export default class Start extends BaseCommand {
     await this.toMeta(flags, { resolveServer: false, source: serverUrl });
 
     validatePort(port);
-    const image = flags.image ?? this.meta.env.ZITADEL_LOCAL_IMAGE ?? DEFAULT_LOCAL_SERVER_IMAGE;
+    const image =
+      flags.image ??
+      this.meta.env.ZITADEL_LOCAL_IMAGE ??
+      defaultLocalServerImage(this.meta.cliVersion);
     const containerName = localContainerName(this.meta.cwd);
     if (this.meta.dryRun) {
       return this.emit({

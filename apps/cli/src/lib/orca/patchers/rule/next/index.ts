@@ -1,6 +1,7 @@
 import { join } from "node:path";
 
 import { MANAGED_MARKER } from "../../../../paths";
+import { releaseVersion } from "../../../../versions";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
@@ -118,12 +119,15 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
   ops.push({
     kind: "add-dep",
     name: renderer.dependency.name,
-    version: dependencyVersionForCli(ctx.cliVersion, renderer.dependency.version),
+    version: dependencyVersionForCli(ctx, renderer),
   });
   return ops;
 }
 
-function dependencyVersionForCli(cliVersion: string, fallback: string): string {
-  const prerelease = cliVersion.match(/^\d+\.\d+\.\d+-([0-9A-Za-z]+)(?:[.-]|$)/)?.[1];
-  return prerelease ?? fallback;
+function dependencyVersionForCli(ctx: PatchContext, renderer: RendererSpec): string {
+  return (
+    ctx.dependencyVersions?.[renderer.dependency.name] ??
+    releaseVersion(ctx.cliVersion) ??
+    renderer.dependency.version
+  );
 }

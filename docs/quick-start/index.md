@@ -14,9 +14,9 @@ local Zitadel runtime.
 npx create-next-app@latest myapp
 cd myapp
 
-npx @zitadel/cli@alpha doctor
-npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --framework next --server local
+npx @zitadel/cli@preview doctor
+npx @zitadel/cli@preview start
+npx @zitadel/cli@preview setup --framework next --server local
 
 npm install
 npm run dev
@@ -33,13 +33,13 @@ The CLI stores runtime metadata in `.zitadel/local/runtime.json` and mounts
 `.zitadel/local/nextgen-data` into the container. Stop preserves that data:
 
 ```sh
-npx @zitadel/cli@alpha stop
+npx @zitadel/cli@preview stop
 ```
 
 Delete it explicitly:
 
 ```sh
-npx @zitadel/cli@alpha reset --force
+npx @zitadel/cli@preview reset --force
 ```
 
 ## Local Runtime URLs

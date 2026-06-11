@@ -22,13 +22,15 @@ corepack pnpm changeset
 
 Pick the affected packages, the bump type (patch / minor / major), and write a one-line summary. A markdown file appears in this directory and gets committed with your PR.
 
-## Alpha prerelease mode
+## Alpha versions, preview channel
 
-The repo is currently in changesets **prerelease mode** with the `alpha` tag (see `.changeset/pre.json`). While in this mode:
+The repo is currently in changesets **prerelease mode** with the `alpha` tag
+(see `.changeset/pre.json`). The `alpha` tag controls the version suffix; the
+public npm channel for community testing is `preview`. While in this mode:
 
 - `changeset version` cuts versions like `0.1.0-alpha.0`, `0.1.0-alpha.1`, …
-- `changeset publish` publishes them under the **`alpha`** npm dist-tag, **not** `latest`. So `npm install @zitadel/cli` keeps resolving the last stable release; consumers opt into prereleases with `@zitadel/cli@alpha`.
-- A package that has never had a stable release is published to `latest` on its first publish (changesets behaviour), then to `alpha` thereafter until it has a stable release.
+- `changeset publish --tag preview` publishes them under the **`preview`** npm dist-tag, **not** `latest`. So `npm install @zitadel/cli` keeps resolving the last stable release; consumers opt into preview bundles with `@zitadel/cli@preview`.
+- The public packages are configured as a fixed MVP preview group, so the Version Packages PR keeps their versions aligned.
 
 To leave alpha and cut a stable `latest` release:
 
@@ -39,7 +41,7 @@ corepack pnpm changeset version   # strips the -alpha suffix
 
 ## Publishing (npm trusted publishing / OIDC)
 
-The [`.github/workflows/release-npm.yml`](../.github/workflows/release-npm.yml) workflow runs the [changesets GitHub Action](https://github.com/changesets/action). Pushing changesets to `main` opens a "Version Packages" PR aggregating all pending changesets; merging that PR bumps versions, updates `CHANGELOG.md` files, and publishes to npm (under the `alpha` dist-tag while in prerelease mode).
+The [`.github/workflows/release-npm.yml`](../.github/workflows/release-npm.yml) workflow runs the [changesets GitHub Action](https://github.com/changesets/action). Pushing changesets to `main` opens a "Version Packages" PR aggregating all pending changesets; merging that PR bumps versions, updates `CHANGELOG.md` files, and publishes to npm (under the `preview` dist-tag while in prerelease mode). Package-level GitHub Releases are disabled; GoReleaser owns the product-level `ZITADEL Preview` releases.
 
 Publishing authenticates with **npm trusted publishing (OIDC)** — there is **no `NPM_TOKEN`** secret. Before the first automated publish, a maintainer must, once per public package:
 

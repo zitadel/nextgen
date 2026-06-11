@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   CONTAINER_DATA_DIR,
+  defaultLocalServerImage,
   localContainerName,
   localRuntimePaths,
   readRuntimeMetadata,
@@ -46,9 +47,10 @@ describe("local runtime commands", () => {
     expect(envelope.status).toBe("ok");
     expect(envelope.data.ok).toBe(true);
 
+    const image = await currentDefaultImage();
     const dockerCalls = await readDockerCalls(fake.logPath);
-    expect(dockerCalls).toContainEqual(["image", "inspect", "ghcr.io/zitadel/nextgen:latest"]);
-    expect(dockerCalls).toContainEqual(["manifest", "inspect", "ghcr.io/zitadel/nextgen:latest"]);
+    expect(dockerCalls).toContainEqual(["image", "inspect", image]);
+    expect(dockerCalls).toContainEqual(["manifest", "inspect", image]);
     expect(dockerCalls.some((args) => args[0] === "pull")).toBe(false);
   });
 
@@ -145,8 +147,8 @@ describe("local runtime commands", () => {
     };
     expect(envelope.status).toBe("error");
     expect(envelope.hint).toContain("Existing local runtime metadata");
-    expect(envelope.next_commands).toContain("npx @zitadel/cli@alpha start");
-    expect(envelope.next_commands).toContain("npx @zitadel/cli@alpha reset --force");
+    expect(envelope.next_commands).toContain("npx @zitadel/cli@preview start");
+    expect(envelope.next_commands).toContain("npx @zitadel/cli@preview reset --force");
     expect(envelope.details.checks.find((check) => check.name === "runtime")).toMatchObject({
       status: "fail",
     });
@@ -172,7 +174,9 @@ describe("local runtime commands", () => {
     expect(envelope.data.urls.api).toBe(serverUrl);
     expect(envelope.data.next_actions.join("\n")).toContain("From your app directory");
     expect(envelope.data.next_actions.join("\n")).toContain("Setup installs dependencies");
-    expect(envelope.data.next_commands).toEqual(["npx @zitadel/cli@alpha setup --server local"]);
+    expect(envelope.data.next_commands).toEqual([
+      "npx @zitadel/cli@preview setup --server local",
+    ]);
     expect(envelope.data.next_commands).not.toContain("npm install");
     expect(envelope.data.next_commands).not.toContain("npm run dev");
 
@@ -224,7 +228,7 @@ describe("local runtime commands", () => {
       next_commands?: string[];
     };
     expect(envelope.status).toBe("error");
-    expect(envelope.next_commands).toEqual(["npx @zitadel/cli@alpha start"]);
+    expect(envelope.next_commands).toEqual(["npx @zitadel/cli@preview start"]);
   });
 
   it("stop succeeds without suggesting a restart", async () => {
@@ -260,7 +264,7 @@ describe("local runtime commands", () => {
       data: { next_commands?: string[] };
     };
     expect(envelope.status).toBe("ok");
-    expect(envelope.data.next_commands).toEqual(["npx @zitadel/cli@alpha stop"]);
+    expect(envelope.data.next_commands).toEqual(["npx @zitadel/cli@preview stop"]);
   });
 
   it("reset --force deletes local runtime data without suggesting a restart", async () => {
@@ -302,7 +306,7 @@ describe("local runtime commands", () => {
       next_commands?: string[];
     };
     expect(envelope.status).toBe("error");
-    expect(envelope.next_commands).toEqual(["npx @zitadel/cli@alpha reset --force"]);
+    expect(envelope.next_commands).toEqual(["npx @zitadel/cli@preview reset --force"]);
   });
 });
 
@@ -412,4 +416,11 @@ function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
     created_at: "2026-06-09T00:00:00.000Z",
     cli_version: "0.0.0-test",
   };
+}
+
+async function currentDefaultImage(): Promise<string> {
+  const manifest = JSON.parse(
+    await readFile(new URL("../../../package.json", import.meta.url), "utf8"),
+  ) as { version: string };
+  return defaultLocalServerImage(manifest.version);
 }

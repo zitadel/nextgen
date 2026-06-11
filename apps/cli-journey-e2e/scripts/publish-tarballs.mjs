@@ -28,24 +28,14 @@ for (const file of tarballs) {
     "--registry",
     registryUrl,
     "--tag",
-    "alpha",
+    "preview",
     "--access",
     "public",
     "--ignore-scripts",
     "--loglevel",
     "error",
   ]);
-  run("npm", [
-    "dist-tag",
-    "add",
-    `${manifest.name}@${manifest.version}`,
-    "latest",
-    "--registry",
-    registryUrl,
-    "--loglevel",
-    "error",
-  ]);
-  console.log(`published ${manifest.name}@${manifest.version} as alpha and latest`);
+  console.log(`published ${manifest.name}@${manifest.version} as preview`);
 }
 
 function readManifest(tarball) {

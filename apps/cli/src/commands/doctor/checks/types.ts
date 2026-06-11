@@ -13,6 +13,7 @@ export type CheckContext = {
   readonly cwd: string;
   readonly orca: Orca;
   readonly cliVersion: string;
+  readonly dependencyVersions?: Readonly<Record<string, string>>;
   /** When true, {@link SanityCheck.fix} must preview without writing. */
   readonly dryRun: boolean;
 };

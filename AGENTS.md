@@ -49,8 +49,9 @@ Secrets").
   Playwright project. It installs local package tarballs through a temporary
   registry and verifies CLI setup plus real registration/login flows.
 - `packages/components/` contains shared Lit components.
-- `packages/sdk-core/`, `packages/sdk-next/`, and `packages/sdk-nuxt/` contain
-  public TypeScript SDKs.
+- `packages/sdk-core/`, `packages/sdk-next/`, `packages/sdk-nuxt/`,
+  `packages/sdk-react/`, `packages/sdk-vue/`, and `packages/sdk-angular/`
+  contain public TypeScript SDKs.
 - `packages/api-mock/` contains the in-process MSW handlers and standalone
   mock auth server used by demos and e2e tests.
 - `packages/lint/` contains the local Nx plugin that infers Oxlint targets.
@@ -74,12 +75,12 @@ Secrets").
 
 | I want to...                      | Run                                                            |
 | --------------------------------- | -------------------------------------------------------------- |
-| Check local runtime prerequisites | `npx @zitadel/cli@alpha doctor`                                |
-| Start local Zitadel               | `npx @zitadel/cli@alpha start`                                 |
-| Add auth to Next.js               | `npx @zitadel/cli@alpha setup --framework next --server local` |
-| Check generated app files         | `npx @zitadel/cli@alpha doctor`                                |
-| Stop local Zitadel, keeping data  | `npx @zitadel/cli@alpha stop`                                  |
-| Delete local Zitadel data         | `npx @zitadel/cli@alpha reset --force`                         |
+| Check local runtime prerequisites | `npx @zitadel/cli@preview doctor`                              |
+| Start local Zitadel               | `npx @zitadel/cli@preview start`                               |
+| Add auth to Next.js               | `npx @zitadel/cli@preview setup --framework next --server local` |
+| Check generated app files         | `npx @zitadel/cli@preview doctor`                              |
+| Stop local Zitadel, keeping data  | `npx @zitadel/cli@preview stop`                                |
+| Delete local Zitadel data         | `npx @zitadel/cli@preview reset --force`                       |
 
 `corepack pnpm run server` is a repository contributor command that runs the Go
 server from source. `zitadel start` is a published product CLI command that
@@ -213,7 +214,8 @@ For customer-local runtime workflows, agents should prefer
 - User-visible changes to a public npm package need a changeset. The public
   packages are `@zitadel/cli` (`apps/cli/`), `@zitadel/api`,
   `@zitadel/components`, `@zitadel/sdk-core`, `@zitadel/sdk-next`, and
-  `@zitadel/sdk-nuxt`. CI fails a PR that touches them without one
+  `@zitadel/sdk-nuxt`, `@zitadel/sdk-react`, `@zitadel/sdk-vue`, and
+  `@zitadel/sdk-angular`. CI fails a PR that touches them without one
   (`changeset-check` in `.github/workflows/ci.yml`).
 - Add a changeset by writing the file directly — do not depend on the
   interactive `pnpm changeset` prompt. Create `.changeset/<short-slug>.md`:
@@ -227,9 +229,9 @@ For customer-local runtime workflows, agents should prefer
   ```
 
   List only public package names; pick `patch` (fixes), `minor` (features), or
-  `major` (breaking). The repo is in `alpha` prerelease mode
-  (`.changeset/pre.json`), so versions cut as `X.Y.Z-alpha.N` automatically — no
-  extra action needed.
+  `major` (breaking). The repo is in `alpha` prerelease mode for version
+  suffixes (`.changeset/pre.json`), while npm publishing uses the `preview`
+  dist-tag for the community-testable bundle.
 
 - For changes that release nothing (docs, tests, CI, chores), add an empty
   changeset: `corepack pnpm changeset --empty`.

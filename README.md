@@ -27,12 +27,12 @@ Next iteration of the Zitadel identity platform.
 
 | I want to...                      | Run                                                            |
 | --------------------------------- | -------------------------------------------------------------- |
-| Check local runtime prerequisites | `npx @zitadel/cli@alpha doctor`                                |
-| Start local Zitadel               | `npx @zitadel/cli@alpha start`                                 |
-| Add auth to a Next.js app         | `npx @zitadel/cli@alpha setup --framework next --server local` |
-| Check generated app files         | `npx @zitadel/cli@alpha doctor`                                |
-| Stop local Zitadel, keeping data  | `npx @zitadel/cli@alpha stop`                                  |
-| Delete local Zitadel data         | `npx @zitadel/cli@alpha reset --force`                         |
+| Check local runtime prerequisites | `npx @zitadel/cli@preview doctor`                              |
+| Start local Zitadel               | `npx @zitadel/cli@preview start`                               |
+| Add auth to a Next.js app         | `npx @zitadel/cli@preview setup --framework next --server local` |
+| Check generated app files         | `npx @zitadel/cli@preview doctor`                              |
+| Stop local Zitadel, keeping data  | `npx @zitadel/cli@preview stop`                                |
+| Delete local Zitadel data         | `npx @zitadel/cli@preview reset --force`                       |
 
 Nx manages TypeScript workspace targets. Go commands and long-running local
 orchestration run through repository scripts so server processes are signaled
@@ -54,9 +54,9 @@ startup, then runs `go run .`; help output skips the UI sync.
 ```sh
 npx create-next-app@latest myapp
 cd myapp
-npx @zitadel/cli@alpha doctor
-npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --framework next --server local
+npx @zitadel/cli@preview doctor
+npx @zitadel/cli@preview start
+npx @zitadel/cli@preview setup --framework next --server local
 npm run dev
 ```
 
@@ -183,13 +183,15 @@ goreleaser release --snapshot --clean --skip=publish,sign
 docker run --rm -p 8080:8080 \
   -v "$PWD/.zitadel/local/nextgen-data:/var/lib/zitadel/nextgen-data" \
   -e NEXTGEN_SERVER_DATA_DIR=/var/lib/zitadel/nextgen-data \
-  ghcr.io/zitadel/nextgen:<snapshot-tag>-amd64
+  ghcr.io/zitadel/zitadel-preview:<snapshot-tag>-amd64
 ```
 
 The publish-capable release workflow is currently manual-only via
 `.github/workflows/release.yml` (`workflow_dispatch`). It can run a dry snapshot
-or, when intentionally invoked for a release tag, produce multi-arch tarballs and
-push a multi-arch image manifest to `ghcr.io/zitadel/nextgen`.
+or, when intentionally invoked for a release tag, produce `ZITADEL Preview`
+tarballs and push a multi-arch image manifest to
+`ghcr.io/zitadel/zitadel-preview`. `ghcr.io/zitadel/nextgen` is kept as a
+temporary compatibility alias while the repository is still named nextgen.
 
 ### npm packages (`changesets`)
 
@@ -202,7 +204,8 @@ corepack pnpm changeset
 ```
 
 The changesets workflow opens a "Version Packages" PR. Merging that PR versions
-and publishes the affected packages through npm trusted publishing.
+and publishes the public preview package set through npm trusted publishing
+under the `preview` dist-tag, while versions keep their `-alpha.N` suffix.
 
 ### Local development
 

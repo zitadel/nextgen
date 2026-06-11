@@ -99,7 +99,9 @@ describe("Next setup integration", () => {
     const packageJson = JSON.parse(await readFile(join(cwd, "package.json"), "utf8")) as {
       dependencies?: Record<string, string>;
     };
-    expect(packageJson.dependencies?.["@zitadel/sdk-next"]).toBe("alpha");
+    expect(packageJson.dependencies?.["@zitadel/sdk-next"]).toBe(
+      await workspacePackageVersion("packages/sdk-next"),
+    );
 
     const fake = await fakeDocker();
     const port = await freePort();
@@ -208,6 +210,13 @@ async function createNextProject(): Promise<string> {
     "export default function RootLayout({ children }: { children: React.ReactNode }) { return <html><body>{children}</body></html>; }\n",
   );
   return cwd;
+}
+
+async function workspacePackageVersion(relativePath: string): Promise<string> {
+  const manifest = JSON.parse(
+    await readFile(new URL(`../../../../${relativePath}/package.json`, import.meta.url), "utf8"),
+  ) as { version: string };
+  return manifest.version;
 }
 
 async function fakePackageManager(name: "npm"): Promise<{ binDir: string; logPath: string }> {

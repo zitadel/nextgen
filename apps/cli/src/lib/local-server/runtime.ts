@@ -6,8 +6,8 @@ import { join, resolve } from "node:path";
 
 import { ZitadelError } from "../errors";
 import { isObject, parseJsonObject } from "../json";
+import { defaultPreviewImageForVersion } from "../versions";
 
-export const DEFAULT_LOCAL_SERVER_IMAGE = "ghcr.io/zitadel/nextgen:latest";
 export const DEFAULT_LOCAL_SERVER_PORT = 8080;
 export const DEFAULT_LOCAL_SERVER_URL = "http://localhost:8080";
 export const LOCAL_RUNTIME_DIR = ".zitadel/local";
@@ -62,6 +62,10 @@ export function localContainerName(cwd: string): string {
 
 export function localServerUrl(port: number): string {
   return `http://localhost:${port}`;
+}
+
+export function defaultLocalServerImage(cliVersion: string): string {
+  return defaultPreviewImageForVersion(cliVersion);
 }
 
 export async function ensureLocalState(cwd: string): Promise<LocalRuntimePaths> {

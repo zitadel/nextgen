@@ -24,11 +24,11 @@
 
 | I want to...                      | Run                                                            |
 | --------------------------------- | -------------------------------------------------------------- |
-| Check local runtime prerequisites | `npx @zitadel/cli@alpha doctor`                                |
-| Start local Zitadel               | `npx @zitadel/cli@alpha start`                                 |
-| Add auth to Next.js               | `npx @zitadel/cli@alpha setup --framework next --server local` |
-| Stop local Zitadel, keeping data  | `npx @zitadel/cli@alpha stop`                                  |
-| Delete local Zitadel data         | `npx @zitadel/cli@alpha reset --force`                         |
+| Check local runtime prerequisites | `npx @zitadel/cli@preview doctor`                              |
+| Start local Zitadel               | `npx @zitadel/cli@preview start`                               |
+| Add auth to Next.js               | `npx @zitadel/cli@preview setup --framework next --server local` |
+| Stop local Zitadel, keeping data  | `npx @zitadel/cli@preview stop`                                |
+| Delete local Zitadel data         | `npx @zitadel/cli@preview reset --force`                       |
 
 Nx manages TypeScript workspace targets. Go commands and long-running local
 orchestration run through repository scripts so server processes are signaled

@@ -17,6 +17,9 @@ const requiredPackageDirs = [
   "packages/sdk-core",
   "packages/sdk-next",
   "packages/sdk-nuxt",
+  "packages/sdk-react",
+  "packages/sdk-vue",
+  "packages/sdk-angular",
 ];
 const requiredPackageNames = new Set(
   await Promise.all(requiredPackageDirs.map(packageName)),

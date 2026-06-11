@@ -58,7 +58,7 @@ describe("envelope contract", () => {
     expect(envelope.status).toBe("error");
     expect(envelope.code).toBe("E_VALIDATION");
     expect(envelope.message).toBeTypeOf("string");
-    expect(envelope.next_commands).toContain("npx @zitadel/cli@alpha setup");
+    expect(envelope.next_commands).toContain("npx @zitadel/cli@preview setup");
   });
 
   it("renders a human-readable summary (and server suffix) without --json", async () => {

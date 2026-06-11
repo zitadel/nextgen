@@ -7,9 +7,9 @@ name: release-npm
 # merging that PR publishes to npm.
 #
 # The repo is in changesets PRERELEASE mode (.changeset/pre.json, tag "alpha"),
-# so versions are cut as X.Y.Z-alpha.N and published under the `alpha` npm
+# so versions are cut as X.Y.Z-alpha.N and published under the `preview` npm
 # dist-tag — `npm install @zitadel/cli` keeps resolving the last stable
-# `latest`; consumers opt into prereleases with `@zitadel/cli@alpha`. Run
+# `latest`; consumers opt into preview bundles with `@zitadel/cli@preview`. Run
 # `pnpm changeset pre exit` to leave alpha and cut a stable `latest` release.
 #
 # Authentication uses npm trusted publishing (OIDC) — there is no NPM_TOKEN.
@@ -88,12 +88,14 @@ jobs:
         run: corepack pnpm nx run-many -t build
 
       - name: Create release PR or publish to npm
+        id: changesets
         uses: changesets/action@v1
         with:
           version: corepack pnpm changeset version
-          publish: corepack pnpm changeset publish
+          publish: corepack pnpm changeset publish --tag preview
           title: "chore: version packages"
           commit: "chore: version packages"
+          createGithubReleases: false
         env:
           # App token (not GITHUB_TOKEN) so the Version Packages PR triggers CI.
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}

@@ -17,6 +17,8 @@ const appDir = join(outputDir, "myapp");
 const cliPackage = process.env.JOURNEY_CLI_PACKAGE ?? (await packageName("apps/cli"));
 const sdkNextPackage =
   process.env.JOURNEY_SDK_NEXT_PACKAGE ?? (await packageName("packages/sdk-next"));
+const sdkNextVersion =
+  process.env.JOURNEY_SDK_NEXT_VERSION ?? (await packageVersion("packages/sdk-next"));
 
 await rm(appDir, { recursive: true, force: true });
 await mkdir(outputDir, { recursive: true });
@@ -42,7 +44,7 @@ const setup = await run(
   "npx",
   [
     "--yes",
-    `${cliPackage}@alpha`,
+    `${cliPackage}@preview`,
     "setup",
     "--framework",
     "next",
@@ -79,6 +81,11 @@ const dependencies = {
 if (!dependencies[sdkNextPackage]) {
   throw new Error(`generated package.json does not depend on ${sdkNextPackage}`);
 }
+if (dependencies[sdkNextPackage] !== sdkNextVersion) {
+  throw new Error(
+    `generated package.json depends on ${sdkNextPackage}@${dependencies[sdkNextPackage]}, expected ${sdkNextVersion}`,
+  );
+}
 
 await run("npm", ["install", "--registry", registryUrl], { cwd: appDir, env: npmEnv });
 
@@ -107,6 +114,7 @@ const metadata = {
   outputDir,
   registryUrl,
   sdkNextPackage,
+  sdkNextVersion,
   setupPath,
 };
 const metadataPath = join(outputDir, "metadata.json");
@@ -128,6 +136,16 @@ async function packageName(relativePath) {
     throw new Error(`${relativePath}/package.json has no name`);
   }
   return pkg.name;
+}
+
+async function packageVersion(relativePath) {
+  const pkg = JSON.parse(
+    await readFile(join(repoRoot, relativePath, "package.json"), "utf8"),
+  );
+  if (typeof pkg.version !== "string" || pkg.version.length === 0) {
+    throw new Error(`${relativePath}/package.json has no version`);
+  }
+  return pkg.version;
 }
 
 function npmEnvironment() {

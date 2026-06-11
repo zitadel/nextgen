@@ -24,7 +24,7 @@ parse the result rather than scraping human output.
   metadata) or run `zitadel <command> --help` for the full per-command flag list.
 
 ```sh
-npx @zitadel/cli@alpha <command> --non-interactive --json
+npx @zitadel/cli@preview <command> --non-interactive --json
 ```
 
 ## Reading the envelope
@@ -39,7 +39,7 @@ Each invocation prints one JSON object:
   `message`.
 - `next_commands`: the suggested follow-ups. Prefer these over free-text hints.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local Docker runtime with
-  `npx @zitadel/cli@alpha start`, then retry with `--server local`.
+  `npx @zitadel/cli@preview start`, then retry with `--server local`.
 
 Exit codes mirror the error class (3 = validation, 4 = network, 5 = conflict,
 1 = auth, 2 = not-implemented). An unknown command is handled by the CLI's help
@@ -71,19 +71,19 @@ layer, not the envelope.
 ## Golden path
 
 ```sh
-npx @zitadel/cli@alpha doctor --non-interactive --json
-npx @zitadel/cli@alpha start --non-interactive --json
-npx @zitadel/cli@alpha setup --framework next --server local --non-interactive --json
-npx @zitadel/cli@alpha doctor --non-interactive --json
-npx @zitadel/cli@alpha plan --non-interactive --json
-npx @zitadel/cli@alpha apply --non-interactive --json
+npx @zitadel/cli@preview doctor --non-interactive --json
+npx @zitadel/cli@preview start --non-interactive --json
+npx @zitadel/cli@preview setup --framework next --server local --non-interactive --json
+npx @zitadel/cli@preview doctor --non-interactive --json
+npx @zitadel/cli@preview plan --non-interactive --json
+npx @zitadel/cli@preview apply --non-interactive --json
 ```
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `plan` and `apply`. Managed files carry a marker comment; `eject`
 removes only files that still carry it, preserving anything the user replaced.
 For app-local development, `--server local` resolves through
-`.zitadel/local/runtime.json` and requires a healthy `npx @zitadel/cli@alpha start`
+`.zitadel/local/runtime.json` and requires a healthy `npx @zitadel/cli@preview start`
 runtime. `setup` installs dependencies with the detected package manager by
 default; pass `--skip-install` when the agent or host workflow will install
 dependencies separately.

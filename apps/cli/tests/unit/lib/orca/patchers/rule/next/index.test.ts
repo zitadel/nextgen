@@ -5,7 +5,10 @@ import { NextPatcher } from "../../../../../../../src/lib/orca/patchers/rule/nex
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
 
-function ctxFor(appDir: "app" | "src/app"): PatchContext {
+function ctxFor(
+  appDir: "app" | "src/app",
+  overrides: Partial<Pick<PatchContext, "cliVersion" | "dependencyVersions">> = {},
+): PatchContext {
   return {
     framework: { id: "next", appDir, devPort: 3000, url: "http://localhost:3000" },
     rendererId: "react",
@@ -18,7 +21,8 @@ function ctxFor(appDir: "app" | "src/app"): PatchContext {
     },
     issuer: "http://localhost:3000",
     server: "https://api.zitadel.cloud",
-    cliVersion: "0.1.0-alpha.0",
+    cliVersion: overrides.cliVersion ?? "0.1.0-alpha.2",
+    dependencyVersions: overrides.dependencyVersions,
   };
 }
 
@@ -40,12 +44,30 @@ describe("NextPatcher.plan", () => {
     expect(plan.ops.some((op) => op.kind === "add-dep")).toBe(true);
   });
 
-  it("uses the CLI prerelease tag for the SDK dependency", () => {
+  it("uses the bundled SDK version for the SDK dependency", () => {
+    const plan = new NextPatcher().plan(
+      ctxFor("app", { dependencyVersions: { "@zitadel/sdk-next": "0.1.0-alpha.1" } }),
+    );
+    const dep = plan.ops.find(
+      (op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep",
+    );
+    expect(dep).toMatchObject({ name: "@zitadel/sdk-next", version: "0.1.0-alpha.1" });
+  });
+
+  it("falls back to the exact CLI release version without bundled metadata", () => {
     const plan = new NextPatcher().plan(ctxFor("app"));
     const dep = plan.ops.find(
       (op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep",
     );
-    expect(dep).toMatchObject({ name: "@zitadel/sdk-next", version: "alpha" });
+    expect(dep).toMatchObject({ name: "@zitadel/sdk-next", version: "0.1.0-alpha.2" });
+  });
+
+  it("falls back to the renderer dependency for local test versions", () => {
+    const plan = new NextPatcher().plan(ctxFor("app", { cliVersion: "0.0.0-test" }));
+    const dep = plan.ops.find(
+      (op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep",
+    );
+    expect(dep).toMatchObject({ name: "@zitadel/sdk-next", version: "latest" });
   });
 
   it("does not scaffold the user schema or flow (server-provisioned)", () => {

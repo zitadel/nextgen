@@ -148,7 +148,7 @@ jobs:
           # for ubuntu-latest smoke jobs (see quickstart-smoke).
           IMAGE_ID=""
           IMAGE_REF=""
-          for id in $(docker images ghcr.io/zitadel/nextgen --format '{{.ID}}' | sort -u); do
+          for id in $(docker images ghcr.io/zitadel/zitadel-preview --format '{{.ID}}' | sort -u); do
             arch=$(docker image inspect -f '{{.Architecture}}' "$id")
             ref=$(docker image inspect -f '{{index .RepoTags 0}}' "$id")
             case "$ref" in *snapshot*) ;; *) continue ;; esac
@@ -159,12 +159,12 @@ jobs:
             fi
           done
           if [ -z "$IMAGE_ID" ]; then
-            echo "::error::no linux/amd64 snapshot image found for ghcr.io/zitadel/nextgen"
-            docker images ghcr.io/zitadel/nextgen
+            echo "::error::no linux/amd64 snapshot image found for ghcr.io/zitadel/zitadel-preview"
+            docker images ghcr.io/zitadel/zitadel-preview
             exit 1
           fi
           # Save by a stable local tag: docker save by ID drops repo tags from the tarball.
-          CI_IMAGE="ghcr.io/zitadel/nextgen:ci-snapshot-smoke-amd64"
+          CI_IMAGE="ghcr.io/zitadel/zitadel-preview:ci-snapshot-smoke-amd64"
           docker tag "$IMAGE_ID" "$CI_IMAGE"
           echo "$CI_IMAGE" > dist/nextgen-image.tag
           docker save "$CI_IMAGE" -o dist/nextgen-image.tar
@@ -201,7 +201,7 @@ jobs:
           key: embedded-postgres-${{ runner.os }}-${{ hashFiles('go.sum') }}
       - name: Extract linux/amd64 server binary
         run: |
-          TARBALL="$(find goreleaser-dist -name 'nextgen_*_linux_amd64.tar.gz' | head -1)"
+          TARBALL="$(find goreleaser-dist -name 'zitadel-preview_*_linux_amd64.tar.gz' | head -1)"
           test -n "$TARBALL"
           tar -xzf "$TARBALL" -C .
           test -x ./nextgen
@@ -541,14 +541,14 @@ jobs:
 
       - name: Dry-run npm packs
         run: |
-          for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt; do
+          for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt packages/sdk-react packages/sdk-vue packages/sdk-angular; do
             corepack pnpm --dir "$dir" pack --dry-run
           done
 
       - name: Create npm package artifacts
         run: |
           mkdir -p "$RUNNER_TEMP/zitadel-npm-packages"
-          for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt; do
+          for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt packages/sdk-react packages/sdk-vue packages/sdk-angular; do
             corepack pnpm --dir "$dir" pack --pack-destination "$RUNNER_TEMP/zitadel-npm-packages"
           done
           ls -lh "$RUNNER_TEMP/zitadel-npm-packages"

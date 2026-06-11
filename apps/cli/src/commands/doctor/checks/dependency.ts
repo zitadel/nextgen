@@ -38,7 +38,12 @@ export class DependencyCheck extends AbstractSanityCheck {
    * so going through `repair` is the only sanctioned path.
    */
   override async fix(ctx: CheckContext): Promise<void> {
-    const patchCtx = await loadPatchContext(ctx.cwd, ctx.orca, ctx.cliVersion);
+    const patchCtx = await loadPatchContext(
+      ctx.cwd,
+      ctx.orca,
+      ctx.cliVersion,
+      ctx.dependencyVersions,
+    );
     await ctx.orca.patcherFor(patchCtx.framework.id).repair(patchCtx, {
       cwd: ctx.cwd,
       dryRun: ctx.dryRun,

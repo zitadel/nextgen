@@ -168,6 +168,9 @@ async function phasePack() {
     "packages/sdk-core",
     "packages/sdk-next",
     "packages/sdk-nuxt",
+    "packages/sdk-react",
+    "packages/sdk-vue",
+    "packages/sdk-angular",
   ];
   await run("corepack", ["pnpm", "nx", "run-many", "-t", "build"]);
   await run(process.execPath, ["apps/cli/bin/run.js", "--version"]);

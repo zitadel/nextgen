@@ -16,6 +16,7 @@ export async function loadPatchContext(
   cwd: string,
   orca: Orca,
   cliVersion: string,
+  dependencyVersions?: Readonly<Record<string, string>>,
 ): Promise<PatchContext> {
   const config = await readZitadelConfig(cwd);
   const secret = await readZitadelSecret(cwd);
@@ -26,6 +27,7 @@ export async function loadPatchContext(
     issuer: await resolveIssuer(cwd, config, framework),
     server: typeof config.server === "string" ? config.server : "",
     cliVersion,
+    dependencyVersions,
     project: {
       id: secret.project_id,
       projectSecret: secret.project_secret,

@@ -16,7 +16,7 @@ services:
       retries: 10
 
   nextgen:
-    image: ${NEXTGEN_IMAGE:-ghcr.io/zitadel/nextgen:latest}
+    image: ${NEXTGEN_IMAGE:-ghcr.io/zitadel/zitadel-preview:preview}
     restart: unless-stopped
     depends_on:
       postgres:
