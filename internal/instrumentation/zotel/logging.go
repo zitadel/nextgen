@@ -1,4 +1,4 @@
-package otel
+package zotel
 
 import (
 	"context"
@@ -9,34 +9,34 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutlog"
-	sdk_log "go.opentelemetry.io/otel/sdk/log"
+	"go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/resource"
 )
 
-func NewLoggerProvider(ctx context.Context, cfg ExporterConfig, resource *resource.Resource) (_ *sdk_log.LoggerProvider, err error) {
+func NewLoggerProvider(ctx context.Context, cfg ExporterConfig, resource *resource.Resource) (_ *log.LoggerProvider, err error) {
 	exporter, err := cfg.logging(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("log exporter: %w", err)
 	}
 
-	opts := []sdk_log.LoggerProviderOption{
-		sdk_log.WithResource(resource),
+	opts := []log.LoggerProviderOption{
+		log.WithResource(resource),
 	}
 
 	if exporter != nil {
-		opts = append(opts, sdk_log.WithProcessor(
-			sdk_log.NewBatchProcessor(
+		opts = append(opts, log.WithProcessor(
+			log.NewBatchProcessor(
 				exporter,
-				sdk_log.WithExportInterval(cfg.BatchDuration),
+				log.WithExportInterval(cfg.BatchDuration),
 			),
 		))
 	}
 
-	loggerProvider := sdk_log.NewLoggerProvider(opts...)
+	loggerProvider := log.NewLoggerProvider(opts...)
 	return loggerProvider, nil
 }
 
-func (cfg ExporterConfig) logging(ctx context.Context) (sdk_log.Exporter, error) {
+func (cfg ExporterConfig) logging(ctx context.Context) (log.Exporter, error) {
 	switch cfg.Type {
 	case ExporterTypeAuto:
 		// autoexport delegates exporter selection to the standard OTEL env vars.
@@ -79,7 +79,7 @@ func (cfg ExporterConfig) logging(ctx context.Context) (sdk_log.Exporter, error)
 	return nil, nil
 }
 
-func logStdOutExporter(cfg ExporterConfig) (sdk_log.Exporter, error) {
+func logStdOutExporter(cfg ExporterConfig) (log.Exporter, error) {
 	options := []stdoutlog.Option{
 		stdoutlog.WithPrettyPrint(),
 	}
@@ -93,7 +93,7 @@ func logStdOutExporter(cfg ExporterConfig) (sdk_log.Exporter, error) {
 	return exporter, nil
 }
 
-func logGrpcExporter(ctx context.Context, cfg ExporterConfig) (sdk_log.Exporter, error) {
+func logGrpcExporter(ctx context.Context, cfg ExporterConfig) (log.Exporter, error) {
 	var grpcOpts []otlploggrpc.Option
 	if cfg.Endpoint != "" {
 		grpcOpts = append(grpcOpts, otlploggrpc.WithEndpoint(cfg.Endpoint))
@@ -109,7 +109,7 @@ func logGrpcExporter(ctx context.Context, cfg ExporterConfig) (sdk_log.Exporter,
 	return exporter, nil
 }
 
-func logHttpExporter(ctx context.Context, cfg ExporterConfig) (sdk_log.Exporter, error) {
+func logHttpExporter(ctx context.Context, cfg ExporterConfig) (log.Exporter, error) {
 	var httpOpts []otlploghttp.Option
 	if cfg.Endpoint != "" {
 		httpOpts = append(httpOpts, otlploghttp.WithEndpoint(cfg.Endpoint))
