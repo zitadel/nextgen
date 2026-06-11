@@ -1,10 +1,14 @@
 import type { CreateFlow201StepFieldsType } from "@zitadel/api/generated/model";
 import { LitElement, html, nothing, type PropertyValues } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
+import { classMap } from "lit/directives/class-map.js";
+import { ifDefined } from "lit/directives/if-defined.js";
+import { live } from "lit/directives/live.js";
 
 import fieldHost from "@zitadel/shared-component-styles/lit/text-field-host.css?inline";
 import fieldSurface from "@zitadel/shared-component-styles/text-field.css?inline";
 
+import { emit } from "../internal/emit.js";
 import { nextUid } from "../internal/unique-id.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
@@ -17,6 +21,9 @@ import type { IconName } from "./zl-icon.js";
  * accepted `type` values track the API contract exactly.
  */
 export type ZlFieldType = CreateFlow201StepFieldsType;
+
+/** Detail shape emitted by the `zl-input` event (input + clear). */
+export type ZlFieldInputDetail = { name: string; value: string };
 
 /**
  * Atom: `<zl-field>` — labelled input bound to a step `field`. Visual
@@ -82,6 +89,8 @@ export class ZlField extends LitElement {
   @state() private accessor hasHelp = false;
   @state() private accessor hasSuffixSlot = false;
 
+  @query(".zr-field__input") private accessor inputEl: HTMLInputElement | null = null;
+
   private readonly inputId = nextUid("zl-field");
   private readonly internals: ElementInternals;
 
@@ -110,7 +119,7 @@ export class ZlField extends LitElement {
   }
 
   override focus(options?: FocusOptions): void {
-    this.shadowRoot?.querySelector<HTMLInputElement>("input")?.focus(options);
+    this.inputEl?.focus(options);
   }
 
   override render() {
@@ -127,23 +136,19 @@ export class ZlField extends LitElement {
     ]
       .filter(Boolean)
       .join(" ");
-    const rootClass = [
-      "zr-field",
-      this.invalid || showError ? "zr-field--invalid" : "",
-      showSuccess ? "zr-field--success" : "",
-      this.disabled ? "zr-field--disabled" : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
+    const rootClass = classMap({
+      "zr-field": true,
+      "zr-field--invalid": this.invalid || showError,
+      "zr-field--success": showSuccess,
+      "zr-field--disabled": this.disabled,
+    });
     const showDefaultTrailing =
       this.trailingIcon && !this.hasSuffixSlot && !this.disabled;
     const trailing = showDefaultTrailing ? this.renderTrailingIcon() : null;
-    const wrapClass = [
-      "zr-field__wrap",
-      showDefaultTrailing ? "zr-field__wrap--trailing" : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
+    const wrapClass = classMap({
+      "zr-field__wrap": true,
+      "zr-field__wrap--trailing": showDefaultTrailing,
+    });
 
     return html`
       <div class=${rootClass} part="root">
@@ -156,10 +161,10 @@ export class ZlField extends LitElement {
             id=${this.inputId}
             name=${this.name}
             type=${this.type}
-            .value=${this.value}
+            .value=${live(this.value)}
             placeholder=${this.placeholder}
-            autocomplete=${this.autocomplete ?? ""}
-            pattern=${this.pattern ?? ""}
+            autocomplete=${ifDefined(this.autocomplete)}
+            pattern=${ifDefined(this.pattern)}
             ?required=${this.required}
             ?disabled=${this.disabled}
             aria-invalid=${this.invalid || showError ? "true" : "false"}
@@ -279,32 +284,24 @@ export class ZlField extends LitElement {
 
   private handleClear = (): void => {
     this.value = "";
-    this.dispatchEvent(
-      new CustomEvent("zl-input", {
-        bubbles: true,
-        composed: true,
-        detail: { name: this.name, value: this.value },
-      }),
-    );
+    emit<ZlFieldInputDetail>(this, "zl-input", { name: this.name, value: this.value });
     this.syncFormState();
-    this.shadowRoot?.querySelector<HTMLInputElement>(".zr-field__input")?.focus();
+    this.inputEl?.focus();
   };
 
   private handleInput = (event: Event): void => {
     const input = event.target as HTMLInputElement;
     this.value = input.value;
-    this.dispatchEvent(
-      new CustomEvent("zl-input", {
-        bubbles: true,
-        composed: true,
-        detail: { name: this.name, value: this.value },
-      }),
-    );
+    emit<ZlFieldInputDetail>(this, "zl-input", { name: this.name, value: this.value });
   };
 
   private handleChange = (event: Event): void => {
     const input = event.target as HTMLInputElement;
     this.value = input.value;
+    // Re-dispatch the native `change` across the shadow boundary so host
+    // forms and listeners see standard form semantics. This is a DOM standard
+    // event, deliberately NOT part of the `zl-*` override contract in the
+    // manifest (which tracks only the atom's custom `zl-*` events).
     this.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
   };
 

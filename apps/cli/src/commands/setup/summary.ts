@@ -3,6 +3,8 @@ import { basename, join } from "node:path";
 
 import pc from "picocolors";
 
+import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
+
 /**
  * Structured end-of-command summary, modelled on the report layout the
  * setup mock specifies: one line per fact, grouped under uppercase section
@@ -64,19 +66,15 @@ export type ProjectFacts = {
   framework: string;
   frameworkVersion?: string;
   typescript: boolean;
-  packageManager: "npm" | "pnpm" | "yarn" | "bun" | "unknown";
+  packageManager: PackageManager;
 };
 
 /**
  * Reads the project root to identify the framework version, TS presence,
- * and which package manager the user runs. Returns the worst-case
- * (`"unknown"` PM, no version) on any error so summary rendering can
- * always proceed.
+ * and which package manager the user runs. Returns safe defaults (npm
+ * fallback, no version) on any error so summary rendering can always proceed.
  */
-export async function detectProjectFacts(
-  cwd: string,
-  frameworkId: string,
-): Promise<ProjectFacts> {
+export async function detectProjectFacts(cwd: string, frameworkId: string): Promise<ProjectFacts> {
   const facts: ProjectFacts = {
     framework: frameworkId,
     typescript: await fileExists(join(cwd, "tsconfig.json")),
@@ -107,16 +105,8 @@ export function formatFrameworkLine(facts: ProjectFacts): string {
   const pretty = prettyFramework(facts.framework);
   segments.push(facts.frameworkVersion ? `${pretty} ${facts.frameworkVersion}` : pretty);
   if (facts.typescript) segments.push("TypeScript");
-  if (facts.packageManager !== "unknown") segments.push(facts.packageManager);
+  segments.push(facts.packageManager);
   return segments.join(` ${pc.dim("·")} `);
-}
-
-async function detectPackageManager(cwd: string): Promise<ProjectFacts["packageManager"]> {
-  if (await fileExists(join(cwd, "pnpm-lock.yaml"))) return "pnpm";
-  if (await fileExists(join(cwd, "yarn.lock"))) return "yarn";
-  if (await fileExists(join(cwd, "bun.lockb"))) return "bun";
-  if (await fileExists(join(cwd, "package-lock.json"))) return "npm";
-  return "unknown";
 }
 
 async function fileExists(p: string): Promise<boolean> {

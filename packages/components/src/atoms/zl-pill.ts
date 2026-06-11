@@ -1,5 +1,6 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import { classMap } from "lit/directives/class-map.js";
 
 import pillHost from "@zitadel/shared-component-styles/lit/pill-host.css?inline";
 import pillSurface from "@zitadel/shared-component-styles/pill.css?inline";
@@ -56,12 +57,11 @@ export class ZlPill extends LitElement {
   @property({ attribute: "aria-label" })
   override accessor ariaLabel: string | null = null;
 
-  private surfaceClasses(): string {
-    return ["zr-pill", this.tone !== "neutral" ? `zr-pill--${this.tone}` : ""].filter(Boolean).join(" ");
-  }
-
   override render() {
-    const classes = this.surfaceClasses();
+    const classes = classMap({
+      "zr-pill": true,
+      [`zr-pill--${this.tone}`]: this.tone !== "neutral",
+    });
     if (this.href) {
       return html`<a
         class=${classes}
@@ -79,7 +79,7 @@ export const zlPillManifest: AtomManifest = {
   tag: "zl-pill",
   attrs: ["tone", "href", "aria-label"],
   parts: ["pill"],
-  slots: [],
+  slots: [""],
   events: [],
 } as const;
 

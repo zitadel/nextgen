@@ -1,5 +1,6 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import { classMap } from "lit/directives/class-map.js";
 import { unsafeSVG } from "lit/directives/unsafe-svg.js";
 
 import iconHost from "@zitadel/shared-component-styles/lit/icon-host.css?inline";
@@ -67,14 +68,12 @@ export class ZlIcon extends LitElement {
   override render() {
     const ariaLabel = this.label ?? DEFAULT_LABELS[this.name];
     const hidden = this.decorative || !ariaLabel;
-    const classes = [
-      "zr-icon",
-      `zr-icon--${this.size}`,
-      this.tone !== "default" ? `zr-icon--tone-${this.tone}` : "",
-      this.spin ? "zr-icon--spin" : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
+    const classes = classMap({
+      "zr-icon": true,
+      [`zr-icon--${this.size}`]: true,
+      [`zr-icon--tone-${this.tone}`]: this.tone !== "default",
+      "zr-icon--spin": this.spin,
+    });
     return html`
       <span class=${classes}>
         <svg

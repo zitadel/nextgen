@@ -1,10 +1,11 @@
 import { Command, Flags } from "@oclif/core";
 import consola from "consola";
 
-import { resolveServer } from "../server";
 import { toZitadelError, type ZitadelError } from "../errors";
 import { isObject } from "../json";
 import { resolveCwd } from "../paths";
+import { normalizePublicCliCommand, normalizePublicCliCommands } from "../public-cli";
+import { resolveServer } from "../server";
 import type {
   CommandResult,
   ErrorEnvelope,
@@ -104,8 +105,9 @@ export abstract class BaseCommand extends Command {
    * envelope so oclif's `--json` path serialises it.
    */
   protected emit(result: CommandResult): JsonEnvelope {
-    this.log(renderPretty(result, this.meta));
-    return toEnvelope(result, this.meta);
+    const normalized = normalizeCommandResult(result, this.meta);
+    this.log(renderPretty(normalized, this.meta));
+    return toEnvelope(normalized, this.meta);
   }
 
   /**
@@ -120,7 +122,7 @@ export abstract class BaseCommand extends Command {
     if (this.jsonEnabled()) {
       this.logJson(toErrorEnvelope(zitadelError, meta));
     } else {
-      this.logToStderr(renderError(zitadelError));
+      this.logToStderr(renderError(zitadelError, meta));
     }
     return this.exit(zitadelError.exitCode);
   }
@@ -145,6 +147,32 @@ export abstract class BaseCommand extends Command {
       isTTY: Boolean(process.stdout.isTTY && process.stdin.isTTY),
     };
   }
+}
+
+function normalizeCommandResult(result: CommandResult, meta: GlobalOptions): CommandResult {
+  if (result.status === "ok") {
+    return {
+      ...result,
+      data: normalizeDataNextCommands(result.data, meta),
+    };
+  }
+  return {
+    ...result,
+    data: normalizeDataNextCommands(result.data, meta),
+    nextCommands: normalizePublicCliCommands(result.nextCommands, meta.cliVersion),
+  };
+}
+
+function normalizeDataNextCommands(data: unknown, meta: GlobalOptions): unknown {
+  if (!isObject(data) || !Array.isArray(data.next_commands)) {
+    return data;
+  }
+  return {
+    ...data,
+    next_commands: data.next_commands.map((command) =>
+      typeof command === "string" ? normalizePublicCliCommand(command, meta.cliVersion) : command,
+    ),
+  };
 }
 
 /** Wraps a {@link CommandResult} with the invocation metadata into the final envelope. */
@@ -181,7 +209,7 @@ function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelop
     code: error.code,
     message: error.message,
     hint: error.hint,
-    next_commands: error.nextCommands,
+    next_commands: normalizePublicCliCommands(error.nextCommands, meta.cliVersion),
     details: error.details,
   };
 }
@@ -213,14 +241,15 @@ function renderPretty(result: CommandResult, meta: GlobalOptions): string {
  * Renders a {@link ZitadelError} as a human-readable block for stderr: the
  * coded message, an optional hint, and any suggested next commands.
  */
-function renderError(error: ZitadelError): string {
+function renderError(error: ZitadelError, meta: GlobalOptions): string {
   const lines = [`Error ${error.code}: ${error.message}`];
   if (error.hint) {
     lines.push(error.hint);
   }
-  if (error.nextCommands && error.nextCommands.length > 0) {
+  const nextCommands = normalizePublicCliCommands(error.nextCommands, meta.cliVersion);
+  if (nextCommands && nextCommands.length > 0) {
     lines.push("Next:");
-    for (const cmd of error.nextCommands) {
+    for (const cmd of nextCommands) {
       lines.push(`  $ ${cmd}`);
     }
   }
@@ -265,10 +294,22 @@ function formatData(data: unknown, warnings: string[], opts: GlobalOptions): str
     }
   }
 
-  for (const warning of warnings) {
+  for (const warning of warnings.filter((warning) => !warningRenderedInChecks(data, warning))) {
     lines.push(`Warning: ${warning}`);
   }
   return lines.join("\n");
+}
+
+function warningRenderedInChecks(data: unknown, warning: string): boolean {
+  if (!isObject(data) || !Array.isArray(data.checks)) {
+    return false;
+  }
+  return data.checks.some((check) => {
+    if (!isObject(check) || check.status !== "warn") {
+      return false;
+    }
+    return warning === `${String(check.name ?? "check")}: ${String(check.message ?? "")}`;
+  });
 }
 
 function renderKnownSections(lines: string[], data: Record<string, unknown>): void {
@@ -322,7 +363,7 @@ function renderKnownSections(lines: string[], data: Record<string, unknown>): vo
       if (!isObject(check)) {
         continue;
       }
-      const status = check.status === "pass" ? "ok" : "fail";
+      const status = check.status === "pass" ? "ok" : check.status === "warn" ? "warn" : "fail";
       lines.push(`  [${status}] ${String(check.name ?? "check")}: ${String(check.message ?? "")}`);
     }
   }

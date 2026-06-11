@@ -10,10 +10,10 @@ import type { ZitadelLogout } from "./zitadel-logout.js";
  * behaviour and focus restoration depend on a real platform; the unit spec
  * covers cookie parsing, template-slot mode, and aria attributes.
  *
- * Network calls go through the typed `endSession` operation in
- * `@zitadel/api`. We swap `globalThis.fetch` for a lightweight stub
- * (rather than running `msw/browser`) because vitest's browser provider
- * does not register a service worker out of the box.
+ * Network calls go through the typed `revokeMySession` operation in
+ * `@zitadel/api` (`DELETE /sessions/me`). We swap `globalThis.fetch` for a
+ * lightweight stub (rather than running `msw/browser`) because vitest's
+ * browser provider does not register a service worker out of the box.
  */
 const API_BASE = "https://logout.test.invalid";
 
@@ -100,7 +100,7 @@ describe("<zitadel-logout> open/close (chromium)", () => {
     expect(element.shadowRoot?.activeElement).toBe(trigger);
   });
 
-  it("calls the typed end-session URL with credentials", async () => {
+  it("calls DELETE /sessions/me with credentials", async () => {
     const element = await mount();
     const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
     globalThis.fetch = fetchMock as unknown as typeof fetch;
@@ -111,7 +111,8 @@ describe("<zitadel-logout> open/close (chromium)", () => {
     shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
     await waitFor(() => (fetchMock.mock.calls.length > 0 ? fetchMock : null));
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url.startsWith(`${API_BASE}/auth/end-session`)).toBe(true);
+    expect(url.startsWith(`${API_BASE}/sessions/me`)).toBe(true);
+    expect(init.method).toBe("DELETE");
     expect(init.credentials).toBe("include");
   });
 });
