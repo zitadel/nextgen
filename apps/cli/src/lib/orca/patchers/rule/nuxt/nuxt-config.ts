@@ -36,15 +36,21 @@ export function nuxtConfigEdit(opts: {
 
     ensureArrayItem(config, "modules", NUXT_MODULE);
 
-    if (config.nextgen === undefined) config.nextgen = { loginPath: "/login" };
+    if (config.nextgen === undefined) {
+      config.nextgen = { loginPath: "/login" };
+    }
 
-    if (config.runtimeConfig === undefined) config.runtimeConfig = {};
+    if (config.runtimeConfig === undefined) {
+      config.runtimeConfig = {};
+    }
     if (config.runtimeConfig.zitadelUrl === undefined) {
       config.runtimeConfig.zitadelUrl = builders.raw(
         `process.env.ZITADEL_URL ?? ${JSON.stringify(opts.server)}`,
       );
     }
-    if (config.runtimeConfig.public === undefined) config.runtimeConfig.public = {};
+    if (config.runtimeConfig.public === undefined) {
+      config.runtimeConfig.public = {};
+    }
     if (config.runtimeConfig.public.nextgenProxyPath === undefined) {
       config.runtimeConfig.public.nextgenProxyPath = "/__nextgen";
     }
@@ -55,7 +61,9 @@ export function nuxtConfigEdit(opts: {
     }
 
     // The Lit components must be transpiled for SSR.
-    if (config.build === undefined) config.build = {};
+    if (config.build === undefined) {
+      config.build = {};
+    }
     ensureArrayItem(config.build, "transpile", "@zitadel/api");
     ensureArrayItem(config.build, "transpile", "@zitadel/components");
 

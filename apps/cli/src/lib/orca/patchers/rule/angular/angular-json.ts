@@ -47,8 +47,12 @@ export function angularProxyEdit(opts: {
       });
     }
     const options = isObject(serve.options) ? (serve.options as Record<string, unknown>) : {};
-    if (options.proxyConfig === undefined) options.proxyConfig = opts.proxyConfig;
-    if (opts.port !== undefined && options.port === undefined) options.port = opts.port;
+    if (options.proxyConfig === undefined) {
+      options.proxyConfig = opts.proxyConfig;
+    }
+    if (opts.port !== undefined && options.port === undefined) {
+      options.port = opts.port;
+    }
     serve.options = options;
     return `${stableStringify(root)}\n`;
   };

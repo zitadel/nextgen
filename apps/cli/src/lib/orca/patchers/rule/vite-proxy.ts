@@ -32,7 +32,9 @@ export const PROXY_ENTRY_CODE = `{
       if (req.method === "POST" && String(req.url ?? "").includes("/sessions/exchange")) {
         try {
           const secret = JSON.parse(readFileSync(".zitadel/secret", "utf8")).project_secret;
-          if (secret) proxyReq.setHeader("authorization", "Bearer " + secret);
+          if (secret) {
+            proxyReq.setHeader("authorization", "Bearer " + secret);
+          }
         } catch {
           // secret not provisioned yet — leave the request unauthenticated
         }
@@ -74,10 +76,18 @@ export function viteProxyEdit(serverPort: number): (source: string | undefined) 
       });
     }
     const config = resolveDefaultExportObject(mod, "vite.config.ts");
-    if (config.server === undefined) config.server = {};
-    if (config.server.host === undefined) config.server.host = "localhost";
-    if (config.server.port === undefined) config.server.port = serverPort;
-    if (config.server.proxy === undefined) config.server.proxy = {};
+    if (config.server === undefined) {
+      config.server = {};
+    }
+    if (config.server.host === undefined) {
+      config.server.host = "localhost";
+    }
+    if (config.server.port === undefined) {
+      config.server.port = serverPort;
+    }
+    if (config.server.proxy === undefined) {
+      config.server.proxy = {};
+    }
     if (config.server.proxy[PROXY_PATH] === undefined) {
       config.server.proxy[PROXY_PATH] = builders.raw(PROXY_ENTRY_CODE);
     }

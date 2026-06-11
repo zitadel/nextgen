@@ -20,13 +20,19 @@ export function resolveDefaultExportObject(mod: any, filename: string): any {
     new ZitadelError("E_VALIDATION", `Could not locate the config object in ${filename}`, {
       hint: `Add the Zitadel configuration to ${filename} manually (see the SDK README).`,
     });
-  if (!def) throw unreachable();
+  if (!def) {
+    throw unreachable();
+  }
   if (def.$type === "function-call") {
     const arg = def.$args?.[0];
-    if (!arg || arg.$type !== "object") throw unreachable();
+    if (!arg || arg.$type !== "object") {
+      throw unreachable();
+    }
     return arg;
   }
-  if (def.$type === "object") return def;
+  if (def.$type === "object") {
+    return def;
+  }
   throw unreachable();
 }
 
@@ -52,6 +58,16 @@ export function ensureArrayItem(parent: any, key: string, item: string): void {
     return;
   }
   const arr = parent[key];
+  // The existing value is something other than an array literal (e.g. an
+  // identifier or spread), which magicast cannot safely append to. Surface a
+  // clean E_VALIDATION instead of letting `arr.push` throw a raw TypeError.
+  if (typeof arr?.push !== "function" || typeof arr?.length !== "number") {
+    throw new ZitadelError("E_VALIDATION", `Could not add "${item}" to "${key}"`, {
+      hint: `Add "${item}" to "${key}" in your config manually.`,
+    });
+  }
   const present = Array.from({ length: arr.length as number }, (_unused, i) => arr[i]).includes(item);
-  if (!present) arr.push(item);
+  if (!present) {
+    arr.push(item);
+  }
 }

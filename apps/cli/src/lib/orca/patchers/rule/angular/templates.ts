@@ -79,7 +79,9 @@ function injectBearer(proxyReq, req) {
   if (req.method === "POST" && String(req.url || "").includes("/sessions/exchange")) {
     try {
       const secret = JSON.parse(readFileSync(".zitadel/secret", "utf8")).project_secret;
-      if (secret) proxyReq.setHeader("authorization", "Bearer " + secret);
+      if (secret) {
+        proxyReq.setHeader("authorization", "Bearer " + secret);
+      }
     } catch {
       // secret not provisioned yet — leave the request unauthenticated
     }

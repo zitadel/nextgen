@@ -1,3 +1,4 @@
+import { configCandidates } from "./config-paths";
 import type { FileOp } from "./file-writer/types";
 import { viteProxyEdit } from "./vite-proxy";
 
@@ -6,14 +7,7 @@ import { viteProxyEdit } from "./vite-proxy";
  * this list to the generic `edit` file-op, which patches the first one that
  * exists — so any project layout (`vite.config.ts`, `.mts`, `.js`, …) is covered.
  */
-export const VITE_CONFIG_PATHS = [
-  "vite.config.ts",
-  "vite.config.mts",
-  "vite.config.cts",
-  "vite.config.js",
-  "vite.config.mjs",
-  "vite.config.cjs",
-] as const;
+export const VITE_CONFIG_PATHS = configCandidates("vite.config");
 
 /**
  * Capability shared by every Vite-based patcher (React, Vue, and any future

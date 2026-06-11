@@ -1,3 +1,4 @@
+import { configCandidates } from "../config-paths";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
@@ -13,7 +14,7 @@ import {
 
 const SDK_DEPENDENCY = "@zitadel/sdk-nuxt";
 
-const NUXT_CONFIG_PATHS = ["nuxt.config.ts", "nuxt.config.mjs", "nuxt.config.js"] as const;
+const NUXT_CONFIG_PATHS = configCandidates("nuxt.config");
 
 /**
  * Rule-based patcher for a Nuxt app. Like Next.js, Nuxt proxies the backend and
