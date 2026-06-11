@@ -53,6 +53,10 @@ export class AngularPatcher extends AbstractRulePatcher {
     return [SDK_DEPENDENCY];
   }
 
+  protected override routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
+    return ["angular.json"];
+  }
+
   protected summary(_ctx: PatchContext): { title: string; detail: string } {
     return {
       title: "Angular integration",

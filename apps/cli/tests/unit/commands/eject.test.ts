@@ -52,10 +52,34 @@ async function makeManagedProject(): Promise<string> {
   await writeFile(join(cwd, ".zitadel/state.json"), JSON.stringify({ framework: "next" }));
   await writeFile(join(cwd, ".zitadel/schemas/user.json"), JSON.stringify({ type: "object" }));
   await writeFile(join(cwd, ".zitadel/flows/default.json"), JSON.stringify({ name: "default" }));
-  await writeFile(join(cwd, "app/login/page.tsx"), `${MANAGED_MARKER}\nexport default function L() {}\n`);
+  await writeFile(
+    join(cwd, "app/login/page.tsx"),
+    `${MANAGED_MARKER}\nexport default function L() {}\n`,
+  );
   // Register page lacks the managed marker, so eject must preserve it.
   await writeFile(join(cwd, "app/register/page.tsx"), "export default function R() {}\n");
   await writeFile(join(cwd, ".env.local"), "ZITADEL_PROJECT_ID=proj-001\n");
+  return cwd;
+}
+
+/**
+ * Builds a managed Vue (Vite) project — the patcher merges its dev proxy into
+ * `vite.config.ts` via an `edit`, which eject can't reverse, so it must surface
+ * the file as a manual cleanup step rather than deleting it.
+ */
+async function makeManagedViteProject(): Promise<string> {
+  const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-vite-"));
+  tempDirs.push(cwd);
+  await mkdir(join(cwd, ".zitadel"), { recursive: true });
+  await mkdir(join(cwd, "src"), { recursive: true });
+  await writeFile(
+    join(cwd, "package.json"),
+    JSON.stringify({ name: "demo", dependencies: { vue: "^3" }, devDependencies: { vite: "^5" } }),
+  );
+  await writeFile(join(cwd, "zitadel.json"), JSON.stringify({ project: "proj-001" }));
+  await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify({ project_id: "proj-001" }));
+  await writeFile(join(cwd, "src/App.vue"), `<!-- ${MANAGED_MARKER} -->\n<template></template>\n`);
+  await writeFile(join(cwd, "vite.config.ts"), "export default {};\n");
   return cwd;
 }
 
@@ -139,6 +163,26 @@ describe("eject command", () => {
     expect(await exists(join(cwd, "zitadel.json"))).toBe(true);
     expect(await exists(join(cwd, ".zitadel"))).toBe(true);
     expect(await exists(join(cwd, ".env.local"))).toBe(true);
+  });
+
+  it("surfaces in-place config edits as manual steps for edit-based frameworks", async () => {
+    const cwd = await makeManagedViteProject();
+
+    const res = await eject(cwd, ["--force"]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      status: string;
+      data: { files_removed: string[]; manual_steps: string[] };
+    };
+    expect(json.status).toBe("ok");
+    // The managed App.vue is removed, but vite.config.ts can't be auto-reverted.
+    expect(json.data.files_removed).toContain("src/App.vue");
+    expect(json.data.manual_steps).toContain(
+      "Remove the Zitadel configuration block from vite.config.ts",
+    );
+    // The edited config file itself is left in place.
+    expect(await exists(join(cwd, "vite.config.ts"))).toBe(true);
   });
 
   it("emits a skipped envelope when there is nothing to eject", async () => {

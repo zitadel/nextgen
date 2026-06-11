@@ -75,6 +75,10 @@ export class NuxtPatcher extends AbstractRulePatcher {
     return [SDK_DEPENDENCY];
   }
 
+  protected override routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
+    return ["nuxt.config.ts"];
+  }
+
   protected summary(_ctx: PatchContext): { title: string; detail: string } {
     return {
       title: "Nuxt integration",

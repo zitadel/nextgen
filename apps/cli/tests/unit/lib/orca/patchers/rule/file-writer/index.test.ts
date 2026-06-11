@@ -97,29 +97,32 @@ describe("scaffold - write", () => {
 
   it("overwrites an existing file when force is set", async () => {
     await writeFile(join(dir, "page.tsx"), "old");
-    const result = await scaffold(
-      plan({ kind: "write", path: "page.tsx", contents: "new" }),
-      { cwd: dir, dryRun: false, force: true },
-    );
+    const result = await scaffold(plan({ kind: "write", path: "page.tsx", contents: "new" }), {
+      cwd: dir,
+      dryRun: false,
+      force: true,
+    });
     expect(result.filesWritten).toContain(join(dir, "page.tsx"));
     expect(await readFile(join(dir, "page.tsx"), "utf8")).toBe("new");
   });
 
   it("does not write to disk on dry-run", async () => {
-    const result = await scaffold(
-      plan({ kind: "write", path: "page.tsx", contents: "x" }),
-      { cwd: dir, dryRun: true, force: false },
-    );
+    const result = await scaffold(plan({ kind: "write", path: "page.tsx", contents: "x" }), {
+      cwd: dir,
+      dryRun: true,
+      force: false,
+    });
     expect(result.filesWritten).toContain(join(dir, "page.tsx"));
     expect(await exists(join(dir, "page.tsx"))).toBe(false);
   });
 
   it("skips an identical file on dry-run rather than reporting a write", async () => {
     await writeFile(join(dir, "page.tsx"), "same");
-    const result = await scaffold(
-      plan({ kind: "write", path: "page.tsx", contents: "same" }),
-      { cwd: dir, dryRun: true, force: false },
-    );
+    const result = await scaffold(plan({ kind: "write", path: "page.tsx", contents: "same" }), {
+      cwd: dir,
+      dryRun: true,
+      force: false,
+    });
     expect(result.filesSkipped).toEqual([join(dir, "page.tsx")]);
     expect(result.filesWritten).toEqual([]);
   });
@@ -127,10 +130,11 @@ describe("scaffold - write", () => {
 
 describe("scaffold - append", () => {
   it("creates the file and appends contents when missing", async () => {
-    const result = await scaffold(
-      plan({ kind: "append", path: "notes.txt", contents: "line-1" }),
-      { cwd: dir, dryRun: false, force: false },
-    );
+    const result = await scaffold(plan({ kind: "append", path: "notes.txt", contents: "line-1" }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
     expect(result.filesWritten).toContain(join(dir, "notes.txt"));
     expect(await readFile(join(dir, "notes.txt"), "utf8")).toBe("line-1");
   });
@@ -192,7 +196,11 @@ describe("scaffold - merge-env", () => {
 describe("scaffold - merge-json", () => {
   it("creates a JSON file from the patch when none exists", async () => {
     await scaffold(
-      plan({ kind: "merge-json", path: "tsconfig.json", patch: { compilerOptions: { strict: true } } }),
+      plan({
+        kind: "merge-json",
+        path: "tsconfig.json",
+        patch: { compilerOptions: { strict: true } },
+      }),
       { cwd: dir, dryRun: false, force: false },
     );
     const parsed = JSON.parse(await readFile(join(dir, "tsconfig.json"), "utf8")) as {
@@ -207,7 +215,11 @@ describe("scaffold - merge-json", () => {
       JSON.stringify({ compilerOptions: { target: "es2020" }, include: ["src"] }),
     );
     await scaffold(
-      plan({ kind: "merge-json", path: "tsconfig.json", patch: { compilerOptions: { strict: true } } }),
+      plan({
+        kind: "merge-json",
+        path: "tsconfig.json",
+        patch: { compilerOptions: { strict: true } },
+      }),
       { cwd: dir, dryRun: false, force: false },
     );
     const parsed = JSON.parse(await readFile(join(dir, "tsconfig.json"), "utf8")) as {
@@ -246,10 +258,11 @@ describe("scaffold - append-gitignore", () => {
 
   it("only appends entries not already listed", async () => {
     await writeFile(join(dir, ".gitignore"), ".env.local\nnode_modules\n");
-    await scaffold(
-      plan({ kind: "append-gitignore", entries: [".env.local", ".zitadel"] }),
-      { cwd: dir, dryRun: false, force: false },
-    );
+    await scaffold(plan({ kind: "append-gitignore", entries: [".env.local", ".zitadel"] }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
     const text = await readFile(join(dir, ".gitignore"), "utf8");
     expect(text.match(/\.env\.local/g)).toHaveLength(1);
     expect(text).toContain(".zitadel");
@@ -257,10 +270,11 @@ describe("scaffold - append-gitignore", () => {
 
   it("skips when all entries are present", async () => {
     await writeFile(join(dir, ".gitignore"), ".zitadel\n");
-    const result = await scaffold(
-      plan({ kind: "append-gitignore", entries: [".zitadel"] }),
-      { cwd: dir, dryRun: false, force: false },
-    );
+    const result = await scaffold(plan({ kind: "append-gitignore", entries: [".zitadel"] }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
     expect(result.filesSkipped).toEqual([join(dir, ".gitignore")]);
   });
 });
@@ -281,10 +295,11 @@ describe("scaffold - add-dep", () => {
 
   it("adds to devDependencies when dev is set", async () => {
     await writeFile(join(dir, "package.json"), JSON.stringify({ name: "demo" }));
-    await scaffold(
-      plan({ kind: "add-dep", name: "typescript", version: "5.0.0", dev: true }),
-      { cwd: dir, dryRun: false, force: false },
-    );
+    await scaffold(plan({ kind: "add-dep", name: "typescript", version: "5.0.0", dev: true }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
     const parsed = JSON.parse(await readFile(join(dir, "package.json"), "utf8")) as {
       devDependencies: Record<string, string>;
     };
@@ -296,10 +311,11 @@ describe("scaffold - add-dep", () => {
       join(dir, "package.json"),
       JSON.stringify({ name: "demo", dependencies: { foo: "1.0.0" } }),
     );
-    const result = await scaffold(
-      plan({ kind: "add-dep", name: "foo", version: "1.0.0" }),
-      { cwd: dir, dryRun: false, force: false },
-    );
+    const result = await scaffold(plan({ kind: "add-dep", name: "foo", version: "1.0.0" }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
     expect(result.filesSkipped).toEqual([join(dir, "package.json")]);
     expect(result.depsAdded).toEqual([]);
   });
@@ -321,10 +337,11 @@ describe("scaffold - add-dep", () => {
 
   it("records the dep but does not write on dry-run", async () => {
     await writeFile(join(dir, "package.json"), JSON.stringify({ name: "demo" }));
-    const result = await scaffold(
-      plan({ kind: "add-dep", name: "foo", version: "1.0.0" }),
-      { cwd: dir, dryRun: true, force: false },
-    );
+    const result = await scaffold(plan({ kind: "add-dep", name: "foo", version: "1.0.0" }), {
+      cwd: dir,
+      dryRun: true,
+      force: false,
+    });
     expect(result.depsAdded).toEqual(["foo"]);
     const parsed = JSON.parse(await readFile(join(dir, "package.json"), "utf8")) as {
       dependencies?: Record<string, string>;

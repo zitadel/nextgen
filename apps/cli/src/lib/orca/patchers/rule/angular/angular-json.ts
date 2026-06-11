@@ -1,5 +1,5 @@
 import { ZitadelError } from "../../../../errors";
-import { isObject, parseJsonObject, stableStringify } from "../../../../json";
+import { isObject, parseJsonObject } from "../../../../json";
 
 /**
  * Builds the pure `edit` transform the file-writer applies to `angular.json`:
@@ -54,6 +54,7 @@ export function angularProxyEdit(opts: {
       options.port = opts.port;
     }
     serve.options = options;
-    return `${stableStringify(root)}\n`;
+    // Preserve the user's key order (JSON, no comments) instead of sorting.
+    return `${JSON.stringify(root, null, 2)}\n`;
   };
 }

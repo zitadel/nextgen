@@ -47,7 +47,19 @@ export abstract class AbstractRulePatcher implements Patcher {
       directories: [".zitadel"],
       envBackups: [".env.local"],
       dependencies: this.routeDeps(view),
+      configEdits: this.routeConfigEdits(view),
     };
+  }
+
+  /**
+   * User config files this patcher merges into via an `edit` op (e.g.
+   * `vite.config.ts`). `eject` can't reverse an in-place merge, so it lists
+   * these as manual cleanup steps. Defaults to none; patchers that edit a config
+   * (React/Vue/Angular/Nuxt) override it. Next writes whole marker-bearing files
+   * instead, so it has none.
+   */
+  protected routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
+    return [];
   }
 
   /**
