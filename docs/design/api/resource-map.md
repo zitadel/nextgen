@@ -48,8 +48,8 @@ GET  /teams?project_id=…
 ```
 
 `DELETE /teams/{id}` deactivates/tombstones the team, revokes team-scoped API
-keys, and deactivates/removes memberships. Project-owned users survive. Users
-whose lifecycle owner is the deleted team are deactivated according to policy.
+keys, and deactivates/removes memberships. Self-owned users survive. Users whose
+lifecycle owner is the deleted team are deactivated according to policy.
 See [ADR 022](../../adrs/022-user-team-lifecycle-ownership.md).
 
 ---
@@ -72,16 +72,18 @@ GET  /users?project_id=…&q=…&limit=…
 ```
 
 `DELETE /users/{id}` deactivates/tombstones the user, revokes sessions, tokens,
-and credentials, and deactivates memberships. Teams and resources are preserved
-unless a resource-specific cleanup policy says otherwise.
+and credentials, and deactivates memberships. Teams and resources the user
+created or administered are preserved unless a resource-specific cleanup policy
+says otherwise.
 
 ---
 
 ## Memberships
 
 One membership kind: a user is a member of a team with roles and membership
-status. Membership is access/lifecycle relationship state, not proof that the
-team owns the user's identity lifecycle.
+status. Membership is team roster/status/provisioning state. FGA may consume it
+as an authorization fact, but membership is not proof that the team owns the
+user's identity lifecycle.
 
 ```http
 /team_memberships/{id}

@@ -59,13 +59,13 @@ Lifecycle mutations run in two steps:
 1. Authorization checks whether the caller can request the mutation in the
    resolved scope.
 2. Lifecycle policy decides the mutation's effects: deactivate/tombstone, revoke
-   credentials, remove memberships, preserve project-owned users, deactivate
-   team-owned users, or schedule purge.
+   credentials, remove memberships, preserve self-owned users, deactivate users
+   lifecycle-owned by the relevant team, or schedule purge.
 
 Roles such as `owner`, `admin`, and `member` are authorization roles. A user can
-own/administer a team through a membership role while still being a
-project-owned identity. A team only owns a user's lifecycle when explicit
-project/team/provisioning policy marks that user as team-owned.
+own/administer a team through a membership role while still being self-owned. A
+team only owns a user's lifecycle when explicit project/team/provisioning policy
+marks that user as team-owned.
 
 ## FGA decision surface
 

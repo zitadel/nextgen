@@ -20,10 +20,10 @@ Three layers. Long-form in [`api/hierarchy.md`](api/hierarchy.md).
 | **Project** | A tenant / deployment. Owns branding, IdPs, custom domain, feature flags, teams, users, apps, flows, sessions. One project is reserved as the **platform project** — Zitadel's own project, where the accounts that pay Zitadel live. **LOCKED rename** from today's "instance". |
 | **Team** | A tenant-grouping inside any project. Two canonical shapes: (a) a team inside the **platform project** represents a paying customer / developer account; (b) a team inside a **customer project** represents a B2B end-customer tenant. Same resource, different project context. |
 | **User** | An identity inside any project. A user inside the platform project is what used to be called a "platform_user" (a developer/admin). A user inside a customer project is an end-user. Memberships attach users to teams; lifecycle ownership is explicit policy. |
-| **lifecycle_owner** | The configured authority for a user's identity lifecycle: `project`, `team`, or `external`. Separate from membership roles and authorization. See [ADR 022](../adrs/022-user-team-lifecycle-ownership.md). |
-| **project-owned user** | A user whose lifecycle belongs to the project identity namespace. Default for self-serve signup and user-created teams. Team deletion does not delete this user. |
+| **lifecycle_owner** | The configured local authority for a user's identity lifecycle: `self` or `team`. Separate from membership roles, authorization, and external provisioning source. See [ADR 022](../adrs/022-user-team-lifecycle-ownership.md). |
+| **self-owned user** | A user that owns its own lifecycle inside the project. Default for self-serve signup and user-created teams. Team deletion does not delete this user. |
 | **team-owned user** | A managed user whose lifecycle belongs to a specific team by policy, common for enterprise invite, JIT, or SCIM-style provisioning. Team deletion or lifecycle-owner membership removal may deactivate the user according to policy. |
-| **externally managed user** | A user whose source identity lifecycle is owned by an upstream IdP or directory. Zitadel enforces local access state without pretending to own upstream deletion. |
+| **external provisioning source** | An upstream IdP or directory that is authoritative for attributes or provisioning events. It is source metadata, not a third lifecycle owner; the local user is still self-owned or team-owned. |
 
 The platform project's `project_id` is discoverable via the authenticated `/capabilities` response (`defaults.project_id`). Self-hosted returns a singleton; cloud returns whichever project is the caller's platform project.
 

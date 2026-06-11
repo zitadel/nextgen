@@ -62,8 +62,9 @@ graph TD
 
 **LOCKED by [ADR 022](../../adrs/022-user-team-lifecycle-ownership.md).**
 Users are project-scoped identities. Teams are collaboration, data, and
-lifecycle boundaries. A membership is the relationship that gives a user a role
-inside a team.
+lifecycle boundaries. A membership is the team roster/status relationship. FGA
+can consume or mirror that relationship as an authorization fact, but it does
+not replace the membership resource.
 
 These are separate ideas:
 
@@ -73,25 +74,35 @@ These are separate ideas:
   says so, for example enterprise invite, JIT provisioning, or SCIM-style
   tenant management.
 - A user can have zero, one, or many team memberships while retaining one
-  lifecycle owner.
+  lifecycle owner: itself or one team inside the same project.
 - FGA consumes memberships, roles, grants, and resource hierarchy to answer
   access questions. It does not decide whether an identity should be
   deprovisioned or purged.
 
-User lifecycle ownership is configurable:
+Every user has exactly one lifecycle owner:
 
 | Owner | Default meaning |
 |---|---|
-| `project` | Self-serve/default signup. The user survives team deletion unless explicitly deleted. |
+| `self` | Self-serve/default signup. The user survives team deletion unless explicitly deleted. |
 | `team` | Managed account. Team deletion or lifecycle-owner membership removal can deactivate the user according to policy. |
-| `external` | Upstream IdP/directory owns the source identity. Zitadel enforces local access state. |
+
+External IdPs and directories are provisioning authorities, not lifecycle
+owners. They feed into one of the two local ownership modes: self-owned for
+project-wide identity sources, team-owned for tenant-managed sources such as
+enterprise directory or SCIM provisioning.
+
+Lifecycle ownership is not transitive. If a user owned by Team A creates Team B,
+then deleting/deprovisioning the user through Team A removes that user's access
+to Team B, but it does not delete Team B or any resources Team B owns. Team B
+must have its own owner/team policy, transfer flow, or orphaned/needs-owner
+state.
 
 DB-facing lifecycle summary:
 
 | Operation | Canonical effect |
 |---|---|
-| Delete team | Deactivate/tombstone team, revoke team-scoped API keys, deactivate/remove memberships, preserve project-owned users, and deactivate team-owned users according to policy. |
-| Delete user | Deactivate/tombstone user, revoke sessions/tokens/credentials, deactivate memberships, preserve teams/resources unless a resource-specific cleanup policy applies. |
+| Delete team | Deactivate/tombstone team, revoke team-scoped API keys, deactivate/remove memberships, preserve self-owned users, and deactivate users lifecycle-owned by that team according to policy. |
+| Delete user | Deactivate/tombstone user, revoke sessions/tokens/credentials, deactivate memberships, preserve teams/resources the user created or administered unless a resource-specific cleanup policy applies. |
 | Delete membership | Remove access to that team; only deprovision the user if that membership is the configured lifecycle-owner relationship and policy requires it. |
 
 Status is also separate:
@@ -114,6 +125,12 @@ membership status. That covers both:
 - An end-user's membership in a B2B tenant team in a customer project.
 
 The resource is one surface — `/team_memberships` — with the same schema at both scales.
+
+Membership exists because teams need a roster/status/provisioning record even
+when fine-grained resource authorization is handled by FGA. It is the source for
+invitations, SCIM/JIT membership sync, billing seats, `/me/memberships`, and
+team-scoped management views. FGA can use membership facts for decisions; it is
+not the source of truth for the team's membership lifecycle.
 
 ## Caller convenience
 

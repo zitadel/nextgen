@@ -10,10 +10,11 @@ The API hierarchy uses three core resources: projects, teams, and users.
 Projects own the identity namespace. Teams are tenant groupings inside a
 project. Memberships attach users to teams and carry roles.
 
-That model still leaves an important lifecycle question ambiguous: if a team is
-deleted, are its users deleted too? If a user owns a team, does deleting the
-user delete the team? If Fine-Grained Authorization (FGA) grants a user an
-`owner` role, does that make the team own the user's identity lifecycle?
+That model still leaves important lifecycle questions ambiguous: if a team is
+deleted, are its users deleted too? If a team-owned user creates another team,
+does deleting the owning team also delete the new team? If Fine-Grained
+Authorization (FGA) grants a user an `owner` role, does that make the team own
+the user's identity lifecycle?
 
 Those are different concerns. Conflating them makes database constraints look
 like product semantics and makes `ON DELETE CASCADE` appear to answer questions
@@ -27,27 +28,41 @@ Teams are **collaboration, data, and lifecycle boundaries**. A team can own
 workspace data, customer-tenant state, billing, team-scoped keys, memberships,
 and, when policy says so, the lifecycle of managed users.
 
-Memberships are **access relationships**. A `team_membership` binds a project
-user to a team with status and roles. Roles such as `owner`, `admin`, and
-`member` are authorization roles; they do not by themselves decide who owns the
-user's lifecycle.
+Memberships are **team presence relationships**. A `team_membership` records
+that a project user belongs to a team, with status, roles, and provisioning
+metadata. It is the roster/status source for invitations, SCIM/JIT membership
+sync, billing seats, `/me/memberships`, and team-scoped management surfaces.
+FGA may consume or mirror memberships as authorization facts, but FGA does not
+replace the membership resource.
 
 FGA is the **authorization decision layer**. It answers whether a principal can
 perform an action on a resource by evaluating memberships, grants, roles,
 credential class, and resolved resource scope. FGA does not decide whether a
 user identity should be deprovisioned or purged.
 
-User lifecycle ownership is explicit and configurable:
+Every user has exactly one lifecycle owner inside the project:
 
 | Lifecycle owner | Meaning | Typical source |
 |---|---|---|
-| `project` | The user is owned by the project identity namespace and may have zero or many team memberships. | Self-serve signup, user-created workspaces. |
+| `self` | The user owns its own lifecycle inside the project and may have zero or many team memberships. | Self-serve signup, user-created workspaces. |
 | `team` | The user's lifecycle is managed by a specific team. Removing that team or its lifecycle-owner relationship can deactivate the user according to policy. | Enterprise invite, JIT provisioning, SCIM-style tenant management. |
-| `external` | Zitadel enforces local access state, but an upstream system owns the source identity lifecycle. | External IdP, external directory, SCIM where upstream remains authoritative. |
 
-The default for self-serve/default signup is `project`. A user-created team does
-not make the team the user's lifecycle owner; it creates a membership with an
-authorization role such as `owner`.
+The default for self-serve/default signup is `self`. A team-owned user can
+create or administer another team, but that does not make the new team a child
+of the user's lifecycle owner. It creates a team resource and a membership with
+an authorization role such as `owner`.
+
+Lifecycle ownership is not transitive. Deleting or deprovisioning a user
+deactivates that user and removes their memberships/access. It does not delete
+teams, projects, apps, or other resources the user created or administered.
+Those resources must have their own owner/team policy, transfer flow, or
+orphaned/needs-owner state.
+
+External systems are modeled as provisioning authorities, not lifecycle owners.
+An upstream IdP or directory can be authoritative for attributes or provisioning
+events, but the local Zitadel user is still either self-owned or team-owned:
+project-wide SSO normally creates self-owned users; enterprise directory/SCIM
+provisioning for one customer tenant normally creates team-owned users.
 
 ## Lifecycle Matrix
 
@@ -57,8 +72,8 @@ verb.
 
 | Operation | Canonical behavior |
 |---|---|
-| Delete team | Deactivate/tombstone the team, revoke team-scoped API keys, and deactivate/remove team memberships. Preserve project-owned users. Deactivate team-owned users according to the team's lifecycle policy. Preserve or transfer resources only where a resource-specific policy says so. |
-| Delete user | Deactivate/tombstone the user, revoke sessions, tokens, and credentials, and deactivate memberships. Preserve teams and resources unless an explicit resource-specific cleanup policy applies. |
+| Delete team | Deactivate/tombstone the team, revoke team-scoped API keys, and deactivate/remove team memberships. Preserve self-owned users. Deactivate users lifecycle-owned by that team according to policy. Preserve or transfer resources only where a resource-specific policy says so. |
+| Delete user | Deactivate/tombstone the user, revoke sessions, tokens, and credentials, and deactivate memberships. Preserve teams and resources the user created/administered unless an explicit resource-specific cleanup policy applies. |
 | Delete membership | Remove access to that team. Do not delete the user unless that membership is the configured lifecycle-owner relationship and policy calls for deprovisioning. |
 
 The status of a user is separate from the status of a membership:
@@ -71,9 +86,15 @@ The status of a user is separate from the status of a membership:
 ## Consequences
 
 - The database model must not infer identity lifecycle from role names. A user
-  can be an `owner` member of a team while remaining project-owned.
+  can be an `owner` member of a team while remaining self-owned.
 - Team-scoped uniqueness and team-scoped access still exist, but they are not
   proof that the team owns the user identity.
+- External IdPs and directories do not become a third lifecycle-owner target in
+  the database. They are source/provisioning metadata attached to a local
+  self-owned or team-owned user.
+- Team/resource ownership is not inherited from the creator's lifecycle owner.
+  A user owned by Team A can create Team B; deprovisioning the user through Team
+  A removes that user's access to Team B but does not delete Team B.
 - Current or transitional storage artifacts such as `users.team_id` or
   team-to-user `ON DELETE CASCADE` constraints are not the canonical N:N
   membership model. Schema follow-up should align storage with this ADR instead
