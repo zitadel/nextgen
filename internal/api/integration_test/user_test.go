@@ -274,3 +274,55 @@ func TestGetUser(t *testing.T) {
 		assert.IsType(t, &api.GetUserByIDOK{}, resp, helpers.MustMarshal(t, resp))
 	})
 }
+
+func TestGetMyUser(t *testing.T) {
+	t.Run("ok", func(t *testing.T) {
+		project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+		client := harness.EnsureAPIClient(t, project.ID)
+		require.NoError(t, err)
+
+		// CREATE USER
+
+		userService := harness.EnsureUserService(t)
+
+		user, err := userService.CreateUser(t.Context(), service.CreateUserInput{
+			ProjectID: project.ID,
+			User:      harness.TestData.Generator.GenerateUser(t, "testgetuser@example.com"),
+		})
+		require.NoError(t, err)
+		userID := user["id"].(string)
+		userEmail := user["email"].(string)
+
+		const password = "fake-password"
+		err = userService.SetPassword(t.Context(), service.SetPasswordInput{
+			ProjectID: project.ID,
+			UserID:    userID,
+			Password:  password,
+		})
+		require.NoError(t, err)
+
+		// CREATE SESSION TOKEN
+
+		session, err := helpers.CreateSessionUsingPassword(t,
+			harness.EnsureAuthAttemptService(t),
+			harness.EnsureSessionService(t),
+			project.ID,
+			userEmail,
+			password,
+		)
+		require.NoError(t, err)
+
+		sessionToken, err := session.Token(harness.EnsureCrypter(t))
+		require.NoError(t, err)
+
+		// GET USER USING TOKEN
+
+		params := api.GetMyUserParams{
+			NextgenSession: sessionToken,
+		}
+		resp, err := client.GetMyUser(t.Context(), params)
+		assert.NoError(t, err)
+
+		assert.IsType(t, &api.GetMyUserOK{}, resp, helpers.MustMarshal(t, resp))
+	})
+}

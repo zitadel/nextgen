@@ -1,4 +1,3 @@
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { inspectContainer } from "../lib/local-server/docker";
 import {
   DEFAULT_LOCAL_SERVER_URL,
@@ -7,6 +6,7 @@ import {
   readRuntimeMetadata,
   runtimeSummary,
 } from "../lib/local-server/runtime";
+import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import {
   hasZitadelConfig,
   hasZitadelSecret,
@@ -14,6 +14,7 @@ import {
   readZitadelConfig,
   readZitadelSecret,
 } from "../lib/project";
+import { publicCliCommand } from "../lib/public-cli";
 
 /**
  * `zitadel status` — summarize the local server and project state.
@@ -56,7 +57,8 @@ export default class Status extends BaseCommand {
       : "missing";
 
     const project = await projectStatus(cwd);
-    const nextCommands = nextCommandsFor(serverLifecycle, project.lifecycle);
+    const nextCommands = nextCommandsFor(serverLifecycle, project.lifecycle, this.meta.cliVersion);
+    const nextActions = nextActionsFor(project.lifecycle);
 
     return this.emit({
       status: "ok",
@@ -77,6 +79,7 @@ export default class Status extends BaseCommand {
           },
         },
         project,
+        next_actions: nextActions,
         next_commands: nextCommands,
       },
     });
@@ -124,17 +127,33 @@ async function projectStatus(cwd: string): Promise<ProjectStatus> {
   };
 }
 
-function nextCommandsFor(serverLifecycle: string, projectLifecycle: ProjectStatus["lifecycle"]): string[] {
+function nextActionsFor(projectLifecycle: ProjectStatus["lifecycle"]): string[] {
+  if (projectLifecycle === "not-configured") {
+    return [
+      "From your app directory, run setup; the CLI will detect the framework or ask in an empty directory.",
+    ];
+  }
+  return [];
+}
+
+function nextCommandsFor(
+  serverLifecycle: string,
+  projectLifecycle: ProjectStatus["lifecycle"],
+  cliVersion: string,
+): string[] {
   const commands: string[] = [];
   if (serverLifecycle !== "running") {
-    commands.push("zitadel start");
+    commands.push(publicCliCommand("start", cliVersion));
   }
   if (projectLifecycle === "not-configured") {
-    commands.push("zitadel setup --framework next --server local");
+    commands.push(publicCliCommand("setup --server local", cliVersion));
   } else if (projectLifecycle === "orphaned-config") {
-    commands.push("zitadel setup --force", "zitadel doctor --fix");
+    commands.push(
+      publicCliCommand("setup --force", cliVersion),
+      publicCliCommand("doctor --fix", cliVersion),
+    );
   } else {
-    commands.push("zitadel doctor", "zitadel apply");
+    commands.push(publicCliCommand("doctor", cliVersion), publicCliCommand("apply", cliVersion));
   }
   return commands;
 }

@@ -1025,7 +1025,7 @@ func Test_flowDefinitionService_List(t *testing.T) {
 						gomock.Any(),
 						gomock.Any(),
 						"project1",
-						gomock.Any(), // todo: a custom matcher to verify that the filter
+						gomock.Any(), // todo: a custom matcher to verify the filter
 					).
 					Times(1).
 					Return([]*domain.FlowDefinition{
@@ -1103,6 +1103,96 @@ func Test_flowDefinitionService_List(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestFlowDefinitionService_Delete(t *testing.T) {
+	tests := []struct {
+		name               string
+		projectID          string
+		flowDefinitionID   string
+		flowDefinitionRepo func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository
+		wantErr            error
+	}{
+		{
+			name:             "missing project id",
+			projectID:        "",
+			flowDefinitionID: "flowdef_123",
+			wantErr:          domain.ErrMissingProjectID(),
+		},
+		{
+			name:             "missing flow definition id",
+			projectID:        "project1",
+			flowDefinitionID: "",
+			wantErr:          domain.ErrMissingFlowDefinitionID(),
+		},
+		{
+			name:             "flow definition deleted",
+			projectID:        "project1",
+			flowDefinitionID: "flowdef_123",
+			flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
+				repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
+				repo.EXPECT().
+					DeleteFlowDefinition(gomock.Any(), gomock.Any(), "project1", "flowdef_123").
+					Times(1).
+					Return(nil)
+				return repo
+			},
+		},
+		{
+			name:             "error deleting flow definition",
+			projectID:        "project1",
+			flowDefinitionID: "flowdef_123",
+			flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
+				repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
+				repo.EXPECT().
+					DeleteFlowDefinition(gomock.Any(), gomock.Any(), "project1", "flowdef_123").
+					Times(1).
+					Return(assert.AnError)
+				return repo
+			},
+			wantErr: assert.AnError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			userSchema := &domain.JSONSchema{
+				Schema: tenantUserSchema,
+			}
+			schemaResolver := &mockSchemaGetter{
+				getSchema: func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
+					return userSchema, nil
+				},
+			}
+			builtinSchemaProvider := &mockBuiltinSchemaProvider{
+				latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
+					return "https://example.com/schemas/flow-definition.json", nil
+				},
+			}
+			validatorFn := func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error) {
+				return []domain.PivotingTarget{}, nil
+			}
+			if tt.flowDefinitionRepo == nil {
+				tt.flowDefinitionRepo = func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
+					return nil
+				}
+			}
+
+			ctrl := gomock.NewController(t)
+			fd := service.NewFlowDefinitionService(
+				stubPool(),
+				schemaResolver,
+				builtinSchemaProvider,
+				validatorFn,
+				tt.flowDefinitionRepo(ctrl),
+			)
+			err := fd.Delete(context.Background(), tt.projectID, tt.flowDefinitionID)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			assert.NoError(t, err)
 		})
 	}
 }

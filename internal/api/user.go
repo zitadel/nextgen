@@ -64,6 +64,24 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 	return &api.SetUserPasswordNoContent{}, nil
 }
 
+func (h *Handler) GetMyUser(ctx context.Context, params api.GetMyUserParams) (api.GetMyUserRes, error) {
+	input := service.GetMyUserInput{
+		SessionToken: params.NextgenSession,
+	}
+
+	userbs, err := h.userService.GetMyUser(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	user := &api.GetMyUserOK{}
+	err = user.UnmarshalJSON(userbs)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
 // ------------------ Errors ---------------
 
 func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
