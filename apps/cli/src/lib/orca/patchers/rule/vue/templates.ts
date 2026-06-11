@@ -1,5 +1,5 @@
 import { MANAGED_MARKER } from "../../../../paths";
-import { PROXY_PATH } from "../vite-support";
+import { PROXY_PATH } from "../proxy";
 
 /**
  * The managed `src/App.vue`: a minimal path-based router that renders the

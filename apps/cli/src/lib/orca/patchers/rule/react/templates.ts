@@ -1,7 +1,6 @@
 import { MANAGED_MARKER } from "../../../../paths";
 
-export { PROXY_ENTRY_CODE, PROXY_IMPORT, PROXY_PATH } from "../vite-support";
-import { PROXY_PATH } from "../vite-support";
+import { PROXY_PATH } from "../proxy";
 
 /**
  * The managed `src/App.tsx`: a minimal path-based router that renders the

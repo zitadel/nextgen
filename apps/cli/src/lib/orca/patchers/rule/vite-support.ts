@@ -4,6 +4,7 @@ import { ZitadelError } from "../../../errors";
 import { configCandidates } from "./config-paths";
 import type { FileOp } from "./file-writer/types";
 import { importIsPresent, resolveDefaultExportObject } from "./magicast-config";
+import { PROXY_PATH } from "./proxy";
 
 /**
  * Shared Vite dev-server proxy injected into `vite.config.ts` for the SPA
@@ -14,9 +15,6 @@ import { importIsPresent, resolveDefaultExportObject } from "./magicast-config";
  * the secret never enters source or the client bundle). Inserted verbatim as an
  * expression by magicast; the only symbol it needs is `readFileSync`.
  */
-
-/** The proxy key the SDK widgets call same-origin (`configureZitadel({ proxyPath })`). */
-export const PROXY_PATH = "/__nextgen";
 
 /** Raw source for the `server.proxy["/__nextgen"]` entry. */
 export const PROXY_ENTRY_CODE = `{
