@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { runCapture } from "./dev-process.mjs";
 
@@ -62,10 +62,7 @@ function checkNodeModules() {
     pass("workspace dependencies are installed");
     return;
   }
-  fail(
-    "workspace dependencies are not installed",
-    "Run: corepack pnpm install --frozen-lockfile",
-  );
+  fail("workspace dependencies are not installed", "Run: corepack pnpm install --frozen-lockfile");
 }
 
 async function checkGo() {
@@ -93,8 +90,8 @@ async function checkDocker() {
     });
     pass(`Docker engine ${stdout.trim()} is running`);
   } catch {
-    warn(
-      "Docker is not available; journey and integration checks need it",
+    fail(
+      "Docker is not available; local runtime image builds need it",
       "Start Docker Desktop or another Docker daemon, then rerun doctor",
     );
   }
@@ -137,8 +134,8 @@ async function checkGoReleaser() {
     const version = versionLine?.split(/\s+/).at(1) ?? "available";
     pass(`GoReleaser ${version}`);
   } catch {
-    warn(
-      "GoReleaser is not available; release checks need it",
+    fail(
+      "GoReleaser is not available; local runtime image builds and release checks need it",
       "Install GoReleaser v2: https://goreleaser.com/install/",
     );
   }

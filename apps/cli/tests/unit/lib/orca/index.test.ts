@@ -8,8 +8,8 @@ import { Orca } from "../../../../src/lib/orca";
 import type { Detector } from "../../../../src/lib/orca";
 import { detectors } from "../../../../src/lib/orca/detectors";
 import { patchers } from "../../../../src/lib/orca/patchers";
-import type { Scaffolder } from "../../../../src/lib/orca/scaffolders/types";
 import { scaffolders } from "../../../../src/lib/orca/scaffolders";
+import type { Scaffolder } from "../../../../src/lib/orca/scaffolders/types";
 
 const orca = new Orca(detectors, scaffolders, patchers);
 
@@ -74,7 +74,10 @@ describe("Orca selection", () => {
 describe("Orca detection", () => {
   it("detects a Next project and extracts facts", async () => {
     const cwd = await nextProject();
-    await writeFile(join(cwd, "package.json"), JSON.stringify({ scripts: { dev: "next dev -p 4321" }, dependencies: { next: "^15" } }));
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ scripts: { dev: "next dev -p 4321" }, dependencies: { next: "^15" } }),
+    );
     expect(await orca.detect(cwd)).toEqual({
       id: "next",
       appDir: "app",
@@ -86,6 +89,8 @@ describe("Orca detection", () => {
   it("throws E_FRAMEWORK_NOT_DETECTED when nothing matches", async () => {
     await expect(orca.detect(await tmp())).rejects.toMatchObject({
       code: "E_FRAMEWORK_NOT_DETECTED",
+      message: "Could not detect a supported app framework",
+      hint: "Run setup from your app project directory, pass --cwd <path-to-app>, or run setup from an empty directory to scaffold a new app.",
     });
   });
 

@@ -2485,6 +2485,62 @@ func decodeGetMySessionParams(args [0]string, argsEscaped bool, r *http.Request)
 	return params, nil
 }
 
+// GetMyUserParams is parameters of getMyUser operation.
+type GetMyUserParams struct {
+	// The __nextgen_session cookie issued at session creation or superseding handoff exchange.
+	NextgenSession string
+}
+
+func unpackGetMyUserParams(packed middleware.Parameters) (params GetMyUserParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "__nextgen_session",
+			In:   "cookie",
+		}
+		params.NextgenSession = packed[key].(string)
+	}
+	return params
+}
+
+func decodeGetMyUserParams(args [0]string, argsEscaped bool, r *http.Request) (params GetMyUserParams, _ error) {
+	c := uri.NewCookieDecoder(r)
+	// Decode cookie: __nextgen_session.
+	if err := func() error {
+		cfg := uri.CookieParameterDecodingConfig{
+			Name:    "__nextgen_session",
+			Explode: true,
+		}
+		if err := c.HasParam(cfg); err == nil {
+			if err := c.DecodeParam(cfg, func(d uri.Decoder) error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.NextgenSession = c
+				return nil
+			}); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "__nextgen_session",
+			In:   "cookie",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // GetProjectParams is parameters of getProject operation.
 type GetProjectParams struct {
 	ProjectID ProjectID
@@ -4165,7 +4221,7 @@ func decodeListUsersParams(args [0]string, argsEscaped bool, r *http.Request) (p
 
 // RevokeMySessionParams is parameters of revokeMySession operation.
 type RevokeMySessionParams struct {
-	// The session_token cookie issued at session creation or superseding handoff exchange.
+	// The __nextgen_session cookie issued at session creation or superseding handoff exchange.
 	NextgenSession string
 }
 
@@ -4354,6 +4410,147 @@ func decodeRevokeSessionParams(args [1]string, argsEscaped bool, r *http.Request
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "session_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// SetUserPasswordParams is parameters of setUserPassword operation.
+type SetUserPasswordParams struct {
+	// The unique identifier of the project.
+	ProjectID ProjectID
+	UserID    UserID
+}
+
+func unpackSetUserPasswordParams(packed middleware.Parameters) (params SetUserPasswordParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "query",
+		}
+		params.ProjectID = packed[key].(ProjectID)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "user_id",
+			In:   "path",
+		}
+		params.UserID = packed[key].(UserID)
+	}
+	return params
+}
+
+func decodeSetUserPasswordParams(args [1]string, argsEscaped bool, r *http.Request) (params SetUserPasswordParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode query: project_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotProjectIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotProjectIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.ProjectID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode path: user_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "user_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				var paramsDotUserIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotUserIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.UserID = UserID(paramsDotUserIDVal)
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := params.UserID.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "user_id",
 			In:   "path",
 			Err:  err,
 		}

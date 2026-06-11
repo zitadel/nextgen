@@ -2187,16 +2187,16 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 	s.Details = val
 }
 
-func (*ErrorDetails) authorizeDeviceRes()      {}
-func (*ErrorDetails) authorizeGetRes()         {}
-func (*ErrorDetails) createFlowRes()           {}
-func (*ErrorDetails) createProjectRes()        {}
-func (*ErrorDetails) createSessionRes()        {}
-func (*ErrorDetails) deleteFlowDefinitionRes() {}
-func (*ErrorDetails) endSessionRes()           {}
-func (*ErrorDetails) introspectRes()           {}
-func (*ErrorDetails) listFlowDefinitionsRes()  {}
-func (*ErrorDetails) submitFlowStepRes()       {}
+func (*ErrorDetails) authorizeDeviceRes()     {}
+func (*ErrorDetails) authorizeGetRes()        {}
+func (*ErrorDetails) createFlowRes()          {}
+func (*ErrorDetails) createProjectRes()       {}
+func (*ErrorDetails) createSessionRes()       {}
+func (*ErrorDetails) endSessionRes()          {}
+func (*ErrorDetails) getMyUserRes()           {}
+func (*ErrorDetails) introspectRes()          {}
+func (*ErrorDetails) listFlowDefinitionsRes() {}
+func (*ErrorDetails) submitFlowStepRes()      {}
 
 // Additional error-specific context.
 type ErrorDetailsDetails map[string]jx.Raw
@@ -2254,6 +2254,7 @@ func (*ErrorDetailsStatusCode) getHealthRes()              {}
 func (*ErrorDetailsStatusCode) getKeysRes()                {}
 func (*ErrorDetailsStatusCode) getLiveRes()                {}
 func (*ErrorDetailsStatusCode) getMySessionRes()           {}
+func (*ErrorDetailsStatusCode) getMyUserRes()              {}
 func (*ErrorDetailsStatusCode) getOpenIDConfigurationRes() {}
 func (*ErrorDetailsStatusCode) getProjectRes()             {}
 func (*ErrorDetailsStatusCode) getReadyRes()               {}
@@ -2270,6 +2271,7 @@ func (*ErrorDetailsStatusCode) listUsersRes()              {}
 func (*ErrorDetailsStatusCode) revokeMySessionRes()        {}
 func (*ErrorDetailsStatusCode) revokeSessionRes()          {}
 func (*ErrorDetailsStatusCode) revokeTokenRes()            {}
+func (*ErrorDetailsStatusCode) setUserPasswordRes()        {}
 func (*ErrorDetailsStatusCode) submitFlowEventRes()        {}
 func (*ErrorDetailsStatusCode) submitFlowStepRes()         {}
 func (*ErrorDetailsStatusCode) updateFlowDefinitionRes()   {}
@@ -4370,6 +4372,19 @@ func (*GetMySessionNotFound) getMySessionRes() {}
 type GetMySessionUnauthorized ErrorDetails
 
 func (*GetMySessionUnauthorized) getMySessionRes() {}
+
+type GetMyUserOK map[string]jx.Raw
+
+func (s *GetMyUserOK) init() GetMyUserOK {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+func (*GetMyUserOK) getMyUserRes() {}
 
 type GetProjectNotFound ErrorDetails
 
@@ -9396,6 +9411,52 @@ func (o OptUserID) Or(d UserID) UserID {
 	return d
 }
 
+// NewOptUserNotFoundDetails returns new OptUserNotFoundDetails with value set to v.
+func NewOptUserNotFoundDetails(v UserNotFoundDetails) OptUserNotFoundDetails {
+	return OptUserNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserNotFoundDetails is optional UserNotFoundDetails.
+type OptUserNotFoundDetails struct {
+	Value UserNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUserNotFoundDetails was set.
+func (o OptUserNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserNotFoundDetails) Reset() {
+	var v UserNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserNotFoundDetails) SetTo(v UserNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserNotFoundDetails) Get() (v UserNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserNotFoundDetails) Or(d UserNotFoundDetails) UserNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptUserPropertyProperties returns new OptUserPropertyProperties with value set to v.
 func NewOptUserPropertyProperties(v UserPropertyProperties) OptUserPropertyProperties {
 	return OptUserPropertyProperties{
@@ -10532,6 +10593,53 @@ func (s *SessionWithTokenResponseHeaders) SetResponse(val SessionWithTokenRespon
 func (*SessionWithTokenResponseHeaders) createSessionRes()   {}
 func (*SessionWithTokenResponseHeaders) exchangeHandoffRes() {}
 
+type SetUserPasswordBadRequest ErrorDetails
+
+func (*SetUserPasswordBadRequest) setUserPasswordRes() {}
+
+type SetUserPasswordInternalServerError ErrorDetails
+
+func (*SetUserPasswordInternalServerError) setUserPasswordRes() {}
+
+// SetUserPasswordNoContent is response for SetUserPassword operation.
+type SetUserPasswordNoContent struct{}
+
+func (*SetUserPasswordNoContent) setUserPasswordRes() {}
+
+type SetUserPasswordNotFound ErrorDetails
+
+func (*SetUserPasswordNotFound) setUserPasswordRes() {}
+
+// Request to update the user's password.
+// Ref: #
+type SetUserPasswordRequest struct {
+	// The new password for the user.
+	Password string `json:"password"`
+	// Whether the user is required to change their password on the next login.
+	// If not provided, it will default to false.
+	IsChangeRequired OptBool `json:"isChangeRequired"`
+}
+
+// GetPassword returns the value of Password.
+func (s *SetUserPasswordRequest) GetPassword() string {
+	return s.Password
+}
+
+// GetIsChangeRequired returns the value of IsChangeRequired.
+func (s *SetUserPasswordRequest) GetIsChangeRequired() OptBool {
+	return s.IsChangeRequired
+}
+
+// SetPassword sets the value of Password.
+func (s *SetUserPasswordRequest) SetPassword(val string) {
+	s.Password = val
+}
+
+// SetIsChangeRequired sets the value of IsChangeRequired.
+func (s *SetUserPasswordRequest) SetIsChangeRequired(val OptBool) {
+	s.IsChangeRequired = val
+}
+
 // Configuration for a user-invokable action on a step. Keyed by action name
 // in the parent dictionary. The action name is sent back in the submit
 // request as `action`.
@@ -10729,6 +10837,61 @@ func (s *UserAdditional) init() UserAdditional {
 }
 
 type UserID string
+
+// Merged schema.
+// Ref: #
+type UserNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUserNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *UserNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *UserNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *UserNotFound) GetDetails() OptUserNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *UserNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *UserNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *UserNotFound) SetDetails(val OptUserNotFoundDetails) {
+	s.Details = val
+}
+
+func (*UserNotFound) getMyUserRes() {}
+
+// Additional error-specific context.
+type UserNotFoundDetails map[string]jx.Raw
+
+func (s *UserNotFoundDetails) init() UserNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 // This schema is missing `"allOf": [{"$ref": "https://json-schema.org/draft/2020-12/schema"}],`.
 // This is done because a lot of code generators cannot handle that.
