@@ -41,7 +41,7 @@ type GetMyUserInput struct {
 // ---- Implementation -------------------------------------------------------------
 
 type UserService struct {
-	pool         database.Pool
+	dbClient     database.QueryExecutor
 	userRepo     domain.UserRepository
 	passwordRepo domain.UserPasswordRepository
 	schemaRepo   domain.JSONSchemaRepository
@@ -50,7 +50,7 @@ type UserService struct {
 }
 
 func NewUserService(
-	pool database.Pool,
+	dbClient database.QueryExecutor,
 	userRepo domain.UserRepository,
 	passwordRepo domain.UserPasswordRepository,
 	schemaRepo domain.JSONSchemaRepository,
@@ -58,7 +58,7 @@ func NewUserService(
 	hasher crypto.Hasher,
 ) *UserService {
 	return &UserService{
-		pool:         pool,
+		dbClient:     dbClient,
 		userRepo:     userRepo,
 		passwordRepo: passwordRepo,
 		schemaRepo:   schemaRepo,
@@ -76,7 +76,7 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 			WithDetails("No $schema provided for the user. A schema must be provided when creating a new user. Against this schema, the user will be validated")
 	}
 
-	schemaEntity, err := s.schemaRepo.GetByID(ctx, s.pool, input.ProjectID, schemaURL)
+	schemaEntity, err := s.schemaRepo.GetByID(ctx, s.dbClient, input.ProjectID, schemaURL)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrUserInvalid().WithDetails("$schema is not known to the system. First create a schema, then create users.")
@@ -114,7 +114,7 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 
 	// SAVE USER
 
-	err = s.userRepo.Create(ctx, s.pool, createUser)
+	err = s.userRepo.Create(ctx, s.dbClient, createUser)
 	if err != nil {
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
 			return nil, domain.ErrUserAlreadyExists().WithParent(err)
@@ -127,7 +127,7 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 }
 
 func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[string]any, error) {
-	flatUser, err := s.userRepo.GetByID(ctx, s.pool, input.ProjectID, input.TeamID, input.UserID)
+	flatUser, err := s.userRepo.GetByID(ctx, s.dbClient, input.ProjectID, input.TeamID, input.UserID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrUserNotFound()
@@ -150,15 +150,16 @@ func (s *UserService) SetPassword(ctx context.Context, input SetPasswordInput) (
 		return err
 	}
 
-	tx, err := s.pool.Begin(ctx, nil)
+	beginner, ok := s.dbClient.(database.Beginner)
+	if !ok {
+		return domain.ErrInternal(database.ErrNotABeginner)
+	}
+
+	tx, err := beginner.Begin(ctx, nil)
 	if err != nil {
 		return domain.ErrInternal(err).WithMessage("failed to create transaction")
 	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(ctx)
-		}
-	}()
+	defer func() { err = tx.End(ctx, err) }()
 
 	err = s.passwordRepo.DeleteByUserID(ctx, tx, input.ProjectID, input.UserID)
 	if err != nil {
@@ -179,10 +180,6 @@ func (s *UserService) SetPassword(ctx context.Context, input SetPasswordInput) (
 		return domain.ErrInternal(err).WithMessage("failed to set initial password")
 	}
 
-	err = tx.Commit(ctx)
-	if err != nil {
-		return domain.ErrInternal(err).WithMessage("failed to commit transaction while setting password")
-	}
 	return nil
 }
 
@@ -198,7 +195,7 @@ func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]by
 		return nil, domain.ErrUserNotFound()
 	}
 
-	user, err := s.userRepo.GetByID(ctx, s.pool, sessionToken.ProjectID, nil, *sessionToken.UserID)
+	user, err := s.userRepo.GetByID(ctx, s.dbClient, sessionToken.ProjectID, nil, *sessionToken.UserID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrUserNotFound()

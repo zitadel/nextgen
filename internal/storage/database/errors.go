@@ -8,6 +8,8 @@ import (
 var (
 	ErrNoChanges           = errors.New("update must contain a change")
 	ErrInvalidChangeTarget = errors.New("change target must not be nil")
+	// ErrNotABeginner is used when obj.(Beginner) type assertion fails
+	ErrNotABeginner = errors.New("database.Beginner not implemented")
 )
 
 type MissingConditionError struct {
