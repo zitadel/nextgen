@@ -1,5 +1,5 @@
 import { MANAGED_MARKER } from "../../../../paths";
-import { PROXY_PATH } from "../vite-proxy";
+import { PROXY_PATH } from "../vite-support";
 
 /**
  * The managed root component `src/app/app.ts`: a standalone component that
