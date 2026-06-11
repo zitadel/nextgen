@@ -78,7 +78,7 @@ async function applyOp(
       await addDependency(abs(opts.cwd, "package.json"), op, opts.dryRun, result);
       break;
     case "edit":
-      await editFile(abs(opts.cwd, op.path), op.edit, opts.dryRun, result);
+      await editFile(opts.cwd, op.path, op.edit, opts.dryRun, result);
       break;
   }
 }
@@ -86,14 +86,27 @@ async function applyOp(
 /**
  * Generic content edit: read the file, run the patcher-supplied transform, write
  * the result. Framework knowledge lives entirely in `edit` (next to its
- * patcher); this executor only owns idempotency, dry-run, and the atomic write.
+ * patcher); this executor only owns candidate resolution, idempotency, dry-run,
+ * and the atomic write. `pathOrPaths` may be a single path or a priority list of
+ * candidates — the first that exists wins, else the first candidate.
  */
 async function editFile(
-  path: string,
+  cwd: string,
+  pathOrPaths: string | ReadonlyArray<string>,
   edit: (source: string | undefined) => string,
   dryRun: boolean,
   result: ScaffoldAccumulator,
 ): Promise<void> {
+  const candidates = (typeof pathOrPaths === "string" ? [pathOrPaths] : pathOrPaths).map((p) =>
+    abs(cwd, p),
+  );
+  let path = candidates[0];
+  for (const candidate of candidates) {
+    if ((await readIfExists(candidate)) !== undefined) {
+      path = candidate;
+      break;
+    }
+  }
   const source = await readIfExists(path);
   const next = edit(source);
   if (next === source) {

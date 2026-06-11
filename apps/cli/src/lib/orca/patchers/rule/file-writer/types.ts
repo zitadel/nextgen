@@ -50,9 +50,14 @@ export type FileOp =
        * structured edit of `angular.json`) and lives next to its patcher. It must
        * be pure (no I/O) and may throw a `ZitadelError` when it cannot proceed.
        * Idempotent: a transform whose output equals the input is skipped.
+       *
+       * `path` may be a single path or a priority list of candidate paths (e.g.
+       * the `vite.config.{ts,mts,js,…}` variants) — the executor edits the first
+       * one that exists, falling back to the first candidate when none do. The
+       * candidate list itself is generic; which paths to try is the patcher's call.
        */
       readonly kind: "edit";
-      readonly path: string;
+      readonly path: string | ReadonlyArray<string>;
       readonly edit: (source: string | undefined) => string;
     };
 

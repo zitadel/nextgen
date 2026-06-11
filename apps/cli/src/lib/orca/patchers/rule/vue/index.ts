@@ -1,7 +1,7 @@
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
-import { viteProxyEdit } from "../vite-proxy";
+import { type ViteSupport, buildViteProxyOp } from "../vite-support";
 import { appTemplate } from "./templates";
 
 const SDK_DEPENDENCY = "@zitadel/sdk-vue";
@@ -13,15 +13,19 @@ const SDK_DEPENDENCY = "@zitadel/sdk-vue";
  * that adds the `/__nextgen` dev proxy (injecting the project service-key on
  * `/sessions/exchange`), the `VITE_`-prefixed project id, and the SDK dep.
  */
-export class VuePatcher extends AbstractRulePatcher {
+export class VuePatcher extends AbstractRulePatcher implements ViteSupport {
   canPatch(framework: string): boolean {
     return framework === "vue";
+  }
+
+  viteProxyOp(devPort: number): FileOp {
+    return buildViteProxyOp(devPort);
   }
 
   protected routeOps(ctx: PatchContext): FileOp[] {
     return [
       { kind: "write", path: "src/App.vue", contents: appTemplate(), overwrite: true },
-      { kind: "edit", path: "vite.config.ts", edit: viteProxyEdit(ctx.framework.devPort) },
+      this.viteProxyOp(ctx.framework.devPort),
       { kind: "merge-env", path: ".env.example", entries: { VITE_ZITADEL_PROJECT_ID: "" } },
       { kind: "merge-env", path: ".env.local", entries: { VITE_ZITADEL_PROJECT_ID: ctx.project.id } },
       {
