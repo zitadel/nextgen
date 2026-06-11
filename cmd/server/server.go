@@ -190,7 +190,14 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		flowDefinitionRepo,
 	)
 	teamService := service.NewTeamService(pool, teamRepo)
-	userService := service.NewUserService(pool, userRepo, userPasswordRepo, schemaRepo, crypter, passwordHasher)
+	userService := service.NewUserService(
+		pool,
+		userRepo,
+		userPasswordRepo,
+		schemaRepo,
+		passwordHasher,
+		opaqueTokenGenerator,
+	)
 
 	// ── Flow engine ──────────────────
 	ids := idgen.NewULID()
