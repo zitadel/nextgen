@@ -100,8 +100,10 @@ func buildFlowField(stepName, name string, propSchema *jsonschema.Schema, requir
 	return field
 }
 
-// deriveFieldType maps the property's `format` to a [FlowFieldType].
-// `x-password: true` forces a password input regardless of `format`.
+// deriveFieldType maps the property's `format`, `enum`, and JSON
+// `type` keywords to a [FlowFieldType]. `x-password: true` forces a
+// password input regardless of the other keywords. A closed `enum`
+// surfaces as `select`; JSON `type: boolean` surfaces as `checkbox`.
 func deriveFieldType(propSchema *jsonschema.Schema) FlowFieldType {
 	if isPassword(propSchema) {
 		return FlowFieldTypePassword
@@ -113,6 +115,12 @@ func deriveFieldType(propSchema *jsonschema.Schema) FlowFieldType {
 		return FlowFieldTypeURL
 	case "date", "date-time":
 		return FlowFieldTypeDate
+	}
+	if len(lookupStringEnum(propSchema)) > 0 {
+		return FlowFieldTypeSelect
+	}
+	if lookupJSONType(propSchema) == "boolean" {
+		return FlowFieldTypeCheckbox
 	}
 	return FlowFieldTypeText
 }
@@ -148,11 +156,62 @@ func buildValidation(propSchema *jsonschema.Schema) *FlowFieldValidation {
 		Format:    lookupString(propSchema, "format"),
 		MinLength: lookupInt(propSchema, "minLength"),
 		MaxLength: lookupInt(propSchema, "maxLength"),
+		Enum:      lookupStringEnum(propSchema),
 	}
-	if v.Format == "" && v.MinLength == 0 && v.MaxLength == 0 {
+	if v.Format == "" && v.MinLength == 0 && v.MaxLength == 0 && len(v.Enum) == 0 {
 		return nil
 	}
 	return &v
+}
+
+// lookupJSONType returns the property's JSON `type` keyword as a single
+// string. JSON Schema allows `type` to be either a string or an array
+// of strings; when it is an array, the first entry is returned. Use it
+// only as a hint for input-kind selection — the production validator
+// honours the full type set.
+func lookupJSONType(schema *jsonschema.Schema) string {
+	v, ok := schema.LookupKeyword("type")
+	if !ok {
+		return ""
+	}
+	if s, ok := v.(types.PartStringOrStrings); ok {
+		if s.String != "" {
+			return s.String
+		}
+		if len(s.Strings) > 0 {
+			return s.Strings[0]
+		}
+	}
+	return ""
+}
+
+// lookupStringEnum returns the property's `enum` keyword, restricted to
+// string entries. Non-string entries are skipped: the user meta-schema
+// surfaces enums only for closed text choices today; numeric/boolean
+// enums (if ever added) would need a richer wire type.
+func lookupStringEnum(schema *jsonschema.Schema) []string {
+	v, ok := schema.LookupKeyword("enum")
+	if !ok {
+		return nil
+	}
+	part, ok := v.(types.PartAny)
+	if !ok {
+		return nil
+	}
+	raw, ok := part.V.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(raw))
+	for _, item := range raw {
+		if s, ok := item.(string); ok {
+			out = append(out, s)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // passwordAuthEnabled reports whether the root schema declares

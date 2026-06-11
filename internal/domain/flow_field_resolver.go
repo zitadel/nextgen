@@ -115,6 +115,7 @@ const (
 //   - Format    ↔ `format` (enum: email, date-time, uuid, uri)
 //   - MinLength ↔ `minLength`
 //   - MaxLength ↔ `maxLength`
+//   - Enum      ↔ `enum` (closed set of allowed string values)
 //
 // Zero values mean "no rule". JSON Schema's `pattern` keyword is not
 // part of the user meta-schema and is intentionally not surfaced.
@@ -122,6 +123,7 @@ type FlowFieldValidation struct {
 	Format    string
 	MinLength int
 	MaxLength int
+	Enum      []string
 }
 
 // FlowFieldType names the input kind the client should render. Mirrors
@@ -137,6 +139,8 @@ const (
 	FlowFieldTypeURL      FlowFieldType = "url"
 	FlowFieldTypeDate     FlowFieldType = "date"
 	FlowFieldTypeHidden   FlowFieldType = "hidden"
+	FlowFieldTypeCheckbox FlowFieldType = "checkbox"
+	FlowFieldTypeSelect   FlowFieldType = "select"
 )
 
 // FlowFieldValidationRule names a schema-derived validation rule the
