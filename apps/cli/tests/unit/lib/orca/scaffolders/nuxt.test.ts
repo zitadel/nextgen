@@ -44,6 +44,8 @@ describe("NuxtScaffolder", () => {
       "--force",
     ]);
     expect(opts).toMatchObject({ cwd: "/tmp/proj" });
+    // Nuxt 4 puts app.vue under app/; older Nuxt at the root — both removed.
+    expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "app/app.vue"), { force: true });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "app.vue"), { force: true });
   });
 

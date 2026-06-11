@@ -1,3 +1,5 @@
+import { join } from "node:path";
+
 import { npmDistTagForCliVersion } from "../../../../public-cli";
 import { configCandidates } from "../config-paths";
 import type { FileOp } from "../file-writer/types";
@@ -30,17 +32,20 @@ export class NuxtPatcher extends AbstractRulePatcher {
   }
 
   protected routeOps(ctx: PatchContext): FileOp[] {
+    const src = (rel: string) => join(ctx.framework.appDir, rel);
     return [
-      { kind: "write", path: "app.vue", contents: appVueTemplate() },
-      { kind: "write", path: "pages/login.vue", contents: loginPageTemplate() },
-      { kind: "write", path: "pages/register.vue", contents: registerPageTemplate() },
-      { kind: "write", path: "pages/profile.vue", contents: profilePageTemplate() },
+      // app.vue/pages/plugins live under the Nuxt srcDir (`app/` on Nuxt 4, the
+      // root on Nuxt 3); nuxt.config, env, and the dep stay at the project root.
+      { kind: "write", path: src("app.vue"), contents: appVueTemplate() },
+      { kind: "write", path: src("pages/login.vue"), contents: loginPageTemplate() },
+      { kind: "write", path: src("pages/register.vue"), contents: registerPageTemplate() },
+      { kind: "write", path: src("pages/profile.vue"), contents: profilePageTemplate() },
       {
         kind: "write",
-        path: "plugins/zitadel-components.client.ts",
+        path: src("plugins/zitadel-components.client.ts"),
         contents: componentsPluginTemplate(),
       },
-      { kind: "write", path: "plugins/auth.server.ts", contents: authPluginTemplate() },
+      { kind: "write", path: src("plugins/auth.server.ts"), contents: authPluginTemplate() },
       {
         kind: "edit",
         path: [...NUXT_CONFIG_PATHS],
@@ -60,14 +65,15 @@ export class NuxtPatcher extends AbstractRulePatcher {
     ];
   }
 
-  protected routeFiles(_view: PatchView): ReadonlyArray<string> {
+  protected routeFiles(view: PatchView): ReadonlyArray<string> {
+    const src = (rel: string) => join(view.framework.appDir, rel);
     return [
-      "app.vue",
-      "pages/login.vue",
-      "pages/register.vue",
-      "pages/profile.vue",
-      "plugins/zitadel-components.client.ts",
-      "plugins/auth.server.ts",
+      src("app.vue"),
+      src("pages/login.vue"),
+      src("pages/register.vue"),
+      src("pages/profile.vue"),
+      src("plugins/zitadel-components.client.ts"),
+      src("plugins/auth.server.ts"),
     ];
   }
 
