@@ -13,32 +13,38 @@ Next iteration of the Zitadel identity platform.
 
 ### I am contributing to Zitadel
 
-| I want to... | Run |
-| --- | --- |
-| Check my setup | `corepack pnpm run doctor` |
-| Try the local Zitadel CLI | `corepack pnpm run cli -- --help` |
-| Run the server from source | `corepack pnpm run server -- --help` |
-| Test the fresh-app onboarding path | `corepack pnpm run journey` |
-| Run normal local checks | `corepack pnpm run check` |
-| Mirror CI locally | `corepack pnpm run check -- --full` |
-| Rerun one failed phase | `corepack pnpm run check -- --only node` |
+| I want to...                       | Run                                      |
+| ---------------------------------- | ---------------------------------------- |
+| Check my setup                     | `corepack pnpm run doctor`               |
+| Try the local Zitadel CLI          | `corepack pnpm run cli -- --help`        |
+| Run the server from source         | `corepack pnpm run server -- --help`     |
+| Test the fresh-app onboarding path | `corepack pnpm run journey`              |
+| Run normal local checks            | `corepack pnpm run check`                |
+| Mirror CI locally                  | `corepack pnpm run check -- --full`      |
+| Rerun one failed phase             | `corepack pnpm run check -- --only node` |
 
 ### I am adding Zitadel to my app
 
-| I want to... | Run |
-| --- | --- |
-| Check local runtime prerequisites | `npx @zitadel/cli@alpha doctor` |
-| Start local Zitadel | `npx @zitadel/cli@alpha start` |
-| Add auth to a Next.js app | `npx @zitadel/cli@alpha setup --framework next --server local` |
-| Check generated app files | `npx @zitadel/cli@alpha doctor` |
-| Stop local Zitadel, keeping data | `npx @zitadel/cli@alpha stop` |
-| Delete local Zitadel data | `npx @zitadel/cli@alpha reset --force` |
+| I want to...                      | Run                                                            |
+| --------------------------------- | -------------------------------------------------------------- |
+| Check local runtime prerequisites | `npx @zitadel/cli@alpha doctor`                                |
+| Start local Zitadel               | `npx @zitadel/cli@alpha start`                                 |
+| Add auth to a Next.js app         | `npx @zitadel/cli@alpha setup --framework next --server local` |
+| Check generated app files         | `npx @zitadel/cli@alpha doctor`                                |
+| Stop local Zitadel, keeping data  | `npx @zitadel/cli@alpha stop`                                  |
+| Delete local Zitadel data         | `npx @zitadel/cli@alpha reset --force`                         |
 
 Nx manages TypeScript workspace targets. Go commands and long-running local
 orchestration run through repository scripts so server processes are signaled
 and cleaned up directly. The published `zitadel` runtime commands are customer
 workflow commands; they run the released container image through Docker and do
 not require Go, Nx, or a source checkout.
+
+For contributors, `corepack pnpm run cli -- start` builds and uses a fresh
+local runtime image by default. The wrapper runs the CLI build, then builds
+`ghcr.io/zitadel/nextgen:local-dev` through GoReleaser's single-target build
+before invoking `zitadel start`. Pass `--image <tag>` or set
+`ZITADEL_LOCAL_IMAGE=<tag>` to use an existing image instead.
 
 `corepack pnpm run server` builds and syncs the embedded console/login UI before
 startup, then runs `go run .`; help output skips the UI sync.
@@ -51,14 +57,14 @@ cd myapp
 npx @zitadel/cli@alpha doctor
 npx @zitadel/cli@alpha start
 npx @zitadel/cli@alpha setup --framework next --server local
-npm install
 npm run dev
 ```
 
 Open http://localhost:3000/login and register your first local user. The
 managed Zitadel runtime stores its container metadata and data under
 `.zitadel/local/`; `stop` preserves that data and `reset --force`
-deletes it.
+deletes it. `setup` installs dependencies with the detected package manager;
+pass `--skip-install` if you want to install them yourself.
 
 ## Manual Docker quick start
 
@@ -71,11 +77,11 @@ cp env.example .env
 docker compose up -d
 ```
 
-| Surface | URL |
-| ------- | --- |
+| Surface            | URL                               |
+| ------------------ | --------------------------------- |
 | Management console | http://localhost:8080/ui/console/ |
-| Sign-in shell | http://localhost:8080/ui/login/ |
-| Health | http://localhost:8080/healthz |
+| Sign-in shell      | http://localhost:8080/ui/login/   |
+| Health             | http://localhost:8080/healthz     |
 
 Details: [docs/quick-start/index.md](docs/quick-start/index.md). To build from source: [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -96,6 +102,11 @@ Use Node.js from [.nvmrc](.nvmrc) and the pinned pnpm 10 workspace manager from
 corepack pnpm run doctor
 corepack pnpm run check
 ```
+
+The repository doctor checks Docker and GoReleaser because contributor
+`corepack pnpm run cli -- start` auto-builds the local runtime image from this
+source checkout. Playwright browsers remain advisory for opt-in e2e and journey
+workflows.
 
 `corepack pnpm run check -- --full` runs the slower CI-parity phases, including
 integration tests, demo e2e, package smoke checks, GoReleaser, and the fresh-app

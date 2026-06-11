@@ -43,6 +43,7 @@ describe("patch then eject round-trip", () => {
       cwd,
       "--non-interactive",
       "--json",
+      "--skip-install",
     ]);
     expect(setup.exitCode).toBe(0);
     expect((parseJson(setup.stdout) as { status: string }).status).toBe("ok");
@@ -54,7 +55,10 @@ describe("patch then eject round-trip", () => {
     expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toContain(MANAGED_MARKER);
 
     // Simulate the user replacing the register page with their own (unmarked) file.
-    await writeFile(join(cwd, "app/register/page.tsx"), "export default function Page() { return null; }\n");
+    await writeFile(
+      join(cwd, "app/register/page.tsx"),
+      "export default function Page() { return null; }\n",
+    );
 
     const eject = await cli(["eject", "--cwd", cwd, "--force", "--json"]);
     expect(eject.exitCode).toBe(0);

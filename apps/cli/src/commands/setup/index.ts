@@ -1,16 +1,16 @@
-import { Flags } from "@oclif/core";
 import { intro, outro } from "@clack/prompts";
+import { Flags } from "@oclif/core";
+import { createZitadelClient } from "@zitadel/api/client";
+import type { CreateProject201 } from "@zitadel/api/generated/model";
 import { consola } from "consola";
 
-import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import { ZitadelError } from "../../lib/errors";
+import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import { createOrca, issuerFromPort, type FrameworkFacts, type Orca } from "../../lib/orca";
-import type { PatchContext } from "../../lib/orca/patchers/types";
 import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/registry";
-import type { CreateProject201 } from "@zitadel/api/generated/model";
-import { createZitadelClient } from "@zitadel/api/client";
-
+import type { PatchContext } from "../../lib/orca/patchers/types";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
+import { installDependenciesForSetup } from "./install";
 import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
 import {
   detectProjectFacts,
@@ -51,7 +51,13 @@ export default class Setup extends BaseCommand {
   static override examples = ["<%= config.bin %> setup --framework next"];
   static override flags = {
     framework: Flags.string({ description: "Framework to target.", options: FRAMEWORK_OPTIONS }),
-    renderer: Flags.string({ description: "Renderer (default: react).", options: [...RENDERER_IDS] }),
+    renderer: Flags.string({
+      description: "Renderer (default: react).",
+      options: [...RENDERER_IDS],
+    }),
+    "skip-install": Flags.boolean({
+      description: "Do not install dependencies after setup updates package.json.",
+    }),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -75,7 +81,9 @@ export default class Setup extends BaseCommand {
     let scaffoldedFramework = false;
     try {
       framework = await orca.detect(cwd, flags.framework);
-      consola.success(`Detected ${framework.id}${framework.devPort ? ` (dev port ${framework.devPort})` : ""}`);
+      consola.success(
+        `Detected ${framework.id}${framework.devPort ? ` (dev port ${framework.devPort})` : ""}`,
+      );
     } catch (error) {
       if (
         error instanceof ZitadelError &&
@@ -83,7 +91,10 @@ export default class Setup extends BaseCommand {
         (await orca.isEmpty(cwd))
       ) {
         consola.info("Empty directory — scaffolding a fresh project");
-        framework = await orca.scaffold(cwd, await resolveScaffoldFramework(flags.framework, nonInteractive, orca));
+        framework = await orca.scaffold(
+          cwd,
+          await resolveScaffoldFramework(flags.framework, nonInteractive, orca),
+        );
         scaffoldedFramework = true;
         consola.success(`Scaffolded ${framework.id} skeleton`);
       } else {
@@ -139,6 +150,17 @@ export default class Setup extends BaseCommand {
         (result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""),
     );
 
+    const installOutcome = await installDependenciesForSetup({
+      cwd,
+      depsAdded: result.depsAdded,
+      dryRun,
+      env: this.meta.env,
+      issuer,
+      json: this.jsonEnabled(),
+      scaffoldedFramework,
+      skipInstall: Boolean(flags["skip-install"]),
+    });
+
     const writtenRel = result.filesWritten.map((file) => relativeDisplay(cwd, file));
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
@@ -159,11 +181,7 @@ export default class Setup extends BaseCommand {
       // pre-coloured rows (path/url/id helpers) survive intact.
       consola.box({
         title: "Zitadel is ready",
-        message: [
-          renderSummary(sections),
-          "",
-          `Open your app on ${styleUrl(`${issuer}/login`)} and register your first user.`,
-        ].join("\n"),
+        message: [renderSummary(sections), "", installOutcome.nextActions.join("\n")].join("\n"),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
     }
@@ -182,8 +200,9 @@ export default class Setup extends BaseCommand {
         server: answers.server,
         files_written: result.filesWritten.map((file) => relativeDisplay(cwd, file)),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
-        next_actions: [`Start your project: npm install && npm run dev (then open ${issuer}/login)`],
-        next_commands: ["npm install", "npm run dev"],
+        install: installOutcome.install,
+        next_actions: installOutcome.nextActions,
+        next_commands: installOutcome.nextCommands,
       },
     });
   }
@@ -204,7 +223,7 @@ async function resolveScaffoldFramework(
   }
   if (nonInteractive) {
     throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Empty directory — pass --framework", {
-      hint: "Example: --framework next",
+      hint: "Run without --json/--non-interactive to choose from a prompt, or pass --framework for scripted setup.",
     });
   }
   return new PickFrameworkPrompt().ask(orca.availableFrameworks());
@@ -261,11 +280,7 @@ function describeWrittenFile(relPath: string, dryRun: boolean): string | null {
   // Mkdir ops surface in `filesWritten` alongside actual file writes.
   // They're noise at the per-step layer (the files inside them get
   // narrated on their own lines), so swallow them here.
-  if (
-    relPath === ".zitadel" ||
-    relPath === ".zitadel/flows" ||
-    relPath === ".zitadel/schemas"
-  ) {
+  if (relPath === ".zitadel" || relPath === ".zitadel/flows" || relPath === ".zitadel/schemas") {
     return null;
   }
   const verb = dryRun ? "Would write" : "Wrote";
@@ -310,9 +325,7 @@ function buildSummary(opts: {
   const sdkPackage = "@zitadel/sdk-next";
   const packageJsonHit = pickWrittenFile(writtenRel, "package.json");
 
-  const detected: Row[] = [
-    { label: "Framework", value: formatFrameworkLine(projectFacts) },
-  ];
+  const detected: Row[] = [{ label: "Framework", value: formatFrameworkLine(projectFacts) }];
   if (scaffoldedFramework) {
     detected.push({ label: "Scaffold", value: "fresh project (no existing files)" });
   }

@@ -3,8 +3,8 @@
 Scaffolds Zitadel auth (login, register, profile, middleware) into a Next.js app.
 
 ```sh
-npx @zitadel/cli@latest start
-npx @zitadel/cli@latest setup --framework next --server local
+npx @zitadel/cli@alpha start
+npx @zitadel/cli@alpha setup --framework next --server local
 ```
 
 > **Beta.** This is the **next-generation Zitadel**, a ground-up rewrite of the platform. It is distinct from the established Zitadel at [github.com/zitadel/zitadel](https://github.com/zitadel/zitadel). APIs and CLI flags will change.
@@ -20,10 +20,9 @@ npx @zitadel/cli@latest setup --framework next --server local
 ```sh
 npx create-next-app@latest my-app
 cd my-app
-npx @zitadel/cli@latest doctor
-npx @zitadel/cli@latest start
-npx @zitadel/cli@latest setup --framework next --server local
-npm install
+npx @zitadel/cli@alpha doctor
+npx @zitadel/cli@alpha start
+npx @zitadel/cli@alpha setup --framework next --server local
 npm run dev
 ```
 
@@ -31,10 +30,11 @@ npm run dev
 under `.zitadel/local/`. It uses `ghcr.io/zitadel/nextgen:latest` unless
 overridden with `--image` or `ZITADEL_LOCAL_IMAGE`. `setup --server local`
 creates a project on that local server, scaffolds `app/login`, `app/register`, and
-`middleware.ts`, and writes `.env.local` and `.zitadel/`. The project's default
-user schema and login flow are provisioned server-side at creation time, so the
-CLI does not scaffold or upload them. Open `http://localhost:3000/login` to see
-the login page.
+`middleware.ts`, writes `.env.local` and `.zitadel/`, and installs dependencies
+with the detected package manager. Pass `--skip-install` to install them
+yourself. The project's default user schema and login flow are provisioned
+server-side at creation time, so the CLI does not scaffold or upload them.
+Open `http://localhost:3000/login` to see the login page.
 
 The default project flow supports password registration/login, passkey
 registration/login, and optional passkey setup after password registration.
@@ -54,21 +54,22 @@ passkey can sign in with either credential.
 <summary>Full command reference</summary>
 
 <!-- commands -->
-* [`zitadel autocomplete [SHELL]`](#zitadel-autocomplete-shell)
-* [`zitadel commands`](#zitadel-commands)
-* [`zitadel doctor`](#zitadel-doctor)
-* [`zitadel eject`](#zitadel-eject)
-* [`zitadel help [COMMAND]`](#zitadel-help-command)
-* [`zitadel logs`](#zitadel-logs)
-* [`zitadel reset`](#zitadel-reset)
-* [`zitadel search`](#zitadel-search)
-* [`zitadel setup`](#zitadel-setup)
-* [`zitadel start`](#zitadel-start)
-* [`zitadel status`](#zitadel-status)
-* [`zitadel stop`](#zitadel-stop)
-* [`zitadel uninstall`](#zitadel-uninstall)
-* [`zitadel version`](#zitadel-version)
-* [`zitadel which`](#zitadel-which)
+
+- [`zitadel autocomplete [SHELL]`](#zitadel-autocomplete-shell)
+- [`zitadel commands`](#zitadel-commands)
+- [`zitadel doctor`](#zitadel-doctor)
+- [`zitadel eject`](#zitadel-eject)
+- [`zitadel help [COMMAND]`](#zitadel-help-command)
+- [`zitadel logs`](#zitadel-logs)
+- [`zitadel reset`](#zitadel-reset)
+- [`zitadel search`](#zitadel-search)
+- [`zitadel setup`](#zitadel-setup)
+- [`zitadel start`](#zitadel-start)
+- [`zitadel status`](#zitadel-status)
+- [`zitadel stop`](#zitadel-stop)
+- [`zitadel uninstall`](#zitadel-uninstall)
+- [`zitadel version`](#zitadel-version)
+- [`zitadel which`](#zitadel-which)
 
 ## `zitadel autocomplete [SHELL]`
 
@@ -279,7 +280,7 @@ Create a Zitadel project and scaffold local auth.
 ```
 USAGE
   $ zitadel setup [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
-    [--framework next] [--renderer react|web-component]
+    [--framework next] [--renderer react|web-component] [--skip-install]
 
 FLAGS
   -c, --cwd=<value>         Project directory to operate on.
@@ -292,6 +293,7 @@ FLAGS
                             <options: next>
       --renderer=<option>   Renderer (default: react).
                             <options: react|web-component>
+      --skip-install        Do not install dependencies after setup updates package.json.
       --verbose             Verbose logging.
 
 GLOBAL FLAGS
@@ -459,6 +461,7 @@ EXAMPLES
 ```
 
 _See code: [@oclif/plugin-which](https://github.com/oclif/plugin-which/blob/3.2.55/src/commands/which.ts)_
+
 <!-- commandsstop -->
 
 </details>

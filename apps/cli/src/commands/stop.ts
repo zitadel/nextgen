@@ -1,10 +1,11 @@
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { stopAndRemoveContainer } from "../lib/local-server/docker";
 import {
   DEFAULT_LOCAL_SERVER_URL,
   localContainerName,
   readRuntimeMetadata,
 } from "../lib/local-server/runtime";
+import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { publicCliCommand } from "../lib/public-cli";
 
 export default class Stop extends BaseCommand {
   static override description = "Stop the local Zitadel server.";
@@ -28,7 +29,7 @@ export default class Stop extends BaseCommand {
             data_preserved: true,
             data_dir: runtime?.data_dir,
           },
-          next_commands: ["zitadel stop"],
+          next_commands: [publicCliCommand("stop", this.meta.cliVersion)],
         },
       });
     }
@@ -44,7 +45,6 @@ export default class Stop extends BaseCommand {
           data_preserved: true,
           data_dir: runtime?.data_dir,
         },
-        next_commands: ["zitadel start", "zitadel reset --force"],
       },
     });
   }

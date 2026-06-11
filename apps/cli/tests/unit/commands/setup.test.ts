@@ -76,10 +76,20 @@ describe("setup command", () => {
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as {
       status: string;
-      data: { project: { project_id: string } };
+      data: {
+        install: { status: string; reason: string; command: string };
+        next_commands: string[];
+        project: { project_id: string };
+      };
     };
     expect(json.status).toBe("ok");
     expect(json.data.project.project_id).toBe("dry-run-0000");
+    expect(json.data.install).toMatchObject({
+      status: "skipped",
+      reason: "dry-run",
+      command: "npm install",
+    });
+    expect(json.data.next_commands).toEqual(["npm install", "npm run dev"]);
   });
 
   it("errors in a non-interactive empty directory without --framework", async () => {
@@ -89,8 +99,10 @@ describe("setup command", () => {
     const res = await setup(cwd);
 
     expect(res.exitCode).toBe(3);
-    const json = parseJson(res.stdout) as { status: string; code: string };
+    const json = parseJson(res.stdout) as { status: string; code: string; hint: string };
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_FRAMEWORK_NOT_DETECTED");
+    expect(json.hint).toContain("Run without --json/--non-interactive");
+    expect(json.hint).not.toContain("next");
   });
 });
