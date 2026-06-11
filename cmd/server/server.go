@@ -309,6 +309,7 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("instrumentation.log.errors.report_location", true)
 	v.SetDefault("instrumentation.log.errors.stack_trace", true)
 	//v.SetDefault("instrumentation.log.exporter.type", zotel.ExporterTypeStdOut)
+	v.SetDefault("instrumentation.trace.fraction", 1.0)
 	v.SetDefault("instrumentation.trace.exporter.type", zotel.ExporterTypeStdOut)
 	//v.SetDefault("instrumentation.metric.exporter.type", zotel.ExporterTypeStdOut)
 
