@@ -261,6 +261,15 @@ func (UnimplementedHandler) GetMySession(ctx context.Context, params GetMySessio
 	return r, ht.ErrNotImplemented
 }
 
+// GetMyUser implements getMyUser operation.
+//
+// Get my user information.
+//
+// GET /users/me
+func (UnimplementedHandler) GetMyUser(ctx context.Context, params GetMyUserParams) (r GetMyUserRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetOpenIDConfiguration implements getOpenIDConfiguration operation.
 //
 // Retrieve the OpenID Connect configuration.

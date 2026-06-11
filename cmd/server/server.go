@@ -189,7 +189,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		flowDefinitionRepo,
 	)
 	teamService := service.NewTeamService(pool, teamRepo)
-	userService := service.NewUserService(pool, userRepo, userPasswordRepo, schemaRepo, passwordHasher)
+	userService := service.NewUserService(pool, userRepo, userPasswordRepo, schemaRepo, crypter, passwordHasher)
 
 	// ── Flow engine ──────────────────
 	ids := idgen.NewULID()

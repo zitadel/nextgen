@@ -1,9 +1,9 @@
 import type { Orca } from "../../../lib/orca";
 
-/** Pass/fail outcome of a single {@link SanityCheck}. */
+/** Pass/fail/advisory outcome of a single {@link SanityCheck}. */
 export type CheckOutcome = {
   name: string;
-  status: "pass" | "fail";
+  status: "pass" | "warn" | "fail";
   message: string;
   path?: string;
 };

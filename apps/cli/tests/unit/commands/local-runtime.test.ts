@@ -48,15 +48,11 @@ describe("local runtime commands", () => {
 
     const dockerCalls = await readDockerCalls(fake.logPath);
     expect(dockerCalls).toContainEqual(["image", "inspect", "ghcr.io/zitadel/nextgen:latest"]);
-    expect(dockerCalls).toContainEqual([
-      "manifest",
-      "inspect",
-      "ghcr.io/zitadel/nextgen:latest",
-    ]);
+    expect(dockerCalls).toContainEqual(["manifest", "inspect", "ghcr.io/zitadel/nextgen:latest"]);
     expect(dockerCalls.some((args) => args[0] === "pull")).toBe(false);
   });
 
-  it("doctor reports Docker-specific guidance when runtime prerequisites fail", async () => {
+  it("doctor warns when Docker is unreachable before app setup", async () => {
     const cwd = await tempProject("zitadel-doctor-fail-");
     const fake = await fakeDocker({ dockerAvailable: false });
     const port = await freePort();
@@ -66,20 +62,38 @@ describe("local runtime commands", () => {
       DOCKER_LOG: fake.logPath,
     });
 
-    expect(result.exitCode).toBe(3);
+    expect(result.exitCode).toBe(0);
     const envelope = parseJson(result.stdout) as {
       status: string;
-      hint: string;
-      next_commands: string[];
+      warnings: string[];
+      data: { ok: boolean; checks: Array<{ name: string; status: string; message: string }> };
     };
-    expect(envelope.status).toBe("error");
-    expect(envelope.hint).toContain("Docker is required");
-    expect(envelope.hint).not.toContain("doctor --fix");
-    expect(envelope.next_commands).toContain("docker version");
-    expect(envelope.next_commands).toContain("zitadel doctor");
+    expect(envelope.status).toBe("ok");
+    expect(envelope.data.ok).toBe(true);
+    expect(envelope.warnings.join("\n")).toContain("Docker is not reachable");
+    expect(envelope.data.checks.find((check) => check.name === "docker-cli")).toMatchObject({
+      status: "warn",
+    });
   });
 
-  it("doctor reports unavailable images without pulling", async () => {
+  it("does not print duplicate warning lines in human doctor output", async () => {
+    const cwd = await tempProject("zitadel-doctor-human-warn-");
+    const fake = await fakeDocker({ dockerAvailable: false });
+    const port = await freePort();
+
+    const result = await runCliForTest(["doctor", "--cwd", cwd, "--port", String(port)], {
+      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: fake.logPath,
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("[warn] docker-cli:");
+    expect(result.stdout).toContain("[warn] image:");
+    expect(result.stdout).not.toContain("Warning: docker-cli:");
+    expect(result.stdout).not.toContain("Warning: image:");
+  });
+
+  it("doctor warns about unavailable images without pulling", async () => {
     const cwd = await tempProject("zitadel-doctor-image-fail-");
     const fake = await fakeDocker({ imageAvailable: false });
     const port = await freePort();
@@ -92,20 +106,50 @@ describe("local runtime commands", () => {
       },
     );
 
-    expect(result.exitCode).toBe(3);
+    expect(result.exitCode).toBe(0);
     const envelope = parseJson(result.stdout) as {
       status: string;
-      hint: string;
-      next_commands: string[];
+      warnings: string[];
+      data: { ok: boolean; checks: Array<{ name: string; status: string; message: string }> };
     };
-    expect(envelope.status).toBe("error");
-    expect(envelope.hint).toContain("image is not available");
-    expect(envelope.next_commands).toContain("docker pull missing:test");
+    expect(envelope.status).toBe("ok");
+    expect(envelope.data.ok).toBe(true);
+    expect(envelope.warnings.join("\n")).toContain("Image missing:test is not available");
+    expect(envelope.data.checks.find((check) => check.name === "image")).toMatchObject({
+      status: "warn",
+    });
 
     const dockerCalls = await readDockerCalls(fake.logPath);
     expect(dockerCalls).toContainEqual(["image", "inspect", "missing:test"]);
     expect(dockerCalls).toContainEqual(["manifest", "inspect", "missing:test"]);
     expect(dockerCalls.some((args) => args[0] === "pull")).toBe(false);
+  });
+
+  it("doctor still fails when existing local runtime metadata is unhealthy", async () => {
+    const cwd = await tempProject("zitadel-doctor-runtime-fail-");
+    const fake = await fakeDocker();
+    const port = await freePort();
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd, `http://localhost:${String(port)}`));
+
+    const result = await runCliForTest(["doctor", "--cwd", cwd, "--json", "--port", String(port)], {
+      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: fake.logPath,
+    });
+
+    expect(result.exitCode).toBe(3);
+    const envelope = parseJson(result.stdout) as {
+      status: string;
+      hint: string;
+      next_commands: string[];
+      details: { checks: Array<{ name: string; status: string }> };
+    };
+    expect(envelope.status).toBe("error");
+    expect(envelope.hint).toContain("Existing local runtime metadata");
+    expect(envelope.next_commands).toContain("npx @zitadel/cli@alpha start");
+    expect(envelope.next_commands).toContain("npx @zitadel/cli@alpha reset --force");
+    expect(envelope.details.checks.find((check) => check.name === "runtime")).toMatchObject({
+      status: "fail",
+    });
   });
 
   it("start --json starts the single-container runtime and writes metadata", async () => {
@@ -122,13 +166,15 @@ describe("local runtime commands", () => {
     expect(result.exitCode).toBe(0);
     const envelope = parseJson(result.stdout) as {
       status: string;
-      data: { urls: { api: string }; next_commands: string[] };
+      data: { urls: { api: string }; next_actions: string[]; next_commands: string[] };
     };
     expect(envelope.status).toBe("ok");
     expect(envelope.data.urls.api).toBe(serverUrl);
-    expect(envelope.data.next_commands).toContain(
-      "npx @zitadel/cli@alpha setup --framework next --server local",
-    );
+    expect(envelope.data.next_actions.join("\n")).toContain("From your app directory");
+    expect(envelope.data.next_actions.join("\n")).toContain("Setup installs dependencies");
+    expect(envelope.data.next_commands).toEqual(["npx @zitadel/cli@alpha setup --server local"]);
+    expect(envelope.data.next_commands).not.toContain("npm install");
+    expect(envelope.data.next_commands).not.toContain("npm run dev");
 
     const runtime = await readRuntimeMetadata(cwd);
     expect(runtime?.server_url).toBe(serverUrl);
@@ -163,7 +209,61 @@ describe("local runtime commands", () => {
     expect(dockerCalls.find((args) => args[0] === "run")?.at(-1)).toBe("zitadel-nextgen:test");
   });
 
-  it("reset --force deletes local runtime data", async () => {
+  it("logs without runtime suggests the published start command", async () => {
+    const cwd = await tempProject("zitadel-logs-no-runtime-");
+    const fake = await fakeDocker();
+
+    const result = await runCliForTest(["logs", "--cwd", cwd, "--json"], {
+      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: fake.logPath,
+    });
+
+    expect(result.exitCode).toBe(3);
+    const envelope = parseJson(result.stdout) as {
+      status: string;
+      next_commands?: string[];
+    };
+    expect(envelope.status).toBe("error");
+    expect(envelope.next_commands).toEqual(["npx @zitadel/cli@alpha start"]);
+  });
+
+  it("stop succeeds without suggesting a restart", async () => {
+    const cwd = await tempProject("zitadel-stop-");
+    const fake = await fakeDocker();
+
+    const result = await runCliForTest(["stop", "--cwd", cwd, "--json"], {
+      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: fake.logPath,
+    });
+
+    expect(result.exitCode).toBe(0);
+    const envelope = parseJson(result.stdout) as {
+      status: string;
+      data: { next_commands?: string[] };
+    };
+    expect(envelope.status).toBe("ok");
+    expect(envelope.data.next_commands).toBeUndefined();
+  });
+
+  it("stop --dry-run suggests the published stop command", async () => {
+    const cwd = await tempProject("zitadel-stop-dry-run-");
+    const fake = await fakeDocker();
+
+    const result = await runCliForTest(["stop", "--cwd", cwd, "--json", "--dry-run"], {
+      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: fake.logPath,
+    });
+
+    expect(result.exitCode).toBe(0);
+    const envelope = parseJson(result.stdout) as {
+      status: string;
+      data: { next_commands?: string[] };
+    };
+    expect(envelope.status).toBe("ok");
+    expect(envelope.data.next_commands).toEqual(["npx @zitadel/cli@alpha stop"]);
+  });
+
+  it("reset --force deletes local runtime data without suggesting a restart", async () => {
     const cwd = await tempProject("zitadel-reset-");
     const fake = await fakeDocker();
     const paths = localRuntimePaths(cwd);
@@ -177,8 +277,32 @@ describe("local runtime commands", () => {
     });
 
     expect(result.exitCode).toBe(0);
+    const envelope = parseJson(result.stdout) as {
+      status: string;
+      data: { next_commands?: string[] };
+    };
+    expect(envelope.status).toBe("ok");
+    expect(envelope.data.next_commands).toBeUndefined();
     await expect(stat(paths.dataDir)).rejects.toMatchObject({ code: "ENOENT" });
     await expect(readRuntimeMetadata(cwd)).resolves.toBeUndefined();
+  });
+
+  it("reset without --force suggests the published force command in non-interactive mode", async () => {
+    const cwd = await tempProject("zitadel-reset-needs-force-");
+    const fake = await fakeDocker();
+
+    const result = await runCliForTest(["reset", "--cwd", cwd, "--json"], {
+      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: fake.logPath,
+    });
+
+    expect(result.exitCode).toBe(3);
+    const envelope = parseJson(result.stdout) as {
+      status: string;
+      next_commands?: string[];
+    };
+    expect(envelope.status).toBe("error");
+    expect(envelope.next_commands).toEqual(["npx @zitadel/cli@alpha reset --force"]);
   });
 });
 
