@@ -1,6 +1,6 @@
 import { parseModule } from "magicast";
 
-import { ZitadelError } from "../../../errors";
+import { ZitadelError } from "../../../../errors";
 
 /**
  * Generic magicast helpers shared by the config-editing patchers (Vite, Nuxt).

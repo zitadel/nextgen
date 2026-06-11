@@ -5,7 +5,7 @@ import {
   ensureEditableObject,
   parseConfigModule,
   resolveDefaultExportObject,
-} from "../magicast-config";
+} from "../utils/magicast";
 
 const NUXT_MODULE = "@zitadel/sdk-nuxt/module";
 

@@ -2,7 +2,7 @@ import { builders, generateCode } from "magicast";
 
 import { configCandidates } from "./config-paths";
 import type { FileOp } from "./file-writer/types";
-import { importIsPresent, parseConfigModule, resolveDefaultExportObject } from "./magicast-config";
+import { importIsPresent, parseConfigModule, resolveDefaultExportObject } from "./utils/magicast";
 import { PROXY_PATH } from "./proxy";
 
 /**
