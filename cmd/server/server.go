@@ -40,9 +40,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 	"github.com/zitadel/oidc/v3/pkg/op"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/log"
-	"go.opentelemetry.io/otel/propagation"
 )
 
 func NewCommand() *cobra.Command {
@@ -85,10 +83,19 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 
 	slog.Info("building server")
 
-	err = SetUpInstrumentation(ctx, sfs, cfg.Instrumentation)
+	metrics, err := zotel.NewOtelMetrics(ctx, zotel.MetricsConfig{
+		ServiceName:     cfg.Instrumentation.ServiceName,
+		TraceIdFraction: cfg.Instrumentation.Trace.Fraction,
+		TraceExporter:   cfg.Instrumentation.Trace.Exporter,
+		MetricExporter:  cfg.Instrumentation.Metric.Exporter,
+		LogExporter:     cfg.Instrumentation.Log.Exporter,
+	})
 	if err != nil {
-		return fmt.Errorf("failed to set up instrumentation: %w", err)
+		return fmt.Errorf("failed to create otel metrics: %w", err)
 	}
+	sfs.Add(metrics.Shutdown)
+
+	setUpLogging(cfg.Instrumentation.Log, metrics.LoggerProvider())
 
 	pool, err := startDatabase(ctx, cfg)
 	if err != nil {
@@ -216,8 +223,8 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			middleware.AddOperationIdToContext(),
 			// logging is done at net/http level
 		),
-		oasapi.WithMeterProvider(otel.GetMeterProvider()),
-		oasapi.WithTracerProvider(otel.GetTracerProvider()),
+		oasapi.WithMeterProvider(metrics.MeterProvider()),
+		oasapi.WithTracerProvider(metrics.TracerProvider()),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
 		return fmt.Errorf("failed to build api server: %w", err)
@@ -301,6 +308,9 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("instrumentation.log.add_source", true)
 	v.SetDefault("instrumentation.log.errors.report_location", true)
 	v.SetDefault("instrumentation.log.errors.stack_trace", true)
+	//v.SetDefault("instrumentation.log.exporter.type", zotel.ExporterTypeStdOut)
+	v.SetDefault("instrumentation.trace.exporter.type", zotel.ExporterTypeStdOut)
+	//v.SetDefault("instrumentation.metric.exporter.type", zotel.ExporterTypeStdOut)
 
 	// AutomaticEnv only resolves nested keys viper already knows about
 	// (via default, config file, fields of config struct or explicit BindEnv).
@@ -444,51 +454,7 @@ func buildCrypter(hexKey string) (crypto.Crypter, error) {
 
 // ----------------------------- INSTRUMENTATION --------------------------------------
 
-func SetUpInstrumentation(
-	ctx context.Context,
-	sfs *ShutdownFuncs,
-	cfg instrumentation.Config,
-) error {
-	otelResource, err := zotel.CreateResource(cfg.ServiceName)
-	if err != nil {
-		return err
-	}
-
-	propagator := propagation.NewCompositeTextMapPropagator(
-		propagation.TraceContext{},
-		propagation.Baggage{},
-	)
-	otel.SetTextMapPropagator(propagator)
-
-	tracerProvider, err := zotel.NewTracerProvider(ctx, cfg.Trace.Exporter, cfg.Trace.Fraction, otelResource)
-	if err != nil {
-		return nil
-	}
-	sfs.Add(tracerProvider.Shutdown)
-	otel.SetTracerProvider(tracerProvider)
-
-	meterProvider, err := zotel.NewMeterProvider(ctx, cfg.Metric.Exporter, otelResource)
-	if err != nil {
-		return nil
-	}
-	sfs.Add(meterProvider.Shutdown)
-	otel.SetMeterProvider(meterProvider)
-
-	loggerProvider, err := zotel.NewLoggerProvider(ctx, cfg.Log.Exporter, otelResource)
-	if err != nil {
-		return err
-	}
-	sfs.Add(loggerProvider.Shutdown)
-
-	err = setUpLogging(cfg.Log, loggerProvider)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func setUpLogging(cfg instrumentation.LogConfig, otelProvider log.LoggerProvider) error {
+func setUpLogging(cfg instrumentation.LogConfig, otelProvider log.LoggerProvider) {
 	otelHandler := otelslog.NewHandler(
 		Name,
 		otelslog.WithLoggerProvider(otelProvider),
@@ -506,6 +472,4 @@ func setUpLogging(cfg instrumentation.LogConfig, otelProvider log.LoggerProvider
 	logger := zlog.NewLogger(handler)
 	logger.Info("structured logger configured", "config_level", cfg.Level, "format", cfg.Format)
 	slog.SetDefault(logger)
-
-	return nil
 }
