@@ -32,20 +32,14 @@ Before releasing, confirm:
 - Pending changesets are merged through the "Version Packages" PR.
 - You have `git`, `gh`, `node`, and `corepack pnpm` available locally.
 
-## One-Time Setup
+## One-Time Maintenance
 
-Before the first automated npm publish, each public package must already exist
-on npm and have a trusted publisher configured:
+The public package names already exist on npm. If a future release adds another
+public package, create that package on npm and configure trusted publishing for
+`release-npm.yml` before adding it to the release bundle.
 
-1. On npmjs.com, open the package settings.
-2. Under Trusted Publishing, add:
-   - Provider: `GitHub Actions`
-   - Organization/owner: `zitadel`
-   - Repository: `nextgen`
-   - Workflow filename: `release-npm.yml`
-3. Keep `NPM_CONFIG_PROVENANCE=false` while the source repository is private.
-
-Clean up old package-level GitHub Releases once, without deleting git tags:
+Clean up old package-level GitHub Releases once, without deleting git tags, if
+any `@zitadel/*` GitHub Release entries still exist:
 
 ```sh
 node scripts/delete-package-github-releases.mjs

@@ -43,15 +43,14 @@ corepack pnpm changeset version   # strips the -alpha suffix
 
 The [`.github/workflows/release-npm.yml`](../.github/workflows/release-npm.yml) workflow runs the [changesets GitHub Action](https://github.com/changesets/action). Pushing changesets to `main` opens a "Version Packages" PR aggregating all pending changesets; merging that PR bumps versions, updates `CHANGELOG.md` files, and publishes to npm. While `.changeset/pre.json` exists, the publish step uses the `preview` dist-tag; after `changeset pre exit`, it uses Changesets' default dist-tag (`latest`). Package-level GitHub Releases are disabled; GoReleaser owns the product-level `ZITADEL Preview` releases. For the full product release order, follow the operator runbook in [`docs/operations/releasing.md`](../docs/operations/releasing.md).
 
-Publishing authenticates with **npm trusted publishing (OIDC)** — there is **no `NPM_TOKEN`** secret. Before the first automated publish, a maintainer must, once per public package:
+Publishing authenticates with **npm trusted publishing (OIDC)** — there is **no `NPM_TOKEN`** secret. The current public packages already exist on npm. When adding a new public package, a maintainer must create it on npm and then configure trusted publishing for it:
 
-1. Ensure the package exists on npm (publish `0.0.x` manually the first time if needed, since a trusted publisher can only be attached to an existing package).
-2. On npmjs.com → the package → **Settings → Trusted Publishing**, add a publisher:
+1. On npmjs.com → the package → **Settings → Trusted Publishing**, add a publisher:
    - Provider: **GitHub Actions**
    - Organization/owner: `zitadel`
    - Repository: `nextgen`
    - Workflow filename: `release-npm.yml` (exact, case-sensitive)
-3. Optionally, under **Publishing access**, require 2FA and disallow tokens so only this workflow can publish.
+2. Optionally, under **Publishing access**, require 2FA and disallow tokens so only this workflow can publish.
 
 While this repository is private, the workflow keeps npm provenance disabled
 with `NPM_CONFIG_PROVENANCE=false`. Trusted publishing still authenticates with

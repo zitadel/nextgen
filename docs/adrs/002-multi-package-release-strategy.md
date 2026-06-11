@@ -60,7 +60,7 @@ Trade-offs:
 - ✅ The `@zitadel` npm scope is owned (the main `zitadel` repo already publishes `@zitadel/client` and `@zitadel/proto` under it).
 - ✅ The changesets publishing workflow ([`release-npm.yml`](../../.github/workflows/release-npm.yml)) is enabled, using npm trusted publishing (OIDC) — no `NPM_TOKEN` secret. Provenance is disabled while this source repository is private.
 - ✅ Package-level GitHub Releases are disabled in the changesets workflow; GoReleaser owns the product-level `ZITADEL Preview` releases.
-- One-time bootstrap per public package: a maintainer must do the first manual publish (the names do not exist on npm yet) and then add the GitHub Actions trusted publisher on npmjs.com (repo `zitadel/nextgen`, workflow `release-npm.yml`). See [`.changeset/README.md`](../../.changeset/README.md).
+- ✅ The current public package names exist on npm. New public packages still need package creation and GitHub Actions trusted publishing configuration before they join the release bundle. See [`.changeset/README.md`](../../.changeset/README.md).
 - One-time cleanup: run `node scripts/delete-package-github-releases.mjs` to preview old `@zitadel/*` GitHub Releases, then rerun with `--execute` to delete those GitHub Release entries while keeping the git tags and npm releases.
 - Decide when to switch the Go release workflow from manual `workflow_dispatch` to automatic `v*` tag releases.
 - Draft a `CONTRIBUTING.md` section pointing contributors at `pnpm changeset` for npm changes and conventional commit prefixes for the goreleaser changelog.
