@@ -13,6 +13,8 @@ import (
 )
 
 func TestCreateTeam(t *testing.T) {
+	t.Parallel()
+
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
 
@@ -21,6 +23,8 @@ func TestCreateTeam(t *testing.T) {
 	client.SetToken(project.ProjectSecret)
 
 	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
+
 		req := &api.CreateTeamRequest{}
 		params := api.CreateTeamParams{
 			ProjectID: api.ProjectID(project.ID),
@@ -33,7 +37,11 @@ func TestCreateTeam(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
+		t.Parallel()
+
 		t.Run("no project", func(t *testing.T) {
+			t.Parallel()
+
 			req := &api.CreateTeamRequest{}
 			params := api.CreateTeamParams{}
 
@@ -46,6 +54,8 @@ func TestCreateTeam(t *testing.T) {
 }
 
 func TestGetTeam(t *testing.T) {
+	t.Parallel()
+
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
 
@@ -54,6 +64,8 @@ func TestGetTeam(t *testing.T) {
 	client.SetToken(project.ProjectSecret)
 
 	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
+
 		team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
 			ProjectID: project.ID,
 		})
@@ -71,7 +83,11 @@ func TestGetTeam(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
+		t.Parallel()
+
 		t.Run("non existing team", func(t *testing.T) {
+			t.Parallel()
+
 			params := api.GetTeamParams{
 				ProjectID: api.ProjectID(project.ID),
 				TeamID:    api.TeamID("does-not-exist"),

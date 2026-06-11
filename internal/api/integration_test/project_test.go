@@ -69,7 +69,9 @@ func (s *stubAuthAttemptService) RegisterCreatedUser(ctx context.Context, projec
 var _ service.AuthAttemptService = (*stubAuthAttemptService)(nil)
 
 func TestCreateProject(t *testing.T) {
+	t.Parallel()
 	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
 		tcs := []struct {
 			name string
 			req  *api.CreateProjectRequest
@@ -90,6 +92,8 @@ func TestCreateProject(t *testing.T) {
 
 		for _, tc := range tcs {
 			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
 				client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 				require.NoError(t, err)
 
@@ -109,6 +113,8 @@ func TestCreateProject(t *testing.T) {
 }
 
 func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
+	t.Parallel()
+
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
 
@@ -169,6 +175,8 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 }
 
 func TestGetProject(t *testing.T) {
+	t.Parallel()
+
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
 
@@ -177,6 +185,8 @@ func TestGetProject(t *testing.T) {
 	client.SetToken(project.ProjectSecret)
 
 	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
+
 		params := api.GetProjectParams{
 			ProjectID: api.ProjectID(project.ID),
 		}
@@ -193,7 +203,11 @@ func TestGetProject(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
+		t.Parallel()
+
 		t.Run("not found", func(t *testing.T) {
+			t.Parallel()
+
 			params := api.GetProjectParams{
 				ProjectID: "does_not_exist",
 			}

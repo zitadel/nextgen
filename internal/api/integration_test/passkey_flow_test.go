@@ -25,6 +25,8 @@ import (
 // the WebAuthn assertion carries the user handle and the server binds the user
 // from the assertion.
 func TestPasskeyFlowLogin(t *testing.T) {
+	t.Parallel()
+
 	testServer := harness.EnsureTestServer(t)
 
 	// --- Seed project ---------------------------------------------------------

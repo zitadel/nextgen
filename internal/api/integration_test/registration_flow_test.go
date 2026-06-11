@@ -26,6 +26,8 @@ import (
 //
 // This avoids the need for an identifier field with x-unique in the schema.
 func TestPasskeyRegistrationFlow(t *testing.T) {
+	t.Parallel()
+
 	testServer := harness.EnsureTestServer(t)
 
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
