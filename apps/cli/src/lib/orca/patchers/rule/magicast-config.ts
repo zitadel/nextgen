@@ -71,3 +71,25 @@ export function ensureArrayItem(parent: any, key: string, item: string): void {
     arr.push(item);
   }
 }
+
+/**
+ * Returns the object literal at `parent[key]`, creating an empty one when
+ * absent, so callers can safely descend into it. Throws `E_VALIDATION` when the
+ * key already holds something that is not an inline object literal (an
+ * identifier, spread, or function call) — magicast cannot edit those, and
+ * assigning into them otherwise throws a raw proxy `TypeError`. The object
+ * sibling of {@link ensureArrayItem}.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function ensureEditableObject(parent: any, key: string): any {
+  if (parent[key] === undefined) {
+    parent[key] = {};
+  }
+  const value = parent[key];
+  if (value?.$type !== "object") {
+    throw new ZitadelError("E_VALIDATION", `Could not edit "${key}" in the config`, {
+      hint: `Set "${key}" to an inline object literal, or add the Zitadel settings manually.`,
+    });
+  }
+  return value;
+}

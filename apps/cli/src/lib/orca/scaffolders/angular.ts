@@ -1,9 +1,12 @@
+import { rm } from "node:fs/promises";
+import { join } from "node:path";
+
 import { AbstractCLIScaffolder } from "./cli";
 
 /**
- * Scaffolds a new Angular app with the Angular CLI. Unlike the SPA entry files
- * the patcher overwrites (`app.ts`/`app.html`), `ng new` produces those itself,
- * so no boilerplate cleanup is needed. Requires a Node version Angular supports
+ * Scaffolds a new Angular app with the Angular CLI, then removes the starter
+ * `app.ts`/`app.html` root component so the patcher can write the managed ones
+ * without colliding with boilerplate. Requires a Node version Angular supports
  * (Angular 22 needs Node ^22.22.3 || ^24.15.0 || >=26).
  */
 export class AngularScaffolder extends AbstractCLIScaffolder {
@@ -16,5 +19,7 @@ export class AngularScaffolder extends AbstractCLIScaffolder {
       ["-y", "@angular/cli@latest", "new", ".", "--defaults", "--style=css", "--ssr=false", "--skip-git"],
       cwd,
     );
+    await rm(join(cwd, "src/app/app.ts"), { force: true });
+    await rm(join(cwd, "src/app/app.html"), { force: true });
   }
 }

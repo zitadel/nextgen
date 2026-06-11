@@ -58,7 +58,7 @@ async function applyOp(
       await writeText(
         abs(opts.cwd, op.path),
         op.contents,
-        { mode: op.mode, force: opts.force || Boolean(op.overwrite), dryRun: opts.dryRun },
+        { mode: op.mode, force: opts.force, dryRun: opts.dryRun },
         result,
       );
       break;

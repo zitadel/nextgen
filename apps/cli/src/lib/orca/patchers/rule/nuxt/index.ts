@@ -31,7 +31,7 @@ export class NuxtPatcher extends AbstractRulePatcher {
 
   protected routeOps(ctx: PatchContext): FileOp[] {
     return [
-      { kind: "write", path: "app.vue", contents: appVueTemplate(), overwrite: true },
+      { kind: "write", path: "app.vue", contents: appVueTemplate() },
       { kind: "write", path: "pages/login.vue", contents: loginPageTemplate() },
       { kind: "write", path: "pages/register.vue", contents: registerPageTemplate() },
       { kind: "write", path: "pages/profile.vue", contents: profilePageTemplate() },

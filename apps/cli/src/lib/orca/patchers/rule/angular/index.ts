@@ -29,9 +29,8 @@ export class AngularPatcher extends AbstractRulePatcher {
         kind: "write",
         path: "src/app/app.ts",
         contents: appComponentTemplate(ctx.project.id),
-        overwrite: true,
       },
-      { kind: "write", path: "src/app/app.html", contents: appTemplateHtml(), overwrite: true },
+      { kind: "write", path: "src/app/app.html", contents: appTemplateHtml() },
       { kind: "write", path: "proxy.conf.cjs", contents: proxyConfTemplate() },
       {
         kind: "edit",

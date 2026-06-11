@@ -13,15 +13,6 @@ export type FileOp =
       readonly path: string;
       readonly mode?: number;
       readonly contents: string;
-      /**
-       * Replace the file even if it already exists with different contents,
-       * without requiring `--force`. Set only for managed files the integration
-       * legitimately owns (e.g. an SPA's `src/App.tsx` auth entry, which is
-       * framework boilerplate). Omitted writes still refuse to clobber existing
-       * user files. The file still carries the managed marker so eject/doctor
-       * stay marker-aware.
-       */
-      readonly overwrite?: boolean;
     }
   | {
       readonly kind: "append";

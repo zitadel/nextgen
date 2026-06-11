@@ -25,7 +25,7 @@ export class VuePatcher extends AbstractRulePatcher implements ViteSupport {
 
   protected routeOps(ctx: PatchContext): FileOp[] {
     return [
-      { kind: "write", path: "src/App.vue", contents: appTemplate(), overwrite: true },
+      { kind: "write", path: "src/App.vue", contents: appTemplate() },
       this.viteProxyOp(ctx.framework.devPort),
       { kind: "merge-env", path: ".env.example", entries: { VITE_ZITADEL_PROJECT_ID: "" } },
       { kind: "merge-env", path: ".env.local", entries: { VITE_ZITADEL_PROJECT_ID: ctx.project.id } },
