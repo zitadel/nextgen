@@ -41,7 +41,7 @@ post:
             externalValue: examples/schema-url-example.yaml
           defaultHumanUserSchema:
             summary: The default human user schema provided by the server.
-            externalValue: examples/default-human-user-schema-example.json
+            externalValue: examples/default-human-user-schema.json
   responses:
     '201':
       description: The schema was created successfully
