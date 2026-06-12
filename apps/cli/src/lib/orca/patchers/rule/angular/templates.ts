@@ -77,7 +77,7 @@ function setBearer(proxyReq) {
 }
 
 function stripPrefix(path) {
-  return path.replace(/^\\${PROXY_PATH}/, "") || "/";
+  return path.replace(/^\\${PROXY_PATH}/, "").replace(/^(?!\\/)/, "/");
 }
 
 module.exports = {

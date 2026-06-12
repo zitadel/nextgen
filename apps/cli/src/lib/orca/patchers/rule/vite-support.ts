@@ -20,7 +20,7 @@ function proxyEntryCode(server: string): string {
   return `{
   target: ${JSON.stringify(server)},
   changeOrigin: false,
-  rewrite: (path) => path.replace(/^\\${PROXY_PATH}/, "") || "/",
+  rewrite: (path) => path.replace(/^\\${PROXY_PATH}/, "").replace(/^(?!\\/)/, "/"),
   configure: (proxy) => {
     const bearer = \`Bearer sk_\${loadEnv("development", dirname(fileURLToPath(import.meta.url)), "ZITADEL_").ZITADEL_PROJECT_ID}\`;
     proxy.on("proxyReq", (proxyReq) => {
