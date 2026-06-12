@@ -61,8 +61,8 @@ describe("setupMockHandlers", () => {
   test("walks combined sign-in -> passkey-upsell -> done", async () => {
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
     expect(start.step.name).toBe("identifier");
-    expect(start.step.fields?.email).toBeTruthy();
-    expect(start.step.fields?.password).toBeTruthy();
+    expect(start.step.fields?.some((f) => f.name === "email")).toBe(true);
+    expect(start.step.fields?.some((f) => f.name === "password")).toBe(true);
     expect(start.id).toBeTruthy();
 
     const submitSignIn = await submitFlowStep(start.id, {

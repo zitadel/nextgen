@@ -84,7 +84,7 @@ function validFlowDefinitionBody(): Record<string, unknown> {
       {
         name: "identifier",
         fields: ["email"],
-        actions: { submit: { text_key: "submit", primary: true } },
+        actions: [{ name: "submit", text_key: "submit", primary: true }],
       },
     ],
   };

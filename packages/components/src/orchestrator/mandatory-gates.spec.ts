@@ -10,12 +10,12 @@ const locale: Record<string, string> = {
 
 const step: CreateFlow201Step = {
   name: "identifier",
-  fields: {
-    email: { type: "email", text_key: "identifier.field.email", required: true },
-  },
-  actions: {
-    submit: { text_key: "submit.continue", primary: true },
-  },
+  fields: [
+    { name: "email", type: "email", text_key: "identifier.field.email", required: true },
+  ],
+  actions: [
+    { name: "submit", text_key: "submit.continue", primary: true },
+  ],
   gates: {},
 };
 
@@ -68,13 +68,14 @@ describe("patchMandatoryGates", () => {
   it("escapes attribute values in injected fields so the payload can't break out", () => {
     const malicious: CreateFlow201Step = {
       ...step,
-      fields: {
-        '"><script>': {
+      fields: [
+        {
+          name: '"><script>',
           type: "text",
           text_key: '"><script>alert(1)</script>',
           required: true,
         },
-      },
+      ],
     };
     const out = patchMandatoryGates(mandatoryGatesMarkerComment, malicious, locale);
     // The original payload must not appear verbatim — the browser serialiser

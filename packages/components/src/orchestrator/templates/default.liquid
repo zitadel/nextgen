@@ -20,25 +20,25 @@
       {% endfor %}
     {% endif %}
 
-    {% for entry in fields %}
-      {% assign field_placeholder = entry[1].text_key | fieldPlaceholder %}
-      {% assign field_help = entry[1].text_key | fieldHelp %}
-      {% assign field_err = entry[0] | fieldError: errors %}
+    {% for f in fields %}
+      {% assign field_placeholder = f.text_key | fieldPlaceholder %}
+      {% assign field_help = f.text_key | fieldHelp %}
+      {% assign field_err = f.name | fieldError: errors %}
       {% assign autocomplete_val = '' %}
-      {% if entry[0] == 'email' %}
+      {% if f.name == 'email' %}
         {% assign autocomplete_val = 'email' %}
-      {% elsif entry[1].type == 'password' and step.name contains 'register' %}
+      {% elsif f.type == 'password' and step.name contains 'register' %}
         {% assign autocomplete_val = 'new-password' %}
-      {% elsif entry[1].type == 'password' %}
+      {% elsif f.type == 'password' %}
         {% assign autocomplete_val = 'current-password' %}
       {% endif %}
       <zl-field
-        name="{{ entry[0] }}"
-        label="{{ entry[1].text_key | t }}"
-        type="{{ entry[1].type }}"
-        value="{{ entry[1].value }}"
+        name="{{ f.name }}"
+        label="{{ f.text_key | t }}"
+        type="{{ f.type }}"
+        value="{{ f.value }}"
         {% if autocomplete_val != '' %}autocomplete="{{ autocomplete_val }}"{% endif %}
-        {% if entry[1].required %}required{% endif %}
+        {% if f.required %}required{% endif %}
         {% if field_placeholder != "" %}placeholder="{{ field_placeholder }}"{% endif %}
         {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
       >
@@ -48,57 +48,57 @@
       </zl-field>
     {% endfor %}
 
-    {% if fields.email and fields.password and step.name == 'identifier' %}
+    {% if fields_by_name.email and fields_by_name.password and step.name == 'identifier' %}
       <p class="zl-card-forgot">
         <a href="#" class="zl-card-forgot__link" data-action="recover">{{ 'action.forgot_password' | t }}</a>
       </p>
     {% endif %}
 
-    {% for entry in actions %}
-      {% if entry[1].primary %}
+    {% for a in actions %}
+      {% if a.primary %}
         <zl-button
           hierarchy="primary"
           size="medium"
           type="submit"
           block
-          action="{{ entry[0] }}"
-          label="{{ entry[1].text_key | t }}"
+          action="{{ a.name }}"
+          label="{{ a.text_key | t }}"
           {% if loading %}loading{% endif %}
         ></zl-button>
       {% endif %}
     {% endfor %}
 
-    {% for entry in actions %}
-      {% unless entry[1].primary or entry[0] == 'passkey' or entry[0] == 'register' or entry[0] == 'sign_in' %}
+    {% for a in actions %}
+      {% unless a.primary or a.name == 'passkey' or a.name == 'register' or a.name == 'sign_in' %}
         <zl-button
           hierarchy="secondary"
           size="medium"
           type="button"
           block
-          action="{{ entry[0] }}"
-          label="{{ entry[1].text_key | t }}"
+          action="{{ a.name }}"
+          label="{{ a.text_key | t }}"
         ></zl-button>
       {% endunless %}
     {% endfor %}
 
-    {% if actions.passkey %}
+    {% if actions_by_name.passkey %}
       <zl-button
         hierarchy="secondary"
         size="medium"
         block
         action="passkey"
-        label="{{ actions.passkey.text_key | t }}"
+        label="{{ actions_by_name.passkey.text_key | t }}"
       ></zl-button>
     {% endif %}
 
 
-    {% if actions.register %}
+    {% if actions_by_name.register %}
       <p class="zl-card-nav">
         {{ 'identifier.action.register.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="register">{{ 'identifier.action.register.link' | t }}</a>
       </p>
     {% endif %}
 
-    {% if actions.sign_in %}
+    {% if actions_by_name.sign_in %}
       <p class="zl-card-nav">
         {{ 'register.action.sign_in.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="sign_in">{{ 'register.action.sign_in.link' | t }}</a>
       </p>

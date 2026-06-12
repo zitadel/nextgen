@@ -33,7 +33,7 @@ describe("setupMock (browser)", () => {
 
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
     expect(start.step.name).toBe("identifier");
-    expect(start.step.fields?.password).toBeTruthy();
+    expect(start.step.fields?.some((f) => f.name === "password")).toBe(true);
 
     const next = await submitFlowStep(start.id, {
       session_token: start.session_token,

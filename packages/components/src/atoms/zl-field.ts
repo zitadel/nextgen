@@ -1,4 +1,4 @@
-import type { CreateFlow201StepFieldsType } from "@zitadel/api/generated/model";
+import type { CreateFlow201StepFieldsItemType } from "@zitadel/api/generated/model";
 import { LitElement, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
@@ -20,7 +20,7 @@ import type { IconName } from "./zl-icon.js";
  * Alias of the orval-generated wire enum for field types so the atom's
  * accepted `type` values track the API contract exactly.
  */
-export type ZlFieldType = CreateFlow201StepFieldsType;
+export type ZlFieldType = CreateFlow201StepFieldsItemType;
 
 /** Detail shape emitted by the `zl-input` event (input + clear). */
 export type ZlFieldInputDetail = { name: string; value: string };
