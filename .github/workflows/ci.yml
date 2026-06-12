@@ -9,11 +9,62 @@ permissions:
   contents: read
 
 # Cancel an in-flight run when a newer commit is pushed to the same PR/branch.
+# Main runs may publish releases, so do not cancel them once started.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  detect-alpha-release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: depot-ubuntu-24.04-4
+    timeout-minutes: 5
+    outputs:
+      should_release: ${{ steps.detect.outputs.should_release }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect release-relevant changes
+        id: detect
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          base="$BEFORE"
+          if [ -z "$base" ] || [[ "$base" =~ ^0+$ ]] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            base="$(git rev-parse HEAD^ 2>/dev/null || true)"
+          fi
+          if [ -n "$base" ]; then
+            git diff --name-only "$base" HEAD > "$RUNNER_TEMP/release-changed-files"
+          else
+            git diff-tree --no-commit-id --name-only -r HEAD > "$RUNNER_TEMP/release-changed-files"
+          fi
+
+          node --input-type=module <<'NODE'
+          import { appendFileSync, readFileSync } from "node:fs";
+          import { PUBLIC_PACKAGE_MANIFESTS } from "./scripts/release-alpha-train.mjs";
+
+          const changed = readFileSync(`${process.env.RUNNER_TEMP}/release-changed-files`, "utf8")
+            .split("\n")
+            .map((line) => line.trim())
+            .filter(Boolean);
+          const publicPackageReleasePaths = new Set(
+            PUBLIC_PACKAGE_MANIFESTS.flatMap((manifestPath) => [
+              manifestPath,
+              manifestPath.replace(/package\.json$/, "CHANGELOG.md"),
+            ]),
+          );
+          const releaseRelevant = changed.filter(
+            (path) => path.startsWith(".changeset/") || publicPackageReleasePaths.has(path),
+          );
+          const shouldRelease = releaseRelevant.length > 0;
+
+          console.log(`release-relevant changes: ${releaseRelevant.join(", ") || "none"}`);
+          appendFileSync(process.env.GITHUB_OUTPUT, `should_release=${String(shouldRelease)}\n`);
+          NODE
+
   openapi-lint:
     runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 5
@@ -260,7 +311,7 @@ jobs:
     # changeset, so no consumer-visible change merges without a release note.
     # Private packages (apps, demos, mocks, lint, design-tokens, ui-react, ...)
     # are never published and so do not require a changeset. Publishing itself
-    # runs on pushes to main in release-npm.yml.
+    # runs on pushes to main in the release-alpha-train job below.
     #
     # The check lives in scripts/check-changeset-required.mjs so the publishable
     # package list and rules are testable and shared, rather than duplicated in
@@ -701,3 +752,195 @@ jobs:
             ) || true
           fi
           if [ -n "${VERDACCIO_PID:-}" ]; then kill "$VERDACCIO_PID" 2>/dev/null || true; fi
+
+  ci-success:
+    if: always()
+    runs-on: depot-ubuntu-24.04-4
+    timeout-minutes: 5
+    needs:
+      - openapi-lint
+      - go-unit-test
+      - go-integration-test-postgres
+      - go-integration-test-spanner
+      - node-check
+      - changeset-check
+      - node-e2e
+      - goreleaser-snapshot
+      - npm-pack-smoke
+      - go-smoke-test-embedded-postgres
+      - quickstart-smoke
+      - consumer-journey-e2e
+    steps:
+      - name: Check CI gate results
+        env:
+          NEEDS_JSON: ${{ toJson(needs) }}
+        run: |
+          node <<'NODE'
+          const needs = JSON.parse(process.env.NEEDS_JSON);
+          const allowedSkipped = new Set(["changeset-check"]);
+          const failed = Object.entries(needs).filter(([name, job]) => {
+            if (job.result === "success") return false;
+            if (job.result === "skipped" && allowedSkipped.has(name)) return false;
+            return true;
+          });
+
+          if (failed.length > 0) {
+            for (const [name, job] of failed) {
+              console.error(`${name}: ${job.result}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("CI gate passed");
+          NODE
+
+  release-alpha-train:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-alpha-release.outputs.should_release == 'true'
+    runs-on: depot-ubuntu-24.04-8
+    needs: [detect-alpha-release, ci-success]
+    permissions:
+      contents: write
+      pull-requests: write
+      packages: write
+      id-token: write
+    steps:
+      # Mint a short-lived installation token for the release GitHub App so the
+      # changesets PR/commits trigger CI (GITHUB_TOKEN-authored ones do not).
+      - name: Generate a token for the release app
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          registry-url: "https://registry.npmjs.org"
+          cache: pnpm
+
+      # Trusted publishing requires npm >= 11.5.1; the pinned pnpm delegates
+      # the actual publish to the npm CLI, so the runner's npm must be current.
+      - name: Update npm for trusted publishing (OIDC)
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: corepack pnpm nx run-many -t build
+
+      - name: Create release PR or publish to npm
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          version: corepack pnpm changeset version
+          publish: corepack pnpm changeset publish
+          title: "chore: version packages"
+          commit: "chore: version packages"
+          createGithubReleases: false
+        env:
+          # App token (not GITHUB_TOKEN) so the Version Packages PR triggers CI.
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          # Empty so the action does not pass an undefined token; OIDC handles auth.
+          NPM_TOKEN: ""
+          # npm provenance is only supported for public source repositories.
+          # Keep trusted publishing via OIDC, but disable provenance until this
+          # repository is public.
+          NPM_CONFIG_PROVENANCE: "false"
+
+      - name: Inspect alpha release train candidate
+        id: alpha-status
+        env:
+          PUBLISHED: ${{ steps.changesets.outputs.published }}
+        run: |
+          set -euo pipefail
+          alpha_env="$RUNNER_TEMP/alpha-release-status.env"
+          node scripts/release-alpha-train.mjs status --published "$PUBLISHED" --remote false | tee "$alpha_env"
+          cat "$alpha_env" >> "$GITHUB_OUTPUT"
+
+      - name: Login to GHCR
+        if: ${{ steps.alpha-status.outputs.should_complete == 'true' }}
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare alpha release train
+        if: ${{ steps.alpha-status.outputs.should_complete == 'true' }}
+        id: alpha
+        env:
+          PUBLISHED: ${{ steps.changesets.outputs.published }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          alpha_env="$RUNNER_TEMP/alpha-release.env"
+          node scripts/release-alpha-train.mjs prepare --published "$PUBLISHED" --out-dir "$RUNNER_TEMP/alpha-release" | tee "$alpha_env"
+          cat "$alpha_env" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        if: ${{ steps.alpha.outputs.run_goreleaser == 'true' }}
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        if: ${{ steps.alpha.outputs.run_goreleaser == 'true' }}
+        uses: docker/setup-buildx-action@v4
+
+      - name: Create and push Go release tag
+        if: ${{ steps.alpha.outputs.create_tag == 'true' }}
+        env:
+          TAG: ${{ steps.alpha.outputs.tag }}
+          TITLE: ${{ steps.alpha.outputs.title }}
+        run: |
+          set -euo pipefail
+          git config user.name "zitadel-release"
+          git config user.email "noreply@zitadel.com"
+          git tag -a "$TAG" -m "$TITLE"
+          git push origin "$TAG"
+
+      - name: Prune npm package tags for GoReleaser
+        if: ${{ steps.alpha.outputs.run_goreleaser == 'true' }}
+        run: |
+          set -euo pipefail
+          git tag -l '@zitadel/*' | while read -r tag; do
+            git tag -d "$tag"
+          done
+
+      - name: Run GoReleaser
+        if: ${{ steps.alpha.outputs.run_goreleaser == 'true' }}
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update GitHub Release notes
+        if: ${{ steps.alpha.outputs.update_release == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.alpha.outputs.tag }}
+          TITLE: ${{ steps.alpha.outputs.title }}
+          NOTES_PATH: ${{ steps.alpha.outputs.notes_path }}
+        run: |
+          set -euo pipefail
+          gh release edit "$TAG" \
+            --draft \
+            --prerelease \
+            --latest=false \
+            --title "$TITLE" \
+            --notes-file "$NOTES_PATH"

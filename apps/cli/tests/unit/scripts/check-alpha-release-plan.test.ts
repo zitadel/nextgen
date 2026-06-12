@@ -91,17 +91,10 @@ describe("check-alpha-release-plan script", () => {
 
   it("rejects a workflow that lets Changesets create GitHub Releases", async () => {
     const { cwd, statusPath } = await fixtureRepo({
-      releaseWorkflow: [
-        "jobs:",
-        "  release:",
-        "    steps:",
-        "      - uses: changesets/action@v1",
-        "        with:",
-        "          createGithubReleases: true",
-        "      - run: node scripts/release-alpha-train.mjs prepare",
-        "      - run: gh release edit \"$TAG\" --prerelease --latest=false",
-        "",
-      ].join("\n"),
+      ciWorkflow: validCiWorkflow().replace(
+        "createGithubReleases: false",
+        "createGithubReleases: true",
+      ),
     });
 
     await expect(
@@ -111,25 +104,10 @@ describe("check-alpha-release-plan script", () => {
 
   it("rejects alpha release notes generated inside the checkout", async () => {
     const { cwd, statusPath } = await fixtureRepo({
-      releaseWorkflow: [
-        "jobs:",
-        "  release:",
-        "    steps:",
-        "      - uses: changesets/action@v1",
-        "        with:",
-        "          createGithubReleases: false",
-        "      - run: |",
-        "          node scripts/release-alpha-train.mjs status --published \"$PUBLISHED\" --remote false",
-        "      - if: ${{ steps.alpha-status.outputs.should_complete == 'true' }}",
-        "        run: |",
-        "          node scripts/release-alpha-train.mjs prepare --published \"$PUBLISHED\" --out-dir dist/alpha-release | tee dist/alpha-release.env",
-        "      - if: ${{ steps.alpha.outputs.create_tag == 'true' }}",
-        "        run: git tag \"$TAG\"",
-        "      - if: ${{ steps.alpha.outputs.run_goreleaser == 'true' }}",
-        "        run: goreleaser release --clean",
-        "      - run: gh release edit \"$TAG\" --prerelease --latest=false",
-        "",
-      ].join("\n"),
+      ciWorkflow: validCiWorkflow().replace(
+        '--out-dir "$RUNNER_TEMP/alpha-release" | tee "$alpha_env"',
+        "--out-dir dist/alpha-release | tee dist/alpha-release.env",
+      ),
     });
 
     await expect(
@@ -139,42 +117,126 @@ describe("check-alpha-release-plan script", () => {
 
   it("rejects workflow steps gated only on the current Changesets publish result", async () => {
     const { cwd, statusPath } = await fixtureRepo({
-      releaseWorkflow: [
-        "jobs:",
-        "  release:",
-        "    steps:",
-        "      - uses: changesets/action@v1",
-        "        with:",
-        "          createGithubReleases: false",
-        "      - run: |",
-        "          alpha_env=\"$RUNNER_TEMP/alpha-release.env\"",
-        "          node scripts/release-alpha-train.mjs status --published \"$PUBLISHED\" --remote false",
-        "      - if: ${{ steps.alpha-status.outputs.should_complete == 'true' }}",
-        "        run: |",
-        "          node scripts/release-alpha-train.mjs prepare --published \"$PUBLISHED\" --out-dir \"$RUNNER_TEMP/alpha-release\" | tee \"$alpha_env\"",
-        "          cat \"$alpha_env\" >> \"$GITHUB_OUTPUT\"",
-        "      - if: ${{ steps.alpha.outputs.create_tag == 'true' }}",
-        "        run: git tag \"$TAG\"",
-        "      - if: ${{ steps.alpha.outputs.run_goreleaser == 'true' }}",
-        "        run: goreleaser release --clean",
+      ciWorkflow: validCiWorkflow().replace(
+        "      - if: ${{ steps.alpha.outputs.update_release == 'true' }}",
         "      - if: ${{ steps.changesets.outputs.published == 'true' }}",
-        "        run: gh release edit \"$TAG\" --prerelease --latest=false",
-        "",
-      ].join("\n"),
+      ),
     });
 
     await expect(
       checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
     ).rejects.toThrow("post-npm alpha train steps must not be gated only on Changesets publishing");
   });
+
+  it("rejects a legacy standalone release workflow", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      legacyReleaseWorkflow: "name: release-npm\n",
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("release publishing must live in ci.yml");
+  });
+
+  it("rejects CI path filters that can skip release relevance detection", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      ciWorkflow: validCiWorkflow().replace(
+        "  push:\n    branches: [main]",
+        '  push:\n    branches: [main]\n    paths:\n      - ".changeset/**"',
+      ),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("must not path-filter main pushes");
+  });
+
+  it("rejects a workflow missing release job publish permissions", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      ciWorkflow: validCiWorkflow().replace("      packages: write\n", ""),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("must scope publish permissions");
+  });
+
+  it("rejects a workflow that can publish before main CI succeeds", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      ciWorkflow: validCiWorkflow().replace(
+        "    needs: [detect-alpha-release, ci-success]",
+        "    needs: [detect-alpha-release]",
+      ),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("must wait for release relevance detection and the aggregate CI gate");
+  });
 });
+
+function validCiWorkflow(): string {
+  return [
+    "on:",
+    "  pull_request:",
+    "  push:",
+    "    branches: [main]",
+    "permissions:",
+    "  contents: read",
+    "concurrency:",
+    "  group: ci-${{ github.workflow }}-${{ github.ref }}",
+    "  cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
+    "jobs:",
+    "  detect-alpha-release:",
+    "    outputs:",
+    "      should_release: ${{ steps.detect.outputs.should_release }}",
+    "    steps:",
+    "      - id: detect",
+    "        run: |",
+    '          import { PUBLIC_PACKAGE_MANIFESTS } from "./scripts/release-alpha-train.mjs";',
+    '          path.startsWith(".changeset/") || publicPackageReleasePaths.has(path)',
+    "  ci-success:",
+    "    steps:",
+    "      - run: |",
+    '          const allowedSkipped = new Set(["changeset-check"]);',
+    "  release-alpha-train:",
+    "    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-alpha-release.outputs.should_release == 'true'",
+    "    needs: [detect-alpha-release, ci-success]",
+    "    permissions:",
+    "      contents: write",
+    "      pull-requests: write",
+    "      packages: write",
+    "      id-token: write",
+    "    steps:",
+    "      - uses: changesets/action@v1",
+    "        with:",
+    "          createGithubReleases: false",
+    "      - id: alpha-status",
+    "        run: |",
+    "          node scripts/release-alpha-train.mjs status --published \"$PUBLISHED\" --remote false",
+    "      - if: ${{ steps.alpha-status.outputs.should_complete == 'true' }}",
+    "        id: alpha",
+    "        run: |",
+    "          alpha_env=\"$RUNNER_TEMP/alpha-release.env\"",
+    "          node scripts/release-alpha-train.mjs prepare --published \"$PUBLISHED\" --out-dir \"$RUNNER_TEMP/alpha-release\" | tee \"$alpha_env\"",
+    "          cat \"$alpha_env\" >> \"$GITHUB_OUTPUT\"",
+    "      - if: ${{ steps.alpha.outputs.create_tag == 'true' }}",
+    "        run: git tag \"$TAG\"",
+    "      - if: ${{ steps.alpha.outputs.run_goreleaser == 'true' }}",
+    "        run: goreleaser release --clean",
+    "      - if: ${{ steps.alpha.outputs.update_release == 'true' }}",
+    "        run: gh release edit \"$TAG\" --prerelease --latest=false",
+    "",
+  ].join("\n");
+}
 
 async function fixtureRepo(
   options: {
     releases?: Array<{ name: string; type: string; newVersion: string }>;
     versionOverrides?: Record<string, string>;
     goreleaser?: string;
-    releaseWorkflow?: string;
+    ciWorkflow?: string;
+    legacyReleaseWorkflow?: string;
   } = {},
 ): Promise<{ cwd: string; statusPath: string }> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-alpha-check-"));
@@ -200,32 +262,15 @@ async function fixtureRepo(
   );
   await mkdir(join(cwd, ".github/workflows"), { recursive: true });
   await writeFile(
-    join(cwd, ".github/workflows/release-npm.yml"),
-    options.releaseWorkflow ??
-      [
-        "jobs:",
-        "  release:",
-        "    steps:",
-        "      - uses: changesets/action@v1",
-        "        with:",
-        "          createGithubReleases: false",
-        "      - id: alpha-status",
-        "        run: |",
-        "          node scripts/release-alpha-train.mjs status --published \"$PUBLISHED\" --remote false",
-        "      - if: ${{ steps.alpha-status.outputs.should_complete == 'true' }}",
-        "        id: alpha",
-        "        run: |",
-        "          alpha_env=\"$RUNNER_TEMP/alpha-release.env\"",
-        "          node scripts/release-alpha-train.mjs prepare --published \"$PUBLISHED\" --out-dir \"$RUNNER_TEMP/alpha-release\" | tee \"$alpha_env\"",
-        "          cat \"$alpha_env\" >> \"$GITHUB_OUTPUT\"",
-        "      - if: ${{ steps.alpha.outputs.create_tag == 'true' }}",
-        "        run: git tag \"$TAG\"",
-        "      - if: ${{ steps.alpha.outputs.run_goreleaser == 'true' }}",
-        "        run: goreleaser release --clean",
-        "      - run: gh release edit \"$TAG\" --prerelease --latest=false",
-        "",
-      ].join("\n"),
+    join(cwd, ".github/workflows/ci.yml"),
+    options.ciWorkflow ?? validCiWorkflow(),
   );
+  if (options.legacyReleaseWorkflow !== undefined) {
+    await writeFile(
+      join(cwd, ".github/workflows/release-npm.yml"),
+      options.legacyReleaseWorkflow,
+    );
+  }
 
   const statusPath = join(cwd, "changeset-status.json");
   await writeJson(statusPath, {
