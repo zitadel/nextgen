@@ -19,12 +19,18 @@
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
+  "unpkg": "./dist/standalone.mjs",
+  "jsdelivr": "./dist/standalone.mjs",
   "exports": {
     "./package.json": "./package.json",
     ".": {
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
+    },
+    "./standalone": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/standalone.mjs"
     },
     "./atoms": {
       "types": "./dist/atoms/index.d.mts",
