@@ -41,6 +41,10 @@ func TestUserRepository_CreateGetListDelete(t *testing.T) {
 	require.NoError(t, err)
 	attr2, err := domain.NewCreateAttribute("nickname", "n1", domain.AttributeUniquenessTeam)
 	require.NoError(t, err)
+	attrEmptyArray, err := domain.NewCreateAttribute("emptyArray", []any{}, domain.AttributeUniquenessUnspecified)
+	require.NoError(t, err)
+	attrEmptyObj, err := domain.NewCreateAttribute("emptyObj", map[string]any{}, domain.AttributeUniquenessUnspecified)
+	require.NoError(t, err)
 
 	teamCopy := tid
 	create := &domain.CreateUser{
@@ -48,7 +52,7 @@ func TestUserRepository_CreateGetListDelete(t *testing.T) {
 		SchemaURL:  schemaURL,
 		ID:         userID,
 		TeamID:     &teamCopy,
-		Attributes: []*domain.CreateAttribute{attr1, attr2},
+		Attributes: []*domain.CreateAttribute{attr1, attr2, attrEmptyArray, attrEmptyObj},
 	}
 	require.NoError(t, repo.Create(ctx, tx, create))
 
@@ -62,7 +66,7 @@ func TestUserRepository_CreateGetListDelete(t *testing.T) {
 	require.Equal(t, schemaURL, got.SchemaURL)
 	require.NotNil(t, got.TeamID)
 	require.Equal(t, tid, *got.TeamID)
-	require.Len(t, got.Attributes, 2)
+	require.Len(t, got.Attributes, 4)
 
 	countryLit, err := json.Marshal("CH")
 	require.NoError(t, err)
