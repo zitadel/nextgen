@@ -27,7 +27,7 @@ The platform project's `project_id` is discoverable via the authenticated `/capa
 
 ## 2. Lifecycle ownership
 
-Every user has exactly one lifecycle owner inside its project. Long-form in [ADR 023](../adrs/023-user-team-lifecycle-ownership.md).
+Every user has exactly one lifecycle owner inside its project. Long-form in [ADR 024](../adrs/024-user-team-lifecycle-ownership.md).
 
 | Term | Meaning |
 |---|---|

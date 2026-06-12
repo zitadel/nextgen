@@ -27,6 +27,8 @@ Pick the affected packages, the bump type (patch / minor / major), and write a o
 The repo is currently in changesets **prerelease mode** with the `alpha` tag (see `.changeset/pre.json`). While in this mode:
 
 - `changeset version` cuts versions like `0.1.0-alpha.0`, `0.1.0-alpha.1`, …
+- Public packages are in one fixed group, so an alpha train uses the same
+  version across `@zitadel/cli`, SDKs, components, and generated API packages.
 - `changeset publish` publishes them under the **`alpha`** npm dist-tag, **not** `latest`. So `npm install @zitadel/cli` keeps resolving the last stable release; consumers opt into prereleases with `@zitadel/cli@alpha`.
 - A package that has never had a stable release is published to `latest` on its first publish (changesets behaviour), then to `alpha` thereafter until it has a stable release.
 
@@ -57,7 +59,14 @@ short-lived OIDC credentials, but npm only accepts public provenance
 attestations from public source repositories. Re-enable provenance when
 `zitadel/nextgen` is public.
 
-The Go server binary is **not** managed by changesets — it is released with `goreleaser` through the manual [`release.yml`](../.github/workflows/release.yml) workflow while the repo is pre-release. See [docs/adrs/002-multi-package-release-strategy.md](../docs/adrs/002-multi-package-release-strategy.md).
+Changesets does not build the Go server binary. During alpha, `release-npm.yml`
+uses the lockstep npm version as the release train version, creates `v<version>`,
+and then runs GoReleaser so the server image and binaries publish into the same
+GitHub Release. The manual [`release.yml`](../.github/workflows/release.yml)
+workflow remains a server snapshot/fallback path. See
+[docs/adrs/002-multi-package-release-strategy.md](../docs/adrs/002-multi-package-release-strategy.md)
+and
+[docs/adrs/023-lockstep-alpha-release-train.md](../docs/adrs/023-lockstep-alpha-release-train.md).
 
 ## Licensing reminder
 

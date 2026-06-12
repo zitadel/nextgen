@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 
 const SECRET = {
   project_id: "proj-001",
@@ -65,7 +65,7 @@ describe("status command", () => {
     expect(json.data.project.lifecycle).toBe("configured");
     expect(json.data.project.project_id).toBe("proj-001");
     expect(json.data.project.issuer).toBe("http://localhost:3000");
-    expect(json.data.next_commands).toContain("npx @zitadel/cli@alpha doctor");
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("doctor"));
   });
 
   it("reports orphaned-config when zitadel.json exists but secret is missing", async () => {
@@ -86,7 +86,7 @@ describe("status command", () => {
       };
     };
     expect(json.status).toBe("ok");
-    expect(json.data.next_commands).toContain("npx @zitadel/cli@alpha setup --force");
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("setup --force"));
     expect(json.data.project.project_id).toBe("orphan");
     expect(json.data.project.lifecycle).toBe("orphaned-config");
   });
@@ -110,8 +110,8 @@ describe("status command", () => {
     expect(json.data.server.lifecycle).toBe("missing");
     expect(json.data.project.lifecycle).toBe("not-configured");
     expect(json.data.next_actions.join("\n")).toContain("From your app directory");
-    expect(json.data.next_commands).toContain("npx @zitadel/cli@alpha start");
-    expect(json.data.next_commands).toContain("npx @zitadel/cli@alpha setup --server local");
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("start"));
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("setup --server local"));
   });
 
   it("falls back to the secret project_id when config.project is absent", async () => {

@@ -7,13 +7,14 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   CONTAINER_DATA_DIR,
+  defaultLocalServerImageForCliVersion,
   localContainerName,
   localRuntimePaths,
   readRuntimeMetadata,
   writeRuntimeMetadata,
   type RuntimeMetadata,
 } from "../../../src/lib/local-server/runtime";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 
 const tempDirs: string[] = [];
 const servers: Server[] = [];
@@ -40,6 +41,7 @@ describe("local runtime commands", () => {
       PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
       DOCKER_LOG: fake.logPath,
     });
+    const defaultImage = await expectedDefaultImage();
 
     expect(result.exitCode).toBe(0);
     const envelope = parseJson(result.stdout) as { status: string; data: { ok: boolean } };
@@ -47,8 +49,8 @@ describe("local runtime commands", () => {
     expect(envelope.data.ok).toBe(true);
 
     const dockerCalls = await readDockerCalls(fake.logPath);
-    expect(dockerCalls).toContainEqual(["image", "inspect", "ghcr.io/zitadel/nextgen:latest"]);
-    expect(dockerCalls).toContainEqual(["manifest", "inspect", "ghcr.io/zitadel/nextgen:latest"]);
+    expect(dockerCalls).toContainEqual(["image", "inspect", defaultImage]);
+    expect(dockerCalls).toContainEqual(["manifest", "inspect", defaultImage]);
     expect(dockerCalls.some((args) => args[0] === "pull")).toBe(false);
   });
 
@@ -145,8 +147,8 @@ describe("local runtime commands", () => {
     };
     expect(envelope.status).toBe("error");
     expect(envelope.hint).toContain("Existing local runtime metadata");
-    expect(envelope.next_commands).toContain("npx @zitadel/cli@alpha start");
-    expect(envelope.next_commands).toContain("npx @zitadel/cli@alpha reset --force");
+    expect(envelope.next_commands).toContain(expectedPublicCliCommand("start"));
+    expect(envelope.next_commands).toContain(expectedPublicCliCommand("reset --force"));
     expect(envelope.details.checks.find((check) => check.name === "runtime")).toMatchObject({
       status: "fail",
     });
@@ -172,7 +174,7 @@ describe("local runtime commands", () => {
     expect(envelope.data.urls.api).toBe(serverUrl);
     expect(envelope.data.next_actions.join("\n")).toContain("From your app directory");
     expect(envelope.data.next_actions.join("\n")).toContain("Setup installs dependencies");
-    expect(envelope.data.next_commands).toEqual(["npx @zitadel/cli@alpha setup --server local"]);
+    expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("setup --server local")]);
     expect(envelope.data.next_commands).not.toContain("npm install");
     expect(envelope.data.next_commands).not.toContain("npm run dev");
 
@@ -186,6 +188,7 @@ describe("local runtime commands", () => {
     expect(runCall?.join(" ")).toContain(`${localRuntimePaths(cwd).dataDir}:${CONTAINER_DATA_DIR}`);
     expect(runCall?.join(" ")).toContain(`NEXTGEN_SERVER_DATA_DIR=${CONTAINER_DATA_DIR}`);
     expect(runCall?.join(" ")).not.toContain("NEXTGEN_SERVER_ENCRYPTION_KEY");
+    expect(runCall?.at(-1)).toBe(await expectedDefaultImage());
   });
 
   it("start uses a prebuilt local image without pulling it", async () => {
@@ -209,6 +212,72 @@ describe("local runtime commands", () => {
     expect(dockerCalls.find((args) => args[0] === "run")?.at(-1)).toBe("zitadel-nextgen:test");
   });
 
+  it("start uses ZITADEL_LOCAL_IMAGE before the derived alpha image", async () => {
+    const cwd = await tempProject("zitadel-start-env-image-");
+    const fake = await fakeDocker({ imageExists: true });
+    const serverUrl = await startHealthServer();
+    const port = Number(new URL(serverUrl).port);
+
+    const result = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
+      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: fake.logPath,
+      ZITADEL_LOCAL_IMAGE: "zitadel-nextgen:env",
+    });
+
+    expect(result.exitCode).toBe(0);
+    const dockerCalls = await readDockerCalls(fake.logPath);
+    expect(dockerCalls.find((args) => args[0] === "run")?.at(-1)).toBe("zitadel-nextgen:env");
+  });
+
+  it("start --image overrides ZITADEL_LOCAL_IMAGE", async () => {
+    const cwd = await tempProject("zitadel-start-replace-image-");
+    const fake = await fakeDocker({ imageExists: true });
+    const serverUrl = await startHealthServer();
+    const port = Number(new URL(serverUrl).port);
+
+    const result = await runCliForTest(
+      [
+        "start",
+        "--cwd",
+        cwd,
+        "--json",
+        "--port",
+        String(port),
+        "--image",
+        "zitadel-nextgen:override",
+      ],
+      {
+        PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: fake.logPath,
+        ZITADEL_LOCAL_IMAGE: "zitadel-nextgen:env",
+      },
+    );
+
+    expect(result.exitCode).toBe(0);
+    const dockerCalls = await readDockerCalls(fake.logPath);
+    expect(dockerCalls.find((args) => args[0] === "run")?.at(-1)).toBe("zitadel-nextgen:override");
+  });
+
+  it("start replaces an existing container from another image", async () => {
+    const cwd = await tempProject("zitadel-start-replace-image-");
+    const fake = await fakeDocker({ existingContainerImage: "ghcr.io/zitadel/nextgen:old" });
+    const serverUrl = await startHealthServer();
+    const port = Number(new URL(serverUrl).port);
+
+    const result = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
+      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: fake.logPath,
+    });
+
+    expect(result.exitCode).toBe(0);
+    const dockerCalls = await readDockerCalls(fake.logPath);
+    expect(dockerCalls.some((args) => args[0] === "stop")).toBe(true);
+    expect(dockerCalls.some((args) => args[0] === "rm")).toBe(true);
+    expect(dockerCalls.find((args) => args[0] === "run")?.at(-1)).toBe(
+      await expectedDefaultImage(),
+    );
+  });
+
   it("logs without runtime suggests the published start command", async () => {
     const cwd = await tempProject("zitadel-logs-no-runtime-");
     const fake = await fakeDocker();
@@ -224,7 +293,7 @@ describe("local runtime commands", () => {
       next_commands?: string[];
     };
     expect(envelope.status).toBe("error");
-    expect(envelope.next_commands).toEqual(["npx @zitadel/cli@alpha start"]);
+    expect(envelope.next_commands).toEqual([expectedPublicCliCommand("start")]);
   });
 
   it("stop succeeds without suggesting a restart", async () => {
@@ -260,7 +329,7 @@ describe("local runtime commands", () => {
       data: { next_commands?: string[] };
     };
     expect(envelope.status).toBe("ok");
-    expect(envelope.data.next_commands).toEqual(["npx @zitadel/cli@alpha stop"]);
+    expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("stop")]);
   });
 
   it("reset --force deletes local runtime data without suggesting a restart", async () => {
@@ -302,7 +371,7 @@ describe("local runtime commands", () => {
       next_commands?: string[];
     };
     expect(envelope.status).toBe("error");
-    expect(envelope.next_commands).toEqual(["npx @zitadel/cli@alpha reset --force"]);
+    expect(envelope.next_commands).toEqual([expectedPublicCliCommand("reset --force")]);
   });
 });
 
@@ -313,7 +382,12 @@ async function tempProject(prefix: string): Promise<string> {
 }
 
 async function fakeDocker(
-  options: { dockerAvailable?: boolean; imageExists?: boolean; imageAvailable?: boolean } = {},
+  options: {
+    dockerAvailable?: boolean;
+    existingContainerImage?: string;
+    imageExists?: boolean;
+    imageAvailable?: boolean;
+  } = {},
 ): Promise<{ binDir: string; logPath: string }> {
   const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-docker-"));
   tempDirs.push(binDir);
@@ -344,6 +418,10 @@ if (args[0] === "manifest" && args[1] === "inspect") {
   process.exit(${options.imageAvailable === false ? "1" : "0"});
 }
 if (args[0] === "inspect") {
+  if (${options.existingContainerImage ? "true" : "false"}) {
+    console.log("container-test-id true ${options.existingContainerImage ?? ""}");
+    process.exit(0);
+  }
   process.exit(1);
 }
 if (args[0] === "run") {
@@ -412,4 +490,11 @@ function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
     created_at: "2026-06-09T00:00:00.000Z",
     cli_version: "0.0.0-test",
   };
+}
+
+async function expectedDefaultImage(): Promise<string> {
+  const pkg = JSON.parse(
+    await readFile(new URL("../../../package.json", import.meta.url), "utf8"),
+  ) as { version: string };
+  return defaultLocalServerImageForCliVersion(pkg.version);
 }

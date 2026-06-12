@@ -12,7 +12,7 @@ demo-app e2e suite.
 - Produce package artifacts with `corepack pnpm --dir <package> pack` and keep
   tarball verification for required package presence plus unresolved
   `catalog:` or `workspace:` dependency specs.
-- Pack only the six public Zitadel packages. Private support packages such as
+- Pack only the public Zitadel packages. Private support packages such as
   design tokens must not be uploaded or published to Verdaccio.
 - Keep Verdaccio proxying npmjs for third-party dependencies while publishing
   Zitadel tarballs under both `alpha` and `latest`.

@@ -45,7 +45,7 @@ describe("NextPatcher.plan", () => {
     const dep = plan.ops.find(
       (op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep",
     );
-    expect(dep).toMatchObject({ name: "@zitadel/sdk-next", version: "alpha" });
+    expect(dep).toMatchObject({ name: "@zitadel/sdk-next", version: "0.1.0-alpha.0" });
   });
 
   it("does not scaffold the user schema or flow (server-provisioned)", () => {

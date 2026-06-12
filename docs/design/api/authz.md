@@ -49,7 +49,7 @@ For end-users: token issuance resolves grants and roles, embeds claims/scopes in
 
 ## Authorization vs lifecycle ownership
 
-**LOCKED by [ADR 023](../../adrs/023-user-team-lifecycle-ownership.md).**
+**LOCKED by [ADR 024](../../adrs/024-user-team-lifecycle-ownership.md).**
 FGA decides whether a principal may perform an action. It does not decide who
 owns a user's identity lifecycle or what deletion/deprovisioning should do after
 the action is authorized.

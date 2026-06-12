@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   openapi-lint:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
@@ -27,7 +27,7 @@ jobs:
         run: npx --yes @redocly/cli@2.31.5 lint api/openapi/openapi-spec.yaml --format=github-actions
 
   go-unit-test:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-8
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
@@ -54,7 +54,7 @@ jobs:
       - run: go test -v -timeout=10m ./...
 
   go-integration-test-postgres:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
@@ -63,7 +63,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       # Postgres integration tests run against a Docker testcontainer (mirroring
-      # the spanner job); ubuntu-latest ships Docker, so no embedded-postgres
+      # the spanner job); the Depot Ubuntu runner ships Docker, so no embedded-postgres
       # runtime deps or Maven binary cache are needed here.
       - name: Postgres integration tests
         run: |
@@ -80,7 +80,7 @@ jobs:
           retention-days: 7
 
   go-integration-test-spanner:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
@@ -93,7 +93,7 @@ jobs:
       - run: go test -v -tags spanner_integration -timeout=10m ./...
 
   goreleaser-snapshot:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-8
     timeout-minutes: 20
     needs: [go-unit-test, go-integration-test-postgres, go-integration-test-spanner, node-check]
     steps:
@@ -145,7 +145,7 @@ jobs:
       - name: Export Docker image for smoke tests
         run: |
           # Goreleaser builds linux/amd64 and linux/arm64 with the same tag; pin amd64
-          # for ubuntu-latest smoke jobs (see quickstart-smoke).
+          # for the linux/amd64 smoke jobs (see quickstart-smoke).
           IMAGE_ID=""
           IMAGE_REF=""
           for id in $(docker images ghcr.io/zitadel/nextgen --format '{{.ID}}' | sort -u); do
@@ -178,7 +178,7 @@ jobs:
           retention-days: 7
 
   go-smoke-test-embedded-postgres:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 15
     needs: [goreleaser-snapshot]
     steps:
@@ -233,7 +233,7 @@ jobs:
 
 
   node-check:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-8
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
@@ -270,7 +270,7 @@ jobs:
     # package manifests/changelogs and *removes* changesets (consuming them),
     # which would otherwise trip this gate.
     if: github.event_name == 'pull_request' && github.head_ref != 'changeset-release/main'
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
@@ -284,7 +284,7 @@ jobs:
           node scripts/check-changeset-required.mjs --base "origin/${{ github.base_ref }}"
 
   quickstart-smoke:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 20
     needs: [goreleaser-snapshot]
     env:
@@ -440,7 +440,7 @@ jobs:
           fi
 
   node-e2e:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
@@ -511,7 +511,7 @@ jobs:
           retention-days: 7
 
   npm-pack-smoke:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 15
     needs: node-check
     steps:
@@ -541,14 +541,14 @@ jobs:
 
       - name: Dry-run npm packs
         run: |
-          for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt; do
+          for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt packages/sdk-react packages/sdk-vue packages/sdk-angular; do
             corepack pnpm --dir "$dir" pack --dry-run
           done
 
       - name: Create npm package artifacts
         run: |
           mkdir -p "$RUNNER_TEMP/zitadel-npm-packages"
-          for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt; do
+          for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt packages/sdk-react packages/sdk-vue packages/sdk-angular; do
             corepack pnpm --dir "$dir" pack --pack-destination "$RUNNER_TEMP/zitadel-npm-packages"
           done
           ls -lh "$RUNNER_TEMP/zitadel-npm-packages"
@@ -565,7 +565,7 @@ jobs:
           retention-days: 7
 
   consumer-journey-e2e:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 35
     needs: [goreleaser-snapshot, npm-pack-smoke]
     steps:

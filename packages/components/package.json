@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/components",
-  "version": "0.1.0-alpha.0",
+  "version": "0.1.0-alpha.2",
   "description": "Lit-based atomic web components and the <zitadel-login> orchestrator for the Zitadel auth UI.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/components#readme",
   "bugs": {
@@ -19,12 +19,18 @@
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
+  "unpkg": "./dist/standalone.mjs",
+  "jsdelivr": "./dist/standalone.mjs",
   "exports": {
     "./package.json": "./package.json",
     ".": {
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
+    },
+    "./standalone": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/standalone.mjs"
     },
     "./atoms": {
       "types": "./dist/atoms/index.d.mts",

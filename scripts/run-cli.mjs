@@ -29,7 +29,7 @@ export async function main(options = {}) {
 }
 
 export function shouldAutoBuildLocalRuntimeImage(args, env = process.env) {
-  return commandName(args) === "start" && !hasImageOverride(args, env);
+  return commandName(args) === "start" && !hasRuntimeImageSource(args, env);
 }
 
 export function commandName(args) {
@@ -55,11 +55,14 @@ export function cliCwdFor(env = process.env, fallback = process.cwd()) {
   return env.INIT_CWD || fallback;
 }
 
-function hasImageOverride(args, env) {
+function hasRuntimeImageSource(args, env) {
   if (env.ZITADEL_LOCAL_IMAGE) {
     return true;
   }
-  return args.some((arg) => arg === "--image" || arg.startsWith("--image="));
+  return args.some(
+    (arg) =>
+      arg === "--image" || arg.startsWith("--image="),
+  );
 }
 
 export function buildCli() {
