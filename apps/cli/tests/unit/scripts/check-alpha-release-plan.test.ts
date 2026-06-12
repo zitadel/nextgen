@@ -25,18 +25,6 @@ const publicPackageNames = [
   "@zitadel/sdk-angular",
 ];
 
-const publicPackageManifestPaths = [
-  "apps/cli/package.json",
-  "packages/api/package.json",
-  "packages/components/package.json",
-  "packages/sdk-core/package.json",
-  "packages/sdk-next/package.json",
-  "packages/sdk-nuxt/package.json",
-  "packages/sdk-react/package.json",
-  "packages/sdk-vue/package.json",
-  "packages/sdk-angular/package.json",
-];
-
 beforeAll(async () => {
   checkAlphaReleasePlanModule = (await import(
     new URL("../../../../../scripts/check-alpha-release-plan.mjs", import.meta.url).href
@@ -103,7 +91,7 @@ describe("check-alpha-release-plan script", () => {
 
   it("rejects a workflow that lets Changesets create GitHub Releases", async () => {
     const { cwd, statusPath } = await fixtureRepo({
-      releaseWorkflow: validReleaseWorkflow().replace(
+      ciWorkflow: validCiWorkflow().replace(
         "createGithubReleases: false",
         "createGithubReleases: true",
       ),
@@ -116,7 +104,7 @@ describe("check-alpha-release-plan script", () => {
 
   it("rejects alpha release notes generated inside the checkout", async () => {
     const { cwd, statusPath } = await fixtureRepo({
-      releaseWorkflow: validReleaseWorkflow().replace(
+      ciWorkflow: validCiWorkflow().replace(
         '--out-dir "$RUNNER_TEMP/alpha-release" | tee "$alpha_env"',
         "--out-dir dist/alpha-release | tee dist/alpha-release.env",
       ),
@@ -129,7 +117,7 @@ describe("check-alpha-release-plan script", () => {
 
   it("rejects workflow steps gated only on the current Changesets publish result", async () => {
     const { cwd, statusPath } = await fixtureRepo({
-      releaseWorkflow: validReleaseWorkflow().replace(
+      ciWorkflow: validCiWorkflow().replace(
         "      - if: ${{ steps.alpha.outputs.update_release == 'true' }}",
         "      - if: ${{ steps.changesets.outputs.published == 'true' }}",
       ),
@@ -140,68 +128,86 @@ describe("check-alpha-release-plan script", () => {
     ).rejects.toThrow("post-npm alpha train steps must not be gated only on Changesets publishing");
   });
 
-  it("rejects a workflow without release-relevant path filters", async () => {
+  it("rejects a legacy standalone release workflow", async () => {
     const { cwd, statusPath } = await fixtureRepo({
-      releaseWorkflow: validReleaseWorkflow().replace(
-        / {4}paths:\n(?: {6}- "[^"]+"\n)+/,
-        "",
+      legacyReleaseWorkflow: "name: release-npm\n",
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("release publishing must live in ci.yml");
+  });
+
+  it("rejects CI path filters that can skip release relevance detection", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      ciWorkflow: validCiWorkflow().replace(
+        "  push:\n    branches: [main]",
+        '  push:\n    branches: [main]\n    paths:\n      - ".changeset/**"',
       ),
     });
 
     await expect(
       checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
-    ).rejects.toThrow("must limit main pushes to release-relevant files");
+    ).rejects.toThrow("must not path-filter main pushes");
   });
 
-  it("rejects a workflow missing actions read permission", async () => {
+  it("rejects a workflow missing release job publish permissions", async () => {
     const { cwd, statusPath } = await fixtureRepo({
-      releaseWorkflow: validReleaseWorkflow().replace("  actions: read\n", ""),
+      ciWorkflow: validCiWorkflow().replace("      packages: write\n", ""),
     });
 
     await expect(
       checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
-    ).rejects.toThrow("must grant actions: read");
+    ).rejects.toThrow("must scope publish permissions");
   });
 
   it("rejects a workflow that can publish before main CI succeeds", async () => {
-    const waitStep = mainCiWaitStep();
     const { cwd, statusPath } = await fixtureRepo({
-      releaseWorkflow: validReleaseWorkflow()
-        .replace(waitStep, "")
-        .replace("      - id: alpha-status", `${waitStep}      - id: alpha-status`),
+      ciWorkflow: validCiWorkflow().replace(
+        "    needs: [release-plan, ci-success]",
+        "    needs: [release-plan]",
+      ),
     });
 
     await expect(
       checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
-    ).rejects.toThrow("must wait for main CI before Changesets can publish");
+    ).rejects.toThrow("must wait for the release plan and aggregate CI gate");
   });
 });
 
-function validReleaseWorkflow(): string {
-  const releasePaths = [
-    ".changeset/**",
-    ...publicPackageManifestPaths.flatMap((path) => [
-      path,
-      path.replace(/package\.json$/, "CHANGELOG.md"),
-    ]),
-  ];
-
+function validCiWorkflow(): string {
   return [
     "on:",
+    "  pull_request:",
     "  push:",
     "    branches: [main]",
-    "    paths:",
-    ...releasePaths.map((path) => `      - "${path}"`),
     "permissions:",
-    "  contents: write",
-    "  pull-requests: write",
-    "  packages: write",
-    "  id-token: write",
-    "  actions: read",
+    "  contents: read",
+    "concurrency:",
+    "  group: ci-${{ github.workflow }}-${{ github.ref }}",
+    "  cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
     "jobs:",
-    "  release:",
+    "  release-plan:",
+    "    outputs:",
+    "      should_release: ${{ steps.detect.outputs.should_release }}",
     "    steps:",
-    mainCiWaitStep().trimEnd(),
+    "      - id: detect",
+    "        run: |",
+    '          import { PUBLIC_PACKAGE_MANIFESTS } from "./scripts/release-alpha-train.mjs";',
+    '          path.startsWith(".changeset/") || publicPackageReleasePaths.has(path)',
+    "  ci-success:",
+    "    steps:",
+    "      - run: |",
+    '          const allowedSkipped = new Set(["changeset-check"]);',
+    "  release-npm:",
+    "    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.release-plan.outputs.should_release == 'true'",
+    "    needs: [release-plan, ci-success]",
+    "    permissions:",
+    "      contents: write",
+    "      pull-requests: write",
+    "      packages: write",
+    "      id-token: write",
+    "    steps:",
     "      - uses: changesets/action@v1",
     "        with:",
     "          createGithubReleases: false",
@@ -224,23 +230,13 @@ function validReleaseWorkflow(): string {
   ].join("\n");
 }
 
-function mainCiWaitStep(): string {
-  return [
-    "      - name: Wait for main CI",
-    "        run: |",
-    '          run_fields="$(gh run list --workflow ci.yml --branch main --commit "$GITHUB_SHA" --event push --limit 1 --json status,conclusion,url --jq \'.[] | [.status, (.conclusion // ""), .url] | @tsv\')"',
-    "          if [ \"$conclusion\" = \"success\" ]; then exit 0; fi",
-    "          echo \"::error::timed out waiting for main CI\"",
-    "",
-  ].join("\n");
-}
-
 async function fixtureRepo(
   options: {
     releases?: Array<{ name: string; type: string; newVersion: string }>;
     versionOverrides?: Record<string, string>;
     goreleaser?: string;
-    releaseWorkflow?: string;
+    ciWorkflow?: string;
+    legacyReleaseWorkflow?: string;
   } = {},
 ): Promise<{ cwd: string; statusPath: string }> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-alpha-check-"));
@@ -266,9 +262,15 @@ async function fixtureRepo(
   );
   await mkdir(join(cwd, ".github/workflows"), { recursive: true });
   await writeFile(
-    join(cwd, ".github/workflows/release-npm.yml"),
-    options.releaseWorkflow ?? validReleaseWorkflow(),
+    join(cwd, ".github/workflows/ci.yml"),
+    options.ciWorkflow ?? validCiWorkflow(),
   );
+  if (options.legacyReleaseWorkflow !== undefined) {
+    await writeFile(
+      join(cwd, ".github/workflows/release-npm.yml"),
+      options.legacyReleaseWorkflow,
+    );
+  }
 
   const statusPath = join(cwd, "changeset-status.json");
   await writeJson(statusPath, {

@@ -4,14 +4,10 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
-  PUBLIC_PACKAGE_MANIFESTS,
   PUBLIC_PACKAGE_NAMES,
   validateAlphaVersion,
   validateChangesetsFixedGroup,
 } from "./release-alpha-train.mjs";
-
-const MAIN_CI_WAIT_COMMAND =
-  'gh run list --workflow ci.yml --branch main --commit "$GITHUB_SHA" --event push';
 
 export async function checkAlphaReleasePlan(options) {
   const cwd = options.cwd ?? process.cwd();
@@ -95,112 +91,141 @@ export async function validateReleaseTooling(cwd, readFileFn = readFileDefault) 
     "GoReleaser prereleases must not become GitHub latest",
   );
 
-  const releaseWorkflow = await readFileFn(join(cwd, ".github/workflows/release-npm.yml"), "utf8");
-  assertContains(
-    releaseWorkflow,
-    "actions: read",
-    "release-npm.yml must grant actions: read so it can wait for main CI",
+  const legacyReleaseWorkflow = await readOptionalFile(
+    join(cwd, ".github/workflows/release-npm.yml"),
+    readFileFn,
   );
-  assertContains(
-    releaseWorkflow,
-    "paths:",
-    "release-npm.yml must limit main pushes to release-relevant files",
-  );
-  assertContains(
-    releaseWorkflow,
-    ".changeset/**",
-    "release-npm.yml must run for Changesets release bookkeeping",
-  );
-  for (const path of publicPackageReleasePaths()) {
-    assertContains(
-      releaseWorkflow,
-      path,
-      `release-npm.yml must run for public package release file ${path}`,
-    );
+  if (legacyReleaseWorkflow !== undefined) {
+    throw new Error("release publishing must live in ci.yml, not release-npm.yml");
   }
+
+  const ciWorkflow = await readFileFn(join(cwd, ".github/workflows/ci.yml"), "utf8");
   assertContains(
-    releaseWorkflow,
-    MAIN_CI_WAIT_COMMAND,
-    "release-npm.yml must wait for the matching main CI run",
+    ciWorkflow,
+    "cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
+    "ci.yml must not cancel main release runs",
   );
-  assertBefore(
-    releaseWorkflow,
-    MAIN_CI_WAIT_COMMAND,
-    "uses: changesets/action@v1",
-    "release-npm.yml must wait for main CI before Changesets can publish",
-  );
-  assertContains(
-    releaseWorkflow,
-    '[ "$conclusion" = "success" ]',
-    "release-npm.yml must require successful main CI before publishing",
+  assertNotContains(
+    ciWorkflow,
+    "    paths:",
+    "ci.yml must not path-filter main pushes before release relevance is computed",
   );
   assertContains(
-    releaseWorkflow,
-    "timed out waiting for main CI",
-    "release-npm.yml must fail if main CI does not finish in time",
+    ciWorkflow,
+    "release-plan:",
+    "ci.yml must compute release relevance before publishing",
   );
   assertContains(
-    releaseWorkflow,
+    ciWorkflow,
+    "should_release: ${{ steps.detect.outputs.should_release }}",
+    "release-plan must expose a should_release output",
+  );
+  assertContains(
+    ciWorkflow,
+    'import { PUBLIC_PACKAGE_MANIFESTS } from "./scripts/release-alpha-train.mjs";',
+    "release-plan must derive public package release paths from release-alpha-train.mjs",
+  );
+  assertContains(
+    ciWorkflow,
+    'path.startsWith(".changeset/") || publicPackageReleasePaths.has(path)',
+    "release-plan must detect Changesets and public package release files",
+  );
+  assertContains(
+    ciWorkflow,
+    "ci-success:",
+    "ci.yml must include an aggregate CI success gate",
+  );
+  assertContains(
+    ciWorkflow,
+    'const allowedSkipped = new Set(["changeset-check"]);',
+    "ci-success must only allow intentionally skipped jobs",
+  );
+  assertContains(
+    ciWorkflow,
+    "release-npm:",
+    "ci.yml must contain the npm release job",
+  );
+  assertContains(
+    ciWorkflow,
+    "if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.release-plan.outputs.should_release == 'true'",
+    "release-npm must only run on release-relevant main pushes",
+  );
+  assertContains(
+    ciWorkflow,
+    "needs: [release-plan, ci-success]",
+    "release-npm must wait for the release plan and aggregate CI gate",
+  );
+  assertContains(
+    ciWorkflow,
+    [
+      "    permissions:",
+      "      contents: write",
+      "      pull-requests: write",
+      "      packages: write",
+      "      id-token: write",
+    ].join("\n"),
+    "release-npm must scope publish permissions to the release job",
+  );
+  assertNotContains(
+    ciWorkflow,
+    "gh run list --workflow ci.yml",
+    "release-npm must rely on ci.yml needs instead of polling GitHub Actions",
+  );
+  assertContains(
+    ciWorkflow,
     "createGithubReleases: false",
     "Changesets must not create package-shaped GitHub Releases",
   );
   assertContains(
-    releaseWorkflow,
+    ciWorkflow,
     "node scripts/release-alpha-train.mjs status --published \"$PUBLISHED\" --remote false",
-    "release-npm.yml must inspect alpha train recovery status without remote checks",
+    "ci.yml must inspect alpha train recovery status without remote checks",
   );
   assertContains(
-    releaseWorkflow,
+    ciWorkflow,
     "steps.alpha-status.outputs.should_complete == 'true'",
-    "release-npm.yml must complete recoverable alpha trains even when npm publish is not rerun",
+    "ci.yml must complete recoverable alpha trains even when npm publish is not rerun",
   );
   assertContains(
-    releaseWorkflow,
+    ciWorkflow,
     "node scripts/release-alpha-train.mjs prepare --published \"$PUBLISHED\"",
-    "release-npm.yml must prepare the alpha train before GoReleaser",
+    "ci.yml must prepare the alpha train before GoReleaser",
   );
   assertContains(
-    releaseWorkflow,
+    ciWorkflow,
     '--out-dir "$RUNNER_TEMP/alpha-release"',
-    "release-npm.yml must write alpha release notes outside the checkout before GoReleaser --clean",
+    "ci.yml must write alpha release notes outside the checkout before GoReleaser --clean",
   );
   assertContains(
-    releaseWorkflow,
+    ciWorkflow,
     'alpha_env="$RUNNER_TEMP/alpha-release.env"',
-    "release-npm.yml must write alpha release outputs outside the checkout before GoReleaser --clean",
+    "ci.yml must write alpha release outputs outside the checkout before GoReleaser --clean",
   );
   assertContains(
-    releaseWorkflow,
+    ciWorkflow,
     "steps.alpha.outputs.create_tag == 'true'",
-    "release-npm.yml must create the Go tag only when the alpha train needs it",
+    "ci.yml must create the Go tag only when the alpha train needs it",
   );
   assertContains(
-    releaseWorkflow,
+    ciWorkflow,
     "steps.alpha.outputs.run_goreleaser == 'true'",
-    "release-npm.yml must skip GoReleaser when the alpha release and image already exist",
+    "ci.yml must skip GoReleaser when the alpha release and image already exist",
   );
   assertNotContains(
-    releaseWorkflow,
+    ciWorkflow,
     "if: ${{ steps.changesets.outputs.published == 'true' }}",
     "post-npm alpha train steps must not be gated only on Changesets publishing in the current rerun",
   );
   assertContains(
-    releaseWorkflow,
+    ciWorkflow,
     "--prerelease",
     "alpha GitHub Releases must be marked as prereleases",
   );
   assertContains(
-    releaseWorkflow,
+    ciWorkflow,
     "--latest=false",
     "alpha GitHub Releases must not become GitHub latest",
   );
-}
-
-function publicPackageReleasePaths() {
-  return PUBLIC_PACKAGE_MANIFESTS.flatMap((manifestPath) => [
-    manifestPath,
-    manifestPath.replace(/package\.json$/, "CHANGELOG.md"),
-  ]);
 }
 
 function assertContains(input, expected, message) {
@@ -221,11 +246,14 @@ function assertPattern(input, pattern, message) {
   }
 }
 
-function assertBefore(input, before, after, message) {
-  const beforeIndex = input.indexOf(before);
-  const afterIndex = input.indexOf(after);
-  if (beforeIndex === -1 || afterIndex === -1 || beforeIndex > afterIndex) {
-    throw new Error(message);
+async function readOptionalFile(path, readFileFn) {
+  try {
+    return await readFileFn(path, "utf8");
+  } catch (error) {
+    if (error && typeof error === "object" && error.code === "ENOENT") {
+      return undefined;
+    }
+    throw error;
   }
 }
 
