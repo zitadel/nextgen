@@ -36,11 +36,33 @@ export interface ZitadelProject {
 
 export type { ZitadelApi };
 
-let currentProject: ZitadelProject | null = null;
+/**
+ * Cross-realm slot for the configured project. Stored on `globalThis`
+ * under a {@link Symbol.for} key so every copy of this module shares the
+ * same state — the standalone components bundle inlines its own copy of
+ * this file, and dual-package hazards / monorepo duplicates can load
+ * a second copy alongside the app's. With a module-local `let` each
+ * instance kept its own singleton and `configureZitadel()` calls in one
+ * were invisible to `getZitadelConfig()` calls in another. The shared
+ * symbol registry collapses them to one.
+ */
+const PROJECT_SLOT = Symbol.for("@zitadel/api/config:currentProject");
+
+function readSlot(): ZitadelProject | null {
+  const value = (globalThis as Record<symbol, unknown>)[PROJECT_SLOT];
+  return (value as ZitadelProject | null | undefined) ?? null;
+}
+
+function writeSlot(value: ZitadelProject | null): void {
+  (globalThis as Record<symbol, unknown>)[PROJECT_SLOT] = value;
+}
 
 /**
  * Per-project API client cache. Ensures `getApi(project)` returns the
  * same instance for the same project handle — no re-wrapping on every call.
+ * Module-local on purpose: keyed by the shared frozen `ZitadelProject`
+ * object identity, so cross-instance reads still resolve through the
+ * same key and at worst memoize once per module instance.
  */
 const apiCache = new WeakMap<ZitadelProject, ZitadelApi>();
 
@@ -55,33 +77,33 @@ const apiCache = new WeakMap<ZitadelProject, ZitadelApi>();
  */
 export function configureZitadel(config: ZitadelConfig): ZitadelProject {
   const resolvedProxyPath = config.proxyPath ?? "/__nextgen";
+  const existing = readSlot();
 
-  if (currentProject !== null) {
-    // Same values → no-op (safe for HMR / React strict mode double-mount)
+  if (existing !== null) {
     if (
-      currentProject.proxyPath === resolvedProxyPath &&
-      currentProject.projectId === config.projectId &&
-      currentProject.url === config.url
+      existing.proxyPath === resolvedProxyPath &&
+      existing.projectId === config.projectId &&
+      existing.url === config.url
     ) {
-      return currentProject;
+      setProxyPath(resolvedProxyPath);
+      return existing;
     }
     console.warn(
       `[zitadel] configureZitadel() already called with different values. ` +
         `Ignoring: ${JSON.stringify(config)}`,
     );
-    return currentProject;
+    setProxyPath(existing.proxyPath);
+    return existing;
   }
 
-  currentProject = Object.freeze({
+  const project = Object.freeze({
     proxyPath: resolvedProxyPath,
     projectId: config.projectId,
     url: config.url,
   });
-
-  // Keep the global in sync for the generated code's internal use
+  writeSlot(project);
   setProxyPath(resolvedProxyPath);
-
-  return currentProject;
+  return project;
 }
 
 /**
@@ -107,7 +129,7 @@ export function getApi(project: ZitadelProject): ZitadelApi {
  * has not been called yet.
  */
 export function getZitadelConfig(): ZitadelProject | null {
-  return currentProject;
+  return readSlot();
 }
 
 /**
@@ -116,6 +138,6 @@ export function getZitadelConfig(): ZitadelProject | null {
  * across isolated test cases without the write-once guard rejecting them.
  */
 export function _resetConfigForTesting(): void {
-  currentProject = null;
+  writeSlot(null);
   setProxyPath("");
 }
