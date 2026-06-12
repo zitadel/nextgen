@@ -49,7 +49,7 @@ concurrency:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-8
     steps:
       # Mint a short-lived installation token for the release GitHub App so the
       # changesets PR/commits trigger CI (GITHUB_TOKEN-authored ones do not).
