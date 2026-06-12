@@ -78,12 +78,22 @@ export default defineConfig([
    * third-party UI deps ARE inlined, so `<script type="module"
    * src="…/standalone.mjs">` works with no import map and no bundler. Kept
    * separate from the library build above so npm/SDK consumers are unaffected.
+   *
+   * `platform: "browser"` is required: the default ("node") makes rolldown emit
+   * `import { createRequire } from "node:module"` for its CJS-interop helper,
+   * which a browser cannot resolve — the whole module then fails to load. The
+   * browser platform also picks the `browser`/`import` export conditions of the
+   * inlined deps so no Node-only entry points leak in.
    */
   {
     plugins: [liquidRaw()],
     entry: { standalone: "src/index.ts" },
     outDir: "dist",
     format: ["esm"],
+    platform: "browser",
+    // `platform: "browser"` would otherwise emit `standalone.js`; force `.mjs`
+    // so the `unpkg`/`jsdelivr`/`./standalone` paths in package.json still match.
+    fixedExtension: true,
     tsconfig: "tsconfig.lib.json",
     dts: false,
     sourcemap: false,

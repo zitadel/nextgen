@@ -19,16 +19,7 @@ import {
 } from "@zitadel/api-mock";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "./zitadel-login.js";
 import type { ZitadelLogin } from "./zitadel-login.js";
@@ -72,7 +63,10 @@ async function waitFor<T>(probe: () => T | null | undefined, timeout = 1500): Pr
 }
 
 /** Walks the api-mock login path: combined sign-in → passkey-upsell → done. */
-async function advanceMockLoginFlow(element: ZitadelLogin, email = "alice@acme.com"): Promise<void> {
+async function advanceMockLoginFlow(
+  element: ZitadelLogin,
+  email = "alice@acme.com",
+): Promise<void> {
   element.shadowRoot?.dispatchEvent(
     new CustomEvent("zl-input", {
       bubbles: true,
@@ -138,6 +132,37 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(fields[1]?.getAttribute("name")).toBe("password");
   });
 
+  it("starts a flow from project-id / proxy-path attributes with no global config", async () => {
+    // Clear the global so the attributes are the only thing that can configure
+    // the element — proves declarative HTML config works on its own.
+    _resetConfigForTesting();
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.setAttribute("project-id", "demo-project");
+    element.setAttribute("proxy-path", API_BASE);
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+    expect(mock.getCaptured()[0]).toEqual({
+      kind: "createFlow",
+      body: { purpose: "login", project_id: "demo-project" },
+    });
+  });
+
+  it("prefers the project property over the project-id attribute", async () => {
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.project = testProject; // projectId "demo-project"
+    element.setAttribute("project-id", "ignored-attr-project");
+    element.setAttribute("proxy-path", API_BASE);
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+    // The property wins: the attribute's project id never reaches the wire.
+    expect(mock.getCaptured()[0]).toEqual({
+      kind: "createFlow",
+      body: { purpose: "login", project_id: "demo-project" },
+    });
+  });
+
   it("submits with {session_token, action, fields} and applies the next step", async () => {
     const element = await mount(host);
 
@@ -174,10 +199,12 @@ describe("<zitadel-login> against the typed Flow API", () => {
       return title?.textContent?.includes("Sign in faster") ? title : null;
     });
 
-    const submits = mock.getCaptured().filter(
-      (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
-        req.kind === "submitFlowStep",
-    );
+    const submits = mock
+      .getCaptured()
+      .filter(
+        (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+          req.kind === "submitFlowStep",
+      );
     expect(submits).toHaveLength(1);
     expect(submits[0]?.body).toMatchObject({
       action: "submit",
@@ -195,12 +222,9 @@ describe("<zitadel-login> against the typed Flow API", () => {
 
     await advanceMockLoginFlow(element);
     await waitFor(() => (completeEvents.length > 0 ? completeEvents : null));
-    expect(completeEvents[0]?.detail).toEqual(
-      expect.objectContaining({ behavior: "show" }),
-    );
+    expect(completeEvents[0]?.detail).toEqual(expect.objectContaining({ behavior: "show" }));
     expect(completeEvents[0]?.detail.handoff_token).toBeTruthy();
   });
-
 
   it("exchanges the handoff token and navigates when post-sign-in-url is set", async () => {
     const assign = vi.fn();
@@ -222,10 +246,12 @@ describe("<zitadel-login> against the typed Flow API", () => {
 
       await waitFor(() => (assign.mock.calls.length > 0 ? assign : null));
       expect(assign).toHaveBeenCalledWith("/admin");
-      const exchanges = mock.getCaptured().filter(
-        (req): req is Extract<CapturedRequest, { kind: "exchangeHandoff" }> =>
-          req.kind === "exchangeHandoff",
-      );
+      const exchanges = mock
+        .getCaptured()
+        .filter(
+          (req): req is Extract<CapturedRequest, { kind: "exchangeHandoff" }> =>
+            req.kind === "exchangeHandoff",
+        );
       expect(exchanges).toHaveLength(1);
       expect(exchanges[0]?.body.handoff_token).toBeTruthy();
       expect(exchanges[0]?.projectId).toBe("demo-project");
@@ -238,13 +264,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
   });
 
   it("surfaces network errors via zitadel-flow-error", async () => {
-    server.resetHandlers(
-      http.post(
-        "*/flow",
-        () => HttpResponse.error(),
-        { once: true },
-      ),
-    );
+    server.resetHandlers(http.post("*/flow", () => HttpResponse.error(), { once: true }));
 
     const errorEvents: CustomEvent[] = [];
     const element = document.createElement("zitadel-login") as ZitadelLogin;
@@ -283,10 +303,12 @@ describe("<zitadel-login> against the typed Flow API", () => {
 
     // Wait for the passkey-login step (which contains a challenge)
     await waitFor(() => {
-      const submits = mock.getCaptured().filter(
-        (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
-          req.kind === "submitFlowStep",
-      );
+      const submits = mock
+        .getCaptured()
+        .filter(
+          (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+            req.kind === "submitFlowStep",
+        );
       return submits.some((s) => s.body.action === "passkey") ? submits : null;
     });
 
@@ -324,10 +346,12 @@ describe("<zitadel-login> against the typed Flow API", () => {
     await waitFor(() => (completeEvents.length > 0 ? completeEvents : null));
 
     // Assert the submit body includes challenge_response
-    const submits = mock.getCaptured().filter(
-      (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
-        req.kind === "submitFlowStep",
-    );
+    const submits = mock
+      .getCaptured()
+      .filter(
+        (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+          req.kind === "submitFlowStep",
+      );
     // Two submits: passkey action + challenge_response submit
     expect(submits.length).toBeGreaterThanOrEqual(2);
     const proofSubmit = submits.find((s) => s.body.challenge_response);
@@ -354,10 +378,12 @@ describe("<zitadel-login> against the typed Flow API", () => {
 
     // Wait for the passkey-login step
     await waitFor(() => {
-      const submits = mock.getCaptured().filter(
-        (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
-          req.kind === "submitFlowStep",
-      );
+      const submits = mock
+        .getCaptured()
+        .filter(
+          (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+            req.kind === "submitFlowStep",
+        );
       return submits.some((s) => s.body.action === "passkey") ? submits : null;
     });
 
@@ -387,10 +413,12 @@ describe("<zitadel-login> against the typed Flow API", () => {
     });
 
     // The step should still be passkey-login (no additional submits from the error)
-    const postErrorSubmits = mock.getCaptured().filter(
-      (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
-        req.kind === "submitFlowStep",
-    );
+    const postErrorSubmits = mock
+      .getCaptured()
+      .filter(
+        (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+          req.kind === "submitFlowStep",
+      );
     // Only the initial "passkey" action submit — no extra submit from the error handler
     expect(postErrorSubmits).toHaveLength(1);
     expect(postErrorSubmits[0]?.body.action).toBe("passkey");
@@ -457,9 +485,9 @@ describe("<zitadel-login> against the typed Flow API", () => {
     // Regression: empty defaults from the re-rendered step used to wipe
     // formValues, which then propagated back to the field via
     // applyValuesToFields. The typed input must survive.
-    const emailField = element.shadowRoot?.querySelector<
-      HTMLElement & { value?: string }
-    >('zl-field[name="email"]');
+    const emailField = element.shadowRoot?.querySelector<HTMLElement & { value?: string }>(
+      'zl-field[name="email"]',
+    );
     expect(emailField?.value).toBe("bad-email");
   });
 
@@ -479,17 +507,21 @@ describe("<zitadel-login> against the typed Flow API", () => {
     );
 
     await waitFor(() => {
-      const submits = mock.getCaptured().filter(
-        (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
-          req.kind === "submitFlowStep",
-      );
+      const submits = mock
+        .getCaptured()
+        .filter(
+          (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+            req.kind === "submitFlowStep",
+        );
       return submits.length > 0 ? submits : null;
     });
 
-    const submits = mock.getCaptured().filter(
-      (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
-        req.kind === "submitFlowStep",
-    );
+    const submits = mock
+      .getCaptured()
+      .filter(
+        (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+          req.kind === "submitFlowStep",
+      );
     expect(submits[0]?.body.fields).toEqual({ email: "", password: "" });
   });
 });
