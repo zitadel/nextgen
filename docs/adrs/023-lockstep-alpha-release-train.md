@@ -17,7 +17,7 @@ During the alpha period, this intentionally overrides the independent component
 cadence described in [ADR 002](002-multi-package-release-strategy.md). Changesets
 remains the version and npm changelog tool, but all public npm packages are in
 one fixed group. When the Changesets "Version Packages" PR is merged,
-the `release-npm` job in `ci.yml` runs after the matching main-branch CI gate
+the `release-alpha-train` job in `ci.yml` runs after the matching main-branch CI gate
 passes, publishes npm first, validates that every public package has the same
 alpha version, creates the matching `v<version>` tag, runs GoReleaser from that
 tag, and updates one draft GitHub Release named `ZITADEL Alpha <version>`.

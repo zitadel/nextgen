@@ -112,23 +112,23 @@ export async function validateReleaseTooling(cwd, readFileFn = readFileDefault) 
   );
   assertContains(
     ciWorkflow,
-    "release-plan:",
+    "detect-alpha-release:",
     "ci.yml must compute release relevance before publishing",
   );
   assertContains(
     ciWorkflow,
     "should_release: ${{ steps.detect.outputs.should_release }}",
-    "release-plan must expose a should_release output",
+    "detect-alpha-release must expose a should_release output",
   );
   assertContains(
     ciWorkflow,
     'import { PUBLIC_PACKAGE_MANIFESTS } from "./scripts/release-alpha-train.mjs";',
-    "release-plan must derive public package release paths from release-alpha-train.mjs",
+    "detect-alpha-release must derive public package release paths from release-alpha-train.mjs",
   );
   assertContains(
     ciWorkflow,
     'path.startsWith(".changeset/") || publicPackageReleasePaths.has(path)',
-    "release-plan must detect Changesets and public package release files",
+    "detect-alpha-release must detect Changesets and public package release files",
   );
   assertContains(
     ciWorkflow,
@@ -142,18 +142,18 @@ export async function validateReleaseTooling(cwd, readFileFn = readFileDefault) 
   );
   assertContains(
     ciWorkflow,
-    "release-npm:",
-    "ci.yml must contain the npm release job",
+    "release-alpha-train:",
+    "ci.yml must contain the alpha release train job",
   );
   assertContains(
     ciWorkflow,
-    "if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.release-plan.outputs.should_release == 'true'",
-    "release-npm must only run on release-relevant main pushes",
+    "if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-alpha-release.outputs.should_release == 'true'",
+    "release-alpha-train must only run on release-relevant main pushes",
   );
   assertContains(
     ciWorkflow,
-    "needs: [release-plan, ci-success]",
-    "release-npm must wait for the release plan and aggregate CI gate",
+    "needs: [detect-alpha-release, ci-success]",
+    "release-alpha-train must wait for release relevance detection and the aggregate CI gate",
   );
   assertContains(
     ciWorkflow,
@@ -164,12 +164,12 @@ export async function validateReleaseTooling(cwd, readFileFn = readFileDefault) 
       "      packages: write",
       "      id-token: write",
     ].join("\n"),
-    "release-npm must scope publish permissions to the release job",
+    "release-alpha-train must scope publish permissions to the release job",
   );
   assertNotContains(
     ciWorkflow,
     "gh run list --workflow ci.yml",
-    "release-npm must rely on ci.yml needs instead of polling GitHub Actions",
+    "release-alpha-train must rely on ci.yml needs instead of polling GitHub Actions",
   );
   assertContains(
     ciWorkflow,

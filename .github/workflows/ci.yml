@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  release-plan:
+  detect-alpha-release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 5
@@ -311,7 +311,7 @@ jobs:
     # changeset, so no consumer-visible change merges without a release note.
     # Private packages (apps, demos, mocks, lint, design-tokens, ui-react, ...)
     # are never published and so do not require a changeset. Publishing itself
-    # runs on pushes to main in the release-npm job below.
+    # runs on pushes to main in the release-alpha-train job below.
     #
     # The check lives in scripts/check-changeset-required.mjs so the publishable
     # package list and rules are testable and shared, rather than duplicated in
@@ -794,10 +794,10 @@ jobs:
           console.log("CI gate passed");
           NODE
 
-  release-npm:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.release-plan.outputs.should_release == 'true'
+  release-alpha-train:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-alpha-release.outputs.should_release == 'true'
     runs-on: depot-ubuntu-24.04-8
-    needs: [release-plan, ci-success]
+    needs: [detect-alpha-release, ci-success]
     permissions:
       contents: write
       pull-requests: write

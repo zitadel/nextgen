@@ -7,16 +7,16 @@ artifacts, for example `0.1.0-alpha.7`.
 ## Steps
 
 1. Merge feature and fix PRs with changesets as usual.
-2. Wait for the `release-npm` job in [`ci.yml`](../../.github/workflows/ci.yml)
+2. Wait for the `release-alpha-train` job in [`ci.yml`](../../.github/workflows/ci.yml)
    to open or update the `chore: version packages` PR.
 3. Review that every public `@zitadel/*` package in the fixed group has the same
    `0.1.0-alpha.N` version.
 4. Before merging, run the release process check:
    `corepack pnpm run check -- --only release`.
 5. Merge the Version Packages PR after CI is green.
-6. Let the main-branch `ci.yml` run finish. Its `release-npm` job starts only
+6. Let the main-branch `ci.yml` run finish. Its `release-alpha-train` job starts only
    after the aggregate CI gate passes for that exact commit.
-7. After CI is green, the `release-npm` job creates `v<version>`, runs
+7. After CI is green, the `release-alpha-train` job creates `v<version>`, runs
    GoReleaser, publishes `ghcr.io/zitadel/nextgen:<version>`, and updates one
    draft GitHub prerelease named `ZITADEL Alpha <version>`. Alpha trains do not
    move `ghcr.io/zitadel/nextgen:latest`.

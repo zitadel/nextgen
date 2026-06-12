@@ -164,14 +164,14 @@ describe("check-alpha-release-plan script", () => {
   it("rejects a workflow that can publish before main CI succeeds", async () => {
     const { cwd, statusPath } = await fixtureRepo({
       ciWorkflow: validCiWorkflow().replace(
-        "    needs: [release-plan, ci-success]",
-        "    needs: [release-plan]",
+        "    needs: [detect-alpha-release, ci-success]",
+        "    needs: [detect-alpha-release]",
       ),
     });
 
     await expect(
       checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
-    ).rejects.toThrow("must wait for the release plan and aggregate CI gate");
+    ).rejects.toThrow("must wait for release relevance detection and the aggregate CI gate");
   });
 });
 
@@ -187,7 +187,7 @@ function validCiWorkflow(): string {
     "  group: ci-${{ github.workflow }}-${{ github.ref }}",
     "  cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
     "jobs:",
-    "  release-plan:",
+    "  detect-alpha-release:",
     "    outputs:",
     "      should_release: ${{ steps.detect.outputs.should_release }}",
     "    steps:",
@@ -199,9 +199,9 @@ function validCiWorkflow(): string {
     "    steps:",
     "      - run: |",
     '          const allowedSkipped = new Set(["changeset-check"]);',
-    "  release-npm:",
-    "    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.release-plan.outputs.should_release == 'true'",
-    "    needs: [release-plan, ci-success]",
+    "  release-alpha-train:",
+    "    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-alpha-release.outputs.should_release == 'true'",
+    "    needs: [detect-alpha-release, ci-success]",
     "    permissions:",
     "      contents: write",
     "      pull-requests: write",
