@@ -59,13 +59,13 @@ describe("NuxtPatcher.plan", () => {
 });
 
 describe("NuxtPatcher.artifacts", () => {
-  it("lists the srcDir pages as managed and nuxt.config.ts as a manual config edit", () => {
+  it("lists the srcDir pages as managed and the Nuxt config as a manual config edit", () => {
     const artifacts = new NuxtPatcher().artifacts({
       framework: { id: "nuxt", appDir: "app", devPort: 3000, url: "http://localhost:3000" },
       rendererId: "react",
     });
     expect(artifacts.markedFiles).toContain("app/pages/login.vue");
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-nuxt"]);
-    expect(artifacts.configEdits).toEqual(["nuxt.config.ts"]);
+    expect(artifacts.configEdits).toEqual(["nuxt.config.*"]);
   });
 });

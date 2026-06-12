@@ -50,13 +50,13 @@ describe("VuePatcher.plan", () => {
 });
 
 describe("VuePatcher.artifacts", () => {
-  it("lists App.vue as managed and vite.config.ts as a manual config edit", () => {
+  it("lists App.vue as managed and the Vite config as a manual config edit", () => {
     const artifacts = new VuePatcher().artifacts({
       framework: { id: "vue", appDir: "src", devPort: 3000, url: "http://localhost:3000" },
       rendererId: "react",
     });
     expect(artifacts.markedFiles).toContain("src/App.vue");
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-vue"]);
-    expect(artifacts.configEdits).toEqual(["vite.config.ts"]);
+    expect(artifacts.configEdits).toEqual(["vite.config.*"]);
   });
 });

@@ -179,7 +179,7 @@ describe("eject command", () => {
     // The managed App.vue is removed, but vite.config.ts can't be auto-reverted.
     expect(json.data.files_removed).toContain("src/App.vue");
     expect(json.data.manual_steps).toContain(
-      "Remove the Zitadel configuration block from vite.config.ts",
+      "Remove the Zitadel configuration block from vite.config.*",
     );
     // The edited config file itself is left in place.
     expect(await exists(join(cwd, "vite.config.ts"))).toBe(true);

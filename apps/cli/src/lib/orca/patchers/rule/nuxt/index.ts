@@ -82,7 +82,7 @@ export class NuxtPatcher extends AbstractRulePatcher {
   }
 
   protected override routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
-    return ["nuxt.config.ts"];
+    return ["nuxt.config.*"];
   }
 
   protected summary(_ctx: PatchContext): { title: string; detail: string } {

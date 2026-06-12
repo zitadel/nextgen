@@ -55,7 +55,7 @@ export class ReactPatcher extends AbstractRulePatcher implements ViteSupport {
   }
 
   protected override routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
-    return ["vite.config.ts"];
+    return ["vite.config.*"];
   }
 
   protected summary(_ctx: PatchContext): { title: string; detail: string } {
