@@ -77,7 +77,7 @@ module.exports = {
   "${PROXY_PATH}": {
     target: config.server,
     changeOrigin: false,
-    pathRewrite: { "^${PROXY_PATH}": "" },
+    pathRewrite: (path) => path.replace(/^\\${PROXY_PATH}/, "") || "/",
     onProxyReq: setBearer,
     configure: (proxy) => proxy.on("proxyReq", setBearer),
   },

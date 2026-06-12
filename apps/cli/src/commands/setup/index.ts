@@ -142,6 +142,11 @@ export default class Setup extends BaseCommand {
     }
 
     const issuer = issuerFromPort(answers.devPort);
+    // The DevPortPrompt can change the port interactively, so fold the answer
+    // back into the framework: the patched dev-server config reads
+    // `framework.devPort`, and it must agree with the issuer and the registered
+    // origin (both derived from `answers.devPort`).
+    framework = { ...framework, devPort: answers.devPort, url: issuer };
 
     // `POST /projects` is unauthenticated. Creating the project also
     // provisions its default user schema and login flow server-side, so the
