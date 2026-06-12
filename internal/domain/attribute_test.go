@@ -145,6 +145,39 @@ func TestFlattenMapToCreateAttributes(t *testing.T) {
 					mustNewCreateAttribute(t, "address.secondary_email", "also@example.com", AttributeUniquenessProject),
 				},
 			},
+			{
+				name: "empty address",
+				mapValue: map[string]any{
+					"address": map[string]any{},
+				},
+				schema: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"address": map[string]any{
+							"type": "object",
+							"properties": map[string]any{
+								"street": map[string]any{
+									"type": "string",
+								},
+								"houseNumber": map[string]any{
+									"type": "string",
+								},
+								"city": map[string]any{
+									"type": "string",
+								},
+								"zipCode": map[string]any{
+									"type":     "string",
+									"x-unique": "project",
+								},
+								"country": map[string]any{
+									"type": "string",
+								},
+							},
+						},
+					},
+				},
+				expected: []*CreateAttribute{},
+			},
 		}
 
 		for _, tc := range tcs {
