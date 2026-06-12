@@ -1,10 +1,14 @@
 type: object
-required: [kind, provider]
+required: [name, kind, provider]
 description: |
   A security challenge that must be satisfied before this step's submission
   is accepted. The engine may also inject gates at runtime based on policy
   or risk evaluation.
 properties:
+  name:
+    type: string
+    description: Gate identifier within the step.
+    example: bot_check
   kind:
     type: string
     enum: [captcha]

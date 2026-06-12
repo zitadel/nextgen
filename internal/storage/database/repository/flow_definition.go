@@ -44,8 +44,8 @@ type flowDefinitionAudienceJSON struct {
 type flowDefinitionStepJSON struct {
 	Name         string                            `json:"name"`
 	Fields       []string                          `json:"fields,omitempty"`
-	Actions      map[string]flowStepActionJSON     `json:"actions,omitempty"`
-	Gates        map[string]flowStepGateJSON       `json:"gates,omitempty"`
+	Actions      []flowStepActionJSON              `json:"actions,omitempty"`
+	Gates        []flowStepGateJSON                `json:"gates,omitempty"`
 	SSOProviders []flowSSOProviderJSON             `json:"sso_providers,omitempty"`
 	OnSuccess    *string                           `json:"on_success,omitempty"`
 	Complete     *string                           `json:"complete,omitempty"`
@@ -53,11 +53,13 @@ type flowDefinitionStepJSON struct {
 }
 
 type flowStepActionJSON struct {
+	Name    string `json:"name"`
 	TextKey string `json:"text_key,omitempty"`
 	Primary bool   `json:"primary,omitempty"`
 }
 
 type flowStepGateJSON struct {
+	Name     string         `json:"name"`
 	Kind     string         `json:"kind"`
 	Provider string         `json:"provider,omitempty"`
 	Config   map[string]any `json:"config,omitempty"`
@@ -278,22 +280,24 @@ func marshalFlowDefinitionContent(def *domain.FlowDefinition) ([]byte, error) {
 			Transitions: transitions,
 		}
 		if len(s.Actions) > 0 {
-			stepJSON.Actions = make(map[string]flowStepActionJSON, len(s.Actions))
-			for name, a := range s.Actions {
-				stepJSON.Actions[name] = flowStepActionJSON{
+			stepJSON.Actions = make([]flowStepActionJSON, 0, len(s.Actions))
+			for _, a := range s.Actions {
+				stepJSON.Actions = append(stepJSON.Actions, flowStepActionJSON{
+					Name:    a.Name,
 					TextKey: a.TextKey,
 					Primary: a.Primary,
-				}
+				})
 			}
 		}
 		if len(s.Gates) > 0 {
-			stepJSON.Gates = make(map[string]flowStepGateJSON, len(s.Gates))
-			for name, g := range s.Gates {
-				stepJSON.Gates[name] = flowStepGateJSON{
+			stepJSON.Gates = make([]flowStepGateJSON, 0, len(s.Gates))
+			for _, g := range s.Gates {
+				stepJSON.Gates = append(stepJSON.Gates, flowStepGateJSON{
+					Name:     g.Name,
 					Kind:     g.Kind.String(),
 					Provider: g.Provider,
 					Config:   g.Config,
-				}
+				})
 			}
 		}
 		if len(s.SSOProviders) > 0 {
@@ -365,26 +369,28 @@ func rowToFlowDefinition(row flowDefinitionRow) (*domain.FlowDefinition, error) 
 			Transitions: transitions,
 		}
 		if len(s.Actions) > 0 {
-			step.Actions = make(map[string]domain.FlowStepAction, len(s.Actions))
-			for name, a := range s.Actions {
-				step.Actions[name] = domain.FlowStepAction{
+			step.Actions = make([]domain.FlowStepAction, 0, len(s.Actions))
+			for _, a := range s.Actions {
+				step.Actions = append(step.Actions, domain.FlowStepAction{
+					Name:    a.Name,
 					TextKey: a.TextKey,
 					Primary: a.Primary,
-				}
+				})
 			}
 		}
 		if len(s.Gates) > 0 {
-			step.Gates = make(map[string]domain.FlowStepGate, len(s.Gates))
-			for name, g := range s.Gates {
+			step.Gates = make([]domain.FlowStepGate, 0, len(s.Gates))
+			for _, g := range s.Gates {
 				gateKind, err := domain.FlowGateKindString(g.Kind)
 				if err != nil {
 					return nil, err
 				}
-				step.Gates[name] = domain.FlowStepGate{
+				step.Gates = append(step.Gates, domain.FlowStepGate{
+					Name:     g.Name,
 					Kind:     gateKind,
 					Provider: g.Provider,
 					Config:   g.Config,
-				}
+				})
 			}
 		}
 		if len(s.SSOProviders) > 0 {

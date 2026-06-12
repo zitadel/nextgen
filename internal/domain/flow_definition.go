@@ -156,12 +156,13 @@ type FlowDefinitionStep struct {
 	// Resolved against [FlowDefinition.UserSchema] at runtime to derive
 	// per-field type, validation, and implicit outcomes.
 	Fields []string
-	// Actions are the user-selectable actions on this step, keyed by the
-	// name the frontend echoes back in the submit request.
-	Actions map[string]FlowStepAction
+	// Actions are the user-selectable actions on this step, in display
+	// order. Each action's Name is what the frontend echoes back in the
+	// submit request.
+	Actions []FlowStepAction
 	// Gates are security challenges that must be satisfied before the
-	// step's submission is accepted, keyed by gate name.
-	Gates map[string]FlowStepGate
+	// step's submission is accepted, in display order.
+	Gates []FlowStepGate
 	// SSOProviders lists the identity providers available on this step.
 	SSOProviders []FlowSSOProvider
 	// OnSuccess names the server-side mutation to run after field
@@ -181,12 +182,14 @@ type FlowDefinitionStep struct {
 
 // FlowStepAction is a user-selectable action declared on a step.
 type FlowStepAction struct {
+	Name    string
 	TextKey string
 	Primary bool
 }
 
 // FlowStepGate is a security challenge attached to a step.
 type FlowStepGate struct {
+	Name     string
 	Kind     FlowGateKind
 	Provider string
 	// Config is provider-specific challenge configuration, opaque to the engine.

@@ -2373,6 +2373,9 @@ func (s *FactorMethod) UnmarshalText(data []byte) error {
 // Does not contain display text — only a `text_key` resolved client-side.
 // Ref: #
 type Field struct {
+	// Field name, matching a property in the flow's user schema. Carries
+	// the submitted value back to the engine.
+	Name string `json:"name"`
 	// The input kind the client should render. Encodes the formats that
 	// have a matching HTML input type (email, url, date). For other
 	// formats (e.g. uuid) the type is `text` and `validation.format`
@@ -2393,6 +2396,11 @@ type Field struct {
 	// Each key mirrors a JSON Schema keyword on the underlying user
 	// property; absent keys mean no rule.
 	Validation OptFieldValidation `json:"validation"`
+}
+
+// GetName returns the value of Name.
+func (s *Field) GetName() string {
+	return s.Name
 }
 
 // GetType returns the value of Type.
@@ -2418,6 +2426,11 @@ func (s *Field) GetValue() jx.Raw {
 // GetValidation returns the value of Validation.
 func (s *Field) GetValidation() OptFieldValidation {
 	return s.Validation
+}
+
+// SetName sets the value of Name.
+func (s *Field) SetName(val string) {
+	s.Name = val
 }
 
 // SetType sets the value of Type.
@@ -2983,15 +2996,15 @@ type FlowDefinitionStep struct {
 	// (e.g. a property with `x-unique` set implies a `user_not_found`
 	// transition outcome).
 	Fields []string `json:"fields"`
-	// Actions the user can take. Keyed by action name.
-	// The action name is what the frontend sends back in the submit request.
-	// If omitted, the engine provides a default `submit` action.
-	Actions OptFlowDefinitionStepActions `json:"actions"`
-	// Security gates that must be satisfied before submission. Keyed by gate
-	// name. Each gate selects a kind (e.g. "captcha") and provider-specific
+	// Ordered list of actions the user can take. The action name is what the
+	// frontend sends back in the submit request. If omitted, the engine
+	// provides a default `submit` action.
+	Actions []StepAction `json:"actions"`
+	// Ordered list of security gates that must be satisfied before submission.
+	// Each gate selects a kind (e.g. "captcha") and provider-specific
 	// configuration. The engine may also inject gates dynamically based on
 	// policy.
-	Gates OptFlowDefinitionStepGates `json:"gates"`
+	Gates []Gate `json:"gates"`
 	// Available SSO identity providers for this step.
 	SSOProviders []SSOProvider `json:"sso_providers"`
 	// Server-side mutation to execute when this step completes successfully.
@@ -3003,7 +3016,7 @@ type FlowDefinitionStep struct {
 	// - show: render as a success/info screen.
 	Complete OptFlowDefinitionStepComplete `json:"complete"`
 	// Maps action/outcome names to their transition descriptor.
-	// Keys match action names from the `actions` dict. Additional keys
+	// Keys match action names from the `actions` array. Additional keys
 	// come from implicit outcomes based on schema annotations
 	// (e.g. `user_not_found` from `x-unique` fields) and engine
 	// events (e.g. `sso`, `callback`).
@@ -3021,12 +3034,12 @@ func (s *FlowDefinitionStep) GetFields() []string {
 }
 
 // GetActions returns the value of Actions.
-func (s *FlowDefinitionStep) GetActions() OptFlowDefinitionStepActions {
+func (s *FlowDefinitionStep) GetActions() []StepAction {
 	return s.Actions
 }
 
 // GetGates returns the value of Gates.
-func (s *FlowDefinitionStep) GetGates() OptFlowDefinitionStepGates {
+func (s *FlowDefinitionStep) GetGates() []Gate {
 	return s.Gates
 }
 
@@ -3061,12 +3074,12 @@ func (s *FlowDefinitionStep) SetFields(val []string) {
 }
 
 // SetActions sets the value of Actions.
-func (s *FlowDefinitionStep) SetActions(val OptFlowDefinitionStepActions) {
+func (s *FlowDefinitionStep) SetActions(val []StepAction) {
 	s.Actions = val
 }
 
 // SetGates sets the value of Gates.
-func (s *FlowDefinitionStep) SetGates(val OptFlowDefinitionStepGates) {
+func (s *FlowDefinitionStep) SetGates(val []Gate) {
 	s.Gates = val
 }
 
@@ -3088,20 +3101,6 @@ func (s *FlowDefinitionStep) SetComplete(val OptFlowDefinitionStepComplete) {
 // SetTransitions sets the value of Transitions.
 func (s *FlowDefinitionStep) SetTransitions(val OptFlowDefinitionStepTransitions) {
 	s.Transitions = val
-}
-
-// Actions the user can take. Keyed by action name.
-// The action name is what the frontend sends back in the submit request.
-// If omitted, the engine provides a default `submit` action.
-type FlowDefinitionStepActions map[string]StepAction
-
-func (s *FlowDefinitionStepActions) init() FlowDefinitionStepActions {
-	m := *s
-	if m == nil {
-		m = map[string]StepAction{}
-		*s = m
-	}
-	return m
 }
 
 // Marks this as a terminal step. Tells the frontend what to do:
@@ -3148,21 +3147,6 @@ func (s *FlowDefinitionStepComplete) UnmarshalText(data []byte) error {
 	}
 }
 
-// Security gates that must be satisfied before submission. Keyed by gate
-// name. Each gate selects a kind (e.g. "captcha") and provider-specific
-// configuration. The engine may also inject gates dynamically based on
-// policy.
-type FlowDefinitionStepGates map[string]Gate
-
-func (s *FlowDefinitionStepGates) init() FlowDefinitionStepGates {
-	m := *s
-	if m == nil {
-		m = map[string]Gate{}
-		*s = m
-	}
-	return m
-}
-
 // Server-side mutation to execute when this step completes successfully.
 // Runs after field validation passes, before the transition fires.
 // - create_user: creates the user record (registration flows).
@@ -3201,7 +3185,7 @@ func (s *FlowDefinitionStepOnSuccess) UnmarshalText(data []byte) error {
 }
 
 // Maps action/outcome names to their transition descriptor.
-// Keys match action names from the `actions` dict. Additional keys
+// Keys match action names from the `actions` array. Additional keys
 // come from implicit outcomes based on schema annotations
 // (e.g. `user_not_found` from `x-unique` fields) and engine
 // events (e.g. `sso`, `callback`).
@@ -3643,9 +3627,10 @@ func (s *FlowResponseHeaders) SetResponse(val FlowResponse) {
 
 func (*FlowResponseHeaders) createFlowRes() {}
 
-// A step contains unordered capability dictionaries: what to collect (fields),
+// A step contains ordered capability arrays: what to collect (fields),
 // what the user can do (actions), and what security gates must be satisfied (gates).
-// Layout and element ordering are controlled by the LiquidJS template in `branding.liquid_template`.
+// The LiquidJS template in `branding.liquid_template` iterates these arrays in order
+// and builds name-keyed indexes locally for lookup.
 // Ref: #
 type FlowStep struct {
 	// Step name from the flow definition.
@@ -3659,18 +3644,18 @@ type FlowStep struct {
 	Complete OptFlowStepComplete `json:"complete"`
 	// URL to navigate to (e.g., SSO provider redirect).
 	RedirectURL OptURI `json:"redirect_url"`
-	// Unordered dictionary of input fields to collect. Keyed by field name.
-	// The LiquidJS template controls which fields appear and in what order.
-	// Field metadata (type, validation) is resolved by the engine from the
-	// flow's user schema.
-	Fields FlowStepFields `json:"fields"`
-	// Unordered dictionary of available user actions. Keyed by action name.
-	// The LiquidJS template controls positioning and presentation.
-	Actions FlowStepActions `json:"actions"`
+	// Ordered list of input fields to collect. Field metadata (type, validation)
+	// is resolved by the engine from the flow's user schema. The LiquidJS
+	// template iterates this array; for keyed lookup it builds a name-indexed
+	// map locally.
+	Fields []Field `json:"fields"`
+	// Ordered list of available user actions. The LiquidJS template iterates
+	// this array and builds a name-indexed map locally for keyed lookup.
+	Actions []StepAction `json:"actions"`
 	// Security gates that must be satisfied before the step can be submitted.
 	// The engine injects gates dynamically based on policy, even if they
 	// are not declared in the flow definition.
-	Gates FlowStepGates `json:"gates"`
+	Gates []Gate `json:"gates"`
 	// Available SSO identity providers for this step.
 	SSOProviders []SSOProvider `json:"sso_providers"`
 	// A pending authentication challenge issued by the server. Present when the
@@ -3708,17 +3693,17 @@ func (s *FlowStep) GetRedirectURL() OptURI {
 }
 
 // GetFields returns the value of Fields.
-func (s *FlowStep) GetFields() FlowStepFields {
+func (s *FlowStep) GetFields() []Field {
 	return s.Fields
 }
 
 // GetActions returns the value of Actions.
-func (s *FlowStep) GetActions() FlowStepActions {
+func (s *FlowStep) GetActions() []StepAction {
 	return s.Actions
 }
 
 // GetGates returns the value of Gates.
-func (s *FlowStep) GetGates() FlowStepGates {
+func (s *FlowStep) GetGates() []Gate {
 	return s.Gates
 }
 
@@ -3758,17 +3743,17 @@ func (s *FlowStep) SetRedirectURL(val OptURI) {
 }
 
 // SetFields sets the value of Fields.
-func (s *FlowStep) SetFields(val FlowStepFields) {
+func (s *FlowStep) SetFields(val []Field) {
 	s.Fields = val
 }
 
 // SetActions sets the value of Actions.
-func (s *FlowStep) SetActions(val FlowStepActions) {
+func (s *FlowStep) SetActions(val []StepAction) {
 	s.Actions = val
 }
 
 // SetGates sets the value of Gates.
-func (s *FlowStep) SetGates(val FlowStepGates) {
+func (s *FlowStep) SetGates(val []Gate) {
 	s.Gates = val
 }
 
@@ -3780,19 +3765,6 @@ func (s *FlowStep) SetSSOProviders(val []SSOProvider) {
 // SetChallenge sets the value of Challenge.
 func (s *FlowStep) SetChallenge(val OptFlowStepChallenge) {
 	s.Challenge = val
-}
-
-// Unordered dictionary of available user actions. Keyed by action name.
-// The LiquidJS template controls positioning and presentation.
-type FlowStepActions map[string]StepAction
-
-func (s *FlowStepActions) init() FlowStepActions {
-	m := *s
-	if m == nil {
-		m = map[string]StepAction{}
-		*s = m
-	}
-	return m
 }
 
 // A pending authentication challenge issued by the server. Present when the
@@ -3936,35 +3908,6 @@ func (s *FlowStepComplete) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
-}
-
-// Unordered dictionary of input fields to collect. Keyed by field name.
-// The LiquidJS template controls which fields appear and in what order.
-// Field metadata (type, validation) is resolved by the engine from the
-// flow's user schema.
-type FlowStepFields map[string]Field
-
-func (s *FlowStepFields) init() FlowStepFields {
-	m := *s
-	if m == nil {
-		m = map[string]Field{}
-		*s = m
-	}
-	return m
-}
-
-// Security gates that must be satisfied before the step can be submitted.
-// The engine injects gates dynamically based on policy, even if they
-// are not declared in the flow definition.
-type FlowStepGates map[string]Gate
-
-func (s *FlowStepGates) init() FlowStepGates {
-	m := *s
-	if m == nil {
-		m = map[string]Gate{}
-		*s = m
-	}
-	return m
 }
 
 // Ref: #
@@ -4136,6 +4079,8 @@ func (s *FlowSubmitRequestGateProofs) init() FlowSubmitRequestGateProofs {
 // or risk evaluation.
 // Ref: #
 type Gate struct {
+	// Gate identifier within the step.
+	Name string `json:"name"`
 	// The gate category. Only `captcha` is currently defined. Authenticator
 	// ceremonies (e.g. passkey) are modelled as credential auth_attempts via
 	// `x-credential` on a field, not as gates.
@@ -4147,6 +4092,11 @@ type Gate struct {
 	// Provider-specific configuration consumed by the implementation when
 	// issuing the per-render challenge. Opaque to the engine.
 	Config OptGateConfig `json:"config"`
+}
+
+// GetName returns the value of Name.
+func (s *Gate) GetName() string {
+	return s.Name
 }
 
 // GetKind returns the value of Kind.
@@ -4162,6 +4112,11 @@ func (s *Gate) GetProvider() string {
 // GetConfig returns the value of Config.
 func (s *Gate) GetConfig() OptGateConfig {
 	return s.Config
+}
+
+// SetName sets the value of Name.
+func (s *Gate) SetName(val string) {
+	s.Name = val
 }
 
 // SetKind sets the value of Kind.
@@ -7326,52 +7281,6 @@ func (o OptFlowAudience) Or(d FlowAudience) FlowAudience {
 	return d
 }
 
-// NewOptFlowDefinitionStepActions returns new OptFlowDefinitionStepActions with value set to v.
-func NewOptFlowDefinitionStepActions(v FlowDefinitionStepActions) OptFlowDefinitionStepActions {
-	return OptFlowDefinitionStepActions{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptFlowDefinitionStepActions is optional FlowDefinitionStepActions.
-type OptFlowDefinitionStepActions struct {
-	Value FlowDefinitionStepActions
-	Set   bool
-}
-
-// IsSet returns true if OptFlowDefinitionStepActions was set.
-func (o OptFlowDefinitionStepActions) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptFlowDefinitionStepActions) Reset() {
-	var v FlowDefinitionStepActions
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptFlowDefinitionStepActions) SetTo(v FlowDefinitionStepActions) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptFlowDefinitionStepActions) Get() (v FlowDefinitionStepActions, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptFlowDefinitionStepActions) Or(d FlowDefinitionStepActions) FlowDefinitionStepActions {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptFlowDefinitionStepComplete returns new OptFlowDefinitionStepComplete with value set to v.
 func NewOptFlowDefinitionStepComplete(v FlowDefinitionStepComplete) OptFlowDefinitionStepComplete {
 	return OptFlowDefinitionStepComplete{
@@ -7412,52 +7321,6 @@ func (o OptFlowDefinitionStepComplete) Get() (v FlowDefinitionStepComplete, ok b
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowDefinitionStepComplete) Or(d FlowDefinitionStepComplete) FlowDefinitionStepComplete {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptFlowDefinitionStepGates returns new OptFlowDefinitionStepGates with value set to v.
-func NewOptFlowDefinitionStepGates(v FlowDefinitionStepGates) OptFlowDefinitionStepGates {
-	return OptFlowDefinitionStepGates{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptFlowDefinitionStepGates is optional FlowDefinitionStepGates.
-type OptFlowDefinitionStepGates struct {
-	Value FlowDefinitionStepGates
-	Set   bool
-}
-
-// IsSet returns true if OptFlowDefinitionStepGates was set.
-func (o OptFlowDefinitionStepGates) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptFlowDefinitionStepGates) Reset() {
-	var v FlowDefinitionStepGates
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptFlowDefinitionStepGates) SetTo(v FlowDefinitionStepGates) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptFlowDefinitionStepGates) Get() (v FlowDefinitionStepGates, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptFlowDefinitionStepGates) Or(d FlowDefinitionStepGates) FlowDefinitionStepGates {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -10640,11 +10503,12 @@ func (s *SetUserPasswordRequest) SetIsChangeRequired(val OptBool) {
 	s.IsChangeRequired = val
 }
 
-// Configuration for a user-invokable action on a step. Keyed by action name
-// in the parent dictionary. The action name is sent back in the submit
-// request as `action`.
+// Configuration for a user-invokable action on a step. The `name` is sent
+// back in the submit request as `action`.
 // Ref: #
 type StepAction struct {
+	// Action identifier. Sent back in the submit request as `action`.
+	Name string `json:"name"`
 	// Marks this as the default/primary action. The runtime template uses
 	// this hint to choose visual emphasis. At most one action per step
 	// should be primary; this is not enforced here.
@@ -10656,6 +10520,11 @@ type StepAction struct {
 	TextKey OptString `json:"text_key"`
 }
 
+// GetName returns the value of Name.
+func (s *StepAction) GetName() string {
+	return s.Name
+}
+
 // GetPrimary returns the value of Primary.
 func (s *StepAction) GetPrimary() OptBool {
 	return s.Primary
@@ -10664,6 +10533,11 @@ func (s *StepAction) GetPrimary() OptBool {
 // GetTextKey returns the value of TextKey.
 func (s *StepAction) GetTextKey() OptString {
 	return s.TextKey
+}
+
+// SetName sets the value of Name.
+func (s *StepAction) SetName(val string) {
+	s.Name = val
 }
 
 // SetPrimary sets the value of Primary.

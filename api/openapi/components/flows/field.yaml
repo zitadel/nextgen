@@ -1,9 +1,15 @@
 type: object
-required: [type, text_key]
+required: [name, type, text_key]
 description: |
   A data input capability. Describes what the user must provide.
   Does not contain display text — only a `text_key` resolved client-side.
 properties:
+  name:
+    type: string
+    description: |
+      Field name, matching a property in the flow's user schema. Carries
+      the submitted value back to the engine.
+    example: email
   type:
     type: string
     enum: [text, email, password, tel, number, url, date, hidden]

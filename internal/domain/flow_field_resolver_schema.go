@@ -61,7 +61,7 @@ func (r *SchemaFieldResolver) Resolve(
 	required := readRequiredSet(schema)
 	properties := lookupProperties(schema)
 
-	fields := make(map[string]FlowField, len(fieldNames))
+	fields := make([]FlowField, 0, len(fieldNames))
 	implicit := make(map[string][]string)
 
 	for _, name := range fieldNames {
@@ -70,7 +70,7 @@ func (r *SchemaFieldResolver) Resolve(
 			return FlowResolvedFields{}, fmt.Errorf("%w: %q", ErrFlowFieldUnknown, name)
 		}
 		field := buildFlowField(stepName, name, propSchema, required, passwordEnabled)
-		fields[name] = field
+		fields = append(fields, field)
 		if outcomes := ImplicitOutcomesForChallenge(field.Challenge); len(outcomes) > 0 {
 			implicit[name] = append(implicit[name], outcomes...)
 		}
@@ -86,6 +86,7 @@ func (r *SchemaFieldResolver) Resolve(
 func buildFlowField(stepName, name string, propSchema *jsonschema.Schema, required map[string]struct{}, passwordEnabled bool) FlowField {
 	unique := deriveUnique(propSchema)
 	field := FlowField{
+		Name:      name,
 		TextKey:   stepName + ".field." + name,
 		Type:      deriveFieldType(propSchema),
 		Challenge: deriveChallenge(propSchema, unique, passwordEnabled),

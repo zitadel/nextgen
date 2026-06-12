@@ -15,6 +15,24 @@ import (
 
 const testProjectID = "proj-1"
 
+// findField returns the resolved field with the given name. ok is false
+// when no field matches.
+func findField(r domain.FlowResolvedFields, name string) (domain.FlowField, bool) {
+	for _, f := range r.Fields {
+		if f.Name == name {
+			return f, true
+		}
+	}
+	return domain.FlowField{}, false
+}
+
+// mustField returns the resolved field with the given name; helpers that
+// call this past a known-good Resolve don't need to thread an error.
+func mustField(r domain.FlowResolvedFields, name string) domain.FlowField {
+	f, _ := findField(r, name)
+	return f
+}
+
 // fakeSchemaResolver feeds inline JSON bytes through a real
 // [jsonschema.SchemaFromJSON] parser so tests exercise the same
 // keyword extraction the production path uses, without needing a
@@ -89,7 +107,7 @@ func TestSchemaFieldResolver_Resolve_DefaultFields(t *testing.T) {
 		{"family_name", domain.FlowFieldTypeText, "identifier.field.family_name"},
 	}
 	for _, tc := range tests {
-		f, ok := got.Fields[tc.name]
+		f, ok := findField(got, tc.name)
 		if !ok {
 			t.Errorf("Resolve missing field %q", tc.name)
 			continue
@@ -117,13 +135,13 @@ func TestSchemaFieldResolver_Resolve_IdentifierImpliesUserNotFound(t *testing.T)
 	if !slices.Contains(got.ImplicitOutcomes["email"], domain.FlowImplicitOutcomeUserNotFound) {
 		t.Errorf("Resolve email ImplicitOutcomes = %v, want user_not_found", got.ImplicitOutcomes["email"])
 	}
-	if got.Fields["email"].Challenge != domain.FlowFieldChallengeIdentifier {
-		t.Errorf("Resolve email Challenge = %q, want %q", got.Fields["email"].Challenge, domain.FlowFieldChallengeIdentifier)
+	if mustField(got, "email").Challenge != domain.FlowFieldChallengeIdentifier {
+		t.Errorf("Resolve email Challenge = %q, want %q", mustField(got, "email").Challenge, domain.FlowFieldChallengeIdentifier)
 	}
 	if len(got.ImplicitOutcomes["password"]) != 0 {
 		t.Errorf("Resolve password ImplicitOutcomes = %v, want empty", got.ImplicitOutcomes["password"])
 	}
-	if got.Fields["password"].Challenge == domain.FlowFieldChallengeIdentifier {
+	if mustField(got, "password").Challenge == domain.FlowFieldChallengeIdentifier {
 		t.Error("Resolve password Challenge = identifier, want non-identifier")
 	}
 }
@@ -136,14 +154,14 @@ func TestSchemaFieldResolver_Resolve_ChallengeSurfaces(t *testing.T) {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
 
-	if got.Fields["email"].Challenge != domain.FlowFieldChallengeIdentifier {
-		t.Errorf("Resolve email Challenge = %q, want %q", got.Fields["email"].Challenge, domain.FlowFieldChallengeIdentifier)
+	if mustField(got, "email").Challenge != domain.FlowFieldChallengeIdentifier {
+		t.Errorf("Resolve email Challenge = %q, want %q", mustField(got, "email").Challenge, domain.FlowFieldChallengeIdentifier)
 	}
-	if got.Fields["password"].Challenge != domain.FlowFieldChallengePassword {
-		t.Errorf("Resolve password Challenge = %q, want %q", got.Fields["password"].Challenge, domain.FlowFieldChallengePassword)
+	if mustField(got, "password").Challenge != domain.FlowFieldChallengePassword {
+		t.Errorf("Resolve password Challenge = %q, want %q", mustField(got, "password").Challenge, domain.FlowFieldChallengePassword)
 	}
-	if got.Fields["given_name"].Challenge != domain.FlowFieldChallengeNone {
-		t.Errorf("Resolve given_name Challenge = %q, want %q", got.Fields["given_name"].Challenge, domain.FlowFieldChallengeNone)
+	if mustField(got, "given_name").Challenge != domain.FlowFieldChallengeNone {
+		t.Errorf("Resolve given_name Challenge = %q, want %q", mustField(got, "given_name").Challenge, domain.FlowFieldChallengeNone)
 	}
 }
 
@@ -162,8 +180,8 @@ func TestSchemaFieldResolver_Resolve_PasswordChallengeRequiresAuthMethodEnabled(
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
-	if got.Fields["password"].Challenge != domain.FlowFieldChallengeNone {
-		t.Errorf("Resolve password Challenge = %q, want None (auth-methods absent)", got.Fields["password"].Challenge)
+	if mustField(got, "password").Challenge != domain.FlowFieldChallengeNone {
+		t.Errorf("Resolve password Challenge = %q, want None (auth-methods absent)", mustField(got, "password").Challenge)
 	}
 }
 
@@ -183,11 +201,11 @@ func TestSchemaFieldResolver_Resolve_PasswordChallengeRequiresXPassword(t *testi
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
-	if got.Fields["password"].Challenge != domain.FlowFieldChallengeNone {
-		t.Errorf("Resolve password Challenge = %q, want None (x-password absent on property)", got.Fields["password"].Challenge)
+	if mustField(got, "password").Challenge != domain.FlowFieldChallengeNone {
+		t.Errorf("Resolve password Challenge = %q, want None (x-password absent on property)", mustField(got, "password").Challenge)
 	}
-	if got.Fields["password"].Type != domain.FlowFieldTypeText {
-		t.Errorf("Resolve password Type = %q, want text (no x-password annotation)", got.Fields["password"].Type)
+	if mustField(got, "password").Type != domain.FlowFieldTypeText {
+		t.Errorf("Resolve password Type = %q, want text (no x-password annotation)", mustField(got, "password").Type)
 	}
 }
 
@@ -207,11 +225,11 @@ func TestSchemaFieldResolver_Resolve_RenamedPasswordField(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
-	if got.Fields["secret"].Challenge != domain.FlowFieldChallengePassword {
-		t.Errorf("Resolve secret Challenge = %q, want %q", got.Fields["secret"].Challenge, domain.FlowFieldChallengePassword)
+	if mustField(got, "secret").Challenge != domain.FlowFieldChallengePassword {
+		t.Errorf("Resolve secret Challenge = %q, want %q", mustField(got, "secret").Challenge, domain.FlowFieldChallengePassword)
 	}
-	if got.Fields["secret"].Type != domain.FlowFieldTypePassword {
-		t.Errorf("Resolve secret Type = %q, want %q", got.Fields["secret"].Type, domain.FlowFieldTypePassword)
+	if mustField(got, "secret").Type != domain.FlowFieldTypePassword {
+		t.Errorf("Resolve secret Type = %q, want %q", mustField(got, "secret").Type, domain.FlowFieldTypePassword)
 	}
 }
 
@@ -223,11 +241,11 @@ func TestSchemaFieldResolver_Resolve_UniqueScopeSurfaces(t *testing.T) {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
 
-	if got.Fields["email"].Unique != domain.AttributeUniquenessTeam {
-		t.Errorf("Resolve email Unique = %v, want %v", got.Fields["email"].Unique, domain.AttributeUniquenessTeam)
+	if mustField(got, "email").Unique != domain.AttributeUniquenessTeam {
+		t.Errorf("Resolve email Unique = %v, want %v", mustField(got, "email").Unique, domain.AttributeUniquenessTeam)
 	}
-	if got.Fields["password"].Unique != domain.AttributeUniquenessUnspecified {
-		t.Errorf("Resolve password Unique = %v, want %v", got.Fields["password"].Unique, domain.AttributeUniquenessUnspecified)
+	if mustField(got, "password").Unique != domain.AttributeUniquenessUnspecified {
+		t.Errorf("Resolve password Unique = %v, want %v", mustField(got, "password").Unique, domain.AttributeUniquenessUnspecified)
 	}
 }
 
@@ -246,8 +264,8 @@ func TestSchemaFieldResolver_Resolve_UniqueScopeProject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
-	if got.Fields["handle"].Unique != domain.AttributeUniquenessProject {
-		t.Errorf("Resolve handle Unique = %v, want %v", got.Fields["handle"].Unique, domain.AttributeUniquenessProject)
+	if mustField(got, "handle").Unique != domain.AttributeUniquenessProject {
+		t.Errorf("Resolve handle Unique = %v, want %v", mustField(got, "handle").Unique, domain.AttributeUniquenessProject)
 	}
 }
 
@@ -296,11 +314,11 @@ func TestSchemaFieldResolver_Resolve_FormatAndTypeVariants(t *testing.T) {
 		"nickname": domain.FlowFieldTypeText,
 	}
 	for name, want := range wantTypes {
-		if got.Fields[name].Type != want {
-			t.Errorf("Resolve field %q Type = %q, want %q", name, got.Fields[name].Type, want)
+		if mustField(got, name).Type != want {
+			t.Errorf("Resolve field %q Type = %q, want %q", name, mustField(got, name).Type, want)
 		}
 	}
-	if got.Fields["nickname"].Validation != nil {
-		t.Errorf("Resolve nickname Validation = %+v, want nil (no rules)", got.Fields["nickname"].Validation)
+	if mustField(got, "nickname").Validation != nil {
+		t.Errorf("Resolve nickname Validation = %+v, want nil (no rules)", mustField(got, "nickname").Validation)
 	}
 }

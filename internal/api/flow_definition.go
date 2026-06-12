@@ -97,21 +97,22 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 			Fields: step.GetFields(),
 		}
 		// actions
-		if step.GetActions().IsSet() {
-			actions := make(map[string]domain.FlowStepAction, len(step.GetActions().Value))
-			for name, apiAction := range step.GetActions().Value {
-				actions[name] = domain.FlowStepAction{
+		if len(step.GetActions()) > 0 {
+			actions := make([]domain.FlowStepAction, 0, len(step.GetActions()))
+			for _, apiAction := range step.GetActions() {
+				actions = append(actions, domain.FlowStepAction{
+					Name:    apiAction.GetName(),
 					Primary: apiAction.GetPrimary().Value,
 					TextKey: apiAction.GetTextKey().Value,
-				}
+				})
 			}
 			s.Actions = actions
 		}
 
 		// gates
-		if step.GetGates().IsSet() {
-			gates := make(map[string]domain.FlowStepGate, len(step.GetGates().Value))
-			for name, apiGate := range step.GetGates().Value {
+		if len(step.GetGates()) > 0 {
+			gates := make([]domain.FlowStepGate, 0, len(step.GetGates()))
+			for _, apiGate := range step.GetGates() {
 				kind, _ := domain.FlowGateKindString(string(apiGate.GetKind())) // todo (grvijayan): validate in the domain layer
 
 				cfg := make(map[string]any, len(apiGate.GetConfig().Value))
@@ -121,11 +122,12 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 						cfg[k] = val
 					}
 				}
-				gates[name] = domain.FlowStepGate{
+				gates = append(gates, domain.FlowStepGate{
+					Name:     apiGate.GetName(),
 					Kind:     kind,
 					Provider: apiGate.GetProvider(),
 					Config:   cfg,
-				}
+				})
 			}
 			s.Gates = gates
 		}
@@ -270,16 +272,10 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 			complete = step.Complete.String()
 		}
 		apiStep := api.FlowDefinitionStep{
-			Name:   step.Name,
-			Fields: step.Fields,
-			Actions: api.OptFlowDefinitionStepActions{
-				Value: actions,
-				Set:   actions != nil,
-			},
-			Gates: api.OptFlowDefinitionStepGates{
-				Value: gates,
-				Set:   gates != nil,
-			},
+			Name:         step.Name,
+			Fields:       step.Fields,
+			Actions:      actions,
+			Gates:        gates,
 			SSOProviders: ssoProviders,
 			Transitions: api.OptFlowDefinitionStepTransitions{
 				Value: transitions,
@@ -299,13 +295,14 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 	return steps
 }
 
-func mapActionsToAPI(domainActions map[string]domain.FlowStepAction) map[string]api.StepAction {
+func mapActionsToAPI(domainActions []domain.FlowStepAction) []api.StepAction {
 	if len(domainActions) == 0 {
 		return nil
 	}
-	actions := make(map[string]api.StepAction, len(domainActions))
-	for name, action := range domainActions {
-		actions[name] = api.StepAction{
+	actions := make([]api.StepAction, 0, len(domainActions))
+	for _, action := range domainActions {
+		actions = append(actions, api.StepAction{
+			Name: action.Name,
 			Primary: api.OptBool{
 				Value: action.Primary,
 				Set:   action.Primary,
@@ -314,7 +311,7 @@ func mapActionsToAPI(domainActions map[string]domain.FlowStepAction) map[string]
 				Value: action.TextKey,
 				Set:   action.TextKey != "",
 			},
-		}
+		})
 	}
 	return actions
 }
@@ -356,12 +353,12 @@ func mapSSOProvidersToAPI(domainSSOProviders []domain.FlowSSOProvider) []api.SSO
 	return ssoProviders
 }
 
-func mapGatesToAPI(domainGates map[string]domain.FlowStepGate) map[string]api.Gate {
+func mapGatesToAPI(domainGates []domain.FlowStepGate) []api.Gate {
 	if len(domainGates) == 0 {
 		return nil
 	}
-	gates := make(map[string]api.Gate, len(domainGates))
-	for name, gate := range domainGates {
+	gates := make([]api.Gate, 0, len(domainGates))
+	for _, gate := range domainGates {
 		gateConfig := make(api.GateConfig, len(gate.Config))
 		for k, v := range gate.Config {
 			val, err := json.Marshal(v)
@@ -369,14 +366,15 @@ func mapGatesToAPI(domainGates map[string]domain.FlowStepGate) map[string]api.Ga
 				gateConfig[k] = val
 			}
 		}
-		gates[name] = api.Gate{
+		gates = append(gates, api.Gate{
+			Name:     gate.Name,
 			Kind:     api.GateKind(gate.Kind.String()),
 			Provider: gate.Provider,
 			Config: api.OptGateConfig{
 				Value: gateConfig,
 				Set:   true,
 			},
-		}
+		})
 	}
 	return gates
 }
