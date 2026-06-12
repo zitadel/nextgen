@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   openapi-lint:
-    runs-on: depot-ubuntu-24.04-8
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
@@ -54,7 +54,7 @@ jobs:
       - run: go test -v -timeout=10m ./...
 
   go-integration-test-postgres:
-    runs-on: depot-ubuntu-24.04-8
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
@@ -80,7 +80,7 @@ jobs:
           retention-days: 7
 
   go-integration-test-spanner:
-    runs-on: depot-ubuntu-24.04-8
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
@@ -178,7 +178,7 @@ jobs:
           retention-days: 7
 
   go-smoke-test-embedded-postgres:
-    runs-on: depot-ubuntu-24.04-8
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 15
     needs: [goreleaser-snapshot]
     steps:
@@ -270,7 +270,7 @@ jobs:
     # package manifests/changelogs and *removes* changesets (consuming them),
     # which would otherwise trip this gate.
     if: github.event_name == 'pull_request' && github.head_ref != 'changeset-release/main'
-    runs-on: depot-ubuntu-24.04-8
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
@@ -284,7 +284,7 @@ jobs:
           node scripts/check-changeset-required.mjs --base "origin/${{ github.base_ref }}"
 
   quickstart-smoke:
-    runs-on: depot-ubuntu-24.04-8
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 20
     needs: [goreleaser-snapshot]
     env:
@@ -440,7 +440,7 @@ jobs:
           fi
 
   node-e2e:
-    runs-on: depot-ubuntu-24.04-8
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
@@ -511,7 +511,7 @@ jobs:
           retention-days: 7
 
   npm-pack-smoke:
-    runs-on: depot-ubuntu-24.04-8
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 15
     needs: node-check
     steps:
@@ -565,7 +565,7 @@ jobs:
           retention-days: 7
 
   consumer-journey-e2e:
-    runs-on: depot-ubuntu-24.04-8
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 35
     needs: [goreleaser-snapshot, npm-pack-smoke]
     steps:
