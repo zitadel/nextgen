@@ -10,6 +10,8 @@ describe("viteProxyEdit", () => {
     expect(out).toContain("/__nextgen");
     expect(out).toContain("readFileSync");
     expect(out).toContain("5173");
+    // Must NOT rewrite the Host header — the backend's origin check reads it.
+    expect(out).not.toContain("changeOrigin: true");
   });
 
   it("preserves the user's existing plugins", () => {

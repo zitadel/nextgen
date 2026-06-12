@@ -24,7 +24,10 @@ export const PROXY_ENTRY_CODE = `{
       return "http://localhost:8080";
     }
   })(),
-  changeOrigin: true,
+  // No changeOrigin: the backend validates the request origin from the Host
+  // header (same-origin browser requests send no Origin header), so the proxy
+  // must forward the app's own Host — not rewrite it to the backend's — or the
+  // origin check rejects it.
   rewrite: (path) => path.replace(/^\\/__nextgen/, ""),
   configure: (proxy) => {
     proxy.on("proxyReq", (proxyReq, req) => {

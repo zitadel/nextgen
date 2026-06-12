@@ -92,7 +92,8 @@ module.exports = {
   "${PROXY_PATH}": {
     target: backendTarget(),
     secure: false,
-    changeOrigin: true,
+    // No changeOrigin: forward the app's own Host so the backend's origin check
+    // (which falls back to Host for same-origin requests) sees the app origin.
     pathRewrite: { "^${PROXY_PATH}": "" },
     onProxyReq: injectBearer,
     configure: (proxy) => proxy.on("proxyReq", injectBearer),

@@ -138,9 +138,11 @@ export default class Setup extends BaseCommand {
     // CLI no longer builds, scaffolds, or uploads those resources here.
     consola.start(`Creating project on ${answers.server}${dryRun ? " (dry run)" : ""}`);
     const unauthClient = createZitadelClient({ baseUrl: answers.server });
+    // Register the app's own origin so the backend's origin check allows
+    // requests the dev proxy forwards from it.
     const project = dryRun
       ? dryRunProject()
-      : await unauthClient.createProject({ previewOrigins: [] });
+      : await unauthClient.createProject({ previewOrigins: [issuer] });
     consola.success(`Created project ${project.id}`);
 
     const ctx: PatchContext = {
