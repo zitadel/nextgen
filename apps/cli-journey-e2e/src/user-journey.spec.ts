@@ -79,6 +79,7 @@ async function registerWithPassword(
   await advanceUnknownUserToRegistration(page);
   await expectRegistrationChoice(page);
   await fillEmailIfVisible(page, email);
+  await fillProfileFieldsIfVisible(page);
   await choosePasswordRegistration(page);
   await fillPassword(page, password);
   await clickSubmit(page);
@@ -104,6 +105,7 @@ async function registerWithPasskey(page: Page, email: string): Promise<void> {
   await advanceUnknownUserToRegistration(page);
   await expectRegistrationChoice(page);
   await fillEmailIfVisible(page, email);
+  await fillProfileFieldsIfVisible(page);
   await clickAction(page, /register.*passkey|passkey.*register|passkey_register/i, [
     "passkey_register",
   ]);
@@ -201,6 +203,23 @@ async function fillEmailIfVisible(page: Page, email: string): Promise<void> {
   const emailField = page.getByLabel(/email/i).first();
   if (await emailField.isVisible().catch(() => false)) {
     await emailField.fill(email);
+  }
+}
+
+async function fillProfileFieldsIfVisible(page: Page): Promise<void> {
+  await fillFieldIfVisible(page, /given.?name/i, "Ada");
+  await fillFieldIfVisible(page, /family.?name/i, "Lovelace");
+  await fillFieldIfVisible(page, /date.?of.?birth/i, "1990-01-15");
+}
+
+async function fillFieldIfVisible(
+  page: Page,
+  label: RegExp,
+  value: string,
+): Promise<void> {
+  const field = page.getByLabel(label).first();
+  if (await field.isVisible().catch(() => false)) {
+    await field.fill(value);
   }
 }
 

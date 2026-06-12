@@ -148,7 +148,7 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 
 	registerStep, ok := flowDef.FindStep("register")
 	require.True(t, ok)
-	assert.Equal(t, []string{"email"}, registerStep.Fields)
+	assert.Equal(t, []string{"email", "givenName", "familyName", "dateOfBirth"}, registerStep.Fields)
 	assert.Contains(t, registerStep.Actions, domain.FlowActionPasskeyRegister)
 	assert.Equal(t, "done", registerStep.Transitions[domain.FlowActionPasskeyRegister].Target)
 
