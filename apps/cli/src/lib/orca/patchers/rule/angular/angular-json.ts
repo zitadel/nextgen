@@ -7,7 +7,9 @@ import { isObject, parseJsonObject } from "../../../../json";
  * `serve` target. The project name is discovered from the file (`defaultProject`,
  * else the sole project) rather than hardcoded, since it varies per app.
  * Idempotent — already-set values are left as-is. Throws `E_VALIDATION` when the
- * file is absent or the project/serve target cannot be located.
+ * file is absent, the project/serve target cannot be located, or the workspace
+ * has several projects with no `defaultProject` to disambiguate (rather than
+ * guessing and wiring the proxy into an arbitrary one).
  */
 export function angularProxyEdit(opts: {
   proxyConfig: string;
@@ -23,10 +25,21 @@ export function angularProxyEdit(opts: {
     const projects = isObject(root.projects)
       ? (root.projects as Record<string, unknown>)
       : undefined;
-    const projectName =
-      typeof root.defaultProject === "string"
-        ? root.defaultProject
-        : Object.keys(projects ?? {})[0];
+    const projectNames = Object.keys(projects ?? {});
+    let projectName: string | undefined;
+    if (typeof root.defaultProject === "string") {
+      projectName = root.defaultProject;
+    } else if (projectNames.length === 1) {
+      projectName = projectNames[0];
+    } else if (projectNames.length > 1) {
+      throw new ZitadelError(
+        "E_VALIDATION",
+        "angular.json has multiple projects and no defaultProject to choose from",
+        {
+          hint: `Set "defaultProject" in angular.json, or add "proxyConfig" to the right project's serve target manually. Projects: ${projectNames.join(", ")}.`,
+        },
+      );
+    }
     const project = projects && projectName ? projects[projectName] : undefined;
     if (!isObject(project)) {
       throw new ZitadelError("E_VALIDATION", "No project found in angular.json", {

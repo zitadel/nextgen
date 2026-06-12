@@ -40,6 +40,19 @@ describe("angularProxyEdit", () => {
     expect(() => edit(JSON.stringify({ projects: {} }))).toThrowError(/No project/);
   });
 
+  it("throws on multiple projects with no defaultProject instead of guessing", () => {
+    expect(() =>
+      edit(
+        JSON.stringify({
+          projects: {
+            web: { architect: { serve: { options: {} } } },
+            admin: { architect: { serve: { options: {} } } },
+          },
+        }),
+      ),
+    ).toThrowError(/multiple projects/);
+  });
+
   it("throws when there is no serve target", () => {
     expect(() => edit(ng({ architect: {} }))).toThrowError(/serve/);
   });

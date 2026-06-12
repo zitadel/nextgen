@@ -57,11 +57,12 @@ export function appTemplateHtml(): string {
 }
 
 /**
- * The managed `proxy.conf.cjs` for `ng serve` (Angular's Vite-based dev server).
- * `proxy.conf.cjs` for `ng serve`: forwards `/__nextgen/*` to the backend (from
- * `zitadel.json`), strips the prefix, and attaches the project's `sk_<project_id>`
- * bearer to every proxied request. Both `onProxyReq` (http-proxy-middleware) and
- * `configure` (Vite) hooks are set so whichever Angular's dev server honors fires.
+ * The managed `proxy.conf.cjs` for `ng serve`: forwards `/__nextgen/*` to the
+ * backend (from `zitadel.json`), strips the prefix, and attaches the project's
+ * `sk_<project_id>` bearer to every proxied request. The prefix strip and the
+ * bearer are each provided in both the http-proxy-middleware form
+ * (`pathRewrite`/`onProxyReq`) and the Vite form (`rewrite`/`configure`), so
+ * both fire whichever proxy layer Angular's dev server uses.
  */
 export function proxyConfTemplate(): string {
   return `${MANAGED_MARKER}
@@ -74,11 +75,16 @@ function setBearer(proxyReq) {
   proxyReq.setHeader("authorization", bearer);
 }
 
+function stripPrefix(path) {
+  return path.replace(/^\\${PROXY_PATH}/, "") || "/";
+}
+
 module.exports = {
   "${PROXY_PATH}": {
     target: config.server,
     changeOrigin: false,
-    pathRewrite: (path) => path.replace(/^\\${PROXY_PATH}/, "") || "/",
+    pathRewrite: stripPrefix,
+    rewrite: stripPrefix,
     onProxyReq: setBearer,
     configure: (proxy) => proxy.on("proxyReq", setBearer),
   },
