@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFile as execFileCallback } from "node:child_process";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
@@ -113,7 +113,10 @@ export async function inspectAlphaReleaseTrain(options = {}) {
   const tagName = `v${version}`;
   const image = `${SERVER_IMAGE_NAME}:${version}`;
   const title = `ZITADEL Alpha ${version}`;
-  const activeChangesets = await activeChangesetFiles(cwd, readdirFn);
+  const activeChangesets = await activeChangesetFiles(cwd, {
+    readFile: readFileFn,
+    readdir: readdirFn,
+  });
   const headCommit = await gitOutput(execFileFn, cwd, ["rev-parse", "HEAD"]);
   const tagCommit = await tagCommitFor(tagName, execFileFn, cwd);
   const tagExists = Boolean(tagCommit);
@@ -246,6 +249,26 @@ export async function tagExists(tagName, execFileFn = execFile, cwd = process.cw
   return Boolean(await tagCommitFor(tagName, execFileFn, cwd));
 }
 
+export async function pruneEmptyChangesets(options = {}) {
+  const cwd = options.cwd ?? process.cwd();
+  const readFileFn = options.readFile ?? readFile;
+  const readdirFn = options.readdir ?? readdir;
+  const unlinkFn = options.unlink ?? unlink;
+
+  const removed = [];
+  const files = await changesetMarkdownFiles(cwd, readdirFn);
+  for (const file of files) {
+    const path = join(cwd, ".changeset", file);
+    const content = await readFileFn(path, "utf8");
+    if (!changesetHasReleaseBump(content)) {
+      await unlinkFn(path);
+      removed.push(file);
+    }
+  }
+
+  return removed.sort();
+}
+
 export function renderAlphaReleaseNotes({ title, version, image, packages }) {
   const lines = [
     `# ${title}`,
@@ -286,8 +309,10 @@ export function renderAlphaReleaseNotes({ title, version, image, packages }) {
 
 export function parseAlphaReleaseArgs(args) {
   const command = args[0];
-  if (command !== "prepare" && command !== "status") {
-    throw new Error("Usage: release-alpha-train.mjs <status|prepare> [--out-dir <path>] [--published <true|false>]");
+  if (command !== "prepare" && command !== "status" && command !== "prune-empty-changesets") {
+    throw new Error(
+      "Usage: release-alpha-train.mjs <status|prepare|prune-empty-changesets> [--out-dir <path>] [--published <true|false>]",
+    );
   }
   const values = {};
   for (let index = 1; index < args.length; index += 1) {
@@ -310,7 +335,25 @@ function camelCase(value) {
   return value.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
 }
 
-async function activeChangesetFiles(cwd, readdirFn = readdir) {
+async function activeChangesetFiles(cwd, options = {}) {
+  const readFileFn = options.readFile ?? readFile;
+  const readdirFn = options.readdir ?? readdir;
+  const prereleaseChangesets = await prereleaseTrackedChangesets(cwd, readFileFn);
+  const files = await changesetMarkdownFiles(cwd, readdirFn);
+  const active = [];
+  for (const file of files) {
+    if (prereleaseChangesets.has(changesetSlug(file))) {
+      continue;
+    }
+    const content = await readFileFn(join(cwd, ".changeset", file), "utf8");
+    if (changesetHasReleaseBump(content)) {
+      active.push(file);
+    }
+  }
+  return active.sort();
+}
+
+async function changesetMarkdownFiles(cwd, readdirFn = readdir) {
   let entries = [];
   try {
     entries = await readdirFn(join(cwd, ".changeset"), { withFileTypes: true });
@@ -325,6 +368,51 @@ async function activeChangesetFiles(cwd, readdirFn = readdir) {
     .map((entry) => entry.name)
     .filter((name) => name.endsWith(".md") && name !== "README.md")
     .sort();
+}
+
+async function prereleaseTrackedChangesets(cwd, readFileFn = readFile) {
+  let preState;
+  try {
+    preState = JSON.parse(await readFileFn(join(cwd, ".changeset/pre.json"), "utf8"));
+  } catch (error) {
+    if (isMissingPath(error)) {
+      return new Set();
+    }
+    throw error;
+  }
+  if (!Array.isArray(preState.changesets)) {
+    return new Set();
+  }
+  return new Set(preState.changesets.filter((name) => typeof name === "string"));
+}
+
+function changesetSlug(file) {
+  return file.replace(/\.md$/, "");
+}
+
+function changesetHasReleaseBump(content) {
+  const frontmatter = changesetFrontmatter(content);
+  if (frontmatter === undefined) {
+    return true;
+  }
+  return frontmatter.split("\n").some((line) => {
+    const trimmed = line.trim();
+    return trimmed.length > 0 && !trimmed.startsWith("#");
+  });
+}
+
+function changesetFrontmatter(content) {
+  const normalized = content.replace(/\r\n/g, "\n");
+  if (!normalized.startsWith("---\n")) {
+    return undefined;
+  }
+  const lines = normalized.split("\n");
+  for (let index = 1; index < lines.length; index += 1) {
+    if (lines[index] === "---") {
+      return lines.slice(1, index).join("\n");
+    }
+  }
+  return undefined;
 }
 
 async function tagCommitFor(tagName, execFileFn = execFile, cwd = process.cwd()) {
@@ -400,6 +488,10 @@ function printAlphaOutputs(result) {
   }
 }
 
+function printPrunedChangesets(files) {
+  console.log(`pruned_empty_changesets=${files.join(",")}`);
+}
+
 function isDirectRun(url) {
   return process.argv[1] && url === new URL(`file://${process.argv[1]}`).href;
 }
@@ -407,11 +499,15 @@ function isDirectRun(url) {
 if (isDirectRun(import.meta.url)) {
   try {
     const { command, values } = parseAlphaReleaseArgs(process.argv.slice(2));
-    const result =
-      command === "status"
-        ? await inspectAlphaReleaseTrain(values)
-        : await prepareAlphaReleaseTrain(values);
-    printAlphaOutputs(result);
+    if (command === "prune-empty-changesets") {
+      printPrunedChangesets(await pruneEmptyChangesets(values));
+    } else {
+      const result =
+        command === "status"
+          ? await inspectAlphaReleaseTrain(values)
+          : await prepareAlphaReleaseTrain(values);
+      printAlphaOutputs(result);
+    }
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
