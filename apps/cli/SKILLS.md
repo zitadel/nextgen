@@ -4,8 +4,8 @@ description: >-
   Set up and manage Zitadel authentication in a local project with the
   agent-friendly `zitadel` CLI. Use when the user wants to add login,
   registration, or session handling, create a Zitadel project, scaffold auth
-  routes for a Next.js App Router app, or plan and apply Zitadel config changes
-  from repo state.
+  for a Next.js, React, Vue, Angular, or Nuxt app, or plan and apply Zitadel
+  config changes from repo state.
 ---
 
 # Zitadel CLI
@@ -50,7 +50,10 @@ layer, not the envelope.
 - `setup` — create a Zitadel project and scaffold local auth (routes,
   middleware, `.zitadel/**`, env templates). The project's default user schema
   and login flow are provisioned server-side at creation, so setup neither
-  scaffolds nor uploads them. Flags: `--framework`, `--renderer`.
+  scaffolds nor uploads them. Flags: `--framework next|react|vue|angular|nuxt`,
+  `--renderer` (Next.js only), `--dev-port` (dev-server port, also the issuer
+  origin registered with Zitadel — use distinct ports to run several scaffolded
+  apps side by side), `--skip-install`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
 - `doctor` — verify generated app files and local state once `zitadel.json`

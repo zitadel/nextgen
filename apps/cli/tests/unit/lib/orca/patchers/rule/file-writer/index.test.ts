@@ -350,6 +350,68 @@ describe("scaffold - add-dep", () => {
   });
 });
 
+describe("scaffold - edit", () => {
+  it("runs the transform on the file contents and writes the result", async () => {
+    const target = join(dir, "vite.config.ts");
+    await writeFile(target, "export default {}");
+    const result = await scaffold(
+      plan({ kind: "edit", path: "vite.config.ts", edit: (s) => `${s}\n// edited` }),
+      { cwd: dir, dryRun: false, force: false },
+    );
+    expect(result.filesWritten).toEqual([target]);
+    expect(await readFile(target, "utf8")).toBe("export default {}\n// edited");
+  });
+
+  it("edits the first existing candidate from a priority list", async () => {
+    await writeFile(join(dir, "vite.config.js"), "js");
+    const result = await scaffold(
+      plan({
+        kind: "edit",
+        path: ["vite.config.ts", "vite.config.js"],
+        edit: (s) => `${s}!`,
+      }),
+      { cwd: dir, dryRun: false, force: false },
+    );
+    expect(result.filesWritten).toEqual([join(dir, "vite.config.js")]);
+    expect(await readFile(join(dir, "vite.config.js"), "utf8")).toBe("js!");
+    expect(await exists(join(dir, "vite.config.ts"))).toBe(false);
+  });
+
+  it("passes undefined to the transform and writes the first candidate when none exist", async () => {
+    const result = await scaffold(
+      plan({
+        kind: "edit",
+        path: ["vite.config.ts", "vite.config.js"],
+        edit: (s) => (s === undefined ? "created" : "wrong"),
+      }),
+      { cwd: dir, dryRun: false, force: false },
+    );
+    expect(result.filesWritten).toEqual([join(dir, "vite.config.ts")]);
+    expect(await readFile(join(dir, "vite.config.ts"), "utf8")).toBe("created");
+  });
+
+  it("skips when the transform leaves the contents unchanged", async () => {
+    const target = join(dir, "vite.config.ts");
+    await writeFile(target, "untouched");
+    const result = await scaffold(
+      plan({ kind: "edit", path: "vite.config.ts", edit: (s) => s ?? "" }),
+      { cwd: dir, dryRun: false, force: false },
+    );
+    expect(result.filesSkipped).toEqual([target]);
+    expect(result.filesWritten).toEqual([]);
+  });
+
+  it("does not write to disk on dry-run but reports the path", async () => {
+    await writeFile(join(dir, "vite.config.ts"), "before");
+    const result = await scaffold(
+      plan({ kind: "edit", path: "vite.config.ts", edit: () => "after" }),
+      { cwd: dir, dryRun: true, force: false },
+    );
+    expect(result.filesWritten).toEqual([join(dir, "vite.config.ts")]);
+    expect(await readFile(join(dir, "vite.config.ts"), "utf8")).toBe("before");
+  });
+});
+
 describe("scaffold - multi-op plans", () => {
   it("applies ops in order and aggregates the result", async () => {
     await writeFile(join(dir, "package.json"), JSON.stringify({ name: "demo" }));

@@ -48,7 +48,10 @@ const FRAMEWORK_OPTIONS = createOrca()
  */
 export default class Setup extends BaseCommand {
   static override description = "Create a Zitadel project and scaffold local auth.";
-  static override examples = ["<%= config.bin %> setup --framework next"];
+  static override examples = [
+    "<%= config.bin %> setup --framework next",
+    "<%= config.bin %> setup --framework react --dev-port 3000",
+  ];
   static override flags = {
     framework: Flags.string({ description: "Framework to target.", options: FRAMEWORK_OPTIONS }),
     renderer: Flags.string({
