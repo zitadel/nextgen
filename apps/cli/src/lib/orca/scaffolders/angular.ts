@@ -7,7 +7,8 @@ import { AbstractCLIScaffolder } from "./cli";
  * Derives a valid Angular project name from the target directory. `ng new`
  * validates the name against `^[a-zA-Z0-9-~][a-zA-Z0-9-._~]*$` and rejects `.`,
  * so we slugify the directory's basename (lowercase, non-alphanumerics → `-`)
- * and guarantee a leading letter, falling back to `app` for an unusable name.
+ * and guarantee a leading letter by prefixing `app-` when the slug does not
+ * start with one (`app-zitadel` when the basename slugifies to nothing).
  */
 function angularProjectName(cwd: string): string {
   const slug = basename(cwd)

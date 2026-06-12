@@ -1,3 +1,4 @@
+import { isObject, parseJsonObject, stableStringify } from "../../../../json";
 import { npmDistTagForCliVersion } from "../../../../public-cli";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
@@ -8,11 +9,28 @@ import { appComponentTemplate, appTemplateHtml, proxyConfTemplate } from "./temp
 const SDK_DEPENDENCY = "@zitadel/sdk-angular";
 
 /**
+ * Adds a `dev: "ng serve"` script only when the project does not already define
+ * one. `ng new` ships only a `start` script, but the CLI tells every framework
+ * to run `npm run dev` (and `ng serve` reads the proxy + port from
+ * `angular.json`). Non-destructive: an existing `dev` script is preserved, so
+ * patching a project that already wires its own `dev` leaves it untouched.
+ */
+function ensureDevScript(source: string | undefined): string {
+  const pkg: Record<string, unknown> = source ? parseJsonObject(source, "package.json") : {};
+  const scripts: Record<string, unknown> = isObject(pkg.scripts) ? { ...pkg.scripts } : {};
+  if (scripts.dev === undefined) {
+    scripts.dev = "ng serve";
+  }
+  pkg.scripts = scripts;
+  return `${stableStringify(pkg)}\n`;
+}
+
+/**
  * Rule-based patcher for an Angular app. Inherits the shared `.zitadel/` base
  * files from {@link AbstractRulePatcher} and contributes the managed root
  * component (`app.ts`/`app.html`) that renders the `@zitadel/sdk-angular`
- * widgets, a `proxy.conf.cjs` dev proxy (injecting the project service-key on
- * `/sessions/exchange`) wired into `angular.json`, and the SDK dep.
+ * widgets, a `proxy.conf.cjs` dev proxy (attaching the `sk_<project_id>` bearer
+ * to every proxied request) wired into `angular.json`, and the SDK dep.
  *
  * Unlike React/Vue (whose dev proxy lives in `vite.config.ts`), Angular owns its
  * Vite config, so the proxy is a separate `proxy.conf.cjs` referenced from the
@@ -37,10 +55,7 @@ export class AngularPatcher extends AbstractRulePatcher {
         path: "angular.json",
         edit: angularProxyEdit({ proxyConfig: "proxy.conf.cjs", port: ctx.framework.devPort }),
       },
-      // `ng new` only adds a `start` script; the CLI tells every framework to run
-      // `npm run dev`, so give Angular a matching `dev` script (ng serve reads the
-      // proxy + port from angular.json).
-      { kind: "merge-json", path: "package.json", patch: { scripts: { dev: "ng serve" } } },
+      { kind: "edit", path: "package.json", edit: ensureDevScript },
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,

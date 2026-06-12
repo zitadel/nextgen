@@ -44,15 +44,26 @@ describe("AngularPatcher.plan", () => {
   });
 
   it("adds a `dev` npm script so `npm run dev` works like the other frameworks", () => {
-    const mergeJson = new AngularPatcher()
+    const edit = new AngularPatcher()
       .plan(ctx())
       .ops.find(
-        (op): op is Extract<FileOp, { kind: "merge-json" }> =>
-          op.kind === "merge-json" && op.path === "package.json",
+        (op): op is Extract<FileOp, { kind: "edit" }> =>
+          op.kind === "edit" && op.path === "package.json",
       );
-    expect((mergeJson?.patch as { scripts?: { dev?: string } } | undefined)?.scripts?.dev).toBe(
-      "ng serve",
-    );
+    const result = JSON.parse(edit!.edit(`{ "scripts": { "start": "ng serve" } }`));
+    expect(result.scripts.dev).toBe("ng serve");
+    expect(result.scripts.start).toBe("ng serve");
+  });
+
+  it("preserves an existing `dev` script instead of overwriting it", () => {
+    const edit = new AngularPatcher()
+      .plan(ctx())
+      .ops.find(
+        (op): op is Extract<FileOp, { kind: "edit" }> =>
+          op.kind === "edit" && op.path === "package.json",
+      );
+    const result = JSON.parse(edit!.edit(`{ "scripts": { "dev": "ng serve --hmr" } }`));
+    expect(result.scripts.dev).toBe("ng serve --hmr");
   });
 
   it("adds the SDK dependency at the CLI's prerelease tag", () => {
