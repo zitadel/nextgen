@@ -3,7 +3,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { type ZitadelProject } from "@zitadel/api/config";
 
 import { applyBaseTokens } from "./branding-to-tokens.js";
-import { resolveApi } from "./resolve-api.js";
+import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
 import { emit } from "../internal/emit.js";
 import { baseHostStyles, focusVisibleStyles, t } from "../styles/index.js";
 
@@ -190,10 +190,31 @@ export class ZitadelLogout extends LitElement {
   ];
 
   /**
-   * SDK project handle returned by `configureZitadel()`. When set, takes
-   * precedence over the global singleton from `getZitadelConfig()`.
+   * SDK project handle returned by `configureZitadel()`. Set from JS (or a
+   * framework binding). When set, takes precedence over both the
+   * `project-id`/`proxy-path`/`url` attributes and the global singleton from
+   * `getZitadelConfig()`.
    */
   @property({ attribute: false }) accessor project: ZitadelProject | undefined;
+
+  /**
+   * Project ID, set declaratively in HTML. Lets the component be configured on
+   * a plain page without JS or `configureZitadel()`. Ignored when the `project`
+   * property or a `configureZitadel()` global is set.
+   */
+  @property({ type: String, attribute: "project-id" }) accessor projectId = "";
+
+  /**
+   * Proxy path for API requests (e.g. `/__nextgen`), set declaratively in HTML.
+   * Defaults to `/__nextgen` when omitted, matching `configureZitadel()`.
+   */
+  @property({ type: String, attribute: "proxy-path" }) accessor proxyPath = "";
+
+  /**
+   * Full URL of the Zitadel auth backend, set declaratively in HTML. Optional —
+   * not needed in client-only setups.
+   */
+  @property({ type: String }) accessor url = "";
 
   /** URL to navigate to after a successful sign-out. */
   @property({ type: String, attribute: "post-sign-out-url" }) accessor postSignOutUrl = "";
@@ -257,9 +278,7 @@ export class ZitadelLogout extends LitElement {
    */
   private readDisplayCookie(): void {
     if (typeof document === "undefined") return;
-    const match = document.cookie.match(
-      new RegExp(`(?:^|;\\s*)${DISPLAY_COOKIE_NAME}=([^;]+)`),
-    );
+    const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${DISPLAY_COOKIE_NAME}=([^;]+)`));
     if (!match || !match[1]) return;
     try {
       const data = JSON.parse(atob(match[1])) as DisplayData;
@@ -322,12 +341,17 @@ export class ZitadelLogout extends LitElement {
    * clears the cookie via `Set-Cookie: Max-Age=0`. On success this element fires
    * `zitadel-signout` and optionally navigates to `postSignOutUrl`.
    */
+  /** Declarative config read from this element's attributes. */
+  private get projectAttrs(): ProjectAttrs {
+    return { projectId: this.projectId, proxyPath: this.proxyPath, url: this.url };
+  }
+
   private async doLogout(): Promise<void> {
     this.loading = true;
     this.errorMessage = "";
 
     try {
-      const { api } = resolveApi(this.project, "<zitadel-logout>");
+      const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-logout>");
       await api.revokeMySession({ credentials: "include" });
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
@@ -357,7 +381,7 @@ export class ZitadelLogout extends LitElement {
       ...(this.clientId ? { client_id: this.clientId } : {}),
       ...(this.postSignOutUrl ? { post_logout_redirect_uri: this.postSignOutUrl } : {}),
     };
-    const { api } = resolveApi(this.project, "<zitadel-logout>");
+    const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-logout>");
     return api.getEndSessionUrl(params);
   }
 
