@@ -11,56 +11,101 @@ import (
 
 func (h *Harness) EnsureAPIClient(t *testing.T, projectID string) *api.Client {
 	t.Helper()
+	h.mu.Lock()
+	if h.apiClients != nil {
+		if client, ok := h.apiClients[projectID]; ok {
+			h.mu.Unlock()
+			return client
+		}
+	}
+	h.mu.Unlock()
+
 	serv := h.EnsureTestServer(t)
-	if h.apiClients == nil {
-		h.apiClients = make(map[string]*api.Client)
-	}
-	if client, ok := h.apiClients[projectID]; ok {
-		return client
-	}
 	client, err := api.NewClient(
 		serv.URL,
 		h.EnsureFakeSecuritySource(t, projectID),
 	)
 	require.NoError(t, err)
+	h.mu.Lock()
+	if h.apiClients == nil {
+		h.apiClients = make(map[string]*api.Client)
+	}
+	if existing, ok := h.apiClients[projectID]; ok {
+		h.mu.Unlock()
+		return existing
+	}
 	h.apiClients[projectID] = client
+	h.mu.Unlock()
 	return client
 }
 
 func (h *Harness) EnsureAnonymousAPIClient(t *testing.T) *api.Client {
 	t.Helper()
+	h.mu.Lock()
+	client := h.anonymousClient
+	h.mu.Unlock()
+	if client != nil {
+		return client
+	}
+
 	serv := h.EnsureTestServer(t)
+	client, err := api.NewClient(
+		serv.URL,
+		h.EnsureAnonymousSecuritySource(t),
+	)
+	require.NoError(t, err)
+	h.mu.Lock()
 	if h.anonymousClient == nil {
-		client, err := api.NewClient(
-			serv.URL,
-			h.EnsureAnonymousSecuritySource(t),
-		)
-		require.NoError(t, err)
 		h.anonymousClient = client
 	}
-	return h.anonymousClient
+	client = h.anonymousClient
+	h.mu.Unlock()
+	return client
 }
 
 func (h *Harness) EnsureFakeSecuritySource(t *testing.T, projectID string) *FakeSecuritySource {
 	t.Helper()
+	h.mu.Lock()
+	if h.fakeSecuritySources != nil {
+		if source, ok := h.fakeSecuritySources[projectID]; ok {
+			h.mu.Unlock()
+			return source
+		}
+	}
+	h.mu.Unlock()
+
+	source := &FakeSecuritySource{
+		projectID: projectID,
+	}
+	h.mu.Lock()
 	if h.fakeSecuritySources == nil {
 		h.fakeSecuritySources = make(map[string]*FakeSecuritySource)
 	}
 	if source, ok := h.fakeSecuritySources[projectID]; ok {
+		h.mu.Unlock()
 		return source
 	}
-	h.fakeSecuritySources[projectID] = &FakeSecuritySource{
-		projectID: projectID,
-	}
-	return h.fakeSecuritySources[projectID]
+	h.fakeSecuritySources[projectID] = source
+	h.mu.Unlock()
+	return source
 }
 
 func (h *Harness) EnsureAnonymousSecuritySource(t *testing.T) *FakeSecuritySource {
 	t.Helper()
-	if h.anonymousSecuritySource == nil {
-		h.anonymousSecuritySource = &FakeSecuritySource{}
+	h.mu.Lock()
+	source := h.anonymousSecuritySource
+	h.mu.Unlock()
+	if source != nil {
+		return source
 	}
-	return h.anonymousSecuritySource
+	source = &FakeSecuritySource{}
+	h.mu.Lock()
+	if h.anonymousSecuritySource == nil {
+		h.anonymousSecuritySource = source
+	}
+	source = h.anonymousSecuritySource
+	h.mu.Unlock()
+	return source
 }
 
 type FakeSecuritySource struct {

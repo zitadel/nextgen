@@ -10,22 +10,41 @@ import (
 
 func (h *Harness) EnsureTeamRepo(t *testing.T) domain.TeamRepository {
 	t.Helper()
-	if h.TeamRepo == nil {
-		h.TeamRepo = repository.NewTeamRepository(
-			h.EnsureDBPool(t),
-		)
+	h.mu.Lock()
+	repo := h.TeamRepo
+	h.mu.Unlock()
+	if repo != nil {
+		return repo
 	}
-
-	return h.TeamRepo
+	repo = repository.NewTeamRepository(
+		h.EnsureDBPool(t),
+	)
+	h.mu.Lock()
+	if h.TeamRepo == nil {
+		h.TeamRepo = repo
+	}
+	repo = h.TeamRepo
+	h.mu.Unlock()
+	return repo
 }
 
 func (h *Harness) EnsureTeamService(t *testing.T) *service.TeamService {
 	t.Helper()
-	if h.TeamService == nil {
-		h.TeamService = service.NewTeamService(
-			h.EnsureDBPool(t),
-			h.EnsureTeamRepo(t),
-		)
+	h.mu.Lock()
+	svc := h.TeamService
+	h.mu.Unlock()
+	if svc != nil {
+		return svc
 	}
-	return h.TeamService
+	svc = service.NewTeamService(
+		h.EnsureDBPool(t),
+		h.EnsureTeamRepo(t),
+	)
+	h.mu.Lock()
+	if h.TeamService == nil {
+		h.TeamService = svc
+	}
+	svc = h.TeamService
+	h.mu.Unlock()
+	return svc
 }

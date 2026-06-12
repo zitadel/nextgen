@@ -15,8 +15,6 @@ import (
 )
 
 func TestCreateFlowDefinitionUnauthenticated(t *testing.T) {
-	t.Parallel()
-
 	userSchema := "https://some-tenant.com/schemas/unknown-user-schema.yaml"
 	userSchemaURI, err := url.Parse(userSchema)
 	require.NoError(t, err)
@@ -49,12 +47,11 @@ func TestCreateFlowDefinitionUnauthenticated(t *testing.T) {
 }
 
 func TestCreateFlowDefinition(t *testing.T) {
-	t.Parallel()
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
-	harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
-	u := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
+	u := flowDefinitionSchemaURL(t)
+	harness.EnsureUserSchemaWithID(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema, u)
 	userSchemaURI, err := url.Parse(u)
 	require.NoError(t, err)
 
@@ -290,7 +287,6 @@ func TestCreateFlowDefinition(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			client := harness.EnsureAPIClient(t, project.ID)
 			resp, err := client.CreateFlowDefinition(t.Context(), tt.req)
 			assert.NoError(t, err)
@@ -365,8 +361,12 @@ func validSteps() []api.FlowDefinitionStep {
 	}
 }
 
+func flowDefinitionSchemaURL(t *testing.T) string {
+	t.Helper()
+	return "https://test.example.schemas.com/integration/" + url.PathEscape(t.Name()) + ".json"
+}
+
 func TestGetFlowDefinitionUnauthenticated(t *testing.T) {
-	t.Parallel()
 	client := harness.EnsureAnonymousAPIClient(t)
 	getResp, err := client.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{
 		ID:        "flowDef_1234",
@@ -385,11 +385,10 @@ func TestGetFlowDefinitionUnauthenticated(t *testing.T) {
 }
 
 func TestGetFlowDefinition(t *testing.T) {
-	t.Parallel()
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
-	harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
-	u := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
+	u := flowDefinitionSchemaURL(t)
+	harness.EnsureUserSchemaWithID(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema, u)
 	userSchemaURI, err := url.Parse(u)
 	require.NoError(t, err)
 
@@ -442,7 +441,6 @@ func TestGetFlowDefinition(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			client := harness.EnsureAPIClient(t, project.ID)
 			resp, err := client.GetFlowDefinition(t.Context(), tt.req)
 			assert.NoError(t, err)
@@ -452,8 +450,6 @@ func TestGetFlowDefinition(t *testing.T) {
 }
 
 func TestListFlowDefinitionsUnauthenticated(t *testing.T) {
-	t.Parallel()
-
 	client := harness.EnsureAnonymousAPIClient(t)
 	getResp, err := client.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{
 		ProjectID: "proj_1234",
@@ -471,19 +467,18 @@ func TestListFlowDefinitionsUnauthenticated(t *testing.T) {
 }
 
 func TestListFlowDefinitions(t *testing.T) {
-	t.Parallel()
 	project1, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
-	harness.CreateUserSchema(t, project1.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
 	project2, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
-	harness.CreateUserSchema(t, project2.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
 	project3, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
 
-	u := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
+	u := flowDefinitionSchemaURL(t)
+	harness.EnsureUserSchemaWithID(t, project1.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema, u)
+	harness.EnsureUserSchemaWithID(t, project2.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema, u)
 	userSchemaURI, err := url.Parse(u)
 	require.NoError(t, err)
 
@@ -666,7 +661,6 @@ func TestListFlowDefinitions(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			client := harness.EnsureAPIClient(t, project1.ID)
 			resp, err := client.ListFlowDefinitions(t.Context(), tt.req)
 			assert.NoError(t, err)
@@ -699,7 +693,6 @@ func TestListFlowDefinitions(t *testing.T) {
 }
 
 func TestDeleteFlowDefinitionUnauthenticated(t *testing.T) {
-	t.Parallel()
 	client := harness.EnsureAnonymousAPIClient(t)
 	resp, err := client.DeleteFlowDefinition(t.Context(), api.DeleteFlowDefinitionParams{
 		ID:        "flowDef_1234",
@@ -717,11 +710,10 @@ func TestDeleteFlowDefinitionUnauthenticated(t *testing.T) {
 }
 
 func TestDeleteFlowDefinition(t *testing.T) {
-	t.Parallel()
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
-	harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
-	u := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
+	u := flowDefinitionSchemaURL(t)
+	harness.EnsureUserSchemaWithID(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema, u)
 	userSchemaURI, err := url.Parse(u)
 	require.NoError(t, err)
 
@@ -776,7 +768,6 @@ func TestDeleteFlowDefinition(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			client := harness.EnsureAPIClient(t, project.ID)
 			resp, err := client.DeleteFlowDefinition(t.Context(), tt.req)
 			assert.NoError(t, err)

@@ -8,8 +8,18 @@ import (
 
 func (h *Harness) EnsureSecretGenerator(t *testing.T) secrets.Generator {
 	t.Helper()
-	if h.SecretGenerator == nil {
-		h.SecretGenerator = secrets.NewRandomSecretGenerator()
+	h.mu.Lock()
+	generator := h.SecretGenerator
+	h.mu.Unlock()
+	if generator != nil {
+		return generator
 	}
-	return h.SecretGenerator
+	generator = secrets.NewRandomSecretGenerator()
+	h.mu.Lock()
+	if h.SecretGenerator == nil {
+		h.SecretGenerator = generator
+	}
+	generator = h.SecretGenerator
+	h.mu.Unlock()
+	return generator
 }

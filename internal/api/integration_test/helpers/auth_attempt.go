@@ -10,27 +10,47 @@ import (
 
 func (h *Harness) EnsureAuthAttemptService(t *testing.T) service.AuthAttemptService {
 	t.Helper()
-	if h.AuthAttemptService == nil {
-		h.AuthAttemptService = service.NewAuthAttemptService(
-			h.EnsureDBPool(t),
-			h.EnsureAuthAttemptRepo(t),
-			h.EnsureSessionRepo(t),
-			h.EnsureProjectRepo(t),
-			h.EnsureUserRepo(t),
-			h.EnsureUserPasswordRepo(t),
-			h.EnsureUserPasskeyRepo(t),
-			h.EnsureHashVerifier(t),
-		)
+	h.mu.Lock()
+	svc := h.AuthAttemptService
+	h.mu.Unlock()
+	if svc != nil {
+		return svc
 	}
-	return h.AuthAttemptService
+	svc = service.NewAuthAttemptService(
+		h.EnsureDBPool(t),
+		h.EnsureAuthAttemptRepo(t),
+		h.EnsureSessionRepo(t),
+		h.EnsureProjectRepo(t),
+		h.EnsureUserRepo(t),
+		h.EnsureUserPasswordRepo(t),
+		h.EnsureUserPasskeyRepo(t),
+		h.EnsureHashVerifier(t),
+	)
+	h.mu.Lock()
+	if h.AuthAttemptService == nil {
+		h.AuthAttemptService = svc
+	}
+	svc = h.AuthAttemptService
+	h.mu.Unlock()
+	return svc
 }
 
 func (h *Harness) EnsureAuthAttemptRepo(t *testing.T) domain.AuthAttemptRepository {
 	t.Helper()
-	if h.AuthAttemptRepo == nil {
-		h.AuthAttemptRepo = repository.NewAuthAttemptRepository(
-			h.EnsureDBPool(t),
-		)
+	h.mu.Lock()
+	repo := h.AuthAttemptRepo
+	h.mu.Unlock()
+	if repo != nil {
+		return repo
 	}
-	return h.AuthAttemptRepo
+	repo = repository.NewAuthAttemptRepository(
+		h.EnsureDBPool(t),
+	)
+	h.mu.Lock()
+	if h.AuthAttemptRepo == nil {
+		h.AuthAttemptRepo = repo
+	}
+	repo = h.AuthAttemptRepo
+	h.mu.Unlock()
+	return repo
 }

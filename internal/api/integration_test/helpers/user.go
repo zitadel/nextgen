@@ -12,26 +12,45 @@ import (
 
 func (h *Harness) EnsureUserService(t *testing.T) *service.UserService {
 	t.Helper()
-	if h.UserService == nil {
-		h.UserService = service.NewUserService(
-			h.EnsureDBPool(t),
-			h.EnsureUserRepo(t),
-			h.EnsureUserPasswordRepo(t),
-			h.EnsureSchemaRepo(t),
-			h.EnsureDecrypter(t),
-			h.EnsureHasher(t),
-		)
+	h.mu.Lock()
+	svc := h.UserService
+	h.mu.Unlock()
+	if svc != nil {
+		return svc
 	}
-	return h.UserService
+	svc = service.NewUserService(
+		h.EnsureDBPool(t),
+		h.EnsureUserRepo(t),
+		h.EnsureUserPasswordRepo(t),
+		h.EnsureSchemaRepo(t),
+		h.EnsureDecrypter(t),
+		h.EnsureHasher(t),
+	)
+	h.mu.Lock()
+	if h.UserService == nil {
+		h.UserService = svc
+	}
+	svc = h.UserService
+	h.mu.Unlock()
+	return svc
 }
 
 func (h *Harness) EnsureUserRepo(t *testing.T) domain.UserRepository {
 	t.Helper()
-	if h.UserRepo == nil {
-		h.UserRepo = repository.NewUserRepository()
+	h.mu.Lock()
+	repo := h.UserRepo
+	h.mu.Unlock()
+	if repo != nil {
+		return repo
 	}
-
-	return h.UserRepo
+	repo = repository.NewUserRepository()
+	h.mu.Lock()
+	if h.UserRepo == nil {
+		h.UserRepo = repo
+	}
+	repo = h.UserRepo
+	h.mu.Unlock()
+	return repo
 }
 
 func CreateSessionUsingPassword(t *testing.T,

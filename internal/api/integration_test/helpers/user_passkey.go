@@ -9,9 +9,18 @@ import (
 
 func (h *Harness) EnsureUserPasskeyRepo(t *testing.T) domain.UserPasskeyRepository {
 	t.Helper()
-	if h.UserPasskeyRepo == nil {
-		h.UserPasskeyRepo = repository.NewUserPasskeyRepository()
+	h.mu.Lock()
+	repo := h.UserPasskeyRepo
+	h.mu.Unlock()
+	if repo != nil {
+		return repo
 	}
-
-	return h.UserPasskeyRepo
+	repo = repository.NewUserPasskeyRepository()
+	h.mu.Lock()
+	if h.UserPasskeyRepo == nil {
+		h.UserPasskeyRepo = repo
+	}
+	repo = h.UserPasskeyRepo
+	h.mu.Unlock()
+	return repo
 }

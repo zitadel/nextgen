@@ -8,14 +8,24 @@ import (
 
 func (h *Harness) EnsureFlowDefinitionService(t *testing.T) service.FlowDefinitionService {
 	t.Helper()
-	if h.FlowDefinitionService == nil {
-		h.FlowDefinitionService = service.NewFlowDefinitionService(
-			h.EnsureDBPool(t),
-			h.EnsureSchemaService(t),
-			h.EnsureSchemaValidator(t),
-			nil,
-			h.EnsureFlowDefinitionRepo(t),
-		)
+	h.mu.Lock()
+	svc := h.FlowDefinitionService
+	h.mu.Unlock()
+	if svc != nil {
+		return svc
 	}
-	return h.FlowDefinitionService
+	svc = service.NewFlowDefinitionService(
+		h.EnsureDBPool(t),
+		h.EnsureSchemaService(t),
+		h.EnsureSchemaValidator(t),
+		nil,
+		h.EnsureFlowDefinitionRepo(t),
+	)
+	h.mu.Lock()
+	if h.FlowDefinitionService == nil {
+		h.FlowDefinitionService = svc
+	}
+	svc = h.FlowDefinitionService
+	h.mu.Unlock()
+	return svc
 }

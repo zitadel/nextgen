@@ -11,22 +11,42 @@ import (
 
 func (h *Harness) EnsureSessionService(t *testing.T) service.SessionService {
 	t.Helper()
-	if h.SessionService == nil {
-		h.SessionService = service.NewSessionService(
-			h.EnsureDBPool(t),
-			h.EnsureSessionRepo(t),
-			service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour},
-		)
+	h.mu.Lock()
+	svc := h.SessionService
+	h.mu.Unlock()
+	if svc != nil {
+		return svc
 	}
-	return h.SessionService
+	svc = service.NewSessionService(
+		h.EnsureDBPool(t),
+		h.EnsureSessionRepo(t),
+		service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour},
+	)
+	h.mu.Lock()
+	if h.SessionService == nil {
+		h.SessionService = svc
+	}
+	svc = h.SessionService
+	h.mu.Unlock()
+	return svc
 }
 
 func (h *Harness) EnsureSessionRepo(t *testing.T) domain.SessionRepository {
 	t.Helper()
-	if h.SessionRepo == nil {
-		h.SessionRepo = repository.NewSessionRepository(
-			h.EnsureDBPool(t),
-		)
+	h.mu.Lock()
+	repo := h.SessionRepo
+	h.mu.Unlock()
+	if repo != nil {
+		return repo
 	}
-	return h.SessionRepo
+	repo = repository.NewSessionRepository(
+		h.EnsureDBPool(t),
+	)
+	h.mu.Lock()
+	if h.SessionRepo == nil {
+		h.SessionRepo = repo
+	}
+	repo = h.SessionRepo
+	h.mu.Unlock()
+	return repo
 }

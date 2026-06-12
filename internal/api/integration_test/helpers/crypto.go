@@ -10,26 +10,35 @@ import (
 
 func (h *Harness) EnsureHasher(t *testing.T) crypto.Hasher {
 	t.Helper()
-	if h.Hasher == nil {
-		h.Hasher = createNewHasher(t)
-	}
-	return h.Hasher
+	return h.ensurePasswapHasher(t)
 }
 
 func (h *Harness) EnsureHashVerifier(t *testing.T) crypto.HashVerifier {
 	t.Helper()
-	if h.Hasher == nil {
-		h.Hasher = createNewHasher(t)
-	}
-	return h.Hasher
+	return h.ensurePasswapHasher(t)
 }
 
 func (h *Harness) EnsureHashValidator(t *testing.T) crypto.HashValidator {
 	t.Helper()
-	if h.Hasher == nil {
-		h.Hasher = createNewHasher(t)
+	return h.ensurePasswapHasher(t)
+}
+
+func (h *Harness) ensurePasswapHasher(t *testing.T) *crypto.PasswapHasher {
+	t.Helper()
+	h.mu.Lock()
+	hasher := h.Hasher
+	h.mu.Unlock()
+	if hasher != nil {
+		return hasher
 	}
-	return h.Hasher
+	hasher = createNewHasher(t)
+	h.mu.Lock()
+	if h.Hasher == nil {
+		h.Hasher = hasher
+	}
+	hasher = h.Hasher
+	h.mu.Unlock()
+	return hasher
 }
 
 func createNewHasher(t *testing.T) *crypto.PasswapHasher {
@@ -55,11 +64,21 @@ func createNewHasher(t *testing.T) *crypto.PasswapHasher {
 
 func (h *Harness) EnsureCrypter(t *testing.T) crypto.Crypter {
 	t.Helper()
-	if h.Crypter == nil {
-		key := [32]byte([]byte("MasterkeyNeedsToHave32Characters"))
-		h.Crypter = op.NewAES256GCMCrypto(key, "")
+	h.mu.Lock()
+	crypter := h.Crypter
+	h.mu.Unlock()
+	if crypter != nil {
+		return crypter
 	}
-	return h.Crypter
+	key := [32]byte([]byte("MasterkeyNeedsToHave32Characters"))
+	crypter = op.NewAES256GCMCrypto(key, "")
+	h.mu.Lock()
+	if h.Crypter == nil {
+		h.Crypter = crypter
+	}
+	crypter = h.Crypter
+	h.mu.Unlock()
+	return crypter
 }
 
 func (h *Harness) EnsureEncrypter(t *testing.T) crypto.Encrypter {
