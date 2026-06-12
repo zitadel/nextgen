@@ -249,7 +249,7 @@ function workflowJobBlock(input, jobName) {
     return undefined;
   }
 
-  const nextJobPattern = /^  [A-Za-z0-9_-]+:\s*$/gm;
+  const nextJobPattern = /^ {2}[A-Za-z0-9_-]+:\s*$/gm;
   nextJobPattern.lastIndex = header.index + header[0].length;
   const nextJob = nextJobPattern.exec(input);
   const end = nextJob ? nextJob.index : input.length;
