@@ -188,6 +188,29 @@ describe("<zitadel-logout>", () => {
     expect(window.location.href).toBe("https://app.test/done");
   });
 
+  it("signs out using project-id / proxy-path attributes with no global config", async () => {
+    // Drop the global so only the declarative attributes can configure the
+    // element; restore it afterwards so later tests keep their global config.
+    _resetConfigForTesting();
+    try {
+      setDisplayCookie("Alice", "alice@acme.com");
+      const element = mount(
+        `<zitadel-logout project-id="test" proxy-path="${API_BASE}"></zitadel-logout>`,
+      );
+      await element.updateComplete;
+      shadowQuery<HTMLButtonElement>(element, ".trigger").click();
+      await element.updateComplete;
+      shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
+      await new Promise((resolve) => setTimeout(resolve, 32));
+
+      expect(requestLog).toHaveLength(1);
+      expect(requestLog[0]?.url).toBe(`${API_BASE}/sessions/me`);
+      expect(requestLog[0]?.credentials).toBe("include");
+    } finally {
+      configureZitadel({ proxyPath: API_BASE, projectId: "test" });
+    }
+  });
+
   it("surfaces a network error in the dropdown without redirecting", async () => {
     setDisplayCookie("Alice", "alice@acme.com");
     server.use(http.delete(`${API_BASE}/sessions/me`, () => HttpResponse.error()));
