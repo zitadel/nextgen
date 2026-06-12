@@ -22,6 +22,9 @@ name: release-npm
 on:
   push:
     branches: [main]
+    # Avoid starting release-npm for docs-only or unrelated main pushes. Public
+    # package source changes are covered by .changeset/** before the Version
+    # Packages PR, and package.json/CHANGELOG.md cover the publish merge.
     paths:
       - ".changeset/**"
       - "apps/cli/package.json"
