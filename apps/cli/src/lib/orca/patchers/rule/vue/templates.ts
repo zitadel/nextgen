@@ -6,8 +6,9 @@ import { PROXY_PATH } from "../proxy";
  * `@zitadel/sdk-vue` widgets — login at `/login` (and `/`), register at
  * `/register`, and the logout widget at `/profile`. The managed marker lives in
  * the `<script setup>` block (a JS comment) so eject/doctor stay marker-aware.
- * The project id comes from `VITE_ZITADEL_PROJECT_ID`; the secret is injected by
- * the dev proxy in `vite.config.ts` and never reaches the browser.
+ * The project id comes from `VITE_ZITADEL_PROJECT_ID`. No secret reaches the
+ * browser: the dev proxy in `vite.config.*` attaches the `sk_<project_id>`
+ * bearer (derived from the public project id) server-side.
  */
 export function appTemplate(): string {
   return `<script setup lang="ts">

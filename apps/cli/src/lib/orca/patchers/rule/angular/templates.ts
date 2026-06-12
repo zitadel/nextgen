@@ -4,8 +4,9 @@ import { PROXY_PATH } from "../proxy";
 /**
  * The managed root component `src/app/app.ts`: a standalone component that
  * renders the `@zitadel/sdk-angular` widgets based on the current path. The
- * project id (public, not secret) is inlined; the secret is injected by the dev
- * proxy in `proxy.conf.cjs` and never reaches the browser.
+ * project id (public, not secret) is inlined; the dev proxy in `proxy.conf.cjs`
+ * attaches the `sk_<project_id>` bearer (derived from that public id)
+ * server-side, and no secret reaches the browser.
  */
 export function appComponentTemplate(projectId: string): string {
   return `${MANAGED_MARKER}

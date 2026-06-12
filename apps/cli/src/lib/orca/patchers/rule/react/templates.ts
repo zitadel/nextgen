@@ -7,8 +7,9 @@ import { PROXY_PATH } from "../proxy";
  * `@zitadel/sdk-react` widgets — login at `/login` (and `/`), register at
  * `/register`, and the logout widget at `/profile`. The project id comes from
  * `VITE_ZITADEL_PROJECT_ID` (Vite only exposes `VITE_`-prefixed env to the
- * client); the secret never reaches the browser — it is injected by the dev
- * proxy in `vite.config.ts`.
+ * client). No secret reaches the browser: the dev proxy in `vite.config.*`
+ * attaches the `sk_<project_id>` bearer (derived from the public project id)
+ * server-side.
  */
 export function appTemplate(): string {
   return `${MANAGED_MARKER}
