@@ -37,14 +37,17 @@ export interface ZitadelProject {
 export type { ZitadelApi };
 
 /**
- * Cross-realm slot for the configured project. Stored on `globalThis`
- * under a {@link Symbol.for} key so every copy of this module shares the
- * same state — the standalone components bundle inlines its own copy of
- * this file, and dual-package hazards / monorepo duplicates can load
+ * Slot for the configured project, stored on `globalThis` under a
+ * {@link Symbol.for} key. Every copy of this module evaluated in the
+ * same JS realm resolves the symbol through the global symbol registry
+ * to the same identity, so they all read and write a single slot —
+ * needed because the standalone components bundle inlines its own copy
+ * of this file, and dual-package hazards / monorepo duplicates can load
  * a second copy alongside the app's. With a module-local `let` each
  * instance kept its own singleton and `configureZitadel()` calls in one
- * were invisible to `getZitadelConfig()` calls in another. The shared
- * symbol registry collapses them to one.
+ * were invisible to `getZitadelConfig()` calls in another. Sharing is
+ * realm-scoped — separate realms (iframes, Node `vm` contexts, worker
+ * threads) have their own registries and are not unified by this.
  */
 const PROJECT_SLOT = Symbol.for("@zitadel/api/config:currentProject");
 

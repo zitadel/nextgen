@@ -10,6 +10,7 @@ import {
 
 afterEach(() => {
   _resetConfigForTesting();
+  vi.restoreAllMocks();
 });
 
 describe("configureZitadel", () => {
