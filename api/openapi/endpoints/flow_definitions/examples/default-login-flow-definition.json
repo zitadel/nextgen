@@ -63,7 +63,10 @@
       {
         "name": "register",
         "fields": [
-          "email"
+          "email",
+          "givenName",
+          "familyName",
+          "dateOfBirth"
         ],
         "actions": {
           "submit": {
