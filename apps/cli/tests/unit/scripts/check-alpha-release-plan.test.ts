@@ -143,7 +143,7 @@ describe("check-alpha-release-plan script", () => {
   it("rejects a workflow without release-relevant path filters", async () => {
     const { cwd, statusPath } = await fixtureRepo({
       releaseWorkflow: validReleaseWorkflow().replace(
-        /    paths:\n(?:      - "[^"]+"\n)+/,
+        / {4}paths:\n(?: {6}- "[^"]+"\n)+/,
         "",
       ),
     });
