@@ -6,6 +6,7 @@ import {
   parseConfigModule,
   resolveDefaultExportObject,
 } from "../utils/magicast";
+import { configPattern } from "../config-paths";
 import { PROXY_PATH } from "../proxy";
 
 const NUXT_MODULE = "@zitadel/sdk-nuxt/module";
@@ -23,8 +24,9 @@ export function nuxtConfigEdit(opts: {
   server: string;
 }): (source: string | undefined) => string {
   return (source) => {
-    const mod = parseConfigModule(source, "the Nuxt config");
-    const config = resolveDefaultExportObject(mod, "the Nuxt config");
+    const label = `the Nuxt config (${configPattern("nuxt.config")})`;
+    const mod = parseConfigModule(source, label);
+    const config = resolveDefaultExportObject(mod, label);
 
     ensureArrayItem(config, "modules", NUXT_MODULE);
 

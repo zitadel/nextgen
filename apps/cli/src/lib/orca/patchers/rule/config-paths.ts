@@ -16,3 +16,13 @@ const CONFIG_EXTENSIONS = ["ts", "mts", "js", "mjs"] as const;
 export function configCandidates(basename: string): string[] {
   return CONFIG_EXTENSIONS.map((ext) => `${basename}.${ext}`);
 }
+
+/**
+ * A human-readable glob of the candidate filenames for `basename`, e.g.
+ * `configPattern("vite.config")` → `vite.config.{ts,mts,js,mjs}`. Used in error
+ * messages so a failure names the exact files/extensions setup accepts (and
+ * stays in sync with {@link configCandidates}).
+ */
+export function configPattern(basename: string): string {
+  return `${basename}.{${CONFIG_EXTENSIONS.join(",")}}`;
+}

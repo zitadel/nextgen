@@ -1,6 +1,6 @@
 import { builders, generateCode } from "magicast";
 
-import { configCandidates } from "./config-paths";
+import { configCandidates, configPattern } from "./config-paths";
 import type { FileOp } from "./file-writer/types";
 import {
   ensureEditableObject,
@@ -20,7 +20,7 @@ function proxyEntryCode(server: string): string {
   return `{
   target: ${JSON.stringify(server)},
   changeOrigin: false,
-  rewrite: (path) => path.replace(/^\\/__nextgen/, "") || "/",
+  rewrite: (path) => path.replace(/^\\${PROXY_PATH}/, "") || "/",
   configure: (proxy) => {
     const bearer = \`Bearer sk_\${loadEnv("development", dirname(fileURLToPath(import.meta.url)), "ZITADEL_").ZITADEL_PROJECT_ID}\`;
     proxy.on("proxyReq", (proxyReq) => {
@@ -51,8 +51,9 @@ export function viteProxyEdit(
   server: string,
 ): (source: string | undefined) => string {
   return (source) => {
-    const mod = parseConfigModule(source, "the Vite config");
-    const config = resolveDefaultExportObject(mod, "the Vite config");
+    const label = `the Vite config (${configPattern("vite.config")})`;
+    const mod = parseConfigModule(source, label);
+    const config = resolveDefaultExportObject(mod, label);
     const serverConfig = ensureEditableObject(config, "server");
     if (serverConfig.host === undefined) {
       serverConfig.host = "localhost";
