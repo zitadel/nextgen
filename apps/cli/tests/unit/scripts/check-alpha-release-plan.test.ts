@@ -128,6 +128,19 @@ describe("check-alpha-release-plan script", () => {
     ).rejects.toThrow("post-npm alpha train steps must not be gated only on Changesets publishing");
   });
 
+  it("rejects a release job condition that can inherit intentional main-branch skips", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      ciWorkflow: validCiWorkflow().replace(
+        "    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-alpha-release.result == 'success' && needs.ci-success.result == 'success' && needs.detect-alpha-release.outputs.should_release == 'true'",
+        "    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-alpha-release.outputs.should_release == 'true'",
+      ),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("must explicitly require release relevance and a successful CI gate");
+  });
+
   it("rejects a legacy standalone release workflow", async () => {
     const { cwd, statusPath } = await fixtureRepo({
       legacyReleaseWorkflow: "name: release-npm\n",
@@ -200,7 +213,7 @@ function validCiWorkflow(): string {
     "      - run: |",
     '          const allowedSkipped = new Set(["changeset-check"]);',
     "  release-alpha-train:",
-    "    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-alpha-release.outputs.should_release == 'true'",
+    "    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-alpha-release.result == 'success' && needs.ci-success.result == 'success' && needs.detect-alpha-release.outputs.should_release == 'true'",
     "    needs: [detect-alpha-release, ci-success]",
     "    permissions:",
     "      contents: write",

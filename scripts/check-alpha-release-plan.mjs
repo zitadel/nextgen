@@ -147,8 +147,8 @@ export async function validateReleaseTooling(cwd, readFileFn = readFileDefault) 
   );
   assertContains(
     ciWorkflow,
-    "if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-alpha-release.outputs.should_release == 'true'",
-    "release-alpha-train must only run on release-relevant main pushes",
+    "if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-alpha-release.result == 'success' && needs.ci-success.result == 'success' && needs.detect-alpha-release.outputs.should_release == 'true'",
+    "release-alpha-train must explicitly require release relevance and a successful CI gate",
   );
   assertContains(
     ciWorkflow,

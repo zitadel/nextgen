@@ -795,7 +795,7 @@ jobs:
           NODE
 
   release-alpha-train:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-alpha-release.outputs.should_release == 'true'
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-alpha-release.result == 'success' && needs.ci-success.result == 'success' && needs.detect-alpha-release.outputs.should_release == 'true'
     runs-on: depot-ubuntu-24.04-8
     needs: [detect-alpha-release, ci-success]
     permissions:
