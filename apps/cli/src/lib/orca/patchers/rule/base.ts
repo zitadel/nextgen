@@ -146,8 +146,10 @@ export abstract class AbstractRulePatcher implements Patcher {
 function projectConfig(ctx: PatchContext): Record<string, unknown> {
   const environments: Record<string, unknown> = { development: { issuer: ctx.issuer } };
   if (ctx.project.previewOrigins.length > 0) {
+    // previewOrigins are already full origins (scheme://host[:port]); don't
+    // prepend a scheme or it doubles up (https://http://localhost:3000).
     environments.preview = {
-      issuer_pattern: ctx.project.previewOrigins.map((origin) => `https://${origin}`),
+      issuer_pattern: [...ctx.project.previewOrigins],
     };
   }
   return {

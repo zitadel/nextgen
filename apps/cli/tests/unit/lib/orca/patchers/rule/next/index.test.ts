@@ -57,6 +57,20 @@ describe("NextPatcher.plan", () => {
     expect(writeContents(plan, ".zitadel/flows/default.json")).toBeUndefined();
   });
 
+  it("writes preview issuer_pattern as the raw origins, not a doubled scheme", () => {
+    const base = ctxFor("app");
+    const ctx = {
+      ...base,
+      project: { ...base.project, previewOrigins: ["https://nextgen.dev.mrida.ng"] },
+    };
+    const zitadelJson = JSON.parse(
+      writeContents(new NextPatcher().plan(ctx), "zitadel.json") ?? "{}",
+    );
+    expect(zitadelJson.environments.preview.issuer_pattern).toEqual([
+      "https://nextgen.dev.mrida.ng",
+    ]);
+  });
+
   it("honors the src/app directory", () => {
     const plan = new NextPatcher().plan(ctxFor("src/app"));
     expect(writeContents(plan, "src/app/login/page.tsx")).toContain(MANAGED_MARKER);
