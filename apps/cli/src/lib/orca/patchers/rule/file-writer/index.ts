@@ -101,13 +101,15 @@ async function editFile(
     abs(cwd, p),
   );
   let path = candidates[0];
+  let source: string | undefined;
   for (const candidate of candidates) {
-    if ((await readIfExists(candidate)) !== undefined) {
+    const contents = await readIfExists(candidate);
+    if (contents !== undefined) {
       path = candidate;
+      source = contents;
       break;
     }
   }
-  const source = await readIfExists(path);
   const next = edit(source);
   if (next === source) {
     result.filesSkipped.push(path);
