@@ -29,7 +29,7 @@ Next iteration of the Zitadel identity platform.
 | --------------------------------- | -------------------------------------------------------------- |
 | Check local runtime prerequisites | `npx @zitadel/cli@alpha doctor`                                |
 | Start local Zitadel               | `npx @zitadel/cli@alpha start`                                 |
-| Add auth to a Next.js app         | `npx @zitadel/cli@alpha setup --framework next --server local` |
+| Add auth to a Next.js app         | `npx @zitadel/cli@alpha setup --server local`                  |
 | Check generated app files         | `npx @zitadel/cli@alpha doctor`                                |
 | Stop local Zitadel, keeping data  | `npx @zitadel/cli@alpha stop`                                  |
 | Delete local Zitadel data         | `npx @zitadel/cli@alpha reset --force`                         |
@@ -52,19 +52,21 @@ startup, then runs `go run .`; help output skips the UI sync.
 ## Customer quick start
 
 ```sh
-npx create-next-app@latest myapp
+mkdir myapp
 cd myapp
 npx @zitadel/cli@alpha doctor
 npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --framework next --server local
+npx @zitadel/cli@alpha setup --server local
 npm run dev
 ```
 
 Open http://localhost:3000/login and register your first local user. The
 managed Zitadel runtime stores its container metadata and data under
 `.zitadel/local/`; `stop` preserves that data and `reset --force`
-deletes it. `setup` installs dependencies with the detected package manager;
-pass `--skip-install` if you want to install them yourself.
+deletes it. In a fresh directory, `setup` asks which framework to scaffold and
+writes the app into the current directory. It installs dependencies with the
+detected package manager; pass `--skip-install` if you want to install them
+yourself.
 
 ## Manual Docker quick start
 
@@ -135,16 +137,17 @@ Use `corepack pnpm --silent run cli -- ... --json` when a script needs
 parseable CLI stdout. Plain `pnpm run` prints its own script prelude before
 the command output.
 
-Fresh-app consumer journey check:
+Customer local setup journey check:
 
 ```sh
 corepack pnpm run journey
 ```
 
 This opt-in check ensures the Playwright Chromium browsers are installed, builds
-the local npm packages, publishes them to a temporary Verdaccio registry, starts
-a source backend with embedded Postgres, scaffolds a new Next.js app outside the
-repo, and verifies registration/login journeys against the generated app.
+the local npm packages, publishes them to a temporary Verdaccio registry, runs
+`npx @zitadel/cli@alpha doctor`, `start`, and
+`setup --framework next --server local` in an empty app directory, starts the
+generated app, and verifies registration/login journeys.
 
 ## CI
 
@@ -156,13 +159,15 @@ Pull requests and pushes to `main` run:
 - npm package dry-run/pack checks.
 - A non-publishing GoReleaser snapshot.
 - `consumer-journey-e2e`, which downloads the current workflow's GoReleaser
-  snapshot image and npm package tarballs, installs them through a temporary
-  npm registry into a fresh Next.js app, and runs the Playwright user journey.
+  snapshot image and npm package tarballs, installs the CLI through a temporary
+  npm registry, runs the customer local setup commands in a fresh app directory,
+  and runs the Playwright user journey against the generated app.
 
 CI uploads short-lived workflow artifacts for review: GoReleaser snapshot output
 and npm package tarballs. On consumer journey failures it also uploads focused
-diagnostics such as Playwright traces, setup JSON, package lock metadata, and
-service logs. These artifacts expire after 7 days and are not release artifacts.
+diagnostics such as Playwright traces, doctor/start/setup JSON, package lock
+metadata, local runtime logs, and service logs. These artifacts expire after 7
+days and are not release artifacts.
 
 ## Build & release
 
@@ -226,7 +231,7 @@ Tester commands use either the latest alpha stream or an exact train:
 ```sh
 npx @zitadel/cli@alpha doctor
 npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --framework next --server local
+npx @zitadel/cli@alpha setup --server local
 
 npx @zitadel/cli@0.1.0-alpha.N start
 ```

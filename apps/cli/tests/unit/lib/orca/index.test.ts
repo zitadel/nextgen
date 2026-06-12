@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -79,9 +79,39 @@ describe("Orca detection", () => {
     expect(await orca.tryDetect(await nextProject())).toMatchObject({ id: "next" });
   });
 
-  it("isEmpty reflects the presence of package.json", async () => {
-    expect(await orca.isEmpty(await tmp())).toBe(true);
-    expect(await orca.isEmpty(await nextProject())).toBe(false);
+  it("treats an empty directory as a fresh scaffold target", async () => {
+    expect(await orca.isFreshScaffoldTarget(await tmp())).toBe(true);
+  });
+
+  it("allows .gitignore in a fresh scaffold target", async () => {
+    const cwd = await tmp();
+    await writeFile(join(cwd, ".gitignore"), ".zitadel/local/\n");
+
+    expect(await orca.isFreshScaffoldTarget(cwd)).toBe(true);
+  });
+
+  it("allows runtime-only .zitadel/local state in a fresh scaffold target", async () => {
+    const cwd = await tmp();
+    await writeFile(join(cwd, ".gitignore"), ".zitadel/local/\n");
+    await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel/local/runtime.json"), "{}");
+
+    expect(await orca.isFreshScaffoldTarget(cwd)).toBe(true);
+  });
+
+  it("rejects project state and arbitrary files as fresh scaffold targets", async () => {
+    const withSecret = await tmp();
+    await mkdir(join(withSecret, ".zitadel"), { recursive: true });
+    await writeFile(join(withSecret, ".zitadel/secret"), "{}");
+
+    const withReadme = await tmp();
+    await writeFile(join(withReadme, "README.md"), "not empty");
+
+    const withPackageJson = await nextProject();
+
+    await expect(orca.isFreshScaffoldTarget(withSecret)).resolves.toBe(false);
+    await expect(orca.isFreshScaffoldTarget(withReadme)).resolves.toBe(false);
+    await expect(orca.isFreshScaffoldTarget(withPackageJson)).resolves.toBe(false);
   });
 });
 
@@ -113,6 +143,33 @@ describe("Orca.scaffold", () => {
     const cwd = await tmp();
     expect(await fakeOrca.scaffold(cwd, "fake")).toMatchObject({ id: "fake" });
     await expect(readFile(join(cwd, "package.json"), "utf8")).resolves.toBe("{}");
+  });
+
+  it("scaffolds in place while preserving runtime-only .zitadel/local state", async () => {
+    const cwd = await tmp();
+    await writeFile(join(cwd, ".gitignore"), ".zitadel/local/\n");
+    await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel/local/runtime.json"), '{"server_url":"http://localhost"}');
+
+    const guardedScaffolder: Scaffolder = {
+      ...fakeScaffolder,
+      async scaffold(scaffoldCwd) {
+        await expect(stat(join(scaffoldCwd, ".zitadel"))).rejects.toMatchObject({
+          code: "ENOENT",
+        });
+        await writeFile(join(scaffoldCwd, ".gitignore"), "node_modules\n");
+        await writeFile(join(scaffoldCwd, "package.json"), "{}");
+      },
+    };
+    const guardedOrca = new Orca([fakeDetector], [guardedScaffolder], []);
+
+    await expect(guardedOrca.scaffold(cwd, "fake")).resolves.toMatchObject({ id: "fake" });
+    await expect(readFile(join(cwd, "package.json"), "utf8")).resolves.toBe("{}");
+    await expect(readFile(join(cwd, ".zitadel/local/runtime.json"), "utf8")).resolves.toContain(
+      "localhost",
+    );
+    await expect(readFile(join(cwd, ".gitignore"), "utf8")).resolves.toContain(".zitadel/local/");
+    await expect(stat(join(cwd, "myapp"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("throws E_CONFLICT when the directory already contains a project", async () => {

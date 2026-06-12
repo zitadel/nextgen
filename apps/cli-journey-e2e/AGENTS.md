@@ -5,8 +5,10 @@ These instructions apply to `apps/cli-journey-e2e/**`. Defer to the root
 
 ## Purpose
 
-This project protects the real consumer onboarding journey. Tests must exercise
-a freshly generated Next.js app, not the checked-in demo apps.
+This project protects the customer local setup journey. Tests must exercise a
+fresh app directory that runs the CLI local runtime path (`doctor`, `start`,
+`setup --server local`) before starting the generated Next.js app. It must not
+test the checked-in demo apps.
 
 ## Maintenance Rules
 
@@ -17,6 +19,9 @@ a freshly generated Next.js app, not the checked-in demo apps.
   protocols.
 - CI must install Zitadel packages from current workflow tarballs through the
   temporary Verdaccio registry, not from public npm.
+- CI must run `npx @zitadel/cli@alpha doctor`, `start`, and
+  `setup --framework next --server local` from the fresh app directory with
+  `--non-interactive --json`.
 - Pack and upload only the public packages:
   `@zitadel/cli`, `@zitadel/api`, `@zitadel/components`,
   `@zitadel/sdk-core`, `@zitadel/sdk-next`, `@zitadel/sdk-nuxt`,

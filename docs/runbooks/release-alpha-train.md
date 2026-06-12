@@ -39,7 +39,7 @@ Latest alpha stream:
 ```sh
 npx @zitadel/cli@alpha doctor
 npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --framework next --server local
+npx @zitadel/cli@alpha setup --server local
 ```
 
 Exact reproducible train:
@@ -47,7 +47,7 @@ Exact reproducible train:
 ```sh
 npx @zitadel/cli@0.1.0-alpha.N doctor
 npx @zitadel/cli@0.1.0-alpha.N start
-npx @zitadel/cli@0.1.0-alpha.N setup --framework next --server local
+npx @zitadel/cli@0.1.0-alpha.N setup --server local
 ```
 
 For `@zitadel/cli@0.1.0-alpha.N`, the CLI starts

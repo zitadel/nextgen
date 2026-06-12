@@ -17,8 +17,6 @@ const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, "..");
 const repoRoot = resolve(projectRoot, "../..");
 const composeFile = join(projectRoot, "docker-compose.local.yaml");
-const devEncryptionKey =
-  "4d61737465726b65794e65656473546f48617665333243686172616374657273";
 const packageDirs = [
   "apps/cli",
   "packages/api",
@@ -31,30 +29,30 @@ const packageDirs = [
   "packages/sdk-angular",
 ];
 
-const options = parseArgs(process.argv.slice(2));
+const options = parseArgsOrExit(process.argv.slice(2));
 const workDir = resolve(
   options.workDir || (await mkdtemp(join(tmpdir(), "zitadel-cli-journey-local-"))),
 );
 const tarballsDir = join(workDir, "npm-packages");
 const diagnosticsDir = join(workDir, "diagnostics");
+const appDir = join(workDir, "myapp");
 const composeEnvPath = join(workDir, "compose.env");
 const verdaccioConfigPath = join(workDir, "verdaccio", "config.yaml");
 const verdaccioStoragePath = join(workDir, "verdaccio", "storage");
 const verdaccioNpmrcPath = join(workDir, "verdaccio.npmrc");
-const backendLogPath = join(diagnosticsDir, "backend.log");
 const nextLogPath = join(diagnosticsDir, "next-app.log");
 const composeLogPath = join(diagnosticsDir, "compose.log");
 const composeProjectName = `zitadel-journey-${process.pid}-${Date.now()}`;
 const registryPort = await resolvePort("JOURNEY_REGISTRY_PORT");
-const backendPort = await resolvePort("JOURNEY_BACKEND_PORT");
-const appPort = await resolvePort("JOURNEY_APP_PORT");
+const appPort = await resolvePort("JOURNEY_APP_PORT", 3000);
 const registryUrl = `http://127.0.0.1:${registryPort}`;
-const backendUrl = `http://127.0.0.1:${backendPort}`;
 const appUrl = `http://localhost:${appPort}`;
+const cliPackage = await packageName("apps/cli");
 const childProcesses = new Set();
 let composeStarted = false;
 let cleanupStarted = false;
 let success = false;
+let localRuntimeImage = process.env.ZITADEL_LOCAL_IMAGE || options.image;
 
 process.on("SIGINT", () => void handleSignal("SIGINT"));
 process.on("SIGTERM", () => void handleSignal("SIGTERM"));
@@ -94,26 +92,22 @@ try {
     },
   );
 
-  let backendProcess;
-  if (options.backend === "image") {
-    await waitForHttp(`${backendUrl}/healthz`, "backend image");
-  } else {
-    backendProcess = await startSourceBackend();
-    await waitForHttp(`${backendUrl}/healthz`, "source backend", backendProcess);
+  if (!localRuntimeImage) {
+    log("building local runtime image for npx @zitadel/cli@alpha start");
+    localRuntimeImage = await buildJourneyRuntimeImage();
   }
 
   await run("node", ["apps/cli-journey-e2e/scripts/prepare-next-app.mjs"], {
     env: {
       ...process.env,
       JOURNEY_APP_URL: appUrl,
-      JOURNEY_BACKEND_URL: backendUrl,
       JOURNEY_REGISTRY_URL: registryUrl,
       JOURNEY_WORK_DIR: workDir,
       NPM_CONFIG_USERCONFIG: verdaccioNpmrcPath,
+      ZITADEL_LOCAL_IMAGE: localRuntimeImage,
     },
   });
 
-  const appDir = join(workDir, "myapp");
   const nextProcess = startChild("npm", [
     "run",
     "dev",
@@ -152,11 +146,11 @@ try {
   );
 
   success = true;
-  log("local consumer journey passed");
+  log("customer local setup journey passed");
 } catch (error) {
   await collectDiagnostics();
   console.error("");
-  console.error(`[journey-local] failed: ${error.message}`);
+  console.error(`[journey-local] failed: ${errorMessage(error)}`);
   console.error(`[journey-local] diagnostics preserved in ${workDir}`);
   process.exitCode = 1;
 } finally {
@@ -170,9 +164,17 @@ try {
 
 process.exit(process.exitCode ?? 0);
 
+function parseArgsOrExit(args) {
+  try {
+    return parseArgs(args);
+  } catch (error) {
+    console.error(`[journey-local] ${errorMessage(error)}`);
+    process.exit(1);
+  }
+}
+
 function parseArgs(args) {
   const parsed = {
-    backend: "source",
     image: "",
     keep: false,
     workDir: "",
@@ -182,8 +184,14 @@ function parseArgs(args) {
     const arg = args[index];
     switch (arg) {
       case "--backend": {
-        parsed.backend = readValue(args, ++index, arg);
-        break;
+        readValue(args, ++index, arg);
+        throw new Error(
+          [
+            "--backend was removed from the journey runner.",
+            "The journey now always exercises `npx @zitadel/cli@alpha start`.",
+            "Remove `--backend`, or pass `--image <docker-tag>` / set ZITADEL_LOCAL_IMAGE to choose the local runtime image.",
+          ].join(" "),
+        );
       }
       case "--image": {
         parsed.image = readValue(args, ++index, arg);
@@ -208,12 +216,6 @@ function parseArgs(args) {
     }
   }
 
-  if (!["source", "image"].includes(parsed.backend)) {
-    throw new Error(`--backend must be "source" or "image", got ${parsed.backend}`);
-  }
-  if (parsed.backend === "image" && !parsed.image) {
-    throw new Error("--backend image requires --image <docker-tag>");
-  }
   return parsed;
 }
 
@@ -229,15 +231,13 @@ function printUsage() {
   console.log(`usage: node scripts/run-local.mjs [options]
 
 Options:
-  --backend source          Run go run . with embedded Postgres (default)
-  --backend image           Run the backend through docker compose
-  --image <docker-tag>      Required with --backend image
+  --image <docker-tag>      Use an existing local runtime image instead of building one
   --keep                    Keep the temp work directory after success
   --work-dir <path>         Use an explicit work directory
 `);
 }
 
-async function resolvePort(envName) {
+async function resolvePort(envName, fallback) {
   const value = process.env[envName];
   if (value) {
     const port = Number(value);
@@ -245,6 +245,9 @@ async function resolvePort(envName) {
       throw new Error(`${envName} must be a TCP port, got ${value}`);
     }
     return port;
+  }
+  if (fallback) {
+    return fallback;
   }
   return freePort();
 }
@@ -307,11 +310,8 @@ async function writeComposeEnv() {
     composeEnvPath,
     [
       `JOURNEY_REGISTRY_PORT=${registryPort}`,
-      `JOURNEY_BACKEND_PORT=${backendPort}`,
-      `JOURNEY_BACKEND_IMAGE=${options.image || "unused"}`,
       `JOURNEY_VERDACCIO_CONFIG=${verdaccioConfigPath}`,
       `JOURNEY_VERDACCIO_STORAGE=${verdaccioStoragePath}`,
-      `NEXTGEN_SERVER_ENCRYPTION_KEY=${devEncryptionKey}`,
       "",
     ].join("\n"),
   );
@@ -368,6 +368,15 @@ async function ensurePlaywrightBrowsers() {
   ]);
 }
 
+async function buildJourneyRuntimeImage() {
+  const result = await runCapture("node", ["scripts/build-local-runtime-image.mjs"]);
+  const image = result.stdout.trim().split(/\r?\n/).filter(Boolean).at(-1);
+  if (!image) {
+    throw new Error("local runtime image build did not print an image tag");
+  }
+  return image;
+}
+
 async function assertDockerAvailable() {
   let engineVersion = "";
   let composeVersion = "";
@@ -408,35 +417,9 @@ async function assertDockerAvailable() {
 }
 
 async function startCompose() {
-  if (options.backend === "image") {
-    log(`starting Verdaccio and backend image ${options.image}`);
-    await run("docker", composeArgs(["up", "-d", "verdaccio", "nextgen"], true));
-  } else {
-    log("starting Verdaccio");
-    await run("docker", composeArgs(["up", "-d", "verdaccio"]));
-  }
+  log("starting Verdaccio");
+  await run("docker", composeArgs(["up", "-d", "verdaccio"]));
   composeStarted = true;
-}
-
-async function startSourceBackend() {
-  log(`starting source backend on ${backendUrl}`);
-  const env = {
-    ...process.env,
-    NEXTGEN_SERVER_ADDRESS: `127.0.0.1:${backendPort}`,
-    NEXTGEN_SERVER_CONSOLE_ENABLED: "false",
-    NEXTGEN_SERVER_ENCRYPTION_KEY: devEncryptionKey,
-    NEXTGEN_SERVER_LOGIN_ENABLED: "false",
-  };
-  for (const key of Object.keys(env)) {
-    if (key.startsWith("NEXTGEN_DATABASE_")) {
-      delete env[key];
-    }
-  }
-  return startChild("go", ["run", "."], {
-    cwd: repoRoot,
-    env,
-    logFile: backendLogPath,
-  });
 }
 
 async function waitForHttp(url, label, child) {
@@ -530,7 +513,7 @@ function runCapture(command, args, optionsForRun = {}) {
 }
 
 function commandErrorDetail(error) {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = errorMessage(error);
   const lines = message
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -546,7 +529,7 @@ function commandErrorDetail(error) {
   return (detailLines.length > 0 ? detailLines : lines).slice(-4).join("\n");
 }
 
-function composeArgs(args, includeImageProfile = false) {
+function composeArgs(args) {
   const base = [
     "compose",
     "--project-name",
@@ -556,33 +539,46 @@ function composeArgs(args, includeImageProfile = false) {
     "-f",
     composeFile,
   ];
-  if (includeImageProfile) {
-    base.push("--profile", "backend-image");
-  }
   return [...base, ...args];
 }
 
 async function collectDiagnostics() {
   await mkdir(diagnosticsDir, { recursive: true });
+  await collectLocalRuntimeLogs();
   if (composeStarted) {
     try {
       const result = await runCapture(
         "docker",
-        composeArgs(["logs"], options.backend === "image"),
+        composeArgs(["logs"]),
       );
       await writeFile(composeLogPath, `${result.stdout}${result.stderr}`);
     } catch (error) {
-      await writeFile(composeLogPath, `failed to collect compose logs: ${error.message}\n`);
+      await writeFile(composeLogPath, `failed to collect compose logs: ${errorMessage(error)}\n`);
     }
   }
 
-  const appDir = join(workDir, "myapp");
+  await copyIfExists(join(workDir, "doctor.json"), join(diagnosticsDir, "doctor.json"));
+  await copyIfExists(
+    join(workDir, "doctor.stderr.log"),
+    join(diagnosticsDir, "doctor.stderr.log"),
+  );
+  await copyIfExists(join(workDir, "start.json"), join(diagnosticsDir, "start.json"));
+  await copyIfExists(
+    join(workDir, "start.stderr.log"),
+    join(diagnosticsDir, "start.stderr.log"),
+  );
   await copyIfExists(join(workDir, "setup.json"), join(diagnosticsDir, "setup.json"));
   await copyIfExists(
     join(workDir, "setup.stderr.log"),
     join(diagnosticsDir, "setup.stderr.log"),
   );
   await copyIfExists(join(workDir, "metadata.json"), join(diagnosticsDir, "metadata.json"));
+  await copyIfExists(join(workDir, "logs.json"), join(diagnosticsDir, "logs.json"));
+  await copyIfExists(join(workDir, "logs.stderr.log"), join(diagnosticsDir, "logs.stderr.log"));
+  await copyIfExists(
+    join(appDir, ".zitadel/local/runtime.json"),
+    join(diagnosticsDir, "runtime.json"),
+  );
   await mkdir(join(diagnosticsDir, "generated-app"), { recursive: true });
   await copyIfExists(
     join(appDir, "package.json"),
@@ -596,6 +592,23 @@ async function collectDiagnostics() {
     join(projectRoot, "test-output", "playwright"),
     join(diagnosticsDir, "playwright"),
   );
+}
+
+async function collectLocalRuntimeLogs() {
+  try {
+    const result = await runCapture(
+      "npx",
+      cliArgs(["logs", "--tail", "400"]),
+      { cwd: appDir, env: npxEnv() },
+    );
+    await writeFile(join(diagnosticsDir, "logs.json"), result.stdout);
+    await writeFile(join(diagnosticsDir, "logs.stderr.log"), result.stderr);
+  } catch (error) {
+    await writeFile(
+      join(diagnosticsDir, "logs.stderr.log"),
+      `failed to collect local runtime logs: ${errorMessage(error)}\n`,
+    );
+  }
 }
 
 async function copyIfExists(source, destination) {
@@ -616,12 +629,26 @@ async function cleanup() {
     await stopChild(child);
   }
 
+  await resetLocalRuntime();
+
   if (composeStarted) {
     try {
-      await run("docker", composeArgs(["down", "-v", "--remove-orphans"], true));
+      await run("docker", composeArgs(["down", "-v", "--remove-orphans"]));
     } catch (error) {
-      console.error(`[journey-local] docker compose cleanup failed: ${error.message}`);
+      console.error(`[journey-local] docker compose cleanup failed: ${errorMessage(error)}`);
     }
+  }
+}
+
+async function resetLocalRuntime() {
+  try {
+    await runCapture(
+      "npx",
+      cliArgs(["reset", "--force"]),
+      { cwd: appDir, env: npxEnv() },
+    );
+  } catch (error) {
+    console.error(`[journey-local] local runtime reset failed: ${errorMessage(error)}`);
   }
 }
 
@@ -664,6 +691,30 @@ function delay(ms) {
   return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
 }
 
+function cliArgs(args) {
+  return ["--yes", `${cliPackage}@alpha`, ...args, "--non-interactive", "--json"];
+}
+
+function npxEnv() {
+  const env = {
+    ...process.env,
+    NPM_CONFIG_USERCONFIG: verdaccioNpmrcPath,
+    npm_config_audit: "false",
+    npm_config_fund: "false",
+    npm_config_registry: registryUrl,
+    npm_config_yes: "true",
+  };
+  const image = localRuntimeImage || process.env.ZITADEL_LOCAL_IMAGE;
+  if (image) {
+    env.ZITADEL_LOCAL_IMAGE = image;
+  }
+  return env;
+}
+
 function log(message) {
   console.log(`[journey-local] ${message}`);
+}
+
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
 }

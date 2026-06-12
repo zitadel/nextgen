@@ -356,75 +356,6 @@ jobs:
           docker load -i goreleaser-dist/nextgen-image.tar
           docker image inspect -f '{{.Os}}/{{.Architecture}}' "$(cat goreleaser-dist/nextgen-image.tag)" | grep -q '^linux/amd64$'
 
-      - name: Smoke test CLI-style local runtime image
-        run: |
-          set -euo pipefail
-          IMAGE="$(cat goreleaser-dist/nextgen-image.tag)"
-          DATA_DIR="$RUNNER_TEMP/nextgen-dev-data"
-          RUNTIME_DIR="$RUNNER_TEMP/nextgen-dev-runtime"
-          HOST_UID="$(id -u)"
-          HOST_GID="$(id -g)"
-          PASSWD_FILE="$RUNTIME_DIR/container-passwd"
-          GROUP_FILE="$RUNTIME_DIR/container-group"
-          mkdir -p "$DATA_DIR" "$RUNTIME_DIR"
-          # Mirror `zitadel start`: run the container as the host user so
-          # bind-mounted state stays editable, and provide passwd/group entries
-          # because embedded Postgres initdb refuses unknown numeric users.
-          {
-            echo "root:x:0:0:root:/root:/bin/sh"
-            echo "nonroot:x:65532:65532:nonroot:/nonexistent:/usr/sbin/nologin"
-            echo "zitadel-local:x:${HOST_UID}:${HOST_GID}:Zitadel local user:/tmp:/usr/sbin/nologin"
-          } > "$PASSWD_FILE"
-          {
-            echo "root:x:0:"
-            echo "nonroot:x:65532:"
-            echo "zitadel-local:x:${HOST_GID}:"
-          } > "$GROUP_FILE"
-          CONTAINER="$(
-            docker run -d \
-              -p 127.0.0.1:18080:8080 \
-              -v "$DATA_DIR:/var/lib/zitadel/nextgen-data" \
-              -v "$PASSWD_FILE:/etc/passwd:ro" \
-              -v "$GROUP_FILE:/etc/group:ro" \
-              --user "${HOST_UID}:${HOST_GID}" \
-              -e NEXTGEN_SERVER_ADDRESS=:8080 \
-              -e NEXTGEN_SERVER_DATA_DIR=/var/lib/zitadel/nextgen-data \
-              "$IMAGE"
-          )"
-          cleanup() {
-            docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
-          }
-          diagnose() {
-            docker logs "$CONTAINER" || true
-          }
-          trap cleanup EXIT
-
-          ready=0
-          for _ in $(seq 1 120); do
-            if curl -fsS http://localhost:18080/healthz >/dev/null; then
-              ready=1
-              break
-            fi
-            sleep 1
-          done
-          if [ "$ready" -ne 1 ]; then
-            echo "::error::timed out waiting for zero-config /healthz"
-            diagnose
-            exit 1
-          fi
-          test -f "$DATA_DIR/server-encryption-key"
-          if ! curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:18080/ui/console/ | grep -q '^200$'; then
-            echo "::error::zero-config /ui/console/ did not return 200"
-            diagnose
-            exit 1
-          fi
-          if ! curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:18080/ui/login/ | grep -q '^200$'; then
-            echo "::error::zero-config /ui/login/ did not return 200"
-            diagnose
-            exit 1
-          fi
-          echo "CLI-style local runtime image smoke test passed"
-
       - name: Prepare quick-start compose stack
         run: |
           mkdir -p nextgen_quickstart
@@ -451,8 +382,9 @@ jobs:
       - name: Start stack and verify HTTP endpoints
         run: |
           set -euo pipefail
-          # Separate from the CLI-style smoke above: this keeps the documented
-          # compose fallback valid for operators/manual quick-start usage.
+          # Separate from the customer local setup journey: this keeps the
+          # documented compose fallback valid for operators/manual quick-start
+          # usage.
           COMPOSE=(docker compose -f nextgen_quickstart/docker-compose.yaml --env-file nextgen_quickstart/.env)
           "${COMPOSE[@]}" up -d --wait
           ready=0
@@ -733,32 +665,11 @@ jobs:
           test -f goreleaser-dist/nextgen-image.tag
           docker load -i goreleaser-dist/nextgen-image.tar
           docker image inspect -f '{{.Os}}/{{.Architecture}}' "$(cat goreleaser-dist/nextgen-image.tag)" | grep -q '^linux/amd64$'
-
-      - name: Start backend stack
-        run: |
-          mkdir -p "$RUNNER_TEMP/nextgen-journey"
-          cp docs/operations/docker-compose.yaml "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml"
-          IMAGE="$(cat goreleaser-dist/nextgen-image.tag)"
-          {
-            echo "NEXTGEN_IMAGE=${IMAGE}"
-            echo "NEXTGEN_PORT=8080"
-          } > "$RUNNER_TEMP/nextgen-journey/.env"
-          docker compose -f "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml" --env-file "$RUNNER_TEMP/nextgen-journey/.env" up -d --wait
-          for _ in $(seq 1 90); do
-            if curl -fsS http://localhost:8080/healthz >/dev/null; then
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "::error::timed out waiting for backend /healthz"
-          docker compose -f "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml" --env-file "$RUNNER_TEMP/nextgen-journey/.env" logs nextgen
-          exit 1
+          echo "ZITADEL_LOCAL_IMAGE=$(cat goreleaser-dist/nextgen-image.tag)" >> "$GITHUB_ENV"
 
       - name: Prepare fresh Next.js app
         id: prepare-app
         env:
-          JOURNEY_BACKEND_URL: http://localhost:8080
-          JOURNEY_CREATE_NEXT_APP_VERSION: 16.2.4
           JOURNEY_REGISTRY_URL: http://127.0.0.1:4873
           JOURNEY_WORK_DIR: ${{ runner.temp }}/zitadel-cli-journey
         run: node apps/cli-journey-e2e/scripts/prepare-next-app.mjs
@@ -786,17 +697,32 @@ jobs:
       - name: Collect diagnostics
         if: failure()
         run: |
-          docker compose -f "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml" --env-file "$RUNNER_TEMP/nextgen-journey/.env" logs > "$RUNNER_TEMP/backend-compose.log" 2>&1 || true
           DIAG_DIR="$RUNNER_TEMP/consumer-journey-diagnostics"
+          APP_DIR="$RUNNER_TEMP/zitadel-cli-journey/myapp"
           mkdir -p "$DIAG_DIR/generated-app"
-          cp "$RUNNER_TEMP/backend-compose.log" "$DIAG_DIR/" 2>/dev/null || true
+          if [ -d "$APP_DIR" ]; then
+            (
+              cd "$APP_DIR"
+              npm_config_registry=http://127.0.0.1:4873 \
+              npm_config_yes=true \
+              npm_config_audit=false \
+              npm_config_fund=false \
+              npx --yes @zitadel/cli@alpha logs --tail 400 --non-interactive --json \
+                > "$DIAG_DIR/logs.json" 2> "$DIAG_DIR/logs.stderr.log"
+            ) || true
+          fi
           cp "$RUNNER_TEMP/next-app.log" "$DIAG_DIR/" 2>/dev/null || true
           cp "$RUNNER_TEMP/verdaccio.log" "$DIAG_DIR/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/zitadel-cli-journey/doctor.json" "$DIAG_DIR/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/zitadel-cli-journey/doctor.stderr.log" "$DIAG_DIR/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/zitadel-cli-journey/start.json" "$DIAG_DIR/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/zitadel-cli-journey/start.stderr.log" "$DIAG_DIR/" 2>/dev/null || true
           cp "$RUNNER_TEMP/zitadel-cli-journey/setup.json" "$DIAG_DIR/" 2>/dev/null || true
           cp "$RUNNER_TEMP/zitadel-cli-journey/setup.stderr.log" "$DIAG_DIR/" 2>/dev/null || true
           cp "$RUNNER_TEMP/zitadel-cli-journey/metadata.json" "$DIAG_DIR/" 2>/dev/null || true
-          cp "$RUNNER_TEMP/zitadel-cli-journey/myapp/package.json" "$DIAG_DIR/generated-app/" 2>/dev/null || true
-          cp "$RUNNER_TEMP/zitadel-cli-journey/myapp/package-lock.json" "$DIAG_DIR/generated-app/" 2>/dev/null || true
+          cp "$APP_DIR/.zitadel/local/runtime.json" "$DIAG_DIR/runtime.json" 2>/dev/null || true
+          cp "$APP_DIR/package.json" "$DIAG_DIR/generated-app/" 2>/dev/null || true
+          cp "$APP_DIR/package-lock.json" "$DIAG_DIR/generated-app/" 2>/dev/null || true
 
       - name: Upload consumer journey diagnostics
         if: failure()
@@ -814,10 +740,18 @@ jobs:
         if: always()
         run: |
           if [ -n "${NEXT_APP_PID:-}" ]; then kill "$NEXT_APP_PID" 2>/dev/null || true; fi
-          if [ -n "${VERDACCIO_PID:-}" ]; then kill "$VERDACCIO_PID" 2>/dev/null || true; fi
-          if [ -f "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml" ]; then
-            docker compose -f "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml" --env-file "$RUNNER_TEMP/nextgen-journey/.env" down -v
+          APP_DIR="$RUNNER_TEMP/zitadel-cli-journey/myapp"
+          if [ -d "$APP_DIR" ]; then
+            (
+              cd "$APP_DIR"
+              npm_config_registry=http://127.0.0.1:4873 \
+              npm_config_yes=true \
+              npm_config_audit=false \
+              npm_config_fund=false \
+              npx --yes @zitadel/cli@alpha reset --force --non-interactive --json
+            ) || true
           fi
+          if [ -n "${VERDACCIO_PID:-}" ]; then kill "$VERDACCIO_PID" 2>/dev/null || true; fi
 
   ci-success:
     if: always()

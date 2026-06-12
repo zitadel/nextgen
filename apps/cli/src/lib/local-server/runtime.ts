@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { createServer } from "node:net";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import { ZitadelError } from "../errors";
 import { isObject, parseJsonObject } from "../json";
@@ -37,6 +37,11 @@ export type LocalRuntimePaths = {
   runtimeFile: string;
   containerPasswdFile: string;
   containerGroupFile: string;
+};
+
+export type WritablePathProbe = {
+  targetPath: string;
+  checkedPath: string;
 };
 
 export type ContainerIdentity = {
@@ -78,6 +83,13 @@ export async function ensureLocalState(cwd: string): Promise<LocalRuntimePaths> 
   await mkdir(paths.dataDir, { recursive: true, mode: 0o700 });
   await appendGitignoreEntry(cwd, `${LOCAL_RUNTIME_DIR}/`);
   return paths;
+}
+
+export async function assertLocalStateWritable(cwd: string): Promise<WritablePathProbe> {
+  const paths = localRuntimePaths(cwd);
+  const checkedPath = await nearestExistingDirectory(paths.dataDir);
+  await access(checkedPath, constants.W_OK);
+  return { targetPath: paths.dataDir, checkedPath };
 }
 
 export async function ensureContainerIdentity(
@@ -247,6 +259,28 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
 export async function assertWritableDirectory(path: string): Promise<void> {
   await mkdir(path, { recursive: true, mode: 0o700 });
   await access(path, constants.W_OK);
+}
+
+async function nearestExistingDirectory(path: string): Promise<string> {
+  let current = path;
+  while (true) {
+    try {
+      const info = await stat(current);
+      if (!info.isDirectory()) {
+        throw new Error(`${current} exists but is not a directory`);
+      }
+      return current;
+    } catch (error) {
+      if (!isErrno(error, "ENOENT")) {
+        throw error;
+      }
+      const parent = dirname(current);
+      if (parent === current) {
+        throw error;
+      }
+      current = parent;
+    }
+  }
 }
 
 function isErrno(error: unknown, code: string): boolean {

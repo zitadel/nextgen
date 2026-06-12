@@ -50,7 +50,9 @@ layer, not the envelope.
 - `setup` — create a Zitadel project and scaffold local auth (routes,
   middleware, `.zitadel/**`, env templates). The project's default user schema
   and login flow are provisioned server-side at creation, so setup neither
-  scaffolds nor uploads them. Flags: `--framework`, `--renderer`.
+  scaffolds nor uploads them. Agents must pass `--framework` when scaffolding
+  into a fresh directory; interactive humans can omit it and choose from the
+  prompt. Flags: `--framework`, `--renderer`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
 - `doctor` — verify generated app files and local state once `zitadel.json`
@@ -98,6 +100,7 @@ then re-run `plan` and `apply`. Managed files carry a marker comment; `eject`
 removes only files that still carry it, preserving anything the user replaced.
 For app-local development, `--server local` resolves through
 `.zitadel/local/runtime.json` and requires a healthy `npx @zitadel/cli@alpha start`
-runtime. `setup` installs dependencies with the detected package manager by
-default; pass `--skip-install` when the agent or host workflow will install
-dependencies separately.
+runtime. Runtime-only `.zitadel/local/**` state does not block fresh
+same-directory scaffolding. `setup` installs dependencies with the detected
+package manager by default; pass `--skip-install` when the agent or host
+workflow will install dependencies separately.
