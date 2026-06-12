@@ -123,6 +123,39 @@ describe("check-alpha-release-plan script", () => {
     ).rejects.toThrow("must prune empty changesets before Changesets decides whether to publish");
   });
 
+  it("rejects a workflow that leaves pruned changesets dirty for GoReleaser", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      ciWorkflow: validCiWorkflow().replace(
+        [
+          "      - name: Restore changesets after publish decision",
+          "        run: git restore -- .changeset",
+          "",
+        ].join("\n"),
+        "",
+      ),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("must restore pruned changesets before inspecting or running GoReleaser");
+  });
+
+  it("rejects a workflow that cannot recover an existing Go release tag", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      ciWorkflow: validCiWorkflow().replace(
+        [
+          "      - if: ${{ steps.alpha.outputs.run_goreleaser == 'true' && steps.alpha.outputs.tag_exists == 'true' }}",
+          "        run: git checkout --detach \"$TAG\"",
+        ].join("\n"),
+        "",
+      ),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("must check out an existing Go tag before recovering GoReleaser");
+  });
+
   it("rejects alpha release notes generated inside the checkout", async () => {
     const { cwd, statusPath } = await fixtureRepo({
       ciWorkflow: validCiWorkflow().replace(
@@ -264,7 +297,11 @@ function validCiWorkflow(): string {
     "        uses: changesets/action@v1",
     "        with:",
     "          createGithubReleases: false",
-    "      - id: alpha-status",
+    "      - name: Restore changesets after publish decision",
+    "        run: git restore -- .changeset",
+    "",
+    "      - name: Inspect alpha release train candidate",
+    "        id: alpha-status",
     "        run: |",
     "          node scripts/release-alpha-train.mjs status --published \"$PUBLISHED\" --remote false",
     "      - if: ${{ steps.alpha-status.outputs.should_complete == 'true' }}",
@@ -275,6 +312,8 @@ function validCiWorkflow(): string {
     "          cat \"$alpha_env\" >> \"$GITHUB_OUTPUT\"",
     "      - if: ${{ steps.alpha.outputs.create_tag == 'true' }}",
     "        run: git tag \"$TAG\"",
+    "      - if: ${{ steps.alpha.outputs.run_goreleaser == 'true' && steps.alpha.outputs.tag_exists == 'true' }}",
+    "        run: git checkout --detach \"$TAG\"",
     "      - if: ${{ steps.alpha.outputs.run_goreleaser == 'true' }}",
     "        run: goreleaser release --clean",
     "      - if: ${{ steps.alpha.outputs.update_release == 'true' }}",

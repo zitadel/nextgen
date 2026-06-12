@@ -864,6 +864,9 @@ jobs:
           # repository is public.
           NPM_CONFIG_PROVENANCE: "false"
 
+      - name: Restore changesets after publish decision
+        run: git restore -- .changeset
+
       - name: Inspect alpha release train candidate
         id: alpha-status
         env:
@@ -913,6 +916,12 @@ jobs:
           git config user.email "noreply@zitadel.com"
           git tag -a "$TAG" -m "$TITLE"
           git push origin "$TAG"
+
+      - name: Check out existing Go release tag
+        if: ${{ steps.alpha.outputs.run_goreleaser == 'true' && steps.alpha.outputs.tag_exists == 'true' }}
+        env:
+          TAG: ${{ steps.alpha.outputs.tag }}
+        run: git checkout --detach "$TAG"
 
       - name: Prune npm package tags for GoReleaser
         if: ${{ steps.alpha.outputs.run_goreleaser == 'true' }}

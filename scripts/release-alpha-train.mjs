@@ -53,11 +53,6 @@ export async function prepareAlphaReleaseTrain(options = {}) {
   if (state.skipReason) {
     throw new Error(`alpha release train is not ready to complete: ${state.skipReason}`);
   }
-  if (state.tagExists && !state.tagMatchesHead) {
-    throw new Error(
-      `release tag ${state.tagName} already exists at ${state.tagCommit}, not ${state.headCommit}`,
-    );
-  }
   if (state.releaseExists && !state.imageExists) {
     throw new Error(
       `GitHub Release ${state.tagName} exists but ${state.image} is missing; recover that partial release manually before rerunning the alpha train`,
@@ -142,32 +137,6 @@ export async function inspectAlphaReleaseTrain(options = {}) {
       shouldUpdateRelease: false,
       skipReason: `pending changesets: ${activeChangesets.join(", ")}`,
     };
-  }
-
-  if (!published && tagExists && !tagMatchesHead) {
-    return {
-      version,
-      tagName,
-      title,
-      image,
-      packages,
-      activeChangesets,
-      headCommit,
-      tagCommit,
-      tagExists,
-      tagMatchesHead,
-      releaseExists: false,
-      imageExists: false,
-      shouldComplete: false,
-      shouldCreateTag: false,
-      shouldRunGoreleaser: false,
-      shouldUpdateRelease: false,
-      skipReason: `version ${version} was already released from ${tagCommit}`,
-    };
-  }
-
-  if (tagExists && !tagMatchesHead) {
-    throw new Error(`release tag ${tagName} already exists at ${tagCommit}, not ${headCommit}`);
   }
 
   const releaseExists = remote ? await githubReleaseExists(tagName, execFileFn, cwd) : false;

@@ -121,31 +121,35 @@ describe("release-alpha-train script", () => {
     expect(result.shouldRunGoreleaser).toBe(true);
   });
 
-  it("rejects an existing Go release tag when it points at another commit during publish recovery", async () => {
+  it("recovers an existing Go release tag when artifacts are missing", async () => {
     const cwd = await fixtureRepo();
 
-    await expect(
-      releaseAlphaTrain.prepareAlphaReleaseTrain({
-        cwd,
-        execFile: commandMock({ tagCommit: "other-commit" }),
-        published: true,
-      }),
-    ).rejects.toThrow("release tag v0.1.0-alpha.5 already exists at other-commit");
+    const result = await releaseAlphaTrain.prepareAlphaReleaseTrain({
+      cwd,
+      execFile: commandMock({ tagCommit: "other-commit" }),
+      published: true,
+    });
+
+    expect(result.shouldCreateTag).toBe(false);
+    expect(result.shouldRunGoreleaser).toBe(true);
+    expect(result.shouldUpdateRelease).toBe(true);
   });
 
-  it("skips normal main pushes when the current version was already released from another commit", async () => {
+  it("skips GoReleaser when an existing tag from another commit is already complete", async () => {
     const cwd = await fixtureRepo();
 
-    await expect(
-      releaseAlphaTrain.inspectAlphaReleaseTrain({
-        cwd,
-        execFile: commandMock({ tagCommit: "other-commit" }),
-        remote: false,
+    const result = await releaseAlphaTrain.prepareAlphaReleaseTrain({
+      cwd,
+      execFile: commandMock({
+        tagCommit: "other-commit",
+        releaseExists: true,
+        imageExists: true,
       }),
-    ).resolves.toMatchObject({
-      shouldComplete: false,
-      skipReason: "version 0.1.0-alpha.5 was already released from other-commit",
     });
+
+    expect(result.shouldCreateTag).toBe(false);
+    expect(result.shouldRunGoreleaser).toBe(false);
+    expect(result.shouldUpdateRelease).toBe(true);
   });
 
   it("ignores prerelease-tracked and empty changesets when recovering a versioned train", async () => {

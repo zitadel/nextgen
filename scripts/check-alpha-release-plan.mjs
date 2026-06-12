@@ -188,6 +188,17 @@ export async function validateReleaseTooling(cwd, readFileFn = readFileDefault) 
     ].join("\n"),
     "release-alpha-train must prune empty changesets before Changesets decides whether to publish",
   );
+  assertJobContains(
+    ciWorkflow,
+    "release-alpha-train",
+    [
+      "      - name: Restore changesets after publish decision",
+      "        run: git restore -- .changeset",
+      "",
+      "      - name: Inspect alpha release train candidate",
+    ].join("\n"),
+    "release-alpha-train must restore pruned changesets before inspecting or running GoReleaser",
+  );
   assertContains(
     ciWorkflow,
     "node scripts/release-alpha-train.mjs status --published \"$PUBLISHED\" --remote false",
@@ -217,6 +228,11 @@ export async function validateReleaseTooling(cwd, readFileFn = readFileDefault) 
     ciWorkflow,
     "steps.alpha.outputs.create_tag == 'true'",
     "ci.yml must create the Go tag only when the alpha train needs it",
+  );
+  assertContains(
+    ciWorkflow,
+    "steps.alpha.outputs.run_goreleaser == 'true' && steps.alpha.outputs.tag_exists == 'true'",
+    "ci.yml must check out an existing Go tag before recovering GoReleaser",
   );
   assertContains(
     ciWorkflow,
