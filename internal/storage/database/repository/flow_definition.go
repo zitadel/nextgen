@@ -45,7 +45,7 @@ type flowDefinitionStepJSON struct {
 	Name         string                            `json:"name"`
 	Fields       []string                          `json:"fields,omitempty"`
 	Actions      []flowStepActionJSON              `json:"actions,omitempty"`
-	Gates        []flowStepGateJSON                `json:"gates,omitempty"`
+	Gates        map[string]flowStepGateJSON       `json:"gates,omitempty"`
 	SSOProviders []flowSSOProviderJSON             `json:"sso_providers,omitempty"`
 	OnSuccess    *string                           `json:"on_success,omitempty"`
 	Complete     *string                           `json:"complete,omitempty"`
@@ -59,7 +59,6 @@ type flowStepActionJSON struct {
 }
 
 type flowStepGateJSON struct {
-	Name     string         `json:"name"`
 	Kind     string         `json:"kind"`
 	Provider string         `json:"provider,omitempty"`
 	Config   map[string]any `json:"config,omitempty"`
@@ -290,14 +289,13 @@ func marshalFlowDefinitionContent(def *domain.FlowDefinition) ([]byte, error) {
 			}
 		}
 		if len(s.Gates) > 0 {
-			stepJSON.Gates = make([]flowStepGateJSON, 0, len(s.Gates))
-			for _, g := range s.Gates {
-				stepJSON.Gates = append(stepJSON.Gates, flowStepGateJSON{
-					Name:     g.Name,
+			stepJSON.Gates = make(map[string]flowStepGateJSON, len(s.Gates))
+			for name, g := range s.Gates {
+				stepJSON.Gates[name] = flowStepGateJSON{
 					Kind:     g.Kind.String(),
 					Provider: g.Provider,
 					Config:   g.Config,
-				})
+				}
 			}
 		}
 		if len(s.SSOProviders) > 0 {
@@ -379,18 +377,17 @@ func rowToFlowDefinition(row flowDefinitionRow) (*domain.FlowDefinition, error) 
 			}
 		}
 		if len(s.Gates) > 0 {
-			step.Gates = make([]domain.FlowStepGate, 0, len(s.Gates))
-			for _, g := range s.Gates {
+			step.Gates = make(map[string]domain.FlowStepGate, len(s.Gates))
+			for name, g := range s.Gates {
 				gateKind, err := domain.FlowGateKindString(g.Kind)
 				if err != nil {
 					return nil, err
 				}
-				step.Gates = append(step.Gates, domain.FlowStepGate{
-					Name:     g.Name,
+				step.Gates[name] = domain.FlowStepGate{
 					Kind:     gateKind,
 					Provider: g.Provider,
 					Config:   g.Config,
-				})
+				}
 			}
 		}
 		if len(s.SSOProviders) > 0 {

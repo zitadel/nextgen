@@ -161,8 +161,8 @@ type FlowDefinitionStep struct {
 	// submit request.
 	Actions []FlowStepAction
 	// Gates are security challenges that must be satisfied before the
-	// step's submission is accepted, in display order.
-	Gates []FlowStepGate
+	// step's submission is accepted, keyed by gate name.
+	Gates map[string]FlowStepGate
 	// SSOProviders lists the identity providers available on this step.
 	SSOProviders []FlowSSOProvider
 	// OnSuccess names the server-side mutation to run after field
@@ -189,7 +189,6 @@ type FlowStepAction struct {
 
 // FlowStepGate is a security challenge attached to a step.
 type FlowStepGate struct {
-	Name     string
 	Kind     FlowGateKind
 	Provider string
 	// Config is provider-specific challenge configuration, opaque to the engine.

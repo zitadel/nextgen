@@ -56,9 +56,8 @@ func TestFlowDefinitionRepository_CreateAndGet(t *testing.T) {
 	assert.Equal(t, "identifier.submit", identifier.Actions[0].TextKey)
 	assert.True(t, identifier.Actions[0].Primary)
 
-	require.Len(t, identifier.Gates, 1)
-	bot := identifier.Gates[0]
-	assert.Equal(t, "bot", bot.Name)
+	require.Contains(t, identifier.Gates, "bot")
+	bot := identifier.Gates["bot"]
 	assert.Equal(t, domain.FlowGateKindCaptcha, bot.Kind)
 	assert.Equal(t, "altcha", bot.Provider)
 	assert.Equal(t, "abc", bot.Config["site_key"])
@@ -263,9 +262,8 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 				Actions: []domain.FlowStepAction{
 					{Name: "submit", TextKey: "identifier.submit", Primary: true},
 				},
-				Gates: []domain.FlowStepGate{
-					{
-						Name:     "bot",
+				Gates: map[string]domain.FlowStepGate{
+					"bot": {
 						Kind:     domain.FlowGateKindCaptcha,
 						Provider: "altcha",
 						Config:   map[string]any{"site_key": "abc"},

@@ -124,18 +124,6 @@ func validateSteps(steps []FlowDefinitionStep, userSchema *jsonschema.Schema) er
 			}
 			actionNames[a.Name] = struct{}{}
 		}
-		gateNames := make(map[string]struct{}, len(step.Gates))
-		for _, g := range step.Gates {
-			if g.Name == "" {
-				return ErrFlowDefinitionInvalid(fmt.Sprintf(
-					"step %q: gate has empty name", step.Name), nil)
-			}
-			if _, dup := gateNames[g.Name]; dup {
-				return ErrFlowDefinitionInvalid(fmt.Sprintf(
-					"step %q: duplicate gate %q", step.Name, g.Name), nil)
-			}
-			gateNames[g.Name] = struct{}{}
-		}
 
 		// a non-terminal step must do something
 		_, hasCallback := step.Transitions["callback"]

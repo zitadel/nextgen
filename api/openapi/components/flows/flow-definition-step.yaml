@@ -46,17 +46,17 @@ properties:
       - name: forgot_password
 
   gates:
-    type: array
+    type: object
     description: |
-      Ordered list of security gates that must be satisfied before submission.
-      Each gate selects a kind (e.g. "captcha") and provider-specific
+      Security gates that must be satisfied before submission. Keyed by gate
+      name. Each gate selects a kind (e.g. "captcha") and provider-specific
       configuration. The engine may also inject gates dynamically based on
       policy.
-    items:
+    additionalProperties:
       $ref: gate.yaml
-    default: []
+    default: {}
     example:
-      - name: bot_check
+      bot_check:
         kind: captcha
         provider: altcha
 

@@ -3000,11 +3000,11 @@ type FlowDefinitionStep struct {
 	// frontend sends back in the submit request. If omitted, the engine
 	// provides a default `submit` action.
 	Actions []StepAction `json:"actions"`
-	// Ordered list of security gates that must be satisfied before submission.
-	// Each gate selects a kind (e.g. "captcha") and provider-specific
+	// Security gates that must be satisfied before submission. Keyed by gate
+	// name. Each gate selects a kind (e.g. "captcha") and provider-specific
 	// configuration. The engine may also inject gates dynamically based on
 	// policy.
-	Gates []Gate `json:"gates"`
+	Gates OptFlowDefinitionStepGates `json:"gates"`
 	// Available SSO identity providers for this step.
 	SSOProviders []SSOProvider `json:"sso_providers"`
 	// Server-side mutation to execute when this step completes successfully.
@@ -3039,7 +3039,7 @@ func (s *FlowDefinitionStep) GetActions() []StepAction {
 }
 
 // GetGates returns the value of Gates.
-func (s *FlowDefinitionStep) GetGates() []Gate {
+func (s *FlowDefinitionStep) GetGates() OptFlowDefinitionStepGates {
 	return s.Gates
 }
 
@@ -3079,7 +3079,7 @@ func (s *FlowDefinitionStep) SetActions(val []StepAction) {
 }
 
 // SetGates sets the value of Gates.
-func (s *FlowDefinitionStep) SetGates(val []Gate) {
+func (s *FlowDefinitionStep) SetGates(val OptFlowDefinitionStepGates) {
 	s.Gates = val
 }
 
@@ -3145,6 +3145,21 @@ func (s *FlowDefinitionStepComplete) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// Security gates that must be satisfied before submission. Keyed by gate
+// name. Each gate selects a kind (e.g. "captcha") and provider-specific
+// configuration. The engine may also inject gates dynamically based on
+// policy.
+type FlowDefinitionStepGates map[string]Gate
+
+func (s *FlowDefinitionStepGates) init() FlowDefinitionStepGates {
+	m := *s
+	if m == nil {
+		m = map[string]Gate{}
+		*s = m
+	}
+	return m
 }
 
 // Server-side mutation to execute when this step completes successfully.
@@ -3655,7 +3670,7 @@ type FlowStep struct {
 	// Security gates that must be satisfied before the step can be submitted.
 	// The engine injects gates dynamically based on policy, even if they
 	// are not declared in the flow definition.
-	Gates []Gate `json:"gates"`
+	Gates FlowStepGates `json:"gates"`
 	// Available SSO identity providers for this step.
 	SSOProviders []SSOProvider `json:"sso_providers"`
 	// A pending authentication challenge issued by the server. Present when the
@@ -3703,7 +3718,7 @@ func (s *FlowStep) GetActions() []StepAction {
 }
 
 // GetGates returns the value of Gates.
-func (s *FlowStep) GetGates() []Gate {
+func (s *FlowStep) GetGates() FlowStepGates {
 	return s.Gates
 }
 
@@ -3753,7 +3768,7 @@ func (s *FlowStep) SetActions(val []StepAction) {
 }
 
 // SetGates sets the value of Gates.
-func (s *FlowStep) SetGates(val []Gate) {
+func (s *FlowStep) SetGates(val FlowStepGates) {
 	s.Gates = val
 }
 
@@ -3908,6 +3923,20 @@ func (s *FlowStepComplete) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// Security gates that must be satisfied before the step can be submitted.
+// The engine injects gates dynamically based on policy, even if they
+// are not declared in the flow definition.
+type FlowStepGates map[string]Gate
+
+func (s *FlowStepGates) init() FlowStepGates {
+	m := *s
+	if m == nil {
+		m = map[string]Gate{}
+		*s = m
+	}
+	return m
 }
 
 // Ref: #
@@ -4079,8 +4108,6 @@ func (s *FlowSubmitRequestGateProofs) init() FlowSubmitRequestGateProofs {
 // or risk evaluation.
 // Ref: #
 type Gate struct {
-	// Gate identifier within the step.
-	Name string `json:"name"`
 	// The gate category. Only `captcha` is currently defined. Authenticator
 	// ceremonies (e.g. passkey) are modelled as credential auth_attempts via
 	// `x-credential` on a field, not as gates.
@@ -4092,11 +4119,6 @@ type Gate struct {
 	// Provider-specific configuration consumed by the implementation when
 	// issuing the per-render challenge. Opaque to the engine.
 	Config OptGateConfig `json:"config"`
-}
-
-// GetName returns the value of Name.
-func (s *Gate) GetName() string {
-	return s.Name
 }
 
 // GetKind returns the value of Kind.
@@ -4112,11 +4134,6 @@ func (s *Gate) GetProvider() string {
 // GetConfig returns the value of Config.
 func (s *Gate) GetConfig() OptGateConfig {
 	return s.Config
-}
-
-// SetName sets the value of Name.
-func (s *Gate) SetName(val string) {
-	s.Name = val
 }
 
 // SetKind sets the value of Kind.
@@ -7321,6 +7338,52 @@ func (o OptFlowDefinitionStepComplete) Get() (v FlowDefinitionStepComplete, ok b
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowDefinitionStepComplete) Or(d FlowDefinitionStepComplete) FlowDefinitionStepComplete {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowDefinitionStepGates returns new OptFlowDefinitionStepGates with value set to v.
+func NewOptFlowDefinitionStepGates(v FlowDefinitionStepGates) OptFlowDefinitionStepGates {
+	return OptFlowDefinitionStepGates{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowDefinitionStepGates is optional FlowDefinitionStepGates.
+type OptFlowDefinitionStepGates struct {
+	Value FlowDefinitionStepGates
+	Set   bool
+}
+
+// IsSet returns true if OptFlowDefinitionStepGates was set.
+func (o OptFlowDefinitionStepGates) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowDefinitionStepGates) Reset() {
+	var v FlowDefinitionStepGates
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowDefinitionStepGates) SetTo(v FlowDefinitionStepGates) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowDefinitionStepGates) Get() (v FlowDefinitionStepGates, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowDefinitionStepGates) Or(d FlowDefinitionStepGates) FlowDefinitionStepGates {
 	if v, ok := o.Get(); ok {
 		return v
 	}

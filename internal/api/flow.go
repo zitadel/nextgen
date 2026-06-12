@@ -281,7 +281,7 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 		Texts:   api.NewOptStepTexts(toStepTexts(step.Texts)),
 		Fields:  toFlowStepFields(step.Fields),
 		Actions: toFlowStepActions(step.Actions),
-		Gates:   []api.Gate{},
+		Gates:   api.FlowStepGates{},
 	}
 	if step.Error != nil {
 		out.Error = api.NewOptNilString(*step.Error)

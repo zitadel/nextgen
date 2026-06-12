@@ -28,7 +28,7 @@ example:
     - name: recover
       text_key: login.action.recover
   gates:
-    - name: captcha
+    captcha:
       kind: captcha
       provider: altcha
       config:
@@ -84,14 +84,14 @@ properties:
       $ref: step-action.yaml
     default: []
   gates:
-    type: array
+    type: object
     description: |
       Security gates that must be satisfied before the step can be submitted.
       The engine injects gates dynamically based on policy, even if they
       are not declared in the flow definition.
-    items:
+    additionalProperties:
       $ref: gate.yaml
-    default: []
+    default: {}
   sso_providers:
     type: array
     description: Available SSO identity providers for this step.

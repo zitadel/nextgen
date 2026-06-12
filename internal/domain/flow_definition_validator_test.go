@@ -1203,31 +1203,6 @@ func TestValidator_DuplicateActionRejected(t *testing.T) {
 	assert.Contains(t, errorDetails(t, err), `duplicate action "submit"`)
 }
 
-// TestValidator_DuplicateGateRejected mirrors the action check on Gates.
-func TestValidator_DuplicateGateRejected(t *testing.T) {
-	schema := mustSchema(t, userSchemaIDAndPassword)
-	def := domain.FlowDefinition{
-		ProjectID: "p", Name: "f", SchemaVersion: "1",
-		UserSchema: "https://tenant.com/schemas/idpw-user.json",
-		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step"},
-		Steps: []domain.FlowDefinitionStep{
-			{
-				Name: "step", Fields: []string{"email"},
-				Gates: []domain.FlowStepGate{
-					{Name: "bot", Kind: domain.FlowGateKindCaptcha, Provider: "altcha"},
-					{Name: "bot", Kind: domain.FlowGateKindCaptcha, Provider: "altcha"},
-				},
-				Actions:     []domain.FlowStepAction{{Name: "submit", Primary: true}},
-				Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
-			},
-			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
-		},
-	}
-	_, err := domain.ValidateFlowDefinition(schema, def)
-	require.Error(t, err)
-	assert.Contains(t, errorDetails(t, err), `duplicate gate "bot"`)
-}
-
 // TestValidator_EmptyActionNameRejected guards against array entries lacking
 // the required name selector.
 func TestValidator_EmptyActionNameRejected(t *testing.T) {

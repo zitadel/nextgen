@@ -110,9 +110,9 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 		}
 
 		// gates
-		if len(step.GetGates()) > 0 {
-			gates := make([]domain.FlowStepGate, 0, len(step.GetGates()))
-			for _, apiGate := range step.GetGates() {
+		if step.GetGates().IsSet() {
+			gates := make(map[string]domain.FlowStepGate, len(step.GetGates().Value))
+			for name, apiGate := range step.GetGates().Value {
 				kind, _ := domain.FlowGateKindString(string(apiGate.GetKind())) // todo (grvijayan): validate in the domain layer
 
 				cfg := make(map[string]any, len(apiGate.GetConfig().Value))
@@ -122,12 +122,11 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 						cfg[k] = val
 					}
 				}
-				gates = append(gates, domain.FlowStepGate{
-					Name:     apiGate.GetName(),
+				gates[name] = domain.FlowStepGate{
 					Kind:     kind,
 					Provider: apiGate.GetProvider(),
 					Config:   cfg,
-				})
+				}
 			}
 			s.Gates = gates
 		}
@@ -272,10 +271,13 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 			complete = step.Complete.String()
 		}
 		apiStep := api.FlowDefinitionStep{
-			Name:         step.Name,
-			Fields:       step.Fields,
-			Actions:      actions,
-			Gates:        gates,
+			Name:    step.Name,
+			Fields:  step.Fields,
+			Actions: actions,
+			Gates: api.OptFlowDefinitionStepGates{
+				Value: gates,
+				Set:   gates != nil,
+			},
 			SSOProviders: ssoProviders,
 			Transitions: api.OptFlowDefinitionStepTransitions{
 				Value: transitions,
@@ -353,12 +355,12 @@ func mapSSOProvidersToAPI(domainSSOProviders []domain.FlowSSOProvider) []api.SSO
 	return ssoProviders
 }
 
-func mapGatesToAPI(domainGates []domain.FlowStepGate) []api.Gate {
+func mapGatesToAPI(domainGates map[string]domain.FlowStepGate) map[string]api.Gate {
 	if len(domainGates) == 0 {
 		return nil
 	}
-	gates := make([]api.Gate, 0, len(domainGates))
-	for _, gate := range domainGates {
+	gates := make(map[string]api.Gate, len(domainGates))
+	for name, gate := range domainGates {
 		gateConfig := make(api.GateConfig, len(gate.Config))
 		for k, v := range gate.Config {
 			val, err := json.Marshal(v)
@@ -366,15 +368,14 @@ func mapGatesToAPI(domainGates []domain.FlowStepGate) []api.Gate {
 				gateConfig[k] = val
 			}
 		}
-		gates = append(gates, api.Gate{
-			Name:     gate.Name,
+		gates[name] = api.Gate{
 			Kind:     api.GateKind(gate.Kind.String()),
 			Provider: gate.Provider,
 			Config: api.OptGateConfig{
 				Value: gateConfig,
 				Set:   true,
 			},
-		})
+		}
 	}
 	return gates
 }

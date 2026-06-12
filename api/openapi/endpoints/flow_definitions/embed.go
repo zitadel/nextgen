@@ -180,12 +180,12 @@ func convertStepSSOProviders(providers []api.SSOProvider) []domain.FlowSSOProvid
 	return ret
 }
 
-func convertStepGates(gates []api.Gate) ([]domain.FlowStepGate, error) {
-	if len(gates) == 0 {
+func convertStepGates(gates api.OptFlowDefinitionStepGates) (map[string]domain.FlowStepGate, error) {
+	if !gates.IsSet() {
 		return nil, nil
 	}
-	ret := make([]domain.FlowStepGate, 0, len(gates))
-	for _, gate := range gates {
+	ret := make(map[string]domain.FlowStepGate, len(gates.Value))
+	for name, gate := range gates.Value {
 		kind, err := domain.FlowGateKindString(string(gate.Kind))
 		if err != nil {
 			return nil, err
@@ -196,12 +196,11 @@ func convertStepGates(gates []api.Gate) ([]domain.FlowStepGate, error) {
 			return nil, err
 		}
 
-		ret = append(ret, domain.FlowStepGate{
-			Name:     gate.GetName(),
+		ret[name] = domain.FlowStepGate{
 			Kind:     kind,
 			Provider: gate.GetProvider(),
 			Config:   config,
-		})
+		}
 	}
 	return ret, nil
 }
