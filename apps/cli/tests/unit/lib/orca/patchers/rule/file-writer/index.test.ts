@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -409,6 +409,17 @@ describe("scaffold - edit", () => {
     );
     expect(result.filesWritten).toEqual([join(dir, "vite.config.ts")]);
     expect(await readFile(join(dir, "vite.config.ts"), "utf8")).toBe("before");
+  });
+
+  it("preserves the existing file's mode across the temp-file swap", async () => {
+    const target = join(dir, "hook.cjs");
+    await writeFile(target, "old", { mode: 0o755 });
+    await scaffold(plan({ kind: "edit", path: "hook.cjs", edit: () => "new" }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
+    expect((await stat(target)).mode & 0o777).toBe(0o755);
   });
 });
 

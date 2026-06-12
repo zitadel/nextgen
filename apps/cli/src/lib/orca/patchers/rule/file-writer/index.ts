@@ -1,4 +1,4 @@
-import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { ZitadelError } from "../../../../errors";
@@ -102,11 +102,14 @@ async function editFile(
   );
   let path = candidates[0];
   let source: string | undefined;
+  let mode: number | undefined;
   for (const candidate of candidates) {
     const contents = await readIfExists(candidate);
     if (contents !== undefined) {
       path = candidate;
       source = contents;
+      // Preserve the existing file's permissions across the temp-file swap.
+      mode = (await stat(candidate)).mode;
       break;
     }
   }
@@ -122,6 +125,9 @@ async function editFile(
   await mkdir(dirname(path), { recursive: true });
   const tmp = `${path}.tmp-${process.pid}-${Date.now()}`;
   await writeFile(tmp, next);
+  if (mode !== undefined) {
+    await chmod(tmp, mode).catch(() => undefined);
+  }
   await rename(tmp, path);
   result.filesWritten.push(path);
 }
