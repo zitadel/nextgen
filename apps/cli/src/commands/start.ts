@@ -12,9 +12,9 @@ import {
   stopAndRemoveContainer,
 } from "../lib/local-server/docker";
 import {
-  DEFAULT_LOCAL_SERVER_IMAGE,
   DEFAULT_LOCAL_SERVER_PORT,
   checkLocalServerHealth,
+  defaultLocalServerImageForCliVersion,
   ensureContainerIdentity,
   ensureLocalState,
   localContainerName,
@@ -40,7 +40,10 @@ export default class Start extends BaseCommand {
     await this.toMeta(flags, { resolveServer: false, source: serverUrl });
 
     validatePort(port);
-    const image = flags.image ?? this.meta.env.ZITADEL_LOCAL_IMAGE ?? DEFAULT_LOCAL_SERVER_IMAGE;
+    const image =
+      flags.image ??
+      this.meta.env.ZITADEL_LOCAL_IMAGE ??
+      defaultLocalServerImageForCliVersion(this.meta.cliVersion);
     const containerName = localContainerName(this.meta.cwd);
     if (this.meta.dryRun) {
       return this.emit({
@@ -65,7 +68,12 @@ export default class Start extends BaseCommand {
     const paths = await ensureLocalState(this.meta.cwd);
 
     const existing = await inspectContainer(containerName);
-    if (existing.exists && existing.running && (await checkLocalServerHealth(serverUrl))) {
+    if (
+      existing.exists &&
+      existing.running &&
+      existing.image === image &&
+      (await checkLocalServerHealth(serverUrl))
+    ) {
       const metadata = metadataFromStart({
         cwdDataDir: paths.dataDir,
         cliVersion: this.meta.cliVersion,
@@ -76,7 +84,10 @@ export default class Start extends BaseCommand {
         serverUrl,
       });
       await writeRuntimeMetadata(this.meta.cwd, metadata);
-      return this.emit({ status: "ok", data: readyData(metadata, true, this.meta.cliVersion) });
+      return this.emit({
+        status: "ok",
+        data: readyData(metadata, true, this.meta.cliVersion),
+      });
     }
 
     if (existing.exists) {
@@ -103,7 +114,10 @@ export default class Start extends BaseCommand {
       serverUrl,
     });
     await writeRuntimeMetadata(this.meta.cwd, metadata);
-    return this.emit({ status: "ok", data: readyData(metadata, false, this.meta.cliVersion) });
+    return this.emit({
+      status: "ok",
+      data: readyData(metadata, false, this.meta.cliVersion),
+    });
   }
 }
 

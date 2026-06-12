@@ -49,8 +49,9 @@ Secrets").
   Playwright project. It installs local package tarballs through a temporary
   registry and verifies CLI setup plus real registration/login flows.
 - `packages/components/` contains shared Lit components.
-- `packages/sdk-core/`, `packages/sdk-next/`, and `packages/sdk-nuxt/` contain
-  public TypeScript SDKs.
+- `packages/sdk-core/`, `packages/sdk-next/`, `packages/sdk-nuxt/`,
+  `packages/sdk-react/`, `packages/sdk-vue/`, and `packages/sdk-angular/`
+  contain public TypeScript SDKs.
 - `packages/api-mock/` contains the in-process MSW handlers and standalone
   mock auth server used by demos and e2e tests.
 - `packages/lint/` contains the local Nx plugin that infers Oxlint targets.
@@ -107,6 +108,8 @@ workflows.
 
 Use `corepack pnpm run check -- --full` for slower CI-parity phases and
 `corepack pnpm run check -- --only <phase>` to rerun one named phase.
+Use `corepack pnpm run check -- --only release` after touching Changesets,
+GoReleaser, release workflows, or alpha train behavior.
 
 Prefer Nx project targets for narrow package work, for example
 `corepack pnpm nx test @zitadel/cli`.
@@ -212,8 +215,9 @@ For customer-local runtime workflows, agents should prefer
   `docs` type, for example `docs: add preview status disclaimer`.
 - User-visible changes to a public npm package need a changeset. The public
   packages are `@zitadel/cli` (`apps/cli/`), `@zitadel/api`,
-  `@zitadel/components`, `@zitadel/sdk-core`, `@zitadel/sdk-next`, and
-  `@zitadel/sdk-nuxt`. CI fails a PR that touches them without one
+  `@zitadel/components`, `@zitadel/sdk-core`, `@zitadel/sdk-next`,
+  `@zitadel/sdk-nuxt`, `@zitadel/sdk-react`, `@zitadel/sdk-vue`, and
+  `@zitadel/sdk-angular`. CI fails a PR that touches them without one
   (`changeset-check` in `.github/workflows/ci.yml`).
 - Add a changeset by writing the file directly — do not depend on the
   interactive `pnpm changeset` prompt. Create `.changeset/<short-slug>.md`:
@@ -228,8 +232,9 @@ For customer-local runtime workflows, agents should prefer
 
   List only public package names; pick `patch` (fixes), `minor` (features), or
   `major` (breaking). The repo is in `alpha` prerelease mode
-  (`.changeset/pre.json`), so versions cut as `X.Y.Z-alpha.N` automatically — no
-  extra action needed.
+  (`.changeset/pre.json`) and public packages are in one fixed group, so
+  versions cut as one `X.Y.Z-alpha.N` train automatically — no extra action
+  needed.
 
 - For changes that release nothing (docs, tests, CI, chores), add an empty
   changeset: `corepack pnpm changeset --empty`.

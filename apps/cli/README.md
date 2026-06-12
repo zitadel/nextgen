@@ -27,14 +27,26 @@ npm run dev
 ```
 
 `start` runs a Docker-backed local Zitadel server and stores runtime data
-under `.zitadel/local/`. It uses `ghcr.io/zitadel/nextgen:latest` unless
-overridden with `--image` or `ZITADEL_LOCAL_IMAGE`. `setup --server local`
-creates a project on that local server, scaffolds `app/login`, `app/register`, and
-`middleware.ts`, writes `.env.local` and `.zitadel/`, and installs dependencies
-with the detected package manager. Pass `--skip-install` to install them
-yourself. The project's default user schema and login flow are provisioned
-server-side at creation time, so the CLI does not scaffold or upload them.
-Open `http://localhost:3000/login` to see the login page.
+under `.zitadel/local/`. Alpha CLI versions use the matching
+`ghcr.io/zitadel/nextgen:<cli-version>` image by default; local/dev builds fall
+back to `ghcr.io/zitadel/nextgen:latest`. Override with `--image` or
+`ZITADEL_LOCAL_IMAGE` for advanced debugging.
+`setup --server local` creates a project on that local server, scaffolds
+`app/login`, `app/register`, and `middleware.ts`, writes `.env.local` and
+`.zitadel/`, and installs dependencies with the detected package manager. Pass
+`--skip-install` to install them yourself. The project's default user schema
+and login flow are provisioned server-side at creation time, so the CLI does
+not scaffold or upload them. Open `http://localhost:3000/login` to see the
+login page.
+
+For a reproducible tester report, use the exact alpha train from the GitHub
+Release:
+
+```sh
+npx @zitadel/cli@0.1.0-alpha.N doctor
+npx @zitadel/cli@0.1.0-alpha.N start
+npx @zitadel/cli@0.1.0-alpha.N setup --framework next --server local
+```
 
 The default project flow supports password registration/login, passkey
 registration/login, and optional passkey setup after password registration.

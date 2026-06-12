@@ -99,7 +99,7 @@ describe("Next setup integration", () => {
     const packageJson = JSON.parse(await readFile(join(cwd, "package.json"), "utf8")) as {
       dependencies?: Record<string, string>;
     };
-    expect(packageJson.dependencies?.["@zitadel/sdk-next"]).toBe("alpha");
+    expect(packageJson.dependencies?.["@zitadel/sdk-next"]).toBe(await expectedCliVersion());
 
     const fake = await fakeDocker();
     const port = await freePort();
@@ -181,6 +181,7 @@ describe("Next setup integration", () => {
     });
     expect(applyWithEnv.exitCode).toBe(0);
   });
+
 });
 
 async function createNextProject(): Promise<string> {
@@ -265,4 +266,11 @@ async function freePort(): Promise<number> {
     throw new Error("free port probe did not expose a TCP address");
   }
   return address.port;
+}
+
+async function expectedCliVersion(): Promise<string> {
+  const pkg = JSON.parse(
+    await readFile(new URL("../../package.json", import.meta.url), "utf8"),
+  ) as { version: string };
+  return pkg.version;
 }
