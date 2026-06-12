@@ -1,5 +1,14 @@
 # @zitadel/cli
 
+## 0.1.0-alpha.3
+
+### Patch Changes
+
+- [#272](https://github.com/zitadel/nextgen/pull/272) [`08b7ab4`](https://github.com/zitadel/nextgen/commit/08b7ab44f13e104545f17f6f94244eb825a4dcf5) Thanks [@fforootd](https://github.com/fforootd)! - Allow same-directory setup after starting the local Zitadel runtime.
+
+- Updated dependencies []:
+  - @zitadel/api@0.1.0-alpha.3
+
 ## 0.1.0-alpha.2
 
 ### Patch Changes
