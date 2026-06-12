@@ -57,15 +57,6 @@ type CreateUser struct {
 	Attributes []*CreateAttribute
 }
 
-func SchemaFromUserMap(user map[string]any) (string, error) {
-	schemaURL, ok := maputil.Get[string](user, "$schema")
-	if !ok {
-		return "", ErrUserInvalid().
-			WithDetails("No $schema provided for the user. A schema must be provided when creating a new user. Against this schema, the user will be validated")
-	}
-	return schemaURL, nil
-}
-
 func NewCreateUser(projectID string, teamID *string, schemabs []byte, muser map[string]any) (*CreateUser, error) {
 	schemaURL, err := SchemaFromUserMap(muser)
 	if err != nil {
@@ -106,6 +97,15 @@ func NewCreateUser(projectID string, teamID *string, schemabs []byte, muser map[
 		SchemaURL:  schemaURL,
 		Attributes: attrs,
 	}, nil
+}
+
+func SchemaFromUserMap(user map[string]any) (string, error) {
+	schemaURL, ok := maputil.Get[string](user, "$schema")
+	if !ok {
+		return "", ErrUserInvalid().
+			WithDetails("No $schema provided for the user. A schema must be provided when creating a new user. Against this schema, the user will be validated")
+	}
+	return schemaURL, nil
 }
 
 type UserRepository interface {

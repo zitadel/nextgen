@@ -105,7 +105,7 @@ func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (
 func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ map[string]any, err error) {
 	// CreateUser does not need a transaction, so we don't wrap it in an `ApplyActions` call
 
-	action := WithCreateUser(input, s.userRepo, s.schemaRepo, s.pool)
+	action := NewCreateUserAction(input, s.userRepo, s.schemaRepo, s.pool)
 	err = action.Prepare(ctx)
 	if err != nil {
 		return nil, err
@@ -138,7 +138,7 @@ func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[
 }
 
 func (s *UserService) SetPassword(ctx context.Context, input SetPasswordInput) (err error) {
-	action := WithSetUserPassword(input, s.hasher, s.passwordRepo)
+	action := NewSetUserPasswordAction(input, s.hasher, s.passwordRepo)
 	return s.ApplyActions(ctx, action)
 }
 
@@ -182,7 +182,7 @@ type CreateUserAction struct {
 	createUser *domain.CreateUser
 }
 
-func WithCreateUser(input CreateUserInput, userRepo domain.UserRepository, schemaRepo domain.JSONSchemaRepository, db database.Pool) *CreateUserAction {
+func NewCreateUserAction(input CreateUserInput, userRepo domain.UserRepository, schemaRepo domain.JSONSchemaRepository, db database.Pool) *CreateUserAction {
 	return &CreateUserAction{
 		CreateUserInput: input,
 		userRepo:        userRepo,
@@ -234,7 +234,7 @@ type SetPasswordUserAction struct {
 	hash string
 }
 
-func WithSetUserPassword(input SetPasswordInput, hasher crypto.Hasher, passwordRepo domain.UserPasswordRepository) *SetPasswordUserAction {
+func NewSetUserPasswordAction(input SetPasswordInput, hasher crypto.Hasher, passwordRepo domain.UserPasswordRepository) *SetPasswordUserAction {
 	return &SetPasswordUserAction{
 		SetPasswordInput: input,
 		hasher:           hasher,
