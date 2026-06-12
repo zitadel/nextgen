@@ -2,7 +2,12 @@ import { builders, generateCode } from "magicast";
 
 import { configCandidates } from "./config-paths";
 import type { FileOp } from "./file-writer/types";
-import { importIsPresent, parseConfigModule, resolveDefaultExportObject } from "./utils/magicast";
+import {
+  ensureEditableObject,
+  importIsPresent,
+  parseConfigModule,
+  resolveDefaultExportObject,
+} from "./utils/magicast";
 import { PROXY_PATH } from "./proxy";
 
 /**
@@ -48,23 +53,19 @@ export function viteProxyEdit(
   return (source) => {
     const mod = parseConfigModule(source, "vite.config.ts");
     const config = resolveDefaultExportObject(mod, "vite.config.ts");
-    if (config.server === undefined) {
-      config.server = {};
+    const serverConfig = ensureEditableObject(config, "server");
+    if (serverConfig.host === undefined) {
+      serverConfig.host = "localhost";
     }
-    if (config.server.host === undefined) {
-      config.server.host = "localhost";
+    if (serverConfig.port === undefined) {
+      serverConfig.port = devPort;
     }
-    if (config.server.port === undefined) {
-      config.server.port = devPort;
+    if (serverConfig.strictPort === undefined) {
+      serverConfig.strictPort = true;
     }
-    if (config.server.strictPort === undefined) {
-      config.server.strictPort = true;
-    }
-    if (config.server.proxy === undefined) {
-      config.server.proxy = {};
-    }
-    if (config.server.proxy[PROXY_PATH] === undefined) {
-      config.server.proxy[PROXY_PATH] = builders.raw(proxyEntryCode(server));
+    const proxyConfig = ensureEditableObject(serverConfig, "proxy");
+    if (proxyConfig[PROXY_PATH] === undefined) {
+      proxyConfig[PROXY_PATH] = builders.raw(proxyEntryCode(server));
     }
     for (const imp of PROXY_IMPORTS) {
       if (!importIsPresent(mod, imp.local)) {

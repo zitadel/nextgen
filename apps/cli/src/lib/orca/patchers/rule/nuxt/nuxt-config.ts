@@ -27,8 +27,9 @@ export function nuxtConfigEdit(opts: {
 
     ensureArrayItem(config, "modules", NUXT_MODULE);
 
-    if (config.nextgen === undefined) {
-      config.nextgen = { loginPath: "/login" };
+    const nextgen = ensureEditableObject(config, "nextgen");
+    if (nextgen.loginPath === undefined) {
+      nextgen.loginPath = "/login";
     }
 
     const runtimeConfig = ensureEditableObject(config, "runtimeConfig");
