@@ -6,10 +6,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ianlancetaylor/jsonschema"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/maputil"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -68,12 +66,9 @@ func NewUserService(
 }
 
 func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ map[string]any, err error) {
-	// FETCH SCHEMA
-
-	schemaURL, ok := maputil.Get[string](input.User, "$schema")
-	if !ok {
-		return nil, domain.ErrUserInvalid().
-			WithDetails("No $schema provided for the user. A schema must be provided when creating a new user. Against this schema, the user will be validated")
+	schemaURL, err := domain.SchemaFromUserMap(input.User)
+	if err != nil {
+		return nil, err
 	}
 
 	schemaEntity, err := s.schemaRepo.GetByID(ctx, s.pool, input.ProjectID, schemaURL)
@@ -84,35 +79,10 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 		return nil, domain.ErrInternal(err).WithMessage("failed to get schema from database")
 	}
 
-	// VALIDATE USER
-
-	var schema jsonschema.Schema
-	err = json.Unmarshal(schemaEntity.Schema, &schema)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to unmarshal json schema")
-	}
-
-	err = schema.Validate(input.User)
-	if err != nil {
-		return nil, domain.ErrUserInvalid().
-			WithParent(err).
-			WithMessage("user is not valid according to schema")
-	}
-
-	// PREPARE DOMAIN USER
-
-	var schemaMap map[string]any
-	err = json.Unmarshal(schemaEntity.Schema, &schemaMap)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to unmarshal schema map")
-	}
-
-	createUser, err := domain.NewCreateUser(input.ProjectID, input.TeamID, schemaURL, input.User, schemaMap)
+	createUser, err := domain.NewCreateUser(input.ProjectID, input.TeamID, schemaEntity.Schema, input.User)
 	if err != nil {
 		return nil, err
 	}
-
-	// SAVE USER
 
 	err = s.userRepo.Create(ctx, s.pool, createUser)
 	if err != nil {
