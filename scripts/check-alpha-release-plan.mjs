@@ -145,10 +145,11 @@ export async function validateReleaseTooling(cwd, readFileFn = readFileDefault) 
     "release-alpha-train:",
     "ci.yml must contain the alpha release train job",
   );
-  assertContains(
+  assertJobContains(
     ciWorkflow,
-    "if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-alpha-release.outputs.should_release == 'true'",
-    "release-alpha-train must only run on release-relevant main pushes",
+    "release-alpha-train",
+    "    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-alpha-release.result == 'success' && needs.ci-success.result == 'success' && needs.detect-alpha-release.outputs.should_release == 'true'",
+    "release-alpha-train must explicitly require release relevance and a successful CI gate",
   );
   assertContains(
     ciWorkflow,
@@ -232,6 +233,31 @@ function assertContains(input, expected, message) {
   if (!input.includes(expected)) {
     throw new Error(message);
   }
+}
+
+function assertJobContains(input, jobName, expected, message) {
+  const block = workflowJobBlock(input, jobName);
+  if (!block || !block.includes(expected)) {
+    throw new Error(message);
+  }
+}
+
+function workflowJobBlock(input, jobName) {
+  const headerPattern = new RegExp(`^  ${escapeRegExp(jobName)}:\\s*$`, "m");
+  const header = headerPattern.exec(input);
+  if (!header) {
+    return undefined;
+  }
+
+  const nextJobPattern = /^  [A-Za-z0-9_-]+:\s*$/gm;
+  nextJobPattern.lastIndex = header.index + header[0].length;
+  const nextJob = nextJobPattern.exec(input);
+  const end = nextJob ? nextJob.index : input.length;
+  return input.slice(header.index, end);
+}
+
+function escapeRegExp(input) {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function assertNotContains(input, expected, message) {

@@ -25,6 +25,11 @@ const publicPackageNames = [
   "@zitadel/sdk-angular",
 ];
 
+const releaseJobCondition =
+  "    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-alpha-release.result == 'success' && needs.ci-success.result == 'success' && needs.detect-alpha-release.outputs.should_release == 'true'";
+const inheritedSkipReleaseJobCondition =
+  "    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-alpha-release.outputs.should_release == 'true'";
+
 beforeAll(async () => {
   checkAlphaReleasePlanModule = (await import(
     new URL("../../../../../scripts/check-alpha-release-plan.mjs", import.meta.url).href
@@ -128,6 +133,34 @@ describe("check-alpha-release-plan script", () => {
     ).rejects.toThrow("post-npm alpha train steps must not be gated only on Changesets publishing");
   });
 
+  it("rejects a release job condition that can inherit intentional main-branch skips", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      ciWorkflow: validCiWorkflow().replace(
+        releaseJobCondition,
+        inheritedSkipReleaseJobCondition,
+      ),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("must explicitly require release relevance and a successful CI gate");
+  });
+
+  it("rejects a release job condition that only appears on a different job", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      ciWorkflow: validCiWorkflow()
+        .replace(releaseJobCondition, inheritedSkipReleaseJobCondition)
+        .replace(
+          "  ci-success:\n    steps:",
+          ["  ci-success:", releaseJobCondition, "    steps:"].join("\n"),
+        ),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("must explicitly require release relevance and a successful CI gate");
+  });
+
   it("rejects a legacy standalone release workflow", async () => {
     const { cwd, statusPath } = await fixtureRepo({
       legacyReleaseWorkflow: "name: release-npm\n",
@@ -200,7 +233,7 @@ function validCiWorkflow(): string {
     "      - run: |",
     '          const allowedSkipped = new Set(["changeset-check"]);',
     "  release-alpha-train:",
-    "    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-alpha-release.outputs.should_release == 'true'",
+    releaseJobCondition,
     "    needs: [detect-alpha-release, ci-success]",
     "    permissions:",
     "      contents: write",
