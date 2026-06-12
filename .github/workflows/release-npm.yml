@@ -71,7 +71,7 @@ concurrency:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-8
     steps:
       - name: Wait for main CI
         env:
