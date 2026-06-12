@@ -19,6 +19,7 @@ import {
 
 @Component({
   selector: "app-root",
+  standalone: true,
   imports: [ZitadelLoginComponent, ZitadelLogoutComponent],
   templateUrl: "./app.html",
 })

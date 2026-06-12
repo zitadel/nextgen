@@ -13,6 +13,8 @@ describe("nuxtConfigEdit", () => {
     expect(out).toContain("process.env.ZITADEL_URL");
     expect(out).toContain("process.env.NUXT_PUBLIC_ZITADEL_PROJECT_ID");
     expect(out).toContain("@zitadel/components");
+    expect(out).toContain("isCustomElement");
+    expect(out).toContain('tag.startsWith("zitadel-")');
   });
 
   it("is idempotent — re-running over its own output changes nothing", () => {

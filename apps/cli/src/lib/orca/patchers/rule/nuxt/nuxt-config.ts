@@ -14,8 +14,9 @@ const NUXT_MODULE = "@zitadel/sdk-nuxt/module";
 /**
  * Builds the pure `edit` transform the file-writer applies to the project's Nuxt
  * config (`nuxt.config.*`): registers the `@zitadel/sdk-nuxt` module (which wires
- * the server-side proxy + session middleware), sets the login path, and seeds
- * `runtimeConfig` with the backend URL, the proxy path, and the project id —
+ * the server-side proxy + session middleware), sets the login path, seeds
+ * `runtimeConfig` with the backend URL, the proxy path, and the project id, and
+ * marks the `zitadel-*` Lit elements as custom elements for the Vue compiler —
  * preserving the user's existing config via magicast. Idempotent. Throws
  * `E_VALIDATION` when the file is absent or `defineNuxtConfig` cannot be reached.
  */
@@ -55,6 +56,15 @@ export function nuxtConfigEdit(opts: {
     const build = ensureEditableObject(config, "build");
     ensureArrayItem(build, "transpile", "@zitadel/api");
     ensureArrayItem(build, "transpile", "@zitadel/components");
+
+    // Tell Vue's template compiler the `zitadel-*` Lit elements are custom
+    // elements, not Vue components, so it renders them as native elements
+    // instead of logging "Failed to resolve component" and mis-binding props.
+    const vue = ensureEditableObject(config, "vue");
+    const compilerOptions = ensureEditableObject(vue, "compilerOptions");
+    if (compilerOptions.isCustomElement === undefined) {
+      compilerOptions.isCustomElement = builders.raw(`(tag) => tag.startsWith("zitadel-")`);
+    }
 
     const code = generateCode(mod).code;
     return code.endsWith("\n") ? code : `${code}\n`;
