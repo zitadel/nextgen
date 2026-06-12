@@ -1,8 +1,10 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { getZitadelConfig, getApi, type ZitadelProject } from "@zitadel/api/config";
+import { type ZitadelProject } from "@zitadel/api/config";
 
 import { applyBaseTokens } from "./branding-to-tokens.js";
+import { resolveApi } from "./resolve-api.js";
+import { emit } from "../internal/emit.js";
 import { baseHostStyles, focusVisibleStyles, t } from "../styles/index.js";
 
 /**
@@ -25,10 +27,12 @@ const DISPLAY_COOKIE_NAME = "__nextgen_display";
  * Reads the user's display name + email from the `__nextgen_display` cookie
  * (set by the auth backend on sign-in), renders an avatar trigger with a
  * dropdown that exposes a "Sign out" action, and calls the typed
- * `endSession` operation in `@zitadel/api`
- * (`GET /auth/end-session`). The server clears the session cookie via
+ * `revokeMySession` operation in `@zitadel/api`
+ * (`DELETE /sessions/me`). The server clears the session cookie via
  * `Set-Cookie: Max-Age=0`; on success the element fires `zitadel-signout`
- * and optionally navigates to `post-sign-out-url`.
+ * and optionally navigates to `post-sign-out-url`. (`getEndSessionUrl()`
+ * additionally exposes the OIDC end-session URL for consumers that prefer a
+ * user-agent-driven redirect.)
  *
  * ## Template-slot mode
  *
@@ -323,9 +327,8 @@ export class ZitadelLogout extends LitElement {
     this.errorMessage = "";
 
     try {
-      const cfg = this.project ?? getZitadelConfig();
-      if (!cfg) throw new Error("<zitadel-logout> requires a `config` prop (from configureZitadel()).");
-      await getApi(cfg).revokeMySession({ credentials: "include" });
+      const { api } = resolveApi(this.project, "<zitadel-logout>");
+      await api.revokeMySession({ credentials: "include" });
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       this.errorMessage = message || "Sign-out failed. Please try again.";
@@ -336,14 +339,7 @@ export class ZitadelLogout extends LitElement {
     this.open = false;
     this.loading = false;
 
-    const detail = { name: this.displayName, email: this.displayEmail };
-    this.dispatchEvent(
-      new CustomEvent("zitadel-signout", {
-        bubbles: true,
-        composed: true,
-        detail,
-      }),
-    );
+    emit(this, "zitadel-signout", { name: this.displayName, email: this.displayEmail });
 
     if (this.postSignOutUrl && typeof window !== "undefined") {
       window.location.href = this.postSignOutUrl;
@@ -361,9 +357,8 @@ export class ZitadelLogout extends LitElement {
       ...(this.clientId ? { client_id: this.clientId } : {}),
       ...(this.postSignOutUrl ? { post_logout_redirect_uri: this.postSignOutUrl } : {}),
     };
-    const cfg = this.project ?? getZitadelConfig();
-    if (!cfg) throw new Error("<zitadel-logout> requires a `config` prop (from configureZitadel()).");
-    return getApi(cfg).getEndSessionUrl(params);
+    const { api } = resolveApi(this.project, "<zitadel-logout>");
+    return api.getEndSessionUrl(params);
   }
 
   private handleSignOutClick(event: Event): void {

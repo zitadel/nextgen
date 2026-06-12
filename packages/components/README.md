@@ -39,22 +39,24 @@ externalised so npm consumers dedupe with their own copies.
 
 ## Quickstart — drop on a page
 
-The 90% case: render the element, point the typed Flow API client at your
-backend, set a locale.
+The 90% case: configure the SDK once, render the element, optionally set a
+language. `<zitadel-login>` reads the global project handle from
+`configureZitadel()` via `getZitadelConfig()` — no per-element wiring needed.
 
 ```html
-<script type="module" src="@zitadel/components"></script>
-
-<zitadel-login id="login" purpose="login" project-id="proj_123"></zitadel-login>
-
 <script type="module">
-  import { setProxyPath } from '@zitadel/api/runtime/base-url';
+  import '@zitadel/components';
+  import { configureZitadel } from '@zitadel/api/config';
 
-  setProxyPath('https://api.tenant.com');
+  // Write-once: sets the global project handle (and the proxy path the
+  // generated client uses). The element picks this up automatically.
+  configureZitadel({ projectId: 'proj_123', proxyPath: '/__nextgen' });
 
   const el = document.getElementById('login');
-  el.locale = await fetch('/i18n/en.json').then((r) => r.json());
+  el.lang = 'en'; // optional; defaults to <html lang> / navigator.language
 </script>
+
+<zitadel-login id="login" purpose="login"></zitadel-login>
 ```
 
 What `<zitadel-login>` handles for you:
@@ -75,22 +77,26 @@ What `<zitadel-login>` handles for you:
 
 Same element, lifted into JSX. Pass objects through `ref` rather than as
 attributes (web component properties are typed objects, not stringified
-attributes).
+attributes). Either configure the SDK globally with `configureZitadel()` and
+let the element read it, or assign the returned handle to `el.project`.
 
 ```tsx
 import '@zitadel/components';
-import { setProxyPath } from '@zitadel/api/runtime/base-url';
+import { configureZitadel } from '@zitadel/api/config';
 
-setProxyPath(import.meta.env.VITE_ZITADEL_API_BASE);
+const project = configureZitadel({
+  projectId: 'proj_123',
+  proxyPath: import.meta.env.VITE_ZITADEL_PROXY_PATH,
+});
 
-export function Login({ locale }: Props) {
+export function Login({ locales }: Props) {
   return (
     <zitadel-login
       purpose="login"
-      project-id="proj_123"
       ref={(el) => {
         if (!el) return;
-        el.locale = locale;
+        el.project = project;
+        el.locales = locales;
       }}
     />
   );
@@ -159,17 +165,18 @@ form-associated inputs.
 
 | Tier | Surface | Use when |
 | --- | --- | --- |
-| API base | `setProxyPath()` from `@zitadel/api/runtime/base-url` | every consumer — points at your backend |
+| SDK config | `configureZitadel({ projectId, proxyPath })` from `@zitadel/api/config` | every consumer — sets the project + proxy path the element reads |
 | Tokens | branding payload returned from the server | tenant colour / logo / font |
 | CSS hooks | `zitadel-login::part(form)`, `zl-field::part(input)` | targeted overrides from the host page |
-| Locale | `el.locale = { ... }` | i18n / custom copy |
+| Locale | `el.lang = 'de'` / `el.locales = { ... }` | i18n / custom copy |
 | MSW mocks | `setupWorker` / `setupServer` from `msw` | offline / staging / fixtures |
 | Custom template | (planned) | tenant-supplied Liquid layouts |
 | Atoms-only | hand-built form | non-standard flow shells |
 
-The "Custom template" surface is not yet exposed on `<zitadel-login>`; the
-orchestrator currently uses the bundled `auth_form.liquid`. Tracked as a
-follow-up.
+A tenant Liquid template can already be supplied through the branding
+payload's `liquid_template` field; a dedicated declarative `template`
+surface on `<zitadel-login>` is not yet exposed. The orchestrator otherwise
+renders the bundled `default.liquid`. Tracked as a follow-up.
 
 ## Element APIs
 
@@ -178,31 +185,29 @@ follow-up.
 | Property | Type | Notes |
 | --- | --- | --- |
 | `purpose` | `'login' \| 'register' \| 'reset_password' \| string` | Which flow purpose to drive |
-| `projectId` / `project-id` | `string` | Project / tenant id sent with `POST /flow` |
-| `apiBase` / `api-base` | `string` | Optional declarative override for `setProxyPath()` |
-| `sessionExchangePath` / `session-exchange-path` | `string` | Handoff exchange path (default `/sessions/exchange`, prefixed with `api-base`). Any other value is resolved from `location.origin` instead — use when exchange is rewritten separately (e.g. `/api/auth/exchange`) |
-| `postSignInUrl` / `post-sign-in-url` | `string` | After `complete: "show"`, exchange the `handoff_token` at the configured exchange path and navigate here |
+| `project` | `ZitadelProject` | SDK handle from `configureZitadel()`. Object property (not an attribute). When unset, the element falls back to the global handle from `getZitadelConfig()` |
+| `lang` | `string` | BCP 47 tag (e.g. `"de"`, `"en-US"`). Resolves to a built-in dictionary; falls back to `<html lang>` / `navigator.language` |
+| `locales` | `Record<string, Locale>` | Custom locale dictionaries keyed by language code; spread over the built-in dictionary so partial overrides work |
+| `postSignInUrl` / `post-sign-in-url` | `string` | After `complete: "show"`, exchange the `handoff_token` for a session cookie and navigate here |
 | `resumeFlowId` / `resume-flow-id` | `string` | Resume an existing flow handle instead of starting fresh |
-| `locale` | `Record<string, string>` | i18n dictionary consumed by Liquid's `\| t` filter |
 
-Events: `zitadel-flow-input`, `zitadel-flow-action`, `zitadel-flow-step`,
-`zitadel-flow-complete`, `zitadel-flow-error`. The orchestrator exposes
-`::part(form)` for tenant-side CSS hooks. Adopts design tokens and
-`branding.font_url` into its shadow root on each update.
+Events: `zitadel-flow-input`, `zitadel-flow-step`, `zitadel-flow-complete`,
+`zitadel-flow-error`. The orchestrator exposes `::part(form)` for tenant-side
+CSS hooks. Adopts design tokens and `branding.font_url` into its shadow root
+on each update.
 
 ### `<zitadel-logout>`
 
 Session menu / sign-out control for embedded apps. Reads the
-`__nextgen_display` cookie set during sign-in, calls `GET /auth/end-session`
-through `api-base`, and clears the session. Uses the same token adoption as
-`<zitadel-login>` (`applyBaseTokens` + optional `font_url` when hosted on a
-page without global tokens).
+`__nextgen_display` cookie set during sign-in, calls `revokeMySession`
+(`DELETE /sessions/me`) through the SDK handle, and clears the session. Uses
+the same token adoption as `<zitadel-login>` (`applyBaseTokens`).
 
 | Property | Type | Notes |
 | --- | --- | --- |
-| `apiBase` / `api-base` | `string` | Proxied auth API prefix (e.g. `/__nextgen`) |
+| `project` | `ZitadelProject` | SDK handle from `configureZitadel()`. Object property; falls back to the global handle from `getZitadelConfig()` |
 | `postSignOutUrl` / `post-sign-out-url` | `string` | Navigate here after sign-out |
-| `clientId` / `client-id` | `string` | Optional OIDC client id forwarded to end-session |
+| `clientId` / `client-id` | `string` | Optional OIDC client id forwarded to `getEndSessionUrl()` |
 
 Supports a light-DOM `<template>` slot for a fully custom menu; default UI is
 the avatar trigger + dropdown.
@@ -270,7 +275,7 @@ packages/components/
 │   │                       zl-card, zl-page-shell + tests
 │   ├── orchestrator/      <zitadel-login>, <zitadel-logout>, api-client, liquid, branding
 │   │   ├── locales/       bundled English fallback
-│   │   └── templates/     auth-form / passkey-upsell / signed-in liquid partials
+│   │   └── templates/     default.liquid (all steps) + layout-chrome.css
 │   ├── tokens/            re-export of @zitadel/design-tokens
 │   ├── styles/            shared host styles, focus ring, t() css-var bridge
 │   ├── manifests.ts       per-atom attribute / part / event manifests

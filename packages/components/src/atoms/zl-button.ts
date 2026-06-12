@@ -1,9 +1,11 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import { classMap } from "lit/directives/class-map.js";
 
 import buttonHost from "@zitadel/shared-component-styles/lit/button-host.css?inline";
 import buttonSurface from "@zitadel/shared-component-styles/button.css?inline";
 
+import { emit } from "../internal/emit.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
 
@@ -93,6 +95,14 @@ export class ZlButton extends LitElement {
 
   @property() accessor label: string | undefined = undefined;
 
+  /**
+   * Forces a visual interaction state on the inner button, projected to its
+   * `data-state` attribute. Used by the design playground to capture
+   * hover/pressed/focus states; reactive so toggling the host attribute
+   * re-renders.
+   */
+  @property({ attribute: "data-state" }) accessor forcedState: string | null = null;
+
   private readonly internals: ElementInternals;
 
   constructor() {
@@ -104,21 +114,8 @@ export class ZlButton extends LitElement {
     this.shadowRoot?.querySelector<HTMLButtonElement>("button")?.focus(options);
   }
 
-  private surfaceClasses(): string {
-    return [
-      "root",
-      "zr-btn",
-      `zr-btn--${this.hierarchy}`,
-      `zr-btn--${this.size}`,
-      this.block ? "zr-btn--block" : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
-  }
-
   override render() {
     const blocked = this.disabled || this.loading;
-    const forcedState = this.getAttribute("data-state");
     // If `label` is provided, render the text directly and treat the default
     // slot as a fallback (avoids the whitespace-only slot bug where indentation
     // between `<zl-icon slot="leading">` tags marks the default slot as
@@ -126,12 +123,18 @@ export class ZlButton extends LitElement {
     const body = this.label !== undefined ? html`<span>${this.label}</span>` : html`<slot></slot>`;
     return html`
       <button
-        class=${this.surfaceClasses()}
+        class=${classMap({
+          root: true,
+          "zr-btn": true,
+          [`zr-btn--${this.hierarchy}`]: true,
+          [`zr-btn--${this.size}`]: true,
+          "zr-btn--block": this.block,
+        })}
         part="root"
         type=${this.type}
         ?disabled=${blocked}
         aria-busy=${this.loading ? "true" : "false"}
-        data-state=${forcedState ?? nothing}
+        data-state=${this.forcedState ?? nothing}
         @click=${this.handleClick}
       >
         <slot name="leading"></slot>
@@ -159,13 +162,7 @@ export class ZlButton extends LitElement {
       event.preventDefault();
       form.reset();
     }
-    this.dispatchEvent(
-      new CustomEvent("zl-submit", {
-        bubbles: true,
-        composed: true,
-        detail: { action: this.action ?? null },
-      }),
-    );
+    emit<{ action: string | null }>(this, "zl-submit", { action: this.action ?? null });
   };
 }
 
