@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -82,6 +83,19 @@ func TestCreateUser(t *testing.T) {
 					"$schema":  "https://test.example.schemas.com/schemas/default-human-user.json",
 					"email":    "john.doe.withteammembermship@example.com",
 					"password": "my-strong-password",
+				}),
+			},
+			{
+				name: "user with empty value for optional properties",
+				params: api.CreateUserParams{
+					ProjectID: api.ProjectID(project.ID),
+				},
+				userjson: helpers.MustMarshal(t, map[string]any{
+					"$schema":     "https://test.example.schemas.com/schemas/default-human-user.json",
+					"email":       "john.doe.emptyvalueoptionalproperties@example.com",
+					"password":    "my-strong-password",
+					"name":        "",
+					"phoneNumber": "",
 				}),
 			},
 		}
