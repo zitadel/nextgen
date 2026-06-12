@@ -91,59 +91,138 @@ export async function validateReleaseTooling(cwd, readFileFn = readFileDefault) 
     "GoReleaser prereleases must not become GitHub latest",
   );
 
-  const releaseWorkflow = await readFileFn(join(cwd, ".github/workflows/release-npm.yml"), "utf8");
+  const legacyReleaseWorkflow = await readOptionalFile(
+    join(cwd, ".github/workflows/release-npm.yml"),
+    readFileFn,
+  );
+  if (legacyReleaseWorkflow !== undefined) {
+    throw new Error("release publishing must live in ci.yml, not release-npm.yml");
+  }
+
+  const ciWorkflow = await readFileFn(join(cwd, ".github/workflows/ci.yml"), "utf8");
   assertContains(
-    releaseWorkflow,
+    ciWorkflow,
+    "cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
+    "ci.yml must not cancel main release runs",
+  );
+  assertNotContains(
+    ciWorkflow,
+    "    paths:",
+    "ci.yml must not path-filter main pushes before release relevance is computed",
+  );
+  assertContains(
+    ciWorkflow,
+    "detect-alpha-release:",
+    "ci.yml must compute release relevance before publishing",
+  );
+  assertContains(
+    ciWorkflow,
+    "should_release: ${{ steps.detect.outputs.should_release }}",
+    "detect-alpha-release must expose a should_release output",
+  );
+  assertContains(
+    ciWorkflow,
+    'import { PUBLIC_PACKAGE_MANIFESTS } from "./scripts/release-alpha-train.mjs";',
+    "detect-alpha-release must derive public package release paths from release-alpha-train.mjs",
+  );
+  assertContains(
+    ciWorkflow,
+    'path.startsWith(".changeset/") || publicPackageReleasePaths.has(path)',
+    "detect-alpha-release must detect Changesets and public package release files",
+  );
+  assertContains(
+    ciWorkflow,
+    "ci-success:",
+    "ci.yml must include an aggregate CI success gate",
+  );
+  assertContains(
+    ciWorkflow,
+    'const allowedSkipped = new Set(["changeset-check"]);',
+    "ci-success must only allow intentionally skipped jobs",
+  );
+  assertContains(
+    ciWorkflow,
+    "release-alpha-train:",
+    "ci.yml must contain the alpha release train job",
+  );
+  assertContains(
+    ciWorkflow,
+    "if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-alpha-release.outputs.should_release == 'true'",
+    "release-alpha-train must only run on release-relevant main pushes",
+  );
+  assertContains(
+    ciWorkflow,
+    "needs: [detect-alpha-release, ci-success]",
+    "release-alpha-train must wait for release relevance detection and the aggregate CI gate",
+  );
+  assertContains(
+    ciWorkflow,
+    [
+      "    permissions:",
+      "      contents: write",
+      "      pull-requests: write",
+      "      packages: write",
+      "      id-token: write",
+    ].join("\n"),
+    "release-alpha-train must scope publish permissions to the release job",
+  );
+  assertNotContains(
+    ciWorkflow,
+    "gh run list --workflow ci.yml",
+    "release-alpha-train must rely on ci.yml needs instead of polling GitHub Actions",
+  );
+  assertContains(
+    ciWorkflow,
     "createGithubReleases: false",
     "Changesets must not create package-shaped GitHub Releases",
   );
   assertContains(
-    releaseWorkflow,
+    ciWorkflow,
     "node scripts/release-alpha-train.mjs status --published \"$PUBLISHED\" --remote false",
-    "release-npm.yml must inspect alpha train recovery status without remote checks",
+    "ci.yml must inspect alpha train recovery status without remote checks",
   );
   assertContains(
-    releaseWorkflow,
+    ciWorkflow,
     "steps.alpha-status.outputs.should_complete == 'true'",
-    "release-npm.yml must complete recoverable alpha trains even when npm publish is not rerun",
+    "ci.yml must complete recoverable alpha trains even when npm publish is not rerun",
   );
   assertContains(
-    releaseWorkflow,
+    ciWorkflow,
     "node scripts/release-alpha-train.mjs prepare --published \"$PUBLISHED\"",
-    "release-npm.yml must prepare the alpha train before GoReleaser",
+    "ci.yml must prepare the alpha train before GoReleaser",
   );
   assertContains(
-    releaseWorkflow,
+    ciWorkflow,
     '--out-dir "$RUNNER_TEMP/alpha-release"',
-    "release-npm.yml must write alpha release notes outside the checkout before GoReleaser --clean",
+    "ci.yml must write alpha release notes outside the checkout before GoReleaser --clean",
   );
   assertContains(
-    releaseWorkflow,
+    ciWorkflow,
     'alpha_env="$RUNNER_TEMP/alpha-release.env"',
-    "release-npm.yml must write alpha release outputs outside the checkout before GoReleaser --clean",
+    "ci.yml must write alpha release outputs outside the checkout before GoReleaser --clean",
   );
   assertContains(
-    releaseWorkflow,
+    ciWorkflow,
     "steps.alpha.outputs.create_tag == 'true'",
-    "release-npm.yml must create the Go tag only when the alpha train needs it",
+    "ci.yml must create the Go tag only when the alpha train needs it",
   );
   assertContains(
-    releaseWorkflow,
+    ciWorkflow,
     "steps.alpha.outputs.run_goreleaser == 'true'",
-    "release-npm.yml must skip GoReleaser when the alpha release and image already exist",
+    "ci.yml must skip GoReleaser when the alpha release and image already exist",
   );
   assertNotContains(
-    releaseWorkflow,
+    ciWorkflow,
     "if: ${{ steps.changesets.outputs.published == 'true' }}",
     "post-npm alpha train steps must not be gated only on Changesets publishing in the current rerun",
   );
   assertContains(
-    releaseWorkflow,
+    ciWorkflow,
     "--prerelease",
     "alpha GitHub Releases must be marked as prereleases",
   );
   assertContains(
-    releaseWorkflow,
+    ciWorkflow,
     "--latest=false",
     "alpha GitHub Releases must not become GitHub latest",
   );
@@ -164,6 +243,17 @@ function assertNotContains(input, expected, message) {
 function assertPattern(input, pattern, message) {
   if (!pattern.test(input)) {
     throw new Error(message);
+  }
+}
+
+async function readOptionalFile(path, readFileFn) {
+  try {
+    return await readFileFn(path, "utf8");
+  } catch (error) {
+    if (error && typeof error === "object" && error.code === "ENOENT") {
+      return undefined;
+    }
+    throw error;
   }
 }
 
