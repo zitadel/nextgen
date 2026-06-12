@@ -89,7 +89,7 @@ func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (
 	}()
 
 	for _, action := range actions {
-		err := action.Apply(ctx, tx)
+		err = action.Apply(ctx, tx)
 		if err != nil {
 			return err
 		}
@@ -244,7 +244,6 @@ func WithSetUserPassword(input SetPasswordInput, hasher crypto.Hasher, passwordR
 func (o *SetPasswordUserAction) Prepare(_ context.Context) (err error) {
 	o.hash, err = domain.HashPassword(o.Password, o.hasher)
 	return err
-
 }
 
 func (o *SetPasswordUserAction) Apply(ctx context.Context, db database.QueryExecutor) error {
