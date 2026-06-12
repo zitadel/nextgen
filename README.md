@@ -137,16 +137,17 @@ Use `corepack pnpm --silent run cli -- ... --json` when a script needs
 parseable CLI stdout. Plain `pnpm run` prints its own script prelude before
 the command output.
 
-Fresh-app consumer journey check:
+Customer local setup journey check:
 
 ```sh
 corepack pnpm run journey
 ```
 
 This opt-in check ensures the Playwright Chromium browsers are installed, builds
-the local npm packages, publishes them to a temporary Verdaccio registry, starts
-a source backend with embedded Postgres, scaffolds a new Next.js app outside the
-repo, and verifies registration/login journeys against the generated app.
+the local npm packages, publishes them to a temporary Verdaccio registry, runs
+`npx @zitadel/cli@alpha doctor`, `start`, and
+`setup --framework next --server local` in an empty app directory, starts the
+generated app, and verifies registration/login journeys.
 
 ## CI
 
@@ -158,13 +159,15 @@ Pull requests and pushes to `main` run:
 - npm package dry-run/pack checks.
 - A non-publishing GoReleaser snapshot.
 - `consumer-journey-e2e`, which downloads the current workflow's GoReleaser
-  snapshot image and npm package tarballs, installs them through a temporary
-  npm registry into a fresh Next.js app, and runs the Playwright user journey.
+  snapshot image and npm package tarballs, installs the CLI through a temporary
+  npm registry, runs the customer local setup commands in a fresh app directory,
+  and runs the Playwright user journey against the generated app.
 
 CI uploads short-lived workflow artifacts for review: GoReleaser snapshot output
 and npm package tarballs. On consumer journey failures it also uploads focused
-diagnostics such as Playwright traces, setup JSON, package lock metadata, and
-service logs. These artifacts expire after 7 days and are not release artifacts.
+diagnostics such as Playwright traces, doctor/start/setup JSON, package lock
+metadata, local runtime logs, and service logs. These artifacts expire after 7
+days and are not release artifacts.
 
 ## Build & release
 

@@ -5,124 +5,203 @@ import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(here, "../../..");
+const defaultRepoRoot = resolve(here, "../../..");
+const defaultRegistryUrl = "http://127.0.0.1:4873";
+const defaultAppUrl = "http://localhost:3000";
 
-const registryUrl = process.env.JOURNEY_REGISTRY_URL ?? "http://127.0.0.1:4873";
-const backendUrl = process.env.JOURNEY_BACKEND_URL ?? "http://localhost:8080";
-const createNextAppVersion = process.env.JOURNEY_CREATE_NEXT_APP_VERSION ?? "16.2.4";
-const outputDir =
-  process.env.JOURNEY_WORK_DIR ??
-  join(tmpdir(), `zitadel-cli-journey-${process.pid}-${Date.now()}`);
-const appDir = join(outputDir, "myapp");
-const cliPackage = process.env.JOURNEY_CLI_PACKAGE ?? (await packageName("apps/cli"));
-const sdkNextPackage =
-  process.env.JOURNEY_SDK_NEXT_PACKAGE ?? (await packageName("packages/sdk-next"));
+export async function prepareNextApp(options = {}) {
+  const env = options.env ?? process.env;
+  const repoRoot = options.repoRoot ?? defaultRepoRoot;
+  const outputDir = resolve(
+    env.JOURNEY_WORK_DIR ?? join(tmpdir(), `zitadel-cli-journey-${process.pid}-${Date.now()}`),
+  );
+  const appDir = resolve(env.JOURNEY_APP_DIR ?? join(outputDir, "myapp"));
+  const registryUrl = env.JOURNEY_REGISTRY_URL ?? defaultRegistryUrl;
+  const appUrl = env.JOURNEY_APP_URL ?? defaultAppUrl;
+  const fs = {
+    appendFile: options.appendFile ?? appendFile,
+    mkdir: options.mkdir ?? mkdir,
+    readFile: options.readFile ?? readFile,
+    rm: options.rm ?? rm,
+    writeFile: options.writeFile ?? writeFile,
+  };
+  const runCaptureFn = options.runCapture ?? runCapture;
+  const packageNameFn =
+    options.packageName ?? ((relativePath) => packageName(relativePath, { readFile: fs.readFile, repoRoot }));
+  const cliPackage = env.JOURNEY_CLI_PACKAGE ?? (await packageNameFn("apps/cli"));
+  const sdkNextPackage = env.JOURNEY_SDK_NEXT_PACKAGE ?? (await packageNameFn("packages/sdk-next"));
+  const npmEnv = npmEnvironment(env, registryUrl);
 
-await rm(appDir, { recursive: true, force: true });
-await mkdir(outputDir, { recursive: true });
+  await fs.rm(appDir, { recursive: true, force: true });
+  await fs.mkdir(appDir, { recursive: true });
+  await fs.mkdir(outputDir, { recursive: true });
 
-const npmEnv = npmEnvironment();
-
-await run(
-  "npx",
-  [
-    "--yes",
-    `create-next-app@${createNextAppVersion}`,
-    "myapp",
-    "--ts",
-    "--app",
-    "--use-npm",
-    "--disable-git",
-    "--yes",
-  ],
-  { cwd: outputDir, env: npmEnv },
-);
-
-const setup = await run(
-  "npx",
-  [
-    "--yes",
-    `${cliPackage}@alpha`,
-    "setup",
-    "--framework",
-    "next",
-    "--server",
-    backendUrl,
-    "--non-interactive",
-    "--json",
-  ],
-  { cwd: appDir, env: npmEnv },
-);
-
-const setupPath = join(outputDir, "setup.json");
-const setupStderrPath = join(outputDir, "setup.stderr.log");
-await writeFile(setupPath, setup.stdout);
-await writeFile(setupStderrPath, setup.stderr);
-
-let setupJson;
-try {
-  setupJson = JSON.parse(setup.stdout);
-} catch (error) {
-  throw new Error(`setup stdout was not JSON: ${String(error)}\n${setup.stdout}`, {
-    cause: error,
-  });
-}
-if (setupJson.status !== "ok") {
-  throw new Error(`setup returned status ${JSON.stringify(setupJson.status)}`);
-}
-
-const appPackage = JSON.parse(await readFile(join(appDir, "package.json"), "utf8"));
-const dependencies = {
-  ...(appPackage.dependencies ?? {}),
-  ...(appPackage.devDependencies ?? {}),
-};
-if (!dependencies[sdkNextPackage]) {
-  throw new Error(`generated package.json does not depend on ${sdkNextPackage}`);
-}
-
-await run("npm", ["install", "--registry", registryUrl], { cwd: appDir, env: npmEnv });
-
-const packageLockPath = join(appDir, "package-lock.json");
-const packageLock = JSON.parse(await readFile(packageLockPath, "utf8"));
-const packageScope = sdkNextPackage.split("/")[0];
-const scopedNodeModulePrefix = `node_modules/${packageScope}/`;
-const lockedZitadelPackages = Object.entries(packageLock.packages ?? {}).filter(
-  ([name]) => name.startsWith(scopedNodeModulePrefix),
-);
-if (lockedZitadelPackages.length === 0) {
-  throw new Error(`package-lock.json does not contain ${packageScope} packages`);
-}
-for (const [name, entry] of lockedZitadelPackages) {
-  const resolved = entry?.resolved;
-  if (typeof resolved !== "string" || !resolved.startsWith(registryUrl)) {
-    throw new Error(`${name} resolved outside the temporary registry: ${resolved}`);
+  let startJson;
+  let setupJson;
+  try {
+    await runCliJsonStep({
+      appDir,
+      cliPackage,
+      env: npmEnv,
+      outputDir,
+      runCapture: runCaptureFn,
+      step: "doctor",
+      stepArgs: ["doctor"],
+      writeFile: fs.writeFile,
+    });
+    startJson = await runCliJsonStep({
+      appDir,
+      cliPackage,
+      env: npmEnv,
+      outputDir,
+      runCapture: runCaptureFn,
+      step: "start",
+      stepArgs: ["start"],
+      writeFile: fs.writeFile,
+    });
+    setupJson = await runCliJsonStep({
+      appDir,
+      cliPackage,
+      env: npmEnv,
+      outputDir,
+      runCapture: runCaptureFn,
+      step: "setup",
+      stepArgs: ["setup", "--framework", "next", "--server", "local"],
+      writeFile: fs.writeFile,
+    });
+  } catch (error) {
+    await collectLocalRuntimeLogs({
+      appDir,
+      cliPackage,
+      env: npmEnv,
+      outputDir,
+      runCapture: runCaptureFn,
+      writeFile: fs.writeFile,
+    });
+    throw error;
   }
+
+  await assertNoNestedApp(appDir, fs.readFile);
+
+  const appPackage = JSON.parse(await fs.readFile(join(appDir, "package.json"), "utf8"));
+  const dependencies = {
+    ...(appPackage.dependencies ?? {}),
+    ...(appPackage.devDependencies ?? {}),
+  };
+  if (!dependencies[sdkNextPackage]) {
+    throw new Error(`generated package.json does not depend on ${sdkNextPackage}`);
+  }
+
+  const packageLockPath = join(appDir, "package-lock.json");
+  const packageLock = JSON.parse(await fs.readFile(packageLockPath, "utf8"));
+  const packageScope = sdkNextPackage.split("/")[0];
+  const scopedNodeModulePrefix = `node_modules/${packageScope}/`;
+  const lockedZitadelPackages = Object.entries(packageLock.packages ?? {}).filter(
+    ([name]) => name.startsWith(scopedNodeModulePrefix),
+  );
+  if (lockedZitadelPackages.length === 0) {
+    throw new Error(`package-lock.json does not contain ${packageScope} packages`);
+  }
+  for (const [name, entry] of lockedZitadelPackages) {
+    const resolved = entry?.resolved;
+    if (typeof resolved !== "string" || !resolved.startsWith(registryUrl)) {
+      throw new Error(`${name} resolved outside the temporary registry: ${resolved}`);
+    }
+  }
+
+  const metadata = {
+    appDir,
+    appUrl,
+    cliPackage,
+    doctorPath: join(outputDir, "doctor.json"),
+    localRuntimeUrl: startJson?.data?.urls?.api ?? null,
+    outputDir,
+    registryUrl,
+    runtimeMetadataPath: join(appDir, ".zitadel/local/runtime.json"),
+    sdkNextPackage,
+    setupPath: join(outputDir, "setup.json"),
+    setupServer: setupJson?.data?.server ?? null,
+    startPath: join(outputDir, "start.json"),
+  };
+  const metadataPath = join(outputDir, "metadata.json");
+  await fs.writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`);
+
+  await exportEnv("JOURNEY_APP_DIR", appDir, fs.appendFile, env);
+  await exportEnv("JOURNEY_APP_URL", appUrl, fs.appendFile, env);
+  await exportEnv("JOURNEY_OUTPUT_DIR", outputDir, fs.appendFile, env);
+  await exportOutput("app_dir", appDir, fs.appendFile, env);
+  await exportOutput("output_dir", outputDir, fs.appendFile, env);
+
+  if (options.logMetadata !== false) {
+    console.log(JSON.stringify(metadata, null, 2));
+  }
+  return metadata;
 }
 
-const metadata = {
-  appDir,
-  backendUrl,
-  cliPackage,
-  createNextAppVersion,
-  outputDir,
-  registryUrl,
-  sdkNextPackage,
-  setupPath,
-};
-const metadataPath = join(outputDir, "metadata.json");
-await writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`);
+export function cliStepArgs(cliPackage, stepArgs) {
+  return ["--yes", `${cliPackage}@alpha`, ...stepArgs, "--non-interactive", "--json"];
+}
 
-await exportEnv("JOURNEY_APP_DIR", appDir);
-await exportEnv("JOURNEY_APP_URL", "http://localhost:3000");
-await exportEnv("JOURNEY_OUTPUT_DIR", outputDir);
-await exportOutput("app_dir", appDir);
-await exportOutput("output_dir", outputDir);
+async function runCliJsonStep(input) {
+  const result = await input.runCapture("npx", cliStepArgs(input.cliPackage, input.stepArgs), {
+    cwd: input.appDir,
+    env: input.env,
+  });
+  await input.writeFile(join(input.outputDir, `${input.step}.json`), result.stdout);
+  await input.writeFile(join(input.outputDir, `${input.step}.stderr.log`), result.stderr);
 
-console.log(JSON.stringify(metadata, null, 2));
+  let parsed;
+  try {
+    parsed = JSON.parse(result.stdout);
+  } catch (error) {
+    throw new Error(`${input.step} stdout was not JSON: ${String(error)}\n${result.stdout}`, {
+      cause: error,
+    });
+  }
 
-async function packageName(relativePath) {
+  if (result.code !== 0) {
+    throw new Error(`${input.step} exited ${result.code}: ${parsed.message ?? result.stderr}`);
+  }
+  if (parsed.status !== "ok") {
+    throw new Error(`${input.step} returned status ${JSON.stringify(parsed.status)}`);
+  }
+  return parsed;
+}
+
+async function collectLocalRuntimeLogs(input) {
+  let result;
+  try {
+    result = await input.runCapture(
+      "npx",
+      cliStepArgs(input.cliPackage, ["logs", "--tail", "400"]),
+      { cwd: input.appDir, env: input.env },
+    );
+  } catch (error) {
+    await input.writeFile(
+      join(input.outputDir, "logs.stderr.log"),
+      `failed to collect local runtime logs: ${error.message}\n`,
+    );
+    return;
+  }
+  await input.writeFile(join(input.outputDir, "logs.json"), result.stdout);
+  await input.writeFile(join(input.outputDir, "logs.stderr.log"), result.stderr);
+}
+
+async function assertNoNestedApp(appDir, readFileFn) {
+  try {
+    await readFileFn(join(appDir, "myapp", "package.json"), "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return;
+    }
+    throw error;
+  }
+  throw new Error("setup scaffolded a nested myapp directory instead of using the app root");
+}
+
+async function packageName(relativePath, options) {
   const pkg = JSON.parse(
-    await readFile(join(repoRoot, relativePath, "package.json"), "utf8"),
+    await options.readFile(join(options.repoRoot, relativePath, "package.json"), "utf8"),
   );
   if (typeof pkg.name !== "string" || pkg.name.length === 0) {
     throw new Error(`${relativePath}/package.json has no name`);
@@ -130,15 +209,15 @@ async function packageName(relativePath) {
   return pkg.name;
 }
 
-function npmEnvironment() {
-  const env = { ...process.env };
-  for (const key of Object.keys(env)) {
+function npmEnvironment(env, registryUrl) {
+  const next = { ...env };
+  for (const key of Object.keys(next)) {
     if (key.startsWith("npm_config_")) {
-      delete env[key];
+      delete next[key];
     }
   }
   return {
-    ...env,
+    ...next,
     npm_config_audit: "false",
     npm_config_fund: "false",
     npm_config_registry: registryUrl,
@@ -146,7 +225,7 @@ function npmEnvironment() {
   };
 }
 
-function run(command, args, options) {
+function runCapture(command, args, options) {
   return new Promise((resolveRun, reject) => {
     const child = spawn(command, args, {
       ...options,
@@ -164,25 +243,26 @@ function run(command, args, options) {
     });
     child.on("error", reject);
     child.on("close", (code) => {
-      if (code === 0) {
-        resolveRun({ stdout, stderr });
-        return;
-      }
-      reject(
-        new Error(
-          `${command} ${args.join(" ")} exited ${code}\nSTDOUT:\n${stdout}\nSTDERR:\n${stderr}`,
-        ),
-      );
+      resolveRun({ code: code ?? 1, stdout, stderr });
     });
   });
 }
 
-async function exportEnv(name, value) {
-  if (!process.env.GITHUB_ENV) return;
-  await appendFile(process.env.GITHUB_ENV, `${name}=${value}\n`);
+async function exportEnv(name, value, appendFileFn, env) {
+  if (!env.GITHUB_ENV) return;
+  await appendFileFn(env.GITHUB_ENV, `${name}=${value}\n`);
 }
 
-async function exportOutput(name, value) {
-  if (!process.env.GITHUB_OUTPUT) return;
-  await appendFile(process.env.GITHUB_OUTPUT, `${name}=${value}\n`);
+async function exportOutput(name, value, appendFileFn, env) {
+  if (!env.GITHUB_OUTPUT) return;
+  await appendFileFn(env.GITHUB_OUTPUT, `${name}=${value}\n`);
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try {
+    await prepareNextApp();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
 }

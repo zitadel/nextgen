@@ -137,13 +137,13 @@ The local reproduction command for the fresh-app consumer journey gate is:
 corepack pnpm run journey
 ```
 
-This runner requires Docker for Verdaccio. By default it starts the backend from
-source with embedded Postgres, ensures the Playwright Chromium browsers are
-installed, builds and packs local npm packages with pnpm, creates a temporary
-Next.js app outside the repo, runs CLI setup through npm, starts the generated
-app on `localhost`, and runs Playwright with one worker. Use
-`-- --backend image --image <docker-tag>` to run the backend through the local
-compose profile for image parity.
+This runner requires Docker for Verdaccio and the CLI-managed local runtime. By
+default it builds a local runtime image, ensures the Playwright Chromium
+browsers are installed, builds and packs local npm packages with pnpm, creates
+an empty app directory outside the repo, runs `npx @zitadel/cli@alpha doctor`,
+`start`, and `setup --framework next --server local`, starts the generated app
+on `localhost`, and runs Playwright with one worker. Use
+`-- --image <docker-tag>` to reuse an existing local runtime image.
 
 In CI the dedicated `node-e2e` job (in `.github/workflows/ci.yml`) gates merges
 on the checked-in demo integrations. The separate `consumer-journey-e2e` job is
@@ -170,7 +170,7 @@ upward**. When deciding where a new test belongs:
 
 The consumer journey suite is the exception to the checked-in demo ownership
 rule: it belongs in `apps/cli-journey-e2e/` and must exercise a freshly
-generated app because it protects the real CLI onboarding path.
+generated app because it protects the customer local setup path.
 
 A new test belongs at e2e level only when the boundary it covers is
 exclusively the framework integration (middleware, cookie origin, full
