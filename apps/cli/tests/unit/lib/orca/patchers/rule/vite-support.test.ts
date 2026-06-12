@@ -13,6 +13,8 @@ describe("viteProxyEdit", () => {
     expect(out).toContain("Bearer sk_");
     expect(out).toContain("http://127.0.0.1:8099");
     expect(out).toContain("5173");
+    // Bind the exact issuer port or fail — never drift to a port not in previewOrigins.
+    expect(out).toContain("strictPort: true");
     expect(out).toContain("changeOrigin: false");
     // No file reads — the bearer comes from env, not the secret file.
     expect(out).not.toContain("readFileSync");

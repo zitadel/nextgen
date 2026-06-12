@@ -57,6 +57,9 @@ export function viteProxyEdit(
     if (config.server.port === undefined) {
       config.server.port = devPort;
     }
+    if (config.server.strictPort === undefined) {
+      config.server.strictPort = true;
+    }
     if (config.server.proxy === undefined) {
       config.server.proxy = {};
     }
