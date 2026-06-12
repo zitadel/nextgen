@@ -208,11 +208,18 @@ For customer-local runtime workflows, agents should prefer
 
 ## Release, Licensing, And Secrets
 
-- PR titles must pass the Semantic PR check. Use the conventional format
-  `<type>(optional-scope): <summary>` and treat `.github/semantic.yml` as the
+- PR titles must pass the Semantic PR check. Before publishing, opening, or
+  renaming a PR, inspect `.github/semantic.yml` and use the conventional format
+  `<type>(optional-scope): <summary>`. Treat `.github/semantic.yml` as the
   source of truth for allowed types and scopes. Scopes are optional; omit the
-  scope instead of inventing one. For documentation-only changes, use the
-  `docs` type, for example `docs: add preview status disclaimer`.
+  scope when unsure or when no allowed scope fits. Do not invent scopes. For
+  documentation-only changes, use the `docs` type, for example
+  `docs: add preview status disclaimer`.
+- Agent-created or agent-updated PRs must include a concise description before
+  handoff. Use sections for `Summary`, `Validation`,
+  `Release notes / changeset`, and `Notes`. List the exact validation commands
+  run; if validation was not run, say so explicitly. Mention changeset status
+  for user-visible package changes.
 - User-visible changes to a public npm package need a changeset. The public
   packages are `@zitadel/cli` (`apps/cli/`), `@zitadel/api`,
   `@zitadel/components`, `@zitadel/sdk-core`, `@zitadel/sdk-next`,
