@@ -107,6 +107,22 @@ describe("check-alpha-release-plan script", () => {
     ).rejects.toThrow("Changesets must not create package-shaped GitHub Releases");
   });
 
+  it("rejects a workflow that lets empty changesets suppress npm publishing", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      ciWorkflow: validCiWorkflow().replace(
+        [
+          "      - name: Prune empty changesets before publish decision",
+          "        run: node scripts/release-alpha-train.mjs prune-empty-changesets",
+        ].join("\n"),
+        "",
+      ),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("must prune empty changesets before Changesets decides whether to publish");
+  });
+
   it("rejects alpha release notes generated inside the checkout", async () => {
     const { cwd, statusPath } = await fixtureRepo({
       ciWorkflow: validCiWorkflow().replace(
@@ -241,7 +257,11 @@ function validCiWorkflow(): string {
     "      packages: write",
     "      id-token: write",
     "    steps:",
-    "      - uses: changesets/action@v1",
+    "      - name: Prune empty changesets before publish decision",
+    "        run: node scripts/release-alpha-train.mjs prune-empty-changesets",
+    "",
+    "      - name: Create release PR or publish to npm",
+    "        uses: changesets/action@v1",
     "        with:",
     "          createGithubReleases: false",
     "      - id: alpha-status",

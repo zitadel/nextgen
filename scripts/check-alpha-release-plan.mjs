@@ -177,6 +177,17 @@ export async function validateReleaseTooling(cwd, readFileFn = readFileDefault) 
     "createGithubReleases: false",
     "Changesets must not create package-shaped GitHub Releases",
   );
+  assertJobContains(
+    ciWorkflow,
+    "release-alpha-train",
+    [
+      "      - name: Prune empty changesets before publish decision",
+      "        run: node scripts/release-alpha-train.mjs prune-empty-changesets",
+      "",
+      "      - name: Create release PR or publish to npm",
+    ].join("\n"),
+    "release-alpha-train must prune empty changesets before Changesets decides whether to publish",
+  );
   assertContains(
     ciWorkflow,
     "node scripts/release-alpha-train.mjs status --published \"$PUBLISHED\" --remote false",

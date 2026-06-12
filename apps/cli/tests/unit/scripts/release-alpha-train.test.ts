@@ -7,6 +7,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 type ReleaseAlphaTrainModule = {
   PUBLIC_PACKAGE_MANIFESTS: string[];
   PUBLIC_PACKAGE_NAMES: string[];
+  pruneEmptyChangesets: (options: { cwd: string }) => Promise<string[]>;
   inspectAlphaReleaseTrain: (options: {
     cwd: string;
     execFile?: ExecFileMock;
@@ -147,6 +148,65 @@ describe("release-alpha-train script", () => {
     });
   });
 
+  it("ignores prerelease-tracked and empty changesets when recovering a versioned train", async () => {
+    const cwd = await fixtureRepo({
+      changesets: {
+        "add-spa-sdks.md": releaseChangeset("@zitadel/cli", "minor"),
+        "ci-only.md": emptyChangeset(),
+      },
+      preChangesets: ["add-spa-sdks"],
+    });
+
+    await expect(
+      releaseAlphaTrain.inspectAlphaReleaseTrain({
+        cwd,
+        execFile: commandMock(),
+        remote: false,
+      }),
+    ).resolves.toMatchObject({
+      shouldComplete: true,
+      skipReason: "",
+    });
+  });
+
+  it("blocks unconsumed release changesets before npm publishes", async () => {
+    const cwd = await fixtureRepo({
+      changesets: {
+        "feature.md": releaseChangeset("@zitadel/cli", "minor"),
+      },
+    });
+
+    await expect(
+      releaseAlphaTrain.inspectAlphaReleaseTrain({
+        cwd,
+        execFile: commandMock(),
+        remote: false,
+      }),
+    ).resolves.toMatchObject({
+      shouldComplete: false,
+      skipReason: "pending changesets: feature.md",
+    });
+  });
+
+  it("prunes empty changesets before Changesets decides whether to publish", async () => {
+    const cwd = await fixtureRepo({
+      changesets: {
+        "ci-only.md": emptyChangeset(),
+        "feature.md": releaseChangeset("@zitadel/cli", "minor"),
+      },
+    });
+
+    await expect(releaseAlphaTrain.pruneEmptyChangesets({ cwd })).resolves.toEqual([
+      "ci-only.md",
+    ]);
+    await expect(readFile(join(cwd, ".changeset/ci-only.md"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+    await expect(readFile(join(cwd, ".changeset/feature.md"), "utf8")).resolves.toContain(
+      "@zitadel/cli",
+    );
+  });
+
   it("skips GoReleaser when both the GitHub Release and container image already exist", async () => {
     const cwd = await fixtureRepo();
 
@@ -196,8 +256,10 @@ describe("release-alpha-train script", () => {
 
 async function fixtureRepo(
   options: {
+    changesets?: Record<string, string>;
     versions?: Record<string, string>;
     fixedGroupExtra?: string[];
+    preChangesets?: string[];
   } = {},
 ): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-alpha-train-"));
@@ -231,8 +293,34 @@ async function fixtureRepo(
       2,
     )}\n`,
   );
+  if (options.preChangesets) {
+    await writeFile(
+      join(cwd, ".changeset/pre.json"),
+      `${JSON.stringify(
+        {
+          mode: "pre",
+          tag: "alpha",
+          initialVersions: {},
+          changesets: options.preChangesets,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+  }
+  for (const [file, content] of Object.entries(options.changesets ?? {})) {
+    await writeFile(join(cwd, ".changeset", file), content);
+  }
 
   return cwd;
+}
+
+function releaseChangeset(name: string, type: "major" | "minor" | "patch"): string {
+  return ["---", `"${name}": ${type}`, "---", "", "Release package change.", ""].join("\n");
+}
+
+function emptyChangeset(): string {
+  return ["---", "---", "", "CI-only change.", ""].join("\n");
 }
 
 function commandMock(
