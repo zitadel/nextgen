@@ -19,6 +19,11 @@ type CreateUserInput struct {
 	User      map[string]any
 }
 
+type UserAction interface {
+	Prepare(ctx context.Context) error
+	Apply(ctx context.Context, db database.QueryExecutor) error
+}
+
 type SetPasswordInput struct {
 	ProjectID                string
 	UserID                   string
@@ -65,35 +70,53 @@ func NewUserService(
 	}
 }
 
+func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (err error) {
+	for _, action := range actions {
+		err = action.Prepare(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	tx, err := s.pool.Begin(ctx, nil)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to create transaction")
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(ctx)
+		}
+	}()
+
+	for _, action := range actions {
+		err := action.Apply(ctx, tx)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to commit transaction")
+	}
+	return nil
+}
+
 func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ map[string]any, err error) {
-	schemaURL, err := domain.SchemaFromUserMap(input.User)
+	// CreateUser does not need a transaction, so we don't wrap it in an `ApplyActions` call
+
+	action := WithCreateUser(input, s.userRepo, s.schemaRepo, s.pool)
+	err = action.Prepare(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	schemaEntity, err := s.schemaRepo.GetByID(ctx, s.pool, input.ProjectID, schemaURL)
-	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return nil, domain.ErrUserInvalid().WithDetails("$schema is not known to the system. First create a schema, then create users.")
-		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to get schema from database")
-	}
-
-	createUser, err := domain.NewCreateUser(input.ProjectID, input.TeamID, schemaEntity.Schema, input.User)
+	err = action.Apply(ctx, s.pool)
 	if err != nil {
 		return nil, err
 	}
 
-	err = s.userRepo.Create(ctx, s.pool, createUser)
-	if err != nil {
-		if _, ok := errors.AsType[*database.UniqueError](err); ok {
-			return nil, domain.ErrUserAlreadyExists().WithParent(err)
-		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to create user in the database")
-	}
-
-	input.User["id"] = createUser.ID
-	return input.User, nil
+	return action.User, nil
 }
 
 func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[string]any, error) {
@@ -115,45 +138,8 @@ func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[
 }
 
 func (s *UserService) SetPassword(ctx context.Context, input SetPasswordInput) (err error) {
-	hash, err := domain.HashPassword(input.Password, s.hasher)
-	if err != nil {
-		return err
-	}
-
-	tx, err := s.pool.Begin(ctx, nil)
-	if err != nil {
-		return domain.ErrInternal(err).WithMessage("failed to create transaction")
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(ctx)
-		}
-	}()
-
-	err = s.passwordRepo.DeleteByUserID(ctx, tx, input.ProjectID, input.UserID)
-	if err != nil {
-		return domain.ErrInternal(err).WithMessage("failed to remove old password from database")
-	}
-
-	err = s.passwordRepo.Create(ctx, tx, &domain.CreateUserPassword{
-		ProjectID:      input.ProjectID,
-		UserID:         input.UserID,
-		EncodedHash:    hash,
-		ChangeRequired: input.IsPasswordChangeRequired,
-		VerificationID: nil, // TODO what should I do with this?
-	})
-	if err != nil {
-		if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
-			return domain.ErrUserNotFound()
-		}
-		return domain.ErrInternal(err).WithMessage("failed to set initial password")
-	}
-
-	err = tx.Commit(ctx)
-	if err != nil {
-		return domain.ErrInternal(err).WithMessage("failed to commit transaction while setting password")
-	}
-	return nil
+	action := WithSetUserPassword(input, s.hasher, s.passwordRepo)
+	return s.ApplyActions(ctx, action)
 }
 
 func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]byte, error) {
@@ -182,4 +168,102 @@ func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]by
 	}
 
 	return userbs, nil
+}
+
+// ---- CreateUser opts -------------------------------------------------------------
+
+type CreateUserAction struct {
+	CreateUserInput
+
+	userRepo   domain.UserRepository
+	schemaRepo domain.JSONSchemaRepository
+	db         database.Pool
+
+	createUser *domain.CreateUser
+}
+
+func WithCreateUser(input CreateUserInput, userRepo domain.UserRepository, schemaRepo domain.JSONSchemaRepository, db database.Pool) *CreateUserAction {
+	return &CreateUserAction{
+		CreateUserInput: input,
+		userRepo:        userRepo,
+		schemaRepo:      schemaRepo,
+		db:              db,
+	}
+}
+
+func (o *CreateUserAction) Prepare(ctx context.Context) error {
+	schemaURL, err := domain.SchemaFromUserMap(o.User)
+	if err != nil {
+		return err
+	}
+
+	schemaEntity, err := o.schemaRepo.GetByID(ctx, o.db, o.ProjectID, schemaURL)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return domain.ErrUserInvalid().WithDetails("$schema is not known to the system. First create a schema, then create users.")
+		}
+		return domain.ErrInternal(err).WithMessage("failed to get schema from database")
+	}
+
+	o.createUser, err = domain.NewCreateUser(o.ProjectID, o.TeamID, schemaEntity.Schema, o.User)
+	if err != nil {
+		return err
+	}
+
+	o.User["id"] = o.createUser.ID
+	return nil
+}
+func (o *CreateUserAction) Apply(ctx context.Context, db database.QueryExecutor) error {
+	err := o.userRepo.Create(ctx, db, o.createUser)
+	if err != nil {
+		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+			return domain.ErrUserAlreadyExists().WithParent(err)
+		}
+		return domain.ErrInternal(err).WithMessage("failed to create user in the database")
+	}
+
+	return nil
+}
+
+type SetPasswordUserAction struct {
+	SetPasswordInput
+
+	hasher       crypto.Hasher
+	passwordRepo domain.UserPasswordRepository
+
+	hash string
+}
+
+func WithSetUserPassword(input SetPasswordInput, hasher crypto.Hasher, passwordRepo domain.UserPasswordRepository) *SetPasswordUserAction {
+	return &SetPasswordUserAction{
+		SetPasswordInput: input,
+		hasher:           hasher,
+		passwordRepo:     passwordRepo,
+	}
+}
+func (o *SetPasswordUserAction) Prepare(_ context.Context) (err error) {
+	o.hash, err = domain.HashPassword(o.Password, o.hasher)
+	return err
+
+}
+
+func (o *SetPasswordUserAction) Apply(ctx context.Context, db database.QueryExecutor) error {
+	err := o.passwordRepo.DeleteByUserID(ctx, db, o.ProjectID, o.UserID)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to remove old password from database")
+	}
+
+	err = o.passwordRepo.Create(ctx, db, &domain.CreateUserPassword{
+		ProjectID:      o.ProjectID,
+		UserID:         o.UserID,
+		EncodedHash:    o.hash,
+		ChangeRequired: o.IsPasswordChangeRequired,
+	})
+	if err != nil {
+		if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
+			return domain.ErrUserNotFound()
+		}
+		return domain.ErrInternal(err).WithMessage("failed to set initial password")
+	}
+	return nil
 }
