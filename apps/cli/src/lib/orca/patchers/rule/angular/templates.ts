@@ -76,7 +76,6 @@ function setBearer(proxyReq) {
 module.exports = {
   "${PROXY_PATH}": {
     target: config.server,
-    secure: false,
     changeOrigin: false,
     pathRewrite: { "^${PROXY_PATH}": "" },
     onProxyReq: setBearer,

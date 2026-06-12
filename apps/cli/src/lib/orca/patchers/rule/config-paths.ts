@@ -1,9 +1,11 @@
 /**
  * The module extensions a JS/TS config file can use, in resolution priority.
  * Shared so every config-editing patcher (Vite, Nuxt, …) accepts the same set
- * instead of hardcoding a partial list per framework.
+ * instead of hardcoding a partial list per framework. CommonJS extensions
+ * (`cts`/`cjs`) are excluded: magicast injects ESM `import`/`import.meta.url`,
+ * which a CommonJS config file cannot evaluate.
  */
-const CONFIG_EXTENSIONS = ["ts", "mts", "cts", "js", "mjs", "cjs"] as const;
+const CONFIG_EXTENSIONS = ["ts", "mts", "js", "mjs"] as const;
 
 /**
  * Candidate config filenames for `basename` across every supported extension,

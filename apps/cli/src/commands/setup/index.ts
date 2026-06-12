@@ -110,10 +110,17 @@ export default class Setup extends BaseCommand {
     // the issuer, the registered origin, and the patched dev-server config all
     // agree (and several apps can be scaffolded on distinct ports).
     if (flags["dev-port"] !== undefined) {
+      const devPort = flags["dev-port"];
+      if (!Number.isInteger(devPort) || devPort < 1 || devPort > 65535) {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `--dev-port must be an integer in 1..65535, got ${devPort}`,
+        );
+      }
       framework = {
         ...framework,
-        devPort: flags["dev-port"],
-        url: issuerFromPort(flags["dev-port"]),
+        devPort,
+        url: issuerFromPort(devPort),
       };
     }
 
@@ -141,7 +148,7 @@ export default class Setup extends BaseCommand {
     // Register the app's own origin so the backend's origin check allows
     // requests the dev proxy forwards from it.
     const project = dryRun
-      ? dryRunProject()
+      ? dryRunProject(issuer)
       : await unauthClient.createProject({ previewOrigins: [issuer] });
     consola.success(`Created project ${project.id}`);
 
@@ -247,12 +254,12 @@ async function resolveScaffoldFramework(
 }
 
 /** A deterministic stand-in project for `--dry-run`, so no remote call is made. */
-function dryRunProject(): CreateProject201 {
+function dryRunProject(issuer: string): CreateProject201 {
   return {
     id: "dry-run-0000",
     projectSecret: "sk_proj_dry_run_full",
     previewSecret: "sk_proj_dry_run_preview",
-    previewOrigins: [],
+    previewOrigins: [issuer],
     createdAt: "2026-04-21T14:03:11.000Z",
   };
 }
