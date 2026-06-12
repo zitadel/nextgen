@@ -19,14 +19,14 @@ export class VuePatcher extends AbstractRulePatcher implements ViteSupport {
     return framework === "vue";
   }
 
-  viteProxyOp(devPort: number): FileOp {
-    return buildViteProxyOp(devPort);
+  viteProxyOp(devPort: number, server: string): FileOp {
+    return buildViteProxyOp(devPort, server);
   }
 
   protected routeOps(ctx: PatchContext): FileOp[] {
     return [
       { kind: "write", path: "src/App.vue", contents: appTemplate() },
-      this.viteProxyOp(ctx.framework.devPort),
+      this.viteProxyOp(ctx.framework.devPort, ctx.server),
       { kind: "merge-env", path: ".env.example", entries: { VITE_ZITADEL_PROJECT_ID: "" } },
       {
         kind: "merge-env",

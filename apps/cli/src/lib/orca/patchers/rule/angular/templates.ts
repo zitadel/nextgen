@@ -57,46 +57,30 @@ export function appTemplateHtml(): string {
 
 /**
  * The managed `proxy.conf.cjs` for `ng serve` (Angular's Vite-based dev server).
- * Local-dev stand-in for `@zitadel/edge-proxy`: forwards `/__nextgen/*` to the
- * backend (read from `zitadel.json`), strips the prefix, and injects the project
- * service-key on `POST /sessions/exchange` (read from the gitignored
- * `.zitadel/secret`). Provides both `onProxyReq` (http-proxy-middleware) and
- * `configure` (Vite) hooks so whichever Angular's dev server honors will fire.
+ * `proxy.conf.cjs` for `ng serve`: forwards `/__nextgen/*` to the backend (from
+ * `zitadel.json`), strips the prefix, and attaches the project's `sk_<project_id>`
+ * bearer to every proxied request. Both `onProxyReq` (http-proxy-middleware) and
+ * `configure` (Vite) hooks are set so whichever Angular's dev server honors fires.
  */
 export function proxyConfTemplate(): string {
   return `${MANAGED_MARKER}
 const { readFileSync } = require("node:fs");
 
-function backendTarget() {
-  try {
-    return JSON.parse(readFileSync("zitadel.json", "utf8")).server || "http://localhost:8080";
-  } catch {
-    return "http://localhost:8080";
-  }
-}
+const config = JSON.parse(readFileSync("zitadel.json", "utf8"));
+const bearer = \`Bearer sk_\${config.project}\`;
 
-function injectBearer(proxyReq, req) {
-  if (req.method === "POST" && String(req.url || "").includes("/sessions/exchange")) {
-    try {
-      const secret = JSON.parse(readFileSync(".zitadel/secret", "utf8")).project_secret;
-      if (secret) {
-        proxyReq.setHeader("authorization", "Bearer " + secret);
-      }
-    } catch {
-      // secret not provisioned yet — leave the request unauthenticated
-    }
-  }
+function setBearer(proxyReq) {
+  proxyReq.setHeader("authorization", bearer);
 }
 
 module.exports = {
   "${PROXY_PATH}": {
-    target: backendTarget(),
+    target: config.server,
     secure: false,
-    // No changeOrigin: forward the app's own Host so the backend's origin check
-    // (which falls back to Host for same-origin requests) sees the app origin.
+    changeOrigin: false,
     pathRewrite: { "^${PROXY_PATH}": "" },
-    onProxyReq: injectBearer,
-    configure: (proxy) => proxy.on("proxyReq", injectBearer),
+    onProxyReq: setBearer,
+    configure: (proxy) => proxy.on("proxyReq", setBearer),
   },
 };
 `;

@@ -23,14 +23,14 @@ export class ReactPatcher extends AbstractRulePatcher implements ViteSupport {
     return framework === "react";
   }
 
-  viteProxyOp(devPort: number): FileOp {
-    return buildViteProxyOp(devPort);
+  viteProxyOp(devPort: number, server: string): FileOp {
+    return buildViteProxyOp(devPort, server);
   }
 
   protected routeOps(ctx: PatchContext): FileOp[] {
     return [
       { kind: "write", path: "src/App.tsx", contents: appTemplate() },
-      this.viteProxyOp(ctx.framework.devPort),
+      this.viteProxyOp(ctx.framework.devPort, ctx.server),
       // Vite only exposes VITE_-prefixed vars to client code (import.meta.env).
       { kind: "merge-env", path: ".env.example", entries: { VITE_ZITADEL_PROJECT_ID: "" } },
       {

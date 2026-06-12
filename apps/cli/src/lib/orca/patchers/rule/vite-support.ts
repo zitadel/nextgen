@@ -7,50 +7,30 @@ import { PROXY_PATH } from "./proxy";
 
 /**
  * Shared Vite dev-server proxy injected into `vite.config.ts` for the SPA
- * frameworks (React, Vue). It is a local-dev stand-in for `@zitadel/edge-proxy`:
- * it forwards same-origin `/__nextgen/*` calls to the backend (read from
- * `zitadel.json`), strips the prefix, and injects the project service-key bearer
- * on `POST /sessions/exchange` (read from the gitignored `.zitadel/secret`, so
- * the secret never enters source or the client bundle). Inserted verbatim as an
- * expression by magicast; the only symbol it needs is `readFileSync`.
+ * frameworks (React, Vue). It forwards same-origin `/__nextgen/*` calls to the
+ * backend, strips the prefix, and attaches the project's `sk_<project_id>`
+ * bearer (read from `ZITADEL_PROJECT_ID` in the env) to every proxied request.
  */
-
-/** Raw source for the `server.proxy["/__nextgen"]` entry. */
-export const PROXY_ENTRY_CODE = `{
-  target: (() => {
-    try {
-      return JSON.parse(readFileSync("zitadel.json", "utf8")).server ?? "http://localhost:8080";
-    } catch {
-      return "http://localhost:8080";
-    }
-  })(),
-  // No changeOrigin: the backend validates the request origin from the Host
-  // header (same-origin browser requests send no Origin header), so the proxy
-  // must forward the app's own Host — not rewrite it to the backend's — or the
-  // origin check rejects it.
+function proxyEntryCode(server: string): string {
+  return `{
+  target: ${JSON.stringify(server)},
+  changeOrigin: false,
   rewrite: (path) => path.replace(/^\\/__nextgen/, ""),
   configure: (proxy) => {
-    proxy.on("proxyReq", (proxyReq, req) => {
-      if (req.method === "POST" && String(req.url ?? "").includes("/sessions/exchange")) {
-        try {
-          const secret = JSON.parse(readFileSync(".zitadel/secret", "utf8")).project_secret;
-          if (secret) {
-            proxyReq.setHeader("authorization", "Bearer " + secret);
-          }
-        } catch {
-          // secret not provisioned yet — leave the request unauthenticated
-        }
-      }
+    const bearer = \`Bearer sk_\${loadEnv("development", dirname(fileURLToPath(import.meta.url)), "ZITADEL_").ZITADEL_PROJECT_ID}\`;
+    proxy.on("proxyReq", (proxyReq) => {
+      proxyReq.setHeader("authorization", bearer);
     });
   },
 }`;
+}
 
-/** The import the injected proxy entry depends on. */
-export const PROXY_IMPORT = {
-  from: "node:fs",
-  imported: "readFileSync",
-  local: "readFileSync",
-} as const;
+/** The imports the injected proxy entry depends on. */
+const PROXY_IMPORTS = [
+  { from: "vite", imported: "loadEnv", local: "loadEnv" },
+  { from: "node:url", imported: "fileURLToPath", local: "fileURLToPath" },
+  { from: "node:path", imported: "dirname", local: "dirname" },
+] as const;
 
 /**
  * Builds the pure `edit` transform that the file-writer applies to the user's
@@ -61,7 +41,10 @@ export const PROXY_IMPORT = {
  * or the config object cannot be reached (function-built/exotic configs), with a
  * hint to add the block manually.
  */
-export function viteProxyEdit(devPort: number): (source: string | undefined) => string {
+export function viteProxyEdit(
+  devPort: number,
+  server: string,
+): (source: string | undefined) => string {
   return (source) => {
     const mod = parseConfigModule(source, "vite.config.ts");
     const config = resolveDefaultExportObject(mod, "vite.config.ts");
@@ -78,10 +61,12 @@ export function viteProxyEdit(devPort: number): (source: string | undefined) => 
       config.server.proxy = {};
     }
     if (config.server.proxy[PROXY_PATH] === undefined) {
-      config.server.proxy[PROXY_PATH] = builders.raw(PROXY_ENTRY_CODE);
+      config.server.proxy[PROXY_PATH] = builders.raw(proxyEntryCode(server));
     }
-    if (!importIsPresent(mod, PROXY_IMPORT.local)) {
-      mod.imports.$add({ ...PROXY_IMPORT });
+    for (const imp of PROXY_IMPORTS) {
+      if (!importIsPresent(mod, imp.local)) {
+        mod.imports.$add({ ...imp });
+      }
     }
     const code = generateCode(mod).code;
     return code.endsWith("\n") ? code : `${code}\n`;
@@ -105,10 +90,10 @@ export const VITE_CONFIG_PATHS = configCandidates("vite.config");
  */
 export interface ViteSupport {
   /** The `edit` file-op that merges the `/__nextgen` proxy into the Vite config. */
-  viteProxyOp(devPort: number): FileOp;
+  viteProxyOp(devPort: number, server: string): FileOp;
 }
 
 /** Builds the shared Vite-config proxy {@link FileOp} for a {@link ViteSupport} patcher. */
-export function buildViteProxyOp(devPort: number): FileOp {
-  return { kind: "edit", path: [...VITE_CONFIG_PATHS], edit: viteProxyEdit(devPort) };
+export function buildViteProxyOp(devPort: number, server: string): FileOp {
+  return { kind: "edit", path: [...VITE_CONFIG_PATHS], edit: viteProxyEdit(devPort, server) };
 }

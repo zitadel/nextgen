@@ -2,16 +2,21 @@ import { describe, expect, it } from "vitest";
 
 import { viteProxyEdit } from "../../../../../../src/lib/orca/patchers/rule/vite-support";
 
-const edit = viteProxyEdit(5173);
+const edit = viteProxyEdit(5173, "http://127.0.0.1:8099");
 
 describe("viteProxyEdit", () => {
-  it("adds the /__nextgen proxy, the readFileSync import, and the derived port", () => {
+  it("adds the /__nextgen proxy with the env-derived sk_ bearer and the backend target", () => {
     const out = edit('import { defineConfig } from "vite";\nexport default defineConfig({});');
     expect(out).toContain("/__nextgen");
-    expect(out).toContain("readFileSync");
+    expect(out).toContain("loadEnv");
+    expect(out).toContain("ZITADEL_PROJECT_ID");
+    expect(out).toContain("Bearer sk_");
+    expect(out).toContain("http://127.0.0.1:8099");
     expect(out).toContain("5173");
-    // Must NOT rewrite the Host header — the backend's origin check reads it.
-    expect(out).not.toContain("changeOrigin: true");
+    expect(out).toContain("changeOrigin: false");
+    // No file reads — the bearer comes from env, not the secret file.
+    expect(out).not.toContain("readFileSync");
+    expect(out).not.toContain(".zitadel/secret");
   });
 
   it("preserves the user's existing plugins", () => {
