@@ -179,7 +179,7 @@ async function collectLocalRuntimeLogs(input) {
   } catch (error) {
     await input.writeFile(
       join(input.outputDir, "logs.stderr.log"),
-      `failed to collect local runtime logs: ${error.message}\n`,
+      `failed to collect local runtime logs: ${errorMessage(error)}\n`,
     );
     return;
   }
@@ -262,7 +262,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     await prepareNextApp();
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
+    console.error(errorMessage(error));
     process.exit(1);
   }
+}
+
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
 }

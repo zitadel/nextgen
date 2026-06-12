@@ -29,7 +29,7 @@ const packageDirs = [
   "packages/sdk-angular",
 ];
 
-const options = parseArgs(process.argv.slice(2));
+const options = parseArgsOrExit(process.argv.slice(2));
 const workDir = resolve(
   options.workDir || (await mkdtemp(join(tmpdir(), "zitadel-cli-journey-local-"))),
 );
@@ -150,7 +150,7 @@ try {
 } catch (error) {
   await collectDiagnostics();
   console.error("");
-  console.error(`[journey-local] failed: ${error.message}`);
+  console.error(`[journey-local] failed: ${errorMessage(error)}`);
   console.error(`[journey-local] diagnostics preserved in ${workDir}`);
   process.exitCode = 1;
 } finally {
@@ -164,6 +164,15 @@ try {
 
 process.exit(process.exitCode ?? 0);
 
+function parseArgsOrExit(args) {
+  try {
+    return parseArgs(args);
+  } catch (error) {
+    console.error(`[journey-local] ${errorMessage(error)}`);
+    process.exit(1);
+  }
+}
+
 function parseArgs(args) {
   const parsed = {
     image: "",
@@ -175,11 +184,14 @@ function parseArgs(args) {
     const arg = args[index];
     switch (arg) {
       case "--backend": {
-        const backend = readValue(args, ++index, arg);
-        if (!["source", "image"].includes(backend)) {
-          throw new Error(`--backend must be "source" or "image", got ${backend}`);
-        }
-        break;
+        readValue(args, ++index, arg);
+        throw new Error(
+          [
+            "--backend was removed from the journey runner.",
+            "The journey now always exercises `npx @zitadel/cli@alpha start`.",
+            "Remove `--backend`, or pass `--image <docker-tag>` / set ZITADEL_LOCAL_IMAGE to choose the local runtime image.",
+          ].join(" "),
+        );
       }
       case "--image": {
         parsed.image = readValue(args, ++index, arg);
@@ -501,7 +513,7 @@ function runCapture(command, args, optionsForRun = {}) {
 }
 
 function commandErrorDetail(error) {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = errorMessage(error);
   const lines = message
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -541,7 +553,7 @@ async function collectDiagnostics() {
       );
       await writeFile(composeLogPath, `${result.stdout}${result.stderr}`);
     } catch (error) {
-      await writeFile(composeLogPath, `failed to collect compose logs: ${error.message}\n`);
+      await writeFile(composeLogPath, `failed to collect compose logs: ${errorMessage(error)}\n`);
     }
   }
 
@@ -594,7 +606,7 @@ async function collectLocalRuntimeLogs() {
   } catch (error) {
     await writeFile(
       join(diagnosticsDir, "logs.stderr.log"),
-      `failed to collect local runtime logs: ${error.message}\n`,
+      `failed to collect local runtime logs: ${errorMessage(error)}\n`,
     );
   }
 }
@@ -623,7 +635,7 @@ async function cleanup() {
     try {
       await run("docker", composeArgs(["down", "-v", "--remove-orphans"]));
     } catch (error) {
-      console.error(`[journey-local] docker compose cleanup failed: ${error.message}`);
+      console.error(`[journey-local] docker compose cleanup failed: ${errorMessage(error)}`);
     }
   }
 }
@@ -636,7 +648,7 @@ async function resetLocalRuntime() {
       { cwd: appDir, env: npxEnv() },
     );
   } catch (error) {
-    console.error(`[journey-local] local runtime reset failed: ${error.message}`);
+    console.error(`[journey-local] local runtime reset failed: ${errorMessage(error)}`);
   }
 }
 
@@ -701,4 +713,8 @@ function npxEnv() {
 
 function log(message) {
   console.log(`[journey-local] ${message}`);
+}
+
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
 }

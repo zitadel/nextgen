@@ -138,6 +138,47 @@ test("collects local runtime logs when a CLI step fails", async () => {
   }
 });
 
+test("records log collection failures thrown as non-Error values", async () => {
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-journey-prepare-non-error-test-"));
+
+  try {
+    await assert.rejects(
+      prepareNextApp({
+        env: {
+          JOURNEY_CLI_PACKAGE: "@zitadel/cli",
+          JOURNEY_SDK_NEXT_PACKAGE: "@zitadel/sdk-next",
+          JOURNEY_WORK_DIR: workDir,
+        },
+        logMetadata: false,
+        runCapture: async (command, args) => {
+          if (args.includes("doctor")) {
+            return { code: 0, stdout: `${JSON.stringify(okEnvelope(args))}\n`, stderr: "" };
+          }
+          if (args.includes("start")) {
+            return {
+              code: 1,
+              stdout: `${JSON.stringify({ status: "error", message: "boom" })}\n`,
+              stderr: "start failed",
+            };
+          }
+          if (args.includes("logs")) {
+            throw null;
+          }
+          throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
+        },
+      }),
+      /start exited 1/,
+    );
+
+    assert.equal(
+      await readFile(join(workDir, "logs.stderr.log"), "utf8"),
+      "failed to collect local runtime logs: null\n",
+    );
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+});
+
 async function writeGeneratedApp(appDir, registryUrl) {
   await writeFile(
     join(appDir, "package.json"),
