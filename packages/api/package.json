@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/api",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "description": "Generated TypeScript API client for Zitadel NextGen",
   "license": "MIT",
   "type": "module",
