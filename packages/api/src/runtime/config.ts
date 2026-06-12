@@ -136,9 +136,12 @@ export function getZitadelConfig(): ZitadelProject | null {
 }
 
 /**
- * Reset internal state. **Test-only** — not exported from the package's
- * public API. Allows tests to call `configureZitadel()` multiple times
- * across isolated test cases without the write-once guard rejecting them.
+ * Reset internal state. **Test-only**, and not part of the supported
+ * public API even though the `./config` subpath ships every binding in
+ * this module: the leading `_` marks it as private and the behaviour
+ * is free to change without notice. Lets tests call `configureZitadel()`
+ * multiple times across isolated cases without the write-once guard
+ * rejecting them.
  */
 export function _resetConfigForTesting(): void {
   writeSlot(null);
