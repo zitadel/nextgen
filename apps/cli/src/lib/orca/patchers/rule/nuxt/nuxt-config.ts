@@ -6,6 +6,7 @@ import {
   parseConfigModule,
   resolveDefaultExportObject,
 } from "../utils/magicast";
+import { PROXY_PATH } from "../proxy";
 
 const NUXT_MODULE = "@zitadel/sdk-nuxt/module";
 
@@ -40,7 +41,7 @@ export function nuxtConfigEdit(opts: {
     }
     const publicConfig = ensureEditableObject(runtimeConfig, "public");
     if (publicConfig.nextgenProxyPath === undefined) {
-      publicConfig.nextgenProxyPath = "/__nextgen";
+      publicConfig.nextgenProxyPath = PROXY_PATH;
     }
     if (publicConfig.zitadelProjectId === undefined) {
       publicConfig.zitadelProjectId = builders.raw(
