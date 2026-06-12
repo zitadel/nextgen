@@ -33,6 +33,19 @@ function writeContents(plan: ScaffoldPlan, path: string): string | undefined {
   return op?.contents;
 }
 
+function packageJsonEdit(): (source: string | undefined) => string {
+  const op = new AngularPatcher()
+    .plan(ctx())
+    .ops.find(
+      (candidate): candidate is Extract<FileOp, { kind: "edit" }> =>
+        candidate.kind === "edit" && candidate.path === "package.json",
+    );
+  if (!op) {
+    throw new Error("expected a package.json edit op in the Angular plan");
+  }
+  return op.edit;
+}
+
 describe("AngularPatcher.plan", () => {
   it("writes the managed root component, template, and proxy config", () => {
     const plan = new AngularPatcher().plan(ctx());
@@ -44,26 +57,18 @@ describe("AngularPatcher.plan", () => {
   });
 
   it("adds a `dev` npm script so `npm run dev` works like the other frameworks", () => {
-    const edit = new AngularPatcher()
-      .plan(ctx())
-      .ops.find(
-        (op): op is Extract<FileOp, { kind: "edit" }> =>
-          op.kind === "edit" && op.path === "package.json",
-      );
-    const result = JSON.parse(edit!.edit(`{ "scripts": { "start": "ng serve" } }`));
+    const result = JSON.parse(packageJsonEdit()(`{ "scripts": { "start": "ng serve" } }`));
     expect(result.scripts.dev).toBe("ng serve");
     expect(result.scripts.start).toBe("ng serve");
   });
 
   it("preserves an existing `dev` script instead of overwriting it", () => {
-    const edit = new AngularPatcher()
-      .plan(ctx())
-      .ops.find(
-        (op): op is Extract<FileOp, { kind: "edit" }> =>
-          op.kind === "edit" && op.path === "package.json",
-      );
-    const result = JSON.parse(edit!.edit(`{ "scripts": { "dev": "ng serve --hmr" } }`));
+    const result = JSON.parse(packageJsonEdit()(`{ "scripts": { "dev": "ng serve --hmr" } }`));
     expect(result.scripts.dev).toBe("ng serve --hmr");
+  });
+
+  it("fails fast when package.json is absent instead of fabricating one", () => {
+    expect(() => packageJsonEdit()(undefined)).toThrowError(/package\.json is required/);
   });
 
   it("adds the SDK dependency at the CLI's prerelease tag", () => {

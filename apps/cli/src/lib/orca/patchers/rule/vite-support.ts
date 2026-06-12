@@ -22,7 +22,11 @@ function proxyEntryCode(server: string): string {
   changeOrigin: false,
   rewrite: (path) => path.replace(/^\\${PROXY_PATH}/, "").replace(/^(?!\\/)/, "/"),
   configure: (proxy) => {
-    const bearer = \`Bearer sk_\${loadEnv("development", dirname(fileURLToPath(import.meta.url)), "ZITADEL_").ZITADEL_PROJECT_ID}\`;
+    const projectId = loadEnv("development", dirname(fileURLToPath(import.meta.url)), "ZITADEL_").ZITADEL_PROJECT_ID;
+    if (!projectId) {
+      throw new Error("ZITADEL_PROJECT_ID is not set; add it to .env.local (zitadel setup writes it).");
+    }
+    const bearer = \`Bearer sk_\${projectId}\`;
     proxy.on("proxyReq", (proxyReq) => {
       proxyReq.setHeader("authorization", bearer);
     });

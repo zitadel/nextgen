@@ -1,3 +1,4 @@
+import { ZitadelError } from "../../../../errors";
 import { isObject, parseJsonObject, stableStringify } from "../../../../json";
 import { npmDistTagForCliVersion } from "../../../../public-cli";
 import type { FileOp } from "../file-writer/types";
@@ -16,11 +17,16 @@ const SDK_DEPENDENCY = "@zitadel/sdk-angular";
  * patching a project that already wires its own `dev` leaves it untouched.
  */
 function ensureDevScript(source: string | undefined): string {
-  const pkg: Record<string, unknown> = source ? parseJsonObject(source, "package.json") : {};
+  if (source === undefined) {
+    throw new ZitadelError("E_VALIDATION", "package.json is required to add the dev script", {
+      hint: "Run setup from a project that has a package.json.",
+    });
+  }
+  const pkg = parseJsonObject(source, "package.json");
   const scripts = isObject(pkg.scripts) ? pkg.scripts : undefined;
   // Leave an existing dev script untouched, returning the source unchanged so
   // the edit op skips the file instead of reformatting the user's package.json.
-  if (source !== undefined && scripts?.dev !== undefined) {
+  if (scripts?.dev !== undefined) {
     return source;
   }
   pkg.scripts = { ...(scripts ?? {}), dev: "ng serve" };

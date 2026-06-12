@@ -70,6 +70,9 @@ export function proxyConfTemplate(): string {
 const { readFileSync } = require("node:fs");
 
 const config = JSON.parse(readFileSync("zitadel.json", "utf8"));
+if (!config.project) {
+  throw new Error("zitadel.json is missing \\"project\\"; re-run zitadel setup.");
+}
 const bearer = \`Bearer sk_\${config.project}\`;
 
 function setBearer(proxyReq) {
