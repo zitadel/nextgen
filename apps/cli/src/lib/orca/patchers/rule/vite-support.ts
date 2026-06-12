@@ -11,7 +11,7 @@ import {
 import { PROXY_PATH } from "./proxy";
 
 /**
- * Shared Vite dev-server proxy injected into `vite.config.ts` for the SPA
+ * Shared Vite dev-server proxy merged into the project's Vite config for the SPA
  * frameworks (React, Vue). It forwards same-origin `/__nextgen/*` calls to the
  * backend, strips the prefix, and attaches the project's `sk_<project_id>`
  * bearer (read from `ZITADEL_PROJECT_ID` in the env) to every proxied request.
@@ -38,21 +38,21 @@ const PROXY_IMPORTS = [
 ] as const;
 
 /**
- * Builds the pure `edit` transform that the file-writer applies to the user's
- * `vite.config.ts`: a non-destructive magicast merge that adds the `/__nextgen`
- * proxy (and pins `server.host`/`server.port` to the issuer the CLI derived),
- * preserving the user's plugins, options, and formatting. Idempotent — entries
- * already present are left as-is. Throws `E_VALIDATION` when the file is absent
- * or the config object cannot be reached (function-built/exotic configs), with a
- * hint to add the block manually.
+ * Builds the pure `edit` transform the file-writer applies to the project's Vite
+ * config (`vite.config.*`): a non-destructive magicast merge that adds the
+ * `/__nextgen` proxy and sets `server.host`/`server.port`/`strictPort` when they
+ * are unset, preserving the user's plugins, options, and formatting. Idempotent
+ * — entries already present are left as-is. Throws `E_VALIDATION` when the file
+ * is absent or the config object cannot be reached (function-built/exotic
+ * configs), with a hint to add the block manually.
  */
 export function viteProxyEdit(
   devPort: number,
   server: string,
 ): (source: string | undefined) => string {
   return (source) => {
-    const mod = parseConfigModule(source, "vite.config.ts");
-    const config = resolveDefaultExportObject(mod, "vite.config.ts");
+    const mod = parseConfigModule(source, "the Vite config");
+    const config = resolveDefaultExportObject(mod, "the Vite config");
     const serverConfig = ensureEditableObject(config, "server");
     if (serverConfig.host === undefined) {
       serverConfig.host = "localhost";

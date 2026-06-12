@@ -10,8 +10,8 @@ const CONFIG_EXTENSIONS = ["ts", "mts", "js", "mjs"] as const;
 /**
  * Candidate config filenames for `basename` across every supported extension,
  * e.g. `configCandidates("vite.config")` →
- * `["vite.config.ts", "vite.config.mts", …, "vite.config.cjs"]`. Handed to the
- * generic `edit` file-op, which patches the first one that exists.
+ * `["vite.config.ts", "vite.config.mts", "vite.config.js", "vite.config.mjs"]`.
+ * Handed to the generic `edit` file-op, which patches the first one that exists.
  */
 export function configCandidates(basename: string): string[] {
   return CONFIG_EXTENSIONS.map((ext) => `${basename}.${ext}`);

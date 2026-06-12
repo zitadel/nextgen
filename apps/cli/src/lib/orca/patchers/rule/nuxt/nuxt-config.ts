@@ -10,20 +10,20 @@ import {
 const NUXT_MODULE = "@zitadel/sdk-nuxt/module";
 
 /**
- * Builds the pure `edit` transform the file-writer applies to `nuxt.config.ts`:
- * registers the `@zitadel/sdk-nuxt` module (which wires the server-side proxy +
- * session middleware), sets the login path, and seeds `runtimeConfig` with the
- * backend URL, the proxy path, and the project id — preserving the user's
- * existing config via magicast. Idempotent. Throws `E_VALIDATION` when the file
- * is absent or `defineNuxtConfig` cannot be reached.
+ * Builds the pure `edit` transform the file-writer applies to the project's Nuxt
+ * config (`nuxt.config.*`): registers the `@zitadel/sdk-nuxt` module (which wires
+ * the server-side proxy + session middleware), sets the login path, and seeds
+ * `runtimeConfig` with the backend URL, the proxy path, and the project id —
+ * preserving the user's existing config via magicast. Idempotent. Throws
+ * `E_VALIDATION` when the file is absent or `defineNuxtConfig` cannot be reached.
  */
 export function nuxtConfigEdit(opts: {
   projectId: string;
   server: string;
 }): (source: string | undefined) => string {
   return (source) => {
-    const mod = parseConfigModule(source, "nuxt.config.ts");
-    const config = resolveDefaultExportObject(mod, "nuxt.config.ts");
+    const mod = parseConfigModule(source, "the Nuxt config");
+    const config = resolveDefaultExportObject(mod, "the Nuxt config");
 
     ensureArrayItem(config, "modules", NUXT_MODULE);
 
