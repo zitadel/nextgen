@@ -99,8 +99,8 @@ export class ZitadelLogin extends LitElement {
 
   /**
    * Project ID, set declaratively in HTML. Lets the component be configured on
-   * a plain page without JS or `configureZitadel()`. Ignored when the
-   * `project` property is set. See {@link projectAttrs}.
+   * a plain page without JS or `configureZitadel()`. Ignored when the `project`
+   * property or a `configureZitadel()` global is set. See {@link projectAttrs}.
    */
   @property({ type: String, attribute: "project-id" }) accessor projectId = "";
 

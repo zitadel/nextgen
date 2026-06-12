@@ -163,6 +163,21 @@ describe("<zitadel-login> against the typed Flow API", () => {
     });
   });
 
+  it("prefers the configureZitadel() global over the project-id attribute", async () => {
+    // beforeEach already configured the global to "demo-project"; a stray/stale
+    // attribute must not override a deliberate app-wide configureZitadel().
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.setAttribute("project-id", "ignored-attr-project");
+    element.setAttribute("proxy-path", API_BASE);
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+    expect(mock.getCaptured()[0]).toEqual({
+      kind: "createFlow",
+      body: { purpose: "login", project_id: "demo-project" },
+    });
+  });
+
   it("submits with {session_token, action, fields} and applies the next step", async () => {
     const element = await mount(host);
 

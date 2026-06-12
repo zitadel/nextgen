@@ -52,8 +52,12 @@ function projectFromAttrs({ projectId, proxyPath, url }: ProjectAttrs): ZitadelP
  * orchestrator element. Precedence, highest first:
  *
  * 1. the element's `project` property (an SDK handle set from JS / a framework),
- * 2. the `project-id` / `proxy-path` / `url` attributes set declaratively in HTML,
- * 3. the global handle from `configureZitadel()`.
+ * 2. the global handle from `configureZitadel()`,
+ * 3. the `project-id` / `proxy-path` / `url` attributes set declaratively in HTML.
+ *
+ * Both JS paths (property and global) win over the declarative attributes, so a
+ * deliberate `configureZitadel()` is never silently overridden by fallback or
+ * stale HTML attributes; the attributes are the no-JS fallback.
  *
  * Both `<zitadel-login>` and `<zitadel-logout>` need the same resolution and
  * the same "no config" failure, so it lives here rather than being copied
@@ -70,7 +74,7 @@ export function resolveApi(
   attrs: ProjectAttrs,
   element: string,
 ): { project: ZitadelProject; api: ZitadelApi } {
-  const cfg = project ?? projectFromAttrs(attrs) ?? getZitadelConfig();
+  const cfg = project ?? getZitadelConfig() ?? projectFromAttrs(attrs);
   if (!cfg) {
     throw new Error(
       `${element} requires a configured project: set the \`project-id\` attribute, ` +
