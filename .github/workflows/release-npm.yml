@@ -4,8 +4,9 @@ name: release-npm
 # @zitadel/components, @zitadel/sdk-core, @zitadel/sdk-next, @zitadel/sdk-nuxt,
 # @zitadel/sdk-react, @zitadel/sdk-vue, @zitadel/sdk-angular)
 # via Changesets, then the matching Go server image/binaries via GoReleaser.
-# Pushing changesets to main opens a "Version Packages" PR; merging that PR
-# publishes to npm, creates v<version>, and publishes the single GitHub Release.
+# Pushing release-relevant changes to main opens a "Version Packages" PR;
+# merging that PR waits for the matching main CI run to pass, then publishes to
+# npm, creates v<version>, and publishes the single GitHub Release.
 #
 # The repo is in changesets PRERELEASE mode (.changeset/pre.json, tag "alpha"),
 # so versions are cut as X.Y.Z-alpha.N and published under the `alpha` npm
@@ -21,6 +22,26 @@ name: release-npm
 on:
   push:
     branches: [main]
+    paths:
+      - ".changeset/**"
+      - "apps/cli/package.json"
+      - "apps/cli/CHANGELOG.md"
+      - "packages/api/package.json"
+      - "packages/api/CHANGELOG.md"
+      - "packages/components/package.json"
+      - "packages/components/CHANGELOG.md"
+      - "packages/sdk-core/package.json"
+      - "packages/sdk-core/CHANGELOG.md"
+      - "packages/sdk-next/package.json"
+      - "packages/sdk-next/CHANGELOG.md"
+      - "packages/sdk-nuxt/package.json"
+      - "packages/sdk-nuxt/CHANGELOG.md"
+      - "packages/sdk-react/package.json"
+      - "packages/sdk-react/CHANGELOG.md"
+      - "packages/sdk-vue/package.json"
+      - "packages/sdk-vue/CHANGELOG.md"
+      - "packages/sdk-angular/package.json"
+      - "packages/sdk-angular/CHANGELOG.md"
 
 # id-token: write is required for OIDC trusted publishing.
 # contents/pull-requests: write let the changesets action open the
@@ -42,6 +63,7 @@ permissions:
   pull-requests: write
   packages: write
   id-token: write
+  actions: read
 
 concurrency:
   group: release-npm-${{ github.ref }}
@@ -51,6 +73,40 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
+      - name: Wait for main CI
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 90 * 60))
+          while true; do
+            run_fields="$(gh run list --workflow ci.yml --branch main --commit "$GITHUB_SHA" --event push --limit 1 --json status,conclusion,url --jq '.[] | [.status, (.conclusion // ""), .url] | @tsv')"
+            if [ -z "$run_fields" ]; then
+              status="missing"
+              conclusion=""
+              url=""
+            else
+              IFS=$'\t' read -r status conclusion url <<< "$run_fields"
+            fi
+
+            if [ "$status" = "completed" ]; then
+              if [ "$conclusion" = "success" ]; then
+                echo "main CI passed: $url"
+                exit 0
+              fi
+              echo "::error::main CI finished with conclusion $conclusion: $url"
+              exit 1
+            fi
+
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::timed out waiting for main CI for $GITHUB_SHA"
+              exit 1
+            fi
+
+            echo "Waiting for main CI for $GITHUB_SHA (status: $status)..."
+            sleep 30
+          done
+
       # Mint a short-lived installation token for the release GitHub App so the
       # changesets PR/commits trigger CI (GITHUB_TOKEN-authored ones do not).
       - name: Generate a token for the release app

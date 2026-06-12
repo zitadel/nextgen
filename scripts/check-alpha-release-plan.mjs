@@ -4,10 +4,14 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
+  PUBLIC_PACKAGE_MANIFESTS,
   PUBLIC_PACKAGE_NAMES,
   validateAlphaVersion,
   validateChangesetsFixedGroup,
 } from "./release-alpha-train.mjs";
+
+const MAIN_CI_WAIT_COMMAND =
+  'gh run list --workflow ci.yml --branch main --commit "$GITHUB_SHA" --event push';
 
 export async function checkAlphaReleasePlan(options) {
   const cwd = options.cwd ?? process.cwd();
@@ -94,6 +98,49 @@ export async function validateReleaseTooling(cwd, readFileFn = readFileDefault) 
   const releaseWorkflow = await readFileFn(join(cwd, ".github/workflows/release-npm.yml"), "utf8");
   assertContains(
     releaseWorkflow,
+    "actions: read",
+    "release-npm.yml must grant actions: read so it can wait for main CI",
+  );
+  assertContains(
+    releaseWorkflow,
+    "paths:",
+    "release-npm.yml must limit main pushes to release-relevant files",
+  );
+  assertContains(
+    releaseWorkflow,
+    ".changeset/**",
+    "release-npm.yml must run for Changesets release bookkeeping",
+  );
+  for (const path of publicPackageReleasePaths()) {
+    assertContains(
+      releaseWorkflow,
+      path,
+      `release-npm.yml must run for public package release file ${path}`,
+    );
+  }
+  assertContains(
+    releaseWorkflow,
+    MAIN_CI_WAIT_COMMAND,
+    "release-npm.yml must wait for the matching main CI run",
+  );
+  assertBefore(
+    releaseWorkflow,
+    MAIN_CI_WAIT_COMMAND,
+    "uses: changesets/action@v1",
+    "release-npm.yml must wait for main CI before Changesets can publish",
+  );
+  assertContains(
+    releaseWorkflow,
+    '[ "$conclusion" = "success" ]',
+    "release-npm.yml must require successful main CI before publishing",
+  );
+  assertContains(
+    releaseWorkflow,
+    "timed out waiting for main CI",
+    "release-npm.yml must fail if main CI does not finish in time",
+  );
+  assertContains(
+    releaseWorkflow,
     "createGithubReleases: false",
     "Changesets must not create package-shaped GitHub Releases",
   );
@@ -149,6 +196,13 @@ export async function validateReleaseTooling(cwd, readFileFn = readFileDefault) 
   );
 }
 
+function publicPackageReleasePaths() {
+  return PUBLIC_PACKAGE_MANIFESTS.flatMap((manifestPath) => [
+    manifestPath,
+    manifestPath.replace(/package\.json$/, "CHANGELOG.md"),
+  ]);
+}
+
 function assertContains(input, expected, message) {
   if (!input.includes(expected)) {
     throw new Error(message);
@@ -163,6 +217,14 @@ function assertNotContains(input, expected, message) {
 
 function assertPattern(input, pattern, message) {
   if (!pattern.test(input)) {
+    throw new Error(message);
+  }
+}
+
+function assertBefore(input, before, after, message) {
+  const beforeIndex = input.indexOf(before);
+  const afterIndex = input.indexOf(after);
+  if (beforeIndex === -1 || afterIndex === -1 || beforeIndex > afterIndex) {
     throw new Error(message);
   }
 }
