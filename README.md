@@ -29,7 +29,7 @@ Next iteration of the Zitadel identity platform.
 | --------------------------------- | -------------------------------------------------------------- |
 | Check local runtime prerequisites | `npx @zitadel/cli@alpha doctor`                                |
 | Start local Zitadel               | `npx @zitadel/cli@alpha start`                                 |
-| Add auth to a Next.js app         | `npx @zitadel/cli@alpha setup --framework next --server local` |
+| Add auth to a Next.js app         | `npx @zitadel/cli@alpha setup --server local`                  |
 | Check generated app files         | `npx @zitadel/cli@alpha doctor`                                |
 | Stop local Zitadel, keeping data  | `npx @zitadel/cli@alpha stop`                                  |
 | Delete local Zitadel data         | `npx @zitadel/cli@alpha reset --force`                         |
@@ -52,19 +52,21 @@ startup, then runs `go run .`; help output skips the UI sync.
 ## Customer quick start
 
 ```sh
-npx create-next-app@latest myapp
+mkdir myapp
 cd myapp
 npx @zitadel/cli@alpha doctor
 npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --framework next --server local
+npx @zitadel/cli@alpha setup --server local
 npm run dev
 ```
 
 Open http://localhost:3000/login and register your first local user. The
 managed Zitadel runtime stores its container metadata and data under
 `.zitadel/local/`; `stop` preserves that data and `reset --force`
-deletes it. `setup` installs dependencies with the detected package manager;
-pass `--skip-install` if you want to install them yourself.
+deletes it. In a fresh directory, `setup` asks which framework to scaffold and
+writes the app into the current directory. It installs dependencies with the
+detected package manager; pass `--skip-install` if you want to install them
+yourself.
 
 ## Manual Docker quick start
 
@@ -226,7 +228,7 @@ Tester commands use either the latest alpha stream or an exact train:
 ```sh
 npx @zitadel/cli@alpha doctor
 npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --framework next --server local
+npx @zitadel/cli@alpha setup --server local
 
 npx @zitadel/cli@0.1.0-alpha.N start
 ```

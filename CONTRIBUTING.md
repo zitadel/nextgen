@@ -26,7 +26,7 @@
 | --------------------------------- | -------------------------------------------------------------- |
 | Check local runtime prerequisites | `npx @zitadel/cli@alpha doctor`                                |
 | Start local Zitadel               | `npx @zitadel/cli@alpha start`                                 |
-| Add auth to Next.js               | `npx @zitadel/cli@alpha setup --framework next --server local` |
+| Add auth to Next.js               | `npx @zitadel/cli@alpha setup --server local`                  |
 | Stop local Zitadel, keeping data  | `npx @zitadel/cli@alpha stop`                                  |
 | Delete local Zitadel data         | `npx @zitadel/cli@alpha reset --force`                         |
 

@@ -11,14 +11,13 @@ local Zitadel runtime.
 ## Steps
 
 ```sh
-npx create-next-app@latest myapp
+mkdir myapp
 cd myapp
 
 npx @zitadel/cli@alpha doctor
 npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --framework next --server local
+npx @zitadel/cli@alpha setup --server local
 
-npm install
 npm run dev
 ```
 
@@ -30,7 +29,9 @@ http://localhost:3000/login
 
 The managed local Zitadel server listens on http://localhost:8080 by default.
 The CLI stores runtime metadata in `.zitadel/local/runtime.json` and mounts
-`.zitadel/local/nextgen-data` into the container. Stop preserves that data:
+`.zitadel/local/nextgen-data` into the container. If you start from a fresh
+directory, `setup --server local` asks which framework to scaffold and writes
+the app into the current directory. Stop preserves runtime data:
 
 ```sh
 npx @zitadel/cli@alpha stop
