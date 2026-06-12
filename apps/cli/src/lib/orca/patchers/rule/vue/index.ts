@@ -58,7 +58,7 @@ export class VuePatcher extends AbstractRulePatcher implements ViteSupport {
     return {
       title: "Vue (Vite) integration",
       detail:
-        "Wrote src/App.vue auth entry and merged the /__nextgen dev proxy into vite.config.ts.",
+        "Wrote src/App.vue auth entry and merged the /__nextgen dev proxy into vite.config.*.",
     };
   }
 }

@@ -63,7 +63,7 @@ export class ReactPatcher extends AbstractRulePatcher implements ViteSupport {
     return {
       title: "React (Vite) integration",
       detail:
-        "Wrote src/App.tsx auth entry and merged the /__nextgen dev proxy into vite.config.ts.",
+        "Wrote src/App.tsx auth entry and merged the /__nextgen dev proxy into vite.config.*.",
     };
   }
 }

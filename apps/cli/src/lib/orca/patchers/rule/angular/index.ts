@@ -17,11 +17,13 @@ const SDK_DEPENDENCY = "@zitadel/sdk-angular";
  */
 function ensureDevScript(source: string | undefined): string {
   const pkg: Record<string, unknown> = source ? parseJsonObject(source, "package.json") : {};
-  const scripts: Record<string, unknown> = isObject(pkg.scripts) ? { ...pkg.scripts } : {};
-  if (scripts.dev === undefined) {
-    scripts.dev = "ng serve";
+  const scripts = isObject(pkg.scripts) ? pkg.scripts : undefined;
+  // Leave an existing dev script untouched, returning the source unchanged so
+  // the edit op skips the file instead of reformatting the user's package.json.
+  if (source !== undefined && scripts?.dev !== undefined) {
+    return source;
   }
-  pkg.scripts = scripts;
+  pkg.scripts = { ...(scripts ?? {}), dev: "ng serve" };
   return `${stableStringify(pkg)}\n`;
 }
 

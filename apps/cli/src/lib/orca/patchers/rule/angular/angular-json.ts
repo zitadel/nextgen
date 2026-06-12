@@ -60,11 +60,19 @@ export function angularProxyEdit(opts: {
       });
     }
     const options = isObject(serve.options) ? (serve.options as Record<string, unknown>) : {};
+    let changed = false;
     if (options.proxyConfig === undefined) {
       options.proxyConfig = opts.proxyConfig;
+      changed = true;
     }
     if (opts.port !== undefined && options.port === undefined) {
       options.port = opts.port;
+      changed = true;
+    }
+    // Nothing to add — return the source untouched so the edit op skips it
+    // instead of reformatting (re-indenting) the user's angular.json.
+    if (!changed) {
+      return source;
     }
     serve.options = options;
     // Preserve the user's key order (JSON, no comments) instead of sorting.

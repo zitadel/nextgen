@@ -26,6 +26,11 @@ describe("angularProxyEdit", () => {
     expect(JSON.parse(out).projects.app.architect.serve.options.proxyConfig).toBe("mine.cjs");
   });
 
+  it("returns the source untouched when proxyConfig and port are already set", () => {
+    const once = edit(ng({ architect: { serve: { options: {} } } }));
+    expect(edit(once)).toBe(once);
+  });
+
   it("resolves the project named by defaultProject", () => {
     const out = edit(
       JSON.stringify({
