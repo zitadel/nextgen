@@ -23,9 +23,11 @@ export interface ProjectAttrs {
  * tuple. `getApi()` caches its client in a `WeakMap` keyed by the project's
  * identity, so the same attribute values must yield the *same* frozen object
  * across the several `resolveApi()` calls a single flow makes — otherwise
- * every call misses the cache and re-wraps a fresh client. Distinct configs
- * on one page are effectively one, so this never grows unbounded in practice.
+ * every call misses the cache and re-wraps a fresh client. A real page uses a
+ * handful of distinct configs at most; the FIFO bound below is just a guard so
+ * a pathological page that churns through unique configs can't leak memory.
  */
+const MAX_SYNTHETIC_PROJECTS = 32;
 const syntheticProjects = new Map<string, ZitadelProject>();
 
 /**
@@ -42,6 +44,9 @@ function projectFromAttrs({ projectId, proxyPath, url }: ProjectAttrs): ZitadelP
   let project = syntheticProjects.get(key);
   if (!project) {
     project = Object.freeze({ projectId, proxyPath: resolvedProxyPath, url: resolvedUrl });
+    if (syntheticProjects.size >= MAX_SYNTHETIC_PROJECTS) {
+      syntheticProjects.delete(syntheticProjects.keys().next().value);
+    }
     syntheticProjects.set(key, project);
   }
   return project;
