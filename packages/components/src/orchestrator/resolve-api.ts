@@ -45,7 +45,10 @@ function projectFromAttrs({ projectId, proxyPath, url }: ProjectAttrs): ZitadelP
   if (!project) {
     project = Object.freeze({ projectId, proxyPath: resolvedProxyPath, url: resolvedUrl });
     if (syntheticProjects.size >= MAX_SYNTHETIC_PROJECTS) {
-      syntheticProjects.delete(syntheticProjects.keys().next().value);
+      const oldest = syntheticProjects.keys().next().value;
+      if (oldest !== undefined) {
+        syntheticProjects.delete(oldest);
+      }
     }
     syntheticProjects.set(key, project);
   }
