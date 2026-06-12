@@ -47,6 +47,7 @@ describe("local runtime commands", () => {
     const envelope = parseJson(result.stdout) as { status: string; data: { ok: boolean } };
     expect(envelope.status).toBe("ok");
     expect(envelope.data.ok).toBe(true);
+    await expect(stat(join(cwd, ".zitadel"))).rejects.toMatchObject({ code: "ENOENT" });
 
     const dockerCalls = await readDockerCalls(fake.logPath);
     expect(dockerCalls).toContainEqual(["image", "inspect", defaultImage]);

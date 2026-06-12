@@ -1,9 +1,16 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import {
+  localContainerName,
+  localRuntimePaths,
+  writeRuntimeMetadata,
+  type RuntimeMetadata,
+} from "../../../../src/lib/local-server/runtime";
 import { parseJson, runCliForTest } from "../../../helpers/run-cli";
 
 /**
@@ -15,6 +22,7 @@ import { parseJson, runCliForTest } from "../../../helpers/run-cli";
  * api-mock.
  */
 const tempDirs: string[] = [];
+const servers: Server[] = [];
 
 async function makeTempDir(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-test-"));
@@ -23,6 +31,9 @@ async function makeTempDir(): Promise<string> {
 }
 
 afterEach(async () => {
+  for (const server of servers.splice(0)) {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop();
     if (dir) {
@@ -69,6 +80,28 @@ describe("setup command pre-flight", () => {
     expect(json.hint).toContain("--framework");
   });
 
+  it("still requires --framework in non-interactive local setup after runtime start", async () => {
+    const cwd = await makeTempDir();
+    const serverUrl = await startHealthServer();
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--server",
+      "local",
+      "--non-interactive",
+      "--json",
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { status: string; code: string; hint?: string };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_FRAMEWORK_NOT_DETECTED");
+    expect(json.hint).toContain("--framework");
+  });
+
   it("throws E_FRAMEWORK_NOT_DETECTED for a non-empty dir whose framework can't be inferred", async () => {
     const cwd = await makeTempDir();
     // A non-empty dir that isn't a known framework — Orca's detector fails
@@ -83,3 +116,34 @@ describe("setup command pre-flight", () => {
     expect(json.code).toBe("E_FRAMEWORK_NOT_DETECTED");
   });
 });
+
+async function startHealthServer(): Promise<string> {
+  const server = createServer((req, res) => {
+    if (req.url === "/healthz") {
+      res.writeHead(200).end("ok");
+      return;
+    }
+    res.writeHead(404).end();
+  });
+  servers.push(server);
+  await new Promise<void>((resolve) => server.listen(0, "localhost", () => resolve()));
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("health server did not expose a TCP address");
+  }
+  return `http://localhost:${String(address.port)}`;
+}
+
+function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
+  return {
+    schema_version: 1,
+    container_name: localContainerName(cwd),
+    container_id: "container-test-id",
+    image: "ghcr.io/zitadel/nextgen:test",
+    port: Number(new URL(serverUrl).port),
+    server_url: serverUrl,
+    data_dir: localRuntimePaths(cwd).dataDir,
+    created_at: "2026-06-09T00:00:00.000Z",
+    cli_version: "0.0.0-test",
+  };
+}

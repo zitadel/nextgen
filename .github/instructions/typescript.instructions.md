@@ -19,6 +19,9 @@ Vitest.
 - User-visible changes to those packages need a changeset; write the
   `.changeset/<slug>.md` file directly rather than via the interactive prompt.
   See `AGENTS.md` for the package list and file format.
+- PR descriptions for public package changes should mention the changeset
+  status and list the focused package validation commands that were actually
+  run.
 - Avoid committing generated `dist/**` churn unless the release or package smoke
   check explicitly requires it.
 - Respect peer dependencies in `packages/sdk-next`; do not bundle React, Next,

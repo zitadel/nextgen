@@ -7,6 +7,7 @@ import {
   runtimeSummary,
 } from "../lib/local-server/runtime";
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { resolveCwd } from "../lib/paths";
 import {
   hasZitadelConfig,
   hasZitadelSecret,
@@ -28,7 +29,8 @@ export default class Status extends BaseCommand {
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Status);
-    const runtime = await readRuntimeMetadata(flags.cwd ? String(flags.cwd) : process.cwd());
+    const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
+    const runtime = await readRuntimeMetadata(cwd);
     if (flags.server === "local") {
       await this.toMeta(flags, {
         resolveServer: false,
@@ -37,9 +39,7 @@ export default class Status extends BaseCommand {
     } else {
       await this.toMeta(flags);
     }
-    const { cwd } = this.meta;
-
-    const containerName = runtime?.container_name ?? localContainerName(cwd);
+    const containerName = runtime?.container_name ?? localContainerName(this.meta.cwd);
     let docker: Awaited<ReturnType<typeof inspectContainer>> | undefined;
     let dockerError: string | undefined;
     try {
@@ -56,7 +56,7 @@ export default class Status extends BaseCommand {
           : "stopped"
       : "missing";
 
-    const project = await projectStatus(cwd);
+    const project = await projectStatus(this.meta.cwd);
     const nextCommands = nextCommandsFor(serverLifecycle, project.lifecycle, this.meta.cliVersion);
     const nextActions = nextActionsFor(project.lifecycle);
 

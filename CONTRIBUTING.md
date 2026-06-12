@@ -26,7 +26,7 @@
 | --------------------------------- | -------------------------------------------------------------- |
 | Check local runtime prerequisites | `npx @zitadel/cli@alpha doctor`                                |
 | Start local Zitadel               | `npx @zitadel/cli@alpha start`                                 |
-| Add auth to Next.js               | `npx @zitadel/cli@alpha setup --framework next --server local` |
+| Add auth to Next.js               | `npx @zitadel/cli@alpha setup --server local`                  |
 | Stop local Zitadel, keeping data  | `npx @zitadel/cli@alpha stop`                                  |
 | Delete local Zitadel data         | `npx @zitadel/cli@alpha reset --force`                         |
 
@@ -182,3 +182,15 @@ documentation-only changes, use the `docs` type, for example:
 ```text
 docs: add preview status disclaimer
 ```
+
+## Pull request descriptions
+
+Include a concise PR description before handing work off for review. Use these
+sections:
+
+- `Summary` — what changed and why.
+- `Validation` — exact commands run. If validation was not run, say so
+  explicitly.
+- `Release notes / changeset` — changeset status for user-visible package
+  changes.
+- `Notes` — reviewer context, follow-ups, risks, or `None`.

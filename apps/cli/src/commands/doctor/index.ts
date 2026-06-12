@@ -5,11 +5,10 @@ import { ZitadelError } from "../../lib/errors";
 import { dockerAvailable, imageAvailable } from "../../lib/local-server/docker";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
-  assertWritableDirectory,
+  assertLocalStateWritable,
   checkLocalServerHealth,
   defaultLocalServerImageForCliVersion,
   isPortAvailable,
-  localRuntimePaths,
   localServerUrl,
   readRuntimeMetadata,
 } from "../../lib/local-server/runtime";
@@ -223,9 +222,10 @@ async function runLocalRuntimeChecks(
       "state-dir",
       "Local state directory is writable",
       async () => {
-        const paths = localRuntimePaths(cwd);
-        await assertWritableDirectory(paths.dataDir);
-        return `${paths.dataDir} is writable`;
+        const probe = await assertLocalStateWritable(cwd);
+        return probe.checkedPath === probe.targetPath
+          ? `${probe.targetPath} is writable`
+          : `${probe.targetPath} can be created (${probe.checkedPath} is writable)`;
       },
       "warn",
     ),
