@@ -110,8 +110,11 @@ export default class Setup extends BaseCommand {
     }
 
     // An explicit --dev-port overrides the detected port for the whole run, so
-    // the issuer, the registered origin, and the patched dev-server config all
-    // agree (and several apps can be scaffolded on distinct ports).
+    // the issuer and the registered origin track the requested port (and several
+    // apps can be scaffolded on distinct ports). The config edits set the
+    // dev-server port only when it is unset, so a project that already pins a
+    // different port in vite.config.*/angular.json keeps it — pass --dev-port to
+    // match that pin (or remove it) if the origin check rejects requests.
     if (flags["dev-port"] !== undefined) {
       const devPort = flags["dev-port"];
       if (!Number.isInteger(devPort) || devPort < 1 || devPort > 65535) {

@@ -10,9 +10,10 @@ const SDK_DEPENDENCY = "@zitadel/sdk-vue";
 /**
  * Rule-based patcher for a Vite + Vue single-page app. Inherits the shared
  * `.zitadel/` base files from {@link AbstractRulePatcher} and contributes the
- * managed `src/App.vue` auth entry, a non-destructive `vite.config.ts` merge
- * that adds the `/__nextgen` dev proxy (injecting the project service-key on
- * `/sessions/exchange`), the `VITE_`-prefixed project id, and the SDK dep.
+ * managed `src/App.vue` auth entry, a non-destructive `vite.config.*` merge
+ * that adds the `/__nextgen` dev proxy (attaching the `sk_<project_id>` bearer
+ * from `ZITADEL_PROJECT_ID` to every proxied request), the `VITE_`-prefixed
+ * project id, and the SDK dep.
  */
 export class VuePatcher extends AbstractRulePatcher implements ViteSupport {
   canPatch(framework: string): boolean {
