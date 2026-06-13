@@ -189,8 +189,8 @@ describe("check-alpha-release-plan script", () => {
           "      - name: Promote CLI alpha to npm latest",
           "        if: ${{ steps.changesets.outputs.published == 'true' }}",
           "        run: |",
-          "          npm dist-tag add \"@zitadel/cli@$version\" alpha",
-          "          npm dist-tag add \"@zitadel/cli@$version\" latest",
+          '          npm dist-tag add "@zitadel/cli@$version" alpha || echo "::warning::Unable to refresh @zitadel/cli@$version npm alpha dist-tag"',
+          '          npm dist-tag add "@zitadel/cli@$version" latest || echo "::warning::Unable to promote @zitadel/cli@$version to npm latest dist-tag"',
           "",
         ].join("\n"),
         "",
@@ -223,6 +223,19 @@ describe("check-alpha-release-plan script", () => {
     await expect(
       checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
     ).rejects.toThrow("must keep the CLI alpha dist-tag on the published train");
+  });
+
+  it("rejects a workflow that fails the train when npm latest promotion fails", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      ciWorkflow: validCiWorkflow().replace(
+        '          npm dist-tag add "@zitadel/cli@$version" latest || echo "::warning::Unable to promote @zitadel/cli@$version to npm latest dist-tag"',
+        '          npm dist-tag add "@zitadel/cli@$version" latest',
+      ),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("must not fail the alpha train when npm latest dist-tag promotion fails");
   });
 
   it("rejects a workflow that moves the CLI latest tag outside the release job", async () => {
@@ -382,8 +395,8 @@ function validCiWorkflow(): string {
     "      - name: Promote CLI alpha to npm latest",
     "        if: ${{ steps.changesets.outputs.published == 'true' }}",
     "        run: |",
-    "          npm dist-tag add \"@zitadel/cli@$version\" alpha",
-    "          npm dist-tag add \"@zitadel/cli@$version\" latest",
+    '          npm dist-tag add "@zitadel/cli@$version" alpha || echo "::warning::Unable to refresh @zitadel/cli@$version npm alpha dist-tag"',
+    '          npm dist-tag add "@zitadel/cli@$version" latest || echo "::warning::Unable to promote @zitadel/cli@$version to npm latest dist-tag"',
     "",
     "      - name: Restore changesets after publish decision",
     "        run: git restore -- .changeset",
