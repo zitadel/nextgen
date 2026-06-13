@@ -7,7 +7,8 @@ Integrates Zitadel auth into an Angular app.
 - `src/app/app.ts`, `src/app/app.html` — root component that renders the Zitadel widgets
 - `proxy.conf.cjs` — dev-server proxy
 - `angular.json` — wires `proxyConfig` into the `serve` target
-- `package.json` — adds `@zitadel/sdk-angular`
+- `package.json` — adds `@zitadel/sdk-angular`, and a `dev` script (`ng serve`)
+  when the project doesn't already define one
 
 ## How the proxy works
 

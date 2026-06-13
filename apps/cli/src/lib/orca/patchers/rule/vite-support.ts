@@ -22,7 +22,7 @@ function proxyEntryCode(server: string): string {
   changeOrigin: false,
   rewrite: (path) => path.replace(/^\\${PROXY_PATH}/, "").replace(/^(?!\\/)/, "/"),
   configure: (proxy) => {
-    const projectId = loadEnv("development", dirname(fileURLToPath(import.meta.url)), "ZITADEL_").ZITADEL_PROJECT_ID;
+    const projectId = loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_ID;
     if (!projectId) {
       throw new Error("ZITADEL_PROJECT_ID is not set; add it to .env.local (zitadel setup writes it).");
     }
@@ -35,11 +35,7 @@ function proxyEntryCode(server: string): string {
 }
 
 /** The imports the injected proxy entry depends on. */
-const PROXY_IMPORTS = [
-  { from: "vite", imported: "loadEnv", local: "loadEnv" },
-  { from: "node:url", imported: "fileURLToPath", local: "fileURLToPath" },
-  { from: "node:path", imported: "dirname", local: "dirname" },
-] as const;
+const PROXY_IMPORTS = [{ from: "vite", imported: "loadEnv", local: "loadEnv" }] as const;
 
 /**
  * Builds the pure `edit` transform the file-writer applies to the project's Vite
