@@ -4,12 +4,11 @@ import consola from "consola";
 import { ZitadelError } from "../../lib/errors";
 import { dockerAvailable, imageAvailable } from "../../lib/local-server/docker";
 import {
-  DEFAULT_LOCAL_SERVER_IMAGE,
   DEFAULT_LOCAL_SERVER_PORT,
-  assertWritableDirectory,
+  assertLocalStateWritable,
   checkLocalServerHealth,
+  defaultLocalServerImageForCliVersion,
   isPortAvailable,
-  localRuntimePaths,
   localServerUrl,
   readRuntimeMetadata,
 } from "../../lib/local-server/runtime";
@@ -47,7 +46,10 @@ export default class Doctor extends BaseCommand {
     const port = flags.port ?? DEFAULT_LOCAL_SERVER_PORT;
     await this.toMeta(flags, { resolveServer: false, source: localServerUrl(port) });
     const { cwd, dryRun } = this.meta;
-    const image = flags.image ?? this.meta.env.ZITADEL_LOCAL_IMAGE ?? DEFAULT_LOCAL_SERVER_IMAGE;
+    const image =
+      flags.image ??
+      this.meta.env.ZITADEL_LOCAL_IMAGE ??
+      defaultLocalServerImageForCliVersion(this.meta.cliVersion);
     const runtimeChecks = await runLocalRuntimeChecks(cwd, image, port);
     const hasConfig = await hasZitadelConfig(cwd);
     const ctx: CheckContext = { cwd, orca: createOrca(), cliVersion: this.meta.cliVersion, dryRun };
@@ -220,9 +222,10 @@ async function runLocalRuntimeChecks(
       "state-dir",
       "Local state directory is writable",
       async () => {
-        const paths = localRuntimePaths(cwd);
-        await assertWritableDirectory(paths.dataDir);
-        return `${paths.dataDir} is writable`;
+        const probe = await assertLocalStateWritable(cwd);
+        return probe.checkedPath === probe.targetPath
+          ? `${probe.targetPath} is writable`
+          : `${probe.targetPath} can be created (${probe.checkedPath} is writable)`;
       },
       "warn",
     ),

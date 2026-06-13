@@ -9,13 +9,64 @@ permissions:
   contents: read
 
 # Cancel an in-flight run when a newer commit is pushed to the same PR/branch.
+# Main runs may publish releases, so do not cancel them once started.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  detect-alpha-release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: depot-ubuntu-24.04-4
+    timeout-minutes: 5
+    outputs:
+      should_release: ${{ steps.detect.outputs.should_release }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect release-relevant changes
+        id: detect
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          base="$BEFORE"
+          if [ -z "$base" ] || [[ "$base" =~ ^0+$ ]] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            base="$(git rev-parse HEAD^ 2>/dev/null || true)"
+          fi
+          if [ -n "$base" ]; then
+            git diff --name-only "$base" HEAD > "$RUNNER_TEMP/release-changed-files"
+          else
+            git diff-tree --no-commit-id --name-only -r HEAD > "$RUNNER_TEMP/release-changed-files"
+          fi
+
+          node --input-type=module <<'NODE'
+          import { appendFileSync, readFileSync } from "node:fs";
+          import { PUBLIC_PACKAGE_MANIFESTS } from "./scripts/release-alpha-train.mjs";
+
+          const changed = readFileSync(`${process.env.RUNNER_TEMP}/release-changed-files`, "utf8")
+            .split("\n")
+            .map((line) => line.trim())
+            .filter(Boolean);
+          const publicPackageReleasePaths = new Set(
+            PUBLIC_PACKAGE_MANIFESTS.flatMap((manifestPath) => [
+              manifestPath,
+              manifestPath.replace(/package\.json$/, "CHANGELOG.md"),
+            ]),
+          );
+          const releaseRelevant = changed.filter(
+            (path) => path.startsWith(".changeset/") || publicPackageReleasePaths.has(path),
+          );
+          const shouldRelease = releaseRelevant.length > 0;
+
+          console.log(`release-relevant changes: ${releaseRelevant.join(", ") || "none"}`);
+          appendFileSync(process.env.GITHUB_OUTPUT, `should_release=${String(shouldRelease)}\n`);
+          NODE
+
   openapi-lint:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
@@ -27,7 +78,7 @@ jobs:
         run: npx --yes @redocly/cli@2.31.5 lint api/openapi/openapi-spec.yaml --format=github-actions
 
   go-unit-test:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-8
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
@@ -54,7 +105,7 @@ jobs:
       - run: go test -v -timeout=10m ./...
 
   go-integration-test-postgres:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
@@ -63,7 +114,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       # Postgres integration tests run against a Docker testcontainer (mirroring
-      # the spanner job); ubuntu-latest ships Docker, so no embedded-postgres
+      # the spanner job); the Depot Ubuntu runner ships Docker, so no embedded-postgres
       # runtime deps or Maven binary cache are needed here.
       - name: Postgres integration tests
         run: |
@@ -80,7 +131,7 @@ jobs:
           retention-days: 7
 
   go-integration-test-spanner:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
@@ -93,7 +144,7 @@ jobs:
       - run: go test -v -tags spanner_integration -timeout=10m ./...
 
   goreleaser-snapshot:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-8
     timeout-minutes: 20
     needs: [go-unit-test, go-integration-test-postgres, go-integration-test-spanner, node-check]
     steps:
@@ -145,7 +196,7 @@ jobs:
       - name: Export Docker image for smoke tests
         run: |
           # Goreleaser builds linux/amd64 and linux/arm64 with the same tag; pin amd64
-          # for ubuntu-latest smoke jobs (see quickstart-smoke).
+          # for the linux/amd64 smoke jobs (see quickstart-smoke).
           IMAGE_ID=""
           IMAGE_REF=""
           for id in $(docker images ghcr.io/zitadel/nextgen --format '{{.ID}}' | sort -u); do
@@ -178,7 +229,7 @@ jobs:
           retention-days: 7
 
   go-smoke-test-embedded-postgres:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 15
     needs: [goreleaser-snapshot]
     steps:
@@ -233,7 +284,7 @@ jobs:
 
 
   node-check:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-8
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
@@ -260,7 +311,7 @@ jobs:
     # changeset, so no consumer-visible change merges without a release note.
     # Private packages (apps, demos, mocks, lint, design-tokens, ui-react, ...)
     # are never published and so do not require a changeset. Publishing itself
-    # runs on pushes to main in release-npm.yml.
+    # runs on pushes to main in the release-alpha-train job below.
     #
     # The check lives in scripts/check-changeset-required.mjs so the publishable
     # package list and rules are testable and shared, rather than duplicated in
@@ -270,7 +321,7 @@ jobs:
     # package manifests/changelogs and *removes* changesets (consuming them),
     # which would otherwise trip this gate.
     if: github.event_name == 'pull_request' && github.head_ref != 'changeset-release/main'
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
@@ -284,7 +335,7 @@ jobs:
           node scripts/check-changeset-required.mjs --base "origin/${{ github.base_ref }}"
 
   quickstart-smoke:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 20
     needs: [goreleaser-snapshot]
     env:
@@ -304,75 +355,6 @@ jobs:
           test -f goreleaser-dist/nextgen-image.tag
           docker load -i goreleaser-dist/nextgen-image.tar
           docker image inspect -f '{{.Os}}/{{.Architecture}}' "$(cat goreleaser-dist/nextgen-image.tag)" | grep -q '^linux/amd64$'
-
-      - name: Smoke test CLI-style local runtime image
-        run: |
-          set -euo pipefail
-          IMAGE="$(cat goreleaser-dist/nextgen-image.tag)"
-          DATA_DIR="$RUNNER_TEMP/nextgen-dev-data"
-          RUNTIME_DIR="$RUNNER_TEMP/nextgen-dev-runtime"
-          HOST_UID="$(id -u)"
-          HOST_GID="$(id -g)"
-          PASSWD_FILE="$RUNTIME_DIR/container-passwd"
-          GROUP_FILE="$RUNTIME_DIR/container-group"
-          mkdir -p "$DATA_DIR" "$RUNTIME_DIR"
-          # Mirror `zitadel start`: run the container as the host user so
-          # bind-mounted state stays editable, and provide passwd/group entries
-          # because embedded Postgres initdb refuses unknown numeric users.
-          {
-            echo "root:x:0:0:root:/root:/bin/sh"
-            echo "nonroot:x:65532:65532:nonroot:/nonexistent:/usr/sbin/nologin"
-            echo "zitadel-local:x:${HOST_UID}:${HOST_GID}:Zitadel local user:/tmp:/usr/sbin/nologin"
-          } > "$PASSWD_FILE"
-          {
-            echo "root:x:0:"
-            echo "nonroot:x:65532:"
-            echo "zitadel-local:x:${HOST_GID}:"
-          } > "$GROUP_FILE"
-          CONTAINER="$(
-            docker run -d \
-              -p 127.0.0.1:18080:8080 \
-              -v "$DATA_DIR:/var/lib/zitadel/nextgen-data" \
-              -v "$PASSWD_FILE:/etc/passwd:ro" \
-              -v "$GROUP_FILE:/etc/group:ro" \
-              --user "${HOST_UID}:${HOST_GID}" \
-              -e NEXTGEN_SERVER_ADDRESS=:8080 \
-              -e NEXTGEN_SERVER_DATA_DIR=/var/lib/zitadel/nextgen-data \
-              "$IMAGE"
-          )"
-          cleanup() {
-            docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
-          }
-          diagnose() {
-            docker logs "$CONTAINER" || true
-          }
-          trap cleanup EXIT
-
-          ready=0
-          for _ in $(seq 1 120); do
-            if curl -fsS http://localhost:18080/healthz >/dev/null; then
-              ready=1
-              break
-            fi
-            sleep 1
-          done
-          if [ "$ready" -ne 1 ]; then
-            echo "::error::timed out waiting for zero-config /healthz"
-            diagnose
-            exit 1
-          fi
-          test -f "$DATA_DIR/server-encryption-key"
-          if ! curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:18080/ui/console/ | grep -q '^200$'; then
-            echo "::error::zero-config /ui/console/ did not return 200"
-            diagnose
-            exit 1
-          fi
-          if ! curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:18080/ui/login/ | grep -q '^200$'; then
-            echo "::error::zero-config /ui/login/ did not return 200"
-            diagnose
-            exit 1
-          fi
-          echo "CLI-style local runtime image smoke test passed"
 
       - name: Prepare quick-start compose stack
         run: |
@@ -400,8 +382,9 @@ jobs:
       - name: Start stack and verify HTTP endpoints
         run: |
           set -euo pipefail
-          # Separate from the CLI-style smoke above: this keeps the documented
-          # compose fallback valid for operators/manual quick-start usage.
+          # Separate from the customer local setup journey: this keeps the
+          # documented compose fallback valid for operators/manual quick-start
+          # usage.
           COMPOSE=(docker compose -f nextgen_quickstart/docker-compose.yaml --env-file nextgen_quickstart/.env)
           "${COMPOSE[@]}" up -d --wait
           ready=0
@@ -440,7 +423,7 @@ jobs:
           fi
 
   node-e2e:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
@@ -511,7 +494,7 @@ jobs:
           retention-days: 7
 
   npm-pack-smoke:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 15
     needs: node-check
     steps:
@@ -541,14 +524,14 @@ jobs:
 
       - name: Dry-run npm packs
         run: |
-          for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt; do
+          for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt packages/sdk-react packages/sdk-vue packages/sdk-angular; do
             corepack pnpm --dir "$dir" pack --dry-run
           done
 
       - name: Create npm package artifacts
         run: |
           mkdir -p "$RUNNER_TEMP/zitadel-npm-packages"
-          for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt; do
+          for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt packages/sdk-react packages/sdk-vue packages/sdk-angular; do
             corepack pnpm --dir "$dir" pack --pack-destination "$RUNNER_TEMP/zitadel-npm-packages"
           done
           ls -lh "$RUNNER_TEMP/zitadel-npm-packages"
@@ -565,7 +548,7 @@ jobs:
           retention-days: 7
 
   consumer-journey-e2e:
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 35
     needs: [goreleaser-snapshot, npm-pack-smoke]
     steps:
@@ -682,32 +665,11 @@ jobs:
           test -f goreleaser-dist/nextgen-image.tag
           docker load -i goreleaser-dist/nextgen-image.tar
           docker image inspect -f '{{.Os}}/{{.Architecture}}' "$(cat goreleaser-dist/nextgen-image.tag)" | grep -q '^linux/amd64$'
-
-      - name: Start backend stack
-        run: |
-          mkdir -p "$RUNNER_TEMP/nextgen-journey"
-          cp docs/operations/docker-compose.yaml "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml"
-          IMAGE="$(cat goreleaser-dist/nextgen-image.tag)"
-          {
-            echo "NEXTGEN_IMAGE=${IMAGE}"
-            echo "NEXTGEN_PORT=8080"
-          } > "$RUNNER_TEMP/nextgen-journey/.env"
-          docker compose -f "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml" --env-file "$RUNNER_TEMP/nextgen-journey/.env" up -d --wait
-          for _ in $(seq 1 90); do
-            if curl -fsS http://localhost:8080/healthz >/dev/null; then
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "::error::timed out waiting for backend /healthz"
-          docker compose -f "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml" --env-file "$RUNNER_TEMP/nextgen-journey/.env" logs nextgen
-          exit 1
+          echo "ZITADEL_LOCAL_IMAGE=$(cat goreleaser-dist/nextgen-image.tag)" >> "$GITHUB_ENV"
 
       - name: Prepare fresh Next.js app
         id: prepare-app
         env:
-          JOURNEY_BACKEND_URL: http://localhost:8080
-          JOURNEY_CREATE_NEXT_APP_VERSION: 16.2.4
           JOURNEY_REGISTRY_URL: http://127.0.0.1:4873
           JOURNEY_WORK_DIR: ${{ runner.temp }}/zitadel-cli-journey
         run: node apps/cli-journey-e2e/scripts/prepare-next-app.mjs
@@ -735,17 +697,32 @@ jobs:
       - name: Collect diagnostics
         if: failure()
         run: |
-          docker compose -f "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml" --env-file "$RUNNER_TEMP/nextgen-journey/.env" logs > "$RUNNER_TEMP/backend-compose.log" 2>&1 || true
           DIAG_DIR="$RUNNER_TEMP/consumer-journey-diagnostics"
+          APP_DIR="$RUNNER_TEMP/zitadel-cli-journey/myapp"
           mkdir -p "$DIAG_DIR/generated-app"
-          cp "$RUNNER_TEMP/backend-compose.log" "$DIAG_DIR/" 2>/dev/null || true
+          if [ -d "$APP_DIR" ]; then
+            (
+              cd "$APP_DIR"
+              npm_config_registry=http://127.0.0.1:4873 \
+              npm_config_yes=true \
+              npm_config_audit=false \
+              npm_config_fund=false \
+              npx --yes @zitadel/cli@alpha logs --tail 400 --non-interactive --json \
+                > "$DIAG_DIR/logs.json" 2> "$DIAG_DIR/logs.stderr.log"
+            ) || true
+          fi
           cp "$RUNNER_TEMP/next-app.log" "$DIAG_DIR/" 2>/dev/null || true
           cp "$RUNNER_TEMP/verdaccio.log" "$DIAG_DIR/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/zitadel-cli-journey/doctor.json" "$DIAG_DIR/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/zitadel-cli-journey/doctor.stderr.log" "$DIAG_DIR/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/zitadel-cli-journey/start.json" "$DIAG_DIR/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/zitadel-cli-journey/start.stderr.log" "$DIAG_DIR/" 2>/dev/null || true
           cp "$RUNNER_TEMP/zitadel-cli-journey/setup.json" "$DIAG_DIR/" 2>/dev/null || true
           cp "$RUNNER_TEMP/zitadel-cli-journey/setup.stderr.log" "$DIAG_DIR/" 2>/dev/null || true
           cp "$RUNNER_TEMP/zitadel-cli-journey/metadata.json" "$DIAG_DIR/" 2>/dev/null || true
-          cp "$RUNNER_TEMP/zitadel-cli-journey/myapp/package.json" "$DIAG_DIR/generated-app/" 2>/dev/null || true
-          cp "$RUNNER_TEMP/zitadel-cli-journey/myapp/package-lock.json" "$DIAG_DIR/generated-app/" 2>/dev/null || true
+          cp "$APP_DIR/.zitadel/local/runtime.json" "$DIAG_DIR/runtime.json" 2>/dev/null || true
+          cp "$APP_DIR/package.json" "$DIAG_DIR/generated-app/" 2>/dev/null || true
+          cp "$APP_DIR/package-lock.json" "$DIAG_DIR/generated-app/" 2>/dev/null || true
 
       - name: Upload consumer journey diagnostics
         if: failure()
@@ -763,7 +740,219 @@ jobs:
         if: always()
         run: |
           if [ -n "${NEXT_APP_PID:-}" ]; then kill "$NEXT_APP_PID" 2>/dev/null || true; fi
-          if [ -n "${VERDACCIO_PID:-}" ]; then kill "$VERDACCIO_PID" 2>/dev/null || true; fi
-          if [ -f "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml" ]; then
-            docker compose -f "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml" --env-file "$RUNNER_TEMP/nextgen-journey/.env" down -v
+          APP_DIR="$RUNNER_TEMP/zitadel-cli-journey/myapp"
+          if [ -d "$APP_DIR" ]; then
+            (
+              cd "$APP_DIR"
+              npm_config_registry=http://127.0.0.1:4873 \
+              npm_config_yes=true \
+              npm_config_audit=false \
+              npm_config_fund=false \
+              npx --yes @zitadel/cli@alpha reset --force --non-interactive --json
+            ) || true
           fi
+          if [ -n "${VERDACCIO_PID:-}" ]; then kill "$VERDACCIO_PID" 2>/dev/null || true; fi
+
+  ci-success:
+    if: always()
+    runs-on: depot-ubuntu-24.04-4
+    timeout-minutes: 5
+    needs:
+      - openapi-lint
+      - go-unit-test
+      - go-integration-test-postgres
+      - go-integration-test-spanner
+      - node-check
+      - changeset-check
+      - node-e2e
+      - goreleaser-snapshot
+      - npm-pack-smoke
+      - go-smoke-test-embedded-postgres
+      - quickstart-smoke
+      - consumer-journey-e2e
+    steps:
+      - name: Check CI gate results
+        env:
+          NEEDS_JSON: ${{ toJson(needs) }}
+        run: |
+          node <<'NODE'
+          const needs = JSON.parse(process.env.NEEDS_JSON);
+          const allowedSkipped = new Set(["changeset-check"]);
+          const failed = Object.entries(needs).filter(([name, job]) => {
+            if (job.result === "success") return false;
+            if (job.result === "skipped" && allowedSkipped.has(name)) return false;
+            return true;
+          });
+
+          if (failed.length > 0) {
+            for (const [name, job] of failed) {
+              console.error(`${name}: ${job.result}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("CI gate passed");
+          NODE
+
+  release-alpha-train:
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-alpha-release.result == 'success' && needs.ci-success.result == 'success' && needs.detect-alpha-release.outputs.should_release == 'true'
+    runs-on: depot-ubuntu-24.04-8
+    needs: [detect-alpha-release, ci-success]
+    permissions:
+      contents: write
+      pull-requests: write
+      packages: write
+      id-token: write
+    steps:
+      # Mint a short-lived installation token for the release GitHub App so the
+      # changesets PR/commits trigger CI (GITHUB_TOKEN-authored ones do not).
+      - name: Generate a token for the release app
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          registry-url: "https://registry.npmjs.org"
+          cache: pnpm
+
+      # Trusted publishing requires npm >= 11.5.1; the pinned pnpm delegates
+      # the actual publish to the npm CLI, so the runner's npm must be current.
+      - name: Update npm for trusted publishing (OIDC)
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: corepack pnpm nx run-many -t build
+
+      - name: Prune empty changesets before publish decision
+        run: node scripts/release-alpha-train.mjs prune-empty-changesets
+
+      - name: Create release PR or publish to npm
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          version: corepack pnpm changeset version
+          publish: corepack pnpm changeset publish
+          title: "chore: version packages"
+          commit: "chore: version packages"
+          createGithubReleases: false
+        env:
+          # App token (not GITHUB_TOKEN) so the Version Packages PR triggers CI.
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          # Empty so the action does not pass an undefined token; OIDC handles auth.
+          NPM_TOKEN: ""
+          # npm provenance is only supported for public source repositories.
+          # Keep trusted publishing via OIDC, but disable provenance until this
+          # repository is public.
+          NPM_CONFIG_PROVENANCE: "false"
+
+      - name: Restore changesets after publish decision
+        run: git restore -- .changeset
+
+      - name: Inspect alpha release train candidate
+        id: alpha-status
+        env:
+          PUBLISHED: ${{ steps.changesets.outputs.published }}
+        run: |
+          set -euo pipefail
+          alpha_env="$RUNNER_TEMP/alpha-release-status.env"
+          node scripts/release-alpha-train.mjs status --published "$PUBLISHED" --remote false | tee "$alpha_env"
+          cat "$alpha_env" >> "$GITHUB_OUTPUT"
+
+      - name: Login to GHCR
+        if: ${{ steps.alpha-status.outputs.should_complete == 'true' }}
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare alpha release train
+        if: ${{ steps.alpha-status.outputs.should_complete == 'true' }}
+        id: alpha
+        env:
+          PUBLISHED: ${{ steps.changesets.outputs.published }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          alpha_env="$RUNNER_TEMP/alpha-release.env"
+          node scripts/release-alpha-train.mjs prepare --published "$PUBLISHED" --out-dir "$RUNNER_TEMP/alpha-release" | tee "$alpha_env"
+          cat "$alpha_env" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        if: ${{ steps.alpha.outputs.run_goreleaser == 'true' }}
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        if: ${{ steps.alpha.outputs.run_goreleaser == 'true' }}
+        uses: docker/setup-buildx-action@v4
+
+      - name: Create and push Go release tag
+        if: ${{ steps.alpha.outputs.create_tag == 'true' }}
+        env:
+          TAG: ${{ steps.alpha.outputs.tag }}
+          TITLE: ${{ steps.alpha.outputs.title }}
+        run: |
+          set -euo pipefail
+          git config user.name "zitadel-release"
+          git config user.email "noreply@zitadel.com"
+          git tag -a "$TAG" -m "$TITLE"
+          git push origin "$TAG"
+
+      - name: Check out existing Go release tag
+        if: ${{ steps.alpha.outputs.run_goreleaser == 'true' && steps.alpha.outputs.tag_exists == 'true' }}
+        env:
+          TAG: ${{ steps.alpha.outputs.tag }}
+        run: git checkout --detach "$TAG"
+
+      - name: Prune npm package tags for GoReleaser
+        if: ${{ steps.alpha.outputs.run_goreleaser == 'true' }}
+        run: |
+          set -euo pipefail
+          git tag -l '@zitadel/*' | while read -r tag; do
+            git tag -d "$tag"
+          done
+
+      - name: Run GoReleaser
+        if: ${{ steps.alpha.outputs.run_goreleaser == 'true' }}
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update GitHub Release notes
+        if: ${{ steps.alpha.outputs.update_release == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.alpha.outputs.tag }}
+          TITLE: ${{ steps.alpha.outputs.title }}
+          NOTES_PATH: ${{ steps.alpha.outputs.notes_path }}
+        run: |
+          set -euo pipefail
+          gh release edit "$TAG" \
+            --draft \
+            --prerelease \
+            --latest=false \
+            --title "$TITLE" \
+            --notes-file "$NOTES_PATH"

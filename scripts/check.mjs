@@ -168,6 +168,9 @@ async function phasePack() {
     "packages/sdk-core",
     "packages/sdk-next",
     "packages/sdk-nuxt",
+    "packages/sdk-react",
+    "packages/sdk-vue",
+    "packages/sdk-angular",
   ];
   await run("corepack", ["pnpm", "nx", "run-many", "-t", "build"]);
   await run(process.execPath, ["apps/cli/bin/run.js", "--version"]);
@@ -192,7 +195,38 @@ async function phasePack() {
 }
 
 async function phaseRelease() {
-  await run("goreleaser", ["release", "--snapshot", "--clean", "--skip=publish,sign"]);
+  const releaseCheckDir = await mkdtemp(join(tmpdir(), "zitadel-release-check-"));
+  const changesetStatusPath = join(releaseCheckDir, "changeset-status.json");
+  try {
+    await run("goreleaser", ["check"]);
+    await run("corepack", [
+      "pnpm",
+      "exec",
+      "changeset",
+      "status",
+      `--output=${changesetStatusPath}`,
+    ]);
+    await run(process.execPath, ["scripts/check-alpha-release-plan.mjs", changesetStatusPath]);
+    await run("corepack", [
+      "pnpm",
+      "nx",
+      "test",
+      "@zitadel/cli",
+      "--",
+      "tests/unit/scripts/release-alpha-train.test.ts",
+      "tests/unit/scripts/check-alpha-release-plan.test.ts",
+    ]);
+    await withPrunedNpmPackageTags(async () => {
+      await run("goreleaser", [
+        "release",
+        "--snapshot",
+        "--clean",
+        "--skip=publish,sign,docker",
+      ]);
+    });
+  } finally {
+    await rm(releaseCheckDir, { recursive: true, force: true });
+  }
 }
 
 async function phaseJourney() {
@@ -205,4 +239,34 @@ async function gitState() {
     runCapture("git", ["status", "--porcelain=v1", "-z"]),
   ]);
   return `${diff.stdout}\0${status.stdout}`;
+}
+
+async function withPrunedNpmPackageTags(callback) {
+  const tags = await npmPackageTags();
+  try {
+    for (const tag of tags) {
+      await run("git", ["update-ref", "-d", tag.ref]);
+    }
+    await callback();
+  } finally {
+    for (const tag of tags) {
+      await run("git", ["update-ref", tag.ref, tag.object]);
+    }
+  }
+}
+
+async function npmPackageTags() {
+  const { stdout } = await runCapture("git", [
+    "for-each-ref",
+    "--format=%(refname) %(objectname)",
+    "refs/tags/@zitadel/*",
+  ]);
+  return stdout
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const [ref, object] = line.split(" ");
+      return { ref, object };
+    });
 }

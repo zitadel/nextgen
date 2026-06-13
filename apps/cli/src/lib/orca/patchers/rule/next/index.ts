@@ -122,6 +122,10 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
 }
 
 function dependencyVersionForCli(cliVersion: string, fallback: string): string {
-  const prerelease = cliVersion.match(/^\d+\.\d+\.\d+-([0-9A-Za-z]+)(?:[.-]|$)/)?.[1];
+  const normalized = cliVersion.trim().replace(/^v/, "");
+  if (/^\d+\.\d+\.\d+-alpha\.\d+$/.test(normalized)) {
+    return normalized;
+  }
+  const prerelease = normalized.match(/^\d+\.\d+\.\d+-([0-9A-Za-z]+)(?:[.-]|$)/)?.[1];
   return prerelease ?? fallback;
 }

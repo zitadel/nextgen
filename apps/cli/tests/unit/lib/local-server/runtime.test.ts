@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   LOCAL_RUNTIME_FILE,
+  defaultLocalServerImageForCliVersion,
   ensureContainerIdentity,
   ensureLocalState,
   localContainerName,
@@ -27,6 +28,15 @@ afterEach(async () => {
 });
 
 describe("local server runtime metadata", () => {
+  it.each([
+    ["0.1.0-alpha.5", "ghcr.io/zitadel/nextgen:0.1.0-alpha.5"],
+    ["v0.1.0-alpha.5", "ghcr.io/zitadel/nextgen:0.1.0-alpha.5"],
+    ["0.0.0-test", "ghcr.io/zitadel/nextgen:latest"],
+    ["0.1.0", "ghcr.io/zitadel/nextgen:latest"],
+  ])("derives the default image for CLI version %s", (cliVersion, image) => {
+    expect(defaultLocalServerImageForCliVersion(cliVersion)).toBe(image);
+  });
+
   it("creates local state and gitignores it", async () => {
     const paths = await ensureLocalState(cwd);
 

@@ -95,9 +95,9 @@ export default class Setup extends BaseCommand {
       if (
         error instanceof ZitadelError &&
         error.code === "E_FRAMEWORK_NOT_DETECTED" &&
-        (await orca.isEmpty(cwd))
+        (await orca.isFreshScaffoldTarget(cwd))
       ) {
-        consola.info("Empty directory — scaffolding a fresh project");
+        consola.info("Fresh app directory — scaffolding a fresh project");
         framework = await orca.scaffold(
           cwd,
           await resolveScaffoldFramework(flags.framework, nonInteractive, orca),

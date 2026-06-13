@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { parseJson, runCliForTest } from "../helpers/run-cli";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "../helpers/run-cli";
 
 async function scaffoldNextProject(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-contract-"));
@@ -58,7 +58,7 @@ describe("envelope contract", () => {
     expect(envelope.status).toBe("error");
     expect(envelope.code).toBe("E_VALIDATION");
     expect(envelope.message).toBeTypeOf("string");
-    expect(envelope.next_commands).toContain("npx @zitadel/cli@alpha setup");
+    expect(envelope.next_commands).toContain(expectedPublicCliCommand("setup"));
   });
 
   it("renders a human-readable summary (and server suffix) without --json", async () => {

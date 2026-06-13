@@ -1,5 +1,24 @@
 # @zitadel/components
 
+## 0.1.0-alpha.3
+
+## 0.1.0-alpha.2
+
+### Minor Changes
+
+- [#266](https://github.com/zitadel/nextgen/pull/266) [`01aed1e`](https://github.com/zitadel/nextgen/commit/01aed1e0de4ffd1ec6d78f8fa73f0ce19b907aa0) Thanks [@mridang](https://github.com/mridang)! - Allow configuring `<zitadel-login>` and `<zitadel-logout>` declaratively from HTML via `project-id`, `proxy-path`, and `url` attributes, so the components work on a plain page without JS or `configureZitadel()`. Configuration resolves in this order, highest first: the `project` property, then the `configureZitadel()` global, then the HTML attributes. The existing JS paths still win — the attributes are the no-JS fallback.
+
+  Also fix the standalone bundle so it loads in a browser: it was built for Node and emitted an `import "node:module"` that browsers cannot resolve. It is now built for the browser, so `dist/standalone.mjs` is genuinely self-contained.
+
+- [#261](https://github.com/zitadel/nextgen/pull/261) [`09aa2b1`](https://github.com/zitadel/nextgen/commit/09aa2b13da9dd0e15453f46f4d62fb2863835a0c) Thanks [@mridang](https://github.com/mridang)! - Add a standalone browser bundle (`dist/standalone.mjs`) so the components work on a plain HTML page via `<script type="module">` with no import map or bundler. Exposed via the `./standalone` export and `unpkg`/`jsdelivr`.
+
+### Patch Changes
+
+- [#231](https://github.com/zitadel/nextgen/pull/231) [`ce89c59`](https://github.com/zitadel/nextgen/commit/ce89c5941b4ae90849fac720ecc4a2a0c49c245d) Thanks [@bastionstack](https://github.com/bastionstack)! - Tidy the web components package: align README/AGENTS docs with the real SDK-config API, adopt idiomatic Lit patterns (`classMap`, `live()`, `ifDefined`, `@query`, a shared `emit()` helper), make post-step focus deterministic via `updateComplete` instead of `requestAnimationFrame`, centralise SDK/API resolution in a `resolveApi()` helper, correct the manifest registry (e.g. `zl-passkey` `method` attribute), and expand unit/browser test coverage.
+
+- [#253](https://github.com/zitadel/nextgen/pull/253) [`c097a5f`](https://github.com/zitadel/nextgen/commit/c097a5f0b720e58920c692ec909960e9c44696e3) Thanks [@vitorbari](https://github.com/vitorbari)! - Add English labels for the `givenName`, `familyName`, and `dateOfBirth`
+  fields the default register step now collects.
+
 ## 0.1.0-alpha.0
 
 ### Minor Changes

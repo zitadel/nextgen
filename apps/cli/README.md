@@ -4,7 +4,7 @@ Scaffolds Zitadel auth (login, register, profile, middleware) into a Next.js, Re
 
 ```sh
 npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --framework next --server local
+npx @zitadel/cli@alpha setup --server local
 ```
 
 > **Beta.** This is the **next-generation Zitadel**, a ground-up rewrite of the platform. It is distinct from the established Zitadel at [github.com/zitadel/zitadel](https://github.com/zitadel/zitadel). APIs and CLI flags will change.
@@ -13,28 +13,41 @@ npx @zitadel/cli@alpha setup --framework next --server local
 
 - Node 20+
 - Docker for the managed local Zitadel runtime
-- A Next.js project created with `create-next-app`
+- A Next.js project, or an empty directory where setup can scaffold one
 
 ## Quickstart
 
 ```sh
-npx create-next-app@latest my-app
+mkdir my-app
 cd my-app
 npx @zitadel/cli@alpha doctor
 npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --framework next --server local
+npx @zitadel/cli@alpha setup --server local
 npm run dev
 ```
 
 `start` runs a Docker-backed local Zitadel server and stores runtime data
-under `.zitadel/local/`. It uses `ghcr.io/zitadel/nextgen:latest` unless
-overridden with `--image` or `ZITADEL_LOCAL_IMAGE`. `setup --server local`
-creates a project on that local server, scaffolds `app/login`, `app/register`, and
+under `.zitadel/local/`. Alpha CLI versions use the matching
+`ghcr.io/zitadel/nextgen:<cli-version>` image by default; local/dev builds fall
+back to `ghcr.io/zitadel/nextgen:latest`. Override with `--image` or
+`ZITADEL_LOCAL_IMAGE` for advanced debugging.
+`setup --server local` creates a project on that local server, asks which
+framework to scaffold when the directory is fresh, writes the Next.js app into
+the current directory, scaffolds `app/login`, `app/register`, and
 `middleware.ts`, writes `.env.local` and `.zitadel/`, and installs dependencies
 with the detected package manager. Pass `--skip-install` to install them
 yourself. The project's default user schema and login flow are provisioned
-server-side at creation time, so the CLI does not scaffold or upload them.
-Open `http://localhost:3000/login` to see the login page.
+server-side at creation time, so the CLI does not scaffold or upload them. Open
+`http://localhost:3000/login` to see the login page.
+
+For a reproducible tester report, use the exact alpha train from the GitHub
+Release:
+
+```sh
+npx @zitadel/cli@0.1.0-alpha.N doctor
+npx @zitadel/cli@0.1.0-alpha.N start
+npx @zitadel/cli@0.1.0-alpha.N setup --server local
+```
 
 The default project flow supports password registration/login, passkey
 registration/login, and optional passkey setup after password registration.

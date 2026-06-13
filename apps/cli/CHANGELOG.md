@@ -1,5 +1,25 @@
 # @zitadel/cli
 
+## 0.1.0-alpha.3
+
+### Patch Changes
+
+- [#272](https://github.com/zitadel/nextgen/pull/272) [`08b7ab4`](https://github.com/zitadel/nextgen/commit/08b7ab44f13e104545f17f6f94244eb825a4dcf5) Thanks [@fforootd](https://github.com/fforootd)! - Allow same-directory setup after starting the local Zitadel runtime.
+
+- Updated dependencies []:
+  - @zitadel/api@0.1.0-alpha.3
+
+## 0.1.0-alpha.2
+
+### Patch Changes
+
+- [#265](https://github.com/zitadel/nextgen/pull/265) [`ceb74d5`](https://github.com/zitadel/nextgen/commit/ceb74d54c98fff07deb90c800a5aa08b2f46e30e) Thanks [@fforootd](https://github.com/fforootd)! - Derive alpha local runtime images from the installed CLI version, pin generated SDK dependencies to the same alpha train, and emit exact-version follow-up commands for reproducible tester reports.
+
+- [#255](https://github.com/zitadel/nextgen/pull/255) [`ca53f61`](https://github.com/zitadel/nextgen/commit/ca53f61ae249f81fd301f71f33cd9be416271ad7) Thanks [@fforootd](https://github.com/fforootd)! - Make doctor local-runtime checks advisory for cloud setup, harden fresh Next.js scaffolding, auto-install setup dependencies, normalize public follow-up commands, and avoid assuming Next.js in local-runtime setup guidance.
+
+- Updated dependencies [[`b0094f4`](https://github.com/zitadel/nextgen/commit/b0094f4255854c571664e746f70447c365c52af2)]:
+  - @zitadel/api@0.1.0-alpha.2
+
 ## 0.1.0-alpha.1
 
 ### Minor Changes

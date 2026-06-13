@@ -50,10 +50,12 @@ layer, not the envelope.
 - `setup` — create a Zitadel project and scaffold local auth (routes,
   middleware, `.zitadel/**`, env templates). The project's default user schema
   and login flow are provisioned server-side at creation, so setup neither
-  scaffolds nor uploads them. Flags: `--framework next|react|vue|angular|nuxt`,
-  `--renderer` (Next.js only), `--dev-port` (dev-server port, also the issuer
-  origin registered with Zitadel — use distinct ports to run several scaffolded
-  apps side by side), `--skip-install`.
+  scaffolds nor uploads them. Agents must pass `--framework` when scaffolding
+  into a fresh directory; interactive humans can omit it and choose from the
+  prompt. Flags: `--framework next|react|vue|angular|nuxt`, `--renderer`
+  (Next.js only), `--dev-port` (dev-server port, also the issuer origin
+  registered with Zitadel — use distinct ports to run several scaffolded apps
+  side by side), `--skip-install`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
 - `doctor` — verify generated app files and local state once `zitadel.json`
@@ -71,6 +73,12 @@ layer, not the envelope.
 - `reset` — stop/remove the managed container and delete local runtime data;
   requires `--force` when non-interactive.
 
+Alpha releases are lockstep trains. `npx @zitadel/cli@alpha start` runs the
+latest tested alpha server image, and
+`npx @zitadel/cli@0.1.0-alpha.N start` runs
+`ghcr.io/zitadel/nextgen:0.1.0-alpha.N`. `zitadel start --image <ref>` remains
+the explicit image override for debugging.
+
 ## Golden path
 
 ```sh
@@ -82,11 +90,20 @@ npx @zitadel/cli@alpha plan --non-interactive --json
 npx @zitadel/cli@alpha apply --non-interactive --json
 ```
 
+Exact alpha train invocation:
+
+```sh
+npx @zitadel/cli@0.1.0-alpha.N doctor --non-interactive --json
+npx @zitadel/cli@0.1.0-alpha.N start --non-interactive --json
+npx @zitadel/cli@0.1.0-alpha.N setup --framework next --server local --non-interactive --json
+```
+
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `plan` and `apply`. Managed files carry a marker comment; `eject`
 removes only files that still carry it, preserving anything the user replaced.
 For app-local development, `--server local` resolves through
 `.zitadel/local/runtime.json` and requires a healthy `npx @zitadel/cli@alpha start`
-runtime. `setup` installs dependencies with the detected package manager by
-default; pass `--skip-install` when the agent or host workflow will install
-dependencies separately.
+runtime. Runtime-only `.zitadel/local/**` state does not block fresh
+same-directory scaffolding. `setup` installs dependencies with the detected
+package manager by default; pass `--skip-install` when the agent or host
+workflow will install dependencies separately.
