@@ -87,6 +87,7 @@ export async function inspectAlphaReleaseTrain(options = {}) {
   const readFileFn = options.readFile ?? readFile;
   const readdirFn = options.readdir ?? readdir;
   const execFileFn = options.execFile ?? execFile;
+  const publishedWasSpecified = options.published !== undefined;
   const published = normalizeBoolean(options.published);
   const remote = options.remote === undefined ? true : normalizeBoolean(options.remote);
 
@@ -112,6 +113,28 @@ export async function inspectAlphaReleaseTrain(options = {}) {
     readFile: readFileFn,
     readdir: readdirFn,
   });
+  if (publishedWasSpecified && !published) {
+    return {
+      version,
+      tagName,
+      title,
+      image,
+      packages,
+      activeChangesets,
+      headCommit: "",
+      tagCommit: "",
+      tagExists: false,
+      tagMatchesHead: false,
+      releaseExists: false,
+      imageExists: false,
+      shouldComplete: false,
+      shouldCreateTag: false,
+      shouldRunGoreleaser: false,
+      shouldUpdateRelease: false,
+      skipReason: "npm publish did not run",
+    };
+  }
+
   const headCommit = await gitOutput(execFileFn, cwd, ["rev-parse", "HEAD"]);
   const tagCommit = await tagCommitFor(tagName, execFileFn, cwd);
   const tagExists = Boolean(tagCommit);

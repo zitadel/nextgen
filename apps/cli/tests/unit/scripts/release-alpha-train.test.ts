@@ -192,6 +192,50 @@ describe("release-alpha-train script", () => {
     });
   });
 
+  it("blocks GoReleaser when Changesets did not publish npm packages", async () => {
+    const cwd = await fixtureRepo();
+
+    await expect(
+      releaseAlphaTrain.inspectAlphaReleaseTrain({
+        cwd,
+        execFile: commandMock(),
+        published: false,
+        remote: false,
+      }),
+    ).resolves.toMatchObject({
+      shouldComplete: false,
+      skipReason: "npm publish did not run",
+    });
+  });
+
+  it("rejects prepare when Changesets did not publish npm packages", async () => {
+    const cwd = await fixtureRepo();
+
+    await expect(
+      releaseAlphaTrain.prepareAlphaReleaseTrain({
+        cwd,
+        execFile: commandMock(),
+        published: false,
+      }),
+    ).rejects.toThrow("alpha release train is not ready to complete: npm publish did not run");
+  });
+
+  it("allows completion after Changesets publishes npm packages", async () => {
+    const cwd = await fixtureRepo();
+
+    await expect(
+      releaseAlphaTrain.inspectAlphaReleaseTrain({
+        cwd,
+        execFile: commandMock(),
+        published: true,
+        remote: false,
+      }),
+    ).resolves.toMatchObject({
+      shouldComplete: true,
+      skipReason: "",
+    });
+  });
+
   it("prunes empty changesets before Changesets decides whether to publish", async () => {
     const cwd = await fixtureRepo({
       changesets: {
