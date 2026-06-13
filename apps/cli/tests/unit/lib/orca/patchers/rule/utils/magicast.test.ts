@@ -31,6 +31,12 @@ describe("parseConfigModule", () => {
     ).toThrowError(/CommonJS module/);
   });
 
+  it("rejects a CommonJS config that uses exports.default", () => {
+    expect(() =>
+      parseConfigModule("exports.default = { server: {} };", "vite.config.cjs"),
+    ).toThrowError(/CommonJS module/);
+  });
+
   it("does not flag an ESM config that merely mentions module.exports in a comment", () => {
     const mod = parseConfigModule(
       "// migrated from module.exports\nexport default { server: {} };",

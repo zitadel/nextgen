@@ -160,11 +160,15 @@ export default class Eject extends BaseCommand {
     // can't be auto-reverted, so surface them as manual cleanup steps. The
     // Angular patcher also edits package.json (a `dev` script, not a config
     // block), so word that one accurately.
-    const manualSteps = actions.configEdits.map((rel) =>
-      rel === "package.json" || rel.endsWith("/package.json")
-        ? `Remove the "dev" script setup added to ${rel}`
-        : `Remove the Zitadel configuration block from ${rel}`,
-    );
+    const manualSteps = actions.configEdits.map((rel) => {
+      if (rel === "package.json" || rel.endsWith("/package.json")) {
+        return `Remove the "dev" script setup added to ${rel}`;
+      }
+      if (rel === "angular.json" || rel.endsWith("/angular.json")) {
+        return `Remove the Zitadel proxyConfig (and dev-server port) from the serve target in ${rel}`;
+      }
+      return `Remove the Zitadel configuration block from ${rel}`;
+    });
 
     if (removed.length === 0 && backedUp.length === 0 && manualSteps.length === 0) {
       return this.emit({ status: "skipped", reason: "nothing-to-eject", data: { cwd } });
