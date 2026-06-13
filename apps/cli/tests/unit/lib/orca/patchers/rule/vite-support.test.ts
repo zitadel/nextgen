@@ -33,6 +33,11 @@ describe("viteProxyEdit", () => {
     expect(out).not.toContain("5173");
   });
 
+  it("leaves server.host unset so the user can opt into network binding", () => {
+    const out = edit("export default defineConfig({});");
+    expect(out).not.toContain("host:");
+  });
+
   it("is idempotent — re-running over its own output changes nothing", () => {
     const once = edit("export default defineConfig({});");
     expect(edit(once)).toBe(once);

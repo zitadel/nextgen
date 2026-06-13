@@ -52,10 +52,14 @@ export function nuxtConfigEdit(opts: {
       );
     }
 
-    // The Lit components must be transpiled for SSR.
+    // The Lit components and their style/token deps must be transpiled for SSR
+    // (matching the repo's own demo-nuxt config) or the build fails on the
+    // untranspiled ESM those transitive packages ship.
     const build = ensureEditableObject(config, "build");
     ensureArrayItem(build, "transpile", "@zitadel/api");
     ensureArrayItem(build, "transpile", "@zitadel/components");
+    ensureArrayItem(build, "transpile", "@zitadel/shared-component-styles");
+    ensureArrayItem(build, "transpile", "@zitadel/design-tokens");
 
     // Tell Vue's template compiler the `zitadel-*` Lit elements are custom
     // elements, not Vue components, so it renders them as native elements

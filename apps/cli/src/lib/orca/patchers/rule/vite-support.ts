@@ -44,8 +44,10 @@ const PROXY_IMPORTS = [
 /**
  * Builds the pure `edit` transform the file-writer applies to the project's Vite
  * config (`vite.config.*`): a non-destructive magicast merge that adds the
- * `/__nextgen` proxy and sets `server.host`/`server.port`/`strictPort` when they
- * are unset, preserving the user's plugins, options, and formatting. Idempotent
+ * `/__nextgen` proxy and sets `server.port`/`strictPort` when they are unset,
+ * preserving the user's plugins, options, and formatting. Leaves `server.host`
+ * alone so the user can still opt into network binding (`--host`/`host: true`);
+ * the issuer/origin requirement is about the port, not the bind host. Idempotent
  * — entries already present are left as-is. Throws `E_VALIDATION` when the file
  * is absent or the config object cannot be reached (function-built/exotic
  * configs), with a hint to add the block manually.
@@ -59,9 +61,6 @@ export function viteProxyEdit(
     const mod = parseConfigModule(source, label);
     const config = resolveDefaultExportObject(mod, label);
     const serverConfig = ensureEditableObject(config, "server");
-    if (serverConfig.host === undefined) {
-      serverConfig.host = "localhost";
-    }
     if (serverConfig.port === undefined) {
       serverConfig.port = devPort;
     }
