@@ -44,6 +44,14 @@ describe("parseConfigModule", () => {
     );
     expect(mod).toBeTruthy();
   });
+
+  it("does not flag an ESM config with module.exports inside a string literal", () => {
+    const mod = parseConfigModule(
+      'export default { note: "set via module.exports = {} in the old config" };',
+      "vite.config.ts",
+    );
+    expect(mod).toBeTruthy();
+  });
 });
 
 describe("resolveDefaultExportObject", () => {

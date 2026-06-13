@@ -22,24 +22,64 @@ export function parseConfigModule(
       hint: `Run setup from a project that has ${filename}.`,
     });
   }
-  // A CommonJS config (e.g. a `*.cjs` file or a `*.js` with `module.exports`)
-  // can't evaluate the ESM `import`/`import.meta.url` these edits inject, so
-  // reject it with a clear message instead of producing a broken config. Match
-  // an actual `module.exports =` or `exports.<name> =` assignment so a stray
-  // mention in a comment or string doesn't trip a false positive.
-  if (/\b(?:module\.exports|exports\.\w+)\s*=/.test(source)) {
-    throw new ZitadelError("E_VALIDATION", `${filename} is a CommonJS module, which can't be edited`, {
-      hint: `The Zitadel edits use ESM imports. Convert the config to ESM (a .ts/.mts file, or set "type": "module"), or add the Zitadel block manually.`,
-    });
-  }
+  let mod: ReturnType<typeof parseModule>;
   try {
-    return parseModule(source);
+    mod = parseModule(source);
   } catch (error) {
     throw new ZitadelError("E_VALIDATION", `Could not parse ${filename}`, {
       hint: `Ensure ${filename} is valid, or apply the Zitadel changes manually.`,
       details: { cause: error instanceof Error ? error.message : String(error) },
     });
   }
+  // A CommonJS config (e.g. a `*.cjs` file or a `*.js` with `module.exports`)
+  // can't evaluate the ESM `import`/`import.meta.url` these edits inject, so
+  // reject it with a clear message instead of producing a broken config. Check
+  // the parsed AST for a real `module.exports`/`exports.x` assignment — scanning
+  // raw text would false-positive on the same string in a comment or literal.
+  if (hasCommonJsExport(mod)) {
+    throw new ZitadelError("E_VALIDATION", `${filename} is a CommonJS module, which can't be edited`, {
+      hint: `The Zitadel edits use ESM imports. Convert the config to ESM (a .ts/.mts file, or set "type": "module"), or add the Zitadel block manually.`,
+    });
+  }
+  return mod;
+}
+
+/**
+ * Whether the module has a top-level CommonJS export assignment —
+ * `module.exports = …`, `module.exports.x = …`, or `exports.x = …` — read from
+ * the parsed AST so comments and string literals can't trigger a false match.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function hasCommonJsExport(mod: any): boolean {
+  // magicast's `$ast` may be a babel `File` (with `.program.body`) or the
+  // `Program` node itself (`.body`) — handle both.
+  const program = mod?.$ast?.program ?? mod?.$ast;
+  const body = program?.body ?? [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return body.some((node: any) => {
+    if (node?.type !== "ExpressionStatement" || node.expression?.type !== "AssignmentExpression") {
+      return false;
+    }
+    const left = node.expression.left;
+    if (left?.type !== "MemberExpression") {
+      return false;
+    }
+    const object = left.object;
+    // `exports.x = …`
+    if (object?.type === "Identifier" && object.name === "exports") {
+      return true;
+    }
+    // `module.exports = …`
+    if (object?.type === "Identifier" && object.name === "module" && left.property?.name === "exports") {
+      return true;
+    }
+    // `module.exports.x = …`
+    return (
+      object?.type === "MemberExpression" &&
+      object.object?.name === "module" &&
+      object.property?.name === "exports"
+    );
+  });
 }
 
 /**
