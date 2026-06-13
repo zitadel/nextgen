@@ -286,6 +286,11 @@ function assertCliLatestPromotion(ciWorkflow) {
       throw new Error("only @zitadel/cli may move the npm latest dist-tag during alpha");
     }
   }
+  assertContains(
+    releaseJob,
+    'npm dist-tag add "@zitadel/cli@$version" latest ||',
+    "release-alpha-train must not fail the alpha train when npm latest dist-tag promotion fails",
+  );
 }
 
 function assertNoUnexpectedPublishOnlyGates(ciWorkflow) {
