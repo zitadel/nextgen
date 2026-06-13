@@ -52,10 +52,12 @@ layer, not the envelope.
   and login flow are provisioned server-side at creation, so setup neither
   scaffolds nor uploads them. Agents must pass `--framework` when scaffolding
   into a fresh directory; interactive humans can omit it and choose from the
-  prompt. Flags: `--framework next|react|vue|angular|nuxt`, `--renderer`
-  (Next.js only), `--dev-port` (dev-server port, also the issuer origin
-  registered with Zitadel — use distinct ports to run several scaffolded apps
-  side by side), `--skip-install`.
+  prompt. Flags: `--framework next|react|vue|angular|nuxt`, `--renderer
+  react|web-component` (selects the Next.js auth-page renderer; accepted for any
+  framework and recorded in `zitadel.json` branding, but only Next varies its
+  generated templates by it), `--dev-port` (dev-server port, also the issuer
+  origin registered with Zitadel — use distinct ports to run several scaffolded
+  apps side by side), `--skip-install`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
 - `doctor` — verify generated app files and local state once `zitadel.json`
