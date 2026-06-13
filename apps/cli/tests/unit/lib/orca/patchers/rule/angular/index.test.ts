@@ -80,13 +80,13 @@ describe("AngularPatcher.plan", () => {
 });
 
 describe("AngularPatcher.artifacts", () => {
-  it("lists the component files as managed and angular.json as a manual config edit", () => {
+  it("lists the component files as managed and the config edits as manual cleanup", () => {
     const artifacts = new AngularPatcher().artifacts({
       framework: { id: "angular", appDir: "src/app", devPort: 3000, url: "http://localhost:3000" },
       rendererId: "react",
     });
     expect(artifacts.markedFiles).toContain("src/app/app.ts");
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-angular"]);
-    expect(artifacts.configEdits).toEqual(["angular.json"]);
+    expect(artifacts.configEdits).toEqual(["angular.json", "package.json"]);
   });
 });

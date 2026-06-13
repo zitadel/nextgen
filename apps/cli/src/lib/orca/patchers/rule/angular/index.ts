@@ -81,7 +81,9 @@ export class AngularPatcher extends AbstractRulePatcher {
   }
 
   protected override routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
-    return ["angular.json"];
+    // Both files are touched via `edit` ops eject can't auto-revert: the proxy
+    // wired into angular.json and the `dev` script added to package.json.
+    return ["angular.json", "package.json"];
   }
 
   protected summary(_ctx: PatchContext): { title: string; detail: string } {
