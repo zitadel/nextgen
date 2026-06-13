@@ -25,14 +25,3 @@ const COMMONJS_EXTENSIONS = ["cts", "cjs"] as const;
 export function configCandidates(basename: string): string[] {
   return [...CONFIG_EXTENSIONS, ...COMMONJS_EXTENSIONS].map((ext) => `${basename}.${ext}`);
 }
-
-/**
- * A human-readable glob of the *editable* (ESM) filenames for `basename`, e.g.
- * `configPattern("vite.config")` → `vite.config.{ts,mts,js,mjs}`. Used in error
- * messages so a failure names the extensions setup can actually write (the
- * CommonJS variants are probed but not editable, so they're intentionally
- * omitted here).
- */
-export function configPattern(basename: string): string {
-  return `${basename}.{${CONFIG_EXTENSIONS.join(",")}}`;
-}

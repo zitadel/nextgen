@@ -1,6 +1,6 @@
 import { builders, generateCode } from "magicast";
 
-import { configCandidates, configPattern } from "./config-paths";
+import { configCandidates } from "./config-paths";
 import type { FileOp } from "./file-writer/types";
 import {
   ensureEditableObject,
@@ -53,7 +53,7 @@ export function viteProxyEdit(
   server: string,
 ): (source: string | undefined) => string {
   return (source) => {
-    const label = `the Vite config (${configPattern("vite.config")})`;
+    const label = "the Vite config (vite.config.*)";
     const mod = parseConfigModule(source, label);
     const config = resolveDefaultExportObject(mod, label);
     let changed = false;
