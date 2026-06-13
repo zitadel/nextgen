@@ -18,6 +18,7 @@ export async function prepareNextApp(options = {}) {
   const appDir = resolve(env.JOURNEY_APP_DIR ?? join(outputDir, "myapp"));
   const registryUrl = env.JOURNEY_REGISTRY_URL ?? defaultRegistryUrl;
   const appUrl = env.JOURNEY_APP_URL ?? defaultAppUrl;
+  const zitadelPort = optionalPort(env.JOURNEY_ZITADEL_PORT, "JOURNEY_ZITADEL_PORT");
   const fs = {
     appendFile: options.appendFile ?? appendFile,
     mkdir: options.mkdir ?? mkdir,
@@ -46,7 +47,7 @@ export async function prepareNextApp(options = {}) {
       outputDir,
       runCapture: runCaptureFn,
       step: "doctor",
-      stepArgs: ["doctor"],
+      stepArgs: withPort(["doctor"], zitadelPort),
       writeFile: fs.writeFile,
     });
     startJson = await runCliJsonStep({
@@ -56,7 +57,7 @@ export async function prepareNextApp(options = {}) {
       outputDir,
       runCapture: runCaptureFn,
       step: "start",
-      stepArgs: ["start"],
+      stepArgs: withPort(["start"], zitadelPort),
       writeFile: fs.writeFile,
     });
     setupJson = await runCliJsonStep({
@@ -223,6 +224,20 @@ function npmEnvironment(env, registryUrl) {
     npm_config_registry: registryUrl,
     npm_config_yes: "true",
   };
+}
+
+function optionalPort(value, name) {
+  if (!value) return undefined;
+  const port = Number(value);
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+    throw new Error(`${name} must be a TCP port, got ${value}`);
+  }
+  return port;
+}
+
+function withPort(args, port) {
+  if (!port) return args;
+  return [...args, "--port", String(port)];
 }
 
 function runCapture(command, args, options) {

@@ -182,6 +182,88 @@ describe("check-alpha-release-plan script", () => {
     ).rejects.toThrow("post-npm alpha train steps must not be gated only on Changesets publishing");
   });
 
+  it("rejects a workflow that does not promote the CLI alpha to npm latest", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      ciWorkflow: validCiWorkflow().replace(
+        [
+          "      - name: Promote CLI alpha to npm latest",
+          "        if: ${{ steps.changesets.outputs.published == 'true' }}",
+          "        run: |",
+          "          npm dist-tag add \"@zitadel/cli@$version\" alpha",
+          "          npm dist-tag add \"@zitadel/cli@$version\" latest",
+          "",
+        ].join("\n"),
+        "",
+      ),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("must promote the CLI alpha package to npm latest");
+  });
+
+  it("rejects a workflow that refreshes the CLI alpha tag outside the release job", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      ciWorkflow: validCiWorkflow()
+        .replace(
+          '          npm dist-tag add "@zitadel/cli@$version" alpha',
+          '          echo "alpha tag moved elsewhere"',
+        )
+        .replace(
+          "  ci-success:\n    steps:",
+          [
+            "  ci-success:",
+            "    steps:",
+            "      - run: |",
+            '          npm dist-tag add "@zitadel/cli@$version" alpha',
+          ].join("\n"),
+        ),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("must keep the CLI alpha dist-tag on the published train");
+  });
+
+  it("rejects a workflow that moves the CLI latest tag outside the release job", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      ciWorkflow: validCiWorkflow()
+        .replace(
+          '          npm dist-tag add "@zitadel/cli@$version" latest',
+          '          echo "latest tag moved elsewhere"',
+        )
+        .replace(
+          "  ci-success:\n    steps:",
+          [
+            "  ci-success:",
+            "    steps:",
+            "      - run: |",
+            '          npm dist-tag add "@zitadel/cli@$version" latest',
+          ].join("\n"),
+        ),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("must move only the CLI npm latest dist-tag during alpha");
+  });
+
+  it("rejects a workflow that moves any non-CLI package to npm latest", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      ciWorkflow: validCiWorkflow().replace(
+        '          npm dist-tag add "@zitadel/cli@$version" latest',
+        [
+          '          npm dist-tag add "@zitadel/cli@$version" latest',
+          '          npm dist-tag add "@zitadel/sdk-next@$version" latest',
+        ].join("\n"),
+      ),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("only @zitadel/cli may move the npm latest dist-tag");
+  });
+
   it("rejects a release job condition that can inherit intentional main-branch skips", async () => {
     const { cwd, statusPath } = await fixtureRepo({
       ciWorkflow: validCiWorkflow().replace(
@@ -297,6 +379,12 @@ function validCiWorkflow(): string {
     "        uses: changesets/action@v1",
     "        with:",
     "          createGithubReleases: false",
+    "      - name: Promote CLI alpha to npm latest",
+    "        if: ${{ steps.changesets.outputs.published == 'true' }}",
+    "        run: |",
+    "          npm dist-tag add \"@zitadel/cli@$version\" alpha",
+    "          npm dist-tag add \"@zitadel/cli@$version\" latest",
+    "",
     "      - name: Restore changesets after publish decision",
     "        run: git restore -- .changeset",
     "",

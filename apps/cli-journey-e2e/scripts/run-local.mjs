@@ -3,7 +3,6 @@ import {
   cp,
   mkdir,
   mkdtemp,
-  readFile,
   rm,
   writeFile,
 } from "node:fs/promises";
@@ -13,41 +12,43 @@ import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import net from "node:net";
 
+import {
+  composeArgs,
+  localRegistryPaths,
+  npmEnvironment,
+  packageName,
+  prepareLocalRegistry,
+  stopLocalRegistry,
+  waitForHttp,
+} from "./local-registry.mjs";
+
 const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, "..");
 const repoRoot = resolve(projectRoot, "../..");
 const composeFile = join(projectRoot, "docker-compose.local.yaml");
-const packageDirs = [
-  "apps/cli",
-  "packages/api",
-  "packages/components",
-  "packages/sdk-core",
-  "packages/sdk-next",
-  "packages/sdk-nuxt",
-  "packages/sdk-react",
-  "packages/sdk-vue",
-  "packages/sdk-angular",
-];
 
 const options = parseArgsOrExit(process.argv.slice(2));
 const workDir = resolve(
   options.workDir || (await mkdtemp(join(tmpdir(), "zitadel-cli-journey-local-"))),
 );
-const tarballsDir = join(workDir, "npm-packages");
 const diagnosticsDir = join(workDir, "diagnostics");
 const appDir = join(workDir, "myapp");
-const composeEnvPath = join(workDir, "compose.env");
-const verdaccioConfigPath = join(workDir, "verdaccio", "config.yaml");
-const verdaccioStoragePath = join(workDir, "verdaccio", "storage");
-const verdaccioNpmrcPath = join(workDir, "verdaccio.npmrc");
+const registryPaths = localRegistryPaths(workDir);
 const nextLogPath = join(diagnosticsDir, "next-app.log");
 const composeLogPath = join(diagnosticsDir, "compose.log");
 const composeProjectName = `zitadel-journey-${process.pid}-${Date.now()}`;
 const registryPort = await resolvePort("JOURNEY_REGISTRY_PORT");
 const appPort = await resolvePort("JOURNEY_APP_PORT", 3000);
+const zitadelPort = await resolvePort("JOURNEY_ZITADEL_PORT");
 const registryUrl = `http://127.0.0.1:${registryPort}`;
 const appUrl = `http://localhost:${appPort}`;
-const cliPackage = await packageName("apps/cli");
+const cliPackage = await packageName(repoRoot, "apps/cli");
+const compose = {
+  envPath: registryPaths.composeEnvPath,
+  file: composeFile,
+  projectName: composeProjectName,
+  repoRoot,
+};
 const childProcesses = new Set();
 let composeStarted = false;
 let cleanupStarted = false;
@@ -58,39 +59,25 @@ process.on("SIGINT", () => void handleSignal("SIGINT"));
 process.on("SIGTERM", () => void handleSignal("SIGTERM"));
 
 try {
-  await mkdir(tarballsDir, { recursive: true });
   await mkdir(diagnosticsDir, { recursive: true });
-  await mkdir(dirname(verdaccioConfigPath), { recursive: true });
-  await mkdir(verdaccioStoragePath, { recursive: true });
-
-  await writeVerdaccioConfig();
-  await writeVerdaccioNpmrc();
-  await writeComposeEnv();
 
   log(`work dir: ${workDir}`);
   await assertDockerAvailable();
   await ensurePlaywrightBrowsers();
-  await buildPackages();
-  await packPackages();
-  await run("node", [
-    "apps/cli-journey-e2e/scripts/verify-tarballs.mjs",
-    tarballsDir,
-  ]);
-
-  await startCompose();
-  await waitForHttp(`${registryUrl}/-/ping`, "Verdaccio");
-
-  await run(
-    "node",
-    ["apps/cli-journey-e2e/scripts/publish-tarballs.mjs", tarballsDir],
-    {
-      env: {
-        ...process.env,
-        JOURNEY_REGISTRY_URL: registryUrl,
-        NPM_CONFIG_USERCONFIG: verdaccioNpmrcPath,
-      },
+  await prepareLocalRegistry({
+    compose,
+    env: process.env,
+    log,
+    onStarted: () => {
+      composeStarted = true;
     },
-  );
+    paths: registryPaths,
+    registryPort,
+    registryUrl,
+    repoRoot,
+    run,
+    workDir,
+  });
 
   if (!localRuntimeImage) {
     log("building local runtime image for npx @zitadel/cli@alpha start");
@@ -101,9 +88,10 @@ try {
     env: {
       ...process.env,
       JOURNEY_APP_URL: appUrl,
+      JOURNEY_ZITADEL_PORT: String(zitadelPort),
       JOURNEY_REGISTRY_URL: registryUrl,
       JOURNEY_WORK_DIR: workDir,
-      NPM_CONFIG_USERCONFIG: verdaccioNpmrcPath,
+      NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
       ZITADEL_LOCAL_IMAGE: localRuntimeImage,
     },
   });
@@ -268,93 +256,6 @@ function freePort() {
   });
 }
 
-async function writeVerdaccioConfig() {
-  await writeFile(
-    verdaccioConfigPath,
-    `storage: /verdaccio/storage
-uplinks:
-  npmjs:
-    url: https://registry.npmjs.org/
-packages:
-  '@zitadel/*':
-    access: $all
-    publish: $all
-    unpublish: $all
-  '@*/*':
-    access: $all
-    publish: $all
-    unpublish: $all
-    proxy: npmjs
-  '**':
-    access: $all
-    publish: $all
-    unpublish: $all
-    proxy: npmjs
-logs:
-  - { type: stdout, format: pretty, level: http }
-`,
-  );
-}
-
-async function writeVerdaccioNpmrc() {
-  await writeFile(
-    verdaccioNpmrcPath,
-    `registry=${registryUrl}/
-//127.0.0.1:${registryPort}/:_authToken=journey-token
-`,
-  );
-}
-
-async function writeComposeEnv() {
-  await writeFile(
-    composeEnvPath,
-    [
-      `JOURNEY_REGISTRY_PORT=${registryPort}`,
-      `JOURNEY_VERDACCIO_CONFIG=${verdaccioConfigPath}`,
-      `JOURNEY_VERDACCIO_STORAGE=${verdaccioStoragePath}`,
-      "",
-    ].join("\n"),
-  );
-}
-
-async function buildPackages() {
-  const projectNames = await Promise.all(packageDirs.map(packageName));
-  log(`building ${projectNames.join(", ")}`);
-  await run("corepack", [
-    "pnpm",
-    "nx",
-    "run-many",
-    "-t",
-    "build",
-    "-p",
-    projectNames.join(","),
-  ]);
-}
-
-async function packPackages() {
-  log(`packing npm tarballs into ${tarballsDir}`);
-  for (const dir of packageDirs) {
-    await run("corepack", [
-      "pnpm",
-      "--dir",
-      dir,
-      "pack",
-      "--pack-destination",
-      tarballsDir,
-    ]);
-  }
-}
-
-async function packageName(relativePath) {
-  const manifest = JSON.parse(
-    await readFile(join(repoRoot, relativePath, "package.json"), "utf8"),
-  );
-  if (typeof manifest.name !== "string" || manifest.name.length === 0) {
-    throw new Error(`${relativePath}/package.json has no name`);
-  }
-  return manifest.name;
-}
-
 async function ensurePlaywrightBrowsers() {
   log("ensuring Playwright Chromium browsers are installed");
   await run("corepack", [
@@ -414,34 +315,6 @@ async function assertDockerAvailable() {
     composeVersion ? `compose ${composeVersion}` : "",
   ].filter(Boolean);
   log(`Docker is available${versionDetails.length > 0 ? ` (${versionDetails.join(", ")})` : ""}`);
-}
-
-async function startCompose() {
-  log("starting Verdaccio");
-  await run("docker", composeArgs(["up", "-d", "verdaccio"]));
-  composeStarted = true;
-}
-
-async function waitForHttp(url, label, child) {
-  const deadline = Date.now() + 90_000;
-  let lastError;
-  while (Date.now() < deadline) {
-    if (child && child.exitCode !== null) {
-      throw new Error(`${label} exited before becoming ready; see ${child.logFile}`);
-    }
-    try {
-      const response = await fetch(url);
-      if (response.ok) {
-        log(`${label} is ready at ${url}`);
-        return;
-      }
-      lastError = new Error(`${url} returned ${response.status}`);
-    } catch (error) {
-      lastError = error;
-    }
-    await delay(1000);
-  }
-  throw new Error(`timed out waiting for ${label} at ${url}: ${lastError?.message}`);
 }
 
 function startChild(command, args, optionsForChild) {
@@ -529,19 +402,6 @@ function commandErrorDetail(error) {
   return (detailLines.length > 0 ? detailLines : lines).slice(-4).join("\n");
 }
 
-function composeArgs(args) {
-  const base = [
-    "compose",
-    "--project-name",
-    composeProjectName,
-    "--env-file",
-    composeEnvPath,
-    "-f",
-    composeFile,
-  ];
-  return [...base, ...args];
-}
-
 async function collectDiagnostics() {
   await mkdir(diagnosticsDir, { recursive: true });
   await collectLocalRuntimeLogs();
@@ -549,7 +409,7 @@ async function collectDiagnostics() {
     try {
       const result = await runCapture(
         "docker",
-        composeArgs(["logs"]),
+        composeArgs(compose, ["logs"]),
       );
       await writeFile(composeLogPath, `${result.stdout}${result.stderr}`);
     } catch (error) {
@@ -633,7 +493,7 @@ async function cleanup() {
 
   if (composeStarted) {
     try {
-      await run("docker", composeArgs(["down", "-v", "--remove-orphans"]));
+      await stopLocalRegistry(compose, run, process.env);
     } catch (error) {
       console.error(`[journey-local] docker compose cleanup failed: ${errorMessage(error)}`);
     }
@@ -687,23 +547,12 @@ async function handleSignal(signal) {
   process.exit(130);
 }
 
-function delay(ms) {
-  return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
-}
-
 function cliArgs(args) {
   return ["--yes", `${cliPackage}@alpha`, ...args, "--non-interactive", "--json"];
 }
 
 function npxEnv() {
-  const env = {
-    ...process.env,
-    NPM_CONFIG_USERCONFIG: verdaccioNpmrcPath,
-    npm_config_audit: "false",
-    npm_config_fund: "false",
-    npm_config_registry: registryUrl,
-    npm_config_yes: "true",
-  };
+  const env = npmEnvironment(process.env, registryUrl, registryPaths.npmrcPath);
   const image = localRuntimeImage || process.env.ZITADEL_LOCAL_IMAGE;
   if (image) {
     env.ZITADEL_LOCAL_IMAGE = image;

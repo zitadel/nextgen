@@ -34,6 +34,13 @@ ghcr.io/zitadel/nextgen:<version>
 Alpha trains do not move the Docker `latest` tag. Only stable, non-prerelease
 GoReleaser releases may publish `ghcr.io/zitadel/nextgen:latest`.
 
+Alpha trains do move the `@zitadel/cli` npm `latest` dist-tag as a temporary
+preview exception, because the CLI is the tester entrypoint and bare
+`npx @zitadel/cli` otherwise resolves to an unusable pre-alpha package. The
+`alpha` dist-tag remains the canonical prerelease tag, exact alpha versions
+remain reproducible, and no other public npm package moves `latest` during
+alpha.
+
 The CLI derives the default local runtime image from its own installed version:
 
 ```text

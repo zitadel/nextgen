@@ -57,6 +57,7 @@ describe("Orca detection", () => {
       appDir: "app",
       devPort: 4321,
       url: "http://localhost:4321",
+      versionMajor: 15,
     });
   });
 

@@ -79,6 +79,7 @@ const COMMON_ATTRS: readonly string[] = [
   "style",
   "name",
   "for",
+  "data-testid",
   "data-theme",
   "hidden",
 ];
