@@ -75,13 +75,15 @@ export function importIsPresent(mod: any, local: string): boolean {
 /**
  * Appends `item` to a string array at `parent[key]`, creating the array when
  * absent and skipping it when already present. Reads the proxified array by
- * index so primitive elements compare as plain values.
+ * index so primitive elements compare as plain values. Returns `true` when it
+ * actually added the item, so callers can tell whether the edit changed
+ * anything (and skip rewriting an already-complete config).
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function ensureArrayItem(parent: any, key: string, item: string): void {
+export function ensureArrayItem(parent: any, key: string, item: string): boolean {
   if (parent[key] === undefined) {
     parent[key] = [item];
-    return;
+    return true;
   }
   const arr = parent[key];
   // The existing value is something other than an array literal (e.g. an
@@ -97,7 +99,9 @@ export function ensureArrayItem(parent: any, key: string, item: string): void {
   );
   if (!present) {
     arr.push(item);
+    return true;
   }
+  return false;
 }
 
 /**

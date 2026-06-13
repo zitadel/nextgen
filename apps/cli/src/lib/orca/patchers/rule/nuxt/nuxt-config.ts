@@ -29,11 +29,12 @@ export function nuxtConfigEdit(opts: {
     const mod = parseConfigModule(source, label);
     const config = resolveDefaultExportObject(mod, label);
 
-    ensureArrayItem(config, "modules", NUXT_MODULE);
+    let changed = ensureArrayItem(config, "modules", NUXT_MODULE);
 
     const nextgen = ensureEditableObject(config, "nextgen");
     if (nextgen.loginPath === undefined) {
       nextgen.loginPath = "/login";
+      changed = true;
     }
 
     const runtimeConfig = ensureEditableObject(config, "runtimeConfig");
@@ -41,25 +42,34 @@ export function nuxtConfigEdit(opts: {
       runtimeConfig.zitadelUrl = builders.raw(
         `process.env.ZITADEL_URL ?? ${JSON.stringify(opts.server)}`,
       );
+      changed = true;
     }
     const publicConfig = ensureEditableObject(runtimeConfig, "public");
     if (publicConfig.nextgenProxyPath === undefined) {
       publicConfig.nextgenProxyPath = PROXY_PATH;
+      changed = true;
     }
     if (publicConfig.zitadelProjectId === undefined) {
       publicConfig.zitadelProjectId = builders.raw(
         `process.env.NUXT_PUBLIC_ZITADEL_PROJECT_ID ?? ${JSON.stringify(opts.projectId)}`,
       );
+      changed = true;
     }
 
     // The Lit components and their style/token deps must be transpiled for SSR
     // (matching the repo's own demo-nuxt config) or the build fails on the
     // untranspiled ESM those transitive packages ship.
     const build = ensureEditableObject(config, "build");
-    ensureArrayItem(build, "transpile", "@zitadel/api");
-    ensureArrayItem(build, "transpile", "@zitadel/components");
-    ensureArrayItem(build, "transpile", "@zitadel/shared-component-styles");
-    ensureArrayItem(build, "transpile", "@zitadel/design-tokens");
+    for (const dep of [
+      "@zitadel/api",
+      "@zitadel/components",
+      "@zitadel/shared-component-styles",
+      "@zitadel/design-tokens",
+    ]) {
+      if (ensureArrayItem(build, "transpile", dep)) {
+        changed = true;
+      }
+    }
 
     // Tell Vue's template compiler the `zitadel-*` Lit elements are custom
     // elements, not Vue components, so it renders them as native elements
@@ -68,8 +78,14 @@ export function nuxtConfigEdit(opts: {
     const compilerOptions = ensureEditableObject(vue, "compilerOptions");
     if (compilerOptions.isCustomElement === undefined) {
       compilerOptions.isCustomElement = builders.raw(`(tag) => tag.startsWith("zitadel-")`);
+      changed = true;
     }
 
+    // Nothing was missing — return the source untouched so the file-writer skips
+    // it instead of letting magicast reformat an already-patched config.
+    if (!changed && source !== undefined) {
+      return source;
+    }
     const code = generateCode(mod).code;
     return code.endsWith("\n") ? code : `${code}\n`;
   };

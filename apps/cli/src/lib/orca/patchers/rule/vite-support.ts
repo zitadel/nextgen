@@ -56,21 +56,31 @@ export function viteProxyEdit(
     const label = `the Vite config (${configPattern("vite.config")})`;
     const mod = parseConfigModule(source, label);
     const config = resolveDefaultExportObject(mod, label);
+    let changed = false;
     const serverConfig = ensureEditableObject(config, "server");
     if (serverConfig.port === undefined) {
       serverConfig.port = devPort;
+      changed = true;
     }
     if (serverConfig.strictPort === undefined) {
       serverConfig.strictPort = true;
+      changed = true;
     }
     const proxyConfig = ensureEditableObject(serverConfig, "proxy");
     if (proxyConfig[PROXY_PATH] === undefined) {
       proxyConfig[PROXY_PATH] = builders.raw(proxyEntryCode(server));
+      changed = true;
     }
     for (const imp of PROXY_IMPORTS) {
       if (!importIsPresent(mod, imp.local)) {
         mod.imports.$add({ ...imp });
+        changed = true;
       }
+    }
+    // Nothing was missing — return the source untouched so the file-writer skips
+    // it instead of letting magicast reformat an already-patched config.
+    if (!changed && source !== undefined) {
+      return source;
     }
     const code = generateCode(mod).code;
     return code.endsWith("\n") ? code : `${code}\n`;
