@@ -864,26 +864,6 @@ jobs:
           # repository is public.
           NPM_CONFIG_PROVENANCE: "false"
 
-      - name: Promote CLI alpha to npm latest
-        if: ${{ steps.changesets.outputs.published == 'true' }}
-        env:
-          NPM_CONFIG_PROVENANCE: "false"
-        run: |
-          set -euo pipefail
-          version="$(node -p "require('./apps/cli/package.json').version")"
-          node --input-type=module - "$version" <<'NODE'
-          const version = process.argv[2];
-          if (!/^\d+\.\d+\.\d+-alpha\.\d+$/.test(version)) {
-            throw new Error(`expected an alpha CLI version, got ${version}`);
-          }
-          NODE
-          # Temporary public-alpha exception: the CLI is the tester entrypoint,
-          # so bare `npx @zitadel/cli` must reach the supported local workflow.
-          # Keep `alpha` as the canonical prerelease tag, and do not move
-          # `latest` for SDKs/components, Docker images, or GitHub Releases.
-          npm dist-tag add "@zitadel/cli@$version" alpha || echo "::warning::Unable to refresh @zitadel/cli@$version npm alpha dist-tag"
-          npm dist-tag add "@zitadel/cli@$version" latest || echo "::warning::Unable to promote @zitadel/cli@$version to npm latest dist-tag"
-
       - name: Restore changesets after publish decision
         run: git restore -- .changeset
 
@@ -916,6 +896,27 @@ jobs:
           alpha_env="$RUNNER_TEMP/alpha-release.env"
           node scripts/release-alpha-train.mjs prepare --published "$PUBLISHED" --out-dir "$RUNNER_TEMP/alpha-release" | tee "$alpha_env"
           cat "$alpha_env" >> "$GITHUB_OUTPUT"
+
+      - name: Refresh CLI npm dist-tags
+        if: ${{ steps.alpha.outputs.version != '' }}
+        env:
+          NPM_CONFIG_PROVENANCE: "false"
+          VERSION: ${{ steps.alpha.outputs.version }}
+        run: |
+          set -euo pipefail
+          version="$VERSION"
+          node --input-type=module - "$version" <<'NODE'
+          const version = process.argv[2];
+          if (!/^\d+\.\d+\.\d+-alpha\.\d+$/.test(version)) {
+            throw new Error(`expected an alpha CLI version, got ${version}`);
+          }
+          NODE
+          # Temporary public-alpha exception: the CLI is the tester entrypoint,
+          # so bare `npx @zitadel/cli` must reach the supported local workflow.
+          # Keep `alpha` as the canonical prerelease tag, and do not move
+          # `latest` for SDKs/components, Docker images, or GitHub Releases.
+          npm dist-tag add "@zitadel/cli@$version" alpha || echo "::warning::Unable to refresh @zitadel/cli@$version npm alpha dist-tag"
+          npm dist-tag add "@zitadel/cli@$version" latest || echo "::warning::Unable to promote @zitadel/cli@$version to npm latest dist-tag"
 
       - name: Set up QEMU
         if: ${{ steps.alpha.outputs.run_goreleaser == 'true' }}

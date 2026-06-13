@@ -14,6 +14,7 @@ type ReleaseAlphaTrainModule = {
     published?: boolean | string;
     remote?: boolean | string;
   }) => Promise<{
+    npmTrainExists?: boolean;
     shouldComplete: boolean;
     skipReason?: string;
   }>;
@@ -192,32 +193,73 @@ describe("release-alpha-train script", () => {
     });
   });
 
-  it("blocks GoReleaser when Changesets did not publish npm packages", async () => {
+  it("continues when Changesets did not publish in this run but the npm train exists", async () => {
+    const cwd = await fixtureRepo();
+
+    const result = await releaseAlphaTrain.prepareAlphaReleaseTrain({
+      cwd,
+      execFile: commandMock({ npmTrainExists: true }),
+      published: false,
+    });
+
+    expect(result.shouldCreateTag).toBe(true);
+    expect(result.shouldRunGoreleaser).toBe(true);
+    expect(result.shouldUpdateRelease).toBe(true);
+  });
+
+  it("blocks GoReleaser when the npm train is not published", async () => {
     const cwd = await fixtureRepo();
 
     await expect(
       releaseAlphaTrain.inspectAlphaReleaseTrain({
         cwd,
-        execFile: commandMock(),
+        execFile: commandMock({ npmTrainExists: false }),
         published: false,
         remote: false,
       }),
     ).resolves.toMatchObject({
+      npmTrainExists: false,
       shouldComplete: false,
-      skipReason: "npm publish did not run",
+      skipReason: "npm train is not published",
     });
   });
 
-  it("rejects prepare when Changesets did not publish npm packages", async () => {
+  it("surfaces unexpected npm lookup failures", async () => {
+    const cwd = await fixtureRepo();
+
+    await expect(
+      releaseAlphaTrain.inspectAlphaReleaseTrain({
+        cwd,
+        execFile: commandMock({ npmLookupFailsUnexpectedly: true }),
+        published: false,
+        remote: false,
+      }),
+    ).rejects.toThrow("npm exploded");
+  });
+
+  it("surfaces npm auth failures instead of treating them as missing packages", async () => {
+    const cwd = await fixtureRepo();
+
+    await expect(
+      releaseAlphaTrain.inspectAlphaReleaseTrain({
+        cwd,
+        execFile: commandMock({ npmAuthFails: true }),
+        published: false,
+        remote: false,
+      }),
+    ).rejects.toThrow("npm auth failed");
+  });
+
+  it("rejects prepare when the npm train is not published", async () => {
     const cwd = await fixtureRepo();
 
     await expect(
       releaseAlphaTrain.prepareAlphaReleaseTrain({
         cwd,
-        execFile: commandMock(),
+        execFile: commandMock({ npmTrainExists: false }),
         published: false,
       }),
-    ).rejects.toThrow("alpha release train is not ready to complete: npm publish did not run");
+    ).rejects.toThrow("alpha release train is not ready to complete: npm train is not published");
   });
 
   it("allows GoReleaser recovery when npm did not publish but the release tag exists", async () => {
@@ -240,11 +282,12 @@ describe("release-alpha-train script", () => {
     await expect(
       releaseAlphaTrain.inspectAlphaReleaseTrain({
         cwd,
-        execFile: commandMock(),
+        execFile: commandMock({ npmTrainExists: true }),
         published: true,
         remote: false,
       }),
     ).resolves.toMatchObject({
+      npmTrainExists: true,
       shouldComplete: true,
       skipReason: "",
     });
@@ -301,18 +344,20 @@ describe("release-alpha-train script", () => {
     expect(result.shouldRunGoreleaser).toBe(true);
   });
 
-  it("rejects a partial GitHub Release whose container image is missing", async () => {
+  it("runs GoReleaser when the GitHub Release exists but the container image is missing", async () => {
     const cwd = await fixtureRepo();
 
-    await expect(
-      releaseAlphaTrain.prepareAlphaReleaseTrain({
-        cwd,
-        execFile: commandMock({
-          tagCommit: "head-commit",
-          releaseExists: true,
-        }),
+    const result = await releaseAlphaTrain.prepareAlphaReleaseTrain({
+      cwd,
+      execFile: commandMock({
+        tagCommit: "head-commit",
+        releaseExists: true,
       }),
-    ).rejects.toThrow("exists but ghcr.io/zitadel/nextgen:0.1.0-alpha.5 is missing");
+    });
+
+    expect(result.shouldCreateTag).toBe(false);
+    expect(result.shouldRunGoreleaser).toBe(true);
+    expect(result.shouldUpdateRelease).toBe(true);
   });
 });
 
@@ -389,6 +434,9 @@ function commandMock(
   options: {
     headCommit?: string;
     imageExists?: boolean;
+    npmAuthFails?: boolean;
+    npmLookupFailsUnexpectedly?: boolean;
+    npmTrainExists?: boolean;
     releaseExists?: boolean;
     tagCommit?: string;
   } = {},
@@ -416,6 +464,18 @@ function commandMock(
       }
       throw missingCommand();
     }
+    if (command === "npm" && args[0] === "view") {
+      if (options.npmAuthFails) {
+        throw npmAuthFailure();
+      }
+      if (options.npmLookupFailsUnexpectedly) {
+        throw Object.assign(new Error("npm exploded"), { code: 2 });
+      }
+      if (options.npmTrainExists ?? true) {
+        return { stdout: '"0.1.0-alpha.5"\n', stderr: "" };
+      }
+      throw missingNpmPackage();
+    }
     throw new Error(`unexpected command: ${command} ${args.join(" ")}`);
   });
 }
@@ -423,5 +483,22 @@ function commandMock(
 function missingCommand(): Error & { code: number } {
   const error = new Error("missing") as Error & { code: number };
   error.code = 1;
+  return error;
+}
+
+function missingNpmPackage(): Error & { code: number; stderr: string } {
+  const error = new Error("npm package is not in this registry") as Error & {
+    code: number;
+    stderr: string;
+  };
+  error.code = 1;
+  error.stderr = "npm error code E404\nnpm error 404 '@zitadel/cli@0.1.0-alpha.5' is not in this registry\n";
+  return error;
+}
+
+function npmAuthFailure(): Error & { code: number; stderr: string } {
+  const error = new Error("npm auth failed") as Error & { code: number; stderr: string };
+  error.code = 1;
+  error.stderr = "npm error code E401\nnpm error Unable to authenticate, your authentication token seems to be invalid.\n";
   return error;
 }

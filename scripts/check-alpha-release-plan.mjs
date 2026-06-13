@@ -99,6 +99,15 @@ export async function validateReleaseTooling(cwd, readFileFn = readFileDefault) 
     throw new Error("release publishing must live in ci.yml, not release-npm.yml");
   }
 
+  const recoveryWorkflow = await readOptionalFile(
+    join(cwd, ".github/workflows/recover-alpha-train.yml"),
+    readFileFn,
+  );
+  if (recoveryWorkflow === undefined) {
+    throw new Error("alpha recovery workflow must exist");
+  }
+  assertAlphaRecoveryWorkflow(recoveryWorkflow);
+
   const ciWorkflow = await readFileFn(join(cwd, ".github/workflows/ci.yml"), "utf8");
   assertContains(
     ciWorkflow,
@@ -262,10 +271,22 @@ function assertCliLatestPromotion(ciWorkflow) {
     ciWorkflow,
     "release-alpha-train",
     [
-      "      - name: Promote CLI alpha to npm latest",
-      "        if: ${{ steps.changesets.outputs.published == 'true' }}",
+      "      - name: Refresh CLI npm dist-tags",
+      "        if: ${{ steps.alpha.outputs.version != '' }}",
     ].join("\n"),
-    "release-alpha-train must promote the CLI alpha package to npm latest after publishing",
+    "release-alpha-train must refresh CLI npm dist-tags after verifying the npm train",
+  );
+  assertOrdered(
+    releaseJob,
+    "      - name: Prepare alpha release train",
+    "      - name: Refresh CLI npm dist-tags",
+    "release-alpha-train must refresh CLI npm dist-tags after alpha train preparation",
+  );
+  assertOrdered(
+    releaseJob,
+    "      - name: Refresh CLI npm dist-tags",
+    "      - name: Create and push Go release tag",
+    "release-alpha-train must refresh CLI npm dist-tags before creating the Go tag",
   );
   assertContains(
     releaseJob,
@@ -293,17 +314,110 @@ function assertCliLatestPromotion(ciWorkflow) {
   );
 }
 
+function assertAlphaRecoveryWorkflow(recoveryWorkflow) {
+  assertContains(
+    recoveryWorkflow,
+    "workflow_dispatch:",
+    "alpha recovery must be manually triggerable",
+  );
+  assertContains(
+    recoveryWorkflow,
+    "alpha_version:",
+    "alpha recovery must require an exact alpha version input",
+  );
+  assertContains(
+    recoveryWorkflow,
+    "ref:",
+    "alpha recovery must require a versioned train ref input",
+  );
+  assertNotContains(
+    recoveryWorkflow,
+    "default: main",
+    "alpha recovery must not default to a moving ref",
+  );
+  assertNotContains(
+    recoveryWorkflow,
+    "changesets/action@v1",
+    "alpha recovery must not create a Version Packages PR or publish npm",
+  );
+  assertNotContains(
+    recoveryWorkflow,
+    "changeset publish",
+    "alpha recovery must not publish npm packages",
+  );
+  assertContains(
+    recoveryWorkflow,
+    'corepack pnpm changeset status --output "$RUNNER_TEMP/recovery-changeset-status.json"',
+    "alpha recovery must reject refs with pending release changesets",
+  );
+  assertContains(
+    recoveryWorkflow,
+    "PUBLIC_PACKAGE_MANIFESTS",
+    "alpha recovery must verify public package manifests",
+  );
+  assertContains(
+    recoveryWorkflow,
+    "PUBLIC_PACKAGE_NAMES",
+    "alpha recovery must verify every public package",
+  );
+  assertContains(
+    recoveryWorkflow,
+    "validateAlphaVersion(version)",
+    "alpha recovery must validate the requested alpha version",
+  );
+  assertContains(
+    recoveryWorkflow,
+    "manifest.version !== version",
+    "alpha recovery must require checked-out package versions to match the requested version",
+  );
+  assertContains(
+    recoveryWorkflow,
+    'execFileSync("npm", ["view", `${expectedName}@${version}`, "version", "--json"]',
+    "alpha recovery must verify the npm package train already exists",
+  );
+  assertContains(
+    recoveryWorkflow,
+    "docker/login-action@v4",
+    "alpha recovery must log in to GHCR before inspecting remote container artifacts",
+  );
+  assertContains(
+    recoveryWorkflow,
+    "node scripts/release-alpha-train.mjs status --published true",
+    "alpha recovery must satisfy the publish gate only after verifying npm packages",
+  );
+  assertContains(
+    recoveryWorkflow,
+    'node scripts/release-alpha-train.mjs prepare --published true --out-dir "$RUNNER_TEMP/alpha-release"',
+    "alpha recovery must prepare the alpha train before GoReleaser",
+  );
+  assertContains(
+    recoveryWorkflow,
+    "steps.alpha.outputs.create_tag == 'true'",
+    "alpha recovery must create the Go tag when it is missing",
+  );
+  assertContains(
+    recoveryWorkflow,
+    "steps.alpha.outputs.run_goreleaser == 'true' && steps.alpha.outputs.tag_exists == 'true'",
+    "alpha recovery must check out an existing Go tag before rerunning GoReleaser",
+  );
+  assertContains(
+    recoveryWorkflow,
+    "goreleaser/goreleaser-action@v7",
+    "alpha recovery must run GoReleaser",
+  );
+  assertContains(
+    recoveryWorkflow,
+    "--latest=false",
+    "alpha recovery must not mark recovered alpha GitHub Releases as latest",
+  );
+}
+
 function assertNoUnexpectedPublishOnlyGates(ciWorkflow) {
   const forbidden = "if: ${{ steps.changesets.outputs.published == 'true' }}";
-  let index = ciWorkflow.indexOf(forbidden);
-  while (index !== -1) {
-    const before = ciWorkflow.slice(Math.max(0, index - 140), index);
-    if (!before.includes("- name: Promote CLI alpha to npm latest")) {
-      throw new Error(
-        "post-npm alpha train steps must not be gated only on Changesets publishing in the current rerun",
-      );
-    }
-    index = ciWorkflow.indexOf(forbidden, index + forbidden.length);
+  if (ciWorkflow.includes(forbidden)) {
+    throw new Error(
+      "post-npm alpha train steps must not be gated only on Changesets publishing in the current rerun",
+    );
   }
 }
 
@@ -316,6 +430,14 @@ function assertContains(input, expected, message) {
 function assertJobContains(input, jobName, expected, message) {
   const block = workflowJobBlock(input, jobName);
   if (!block || !block.includes(expected)) {
+    throw new Error(message);
+  }
+}
+
+function assertOrdered(input, before, after, message) {
+  const beforeIndex = input.indexOf(before);
+  const afterIndex = input.indexOf(after);
+  if (beforeIndex === -1 || afterIndex === -1 || beforeIndex >= afterIndex) {
     throw new Error(message);
   }
 }

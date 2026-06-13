@@ -53,11 +53,6 @@ export async function prepareAlphaReleaseTrain(options = {}) {
   if (state.skipReason) {
     throw new Error(`alpha release train is not ready to complete: ${state.skipReason}`);
   }
-  if (state.releaseExists && !state.imageExists) {
-    throw new Error(
-      `GitHub Release ${state.tagName} exists but ${state.image} is missing; recover that partial release manually before rerunning the alpha train`,
-    );
-  }
 
   const { image, packages, tagName, title, version } = state;
   const notes = renderAlphaReleaseNotes({ title, version, image, packages });
@@ -79,6 +74,7 @@ export async function prepareAlphaReleaseTrain(options = {}) {
     tagExists: state.tagExists,
     releaseExists: state.releaseExists,
     imageExists: state.imageExists,
+    npmTrainExists: state.npmTrainExists,
   };
 }
 
@@ -88,7 +84,6 @@ export async function inspectAlphaReleaseTrain(options = {}) {
   const readdirFn = options.readdir ?? readdir;
   const execFileFn = options.execFile ?? execFile;
   const publishedWasSpecified = options.published !== undefined;
-  const published = normalizeBoolean(options.published);
   const remote = options.remote === undefined ? true : normalizeBoolean(options.remote);
 
   const packages = await readPublicPackageManifests(cwd, readFileFn);
@@ -118,29 +113,7 @@ export async function inspectAlphaReleaseTrain(options = {}) {
   const tagExists = Boolean(tagCommit);
   const tagMatchesHead = tagCommit === headCommit;
 
-  if (publishedWasSpecified && !published && !tagExists) {
-    return {
-      version,
-      tagName,
-      title,
-      image,
-      packages,
-      activeChangesets,
-      headCommit,
-      tagCommit,
-      tagExists,
-      tagMatchesHead,
-      releaseExists: false,
-      imageExists: false,
-      shouldComplete: false,
-      shouldCreateTag: false,
-      shouldRunGoreleaser: false,
-      shouldUpdateRelease: false,
-      skipReason: "npm publish did not run",
-    };
-  }
-
-  if (!published && activeChangesets.length > 0) {
+  if (activeChangesets.length > 0) {
     return {
       version,
       tagName,
@@ -162,14 +135,35 @@ export async function inspectAlphaReleaseTrain(options = {}) {
     };
   }
 
-  const releaseExists = remote ? await githubReleaseExists(tagName, execFileFn, cwd) : false;
-  const imageExists = remote ? await containerImageExists(image, execFileFn, cwd) : false;
-  if (releaseExists && !imageExists) {
-    throw new Error(
-      `GitHub Release ${tagName} exists but ${image} is missing; recover that partial release manually before rerunning the alpha train`,
-    );
+  const shouldVerifyNpmTrain = publishedWasSpecified;
+  const npmTrainExists = shouldVerifyNpmTrain
+    ? await publicNpmPackageTrainExists(packages, execFileFn, cwd)
+    : undefined;
+  if (shouldVerifyNpmTrain && !npmTrainExists) {
+    return {
+      version,
+      tagName,
+      title,
+      image,
+      packages,
+      activeChangesets,
+      headCommit,
+      tagCommit,
+      tagExists,
+      tagMatchesHead,
+      releaseExists: false,
+      imageExists: false,
+      shouldComplete: false,
+      shouldCreateTag: false,
+      shouldRunGoreleaser: false,
+      shouldUpdateRelease: false,
+      npmTrainExists,
+      skipReason: "npm train is not published",
+    };
   }
 
+  const releaseExists = remote ? await githubReleaseExists(tagName, execFileFn, cwd) : false;
+  const imageExists = remote ? await containerImageExists(image, execFileFn, cwd) : false;
   const shouldRunGoreleaser = !(releaseExists && imageExists);
   return {
     version,
@@ -188,6 +182,7 @@ export async function inspectAlphaReleaseTrain(options = {}) {
     shouldCreateTag: !tagExists,
     shouldRunGoreleaser,
     shouldUpdateRelease: true,
+    npmTrainExists,
     skipReason: "",
   };
 }
@@ -442,6 +437,36 @@ async function containerImageExists(image, execFileFn = execFile, cwd = process.
   }
 }
 
+async function publicNpmPackageTrainExists(packages, execFileFn = execFile, cwd = process.cwd()) {
+  for (const pkg of packages) {
+    if (!(await npmPackageVersionExists(pkg.name, pkg.version, execFileFn, cwd))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+async function npmPackageVersionExists(name, version, execFileFn = execFile, cwd = process.cwd()) {
+  let result;
+  try {
+    result = await execFileFn("npm", ["view", `${name}@${version}`, "version", "--json"], {
+      cwd,
+    });
+  } catch (error) {
+    if (isNpmPackageNotFound(error)) {
+      return false;
+    }
+    throw error;
+  }
+
+  const stdout = String(result.stdout ?? "").trim();
+  if (stdout.length === 0) {
+    return false;
+  }
+  const publishedVersion = JSON.parse(stdout);
+  return publishedVersion === version;
+}
+
 async function gitOutput(execFileFn, cwd, args) {
   const result = await execFileFn("git", args, { cwd });
   return String(result.stdout ?? "").trim();
@@ -460,6 +485,27 @@ function isExpectedMissingCommand(error) {
   return code === 1 || code === 128;
 }
 
+function isNpmPackageNotFound(error) {
+  const code = error && typeof error === "object" ? error.code : undefined;
+  if (code !== 1) {
+    return false;
+  }
+  const details = [
+    error instanceof Error ? error.message : "",
+    error && typeof error === "object" && "stdout" in error ? error.stdout : "",
+    error && typeof error === "object" && "stderr" in error ? error.stderr : "",
+  ]
+    .map((value) => String(value ?? "").toLowerCase())
+    .join("\n");
+  return (
+    details.includes("e404") ||
+    details.includes("404 not found") ||
+    details.includes("is not in this registry") ||
+    details.includes("no matching version found") ||
+    details.includes("no match found for version")
+  );
+}
+
 function printAlphaOutputs(result) {
   console.log(`version=${result.version}`);
   console.log(`tag=${result.tagName}`);
@@ -475,6 +521,9 @@ function printAlphaOutputs(result) {
   console.log(`tag_exists=${String(result.tagExists)}`);
   console.log(`release_exists=${String(result.releaseExists)}`);
   console.log(`image_exists=${String(result.imageExists)}`);
+  if (result.npmTrainExists !== undefined) {
+    console.log(`npm_train_exists=${String(result.npmTrainExists)}`);
+  }
   if (result.skipReason) {
     console.log(`skip_reason=${result.skipReason}`);
   }
