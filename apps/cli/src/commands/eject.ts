@@ -157,9 +157,13 @@ export default class Eject extends BaseCommand {
     }
 
     // In-place config merges (vite.config.ts / angular.json / nuxt.config.ts)
-    // can't be auto-reverted, so surface them as manual cleanup steps.
-    const manualSteps = actions.configEdits.map(
-      (rel) => `Remove the Zitadel configuration block from ${rel}`,
+    // can't be auto-reverted, so surface them as manual cleanup steps. The
+    // Angular patcher also edits package.json (a `dev` script, not a config
+    // block), so word that one accurately.
+    const manualSteps = actions.configEdits.map((rel) =>
+      rel === "package.json" || rel.endsWith("/package.json")
+        ? `Remove the Zitadel "dev" script from ${rel}`
+        : `Remove the Zitadel configuration block from ${rel}`,
     );
 
     if (removed.length === 0 && backedUp.length === 0 && manualSteps.length === 0) {

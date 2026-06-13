@@ -100,6 +100,11 @@ async function editFile(
   const candidates = (typeof pathOrPaths === "string" ? [pathOrPaths] : pathOrPaths).map((p) =>
     abs(cwd, p),
   );
+  if (candidates.length === 0) {
+    throw new ZitadelError("E_VALIDATION", "An edit op needs at least one candidate path", {
+      hint: "This is an internal patcher error — please report it if you hit it.",
+    });
+  }
   let path = candidates[0];
   let source: string | undefined;
   let mode: number | undefined;
@@ -108,8 +113,9 @@ async function editFile(
     if (contents !== undefined) {
       path = candidate;
       source = contents;
-      // Preserve the existing file's permissions across the temp-file swap.
-      mode = (await stat(candidate)).mode;
+      // Preserve the existing file's permission bits across the temp-file swap
+      // (mask off the file-type bits `stat` includes so `chmod` gets only perms).
+      mode = (await stat(candidate)).mode & 0o777;
       break;
     }
   }
