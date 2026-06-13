@@ -125,4 +125,42 @@ describe("<zl-field> form participation (chromium)", () => {
     const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
     expect(field.shadowRoot?.activeElement).toBe(input);
   });
+
+  it("syncs native input/change events with host value and FormData", async () => {
+    const { form, field } = mount(
+      `<form><zl-field name="email" data-testid="zitadel-field-email"></zl-field></form>`,
+    );
+    await field.updateComplete;
+    const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+    expect(input.getAttribute("data-testid")).toBe("zitadel-field-email-input");
+    let inputEvents = 0;
+    let changeEvents = 0;
+    let hostInputEvent: Event | undefined;
+    field.addEventListener("input", (event) => {
+      inputEvents += 1;
+      hostInputEvent = event;
+    });
+    field.addEventListener("change", () => {
+      changeEvents += 1;
+    });
+
+    input.value = "alice@acme.com";
+    input.dispatchEvent(
+      new InputEvent("input", {
+        bubbles: true,
+        composed: true,
+        data: "m",
+        inputType: "insertText",
+      }),
+    );
+    input.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+
+    expect(field.value).toBe("alice@acme.com");
+    expect(new FormData(form).get("email")).toBe("alice@acme.com");
+    expect(inputEvents).toBe(1);
+    expect(changeEvents).toBe(1);
+    expect(hostInputEvent).toBeInstanceOf(InputEvent);
+    expect((hostInputEvent as InputEvent).data).toBe("m");
+    expect((hostInputEvent as InputEvent).inputType).toBe("insertText");
+  });
 });

@@ -8,17 +8,18 @@ import { getRenderer } from "./renderers/registry";
 import type { RendererSpec } from "./renderers/types";
 
 /**
- * Next.js `middleware.ts` at the project root. Wires `nextgenMiddleware` so the
- * scaffolded `<zitadel-login api-base="/__nextgen">` requests are same-origin
- * proxied to `ZITADEL_URL` and `/profile` is gated. The `middleware`
- * form (not the Next 16 `proxy` rename) works on every supported Next major.
+ * Next.js request-boundary file at the project root. Wires `nextgenMiddleware` so the
+ * generated project config's `/__nextgen` proxy path is same-origin proxied
+ * to `ZITADEL_URL` and `/profile` is gated. Next 16 renamed this convention to
+ * `proxy.ts`; older projects keep `middleware.ts`.
  * Carries the managed marker so `doctor --fix` reclaims it and `eject` removes it.
  */
-const middlewareTemplate = `${MANAGED_MARKER}
+function requestBoundaryTemplate(functionName: "middleware" | "proxy"): string {
+  return `${MANAGED_MARKER}
 import { nextgenMiddleware } from "@zitadel/sdk-next/middleware";
 import type { NextRequest } from "next/server";
 
-export function middleware(req: NextRequest) {
+export function ${functionName}(req: NextRequest) {
   return nextgenMiddleware(req, {
     url: process.env.ZITADEL_URL,
     protectedRoutes: ["/profile"],
@@ -30,11 +31,12 @@ export const config = {
   matcher: ["/__nextgen/:path*", "/profile/:path*"],
 };
 `;
+}
 
 /**
  * Rule-based patcher for the Next.js App Router. Inherits the shared
  * `.zitadel/` base files from {@link AbstractRulePatcher} and contributes the
- * Next routes/middleware whose templates come from the chosen renderer.
+ * Next routes and request boundary whose templates come from the chosen renderer.
  */
 export class NextPatcher extends AbstractRulePatcher {
   /** Returns true for Next.js projects. */
@@ -47,7 +49,7 @@ export class NextPatcher extends AbstractRulePatcher {
   }
 
   protected routeFiles(view: PatchView): ReadonlyArray<string> {
-    return nextCodeFilePaths(view.framework.appDir, getRenderer(view.rendererId));
+    return nextCodeFilePaths(view.framework, getRenderer(view.rendererId));
   }
 
   protected routeDeps(view: PatchView): ReadonlyArray<string> {
@@ -68,12 +70,16 @@ export class NextPatcher extends AbstractRulePatcher {
  * and {@link NextPatcher.routeFiles} (which only needs the paths) so the two
  * cannot drift.
  */
-function nextCodeFilePaths(appDir: string, renderer: RendererSpec): ReadonlyArray<string> {
+function nextCodeFilePaths(
+  framework: PatchView["framework"],
+  renderer: RendererSpec,
+): ReadonlyArray<string> {
+  const appDir = framework.appDir;
   const paths = [join(appDir, "login/page.tsx"), join(appDir, "register/page.tsx")];
   if (renderer.templates.profilePage) {
     paths.push(join(appDir, "profile/page.tsx"));
   }
-  paths.push(join(appDir, "../middleware.ts"));
+  paths.push(join(appDir, `../${requestBoundaryFile(framework).filename}`));
   if (renderer.templates.provider) {
     paths.push(join(appDir, renderer.templates.provider.filename));
   }
@@ -83,7 +89,7 @@ function nextCodeFilePaths(appDir: string, renderer: RendererSpec): ReadonlyArra
   return paths;
 }
 
-/** The Next route/middleware write ops plus the SDK dependency. */
+/** The Next route/request-boundary write ops plus the SDK dependency. */
 function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
   const appDir = ctx.framework.appDir;
   const ops: FileOp[] = [
@@ -102,7 +108,12 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
   if (profile) {
     ops.push({ kind: "write", path: join(appDir, "profile/page.tsx"), contents: profile.contents });
   }
-  ops.push({ kind: "write", path: join(appDir, "../middleware.ts"), contents: middlewareTemplate });
+  const boundary = requestBoundaryFile(ctx.framework);
+  ops.push({
+    kind: "write",
+    path: join(appDir, `../${boundary.filename}`),
+    contents: requestBoundaryTemplate(boundary.functionName),
+  });
   const provider = renderer.templates.provider;
   if (provider) {
     ops.push({ kind: "write", path: join(appDir, provider.filename), contents: provider.contents });
@@ -121,6 +132,16 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
     version: dependencyVersionForCli(ctx.cliVersion, renderer.dependency.version),
   });
   return ops;
+}
+
+function requestBoundaryFile(framework: PatchContext["framework"]): {
+  filename: "middleware.ts" | "proxy.ts";
+  functionName: "middleware" | "proxy";
+} {
+  if ((framework.versionMajor ?? 0) >= 16) {
+    return { filename: "proxy.ts", functionName: "proxy" };
+  }
+  return { filename: "middleware.ts", functionName: "middleware" };
 }
 
 function dependencyVersionForCli(cliVersion: string, fallback: string): string {

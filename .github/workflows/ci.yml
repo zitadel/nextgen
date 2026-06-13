@@ -864,6 +864,26 @@ jobs:
           # repository is public.
           NPM_CONFIG_PROVENANCE: "false"
 
+      - name: Promote CLI alpha to npm latest
+        if: ${{ steps.changesets.outputs.published == 'true' }}
+        env:
+          NPM_CONFIG_PROVENANCE: "false"
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./apps/cli/package.json').version")"
+          node --input-type=module - "$version" <<'NODE'
+          const version = process.argv[2];
+          if (!/^\d+\.\d+\.\d+-alpha\.\d+$/.test(version)) {
+            throw new Error(`expected an alpha CLI version, got ${version}`);
+          }
+          NODE
+          # Temporary public-alpha exception: the CLI is the tester entrypoint,
+          # so bare `npx @zitadel/cli` must reach the supported local workflow.
+          # Keep `alpha` as the canonical prerelease tag, and do not move
+          # `latest` for SDKs/components, Docker images, or GitHub Releases.
+          npm dist-tag add "@zitadel/cli@$version" alpha
+          npm dist-tag add "@zitadel/cli@$version" latest
+
       - name: Restore changesets after publish decision
         run: git restore -- .changeset
 

@@ -115,6 +115,40 @@ describe("setup command pre-flight", () => {
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_FRAMEWORK_NOT_DETECTED");
   });
+
+  it("points cloud project creation failures at the local alpha path", async () => {
+    const cwd = await makeTempDir();
+    await mkdir(join(cwd, "app"), { recursive: true });
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
+    );
+    const serverUrl = await startNotFoundServer();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--server",
+      serverUrl,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+    ]);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as {
+      status: string;
+      code: string;
+      hint?: string;
+      next_commands?: string[];
+    };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.hint).toContain("npx @zitadel/cli@alpha start");
+    expect(json.hint).toContain("--server local");
+    expect(json.next_commands?.join(" ")).toContain("setup --server local");
+  });
 });
 
 async function startHealthServer(): Promise<string> {
@@ -130,6 +164,21 @@ async function startHealthServer(): Promise<string> {
   const address = server.address();
   if (!address || typeof address === "string") {
     throw new Error("health server did not expose a TCP address");
+  }
+  return `http://localhost:${String(address.port)}`;
+}
+
+async function startNotFoundServer(): Promise<string> {
+  const server = createServer((_req, res) => {
+    res.writeHead(404, { "content-type": "application/json" }).end(
+      JSON.stringify({ message: "not found" }),
+    );
+  });
+  servers.push(server);
+  await new Promise<void>((resolve) => server.listen(0, "localhost", () => resolve()));
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("not-found server did not expose a TCP address");
   }
   return `http://localhost:${String(address.port)}`;
 }

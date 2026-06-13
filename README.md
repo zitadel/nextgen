@@ -46,6 +46,13 @@ local runtime image by default. The wrapper runs the CLI build, then builds
 before invoking `zitadel start`. Pass `--image <tag>` or set
 `ZITADEL_LOCAL_IMAGE=<tag>` to use an existing image instead.
 
+`corepack pnpm run cli -- setup ...` is the manual whole-local-train path for
+humans and agents. Before invoking the local CLI, the wrapper builds and packs
+the public workspace packages, publishes them to a persistent local Verdaccio
+registry under `tmp/cli-local-registry`, and points the generated app install at
+that registry. Set `ZITADEL_CLI_USE_PUBLIC_PACKAGES=1` when you intentionally
+want the generated app to install public npm packages instead.
+
 `corepack pnpm run server` builds and syncs the embedded console/login UI before
 startup, then runs `go run .`; help output skips the UI sync.
 
@@ -148,6 +155,11 @@ the local npm packages, publishes them to a temporary Verdaccio registry, runs
 `npx @zitadel/cli@alpha doctor`, `start`, and
 `setup --framework next --server local` in an empty app directory, starts the
 generated app, and verifies registration/login journeys.
+
+Use `corepack pnpm run journey` for deterministic CI-style proof. Use
+`corepack pnpm run cli -- ...` when you want to drive the same local package
+train manually in a browser and see whether the command guidance is clear enough
+for a human or agent.
 
 ## CI
 

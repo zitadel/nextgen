@@ -4,12 +4,13 @@ import { createZitadelClient } from "@zitadel/api/client";
 import type { CreateProject201 } from "@zitadel/api/generated/model";
 import { consola } from "consola";
 
-import { ZitadelError } from "../../lib/errors";
+import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import { createOrca, issuerFromPort, type FrameworkFacts, type Orca } from "../../lib/orca";
 import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
+import { publicCliCommand } from "../../lib/public-cli";
 import { installDependenciesForSetup } from "./install";
 import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
 import {
@@ -125,7 +126,11 @@ export default class Setup extends BaseCommand {
     const unauthClient = createZitadelClient({ baseUrl: answers.server });
     const project = dryRun
       ? dryRunProject()
-      : await unauthClient.createProject({ previewOrigins: [] });
+      : await createProjectWithLocalHint(
+          unauthClient,
+          answers.server,
+          this.meta.cliVersion,
+        );
     consola.success(`Created project ${project.id}`);
 
     const ctx: PatchContext = {
@@ -240,6 +245,32 @@ function dryRunProject(): CreateProject201 {
   };
 }
 
+async function createProjectWithLocalHint(
+  client: ReturnType<typeof createZitadelClient>,
+  server: string,
+  cliVersion: string,
+): Promise<CreateProject201> {
+  try {
+    return await client.createProject({ previewOrigins: [] });
+  } catch (error) {
+    const normalized = toZitadelError(error);
+    throw new ZitadelError(normalized.code, normalized.message, {
+      hint:
+        `${normalized.hint ? `${normalized.hint} ` : ""}` +
+        "If you meant to use a local Zitadel server, run npx @zitadel/cli@alpha start " +
+        "and retry setup with --server local.",
+      nextCommands: [
+        publicCliCommand("start", cliVersion),
+        publicCliCommand("setup --server local", cliVersion),
+      ],
+      details: {
+        server,
+        original: normalized.details,
+      },
+    });
+  }
+}
+
 /** Renders an absolute path relative to `cwd` for human-readable output. */
 function relativeDisplay(cwd: string, path: string): string {
   return path.startsWith(cwd) ? path.slice(cwd.length + 1) : path;
@@ -308,6 +339,7 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   "app/register/page.tsx": { subject: "the registration page" },
   "app/profile/page.tsx": { subject: "the profile page" },
   "middleware.ts": { subject: "the Next.js middleware" },
+  "proxy.ts": { subject: "the Next.js proxy" },
   "custom-elements.d.ts": { subject: "the web-component type declarations" },
   "package.json": { subject: "package.json with the SDK dependency" },
 };
@@ -342,6 +374,7 @@ function buildSummary(opts: {
     ["Login page", "app/login/page.tsx"],
     ["Register page", "app/register/page.tsx"],
     ["Profile page", "app/profile/page.tsx"],
+    ["Request proxy", "proxy.ts"],
     ["Middleware", "middleware.ts"],
     ["Env vars", ".env.local"],
   ] as const) {

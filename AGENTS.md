@@ -92,6 +92,14 @@ builds `ghcr.io/zitadel/nextgen:local-dev` through GoReleaser's single-target
 build when neither `--image` nor `ZITADEL_LOCAL_IMAGE` is provided, then invokes
 the local CLI against that image.
 
+`corepack pnpm run cli -- setup ...` is also a contributor exception for manual
+human and agent testing. The wrapper builds and packs the public workspace npm
+packages, publishes them to a persistent local Verdaccio registry under
+`tmp/cli-local-registry`, and forwards npm registry config so the generated app
+installs local `@zitadel/*` tarballs instead of public npm. Set
+`ZITADEL_CLI_USE_PUBLIC_PACKAGES=1` only when intentionally testing published
+packages.
+
 ## Local Checks
 
 Use Node.js from `.nvmrc` and the pinned pnpm version from `package.json`.
@@ -144,6 +152,10 @@ an empty app directory outside the repo, runs `npx @zitadel/cli@alpha doctor`,
 `start`, and `setup --framework next --server local`, starts the generated app
 on `localhost`, and runs Playwright with one worker. Use
 `-- --image <docker-tag>` to reuse an existing local runtime image.
+
+Use `corepack pnpm run journey` for deterministic CI-style proof of the
+fresh-app path. Use `corepack pnpm run cli -- ...` for manual browser or agent
+experiments against the same local package train.
 
 In CI the dedicated `node-e2e` job (in `.github/workflows/ci.yml`) gates merges
 on the checked-in demo integrations. The separate `consumer-journey-e2e` job is

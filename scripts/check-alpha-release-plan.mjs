@@ -188,6 +188,7 @@ export async function validateReleaseTooling(cwd, readFileFn = readFileDefault) 
     ].join("\n"),
     "release-alpha-train must prune empty changesets before Changesets decides whether to publish",
   );
+  assertCliLatestPromotion(ciWorkflow);
   assertJobContains(
     ciWorkflow,
     "release-alpha-train",
@@ -239,11 +240,7 @@ export async function validateReleaseTooling(cwd, readFileFn = readFileDefault) 
     "steps.alpha.outputs.run_goreleaser == 'true'",
     "ci.yml must skip GoReleaser when the alpha release and image already exist",
   );
-  assertNotContains(
-    ciWorkflow,
-    "if: ${{ steps.changesets.outputs.published == 'true' }}",
-    "post-npm alpha train steps must not be gated only on Changesets publishing in the current rerun",
-  );
+  assertNoUnexpectedPublishOnlyGates(ciWorkflow);
   assertContains(
     ciWorkflow,
     "--prerelease",
@@ -254,6 +251,55 @@ export async function validateReleaseTooling(cwd, readFileFn = readFileDefault) 
     "--latest=false",
     "alpha GitHub Releases must not become GitHub latest",
   );
+}
+
+function assertCliLatestPromotion(ciWorkflow) {
+  const releaseJob = workflowJobBlock(ciWorkflow, "release-alpha-train");
+  if (!releaseJob) {
+    throw new Error("release-alpha-train job is missing");
+  }
+  assertJobContains(
+    ciWorkflow,
+    "release-alpha-train",
+    [
+      "      - name: Promote CLI alpha to npm latest",
+      "        if: ${{ steps.changesets.outputs.published == 'true' }}",
+    ].join("\n"),
+    "release-alpha-train must promote the CLI alpha package to npm latest after publishing",
+  );
+  assertContains(
+    releaseJob,
+    'npm dist-tag add "@zitadel/cli@$version" alpha',
+    "release-alpha-train must keep the CLI alpha dist-tag on the published train",
+  );
+  assertContains(
+    releaseJob,
+    'npm dist-tag add "@zitadel/cli@$version" latest',
+    "release-alpha-train must move only the CLI npm latest dist-tag during alpha",
+  );
+
+  const latestTagCommands = releaseJob.matchAll(
+    /npm\s+dist-tag\s+add\s+["'](@zitadel\/[^@"']+)@[^"']+["']\s+latest/g,
+  );
+  for (const match of latestTagCommands) {
+    if (match[1] !== "@zitadel/cli") {
+      throw new Error("only @zitadel/cli may move the npm latest dist-tag during alpha");
+    }
+  }
+}
+
+function assertNoUnexpectedPublishOnlyGates(ciWorkflow) {
+  const forbidden = "if: ${{ steps.changesets.outputs.published == 'true' }}";
+  let index = ciWorkflow.indexOf(forbidden);
+  while (index !== -1) {
+    const before = ciWorkflow.slice(Math.max(0, index - 140), index);
+    if (!before.includes("- name: Promote CLI alpha to npm latest")) {
+      throw new Error(
+        "post-npm alpha train steps must not be gated only on Changesets publishing in the current rerun",
+      );
+    }
+    index = ciWorkflow.indexOf(forbidden, index + forbidden.length);
+  }
 }
 
 function assertContains(input, expected, message) {

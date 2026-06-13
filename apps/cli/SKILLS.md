@@ -27,6 +27,10 @@ parse the result rather than scraping human output.
 npx @zitadel/cli@alpha <command> --non-interactive --json
 ```
 
+During the public alpha, bare `npx @zitadel/cli` is promoted to the same tested
+alpha CLI so discovery works for first-time users. Prefer `@alpha` or an exact
+`0.1.0-alpha.N` selector in agent scripts and bug reports for reproducibility.
+
 ## Reading the envelope
 
 Each invocation prints one JSON object:

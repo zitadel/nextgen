@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 test.describe.configure({ mode: "serial" });
 
@@ -196,11 +196,11 @@ async function expectRegistrationChoice(page: Page): Promise<void> {
 }
 
 async function fillEmail(page: Page, email: string): Promise<void> {
-  await page.getByLabel(/email/i).first().fill(email);
+  await fieldControl(page, "email", /email/i).fill(email);
 }
 
 async function fillEmailIfVisible(page: Page, email: string): Promise<void> {
-  const emailField = page.getByLabel(/email/i).first();
+  const emailField = fieldControl(page, "email", /email/i);
   if (await emailField.isVisible().catch(() => false)) {
     await emailField.fill(email);
   }
@@ -224,11 +224,11 @@ async function fillFieldIfVisible(
 }
 
 async function fillPassword(page: Page, password: string): Promise<void> {
-  await page.getByLabel(/password/i).first().fill(password);
+  await fieldControl(page, "password", /password/i).fill(password);
 }
 
 async function isPasswordVisible(page: Page): Promise<boolean> {
-  return page.getByLabel(/password/i).first().isVisible().catch(() => false);
+  return fieldControl(page, "password", /password/i).isVisible().catch(() => false);
 }
 
 async function expectSessionCleared(page: Page): Promise<void> {
@@ -253,13 +253,27 @@ async function clickAction(
 ): Promise<void> {
   let locator = page.getByRole("button", { name }).or(page.getByRole("link", { name }));
   for (const actionName of actionNames) {
-    locator = actionLocator(page, actionName).or(locator);
+    locator = page
+      .getByTestId(`zitadel-action-${actionName}-button`)
+      .or(page.getByTestId(`zitadel-action-${actionName}`))
+      .or(page.getByTestId(`zitadel-action-${actionName}-link`))
+      .or(actionLocator(page, actionName))
+      .or(locator);
   }
   await locator.first().click();
 }
 
 function actionLocator(page: Page, actionName: string) {
   return page.locator(`zl-button[action="${actionName}"], [data-action="${actionName}"]`);
+}
+
+function fieldControl(page: Page, fieldName: string, label: RegExp): Locator {
+  return page
+    .getByTestId(`zitadel-field-${fieldName}`)
+    .locator("input")
+    .or(page.locator(`zl-field[name="${fieldName}"]`).locator("input"))
+    .or(page.getByLabel(label))
+    .first();
 }
 
 function logoutLocator(page: Page) {

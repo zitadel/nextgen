@@ -89,7 +89,9 @@ describe("LiquidJS engine", () => {
     expect(result).toContain("<zl-page-shell");
     expect(result).toContain("<zl-card");
     expect(result).toContain("<zl-field");
+    expect(result).toContain('data-testid="zitadel-field-identifier"');
     expect(result).toContain('<zl-button');
+    expect(result).toContain('data-testid="zitadel-action-submit"');
     expect(result).toContain('hierarchy="primary"');
     expect(result).toContain(mandatoryGatesMarkerComment);
   });

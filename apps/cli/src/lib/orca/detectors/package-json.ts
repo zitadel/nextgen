@@ -30,3 +30,12 @@ export async function readPackageJson(cwd: string): Promise<PackageJson> {
 export function hasDependency(pkg: PackageJson, name: string): boolean {
   return Boolean(pkg.dependencies?.[name] ?? pkg.devDependencies?.[name]);
 }
+
+export function dependencyVersionMajor(pkg: PackageJson, name: string): number | undefined {
+  const spec = pkg.dependencies?.[name] ?? pkg.devDependencies?.[name];
+  if (!spec) {
+    return undefined;
+  }
+  const match = spec.match(/\d+/);
+  return match ? Number(match[0]) : undefined;
+}
