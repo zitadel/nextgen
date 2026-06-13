@@ -220,6 +220,20 @@ describe("release-alpha-train script", () => {
     ).rejects.toThrow("alpha release train is not ready to complete: npm publish did not run");
   });
 
+  it("allows GoReleaser recovery when npm did not publish but the release tag exists", async () => {
+    const cwd = await fixtureRepo();
+
+    const result = await releaseAlphaTrain.prepareAlphaReleaseTrain({
+      cwd,
+      execFile: commandMock({ tagCommit: "head-commit" }),
+      published: false,
+    });
+
+    expect(result.shouldCreateTag).toBe(false);
+    expect(result.shouldRunGoreleaser).toBe(true);
+    expect(result.shouldUpdateRelease).toBe(true);
+  });
+
   it("allows completion after Changesets publishes npm packages", async () => {
     const cwd = await fixtureRepo();
 

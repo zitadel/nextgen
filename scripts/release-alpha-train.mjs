@@ -113,7 +113,12 @@ export async function inspectAlphaReleaseTrain(options = {}) {
     readFile: readFileFn,
     readdir: readdirFn,
   });
-  if (publishedWasSpecified && !published) {
+  const headCommit = await gitOutput(execFileFn, cwd, ["rev-parse", "HEAD"]);
+  const tagCommit = await tagCommitFor(tagName, execFileFn, cwd);
+  const tagExists = Boolean(tagCommit);
+  const tagMatchesHead = tagCommit === headCommit;
+
+  if (publishedWasSpecified && !published && !tagExists) {
     return {
       version,
       tagName,
@@ -121,10 +126,10 @@ export async function inspectAlphaReleaseTrain(options = {}) {
       image,
       packages,
       activeChangesets,
-      headCommit: "",
-      tagCommit: "",
-      tagExists: false,
-      tagMatchesHead: false,
+      headCommit,
+      tagCommit,
+      tagExists,
+      tagMatchesHead,
       releaseExists: false,
       imageExists: false,
       shouldComplete: false,
@@ -134,11 +139,6 @@ export async function inspectAlphaReleaseTrain(options = {}) {
       skipReason: "npm publish did not run",
     };
   }
-
-  const headCommit = await gitOutput(execFileFn, cwd, ["rev-parse", "HEAD"]);
-  const tagCommit = await tagCommitFor(tagName, execFileFn, cwd);
-  const tagExists = Boolean(tagCommit);
-  const tagMatchesHead = tagCommit === headCommit;
 
   if (!published && activeChangesets.length > 0) {
     return {
