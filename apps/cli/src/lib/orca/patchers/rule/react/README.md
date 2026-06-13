@@ -7,7 +7,10 @@ Integrates Zitadel auth into a Vite + React single-page app.
 - `src/App.tsx` — auth entry that renders the Zitadel login/logout widgets
 - `vite.config.*` — merges the `/__nextgen` dev-server proxy into the first
   matching `vite.config.{ts,mts,js,mjs}`
-- `.env.example`, `.env.local` — `VITE_ZITADEL_PROJECT_ID`
+- `.env.example`, `.env.local` — `VITE_ZITADEL_PROJECT_ID` (client-exposed), plus
+  the shared `ZITADEL_*` keys the base patcher writes (`ZITADEL_PROJECT_ID`,
+  `ZITADEL_ISSUER`, `ZITADEL_URL`, `ZITADEL_ENVIRONMENT`) — the dev proxy reads
+  `ZITADEL_PROJECT_ID`
 - `package.json` — adds `@zitadel/sdk-react`
 
 ## How the proxy works
