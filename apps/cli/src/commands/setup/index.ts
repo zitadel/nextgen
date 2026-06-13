@@ -137,7 +137,11 @@ export default class Setup extends BaseCommand {
 
     if (!nonInteractive && !dryRun) {
       intro("Zitadel setup");
-      const promptCtx = { framework, serverFlag: this.meta.serverFlag };
+      const promptCtx = {
+        framework,
+        serverFlag: this.meta.serverFlag,
+        devPortFromFlag: flags["dev-port"] !== undefined,
+      };
       for (const prompt of SETUP_PROMPTS) {
         answers = await prompt.ask(answers, promptCtx);
       }

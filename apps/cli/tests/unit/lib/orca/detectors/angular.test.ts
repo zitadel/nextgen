@@ -31,4 +31,15 @@ describe("AngularDetector", () => {
   it("returns null without @angular/core", async () => {
     expect(await new AngularDetector().detect(await project({ react: "^18" }))).toBeNull();
   });
+
+  it("throws E_VALIDATION on Angular older than 17 (templates use @if)", async () => {
+    await expect(
+      new AngularDetector().detect(await project({ "@angular/core": "^16.2.0" })),
+    ).rejects.toThrowError(/Angular 16 is unsupported/);
+  });
+
+  it("still detects when the version range has no parseable major", async () => {
+    const facts = await new AngularDetector().detect(await project({ "@angular/core": "latest" }));
+    expect(facts?.id).toBe("angular");
+  });
 });

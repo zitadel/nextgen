@@ -28,6 +28,12 @@ export type PromptContext = {
    * passed a flag" from "we fell back to the cloud default".
    */
   readonly serverFlag?: string;
+  /**
+   * Whether `--dev-port` was passed explicitly. When set, the flag is
+   * authoritative and {@link import("./dev-port").DevPortPrompt} skips itself so
+   * an interactive answer can't override a scripted/flagged port.
+   */
+  readonly devPortFromFlag?: boolean;
 };
 
 /**
