@@ -24,6 +24,12 @@ describe("parseConfigModule", () => {
       /Could not parse/,
     );
   });
+
+  it("rejects a CommonJS config with a targeted error", () => {
+    expect(() =>
+      parseConfigModule("module.exports = { server: {} };", "vite.config.cjs"),
+    ).toThrowError(/CommonJS module/);
+  });
 });
 
 describe("resolveDefaultExportObject", () => {

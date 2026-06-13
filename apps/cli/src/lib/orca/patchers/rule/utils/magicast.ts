@@ -22,6 +22,14 @@ export function parseConfigModule(
       hint: `Run setup from a project that has ${filename}.`,
     });
   }
+  // A CommonJS config (e.g. a `*.cjs` file or a `*.js` with `module.exports`)
+  // can't evaluate the ESM `import`/`import.meta.url` these edits inject, so
+  // reject it with a clear message instead of producing a broken config.
+  if (/\bmodule\.exports\b/.test(source)) {
+    throw new ZitadelError("E_VALIDATION", `${filename} is a CommonJS module, which can't be edited`, {
+      hint: `The Zitadel edits use ESM imports. Convert the config to ESM (a .ts/.mts file, or set "type": "module"), or add the Zitadel block manually.`,
+    });
+  }
   try {
     return parseModule(source);
   } catch (error) {
