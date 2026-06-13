@@ -15,8 +15,9 @@ const COMMONJS_EXTENSIONS = ["cts", "cjs"] as const;
 
 /**
  * Candidate config filenames for `basename`, ESM extensions first then the
- * CommonJS ones, e.g. `configCandidates("vite.config")` →
- * `["vite.config.ts", ".mts", ".js", ".mjs", ".cts", ".cjs"]`. Handed to the
+ * CommonJS ones, e.g. `configCandidates("vite.config")` → `["vite.config.ts",
+ * "vite.config.mts", "vite.config.js", "vite.config.mjs", "vite.config.cts",
+ * "vite.config.cjs"]`. Handed to the
  * generic `edit` file-op, which patches the first one that exists — an ESM
  * config wins, and a CommonJS-only project is still read so the edit can emit a
  * clear unsupported-format error.

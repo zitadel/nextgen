@@ -162,7 +162,7 @@ export default class Eject extends BaseCommand {
     // block), so word that one accurately.
     const manualSteps = actions.configEdits.map((rel) =>
       rel === "package.json" || rel.endsWith("/package.json")
-        ? `Remove the Zitadel "dev" script from ${rel}`
+        ? `Remove the "dev" script setup added to ${rel}`
         : `Remove the Zitadel configuration block from ${rel}`,
     );
 

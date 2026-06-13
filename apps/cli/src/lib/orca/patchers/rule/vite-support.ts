@@ -34,7 +34,7 @@ function proxyEntryCode(server: string): string {
 }`;
 }
 
-/** The imports the injected proxy entry depends on. */
+/** The imports that the injected proxy entry depends on. */
 const PROXY_IMPORTS = [{ from: "vite", imported: "loadEnv", local: "loadEnv" }] as const;
 
 /**
