@@ -11,13 +11,29 @@ type RunCliModule = {
     buildLocalRuntimeImage?: (options: {
       env: Record<string, string | undefined>;
     }) => Promise<unknown>;
+    localRegistryWorkDir?: string;
+    prepareLocalRegistry?: (options: Record<string, unknown>) => Promise<{
+      env: Record<string, string | undefined>;
+    }>;
     run?: (
       command: string,
       args: string[],
       options: { cwd: string; env: Record<string, string | undefined> },
     ) => Promise<void>;
+    runCapture?: (
+      command: string,
+      args: string[],
+      options: { cwd: string; env: Record<string, string | undefined> },
+    ) => Promise<{ stdout: string; stderr: string }>;
+    stderr?: {
+      write: (chunk: string) => unknown;
+    };
   }) => Promise<void>;
   shouldAutoBuildLocalRuntimeImage: (
+    args: string[],
+    env?: Record<string, string | undefined>,
+  ) => boolean;
+  shouldPrepareLocalPackages: (
     args: string[],
     env?: Record<string, string | undefined>,
   ) => boolean;
@@ -56,6 +72,9 @@ describe("run-cli wrapper", () => {
 
   it("auto-builds a local runtime image only for start without image overrides", () => {
     expect(runCli.shouldAutoBuildLocalRuntimeImage(["start"], {})).toBe(true);
+    expect(runCli.shouldAutoBuildLocalRuntimeImage(["start", "--help"], {})).toBe(false);
+    expect(runCli.shouldAutoBuildLocalRuntimeImage(["start", "-h"], {})).toBe(false);
+    expect(runCli.shouldAutoBuildLocalRuntimeImage(["--version"], {})).toBe(false);
     expect(runCli.shouldAutoBuildLocalRuntimeImage(["start", "--image", "custom:tag"], {})).toBe(
       false,
     );
@@ -70,6 +89,27 @@ describe("run-cli wrapper", () => {
     expect(runCli.shouldAutoBuildLocalRuntimeImage(["doctor"], {})).toBe(false);
     expect(runCli.shouldAutoBuildLocalRuntimeImage(["setup"], {})).toBe(false);
     expect(runCli.shouldAutoBuildLocalRuntimeImage(["status"], {})).toBe(false);
+  });
+
+  it("prepares local packages only for setup commands that install dependencies", () => {
+    expect(runCli.shouldPrepareLocalPackages(["setup"], {})).toBe(true);
+    expect(runCli.shouldPrepareLocalPackages(["setup", "--server", "local"], {})).toBe(true);
+    expect(runCli.shouldPrepareLocalPackages(["setup", "--dry-run"], {})).toBe(false);
+    expect(runCli.shouldPrepareLocalPackages(["setup", "--skip-install"], {})).toBe(false);
+    expect(runCli.shouldPrepareLocalPackages(["setup", "--help"], {})).toBe(false);
+    expect(runCli.shouldPrepareLocalPackages(["setup", "-h"], {})).toBe(false);
+    expect(runCli.shouldPrepareLocalPackages(["doctor"], {})).toBe(false);
+    expect(runCli.shouldPrepareLocalPackages(["--version"], {})).toBe(false);
+    expect(
+      runCli.shouldPrepareLocalPackages(["setup"], {
+        ZITADEL_CLI_USE_PUBLIC_PACKAGES: "1",
+      }),
+    ).toBe(false);
+    expect(
+      runCli.shouldPrepareLocalPackages(["setup"], {
+        ZITADEL_CLI_USE_PUBLIC_PACKAGES: "true",
+      }),
+    ).toBe(false);
   });
 
   it("builds and injects the local image for start without an override", async () => {
@@ -157,7 +197,7 @@ describe("run-cli wrapper", () => {
     const run = vi.fn(noop);
 
     await runCli.main({
-      args: ["setup", "--server", "local"],
+      args: ["setup", "--server", "local", "--skip-install"],
       env: { INIT_CWD: "/tmp/myapp", PATH: "/bin" },
       buildCli: vi.fn(noop),
       buildLocalRuntimeImage: vi.fn(noop),
@@ -166,7 +206,87 @@ describe("run-cli wrapper", () => {
 
     expect(run).toHaveBeenCalledOnce();
     expect(run.mock.calls[0]?.[1][0]).toMatch(/apps\/cli\/bin\/run\.js$/);
-    expect(run.mock.calls[0]?.[1].slice(1)).toEqual(["setup", "--server", "local"]);
+    expect(run.mock.calls[0]?.[1].slice(1)).toEqual([
+      "setup",
+      "--server",
+      "local",
+      "--skip-install",
+    ]);
     expect(run.mock.calls[0]?.[2].cwd).toBe("/tmp/myapp");
+  });
+
+  it("prepares a local package registry for setup and forwards npm env to the CLI", async () => {
+    const prepareLocalRegistry = vi.fn(async (options: Record<string, unknown>) => {
+      expect(options.registryUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+      expect(options.workDir).toMatch(/tmp\/cli-local-registry$/);
+      expect(options.compose).toMatchObject({
+        projectName: expect.stringMatching(/^zitadel-local-packages-[a-f0-9]{12}$/),
+      });
+      return {
+        env: {
+          NPM_CONFIG_USERCONFIG: "/tmp/local-registry/verdaccio.npmrc",
+          npm_config_registry: "http://127.0.0.1:51234",
+        },
+      };
+    });
+    const run = vi.fn(noop);
+
+    await runCli.main({
+      args: ["setup", "--server", "local"],
+      env: { INIT_CWD: "/tmp/myapp", PATH: "/bin" },
+      buildCli: vi.fn(noop),
+      buildLocalRuntimeImage: vi.fn(noop),
+      prepareLocalRegistry,
+      run,
+    });
+
+    expect(prepareLocalRegistry).toHaveBeenCalledOnce();
+    expect(run).toHaveBeenCalledOnce();
+    expect(run.mock.calls[0]?.[2].cwd).toBe("/tmp/myapp");
+    expect(run.mock.calls[0]?.[2].env).toMatchObject({
+      INIT_CWD: "/tmp/myapp",
+      NPM_CONFIG_USERCONFIG: "/tmp/local-registry/verdaccio.npmrc",
+      PATH: "/bin",
+      npm_config_registry: "http://127.0.0.1:51234",
+    });
+  });
+
+  it("routes local package preparation command output to stderr in JSON mode", async () => {
+    let stderrOutput = "";
+    const prepareLocalRegistry = vi.fn(async (options: Record<string, unknown>) => {
+      (options.log as (message: string) => void)("preparing local packages");
+      const runLocal = options.run as (
+        command: string,
+        args: string[],
+        options: { cwd: string; env: Record<string, string | undefined> },
+      ) => Promise<unknown>;
+      await runLocal("npm", ["pack"], { cwd: "/repo", env: {} });
+      return { env: {} };
+    });
+    const runCapture = vi.fn(async () => ({
+      stderr: "captured stderr\n",
+      stdout: "captured stdout\n",
+    }));
+
+    await runCli.main({
+      args: ["setup", "--server", "local", "--json"],
+      env: { INIT_CWD: "/tmp/myapp", PATH: "/bin" },
+      buildCli: vi.fn(noop),
+      buildLocalRuntimeImage: vi.fn(noop),
+      prepareLocalRegistry,
+      run: vi.fn(noop),
+      runCapture,
+      stderr: {
+        write: (chunk: string) => {
+          stderrOutput += chunk;
+          return true;
+        },
+      },
+    });
+
+    expect(runCapture).toHaveBeenCalledWith("npm", ["pack"], { cwd: "/repo", env: {} });
+    expect(stderrOutput).toContain("[zitadel-cli]");
+    expect(stderrOutput).toContain("captured stdout");
+    expect(stderrOutput).toContain("captured stderr");
   });
 });

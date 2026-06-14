@@ -1,5 +1,14 @@
 # @zitadel/cli
 
+## 0.1.0-alpha.4
+
+### Patch Changes
+
+- [#279](https://github.com/zitadel/nextgen/pull/279) [`ce237ef`](https://github.com/zitadel/nextgen/commit/ce237ef355422c666769eef20df78bdc8ec0e0f9) Thanks [@fforootd](https://github.com/fforootd)! - Harden local setup guidance, Next 16 scaffolding, and login form automation.
+
+- Updated dependencies []:
+  - @zitadel/api@0.1.0-alpha.4
+
 ## 0.1.0-alpha.3
 
 ### Patch Changes

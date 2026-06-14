@@ -29,7 +29,7 @@ The repo is currently in changesets **prerelease mode** with the `alpha` tag (se
 - `changeset version` cuts versions like `0.1.0-alpha.0`, `0.1.0-alpha.1`, …
 - Public packages are in one fixed group, so an alpha train uses the same
   version across `@zitadel/cli`, SDKs, components, and generated API packages.
-- `changeset publish` publishes them under the **`alpha`** npm dist-tag, **not** `latest`. So `npm install @zitadel/cli` keeps resolving the last stable release; consumers opt into prereleases with `@zitadel/cli@alpha`.
+- `changeset publish` publishes them under the **`alpha`** npm dist-tag. During the public alpha, the release workflow also promotes only `@zitadel/cli` to `latest` so bare `npx @zitadel/cli` reaches the supported tester workflow. Other public packages stay opt-in via `@alpha` or exact alpha versions.
 - A package that has never had a stable release is published to `latest` on its first publish (changesets behaviour), then to `alpha` thereafter until it has a stable release.
 
 To leave alpha and cut a stable `latest` release:

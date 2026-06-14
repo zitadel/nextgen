@@ -144,7 +144,8 @@ describe("check-alpha-release-plan script", () => {
     const { cwd, statusPath } = await fixtureRepo({
       ciWorkflow: validCiWorkflow().replace(
         [
-          "      - if: ${{ steps.alpha.outputs.run_goreleaser == 'true' && steps.alpha.outputs.tag_exists == 'true' }}",
+          "      - name: Check out existing Go release tag",
+          "        if: ${{ steps.alpha.outputs.run_goreleaser == 'true' && steps.alpha.outputs.tag_exists == 'true' }}",
           "        run: git checkout --detach \"$TAG\"",
         ].join("\n"),
         "",
@@ -172,14 +173,142 @@ describe("check-alpha-release-plan script", () => {
   it("rejects workflow steps gated only on the current Changesets publish result", async () => {
     const { cwd, statusPath } = await fixtureRepo({
       ciWorkflow: validCiWorkflow().replace(
-        "      - if: ${{ steps.alpha.outputs.update_release == 'true' }}",
-        "      - if: ${{ steps.changesets.outputs.published == 'true' }}",
+        "        if: ${{ steps.alpha.outputs.update_release == 'true' }}",
+        "        if: ${{ steps.changesets.outputs.published == 'true' }}",
       ),
     });
 
     await expect(
       checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
     ).rejects.toThrow("post-npm alpha train steps must not be gated only on Changesets publishing");
+  });
+
+  it("rejects a workflow that does not refresh the CLI alpha dist-tags", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      ciWorkflow: validCiWorkflow().replace(
+        [
+          "      - name: Refresh CLI npm dist-tags",
+          "        if: ${{ steps.alpha.outputs.version != '' }}",
+          "        run: |",
+          '          npm dist-tag add "@zitadel/cli@$version" alpha || echo "::warning::Unable to refresh @zitadel/cli@$version npm alpha dist-tag"',
+          '          npm dist-tag add "@zitadel/cli@$version" latest || echo "::warning::Unable to promote @zitadel/cli@$version to npm latest dist-tag"',
+          "",
+        ].join("\n"),
+        "",
+      ),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("must refresh CLI npm dist-tags after verifying the npm train");
+  });
+
+  it("rejects a workflow that refreshes CLI dist-tags before alpha train preparation", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      ciWorkflow: validCiWorkflow()
+        .replace(
+          [
+            "      - name: Refresh CLI npm dist-tags",
+            "        if: ${{ steps.alpha.outputs.version != '' }}",
+            "        run: |",
+            '          npm dist-tag add "@zitadel/cli@$version" alpha || echo "::warning::Unable to refresh @zitadel/cli@$version npm alpha dist-tag"',
+            '          npm dist-tag add "@zitadel/cli@$version" latest || echo "::warning::Unable to promote @zitadel/cli@$version to npm latest dist-tag"',
+            "",
+          ].join("\n"),
+          "",
+        )
+        .replace(
+          "      - name: Inspect alpha release train candidate",
+          [
+            "      - name: Refresh CLI npm dist-tags",
+            "        if: ${{ steps.alpha.outputs.version != '' }}",
+            "        run: |",
+            '          npm dist-tag add "@zitadel/cli@$version" alpha || echo "::warning::Unable to refresh @zitadel/cli@$version npm alpha dist-tag"',
+            '          npm dist-tag add "@zitadel/cli@$version" latest || echo "::warning::Unable to promote @zitadel/cli@$version to npm latest dist-tag"',
+            "",
+            "      - name: Inspect alpha release train candidate",
+          ].join("\n"),
+        ),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("must refresh CLI npm dist-tags after alpha train preparation");
+  });
+
+  it("rejects a workflow that refreshes the CLI alpha tag outside the release job", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      ciWorkflow: validCiWorkflow()
+        .replace(
+          '          npm dist-tag add "@zitadel/cli@$version" alpha',
+          '          echo "alpha tag moved elsewhere"',
+        )
+        .replace(
+          "  ci-success:\n    steps:",
+          [
+            "  ci-success:",
+            "    steps:",
+            "      - run: |",
+            '          npm dist-tag add "@zitadel/cli@$version" alpha',
+          ].join("\n"),
+        ),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("must keep the CLI alpha dist-tag on the published train");
+  });
+
+  it("rejects a workflow that fails the train when npm latest promotion fails", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      ciWorkflow: validCiWorkflow().replace(
+        '          npm dist-tag add "@zitadel/cli@$version" latest || echo "::warning::Unable to promote @zitadel/cli@$version to npm latest dist-tag"',
+        '          npm dist-tag add "@zitadel/cli@$version" latest',
+      ),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("must not fail the alpha train when npm latest dist-tag promotion fails");
+  });
+
+  it("rejects a workflow that moves the CLI latest tag outside the release job", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      ciWorkflow: validCiWorkflow()
+        .replace(
+          '          npm dist-tag add "@zitadel/cli@$version" latest',
+          '          echo "latest tag moved elsewhere"',
+        )
+        .replace(
+          "  ci-success:\n    steps:",
+          [
+            "  ci-success:",
+            "    steps:",
+            "      - run: |",
+            '          npm dist-tag add "@zitadel/cli@$version" latest',
+          ].join("\n"),
+        ),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("must move only the CLI npm latest dist-tag during alpha");
+  });
+
+  it("rejects a workflow that moves any non-CLI package to npm latest", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      ciWorkflow: validCiWorkflow().replace(
+        '          npm dist-tag add "@zitadel/cli@$version" latest',
+        [
+          '          npm dist-tag add "@zitadel/cli@$version" latest',
+          '          npm dist-tag add "@zitadel/sdk-next@$version" latest',
+        ].join("\n"),
+      ),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("only @zitadel/cli may move the npm latest dist-tag");
   });
 
   it("rejects a release job condition that can inherit intentional main-branch skips", async () => {
@@ -218,6 +347,52 @@ describe("check-alpha-release-plan script", () => {
     await expect(
       checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
     ).rejects.toThrow("release publishing must live in ci.yml");
+  });
+
+  it("rejects a missing manual alpha recovery workflow", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      recoveryWorkflow: null,
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("alpha recovery workflow must exist");
+  });
+
+  it("rejects an alpha recovery workflow that can run Changesets", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      recoveryWorkflow: `${validRecoveryWorkflow()}\n      - uses: changesets/action@v1\n`,
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("alpha recovery must not create a Version Packages PR or publish npm");
+  });
+
+  it("rejects an alpha recovery workflow that defaults to a moving ref", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      recoveryWorkflow: validRecoveryWorkflow().replace(
+        "      ref:",
+        "      ref:\n        default: main",
+      ),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("alpha recovery must not default to a moving ref");
+  });
+
+  it("rejects an alpha recovery workflow that does not verify npm packages", async () => {
+    const { cwd, statusPath } = await fixtureRepo({
+      recoveryWorkflow: validRecoveryWorkflow().replace(
+        'execFileSync("npm", ["view", `${expectedName}@${version}`, "version", "--json"]',
+        'execFileSync("npm", ["ping"]',
+      ),
+    });
+
+    await expect(
+      checkAlphaReleasePlanModule.checkAlphaReleasePlan({ cwd, statusPath }),
+    ).rejects.toThrow("alpha recovery must verify the npm package train already exists");
   });
 
   it("rejects CI path filters that can skip release relevance detection", async () => {
@@ -304,20 +479,62 @@ function validCiWorkflow(): string {
     "        id: alpha-status",
     "        run: |",
     "          node scripts/release-alpha-train.mjs status --published \"$PUBLISHED\" --remote false",
-    "      - if: ${{ steps.alpha-status.outputs.should_complete == 'true' }}",
+    "      - name: Prepare alpha release train",
+    "        if: ${{ steps.alpha-status.outputs.should_complete == 'true' }}",
     "        id: alpha",
     "        run: |",
     "          alpha_env=\"$RUNNER_TEMP/alpha-release.env\"",
     "          node scripts/release-alpha-train.mjs prepare --published \"$PUBLISHED\" --out-dir \"$RUNNER_TEMP/alpha-release\" | tee \"$alpha_env\"",
     "          cat \"$alpha_env\" >> \"$GITHUB_OUTPUT\"",
+    "      - name: Refresh CLI npm dist-tags",
+    "        if: ${{ steps.alpha.outputs.version != '' }}",
+    "        run: |",
+    '          npm dist-tag add "@zitadel/cli@$version" alpha || echo "::warning::Unable to refresh @zitadel/cli@$version npm alpha dist-tag"',
+    '          npm dist-tag add "@zitadel/cli@$version" latest || echo "::warning::Unable to promote @zitadel/cli@$version to npm latest dist-tag"',
+    "",
+    "      - name: Create and push Go release tag",
+    "        if: ${{ steps.alpha.outputs.create_tag == 'true' }}",
+    "        run: git tag \"$TAG\"",
+    "      - name: Check out existing Go release tag",
+    "        if: ${{ steps.alpha.outputs.run_goreleaser == 'true' && steps.alpha.outputs.tag_exists == 'true' }}",
+    "        run: git checkout --detach \"$TAG\"",
+    "      - name: Run GoReleaser",
+    "        if: ${{ steps.alpha.outputs.run_goreleaser == 'true' }}",
+    "        run: goreleaser release --clean",
+    "      - name: Update GitHub Release notes",
+    "        if: ${{ steps.alpha.outputs.update_release == 'true' }}",
+    "        run: gh release edit \"$TAG\" --prerelease --latest=false",
+    "",
+  ].join("\n");
+}
+
+function validRecoveryWorkflow(): string {
+  return [
+    "on:",
+    "  workflow_dispatch:",
+    "    inputs:",
+    "      alpha_version:",
+    "      ref:",
+    "jobs:",
+    "  recover-alpha-train:",
+    "    steps:",
+    "      - run: |",
+    '          corepack pnpm changeset status --output "$RUNNER_TEMP/recovery-changeset-status.json"',
+    "          PUBLIC_PACKAGE_MANIFESTS",
+    "          PUBLIC_PACKAGE_NAMES",
+    "          validateAlphaVersion(version)",
+    "          manifest.version !== version",
+    '          execFileSync("npm", ["view", `${expectedName}@${version}`, "version", "--json"]',
+    "      - uses: docker/login-action@v4",
+    "      - run: |",
+    "          node scripts/release-alpha-train.mjs status --published true",
+    '          node scripts/release-alpha-train.mjs prepare --published true --out-dir "$RUNNER_TEMP/alpha-release"',
     "      - if: ${{ steps.alpha.outputs.create_tag == 'true' }}",
     "        run: git tag \"$TAG\"",
     "      - if: ${{ steps.alpha.outputs.run_goreleaser == 'true' && steps.alpha.outputs.tag_exists == 'true' }}",
     "        run: git checkout --detach \"$TAG\"",
-    "      - if: ${{ steps.alpha.outputs.run_goreleaser == 'true' }}",
-    "        run: goreleaser release --clean",
-    "      - if: ${{ steps.alpha.outputs.update_release == 'true' }}",
-    "        run: gh release edit \"$TAG\" --prerelease --latest=false",
+    "      - uses: goreleaser/goreleaser-action@v7",
+    "      - run: gh release edit \"$TAG\" --latest=false",
     "",
   ].join("\n");
 }
@@ -329,6 +546,7 @@ async function fixtureRepo(
     goreleaser?: string;
     ciWorkflow?: string;
     legacyReleaseWorkflow?: string;
+    recoveryWorkflow?: string | null;
   } = {},
 ): Promise<{ cwd: string; statusPath: string }> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-alpha-check-"));
@@ -361,6 +579,12 @@ async function fixtureRepo(
     await writeFile(
       join(cwd, ".github/workflows/release-npm.yml"),
       options.legacyReleaseWorkflow,
+    );
+  }
+  if (options.recoveryWorkflow !== null) {
+    await writeFile(
+      join(cwd, ".github/workflows/recover-alpha-train.yml"),
+      options.recoveryWorkflow ?? validRecoveryWorkflow(),
     );
   }
 

@@ -42,6 +42,13 @@ local runtime image by default. The wrapper runs the CLI build, then builds
 before invoking `zitadel start`. Pass `--image <tag>` or set
 `ZITADEL_LOCAL_IMAGE=<tag>` to use an existing image instead.
 
+`corepack pnpm run cli -- setup ...` is the manual whole-local-train path for
+humans and agents. Before invoking the local CLI, the wrapper builds and packs
+the public workspace packages, publishes them to a persistent local Verdaccio
+registry under `tmp/cli-local-registry`, and points the generated app install at
+that registry. Set `ZITADEL_CLI_USE_PUBLIC_PACKAGES=1` when you intentionally
+want the generated app to install public npm packages instead.
+
 `corepack pnpm run server` builds and syncs the embedded console/login UI before
 startup, then runs `go run .`; help output skips the UI sync.
 
@@ -77,17 +84,21 @@ generated Next.js app:
 corepack pnpm run journey
 ```
 
-The local runner needs Docker for Verdaccio, but by default it starts the
-backend from source with embedded Postgres, so no local database container is
-required. It ensures the Playwright Chromium browsers are installed, builds and
-packs the local publishable packages with pnpm, publishes them to the temporary
-registry, creates a Next.js app outside the repo, runs CLI setup through npm,
-starts the generated app on localhost, and runs Playwright with one worker.
+The local runner needs Docker for Verdaccio and the CLI-managed local runtime.
+It ensures the Playwright Chromium browsers are installed, builds and packs the
+local publishable packages with pnpm, publishes them to the temporary registry,
+creates a Next.js app outside the repo, runs CLI setup through npm, starts the
+generated app on localhost, and runs Playwright with one worker.
+
+Use `corepack pnpm run journey` for deterministic CI-style proof. Use
+`corepack pnpm run cli -- ...` when you want to drive the same local package
+train manually in a browser and see whether the command guidance is clear enough
+for a human or agent.
 
 For image parity with CI, provide a local backend image tag:
 
 ```sh
-corepack pnpm run journey -- --backend image --image nextgen:local
+corepack pnpm run journey -- --image nextgen:local
 ```
 
 Use `--keep` to preserve the temporary work directory after success. On failure

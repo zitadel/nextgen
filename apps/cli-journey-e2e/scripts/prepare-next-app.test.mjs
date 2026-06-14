@@ -20,6 +20,7 @@ test("prepares the customer local setup journey in the app root", async () => {
         JOURNEY_REGISTRY_URL: registryUrl,
         JOURNEY_SDK_NEXT_PACKAGE: "@zitadel/sdk-next",
         JOURNEY_WORK_DIR: workDir,
+        JOURNEY_ZITADEL_PORT: "18080",
         ZITADEL_LOCAL_IMAGE: image,
       },
       logMetadata: false,
@@ -32,7 +33,7 @@ test("prepares the customer local setup journey in the app root", async () => {
           await mkdir(join(options.cwd, ".zitadel/local"), { recursive: true });
           await writeFile(
             join(options.cwd, ".zitadel/local/runtime.json"),
-            `${JSON.stringify({ server_url: "http://localhost:8080" })}\n`,
+            `${JSON.stringify({ server_url: "http://localhost:18080" })}\n`,
           );
         }
         return {
@@ -45,7 +46,7 @@ test("prepares the customer local setup journey in the app root", async () => {
 
     const appDir = join(workDir, "myapp");
     assert.equal(metadata.appDir, appDir);
-    assert.equal(metadata.localRuntimeUrl, "http://localhost:8080");
+    assert.equal(metadata.localRuntimeUrl, "http://localhost:18080");
     assert.deepEqual(
       calls.map((call) => call.args),
       [
@@ -53,6 +54,8 @@ test("prepares the customer local setup journey in the app root", async () => {
           "--yes",
           "@zitadel/cli@alpha",
           "doctor",
+          "--port",
+          "18080",
           "--non-interactive",
           "--json",
         ],
@@ -60,6 +63,8 @@ test("prepares the customer local setup journey in the app root", async () => {
           "--yes",
           "@zitadel/cli@alpha",
           "start",
+          "--port",
+          "18080",
           "--non-interactive",
           "--json",
         ],
@@ -202,11 +207,12 @@ async function writeGeneratedApp(appDir, registryUrl) {
 
 function okEnvelope(args) {
   const command = args[2];
+  const port = args.includes("--port") ? args[args.indexOf("--port") + 1] : "8080";
   if (command === "start") {
-    return { status: "ok", data: { urls: { api: "http://localhost:8080" } } };
+    return { status: "ok", data: { urls: { api: `http://localhost:${port}` } } };
   }
   if (command === "setup") {
-    return { status: "ok", data: { server: "http://localhost:8080" } };
+    return { status: "ok", data: { server: `http://localhost:${port}` } };
   }
   return { status: "ok", data: { ok: true } };
 }

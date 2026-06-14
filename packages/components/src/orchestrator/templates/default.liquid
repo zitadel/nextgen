@@ -34,6 +34,7 @@
       {% endif %}
       <zl-field
         name="{{ entry[0] }}"
+        data-testid="zitadel-field-{{ entry[0] }}"
         label="{{ entry[1].text_key | t }}"
         type="{{ entry[1].type }}"
         value="{{ entry[1].value }}"
@@ -62,6 +63,7 @@
           type="submit"
           block
           action="{{ entry[0] }}"
+          data-testid="zitadel-action-{{ entry[0] }}"
           label="{{ entry[1].text_key | t }}"
           {% if loading %}loading{% endif %}
         ></zl-button>
@@ -76,6 +78,7 @@
           type="button"
           block
           action="{{ entry[0] }}"
+          data-testid="zitadel-action-{{ entry[0] }}"
           label="{{ entry[1].text_key | t }}"
         ></zl-button>
       {% endunless %}
@@ -87,6 +90,7 @@
         size="medium"
         block
         action="passkey"
+        data-testid="zitadel-action-passkey"
         label="{{ actions.passkey.text_key | t }}"
       ></zl-button>
     {% endif %}
@@ -94,13 +98,13 @@
 
     {% if actions.register %}
       <p class="zl-card-nav">
-        {{ 'identifier.action.register.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="register">{{ 'identifier.action.register.link' | t }}</a>
+        {{ 'identifier.action.register.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="register" data-testid="zitadel-action-register-link">{{ 'identifier.action.register.link' | t }}</a>
       </p>
     {% endif %}
 
     {% if actions.sign_in %}
       <p class="zl-card-nav">
-        {{ 'register.action.sign_in.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="sign_in">{{ 'register.action.sign_in.link' | t }}</a>
+        {{ 'register.action.sign_in.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="sign_in" data-testid="zitadel-action-sign_in-link">{{ 'register.action.sign_in.link' | t }}</a>
       </p>
     {% endif %}
 

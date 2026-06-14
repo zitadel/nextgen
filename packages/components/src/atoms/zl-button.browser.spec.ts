@@ -37,6 +37,56 @@ describe("<zl-button> form participation (chromium)", () => {
     expect(submitted).toBe(1);
   });
 
+  it("falls back to attributes when upgraded properties are empty", async () => {
+    host.innerHTML = `<form><zl-button type="submit" action="go" label="Go"></zl-button></form>`;
+    const form = host.querySelector("form") as HTMLFormElement;
+    const button = host.querySelector("zl-button") as ZlButton;
+    await button.updateComplete;
+
+    button.type = "" as ZlButton["type"];
+    button.action = "";
+    await button.updateComplete;
+
+    let submitted = 0;
+    let detail: { action: string | null } | undefined;
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      submitted += 1;
+    });
+    button.addEventListener("zl-submit", (event) => {
+      detail = (event as CustomEvent<{ action: string | null }>).detail;
+    });
+
+    const native = button.shadowRoot?.querySelector("button");
+    expect(native?.getAttribute("data-testid")).toBe("zitadel-action-go");
+    native?.click();
+
+    expect(submitted).toBe(1);
+    expect(detail).toEqual({ action: "go" });
+  });
+
+  it("submits when automation dispatches the click on the custom-element host", async () => {
+    host.innerHTML = `<form><zl-button type="submit" action="go" label="Go"></zl-button></form>`;
+    const form = host.querySelector("form") as HTMLFormElement;
+    const button = host.querySelector("zl-button") as ZlButton;
+    await button.updateComplete;
+
+    let submitted = 0;
+    let detail: { action: string | null } | undefined;
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      submitted += 1;
+    });
+    button.addEventListener("zl-submit", (event) => {
+      detail = (event as CustomEvent<{ action: string | null }>).detail;
+    });
+
+    button.click();
+
+    expect(submitted).toBe(1);
+    expect(detail).toEqual({ action: "go" });
+  });
+
   it("resets the owning form when type=reset is clicked", async () => {
     host.innerHTML = `<form><input name="x" value="seed" /><zl-button type="reset" label="Reset"></zl-button></form>`;
     const input = host.querySelector("input") as HTMLInputElement;
