@@ -11,6 +11,8 @@ import (
 
 func (h *Harness) EnsureAPIClient(t *testing.T, projectID string) *api.Client {
 	t.Helper()
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	serv := h.EnsureTestServer(t)
 	if h.apiClients == nil {
 		h.apiClients = make(map[string]*api.Client)
@@ -20,7 +22,7 @@ func (h *Harness) EnsureAPIClient(t *testing.T, projectID string) *api.Client {
 	}
 	client, err := api.NewClient(
 		serv.URL,
-		h.EnsureFakeSecuritySource(t, projectID),
+		h.ensureFakeSecuritySourceLocked(projectID),
 	)
 	require.NoError(t, err)
 	h.apiClients[projectID] = client
@@ -29,11 +31,13 @@ func (h *Harness) EnsureAPIClient(t *testing.T, projectID string) *api.Client {
 
 func (h *Harness) EnsureAnonymousAPIClient(t *testing.T) *api.Client {
 	t.Helper()
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	serv := h.EnsureTestServer(t)
 	if h.anonymousClient == nil {
 		client, err := api.NewClient(
 			serv.URL,
-			h.EnsureAnonymousSecuritySource(t),
+			h.ensureAnonymousSecuritySourceLocked(),
 		)
 		require.NoError(t, err)
 		h.anonymousClient = client
@@ -43,6 +47,12 @@ func (h *Harness) EnsureAnonymousAPIClient(t *testing.T) *api.Client {
 
 func (h *Harness) EnsureFakeSecuritySource(t *testing.T, projectID string) *FakeSecuritySource {
 	t.Helper()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.ensureFakeSecuritySourceLocked(projectID)
+}
+
+func (h *Harness) ensureFakeSecuritySourceLocked(projectID string) *FakeSecuritySource {
 	if h.fakeSecuritySources == nil {
 		h.fakeSecuritySources = make(map[string]*FakeSecuritySource)
 	}
@@ -57,6 +67,12 @@ func (h *Harness) EnsureFakeSecuritySource(t *testing.T, projectID string) *Fake
 
 func (h *Harness) EnsureAnonymousSecuritySource(t *testing.T) *FakeSecuritySource {
 	t.Helper()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.ensureAnonymousSecuritySourceLocked()
+}
+
+func (h *Harness) ensureAnonymousSecuritySourceLocked() *FakeSecuritySource {
 	if h.anonymousSecuritySource == nil {
 		h.anonymousSecuritySource = &FakeSecuritySource{}
 	}
