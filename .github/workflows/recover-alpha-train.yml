@@ -54,8 +54,9 @@ jobs:
           INPUT_VERSION: ${{ inputs.alpha_version }}
         run: |
           set -euo pipefail
-          corepack pnpm changeset status --output "$RUNNER_TEMP/recovery-changeset-status.json"
-          node --input-type=module <<'NODE'
+          alpha_env="$RUNNER_TEMP/recovery-alpha-status.env"
+          node scripts/release-alpha-train.mjs status --published true --remote false | tee "$alpha_env"
+          ALPHA_ENV="$alpha_env" node --input-type=module <<'NODE'
           import { execFileSync } from "node:child_process";
           import { readFileSync } from "node:fs";
           import { join } from "node:path";
@@ -68,22 +69,22 @@ jobs:
           const version = process.env.INPUT_VERSION;
           validateAlphaVersion(version);
 
-          const status = JSON.parse(
-            readFileSync(`${process.env.RUNNER_TEMP}/recovery-changeset-status.json`, "utf8"),
+          const values = Object.fromEntries(
+            readFileSync(process.env.ALPHA_ENV, "utf8")
+              .trim()
+              .split(/\r?\n/)
+              .filter(Boolean)
+              .map((line) => {
+                const separator = line.indexOf("=");
+                return [line.slice(0, separator), line.slice(separator + 1)];
+              }),
           );
-          const pending = (Array.isArray(status.releases) ? status.releases : []).filter(
-            (release) =>
-              release &&
-              typeof release === "object" &&
-              PUBLIC_PACKAGE_NAMES.includes(release.name) &&
-              release.type !== "none",
-          );
-          if (pending.length > 0) {
-            throw new Error(
-              `recovery ref has pending release changesets: ${pending
-                .map((release) => release.name)
-                .join(", ")}`,
-            );
+          if (values.version !== version) {
+            throw new Error(`recovery ref is ${values.version}, expected ${version}`);
+          }
+          if (values.should_complete !== "true") {
+            const reason = values.skip_reason ? `: ${values.skip_reason}` : "";
+            throw new Error(`recovery ref is not ready to complete${reason}`);
           }
 
           for (let index = 0; index < PUBLIC_PACKAGE_MANIFESTS.length; index += 1) {
