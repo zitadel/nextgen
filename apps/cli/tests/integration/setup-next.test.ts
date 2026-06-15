@@ -81,13 +81,13 @@ describe("Next setup integration", () => {
     expect(profilePage).toContain("configureZitadel");
     expect(profilePage).toContain("project={project}");
     expect(profilePage).toContain('post-sign-out-url="/login"');
-    const middleware = await readFile(join(cwd, "middleware.ts"), "utf8");
-    expect(middleware).toContain("zitadel-cli: managed-file v1");
-    expect(middleware).toContain("nextgenMiddleware");
-    expect(middleware).toContain("export function middleware(");
-    expect(middleware).toContain('protectedRoutes: ["/profile"]');
-    expect(middleware).toContain('"/__nextgen/:path*"');
-    expect(middleware).toContain("process.env.ZITADEL_URL");
+    const proxy = await readFile(join(cwd, "proxy.ts"), "utf8");
+    expect(proxy).toContain("zitadel-cli: managed-file v1");
+    expect(proxy).toContain("nextgenMiddleware");
+    expect(proxy).toContain("export function proxy(");
+    expect(proxy).toContain('protectedRoutes: ["/profile"]');
+    expect(proxy).toContain('"/__nextgen/:path*"');
+    expect(proxy).toContain("process.env.ZITADEL_URL");
     const envLocal = await readFile(join(cwd, ".env.local"), "utf8");
     expect(envLocal).toContain("ZITADEL_ENVIRONMENT=development");
     expect(envLocal).toContain("ZITADEL_URL=");
@@ -99,7 +99,7 @@ describe("Next setup integration", () => {
     const packageJson = JSON.parse(await readFile(join(cwd, "package.json"), "utf8")) as {
       dependencies?: Record<string, string>;
     };
-    expect(packageJson.dependencies?.["@zitadel/sdk-next"]).toBe("alpha");
+    expect(packageJson.dependencies?.["@zitadel/sdk-next"]).toBe(await expectedCliVersion());
 
     const fake = await fakeDocker();
     const port = await freePort();
@@ -181,6 +181,7 @@ describe("Next setup integration", () => {
     });
     expect(applyWithEnv.exitCode).toBe(0);
   });
+
 });
 
 async function createNextProject(): Promise<string> {
@@ -193,7 +194,7 @@ async function createNextProject(): Promise<string> {
         name: "demo-next-app",
         private: true,
         dependencies: {
-          next: "^15.0.0",
+          next: "^16.0.0",
           react: "^19.0.0",
           "react-dom": "^19.0.0",
         },
@@ -265,4 +266,11 @@ async function freePort(): Promise<number> {
     throw new Error("free port probe did not expose a TCP address");
   }
   return address.port;
+}
+
+async function expectedCliVersion(): Promise<string> {
+  const pkg = JSON.parse(
+    await readFile(new URL("../../package.json", import.meta.url), "utf8"),
+  ) as { version: string };
+  return pkg.version;
 }

@@ -56,12 +56,23 @@ describe("<zl-button> rendering (jsdom)", () => {
   it("emits zl-submit carrying the action on click", async () => {
     const el = mount(`<zl-button label="Next" action="submit"></zl-button>`);
     await el.updateComplete;
+    expect(el.shadowRoot?.querySelector("button")?.getAttribute("data-testid")).toBe(
+      "zitadel-action-submit",
+    );
     let detail: unknown;
     el.addEventListener("zl-submit", (event) => {
       detail = (event as CustomEvent).detail;
     });
     el.shadowRoot?.querySelector("button")?.click();
     expect(detail).toEqual({ action: "submit" });
+  });
+
+  it("projects host test ids onto the native button", async () => {
+    const el = mount(`<zl-button label="Next" action="submit" data-testid="zitadel-action-submit"></zl-button>`);
+    await el.updateComplete;
+    expect(el.shadowRoot?.querySelector("button")?.getAttribute("data-testid")).toBe(
+      "zitadel-action-submit-button",
+    );
   });
 
   it("emits zl-submit with a null action when none is set", async () => {

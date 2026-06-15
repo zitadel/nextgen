@@ -21,6 +21,7 @@ async function resolveEjectActions(cwd: string): Promise<EjectActions> {
     directories: [".zitadel"],
     envBackups: [".env.local"],
     dependencies: [],
+    configEdits: [],
   };
   const orca = createOrca();
   const framework = await orca.tryDetect(cwd);
@@ -155,7 +156,21 @@ export default class Eject extends BaseCommand {
       removed.push(rel);
     }
 
-    if (removed.length === 0 && backedUp.length === 0) {
+    // In-place config merges (vite.config.ts / angular.json / nuxt.config.ts)
+    // can't be auto-reverted, so surface them as manual cleanup steps. The
+    // Angular patcher also edits package.json (a `dev` script, not a config
+    // block), so word that one accurately.
+    const manualSteps = actions.configEdits.map((rel) => {
+      if (rel === "package.json" || rel.endsWith("/package.json")) {
+        return `Remove the "dev" script setup added to ${rel}`;
+      }
+      if (rel === "angular.json" || rel.endsWith("/angular.json")) {
+        return `Remove the Zitadel proxyConfig (and dev-server port) from the serve target in ${rel}`;
+      }
+      return `Remove the Zitadel configuration block from ${rel}`;
+    });
+
+    if (removed.length === 0 && backedUp.length === 0 && manualSteps.length === 0) {
       return this.emit({ status: "skipped", reason: "nothing-to-eject", data: { cwd } });
     }
 
@@ -169,6 +184,7 @@ export default class Eject extends BaseCommand {
         files_preserved: preserved,
         backed_up: backedUp,
         next_commands: nextCommands,
+        manual_steps: manualSteps,
       },
     });
   }
