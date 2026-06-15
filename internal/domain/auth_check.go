@@ -4,6 +4,7 @@ import (
 	"time"
 )
 
+//go:generate go tool enumer -type=AuthCheckType -trimprefix=AuthCheckType -text -linecomment
 type AuthCheckType uint8
 
 const (

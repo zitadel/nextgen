@@ -3,13 +3,14 @@ package embedded
 import (
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
 	"time"
 
 	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
+	slogctx "github.com/veqryn/slog-context"
 
 	// "github.com/zitadel/logging"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -127,7 +128,7 @@ func startEmbeddedOnce(options Options) (connector database.Connector, stop func
 	return connector, func() {
 		err := embedded.Stop()
 		if err != nil {
-			log.Printf("unable to stop embedded postgres: %v", err)
+			slog.Error("unable to stop embedded postgres", slogctx.Err(err))
 		}
 		if tailer != nil {
 			tailer.Stop()
