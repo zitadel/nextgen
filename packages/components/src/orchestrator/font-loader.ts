@@ -17,33 +17,22 @@
  */
 const LINK_ID = "zl-font-link";
 
-/**
- * Resolve our previously injected font link, if any. Returns `null` unless the
- * element is a stylesheet `<link>` we own — `getElementById` can return any
- * element, so we never remove or clobber an unrelated node that happens to
- * share the id.
- */
-function findOwnFontLink(root: Document | ShadowRoot): HTMLLinkElement | null {
-  const el = root.getElementById?.(LINK_ID);
-  return el instanceof HTMLLinkElement && el.rel === "stylesheet" ? el : null;
-}
-
 export function applyFontUrl(shadowRoot: ShadowRoot, fontUrl: string | null | undefined): void {
   const ownerDocument = shadowRoot.ownerDocument ?? document;
-  // Legacy cleanup — earlier versions injected into the shadow root itself.
-  findOwnFontLink(shadowRoot)?.remove();
-  const existing = findOwnFontLink(ownerDocument);
+  // Scope the lookup to `<link>` so we only ever touch our own element, then
+  // reuse it across re-renders instead of removing and re-fetching the font.
+  const existing = ownerDocument.head.querySelector<HTMLLinkElement>(`link#${LINK_ID}`);
   if (!fontUrl) {
     existing?.remove();
     return;
   }
-  if (existing && existing.href === fontUrl) {
-    return;
-  }
-  existing?.remove();
-  const link = ownerDocument.createElement("link");
+  const link = existing ?? ownerDocument.createElement("link");
   link.id = LINK_ID;
   link.rel = "stylesheet";
-  link.href = fontUrl;
-  ownerDocument.head.appendChild(link);
+  if (link.href !== fontUrl) {
+    link.href = fontUrl;
+  }
+  if (!existing) {
+    ownerDocument.head.appendChild(link);
+  }
 }
