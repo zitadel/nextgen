@@ -265,7 +265,7 @@ jobs:
           # ran, and services wired; the generous timeout covers a cold Maven download.
           ready=0
           for i in $(seq 1 240); do
-            if grep -q "server listening on" server.log; then ready=1; break; fi
+            if grep -q "server listening for requests" server.log; then ready=1; break; fi
             if ! kill -0 "$pid" 2>/dev/null; then
               echo "::error::server exited before becoming ready"; cat server.log; exit 1
             fi

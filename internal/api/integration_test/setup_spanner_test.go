@@ -4,10 +4,11 @@ package integration_test
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
 	"testing"
 
+	slogctx "github.com/veqryn/slog-context"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
@@ -24,7 +25,7 @@ func runTests(m *testing.M) int {
 
 	connector, stop, err := dbtest.Spanner(ctx)
 	if err != nil {
-		log.Printf("setup: failed to start Spanner database: %v", err)
+		slog.Error("setup: failed to start Spanner database", slogctx.Err(err))
 		return 1
 	}
 	defer stop()
@@ -32,14 +33,14 @@ func runTests(m *testing.M) int {
 
 	pool, err := connector.Connect(ctx)
 	if err != nil {
-		log.Printf("setup: failed to connect: %v", err)
+		slog.Error("setup: failed to connect", slogctx.Err(err))
 		return 1
 	}
 	testPool = pool.(database.PoolTest)
 	defer testPool.Close(ctx)
 
 	if err = testPool.MigrateTest(ctx); err != nil {
-		log.Printf("setup: migration failed: %v", err)
+		slog.Error("setup: migration failed", slogctx.Err(err))
 		return 1
 	}
 
