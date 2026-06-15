@@ -5,11 +5,12 @@ package repository_test
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	slogctx "github.com/veqryn/slog-context"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
 	spannerDialect "github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
@@ -38,7 +39,7 @@ func runTests(m *testing.M) int {
 	}
 
 	if err != nil {
-		log.Printf("error setting up test database: %v", err)
+		slog.Error("error setting up test database", slogctx.Err(err))
 		if stop != nil {
 			stop()
 		}
@@ -62,7 +63,7 @@ func runTests(m *testing.M) int {
 
 func newSpannerURLDB(ctx context.Context, url string) (database.PoolTest, func(), error) {
 	isSpannerDB = true
-	log.Printf("using Spanner database at %s", url)
+	slog.Info("using Spanner database", slog.String("database_url", url))
 	connector, err := spannerDialect.DecodeConfig(url)
 	if err != nil {
 		return nil, func() {}, fmt.Errorf("unable to decode Spanner config: %w", err)
