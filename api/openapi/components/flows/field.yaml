@@ -12,12 +12,13 @@ properties:
     example: email
   type:
     type: string
-    enum: [text, email, password, tel, number, url, date, hidden]
+    enum: [text, email, password, tel, number, url, date, hidden, checkbox, select]
     description: |
-      The input kind the client should render. Encodes the formats that
-      have a matching HTML input type (email, url, date). For other
-      formats (e.g. uuid) the type is `text` and `validation.format`
-      carries the rule.
+      The input kind the client should render. Encodes the formats and
+      JSON types that map to a familiar HTML input: `email`, `url`,
+      `date` come from `format`; `checkbox` from JSON `type: boolean`;
+      `select` from a closed `enum`. For other formats (e.g. uuid) the
+      type is `text` and `validation.format` carries the rule.
   text_key:
     type: string
     description: Localization key for the field label.
@@ -59,3 +60,12 @@ properties:
         type: integer
         minimum: 0
         description: Maximum length in characters (inclusive). Mirrors `maxLength`.
+      enum:
+        type: array
+        items:
+          type: string
+        description: |
+          Closed list of allowed values. Mirrors the JSON Schema `enum`
+          keyword on the underlying user property. When `type` is
+          `select` the client renders these as options; for other types
+          the rule still applies as a membership check.

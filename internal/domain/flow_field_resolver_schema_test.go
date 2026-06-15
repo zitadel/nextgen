@@ -293,25 +293,33 @@ func TestSchemaFieldResolver_Resolve_FormatAndTypeVariants(t *testing.T) {
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
 		"properties": {
-			"website":  { "type": "string", "format": "uri" },
-			"birthday": { "type": "string", "format": "date" },
-			"created":  { "type": "string", "format": "date-time" },
-			"nickname": { "type": "string" }
+			"website":    { "type": "string", "format": "uri" },
+			"birthday":   { "type": "string", "format": "date" },
+			"created":    { "type": "string", "format": "date-time" },
+			"nickname":   { "type": "string" },
+			"gender":     { "type": "string", "enum": ["female", "male", "non_binary"] },
+			"newsletter": { "type": "boolean" },
+			"opt_in":     { "type": ["null", "boolean"] },
+			"opt_in_rev": { "type": ["boolean", "null"] }
 		}
 	}`)
 	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step",
-		[]string{"website", "birthday", "created", "nickname"})
+		[]string{"website", "birthday", "created", "nickname", "gender", "newsletter", "opt_in", "opt_in_rev"})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
 
 	wantTypes := map[string]domain.FlowFieldType{
-		"website":  domain.FlowFieldTypeURL,
-		"birthday": domain.FlowFieldTypeDate,
-		"created":  domain.FlowFieldTypeDate,
-		"nickname": domain.FlowFieldTypeText,
+		"website":    domain.FlowFieldTypeURL,
+		"birthday":   domain.FlowFieldTypeDate,
+		"created":    domain.FlowFieldTypeDate,
+		"nickname":   domain.FlowFieldTypeText,
+		"gender":     domain.FlowFieldTypeSelect,
+		"newsletter": domain.FlowFieldTypeCheckbox,
+		"opt_in":     domain.FlowFieldTypeCheckbox,
+		"opt_in_rev": domain.FlowFieldTypeCheckbox,
 	}
 	for name, want := range wantTypes {
 		if mustField(got, name).Type != want {
@@ -320,5 +328,30 @@ func TestSchemaFieldResolver_Resolve_FormatAndTypeVariants(t *testing.T) {
 	}
 	if mustField(got, "nickname").Validation != nil {
 		t.Errorf("Resolve nickname Validation = %+v, want nil (no rules)", mustField(got, "nickname").Validation)
+	}
+	if v := mustField(got, "gender").Validation; v == nil {
+		t.Errorf("Resolve gender Validation = nil, want enum rule")
+	} else if !slices.Equal(v.Enum, []string{"female", "male", "non_binary"}) {
+		t.Errorf("Resolve gender Validation.Enum = %v, want [female male non_binary]", v.Enum)
+	}
+	if mustField(got, "newsletter").Validation != nil {
+		t.Errorf("Resolve newsletter Validation = %+v, want nil (no rules)", mustField(got, "newsletter").Validation)
+	}
+}
+
+func TestSchemaFieldResolver_Resolve_AmbiguousJSONTypeRejected(t *testing.T) {
+	const url = "https://example.test/ambiguous-type.json"
+	bytes := []byte(`{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"type": "object",
+		"properties": {
+			"either": { "type": ["string", "boolean"] }
+		}
+	}`)
+	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
+
+	_, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step", []string{"either"})
+	if !errors.Is(err, domain.ErrFlowFieldUnsupportedType) {
+		t.Fatalf("Resolve err = %v, want %v", err, domain.ErrFlowFieldUnsupportedType)
 	}
 }

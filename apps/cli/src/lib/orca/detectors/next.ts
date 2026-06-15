@@ -2,7 +2,7 @@ import { stat } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ZitadelError } from "../../errors";
-import { hasDependency, readPackageJson } from "./package-json";
+import { dependencyVersionMajor, hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
 
@@ -42,7 +42,13 @@ export class NextDetector implements Detector {
     }
 
     const devPort = await detectDevPort(cwd, pkg);
-    return { id: "next", appDir, devPort, url: issuerFromPort(devPort) };
+    return {
+      id: "next",
+      appDir,
+      devPort,
+      url: issuerFromPort(devPort),
+      versionMajor: dependencyVersionMajor(pkg, "next"),
+    };
   }
 }
 

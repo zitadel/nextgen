@@ -90,6 +90,29 @@ async function fillSignInFields(
   );
 }
 
+async function fillNativeField(root: ShadowRoot, name: string, value: string): Promise<void> {
+  const field = root.querySelector(`zl-field[name="${name}"]`) as HTMLElement & {
+    updateComplete: Promise<unknown>;
+  };
+  await field.updateComplete;
+  const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+  input.value = value;
+  input.dispatchEvent(new InputEvent("input", { bubbles: true, composed: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+  await field.updateComplete;
+}
+
+async function setNativeFieldValue(root: ShadowRoot, name: string, value: string): Promise<void> {
+  const field = root.querySelector(`zl-field[name="${name}"]`) as HTMLElement & {
+    updateComplete: Promise<unknown>;
+    value: string;
+  };
+  await field.updateComplete;
+  const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+  input.value = value;
+  expect(field.value).not.toBe(value);
+}
+
 async function waitFor<T>(probe: () => T | null | undefined, timeout = 1500): Promise<T> {
   const start = performance.now();
   while (performance.now() - start < timeout) {
@@ -189,6 +212,81 @@ describe("<zitadel-login> form + focus (chromium)", () => {
       const title = element.shadowRoot?.querySelector(".zl-card-title");
       return title?.textContent?.includes("Sign in faster") ? title : null;
     });
+  });
+
+  it("submits values filled through native input events", async () => {
+    const element = await mount();
+    const root = element.shadowRoot!;
+    expect(root.querySelector('[data-testid="zitadel-field-email"]')).toBeTruthy();
+    await fillNativeField(root, "email", "alice@acme.com");
+    await fillNativeField(root, "password", "hunter2");
+    const submit = root.querySelector('zl-button[action="submit"]') as HTMLElement & {
+      updateComplete: Promise<unknown>;
+    };
+    await submit.updateComplete;
+    expect(submit.shadowRoot?.querySelector("button")?.getAttribute("data-testid")).toBe(
+      "zitadel-action-submit-button",
+    );
+    submit.shadowRoot?.querySelector("button")?.click();
+
+    await waitFor(() => {
+      const title = element.shadowRoot?.querySelector(".zl-card-title");
+      return title?.textContent?.includes("Sign in faster") ? title : null;
+    });
+    const body = JSON.parse(String(stub.calls[1]?.init?.body ?? "{}")) as {
+      fields?: Record<string, string>;
+    };
+    expect(body.fields).toEqual({ email: "alice@acme.com", password: "hunter2" });
+  });
+
+  it("captures native input values before submit even when automation did not emit input events", async () => {
+    const element = await mount();
+    const root = element.shadowRoot;
+    expect(root).toBeTruthy();
+    if (!root) return;
+    await setNativeFieldValue(root, "email", "alice@acme.com");
+    await setNativeFieldValue(root, "password", "hunter2");
+    const submit = root.querySelector('zl-button[action="submit"]') as HTMLElement & {
+      updateComplete: Promise<unknown>;
+    };
+    await submit.updateComplete;
+    submit.shadowRoot?.querySelector("button")?.click();
+
+    await waitFor(() => {
+      const title = element.shadowRoot?.querySelector(".zl-card-title");
+      return title?.textContent?.includes("Sign in faster") ? title : null;
+    });
+    const body = JSON.parse(String(stub.calls[1]?.init?.body ?? "{}")) as {
+      fields?: Record<string, string>;
+    };
+    expect(body.fields).toEqual({ email: "alice@acme.com", password: "hunter2" });
+  });
+
+  it("does not submit stale values after a field is cleared", async () => {
+    const element = await mount();
+    const root = element.shadowRoot!;
+    await fillNativeField(root, "email", "alice@acme.com");
+    await fillNativeField(root, "password", "hunter2");
+    const passwordField = root.querySelector('zl-field[name="password"]') as HTMLElement & {
+      value: string;
+      updateComplete: Promise<unknown>;
+    };
+    passwordField.value = "";
+    await passwordField.updateComplete;
+    const submit = root.querySelector('zl-button[action="submit"]') as HTMLElement & {
+      updateComplete: Promise<unknown>;
+    };
+    await submit.updateComplete;
+    submit.shadowRoot?.querySelector("button")?.click();
+
+    await waitFor(() => {
+      const title = element.shadowRoot?.querySelector(".zl-card-title");
+      return title?.textContent?.includes("Sign in faster") ? title : null;
+    });
+    const body = JSON.parse(String(stub.calls[1]?.init?.body ?? "{}")) as {
+      fields?: Record<string, string>;
+    };
+    expect(body.fields).toEqual({ email: "alice@acme.com", password: "" });
   });
 
   it("ignores a duplicate submit while the first request is in-flight", async () => {

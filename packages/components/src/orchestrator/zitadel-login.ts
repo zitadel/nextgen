@@ -540,13 +540,63 @@ export class ZitadelLogin extends LitElement {
     }
   }
 
+  private captureValuesFromFields(): Record<string, string> {
+    const root = this.shadowRoot;
+    if (!root) return this.formValues;
+    const fields = root.querySelectorAll<HTMLElement & { value?: string }>("zl-field");
+    if (fields.length === 0) return this.formValues;
+    const next = { ...this.formValues };
+    let changed = false;
+    for (const field of fields) {
+      const name = field.getAttribute("name");
+      const value = this.currentFieldValue(field);
+      if (!name || value === undefined) continue;
+      if (field.value !== value) {
+        field.value = value;
+      }
+      if (next[name] !== value) {
+        next[name] = value;
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.formValues = next;
+    }
+    return next;
+  }
+
+  private currentFieldValue(field: HTMLElement & { value?: string }): string | undefined {
+    const native = field.shadowRoot?.querySelector<HTMLInputElement>("input");
+    if (native && native.value !== field.value) {
+      return native.value;
+    }
+    return typeof field.value === "string" ? field.value : undefined;
+  }
+
   private handleAtomInput = (event: CustomEvent<{ name: string; value: string }>): void => {
     if (!event.detail) return;
     const { name, value } = event.detail;
     if (!name) return;
     this.formValues = { ...this.formValues, [name]: value };
+    this.syncFieldElementValue(name, value);
     emit(this, "zitadel-flow-input", { name, value });
   };
+
+  private syncFieldElementValue(name: string, value: string): void {
+    const root = this.shadowRoot;
+    if (!root) return;
+    const fields = root.querySelectorAll<HTMLElement & { value?: string }>("zl-field");
+    for (const field of fields) {
+      if (field.getAttribute("name") !== name) continue;
+      if (field.value !== value) {
+        field.value = value;
+      }
+      const native = field.shadowRoot?.querySelector<HTMLInputElement>("input");
+      if (native && native.value !== value) {
+        native.value = value;
+      }
+    }
+  }
 
   private handleAtomSubmit = (event: CustomEvent<{ action: string | null }>): void => {
     if (this.loading) return;
@@ -653,10 +703,11 @@ export class ZitadelLogin extends LitElement {
       // Only send field values that the current step defines. `formValues`
       // carries state across steps (e.g. email for the signed-in greeting)
       // but steps without fields should not leak prior values onto the wire.
+      const formValues = this.captureValuesFromFields();
       const stepFields = this.response.step.fields ?? [];
       const fields: Record<string, string> = {};
       for (const f of stepFields) {
-        const value = this.formValues[f.name];
+        const value = formValues[f.name];
         if (value !== undefined) {
           fields[f.name] = value;
         }

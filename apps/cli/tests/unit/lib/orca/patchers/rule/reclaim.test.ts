@@ -13,14 +13,20 @@ const plan: ScaffoldPlan = {
     { kind: "append-gitignore", entries: [".env*"] },
     { kind: "merge-env", path: ".env.local", entries: { A: "1" } },
     { kind: "add-dep", name: "pkg", version: "1.0.0" },
+    { kind: "edit", path: "vite.config.ts", edit: (source) => source ?? "" },
   ],
   summary: [],
 };
 
 describe("reclaimableOps", () => {
-  it("keeps env, gitignore, add-dep, and marker-bearing writes", () => {
+  it("keeps env, gitignore, add-dep, edit, and marker-bearing writes", () => {
     const kinds = reclaimableOps(plan).map((op) => op.kind);
-    expect(kinds).toEqual(["write", "append-gitignore", "merge-env", "add-dep"]);
+    expect(kinds).toEqual(["write", "append-gitignore", "merge-env", "add-dep", "edit"]);
+  });
+
+  it("keeps config edits so doctor --fix can restore a removed proxy", () => {
+    const ops = reclaimableOps(plan);
+    expect(ops.some((op) => op.kind === "edit" && op.path === "vite.config.ts")).toBe(true);
   });
 
   it("keeps the managed page write but drops unmarked .zitadel/config writes", () => {

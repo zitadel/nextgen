@@ -868,6 +868,10 @@ func (s FieldType) Validate() error {
 		return nil
 	case "hidden":
 		return nil
+	case "checkbox":
+		return nil
+	case "select":
+		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}

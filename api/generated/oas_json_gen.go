@@ -5897,6 +5897,10 @@ func (s *FieldType) Decode(d *jx.Decoder) error {
 		*s = FieldTypeDate
 	case FieldTypeHidden:
 		*s = FieldTypeHidden
+	case FieldTypeCheckbox:
+		*s = FieldTypeCheckbox
+	case FieldTypeSelect:
+		*s = FieldTypeSelect
 	default:
 		*s = FieldType(v)
 	}
@@ -5944,12 +5948,23 @@ func (s *FieldValidation) encodeFields(e *jx.Encoder) {
 			s.MaxLength.Encode(e)
 		}
 	}
+	{
+		if s.Enum != nil {
+			e.FieldStart("enum")
+			e.ArrStart()
+			for _, elem := range s.Enum {
+				e.Str(elem)
+			}
+			e.ArrEnd()
+		}
+	}
 }
 
-var jsonFieldsNameOfFieldValidation = [3]string{
+var jsonFieldsNameOfFieldValidation = [4]string{
 	0: "format",
 	1: "min_length",
 	2: "max_length",
+	3: "enum",
 }
 
 // Decode decodes FieldValidation from json.
@@ -5989,6 +6004,25 @@ func (s *FieldValidation) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"max_length\"")
+			}
+		case "enum":
+			if err := func() error {
+				s.Enum = make([]string, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem string
+					v, err := d.Str()
+					elem = string(v)
+					if err != nil {
+						return err
+					}
+					s.Enum = append(s.Enum, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"enum\"")
 			}
 		default:
 			return d.Skip()

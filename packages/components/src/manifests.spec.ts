@@ -34,6 +34,7 @@ describe("manifest registry", () => {
     const button = findManifest("zl-button");
     expect(button?.consumes?.action?.kind).toBe("submit");
     expect(button?.consumes?.action?.required).toBe(false);
+    expect(button?.attrs).toContain("data-testid");
     expect(button?.events).toContain("zl-submit");
   });
 
@@ -44,6 +45,7 @@ describe("manifest registry", () => {
         "name",
         "label",
         "type",
+        "data-testid",
         "autocomplete",
         "required",
         "pattern",

@@ -2376,10 +2376,11 @@ type Field struct {
 	// Field name, matching a property in the flow's user schema. Carries
 	// the submitted value back to the engine.
 	Name string `json:"name"`
-	// The input kind the client should render. Encodes the formats that
-	// have a matching HTML input type (email, url, date). For other
-	// formats (e.g. uuid) the type is `text` and `validation.format`
-	// carries the rule.
+	// The input kind the client should render. Encodes the formats and
+	// JSON types that map to a familiar HTML input: `email`, `url`,
+	// `date` come from `format`; `checkbox` from JSON `type: boolean`;
+	// `select` from a closed `enum`. For other formats (e.g. uuid) the
+	// type is `text` and `validation.format` carries the rule.
 	Type FieldType `json:"type"`
 	// Localization key for the field label.
 	TextKey string `json:"text_key"`
@@ -2458,10 +2459,11 @@ func (s *Field) SetValidation(val OptFieldValidation) {
 	s.Validation = val
 }
 
-// The input kind the client should render. Encodes the formats that
-// have a matching HTML input type (email, url, date). For other
-// formats (e.g. uuid) the type is `text` and `validation.format`
-// carries the rule.
+// The input kind the client should render. Encodes the formats and
+// JSON types that map to a familiar HTML input: `email`, `url`,
+// `date` come from `format`; `checkbox` from JSON `type: boolean`;
+// `select` from a closed `enum`. For other formats (e.g. uuid) the
+// type is `text` and `validation.format` carries the rule.
 type FieldType string
 
 const (
@@ -2473,6 +2475,8 @@ const (
 	FieldTypeURL      FieldType = "url"
 	FieldTypeDate     FieldType = "date"
 	FieldTypeHidden   FieldType = "hidden"
+	FieldTypeCheckbox FieldType = "checkbox"
+	FieldTypeSelect   FieldType = "select"
 )
 
 // AllValues returns all FieldType values.
@@ -2486,6 +2490,8 @@ func (FieldType) AllValues() []FieldType {
 		FieldTypeURL,
 		FieldTypeDate,
 		FieldTypeHidden,
+		FieldTypeCheckbox,
+		FieldTypeSelect,
 	}
 }
 
@@ -2507,6 +2513,10 @@ func (s FieldType) MarshalText() ([]byte, error) {
 	case FieldTypeDate:
 		return []byte(s), nil
 	case FieldTypeHidden:
+		return []byte(s), nil
+	case FieldTypeCheckbox:
+		return []byte(s), nil
+	case FieldTypeSelect:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -2540,6 +2550,12 @@ func (s *FieldType) UnmarshalText(data []byte) error {
 	case FieldTypeHidden:
 		*s = FieldTypeHidden
 		return nil
+	case FieldTypeCheckbox:
+		*s = FieldTypeCheckbox
+		return nil
+	case FieldTypeSelect:
+		*s = FieldTypeSelect
+		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
@@ -2563,6 +2579,11 @@ type FieldValidation struct {
 	MinLength OptInt `json:"min_length"`
 	// Maximum length in characters (inclusive). Mirrors `maxLength`.
 	MaxLength OptInt `json:"max_length"`
+	// Closed list of allowed values. Mirrors the JSON Schema `enum`
+	// keyword on the underlying user property. When `type` is
+	// `select` the client renders these as options; for other types
+	// the rule still applies as a membership check.
+	Enum []string `json:"enum"`
 }
 
 // GetFormat returns the value of Format.
@@ -2580,6 +2601,11 @@ func (s *FieldValidation) GetMaxLength() OptInt {
 	return s.MaxLength
 }
 
+// GetEnum returns the value of Enum.
+func (s *FieldValidation) GetEnum() []string {
+	return s.Enum
+}
+
 // SetFormat sets the value of Format.
 func (s *FieldValidation) SetFormat(val OptFieldValidationFormat) {
 	s.Format = val
@@ -2593,6 +2619,11 @@ func (s *FieldValidation) SetMinLength(val OptInt) {
 // SetMaxLength sets the value of MaxLength.
 func (s *FieldValidation) SetMaxLength(val OptInt) {
 	s.MaxLength = val
+}
+
+// SetEnum sets the value of Enum.
+func (s *FieldValidation) SetEnum(val []string) {
+	s.Enum = val
 }
 
 // Semantic format the value must match. Values mirror the user
