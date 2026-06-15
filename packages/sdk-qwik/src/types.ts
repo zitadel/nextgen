@@ -1,30 +1,35 @@
 import type { CreateFlow201Step } from '@zitadel/api/generated/model';
 
-/** `detail` payloads for the widgets' public `zitadel-*` events. */
+/** Payload of the `zitadel-flow-step` event. */
 export interface ZitadelFlowStepDetail {
-  step: CreateFlow201Step;
-}
-export interface ZitadelFlowInputDetail {
-  name: string;
-  value: string;
-}
-export interface ZitadelFlowCompleteDetail {
-  behavior: unknown;
-  redirect_uri?: string;
-  handoff_token?: string;
-  handoff_token_expires_at?: string;
-}
-export interface ZitadelFlowErrorDetail {
-  message: string;
-}
-export interface ZitadelSignoutDetail {
-  name: string;
-  email: string;
+  readonly step: CreateFlow201Step;
 }
 
-/**
- * Re-exports shared SDK types from `@zitadel/sdk-core`.
- */
+/** Payload of the `zitadel-flow-input` event. */
+export interface ZitadelFlowInputDetail {
+  readonly name: string;
+  readonly value: string;
+}
+
+/** Payload of the `zitadel-flow-complete` event. */
+export interface ZitadelFlowCompleteDetail {
+  readonly behavior: unknown;
+  readonly redirect_uri?: string;
+  readonly handoff_token?: string;
+  readonly handoff_token_expires_at?: string;
+}
+
+/** Payload of the `zitadel-flow-error` event. */
+export interface ZitadelFlowErrorDetail {
+  readonly message: string;
+}
+
+/** Payload of the `zitadel-signout` event. */
+export interface ZitadelSignoutDetail {
+  readonly name: string;
+  readonly email: string;
+}
+
 export type {
   NextgenSession,
   AuthState,

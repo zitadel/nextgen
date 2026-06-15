@@ -1,5 +1,5 @@
 <script lang="ts">
-  import '@zitadel/components'; // registers <zitadel-login>
+  import '@zitadel/components';
   import type { ZitadelProject } from '@zitadel/api/config';
 
   import type {
@@ -7,6 +7,7 @@
     ZitadelFlowErrorDetail,
     ZitadelFlowInputDetail,
     ZitadelFlowStepDetail,
+    ZitadelLoginProps,
   } from './types';
 
   let {
@@ -17,39 +18,37 @@
     onFlowInput,
     onFlowComplete,
     onFlowError,
-  }: {
-    project: ZitadelProject;
-    purpose?: string;
-    postSignInUrl?: string;
-    onFlowStep?: (detail: ZitadelFlowStepDetail) => void;
-    onFlowInput?: (detail: ZitadelFlowInputDetail) => void;
-    onFlowComplete?: (detail: ZitadelFlowCompleteDetail) => void;
-    onFlowError?: (detail: ZitadelFlowErrorDetail) => void;
-  } = $props();
+  }: ZitadelLoginProps = $props();
 
   let el: HTMLElement | undefined = $state();
 
-  // object handle → DOM property (timing-proof, set after mount)
   $effect(() => {
-    if (el) (el as unknown as { project?: ZitadelProject }).project = project;
+    if (el) {
+      (el as unknown as { project?: ZitadelProject }).project = project;
+    }
   });
 
-  // zitadel-* custom events → optional callbacks, with cleanup
   $effect(() => {
-    if (!el) return;
-    const step = (e: Event) => onFlowStep?.((e as CustomEvent<ZitadelFlowStepDetail>).detail);
-    const input = (e: Event) => onFlowInput?.((e as CustomEvent<ZitadelFlowInputDetail>).detail);
-    const done = (e: Event) => onFlowComplete?.((e as CustomEvent<ZitadelFlowCompleteDetail>).detail);
-    const err = (e: Event) => onFlowError?.((e as CustomEvent<ZitadelFlowErrorDetail>).detail);
+    if (!el) {
+      return;
+    }
+    const step = (event: Event): void =>
+      onFlowStep?.((event as CustomEvent<ZitadelFlowStepDetail>).detail);
+    const input = (event: Event): void =>
+      onFlowInput?.((event as CustomEvent<ZitadelFlowInputDetail>).detail);
+    const complete = (event: Event): void =>
+      onFlowComplete?.((event as CustomEvent<ZitadelFlowCompleteDetail>).detail);
+    const error = (event: Event): void =>
+      onFlowError?.((event as CustomEvent<ZitadelFlowErrorDetail>).detail);
     el.addEventListener('zitadel-flow-step', step);
     el.addEventListener('zitadel-flow-input', input);
-    el.addEventListener('zitadel-flow-complete', done);
-    el.addEventListener('zitadel-flow-error', err);
+    el.addEventListener('zitadel-flow-complete', complete);
+    el.addEventListener('zitadel-flow-error', error);
     return () => {
       el?.removeEventListener('zitadel-flow-step', step);
       el?.removeEventListener('zitadel-flow-input', input);
-      el?.removeEventListener('zitadel-flow-complete', done);
-      el?.removeEventListener('zitadel-flow-error', err);
+      el?.removeEventListener('zitadel-flow-complete', complete);
+      el?.removeEventListener('zitadel-flow-error', error);
     };
   });
 </script>

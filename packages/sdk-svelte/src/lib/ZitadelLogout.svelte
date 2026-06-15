@@ -1,30 +1,29 @@
 <script lang="ts">
-  import '@zitadel/components'; // registers <zitadel-logout>
+  import '@zitadel/components';
   import type { ZitadelProject } from '@zitadel/api/config';
 
-  import type { ZitadelSignoutDetail } from './types';
+  import type { ZitadelLogoutProps, ZitadelSignoutDetail } from './types';
 
-  let {
-    project,
-    postSignOutUrl,
-    onSignout,
-  }: {
-    project: ZitadelProject;
-    postSignOutUrl?: string;
-    onSignout?: (detail: ZitadelSignoutDetail) => void;
-  } = $props();
+  let { project, postSignOutUrl, onSignout }: ZitadelLogoutProps = $props();
 
   let el: HTMLElement | undefined = $state();
 
   $effect(() => {
-    if (el) (el as unknown as { project?: ZitadelProject }).project = project;
+    if (el) {
+      (el as unknown as { project?: ZitadelProject }).project = project;
+    }
   });
 
   $effect(() => {
-    if (!el) return;
-    const signout = (e: Event) => onSignout?.((e as CustomEvent<ZitadelSignoutDetail>).detail);
+    if (!el) {
+      return;
+    }
+    const signout = (event: Event): void =>
+      onSignout?.((event as CustomEvent<ZitadelSignoutDetail>).detail);
     el.addEventListener('zitadel-signout', signout);
-    return () => el?.removeEventListener('zitadel-signout', signout);
+    return () => {
+      el?.removeEventListener('zitadel-signout', signout);
+    };
   });
 </script>
 

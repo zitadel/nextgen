@@ -1,7 +1,5 @@
 import type { JSX } from 'solid-js';
 
-// Registers <zitadel-login> / <zitadel-logout> with the browser, before render,
-// so Solid binds `project` as a DOM property on an upgraded element.
 import '@zitadel/components';
 import {
   configureZitadel,
@@ -19,12 +17,7 @@ import type {
   ZitadelSignoutDetail,
 } from './types';
 
-// Teach Solid's JSX about the elements, the explicit `project` property, and the
-// `zitadel-*` custom events (prop:/on: keys declared directly so the
-// declaration build is self-contained).
 declare module 'solid-js' {
-  // Solid exposes its JSX types through the `JSX` namespace; reopening it is the
-  // only way to register custom elements + their prop:/on: keys.
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {
@@ -60,20 +53,21 @@ export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
 export * from './types';
 
+/** Props for {@link ZitadelLogin}. */
 export interface ZitadelLoginProps {
-  project: ZitadelProject;
-  purpose?: string;
-  postSignInUrl?: string;
-  onFlowStep?: (detail: ZitadelFlowStepDetail) => void;
-  onFlowInput?: (detail: ZitadelFlowInputDetail) => void;
-  onFlowComplete?: (detail: ZitadelFlowCompleteDetail) => void;
-  onFlowError?: (detail: ZitadelFlowErrorDetail) => void;
+  readonly project: ZitadelProject;
+  readonly purpose?: string;
+  readonly postSignInUrl?: string;
+  readonly onFlowStep?: (detail: ZitadelFlowStepDetail) => void;
+  readonly onFlowInput?: (detail: ZitadelFlowInputDetail) => void;
+  readonly onFlowComplete?: (detail: ZitadelFlowCompleteDetail) => void;
+  readonly onFlowError?: (detail: ZitadelFlowErrorDetail) => void;
 }
 
 /**
- * Solid wrapper for the `<zitadel-login>` Lit web component. Binds the SDK
- * `project` handle as a DOM property via Solid's `prop:` namespace, and surfaces
- * the widget's `zitadel-*` events as optional callbacks.
+ * Solid component wrapping the `<zitadel-login>` web component. Binds the
+ * {@link ZitadelProject} handle as a DOM property and forwards the widget's
+ * `zitadel-*` events as optional callbacks.
  */
 export function ZitadelLogin(props: ZitadelLoginProps): JSX.Element {
   return (
@@ -89,13 +83,18 @@ export function ZitadelLogin(props: ZitadelLoginProps): JSX.Element {
   );
 }
 
+/** Props for {@link ZitadelLogout}. */
 export interface ZitadelLogoutProps {
-  project: ZitadelProject;
-  postSignOutUrl?: string;
-  onSignout?: (detail: ZitadelSignoutDetail) => void;
+  readonly project: ZitadelProject;
+  readonly postSignOutUrl?: string;
+  readonly onSignout?: (detail: ZitadelSignoutDetail) => void;
 }
 
-/** Solid wrapper for the `<zitadel-logout>` Lit web component. */
+/**
+ * Solid component wrapping the `<zitadel-logout>` web component. Binds the
+ * {@link ZitadelProject} handle as a DOM property and forwards the widget's
+ * `zitadel-signout` event as an optional callback.
+ */
 export function ZitadelLogout(props: ZitadelLogoutProps): JSX.Element {
   return (
     <zitadel-logout

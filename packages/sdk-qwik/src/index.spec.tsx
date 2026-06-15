@@ -1,16 +1,13 @@
 // @vitest-environment jsdom
 import { render } from '@builder.io/qwik';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-// Register the real custom elements so the rendered tags upgrade in jsdom.
 import '@zitadel/components';
 
 import { ZitadelLogin, ZitadelLogout } from './index';
 
-// A representative project handle (structurally a ZitadelProject).
 const project = { projectId: 'proj-test', proxyPath: '/__nextgen' };
 
 beforeEach(() => {
-  // The widget starts a flow on mount; stub fetch so the attempt fails quietly.
   vi.stubGlobal(
     'fetch',
     vi.fn(() => Promise.reject(new Error('no network'))),

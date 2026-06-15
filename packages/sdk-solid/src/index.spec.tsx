@@ -4,11 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ZitadelLogin, ZitadelLogout } from './index';
 
-// A representative project handle (structurally a ZitadelProject).
 const project = { projectId: 'proj-test', proxyPath: '/__nextgen' };
 
 beforeEach(() => {
-  // The widget starts a flow on mount; stub fetch so the attempt fails quietly.
   vi.stubGlobal(
     'fetch',
     vi.fn(() => Promise.reject(new Error('no network'))),
