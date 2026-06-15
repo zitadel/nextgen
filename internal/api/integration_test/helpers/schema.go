@@ -87,7 +87,7 @@ func (h *Harness) CreateUserSchema(t *testing.T, project *domain.Project, schema
 
 	resp, err := client.CreateSchema(t.Context(), req, params)
 	require.NoError(t, err)
-	require.IsType(t, &api.CreateSchemaResponse{}, resp)
+	require.IsType(t, &api.CreateSchemaResponse{}, resp, MustMarshal(t, resp))
 	return resp.(*api.CreateSchemaResponse).ID
 }
 
