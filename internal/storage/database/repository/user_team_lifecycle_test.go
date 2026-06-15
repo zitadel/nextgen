@@ -41,7 +41,7 @@ func createLifecycleUser(t *testing.T, tx database.Transaction, userRepo *reposi
 		SchemaURL:            schemaURL,
 		ID:                   userID,
 		LifecycleOwnerTeamID: lifecycleOwner,
-		ParticipationTeamID:  participation,
+		InitialMembershipTeamID:  participation,
 		Attributes:           []*domain.CreateAttribute{attr},
 	}))
 }

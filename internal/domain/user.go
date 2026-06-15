@@ -23,6 +23,18 @@ const (
 	PrefixUser ResourcePrefix = "user"
 )
 
+// UserStatus is the lifecycle state of a user identity within a project.
+type UserStatus string
+
+const (
+	UserStatusActive       UserStatus = "active"
+	UserStatusSuspended    UserStatus = "suspended"
+	UserStatusDeactivated  UserStatus = "deactivated"
+	UserStatusPendingPurge UserStatus = "pending_purge"
+)
+
+func (s UserStatus) String() string { return string(s) }
+
 func ErrUserInvalid() Error {
 	return newError(PrefixUser.ErrorCodePrefix("invalid"), "user invalid", nil, nil)
 }
@@ -69,17 +81,23 @@ type CreateUser struct {
 	ProjectID string
 	SchemaURL string
 	ID        string
-	// LifecycleOwnerTeamID set => team-owned; nil => self-owned (default).
+	// LifecycleOwnerTeamID decides who manages this user's identity lifecycle (ADR 024).
+	// nil => self-owned: the user survives team deletion and owns their own deprovisioning.
+	// set => team-owned: deleting/deactivating that team can deactivate this user per policy.
 	LifecycleOwnerTeamID *string
-	// ParticipationTeamID seeds an active team_memberships row and team-scoped EAV uniqueness scope.
-	ParticipationTeamID *string
-	Attributes          []*CreateAttribute
+	// InitialMembershipTeamID is optional roster context at create time — not lifecycle ownership.
+	// When set, Create also inserts an active team_memberships row for this team and uses it as the
+	// team-scoped EAV uniqueness scope for attributes. A self-owned signup user can still set this
+	// to their default workspace team; an enterprise provisioned user may set both fields to the
+	// same tenant team, but lifecycle ownership and roster membership remain separate concerns.
+	InitialMembershipTeamID *string
+	Attributes                []*CreateAttribute
 }
 
 // AttributeTeamScope returns the team id used for team-scoped unique attributes on create.
 func (c *CreateUser) AttributeTeamScope() string {
-	if c.ParticipationTeamID != nil && *c.ParticipationTeamID != "" {
-		return *c.ParticipationTeamID
+	if c.InitialMembershipTeamID != nil && *c.InitialMembershipTeamID != "" {
+		return *c.InitialMembershipTeamID
 	}
 	if c.LifecycleOwnerTeamID != nil && *c.LifecycleOwnerTeamID != "" {
 		return *c.LifecycleOwnerTeamID
@@ -87,7 +105,7 @@ func (c *CreateUser) AttributeTeamScope() string {
 	return ""
 }
 
-func NewCreateUser(projectID string, participationTeamID *string, schemabs []byte, muser map[string]any) (*CreateUser, error) {
+func NewCreateUser(projectID string, initialMembershipTeamID *string, schemabs []byte, muser map[string]any) (*CreateUser, error) {
 	schemaURL, err := SchemaFromUserMap(muser)
 	if err != nil {
 		return nil, err
@@ -121,11 +139,11 @@ func NewCreateUser(projectID string, participationTeamID *string, schemabs []byt
 	}
 
 	return &CreateUser{
-		ProjectID:           projectID,
-		ParticipationTeamID: participationTeamID,
-		ID:                  id,
-		SchemaURL:           schemaURL,
-		Attributes:          attrs,
+		ProjectID:               projectID,
+		InitialMembershipTeamID: initialMembershipTeamID,
+		ID:                      id,
+		SchemaURL:               schemaURL,
+		Attributes:              attrs,
 	}, nil
 }
 

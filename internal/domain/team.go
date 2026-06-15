@@ -11,6 +11,17 @@ const (
 	PrefixTeam ResourcePrefix = "team"
 )
 
+// TeamStatus is the lifecycle state of a team within a project.
+type TeamStatus string
+
+const (
+	TeamStatusActive       TeamStatus = "active"
+	TeamStatusDeactivated  TeamStatus = "deactivated"
+	TeamStatusPendingPurge TeamStatus = "pending_purge"
+)
+
+func (s TeamStatus) String() string { return string(s) }
+
 func ErrTeamNotFound() Error {
 	return newError(PrefixTeam.ErrorCodePrefix("team_not_found"), "team not found", nil, nil)
 }

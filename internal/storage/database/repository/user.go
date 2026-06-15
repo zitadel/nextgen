@@ -149,12 +149,14 @@ func WithUserScalarList(project string, filters []UserListScalarFilter, teamScop
 }
 
 func (r *UserRepository) Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error {
-	wherePart := database.NewStatementBuilder(" WHERE ")
-	condition.Write(wherePart)
-	_, err := client.Exec(ctx,
-		`DELETE FROM zitadel_nextgen.team_memberships WHERE (project_id, user_id) IN (SELECT project_id, id FROM zitadel_nextgen.users`+wherePart.String()+`)`,
-		wherePart.Args()...,
+	builder := database.NewStatementBuilder(
+		"DELETE FROM zitadel_nextgen.team_memberships WHERE (project_id, user_id) IN (SELECT project_id, id FROM ",
 	)
+	builder.WriteString(userTable)
+	builder.WriteString(" WHERE ")
+	condition.Write(builder)
+	builder.WriteString(")")
+	_, err := client.Exec(ctx, builder.String(), builder.Args()...)
 	if err != nil {
 		return err
 	}
@@ -238,13 +240,13 @@ func (r *UserRepository) Create(ctx context.Context, client database.QueryExecut
 	if err != nil {
 		return err
 	}
-	if user.ParticipationTeamID == nil || *user.ParticipationTeamID == "" {
+	if user.InitialMembershipTeamID == nil || *user.InitialMembershipTeamID == "" {
 		return nil
 	}
 	membershipRepo := NewTeamMembershipRepository(client)
 	return membershipRepo.Create(ctx, client, &domain.TeamMembership{
 		ProjectID: user.ProjectID,
-		TeamID:    *user.ParticipationTeamID,
+		TeamID:    *user.InitialMembershipTeamID,
 		UserID:    user.ID,
 		Status:    domain.MembershipStatusActive,
 	})

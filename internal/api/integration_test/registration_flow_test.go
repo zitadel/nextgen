@@ -76,7 +76,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 		ProjectID:           project.ID,
 		SchemaURL:           userSchemaURL.String(),
 		ID:                  userID,
-		ParticipationTeamID: &team.ID,
+		InitialMembershipTeamID: &team.ID,
 		Attributes:          []*domain.CreateAttribute{emailAttr},
 	}))
 

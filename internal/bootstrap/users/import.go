@@ -84,7 +84,7 @@ func importFile(
 		ProjectID:           doc.Header.ProjectID,
 		SchemaURL:           doc.Header.SchemaURL,
 		ID:                  doc.Header.ID,
-		ParticipationTeamID: participationTeamID,
+		InitialMembershipTeamID: participationTeamID,
 		Attributes:          attrs,
 	}); err != nil {
 		return fmt.Errorf("create user: %w", err)

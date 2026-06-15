@@ -51,7 +51,7 @@ func TestUserRepository_CreateGetListDelete(t *testing.T) {
 		ProjectID:           pid,
 		SchemaURL:           schemaURL,
 		ID:                  userID,
-		ParticipationTeamID: &teamCopy,
+		InitialMembershipTeamID: &teamCopy,
 		Attributes:          []*domain.CreateAttribute{attr1, attr2, attrEmptyArray, attrEmptyObj},
 	}
 	require.NoError(t, repo.Create(ctx, tx, create))
@@ -177,7 +177,7 @@ func TestUserRepository_AttributesCondition(t *testing.T) {
 			ProjectID:           pid,
 			SchemaURL:           schemaURL,
 			ID:                  id,
-			ParticipationTeamID: &teamCopy,
+			InitialMembershipTeamID: &teamCopy,
 			Attributes:          []*domain.CreateAttribute{a1, a2},
 		}))
 	}

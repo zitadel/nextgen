@@ -29,7 +29,7 @@ func insertTokenTestUser(t *testing.T, ctx context.Context, tx database.QueryExe
 		ProjectID:           pid,
 		SchemaURL:           schemaURL,
 		ID:                  userID,
-		ParticipationTeamID: &teamCopy,
+		InitialMembershipTeamID: &teamCopy,
 		Attributes:          []*domain.CreateAttribute{attr},
 	}))
 }
