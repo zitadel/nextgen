@@ -11,9 +11,9 @@ import (
 
 func (h *Harness) EnsureAPIClient(t *testing.T, projectID string) *api.Client {
 	t.Helper()
-	serv := h.EnsureTestServer(t)
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	serv := h.EnsureTestServer(t)
 	if h.apiClients == nil {
 		h.apiClients = make(map[string]*api.Client)
 	}
@@ -31,9 +31,9 @@ func (h *Harness) EnsureAPIClient(t *testing.T, projectID string) *api.Client {
 
 func (h *Harness) EnsureAnonymousAPIClient(t *testing.T) *api.Client {
 	t.Helper()
-	serv := h.EnsureTestServer(t)
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	serv := h.EnsureTestServer(t)
 	if h.anonymousClient == nil {
 		client, err := api.NewClient(
 			serv.URL,
