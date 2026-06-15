@@ -10,15 +10,19 @@
  * State graph:
  *
  *   idle --START(login)----> identifier (email+password, Figma 6593:141985)
- *                                       --SUBMIT(submit)--> passkey-upsell
+ *                                       --SUBMIT(submit)--> done
  *                                       --SUBMIT(recover)--> recover --SUBMIT--> identifier
  *                                       --SUBMIT(register)--> register
  *                                       --SUBMIT(passkey)--> passkey-login
  *                                       --SUBMIT(sso_provider_id)--> sso-redirect
- *      \--START(register)--> register --SUBMIT--> passkey-upsell
+ *      \--START(register)--> register --SUBMIT--> done
  *
  *   password -- legacy split step; not reachable from any START transition;
  *               kept so tests can target it directly via actor injection
+ *   passkey-upsell / passkey-setup -- legacy upsell pair; the default flow no
+ *               longer routes through them (passkey registration is offered
+ *               up front instead). Kept so tests can target them directly
+ *               via actor injection.
  *   passkey-upsell --SUBMIT(skip)--> done
  *   passkey-upsell --SUBMIT(*)----> passkey-setup --SUBMIT--> done
  *   passkey-login --SUBMIT--> done
@@ -138,7 +142,7 @@ export const flowMachine = createMachine({
             actions: [captureFields, rotateToken],
           },
           {
-            target: "passkey-upsell",
+            target: "done",
             actions: [captureFields, rotateToken],
           },
         ],
@@ -146,7 +150,7 @@ export const flowMachine = createMachine({
     },
     register: {
       on: {
-        SUBMIT: { target: "passkey-upsell", actions: [captureFields, rotateToken] },
+        SUBMIT: { target: "done", actions: [captureFields, rotateToken] },
       },
     },
     recover: {

@@ -5,7 +5,10 @@
   <zl-card>
     <h1 slot="header" class="zl-card-title">{{ step.texts.title_key | t: identity.display_name }}</h1>
     {% if step.texts.description_key %}
-      <p slot="header" class="zl-card-subtitle">{{ step.texts.description_key | t: identity.display_name }}</p>
+      {% assign card_subtitle = step.texts.description_key | t: identity.display_name %}
+      {% if card_subtitle != "" %}
+        <p slot="header" class="zl-card-subtitle">{{ card_subtitle }}</p>
+      {% endif %}
     {% endif %}
 
     {% if errors and errors.size > 0 %}
@@ -49,9 +52,9 @@
       </zl-field>
     {% endfor %}
 
-    {% if fields_by_name.email and fields_by_name.password and step.name == 'identifier' %}
+    {% if actions_by_name.recover %}
       <p class="zl-card-forgot">
-        <a href="#" class="zl-card-forgot__link" data-action="recover">{{ 'action.forgot_password' | t }}</a>
+        <a href="#" class="zl-card-forgot__link" data-action="recover">{{ actions_by_name.recover.text_key | t }}</a>
       </p>
     {% endif %}
 
@@ -71,7 +74,7 @@
     {% endfor %}
 
     {% for a in actions %}
-      {% unless a.primary or a.name == 'passkey' or a.name == 'register' or a.name == 'sign_in' %}
+      {% unless a.primary or a.name == 'passkey' or a.name == 'register' or a.name == 'sign_in' or a.name == 'recover' %}
         <zl-button
           hierarchy="secondary"
           size="medium"

@@ -10,7 +10,7 @@ test("password-only registration, logout, and password login work in a fresh Nex
 
   await expectProtectedRouteToRedirect(page);
   await page.goto("/login");
-  await registerWithPassword(page, email, password, { setupPasskey: false });
+  await registerWithPassword(page, email, password);
   await expectSignedIn(page);
   await expectSessionCookie(page);
 
@@ -39,29 +39,6 @@ if (process.env.JOURNEY_ENABLE_PASSKEY !== "0") {
     await expectSessionCookie(page);
   });
 
-  test("password-plus-passkey registration supports password and passkey login", async ({
-    page,
-  }) => {
-    await enableVirtualAuthenticator(page);
-
-    const email = uniqueEmail("password-passkey");
-    const password = "Correct-Horse-43!";
-
-    await page.goto("/login");
-    await registerWithPassword(page, email, password, { setupPasskey: true });
-    await expectSignedIn(page);
-    await expectSessionCookie(page);
-
-    await logout(page);
-    await loginWithPassword(page, email, password);
-    await expectSignedIn(page);
-    await expectSessionCookie(page);
-
-    await logout(page);
-    await loginWithPasskey(page, email);
-    await expectSignedIn(page);
-    await expectSessionCookie(page);
-  });
 }
 
 async function expectProtectedRouteToRedirect(page: Page): Promise<void> {
@@ -73,7 +50,6 @@ async function registerWithPassword(
   page: Page,
   email: string,
   password: string,
-  options: { setupPasskey: boolean },
 ): Promise<void> {
   await fillEmail(page, email);
   await advanceUnknownUserToRegistration(page);
@@ -82,8 +58,9 @@ async function registerWithPassword(
   await fillProfileFieldsIfVisible(page);
   await choosePasswordRegistration(page);
   await fillPassword(page, password);
+  // Registration completes directly — the default flow has no passkey
+  // upsell step; passkey registration is offered up front instead.
   await clickSubmit(page);
-  await completePasskeyUpsell(page, options.setupPasskey);
 }
 
 async function loginWithPassword(
@@ -171,22 +148,6 @@ async function choosePasswordRegistration(page: Page): Promise<void> {
     return;
   }
   await clickAction(page, /continue.*password|password/i, ["submit"]);
-}
-
-async function completePasskeyUpsell(
-  page: Page,
-  setupPasskey: boolean,
-): Promise<void> {
-  await expect(
-    page.getByRole("heading", { name: /sign in faster|passkey/i }),
-  ).toBeVisible({ timeout: 30_000 });
-
-  if (setupPasskey) {
-    await clickAction(page, /set up.*passkey|passkey/i, ["passkey_register"]);
-    return;
-  }
-
-  await clickAction(page, /skip/i, ["skip"]);
 }
 
 async function expectRegistrationChoice(page: Page): Promise<void> {

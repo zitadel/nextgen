@@ -62,11 +62,8 @@ async function waitFor<T>(probe: () => T | null | undefined, timeout = 1500): Pr
   throw new Error("waitFor timed out");
 }
 
-/** Walks the api-mock login path: combined sign-in → passkey-upsell → done. */
-async function advanceMockLoginFlow(
-  element: ZitadelLogin,
-  email = "alice@acme.com",
-): Promise<void> {
+/** Walks the api-mock login path: combined sign-in → done. */
+async function advanceMockLoginFlow(element: ZitadelLogin, email = "alice@acme.com"): Promise<void> {
   element.shadowRoot?.dispatchEvent(
     new CustomEvent("zl-input", {
       bubbles: true,
@@ -86,17 +83,6 @@ async function advanceMockLoginFlow(
       bubbles: true,
       composed: true,
       detail: { action: "submit" },
-    }),
-  );
-  await waitFor(() => {
-    const title = element.shadowRoot?.querySelector(".zl-card-title");
-    return title?.textContent?.includes("Sign in faster") ? title : null;
-  });
-  element.shadowRoot?.dispatchEvent(
-    new CustomEvent("zl-submit", {
-      bubbles: true,
-      composed: true,
-      detail: { action: "skip" },
     }),
   );
 }
@@ -211,7 +197,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
 
     await waitFor(() => {
       const title = element.shadowRoot?.querySelector(".zl-card-title");
-      return title?.textContent?.includes("Sign in faster") ? title : null;
+      return title?.textContent?.includes("You're signed in") ? title : null;
     });
 
     const submits = mock
