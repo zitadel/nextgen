@@ -49,8 +49,9 @@ Secrets").
   Playwright project. It installs local package tarballs through a temporary
   registry and verifies CLI setup plus real registration/login flows.
 - `packages/components/` contains shared Lit components.
-- `packages/sdk-core/`, `packages/sdk-next/`, and `packages/sdk-nuxt/` contain
-  public TypeScript SDKs.
+- `packages/sdk-core/`, `packages/sdk-next/`, `packages/sdk-nuxt/`,
+  `packages/sdk-react/`, `packages/sdk-vue/`, and `packages/sdk-angular/`
+  contain public TypeScript SDKs.
 - `packages/api-mock/` contains the in-process MSW handlers and standalone
   mock auth server used by demos and e2e tests.
 - `packages/lint/` contains the local Nx plugin that infers Oxlint targets.
@@ -91,6 +92,14 @@ builds `ghcr.io/zitadel/nextgen:local-dev` through GoReleaser's single-target
 build when neither `--image` nor `ZITADEL_LOCAL_IMAGE` is provided, then invokes
 the local CLI against that image.
 
+`corepack pnpm run cli -- setup ...` is also a contributor exception for manual
+human and agent testing. The wrapper builds and packs the public workspace npm
+packages, publishes them to a persistent local Verdaccio registry under
+`tmp/cli-local-registry`, and forwards npm registry config so the generated app
+installs local `@zitadel/*` tarballs instead of public npm. Set
+`ZITADEL_CLI_USE_PUBLIC_PACKAGES=1` only when intentionally testing published
+packages.
+
 ## Local Checks
 
 Use Node.js from `.nvmrc` and the pinned pnpm version from `package.json`.
@@ -107,6 +116,8 @@ workflows.
 
 Use `corepack pnpm run check -- --full` for slower CI-parity phases and
 `corepack pnpm run check -- --only <phase>` to rerun one named phase.
+Use `corepack pnpm run check -- --only release` after touching Changesets,
+GoReleaser, release workflows, or alpha train behavior.
 
 Prefer Nx project targets for narrow package work, for example
 `corepack pnpm nx test @zitadel/cli`.
@@ -134,13 +145,17 @@ The local reproduction command for the fresh-app consumer journey gate is:
 corepack pnpm run journey
 ```
 
-This runner requires Docker for Verdaccio. By default it starts the backend from
-source with embedded Postgres, ensures the Playwright Chromium browsers are
-installed, builds and packs local npm packages with pnpm, creates a temporary
-Next.js app outside the repo, runs CLI setup through npm, starts the generated
-app on `localhost`, and runs Playwright with one worker. Use
-`-- --backend image --image <docker-tag>` to run the backend through the local
-compose profile for image parity.
+This runner requires Docker for Verdaccio and the CLI-managed local runtime. By
+default it builds a local runtime image, ensures the Playwright Chromium
+browsers are installed, builds and packs local npm packages with pnpm, creates
+an empty app directory outside the repo, runs `npx @zitadel/cli@alpha doctor`,
+`start`, and `setup --framework next --server local`, starts the generated app
+on `localhost`, and runs Playwright with one worker. Use
+`-- --image <docker-tag>` to reuse an existing local runtime image.
+
+Use `corepack pnpm run journey` for deterministic CI-style proof of the
+fresh-app path. Use `corepack pnpm run cli -- ...` for manual browser or agent
+experiments against the same local package train.
 
 In CI the dedicated `node-e2e` job (in `.github/workflows/ci.yml`) gates merges
 on the checked-in demo integrations. The separate `consumer-journey-e2e` job is
@@ -167,7 +182,7 @@ upward**. When deciding where a new test belongs:
 
 The consumer journey suite is the exception to the checked-in demo ownership
 rule: it belongs in `apps/cli-journey-e2e/` and must exercise a freshly
-generated app because it protects the real CLI onboarding path.
+generated app because it protects the customer local setup path.
 
 A new test belongs at e2e level only when the boundary it covers is
 exclusively the framework integration (middleware, cookie origin, full
@@ -205,15 +220,23 @@ For customer-local runtime workflows, agents should prefer
 
 ## Release, Licensing, And Secrets
 
-- PR titles must pass the Semantic PR check. Use the conventional format
-  `<type>(optional-scope): <summary>` and treat `.github/semantic.yml` as the
+- PR titles must pass the Semantic PR check. Before publishing, opening, or
+  renaming a PR, inspect `.github/semantic.yml` and use the conventional format
+  `<type>(optional-scope): <summary>`. Treat `.github/semantic.yml` as the
   source of truth for allowed types and scopes. Scopes are optional; omit the
-  scope instead of inventing one. For documentation-only changes, use the
-  `docs` type, for example `docs: add preview status disclaimer`.
+  scope when unsure or when no allowed scope fits. Do not invent scopes. For
+  documentation-only changes, use the `docs` type, for example
+  `docs: add preview status disclaimer`.
+- Agent-created or agent-updated PRs must include a concise description before
+  handoff. Use sections for `Summary`, `Validation`,
+  `Release notes / changeset`, and `Notes`. List the exact validation commands
+  run; if validation was not run, say so explicitly. Mention changeset status
+  for user-visible package changes.
 - User-visible changes to a public npm package need a changeset. The public
   packages are `@zitadel/cli` (`apps/cli/`), `@zitadel/api`,
-  `@zitadel/components`, `@zitadel/sdk-core`, `@zitadel/sdk-next`, and
-  `@zitadel/sdk-nuxt`. CI fails a PR that touches them without one
+  `@zitadel/components`, `@zitadel/sdk-core`, `@zitadel/sdk-next`,
+  `@zitadel/sdk-nuxt`, `@zitadel/sdk-react`, `@zitadel/sdk-vue`, and
+  `@zitadel/sdk-angular`. CI fails a PR that touches them without one
   (`changeset-check` in `.github/workflows/ci.yml`).
 - Add a changeset by writing the file directly — do not depend on the
   interactive `pnpm changeset` prompt. Create `.changeset/<short-slug>.md`:
@@ -228,8 +251,9 @@ For customer-local runtime workflows, agents should prefer
 
   List only public package names; pick `patch` (fixes), `minor` (features), or
   `major` (breaking). The repo is in `alpha` prerelease mode
-  (`.changeset/pre.json`), so versions cut as `X.Y.Z-alpha.N` automatically — no
-  extra action needed.
+  (`.changeset/pre.json`) and public packages are in one fixed group, so
+  versions cut as one `X.Y.Z-alpha.N` train automatically — no extra action
+  needed.
 
 - For changes that release nothing (docs, tests, CI, chores), add an empty
   changeset: `corepack pnpm changeset --empty`.

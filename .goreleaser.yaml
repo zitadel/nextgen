@@ -44,8 +44,9 @@ dockers_v2:
       - 'ghcr.io/zitadel/nextgen'
     tags:
       - '{{ .Version }}'
-      # Skip `latest` for snapshots so they don't clobber the published tag.
-      - '{{ if not .IsSnapshot }}latest{{ end }}'
+      # Only stable releases move the convenience tag. Alpha/beta/rc trains
+      # must stay on their immutable version tag.
+      - '{{ if and (not .IsSnapshot) (eq .Prerelease "") }}latest{{ end }}'
     platforms:
       - linux/amd64
       - linux/arm64
@@ -70,3 +71,5 @@ changelog:
 
 release:
   draft: true
+  prerelease: auto
+  make_latest: '{{ if .Prerelease }}false{{ else }}true{{ end }}'

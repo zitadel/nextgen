@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  dependencyVersionMajor,
   hasDependency,
   readPackageJson,
   type PackageJson,
@@ -59,5 +60,13 @@ describe("hasDependency", () => {
 
   it("returns false when there are no dependency maps at all", () => {
     expect(hasDependency({}, "next")).toBe(false);
+  });
+});
+
+describe("dependencyVersionMajor", () => {
+  it("extracts the first numeric major from a dependency spec", () => {
+    expect(dependencyVersionMajor({ dependencies: { next: "^16.2.4" } }, "next")).toBe(16);
+    expect(dependencyVersionMajor({ devDependencies: { next: "~15.5.0" } }, "next")).toBe(15);
+    expect(dependencyVersionMajor({ dependencies: { next: "canary" } }, "next")).toBeUndefined();
   });
 });

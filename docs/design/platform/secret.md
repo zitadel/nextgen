@@ -120,7 +120,7 @@ Claim is specified in [claim-flow.md](claim-flow.md). From the secret's perspect
 
 1. **The `sk_proj_…` project secret is rotated.** The server invalidates the pre-claim value and issues a new `sk_proj_…` bound to the newly attached team. The CLI overwrites `.zitadel/secret` atomically.
 2. **The origin-scoped secret is preserved.** Its origin patterns don't change. Any CI pipeline or deploy env using it keeps working.
-3. **Nothing else moves.** `project_id` has been stable since creation. Users, factors, sessions, configs, declared issuers — all bound to `project_id` from day one. Claim attaches *ownership*, not *identity*.
+3. **Nothing else moves.** `project_id` has been stable since creation. Users, factors, sessions, configs, declared issuers — all bound to `project_id` from day one. Claim attaches *project ownership*, not user lifecycle ownership or identity containment.
 
 Post-claim `.zitadel/secret`:
 

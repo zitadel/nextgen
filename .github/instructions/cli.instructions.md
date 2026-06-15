@@ -26,5 +26,8 @@ The CLI is an agent-facing product surface. Review changes against
 - Changes to command names, flags, envelope shape, server resolution, renderer
   direction, or agent guidance should update tests, `apps/cli/SKILLS.md`, and
   the generated README command section.
+- PR descriptions for CLI changes should call out user-visible command behavior,
+  updated agent/docs surfaces, and the focused validation commands that were
+  actually run.
 - Mock behavior should be explicit and must not be presented as live platform
   behavior.

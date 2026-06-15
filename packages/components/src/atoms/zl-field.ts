@@ -77,6 +77,7 @@ export class ZlField extends LitElement {
   @property() accessor pattern: string | undefined = undefined;
   @property() accessor error = "";
   @property() accessor success = "";
+  @property({ attribute: "data-testid" }) accessor testId: string | undefined = undefined;
   @property({ attribute: "forgot-password-href" }) accessor forgotPasswordHref: string | undefined =
     undefined;
   @property({ attribute: "forgot-password-label" }) accessor forgotPasswordLabel =
@@ -159,6 +160,7 @@ export class ZlField extends LitElement {
             class="zr-field__input"
             part="input"
             id=${this.inputId}
+            data-testid=${ifDefined(this.nativeInputTestId())}
             name=${this.name}
             type=${this.type}
             .value=${live(this.value)}
@@ -286,23 +288,25 @@ export class ZlField extends LitElement {
     this.value = "";
     emit<ZlFieldInputDetail>(this, "zl-input", { name: this.name, value: this.value });
     this.syncFormState();
+    this.dispatchNativeInput();
     this.inputEl?.focus();
   };
 
   private handleInput = (event: Event): void => {
+    event.stopPropagation();
     const input = event.target as HTMLInputElement;
     this.value = input.value;
+    this.syncFormState();
     emit<ZlFieldInputDetail>(this, "zl-input", { name: this.name, value: this.value });
+    this.dispatchNativeInput(event);
   };
 
   private handleChange = (event: Event): void => {
+    event.stopPropagation();
     const input = event.target as HTMLInputElement;
     this.value = input.value;
-    // Re-dispatch the native `change` across the shadow boundary so host
-    // forms and listeners see standard form semantics. This is a DOM standard
-    // event, deliberately NOT part of the `zl-*` override contract in the
-    // manifest (which tracks only the atom's custom `zl-*` events).
-    this.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+    this.syncFormState();
+    this.dispatchNativeChange();
   };
 
   private handleKeyDown = (event: KeyboardEvent): void => {
@@ -321,6 +325,34 @@ export class ZlField extends LitElement {
       }
     }
   };
+
+  private nativeInputTestId(): string | undefined {
+    if (this.testId) {
+      return `${this.testId}-input`;
+    }
+    return this.name ? `zitadel-input-${this.name}` : undefined;
+  }
+
+  private dispatchNativeInput(source?: Event): void {
+    if (typeof InputEvent === "function") {
+      const input = source instanceof InputEvent ? source : undefined;
+      this.dispatchEvent(
+        new InputEvent("input", {
+          bubbles: true,
+          composed: true,
+          data: input?.data ?? null,
+          inputType: input?.inputType ?? "",
+          isComposing: input?.isComposing ?? false,
+        }),
+      );
+      return;
+    }
+    this.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+  }
+
+  private dispatchNativeChange(): void {
+    this.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+  }
 }
 
 export const zlFieldManifest: AtomManifest = {
@@ -334,6 +366,7 @@ export const zlFieldManifest: AtomManifest = {
     "placeholder",
     "autocomplete",
     "pattern",
+    "data-testid",
     "required",
     "disabled",
     "invalid",

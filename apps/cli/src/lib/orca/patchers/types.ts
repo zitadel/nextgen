@@ -64,6 +64,10 @@ export type PatchResult = Readonly<{
  *   `eject` does NOT modify `package.json` (the lockfile and other deps might
  *   conflict), but surfaces an `npm uninstall <name>` line in `next_commands`
  *   so the user can finish the revert manually.
+ * - `configEdits` — user config files the integration merged into via an `edit`
+ *   op (e.g. `vite.config.ts`, `angular.json`, `nuxt.config.ts`). `eject` cannot
+ *   reverse an in-place merge, so it surfaces these as manual cleanup steps
+ *   rather than deleting the whole file.
  */
 export type EjectActions = Readonly<{
   markedFiles: ReadonlyArray<string>;
@@ -71,6 +75,7 @@ export type EjectActions = Readonly<{
   directories: ReadonlyArray<string>;
   envBackups: ReadonlyArray<string>;
   dependencies: ReadonlyArray<string>;
+  configEdits: ReadonlyArray<string>;
 }>;
 
 /**

@@ -262,6 +262,21 @@ describe("DependencyCheck", () => {
 
     expect((await check.run(ctxFor(cwd))).status).toBe("pass");
   });
+
+  it("fix reclaims proxy.ts for Next 16 projects", async () => {
+    const cwd = await makeProject();
+    await writeFile(join(cwd, "package.json"), JSON.stringify({ name: "demo", dependencies: { next: "^16" } }));
+    await rm(join(cwd, "middleware.ts"));
+
+    await new DependencyCheck().fix(ctxFor(cwd));
+
+    await expect(readFile(join(cwd, "proxy.ts"), "utf8")).resolves.toContain(
+      "export function proxy(",
+    );
+    await expect(readFile(join(cwd, "middleware.ts"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+  });
 });
 
 describe("ProjectMatchCheck", () => {

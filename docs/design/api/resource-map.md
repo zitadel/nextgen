@@ -6,7 +6,7 @@
 
 All paths are shown without a version segment — versioning is header-selected via `Zitadel-Version` (see [`conventions.md`](conventions.md#versioning)).
 
-Standard REST semantics apply: `POST` on the collection creates, `GET` on the collection lists (scope required — see [`url-architecture.md`](url-architecture.md#scope-resolution-as-a-first-class-invariant)), `GET`/`PATCH`/`DELETE` on the item reads/updates/deletes. Action verbs use slash form (`POST /users/{id}/verify_email`).
+Standard REST semantics apply: `POST` on the collection creates, `GET` on the collection lists (scope required — see [`url-architecture.md`](url-architecture.md#scope-resolution-as-a-first-class-invariant)), and `GET`/`PATCH` on the item reads/updates. `DELETE` on managed resources runs the resource's lifecycle semantics first (usually deactivate/tombstone); it is not a blind SQL hard-delete. Action verbs use slash form (`POST /users/{id}/verify_email`).
 
 ---
 
@@ -47,11 +47,16 @@ POST /teams                     # body: { project_id, name, ... }
 GET  /teams?project_id=…
 ```
 
+`DELETE /teams/{id}` deactivates/tombstones the team, revokes team-scoped API
+keys, and deactivates/removes memberships. Self-owned users survive. Users whose
+lifecycle owner is the deleted team are deactivated according to policy.
+See [ADR 024](../../adrs/024-user-team-lifecycle-ownership.md).
+
 ---
 
 ## Users
 
-Users live inside projects. A user in the platform project is a developer/admin; a user in a customer project is an end-user.
+Users live inside projects. A user in the platform project is a developer/admin; a user in a customer project is an end-user. Users do not live inside teams; memberships attach users to teams.
 
 ```http
 /users/{id}
@@ -66,16 +71,29 @@ POST /users                     # body: { project_id, email, ... }
 GET  /users?project_id=…&q=…&limit=…
 ```
 
+`DELETE /users/{id}` deactivates/tombstones the user, revokes sessions, tokens,
+and credentials, and deactivates memberships. Teams and resources the user
+created or administered are preserved unless a resource-specific cleanup policy
+says otherwise.
+
 ---
 
 ## Memberships
 
-One membership kind: a user is a member of a team with roles.
+One membership kind: a user is a member of a team with roles and membership
+status. Membership is team roster/status/provisioning state. FGA may consume it
+as an authorization fact, but membership is not proof that the team owns the
+user's identity lifecycle.
 
 ```http
 /team_memberships/{id}
 POST /team_memberships          # body: { team_id, user_id, roles: [...] }
+DELETE /team_memberships/{id}
 ```
+
+`DELETE /team_memberships/{id}` removes access to that team. It only
+deprovisions the user if that membership is the configured lifecycle-owner
+relationship and policy requires deprovisioning.
 
 ---
 

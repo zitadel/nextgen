@@ -172,6 +172,16 @@ describe("DevPortPrompt", () => {
 
     expect(out.devPort).toBe(4000);
   });
+
+  it("skips and keeps the flagged port when --dev-port was passed", async () => {
+    const out = await new DevPortPrompt().ask(baseAnswers({ devPort: 5000 }), {
+      ...ctx,
+      devPortFromFlag: true,
+    });
+
+    expect(out.devPort).toBe(5000);
+    expect(vi.mocked(text)).not.toHaveBeenCalled();
+  });
 });
 
 describe("PickFrameworkPrompt", () => {
