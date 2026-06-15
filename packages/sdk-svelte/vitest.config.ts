@@ -1,5 +1,5 @@
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
   plugins: [svelte()],
@@ -10,5 +10,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    // Never run the svelte-package build output (a staged copy of the spec).
+    exclude: [...configDefaults.exclude, '.svelte-kit/**'],
   },
 });

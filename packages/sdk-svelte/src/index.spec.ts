@@ -2,8 +2,8 @@
 import { flushSync, mount, unmount } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import ZitadelLogin from './ZitadelLogin.svelte';
-import ZitadelLogout from './ZitadelLogout.svelte';
+import ZitadelLogin from './lib/ZitadelLogin.svelte';
+import ZitadelLogout from './lib/ZitadelLogout.svelte';
 
 // A representative project handle (structurally a ZitadelProject).
 const project = { projectId: 'proj-test', proxyPath: '/__nextgen' };

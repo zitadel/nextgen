@@ -31,7 +31,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vite build --mode lib && tsc --emitDeclarationOnly --outDir lib-types",
+    "build": "vite build --mode lib && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "lint": "eslint ."
