@@ -11,10 +11,16 @@ import {
   type ZitadelProject,
 } from '@zitadel/api/config';
 
-type FlowEvent = CustomEvent<unknown>;
+import type {
+  ZitadelFlowCompleteDetail,
+  ZitadelFlowErrorDetail,
+  ZitadelFlowInputDetail,
+  ZitadelFlowStepDetail,
+  ZitadelSignoutDetail,
+} from './types';
 
 // Teach Solid's JSX about the elements, the explicit `project` property, and the
-// `zitadel-flow-*` custom events (prop:/on: keys declared directly so the
+// `zitadel-*` custom events (prop:/on: keys declared directly so the
 // declaration build is self-contained).
 declare module 'solid-js' {
   // Solid exposes its JSX types through the `JSX` namespace; reopening it is the
@@ -26,13 +32,25 @@ declare module 'solid-js' {
         'prop:project'?: ZitadelProject;
         purpose?: string;
         'post-sign-in-url'?: string;
-        'on:zitadel-flow-step'?: (event: FlowEvent) => void;
-        'on:zitadel-flow-complete'?: (event: FlowEvent) => void;
-        'on:zitadel-flow-error'?: (event: FlowEvent) => void;
+        'on:zitadel-flow-step'?: (
+          event: CustomEvent<ZitadelFlowStepDetail>,
+        ) => void;
+        'on:zitadel-flow-input'?: (
+          event: CustomEvent<ZitadelFlowInputDetail>,
+        ) => void;
+        'on:zitadel-flow-complete'?: (
+          event: CustomEvent<ZitadelFlowCompleteDetail>,
+        ) => void;
+        'on:zitadel-flow-error'?: (
+          event: CustomEvent<ZitadelFlowErrorDetail>,
+        ) => void;
       };
       'zitadel-logout': HTMLAttributes<HTMLElement> & {
         'prop:project'?: ZitadelProject;
         'post-sign-out-url'?: string;
+        'on:zitadel-signout'?: (
+          event: CustomEvent<ZitadelSignoutDetail>,
+        ) => void;
       };
     }
   }
@@ -46,15 +64,16 @@ export interface ZitadelLoginProps {
   project: ZitadelProject;
   purpose?: string;
   postSignInUrl?: string;
-  onFlowStep?: (detail: unknown) => void;
-  onFlowComplete?: (detail: unknown) => void;
-  onFlowError?: (detail: unknown) => void;
+  onFlowStep?: (detail: ZitadelFlowStepDetail) => void;
+  onFlowInput?: (detail: ZitadelFlowInputDetail) => void;
+  onFlowComplete?: (detail: ZitadelFlowCompleteDetail) => void;
+  onFlowError?: (detail: ZitadelFlowErrorDetail) => void;
 }
 
 /**
  * Solid wrapper for the `<zitadel-login>` Lit web component. Binds the SDK
- * `project` handle as a DOM *property* via Solid's `prop:` namespace, and
- * surfaces the widget's `zitadel-flow-*` events as optional callbacks.
+ * `project` handle as a DOM property via Solid's `prop:` namespace, and surfaces
+ * the widget's `zitadel-*` events as optional callbacks.
  */
 export function ZitadelLogin(props: ZitadelLoginProps): JSX.Element {
   return (
@@ -63,6 +82,7 @@ export function ZitadelLogin(props: ZitadelLoginProps): JSX.Element {
       purpose={props.purpose ?? 'login'}
       post-sign-in-url={props.postSignInUrl}
       on:zitadel-flow-step={(event) => props.onFlowStep?.(event.detail)}
+      on:zitadel-flow-input={(event) => props.onFlowInput?.(event.detail)}
       on:zitadel-flow-complete={(event) => props.onFlowComplete?.(event.detail)}
       on:zitadel-flow-error={(event) => props.onFlowError?.(event.detail)}
     />
@@ -72,6 +92,7 @@ export function ZitadelLogin(props: ZitadelLoginProps): JSX.Element {
 export interface ZitadelLogoutProps {
   project: ZitadelProject;
   postSignOutUrl?: string;
+  onSignout?: (detail: ZitadelSignoutDetail) => void;
 }
 
 /** Solid wrapper for the `<zitadel-logout>` Lit web component. */
@@ -80,6 +101,7 @@ export function ZitadelLogout(props: ZitadelLogoutProps): JSX.Element {
     <zitadel-logout
       prop:project={props.project}
       post-sign-out-url={props.postSignOutUrl}
+      on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
     />
   );
 }
