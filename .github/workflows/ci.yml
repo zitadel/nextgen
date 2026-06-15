@@ -141,7 +141,19 @@ jobs:
           cache: true
       # Spanner tests use a Docker testcontainer emulator, not the embedded
       # postgres binary, so no Maven binary cache is needed here.
-      - run: go test -v -tags spanner_integration -timeout=10m ./...
+      - name: Spanner integration tests
+        run: |
+          mkdir -p test-output/go
+          set -o pipefail
+          go test -json -v -p 1 -tags spanner_integration -timeout=10m ./... | tee test-output/go/spanner-integration.json
+      - name: Upload Spanner test log on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: spanner-integration-test-log
+          path: test-output/go/spanner-integration.json
+          if-no-files-found: ignore
+          retention-days: 7
 
   goreleaser-snapshot:
     runs-on: depot-ubuntu-24.04-8
