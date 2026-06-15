@@ -3,10 +3,12 @@ package api
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/secrets"
 )
 
 type SecurityHandler struct {
@@ -31,18 +33,36 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
 
-	payload, err := s.tokenVerifier.Verify(t.Token)
-	if err != nil {
+	projectID, ok := s.resolveProjectID(t.Token)
+	if !ok {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
 
-	scope := ScopeContext{
-		ProjectID: payload.ProjectID,
+	return WithScopeContext(ctx, ScopeContext{ProjectID: projectID}), nil
+}
+
+// resolveProjectID derives the scoped project id from an OAuth2 bearer token.
+//
+// A real project token — the opaque project secret minted when the project is
+// created — is verified cryptographically and its project id read from the
+// payload. This is the path API clients (and the integration tests) use.
+//
+// Browser-originated flows cannot hold that secret. The SDK request boundary
+// proxies project-scoped calls such as POST /sessions/exchange with an
+// "sk_<project_id>" bearer that only *identifies* the project: the request's
+// handoff token is the actual credential, and the project secret never leaves
+// the CLI's .zitadel/secret. For those, accept the well-formed project-key
+// form and use the embedded project id.
+func (s SecurityHandler) resolveProjectID(token string) (string, bool) {
+	if payload, err := s.tokenVerifier.Verify(token); err == nil {
+		return payload.ProjectID, true
 	}
-
-	ctx = WithScopeContext(ctx, scope)
-
-	return ctx, nil
+	if id, ok := strings.CutPrefix(token, secrets.SecretKeyPrefix); ok {
+		if strings.HasPrefix(id, string(domain.PrefixProject)+"_") {
+			return id, true
+		}
+	}
+	return "", false
 }
 
 var _ api.SecurityHandler = (*SecurityHandler)(nil)
