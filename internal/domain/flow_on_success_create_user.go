@@ -13,8 +13,8 @@ type flowUserWriter interface {
 	Create(ctx context.Context, client database.QueryExecutor, user *CreateUser) error
 }
 
-type flowUserPasswordWriter interface {
-	Create(ctx context.Context, client database.QueryExecutor, password *CreateUserPassword) error
+type flowUserPasswordSetter interface {
+	Set(ctx context.Context, client database.QueryExecutor, password *SetUserPassword) error
 }
 
 // FlowCreateUserHandler implements the `create_user` on_success:
@@ -22,11 +22,11 @@ type flowUserPasswordWriter interface {
 type FlowCreateUserHandler struct {
 	ids       idgen.Generator
 	users     flowUserWriter
-	passwords flowUserPasswordWriter
+	passwords flowUserPasswordSetter
 	hasher    FlowPasswordHasher
 }
 
-func NewFlowCreateUserHandler(ids idgen.Generator, users flowUserWriter, passwords flowUserPasswordWriter, hasher FlowPasswordHasher) *FlowCreateUserHandler {
+func NewFlowCreateUserHandler(ids idgen.Generator, users flowUserWriter, passwords flowUserPasswordSetter, hasher FlowPasswordHasher) *FlowCreateUserHandler {
 	return &FlowCreateUserHandler{ids: ids, users: users, passwords: passwords, hasher: hasher}
 }
 
@@ -84,12 +84,12 @@ func (h *FlowCreateUserHandler) Handle(ctx context.Context, client database.Quer
 		return FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: insert user: %w", err)
 	}
 
-	if err := h.passwords.Create(ctx, client, &CreateUserPassword{
+	if err := h.passwords.Set(ctx, client, &SetUserPassword{
 		ProjectID:   in.ProjectID,
 		UserID:      userID,
 		EncodedHash: encodedHash,
 	}); err != nil {
-		return FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: insert password: %w", err)
+		return FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: set password: %w", err)
 	}
 
 	return FlowOnSuccessResult{UserID: userID}, nil
