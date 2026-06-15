@@ -7,8 +7,7 @@ const ZitadelLogin = dynamic(
     const { demoProject } = await import("@/zitadel");
     await import("@zitadel/components");
     return function ZitadelLoginElement() {
-      return <zitadel-login project={demoProject} post-sign-in-url="/admin" locales={{ en: { "identifier.title": "Howdy!" } }}
-      />;
+      return <zitadel-login project={demoProject} post-sign-in-url="/admin" />;
     };
   },
   { ssr: false },
