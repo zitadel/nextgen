@@ -3,10 +3,12 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   plugins: [qwikVite()],
+  resolve: {
+    // Use the browser build so Qwik's client `render()` works under jsdom.
+    conditions: ['browser'],
+  },
   test: {
-    // Qwik's `createDOM()` provides its own DOM; the jsdom environment conflicts
-    // with it (`node.isAncestor is not a function`), so run under node.
-    environment: 'node',
+    environment: 'jsdom',
     globals: true,
   },
 });
