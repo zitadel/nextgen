@@ -10,5 +10,10 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.spec.ts"]
+  "exclude": ["src/**/*.spec.ts"],
+  "references": [
+    {
+      "path": "../api/tsconfig.lib.json"
+    }
+  ]
 }

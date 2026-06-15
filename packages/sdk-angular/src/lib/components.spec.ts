@@ -15,6 +15,15 @@ describe('ZitadelLoginComponent', () => {
     component.project = project;
     expect(component.project).toBe(project);
   });
+
+  it('emits flowStep with the event detail', () => {
+    const component = new ZitadelLoginComponent();
+    const received: unknown[] = [];
+    component.flowStep.subscribe((detail) => received.push(detail));
+    const detail = { step: { kind: 'register' } };
+    component.onFlowStep(new CustomEvent('zitadel-flow-step', { detail }));
+    expect(received).toEqual([detail]);
+  });
 });
 
 describe('ZitadelLogoutComponent', () => {
@@ -22,5 +31,14 @@ describe('ZitadelLogoutComponent', () => {
     const component = new ZitadelLogoutComponent();
     component.project = project;
     expect(component.project).toBe(project);
+  });
+
+  it('emits signout with the event detail', () => {
+    const component = new ZitadelLogoutComponent();
+    const received: unknown[] = [];
+    component.signout.subscribe((detail) => received.push(detail));
+    const detail = { name: 'Ada', email: 'ada@example.com' };
+    component.onSignout(new CustomEvent('zitadel-signout', { detail }));
+    expect(received).toEqual([detail]);
   });
 });

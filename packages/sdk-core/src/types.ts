@@ -1,10 +1,41 @@
+import type { CreateFlow201Step } from '@zitadel/api/generated/model';
+
 /**
- * Shared types for the Nextgen SDK middleware layer.
- *
- * These types are consumed by both `sdk-next` and `sdk-nuxt`. Each SDK
- * re-exports them from its own public surface so consumers don't need
- * to add a direct `sdk-core` dependency.
+ * Shared types for the Nextgen SDKs: the middleware layer (`sdk-next`,
+ * `sdk-nuxt`) and the SPA widget events (`sdk-react`, `sdk-vue`, `sdk-solid`,
+ * `sdk-svelte`, `sdk-qwik`). Each SDK re-exports them from its own public
+ * surface so consumers don't need a direct `sdk-core` dependency.
  */
+
+/** Payload of the `zitadel-flow-step` event. */
+export interface ZitadelFlowStepDetail {
+  readonly step: CreateFlow201Step;
+}
+
+/** Payload of the `zitadel-flow-input` event. */
+export interface ZitadelFlowInputDetail {
+  readonly name: string;
+  readonly value: string;
+}
+
+/** Payload of the `zitadel-flow-complete` event. */
+export interface ZitadelFlowCompleteDetail {
+  readonly behavior: unknown;
+  readonly redirect_uri?: string;
+  readonly handoff_token?: string;
+  readonly handoff_token_expires_at?: string;
+}
+
+/** Payload of the `zitadel-flow-error` event. */
+export interface ZitadelFlowErrorDetail {
+  readonly message: string;
+}
+
+/** Payload of the `zitadel-signout` event. */
+export interface ZitadelSignoutDetail {
+  readonly name: string;
+  readonly email: string;
+}
 
 /**
  * The authenticated session for a signed-in user.

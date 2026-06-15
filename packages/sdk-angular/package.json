@@ -12,19 +12,31 @@
     "url": "git+https://github.com/zitadel/nextgen.git",
     "directory": "packages/sdk-angular"
   },
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/types/public-api.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "module": "./dist/index.js",
+  "types": "./dist/types/public-api.d.ts",
   "publishConfig": {
-    "access": "public",
-    "directory": "dist"
+    "access": "public"
   },
   "scripts": {
-    "build": "ng-packagr -p ng-package.json",
+    "build": "vite build && ngc -p tsconfig.lib.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "lint": "eslint ."
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
     "@zitadel/components": "workspace:*",
+    "@zitadel/sdk-core": "workspace:*",
     "tslib": "^2.6.0"
   },
   "peerDependencies": {
@@ -34,13 +46,15 @@
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "eslint": "^9.0.0",
+    "@analogjs/vite-plugin-angular": "^2.6.1",
+    "@angular/build": "^22.0.0",
     "@angular/common": "^22.0.0",
     "@angular/compiler": "^22.0.0",
     "@angular/compiler-cli": "^22.0.0",
     "@angular/core": "^22.0.0",
-    "ng-packagr": "^22.0.0",
     "typescript": "~6.0.0",
     "jsdom": "catalog:",
+    "vite": "^7.3.5",
     "vitest": "^3.0.0",
     "zone.js": "~0.16.0",
     "@eslint/json": "^0.11.0",

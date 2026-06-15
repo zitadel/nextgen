@@ -26,9 +26,9 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts src/react.tsx src/types.ts --format esm --dts --clean --tsconfig tsconfig.json --external react react-dom",
+    "build": "vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -49,8 +49,9 @@
     "jsdom": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "tsup": "^8.3.5",
     "typescript": "^5.7.3",
+    "vite": "^7.3.5",
+    "vite-plugin-dts": "^4.5.0",
     "vitest": "^3.0.0",
     "@eslint/json": "^0.11.0",
     "@eslint/markdown": "^6.0.0",

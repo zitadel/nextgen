@@ -8,7 +8,23 @@
     "strict": true,
     "declaration": true,
     "skipLibCheck": true,
-    "types": []
+    "types": [],
+    "customConditions": [
+      "@zitadel/source"
+    ]
   },
-  "include": ["src"]
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../sdk-core"
+    },
+    {
+      "path": "../components"
+    },
+    {
+      "path": "../api"
+    }
+  ]
 }

@@ -26,9 +26,9 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts src/types.ts src/components/ZitadelLogin.ts src/components/ZitadelLogout.ts --format esm --dts --clean --tsconfig tsconfig.json --external vue",
+    "build": "vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -43,8 +43,9 @@
     "@eslint/js": "^9.0.0",
     "eslint": "^9.0.0",
     "jsdom": "catalog:",
-    "tsup": "^8.3.5",
     "typescript": "^5.7.3",
+    "vite": "^7.3.5",
+    "vite-plugin-dts": "^4.5.0",
     "vitest": "^3.0.0",
     "vue": "^3.5.0",
     "@eslint/json": "^0.11.0",

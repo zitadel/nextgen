@@ -1,4 +1,17 @@
-import { Component, Input, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
+import type {
+  ZitadelFlowCompleteDetail,
+  ZitadelFlowErrorDetail,
+  ZitadelFlowInputDetail,
+  ZitadelFlowStepDetail,
+} from '@zitadel/sdk-core/types';
+
+import {
+  Component,
+  CUSTOM_ELEMENTS_SCHEMA,
+  EventEmitter,
+  Input,
+  Output,
+} from '@angular/core';
 
 import type { ZitadelProject } from './config';
 
@@ -12,9 +25,12 @@ import '@zitadel/components';
  * element in its template under `CUSTOM_ELEMENTS_SCHEMA`. The `project` handle
  * (from `configureZitadel(...)`) is bound as a DOM **property** via `[project]`;
  * `purpose` / `post-sign-in-url` are bound as attributes the Lit element reads.
+ * The widget's `zitadel-*` events are re-emitted with their detail as the
+ * `flowStep` / `flowInput` / `flowComplete` / `flowError` outputs.
  *
  * ```html
- * <zitadel-auth-login [project]="project" purpose="login" postSignInUrl="/" />
+ * <zitadel-auth-login [project]="project" purpose="login" postSignInUrl="/"
+ *   (flowComplete)="onComplete($event)" />
  * ```
  */
 @Component({
@@ -25,10 +41,36 @@ import '@zitadel/components';
     [project]="project"
     [attr.purpose]="purpose"
     [attr.post-sign-in-url]="postSignInUrl"
+    (zitadel-flow-step)="onFlowStep($event)"
+    (zitadel-flow-input)="onFlowInput($event)"
+    (zitadel-flow-complete)="onFlowComplete($event)"
+    (zitadel-flow-error)="onFlowError($event)"
   ></zitadel-login>`,
 })
 export class ZitadelLoginComponent {
   @Input() project?: ZitadelProject;
   @Input() purpose = 'login';
   @Input() postSignInUrl?: string;
+  @Output() flowStep = new EventEmitter<ZitadelFlowStepDetail>();
+  @Output() flowInput = new EventEmitter<ZitadelFlowInputDetail>();
+  @Output() flowComplete = new EventEmitter<ZitadelFlowCompleteDetail>();
+  @Output() flowError = new EventEmitter<ZitadelFlowErrorDetail>();
+
+  onFlowStep(event: Event): void {
+    this.flowStep.emit((event as CustomEvent<ZitadelFlowStepDetail>).detail);
+  }
+
+  onFlowInput(event: Event): void {
+    this.flowInput.emit((event as CustomEvent<ZitadelFlowInputDetail>).detail);
+  }
+
+  onFlowComplete(event: Event): void {
+    this.flowComplete.emit(
+      (event as CustomEvent<ZitadelFlowCompleteDetail>).detail,
+    );
+  }
+
+  onFlowError(event: Event): void {
+    this.flowError.emit((event as CustomEvent<ZitadelFlowErrorDetail>).detail);
+  }
 }

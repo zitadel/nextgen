@@ -9,7 +9,23 @@
     "declaration": true,
     "emitDeclarationOnly": true,
     "skipLibCheck": true,
-    "outDir": "lib-types"
+    "outDir": "lib-types",
+    "customConditions": [
+      "@zitadel/source"
+    ]
   },
-  "include": ["src"]
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../sdk-core"
+    },
+    {
+      "path": "../components"
+    },
+    {
+      "path": "../api"
+    }
+  ]
 }
