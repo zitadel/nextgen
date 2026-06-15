@@ -229,6 +229,7 @@ jobs:
           retention-days: 7
 
   go-smoke-test-embedded-postgres:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 15
     needs: [goreleaser-snapshot]
@@ -335,6 +336,7 @@ jobs:
           node scripts/check-changeset-required.mjs --base "origin/${{ github.base_ref }}"
 
   quickstart-smoke:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 20
     needs: [goreleaser-snapshot]
@@ -423,6 +425,7 @@ jobs:
           fi
 
   node-e2e:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 15
     steps:
@@ -548,9 +551,14 @@ jobs:
           retention-days: 7
 
   consumer-journey-e2e:
+    name: consumer-journey-e2e (${{ matrix.framework }})
     runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 35
     needs: [goreleaser-snapshot, npm-pack-smoke]
+    strategy:
+      fail-fast: false
+      matrix:
+        framework: [next, nuxt, react, vue, angular]
     steps:
       - uses: actions/checkout@v6
 
@@ -667,29 +675,43 @@ jobs:
           docker image inspect -f '{{.Os}}/{{.Architecture}}' "$(cat goreleaser-dist/nextgen-image.tag)" | grep -q '^linux/amd64$'
           echo "ZITADEL_LOCAL_IMAGE=$(cat goreleaser-dist/nextgen-image.tag)" >> "$GITHUB_ENV"
 
-      - name: Prepare fresh Next.js app
+      - name: Prepare fresh ${{ matrix.framework }} app
         id: prepare-app
         env:
+          JOURNEY_APP_URL: http://localhost:3000
+          JOURNEY_FRAMEWORK: ${{ matrix.framework }}
           JOURNEY_REGISTRY_URL: http://127.0.0.1:4873
-          JOURNEY_WORK_DIR: ${{ runner.temp }}/zitadel-cli-journey
-        run: node apps/cli-journey-e2e/scripts/prepare-next-app.mjs
+          JOURNEY_WORK_DIR: ${{ runner.temp }}/zitadel-cli-journey-${{ matrix.framework }}
+        run: node apps/cli-journey-e2e/scripts/prepare-app.mjs
 
-      - name: Start generated Next.js app
+      - name: Start generated ${{ matrix.framework }} app
         run: |
           cd "$JOURNEY_APP_DIR"
-          npm run dev -- --hostname localhost --port 3000 > "$RUNNER_TEMP/next-app.log" 2>&1 &
-          echo "NEXT_APP_PID=$!" >> "$GITHUB_ENV"
+          APP_LOG="$RUNNER_TEMP/${{ matrix.framework }}-app.log"
+          case "${{ matrix.framework }}" in
+            next)
+              npm run dev -- --hostname localhost --port 3000 > "$APP_LOG" 2>&1 &
+              ;;
+            *)
+              npm run dev -- --host localhost --port 3000 > "$APP_LOG" 2>&1 &
+              ;;
+          esac
+          echo "JOURNEY_APP_PID=$!" >> "$GITHUB_ENV"
           for _ in $(seq 1 90); do
             if curl -fsS http://localhost:3000/login >/dev/null; then
               exit 0
             fi
             sleep 1
           done
-          echo "::error::timed out waiting for generated Next.js app"
-          cat "$RUNNER_TEMP/next-app.log"
+          echo "::error::timed out waiting for generated ${{ matrix.framework }} app"
+          cat "$APP_LOG"
           exit 1
 
       - name: Run consumer journey Playwright tests
+        env:
+          JOURNEY_FRAMEWORK: ${{ matrix.framework }}
+          JOURNEY_PLAYWRIGHT_OUTPUT_DIR: apps/cli-journey-e2e/test-output/playwright/${{ matrix.framework }}/output
+          JOURNEY_PLAYWRIGHT_REPORT_DIR: apps/cli-journey-e2e/test-output/playwright/${{ matrix.framework }}/report
         run: >-
           corepack pnpm --filter @zitadel/cli-journey-e2e
           exec playwright test --config playwright.config.mts
@@ -697,8 +719,8 @@ jobs:
       - name: Collect diagnostics
         if: failure()
         run: |
-          DIAG_DIR="$RUNNER_TEMP/consumer-journey-diagnostics"
-          APP_DIR="$RUNNER_TEMP/zitadel-cli-journey/myapp"
+          DIAG_DIR="$RUNNER_TEMP/consumer-journey-diagnostics-${{ matrix.framework }}"
+          APP_DIR="$RUNNER_TEMP/zitadel-cli-journey-${{ matrix.framework }}/myapp"
           mkdir -p "$DIAG_DIR/generated-app"
           if [ -d "$APP_DIR" ]; then
             (
@@ -711,15 +733,15 @@ jobs:
                 > "$DIAG_DIR/logs.json" 2> "$DIAG_DIR/logs.stderr.log"
             ) || true
           fi
-          cp "$RUNNER_TEMP/next-app.log" "$DIAG_DIR/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/${{ matrix.framework }}-app.log" "$DIAG_DIR/" 2>/dev/null || true
           cp "$RUNNER_TEMP/verdaccio.log" "$DIAG_DIR/" 2>/dev/null || true
-          cp "$RUNNER_TEMP/zitadel-cli-journey/doctor.json" "$DIAG_DIR/" 2>/dev/null || true
-          cp "$RUNNER_TEMP/zitadel-cli-journey/doctor.stderr.log" "$DIAG_DIR/" 2>/dev/null || true
-          cp "$RUNNER_TEMP/zitadel-cli-journey/start.json" "$DIAG_DIR/" 2>/dev/null || true
-          cp "$RUNNER_TEMP/zitadel-cli-journey/start.stderr.log" "$DIAG_DIR/" 2>/dev/null || true
-          cp "$RUNNER_TEMP/zitadel-cli-journey/setup.json" "$DIAG_DIR/" 2>/dev/null || true
-          cp "$RUNNER_TEMP/zitadel-cli-journey/setup.stderr.log" "$DIAG_DIR/" 2>/dev/null || true
-          cp "$RUNNER_TEMP/zitadel-cli-journey/metadata.json" "$DIAG_DIR/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/zitadel-cli-journey-${{ matrix.framework }}/doctor.json" "$DIAG_DIR/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/zitadel-cli-journey-${{ matrix.framework }}/doctor.stderr.log" "$DIAG_DIR/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/zitadel-cli-journey-${{ matrix.framework }}/start.json" "$DIAG_DIR/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/zitadel-cli-journey-${{ matrix.framework }}/start.stderr.log" "$DIAG_DIR/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/zitadel-cli-journey-${{ matrix.framework }}/setup.json" "$DIAG_DIR/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/zitadel-cli-journey-${{ matrix.framework }}/setup.stderr.log" "$DIAG_DIR/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/zitadel-cli-journey-${{ matrix.framework }}/metadata.json" "$DIAG_DIR/" 2>/dev/null || true
           cp "$APP_DIR/.zitadel/local/runtime.json" "$DIAG_DIR/runtime.json" 2>/dev/null || true
           cp "$APP_DIR/package.json" "$DIAG_DIR/generated-app/" 2>/dev/null || true
           cp "$APP_DIR/package-lock.json" "$DIAG_DIR/generated-app/" 2>/dev/null || true
@@ -728,19 +750,19 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: consumer-journey-diagnostics
+          name: consumer-journey-diagnostics-${{ matrix.framework }}
           path: |
-            apps/cli-journey-e2e/test-output/playwright/report/**
-            apps/cli-journey-e2e/test-output/playwright/output/**
-            ${{ runner.temp }}/consumer-journey-diagnostics/**
+            apps/cli-journey-e2e/test-output/playwright/${{ matrix.framework }}/report/**
+            apps/cli-journey-e2e/test-output/playwright/${{ matrix.framework }}/output/**
+            ${{ runner.temp }}/consumer-journey-diagnostics-${{ matrix.framework }}/**
           if-no-files-found: ignore
           retention-days: 7
 
       - name: Tear down consumer journey services
         if: always()
         run: |
-          if [ -n "${NEXT_APP_PID:-}" ]; then kill "$NEXT_APP_PID" 2>/dev/null || true; fi
-          APP_DIR="$RUNNER_TEMP/zitadel-cli-journey/myapp"
+          if [ -n "${JOURNEY_APP_PID:-}" ]; then kill "$JOURNEY_APP_PID" 2>/dev/null || true; fi
+          APP_DIR="$RUNNER_TEMP/zitadel-cli-journey-${{ matrix.framework }}/myapp"
           if [ -d "$APP_DIR" ]; then
             (
               cd "$APP_DIR"
@@ -773,11 +795,17 @@ jobs:
     steps:
       - name: Check CI gate results
         env:
+          IS_PULL_REQUEST: ${{ github.event_name == 'pull_request' }}
           NEEDS_JSON: ${{ toJson(needs) }}
         run: |
           node <<'NODE'
           const needs = JSON.parse(process.env.NEEDS_JSON);
           const allowedSkipped = new Set(["changeset-check"]);
+          if (process.env.IS_PULL_REQUEST === "true") {
+            allowedSkipped.add("go-smoke-test-embedded-postgres");
+            allowedSkipped.add("quickstart-smoke");
+            allowedSkipped.add("node-e2e");
+          }
           const failed = Object.entries(needs).filter(([name, job]) => {
             if (job.result === "success") return false;
             if (job.result === "skipped" && allowedSkipped.has(name)) return false;
