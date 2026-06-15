@@ -96,10 +96,12 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 			Name:   step.GetName(),
 			Fields: step.GetFields(),
 		}
-		// actions
-		if len(step.GetActions()) > 0 {
-			actions := make([]domain.FlowStepAction, 0, len(step.GetActions()))
-			for _, apiAction := range step.GetActions() {
+		// actions — preserve the nil-vs-empty distinction so an explicit `[]`
+		// (deliberately no actions, e.g. terminal-step shape) survives the
+		// round-trip distinct from an omitted field (engine-default behavior).
+		if apiActions := step.GetActions(); apiActions != nil {
+			actions := make([]domain.FlowStepAction, 0, len(apiActions))
+			for _, apiAction := range apiActions {
 				actions = append(actions, domain.FlowStepAction{
 					Name:    apiAction.GetName(),
 					Primary: apiAction.GetPrimary().Value,
@@ -297,8 +299,11 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 	return steps
 }
 
+// mapActionsToAPI preserves the nil-vs-empty distinction so a stored flow
+// definition's explicit `[]` round-trips back to the client as `[]` (not
+// omitted), keeping sync/diff tooling honest.
 func mapActionsToAPI(domainActions []domain.FlowStepAction) []api.StepAction {
-	if len(domainActions) == 0 {
+	if domainActions == nil {
 		return nil
 	}
 	actions := make([]api.StepAction, 0, len(domainActions))

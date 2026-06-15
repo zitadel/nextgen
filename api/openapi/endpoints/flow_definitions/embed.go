@@ -220,8 +220,11 @@ func convertStepGateConfig(config api.OptGateConfig) (map[string]any, error) {
 	return ret, nil
 }
 
+// convertStepActions preserves the nil-vs-empty distinction so an explicit
+// `actions: []` survives the embed-loader path without collapsing into a
+// nil that would re-read as "omitted, apply default" downstream.
 func convertStepActions(actions []api.StepAction) []domain.FlowStepAction {
-	if len(actions) == 0 {
+	if actions == nil {
 		return nil
 	}
 
