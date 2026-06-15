@@ -72,7 +72,7 @@ export function viteProxyEdit(
       changed = true;
     }
     for (const imp of PROXY_IMPORTS) {
-      if (!importIsPresent(mod, imp.local)) {
+      if (!importIsPresent(mod, imp.local, imp.from)) {
         mod.imports.$add({ ...imp });
         changed = true;
       }

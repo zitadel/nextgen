@@ -113,10 +113,12 @@ export function resolveDefaultExportObject(mod: any, filename: string): any {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function importIsPresent(mod: any, local: string): boolean {
+export function importIsPresent(mod: any, local: string, from?: string): boolean {
   try {
-    const items: ReadonlyArray<{ local?: string }> = mod.imports?.$items ?? [];
-    return items.some((item) => item.local === local);
+    const items: ReadonlyArray<{ local?: string; from?: string }> = mod.imports?.$items ?? [];
+    // Match the source module too when given, so a same-named local imported
+    // from a different module isn't mistaken for the one we need.
+    return items.some((item) => item.local === local && (from === undefined || item.from === from));
   } catch {
     return false;
   }

@@ -79,6 +79,15 @@ describe("importIsPresent", () => {
     expect(importIsPresent(mod, "readFileSync")).toBe(true);
     expect(importIsPresent(mod, "writeFileSync")).toBe(false);
   });
+
+  it("matches the source module when given, ignoring a same-name import elsewhere", () => {
+    const mod = parseModule('import { loadEnv } from "./my-env";\nexport default {}');
+    // local name matches, but it's not the `vite` loadEnv we need
+    expect(importIsPresent(mod, "loadEnv", "vite")).toBe(false);
+    expect(importIsPresent(mod, "loadEnv")).toBe(true);
+    const fromVite = parseModule('import { loadEnv } from "vite";\nexport default {}');
+    expect(importIsPresent(fromVite, "loadEnv", "vite")).toBe(true);
+  });
 });
 
 describe("ensureArrayItem", () => {
