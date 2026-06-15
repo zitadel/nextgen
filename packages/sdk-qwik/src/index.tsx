@@ -13,25 +13,19 @@ import {
   type ZitadelConfig,
   type ZitadelProject,
 } from '@zitadel/api/config';
-
-// Teach Qwik's JSX about the custom elements.
-declare module '@builder.io/qwik' {
-  interface QwikIntrinsicElements {
-    'zitadel-login': QwikIntrinsicElements['div'];
-    'zitadel-logout': QwikIntrinsicElements['div'];
-  }
-}
+// Registers <zitadel-login> / <zitadel-logout> with the browser, before render.
+import '@zitadel/components';
 
 export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
 export * from './types';
 
-// Qwik binds lazily, so the SDK `project` handle (a non-serializable object)
-// can't ride as a late-bound DOM property — it races the element's startup.
-// Instead pass the handle's `projectId`/`proxyPath` as ATTRIBUTES (synchronous,
-// present at upgrade), register the (browser-only Lit) components client-only in
-// a visible task, and wire `zitadel-flow-*` events imperatively (Qwik's
-// declarative `useOn` does not catch these programmatic custom events).
+// `@zitadel/components` ships Qwik JSX types for the elements but omits the
+// property-only `project` member (it has `attribute: false`). Qwik binds objects
+// to custom elements as DOM *properties*, so we set it via a spread.
+function projectProp(project: ZitadelProject): Record<string, unknown> {
+  return { project };
+}
 
 export interface ZitadelLoginProps {
   project: ZitadelProject;
@@ -42,15 +36,20 @@ export interface ZitadelLoginProps {
   onFlowError$?: QRL<(detail: unknown) => void>;
 }
 
+/**
+ * Qwik wrapper for the `<zitadel-login>` Lit web component. Binds the SDK
+ * `project` handle as a DOM property (Qwik passes objects to custom elements as
+ * properties), and surfaces the widget's `zitadel-flow-*` events as optional
+ * callbacks. `useVisibleTask$` is the documented escape hatch for wiring native
+ * listeners on a third-party element; Qwik's declarative `useOn` does not catch
+ * these programmatic custom events.
+ */
 export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
   const host = useSignal<HTMLElement>();
-  // Wiring native listeners on a third-party custom element requires the DOM
-  // post-mount; `useOn` does not catch these programmatic events.
   // eslint-disable-next-line qwik/no-use-visible-task
   useVisibleTask$(({ track, cleanup }) => {
     const el = track(() => host.value);
     if (!el) return;
-    void import('@zitadel/components');
     const onStep = (e: Event) =>
       void props.onFlowStep$?.((e as CustomEvent).detail);
     const onComplete = (e: Event) =>
@@ -69,8 +68,7 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
   return (
     <zitadel-login
       ref={host}
-      project-id={props.project.projectId}
-      proxy-path={props.project.proxyPath}
+      {...projectProp(props.project)}
       purpose={props.purpose ?? 'login'}
       post-sign-in-url={props.postSignInUrl}
     />
@@ -82,19 +80,11 @@ export interface ZitadelLogoutProps {
   postSignOutUrl?: string;
 }
 
+/** Qwik wrapper for the `<zitadel-logout>` Lit web component. */
 export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
-  const host = useSignal<HTMLElement>();
-  // Client-only registration of the (browser-only Lit) components.
-  // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(({ track }) => {
-    const el = track(() => host.value);
-    if (el) void import('@zitadel/components');
-  });
   return (
     <zitadel-logout
-      ref={host}
-      project-id={props.project.projectId}
-      proxy-path={props.project.proxyPath}
+      {...projectProp(props.project)}
       post-sign-out-url={props.postSignOutUrl}
     />
   );
