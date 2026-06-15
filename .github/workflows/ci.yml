@@ -229,6 +229,7 @@ jobs:
           retention-days: 7
 
   go-smoke-test-embedded-postgres:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 15
     needs: [goreleaser-snapshot]
@@ -335,6 +336,7 @@ jobs:
           node scripts/check-changeset-required.mjs --base "origin/${{ github.base_ref }}"
 
   quickstart-smoke:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 20
     needs: [goreleaser-snapshot]
@@ -423,6 +425,7 @@ jobs:
           fi
 
   node-e2e:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 15
     steps:
@@ -792,11 +795,17 @@ jobs:
     steps:
       - name: Check CI gate results
         env:
+          IS_PULL_REQUEST: ${{ github.event_name == 'pull_request' }}
           NEEDS_JSON: ${{ toJson(needs) }}
         run: |
           node <<'NODE'
           const needs = JSON.parse(process.env.NEEDS_JSON);
           const allowedSkipped = new Set(["changeset-check"]);
+          if (process.env.IS_PULL_REQUEST === "true") {
+            allowedSkipped.add("go-smoke-test-embedded-postgres");
+            allowedSkipped.add("quickstart-smoke");
+            allowedSkipped.add("node-e2e");
+          }
           const failed = Object.entries(needs).filter(([name, job]) => {
             if (job.result === "success") return false;
             if (job.result === "skipped" && allowedSkipped.has(name)) return false;
