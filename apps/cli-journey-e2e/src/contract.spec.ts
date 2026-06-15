@@ -14,11 +14,12 @@ test("setup completed and installed local registry packages", async () => {
   expect(setup.source).toEqual(expect.any(String));
 
   const metadata = JSON.parse(await readFile(join(outputDir, "metadata.json"), "utf8"));
+  expect(setup.data.framework).toBe(metadata.framework);
   const packageJson = JSON.parse(await readFile(join(appDir, "package.json"), "utf8"));
-  expect(packageJson.dependencies?.[metadata.sdkNextPackage]).toBeTruthy();
+  expect(packageJson.dependencies?.[metadata.sdkPackage]).toBeTruthy();
 
   const packageLock = JSON.parse(await readFile(join(appDir, "package-lock.json"), "utf8"));
-  const packageScope = metadata.sdkNextPackage.split("/")[0];
+  const packageScope = metadata.sdkPackage.split("/")[0];
   const lockedPackages = Object.entries(packageLock.packages ?? {}).filter(([name]) =>
     name.startsWith(`node_modules/${packageScope}/`),
   );

@@ -4,20 +4,25 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 
+import { appPortFromUrl, frameworkForId } from "./frameworks.mjs";
+
 const here = dirname(fileURLToPath(import.meta.url));
 const defaultRepoRoot = resolve(here, "../../..");
 const defaultRegistryUrl = "http://127.0.0.1:4873";
 const defaultAppUrl = "http://localhost:3000";
 
-export async function prepareNextApp(options = {}) {
+export async function prepareApp(options = {}) {
   const env = options.env ?? process.env;
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
+  const framework = frameworkForId(options.framework ?? env.JOURNEY_FRAMEWORK ?? "next");
   const outputDir = resolve(
-    env.JOURNEY_WORK_DIR ?? join(tmpdir(), `zitadel-cli-journey-${process.pid}-${Date.now()}`),
+    env.JOURNEY_WORK_DIR ??
+      join(tmpdir(), `zitadel-cli-journey-${framework.id}-${process.pid}-${Date.now()}`),
   );
   const appDir = resolve(env.JOURNEY_APP_DIR ?? join(outputDir, "myapp"));
   const registryUrl = env.JOURNEY_REGISTRY_URL ?? defaultRegistryUrl;
   const appUrl = env.JOURNEY_APP_URL ?? defaultAppUrl;
+  const appPort = appPortFromUrl(appUrl);
   const zitadelPort = optionalPort(env.JOURNEY_ZITADEL_PORT, "JOURNEY_ZITADEL_PORT");
   const fs = {
     appendFile: options.appendFile ?? appendFile,
@@ -28,9 +33,13 @@ export async function prepareNextApp(options = {}) {
   };
   const runCaptureFn = options.runCapture ?? runCapture;
   const packageNameFn =
-    options.packageName ?? ((relativePath) => packageName(relativePath, { readFile: fs.readFile, repoRoot }));
+    options.packageName ??
+    ((relativePath) => packageName(relativePath, { readFile: fs.readFile, repoRoot }));
   const cliPackage = env.JOURNEY_CLI_PACKAGE ?? (await packageNameFn("apps/cli"));
-  const sdkNextPackage = env.JOURNEY_SDK_NEXT_PACKAGE ?? (await packageNameFn("packages/sdk-next"));
+  const sdkPackage =
+    env.JOURNEY_SDK_PACKAGE ??
+    env[`JOURNEY_SDK_${framework.id.toUpperCase()}_PACKAGE`] ??
+    (await packageNameFn(framework.sdkPackageDir));
   const npmEnv = npmEnvironment(env, registryUrl);
 
   await fs.rm(appDir, { recursive: true, force: true });
@@ -67,7 +76,15 @@ export async function prepareNextApp(options = {}) {
       outputDir,
       runCapture: runCaptureFn,
       step: "setup",
-      stepArgs: ["setup", "--framework", "next", "--server", "local"],
+      stepArgs: [
+        "setup",
+        "--framework",
+        framework.id,
+        "--server",
+        "local",
+        "--dev-port",
+        String(appPort),
+      ],
       writeFile: fs.writeFile,
     });
   } catch (error) {
@@ -83,54 +100,39 @@ export async function prepareNextApp(options = {}) {
   }
 
   await assertNoNestedApp(appDir, fs.readFile);
-
-  const appPackage = JSON.parse(await fs.readFile(join(appDir, "package.json"), "utf8"));
-  const dependencies = {
-    ...(appPackage.dependencies ?? {}),
-    ...(appPackage.devDependencies ?? {}),
-  };
-  if (!dependencies[sdkNextPackage]) {
-    throw new Error(`generated package.json does not depend on ${sdkNextPackage}`);
-  }
-
-  const packageLockPath = join(appDir, "package-lock.json");
-  const packageLock = JSON.parse(await fs.readFile(packageLockPath, "utf8"));
-  const packageScope = sdkNextPackage.split("/")[0];
-  const scopedNodeModulePrefix = `node_modules/${packageScope}/`;
-  const lockedZitadelPackages = Object.entries(packageLock.packages ?? {}).filter(
-    ([name]) => name.startsWith(scopedNodeModulePrefix),
-  );
-  if (lockedZitadelPackages.length === 0) {
-    throw new Error(`package-lock.json does not contain ${packageScope} packages`);
-  }
-  for (const [name, entry] of lockedZitadelPackages) {
-    const resolved = entry?.resolved;
-    if (typeof resolved !== "string" || !resolved.startsWith(registryUrl)) {
-      throw new Error(`${name} resolved outside the temporary registry: ${resolved}`);
-    }
-  }
+  await assertLocalPackageResolution({
+    appDir,
+    readFile: fs.readFile,
+    registryUrl,
+    sdkPackage,
+  });
 
   const metadata = {
     appDir,
     appUrl,
     cliPackage,
     doctorPath: join(outputDir, "doctor.json"),
+    framework: framework.id,
+    frameworkDisplayName: framework.displayName,
     localRuntimeUrl: startJson?.data?.urls?.api ?? null,
     outputDir,
     registryUrl,
     runtimeMetadataPath: join(appDir, ".zitadel/local/runtime.json"),
-    sdkNextPackage,
+    sdkPackage,
     setupPath: join(outputDir, "setup.json"),
     setupServer: setupJson?.data?.server ?? null,
     startPath: join(outputDir, "start.json"),
+    expectsProtectedRouteRedirect: framework.expectsProtectedRouteRedirect,
   };
   const metadataPath = join(outputDir, "metadata.json");
   await fs.writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`);
 
   await exportEnv("JOURNEY_APP_DIR", appDir, fs.appendFile, env);
   await exportEnv("JOURNEY_APP_URL", appUrl, fs.appendFile, env);
+  await exportEnv("JOURNEY_FRAMEWORK", framework.id, fs.appendFile, env);
   await exportEnv("JOURNEY_OUTPUT_DIR", outputDir, fs.appendFile, env);
   await exportOutput("app_dir", appDir, fs.appendFile, env);
+  await exportOutput("framework", framework.id, fs.appendFile, env);
   await exportOutput("output_dir", outputDir, fs.appendFile, env);
 
   if (options.logMetadata !== false) {
@@ -198,6 +200,35 @@ async function assertNoNestedApp(appDir, readFileFn) {
     throw error;
   }
   throw new Error("setup scaffolded a nested myapp directory instead of using the app root");
+}
+
+async function assertLocalPackageResolution(input) {
+  const appPackage = JSON.parse(await input.readFile(join(input.appDir, "package.json"), "utf8"));
+  const dependencies = {
+    ...(appPackage.dependencies ?? {}),
+    ...(appPackage.devDependencies ?? {}),
+  };
+  if (!dependencies[input.sdkPackage]) {
+    throw new Error(`generated package.json does not depend on ${input.sdkPackage}`);
+  }
+
+  const packageLock = JSON.parse(
+    await input.readFile(join(input.appDir, "package-lock.json"), "utf8"),
+  );
+  const packageScope = input.sdkPackage.split("/")[0];
+  const scopedNodeModulePrefix = `node_modules/${packageScope}/`;
+  const lockedZitadelPackages = Object.entries(packageLock.packages ?? {}).filter(([name]) =>
+    name.startsWith(scopedNodeModulePrefix),
+  );
+  if (lockedZitadelPackages.length === 0) {
+    throw new Error(`package-lock.json does not contain ${packageScope} packages`);
+  }
+  for (const [name, entry] of lockedZitadelPackages) {
+    const resolved = entry?.resolved;
+    if (typeof resolved !== "string" || !resolved.startsWith(input.registryUrl)) {
+      throw new Error(`${name} resolved outside the temporary registry: ${resolved}`);
+    }
+  }
 }
 
 async function packageName(relativePath, options) {
@@ -275,7 +306,7 @@ async function exportOutput(name, value, appendFileFn, env) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    await prepareNextApp();
+    await prepareApp();
   } catch (error) {
     console.error(errorMessage(error));
     process.exit(1);
