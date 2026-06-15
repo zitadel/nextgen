@@ -37,13 +37,15 @@ back to `ghcr.io/zitadel/nextgen:latest`. Override with `--image` or
 `ZITADEL_LOCAL_IMAGE` for advanced debugging.
 `setup --server local` creates a project on that local server, asks which
 framework to scaffold when the directory is fresh, writes the Next.js app into
-the current directory, scaffolds `app/login`, `app/register`, and `proxy.ts`
-for Next 16+ or `middleware.ts` for older Next versions, writes `.env.local`
-and `.zitadel/`, and installs dependencies with the detected package manager.
-Pass `--skip-install` to install them yourself. The project's default user
-schema and login flow are provisioned server-side at creation time, so the CLI
-does not scaffold or upload them. Open `http://localhost:3000/login` to see the
-login page.
+the current directory, scaffolds `app/login`, `app/register`, `app/profile`, and
+`proxy.ts` for Next 16+ or `middleware.ts` for older Next versions. Fresh
+scaffolds also replace the starter `app/page.tsx` with links to sign in, create
+an account, and profile. Setup writes `.env.local` and `.zitadel/`, and installs
+dependencies with the detected package manager. Pass `--skip-install` to install
+them yourself. The project's default user schema and login flow are provisioned
+server-side at creation time, so the CLI does not scaffold or upload them. Open
+the dev server URL printed by your framework, register a user, log out, log back
+in, and end on the signed-in profile page.
 
 For a reproducible tester report, use the exact alpha train from the GitHub
 Release:

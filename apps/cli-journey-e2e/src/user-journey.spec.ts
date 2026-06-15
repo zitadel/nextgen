@@ -296,16 +296,30 @@ async function clickAction(
   name: RegExp,
   actionNames: readonly string[] = [],
 ): Promise<void> {
-  let locator = page.getByRole("button", { name }).or(page.getByRole("link", { name }));
+  const candidates: Locator[] = [];
   for (const actionName of actionNames) {
-    locator = page
-      .getByTestId(`zitadel-action-${actionName}-button`)
-      .or(page.getByTestId(`zitadel-action-${actionName}`))
-      .or(page.getByTestId(`zitadel-action-${actionName}-link`))
-      .or(actionLocator(page, actionName))
-      .or(locator);
+    candidates.push(
+      page.getByTestId(`zitadel-action-${actionName}-button`),
+      page.getByTestId(`zitadel-action-${actionName}`),
+      page.getByTestId(`zitadel-action-${actionName}-link`),
+      actionLocator(page, actionName),
+    );
   }
-  await locator.first().click();
+  candidates.push(page.getByRole("button", { name }), page.getByRole("link", { name }));
+
+  for (const candidate of candidates) {
+    const target = candidate.first();
+    if (await target.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await target.click();
+      return;
+    }
+  }
+
+  const fallback = candidates[candidates.length - 1];
+  if (!fallback) {
+    throw new Error("No action candidates configured");
+  }
+  await fallback.first().click();
 }
 
 function actionLocator(page: Page, actionName: string) {
