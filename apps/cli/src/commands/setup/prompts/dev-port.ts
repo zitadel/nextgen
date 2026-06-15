@@ -8,7 +8,13 @@ import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
  * becomes the issuer URL (`http://localhost:<port>`) via `issuerFromPort`.
  */
 export class DevPortPrompt implements SetupPrompt {
-  async ask(answers: SetupAnswers, _ctx: PromptContext): Promise<SetupAnswers> {
+  async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
+    // `--dev-port <n>` is authoritative: skip the prompt so an interactive
+    // answer can't override the explicit flag (the base command already folded
+    // it into answers.devPort).
+    if (ctx.devPortFromFlag) {
+      return answers;
+    }
     const value = await text({
       message: "Dev server port",
       placeholder: String(answers.devPort),

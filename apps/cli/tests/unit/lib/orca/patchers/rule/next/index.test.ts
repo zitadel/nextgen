@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { FileOp, ScaffoldPlan } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
+import type {
+  FileOp,
+  ScaffoldPlan,
+} from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
 import { NextPatcher } from "../../../../../../../src/lib/orca/patchers/rule/next";
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
@@ -60,6 +63,20 @@ describe("NextPatcher.plan", () => {
     const plan = new NextPatcher().plan(ctxFor("app"));
     expect(writeContents(plan, ".zitadel/schemas/user.json")).toBeUndefined();
     expect(writeContents(plan, ".zitadel/flows/default.json")).toBeUndefined();
+  });
+
+  it("writes preview issuer_pattern as the raw origins, not a doubled scheme", () => {
+    const base = ctxFor("app");
+    const ctx = {
+      ...base,
+      project: { ...base.project, previewOrigins: ["https://nextgen.dev.mrida.ng"] },
+    };
+    const zitadelJson = JSON.parse(
+      writeContents(new NextPatcher().plan(ctx), "zitadel.json") ?? "{}",
+    );
+    expect(zitadelJson.environments.preview.issuer_pattern).toEqual([
+      "https://nextgen.dev.mrida.ng",
+    ]);
   });
 
   it("honors the src/app directory", () => {

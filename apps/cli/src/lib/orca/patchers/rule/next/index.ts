@@ -92,7 +92,11 @@ function nextCodeFilePaths(
 /** The Next route/request-boundary write ops plus the SDK dependency. */
 function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
   const appDir = ctx.framework.appDir;
-  const ops: FileOp[] = [
+  const profile = renderer.templates.profilePage?.();
+  const provider = renderer.templates.provider;
+  const dts = renderer.templates.customElementsDts?.();
+  const boundary = requestBoundaryFile(ctx.framework);
+  return [
     {
       kind: "write",
       path: join(appDir, "login/page.tsx"),
@@ -103,35 +107,33 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
       path: join(appDir, "register/page.tsx"),
       contents: renderer.templates.authPage("register").contents,
     },
-  ];
-  const profile = renderer.templates.profilePage?.();
-  if (profile) {
-    ops.push({ kind: "write", path: join(appDir, "profile/page.tsx"), contents: profile.contents });
-  }
-  const boundary = requestBoundaryFile(ctx.framework);
-  ops.push({
-    kind: "write",
-    path: join(appDir, `../${boundary.filename}`),
-    contents: requestBoundaryTemplate(boundary.functionName),
-  });
-  const provider = renderer.templates.provider;
-  if (provider) {
-    ops.push({ kind: "write", path: join(appDir, provider.filename), contents: provider.contents });
-  }
-  const dts = renderer.templates.customElementsDts?.();
-  if (dts) {
-    ops.push({
+    profile
+      ? { kind: "write", path: join(appDir, "profile/page.tsx"), contents: profile.contents }
+      : undefined,
+    {
       kind: "write",
-      path: join(appDir, "../custom-elements.d.ts"),
-      contents: dts.contents,
-    });
-  }
-  ops.push({
-    kind: "add-dep",
-    name: renderer.dependency.name,
-    version: dependencyVersionForCli(ctx.cliVersion, renderer.dependency.version),
-  });
-  return ops;
+      path: join(appDir, `../${boundary.filename}`),
+      contents: requestBoundaryTemplate(boundary.functionName),
+    },
+    provider
+      ? { kind: "write", path: join(appDir, provider.filename), contents: provider.contents }
+      : undefined,
+    dts
+      ? { kind: "write", path: join(appDir, "../custom-elements.d.ts"), contents: dts.contents }
+      : undefined,
+    // Next.js exposes NEXT_PUBLIC_-prefixed vars to client code.
+    { kind: "merge-env", path: ".env.example", entries: { NEXT_PUBLIC_ZITADEL_PROJECT_ID: "" } },
+    {
+      kind: "merge-env",
+      path: ".env.local",
+      entries: { NEXT_PUBLIC_ZITADEL_PROJECT_ID: ctx.project.id },
+    },
+    {
+      kind: "add-dep",
+      name: renderer.dependency.name,
+      version: dependencyVersionForCli(ctx.cliVersion, renderer.dependency.version),
+    },
+  ].filter((op): op is FileOp => op !== undefined);
 }
 
 function requestBoundaryFile(framework: PatchContext["framework"]): {

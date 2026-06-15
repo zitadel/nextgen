@@ -35,13 +35,39 @@ describe("Orca selection", () => {
     expect(orca.patcherFor("next").canPatch("next")).toBe(true);
   });
 
+  it("selects the Nuxt scaffolder and patcher", () => {
+    expect(orca.scaffolderFor("nuxt").canScaffold("nuxt")).toBe(true);
+    expect(orca.patcherFor("nuxt").canPatch("nuxt")).toBe(true);
+  });
+
+  it("selects the React scaffolder and patcher", () => {
+    expect(orca.scaffolderFor("react").canScaffold("react")).toBe(true);
+    expect(orca.patcherFor("react").canPatch("react")).toBe(true);
+  });
+
+  it("selects the Vue scaffolder and patcher", () => {
+    expect(orca.scaffolderFor("vue").canScaffold("vue")).toBe(true);
+    expect(orca.patcherFor("vue").canPatch("vue")).toBe(true);
+  });
+
+  it("selects the Angular scaffolder and patcher", () => {
+    expect(orca.scaffolderFor("angular").canScaffold("angular")).toBe(true);
+    expect(orca.patcherFor("angular").canPatch("angular")).toBe(true);
+  });
+
   it("throws E_VALIDATION for an unsupported framework", () => {
     expect(() => orca.scaffolderFor("svelte")).toThrowError(/No scaffolder/);
     expect(() => orca.patcherFor("svelte")).toThrowError(/No patcher/);
   });
 
   it("derives available frameworks from the scaffolder registry", () => {
-    expect(orca.availableFrameworks().map((choice) => choice.id)).toEqual(["next"]);
+    expect(orca.availableFrameworks().map((choice) => choice.id)).toEqual([
+      "next",
+      "nuxt",
+      "react",
+      "vue",
+      "angular",
+    ]);
   });
 });
 
