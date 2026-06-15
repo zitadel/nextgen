@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/cli",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.4",
   "description": "Agent-friendly Zitadel CLI",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/cli#readme",
   "bugs": {
@@ -61,6 +61,7 @@
     "@zitadel/api": "workspace:*",
     "ajv": "catalog:",
     "consola": "^3.4.2",
+    "magicast": "^0.5.3",
     "safe-stable-stringify": "catalog:",
     "zod": "catalog:",
     "picocolors": "^1.1.1"

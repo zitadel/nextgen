@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -19,14 +19,20 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	slogctx "github.com/veqryn/slog-context"
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/domain/tokengen"
+	"github.com/zitadel/nextgen/internal/instrumentation"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
+	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
+	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/staticui/console"
 	"github.com/zitadel/nextgen/internal/staticui/login"
@@ -35,6 +41,8 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/embedded"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 	"github.com/zitadel/oidc/v3/pkg/op"
+	"go.opentelemetry.io/contrib/bridges/otelslog"
+	"go.opentelemetry.io/otel/log"
 )
 
 func NewCommand() *cobra.Command {
@@ -49,13 +57,7 @@ func NewCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-
-			pool, err := startDatabase(cmd.Context(), cfg)
-			if err != nil {
-				return err
-			}
-
-			return run(cmd.Context(), cfg, pool, userFiles)
+			return run(cmd.Context(), cfg, userFiles)
 		},
 	}
 
@@ -65,61 +67,61 @@ func NewCommand() *cobra.Command {
 	return cmd
 }
 
-func startDatabase(ctx context.Context, cfg Config) (database.Pool, error) {
-	connector, err := buildDatabaseConnector(cfg)
-	if err != nil {
-		return nil, err
-	}
-	pool, err := connector.Connect(ctx)
-	if err != nil {
-		return nil, err
-	}
-	err = pool.Migrate(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return pool, nil
-}
-
-func buildDatabaseConnector(cfg Config) (database.Connector, error) {
-	if len(cfg.Database.Raw) == 0 {
-		options := embeddedPostgresOptions(cfg.Server.DataDir)
-		log.Printf("no database dialect configured, starting embedded postgres in %s", filepath.Dir(options.DataPath))
-		return embedded.NewConnector(options), nil
-	}
-	return cfg.Database.Build()
-}
-
-func embeddedPostgresOptions(dataDir string) embedded.Options {
-	root := filepath.Join(dataDir, "embedded-postgres")
-	return embedded.Options{
-		RuntimePath: filepath.Join(root, "runtime"),
-		DataPath:    filepath.Join(root, "data"),
-		CachePath:   filepath.Join(root, "cache"),
-		LogPath:     filepath.Join(root, "postgres.log"),
-		Logger:      os.Stdout,
-	}
-}
-
-func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string) error {
+func run(ctx context.Context, cfg Config, userFiles []string) error {
+	var err error
+	sfs := &ShutdownFuncs{}
 	defer func() {
-		if err := pool.Close(context.Background()); err != nil {
-			log.Printf("close database pool: %v", err)
+		if err != nil {
+			slog.Error("run error", slogctx.Err(err))
 		}
+		err = sfs.Exec(context.WithoutCancel(ctx))
+		if err != nil {
+			slog.Error("shutdown error", slogctx.Err(err))
+			os.Exit(1)
+			return
+		}
+		slog.Info("shut down application")
 	}()
+
+	slog.Info("building server")
+
+	metrics, err := zotel.NewOtelMetrics(ctx, zotel.MetricsConfig{
+		ServiceName:     cfg.Instrumentation.ServiceName,
+		TraceIdFraction: cfg.Instrumentation.Trace.Fraction,
+		TraceExporter:   cfg.Instrumentation.Trace.Exporter,
+		MetricExporter:  cfg.Instrumentation.Metric.Exporter,
+		LogExporter:     cfg.Instrumentation.Log.Exporter,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create otel metrics: %w", err)
+	}
+	sfs.Add(metrics.Shutdown)
+
+	setUpLogging(cfg.Instrumentation.Log, metrics.LoggerProvider())
+
+	pool, err := startDatabase(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	sfs.Add(func(ctx context.Context) error {
+		if err := pool.Close(ctx); err != nil {
+			return fmt.Errorf("failed close database pool: %w", err)
+		}
+		return nil
+	})
 
 	crypter, err := buildCrypter(cfg.Server.EncryptionKey)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create Crypter: %w", err)
 	}
 
 	passwordHasher, err := cfg.PasswordHasher.NewHasher()
 	if err != nil {
-		return fmt.Errorf("build password hasher: %w", err)
+		return fmt.Errorf("failed to build password hasher: %w", err)
 	}
 
 	if err := users.Import(ctx, pool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), userFiles); err != nil {
-		return fmt.Errorf("bootstrap users: %w", err)
+		return fmt.Errorf("failed to bootstrap users: %w", err)
 	}
 
 	opaqueTokenGenerator := tokengen.NewOpaqueTokenGenerator(crypter)
@@ -139,22 +141,23 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 	// ── Schema Stuff ─────────────────
 	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](cfg.Schema.LRUCacheSize)
 	if err != nil {
-		return fmt.Errorf("build schema cache: %w", err)
+		return fmt.Errorf("failed to build schema cache: %w", err)
 	}
+
 	var builtinPublicBase *url.URL
 	if cfg.Schema.BuiltinPublicBase != "" {
 		builtinPublicBase, err = url.Parse(cfg.Schema.BuiltinPublicBase)
 		if err != nil {
-			return fmt.Errorf("parse builtin public base: %w", err)
+			return fmt.Errorf("failed to parse builtin public base: %w", err)
 		}
 	}
-	schemaResolverWithHTTP := domain.NewJSONSchemaResolver(schemaRepo, schemaCache, 10, 1000_000, &http.Client{}, builtinPublicBase)
 
+	schemaResolverWithHTTP := domain.NewJSONSchemaResolver(schemaRepo, schemaCache, 10, 1000_000, &http.Client{}, builtinPublicBase)
 	// storageSchemaResolver without an HTTP client to fetch tenant schemas from the cache/storage
 	storageSchemaResolver := domain.NewJSONSchemaResolver(schemaRepo, schemaCache, 10, 1000_000, nil, builtinPublicBase)
 	schemaValidator, err := domain.NewSchemaValidator(builtinPublicBase.String())
 	if err != nil {
-		return fmt.Errorf("build schema validator: %w", err)
+		return fmt.Errorf("failed to build schema validator: %w", err)
 	}
 
 	// ── Services ─────────────────────
@@ -230,14 +233,20 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 			teamService,
 		),
 		api.NewSecurityHandler(opaqueTokenGenerator),
+		oasapi.WithMiddleware(
+			middleware.AddOperationIdToContext(),
+			// logging is done at net/http level
+		),
+		oasapi.WithMeterProvider(metrics.MeterProvider()),
+		oasapi.WithTracerProvider(metrics.TracerProvider()),
 		oasapi.WithErrorHandler(api.OgenErrorHandler))
 	if err != nil {
-		return fmt.Errorf("build api server: %w", err)
+		return fmt.Errorf("failed to build api server: %w", err)
 	}
 
-	mux, err := buildHTTPMux(cfg.Server, oasServer)
+	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to build http mux: %w", err)
 	}
 
 	httpServer := &http.Server{
@@ -251,10 +260,11 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 
 	serverErr := make(chan error, 1)
 	go func() {
-		log.Printf("server listening on %s", httpServer.Addr)
+		slog.Info("server listening for requests", slog.String("address", httpServer.Addr))
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serverErr <- err
 		}
+		slog.Debug("stopped listening")
 		close(serverErr)
 	}()
 
@@ -265,11 +275,14 @@ func run(ctx context.Context, cfg Config, pool database.Pool, userFiles []string
 		if err := httpServer.Shutdown(shutdownCtx); err != nil {
 			return fmt.Errorf("shutdown server: %w", err)
 		}
+		slog.Info("server shut down")
 		return nil
 	case err := <-serverErr:
 		return err
 	}
 }
+
+// ----------------------------- CONFIG --------------------------------------
 
 func loadConfig(configPath string) (Config, error) {
 	v := viper.NewWithOptions(viper.ExperimentalBindStruct())
@@ -296,6 +309,20 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("schema.builtin_public_base", "https://nextgen.com/api/schemas") // todo: temp, review
 	v.SetDefault("session.default_ttl", domain.SessionAnonymousTTL)
 	v.SetDefault("session.max_ttl", 720*time.Hour)
+	v.SetDefault("instrumentation.service_name", "Zitadel")
+	v.SetDefault("instrumentation.log.level", zlog.LevelInfo)
+	v.SetDefault("instrumentation.log.streams", []zlog.Stream{
+		zlog.StreamRuntime,
+		zlog.StreamReady,
+		zlog.StreamRequest,
+		zlog.StreamService,
+		zlog.StreamStorage,
+	})
+	v.SetDefault("instrumentation.log.format", instrumentation.LogFormatText)
+	v.SetDefault("instrumentation.log.add_source", true)
+	v.SetDefault("instrumentation.log.errors.report_location", true)
+	v.SetDefault("instrumentation.log.errors.stack_trace", true)
+	v.SetDefault("instrumentation.trace.fraction", 1.0)
 
 	// AutomaticEnv only resolves nested keys viper already knows about
 	// (via default, config file, fields of config struct or explicit BindEnv).
@@ -340,7 +367,9 @@ func mustBindEnv(v *viper.Viper, key string) {
 	}
 }
 
-func buildHTTPMux(cfg ServerConfig, apiHandler http.Handler) (*http.ServeMux, error) {
+// ----------------------------- HTTP --------------------------------------
+
+func buildHTTPMux(cfg ServerConfig, reqIdGen idgen.Generator, apiHandler http.Handler) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 
 	if cfg.LoginEnabled {
@@ -367,9 +396,55 @@ func buildHTTPMux(cfg ServerConfig, apiHandler http.Handler) (*http.ServeMux, er
 		mux.Handle(cfg.ConsolePath+"/", consoleHandler)
 	}
 
-	mux.Handle("/", api.WithRequestHostMiddleware(apiHandler))
+	mux.Handle("/",
+		middleware.WithRequestIdentification(reqIdGen,
+			middleware.WithLogging(
+				api.WithRequestHostMiddleware(apiHandler),
+			),
+		),
+	)
 	return mux, nil
 }
+
+// ----------------------------- STORAGE --------------------------------------
+
+func startDatabase(ctx context.Context, cfg Config) (database.Pool, error) {
+	connector, err := buildDatabaseConnector(cfg)
+	if err != nil {
+		return nil, err
+	}
+	pool, err := connector.Connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = pool.Migrate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return pool, nil
+}
+
+func buildDatabaseConnector(cfg Config) (database.Connector, error) {
+	if len(cfg.Database.Raw) == 0 {
+		options := embeddedPostgresOptions(cfg.Server.DataDir)
+		slog.Info("no database dialect configured, starting embedded postgres", slog.String("filePath", filepath.Dir(options.DataPath)))
+		return embedded.NewConnector(options), nil
+	}
+	return cfg.Database.Build()
+}
+
+func embeddedPostgresOptions(dataDir string) embedded.Options {
+	root := filepath.Join(dataDir, "embedded-postgres")
+	return embedded.Options{
+		RuntimePath: filepath.Join(root, "runtime"),
+		DataPath:    filepath.Join(root, "data"),
+		CachePath:   filepath.Join(root, "cache"),
+		LogPath:     filepath.Join(root, "postgres.log"),
+		Logger:      os.Stdout,
+	}
+}
+
+// ----------------------------- CRYPTO --------------------------------------
 
 // buildCrypter decodes a hex-encoded crypter key and constructs a
 // [crypto.Crypter]. The key must decode to exactly 32 bytes;
@@ -387,4 +462,26 @@ func buildCrypter(hexKey string) (crypto.Crypter, error) {
 	}
 	crypter := op.NewAES256GCMCrypto([32]byte(key), "")
 	return crypter, nil
+}
+
+// ----------------------------- INSTRUMENTATION --------------------------------------
+
+func setUpLogging(cfg instrumentation.LogConfig, otelProvider log.LoggerProvider) {
+	otelHandler := otelslog.NewHandler(
+		Name,
+		otelslog.WithLoggerProvider(otelProvider),
+	)
+
+	stdErrHandler := cfg.Format.ErrorHandler(cfg.SlogHandlerOptions())
+	handler := zlog.NewHandler(
+		cfg.Level,
+		cfg.Streams,
+		slog.NewMultiHandler(
+			otelHandler,
+			stdErrHandler,
+		),
+	)
+	logger := zlog.NewLogger(handler)
+	logger.Info("structured logger configured", "config_level", cfg.Level, "format", cfg.Format)
+	slog.SetDefault(logger)
 }

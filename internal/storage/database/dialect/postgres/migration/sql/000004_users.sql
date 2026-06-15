@@ -34,9 +34,6 @@ CREATE TABLE zitadel_nextgen.user_attributes (
     --JSONB allows for dynamic typing
     , value JSONB NOT NULL CHECK (
         jsonb_typeof(value) <> 'null'
-        AND value <> '[]'::jsonb
-        AND value <> '{}'::jsonb
-        AND value <> '""'::jsonb
     )
 
     , PRIMARY KEY (project_id, user_id, key)

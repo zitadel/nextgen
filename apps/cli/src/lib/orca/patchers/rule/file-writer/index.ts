@@ -1,4 +1,4 @@
-import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { ZitadelError } from "../../../../errors";
@@ -77,7 +77,65 @@ async function applyOp(
     case "add-dep":
       await addDependency(abs(opts.cwd, "package.json"), op, opts.dryRun, result);
       break;
+    case "edit":
+      await editFile(opts.cwd, op.path, op.edit, opts.dryRun, result);
+      break;
   }
+}
+
+/**
+ * Generic content edit: read the file, run the patcher-supplied transform, write
+ * the result. Framework knowledge lives entirely in `edit` (next to its
+ * patcher); this executor only owns candidate resolution, idempotency, dry-run,
+ * and the atomic write. `pathOrPaths` may be a single path or a priority list of
+ * candidates — the first that exists wins, else the first candidate.
+ */
+async function editFile(
+  cwd: string,
+  pathOrPaths: string | ReadonlyArray<string>,
+  edit: (source: string | undefined) => string,
+  dryRun: boolean,
+  result: ScaffoldAccumulator,
+): Promise<void> {
+  const candidates = (typeof pathOrPaths === "string" ? [pathOrPaths] : pathOrPaths).map((p) =>
+    abs(cwd, p),
+  );
+  if (candidates.length === 0) {
+    throw new ZitadelError("E_VALIDATION", "An edit op needs at least one candidate path", {
+      hint: "This is an internal patcher error — please report it if you hit it.",
+    });
+  }
+  let path = candidates[0];
+  let source: string | undefined;
+  let mode: number | undefined;
+  for (const candidate of candidates) {
+    const contents = await readIfExists(candidate);
+    if (contents !== undefined) {
+      path = candidate;
+      source = contents;
+      // Preserve the existing file's permission bits across the temp-file swap
+      // (mask off the file-type bits `stat` includes so `chmod` gets only perms).
+      mode = (await stat(candidate)).mode & 0o777;
+      break;
+    }
+  }
+  const next = edit(source);
+  if (next === source) {
+    result.filesSkipped.push(path);
+    return;
+  }
+  if (dryRun) {
+    result.filesWritten.push(path);
+    return;
+  }
+  await mkdir(dirname(path), { recursive: true });
+  const tmp = `${path}.tmp-${process.pid}-${Date.now()}`;
+  await writeFile(tmp, next);
+  if (mode !== undefined) {
+    await chmod(tmp, mode).catch(() => undefined);
+  }
+  await rename(tmp, path);
+  result.filesWritten.push(path);
 }
 
 async function ensureDir(

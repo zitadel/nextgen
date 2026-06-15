@@ -9,12 +9,14 @@
  * - `devPort` — the dev-server port parsed from the project, else the framework
  *   default.
  * - `url` — the local OIDC issuer derived from `devPort`.
+ * - `versionMajor` — optional major version of the detected framework package.
  */
 export type FrameworkFacts = Readonly<{
   id: string;
   appDir: string;
   devPort: number;
   url: string;
+  versionMajor?: number;
 }>;
 
 /**

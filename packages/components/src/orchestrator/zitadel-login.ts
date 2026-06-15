@@ -18,7 +18,7 @@ import {
   startFlow as apiStartFlow,
   submitStep as apiSubmitStep,
 } from "./api-client.js";
-import { resolveApi } from "./resolve-api.js";
+import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
 import type { Branding } from "./branding.js";
 import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { validateBranding } from "./branding-validator.js";
@@ -90,10 +90,31 @@ export class ZitadelLogin extends LitElement {
   @property({ type: String }) accessor purpose: CreateFlowBodyPurpose = "login";
 
   /**
-   * SDK project handle returned by `configureZitadel()`. When set, takes
-   * precedence over the global singleton from `getZitadelConfig()`.
+   * SDK project handle returned by `configureZitadel()`. Set from JS (or a
+   * framework binding). When set, takes precedence over both the
+   * `project-id`/`proxy-path`/`url` attributes and the global singleton from
+   * `getZitadelConfig()`.
    */
   @property({ attribute: false }) accessor project: ZitadelProject | undefined;
+
+  /**
+   * Project ID, set declaratively in HTML. Lets the component be configured on
+   * a plain page without JS or `configureZitadel()`. Ignored when the `project`
+   * property or a `configureZitadel()` global is set. See {@link projectAttrs}.
+   */
+  @property({ type: String, attribute: "project-id" }) accessor projectId = "";
+
+  /**
+   * Proxy path for API requests (e.g. `/__nextgen`), set declaratively in HTML.
+   * Defaults to `/__nextgen` when omitted, matching `configureZitadel()`.
+   */
+  @property({ type: String, attribute: "proxy-path" }) accessor proxyPath = "";
+
+  /**
+   * Full URL of the Zitadel auth backend, set declaratively in HTML. Optional —
+   * not needed in client-only setups.
+   */
+  @property({ type: String }) accessor url = "";
 
   /**
    * URL to navigate to after a successful embedded sign-in. When set, the
@@ -327,6 +348,11 @@ export class ZitadelLogin extends LitElement {
     return `<div slot="footer" part="attribution" class="zl-attribution"><zl-pill tone="neutral" href="https://zitadel.com" part="attribution-pill" aria-label="Secured with Zitadel">${zitadelAttributionPillInnerHtml()}</zl-pill></div>`;
   }
 
+  /** Declarative config read from this element's attributes. */
+  private get projectAttrs(): ProjectAttrs {
+    return { projectId: this.projectId, proxyPath: this.proxyPath, url: this.url };
+  }
+
   private async startFlow(): Promise<void> {
     this.loading = true;
     this.startupError = null;
@@ -334,14 +360,15 @@ export class ZitadelLogin extends LitElement {
       // Resolve inside the try so a missing configuration surfaces through
       // `handleTransportError` (rendered as `startupError`) rather than as an
       // unhandled promise rejection from `firstUpdated`'s microtask.
-      const { project: cfg, api } = resolveApi(this.project, "<zitadel-login>");
+      const { project: cfg, api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
       let wire: CreateFlow201;
       if (this.resumeFlowId) {
         wire = await getCurrentStep(api, this.resumeFlowId);
       } else {
         if (!cfg.projectId) {
           throw new Error(
-            "<zitadel-login> requires a project id (configureZitadel({ projectId }) or a `project` handle) to start a flow.",
+            "<zitadel-login> requires a project id (the `project-id` attribute, " +
+              "`configureZitadel({ projectId })`, or a `project` handle) to start a flow.",
           );
         }
         wire = await apiStartFlow(api, { project_id: cfg.projectId, purpose: this.purpose });
@@ -401,7 +428,11 @@ export class ZitadelLogin extends LitElement {
     if (behavior === "show" && handoffToken && this.postSignInUrl) {
       this.loading = true;
       try {
-        const { project: cfg, api } = resolveApi(this.project, "<zitadel-login>");
+        const { project: cfg, api } = resolveApi(
+          this.project,
+          this.projectAttrs,
+          "<zitadel-login>",
+        );
         await exchangeSession(api, { handoff_token: handoffToken }, { project_id: cfg.projectId });
         window.location.assign(this.postSignInUrl);
       } catch (error) {
@@ -501,13 +532,63 @@ export class ZitadelLogin extends LitElement {
     }
   }
 
+  private captureValuesFromFields(): Record<string, string> {
+    const root = this.shadowRoot;
+    if (!root) return this.formValues;
+    const fields = root.querySelectorAll<HTMLElement & { value?: string }>("zl-field");
+    if (fields.length === 0) return this.formValues;
+    const next = { ...this.formValues };
+    let changed = false;
+    for (const field of fields) {
+      const name = field.getAttribute("name");
+      const value = this.currentFieldValue(field);
+      if (!name || value === undefined) continue;
+      if (field.value !== value) {
+        field.value = value;
+      }
+      if (next[name] !== value) {
+        next[name] = value;
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.formValues = next;
+    }
+    return next;
+  }
+
+  private currentFieldValue(field: HTMLElement & { value?: string }): string | undefined {
+    const native = field.shadowRoot?.querySelector<HTMLInputElement>("input");
+    if (native && native.value !== field.value) {
+      return native.value;
+    }
+    return typeof field.value === "string" ? field.value : undefined;
+  }
+
   private handleAtomInput = (event: CustomEvent<{ name: string; value: string }>): void => {
     if (!event.detail) return;
     const { name, value } = event.detail;
     if (!name) return;
     this.formValues = { ...this.formValues, [name]: value };
+    this.syncFieldElementValue(name, value);
     emit(this, "zitadel-flow-input", { name, value });
   };
+
+  private syncFieldElementValue(name: string, value: string): void {
+    const root = this.shadowRoot;
+    if (!root) return;
+    const fields = root.querySelectorAll<HTMLElement & { value?: string }>("zl-field");
+    for (const field of fields) {
+      if (field.getAttribute("name") !== name) continue;
+      if (field.value !== value) {
+        field.value = value;
+      }
+      const native = field.shadowRoot?.querySelector<HTMLInputElement>("input");
+      if (native && native.value !== value) {
+        native.value = value;
+      }
+    }
+  }
 
   private handleAtomSubmit = (event: CustomEvent<{ action: string | null }>): void => {
     if (this.loading) return;
@@ -614,10 +695,11 @@ export class ZitadelLogin extends LitElement {
       // Only send field values that the current step defines. `formValues`
       // carries state across steps (e.g. email for the signed-in greeting)
       // but steps without fields should not leak prior values onto the wire.
+      const formValues = this.captureValuesFromFields();
       const stepFieldKeys = Object.keys(this.response.step.fields ?? {});
       const fields: Record<string, string> = {};
       for (const key of stepFieldKeys) {
-        const value = this.formValues[key];
+        const value = formValues[key];
         if (value !== undefined) {
           fields[key] = value;
         }
@@ -628,7 +710,7 @@ export class ZitadelLogin extends LitElement {
         fields,
         ...(challengeResponse ? { challenge_response: challengeResponse } : {}),
       };
-      const { api } = resolveApi(this.project, "<zitadel-login>");
+      const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
       const wire = await apiSubmitStep(api, id, body);
       this.applyResponse(wire);
       emit(this, "zitadel-flow-step", { step: wire.step });

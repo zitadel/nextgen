@@ -19,7 +19,7 @@ import type { RendererSpec } from "../types";
  * The handle is passed as the `project` DOM property, which relies on React
  * 19's custom-element property binding (the scaffold targets the latest Next /
  * React). The backend URL never reaches the browser: the client talks to the
- * same-origin `/__nextgen` proxy path, and the scaffolded `middleware.ts`
+ * same-origin `/__nextgen` proxy path, and the scaffolded Next request boundary
  * forwards it to `ZITADEL_URL` server-side. `NEXT_PUBLIC_ZITADEL_PROJECT_ID` is
  * public — the project id is not sensitive and the widget needs it to start a
  * flow.
@@ -48,7 +48,7 @@ const ${elementName} = dynamic(
     // \`project\` prop. The component reads config from this prop directly, so
     // it works regardless of how the SDK packages are bundled. The backend URL
     // stays server-side — requests go through the proxy path "/__nextgen",
-    // which the scaffolded middleware forwards to the Zitadel server.
+    // which the scaffolded request boundary forwards to the Zitadel server.
     const project = configureZitadel({
       projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "",
       proxyPath: "/__nextgen",

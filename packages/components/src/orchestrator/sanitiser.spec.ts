@@ -61,9 +61,18 @@ describe("DOMPurify sanitiser", () => {
   });
 
   it("preserves data-* and aria-* attributes", () => {
-    const out = sanitise(`<div data-theme="dark" aria-label="Login">x</div>`);
+    const out = sanitise(`<div data-theme="dark" data-testid="login" aria-label="Login">x</div>`);
     expect(out).toContain('data-theme="dark"');
+    expect(out).toContain('data-testid="login"');
     expect(out).toContain('aria-label="Login"');
+  });
+
+  it("preserves stable test ids on auth atoms", () => {
+    const out = sanitise(
+      `<zl-field name="email" data-testid="zitadel-field-email"></zl-field><zl-button action="submit" data-testid="zitadel-action-submit"></zl-button>`,
+    );
+    expect(out).toContain('data-testid="zitadel-field-email"');
+    expect(out).toContain('data-testid="zitadel-action-submit"');
   });
 
   it("preserves <img> with safe src", () => {

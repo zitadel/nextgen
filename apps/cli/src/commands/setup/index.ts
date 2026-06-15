@@ -4,12 +4,13 @@ import { createZitadelClient } from "@zitadel/api/client";
 import type { CreateProject201 } from "@zitadel/api/generated/model";
 import { consola } from "consola";
 
-import { ZitadelError } from "../../lib/errors";
+import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import { createOrca, issuerFromPort, type FrameworkFacts, type Orca } from "../../lib/orca";
 import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
+import { publicCliCommand } from "../../lib/public-cli";
 import { installDependenciesForSetup } from "./install";
 import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
 import {
@@ -48,12 +49,19 @@ const FRAMEWORK_OPTIONS = createOrca()
  */
 export default class Setup extends BaseCommand {
   static override description = "Create a Zitadel project and scaffold local auth.";
-  static override examples = ["<%= config.bin %> setup --framework next"];
+  static override examples = [
+    "<%= config.bin %> setup --framework next",
+    "<%= config.bin %> setup --framework react --dev-port 3000",
+  ];
   static override flags = {
     framework: Flags.string({ description: "Framework to target.", options: FRAMEWORK_OPTIONS }),
     renderer: Flags.string({
       description: "Renderer (default: react).",
       options: [...RENDERER_IDS],
+    }),
+    "dev-port": Flags.integer({
+      description:
+        "Dev-server port; also the issuer origin registered with Zitadel. Defaults to the detected port. Use distinct ports to run several scaffolded apps side by side.",
     }),
     "skip-install": Flags.boolean({
       description: "Do not install dependencies after setup updates package.json.",
@@ -88,9 +96,9 @@ export default class Setup extends BaseCommand {
       if (
         error instanceof ZitadelError &&
         error.code === "E_FRAMEWORK_NOT_DETECTED" &&
-        (await orca.isEmpty(cwd))
+        (await orca.isFreshScaffoldTarget(cwd))
       ) {
-        consola.info("Empty directory — scaffolding a fresh project");
+        consola.info("Fresh app directory — scaffolding a fresh project");
         framework = await orca.scaffold(
           cwd,
           await resolveScaffoldFramework(flags.framework, nonInteractive, orca),
@@ -102,6 +110,27 @@ export default class Setup extends BaseCommand {
       }
     }
 
+    // An explicit --dev-port overrides the detected port for the whole run, so
+    // the issuer and the registered origin track the requested port (and several
+    // apps can be scaffolded on distinct ports). The config edits set the
+    // dev-server port only when it is unset, so a project that already pins a
+    // different port in vite.config.*/angular.json keeps it — pass --dev-port to
+    // match that pin (or remove it) if the origin check rejects requests.
+    if (flags["dev-port"] !== undefined) {
+      const devPort = flags["dev-port"];
+      if (!Number.isInteger(devPort) || devPort < 1 || devPort > 65535) {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `--dev-port must be an integer in 1..65535, got ${devPort}`,
+        );
+      }
+      framework = {
+        ...framework,
+        devPort,
+        url: issuerFromPort(devPort),
+      };
+    }
+
     let answers: SetupAnswers = {
       server: this.meta.source,
       devPort: framework.devPort,
@@ -109,7 +138,11 @@ export default class Setup extends BaseCommand {
 
     if (!nonInteractive && !dryRun) {
       intro("Zitadel setup");
-      const promptCtx = { framework, serverFlag: this.meta.serverFlag };
+      const promptCtx = {
+        framework,
+        serverFlag: this.meta.serverFlag,
+        devPortFromFlag: flags["dev-port"] !== undefined,
+      };
       for (const prompt of SETUP_PROMPTS) {
         answers = await prompt.ask(answers, promptCtx);
       }
@@ -117,15 +150,27 @@ export default class Setup extends BaseCommand {
     }
 
     const issuer = issuerFromPort(answers.devPort);
+    // The DevPortPrompt can change the port interactively, so fold the answer
+    // back into the framework: the patched dev-server config reads
+    // `framework.devPort`, and it must agree with the issuer and the registered
+    // origin (both derived from `answers.devPort`).
+    framework = { ...framework, devPort: answers.devPort, url: issuer };
 
     // `POST /projects` is unauthenticated. Creating the project also
     // provisions its default user schema and login flow server-side, so the
     // CLI no longer builds, scaffolds, or uploads those resources here.
     consola.start(`Creating project on ${answers.server}${dryRun ? " (dry run)" : ""}`);
     const unauthClient = createZitadelClient({ baseUrl: answers.server });
+    // Register the app's own origin so the backend's origin check allows
+    // requests the dev proxy forwards from it.
     const project = dryRun
-      ? dryRunProject()
-      : await unauthClient.createProject({ previewOrigins: [] });
+      ? dryRunProject(issuer)
+      : await createProjectWithLocalHint(
+          unauthClient,
+          answers.server,
+          this.meta.cliVersion,
+          issuer,
+        );
     consola.success(`Created project ${project.id}`);
 
     const ctx: PatchContext = {
@@ -230,14 +275,43 @@ async function resolveScaffoldFramework(
 }
 
 /** A deterministic stand-in project for `--dry-run`, so no remote call is made. */
-function dryRunProject(): CreateProject201 {
+function dryRunProject(issuer: string): CreateProject201 {
   return {
     id: "dry-run-0000",
     projectSecret: "sk_proj_dry_run_full",
     previewSecret: "sk_proj_dry_run_preview",
-    previewOrigins: [],
+    previewOrigins: [issuer],
     createdAt: "2026-04-21T14:03:11.000Z",
   };
+}
+
+async function createProjectWithLocalHint(
+  client: ReturnType<typeof createZitadelClient>,
+  server: string,
+  cliVersion: string,
+  issuer: string,
+): Promise<CreateProject201> {
+  try {
+    // Register the app's own origin so the backend's origin check allows the
+    // requests the dev proxy forwards from it.
+    return await client.createProject({ previewOrigins: [issuer] });
+  } catch (error) {
+    const normalized = toZitadelError(error);
+    throw new ZitadelError(normalized.code, normalized.message, {
+      hint:
+        `${normalized.hint ? `${normalized.hint} ` : ""}` +
+        "If you meant to use a local Zitadel server, run npx @zitadel/cli@alpha start " +
+        "and retry setup with --server local.",
+      nextCommands: [
+        publicCliCommand("start", cliVersion),
+        publicCliCommand("setup --server local", cliVersion),
+      ],
+      details: {
+        server,
+        original: normalized.details,
+      },
+    });
+  }
 }
 
 /** Renders an absolute path relative to `cwd` for human-readable output. */
@@ -308,6 +382,7 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   "app/register/page.tsx": { subject: "the registration page" },
   "app/profile/page.tsx": { subject: "the profile page" },
   "middleware.ts": { subject: "the Next.js middleware" },
+  "proxy.ts": { subject: "the Next.js proxy" },
   "custom-elements.d.ts": { subject: "the web-component type declarations" },
   "package.json": { subject: "package.json with the SDK dependency" },
 };
@@ -342,6 +417,7 @@ function buildSummary(opts: {
     ["Login page", "app/login/page.tsx"],
     ["Register page", "app/register/page.tsx"],
     ["Profile page", "app/profile/page.tsx"],
+    ["Request proxy", "proxy.ts"],
     ["Middleware", "middleware.ts"],
     ["Env vars", ".env.local"],
   ] as const) {

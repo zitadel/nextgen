@@ -29,7 +29,7 @@ Next iteration of the Zitadel identity platform.
 | --------------------------------- | -------------------------------------------------------------- |
 | Check local runtime prerequisites | `npx @zitadel/cli@alpha doctor`                                |
 | Start local Zitadel               | `npx @zitadel/cli@alpha start`                                 |
-| Add auth to a Next.js app         | `npx @zitadel/cli@alpha setup --framework next --server local` |
+| Add auth to a Next.js app         | `npx @zitadel/cli@alpha setup --server local`                  |
 | Check generated app files         | `npx @zitadel/cli@alpha doctor`                                |
 | Stop local Zitadel, keeping data  | `npx @zitadel/cli@alpha stop`                                  |
 | Delete local Zitadel data         | `npx @zitadel/cli@alpha reset --force`                         |
@@ -46,25 +46,34 @@ local runtime image by default. The wrapper runs the CLI build, then builds
 before invoking `zitadel start`. Pass `--image <tag>` or set
 `ZITADEL_LOCAL_IMAGE=<tag>` to use an existing image instead.
 
+`corepack pnpm run cli -- setup ...` is the manual whole-local-train path for
+humans and agents. Before invoking the local CLI, the wrapper builds and packs
+the public workspace packages, publishes them to a persistent local Verdaccio
+registry under `tmp/cli-local-registry`, and points the generated app install at
+that registry. Set `ZITADEL_CLI_USE_PUBLIC_PACKAGES=1` when you intentionally
+want the generated app to install public npm packages instead.
+
 `corepack pnpm run server` builds and syncs the embedded console/login UI before
 startup, then runs `go run .`; help output skips the UI sync.
 
 ## Customer quick start
 
 ```sh
-npx create-next-app@latest myapp
+mkdir myapp
 cd myapp
 npx @zitadel/cli@alpha doctor
 npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --framework next --server local
+npx @zitadel/cli@alpha setup --server local
 npm run dev
 ```
 
 Open http://localhost:3000/login and register your first local user. The
 managed Zitadel runtime stores its container metadata and data under
 `.zitadel/local/`; `stop` preserves that data and `reset --force`
-deletes it. `setup` installs dependencies with the detected package manager;
-pass `--skip-install` if you want to install them yourself.
+deletes it. In a fresh directory, `setup` asks which framework to scaffold and
+writes the app into the current directory. It installs dependencies with the
+detected package manager; pass `--skip-install` if you want to install them
+yourself.
 
 ## Manual Docker quick start
 
@@ -135,16 +144,22 @@ Use `corepack pnpm --silent run cli -- ... --json` when a script needs
 parseable CLI stdout. Plain `pnpm run` prints its own script prelude before
 the command output.
 
-Fresh-app consumer journey check:
+Customer local setup journey check:
 
 ```sh
 corepack pnpm run journey
 ```
 
 This opt-in check ensures the Playwright Chromium browsers are installed, builds
-the local npm packages, publishes them to a temporary Verdaccio registry, starts
-a source backend with embedded Postgres, scaffolds a new Next.js app outside the
-repo, and verifies registration/login journeys against the generated app.
+the local npm packages, publishes them to a temporary Verdaccio registry, runs
+`npx @zitadel/cli@alpha doctor`, `start`, and
+`setup --framework next --server local` in an empty app directory, starts the
+generated app, and verifies registration/login journeys.
+
+Use `corepack pnpm run journey` for deterministic CI-style proof. Use
+`corepack pnpm run cli -- ...` when you want to drive the same local package
+train manually in a browser and see whether the command guidance is clear enough
+for a human or agent.
 
 ## CI
 
@@ -156,19 +171,24 @@ Pull requests and pushes to `main` run:
 - npm package dry-run/pack checks.
 - A non-publishing GoReleaser snapshot.
 - `consumer-journey-e2e`, which downloads the current workflow's GoReleaser
-  snapshot image and npm package tarballs, installs them through a temporary
-  npm registry into a fresh Next.js app, and runs the Playwright user journey.
+  snapshot image and npm package tarballs, installs the CLI through a temporary
+  npm registry, runs the customer local setup commands in a fresh app directory,
+  and runs the Playwright user journey against the generated app.
 
 CI uploads short-lived workflow artifacts for review: GoReleaser snapshot output
 and npm package tarballs. On consumer journey failures it also uploads focused
-diagnostics such as Playwright traces, setup JSON, package lock metadata, and
-service logs. These artifacts expire after 7 days and are not release artifacts.
+diagnostics such as Playwright traces, doctor/start/setup JSON, package lock
+metadata, local runtime logs, and service logs. These artifacts expire after 7
+days and are not release artifacts.
 
 ## Build & release
 
-This monorepo separates Go release artifacts, console build output, and npm
-package artifacts. The full rationale lives in
-[docs/adrs/002-multi-package-release-strategy.md](docs/adrs/002-multi-package-release-strategy.md).
+This monorepo uses GoReleaser for Go artifacts and Changesets for npm package
+versioning. During the public alpha period, the release train intentionally
+publishes one version across the server image, server binary, CLI, and public
+npm packages. The full rationale lives in
+[docs/adrs/002-multi-package-release-strategy.md](docs/adrs/002-multi-package-release-strategy.md)
+and [docs/adrs/023-lockstep-alpha-release-train.md](docs/adrs/023-lockstep-alpha-release-train.md).
 
 ### Go server binary + embedded UIs (`goreleaser`)
 
@@ -186,10 +206,10 @@ docker run --rm -p 8080:8080 \
   ghcr.io/zitadel/nextgen:<snapshot-tag>-amd64
 ```
 
-The publish-capable release workflow is currently manual-only via
-`.github/workflows/release.yml` (`workflow_dispatch`). It can run a dry snapshot
-or, when intentionally invoked for a release tag, produce multi-arch tarballs and
-push a multi-arch image manifest to `ghcr.io/zitadel/nextgen`.
+The manual `.github/workflows/release.yml` workflow remains available for server
+snapshots and fallback releases. The normal public alpha path runs GoReleaser
+from [`release-npm.yml`](.github/workflows/release-npm.yml) after npm publishing
+succeeds, so the server image and npm packages share the same alpha version.
 
 ### npm packages (`changesets`)
 
@@ -201,8 +221,32 @@ change to those packages:
 corepack pnpm changeset
 ```
 
-The changesets workflow opens a "Version Packages" PR. Merging that PR versions
-and publishes the affected packages through npm trusted publishing.
+The changesets workflow opens a "Version Packages" PR. Merging that PR publishes
+the fixed alpha package group through npm trusted publishing, validates that all
+public packages share the same `0.1.0-alpha.N` version, creates `v<version>`,
+runs GoReleaser, and updates one draft GitHub Release titled
+`ZITADEL Alpha <version>`. Alpha releases are GitHub prereleases and publish only
+the immutable image tag, for example `ghcr.io/zitadel/nextgen:0.1.0-alpha.N`;
+they do not move `ghcr.io/zitadel/nextgen:latest`.
+
+Follow the short [alpha release runbook](docs/runbooks/release-alpha-train.md)
+when cutting a public alpha train.
+
+Release process checks can be run locally with:
+
+```sh
+corepack pnpm run check -- --only release
+```
+
+Tester commands use either the latest alpha stream or an exact train:
+
+```sh
+npx @zitadel/cli@alpha doctor
+npx @zitadel/cli@alpha start
+npx @zitadel/cli@alpha setup --server local
+
+npx @zitadel/cli@0.1.0-alpha.N start
+```
 
 ### Local development
 

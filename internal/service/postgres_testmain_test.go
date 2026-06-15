@@ -6,10 +6,11 @@ package service_test
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
 	"testing"
 
+	slogctx "github.com/veqryn/slog-context"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
 )
@@ -25,21 +26,21 @@ func runPostgresIntegrationTests(m *testing.M) int {
 
 	connector, stop, err := dbtest.Postgres(ctx)
 	if err != nil {
-		log.Printf("integration: database setup failed: %v", err)
+		slog.Error("integration: database setup failed", slogctx.Err(err))
 		return 1
 	}
 	defer stop()
 
 	pool, err := connector.Connect(ctx)
 	if err != nil {
-		log.Printf("integration: connect failed: %v", err)
+		slog.Error("integration: connect failed", slogctx.Err(err))
 		return 1
 	}
 	integrationPool = pool.(database.PoolTest)
 	defer integrationPool.Close(ctx)
 
 	if err = integrationPool.MigrateTest(ctx); err != nil {
-		log.Printf("integration: migrate failed: %v", err)
+		slog.Error("integration: migrate failed", slogctx.Err(err))
 		return 1
 	}
 
