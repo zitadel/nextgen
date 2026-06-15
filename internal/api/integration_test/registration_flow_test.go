@@ -73,11 +73,11 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 
 	userRepo := harness.EnsureUserRepo(t)
 	require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
-		ProjectID:  project.ID,
-		SchemaURL:  userSchemaURL.String(),
-		ID:         userID,
-		TeamID:     &team.ID,
-		Attributes: []*domain.CreateAttribute{emailAttr},
+		ProjectID:           project.ID,
+		SchemaURL:           userSchemaURL.String(),
+		ID:                  userID,
+		ParticipationTeamID: &team.ID,
+		Attributes:          []*domain.CreateAttribute{emailAttr},
 	}))
 
 	passkeyRepo := harness.EnsureUserPasskeyRepo(t)

@@ -74,18 +74,18 @@ func importFile(
 		return err
 	}
 
-	var teamID *string
+	var participationTeamID *string
 	if doc.Header.TeamID != "" {
 		tid := doc.Header.TeamID
-		teamID = &tid
+		participationTeamID = &tid
 	}
 
 	if err := userRepo.Create(ctx, pool, &domain.CreateUser{
-		ProjectID:  doc.Header.ProjectID,
-		SchemaURL:  doc.Header.SchemaURL,
-		ID:         doc.Header.ID,
-		TeamID:     teamID,
-		Attributes: attrs,
+		ProjectID:           doc.Header.ProjectID,
+		SchemaURL:           doc.Header.SchemaURL,
+		ID:                  doc.Header.ID,
+		ParticipationTeamID: participationTeamID,
+		Attributes:          attrs,
 	}); err != nil {
 		return fmt.Errorf("create user: %w", err)
 	}

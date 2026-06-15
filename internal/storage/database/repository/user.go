@@ -18,16 +18,18 @@ const (
 )
 
 var (
-	colUserProjectID          = database.NewColumn(userTable, "project_id")
-	colUserID                 = database.NewColumn(userTable, "id")
-	colUserTeamID             = database.NewColumn(userTable, "team_id")
-	colUserSchemaURL          = database.NewColumn(userTable, "schema_url")
-	colUserCreatedAt          = database.NewColumn(userTable, "created_at")
-	colUserUpdatedAt          = database.NewColumn(userTable, "updated_at")
-	colUserAttributeProjectID = database.NewColumn(userAttributesTable, "project_id")
-	colUserAttributeUserID    = database.NewColumn(userAttributesTable, "user_id")
-	colUserAttributeKey       = database.NewColumn(userAttributesTable, "key")
-	colUserAttributeValue     = database.NewColumn(userAttributesTable, "value")
+	colUserProjectID            = database.NewColumn(userTable, "project_id")
+	colUserID                   = database.NewColumn(userTable, "id")
+	colUserLifecycleOwnerTeamID = database.NewColumn(userTable, "lifecycle_owner_team_id")
+	colUserStatus               = database.NewColumn(userTable, "status")
+	colUserSchemaURL            = database.NewColumn(userTable, "schema_url")
+	colUserCreatedAt            = database.NewColumn(userTable, "created_at")
+	colUserUpdatedAt            = database.NewColumn(userTable, "updated_at")
+	colUserAttributeProjectID   = database.NewColumn(userAttributesTable, "project_id")
+	colUserAttributeTeamID      = database.NewColumn(userAttributesTable, "team_id")
+	colUserAttributeUserID      = database.NewColumn(userAttributesTable, "user_id")
+	colUserAttributeKey         = database.NewColumn(userAttributesTable, "key")
+	colUserAttributeValue       = database.NewColumn(userAttributesTable, "value")
 )
 
 // UserRepository implements [domain.UserRepository] backed by project-scoped tables and user EAV.
@@ -58,8 +60,32 @@ func (r *UserRepository) IDCondition(id string) database.Condition {
 	return database.NewTextCondition(colUserID, database.TextOperationEqual, id)
 }
 
-func (r *UserRepository) TeamIDCondition(teamID string) database.Condition {
-	return database.NewTextCondition(colUserTeamID, database.TextOperationEqual, teamID)
+func (r *UserRepository) LifecycleOwnerTeamIDCondition(teamID string) database.Condition {
+	return database.NewTextCondition(colUserLifecycleOwnerTeamID, database.TextOperationEqual, teamID)
+}
+
+type membershipTeamMatch struct{ teamID string }
+
+func (c membershipTeamMatch) Write(b *database.StatementBuilder) {
+	b.WriteString("EXISTS (SELECT 1 FROM zitadel_nextgen.team_memberships m WHERE m.project_id = ")
+	colUserProjectID.WriteQualified(b)
+	b.WriteString(" AND m.user_id = ")
+	colUserID.WriteQualified(b)
+	b.WriteString(" AND m.team_id = ")
+	b.WriteArg(c.teamID)
+	b.WriteString(" AND m.status = 'active')")
+}
+
+func (membershipTeamMatch) Matches(any) bool { return true }
+
+func (membershipTeamMatch) String() string { return "membershipTeamMatch" }
+
+func (membershipTeamMatch) IsRestrictingColumn(database.Column) bool { return false }
+
+var _ database.Condition = membershipTeamMatch{}
+
+func (r *UserRepository) MembershipTeamCondition(teamID string) database.Condition {
+	return membershipTeamMatch{teamID: teamID}
 }
 
 func (r *UserRepository) AttributesCondition(attrs []domain.Attribute) database.Condition {
@@ -73,8 +99,12 @@ func (r *UserRepository) AttributesCondition(attrs []domain.Attribute) database.
 	return database.And(conds...)
 }
 
-func (r *UserRepository) SetTeam(teamID *string) database.Change {
-	return database.NewChangePtr(colUserTeamID, teamID)
+func (r *UserRepository) SetLifecycleOwnerTeamID(teamID *string) database.Change {
+	return database.NewChangePtr(colUserLifecycleOwnerTeamID, teamID)
+}
+
+func (r *UserRepository) SetStatus(status domain.UserStatus) database.Change {
+	return database.NewChange(colUserStatus, status.String())
 }
 
 func (r *UserRepository) SetAttribute(a domain.CreateAttribute) database.Change {
@@ -119,7 +149,16 @@ func WithUserScalarList(project string, filters []UserListScalarFilter, teamScop
 }
 
 func (r *UserRepository) Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error {
-	_, err := deleteOne(ctx, client, r, condition)
+	wherePart := database.NewStatementBuilder(" WHERE ")
+	condition.Write(wherePart)
+	_, err := client.Exec(ctx,
+		`DELETE FROM zitadel_nextgen.team_memberships WHERE (project_id, user_id) IN (SELECT project_id, id FROM zitadel_nextgen.users`+wherePart.String()+`)`,
+		wherePart.Args()...,
+	)
+	if err != nil {
+		return err
+	}
+	_, err = deleteOne(ctx, client, r, condition)
 	return err
 }
 
@@ -128,16 +167,16 @@ WITH _input_data AS (
     SELECT *,
            unique_scope_txt::zitadel_nextgen.uniqueness_scope AS unique_scope
     FROM unnest(
-        $5::text[],
-        $6::jsonb[],
-        $7::bytea[],
-        $8::text[]
+        $6::text[],
+        $7::jsonb[],
+        $8::bytea[],
+        $9::text[]
     ) AS t(key, value, value_hash, unique_scope_txt)
 ),
 _user_header AS (
-    INSERT INTO zitadel_nextgen.users (project_id, schema_url, id, team_id)
-    VALUES ($1, $2, $3, $4)
-    RETURNING project_id, id, team_id
+    INSERT INTO zitadel_nextgen.users (project_id, schema_url, id, lifecycle_owner_team_id, status)
+    VALUES ($1, $2, $3, $4, 'active')
+    RETURNING project_id, id
 ),
 _registry AS (
     INSERT INTO zitadel_nextgen.user_unique_attributes (
@@ -146,7 +185,7 @@ _registry AS (
     SELECT h.project_id, h.id,
            CASE WHEN d.unique_scope = 'project'::zitadel_nextgen.uniqueness_scope
                 THEN ''
-                ELSE COALESCE(h.team_id, '')::text
+                ELSE COALESCE($5::text, '')
            END,
            d.key, d.value_hash
     FROM _input_data d CROSS JOIN _user_header h
@@ -157,7 +196,7 @@ _attributes AS (
     INSERT INTO zitadel_nextgen.user_attributes (
         project_id, team_id, user_id, key, value
     )
-    SELECT h.project_id, COALESCE(h.team_id, ''), h.id, d.key, d.value
+    SELECT h.project_id, COALESCE($5::text, ''), h.id, d.key, d.value
     FROM _input_data d CROSS JOIN _user_header h
 )
 SELECT 1;
@@ -192,10 +231,23 @@ func (r *UserRepository) Create(ctx context.Context, client database.QueryExecut
 	}
 
 	_, err := client.Exec(ctx, userInsertSQL,
-		user.ProjectID, user.SchemaURL, user.ID, user.TeamID,
+		user.ProjectID, user.SchemaURL, user.ID, user.LifecycleOwnerTeamID,
+		user.AttributeTeamScope(),
 		keys, values, hashes, scopes,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	if user.ParticipationTeamID == nil || *user.ParticipationTeamID == "" {
+		return nil
+	}
+	membershipRepo := NewTeamMembershipRepository()
+	return membershipRepo.Create(ctx, client, &domain.TeamMembership{
+		ProjectID: user.ProjectID,
+		TeamID:    *user.ParticipationTeamID,
+		UserID:    user.ID,
+		Status:    domain.MembershipStatusActive,
+	})
 }
 
 func userHydrationExpressions(rowQualifier, attrKeysPlaceholder, authPlaceholder string) string {
@@ -224,10 +276,27 @@ func userHydrationExpressions(rowQualifier, attrKeysPlaceholder, authPlaceholder
     CASE WHEN ` + authPlaceholder + ` THEN EXISTS(SELECT 1 FROM zitadel_nextgen.user_passkeys p WHERE p.project_id = ` + rowQualifier + `.project_id AND p.user_id = ` + rowQualifier + `.id) ELSE FALSE END AS has_pk`
 }
 
-func (r *UserRepository) GetByID(ctx context.Context, client database.QueryExecutor, projectID string, teamID *string, userID string) (*domain.User, error) {
+func (r *UserRepository) Deactivate(ctx context.Context, client database.QueryExecutor, projectID, userID string) error {
+	cond := r.PrimaryKeyCondition(projectID, userID)
+	_, err := updateOne(ctx, client, r, cond,
+		r.SetStatus(domain.UserStatusDeactivated),
+		database.NewChange(colUserUpdatedAt, database.NowInstruction),
+	)
+	if err != nil {
+		return err
+	}
+	_, err = client.Exec(ctx,
+		`UPDATE zitadel_nextgen.team_memberships SET status = $3, updated_at = NOW()`+
+			` WHERE project_id = $1 AND user_id = $2 AND status <> $3`,
+		projectID, userID, domain.MembershipStatusRemoved.String(),
+	)
+	return err
+}
+
+func (r *UserRepository) GetByID(ctx context.Context, client database.QueryExecutor, projectID string, membershipTeamID *string, userID string) (*domain.User, error) {
 	condition := r.PrimaryKeyCondition(projectID, userID)
-	if teamID != nil {
-		condition = database.And(condition, r.TeamIDCondition(*teamID))
+	if membershipTeamID != nil {
+		condition = database.And(condition, r.MembershipTeamCondition(*membershipTeamID))
 	}
 	return r.Get(ctx, client, database.WithCondition(condition))
 }
@@ -252,7 +321,7 @@ func (r *UserRepository) Get(ctx context.Context, client database.QueryExecutor,
 	authPlaceholder := "$" + strconv.Itoa(n+2)
 
 	stmt := strings.TrimSpace(fmt.Sprintf(`
-SELECT zitadel_nextgen.users.project_id, zitadel_nextgen.users.schema_url, zitadel_nextgen.users.id, zitadel_nextgen.users.team_id, zitadel_nextgen.users.created_at, zitadel_nextgen.users.updated_at,%s
+SELECT zitadel_nextgen.users.project_id, zitadel_nextgen.users.schema_url, zitadel_nextgen.users.id, zitadel_nextgen.users.lifecycle_owner_team_id, zitadel_nextgen.users.status, zitadel_nextgen.users.created_at, zitadel_nextgen.users.updated_at,%s
 FROM zitadel_nextgen.users%s`,
 		userHydrationExpressions("zitadel_nextgen.users", attrPlaceholder, authPlaceholder),
 		wherePart.String(),
@@ -329,7 +398,7 @@ func (r *UserRepository) List(ctx context.Context, client database.QueryExecutor
 		attrPlaceholder := "$" + strconv.Itoa(n+1)
 		authPlaceholder := "$" + strconv.Itoa(n+2)
 		stmt := strings.TrimSpace(fmt.Sprintf(`
-SELECT zitadel_nextgen.users.project_id, zitadel_nextgen.users.schema_url, zitadel_nextgen.users.id, zitadel_nextgen.users.team_id, zitadel_nextgen.users.created_at, zitadel_nextgen.users.updated_at,%s
+SELECT zitadel_nextgen.users.project_id, zitadel_nextgen.users.schema_url, zitadel_nextgen.users.id, zitadel_nextgen.users.lifecycle_owner_team_id, zitadel_nextgen.users.status, zitadel_nextgen.users.created_at, zitadel_nextgen.users.updated_at,%s
 FROM zitadel_nextgen.users%s`,
 			userHydrationExpressions("zitadel_nextgen.users", attrPlaceholder, authPlaceholder),
 			wherePart.String(),
@@ -353,7 +422,7 @@ FROM zitadel_nextgen.users%s`,
 	authPlaceholder := "$6"
 
 	stmt := strings.TrimSpace(fmt.Sprintf(`%s
-SELECT u.project_id, u.schema_url, u.id, u.team_id, u.created_at, u.updated_at,%s
+SELECT u.project_id, u.schema_url, u.id, u.lifecycle_owner_team_id, u.status, u.created_at, u.updated_at,%s
 FROM matching_ids m
 JOIN zitadel_nextgen.users u ON u.project_id = $3 AND u.id = m.user_id`,
 		userListByAttributesCTE,

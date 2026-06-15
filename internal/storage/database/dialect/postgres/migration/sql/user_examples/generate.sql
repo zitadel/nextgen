@@ -23,12 +23,19 @@ SELECT
     '{}' ::json
 FROM zitadel_nextgen.projects p;
 
-INSERT INTO zitadel_nextgen.users (project_id, team_id, id, schema_url)
-SELECT
-    t.project_id,
-    t.id,
-    'usr_' || substr(md5(random()::text || clock_timestamp()::text), 1, 8),
-    './user.schema.json'
-FROM zitadel_nextgen.teams t;
+WITH seeded AS (
+    SELECT
+        t.project_id,
+        t.id AS team_id,
+        'usr_' || substr(md5(random()::text || clock_timestamp()::text), 1, 8) AS user_id
+    FROM zitadel_nextgen.teams t
+)
+INSERT INTO zitadel_nextgen.users (project_id, id, schema_url, lifecycle_owner_team_id, status)
+SELECT project_id, user_id, './user.schema.json', NULL, 'active'
+FROM seeded;
+
+INSERT INTO zitadel_nextgen.team_memberships (project_id, team_id, user_id, status)
+SELECT project_id, team_id, user_id, 'active'
+FROM seeded;
 
 -- Populate attributes + uniqueness registry omitted here; prefer create.sql CTE flows in application code.

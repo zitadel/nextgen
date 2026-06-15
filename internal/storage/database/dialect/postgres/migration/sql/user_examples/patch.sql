@@ -12,7 +12,21 @@ WITH _header AS (
     UPDATE zitadel_nextgen.users
     SET updated_at = now()
     WHERE project_id = $1 AND id = $2
-    RETURNING team_id, schema_url, created_at, updated_at
+    RETURNING project_id, id, lifecycle_owner_team_id, status, schema_url, created_at, updated_at
+),
+_scope AS (
+    SELECT
+        h.*
+        , COALESCE((
+            SELECT m.team_id
+            FROM zitadel_nextgen.team_memberships m
+            WHERE m.project_id = h.project_id
+              AND m.user_id = h.id
+              AND m.status = 'active'
+            ORDER BY m.created_at
+            LIMIT 1
+        ), '')::text AS attr_team_id
+    FROM _header h
 ),
 _input_upsert AS (
     SELECT key, value, value_hash, unique_scope
@@ -31,8 +45,8 @@ _ins_registry AS (
     INSERT INTO zitadel_nextgen.user_unique_attributes (
         project_id, user_id, team_id, key, value_hash
     )
-    SELECT $1, $2, CASE WHEN unique_scope = 'project' THEN '' ELSE COALESCE(h.team_id, '')::text END, key, value_hash
-    FROM _input_upsert, _header h
+    SELECT $1, $2, CASE WHEN unique_scope = 'project' THEN '' ELSE h.attr_team_id END, key, value_hash
+    FROM _input_upsert, _scope h
     WHERE unique_scope <> 'unspecified'
 ),
 _del_attrs AS (
@@ -42,8 +56,8 @@ _del_attrs AS (
 ),
 _upsert_attrs AS (
     INSERT INTO zitadel_nextgen.user_attributes (project_id, team_id, user_id, key, value)
-    SELECT $1, h.team_id, $2, i.key, i.value
-    FROM _input_upsert i, _header h
+    SELECT $1, h.attr_team_id, $2, i.key, i.value
+    FROM _input_upsert i, _scope h
     ON CONFLICT (project_id, user_id, key) DO UPDATE
     SET value = EXCLUDED.value
     RETURNING key
@@ -57,7 +71,7 @@ _upsert_attrs_count AS (
     FROM _upsert_attrs
 )
 SELECT
-    h.schema_url, $2 as id, h.team_id, h.created_at, h.updated_at,
+    h.schema_url, $2 as id, h.lifecycle_owner_team_id, h.status, h.created_at, h.updated_at,
     (
         SELECT array_agg(ROW(final.key, final.value))
         FROM (
@@ -71,6 +85,6 @@ SELECT
     ) AS attributes,
     dac.deleted_attributes,
     uac.upserted_attributes
-FROM _header h
+FROM _scope h
 CROSS JOIN _del_attrs_count dac
 CROSS JOIN _upsert_attrs_count uac;

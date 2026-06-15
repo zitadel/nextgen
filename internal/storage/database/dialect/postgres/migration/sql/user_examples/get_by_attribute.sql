@@ -18,11 +18,11 @@ WITH target AS (
     LIMIT 2
 )
 SELECT
-    u.schema_url, u.id, u.team_id, u.created_at, u.updated_at,
+    u.schema_url, u.id, u.lifecycle_owner_team_id, u.status, u.created_at, u.updated_at,
     (
-      SELECT array_agg(ROW(a.key, a.value))
-      FROM zitadel_nextgen.user_attributes a
-      WHERE a.project_id = u.project_id
+        SELECT array_agg(ROW(a.key, a.value))
+        FROM zitadel_nextgen.user_attributes a
+        WHERE a.project_id = u.project_id
         AND a.user_id = u.id
         AND ($6 IS NULL OR a.key = ANY($6))
     ) AS attributes
