@@ -23,12 +23,10 @@ test("signs in via the embedded component and lands on /admin", async ({ page })
   await page.getByLabel(/email/i).fill(email);
   await page.getByLabel(/password/i).fill("hunter2");
   // Combined identifier step (email + password) — api-mock `identifierStep`.
+  // Submitting goes straight to the terminal step; no passkey upsell screen.
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  const skip = page.getByRole("button", { name: /skip for now/i });
-  await expect(skip).toBeVisible({ timeout: 15_000 });
-  await skip.click();
 
-  await page.waitForURL("**/admin");
+  await page.waitForURL("**/admin", { timeout: 15_000 });
   await expect(page.getByRole("heading", { name: "Admin" })).toBeVisible();
   // SessionDetails component fetches /sessions/me and renders identity + details.
   await expect(page.getByText(/Signed in as user_/)).toBeVisible({ timeout: 10_000 });
