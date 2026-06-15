@@ -230,33 +230,84 @@ For customer-local runtime workflows, agents should prefer
 - Agent-created or agent-updated PRs must include a concise description before
   handoff. Use sections for `Summary`, `Validation`,
   `Release notes / changeset`, and `Notes`. List the exact validation commands
-  run; if validation was not run, say so explicitly. Mention changeset status
-  for user-visible package changes.
-- User-visible changes to a public npm package need a changeset. The public
-  packages are `@zitadel/cli` (`apps/cli/`), `@zitadel/api`,
-  `@zitadel/components`, `@zitadel/sdk-core`, `@zitadel/sdk-next`,
-  `@zitadel/sdk-nuxt`, `@zitadel/sdk-react`, `@zitadel/sdk-vue`, and
-  `@zitadel/sdk-angular`. CI fails a PR that touches them without one
-  (`changeset-check` in `.github/workflows/ci.yml`).
-- Add a changeset by writing the file directly — do not depend on the
-  interactive `pnpm changeset` prompt. Create `.changeset/<short-slug>.md`:
+  run; if validation was not run, say so explicitly. In **Release notes /
+  changeset**, state one of the three outcomes from the changeset decision table
+  below — do not add a `.changeset/*.md` file unless that table says you should.
 
-  ```md
-  ---
-  "@zitadel/cli": minor
-  ---
+### Changesets
 
-  One-line, user-facing summary of the change.
-  ```
+CI (`changeset-check` in `.github/workflows/ci.yml`) runs
+[`scripts/check-changeset-required.mjs`](scripts/check-changeset-required.mjs).
+It fails only when the PR diff touches a **publishable package path** and no
+`.changeset/*.md` file was added.
 
-  List only public package names; pick `patch` (fixes), `minor` (features), or
-  `major` (breaking). The repo is in `alpha` prerelease mode
-  (`.changeset/pre.json`) and public packages are in one fixed group, so
-  versions cut as one `X.Y.Z-alpha.N` train automatically — no extra action
-  needed.
+**Publishable paths** (must match the script):
 
-- For changes that release nothing (docs, tests, CI, chores), add an empty
-  changeset: `corepack pnpm changeset --empty`.
+- `apps/cli/`
+- `packages/api/`, `packages/components/`
+- `packages/sdk-core/`, `packages/sdk-next/`, `packages/sdk-nuxt/`,
+  `packages/sdk-react/`, `packages/sdk-vue/`, `packages/sdk-angular/`
+
+`AGENTS.md` files under those roots are ignored by the gate and do not require a
+changeset on their own.
+
+Everything else — `internal/`, `docs/`, `.github/`, `apps/console/`,
+`packages/api-mock/`, demos, Go server paths, and other private workspaces — does
+**not** require any changeset file.
+
+**User-visible** means npm consumers would notice: exported APIs/types, CLI
+command surface or JSON contract, published component behavior, or install/setup
+docs shipped in the package. Internal refactors, tests-only edits, and
+contributor-only files are not user-visible unless they change what publishes.
+
+**Decision table** — follow in order before opening a PR:
+
+| If the PR… | Add `.changeset/*.md`? | **Release notes / changeset** section |
+| --- | --- | --- |
+| Does **not** modify any publishable path above | **No** | `No changeset required — no public npm package files changed.` |
+| Modifies publishable paths **and** has user-visible npm impact | **Yes** — real changeset | Name the file and summarize the consumer-facing note |
+| Modifies publishable paths only for non-shipping reasons (e.g. package-internal test) | **Rare:** empty changeset to satisfy CI | Explain why the path changed but nothing ships |
+
+**How to add a real changeset** — write the file directly; do not use the
+interactive `pnpm changeset` prompt. Create `.changeset/<short-slug>.md`:
+
+```md
+---
+"@zitadel/cli": minor
+---
+
+One-line, user-facing summary of the change.
+```
+
+List only public package names (`@zitadel/cli`, `@zitadel/api`,
+`@zitadel/components`, `@zitadel/sdk-core`, `@zitadel/sdk-next`,
+`@zitadel/sdk-nuxt`, `@zitadel/sdk-react`, `@zitadel/sdk-vue`,
+`@zitadel/sdk-angular`). Pick `patch` (fixes), `minor` (features), or `major`
+(breaking). The repo is in `alpha` prerelease mode (`.changeset/pre.json`) and
+public packages are in one fixed group, so versions cut as one `X.Y.Z-alpha.N`
+train automatically.
+
+**Empty changeset** (rare) — only when publishable paths changed but nothing
+should ship: `corepack pnpm changeset --empty`. Do **not** use this for
+Go-only, server-only, root `docs/`, CI-only, or other PRs that never touch the
+publishable paths above.
+
+**Anti-patterns:**
+
+- Do **not** add an empty changeset on PRs that only touch non-publishable
+  paths (for example `internal/`, `docs/`, `.github/`, storage migrations).
+- Do **not** skip a changeset when changing published CLI, SDK, or components
+  behavior under the publishable paths above.
+
+**Verify locally** before handoff:
+
+```sh
+node scripts/check-changeset-required.mjs --base origin/main
+```
+
+Exit `0` → no changeset file needed. Exit `1` → add a changeset (real or, rarely,
+empty).
+
 - npm packages under `apps/cli/` and `packages/*` must stay MIT-licensed.
 - Server and console application paths are AGPL-3.0-only by default.
 - Keep local secrets, private keys, tokens, and `.zitadel/secret`-style files out
