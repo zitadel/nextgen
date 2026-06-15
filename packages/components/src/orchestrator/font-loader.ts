@@ -17,11 +17,22 @@
  */
 const LINK_ID = "zl-font-link";
 
+/**
+ * Resolve our previously injected font link, if any. Returns `null` unless the
+ * element is a stylesheet `<link>` we own — `getElementById` can return any
+ * element, so we never remove or clobber an unrelated node that happens to
+ * share the id.
+ */
+function findOwnFontLink(root: Document | ShadowRoot): HTMLLinkElement | null {
+  const el = root.getElementById?.(LINK_ID);
+  return el instanceof HTMLLinkElement && el.rel === "stylesheet" ? el : null;
+}
+
 export function applyFontUrl(shadowRoot: ShadowRoot, fontUrl: string | null | undefined): void {
   const ownerDocument = shadowRoot.ownerDocument ?? document;
   // Legacy cleanup — earlier versions injected into the shadow root itself.
-  (shadowRoot.getElementById?.(LINK_ID) as HTMLLinkElement | null)?.remove();
-  const existing = ownerDocument.getElementById(LINK_ID) as HTMLLinkElement | null;
+  findOwnFontLink(shadowRoot)?.remove();
+  const existing = findOwnFontLink(ownerDocument);
   if (!fontUrl) {
     existing?.remove();
     return;
