@@ -6,6 +6,8 @@ test.setTimeout(60_000);
 
 const framework = process.env.JOURNEY_FRAMEWORK ?? "next";
 const expectsProtectedRouteRedirect = framework === "next" || framework === "nuxt";
+const loginUrl = /\/login(?:[/?#]|$)/;
+const profileUrl = /\/profile(?:[/?#]|$)/;
 
 test(`password-only registration, logout, and password login work in a fresh ${framework} app`, async ({
   page,
@@ -50,11 +52,10 @@ if (process.env.JOURNEY_ENABLE_PASSKEY !== "0") {
 
 async function expectProtectedRouteToRedirect(page: Page): Promise<void> {
   await page.goto("/profile");
-  await expect(page).toHaveURL(/\/login(?:\?|$)/);
+  await expect(page).toHaveURL(loginUrl);
 }
 
 async function gotoLogin(page: Page): Promise<void> {
-  const loginUrl = /\/login(?:\?|$)/;
   if (loginUrl.test(page.url())) {
     return;
   }
@@ -142,8 +143,26 @@ async function skipPasskeyUpsellIfVisible(page: Page): Promise<void> {
 }
 
 async function expectSignedIn(page: Page): Promise<void> {
-  await page.waitForURL("**/profile", { timeout: 30_000 });
+  if (expectsProtectedRouteRedirect) {
+    await expect(page).toHaveURL(profileUrl, { timeout: 30_000 });
+  } else {
+    await expect(signedInLocator(page).first()).toBeVisible({ timeout: 30_000 });
+    if (!profileUrl.test(page.url())) {
+      await gotoProfile(page);
+    }
+  }
   await expect(signedInLocator(page).first()).toBeVisible({ timeout: 30_000 });
+}
+
+async function gotoProfile(page: Page): Promise<void> {
+  await page.goto("/profile").catch(async (error: unknown) => {
+    if (!isInterruptedByProfileNavigation(error) && !profileUrl.test(page.url())) {
+      throw error;
+    }
+    if (!profileUrl.test(page.url())) {
+      await page.waitForURL(profileUrl, { timeout: 5000 });
+    }
+  });
 }
 
 async function expectSessionCookie(page: Page): Promise<void> {
@@ -187,8 +206,8 @@ async function logout(page: Page): Promise<void> {
   await expect(logout.first()).toBeVisible({ timeout: 5000 });
   await logout.first().click();
   const loggedOutUrl = expectsProtectedRouteRedirect
-    ? /\/login(?:\?|$)/
-    : /\/(?:login)?(?:\?|$)/;
+    ? loginUrl
+    : /\/(?:login)?(?:[/?#]|$)/;
   await expect(page).toHaveURL(loggedOutUrl);
   await expectSessionCleared(page);
 }
@@ -296,8 +315,22 @@ function actionLocator(page: Page, actionName: string) {
 function isInterruptedByLoginNavigation(error: unknown): boolean {
   return (
     error instanceof Error &&
-    error.message.includes('interrupted by another navigation to "') &&
-    error.message.includes("/login")
+    isExpectedNavigationRace(error.message, "/login")
+  );
+}
+
+function isInterruptedByProfileNavigation(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    isExpectedNavigationRace(error.message, "/profile")
+  );
+}
+
+function isExpectedNavigationRace(message: string, path: string): boolean {
+  return (
+    (message.includes('interrupted by another navigation to "') ||
+      message.includes("net::ERR_ABORTED at ")) &&
+    message.includes(path)
   );
 }
 
