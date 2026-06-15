@@ -115,6 +115,7 @@ const (
 //   - Format    ↔ `format` (enum: email, date-time, uuid, uri)
 //   - MinLength ↔ `minLength`
 //   - MaxLength ↔ `maxLength`
+//   - Enum      ↔ `enum` (closed set of allowed string values)
 //
 // Zero values mean "no rule". JSON Schema's `pattern` keyword is not
 // part of the user meta-schema and is intentionally not surfaced.
@@ -122,6 +123,7 @@ type FlowFieldValidation struct {
 	Format    string
 	MinLength int
 	MaxLength int
+	Enum      []string
 }
 
 // FlowFieldType names the input kind the client should render. Mirrors
@@ -137,6 +139,8 @@ const (
 	FlowFieldTypeURL      FlowFieldType = "url"
 	FlowFieldTypeDate     FlowFieldType = "date"
 	FlowFieldTypeHidden   FlowFieldType = "hidden"
+	FlowFieldTypeCheckbox FlowFieldType = "checkbox"
+	FlowFieldTypeSelect   FlowFieldType = "select"
 )
 
 // FlowFieldValidationRule names a schema-derived validation rule the
@@ -200,3 +204,10 @@ func ImplicitOutcomesForChallenge(c FlowFieldChallenge) []string {
 // ErrFlowFieldUnknown is returned by [FlowFieldResolver.Resolve] when a
 // requested field name is not part of the resolver's schema or catalog.
 var ErrFlowFieldUnknown = errors.New("flow field: not in resolver catalog")
+
+// ErrFlowFieldUnsupportedType is returned by [FlowFieldResolver.Resolve]
+// when a property declares a JSON `type` set the resolver cannot
+// reduce to a single input kind. The nullable idiom `["null", X]` is
+// reduced to X and does not trigger this error; any other multi-entry
+// union does.
+var ErrFlowFieldUnsupportedType = errors.New("flow field: unsupported JSON type")
