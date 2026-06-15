@@ -1,5 +1,14 @@
 # @zitadel/sdk-vue
 
+## 0.1.0-alpha.5
+
+### Patch Changes
+
+- Updated dependencies [[`f77ca44`](https://github.com/zitadel/nextgen/commit/f77ca44e85565976d26de0b6444b7fc5b1616e8c), [`3795b67`](https://github.com/zitadel/nextgen/commit/3795b6793c72b92300fc6a7d21c7562f0a25343e)]:
+  - @zitadel/components@0.1.0-alpha.5
+  - @zitadel/api@0.1.0-alpha.5
+  - @zitadel/sdk-core@0.1.0-alpha.5
+
 ## 0.1.0-alpha.4
 
 ### Patch Changes
