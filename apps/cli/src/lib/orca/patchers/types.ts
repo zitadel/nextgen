@@ -28,6 +28,7 @@ export type PatchContext = PatchView &
     issuer: string;
     server: string;
     cliVersion: string;
+    scaffoldedFramework?: boolean;
   }>;
 
 /** Where and how a patch is applied. Family-neutral (no file-op coupling). */

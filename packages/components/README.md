@@ -173,6 +173,10 @@ form-associated inputs.
 | Custom template | (planned) | tenant-supplied Liquid layouts |
 | Atoms-only | hand-built form | non-standard flow shells |
 
+Automation can use the stable host and native shadow-root hooks that the default
+template emits, for example `zitadel-field-email`, `zitadel-field-email-input`,
+and `zitadel-action-submit-button`.
+
 A tenant Liquid template can already be supplied through the branding
 payload's `liquid_template` field; a dedicated declarative `template`
 surface on `<zitadel-login>` is not yet exposed. The orchestrator otherwise
