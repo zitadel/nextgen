@@ -1,6 +1,6 @@
 # @zitadel/cli
 
-Scaffolds Zitadel auth (login, register, profile, middleware) into a Next.js app.
+Scaffolds Zitadel auth (login, register, profile, middleware) into a Next.js, React, Vue, Angular, or Nuxt app.
 
 ```sh
 npx @zitadel/cli@alpha start
@@ -74,24 +74,23 @@ passkey can sign in with either credential.
 <summary>Full command reference</summary>
 
 <!-- commands -->
-
-- [`zitadel apply`](#zitadel-apply)
-- [`zitadel autocomplete [SHELL]`](#zitadel-autocomplete-shell)
-- [`zitadel commands`](#zitadel-commands)
-- [`zitadel doctor`](#zitadel-doctor)
-- [`zitadel eject`](#zitadel-eject)
-- [`zitadel help [COMMAND]`](#zitadel-help-command)
-- [`zitadel logs`](#zitadel-logs)
-- [`zitadel plan`](#zitadel-plan)
-- [`zitadel reset`](#zitadel-reset)
-- [`zitadel search`](#zitadel-search)
-- [`zitadel setup`](#zitadel-setup)
-- [`zitadel start`](#zitadel-start)
-- [`zitadel status`](#zitadel-status)
-- [`zitadel stop`](#zitadel-stop)
-- [`zitadel uninstall`](#zitadel-uninstall)
-- [`zitadel version`](#zitadel-version)
-- [`zitadel which`](#zitadel-which)
+* [`zitadel apply`](#zitadel-apply)
+* [`zitadel autocomplete [SHELL]`](#zitadel-autocomplete-shell)
+* [`zitadel commands`](#zitadel-commands)
+* [`zitadel doctor`](#zitadel-doctor)
+* [`zitadel eject`](#zitadel-eject)
+* [`zitadel help [COMMAND]`](#zitadel-help-command)
+* [`zitadel logs`](#zitadel-logs)
+* [`zitadel plan`](#zitadel-plan)
+* [`zitadel reset`](#zitadel-reset)
+* [`zitadel search`](#zitadel-search)
+* [`zitadel setup`](#zitadel-setup)
+* [`zitadel start`](#zitadel-start)
+* [`zitadel status`](#zitadel-status)
+* [`zitadel stop`](#zitadel-stop)
+* [`zitadel uninstall`](#zitadel-uninstall)
+* [`zitadel version`](#zitadel-version)
+* [`zitadel which`](#zitadel-which)
 
 ## `zitadel apply`
 
@@ -99,19 +98,19 @@ Validate and upload repo config to the platform.
 
 ```
 USAGE
-  $ zitadel apply [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
-    [-e development|preview|production]
+  $ zitadel apply [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [-e
+    development|preview|production]
 
 FLAGS
-  -c, --cwd=<value>                 Project directory to operate on.
-  -e, --environment=<option>        Target environment (default: development).
-                                    <options: development|preview|production>
-  -f, --force                       Overwrite protected files on conflict.
-  -n, --non-interactive             Disable prompts. Required when scripting or running as an agent.
-  -s, --server=<value>              Override the resolved server URL.
-      --debug                       Debug logging.
-      --dry-run                     Preview without mutating files or the platform.
-      --verbose                     Verbose logging.
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --environment=<option>  Target environment (default: development).
+                              <options: development|preview|production>
+  -f, --force                 Overwrite protected files on conflict.
+  -n, --non-interactive       Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --verbose               Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -288,19 +287,19 @@ Validate config without mutation and preview the sync diff.
 
 ```
 USAGE
-  $ zitadel plan [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
-    [-e development|preview|production]
+  $ zitadel plan [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [-e
+    development|preview|production]
 
 FLAGS
-  -c, --cwd=<value>                 Project directory to operate on.
-  -e, --environment=<option>        Target environment (default: development).
-                                    <options: development|preview|production>
-  -f, --force                       Overwrite protected files on conflict.
-  -n, --non-interactive             Disable prompts. Required when scripting or running as an agent.
-  -s, --server=<value>              Override the resolved server URL.
-      --debug                       Debug logging.
-      --dry-run                     Preview without mutating files or the platform.
-      --verbose                     Verbose logging.
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --environment=<option>  Target environment (default: development).
+                              <options: development|preview|production>
+  -f, --force                 Overwrite protected files on conflict.
+  -n, --non-interactive       Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --verbose               Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -356,7 +355,7 @@ Create a Zitadel project and scaffold local auth.
 ```
 USAGE
   $ zitadel setup [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
-    [--framework next] [--renderer react|web-component] [--skip-install]
+    [--framework next|nuxt|react|vue|angular] [--renderer react|web-component] [--dev-port <value>] [--skip-install]
 
 FLAGS
   -c, --cwd=<value>         Project directory to operate on.
@@ -364,9 +363,11 @@ FLAGS
   -n, --non-interactive     Disable prompts. Required when scripting or running as an agent.
   -s, --server=<value>      Override the resolved server URL.
       --debug               Debug logging.
+      --dev-port=<value>    Dev-server port; also the issuer origin registered with Zitadel. Defaults to the detected
+                            port. Use distinct ports to run several scaffolded apps side by side.
       --dry-run             Preview without mutating files or the platform.
       --framework=<option>  Framework to target.
-                            <options: next>
+                            <options: next|nuxt|react|vue|angular>
       --renderer=<option>   Renderer (default: react).
                             <options: react|web-component>
       --skip-install        Do not install dependencies after setup updates package.json.
@@ -380,6 +381,8 @@ DESCRIPTION
 
 EXAMPLES
   $ zitadel setup --framework next
+
+  $ zitadel setup --framework react --dev-port 3000
 ```
 
 ## `zitadel start`
@@ -537,7 +540,6 @@ EXAMPLES
 ```
 
 _See code: [@oclif/plugin-which](https://github.com/oclif/plugin-which/blob/3.2.55/src/commands/which.ts)_
-
 <!-- commandsstop -->
 
 </details>
