@@ -3,6 +3,7 @@ package helpers
 import (
 	"net/http"
 	"net/http/httptest"
+	"sync"
 
 	generated "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
@@ -15,6 +16,8 @@ import (
 )
 
 type Harness struct {
+	mu sync.Mutex
+
 	DBPool          database.Pool
 	HttpClient      *http.Client
 	TestServer      *httptest.Server
