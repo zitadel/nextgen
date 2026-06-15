@@ -49,7 +49,6 @@ func TestCreateFlowDefinitionUnauthenticated(t *testing.T) {
 }
 
 func TestCreateFlowDefinition(t *testing.T) {
-	t.Parallel()
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
 	harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
@@ -290,7 +289,6 @@ func TestCreateFlowDefinition(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			client := harness.EnsureAPIClient(t, project.ID)
 			resp, err := client.CreateFlowDefinition(t.Context(), tt.req)
 			assert.NoError(t, err)
@@ -385,7 +383,6 @@ func TestGetFlowDefinitionUnauthenticated(t *testing.T) {
 }
 
 func TestGetFlowDefinition(t *testing.T) {
-	t.Parallel()
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
 	harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
@@ -442,7 +439,6 @@ func TestGetFlowDefinition(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			client := harness.EnsureAPIClient(t, project.ID)
 			resp, err := client.GetFlowDefinition(t.Context(), tt.req)
 			assert.NoError(t, err)
@@ -471,7 +467,6 @@ func TestListFlowDefinitionsUnauthenticated(t *testing.T) {
 }
 
 func TestListFlowDefinitions(t *testing.T) {
-	t.Parallel()
 	project1, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
 	harness.CreateUserSchema(t, project1.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
@@ -666,7 +661,6 @@ func TestListFlowDefinitions(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			client := harness.EnsureAPIClient(t, project1.ID)
 			resp, err := client.ListFlowDefinitions(t.Context(), tt.req)
 			assert.NoError(t, err)
@@ -717,7 +711,6 @@ func TestDeleteFlowDefinitionUnauthenticated(t *testing.T) {
 }
 
 func TestDeleteFlowDefinition(t *testing.T) {
-	t.Parallel()
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
 	harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
@@ -776,7 +769,6 @@ func TestDeleteFlowDefinition(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			client := harness.EnsureAPIClient(t, project.ID)
 			resp, err := client.DeleteFlowDefinition(t.Context(), tt.req)
 			assert.NoError(t, err)
