@@ -7,16 +7,13 @@ import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
 
 /**
  * Convert author-friendly `{ name: {...}, ... }` dicts into the wire-shape
- * `[{ name, ... }, ...]` array plus its `*_by_name` view. Keeps each test's
- * context authoring concise while matching the runtime contract the
- * orchestrator builds for the Liquid engine.
+ * `[{ name, ... }, ...]` array. Keeps each test's context authoring concise
+ * while matching the runtime contract.
  */
-function viewBoth<T extends object>(
+function toArray<T extends object>(
   entries: Record<string, T>,
-): { array: ({ name: string } & T)[]; byName: Record<string, { name: string } & T> } {
-  const array = Object.entries(entries).map(([name, body]) => ({ name, ...body }));
-  const byName = Object.fromEntries(array.map((e) => [e.name, e]));
-  return { array, byName };
+): ({ name: string } & T)[] {
+  return Object.entries(entries).map(([name, body]) => ({ name, ...body }));
 }
 
 const locale: Record<string, string> = {
@@ -85,16 +82,14 @@ describe("LiquidJS engine", () => {
 
   it("renders the bundled default template through the auth-form partial", () => {
     const engine = createLiquidEngine({ locale });
-    const f = viewBoth({
+    const f = toArray({
       identifier: { type: "email", text_key: "identifier.title", required: true },
     });
-    const a = viewBoth({ submit: { text_key: "submit.continue", primary: true } });
+    const a = toArray({ submit: { text_key: "submit.continue", primary: true } });
     const context = {
       step: { name: "identifier", type: "identifier", texts: { title_key: "identifier.title" } },
-      fields: f.array,
-      actions: a.array,
-      fields_by_name: f.byName,
-      actions_by_name: a.byName,
+      fields: f,
+      actions: a,
       branding: {},
       loading: false,
       errors: [],
@@ -116,13 +111,11 @@ describe("LiquidJS engine", () => {
 
   it("renders step title from locale via default template", () => {
     const engine = createLiquidEngine({ locale });
-    const a = viewBoth({ submit: { text_key: "submit.continue", primary: true } });
+    const a = toArray({ submit: { text_key: "submit.continue", primary: true } });
     const context = {
       step: { name: "password", texts: { title_key: "password.title" } },
       fields: [],
-      actions: a.array,
-      fields_by_name: {},
-      actions_by_name: a.byName,
+      actions: a,
       branding: {},
       loading: false,
       errors: [],
@@ -137,16 +130,14 @@ describe("LiquidJS engine", () => {
 
   it("renders passkey upsell: card, primary + secondary CTAs", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
-    const a = viewBoth({
+    const a = toArray({
       setup: { text_key: "passkey-upsell.action.setup", primary: true },
       skip: { text_key: "passkey-upsell.action.skip" },
     });
     const context = {
       step: { name: "passkey-upsell", texts: { title_key: "passkey-upsell.title" } },
       fields: [],
-      actions: a.array,
-      fields_by_name: {},
-      actions_by_name: a.byName,
+      actions: a,
       branding: {},
       loading: false,
       errors: [],
@@ -166,16 +157,14 @@ describe("LiquidJS engine", () => {
 
   it("renders passkey upsell setup error: form-level alert, retry allowed", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
-    const a = viewBoth({
+    const a = toArray({
       setup: { text_key: "passkey-upsell.action.setup", primary: true },
       skip: { text_key: "passkey-upsell.action.skip" },
     });
     const context = {
       step: { name: "passkey-upsell", texts: { title_key: "passkey-upsell.title" } },
       fields: [],
-      actions: a.array,
-      fields_by_name: {},
-      actions_by_name: a.byName,
+      actions: a,
       branding: {},
       loading: false,
       errors: [{ text_key: "error.passkey_cancelled" }],
@@ -197,8 +186,6 @@ describe("LiquidJS engine", () => {
       step: { name: "signed-in", texts: { title_key: "complete.title" } },
       fields: [],
       actions: [],
-      fields_by_name: {},
-      actions_by_name: {},
       branding: {},
       loading: false,
       errors: [],
@@ -213,11 +200,11 @@ describe("LiquidJS engine", () => {
 
   it("renders combined sign-in (6593:141983): email+password, forgot link, sign-in CTA", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
-    const f = viewBoth({
+    const f = toArray({
       email: { type: "email", text_key: "identifier.field.email", required: true },
       password: { type: "password", text_key: "identifier.field.password", required: true },
     });
-    const a = viewBoth({
+    const a = toArray({
       submit: { text_key: "submit.signin", primary: true },
       passkey: { text_key: "identifier.action.passkey" },
       register: { text_key: "identifier.action.register.link" },
@@ -225,10 +212,8 @@ describe("LiquidJS engine", () => {
     });
     const context = {
       step: { name: "identifier", texts: { title_key: "identifier.title" } },
-      fields: f.array,
-      actions: a.array,
-      fields_by_name: f.byName,
-      actions_by_name: a.byName,
+      fields: f,
+      actions: a,
       branding: {},
       loading: false,
       errors: [],
@@ -249,20 +234,18 @@ describe("LiquidJS engine", () => {
 
   it("renders sign-in wrong credentials (6602:180268): inline password error, no form alert", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
-    const f = viewBoth({
+    const f = toArray({
       email: { type: "email", text_key: "identifier.field.email", required: true },
       password: { type: "password", text_key: "identifier.field.password", required: true },
     });
-    const a = viewBoth({
+    const a = toArray({
       submit: { text_key: "submit.signin", primary: true },
       recover: { text_key: "action.forgot_password" },
     });
     const context = {
       step: { name: "identifier", texts: { title_key: "identifier.title" } },
-      fields: f.array,
-      actions: a.array,
-      fields_by_name: f.byName,
-      actions_by_name: a.byName,
+      fields: f,
+      actions: a,
       branding: {},
       loading: false,
       errors: [{ text_key: "error.invalid_credentials" }],
@@ -281,20 +264,18 @@ describe("LiquidJS engine", () => {
 
   it("renders sign-in server error (6594:125237): heading + body alert, fields unchanged", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
-    const f = viewBoth({
+    const f = toArray({
       email: { type: "email", text_key: "identifier.field.email", required: true },
       password: { type: "password", text_key: "identifier.field.password", required: true },
     });
-    const a = viewBoth({
+    const a = toArray({
       submit: { text_key: "submit.signin", primary: true },
       recover: { text_key: "action.forgot_password" },
     });
     const context = {
       step: { name: "identifier", texts: { title_key: "identifier.title" } },
-      fields: f.array,
-      actions: a.array,
-      fields_by_name: f.byName,
-      actions_by_name: a.byName,
+      fields: f,
+      actions: a,
       branding: {},
       loading: false,
       errors: [{ text_key: "error.sign_in_server" }],
@@ -313,19 +294,17 @@ describe("LiquidJS engine", () => {
 
   it("renders sign-up field annotations (6593:141741): autocomplete, help, inline email error", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
-    const f = viewBoth({
+    const f = toArray({
       email: { type: "email", text_key: "register.field.email", required: true },
       password: { type: "password", text_key: "register.field.password", required: true },
     });
-    const a = viewBoth({
+    const a = toArray({
       submit: { text_key: "register.action.submit", primary: true },
     });
     const context = {
       step: { name: "register", texts: { title_key: "register.title" } },
-      fields: f.array,
-      actions: a.array,
-      fields_by_name: f.byName,
-      actions_by_name: a.byName,
+      fields: f,
+      actions: a,
       branding: {},
       loading: false,
       errors: [{ text_key: "error.email_exists" }],
@@ -354,8 +333,6 @@ describe("LiquidJS engine", () => {
       step: { name: "done", complete: "show", texts: { title_key: "complete.title" } },
       fields: [],
       actions: [],
-      fields_by_name: {},
-      actions_by_name: {},
       branding: {},
       loading: false,
       errors: [],

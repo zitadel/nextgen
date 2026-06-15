@@ -52,9 +52,10 @@
       </zl-field>
     {% endfor %}
 
-    {% if actions_by_name.recover %}
+    {% assign recover = actions | where: "name", "recover" | first %}
+    {% if recover %}
       <p class="zl-card-forgot">
-        <a href="#" class="zl-card-forgot__link" data-action="recover">{{ actions_by_name.recover.text_key | t }}</a>
+        <a href="#" class="zl-card-forgot__link" data-action="recover">{{ recover.text_key | t }}</a>
       </p>
     {% endif %}
 
@@ -87,25 +88,28 @@
       {% endunless %}
     {% endfor %}
 
-    {% if actions_by_name.passkey %}
+    {% assign passkey = actions | where: "name", "passkey" | first %}
+    {% if passkey %}
       <zl-button
         hierarchy="secondary"
         size="medium"
         block
         action="passkey"
         data-testid="zitadel-action-passkey"
-        label="{{ actions_by_name.passkey.text_key | t }}"
+        label="{{ passkey.text_key | t }}"
       ></zl-button>
     {% endif %}
 
 
-    {% if actions_by_name.register %}
+    {% assign register = actions | where: "name", "register" | first %}
+    {% if register %}
       <p class="zl-card-nav">
         {{ 'identifier.action.register.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="register" data-testid="zitadel-action-register-link">{{ 'identifier.action.register.link' | t }}</a>
       </p>
     {% endif %}
 
-    {% if actions_by_name.sign_in %}
+    {% assign sign_in = actions | where: "name", "sign_in" | first %}
+    {% if sign_in %}
       <p class="zl-card-nav">
         {{ 'register.action.sign_in.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="sign_in" data-testid="zitadel-action-sign_in-link">{{ 'register.action.sign_in.link' | t }}</a>
       </p>

@@ -117,15 +117,54 @@ export function registerStep(input: StepFixtureInput): CreateFlow201 {
         required: true,
       },
       {
+        name: "given_name",
+        type: "text",
+        text_key: "register.field.givenName",
+        required: true,
+      },
+      {
+        name: "family_name",
+        type: "text",
+        text_key: "register.field.familyName",
+        required: true,
+      },
+      {
+        name: "date_of_birth",
+        type: "date",
+        text_key: "register.field.dateOfBirth",
+      },
+    ],
+    actions: [
+      { name: "submit", text_key: "register.action.password", primary: true },
+      { name: "passkey_register", text_key: "register.action.passkey" },
+      { name: "sign_in", text_key: "register.action.sign_in.link" },
+    ],
+    gates: {},
+  });
+}
+
+/**
+ * Register-password step — second step in the two-step registration flow.
+ * Collects the password after the user has entered their profile fields.
+ */
+export function registerPasswordStep(input: StepFixtureInput): CreateFlow201 {
+  return wrap(input, {
+    name: "register-password",
+    texts: {
+      title_key: "register-password.title",
+      description_key: "register-password.description",
+    },
+    fields: [
+      {
         name: "password",
         type: "password",
-        text_key: "register.field.password",
+        text_key: "register-password.field.password",
         required: true,
         validation: { min_length: 8 },
       },
     ],
     actions: [
-      { name: "submit", text_key: "register.action.submit", primary: true },
+      { name: "submit", text_key: "register-password.action.submit", primary: true },
     ],
     gates: {},
   });

@@ -48,7 +48,9 @@
       </zl-field>
     {% endfor %}
 
-    {% if fields_by_name.email and fields_by_name.password and step.name == 'identifier' %}
+    {% assign has_email = fields | where: "name", "email" | first %}
+    {% assign has_password = fields | where: "name", "password" | first %}
+    {% if has_email and has_password and step.name == 'identifier' %}
       <p class="zl-card-forgot">
         <a href="#" class="zl-card-forgot__link" data-action="recover">{{ 'action.forgot_password' | t }}</a>
       </p>
@@ -81,24 +83,27 @@
       {% endunless %}
     {% endfor %}
 
-    {% if actions_by_name.passkey %}
+    {% assign passkey = actions | where: "name", "passkey" | first %}
+    {% if passkey %}
       <zl-button
         hierarchy="secondary"
         size="medium"
         block
         action="passkey"
-        label="{{ actions_by_name.passkey.text_key | t }}"
+        label="{{ passkey.text_key | t }}"
       ></zl-button>
     {% endif %}
 
 
-    {% if actions_by_name.register %}
+    {% assign register = actions | where: "name", "register" | first %}
+    {% if register %}
       <p class="zl-card-nav">
         {{ 'identifier.action.register.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="register">{{ 'identifier.action.register.link' | t }}</a>
       </p>
     {% endif %}
 
-    {% if actions_by_name.sign_in %}
+    {% assign sign_in = actions | where: "name", "sign_in" | first %}
+    {% if sign_in %}
       <p class="zl-card-nav">
         {{ 'register.action.sign_in.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="sign_in">{{ 'register.action.sign_in.link' | t }}</a>
       </p>
