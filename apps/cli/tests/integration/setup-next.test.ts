@@ -154,7 +154,7 @@ describe("Next setup integration", () => {
         {
           name: "identifier",
           fields: [],
-          actions: {},
+          actions: [],
           gates: {
             captcha: {
               kind: "captcha",
