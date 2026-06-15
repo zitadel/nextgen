@@ -17,9 +17,16 @@ export type FrameworkChoice = Readonly<{ id: string; displayName: string }>;
 
 export type ScaffoldTarget = Readonly<{
   scaffoldable: boolean;
+  hasGitignore: boolean;
   hasRuntimeOnlyZitadel: boolean;
   reason?: string;
   entries: ReadonlyArray<string>;
+}>;
+
+type ScaffoldStash = Readonly<{
+  gitignore?: string;
+  root: string;
+  zitadel?: string;
 }>;
 
 /**
@@ -107,11 +114,11 @@ export class Orca {
         details: { entries: target.entries },
       });
     }
-    const stash = target.hasRuntimeOnlyZitadel ? await stashRuntimeOnlyZitadel(cwd) : undefined;
+    const stash = await stashFreshScaffoldArtifacts(cwd, target);
     try {
       await this.scaffolderFor(framework).scaffold(cwd, framework);
     } finally {
-      await restoreRuntimeOnlyZitadel(cwd, stash);
+      await restoreFreshScaffoldArtifacts(cwd, stash);
     }
     return this.detect(cwd, framework);
   }
@@ -167,6 +174,7 @@ export function createOrca(): Orca {
 export async function inspectScaffoldTarget(cwd: string): Promise<ScaffoldTarget> {
   const entries = await readdir(cwd, { withFileTypes: true });
   const names = entries.map((entry) => entry.name).sort();
+  let hasGitignore = false;
   let hasRuntimeOnlyZitadel = false;
 
   for (const entry of entries) {
@@ -174,11 +182,13 @@ export async function inspectScaffoldTarget(cwd: string): Promise<ScaffoldTarget
       if (!entry.isFile()) {
         return {
           scaffoldable: false,
+          hasGitignore: false,
           hasRuntimeOnlyZitadel: false,
           reason: ".gitignore exists but is not a file.",
           entries: names,
         };
       }
+      hasGitignore = true;
       continue;
     }
 
@@ -186,6 +196,7 @@ export async function inspectScaffoldTarget(cwd: string): Promise<ScaffoldTarget
       if (!entry.isDirectory() || !(await isRuntimeOnlyZitadelDir(join(cwd, ".zitadel")))) {
         return {
           scaffoldable: false,
+          hasGitignore,
           hasRuntimeOnlyZitadel: false,
           reason:
             ".zitadel contains project state. Move it aside or run setup from an empty app directory.",
@@ -198,13 +209,14 @@ export async function inspectScaffoldTarget(cwd: string): Promise<ScaffoldTarget
 
     return {
       scaffoldable: false,
+      hasGitignore,
       hasRuntimeOnlyZitadel: false,
       reason: `Directory contains ${entry.name}. Run setup from an empty directory to scaffold a new app.`,
       entries: names,
     };
   }
 
-  return { scaffoldable: true, hasRuntimeOnlyZitadel, entries: names };
+  return { scaffoldable: true, hasGitignore, hasRuntimeOnlyZitadel, entries: names };
 }
 
 async function isRuntimeOnlyZitadelDir(path: string): Promise<boolean> {
@@ -215,19 +227,54 @@ async function isRuntimeOnlyZitadelDir(path: string): Promise<boolean> {
   return true;
 }
 
-async function stashRuntimeOnlyZitadel(cwd: string): Promise<string> {
-  const source = join(cwd, ".zitadel");
+async function stashFreshScaffoldArtifacts(
+  cwd: string,
+  target: ScaffoldTarget,
+): Promise<ScaffoldStash | undefined> {
+  if (!target.hasGitignore && !target.hasRuntimeOnlyZitadel) {
+    return undefined;
+  }
+
   const parent = dirname(cwd);
-  const prefix = `.${basename(cwd)}.zitadel-local-stash`;
-  const stash = join(parent, `${prefix}-${String(process.pid)}-${String(Date.now())}`);
-  await rename(source, stash);
+  const root = join(
+    parent,
+    `.${basename(cwd)}.fresh-scaffold-stash-${String(process.pid)}-${String(Date.now())}`,
+  );
+  await mkdir(root, { mode: 0o700 });
+
+  const stash: { gitignore?: string; root: string; zitadel?: string } = { root };
+  if (target.hasRuntimeOnlyZitadel) {
+    stash.zitadel = join(root, ".zitadel");
+    await rename(join(cwd, ".zitadel"), stash.zitadel);
+  }
+  if (target.hasGitignore) {
+    stash.gitignore = join(root, ".gitignore");
+    await rename(join(cwd, ".gitignore"), stash.gitignore);
+  }
   return stash;
+}
+
+async function restoreFreshScaffoldArtifacts(
+  cwd: string,
+  stash: ScaffoldStash | undefined,
+): Promise<void> {
+  if (!stash) {
+    return;
+  }
+
+  try {
+    await restoreRuntimeOnlyZitadel(cwd, stash.zitadel);
+    await restoreGitignore(cwd, stash.gitignore);
+  } finally {
+    await rm(stash.root, { recursive: true, force: true });
+  }
 }
 
 async function restoreRuntimeOnlyZitadel(cwd: string, stash: string | undefined): Promise<void> {
   if (!stash) {
     return;
   }
+
   const target = join(cwd, ".zitadel");
   try {
     await rename(stash, target);
@@ -243,6 +290,40 @@ async function restoreRuntimeOnlyZitadel(cwd: string, stash: string | undefined)
   await rename(join(stash, "local"), join(target, "local"));
   await rm(stash, { recursive: true, force: true });
   await appendGitignoreEntry(cwd, ".zitadel/local/");
+}
+
+async function restoreGitignore(cwd: string, stash: string | undefined): Promise<void> {
+  if (!stash) {
+    return;
+  }
+
+  const path = join(cwd, ".gitignore");
+  const stashed = await readFile(stash, "utf8");
+  let current = "";
+  try {
+    current = await readFile(path, "utf8");
+  } catch (error) {
+    if (!isErrno(error, "ENOENT")) {
+      throw error;
+    }
+  }
+
+  const existingLines = new Set(
+    current
+      .split(/\r?\n/g)
+      .map((line) => line.trim())
+      .filter(Boolean),
+  );
+  const missingLines = stashed
+    .split(/\r?\n/g)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !existingLines.has(line));
+  if (missingLines.length === 0) {
+    return;
+  }
+
+  const prefix = current.length === 0 || current.endsWith("\n") ? "" : "\n";
+  await writeFile(path, `${current}${prefix}${missingLines.join("\n")}\n`);
 }
 
 async function appendGitignoreEntry(cwd: string, entry: string): Promise<void> {

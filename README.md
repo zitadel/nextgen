@@ -153,8 +153,10 @@ corepack pnpm run journey
 This opt-in check ensures the Playwright Chromium browsers are installed, builds
 the local npm packages, publishes them to a temporary Verdaccio registry, runs
 `npx @zitadel/cli@alpha doctor`, `start`, and
-`setup --framework next --server local` in an empty app directory, starts the
-generated app, and verifies registration/login journeys.
+`setup --framework <id> --server local` in fresh app directories for every
+supported framework, starts the generated apps, and verifies registration/login
+journeys. Use `corepack pnpm run journey -- --framework next` to run only the
+Next.js journey.
 
 Use `corepack pnpm run journey` for deterministic CI-style proof. Use
 `corepack pnpm run cli -- ...` when you want to drive the same local package

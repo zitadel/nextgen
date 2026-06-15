@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { prepareNextApp } from "./prepare-next-app.mjs";
+import { prepareApp } from "./prepare-app.mjs";
 
 test("prepares the customer local setup journey in the app root", async () => {
   const workDir = await mkdtemp(join(tmpdir(), "zitadel-journey-prepare-test-"));
@@ -14,11 +14,13 @@ test("prepares the customer local setup journey in the app root", async () => {
   const image = "ghcr.io/zitadel/nextgen:test";
 
   try {
-    const metadata = await prepareNextApp({
+    const metadata = await prepareApp({
       env: {
+        JOURNEY_APP_URL: "http://localhost:3010",
         JOURNEY_CLI_PACKAGE: "@zitadel/cli",
+        JOURNEY_FRAMEWORK: "react",
         JOURNEY_REGISTRY_URL: registryUrl,
-        JOURNEY_SDK_NEXT_PACKAGE: "@zitadel/sdk-next",
+        JOURNEY_SDK_PACKAGE: "@zitadel/sdk-react",
         JOURNEY_WORK_DIR: workDir,
         JOURNEY_ZITADEL_PORT: "18080",
         ZITADEL_LOCAL_IMAGE: image,
@@ -27,7 +29,7 @@ test("prepares the customer local setup journey in the app root", async () => {
       runCapture: async (command, args, options) => {
         calls.push({ command, args, cwd: options.cwd, env: options.env });
         if (args.includes("setup")) {
-          await writeGeneratedApp(options.cwd, registryUrl);
+          await writeGeneratedApp(options.cwd, registryUrl, "@zitadel/sdk-react");
         }
         if (args.includes("start")) {
           await mkdir(join(options.cwd, ".zitadel/local"), { recursive: true });
@@ -46,6 +48,8 @@ test("prepares the customer local setup journey in the app root", async () => {
 
     const appDir = join(workDir, "myapp");
     assert.equal(metadata.appDir, appDir);
+    assert.equal(metadata.framework, "react");
+    assert.equal(metadata.sdkPackage, "@zitadel/sdk-react");
     assert.equal(metadata.localRuntimeUrl, "http://localhost:18080");
     assert.deepEqual(
       calls.map((call) => call.args),
@@ -73,9 +77,11 @@ test("prepares the customer local setup journey in the app root", async () => {
           "@zitadel/cli@alpha",
           "setup",
           "--framework",
-          "next",
+          "react",
           "--server",
           "local",
+          "--dev-port",
+          "3010",
           "--non-interactive",
           "--json",
         ],
@@ -101,10 +107,10 @@ test("collects local runtime logs when a CLI step fails", async () => {
 
   try {
     await assert.rejects(
-      prepareNextApp({
+      prepareApp({
         env: {
           JOURNEY_CLI_PACKAGE: "@zitadel/cli",
-          JOURNEY_SDK_NEXT_PACKAGE: "@zitadel/sdk-next",
+          JOURNEY_SDK_PACKAGE: "@zitadel/sdk-next",
           JOURNEY_WORK_DIR: workDir,
         },
         logMetadata: false,
@@ -148,10 +154,10 @@ test("records log collection failures thrown as non-Error values", async () => {
 
   try {
     await assert.rejects(
-      prepareNextApp({
+      prepareApp({
         env: {
           JOURNEY_CLI_PACKAGE: "@zitadel/cli",
-          JOURNEY_SDK_NEXT_PACKAGE: "@zitadel/sdk-next",
+          JOURNEY_SDK_PACKAGE: "@zitadel/sdk-next",
           JOURNEY_WORK_DIR: workDir,
         },
         logMetadata: false,
@@ -184,18 +190,18 @@ test("records log collection failures thrown as non-Error values", async () => {
   }
 });
 
-async function writeGeneratedApp(appDir, registryUrl) {
+async function writeGeneratedApp(appDir, registryUrl, sdkPackage) {
   await writeFile(
     join(appDir, "package.json"),
-    `${JSON.stringify({ dependencies: { "@zitadel/sdk-next": "alpha" } }, null, 2)}\n`,
+    `${JSON.stringify({ dependencies: { [sdkPackage]: "alpha" } }, null, 2)}\n`,
   );
   await writeFile(
     join(appDir, "package-lock.json"),
     `${JSON.stringify(
       {
         packages: {
-          "node_modules/@zitadel/sdk-next": {
-            resolved: `${registryUrl}/@zitadel/sdk-next/-/sdk-next.tgz`,
+          [`node_modules/${sdkPackage}`]: {
+            resolved: `${registryUrl}/${sdkPackage}/-/${sdkPackage.split("/").at(-1)}.tgz`,
           },
         },
       },

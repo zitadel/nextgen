@@ -45,9 +45,10 @@ Secrets").
 - `apps/demo-next-e2e/` and `apps/demo-nuxt-e2e/` are the Playwright projects
   that exercise each demo through real framework middleware against the
   api-mock TCP server.
-- `apps/cli-journey-e2e/` contains the fresh Next.js consumer journey
-  Playwright project. It installs local package tarballs through a temporary
-  registry and verifies CLI setup plus real registration/login flows.
+- `apps/cli-journey-e2e/` contains the fresh consumer journey Playwright
+  project for every CLI-supported framework. It installs local package tarballs
+  through a temporary registry and verifies CLI setup plus real
+  registration/login flows.
 - `packages/components/` contains shared Lit components.
 - `packages/sdk-core/`, `packages/sdk-next/`, `packages/sdk-nuxt/`,
   `packages/sdk-react/`, `packages/sdk-vue/`, and `packages/sdk-angular/`
@@ -148,10 +149,11 @@ corepack pnpm run journey
 This runner requires Docker for Verdaccio and the CLI-managed local runtime. By
 default it builds a local runtime image, ensures the Playwright Chromium
 browsers are installed, builds and packs local npm packages with pnpm, creates
-an empty app directory outside the repo, runs `npx @zitadel/cli@alpha doctor`,
-`start`, and `setup --framework next --server local`, starts the generated app
-on `localhost`, and runs Playwright with one worker. Use
-`-- --image <docker-tag>` to reuse an existing local runtime image.
+empty app directories outside the repo, runs `npx @zitadel/cli@alpha doctor`,
+`start`, and `setup --framework <id> --server local`, starts the generated apps
+on `localhost`, and runs Playwright with one worker per framework journey. Use
+`-- --framework next` to run one framework and `-- --image <docker-tag>` to
+reuse an existing local runtime image.
 
 Use `corepack pnpm run journey` for deterministic CI-style proof of the
 fresh-app path. Use `corepack pnpm run cli -- ...` for manual browser or agent
