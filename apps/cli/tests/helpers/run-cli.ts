@@ -1,10 +1,16 @@
+import { readFileSync } from "node:fs";
 import { format } from "node:util";
 import { fileURLToPath } from "node:url";
 
 import { run } from "@oclif/core";
 
+import { publicCliCommand } from "../../src/lib/public-cli";
+
 /** Repo root of the CLI package (where the oclif config + built dist live). */
 const root = fileURLToPath(new URL("../../", import.meta.url));
+const cliVersion = JSON.parse(
+  readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+) as { version: string };
 
 /**
  * Runs the built oclif CLI in-process, capturing stdout/stderr and the exit
@@ -77,4 +83,8 @@ function exitCodeOf(error: unknown): number {
 
 export function parseJson(stdout: string): unknown {
   return JSON.parse(stdout);
+}
+
+export function expectedPublicCliCommand(args: string): string {
+  return publicCliCommand(args, cliVersion.version);
 }

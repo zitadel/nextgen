@@ -5,6 +5,7 @@ import {
   readRuntimeMetadata,
 } from "../lib/local-server/runtime";
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { resolveCwd } from "../lib/paths";
 import { publicCliCommand } from "../lib/public-cli";
 
 export default class Stop extends BaseCommand {
@@ -12,7 +13,8 @@ export default class Stop extends BaseCommand {
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Stop);
-    const runtime = await readRuntimeMetadata(flags.cwd ? String(flags.cwd) : process.cwd());
+    const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
+    const runtime = await readRuntimeMetadata(cwd);
     await this.toMeta(flags, {
       resolveServer: false,
       source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
