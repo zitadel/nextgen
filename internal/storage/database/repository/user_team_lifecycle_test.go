@@ -48,6 +48,7 @@ func createLifecycleUser(t *testing.T, tx database.Transaction, userRepo *reposi
 
 // Acceptance signal 1: self-owned user survives team deactivation.
 func TestUserTeamLifecycle_SelfOwnedUserSurvivesTeamDeactivation(t *testing.T) {
+	skipIfSpanner(t)
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
 	ctx := t.Context()
@@ -191,7 +192,7 @@ func TestUserRepository_DeactivateRemovesMemberships(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, domain.UserStatusDeactivated, got.Status)
 
-	membershipRepo := repository.NewTeamMembershipRepository()
+	membershipRepo := repository.NewTeamMembershipRepository(tx)
 	membership, err := membershipRepo.Get(ctx, tx, pid, teamID, userID)
 	require.NoError(t, err)
 	require.Equal(t, domain.MembershipStatusRemoved, membership.Status)

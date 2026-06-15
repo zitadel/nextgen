@@ -68,7 +68,7 @@ func TestUserRepository_CreateGetListDelete(t *testing.T) {
 	require.Equal(t, domain.UserStatusActive, got.Status)
 	require.Len(t, got.Attributes, 4)
 
-	membershipRepo := repository.NewTeamMembershipRepository()
+	membershipRepo := repository.NewTeamMembershipRepository(tx)
 	membership, err := membershipRepo.Get(ctx, tx, pid, tid, userID)
 	require.NoError(t, err)
 	require.Equal(t, domain.MembershipStatusActive, membership.Status)

@@ -97,7 +97,7 @@ func ensureUser(t *testing.T, client database.QueryExecutor, projectID, teamID, 
 	if teamID == "" {
 		return
 	}
-	membershipRepo := repository.NewTeamMembershipRepository()
+	membershipRepo := repository.NewTeamMembershipRepository(client)
 	require.NoError(t, membershipRepo.Create(ctx, client, &domain.TeamMembership{
 		ProjectID: projectID,
 		TeamID:    teamID,
@@ -110,7 +110,9 @@ func deleteUser(t *testing.T, client database.QueryExecutor, projectID, userID s
 	t.Helper()
 	ctx := t.Context()
 	if isSpannerDB {
-		_, err := client.Exec(ctx, `DELETE FROM users WHERE project_id = $1 AND id = $2`, projectID, userID)
+		_, err := client.Exec(ctx, `DELETE FROM team_memberships WHERE project_id = $1 AND user_id = $2`, projectID, userID)
+		require.NoError(t, err)
+		_, err = client.Exec(ctx, `DELETE FROM users WHERE project_id = $1 AND id = $2`, projectID, userID)
 		require.NoError(t, err)
 		return
 	}

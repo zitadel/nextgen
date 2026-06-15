@@ -6,17 +6,8 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
-)
-
-const teamMembershipTable = "zitadel_nextgen.team_memberships"
-
-var (
-	colMembershipProjectID = database.NewColumn(teamMembershipTable, "project_id")
-	colMembershipTeamID    = database.NewColumn(teamMembershipTable, "team_id")
-	colMembershipUserID    = database.NewColumn(teamMembershipTable, "user_id")
-	colMembershipStatus    = database.NewColumn(teamMembershipTable, "status")
-	colMembershipCreatedAt = database.NewColumn(teamMembershipTable, "created_at")
-	colMembershipUpdatedAt = database.NewColumn(teamMembershipTable, "updated_at")
+	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres"
+	"github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
 )
 
 type teamMembershipRow struct {
@@ -39,21 +30,50 @@ func (r teamMembershipRow) toDomain() *domain.TeamMembership {
 	}
 }
 
+type teamMembershipMeta struct{ tableName string }
+
+func (m teamMembershipMeta) PrimaryKeyColumns() []database.Column {
+	return []database.Column{
+		database.NewColumn(m.tableName, "project_id"),
+		database.NewColumn(m.tableName, "team_id"),
+		database.NewColumn(m.tableName, "user_id"),
+	}
+}
+
+func (m teamMembershipMeta) UpdatedAtColumn() database.Column {
+	return database.NewColumn(m.tableName, "updated_at")
+}
+
+func (m teamMembershipMeta) qualifiedTableName() string { return m.tableName }
+
+func (m teamMembershipMeta) col(name string) database.Column {
+	return database.NewColumn(m.tableName, name)
+}
+
+var _ updatable = (*teamMembershipMeta)(nil)
+
+// TeamMembershipRepository persists team roster participation.
 type TeamMembershipRepository struct {
-	now database.Instruction
+	meta teamMembershipMeta
+	now  database.Instruction
 }
 
-func NewTeamMembershipRepository() *TeamMembershipRepository {
-	return &TeamMembershipRepository{now: database.NowInstruction}
+// NewTeamMembershipRepository returns a dialect-specific [TeamMembershipRepository].
+func NewTeamMembershipRepository(client database.QueryExecutor) *TeamMembershipRepository {
+	switch client.(type) {
+	case spanner.SpannerPooler:
+		return &TeamMembershipRepository{
+			meta: teamMembershipMeta{tableName: spannerTableMembers},
+			now:  database.CurrentTimestampInstruction,
+		}
+	case postgres.PostgresPooler:
+		return &TeamMembershipRepository{
+			meta: teamMembershipMeta{tableName: pgTableMemberships},
+			now:  database.NowInstruction,
+		}
+	}
+	panic("NewTeamMembershipRepository: unsupported client type")
 }
-
-func (r *TeamMembershipRepository) qualifiedTableName() string { return teamMembershipTable }
-
-func (r *TeamMembershipRepository) PrimaryKeyColumns() []database.Column {
-	return []database.Column{colMembershipProjectID, colMembershipTeamID, colMembershipUserID}
-}
-
-func (r *TeamMembershipRepository) UpdatedAtColumn() database.Column { return colMembershipUpdatedAt }
 
 func (r *TeamMembershipRepository) Create(ctx context.Context, client database.QueryExecutor, m *domain.TeamMembership) error {
 	status := m.Status
@@ -61,7 +81,7 @@ func (r *TeamMembershipRepository) Create(ctx context.Context, client database.Q
 		status = domain.MembershipStatusActive
 	}
 	b := database.NewStatementBuilder("INSERT INTO ")
-	b.WriteString(r.qualifiedTableName())
+	b.WriteString(r.meta.tableName)
 	b.WriteString(" (project_id, team_id, user_id, status, created_at, updated_at) VALUES (")
 	b.WriteArgs(m.ProjectID, m.TeamID, m.UserID, status.String(), r.now, r.now)
 	b.WriteString(")")
@@ -71,7 +91,7 @@ func (r *TeamMembershipRepository) Create(ctx context.Context, client database.Q
 
 func (r *TeamMembershipRepository) Get(ctx context.Context, client database.QueryExecutor, projectID, teamID, userID string) (*domain.TeamMembership, error) {
 	b := database.NewStatementBuilder("SELECT project_id, team_id, user_id, status, created_at, updated_at FROM ")
-	b.WriteString(r.qualifiedTableName())
+	b.WriteString(r.meta.tableName)
 	b.WriteString(" WHERE project_id = ")
 	b.WriteArg(projectID)
 	b.WriteString(" AND team_id = ")
@@ -87,7 +107,7 @@ func (r *TeamMembershipRepository) Get(ctx context.Context, client database.Quer
 
 func (r *TeamMembershipRepository) ListByUser(ctx context.Context, client database.QueryExecutor, projectID, userID string) ([]*domain.TeamMembership, error) {
 	b := database.NewStatementBuilder("SELECT project_id, team_id, user_id, status, created_at, updated_at FROM ")
-	b.WriteString(r.qualifiedTableName())
+	b.WriteString(r.meta.tableName)
 	b.WriteString(" WHERE project_id = ")
 	b.WriteArg(projectID)
 	b.WriteString(" AND user_id = ")
@@ -105,7 +125,7 @@ func (r *TeamMembershipRepository) ListByUser(ctx context.Context, client databa
 
 func (r *TeamMembershipRepository) ListByTeam(ctx context.Context, client database.QueryExecutor, projectID, teamID string) ([]*domain.TeamMembership, error) {
 	b := database.NewStatementBuilder("SELECT project_id, team_id, user_id, status, created_at, updated_at FROM ")
-	b.WriteString(r.qualifiedTableName())
+	b.WriteString(r.meta.tableName)
 	b.WriteString(" WHERE project_id = ")
 	b.WriteArg(projectID)
 	b.WriteString(" AND team_id = ")
@@ -123,13 +143,13 @@ func (r *TeamMembershipRepository) ListByTeam(ctx context.Context, client databa
 
 func (r *TeamMembershipRepository) UpdateStatus(ctx context.Context, client database.QueryExecutor, projectID, teamID, userID string, status domain.MembershipStatus) error {
 	cond := database.And(
-		database.NewTextCondition(colMembershipProjectID, database.TextOperationEqual, projectID),
-		database.NewTextCondition(colMembershipTeamID, database.TextOperationEqual, teamID),
-		database.NewTextCondition(colMembershipUserID, database.TextOperationEqual, userID),
+		database.NewTextCondition(r.meta.col("project_id"), database.TextOperationEqual, projectID),
+		database.NewTextCondition(r.meta.col("team_id"), database.TextOperationEqual, teamID),
+		database.NewTextCondition(r.meta.col("user_id"), database.TextOperationEqual, userID),
 	)
-	_, err := updateOne(ctx, client, r, cond,
-		database.NewChange(colMembershipStatus, status.String()),
-		database.NewChange(colMembershipUpdatedAt, r.now),
+	_, err := updateOne(ctx, client, r.meta, cond,
+		database.NewChange(r.meta.col("status"), status.String()),
+		database.NewChange(r.meta.UpdatedAtColumn(), r.now),
 	)
 	return err
 }

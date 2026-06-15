@@ -241,7 +241,7 @@ func (r *UserRepository) Create(ctx context.Context, client database.QueryExecut
 	if user.ParticipationTeamID == nil || *user.ParticipationTeamID == "" {
 		return nil
 	}
-	membershipRepo := NewTeamMembershipRepository()
+	membershipRepo := NewTeamMembershipRepository(client)
 	return membershipRepo.Create(ctx, client, &domain.TeamMembership{
 		ProjectID: user.ProjectID,
 		TeamID:    *user.ParticipationTeamID,
