@@ -6,6 +6,7 @@ import prettierConfig from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
 import perfectionistPlugin from 'eslint-plugin-perfectionist';
 import prettierPlugin from 'eslint-plugin-prettier';
+import solid from 'eslint-plugin-solid/configs/typescript';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
@@ -46,6 +47,10 @@ export default tseslint.config(
         { argsIgnorePattern: '^_' },
       ],
     },
+  },
+  {
+    ...solid,
+    files: ['**/*.{tsx,jsx}'],
   },
   {
     files: ['**/*.{test,spec}.{ts,tsx}', '**/__tests__/**/*.{ts,tsx}'],

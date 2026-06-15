@@ -6,13 +6,14 @@ import prettierConfig from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
 import perfectionistPlugin from 'eslint-plugin-perfectionist';
 import prettierPlugin from 'eslint-plugin-prettier';
+import sveltePlugin from 'eslint-plugin-svelte';
 import tseslint from 'typescript-eslint';
 
-// `.svelte` files are type-checked and linted by `svelte-check` (the `check`
-// script) — Svelte's first-party tool — so ESLint here covers the `.ts`/`.js`
-// surface, mirroring the hardened rules of the other SPA SDKs.
+// `.svelte` files are linted by eslint-plugin-svelte (and type-checked by
+// `svelte-check`, the `check` script); ESLint also covers the `.ts`/`.js`
+// surface with the hardened rules shared across the SPA SDKs.
 export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**', '.svelte-kit/**', '**/*.svelte'] },
+  { ignores: ['dist/**', 'node_modules/**', '.svelte-kit/**'] },
   {
     ...eslint.configs.recommended,
     files: ['**/*.{ts,js,mjs,cjs}'],
@@ -51,6 +52,17 @@ export default tseslint.config(
         { argsIgnorePattern: '^_' },
       ],
     },
+  },
+  // Scope eslint-plugin-svelte strictly to `.svelte` files so its rules
+  // (e.g. comment-directive) never run on `.ts`/`.md` without svelte context.
+  ...sveltePlugin.configs['flat/recommended'].map((c) => ({
+    ...c,
+    files: ['**/*.svelte'],
+  })),
+  {
+    // Parse `<script lang="ts">` blocks with the TypeScript parser.
+    files: ['**/*.svelte'],
+    languageOptions: { parserOptions: { parser: tseslint.parser } },
   },
   {
     files: ['**/*.{test,spec}.{ts,tsx}', '**/__tests__/**/*.{ts,tsx}'],

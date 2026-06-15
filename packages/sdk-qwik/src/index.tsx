@@ -44,6 +44,9 @@ export interface ZitadelLoginProps {
 
 export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
   const host = useSignal<HTMLElement>();
+  // Wiring native listeners on a third-party custom element requires the DOM
+  // post-mount; `useOn` does not catch these programmatic events.
+  // eslint-disable-next-line qwik/no-use-visible-task
   useVisibleTask$(({ track, cleanup }) => {
     const el = track(() => host.value);
     if (!el) return;
@@ -81,6 +84,8 @@ export interface ZitadelLogoutProps {
 
 export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
   const host = useSignal<HTMLElement>();
+  // Client-only registration of the (browser-only Lit) components.
+  // eslint-disable-next-line qwik/no-use-visible-task
   useVisibleTask$(({ track }) => {
     const el = track(() => host.value);
     if (el) void import('@zitadel/components');

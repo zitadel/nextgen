@@ -6,6 +6,7 @@ import prettierConfig from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
 import perfectionistPlugin from 'eslint-plugin-perfectionist';
 import prettierPlugin from 'eslint-plugin-prettier';
+import qwikPlugin from 'eslint-plugin-qwik';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
@@ -46,6 +47,19 @@ export default tseslint.config(
         { argsIgnorePattern: '^_' },
       ],
     },
+  },
+  {
+    // Qwik rules cover the component source; `valid-lexical-scope` needs
+    // type-aware linting, so enable the project service for src files only.
+    files: ['src/**/*.{ts,tsx}'],
+    plugins: { qwik: qwikPlugin.qwikEslint9Plugin },
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: qwikPlugin.configs.recommended.rules,
   },
   {
     files: ['**/*.{test,spec}.{ts,tsx}', '**/__tests__/**/*.{ts,tsx}'],

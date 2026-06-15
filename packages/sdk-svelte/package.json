@@ -54,6 +54,7 @@
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-perfectionist": "^4.0.0",
     "eslint-plugin-prettier": "^5.0.0",
+    "eslint-plugin-svelte": "^3.0.0",
     "jsdom": "catalog:",
     "prettier": "^3.0.0",
     "svelte": "^5.0.0",
