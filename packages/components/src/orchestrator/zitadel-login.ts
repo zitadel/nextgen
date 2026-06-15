@@ -457,17 +457,6 @@ export class ZitadelLogin extends LitElement {
 
     const fields = step.fields ?? [];
     const actions = step.actions ?? [];
-    // The wire ships fields and actions as ordered arrays so the template can
-    // iterate them in authorial order. Templates also need keyed lookup
-    // (`actions_by_name.passkey`, `fields_by_name.email`) — we build the
-    // name-indexed views once here so they live only in the render context.
-    // The maps use a null prototype so a malicious flow definition naming a
-    // field/action `__proto__` or `constructor` can't shadow Object.prototype
-    // members through the lookup.
-    const fields_by_name: Record<string, (typeof fields)[number]> = Object.create(null);
-    for (const f of fields) fields_by_name[f.name] = f;
-    const actions_by_name: Record<string, (typeof actions)[number]> = Object.create(null);
-    for (const a of actions) actions_by_name[a.name] = a;
     const context: LiquidContext = {
       step: {
         name: step.name,
@@ -477,8 +466,6 @@ export class ZitadelLogin extends LitElement {
       fields,
       actions,
       gates: step.gates ?? {},
-      fields_by_name,
-      actions_by_name,
       sso_providers: step.sso_providers ?? [],
       challenge: step.challenge ?? null,
       messages: [],

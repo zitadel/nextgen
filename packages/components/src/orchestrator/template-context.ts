@@ -9,14 +9,11 @@
  *
  * The orchestrator owns these projections that don't exist on the wire:
  *
- * 1. `fields_by_name` / `actions_by_name` — name-indexed views of the
- *    ordered arrays. Templates iterate `fields` / `actions` for order, then
- *    look up by name (`actions_by_name.passkey`) for keyed branches.
- * 2. `errors` — lifted from `step.error: string | null` so templates iterate
+ * 1. `errors` — lifted from `step.error: string | null` so templates iterate
  *    uniformly even though the wire only carries one error string.
- * 3. `messages` — populated by orchestrator decoration hooks (info banners,
+ * 2. `messages` — populated by orchestrator decoration hooks (info banners,
  *    sticky notices); not on the wire.
- * 4. `identity` — resolved client-side for greet-by-name; not on the wire.
+ * 3. `identity` — resolved client-side for greet-by-name; not on the wire.
  */
 import type {
   CreateFlow201Step,
@@ -59,8 +56,6 @@ export type LiquidContext = {
   fields: readonly CreateFlow201StepFieldsItem[];
   actions: readonly CreateFlow201StepActionsItem[];
   gates: CreateFlow201StepGates;
-  fields_by_name: Record<string, CreateFlow201StepFieldsItem>;
-  actions_by_name: Record<string, CreateFlow201StepActionsItem>;
   sso_providers: readonly CreateFlow201StepSsoProvidersItem[];
   challenge: CreateFlow201StepChallenge | null;
   messages: readonly FlowMessage[];
