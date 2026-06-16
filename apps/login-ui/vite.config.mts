@@ -23,12 +23,21 @@ export default defineConfig(({ command }) => ({
 }));
 
 function keepGoEmbedPlaceholder(outDir: string) {
+  const writePlaceholder = () => {
+    const dir = resolve(import.meta.dirname, outDir);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(resolve(dir, ".gitkeep"), "");
+  };
+
   return {
     name: "zitadel-go-embed-placeholder",
+    buildEnd(error?: Error) {
+      if (error) {
+        writePlaceholder();
+      }
+    },
     closeBundle() {
-      const dir = resolve(import.meta.dirname, outDir);
-      mkdirSync(dir, { recursive: true });
-      writeFileSync(resolve(dir, ".gitkeep"), "");
+      writePlaceholder();
     },
   };
 }

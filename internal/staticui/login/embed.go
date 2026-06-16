@@ -25,7 +25,7 @@ func Handler(prefix string) (http.Handler, error) {
 func ValidateDist() error {
 	if _, err := fs.Stat(dist, "dist/index.html"); err != nil {
 		return fmt.Errorf(
-			"login UI not embedded: run `moon run console:build login-ui:build` (see CONTRIBUTING.md): %w",
+			"login UI not embedded: run `moon run login-ui:build` (see CONTRIBUTING.md): %w",
 			err,
 		)
 	}
