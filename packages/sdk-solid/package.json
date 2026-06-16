@@ -43,7 +43,7 @@
     "@eslint/js": "^9.0.0",
     "@eslint/json": "^0.11.0",
     "@eslint/markdown": "^6.0.0",
-    "@solidjs/testing-library": "catalog:",
+    "@solidjs/testing-library": "^0.8.10",
     "@testing-library/jest-dom": "^6.0.0",
     "eslint": "^9.0.0",
     "eslint-config-prettier": "^10.0.0",
