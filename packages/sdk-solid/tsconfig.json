@@ -3,6 +3,7 @@
   "compilerOptions": {
     "composite": false,
     "declaration": true,
+    "rootDir": "src",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "preserve",
     "jsxImportSource": "solid-js"

@@ -2,12 +2,10 @@
 node_modules
 
 # Build output (per-package generated dirs)
-# Most SDK packages emit `dist`; sdk-qwik emits `lib` + `lib-types`.
+# All SDK packages emit `dist`.
 dist
 build
 out
-lib
-lib-types
 out-tsc
 
 # TypeScript incremental build info

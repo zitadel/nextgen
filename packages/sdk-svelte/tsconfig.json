@@ -1,10 +1,14 @@
 {
-  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "composite": false,
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
     "declaration": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "verbatimModuleSyntax": true
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "customConditions": ["@zitadel/source"]
   },
   "include": ["src"],
   "references": [

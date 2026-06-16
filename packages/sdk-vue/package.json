@@ -54,9 +54,9 @@
     "prettier": "catalog:",
     "typescript": "catalog:",
     "typescript-eslint": "catalog:",
-    "vite": "catalog:",
+    "vite": "^7.3.5",
     "vite-plugin-dts": "catalog:",
-    "vitest": "catalog:",
+    "vitest": "^3.0.0",
     "vue": "^3.5.0"
   }
 }

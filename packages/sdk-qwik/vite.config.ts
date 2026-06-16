@@ -6,10 +6,13 @@ import dts from "vite-plugin-dts";
 // and the `.qwik.mjs` entry the consuming app's qwikVite further processes;
 // vite-plugin-dts emits the `.d.ts`. ESM-only — Qwik is ESM-only and the
 // consuming app's bundler always imports the `.qwik.mjs`. Workspace + qwik deps
-// are externalized — the consumer provides them.
+// are externalized — the consumer provides them. An explicit `build.outDir` is
+// read by qwikVite (vite.ts) and used instead of its library-mode `lib/` default,
+// so this package ships from `dist/` like every other SDK.
 export default defineConfig({
   build: {
     target: "es2020",
+    outDir: "dist",
     lib: {
       entry: "./src/index.tsx",
       formats: ["es"],
@@ -19,12 +22,5 @@ export default defineConfig({
       external: [/^@zitadel\//, /^@builder\.io\//],
     },
   },
-  plugins: [
-    qwikVite(),
-    dts({
-      include: ["src"],
-      exclude: ["src/**/*.spec.*"],
-      outDir: "lib-types",
-    }),
-  ],
+  plugins: [qwikVite(), dts({ include: ["src"], exclude: ["src/**/*.spec.*"] })],
 });

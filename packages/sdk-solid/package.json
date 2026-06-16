@@ -57,9 +57,9 @@
     "solid-js": "^1.9.12",
     "typescript": "catalog:",
     "typescript-eslint": "catalog:",
-    "vite": "catalog:",
+    "vite": "^7.3.5",
     "vite-plugin-dts": "catalog:",
     "vite-plugin-solid": "^2.11.0",
-    "vitest": "catalog:"
+    "vitest": "^3.0.0"
   }
 }
