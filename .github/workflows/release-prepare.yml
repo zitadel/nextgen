@@ -12,9 +12,17 @@ jobs:
     runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 20
     steps:
+      - name: Generate release app token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
 
       - uses: moonrepo/setup-toolchain@v0
 
@@ -33,11 +41,15 @@ jobs:
       - name: Validate release version source
         run: env -u CI -u GITHUB_ACTIONS moon run release:version
 
+      - name: Validate pending changesets
+        run: moon run release:changesets -- --pending --summary
+
       - name: Open or update version PR
         uses: changesets/action@v1
         with:
           version: corepack pnpm exec changeset version
           title: "build: version packages"
           commit: "build: version packages"
+          createGithubReleases: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}

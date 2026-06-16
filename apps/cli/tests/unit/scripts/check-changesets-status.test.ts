@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 type CheckChangesetsStatusModule = {
   checkChangesetsStatus: (options: {
     base?: string;
+    pending?: boolean;
     entries: Array<{ status: string; file: string }>;
     config: { fixed: string[][] };
     changesetSources?: Record<string, string>;
@@ -19,6 +20,11 @@ type CheckChangesetsStatusModule = {
         changesets?: string[];
       }>;
     };
+    runChangesetStatus?: (options: {
+      repoRoot: string;
+      base: string;
+      pending: boolean;
+    }) => Promise<CheckChangesetStatus>;
   }) => Promise<{
     ok: boolean;
     errors: Array<{ code: string; message: string }>;
@@ -29,6 +35,20 @@ type CheckChangesetsStatusModule = {
     nextAction: string;
   }>;
   publicPackages: Array<{ name: string; root: string }>;
+};
+
+type CheckChangesetStatus = {
+  changesets?: Array<{
+    id: string;
+    releases: Array<{ name: string; type: string }>;
+  }>;
+  releases?: Array<{
+    name: string;
+    type: string;
+    oldVersion?: string;
+    newVersion?: string;
+    changesets?: string[];
+  }>;
 };
 
 async function loadModule(): Promise<CheckChangesetsStatusModule> {
@@ -104,6 +124,78 @@ Improve local start behavior.
 
     expect(report.ok).toBe(true);
     expect(report.nextAction).toContain("Changesets are present");
+  });
+
+  it("passes pending mode when public changesets are valid", async () => {
+    const { checkChangesetsStatus } = await loadModule();
+    const report = await checkChangesetsStatus({
+      pending: true,
+      entries: [{ status: "A", file: ".changeset/cli-start.md" }],
+      config: validConfig(),
+      changesetSources: {
+        ".changeset/cli-start.md": `---
+"@zitadel/cli": minor
+---
+
+Improve local start behavior.
+`,
+      },
+      changesetStatus: {
+        changesets: [
+          {
+            id: "cli-start",
+            releases: [{ name: "@zitadel/cli", type: "minor" }],
+          },
+        ],
+        releases: [
+          {
+            name: "@zitadel/cli",
+            type: "minor",
+            oldVersion: "0.1.0-alpha.5",
+            newVersion: "0.1.0-alpha.6",
+            changesets: ["cli-start"],
+          },
+        ],
+      },
+    });
+
+    expect(report.ok).toBe(true);
+    expect(report.nextAction).toContain("Changesets are present");
+  });
+
+  it("runs Changesets status in pending mode so mixed ignored package errors are visible", async () => {
+    const { checkChangesetsStatus } = await loadModule();
+    const report = await checkChangesetsStatus({
+      pending: true,
+      entries: [{ status: "A", file: ".changeset/mixed.md" }],
+      config: validConfig(),
+      changesetSources: {
+        ".changeset/mixed.md": `---
+"@zitadel/api-mock": patch
+"@zitadel/cli": patch
+---
+
+Keep private mocks aligned with public CLI behavior.
+`,
+      },
+      runChangesetStatus: async () => {
+        throw new Error("Found mixed changeset mixed: ignored @zitadel/api-mock and not ignored @zitadel/cli");
+      },
+    });
+
+    expect(report.ok).toBe(false);
+    expect(report.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "invalid-changeset-package",
+          message: expect.stringContaining("@zitadel/api-mock"),
+        }),
+        expect.objectContaining({
+          code: "changeset-status",
+          message: expect.stringContaining("Found mixed changeset"),
+        }),
+      ]),
+    );
   });
 
   it("rejects changesets that reference unknown or private packages", async () => {
