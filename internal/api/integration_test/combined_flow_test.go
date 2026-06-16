@@ -114,12 +114,13 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	// User row landed in the DB with the flipped-into email.
 	db := harness.EnsureDBPool(t)
 	userRepo := harness.EnsureUserRepo(t)
-	users, err := userRepo.List(t.Context(), db,
-		database.WithCondition(userRepo.ProjectIDCondition(project.ID)),
-		database.WithCondition(userRepo.AttributesCondition([]domain.Attribute{{Key: "email", Value: newEmail}})),
+	_, err = userRepo.Get(t.Context(), db,
+		database.WithCondition(database.And(
+			userRepo.ProjectIDCondition(project.ID),
+			userRepo.AttributesCondition([]domain.Attribute{{Key: "email", Value: newEmail}}),
+		)),
 	)
-	require.NoError(t, err)
-	require.Len(t, users, 1, "flip-into-register must persist exactly one user")
+	require.NoError(t, err, "flip-into-register must persist exactly one user")
 }
 
 // combinedPasswordFlowDefinition mirrors examples/05-combined-login-register

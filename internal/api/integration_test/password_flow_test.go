@@ -233,16 +233,17 @@ func TestPasswordRegisterFlow(t *testing.T) {
 	// User row exists with the submitted email.
 	db := harness.EnsureDBPool(t)
 	userRepo := harness.EnsureUserRepo(t)
-	users, err := userRepo.List(t.Context(), db,
-		database.WithCondition(userRepo.ProjectIDCondition(project.ID)),
-		database.WithCondition(userRepo.AttributesCondition([]domain.Attribute{{Key: "email", Value: newEmail}})),
+	user, err := userRepo.Get(t.Context(), db,
+		database.WithCondition(database.And(
+			userRepo.ProjectIDCondition(project.ID),
+			userRepo.AttributesCondition([]domain.Attribute{{Key: "email", Value: newEmail}}),
+		)),
 	)
-	require.NoError(t, err)
-	require.Len(t, users, 1, "create_user must persist exactly one user")
+	require.NoError(t, err, "create_user must persist exactly one user")
 
 	// Password hash exists for that user and verifies the submitted password.
 	passwordRepo := harness.EnsureUserPasswordRepo(t)
-	pw, err := passwordRepo.GetByUserID(t.Context(), db, project.ID, users[0].ID)
+	pw, err := passwordRepo.GetByUserID(t.Context(), db, project.ID, user.ID)
 	require.NoError(t, err)
 	require.NotEmpty(t, pw.EncodedHash)
 	require.NoError(t, pw.Verify(newPass, harness.EnsureHashVerifier(t)))

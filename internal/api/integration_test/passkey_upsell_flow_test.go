@@ -107,12 +107,13 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	// User is now in the DB (create_user fired).
 	db := harness.EnsureDBPool(t)
 	userRepo := harness.EnsureUserRepo(t)
-	users, err := userRepo.List(t.Context(), db,
-		database.WithCondition(userRepo.ProjectIDCondition(project.ID)),
-		database.WithCondition(userRepo.AttributesCondition([]domain.Attribute{{Key: "email", Value: newEmail}})),
+	user, err := userRepo.Get(t.Context(), db,
+		database.WithCondition(database.And(
+			userRepo.ProjectIDCondition(project.ID),
+			userRepo.AttributesCondition([]domain.Attribute{{Key: "email", Value: newEmail}}),
+		)),
 	)
-	require.NoError(t, err)
-	require.Len(t, users, 1, "create_user must persist exactly one user before the upsell")
+	require.NoError(t, err, "create_user must persist exactly one user before the upsell")
 
 	// passkey-upsell: issue passkey_register challenge for the just-created user.
 	issueResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
@@ -162,12 +163,13 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 
 	// Passkey row exists for the freshly-created user — the seam works.
 	passkeyRepo := harness.EnsureUserPasskeyRepo(t)
-	pks, err := passkeyRepo.List(t.Context(), db,
-		database.WithCondition(passkeyRepo.ProjectIDCondition(project.ID)),
-		database.WithCondition(passkeyRepo.UserIDCondition(users[0].ID)),
+	_, err = passkeyRepo.Get(t.Context(), db,
+		database.WithCondition(database.And(
+			passkeyRepo.ProjectIDCondition(project.ID),
+			passkeyRepo.UserIDCondition(user.ID),
+		)),
 	)
-	require.NoError(t, err)
-	require.Len(t, pks, 1, "passkey_register must enroll exactly one credential against the create_user-pinned ID")
+	require.NoError(t, err, "passkey_register must enroll exactly one credential against the create_user-pinned ID")
 }
 
 // TestPostCreateUserPasskeyUpsell_SkipsToDone confirms the skip branch of
