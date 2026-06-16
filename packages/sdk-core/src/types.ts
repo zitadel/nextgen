@@ -9,10 +9,12 @@ import type {
 export type { CreateFlowBodyPurpose } from "@zitadel/api/generated/model";
 
 /**
- * Shared types for the Nextgen SDKs: the middleware layer (`sdk-next`,
- * `sdk-nuxt`) and the SPA widget events (`sdk-react`, `sdk-vue`, `sdk-solid`,
- * `sdk-svelte`, `sdk-qwik`). Each SDK re-exports them from its own public
- * surface so consumers don't need a direct `sdk-core` dependency.
+ * The SPA widget contract shared by every SPA SDK (`sdk-react`, `sdk-vue`,
+ * `sdk-angular`, `sdk-solid`, `sdk-svelte`, `sdk-qwik`): the widget event detail
+ * types plus the config/handler/props types derived from them. Each SPA SDK
+ * re-exports these from its own public surface so consumers don't need a direct
+ * `sdk-core` dependency. The middleware-layer types (`sdk-next`, `sdk-nuxt`) now
+ * live in `@zitadel/sdk-core/middleware`.
  */
 
 /** Payload of the `zitadel-flow-step` event. */
