@@ -403,6 +403,20 @@ describe("release-automation", () => {
     expect(result.shouldRun).toBe(false);
   });
 
+  it("skips publish for version package commits with only empty changeset output", async () => {
+    const { detectReleaseAutomation } = await loadReleaseAutomationModule();
+    const result = await detectReleaseAutomation({
+      mode: "publish",
+      message: "build: version packages (alpha)\n",
+      pendingChangesets: [],
+      entries: [{ status: "D", file: ".changeset/release-tests.md" }],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.shouldRun).toBe(false);
+    expect(result.reason).toContain("no publishable package version output");
+  });
+
   it("fails publish when a version package commit changes non-version files", async () => {
     const { detectReleaseAutomation } = await loadReleaseAutomationModule();
     const result = await detectReleaseAutomation({

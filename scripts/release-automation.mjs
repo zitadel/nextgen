@@ -81,7 +81,7 @@ export async function detectReleaseAutomation(options) {
   if (versionCommit && pendingChangesets.length > 0) {
     errors.push(`version package commit still has pending changesets: ${pendingChangesets.join(", ")}`);
   }
-  if (versionCommit && !analysis.versionOnly) {
+  if (versionCommit && !analysis.versionOutputOnly) {
     errors.push("version package commit changed files outside Changesets version output");
   }
 
@@ -232,7 +232,7 @@ function publishReason({ versionCommit, pendingChangesets, analysis, errors }) {
     return "pending changesets remain";
   }
   if (!analysis.versionOnly) {
-    return "diff is not generated version output";
+    return "version package commit has no publishable package version output";
   }
   return "Changesets version package commit detected";
 }

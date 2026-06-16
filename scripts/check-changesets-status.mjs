@@ -116,6 +116,7 @@ export function analyzeChangedEntries(entries, options = {}) {
     deletedChangesetFiles,
     publishableEntries,
     changedPackages,
+    versionOutputOnly,
     versionOnly,
   };
 }
