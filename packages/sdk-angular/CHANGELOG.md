@@ -1,5 +1,13 @@
 # @zitadel/sdk-angular
 
+## 0.1.0-alpha.10
+
+### Patch Changes
+
+- Updated dependencies [[`acb5b54`](https://github.com/zitadel/nextgen/commit/acb5b549386efcc5ede005871b145c1cd0f9ac5e)]:
+  - @zitadel/components@0.1.0-alpha.10
+  - @zitadel/api@0.1.0-alpha.10
+
 ## 0.1.0-alpha.9
 
 ### Patch Changes

@@ -1,5 +1,15 @@
 # @zitadel/cli
 
+## 0.1.0-alpha.10
+
+### Patch Changes
+
+- [#328](https://github.com/zitadel/nextgen/pull/328) [`acb5b54`](https://github.com/zitadel/nextgen/commit/acb5b549386efcc5ede005871b145c1cd0f9ac5e) Thanks [@fforootd](https://github.com/fforootd)! - Improve fresh-app CLI recovery guidance and align agent automation hook docs with the rendered login controls.
+
+- Updated dependencies []:
+  - @zitadel/server@0.1.0-alpha.10
+  - @zitadel/api@0.1.0-alpha.10
+
 ## 0.1.0-alpha.9
 
 ### Patch Changes
