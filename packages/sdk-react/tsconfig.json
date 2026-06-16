@@ -3,15 +3,10 @@
   "compilerOptions": {
     "composite": false,
     "declaration": true,
-    "rootDir": "src",
-    "outDir": "dist",
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "jsx": "react-jsx",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx"
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["src/**/*.spec.ts", "src/**/*.spec.tsx", "src/**/__tests__/**"],
+  "include": ["src"],
   "references": [
     {
       "path": "../sdk-core"

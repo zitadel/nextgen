@@ -10,7 +10,7 @@ import {
   ZITADEL_LOGOUT_EVENT_HANDLERS,
 } from '@zitadel/sdk-core/types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { defineComponent, h, ref, type Ref } from 'vue';
+import { defineComponent, h, shallowRef, type Ref } from 'vue';
 
 import ZitadelLogin from './components/ZitadelLogin';
 import ZitadelLogout from './components/ZitadelLogout';
@@ -20,13 +20,13 @@ import ZitadelLogout from './components/ZitadelLogout';
 // auto-unwraps the exposed `Ref`, so the consumer reads the element directly as
 // `r.value.element`. Mount the component under a parent that holds such a ref
 // and forward the captured instance out, mirroring that consumer access.
-function mountWithInstanceRef<Element extends HTMLElement>(
+function mountWithInstanceRef(
   child: typeof ZitadelLogin | typeof ZitadelLogout,
 ): {
-  captured: Ref<{ element: Element | null } | null>;
-  container: HTMLElement;
+  captured: Ref<{ element: HTMLElement | null } | null>;
+  container: Element;
 } {
-  const captured = ref<{ element: Element | null } | null>(null);
+  const captured = shallowRef<{ element: HTMLElement | null } | null>(null);
   const parent = defineComponent({
     setup: () => () => h(child, { ref: captured }),
   });
@@ -82,8 +82,7 @@ describe('ZitadelLogin', () => {
   );
 
   it('exposes the rendered element via the instance ref', () => {
-    const { captured, container } =
-      mountWithInstanceRef<ZitadelLoginElement>(ZitadelLogin);
+    const { captured, container } = mountWithInstanceRef(ZitadelLogin);
     const element = captured.value!.element;
     expect(element).not.toBeNull();
     expect(element!.tagName.toLowerCase()).toBe('zitadel-login');
@@ -123,8 +122,7 @@ describe('ZitadelLogout', () => {
   );
 
   it('exposes the rendered element via the instance ref', () => {
-    const { captured, container } =
-      mountWithInstanceRef<ZitadelLogoutElement>(ZitadelLogout);
+    const { captured, container } = mountWithInstanceRef(ZitadelLogout);
     const element = captured.value!.element;
     expect(element).not.toBeNull();
     expect(element!.tagName.toLowerCase()).toBe('zitadel-logout');
