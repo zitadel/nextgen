@@ -218,6 +218,13 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     const element = await mount();
     const root = element.shadowRoot!;
     expect(root.querySelector('[data-testid="zitadel-field-email"]')).toBeTruthy();
+    const emailField = root.querySelector('zl-field[name="email"]') as HTMLElement & {
+      updateComplete: Promise<unknown>;
+    };
+    await emailField.updateComplete;
+    expect(emailField.shadowRoot?.querySelector("input")?.getAttribute("data-testid")).toBe(
+      "zitadel-input-email",
+    );
     await fillNativeField(root, "email", "alice@acme.com");
     await fillNativeField(root, "password", "hunter2");
     const submit = root.querySelector('zl-button[action="submit"]') as HTMLElement & {

@@ -185,8 +185,15 @@ function failureAdvice(
   if (failedNames.has("port")) {
     const fallbackPort = port === DEFAULT_LOCAL_SERVER_PORT ? port + 1 : DEFAULT_LOCAL_SERVER_PORT;
     return {
-      hint: `Port ${String(port)} is already in use. Stop the process using it, or choose another port for local Zitadel.`,
-      nextCommands: [publicCliCommand(`doctor --port ${String(fallbackPort)}`, cliVersion)],
+      hint:
+        `Port ${String(port)} is already in use. Stop the process using it, ` +
+        "run `zitadel stop --all` for CLI-managed local runtimes, then rerun doctor; " +
+        "or choose another port for local Zitadel.",
+      nextCommands: [
+        publicCliCommand("stop --all", cliVersion),
+        publicCliCommand("doctor", cliVersion),
+        publicCliCommand(`doctor --port ${String(fallbackPort)}`, cliVersion),
+      ],
     };
   }
 

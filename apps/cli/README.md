@@ -60,6 +60,10 @@ registration/login, and optional passkey setup after password registration.
 Users who skip passkey setup can still sign in with password; users who add a
 passkey can sign in with either credential.
 
+For agent scripts, pass `--non-interactive --json` and capture stdout and stderr
+separately. The CLI contract is one parseable JSON object on stdout; terminals
+and agent UIs may display stderr package-manager progress together with stdout.
+
 ## Other commands
 
 - `zitadel doctor` — verify the local runtime and generated project files

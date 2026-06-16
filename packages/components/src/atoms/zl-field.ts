@@ -327,10 +327,13 @@ export class ZlField extends LitElement {
   };
 
   private nativeInputTestId(): string | undefined {
+    if (this.name) {
+      return `zitadel-input-${this.name}`;
+    }
     if (this.testId) {
       return `${this.testId}-input`;
     }
-    return this.name ? `zitadel-input-${this.name}` : undefined;
+    return undefined;
   }
 
   private dispatchNativeInput(source?: Event): void {
