@@ -14,7 +14,6 @@ type ConfiguredElement = HTMLElement & {
 };
 
 beforeEach(() => {
-  // The widget starts a flow on mount; stub fetch so the attempt fails quietly.
   vi.stubGlobal(
     'fetch',
     vi.fn(() => Promise.reject(new Error('no network'))),
@@ -22,7 +21,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  // Restore the real fetch and drop mounted nodes so tests stay isolated.
   vi.unstubAllGlobals();
   document.body.innerHTML = '';
 });

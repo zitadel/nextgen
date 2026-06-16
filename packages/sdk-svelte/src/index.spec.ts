@@ -49,7 +49,6 @@ describe('ZitadelLogin', () => {
     });
     flushSync();
     const el = target.querySelector<ConfiguredElement>('zitadel-login');
-    expect(el).not.toBeNull();
     expect(el!.projectId).toBe('proj-test');
     expect(el!.proxyPath).toBe('/__nextgen');
     unmount(component);
@@ -64,10 +63,9 @@ describe('ZitadelLogin', () => {
       props: { project, purpose: 'login', onFlowStep },
     });
     flushSync();
-    const el = target.querySelector('zitadel-login') as HTMLElement | null;
-    expect(el).not.toBeNull();
+    const el = target.querySelector('zitadel-login');
     const detail = { step: { kind: 'register' } };
-    el!.dispatchEvent(new CustomEvent('zitadel-flow-step', { detail }));
+    el?.dispatchEvent(new CustomEvent('zitadel-flow-step', { detail }));
     expect(onFlowStep).toHaveBeenCalledWith(detail);
     unmount(component);
   });
@@ -94,7 +92,6 @@ describe('ZitadelLogout', () => {
     });
     flushSync();
     const el = target.querySelector<ConfiguredElement>('zitadel-logout');
-    expect(el).not.toBeNull();
     expect(el!.projectId).toBe('proj-test');
     expect(el!.proxyPath).toBe('/__nextgen');
     unmount(component);
@@ -109,10 +106,9 @@ describe('ZitadelLogout', () => {
       props: { project, onSignout },
     });
     flushSync();
-    const el = target.querySelector('zitadel-logout') as HTMLElement | null;
-    expect(el).not.toBeNull();
+    const el = target.querySelector('zitadel-logout');
     const detail = { name: 'Ada', email: 'ada@example.com' };
-    el!.dispatchEvent(new CustomEvent('zitadel-signout', { detail }));
+    el?.dispatchEvent(new CustomEvent('zitadel-signout', { detail }));
     expect(onSignout).toHaveBeenCalledWith(detail);
     unmount(component);
   });

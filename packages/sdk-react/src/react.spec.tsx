@@ -32,7 +32,6 @@ describe('ZitadelLogin', () => {
       <ZitadelLogin projectId="proj-test" proxyPath="/__nextgen" />,
     );
     const el = container.querySelector<ConfiguredElement>('zitadel-login');
-    expect(el).not.toBeNull();
     expect(el!.projectId).toBe('proj-test');
     expect(el!.proxyPath).toBe('/__nextgen');
   });
@@ -62,7 +61,6 @@ describe('ZitadelLogout', () => {
       <ZitadelLogout projectId="proj-test" proxyPath="/__nextgen" />,
     );
     const el = container.querySelector<ConfiguredElement>('zitadel-logout');
-    expect(el).not.toBeNull();
     expect(el!.projectId).toBe('proj-test');
     expect(el!.proxyPath).toBe('/__nextgen');
   });
