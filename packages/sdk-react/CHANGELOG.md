@@ -1,5 +1,14 @@
 # @zitadel/sdk-react
 
+## 0.1.0-alpha.8
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @zitadel/api@0.1.0-alpha.8
+  - @zitadel/components@0.1.0-alpha.8
+  - @zitadel/sdk-core@0.1.0-alpha.8
+
 ## 0.1.0-alpha.7
 
 ### Patch Changes
