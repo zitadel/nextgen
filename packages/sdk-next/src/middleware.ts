@@ -85,6 +85,7 @@ export async function nextgenMiddleware(
     audience,
     allowedTokenTypes = ["JWT", "at+JWT"],
     jwksTimeoutMs,
+    opaqueTokenTimeoutMs,
     proxyTimeoutMs = 5000,
     onExchangeResponse,
   } = options;
@@ -123,6 +124,7 @@ export async function nextgenMiddleware(
     audience,
     allowedTokenTypes,
     jwksTimeoutMs,
+    opaqueTokenTimeoutMs,
     pathname,
   });
 }
@@ -310,6 +312,7 @@ interface AuthHandlerOptions {
    */
   readonly allowedTokenTypes: readonly string[];
   readonly jwksTimeoutMs: number | undefined;
+  readonly opaqueTokenTimeoutMs: number | undefined;
   readonly pathname: string;
 }
 
@@ -332,6 +335,7 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
     audience,
     allowedTokenTypes,
     jwksTimeoutMs,
+    opaqueTokenTimeoutMs,
     pathname,
   } = opts;
 
@@ -365,7 +369,11 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
   // failed verification (bad sig, wrong typ/alg) must be rejected — never
   // accepted by a backend call that doesn't re-check the JWT claims.
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const isValid = await validateOpaqueSessionToken(cookieToken, url, jwksTimeoutMs ?? 5000);
+    const isValid = await validateOpaqueSessionToken(
+      cookieToken,
+      url,
+      opaqueTokenTimeoutMs ?? 5000,
+    );
     if (isValid) {
       const tunnelled = tunnelHeaders(req, {
         "x-nextgen-auth-token": cookieToken,
