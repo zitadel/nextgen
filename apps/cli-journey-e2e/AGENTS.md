@@ -32,8 +32,9 @@ generated app. It must not test the checked-in demo apps.
   must stay out of the artifact set.
 - Keep the generated app on `localhost` for browser tests. WebAuthn rejects IP
   address relying-party IDs such as `127.0.0.1`.
-- Keep Playwright serial and one-worker unless each scenario gets isolated
-  backend state.
+- Keep each framework suite Playwright-serial and one-worker. Framework suites
+  may run in parallel only when each suite gets its own generated app directory,
+  npm cache/tmp directories, app port, Zitadel port, and backend runtime state.
 - Passkey coverage is required in CI. `JOURNEY_ENABLE_PASSKEY=0` is only a local
   debugging escape hatch.
 - Keep diagnostics focused. Upload logs, setup JSON, lockfiles, Playwright

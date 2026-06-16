@@ -143,15 +143,20 @@ export async function prepareApp(options = {}) {
   return metadata;
 }
 
-export function cliStepArgs(cliPackage, stepArgs) {
-  return ["--yes", `${cliPackage}@alpha`, ...stepArgs, "--non-interactive", "--json"];
+export function cliStepArgs(cliPackage, stepArgs, cwd) {
+  const cwdArgs = cwd ? ["--cwd", cwd] : [];
+  return ["--yes", `${cliPackage}@alpha`, ...stepArgs, ...cwdArgs, "--non-interactive", "--json"];
 }
 
 async function runCliJsonStep(input) {
-  const result = await input.runCapture("npx", cliStepArgs(input.cliPackage, input.stepArgs), {
-    cwd: input.appDir,
-    env: input.env,
-  });
+  const result = await input.runCapture(
+    "npx",
+    cliStepArgs(input.cliPackage, input.stepArgs, input.appDir),
+    {
+      cwd: input.appDir,
+      env: input.env,
+    },
+  );
   await input.writeFile(join(input.outputDir, `${input.step}.json`), result.stdout);
   await input.writeFile(join(input.outputDir, `${input.step}.stderr.log`), result.stderr);
 
@@ -178,7 +183,7 @@ async function collectLocalRuntimeLogs(input) {
   try {
     result = await input.runCapture(
       "npx",
-      cliStepArgs(input.cliPackage, ["logs", "--tail", "400"]),
+      cliStepArgs(input.cliPackage, ["logs", "--tail", "400"], input.appDir),
       { cwd: input.appDir, env: input.env },
     );
   } catch (error) {
