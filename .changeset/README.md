@@ -111,7 +111,7 @@ Before handoff:
 node scripts/check-changeset-required.mjs --base origin/main
 ```
 
-Exit `0` → no changeset file needed. Exit `1` → add a changeset (real or, rarely,
+Exit `0` → the changeset gate is satisfied; use the decision table above to state the correct PR outcome. Exit `1` → add a changeset (real or, rarely,
 empty).
 
 ## Alpha prerelease mode
