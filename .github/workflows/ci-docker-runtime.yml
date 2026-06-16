@@ -58,6 +58,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: docker-journey-diagnostics
-          path: tmp/ci-docker-journey/diagnostics
+          path: apps/cli-journey-e2e/tmp/ci-docker-journey/diagnostics
           if-no-files-found: ignore
           retention-days: 7
