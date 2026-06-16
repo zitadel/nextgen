@@ -31,7 +31,7 @@ const projectSecret = ((): string | undefined => {
   }
   for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
     const match = line.match(/^ZITADEL_PROJECT_SECRET=(.*)$/);
-    if (match) {
+    if (match && match[1] !== undefined) {
       return match[1].trim().replace(/^(['"])(.*)\1$/, '$2');
     }
   }
