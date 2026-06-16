@@ -76,9 +76,9 @@ const { readFileSync, existsSync } = require("node:fs");
 function loadEnvLocal() {
   if (!existsSync(".env.local")) return {};
   const out = {};
-  for (const line of readFileSync(".env.local", "utf8").split("\\n")) {
+  for (const line of readFileSync(".env.local", "utf8").split(/\\r?\\n/)) {
     const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
-    if (m) out[m[1]] = m[2];
+    if (m) out[m[1]] = m[2].trim().replace(/^(['"])(.*)\\1$/, "$2");
   }
   return out;
 }
