@@ -31,7 +31,7 @@ jobs:
         run: corepack pnpm install --frozen-lockfile
 
       - name: Validate release version source
-        run: moon run release:version
+        run: env -u CI -u GITHUB_ACTIONS moon run release:version
 
       - name: Open or update version PR
         uses: changesets/action@v1

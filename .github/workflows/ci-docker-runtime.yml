@@ -45,13 +45,13 @@ jobs:
         run: corepack pnpm install --frozen-lockfile
 
       - name: Build release snapshot with local container image
-        run: moon run release:snapshot
+        run: env -u CI -u GITHUB_ACTIONS moon run release:snapshot
 
       - name: Run Docker fresh-app journey
         run: |
           version="$(node -p "require('./apps/server/package.json').version")"
           image="ghcr.io/zitadel/nextgen:${version}-snapshot-local"
-          moon run cli-journey-e2e:e2e-local -- --runtime docker --framework next --image "${image}" --work-dir tmp/ci-docker-journey
+          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- --runtime docker --framework next --image "${image}" --work-dir tmp/ci-docker-journey
 
       - name: Upload journey diagnostics
         if: ${{ failure() }}

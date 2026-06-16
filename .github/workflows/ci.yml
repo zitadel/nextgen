@@ -54,19 +54,19 @@ jobs:
 
       - name: Build release snapshot without container
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: moon run release:snapshot -- --skip-container
+        run: env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container
 
       - name: Run binary fresh-app journey
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: moon run cli-journey-e2e:e2e-local -- --runtime binary --work-dir tmp/ci-journey
+        run: env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- --runtime binary --work-dir tmp/ci-journey
 
       - name: Validate version PR
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
-        run: moon run release:version
+        run: env -u CI -u GITHUB_ACTIONS moon run release:version
 
       - name: Pack version PR artifacts
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
-        run: moon run release:pack
+        run: env -u CI -u GITHUB_ACTIONS moon run release:pack
 
       - name: Verify version PR tarballs
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}

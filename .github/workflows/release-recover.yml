@@ -59,7 +59,7 @@ jobs:
         run: corepack pnpm install --frozen-lockfile
 
       - name: Build local release artifacts
-        run: moon run release:snapshot
+        run: env -u CI -u GITHUB_ACTIONS moon run release:snapshot
 
       - name: Recover release
         run: |

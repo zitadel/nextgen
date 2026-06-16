@@ -58,14 +58,14 @@ jobs:
 
       - name: Publish dry run
         if: ${{ inputs.dry_run }}
-        run: moon run release:publish -- --dry-run
+        run: env -u CI -u GITHUB_ACTIONS moon run release:publish -- --dry-run
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: "false"
 
       - name: Publish release
         if: ${{ ! inputs.dry_run }}
-        run: moon run release:publish
+        run: env -u CI -u GITHUB_ACTIONS moon run release:publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: "false"
