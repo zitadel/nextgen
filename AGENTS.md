@@ -235,34 +235,28 @@ For customer-local runtime workflows, agents should prefer
 - Agent-created or agent-updated PRs must include a concise description before
   handoff. Use sections for `Summary`, `Validation`,
   `Release notes / changeset`, and `Notes`. List the exact validation commands
-  run; if validation was not run, say so explicitly. Mention changeset status
-  for user-visible package changes.
-- User-visible changes to a public npm package need a changeset. The public
-  packages are `@zitadel/cli` (`apps/cli/`), `@zitadel/server`
-  (`apps/server/`), the `@zitadel/server-*` platform packages, `@zitadel/api`,
-  `@zitadel/components`, `@zitadel/sdk-core`, `@zitadel/sdk-next`,
-  `@zitadel/sdk-nuxt`, `@zitadel/sdk-react`, `@zitadel/sdk-vue`, and
-  `@zitadel/sdk-angular`. These packages are in one Changesets fixed group for
-  alpha product releases. Moon still creates the product `v<version>` tag and
-  GitHub Release from the fixed package version.
-- Add a changeset by writing the file directly — do not depend on the
-  interactive `pnpm changeset` prompt. Create `.changeset/<short-slug>.md`:
+  run; if validation was not run, say so explicitly. In **Release notes /
+  changeset**, state one of the three outcomes from the
+  [decision table](.changeset/README.md#decision-table) — do not add a
+  `.changeset/*.md` file unless that table says you should.
 
-  ```md
-  ---
-  "@zitadel/cli": minor
-  ---
+### Changesets
 
-  One-line, user-facing summary of the change.
-  ```
+When a PR touches [publishable npm packages](.changeset/README.md#publishable-npm-packages)
+(the public `@zitadel/*` packages under `apps/cli/`, `apps/server*`, and
+selected `packages/*` paths), follow the
+[decision table](.changeset/README.md#decision-table) and workflow in
+[`.changeset/README.md`](.changeset/README.md). Verify locally with
+`node scripts/check-changeset-required.mjs --base origin/main`.
 
-  List only packages whose release record should move. Pick `patch` (fixes),
-  `minor` (features), or `major` (breaking). The repo is in `alpha` prerelease
-  mode (`.changeset/pre.json`), and the product packages release together
-  through the Changesets fixed group.
+The public packages are `@zitadel/cli`, `@zitadel/server`, the
+`@zitadel/server-*` platform packages, `@zitadel/api`, `@zitadel/components`,
+`@zitadel/sdk-core`, `@zitadel/sdk-next`, `@zitadel/sdk-nuxt`,
+`@zitadel/sdk-react`, `@zitadel/sdk-vue`, and `@zitadel/sdk-angular`. These
+packages are in one Changesets fixed group for alpha product releases. Moon
+still creates the product `v<version>` tag and GitHub Release from the fixed
+package version.
 
-- For changes that release nothing (docs, tests, CI, chores), add an empty
-  changeset: `corepack pnpm changeset --empty`.
 - npm packages under `apps/cli/` and `packages/*` must stay MIT-licensed.
 - Server npm packages under `apps/server*` and console application paths are
   AGPL-3.0-only by default.
