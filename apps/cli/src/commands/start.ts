@@ -311,8 +311,5 @@ async function stopExistingRuntime(runtime: RuntimeMetadata | undefined): Promis
     await stopBinaryRuntime(runtime.pid);
     return;
   }
-  if (!(await checkLocalServerHealth(runtime.server_url))) {
-    return;
-  }
   await stopAndRemoveContainer(runtime.container_name);
 }

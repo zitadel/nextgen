@@ -434,6 +434,43 @@ describe("local runtime commands", () => {
     );
   });
 
+  it("start removes Docker runtime metadata before switching to the binary runtime", async () => {
+    const cwd = await tempProject("zitadel-start-binary-after-docker-");
+    const fakeDockerRuntime = await fakeDocker({
+      existingContainerImage: "ghcr.io/zitadel/nextgen:old",
+    });
+    const fakeBinary = await fakeServerBinary();
+    const port = await freePort();
+    const serverUrl = `http://localhost:${String(port)}`;
+    const containerName = localContainerName(cwd);
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
+
+    const result = await runCliForTest(
+      ["start", "--cwd", cwd, "--json", "--runtime", "binary", "--port", String(port)],
+      {
+        PATH: `${fakeDockerRuntime.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: fakeDockerRuntime.logPath,
+        ZITADEL_SERVER_BINARY: fakeBinary.binPath,
+      },
+    );
+
+    expect(result.exitCode).toBe(0);
+    const envelope = parseJson(result.stdout) as {
+      status: string;
+      data: { runtime: { backend: string; pid: number } };
+    };
+    expect(envelope.status).toBe("ok");
+    expect(envelope.data.runtime.backend).toBe("binary");
+    binaryPids.push(envelope.data.runtime.pid);
+
+    const dockerCalls = await readDockerCalls(fakeDockerRuntime.logPath);
+    expect(dockerCalls.some((args) => args[0] === "inspect" && args.at(-1) === containerName)).toBe(
+      true,
+    );
+    expect(dockerCalls).toContainEqual(["stop", containerName]);
+    expect(dockerCalls).toContainEqual(["rm", containerName]);
+  });
+
   it("logs without runtime suggests the published start command", async () => {
     const cwd = await tempProject("zitadel-logs-no-runtime-");
     const fake = await fakeDocker();

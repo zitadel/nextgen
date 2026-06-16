@@ -90,7 +90,9 @@ export async function stopBinaryRuntime(pid: number): Promise<void> {
   if (!isProcessRunning(pid)) {
     return;
   }
-  process.kill(pid, "SIGTERM");
+  if (!signalProcess(pid, "SIGTERM")) {
+    return;
+  }
   const deadline = Date.now() + 10_000;
   while (Date.now() < deadline) {
     if (!isProcessRunning(pid)) {
@@ -99,7 +101,7 @@ export async function stopBinaryRuntime(pid: number): Promise<void> {
     await delay(200);
   }
   if (isProcessRunning(pid)) {
-    process.kill(pid, "SIGKILL");
+    signalProcess(pid, "SIGKILL");
   }
 }
 
@@ -203,6 +205,18 @@ function isErrno(error: unknown, code: string): boolean {
     "code" in error &&
     (error as { code?: unknown }).code === code
   );
+}
+
+function signalProcess(pid: number, signal: NodeJS.Signals): boolean {
+  try {
+    process.kill(pid, signal);
+    return true;
+  } catch (error) {
+    if (isErrno(error, "ESRCH")) {
+      return false;
+    }
+    throw error;
+  }
 }
 
 function errorMessage(error: unknown): string {
