@@ -85,9 +85,11 @@ server bootstrapping, and release tasks, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## CI
 
-Pull requests run two required checks in parallel. `changesets / status` gives
-fast package release feedback. `ci / full-pr` runs the Moon-driven PR
-confidence path on a 16-core Depot runner:
+Pull requests run parallel CI checks. Branch protection currently requires the
+GitHub Actions context `full-pr`, shown in the pull request UI as
+`ci / full-pr`. `changesets / status` gives fast package release feedback.
+`ci / full-pr` runs the Moon-driven PR confidence path on a 16-core Depot
+runner:
 
 - Go vet and tests.
 - pnpm install and Moon lint/typecheck/build/test tasks.
@@ -149,15 +151,23 @@ corepack pnpm changeset
 ```
 
 The manual `release-prepare.yml` workflow runs Moon release validation,
-executes `changeset version`, and opens or updates the version PR. After that
-PR is reviewed and merged, `release-publish.yml` publishes npm packages with
-Changesets, pushes the product tag and container image, and creates or updates
-the single product GitHub Release.
+preflights pending Changesets, executes `changeset version`, and opens or
+updates the version PR with the release GitHub App so the required `full-pr`
+check runs normally. After that PR is reviewed and merged,
+`release-publish.yml` publishes npm packages with Changesets, pushes the
+product tag and container image, and creates or updates the single product
+GitHub Release.
 
 Check local Changesets status with:
 
 ```sh
 moon run release:changesets -- --base origin/main --summary
+```
+
+Before manually preparing a release, validate all pending changesets with:
+
+```sh
+moon run release:changesets -- --pending --summary
 ```
 
 Follow the [manual release runbook](docs/runbooks/manual-release.md) when

@@ -17,7 +17,7 @@
 | Run the server from source         | `moon run workspace:server -- --help`      |
 | Test the fresh-app onboarding path | `moon run workspace:journey`               |
 | Run normal local checks            | `moon ci :lint :typecheck :build :test`    |
-| Check release notes status         | `moon run release:changesets -- --summary` |
+| Check whether a changeset is required | `moon run release:changesets -- --summary` |
 | Mirror CI locally                  | `moon run workspace:check -- --full`       |
 | Rerun one failed task              | `moon run <project>:<task>`                |
 
@@ -76,7 +76,10 @@ Moon task targets use the `<project>:<task>` form, for example
 `moon run cli:test`.
 
 Use `moon run release:changesets -- --base origin/main --summary` for the fast
-local version of the required `changesets / status` PR check.
+local version of the `changesets / status` PR feedback check. If this check
+fails because publishable package paths changed, add a real changeset with
+`corepack pnpm changeset`, or rarely an empty changeset for non-shipping
+changes.
 
 `moon run workspace:check -- --full` runs the repository's slower local
 CI-parity script, including integration tests, demo e2e, package smoke checks,

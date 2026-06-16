@@ -161,11 +161,14 @@ Use `moon run workspace:journey` for deterministic CI-style proof of the
 fresh-app path. Use `moon run workspace:cli -- ...` for manual browser or agent
 experiments against the same local package train.
 
-In CI the required PR checks are `changesets / status` and `ci / full-pr`.
-`ci / full-pr` consumes current workflow npm package tarballs instead of public
-Zitadel packages and exercises the default npm-binary local runtime. The Docker
-fallback journey runs in the `ci-docker-runtime` workflow on `main` and by
-manual dispatch. The checked-in demo integrations, raw binary embedded-postgres
+In CI the branch-protection check is the GitHub Actions context `full-pr`,
+shown in the pull request UI as `ci / full-pr`. It consumes current workflow
+npm package tarballs instead of public Zitadel packages and exercises the
+default npm-binary local runtime. The `changesets / status` workflow runs in
+parallel as fast release feedback, but is not a branch-protection requirement
+unless repository settings are updated. The Docker fallback journey runs in the
+`ci-docker-runtime` workflow on `main` and by manual dispatch. The checked-in
+demo integrations, raw binary embedded-postgres
 smoke, and documented quick-start compose smoke remain release-surface
 confidence checks.
 
