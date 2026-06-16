@@ -70,7 +70,7 @@ export function matchesRoutes(pathname: string, routes: readonly string[]): bool
  */
 export function filterResponseHeaders(upstream: Headers): Headers {
   const filtered = new Headers();
-  for (const [key, value] of upstream.entries()) {
+  upstream.forEach((value, key) => {
     if (
       !HOP_BY_HOP.has(key.toLowerCase()) &&
       key.toLowerCase() !== "set-cookie" &&
@@ -78,7 +78,7 @@ export function filterResponseHeaders(upstream: Headers): Headers {
     ) {
       filtered.set(key, value);
     }
-  }
+  });
   return filtered;
 }
 
