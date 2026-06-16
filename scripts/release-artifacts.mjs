@@ -266,6 +266,8 @@ export async function packPublicPackages(options = {}) {
   await mkdir(tarballsDir, { recursive: true });
 
   for (const dir of PUBLIC_PACKAGE_DIRS) {
+    const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
+    await assertPublishDirectoryReady({ repoRoot, dir, manifest });
     await runFn("corepack", ["pnpm", "--dir", dir, "pack", "--pack-destination", tarballsDir], {
       cwd: repoRoot,
       env: process.env,
@@ -273,6 +275,21 @@ export async function packPublicPackages(options = {}) {
   }
 
   return tarballsDir;
+}
+
+async function assertPublishDirectoryReady({ repoRoot, dir, manifest }) {
+  const publishDirectory = manifest.publishConfig?.directory;
+  if (!publishDirectory) {
+    return;
+  }
+  const manifestPath = join(repoRoot, dir, publishDirectory, "package.json");
+  if (await exists(manifestPath)) {
+    return;
+  }
+  throw new Error(
+    `${manifest.name} publishConfig.directory requires ${dir}/${publishDirectory}/package.json before packing. ` +
+      "The release preflight build is missing or failed.",
+  );
 }
 
 export async function buildContainerImage(options = {}) {

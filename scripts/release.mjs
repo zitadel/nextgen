@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -25,6 +26,17 @@ import {
 } from "./release-artifacts.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
+const PUBLIC_PACKAGE_BUILD_TARGETS = [
+  "cli:build",
+  "api:build",
+  "components:build",
+  "sdk-core:build",
+  "sdk-next:build",
+  "sdk-nuxt:build",
+  "sdk-react:build",
+  "sdk-vue:build",
+  "sdk-angular:build",
+];
 
 export async function main(args = forwardedArgs()) {
   const command = args[0];
@@ -60,6 +72,7 @@ async function commandSnapshot(options) {
 
   await run("corepack", ["pnpm", "install", "--frozen-lockfile"], { cwd: repoRoot });
   await buildEmbeddedUI();
+  await buildPublicPackageArtifacts();
   await run("go", ["mod", "download"], { cwd: repoRoot });
   await buildServerBinaries({ repoRoot, outDir, version: release.version, gitInfo: info });
   await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
@@ -88,6 +101,7 @@ async function commandPack() {
   const outDir = releaseDir(repoRoot, release.version);
   const info = await gitInfo({ repoRoot });
   await buildEmbeddedUI();
+  await buildPublicPackageArtifacts();
   await run("go", ["mod", "download"], { cwd: repoRoot });
   await buildServerBinaries({ repoRoot, outDir, version: release.version, gitInfo: info });
   await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
@@ -99,28 +113,36 @@ async function buildEmbeddedUI() {
   await run("moon", ["run", "console:build", "login-ui:build"], { cwd: repoRoot });
 }
 
-async function commandPublish(options) {
-  const preflight = await detectReleaseAutomation({
-    repoRoot,
-    mode: "publish",
-    base: options.base || process.env.BASE_SHA || "HEAD^",
-  });
-  if (!preflight.ok) {
-    const message = [
-      `release publish preflight failed: ${preflight.reason}`,
-      ...preflight.errors.map((error) => `- ${error}`),
-    ].join("\n");
-    throw new Error(message);
-  }
-  if (!preflight.shouldRun) {
-    console.log(`release publish: skip - ${preflight.reason}`);
-    return;
-  }
+async function buildPublicPackageArtifacts() {
+  await run("moon", ["run", ...PUBLIC_PACKAGE_BUILD_TARGETS], { cwd: repoRoot });
+}
 
+async function commandPublish(options) {
   const release = await readServerRelease(repoRoot);
   const outDir = releaseDir(repoRoot, release.version);
+  if (options.recoverVersion) {
+    assertRecoverVersion(release, options.recoverVersion);
+  } else {
+    const preflight = await detectReleaseAutomation({
+      repoRoot,
+      mode: "publish",
+      base: options.base || process.env.BASE_SHA || "HEAD^",
+    });
+    if (!preflight.ok) {
+      const message = [
+        `release publish preflight failed: ${preflight.reason}`,
+        ...preflight.errors.map((error) => `- ${error}`),
+      ].join("\n");
+      throw new Error(message);
+    }
+    if (!preflight.shouldRun) {
+      console.log(`release publish: skip - ${preflight.reason}`);
+      return;
+    }
+  }
+
   await assertNoUnrecordedPendingChangesets();
-  await assertMainBranch(options);
+  await assertMainBranch(options, { allowDryRunBypass: !options.recoverVersion });
 
   if (options.dryRun) {
     await commandSnapshot({ skipContainer: true });
@@ -142,6 +164,14 @@ async function commandPublish(options) {
   await buildContainerImage({ repoRoot, outDir, release, push: true, platforms: CONTAINER_PLATFORMS });
   await upsertGitHubRelease(release, outDir);
   await commandVerify();
+}
+
+function assertRecoverVersion(release, recoverVersion) {
+  if (release.version !== recoverVersion) {
+    throw new Error(
+      `release publish recovery requires checked-out server version ${recoverVersion}, got ${release.version}`,
+    );
+  }
 }
 
 async function commandRecover(options) {
@@ -175,7 +205,7 @@ async function commandVerify() {
 }
 
 function parseOptions(args) {
-  const parsed = { dryRun: false, skipContainer: false, version: "", base: "" };
+  const parsed = { dryRun: false, skipContainer: false, version: "", recoverVersion: "", base: "" };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     switch (arg) {
@@ -188,6 +218,10 @@ function parseOptions(args) {
       case "--version":
         parsed.version = args[++index] ?? "";
         if (!parsed.version) usage("--version requires a value");
+        break;
+      case "--recover-version":
+        parsed.recoverVersion = args[++index] ?? "";
+        if (!parsed.recoverVersion) usage("--recover-version requires a value");
         break;
       case "--base":
         parsed.base = args[++index] ?? "";
@@ -215,8 +249,8 @@ export async function assertNoUnrecordedPendingChangesets(root = repoRoot) {
   }
 }
 
-async function assertMainBranch(options) {
-  if (options.dryRun || process.env.GITHUB_REF === "refs/heads/main") {
+async function assertMainBranch(options, { allowDryRunBypass = true } = {}) {
+  if ((allowDryRunBypass && options.dryRun) || process.env.GITHUB_REF === "refs/heads/main") {
     return;
   }
   const branch = (await runCapture("git", ["branch", "--show-current"], { cwd: repoRoot })).stdout.trim();
@@ -302,6 +336,8 @@ Options:
   --dry-run          Do not publish or mutate remote registries.
   --skip-container   Build release files without building a local Docker image.
   --version <v>      Recovery target version.
+  --recover-version <v>
+                     Publish recovery target version from release-publish.
   --base <ref>       Base ref for release publish detection.
 `);
   process.exit(error ? 1 : 0);
