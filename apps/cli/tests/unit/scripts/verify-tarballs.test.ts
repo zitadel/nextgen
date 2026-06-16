@@ -33,21 +33,24 @@ afterEach(async () => {
 });
 
 describe("verify-tarballs script", () => {
-  it("accepts installable tarballs with one lockstep alpha version", async () => {
-    const tarballsDir = await fixtureTarballs();
+  it("accepts installable tarballs with independent package versions", async () => {
+    const tarballsDir = await fixtureTarballs({
+      "@zitadel/components": "0.2.0-alpha.1",
+      "@zitadel/sdk-next": "0.1.0-alpha.4",
+    });
 
     await expect(runVerify(tarballsDir)).resolves.toMatchObject({
       stdout: expect.stringContaining("verified 9 installable tarballs"),
     });
   });
 
-  it("rejects public tarballs with mismatched alpha train versions", async () => {
+  it("rejects public tarballs with invalid package versions", async () => {
     const tarballsDir = await fixtureTarballs({
-      "@zitadel/sdk-next": "0.1.0-alpha.4",
+      "@zitadel/sdk-next": "workspace:*",
     });
 
     await expect(runVerify(tarballsDir)).rejects.toMatchObject({
-      stderr: expect.stringContaining("public package tarballs must use one lockstep alpha version"),
+      stderr: expect.stringContaining("public package tarballs must use semver versions"),
     });
   });
 });

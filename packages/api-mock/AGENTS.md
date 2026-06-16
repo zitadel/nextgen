@@ -116,5 +116,5 @@ routing, add a case to the unit spec first — that is what CI gates on.
 - Don't depend on `msw/browser` from anything other than the
   `setupMock(worker)` entry point — the same handlers must work in
   node.
-- Don't ship a build target. The `nx:noop` build is intentional —
-  consumers import source via the workspace export map.
+- Don't ship a build artifact. Consumers import source via the workspace
+  export map; the Moon build task is intentionally a no-op.

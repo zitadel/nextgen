@@ -1,12 +1,10 @@
 import { resolve } from "node:path";
 
-import { nxViteTsPaths } from "@nx/vite/plugins/nx-tsconfig-paths.plugin";
 import { defineConfig } from "vite";
 
 export default defineConfig(() => ({
   root: import.meta.dirname,
   cacheDir: "../../node_modules/.vite/packages/sdk-core",
-  plugins: [nxViteTsPaths()],
   build: {
     emptyOutDir: false,
     lib: {

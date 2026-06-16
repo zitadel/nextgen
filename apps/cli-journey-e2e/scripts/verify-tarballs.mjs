@@ -31,7 +31,7 @@ const dependencyFields = [
   "optionalDependencies",
 ];
 const unsupportedProtocol = /^(catalog|workspace):/;
-const alphaVersion = /^\d+\.\d+\.\d+-alpha\.\d+$/;
+const semverVersion = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const manifests = new Map();
 
 const tarballs = (await readdir(tarballsDir))
@@ -64,7 +64,7 @@ for (const expectedName of requiredPackageNames) {
   }
 }
 
-assertLockstepAlphaVersions(manifests);
+assertValidVersions(manifests);
 
 console.log(
   `verified ${manifests.size} installable tarballs; required packages present: ${[...requiredPackageNames].sort().join(", ")}`,
@@ -102,19 +102,13 @@ function assertInstallableManifest(tarball, manifest) {
   }
 }
 
-function assertLockstepAlphaVersions(manifests) {
-  const versions = new Set([...manifests.values()].map((manifest) => manifest.version));
-  if (versions.size !== 1) {
-    throw new Error(
-      `public package tarballs must use one lockstep alpha version: ${[...manifests.values()]
-        .map((manifest) => `${manifest.name}@${manifest.version}`)
-        .sort()
-        .join(", ")}`,
-    );
-  }
-  const version = [...versions][0];
-  if (!alphaVersion.test(version)) {
-    throw new Error(`public package tarballs must use an alpha train version: ${version}`);
+function assertValidVersions(manifests) {
+  const invalid = [...manifests.values()]
+    .filter((manifest) => !semverVersion.test(manifest.version))
+    .map((manifest) => `${manifest.name}@${manifest.version}`)
+    .sort();
+  if (invalid.length > 0) {
+    throw new Error(`public package tarballs must use semver versions: ${invalid.join(", ")}`);
   }
 }
 

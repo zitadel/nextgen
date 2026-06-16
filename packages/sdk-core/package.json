@@ -16,6 +16,12 @@
     "dist"
   ],
   "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "oxlint ."
+  },
   "exports": {
     ".": {
       "@zitadel/source": "./src/index.ts",

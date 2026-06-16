@@ -63,15 +63,13 @@ export async function prepareLocalRegistry(input) {
 export async function buildPackages(repoRoot, run, env, log = () => undefined) {
   const projectNames = await Promise.all(packageDirs.map((dir) => packageName(repoRoot, dir)));
   log(`building ${projectNames.join(", ")}`);
-  await run("corepack", [
-    "pnpm",
-    "nx",
-    "run-many",
-    "-t",
-    "build",
-    "-p",
-    projectNames.join(","),
-  ], { cwd: repoRoot, env });
+  for (const projectName of projectNames) {
+    await run("moon", ["run", `${moonProjectId(projectName)}:build`], { cwd: repoRoot, env });
+  }
+}
+
+function moonProjectId(packageName) {
+  return packageName.replace(/^@zitadel\//, "");
 }
 
 export async function packPackages(repoRoot, tarballsDir, run, env, log = () => undefined) {

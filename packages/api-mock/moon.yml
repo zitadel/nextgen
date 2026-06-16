@@ -1,0 +1,41 @@
+id: "api-mock"
+language: "typescript"
+layer: "library"
+stack: "backend"
+dependsOn:
+  - "api"
+
+tasks:
+  lint:
+    command: "corepack pnpm exec oxlint ."
+    deps:
+      - "api:build"
+
+  typecheck:
+    command: "corepack pnpm exec tsc --noEmit -p tsconfig.json"
+    deps:
+      - "api:build"
+
+  build:
+    command: "node -e \"process.exit(0)\""
+    deps:
+      - "api:build"
+
+  test:
+    command: "corepack pnpm run test"
+    deps:
+      - "api:build"
+
+  test-browser:
+    command: "corepack pnpm run test:browser"
+    deps:
+      - "api:build"
+    options:
+      runInCI: false
+
+  start:
+    command: "corepack pnpm run start"
+    options:
+      persistent: true
+      runInCI: false
+

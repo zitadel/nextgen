@@ -82,9 +82,9 @@ vitest.config.*.timestamp*
 test-output
 coverage
 
-## nx
-.nx/cache
-.nx/workspace-data
+## moon
+.moon/cache
+.moon/docker
 
 ## Next.js / Nuxt build outputs
 .next/

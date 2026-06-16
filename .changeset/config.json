@@ -2,23 +2,15 @@
   "$schema": "https://unpkg.com/@changesets/config@latest/schema.json",
   "changelog": ["@changesets/changelog-github", { "repo": "zitadel/nextgen" }],
   "commit": false,
-  "fixed": [
-    [
-      "@zitadel/cli",
-      "@zitadel/api",
-      "@zitadel/components",
-      "@zitadel/sdk-core",
-      "@zitadel/sdk-next",
-      "@zitadel/sdk-nuxt",
-      "@zitadel/sdk-react",
-      "@zitadel/sdk-vue",
-      "@zitadel/sdk-angular"
-    ]
-  ],
+  "fixed": [],
   "linked": [],
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
+  "privatePackages": {
+    "version": true,
+    "tag": true
+  },
   "ignore": [
     "@zitadel/api-mock",
     "@zitadel/console",
@@ -27,7 +19,6 @@
     "@zitadel/demo-next-e2e",
     "@zitadel/demo-nuxt",
     "@zitadel/demo-nuxt-e2e",
-    "@zitadel/login-ui",
-    "@zitadel/lint"
+    "@zitadel/login-ui"
   ]
 }

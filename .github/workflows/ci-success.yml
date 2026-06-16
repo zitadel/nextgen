@@ -1,0 +1,57 @@
+name: ci-success
+
+on:
+  workflow_run:
+    workflows: [ci-js, ci-go, ci-journey]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  ci-success:
+    runs-on: depot-ubuntu-24.04-4
+    timeout-minutes: 35
+    steps:
+      - name: Wait for split CI workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          workflows=(ci-js.yml ci-go.yml ci-journey.yml)
+          deadline=$((SECONDS + 1800))
+          while true; do
+            missing=()
+            failed=()
+            for workflow in "${workflows[@]}"; do
+              conclusion="$(
+                gh run list \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --workflow "$workflow" \
+                  --commit "$HEAD_SHA" \
+                  --limit 1 \
+                  --json status,conclusion \
+                  --jq '.[0] | select(.status == "completed") | .conclusion // ""'
+              )"
+              case "$conclusion" in
+                success) ;;
+                failure|cancelled|timed_out|action_required|startup_failure) failed+=("$workflow:$conclusion") ;;
+                *) missing+=("$workflow") ;;
+              esac
+            done
+            if [ "${#failed[@]}" -gt 0 ]; then
+              printf 'failed workflows: %s\n' "${failed[*]}" >&2
+              exit 1
+            fi
+            if [ "${#missing[@]}" -eq 0 ]; then
+              echo "split CI succeeded for $HEAD_SHA"
+              exit 0
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              printf 'timed out waiting for workflows: %s\n' "${missing[*]}" >&2
+              exit 1
+            fi
+            sleep 20
+          done

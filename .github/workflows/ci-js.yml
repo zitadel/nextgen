@@ -1,0 +1,50 @@
+name: ci-js
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-js-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  js:
+    runs-on: depot-ubuntu-24.04-8
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: moonrepo/setup-toolchain@v0
+
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Run Moon JS graph
+        run: moon ci :lint :typecheck :build :test
+
+      - name: Pack public npm packages
+        run: moon run release:pack
+
+      - name: Upload npm tarballs
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-tarballs
+          path: dist/release/*/npm/*.tgz
+          if-no-files-found: error
+          retention-days: 7

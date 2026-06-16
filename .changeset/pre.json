@@ -23,7 +23,8 @@
     "@zitadel/login-ui": "0.0.1",
     "@zitadel/sdk-react": "0.0.0",
     "@zitadel/sdk-vue": "0.0.0",
-    "@zitadel/sdk-angular": "0.0.0"
+    "@zitadel/sdk-angular": "0.0.0",
+    "@zitadel/server-release": "0.0.0"
   },
   "changesets": [
     "add-spa-sdks",

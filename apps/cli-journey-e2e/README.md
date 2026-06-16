@@ -64,7 +64,7 @@ Useful environment overrides:
 
 The `consumer-journey-e2e` workflow job runs as a framework matrix. Each matrix
 leg does not use public Zitadel packages or GHCR images. It downloads the
-GoReleaser snapshot image and the public npm package tarballs produced by the
+Moon release snapshot image and the public npm package tarballs produced by the
 same workflow, publishes those tarballs to Verdaccio, points
 `ZITADEL_LOCAL_IMAGE` at the loaded image, runs the same `npx` local setup flow,
 and runs the same Playwright project against the generated app. Private support

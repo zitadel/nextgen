@@ -74,43 +74,5 @@
     "oclif": "catalog:",
     "tsdown": "^0.21.10",
     "vitest": "^3.0.0"
-  },
-  "nx": {
-    "targets": {
-      "build": {
-        "options": {
-          "cache": true
-        },
-        "inputs": [
-          "production",
-          "^production",
-          {
-            "externalDependencies": [
-              "tsdown"
-            ]
-          }
-        ],
-        "outputs": [
-          "{projectRoot}/dist/**/*.mjs",
-          "{projectRoot}/dist/**/*.mjs.map"
-        ],
-        "dependsOn": [
-          "^build",
-          "^typecheck"
-        ]
-      },
-      "readme": {
-        "dependsOn": [
-          "build"
-        ],
-        "inputs": [
-          "{projectRoot}/dist/**/*.mjs",
-          "{projectRoot}/README.md"
-        ],
-        "outputs": [
-          "{projectRoot}/README.md"
-        ]
-      }
-    }
   }
 }

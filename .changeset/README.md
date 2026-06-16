@@ -12,7 +12,7 @@ This directory holds [changesets](https://github.com/changesets/changesets) for 
 - `@zitadel/sdk-vue` (`packages/sdk-vue`)
 - `@zitadel/sdk-angular` (`packages/sdk-angular`)
 
-Everything else (`@zitadel/api-mock`, `@zitadel/design-tokens`, `@zitadel/shared-component-styles`, `@zitadel/ui-react`, `@zitadel/lint`, the demos, the console) is marked `"private": true` and is never published.
+Everything else (`@zitadel/api-mock`, `@zitadel/design-tokens`, `@zitadel/shared-component-styles`, `@zitadel/ui-react`, the demos, the console) is marked `"private": true` and is never published. The private `@zitadel/server-release` record is the exception: Changesets versions and tags it so the Go server artifacts have a reviewed product version even though Moon publishes the non-npm files.
 
 When you make a user-visible change to one of the public packages, run:
 
@@ -27,9 +27,8 @@ Pick the affected packages, the bump type (patch / minor / major), and write a o
 The repo is currently in changesets **prerelease mode** with the `alpha` tag (see `.changeset/pre.json`). While in this mode:
 
 - `changeset version` cuts versions like `0.1.0-alpha.0`, `0.1.0-alpha.1`, …
-- Public packages are in one fixed group, so an alpha train uses the same
-  version across `@zitadel/cli`, SDKs, components, and generated API packages.
-- `changeset publish` publishes them under the **`alpha`** npm dist-tag. During the public alpha, the release workflow also promotes only `@zitadel/cli` to `latest` so bare `npx @zitadel/cli` reaches the supported tester workflow. Other public packages stay opt-in via `@alpha` or exact alpha versions.
+- Public packages are versioned independently. A release includes only the packages and product release record named by pending changesets.
+- `changeset publish` publishes public npm packages under the **`alpha`** npm dist-tag while prerelease mode is active.
 - A package that has never had a stable release is published to `latest` on its first publish (changesets behaviour), then to `alpha` thereafter until it has a stable release.
 
 To leave alpha and cut a stable `latest` release:
@@ -41,7 +40,7 @@ corepack pnpm changeset version   # strips the -alpha suffix
 
 ## Publishing (npm trusted publishing / OIDC)
 
-The `release-alpha-train` job in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs the [changesets GitHub Action](https://github.com/changesets/action). Pushing changesets to `main` opens a "Version Packages" PR aggregating all pending changesets; merging that PR bumps versions, updates `CHANGELOG.md` files, waits for the CI aggregate gate, and publishes to npm (under the `alpha` dist-tag while in prerelease mode).
+The manual `release-prepare.yml` workflow runs the [changesets GitHub Action](https://github.com/changesets/action) to open a "Version Packages" PR aggregating pending changesets. After that PR merges and CI is green, `release-publish.yml` runs Moon release tasks, publishes npm packages with `changeset publish`, pushes server containers, and updates the product GitHub Release.
 
 Publishing authenticates with **npm trusted publishing (OIDC)** — there is **no `NPM_TOKEN`** secret. Before the first automated publish, a maintainer must, once per public package:
 
@@ -50,7 +49,7 @@ Publishing authenticates with **npm trusted publishing (OIDC)** — there is **n
    - Provider: **GitHub Actions**
    - Organization/owner: `zitadel`
    - Repository: `nextgen`
-   - Workflow filename: `ci.yml` (exact, case-sensitive)
+   - Workflow filename: `release-publish.yml` (exact, case-sensitive)
 3. Optionally, under **Publishing access**, require 2FA and disallow tokens so only this workflow can publish.
 
 While this repository is private, the workflow keeps npm provenance disabled
@@ -59,15 +58,12 @@ short-lived OIDC credentials, but npm only accepts public provenance
 attestations from public source repositories. Re-enable provenance when
 `zitadel/nextgen` is public.
 
-Changesets does not build the Go server binary. During alpha, the `release-alpha-train`
-job uses the lockstep npm version as the release train version, creates
-`v<version>`, and then runs GoReleaser so the server image and binaries publish
-into the same GitHub Release. The manual
-[`release.yml`](../.github/workflows/release.yml) workflow remains a server
-snapshot/fallback path. See
+Changesets does not build the Go server binary. Moon release tasks read the
+Changesets-versioned `@zitadel/server-release` package, create `v<version>`,
+cross-build the Go server, publish containers, and update the product GitHub
+Release. See
 [docs/adrs/002-multi-package-release-strategy.md](../docs/adrs/002-multi-package-release-strategy.md)
-and
-[docs/adrs/023-lockstep-alpha-release-train.md](../docs/adrs/023-lockstep-alpha-release-train.md).
+and [docs/adrs/023-lockstep-alpha-release-train.md](../docs/adrs/023-lockstep-alpha-release-train.md).
 
 ## Licensing reminder
 

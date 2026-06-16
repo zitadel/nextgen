@@ -139,9 +139,9 @@ orchestrator code, which is how a regression in one framework slips past the
 other.
 
 When iterating against a long-running demo dev server, remember the demo
-loads this package's built `dist/` (not source). The Nx `e2e` target has
-`dependsOn: ["^build"]` so CI is safe; manual loops need a fresh
-`nx build @zitadel/components` after orchestrator changes.
+loads this package's built `dist/` (not source). The Moon e2e tasks depend on
+the relevant build tasks so CI is safe; manual loops need a fresh
+`moon run components:build` after orchestrator changes.
 
 ### Lit dev playground (`:5173`) and caching
 

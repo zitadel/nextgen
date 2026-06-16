@@ -1,0 +1,28 @@
+id: "cli-journey-e2e"
+language: "typescript"
+layer: "automation"
+stack: "frontend"
+dependsOn:
+  - "cli"
+
+tasks:
+  lint:
+    command: "corepack pnpm exec oxlint ."
+
+  test:
+    command: "corepack pnpm run test"
+
+  e2e:
+    command: "corepack pnpm run e2e"
+    deps:
+      - "cli:build"
+    options:
+      runInCI: false
+
+  e2e-local:
+    command: "corepack pnpm run e2e-local"
+    deps:
+      - "cli:build"
+    options:
+      runInCI: false
+

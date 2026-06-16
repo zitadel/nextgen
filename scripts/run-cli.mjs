@@ -158,7 +158,7 @@ function wrapperRun({ jsonMode, runCaptureFn, runFn, stderr }) {
 
 export function buildCli() {
   return new Promise((resolve, reject) => {
-    const child = spawn("corepack", ["pnpm", "nx", "build", "@zitadel/cli"], {
+    const child = spawn("moon", ["run", "cli:build"], {
       cwd: repoRoot,
       env: process.env,
       stdio: ["ignore", "pipe", "pipe"],
@@ -173,7 +173,7 @@ export function buildCli() {
         return;
       }
       const detail = signal ? `signal ${signal}` : `exit ${code}`;
-      const error = new Error(`corepack pnpm nx build @zitadel/cli failed with ${detail}`);
+      const error = new Error(`moon run cli:build failed with ${detail}`);
       error.code = code;
       error.signal = signal;
       reject(error);

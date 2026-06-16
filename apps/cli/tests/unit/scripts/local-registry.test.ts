@@ -113,19 +113,17 @@ describe("local registry helper", () => {
     expect(await readFile(paths.verdaccioConfigPath, "utf8")).toContain("'@zitadel/*'");
 
     const runCalls = calls.filter((call): call is RunCall => "command" in call);
-    expect(runCalls[0]).toMatchObject({
-      command: "corepack",
-      args: [
-        "pnpm",
-        "nx",
-        "run-many",
-        "-t",
-        "build",
-        "-p",
-        "@zitadel/cli,@zitadel/api,@zitadel/components,@zitadel/sdk-core,@zitadel/sdk-next,@zitadel/sdk-nuxt,@zitadel/sdk-react,@zitadel/sdk-vue,@zitadel/sdk-angular",
-      ],
-      options: { cwd: repoRoot, env },
-    });
+    expect(runCalls.slice(0, localRegistry.packageDirs.length)).toEqual([
+      { command: "moon", args: ["run", "cli:build"], options: { cwd: repoRoot, env } },
+      { command: "moon", args: ["run", "api:build"], options: { cwd: repoRoot, env } },
+      { command: "moon", args: ["run", "components:build"], options: { cwd: repoRoot, env } },
+      { command: "moon", args: ["run", "sdk-core:build"], options: { cwd: repoRoot, env } },
+      { command: "moon", args: ["run", "sdk-next:build"], options: { cwd: repoRoot, env } },
+      { command: "moon", args: ["run", "sdk-nuxt:build"], options: { cwd: repoRoot, env } },
+      { command: "moon", args: ["run", "sdk-react:build"], options: { cwd: repoRoot, env } },
+      { command: "moon", args: ["run", "sdk-vue:build"], options: { cwd: repoRoot, env } },
+      { command: "moon", args: ["run", "sdk-angular:build"], options: { cwd: repoRoot, env } },
+    ]);
     expect(runCalls.filter((call) => call.args.includes("pack"))).toHaveLength(
       localRegistry.packageDirs.length,
     );
