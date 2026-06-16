@@ -1,4 +1,9 @@
 // @vitest-environment jsdom
+import type {
+  ZitadelLogin as ZitadelLoginElement,
+  ZitadelLogout as ZitadelLogoutElement,
+} from '@zitadel/components';
+
 import { $, render } from '@builder.io/qwik';
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
@@ -11,16 +16,38 @@ import { ZitadelLogin, ZitadelLogout } from './index';
 
 const project = { projectId: 'proj-test', proxyPath: '/__nextgen' };
 
-type ConfiguredElement = HTMLElement & {
-  project?: unknown;
-  projectId?: string;
-  proxyPath?: string;
-};
+const macrotask = (): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, 0));
 
-// Qwik wires the widget's listeners in a useVisibleTask$, which runs a turn after
-// render; await a tick so the listeners exist before the event is dispatched.
-const tick = (): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, 20));
+/**
+ * Qwik wires the widget's listeners in a `useVisibleTask$` that runs a turn
+ * after `render` (eager `document-ready` strategy), so a single fixed delay
+ * races the attachment. Instead, re-dispatch the event each turn until the
+ * forwarded callback fires, polling up to a generous deadline. CustomEvents do
+ * not replay, so dispatching only after the listener exists is essential —
+ * re-dispatching makes that deterministic without guessing the timing. Returns
+ * the detail the callback received (the listener forwards `event.detail`).
+ */
+async function dispatchUntilForwarded(
+  el: Element,
+  eventName: string,
+  detail: Record<string, unknown>,
+  received: readonly Record<string, unknown>[],
+): Promise<void> {
+  const deadline = Date.now() + 1000;
+  while (received.length === 0) {
+    el.dispatchEvent(new CustomEvent(eventName, { detail }));
+    if (received.length > 0) {
+      return;
+    }
+    if (Date.now() > deadline) {
+      throw new Error(
+        `listener for "${eventName}" never forwarded within 1000ms`,
+      );
+    }
+    await macrotask();
+  }
+}
 
 beforeEach(() => {
   vi.stubGlobal(
@@ -39,7 +66,7 @@ describe('ZitadelLogin', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     await render(host, <ZitadelLogin project={project} purpose="login" />);
-    const el = host.querySelector<ConfiguredElement>('zitadel-login');
+    const el = host.querySelector<ZitadelLoginElement>('zitadel-login');
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
@@ -51,7 +78,7 @@ describe('ZitadelLogin', () => {
       host,
       <ZitadelLogin projectId="proj-test" proxyPath="/__nextgen" />,
     );
-    const el = host.querySelector<ConfiguredElement>('zitadel-login');
+    const el = host.querySelector<ZitadelLoginElement>('zitadel-login');
     expect(el!.projectId).toBe('proj-test');
     expect(el!.proxyPath).toBe('/__nextgen');
   });
@@ -73,12 +100,11 @@ describe('ZitadelLogin', () => {
           }}
         />,
       );
-      await tick();
       const el = host.querySelector('zitadel-login');
+      expect(el).not.toBeNull();
       const detail = { probe: eventName };
-      el?.dispatchEvent(new CustomEvent(eventName, { detail }));
-      await tick();
-      expect(received).toEqual([detail]);
+      await dispatchUntilForwarded(el!, eventName, detail, received);
+      expect(received[received.length - 1]).toBe(detail);
     },
   );
 });
@@ -88,7 +114,7 @@ describe('ZitadelLogout', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     await render(host, <ZitadelLogout project={project} />);
-    const el = host.querySelector<ConfiguredElement>('zitadel-logout');
+    const el = host.querySelector<ZitadelLogoutElement>('zitadel-logout');
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
@@ -100,7 +126,7 @@ describe('ZitadelLogout', () => {
       host,
       <ZitadelLogout projectId="proj-test" proxyPath="/__nextgen" />,
     );
-    const el = host.querySelector<ConfiguredElement>('zitadel-logout');
+    const el = host.querySelector<ZitadelLogoutElement>('zitadel-logout');
     expect(el!.projectId).toBe('proj-test');
     expect(el!.proxyPath).toBe('/__nextgen');
   });
@@ -122,12 +148,11 @@ describe('ZitadelLogout', () => {
           }}
         />,
       );
-      await tick();
       const el = host.querySelector('zitadel-logout');
+      expect(el).not.toBeNull();
       const detail = { probe: eventName };
-      el?.dispatchEvent(new CustomEvent(eventName, { detail }));
-      await tick();
-      expect(received).toEqual([detail]);
+      await dispatchUntilForwarded(el!, eventName, detail, received);
+      expect(received[received.length - 1]).toBe(detail);
     },
   );
 });

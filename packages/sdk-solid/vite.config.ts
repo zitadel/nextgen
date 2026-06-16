@@ -13,7 +13,7 @@ export default defineConfig({
       fileName: 'index',
     },
     rollupOptions: {
-      external: [/^solid-js($|\/)/, /^@zitadel\//],
+      external: [/^@zitadel\//, /^solid-js($|\/)/],
     },
   },
   plugins: [solid(), dts({ include: ['src'], exclude: ['src/**/*.spec.*'] })],

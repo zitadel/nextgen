@@ -26,6 +26,7 @@ catalog:
   '@oclif/plugin-version': ^2.2.46
   '@oclif/plugin-which': ^3.2.55
   "@playwright/test": ^1.60.0
+  '@solidjs/testing-library': ^0.8.10
   "@tailwindcss/vite": ^4.2.4
   "@tanstack/devtools-vite": ^0.6.0
   "@tanstack/eslint-plugin-router": ^1.161.6
@@ -34,9 +35,12 @@ catalog:
   "@tanstack/react-router": ^1.168.23
   "@tanstack/react-router-devtools": ^1.166.13
   "@tanstack/router-plugin": ^1.167.22
+  '@testing-library/angular': ^19.4.1
   "@testing-library/jest-dom": ^6.9.1
   "@testing-library/react": ^16.3.2
+  '@testing-library/svelte': ^5.3.1
   "@testing-library/user-event": ^14.6.1
+  '@testing-library/vue': ^8.1.0
   "@tsdown/css": ^0.21.10
   '@types/cookie-parser': ^1.4.10
   "@types/express": ^4.17.21

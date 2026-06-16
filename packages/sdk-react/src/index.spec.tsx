@@ -1,4 +1,9 @@
 // @vitest-environment jsdom
+import type {
+  ZitadelLogin as ZitadelLoginElement,
+  ZitadelLogout as ZitadelLogoutElement,
+} from '@zitadel/components';
+
 import { cleanup, render } from '@testing-library/react';
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
@@ -6,18 +11,12 @@ import {
 } from '@zitadel/sdk-core/types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ZitadelLogin, ZitadelLogout } from './react';
+import { ZitadelLogin, ZitadelLogout } from './index';
 
 // A representative project handle. The element still starts its flow before
 // @lit/react binds this prop (see vitest.config.ts), so the expected mount-time
 // rejection is ignored package-wide; these are light binding/event assertions.
 const project = { projectId: 'proj-test', proxyPath: '/__nextgen' };
-
-type ConfiguredElement = HTMLElement & {
-  project?: unknown;
-  projectId?: string;
-  proxyPath?: string;
-};
 
 afterEach(cleanup);
 
@@ -26,7 +25,7 @@ describe('ZitadelLogin', () => {
     const { container } = render(
       <ZitadelLogin project={project} purpose="login" />,
     );
-    const el = container.querySelector<ConfiguredElement>('zitadel-login');
+    const el = container.querySelector<ZitadelLoginElement>('zitadel-login');
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
@@ -35,7 +34,7 @@ describe('ZitadelLogin', () => {
     const { container } = render(
       <ZitadelLogin projectId="proj-test" proxyPath="/__nextgen" />,
     );
-    const el = container.querySelector<ConfiguredElement>('zitadel-login');
+    const el = container.querySelector<ZitadelLoginElement>('zitadel-login');
     expect(el!.projectId).toBe('proj-test');
     expect(el!.proxyPath).toBe('/__nextgen');
   });
@@ -58,7 +57,7 @@ describe('ZitadelLogin', () => {
 describe('ZitadelLogout', () => {
   it('binds the project handle as a property', () => {
     const { container } = render(<ZitadelLogout project={project} />);
-    const el = container.querySelector<ConfiguredElement>('zitadel-logout');
+    const el = container.querySelector<ZitadelLogoutElement>('zitadel-logout');
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
@@ -67,7 +66,7 @@ describe('ZitadelLogout', () => {
     const { container } = render(
       <ZitadelLogout projectId="proj-test" proxyPath="/__nextgen" />,
     );
-    const el = container.querySelector<ConfiguredElement>('zitadel-logout');
+    const el = container.querySelector<ZitadelLogoutElement>('zitadel-logout');
     expect(el!.projectId).toBe('proj-test');
     expect(el!.proxyPath).toBe('/__nextgen');
   });

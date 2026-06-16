@@ -7,12 +7,17 @@ import dts from 'vite-plugin-dts';
 export default defineConfig({
   build: {
     lib: {
-      entry: './src/index.ts',
+      entry: './src/index.tsx',
       formats: ['es'],
       fileName: 'index',
     },
     rollupOptions: {
-      external: [/^react($|\/)/, /^react-dom($|\/)/, /^@lit\//, /^@zitadel\//],
+      external: [
+        /^@zitadel\//,
+        /^react($|\/)/,
+        /^react-dom($|\/)/,
+        /^@lit\/react($|\/)/,
+      ],
     },
   },
   plugins: [dts({ include: ['src'], exclude: ['src/**/*.spec.*'] })],

@@ -1,7 +1,7 @@
 import type { ZitadelProject } from '@zitadel/api/config';
 import type { ZitadelSignoutDetail } from '@zitadel/sdk-core/types';
 
-import { defineComponent, h, type PropType } from 'vue';
+import { defineComponent, h, type PropType, toRaw } from 'vue';
 import '@zitadel/components';
 
 /**
@@ -24,7 +24,10 @@ export default defineComponent({
   setup(props, { emit }) {
     return () =>
       h('zitadel-logout', {
-        project: props.project,
+        // Hand the Lit element the raw SDK handle, not Vue's reactive proxy:
+        // the widget does identity checks on it (and `render` from test-utils
+        // would otherwise pass a wrapped clone).
+        project: toRaw(props.project),
         projectId: props.projectId,
         proxyPath: props.proxyPath,
         'post-sign-out-url': props.postSignOutUrl,

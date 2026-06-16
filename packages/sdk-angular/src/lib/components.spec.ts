@@ -1,4 +1,9 @@
-import { TestBed } from '@angular/core/testing';
+import type {
+  ZitadelLogin as ZitadelLoginElement,
+  ZitadelLogout as ZitadelLogoutElement,
+} from '@zitadel/components';
+
+import { render } from '@testing-library/angular';
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
@@ -16,12 +21,6 @@ const outputName = (event: string): string =>
   event
     .replace(/^zitadel-/, '')
     .replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-
-type ConfiguredElement = HTMLElement & {
-  project?: unknown;
-  projectId?: string;
-  proxyPath?: string;
-};
 
 // The dynamically-named `@Output()` is an EventEmitter we only `subscribe` to.
 type SubscribableOutput = { subscribe(next: (detail: unknown) => void): void };
@@ -52,37 +51,33 @@ afterEach(() => {
 });
 
 describe('ZitadelLogin', () => {
-  it('binds the project handle as a property', () => {
-    const fixture = TestBed.createComponent(ZitadelLoginComponent);
-    fixture.componentRef.setInput('project', project);
-    fixture.detectChanges();
-    const host = fixture.nativeElement as HTMLElement;
-    const el = host.querySelector<ConfiguredElement>('zitadel-login');
+  it('binds the project handle as a property', async () => {
+    const { container } = await render(ZitadelLoginComponent, {
+      inputs: { project },
+    });
+    const el = container.querySelector<ZitadelLoginElement>('zitadel-login');
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
 
-  it('binds discrete projectId/proxyPath', () => {
-    const fixture = TestBed.createComponent(ZitadelLoginComponent);
-    fixture.componentRef.setInput('projectId', 'proj-test');
-    fixture.componentRef.setInput('proxyPath', '/__nextgen');
-    fixture.detectChanges();
-    const host = fixture.nativeElement as HTMLElement;
-    const el = host.querySelector<ConfiguredElement>('zitadel-login');
+  it('binds discrete projectId/proxyPath', async () => {
+    const { container } = await render(ZitadelLoginComponent, {
+      inputs: { projectId: 'proj-test', proxyPath: '/__nextgen' },
+    });
+    const el = container.querySelector<ZitadelLoginElement>('zitadel-login');
     expect(el!.projectId).toBe('proj-test');
     expect(el!.proxyPath).toBe('/__nextgen');
   });
 
   it.each(Object.keys(ZITADEL_LOGIN_EVENT_HANDLERS))(
     'forwards %s through its @Output',
-    (eventName) => {
-      const fixture = TestBed.createComponent(ZitadelLoginComponent);
-      fixture.componentRef.setInput('project', project);
+    async (eventName) => {
+      const { fixture, container } = await render(ZitadelLoginComponent, {
+        inputs: { project },
+      });
       const spy = vi.fn();
       outputOf(fixture.componentInstance, eventName).subscribe(spy);
-      fixture.detectChanges();
-      const host = fixture.nativeElement as HTMLElement;
-      const el = host.querySelector('zitadel-login');
+      const el = container.querySelector<ZitadelLoginElement>('zitadel-login');
       const detail = { probe: eventName };
       el?.dispatchEvent(new CustomEvent(eventName, { detail }));
       expect(spy).toHaveBeenCalledWith(detail);
@@ -91,37 +86,34 @@ describe('ZitadelLogin', () => {
 });
 
 describe('ZitadelLogout', () => {
-  it('binds the project handle as a property', () => {
-    const fixture = TestBed.createComponent(ZitadelLogoutComponent);
-    fixture.componentRef.setInput('project', project);
-    fixture.detectChanges();
-    const host = fixture.nativeElement as HTMLElement;
-    const el = host.querySelector<ConfiguredElement>('zitadel-logout');
+  it('binds the project handle as a property', async () => {
+    const { container } = await render(ZitadelLogoutComponent, {
+      inputs: { project },
+    });
+    const el = container.querySelector<ZitadelLogoutElement>('zitadel-logout');
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
 
-  it('binds discrete projectId/proxyPath', () => {
-    const fixture = TestBed.createComponent(ZitadelLogoutComponent);
-    fixture.componentRef.setInput('projectId', 'proj-test');
-    fixture.componentRef.setInput('proxyPath', '/__nextgen');
-    fixture.detectChanges();
-    const host = fixture.nativeElement as HTMLElement;
-    const el = host.querySelector<ConfiguredElement>('zitadel-logout');
+  it('binds discrete projectId/proxyPath', async () => {
+    const { container } = await render(ZitadelLogoutComponent, {
+      inputs: { projectId: 'proj-test', proxyPath: '/__nextgen' },
+    });
+    const el = container.querySelector<ZitadelLogoutElement>('zitadel-logout');
     expect(el!.projectId).toBe('proj-test');
     expect(el!.proxyPath).toBe('/__nextgen');
   });
 
   it.each(Object.keys(ZITADEL_LOGOUT_EVENT_HANDLERS))(
     'forwards %s through its @Output',
-    (eventName) => {
-      const fixture = TestBed.createComponent(ZitadelLogoutComponent);
-      fixture.componentRef.setInput('project', project);
+    async (eventName) => {
+      const { fixture, container } = await render(ZitadelLogoutComponent, {
+        inputs: { project },
+      });
       const spy = vi.fn();
       outputOf(fixture.componentInstance, eventName).subscribe(spy);
-      fixture.detectChanges();
-      const host = fixture.nativeElement as HTMLElement;
-      const el = host.querySelector('zitadel-logout');
+      const el =
+        container.querySelector<ZitadelLogoutElement>('zitadel-logout');
       const detail = { probe: eventName };
       el?.dispatchEvent(new CustomEvent(eventName, { detail }));
       expect(spy).toHaveBeenCalledWith(detail);

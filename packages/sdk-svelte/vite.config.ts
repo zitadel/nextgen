@@ -15,7 +15,7 @@ export default defineConfig({
       fileName: 'index',
     },
     rollupOptions: {
-      external: [/^svelte($|\/)/, /^@zitadel\//],
+      external: [/^@zitadel\//, /^svelte($|\/)/],
     },
   },
   plugins: [svelte(), svelteTypes({ input: 'src/lib' })],

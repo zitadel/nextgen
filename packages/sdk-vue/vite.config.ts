@@ -12,7 +12,7 @@ export default defineConfig({
       fileName: 'index',
     },
     rollupOptions: {
-      external: [/^vue($|\/)/, /^@zitadel\//],
+      external: [/^@zitadel\//, /^vue($|\/)/],
     },
   },
   plugins: [dts({ include: ['src'], exclude: ['src/**/*.spec.*'] })],

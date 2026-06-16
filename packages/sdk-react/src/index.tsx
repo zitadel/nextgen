@@ -1,5 +1,12 @@
 import { createComponent, type EventName } from '@lit/react';
 import {
+  configureZitadel,
+  getApi,
+  getZitadelConfig,
+  type ZitadelConfig,
+  type ZitadelProject,
+} from '@zitadel/api/config';
+import {
   ZitadelLogin as ZitadelLoginElement,
   ZitadelLogout as ZitadelLogoutElement,
 } from '@zitadel/components';
@@ -14,6 +21,10 @@ import type {
   ZitadelLogoutProps,
   ZitadelSignoutDetail,
 } from './types';
+
+export { configureZitadel, getApi, getZitadelConfig };
+export type { ZitadelConfig, ZitadelProject };
+export * from './types';
 
 /**
  * React components for the Zitadel auth widgets.

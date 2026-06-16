@@ -7,7 +7,7 @@ import type {
   ZitadelFlowStepDetail,
 } from '@zitadel/sdk-core/types';
 
-import { defineComponent, h, type PropType } from 'vue';
+import { defineComponent, h, type PropType, toRaw } from 'vue';
 // Registers <zitadel-login> / <zitadel-logout> with the browser. Imported at
 // module load (before render) so the element is upgraded by the time Vue
 // patches it — which means Vue binds `project` as a DOM *property* (not a
@@ -42,7 +42,10 @@ export default defineComponent({
   setup(props, { emit }) {
     return () =>
       h('zitadel-login', {
-        project: props.project,
+        // Hand the Lit element the raw SDK handle, not Vue's reactive proxy:
+        // the widget does identity checks on it (and `render` from test-utils
+        // would otherwise pass a wrapped clone).
+        project: toRaw(props.project),
         projectId: props.projectId,
         proxyPath: props.proxyPath,
         purpose: props.purpose,

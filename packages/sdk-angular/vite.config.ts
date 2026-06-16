@@ -20,7 +20,7 @@ export default defineConfig({
   ],
   build: {
     lib: {
-      entry: 'src/public-api.ts',
+      entry: './src/public-api.ts',
       formats: ['es'],
       fileName: 'index',
     },

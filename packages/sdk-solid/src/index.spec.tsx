@@ -1,20 +1,19 @@
 // @vitest-environment jsdom
+import type {
+  ZitadelLogin as ZitadelLoginElement,
+  ZitadelLogout as ZitadelLogoutElement,
+} from '@zitadel/components';
+
+import { cleanup, render } from '@solidjs/testing-library';
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
 } from '@zitadel/sdk-core/types';
-import { render } from 'solid-js/web';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ZitadelLogin, ZitadelLogout } from './index';
 
 const project = { projectId: 'proj-test', proxyPath: '/__nextgen' };
-
-type ConfiguredElement = HTMLElement & {
-  project?: unknown;
-  projectId?: string;
-  proxyPath?: string;
-};
 
 beforeEach(() => {
   vi.stubGlobal(
@@ -24,32 +23,25 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  cleanup();
   vi.unstubAllGlobals();
-  document.body.innerHTML = '';
 });
-
-function mount(node: () => unknown): HTMLElement {
-  const host = document.createElement('div');
-  document.body.appendChild(host);
-  render(node as () => never, host);
-  return host;
-}
 
 describe('ZitadelLogin', () => {
   it('binds the project handle as a property', () => {
-    const host = mount(() => (
+    const { container } = render(() => (
       <ZitadelLogin project={project} purpose="login" />
     ));
-    const el = host.querySelector<ConfiguredElement>('zitadel-login');
+    const el = container.querySelector<ZitadelLoginElement>('zitadel-login');
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
 
   it('binds discrete projectId/proxyPath', () => {
-    const host = mount(() => (
+    const { container } = render(() => (
       <ZitadelLogin projectId="proj-test" proxyPath="/__nextgen" />
     ));
-    const el = host.querySelector<ConfiguredElement>('zitadel-login');
+    const el = container.querySelector<ZitadelLoginElement>('zitadel-login');
     expect(el!.projectId).toBe('proj-test');
     expect(el!.proxyPath).toBe('/__nextgen');
   });
@@ -58,10 +50,10 @@ describe('ZitadelLogin', () => {
     'forwards %s to its callback',
     (eventName, handlerProp) => {
       const spy = vi.fn();
-      const host = mount(() => (
+      const { container } = render(() => (
         <ZitadelLogin project={project} {...{ [handlerProp]: spy }} />
       ));
-      const el = host.querySelector('zitadel-login');
+      const el = container.querySelector('zitadel-login');
       const detail = { probe: eventName };
       el?.dispatchEvent(new CustomEvent(eventName, { detail }));
       expect(spy).toHaveBeenCalledWith(detail);
@@ -71,17 +63,17 @@ describe('ZitadelLogin', () => {
 
 describe('ZitadelLogout', () => {
   it('binds the project handle as a property', () => {
-    const host = mount(() => <ZitadelLogout project={project} />);
-    const el = host.querySelector<ConfiguredElement>('zitadel-logout');
+    const { container } = render(() => <ZitadelLogout project={project} />);
+    const el = container.querySelector<ZitadelLogoutElement>('zitadel-logout');
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
 
   it('binds discrete projectId/proxyPath', () => {
-    const host = mount(() => (
+    const { container } = render(() => (
       <ZitadelLogout projectId="proj-test" proxyPath="/__nextgen" />
     ));
-    const el = host.querySelector<ConfiguredElement>('zitadel-logout');
+    const el = container.querySelector<ZitadelLogoutElement>('zitadel-logout');
     expect(el!.projectId).toBe('proj-test');
     expect(el!.proxyPath).toBe('/__nextgen');
   });
@@ -90,10 +82,10 @@ describe('ZitadelLogout', () => {
     'forwards %s to its callback',
     (eventName, handlerProp) => {
       const spy = vi.fn();
-      const host = mount(() => (
+      const { container } = render(() => (
         <ZitadelLogout project={project} {...{ [handlerProp]: spy }} />
       ));
-      const el = host.querySelector('zitadel-logout');
+      const el = container.querySelector('zitadel-logout');
       const detail = { probe: eventName };
       el?.dispatchEvent(new CustomEvent(eventName, { detail }));
       expect(spy).toHaveBeenCalledWith(detail);
