@@ -1,5 +1,15 @@
 # @zitadel/cli
 
+## 0.1.0-alpha.9
+
+### Patch Changes
+
+- [#325](https://github.com/zitadel/nextgen/pull/325) [`ae99992`](https://github.com/zitadel/nextgen/commit/ae999926df674eb7ca777e0273789b8f58f83a19) Thanks [@fforootd](https://github.com/fforootd)! - Report local port conflicts clearly, sweep managed local runtime orphans with `stop --all`, and explain non-empty setup targets.
+
+- Updated dependencies [[`ae99992`](https://github.com/zitadel/nextgen/commit/ae999926df674eb7ca777e0273789b8f58f83a19)]:
+  - @zitadel/server@0.1.0-alpha.9
+  - @zitadel/api@0.1.0-alpha.9
+
 ## 0.1.0-alpha.8
 
 ### Patch Changes

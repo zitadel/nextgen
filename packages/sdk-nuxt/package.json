@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-nuxt",
-  "version": "0.1.0-alpha.8",
+  "version": "0.1.0-alpha.9",
   "description": "Nuxt proxy middleware and helpers for Nextgen Auth",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-nuxt#readme",
   "bugs": {

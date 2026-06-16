@@ -1,5 +1,11 @@
 # @zitadel/server
 
+## 0.1.0-alpha.9
+
+### Patch Changes
+
+- [#325](https://github.com/zitadel/nextgen/pull/325) [`ae99992`](https://github.com/zitadel/nextgen/commit/ae999926df674eb7ca777e0273789b8f58f83a19) Thanks [@fforootd](https://github.com/fforootd)! - Forward normal shutdown signals from the npm server wrapper to the packaged Zitadel binary.
+
 ## 0.1.0-alpha.8
 
 ### Patch Changes
