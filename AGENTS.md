@@ -166,10 +166,10 @@ shown in the pull request UI as `ci / full-pr`. It consumes current workflow
 npm package tarballs instead of public Zitadel packages and exercises the
 default npm-binary local runtime. Changesets PR comments are informational
 release-intent feedback and are not branch-protection requirements. The Docker
-fallback journey runs in the `ci-docker-runtime` workflow on `main` and by
-manual dispatch. The checked-in demo integrations, raw binary embedded-postgres
-smoke, and documented quick-start compose smoke remain release-surface
-confidence checks.
+fallback journey remains an opt-in local/manual check via
+`moon run workspace:journey -- --runtime docker --image <docker-tag>`. The
+checked-in demo integrations, raw binary embedded-postgres smoke, and
+documented quick-start compose smoke remain release-surface confidence checks.
 
 ## Testing Layers
 

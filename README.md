@@ -98,9 +98,9 @@ confidence path on a 16-core Depot runner:
 - A non-publishing Moon release snapshot without building a container.
 - The fresh-app journey against the default npm server binary runtime.
 
-Changesets version PRs run a smaller release/package validation path. A
-separate `ci-docker-runtime` workflow runs on `main` and manually to exercise
-the Docker fallback journey.
+Changesets version PRs run a smaller release/package validation path. The
+Docker fallback journey remains an opt-in local/manual check via
+`moon run workspace:journey -- --runtime docker --image <docker-tag>`.
 
 CI uploads short-lived workflow artifacts for review: Moon release snapshot output
 and npm package tarballs. On consumer journey failures it also uploads focused
