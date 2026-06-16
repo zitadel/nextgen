@@ -58,13 +58,42 @@ describe("discoverManagedRuntimeProcesses", () => {
       cb(null, env);
     });
 
-    await expect(discoverManagedRuntimeProcesses()).resolves.toMatchObject({
+    const discovery = await discoverManagedRuntimeProcesses();
+
+    expect(discovery).toMatchObject({
       supported: true,
       processes: [
         { kind: "server-wrapper", pid: 123, ppid: 1 },
         { kind: "server-binary", pid: 234, ppid: 123 },
         { kind: "server-binary", pid: 345, ppid: 1 },
       ],
+    });
+    expect(discovery.processes.find((processInfo) => processInfo.pid === 234)?.command).toBe(
+      "/tmp/app/node_modules/@zitadel/server-darwin-arm64/bin/nextgen",
+    );
+    expect(discovery.processes.find((processInfo) => processInfo.pid === 345)?.command).toBe(
+      "/usr/local/bin/nextgen",
+    );
+  });
+
+  it("strips environment markers without joining adjacent command tokens", async () => {
+    whenPs((args, cb) => {
+      if (args[0] === "axo") {
+        cb(null, " 567 1 /usr/local/bin/nextgen\n");
+        return;
+      }
+      cb(
+        null,
+        "NEXTGEN_SERVER_DATA_DIR=/tmp/app/.zitadel/local/nextgen-data /usr/local/bin/nextgen FOO=1 --serve",
+      );
+    });
+
+    const discovery = await discoverManagedRuntimeProcesses();
+
+    expect(discovery.processes).toHaveLength(1);
+    expect(discovery.processes[0]).toMatchObject({
+      pid: 567,
+      command: "/usr/local/bin/nextgen --serve",
     });
   });
 

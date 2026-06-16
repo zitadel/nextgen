@@ -228,7 +228,9 @@ function advisoryForWarnings(
 
   const managedRuntimeWarning = warnings.find((check) => check.name === "managed-runtime-processes");
   if (hasManagedRuntimeProcesses(managedRuntimeWarning)) {
-    nextActions.push("Stop orphaned managed local Zitadel runtimes before starting a new one.");
+    nextActions.push(
+      "Review other host-wide CLI-managed local Zitadel runtimes before starting a new one.",
+    );
     nextCommands.push(publicCliCommand("stop --all", cliVersion));
   }
 
@@ -374,24 +376,24 @@ async function checkManagedRuntimeProcesses(
       details: { supported: false, error: discovery.error },
     };
   }
-  const processes = unmanagedRuntimeProcesses(discovery.processes, runtime);
+  const processes = additionalManagedRuntimeProcesses(discovery.processes, runtime);
   if (processes.length === 0) {
     return {
       name: "managed-runtime-processes",
       status: "pass",
-      message: "No orphaned managed local runtime processes found.",
-      details: { supported: true, processes: [] },
+      message: "No additional host-wide managed local runtime processes found.",
+      details: { supported: true, scope: "host", processes: [] },
     };
   }
   return {
     name: "managed-runtime-processes",
     status: "warn",
-    message: `${String(processes.length)} orphaned managed local runtime process${processes.length === 1 ? "" : "es"} found.`,
-    details: { supported: true, processes },
+    message: `${String(processes.length)} other host-wide managed local runtime process${processes.length === 1 ? "" : "es"} found.`,
+    details: { supported: true, scope: "host", processes },
   };
 }
 
-function unmanagedRuntimeProcesses(
+function additionalManagedRuntimeProcesses(
   processes: ReadonlyArray<ManagedRuntimeProcess>,
   runtime: RuntimeMetadata | undefined,
 ): ReadonlyArray<ManagedRuntimeProcess> {

@@ -45,8 +45,8 @@ Each invocation prints one JSON object:
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime with
   `npx @zitadel/cli@alpha start`, then retry with `--server local`.
 - `E_PORT_IN_USE`: the requested local runtime port already has a listener.
-  Stop that process, run `npx @zitadel/cli@alpha stop --all` for managed local
-  runtime orphans, or choose another `start --port`.
+  Stop that process, run `npx @zitadel/cli@alpha stop --all` for host-wide
+  CLI-managed local runtimes, or choose another `start --port`.
 
 Exit codes mirror the error class (3 = validation, 4 = network, 5 = conflict,
 1 = auth, 2 = not-implemented). An unknown command is handled by the CLI's help
@@ -78,8 +78,9 @@ layer, not the envelope.
   under `.zitadel/local/runtime.json`. Use `--runtime docker` or `--image` for
   the Docker backend.
 - `stop` — stop the managed runtime while preserving
-  `.zitadel/local/nextgen-data`. Use `stop --all` to sweep discovered
-  CLI-managed local runtime processes left behind by interrupted runs.
+  `.zitadel/local/nextgen-data`. Use `stop --all` to sweep all discovered
+  host-wide CLI-managed local runtime processes, including healthy runtimes
+  from other local projects; it does not kill arbitrary `/healthz` listeners.
 - `logs` — print managed runtime logs; `--follow` streams in human mode.
 - `reset` — stop/remove the managed runtime and delete local runtime data;
   requires `--force` when non-interactive.

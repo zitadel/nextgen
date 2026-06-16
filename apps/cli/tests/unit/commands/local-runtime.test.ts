@@ -256,7 +256,7 @@ describe("local runtime commands", () => {
     });
   });
 
-  it("doctor warns about orphaned managed runtime processes and suggests stop --all", async () => {
+  it("doctor warns about other host-wide managed runtime processes and suggests stop --all", async () => {
     const cwd = await tempProject("zitadel-doctor-orphan-");
     const fake = await fakeServerBinary();
     const fakePs = await fakeProcessTable([
@@ -277,15 +277,19 @@ describe("local runtime commands", () => {
     expect(result.exitCode).toBe(0);
     const envelope = parseJson(result.stdout) as {
       data: {
-        checks: Array<{ name: string; status: string }>;
+        checks: Array<{ details?: { scope?: string }; message: string; name: string; status: string }>;
         next_commands?: string[];
       };
       warnings: string[];
     };
     expect(envelope.warnings.join("\n")).toContain("managed-runtime-processes");
     expect(envelope.data.next_commands).toContain(expectedPublicCliCommand("stop --all"));
-    expect(envelope.data.checks.find((check) => check.name === "managed-runtime-processes")).toMatchObject({
+    expect(
+      envelope.data.checks.find((check) => check.name === "managed-runtime-processes"),
+    ).toMatchObject({
       status: "warn",
+      message: expect.stringContaining("other host-wide managed local runtime"),
+      details: { scope: "host" },
     });
   });
 
@@ -656,11 +660,13 @@ describe("local runtime commands", () => {
         sweep: {
           count: number;
           results: Array<{ process: { pid: number }; stop_result: { status: string } }>;
+          scope: string;
         };
       };
       status: string;
     };
     expect(envelope.status).toBe("ok");
+    expect(envelope.data.sweep.scope).toBe("host");
     expect(envelope.data.sweep.count).toBe(1);
     expect(envelope.data.sweep.results).toEqual([
       {

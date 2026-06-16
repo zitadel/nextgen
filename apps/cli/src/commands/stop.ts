@@ -1,9 +1,12 @@
 import { Flags } from "@oclif/core";
 
 import { ZitadelError } from "../lib/errors";
-import { stopBinaryRuntime } from "../lib/local-server/binary";
+import { stopBinaryRuntime, type StopBinaryRuntimeResult } from "../lib/local-server/binary";
 import { stopAndRemoveContainer } from "../lib/local-server/docker";
-import { discoverManagedRuntimeProcesses } from "../lib/local-server/processes";
+import {
+  discoverManagedRuntimeProcesses,
+  type ManagedRuntimeProcess,
+} from "../lib/local-server/processes";
 import {
   DEFAULT_LOCAL_SERVER_URL,
   localContainerName,
@@ -99,7 +102,7 @@ export default class Stop extends BaseCommand {
       });
     }
 
-    const results = [];
+    const results: ManagedRuntimeSweepResult[] = [];
     for (const processInfo of discovery.processes) {
       results.push({
         process: processInfo,
@@ -119,10 +122,11 @@ export default class Stop extends BaseCommand {
       data: {
         title:
           results.length === 0
-            ? "No managed local runtime processes found."
-            : "Managed local runtime processes stopped.",
+            ? "No host-wide managed local runtime processes found."
+            : "Host-wide managed local runtime processes stopped.",
         sweep: {
           supported: true,
+          scope: "host",
           count: results.length,
           results,
         },
@@ -130,3 +134,8 @@ export default class Stop extends BaseCommand {
     });
   }
 }
+
+type ManagedRuntimeSweepResult = Readonly<{
+  process: ManagedRuntimeProcess;
+  stop_result: StopBinaryRuntimeResult;
+}>;

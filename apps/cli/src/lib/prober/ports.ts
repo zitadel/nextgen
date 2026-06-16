@@ -74,8 +74,8 @@ function runLsof(timeoutMs: number): Promise<string> {
 }
 
 /**
- * Parse the `n` records emitted by `lsof -F n`. Each record is a single line
- * `n<address>` where `<address>` ends in `:<port>` (e.g. `n*:8080`,
+ * Parse the pid (`p`), command (`c`), and name/address (`n`) records emitted by
+ * `lsof -F pcn`. Address records end in `:<port>` (e.g. `n*:8080`,
  * `n127.0.0.1:3000`, `n[::1]:5050`). Only loopback/wildcard hosts are kept;
  * external interface bindings are ignored.
  */

@@ -146,7 +146,8 @@ function isCliLocalDataDir(path: string | undefined): boolean {
 
 function stripEnvironmentNoise(command: string): string {
   return command
-    .replace(/\s+[A-Z_][A-Z0-9_]*=(?:"[^"]+"|'[^']+'|[^\s]+)/g, "")
+    .replace(/(^|\s)[A-Z_][A-Z0-9_]*=(?:"[^"]+"|'[^']+'|[^\s]+)/g, " ")
+    .replace(/\s{2,}/g, " ")
     .trim();
 }
 

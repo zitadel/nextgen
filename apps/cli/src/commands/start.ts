@@ -2,12 +2,13 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { Flags } from "@oclif/core";
 
-import { ZitadelError } from "../lib/errors";
+import { ZitadelError, toZitadelError } from "../lib/errors";
 import {
   binaryLogs,
   isProcessRunning,
   startBinaryRuntime,
   stopBinaryRuntime,
+  type StopBinaryRuntimeResult,
 } from "../lib/local-server/binary";
 import {
   currentUser,
@@ -135,7 +136,10 @@ export default class Start extends BaseCommand {
           },
         );
       } catch (error) {
-        await stopBinaryRuntime(metadata.pid);
+        const stopResult = await stopBinaryRuntime(metadata.pid);
+        if (stopResult.status === "failed") {
+          throw startupCleanupFailedError(error, stopResult, this.meta.cliVersion);
+        }
         throw error;
       }
       await writeRuntimeMetadata(this.meta.cwd, metadata);
@@ -205,6 +209,35 @@ export default class Start extends BaseCommand {
       data: readyData(metadata, false, this.meta.cliVersion),
     });
   }
+}
+
+function startupCleanupFailedError(
+  error: unknown,
+  stopResult: StopBinaryRuntimeResult,
+  cliVersion: string,
+): ZitadelError {
+  const startupError = toZitadelError(error);
+  return new ZitadelError(
+    startupError.code,
+    `${startupError.message}; cleanup did not stop the spawned local runtime`,
+    {
+      hint: "Inspect the local runtime process and stop it manually, then rerun `zitadel start`.",
+      nextCommands: unique([
+        ...(startupError.nextCommands ?? []),
+        publicCliCommand("stop --all", cliVersion),
+        publicCliCommand("logs", cliVersion),
+        publicCliCommand("reset --force", cliVersion),
+      ]),
+      details: {
+        startup_error: {
+          code: startupError.code,
+          message: startupError.message,
+          details: startupError.details,
+        },
+        stop_result: stopResult,
+      },
+    },
+  );
 }
 
 async function assertDockerAvailable(cliVersion: string): Promise<void> {
@@ -367,6 +400,10 @@ function assertRuntimeFlags(runtime: RuntimeBackend, image: string | undefined):
       hint: "Use `zitadel start --runtime docker --image <tag>`, or omit --image for the npm binary runtime.",
     });
   }
+}
+
+function unique(values: string[]): string[] {
+  return [...new Set(values)];
 }
 
 async function stopExistingRuntime(runtime: RuntimeMetadata | undefined): Promise<void> {
