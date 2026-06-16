@@ -214,12 +214,39 @@ async function assertLocalPackageResolution(input) {
     throw new Error(`generated package.json does not depend on ${input.sdkPackage}`);
   }
 
-  const packageLock = JSON.parse(
-    await input.readFile(join(input.appDir, "package-lock.json"), "utf8"),
+  const packageLockText = await readOptionalFile(
+    join(input.appDir, "package-lock.json"),
+    input.readFile,
   );
+  if (packageLockText) {
+    assertNpmLockfileResolution({
+      lockfile: JSON.parse(packageLockText),
+      registryUrl: input.registryUrl,
+      sdkPackage: input.sdkPackage,
+    });
+    return;
+  }
+
+  const pnpmLockText = await readOptionalFile(
+    join(input.appDir, "pnpm-lock.yaml"),
+    input.readFile,
+  );
+  if (pnpmLockText) {
+    assertPnpmLockfileResolution({
+      lockfile: pnpmLockText,
+      registryUrl: input.registryUrl,
+      sdkPackage: input.sdkPackage,
+    });
+    return;
+  }
+
+  throw new Error("generated app has no supported lockfile (package-lock.json or pnpm-lock.yaml)");
+}
+
+function assertNpmLockfileResolution(input) {
   const packageScope = input.sdkPackage.split("/")[0];
   const scopedNodeModulePrefix = `node_modules/${packageScope}/`;
-  const lockedZitadelPackages = Object.entries(packageLock.packages ?? {}).filter(([name]) =>
+  const lockedZitadelPackages = Object.entries(input.lockfile.packages ?? {}).filter(([name]) =>
     name.startsWith(scopedNodeModulePrefix),
   );
   if (lockedZitadelPackages.length === 0) {
@@ -230,6 +257,26 @@ async function assertLocalPackageResolution(input) {
     if (typeof resolved !== "string" || !resolved.startsWith(input.registryUrl)) {
       throw new Error(`${name} resolved outside the temporary registry: ${resolved}`);
     }
+  }
+}
+
+function assertPnpmLockfileResolution(input) {
+  if (!input.lockfile.includes(input.sdkPackage)) {
+    throw new Error(`pnpm-lock.yaml does not contain ${input.sdkPackage}`);
+  }
+  if (!input.lockfile.includes(input.registryUrl)) {
+    throw new Error(`pnpm-lock.yaml does not contain the temporary registry ${input.registryUrl}`);
+  }
+}
+
+async function readOptionalFile(path, readFileFn) {
+  try {
+    return await readFileFn(path, "utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return null;
+    }
+    throw error;
   }
 }
 

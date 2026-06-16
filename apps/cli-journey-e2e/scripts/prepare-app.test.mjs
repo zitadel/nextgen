@@ -155,6 +155,40 @@ test("collects local runtime logs when a CLI step fails", async () => {
   }
 });
 
+test("accepts generated apps that use pnpm lockfiles", async () => {
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-journey-prepare-pnpm-test-"));
+  const registryUrl = "http://127.0.0.1:4873";
+
+  try {
+    const metadata = await prepareApp({
+      env: {
+        JOURNEY_APP_URL: "http://localhost:3010",
+        JOURNEY_CLI_PACKAGE: "@zitadel/cli",
+        JOURNEY_FRAMEWORK: "angular",
+        JOURNEY_REGISTRY_URL: registryUrl,
+        JOURNEY_SDK_PACKAGE: "@zitadel/sdk-angular",
+        JOURNEY_WORK_DIR: workDir,
+      },
+      logMetadata: false,
+      runCapture: async (_command, args, options) => {
+        if (args.includes("setup")) {
+          await writeGeneratedApp(options.cwd, registryUrl, "@zitadel/sdk-angular", "pnpm");
+        }
+        return {
+          code: 0,
+          stdout: `${JSON.stringify(okEnvelope(args))}\n`,
+          stderr: "",
+        };
+      },
+    });
+
+    assert.equal(metadata.framework, "angular");
+    assert.equal(metadata.sdkPackage, "@zitadel/sdk-angular");
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+});
+
 test("records log collection failures thrown as non-Error values", async () => {
   const workDir = await mkdtemp(join(tmpdir(), "zitadel-journey-prepare-non-error-test-"));
 
@@ -196,11 +230,32 @@ test("records log collection failures thrown as non-Error values", async () => {
   }
 });
 
-async function writeGeneratedApp(appDir, registryUrl, sdkPackage) {
+async function writeGeneratedApp(appDir, registryUrl, sdkPackage, lockfile = "npm") {
   await writeFile(
     join(appDir, "package.json"),
     `${JSON.stringify({ dependencies: { [sdkPackage]: "alpha" } }, null, 2)}\n`,
   );
+  if (lockfile === "pnpm") {
+    await writeFile(
+      join(appDir, "pnpm-lock.yaml"),
+      [
+        "lockfileVersion: '9.0'",
+        "",
+        "importers:",
+        "  .:",
+        "    dependencies:",
+        `      ${sdkPackage}:`,
+        "        specifier: alpha",
+        "        version: 0.1.0-alpha.5",
+        "",
+        "packages:",
+        `  ${sdkPackage}@0.1.0-alpha.5:`,
+        `    resolution: {tarball: ${registryUrl}/${sdkPackage}/-/package.tgz}`,
+        "",
+      ].join("\n"),
+    );
+    return;
+  }
   await writeFile(
     join(appDir, "package-lock.json"),
     `${JSON.stringify(

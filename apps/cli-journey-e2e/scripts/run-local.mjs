@@ -491,6 +491,10 @@ async function collectDiagnostics(context) {
     join(context.appDir, "package-lock.json"),
     join(context.diagnosticsDir, "generated-app", "package-lock.json"),
   );
+  await copyIfExists(
+    join(context.appDir, "pnpm-lock.yaml"),
+    join(context.diagnosticsDir, "generated-app", "pnpm-lock.yaml"),
+  );
   await copyIfExists(context.playwrightReportDir, join(context.diagnosticsDir, "playwright-report"));
   await copyIfExists(context.playwrightOutputDir, join(context.diagnosticsDir, "playwright-output"));
 }

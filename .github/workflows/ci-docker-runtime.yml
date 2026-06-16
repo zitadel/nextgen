@@ -51,13 +51,13 @@ jobs:
         run: |
           version="$(node -p "require('./apps/server/package.json').version")"
           image="ghcr.io/zitadel/nextgen:${version}-snapshot-local"
-          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- --runtime docker --framework next --image "${image}" --work-dir tmp/ci-docker-journey
+          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- --runtime docker --framework next --image "${image}" --work-dir "${RUNNER_TEMP}/ci-docker-journey"
 
       - name: Upload journey diagnostics
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
           name: docker-journey-diagnostics
-          path: apps/cli-journey-e2e/tmp/ci-docker-journey/diagnostics
+          path: ${{ runner.temp }}/ci-docker-journey/diagnostics
           if-no-files-found: ignore
           retention-days: 7

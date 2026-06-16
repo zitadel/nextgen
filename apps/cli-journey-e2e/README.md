@@ -72,7 +72,7 @@ published.
 
 Failure diagnostics intentionally stay small: Playwright report/output,
 doctor/start/setup JSON and stderr, local runtime metadata/logs, metadata,
-generated app `package.json` and `package-lock.json`, Verdaccio logs, and
+generated app `package.json` and lockfile, Verdaccio logs, and
 generated app logs. Do not upload generated app `node_modules` or framework
 build directories.
 

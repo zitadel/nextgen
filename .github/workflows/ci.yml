@@ -58,7 +58,7 @@ jobs:
 
       - name: Run binary fresh-app journey
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- --runtime binary --work-dir tmp/ci-journey
+        run: env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- --runtime binary --work-dir "${RUNNER_TEMP}/ci-journey"
 
       - name: Validate version PR
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
@@ -88,6 +88,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: journey-diagnostics
-          path: apps/cli-journey-e2e/tmp/ci-journey/diagnostics
+          path: ${{ runner.temp }}/ci-journey/diagnostics
           if-no-files-found: ignore
           retention-days: 7
