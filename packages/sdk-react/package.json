@@ -6,16 +6,16 @@
   "bugs": {
     "url": "https://github.com/zitadel/nextgen/issues"
   },
-  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/zitadel/nextgen.git",
     "directory": "packages/sdk-react"
   },
+  "license": "MIT",
+  "type": "module",
   "files": [
     "dist"
   ],
-  "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -42,29 +42,29 @@
     "react-dom": ">=18"
   },
   "devDependencies": {
-    "@eslint/js": "^9.0.0",
-    "@testing-library/react": "^16.3.2",
-    "@types/react": "^19.2.14",
-    "eslint": "^9.0.0",
-    "jsdom": "catalog:",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5",
-    "typescript": "^5.7.3",
-    "vite": "^7.3.5",
-    "vite-plugin-dts": "^4.5.0",
-    "vitest": "^3.0.0",
-    "@eslint/json": "^0.11.0",
-    "@eslint/markdown": "^6.0.0",
-    "eslint-config-prettier": "^10.0.0",
-    "eslint-import-resolver-typescript": "^3.7.0",
-    "eslint-plugin-import": "^2.31.0",
-    "eslint-plugin-perfectionist": "^4.0.0",
-    "eslint-plugin-prettier": "^5.0.0",
-    "prettier": "^3.0.0",
-    "typescript-eslint": "^8.0.0",
+    "@eslint/js": "catalog:",
+    "@eslint/json": "catalog:",
+    "@eslint/markdown": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@types/react": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-import-resolver-typescript": "catalog:",
+    "eslint-plugin-import": "catalog:",
     "eslint-plugin-jsx-a11y": "^6.10.0",
+    "eslint-plugin-perfectionist": "catalog:",
+    "eslint-plugin-prettier": "catalog:",
     "eslint-plugin-react": "^7.37.0",
     "eslint-plugin-react-hooks": "^5.0.0",
-    "eslint-plugin-testing-library": "^7.0.0"
+    "eslint-plugin-testing-library": "^7.0.0",
+    "jsdom": "catalog:",
+    "prettier": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:",
+    "vite": "catalog:",
+    "vite-plugin-dts": "catalog:",
+    "vitest": "catalog:"
   }
 }
