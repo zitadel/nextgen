@@ -250,16 +250,20 @@ async function proxyRequest(
 
   const hasBody = !['GET', 'HEAD'].includes(req.method);
 
-  // POST /sessions/exchange requires a project service-key bearer token.
-  // The browser can't hold a secret, so the middleware constructs one from
-  // the project_id query param. The server's security handler accepts any
-  // token of the form sk_proj_* at this stage (full validation is a TODO).
+  // POST /sessions/exchange has a separate post-response hook; keep the
+  // predicate so the `onExchangeResponse` block further down still fires.
   const isExchangeRequest =
     req.method === 'POST' && suffix.startsWith('/sessions/exchange');
-  if (isExchangeRequest && !upstreamHeaders.has('authorization')) {
-    const projectId = url.searchParams.get('project_id');
-    if (projectId) {
-      upstreamHeaders.set('authorization', `Bearer sk_${projectId}`);
+
+  // Attach the project service-key secret as the bearer on every proxied
+  // request. The server's security handler verifies it cryptographically; the
+  // browser never sees the secret because Next.js middleware runs in the
+  // node runtime and reads `process.env.ZITADEL_PROJECT_SECRET` (Next auto-
+  // loads `.env.local`, which is gitignored).
+  if (!upstreamHeaders.has('authorization')) {
+    const secret = process.env.ZITADEL_PROJECT_SECRET;
+    if (secret) {
+      upstreamHeaders.set('authorization', `Bearer ${secret}`);
     }
   }
 
