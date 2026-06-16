@@ -69,36 +69,40 @@ export type ZitadelLoginProps = ZitadelLoginConfig &
  * Qwik component wrapping the `<zitadel-login>` web component. Binds the
  * {@link ZitadelProject} handle as a DOM property (or the discrete project id /
  * proxy path) and forwards the widget's `zitadel-*` events as optional
- * callbacks. `useVisibleTask$` wires the native listeners; Qwik's declarative
- * `useOn` does not catch these programmatic custom events.
+ * callbacks. `useVisibleTask$` (eager `document-ready`, so listeners attach on
+ * load rather than on first visibility) wires the native listeners; Qwik's
+ * declarative `useOn` does not catch these programmatic custom events.
  */
 export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
   const host = useSignal<HTMLElement>();
   // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(({ track, cleanup }) => {
-    const el = track(() => host.value);
-    if (!el) {
-      return;
-    }
-    const onStep = (event: Event): void =>
-      void props.onFlowStep$?.(eventDetail(event));
-    const onInput = (event: Event): void =>
-      void props.onFlowInput$?.(eventDetail(event));
-    const onComplete = (event: Event): void =>
-      void props.onFlowComplete$?.(eventDetail(event));
-    const onError = (event: Event): void =>
-      void props.onFlowError$?.(eventDetail(event));
-    el.addEventListener('zitadel-flow-step', onStep);
-    el.addEventListener('zitadel-flow-input', onInput);
-    el.addEventListener('zitadel-flow-complete', onComplete);
-    el.addEventListener('zitadel-flow-error', onError);
-    cleanup(() => {
-      el.removeEventListener('zitadel-flow-step', onStep);
-      el.removeEventListener('zitadel-flow-input', onInput);
-      el.removeEventListener('zitadel-flow-complete', onComplete);
-      el.removeEventListener('zitadel-flow-error', onError);
-    });
-  });
+  useVisibleTask$(
+    ({ track, cleanup }) => {
+      const el = track(() => host.value);
+      if (!el) {
+        return;
+      }
+      const onStep = (event: Event): void =>
+        void props.onFlowStep$?.(eventDetail(event));
+      const onInput = (event: Event): void =>
+        void props.onFlowInput$?.(eventDetail(event));
+      const onComplete = (event: Event): void =>
+        void props.onFlowComplete$?.(eventDetail(event));
+      const onError = (event: Event): void =>
+        void props.onFlowError$?.(eventDetail(event));
+      el.addEventListener('zitadel-flow-step', onStep);
+      el.addEventListener('zitadel-flow-input', onInput);
+      el.addEventListener('zitadel-flow-complete', onComplete);
+      el.addEventListener('zitadel-flow-error', onError);
+      cleanup(() => {
+        el.removeEventListener('zitadel-flow-step', onStep);
+        el.removeEventListener('zitadel-flow-input', onInput);
+        el.removeEventListener('zitadel-flow-complete', onComplete);
+        el.removeEventListener('zitadel-flow-error', onError);
+      });
+    },
+    { strategy: 'document-ready' },
+  );
   return (
     <zitadel-login
       ref={host}
@@ -127,18 +131,21 @@ export type ZitadelLogoutProps = ZitadelLogoutConfig &
 export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
   const host = useSignal<HTMLElement>();
   // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(({ track, cleanup }) => {
-    const el = track(() => host.value);
-    if (!el) {
-      return;
-    }
-    const onSignout = (event: Event): void =>
-      void props.onSignout$?.(eventDetail(event));
-    el.addEventListener('zitadel-signout', onSignout);
-    cleanup(() => {
-      el.removeEventListener('zitadel-signout', onSignout);
-    });
-  });
+  useVisibleTask$(
+    ({ track, cleanup }) => {
+      const el = track(() => host.value);
+      if (!el) {
+        return;
+      }
+      const onSignout = (event: Event): void =>
+        void props.onSignout$?.(eventDetail(event));
+      el.addEventListener('zitadel-signout', onSignout);
+      cleanup(() => {
+        el.removeEventListener('zitadel-signout', onSignout);
+      });
+    },
+    { strategy: 'document-ready' },
+  );
   return (
     <zitadel-logout
       ref={host}
