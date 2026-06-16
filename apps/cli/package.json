@@ -7,6 +7,9 @@
     "url": "https://github.com/zitadel/nextgen/issues"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/zitadel/nextgen.git",
