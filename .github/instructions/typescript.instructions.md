@@ -16,10 +16,10 @@ Vitest.
   `packages/sdk-core`, `packages/sdk-next`, `packages/sdk-nuxt`,
   `packages/sdk-react`, `packages/sdk-vue`, `packages/sdk-angular`) must keep
   `"license": "MIT"`.
-- Follow the **Changesets** decision table in `AGENTS.md` for publishable
-  package paths; add a real changeset for user-visible changes, skip the file
-  when the PR does not touch those paths. Write `.changeset/<slug>.md` directly
-  rather than via the interactive prompt.
+- Follow the [decision table in `.changeset/README.md`](../../.changeset/README.md#decision-table)
+  for publishable package paths; add a real changeset for user-visible changes,
+  skip the file when the PR does not touch those paths. Write
+  `.changeset/<slug>.md` directly rather than via the interactive prompt.
 - PR descriptions for public package changes should state the changeset outcome
   and list the focused package validation commands that were actually run.
 - Avoid committing generated `dist/**` churn unless the release or package smoke
