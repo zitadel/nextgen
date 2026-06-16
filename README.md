@@ -185,8 +185,9 @@ days and are not release artifacts.
 
 ## Build & release
 
-This monorepo uses Moon for task execution and non-npm artifact builds, and
-Changesets for package versions, changelogs, npm publishing, and package tags.
+This monorepo uses Moon for task execution, non-npm artifact builds, and the
+product GitHub Release. Changesets owns package versions, changelogs, npm
+publishing, and public package tags.
 The current release model intentionally separates product/server releases from
 independent SDK/component npm releases. The full rationale lives in
 [docs/adrs/002-multi-package-release-strategy.md](docs/adrs/002-multi-package-release-strategy.md)
@@ -207,8 +208,10 @@ moon run release:publish -- --dry-run
 ```
 
 Release output lands in `dist/release/<version>`. Product tags remain
-`vX.Y.Z` or `vX.Y.Z-alpha.N`; prerelease images publish only immutable version
-tags, while stable releases may move `ghcr.io/zitadel/nextgen:latest`.
+`vX.Y.Z` or `vX.Y.Z-alpha.N` and are created by the Moon release task from the
+private `@zitadel/server-release` version record; prerelease images publish
+only immutable version tags, while stable releases may move
+`ghcr.io/zitadel/nextgen:latest`.
 
 ### npm packages (`changesets`)
 
@@ -221,10 +224,11 @@ corepack pnpm changeset
 ```
 
 The manual `release-prepare.yml` workflow runs Moon release validation,
-executes `changeset version`, and opens or updates the version PR. After that PR
-is reviewed and merged, `release-publish.yml` publishes npm packages with
-Changesets, pushes the product tag and container image, and creates or updates
-the GitHub Release.
+executes `changeset version`, and opens or updates the version PR. Include
+`@zitadel/server-release` in a changeset when the product/server version should
+move. After that PR is reviewed and merged, `release-publish.yml` publishes npm
+packages with Changesets, pushes the product tag and container image, and
+creates or updates the single product GitHub Release.
 
 Follow the [manual release runbook](docs/runbooks/manual-release.md) when
 cutting a release.

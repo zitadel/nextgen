@@ -11,14 +11,14 @@ Release orchestration is split by responsibility:
 1. **Moon owns the monorepo task graph and artifact builds.** CI, local checks,
    Go cross-builds, npm package packing, Docker Buildx image creation, and
    release verification run through `moon` targets.
-2. **Changesets owns versions, changelogs, npm publishing, and package tags.**
-   Public npm packages release independently. A private
-   `@zitadel/server-release` package is Changesets-versioned and tagged so the
-   Go server artifacts have a reviewed product version even though that package
-   is not published to npm.
-3. **Moon publishes non-npm product artifacts.** The server release target reads
-   `@zitadel/server-release`, creates the product `vX.Y.Z` or
-   `vX.Y.Z-alpha.N` tag, builds the Go archives, pushes
+2. **Changesets owns versions, changelogs, npm publishing, and public package
+   tags.** Public npm packages release independently. A private
+   `@zitadel/server-release` package is Changesets-versioned so the Go server
+   artifacts have a reviewed product version even though that package is not
+   published to npm.
+3. **Moon publishes non-npm product artifacts and the product announcement.**
+   The server release target reads `@zitadel/server-release`, creates the
+   product `vX.Y.Z` or `vX.Y.Z-alpha.N` tag, builds the Go archives, pushes
    `ghcr.io/zitadel/nextgen:<version>`, and updates one GitHub Release.
 
 Nx and GoReleaser are retired dependencies. They are not part of the target CI
@@ -49,6 +49,8 @@ Positive:
 - Changesets remains the recognizable npm versioning and publishing workflow.
 - Server versions are reviewed through the same version PR flow as npm package
   versions without pretending the server binary is an npm artifact.
+- Product releases have one human-facing Git tag and GitHub Release, owned by
+  Moon release tasks rather than Changesets package tags.
 - Release recovery becomes idempotent artifact verification and republishing,
   not a separate alpha train state machine.
 

@@ -12,7 +12,7 @@ This directory holds [changesets](https://github.com/changesets/changesets) for 
 - `@zitadel/sdk-vue` (`packages/sdk-vue`)
 - `@zitadel/sdk-angular` (`packages/sdk-angular`)
 
-Everything else (`@zitadel/api-mock`, `@zitadel/design-tokens`, `@zitadel/shared-component-styles`, `@zitadel/ui-react`, the demos, the console) is marked `"private": true` and is never published. The private `@zitadel/server-release` record is the exception: Changesets versions and tags it so the Go server artifacts have a reviewed product version even though Moon publishes the non-npm files.
+Everything else (`@zitadel/api-mock`, `@zitadel/design-tokens`, `@zitadel/shared-component-styles`, `@zitadel/ui-react`, the demos, the console) is marked `"private": true` and is never published. The private `@zitadel/server-release` record is the exception: Changesets versions it so the Go server artifacts have a reviewed product version even though Moon publishes the non-npm files.
 
 When you make a user-visible change to one of the public packages, run:
 
@@ -21,6 +21,13 @@ corepack pnpm changeset
 ```
 
 Pick the affected packages, the bump type (patch / minor / major), and write a one-line summary. A markdown file appears in this directory and gets committed with your PR.
+
+When a change should move the product/server release version, include the
+private `@zitadel/server-release` record in the changeset. Do not add
+`@zitadel/server-release` to npm pack/publish lists: it is the version source
+for server archives, containers, the product `v<version>` tag, and the single
+product GitHub Release. A real npm server runtime would be a separate public
+package such as `@zitadel/server`, with its own ADR and package manifest.
 
 ## Alpha prerelease mode
 
@@ -58,10 +65,10 @@ short-lived OIDC credentials, but npm only accepts public provenance
 attestations from public source repositories. Re-enable provenance when
 `zitadel/nextgen` is public.
 
-Changesets does not build the Go server binary. Moon release tasks read the
-Changesets-versioned `@zitadel/server-release` package, create `v<version>`,
-cross-build the Go server, publish containers, and update the product GitHub
-Release. See
+Changesets does not build the Go server binary or create the product
+announcement. Moon release tasks read the Changesets-versioned
+`@zitadel/server-release` package, create `v<version>`, cross-build the Go
+server, publish containers, and update the single product GitHub Release. See
 [docs/adrs/002-multi-package-release-strategy.md](../docs/adrs/002-multi-package-release-strategy.md)
 and [docs/adrs/023-lockstep-alpha-release-train.md](../docs/adrs/023-lockstep-alpha-release-train.md).
 

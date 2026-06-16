@@ -7,7 +7,7 @@ This directory contains architecture decision records (ADRs) for nextgen.
 | ID | Title | Summary |
 |---|---|---|
 | [001](001-server-cli-cobra-viper.md) | Standardize Server Command Surface on Cobra and Viper | Proposes Cobra and Viper as the standard server command/configuration stack; captures open questions around backend-specific option presentation. |
-| [002](002-multi-package-release-strategy.md) | Multi-package Release Strategy | Moon owns the repo task graph and non-npm artifact builds; Changesets owns package versions, changelogs, npm publishing, and package tags. |
+| [002](002-multi-package-release-strategy.md) | Multi-package Release Strategy | Moon owns the repo task graph, non-npm artifact builds, and the product GitHub Release; Changesets owns package versions, changelogs, npm publishing, and public package tags. |
 | [003](003-create-first-claim-later.md) | Create First, Claim Later | **Withdrawn.** Pre-claim/claim lifecycle removed from CLI and api-mock pending a server-side `claim` contract. |
 | [004](004-agent-contract-and-agents-md.md) | CLI Agent Contract and SKILLS.md | `apps/cli/SKILLS.md` is the CLI agent guidance; agents use `--non-interactive --json` and parse the stable envelope. |
 | [005](005-public-runtime-private-credentials.md) | Public Runtime and Private Credentials | Browser UI receives only public runtime metadata; secrets stay in CLI, server, or secret stores. |

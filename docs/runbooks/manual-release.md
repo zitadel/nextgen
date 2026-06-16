@@ -1,7 +1,8 @@
 # Manual Release Runbook
 
-This repo uses Moon for CI/build orchestration and Changesets for versioning,
-changelogs, npm publishing, and package tags.
+This repo uses Moon for CI/build orchestration, server artifacts, and the
+product GitHub Release. Changesets owns package versioning, changelogs, npm
+publishing, and public package tags.
 
 ## Prepare a version PR
 
@@ -10,7 +11,9 @@ changelogs, npm publishing, and package tags.
 2. Run the manual `release-prepare` workflow.
 3. Review the generated version PR. It should update package versions,
    changelogs, and the private `@zitadel/server-release` record when the server
-   product version changes.
+   product version changes. The version PR should not create the product
+   GitHub Release; `release-publish` does that from the reviewed server-release
+   version.
 4. Merge the version PR only after split CI is green.
 
 ## Publish

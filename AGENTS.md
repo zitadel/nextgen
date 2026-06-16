@@ -30,8 +30,8 @@ proposals and implementations with recorded decisions.
 
 This repo is the pre-release next generation of Zitadel. Moon owns the
 monorepo task graph and release artifact builds. Changesets owns package
-versions, changelogs, npm publishing, and package tags (see "Release,
-Licensing, And Secrets").
+versions, changelogs, npm publishing, and public package tags; Moon owns the
+product tag and GitHub Release (see "Release, Licensing, And Secrets").
 
 - `internal/` contains Go server implementation code.
 - `cmd/` is reserved for Go command wiring.
@@ -240,7 +240,9 @@ For customer-local runtime workflows, agents should prefer
   `@zitadel/components`, `@zitadel/sdk-core`, `@zitadel/sdk-next`,
   `@zitadel/sdk-nuxt`, `@zitadel/sdk-react`, `@zitadel/sdk-vue`, and
   `@zitadel/sdk-angular`. The private `@zitadel/server-release` manifest is
-  versioned by Changesets when product/server versions move.
+  versioned by Changesets when product/server versions move, but is not an npm
+  package. Moon creates the single product `v<version>` tag and GitHub Release
+  from that private version record.
 - Add a changeset by writing the file directly — do not depend on the
   interactive `pnpm changeset` prompt. Create `.changeset/<short-slug>.md`:
 
@@ -252,7 +254,8 @@ For customer-local runtime workflows, agents should prefer
   One-line, user-facing summary of the change.
   ```
 
-  List only packages whose release record should move; pick `patch` (fixes),
+  List only packages whose release record should move; include
+  `@zitadel/server-release` for product/server releases. Pick `patch` (fixes),
   `minor` (features), or `major` (breaking). The repo is in `alpha` prerelease
   mode (`.changeset/pre.json`), but public packages are independently
   versioned unless an ADR explicitly reintroduces lockstep.

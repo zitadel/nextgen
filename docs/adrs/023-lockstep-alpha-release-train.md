@@ -13,11 +13,11 @@ train across npm packages, CLI, server image, and GoReleaser artifacts.
 The current release strategy is:
 
 - Moon owns CI task execution and non-npm artifact builds.
-- Changesets owns versions, changelogs, npm publishing, and package tags.
+- Changesets owns versions, changelogs, npm publishing, and public package tags.
 - Public npm packages release independently.
 - A private `@zitadel/server-release` package records the product/server
-  version that Moon uses for Go archives, containers, product tags, and GitHub
-  Releases.
+  version that Moon uses for Go archives, containers, the product tag, and the
+  product GitHub Release.
 
 ## Historical context
 
