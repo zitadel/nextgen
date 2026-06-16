@@ -157,8 +157,8 @@ async function commandPublish(options) {
   }
 
   await commandSnapshot({ skipContainer: true });
-  await ensureProductTag(release);
   await run("corepack", ["pnpm", "exec", "changeset", "publish"], { cwd: repoRoot });
+  await ensureProductTag(release);
   await buildContainerImage({ repoRoot, outDir, release, push: true, platforms: CONTAINER_PLATFORMS });
   await upsertGitHubRelease(release, outDir);
   await commandVerify();
