@@ -364,10 +364,6 @@ export async function writeReleaseMetadata(options = {}) {
 }
 
 export function artifactSummary(metadata) {
-  const packageRows = metadata.packages
-    .map((pkg) => `| \`${pkg.name}\` | \`${pkg.version}\` |`)
-    .join("\n");
-  const imageRows = metadata.imageTags.map((tag) => `| container | \`${tag}\` |`).join("\n");
   return `# Release Artifact Summary ${metadata.version}
 
 Commit: \`${metadata.shortCommit}\`
@@ -376,14 +372,22 @@ Commit: \`${metadata.shortCommit}\`
 
 | Kind | Reference |
 |---|---|
-${imageRows}
+${artifactImageRows(metadata)}
 
 ## npm Packages
 
 | Package | Version |
 |---|---|
-${packageRows}
+${artifactPackageRows(metadata)}
 `;
+}
+
+export function artifactImageRows(metadata) {
+  return (metadata.imageTags ?? []).map((tag) => `| container | \`${tag}\` |`).join("\n");
+}
+
+export function artifactPackageRows(metadata) {
+  return (metadata.packages ?? []).map((pkg) => `| \`${pkg.name}\` | \`${pkg.version}\` |`).join("\n");
 }
 
 export async function verifyLocalArtifacts(options = {}) {
