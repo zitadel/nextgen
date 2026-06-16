@@ -65,10 +65,11 @@ Useful environment overrides:
 The required PR CI job runs the framework matrix against the default binary
 runtime. It does not use public Zitadel packages or GHCR images; it publishes
 the current workflow's package tarballs to Verdaccio and runs the same `npx`
-local setup flow against the generated app. The Docker fallback journey runs on
-`main` and by manual dispatch. Private support packages such as design tokens
-are bundled into the public packages that need them and must not be uploaded or
-published.
+local setup flow against the generated app. The Docker fallback journey remains
+an opt-in local/manual check via
+`moon run workspace:journey -- --runtime docker --image <docker-tag>`. Private
+support packages such as design tokens are bundled into the public packages
+that need them and must not be uploaded or published.
 
 Failure diagnostics intentionally stay small: Playwright report/output,
 doctor/start/setup JSON and stderr, local runtime metadata/logs, metadata,
