@@ -87,9 +87,9 @@ server bootstrapping, and release tasks, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Pull requests run parallel CI checks. Branch protection currently requires the
 GitHub Actions context `full-pr`, shown in the pull request UI as
-`ci / full-pr`. `changesets / status` gives fast package release feedback.
-`ci / full-pr` runs the Moon-driven PR confidence path on a 16-core Depot
-runner:
+`ci / full-pr`. Changesets comments give package release intent feedback
+without adding a blocking CI gate. `ci / full-pr` runs the Moon-driven PR
+confidence path on a 16-core Depot runner:
 
 - Go vet and tests.
 - pnpm install and Moon lint/typecheck/build/test tasks.
@@ -150,25 +150,17 @@ user-visible change to those packages:
 corepack pnpm changeset
 ```
 
-When pending changesets land on `main`, `release-prepare.yml` runs Moon release
-validation, preflights pending Changesets, executes `changeset version`, and
-opens or updates the version PR with the release GitHub App so the required
-`full-pr` check runs normally. After that PR is reviewed and merged,
-`release-publish.yml` automatically publishes npm packages with Changesets,
-pushes the product tag and container image, and creates or updates the single
-product GitHub Release.
+When pending changesets land on `main`, `release-publish.yml` runs the
+Changesets action and opens or updates the version PR with the release GitHub
+App so the required `full-pr` check runs normally. After that PR is reviewed
+and merged, the same workflow detects the generated version commit, publishes
+npm packages with Changesets, pushes the product tag and container image, and
+creates or updates the single product GitHub Release.
 
-Check local Changesets status with:
-
-```sh
-moon run release:changesets -- --base origin/main --summary
-```
-
-Before forcing release preparation manually, validate all pending changesets
-with:
+Preview local Changesets status with:
 
 ```sh
-moon run release:changesets -- --pending --summary
+corepack pnpm exec changeset status --since origin/main
 ```
 
 Follow the [release runbook](docs/runbooks/manual-release.md) when cutting or

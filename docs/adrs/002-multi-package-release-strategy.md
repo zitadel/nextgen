@@ -25,10 +25,10 @@ Nx and GoReleaser are retired dependencies. They are not part of the target CI
 or release path.
 
 Release execution is automatic after review. When pending changesets land on
-`main`, the prepare workflow opens or updates the Changesets version PR. Merging
-that reviewed version PR is the release approval; the publish workflow then runs
-from the version commit on `main` and performs the npm, container, product tag,
-and GitHub Release steps with idempotent guards.
+`main`, the release workflow uses the Changesets action to open or update the
+version PR. Merging that reviewed version PR is the release approval; the same
+workflow then detects the generated version commit on `main` and performs the
+npm, container, product tag, and GitHub Release steps with idempotent guards.
 
 ## Context
 

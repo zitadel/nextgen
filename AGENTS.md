@@ -164,11 +164,10 @@ experiments against the same local package train.
 In CI the branch-protection check is the GitHub Actions context `full-pr`,
 shown in the pull request UI as `ci / full-pr`. It consumes current workflow
 npm package tarballs instead of public Zitadel packages and exercises the
-default npm-binary local runtime. The `changesets / status` workflow runs in
-parallel as fast release feedback, but is not a branch-protection requirement
-unless repository settings are updated. The Docker fallback journey runs in the
-`ci-docker-runtime` workflow on `main` and by manual dispatch. The checked-in
-demo integrations, raw binary embedded-postgres
+default npm-binary local runtime. Changesets PR comments are informational
+release-intent feedback and are not branch-protection requirements. The Docker
+fallback journey runs in the `ci-docker-runtime` workflow on `main` and by
+manual dispatch. The checked-in demo integrations, raw binary embedded-postgres
 smoke, and documented quick-start compose smoke remain release-surface
 confidence checks.
 
@@ -251,7 +250,8 @@ When a PR touches [publishable npm packages](.changeset/README.md#publishable-np
 selected `packages/*` paths), follow the
 [decision table](.changeset/README.md#decision-table) and workflow in
 [`.changeset/README.md`](.changeset/README.md). Verify locally with
-`moon run release:changesets -- --base origin/main --summary`.
+`corepack pnpm exec changeset status --since origin/main` when you need to
+inspect planned package bumps.
 
 The public packages are `@zitadel/cli`, `@zitadel/server`, the
 `@zitadel/server-*` platform packages, `@zitadel/api`, `@zitadel/components`,
