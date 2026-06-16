@@ -126,7 +126,7 @@ const VALID_FLOW = {
   user_schema:
     "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml",
   purposes: { login: "identifier" },
-  steps: [{ name: "identifier", fields: [], actions: {}, gates: {} }],
+  steps: [{ name: "identifier", fields: [], actions: [], gates: {} }],
 };
 
 describe("FlowDefinitionSyncer", () => {

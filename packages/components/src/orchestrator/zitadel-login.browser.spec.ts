@@ -27,19 +27,21 @@ const identifierStep: CreateFlow201 = {
   step: {
     name: "identifier",
     texts: { title_key: "identifier.title" },
-    fields: {
-      email: {
+    fields: [
+      {
+        name: "email",
         type: "email",
         text_key: "identifier.field.email",
         required: true,
       },
-      password: {
+      {
+        name: "password",
         type: "password",
         text_key: "identifier.field.password",
         required: true,
       },
-    },
-    actions: { submit: { text_key: "submit.signin", primary: true } },
+    ],
+    actions: [{ name: "submit", text_key: "submit.signin", primary: true }],
     gates: {},
   },
 };
@@ -51,11 +53,11 @@ const passkeyUpsellStep: CreateFlow201 = {
   step: {
     name: "passkey-upsell",
     texts: { title_key: "passkey-upsell.title" },
-    fields: {},
-    actions: {
-      setup: { text_key: "passkey-upsell.action.setup", primary: true },
-      skip: { text_key: "passkey-upsell.action.skip" },
-    },
+    fields: [],
+    actions: [
+      { name: "setup", text_key: "passkey-upsell.action.setup", primary: true },
+      { name: "skip", text_key: "passkey-upsell.action.skip" },
+    ],
     gates: {},
   },
 };
