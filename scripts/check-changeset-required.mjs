@@ -62,11 +62,11 @@ if (packageChanges.length > 0 && !hasChangeset) {
     "Run `corepack pnpm changeset` to describe the release (or write the",
   );
   console.error(
-    "`.changeset/<slug>.md` file directly, see AGENTS.md), then commit it.",
+    "`.changeset/<slug>.md` file directly, see .changeset/README.md), then commit it.",
   );
   console.error(
     "For publishable-path-only changes that ship nothing, use",
   );
-  console.error("`corepack pnpm changeset --empty` (rare). See AGENTS.md.");
+  console.error("`corepack pnpm changeset --empty` (rare). See .changeset/README.md.");
   process.exit(1);
 }

@@ -12,7 +12,8 @@
 
 ## Release notes / changeset
 
-<!-- State one outcome from the AGENTS.md changeset decision table:
+<!-- State one outcome from the .changeset/README.md decision table
+     (.changeset/README.md#decision-table):
      - No changeset required — no public npm package files changed.
      - Changeset: .changeset/<slug>.md — <summary>
      - Empty changeset (rare) — <why publishable paths changed but nothing ships> -->

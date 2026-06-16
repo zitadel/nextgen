@@ -24,9 +24,10 @@ more than polish.
 - Watch for secret leakage. Project, preview, token, and `.zitadel/secret` style
   values must not enter source control or browser-safe env metadata.
 - User-visible changes to a public npm package need a changeset; follow the
-  **Changesets** decision table in `AGENTS.md` (paths, when to skip, when to
-  add a real vs empty file). Author `.changeset/<slug>.md` directly rather than
-  via the interactive prompt. npm package manifests must keep `"license": "MIT"`.
+  [decision table in `.changeset/README.md`](.changeset/README.md#decision-table)
+  (paths, when to skip, when to add a real vs empty file). Author
+  `.changeset/<slug>.md` directly rather than via the interactive prompt. npm
+  package manifests must keep `"license": "MIT"`.
 - PR metadata must follow `AGENTS.md`: verify the title against
   `.github/semantic.yml`, prefer a scope-free title when unsure, and keep the
   PR description current with summary, validation, changeset, and notes.

@@ -1,26 +1,118 @@
 # Changesets
 
-This directory holds [changesets](https://github.com/changesets/changesets) for the npm-published packages in this monorepo. The **public** packages are:
+This directory holds [changesets](https://github.com/changesets/changesets) for
+the npm-published packages in this monorepo. For "do I need a changeset on this
+PR?", see [Publishable npm packages](#publishable-npm-packages) and the
+[Decision table](#decision-table).
 
-- `@zitadel/cli` (`apps/cli`)
-- `@zitadel/api` (`packages/api`)
-- `@zitadel/components` (`packages/components`)
-- `@zitadel/sdk-core` (`packages/sdk-core`)
-- `@zitadel/sdk-next` (`packages/sdk-next`)
-- `@zitadel/sdk-nuxt` (`packages/sdk-nuxt`)
-- `@zitadel/sdk-react` (`packages/sdk-react`)
-- `@zitadel/sdk-vue` (`packages/sdk-vue`)
-- `@zitadel/sdk-angular` (`packages/sdk-angular`)
+## PR workflow and CI gate
 
-Everything else (`@zitadel/api-mock`, `@zitadel/design-tokens`, `@zitadel/shared-component-styles`, `@zitadel/ui-react`, `@zitadel/lint`, the demos, the console) is marked `"private": true` and is never published.
+CI (`changeset-check` in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml))
+runs [`scripts/check-changeset-required.mjs`](../scripts/check-changeset-required.mjs).
+It fails only when the PR diff touches a **publishable package path** and no
+`.changeset/*.md` file was added.
 
-When you make a user-visible change to one of the public packages, run:
+Publishable paths are defined in
+[`scripts/check-changeset-required.mjs`](../scripts/check-changeset-required.mjs);
+update that script and this doc together.
+
+## Publishable npm packages
+
+**Publishable npm packages** are the nine public `@zitadel/*` packages that ship
+to npm. CI checks **repo paths** (must match the script's `publishableRoots`):
+
+- `apps/cli/` — `@zitadel/cli`
+- `packages/api/` — `@zitadel/api`
+- `packages/components/` — `@zitadel/components`
+- `packages/sdk-core/` — `@zitadel/sdk-core`
+- `packages/sdk-next/` — `@zitadel/sdk-next`
+- `packages/sdk-nuxt/` — `@zitadel/sdk-nuxt`
+- `packages/sdk-react/` — `@zitadel/sdk-react`
+- `packages/sdk-vue/` — `@zitadel/sdk-vue`
+- `packages/sdk-angular/` — `@zitadel/sdk-angular`
+
+`AGENTS.md` files under those roots are ignored by the gate and do not require a
+changeset on their own.
+
+Everything else — `internal/`, `docs/`, `.github/`, `apps/console/`,
+`packages/api-mock/`, demos, Go server paths, and other private workspaces — does
+**not** require any changeset file. Other workspaces such as
+`@zitadel/api-mock`, `@zitadel/design-tokens`, `@zitadel/shared-component-styles`,
+`@zitadel/ui-react`, and `@zitadel/lint` are marked `"private": true` and are
+never published.
+
+## User-visible changes
+
+**User-visible** means npm consumers would notice: exported APIs/types, CLI
+command surface or JSON contract, published component behavior, or install/setup
+docs shipped in the package. Internal refactors, tests-only edits, and
+contributor-only files are not user-visible unless they change what publishes.
+
+## Decision table
+
+Follow in order before opening a PR:
+
+| If the PR… | Add `.changeset/*.md`? | **Release notes / changeset** section |
+| --- | --- | --- |
+| Does **not** modify any publishable path above | **No** | `No changeset required — no public npm package files changed.` |
+| Modifies publishable paths **and** has user-visible npm impact | **Yes** — real changeset | Name the file and summarize the consumer-facing note |
+| Modifies publishable paths only for non-shipping reasons (e.g. package-internal test) | **Rare:** empty changeset to satisfy CI | Explain why the path changed but nothing ships |
+
+## How to add a changeset
+
+**Humans** can run the interactive prompt:
 
 ```sh
 corepack pnpm changeset
 ```
 
-Pick the affected packages, the bump type (patch / minor / major), and write a one-line summary. A markdown file appears in this directory and gets committed with your PR.
+Pick the affected packages, the bump type (patch / minor / major), and write a
+one-line summary. A markdown file appears in this directory and gets committed
+with your PR.
+
+**Agents and automation** should write the file directly — do not depend on the
+interactive prompt. Create `.changeset/<short-slug>.md`:
+
+```md
+---
+"@zitadel/cli": minor
+---
+
+One-line, user-facing summary of the change.
+```
+
+List only public package names (`@zitadel/cli`, `@zitadel/api`,
+`@zitadel/components`, `@zitadel/sdk-core`, `@zitadel/sdk-next`,
+`@zitadel/sdk-nuxt`, `@zitadel/sdk-react`, `@zitadel/sdk-vue`,
+`@zitadel/sdk-angular`). Pick `patch` (fixes), `minor` (features), or `major`
+(breaking). The repo is in `alpha` prerelease mode (`.changeset/pre.json`) and
+public packages are in one fixed group, so versions cut as one `X.Y.Z-alpha.N`
+train automatically — see [Alpha prerelease mode](#alpha-prerelease-mode).
+
+## Empty changeset
+
+**Empty changeset** (rare) — only when publishable paths changed but nothing
+should ship: `corepack pnpm changeset --empty`. Do **not** use this for
+Go-only, server-only, root `docs/`, CI-only, or other PRs that never touch the
+publishable paths above.
+
+## Anti-patterns
+
+- Do **not** add an empty changeset on PRs that only touch non-publishable
+  paths (for example `internal/`, `docs/`, `.github/`, storage migrations).
+- Do **not** skip a changeset when changing published CLI, SDK, or components
+  behavior under the publishable paths above.
+
+## Verify locally
+
+Before handoff:
+
+```sh
+node scripts/check-changeset-required.mjs --base origin/main
+```
+
+Exit `0` → no changeset file needed. Exit `1` → add a changeset (real or, rarely,
+empty).
 
 ## Alpha prerelease mode
 
