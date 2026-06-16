@@ -100,7 +100,7 @@ try {
 } finally {
   await cleanup();
   if (success && !options.keep) {
-    await rm(workDir, { recursive: true, force: true });
+    await removeWorkDirAfterSuccess(workDir);
   } else if (success) {
     log(`kept work dir: ${workDir}`);
   }
@@ -369,9 +369,11 @@ function startChild(command, args, optionsForChild) {
   const output = createWriteStream(optionsForChild.logFile, { flags: "a" });
   const child = spawn(command, args, {
     cwd: optionsForChild.cwd,
+    detached: process.platform !== "win32",
     env: optionsForChild.env,
     stdio: ["ignore", "pipe", "pipe"],
   });
+  child.detachedForCleanup = process.platform !== "win32";
   child.logFile = optionsForChild.logFile;
   child.stdout.pipe(output, { end: false });
   child.stderr.pipe(output, { end: false });
@@ -571,11 +573,25 @@ async function resetLocalRuntime(context) {
 
 async function stopChild(child) {
   if (child.exitCode !== null) return;
-  child.kill("SIGTERM");
+  signalChild(child, "SIGTERM");
   const exited = await waitForExit(child, 5000);
   if (!exited && child.exitCode === null) {
-    child.kill("SIGKILL");
+    signalChild(child, "SIGKILL");
     await waitForExit(child, 5000);
+  }
+}
+
+function signalChild(child, signal) {
+  try {
+    if (child.detachedForCleanup && child.pid) {
+      process.kill(-child.pid, signal);
+      return;
+    }
+    child.kill(signal);
+  } catch (error) {
+    if (!isErrno(error, "ESRCH")) {
+      throw error;
+    }
   }
 }
 
@@ -595,6 +611,14 @@ function waitForExit(child, timeoutMs) {
     };
     child.once("exit", onExit);
   });
+}
+
+async function removeWorkDirAfterSuccess(path) {
+  try {
+    await rm(path, { recursive: true, force: true, maxRetries: 10, retryDelay: 250 });
+  } catch (error) {
+    console.error(`[journey-local] cleanup left work dir ${path}: ${errorMessage(error)}`);
+  }
 }
 
 async function handleSignal(signal) {
@@ -625,4 +649,13 @@ function log(message) {
 
 function errorMessage(error) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function isErrno(error, code) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === code
+  );
 }
