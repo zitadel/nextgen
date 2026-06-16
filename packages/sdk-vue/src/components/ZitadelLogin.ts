@@ -1,5 +1,6 @@
 import type { ZitadelProject } from '@zitadel/api/config';
 import type {
+  CreateFlowBodyPurpose,
   ZitadelFlowCompleteDetail,
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,
@@ -31,7 +32,10 @@ export default defineComponent({
     project: { type: Object as PropType<ZitadelProject>, default: undefined },
     projectId: { type: String, default: undefined },
     proxyPath: { type: String, default: undefined },
-    purpose: { type: String, default: 'login' },
+    purpose: {
+      type: String as PropType<CreateFlowBodyPurpose>,
+      default: 'login',
+    },
     postSignInUrl: { type: String, default: undefined },
   },
   emits: ['flowStep', 'flowInput', 'flowComplete', 'flowError'],

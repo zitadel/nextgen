@@ -2,6 +2,9 @@
  * Re-exports shared SDK types from `@zitadel/sdk-core`.
  */
 export type {
+  ZitadelLoginProps,
+  ZitadelLogoutProps,
+  CreateFlowBodyPurpose,
   ZitadelFlowStepDetail,
   ZitadelFlowInputDetail,
   ZitadelFlowCompleteDetail,

@@ -1,4 +1,5 @@
 export type {
+  CreateFlowBodyPurpose,
   ZitadelFlowStepDetail,
   ZitadelFlowInputDetail,
   ZitadelFlowCompleteDetail,

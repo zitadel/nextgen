@@ -23,9 +23,8 @@ export default component$(() => {
 The widget's flow events are surfaced as optional QRL callbacks:
 `onFlowStep$`, `onFlowComplete$`, and `onFlowError$`.
 
-> Qwik binds lazily, so the SDK passes the project's `projectId`/`proxyPath` to
-> the element as attributes (read at upgrade) rather than as a late-bound
-> property.
+> The SDK binds `project` (and the discrete `projectId` / `proxyPath`) to the
+> element as DOM properties, the same as the other framework SDKs.
 
 ## Proxying to the backend (deployment)
 

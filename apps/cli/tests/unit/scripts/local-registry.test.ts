@@ -102,7 +102,7 @@ describe("local registry helper", () => {
     });
 
     expect(logs).toContain(
-      "building @zitadel/cli, @zitadel/api, @zitadel/components, @zitadel/sdk-core, @zitadel/sdk-next, @zitadel/sdk-nuxt, @zitadel/sdk-react, @zitadel/sdk-vue, @zitadel/sdk-angular",
+      "building @zitadel/cli, @zitadel/api, @zitadel/components, @zitadel/sdk-core, @zitadel/sdk-next, @zitadel/sdk-nuxt, @zitadel/sdk-react, @zitadel/sdk-vue, @zitadel/sdk-angular, @zitadel/sdk-solid, @zitadel/sdk-svelte, @zitadel/sdk-qwik",
     );
     expect(await readFile(paths.composeEnvPath, "utf8")).toContain(
       "JOURNEY_REGISTRY_PORT=51234",
@@ -122,7 +122,7 @@ describe("local registry helper", () => {
         "-t",
         "build",
         "-p",
-        "@zitadel/cli,@zitadel/api,@zitadel/components,@zitadel/sdk-core,@zitadel/sdk-next,@zitadel/sdk-nuxt,@zitadel/sdk-react,@zitadel/sdk-vue,@zitadel/sdk-angular",
+        "@zitadel/cli,@zitadel/api,@zitadel/components,@zitadel/sdk-core,@zitadel/sdk-next,@zitadel/sdk-nuxt,@zitadel/sdk-react,@zitadel/sdk-vue,@zitadel/sdk-angular,@zitadel/sdk-solid,@zitadel/sdk-svelte,@zitadel/sdk-qwik",
       ],
       options: { cwd: repoRoot, env },
     });

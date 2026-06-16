@@ -1,4 +1,5 @@
 import type {
+  CreateFlowBodyPurpose,
   ZitadelFlowCompleteDetail,
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,
@@ -54,7 +55,7 @@ export class ZitadelLoginComponent {
   @Input() project?: ZitadelProject;
   @Input() projectId?: string;
   @Input() proxyPath?: string;
-  @Input() purpose = 'login';
+  @Input() purpose: CreateFlowBodyPurpose = 'login';
   @Input() postSignInUrl?: string;
   @Output() flowStep = new EventEmitter<ZitadelFlowStepDetail>();
   @Output() flowInput = new EventEmitter<ZitadelFlowInputDetail>();

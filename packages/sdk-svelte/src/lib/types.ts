@@ -1,6 +1,7 @@
 export type {
   ZitadelLoginProps,
   ZitadelLogoutProps,
+  CreateFlowBodyPurpose,
   ZitadelFlowStepDetail,
   ZitadelFlowInputDetail,
   ZitadelFlowCompleteDetail,

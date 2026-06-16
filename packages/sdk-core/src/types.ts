@@ -4,6 +4,9 @@ import type {
   CreateFlowBodyPurpose,
 } from '@zitadel/api/generated/model';
 
+/** Re-exported so consumers can type the `purpose` prop without a deep import. */
+export type { CreateFlowBodyPurpose } from '@zitadel/api/generated/model';
+
 /**
  * Shared types for the Nextgen SDKs: the middleware layer (`sdk-next`,
  * `sdk-nuxt`) and the SPA widget events (`sdk-react`, `sdk-vue`, `sdk-solid`,
