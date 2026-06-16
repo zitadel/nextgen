@@ -16,22 +16,5 @@
     }
   },
   "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"],
-  "references": [
-    {
-      "path": "../../packages/api"
-    },
-    {
-      "path": "../../packages/sdk-next"
-    },
-    {
-      "path": "../../packages/shared-component-styles"
-    },
-    {
-      "path": "../../packages/design-tokens"
-    },
-    {
-      "path": "../../packages/components"
-    }
-  ]
+  "exclude": ["node_modules"]
 }

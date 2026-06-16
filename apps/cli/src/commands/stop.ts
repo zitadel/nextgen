@@ -1,3 +1,4 @@
+import { stopBinaryRuntime } from "../lib/local-server/binary";
 import { stopAndRemoveContainer } from "../lib/local-server/docker";
 import {
   DEFAULT_LOCAL_SERVER_URL,
@@ -20,14 +21,18 @@ export default class Stop extends BaseCommand {
       source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
     });
 
-    const containerName = runtime?.container_name ?? localContainerName(this.meta.cwd);
+    const containerName =
+      runtime?.backend === "docker" ? runtime.container_name : localContainerName(this.meta.cwd);
     if (this.meta.dryRun) {
       return this.emit({
         status: "ok",
         data: {
           title: "Local Zitadel server stop plan.",
           runtime: {
-            container_name: containerName,
+            backend: runtime?.backend ?? "missing",
+            ...(runtime?.backend === "binary"
+              ? { pid: runtime.pid, log_path: runtime.log_path }
+              : { container_name: containerName }),
             data_preserved: true,
             data_dir: runtime?.data_dir,
           },
@@ -36,14 +41,21 @@ export default class Stop extends BaseCommand {
       });
     }
 
-    await stopAndRemoveContainer(containerName);
+    if (runtime?.backend === "binary") {
+      await stopBinaryRuntime(runtime.pid);
+    } else {
+      await stopAndRemoveContainer(containerName);
+    }
 
     return this.emit({
       status: "ok",
       data: {
         title: "Local Zitadel server stopped.",
         runtime: {
-          container_name: containerName,
+          backend: runtime?.backend ?? "missing",
+          ...(runtime?.backend === "binary"
+            ? { pid: runtime.pid, log_path: runtime.log_path }
+            : { container_name: containerName }),
           data_preserved: true,
           data_dir: runtime?.data_dir,
         },

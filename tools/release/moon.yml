@@ -1,0 +1,67 @@
+id: "release"
+language: "javascript"
+layer: "tool"
+stack: "infrastructure"
+
+tasks:
+  changesets:
+    command: "node scripts/check-changesets-status.mjs"
+    options:
+      cache: false
+      runFromWorkspaceRoot: true
+      runInCI: true
+
+  version:
+    command: "node scripts/release.mjs version"
+    options:
+      runFromWorkspaceRoot: true
+      runInCI: false
+
+  pack:
+    command: "node scripts/release.mjs pack"
+    deps:
+      - "cli:build"
+      - "api:build"
+      - "components:build"
+      - "sdk-core:build"
+      - "sdk-next:build"
+      - "sdk-nuxt:build"
+      - "sdk-react:build"
+      - "sdk-vue:build"
+      - "sdk-angular:build"
+    outputs:
+      - "/dist/release/**/*"
+    options:
+      runFromWorkspaceRoot: true
+      runInCI: false
+
+  snapshot:
+    command: "node scripts/release.mjs snapshot"
+    deps:
+      - "server:test"
+      - "cli:build"
+      - "api:build"
+      - "components:build"
+      - "sdk-core:build"
+      - "sdk-next:build"
+      - "sdk-nuxt:build"
+      - "sdk-react:build"
+      - "sdk-vue:build"
+      - "sdk-angular:build"
+    outputs:
+      - "/dist/release/**/*"
+    options:
+      runFromWorkspaceRoot: true
+      runInCI: false
+
+  publish:
+    command: "node scripts/release.mjs publish"
+    options:
+      runFromWorkspaceRoot: true
+      runInCI: false
+
+  recover:
+    command: "node scripts/release.mjs recover"
+    options:
+      runFromWorkspaceRoot: true
+      runInCI: false

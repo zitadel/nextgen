@@ -63,6 +63,7 @@ opencode.json
 #Frontend
 ## compiled output
 dist
+apps/server-*/bin/
 tmp
 .tmp/
 out-tsc
@@ -82,9 +83,9 @@ vitest.config.*.timestamp*
 test-output
 coverage
 
-## nx
-.nx/cache
-.nx/workspace-data
+## moon
+.moon/cache
+.moon/docker
 
 ## Next.js / Nuxt build outputs
 .next/

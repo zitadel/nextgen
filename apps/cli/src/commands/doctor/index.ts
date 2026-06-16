@@ -2,6 +2,7 @@ import { Flags } from "@oclif/core";
 import consola from "consola";
 
 import { ZitadelError } from "../../lib/errors";
+import { assertServerPackageAvailable } from "../../lib/local-server/binary";
 import { dockerAvailable, imageAvailable } from "../../lib/local-server/docker";
 import {
   dockerRuntimeGuidance,
@@ -15,6 +16,7 @@ import {
   isPortAvailable,
   localServerUrl,
   readRuntimeMetadata,
+  type RuntimeBackend,
 } from "../../lib/local-server/runtime";
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import { createOrca } from "../../lib/orca";
@@ -22,7 +24,14 @@ import { hasZitadelConfig } from "../../lib/project";
 import { publicCliCommand } from "../../lib/public-cli";
 import { SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
 
-const LOCAL_RUNTIME_CHECK_NAMES = new Set(["docker-cli", "image", "state-dir", "port", "runtime"]);
+const LOCAL_RUNTIME_CHECK_NAMES = new Set([
+  "server-binary",
+  "docker-cli",
+  "image",
+  "state-dir",
+  "port",
+  "runtime",
+]);
 
 /**
  * `zitadel doctor` — verify generated files and local state.
@@ -43,6 +52,10 @@ export default class Doctor extends BaseCommand {
     fix: Flags.boolean({ description: "Re-apply missing managed files." }),
     image: Flags.string({ description: "Container image to check." }),
     port: Flags.integer({ description: "Local HTTP port.", default: DEFAULT_LOCAL_SERVER_PORT }),
+    runtime: Flags.string({
+      description: "Local runtime backend.",
+      options: ["binary", "docker"],
+    }),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -50,11 +63,18 @@ export default class Doctor extends BaseCommand {
     const port = flags.port ?? DEFAULT_LOCAL_SERVER_PORT;
     await this.toMeta(flags, { resolveServer: false, source: localServerUrl(port) });
     const { cwd, dryRun } = this.meta;
+    const existingRuntime = await readRuntimeMetadata(cwd);
+    const runtimeBackend = resolveRuntimeBackend({
+      runtime: flags.runtime,
+      image: flags.image,
+      envImage: this.meta.env.ZITADEL_LOCAL_IMAGE,
+      existingRuntime,
+    });
     const image =
       flags.image ??
       this.meta.env.ZITADEL_LOCAL_IMAGE ??
       defaultLocalServerImageForCliVersion(this.meta.cliVersion);
-    const runtimeChecks = await runLocalRuntimeChecks(cwd, image, port);
+    const runtimeChecks = await runLocalRuntimeChecks(cwd, runtimeBackend, image, port);
     const hasConfig = await hasZitadelConfig(cwd);
     const ctx: CheckContext = { cwd, orca: createOrca(), cliVersion: this.meta.cliVersion, dryRun };
 
@@ -87,7 +107,8 @@ export default class Doctor extends BaseCommand {
             ? "Zitadel doctor passed with warnings."
             : "Zitadel doctor passed.",
       ok: failed.length === 0,
-      image,
+      runtime: runtimeBackend,
+      ...(runtimeBackend === "docker" ? { image } : {}),
       port,
       project: {
         lifecycle: hasConfig ? "configured" : "not-configured",
@@ -125,6 +146,13 @@ function failureAdvice(
   cliVersion: string,
 ): { hint: string; nextCommands: string[] } {
   const failedNames = new Set(failed.map((check) => check.name));
+
+  if (failedNames.has("server-binary")) {
+    return {
+      hint: "The Zitadel server npm package is not available. Reinstall the CLI package, then retry.",
+      nextCommands: [publicCliCommand("doctor", cliVersion)],
+    };
+  }
 
   if (failedNames.has("docker-cli")) {
     const advice = dockerRuntimeGuidance("doctor", cliVersion);
@@ -193,10 +221,46 @@ function advisoryForWarnings(
 
 async function runLocalRuntimeChecks(
   cwd: string,
+  runtimeBackend: RuntimeBackend,
   image: string,
   port: number,
 ): Promise<CheckOutcome[]> {
   const runtime = await readRuntimeMetadata(cwd);
+  if (runtimeBackend === "binary") {
+    return [
+      await check("server-binary", "Server npm package is available", async () => {
+        const version = await assertServerPackageAvailable();
+        return `@zitadel/server ${version} is available`;
+      }),
+      await check(
+        "state-dir",
+        "Local state directory is writable",
+        async () => {
+          const probe = await assertLocalStateWritable(cwd);
+          return probe.checkedPath === probe.targetPath
+            ? `${probe.targetPath} is writable`
+            : `${probe.targetPath} can be created (${probe.checkedPath} is writable)`;
+        },
+        "warn",
+      ),
+      await check(
+        "port",
+        `Port ${String(port)} is available`,
+        async () => {
+          if (runtime && (await checkLocalServerHealth(runtime.server_url))) {
+            return `${runtime.server_url} is already healthy`;
+          }
+          if (!(await isPortAvailable(port))) {
+            throw new Error(`Port ${String(port)} is already in use`);
+          }
+          return `Port ${String(port)} is available`;
+        },
+        "warn",
+      ),
+      await checkRuntime(runtime, runtimeBackend),
+    ];
+  }
+
   const docker = await check(
     "docker-cli",
     "Docker is reachable",
@@ -266,16 +330,46 @@ async function runLocalRuntimeChecks(
       },
       "warn",
     ),
-    await check("runtime", "Existing local runtime is healthy", async () => {
-      if (!runtime) {
-        return "No existing runtime metadata";
-      }
-      if (!(await checkLocalServerHealth(runtime.server_url))) {
-        throw new Error(`${runtime.server_url} did not respond to /healthz`);
-      }
-      return `${runtime.server_url} is healthy`;
-    }),
+    await checkRuntime(runtime, runtimeBackend),
   ];
+}
+
+async function checkRuntime(
+  runtime: { backend: RuntimeBackend; server_url: string } | undefined,
+  runtimeBackend: RuntimeBackend,
+): Promise<CheckOutcome> {
+  return check("runtime", "Existing local runtime is healthy", async () => {
+    if (!runtime) {
+      return "No existing runtime metadata";
+    }
+    if (runtime.backend !== runtimeBackend) {
+      throw new Error(
+        `Existing local runtime uses ${runtime.backend}; run start --runtime ${runtimeBackend} to switch backends.`,
+      );
+    }
+    if (!(await checkLocalServerHealth(runtime.server_url))) {
+      throw new Error(`${runtime.server_url} did not respond to /healthz`);
+    }
+    return `${runtime.server_url} is healthy`;
+  });
+}
+
+function resolveRuntimeBackend(input: {
+  runtime: unknown;
+  image: string | undefined;
+  envImage: string | undefined;
+  existingRuntime: { backend: RuntimeBackend } | undefined;
+}): RuntimeBackend {
+  if (input.runtime === "binary" || input.runtime === "docker") {
+    return input.runtime;
+  }
+  if (input.existingRuntime) {
+    return input.existingRuntime.backend;
+  }
+  if (input.image || input.envImage) {
+    return "docker";
+  }
+  return "binary";
 }
 
 async function check(

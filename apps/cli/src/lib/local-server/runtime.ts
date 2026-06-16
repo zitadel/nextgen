@@ -14,16 +14,17 @@ export const DEFAULT_LOCAL_SERVER_URL = "http://localhost:8080";
 export const LOCAL_RUNTIME_DIR = ".zitadel/local";
 export const LOCAL_DATA_DIR = ".zitadel/local/nextgen-data";
 export const LOCAL_RUNTIME_FILE = ".zitadel/local/runtime.json";
+export const LOCAL_SERVER_LOG_FILE = ".zitadel/local/server.log";
 export const LOCAL_CONTAINER_PASSWD_FILE = ".zitadel/local/container-passwd";
 export const LOCAL_CONTAINER_GROUP_FILE = ".zitadel/local/container-group";
 export const CONTAINER_DATA_DIR = "/var/lib/zitadel/nextgen-data";
 export const CONTAINER_HTTP_PORT = 8080;
 
-export type RuntimeMetadata = {
+export type RuntimeBackend = "binary" | "docker";
+
+type RuntimeMetadataBase = {
   schema_version: 1;
-  container_name: string;
-  container_id: string;
-  image: string;
+  backend: RuntimeBackend;
   port: number;
   server_url: string;
   data_dir: string;
@@ -31,10 +32,29 @@ export type RuntimeMetadata = {
   cli_version: string;
 };
 
+export type BinaryRuntimeMetadata = RuntimeMetadataBase & {
+  backend: "binary";
+  pid: number;
+  command: string;
+  log_path: string;
+  server_package: string;
+  server_version: string;
+};
+
+export type DockerRuntimeMetadata = RuntimeMetadataBase & {
+  backend: "docker";
+  container_name: string;
+  container_id: string;
+  image: string;
+};
+
+export type RuntimeMetadata = BinaryRuntimeMetadata | DockerRuntimeMetadata;
+
 export type LocalRuntimePaths = {
   runtimeDir: string;
   dataDir: string;
   runtimeFile: string;
+  logFile: string;
   containerPasswdFile: string;
   containerGroupFile: string;
 };
@@ -56,6 +76,7 @@ export function localRuntimePaths(cwd: string): LocalRuntimePaths {
     runtimeDir: join(cwd, LOCAL_RUNTIME_DIR),
     dataDir: join(cwd, LOCAL_DATA_DIR),
     runtimeFile: join(cwd, LOCAL_RUNTIME_FILE),
+    logFile: join(cwd, LOCAL_SERVER_LOG_FILE),
     containerPasswdFile: join(cwd, LOCAL_CONTAINER_PASSWD_FILE),
     containerGroupFile: join(cwd, LOCAL_CONTAINER_GROUP_FILE),
   };
@@ -226,9 +247,6 @@ async function appendGitignoreEntry(cwd: string, entry: string): Promise<void> {
 function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetadata {
   if (
     input.schema_version !== 1 ||
-    typeof input.container_name !== "string" ||
-    typeof input.container_id !== "string" ||
-    typeof input.image !== "string" ||
     typeof input.port !== "number" ||
     !isValidPort(input.port) ||
     typeof input.server_url !== "string" ||
@@ -237,22 +255,56 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
     typeof input.created_at !== "string" ||
     typeof input.cli_version !== "string"
   ) {
-    throw new ZitadelError("E_VALIDATION", `${LOCAL_RUNTIME_FILE} is malformed`, {
-      hint: "Run `zitadel reset --force`, then `zitadel start`.",
-      nextCommands: ["zitadel reset --force", "zitadel start"],
-      details: input,
-    });
+    throw malformedRuntime(input);
   }
-  return {
-    schema_version: 1,
-    container_name: input.container_name,
-    container_id: input.container_id,
-    image: input.image,
+
+  const backend = input.backend === undefined ? "docker" : input.backend;
+  const base = {
+    schema_version: 1 as const,
     port: input.port,
     server_url: input.server_url,
     data_dir: input.data_dir,
     created_at: input.created_at,
     cli_version: input.cli_version,
+  };
+
+  if (backend === "binary") {
+    if (
+      typeof input.pid !== "number" ||
+      !Number.isInteger(input.pid) ||
+      input.pid <= 0 ||
+      typeof input.command !== "string" ||
+      typeof input.log_path !== "string" ||
+      typeof input.server_package !== "string" ||
+      typeof input.server_version !== "string"
+    ) {
+      throw malformedRuntime(input);
+    }
+    return {
+      ...base,
+      backend: "binary",
+      pid: input.pid,
+      command: input.command,
+      log_path: input.log_path,
+      server_package: input.server_package,
+      server_version: input.server_version,
+    };
+  }
+
+  if (
+    backend !== "docker" ||
+    typeof input.container_name !== "string" ||
+    typeof input.container_id !== "string" ||
+    typeof input.image !== "string"
+  ) {
+    throw malformedRuntime(input);
+  }
+  return {
+    ...base,
+    backend: "docker",
+    container_name: input.container_name,
+    container_id: input.container_id,
+    image: input.image,
   };
 }
 
@@ -296,15 +348,29 @@ export function runtimeSummary(metadata: RuntimeMetadata | undefined): Record<st
   if (!metadata) {
     return { configured: false };
   }
-  return {
+  const base = {
     configured: true,
-    container_name: metadata.container_name,
-    container_id: metadata.container_id,
-    image: metadata.image,
+    backend: metadata.backend,
     port: metadata.port,
     server_url: metadata.server_url,
     data_dir: metadata.data_dir,
     created_at: metadata.created_at,
+  };
+  if (metadata.backend === "binary") {
+    return {
+      ...base,
+      pid: metadata.pid,
+      command: metadata.command,
+      log_path: metadata.log_path,
+      server_package: metadata.server_package,
+      server_version: metadata.server_version,
+    };
+  }
+  return {
+    ...base,
+    container_name: metadata.container_name,
+    container_id: metadata.container_id,
+    image: metadata.image,
   };
 }
 
@@ -336,4 +402,12 @@ function explicitUrlPort(value: string): number | undefined {
   }
   const port = Number(match[1]);
   return isValidPort(port) ? port : undefined;
+}
+
+function malformedRuntime(input: Record<string, unknown>): ZitadelError {
+  return new ZitadelError("E_VALIDATION", `${LOCAL_RUNTIME_FILE} is malformed`, {
+    hint: "Run `zitadel reset --force`, then `zitadel start`.",
+    nextCommands: ["zitadel reset --force", "zitadel start"],
+    details: input,
+  });
 }

@@ -40,18 +40,16 @@ belong in this project.
 
 ```sh
 corepack pnpm exec playwright install        # one-time, browsers
-corepack pnpm exec nx run @zitadel/demo-nuxt-e2e:e2e
+moon run demo-nuxt-e2e:e2e
 ```
 
-Nx rebuilds `@zitadel/components` first via `^build`, then
+Moon rebuilds `@zitadel/components` first through task dependencies, then
 Playwright boots `api-mock` (`:4001`) and `demo-nuxt` (`:3001`) through
-direct `pnpm --filter` commands. Using `nx run …` inside
-`webServer.command` makes `@nx/playwright/plugin` treat the dev servers
-as required deps and hangs the run — keep the direct invocations.
+direct `pnpm --filter` commands.
 
 The api-mock listens on `:4001` here (not the default `:4000`) so this
 project can run in parallel with `apps/demo-next-e2e/` under
-`nx run-many -t e2e` without `EADDRINUSE`. The `PORT` override is
+`moon run demo-next-e2e:e2e demo-nuxt-e2e:e2e` without `EADDRINUSE`. The `PORT` override is
 plumbed through via Playwright's `webServer.env` and matched by the
 `ZITADEL_URL` passed to the Nuxt dev server. Both knobs are
 existing env contracts — no application code changes.

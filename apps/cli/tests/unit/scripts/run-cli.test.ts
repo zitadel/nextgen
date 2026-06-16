@@ -70,8 +70,20 @@ describe("run-cli wrapper", () => {
     expect(runCli.commandName(["--", "status"])).toBe("status");
   });
 
-  it("auto-builds a local runtime image only for start without image overrides", () => {
-    expect(runCli.shouldAutoBuildLocalRuntimeImage(["start"], {})).toBe(true);
+  it("auto-builds a local runtime image only for explicit Docker start without image overrides", () => {
+    expect(runCli.shouldAutoBuildLocalRuntimeImage(["start"], {})).toBe(false);
+    expect(runCli.shouldAutoBuildLocalRuntimeImage(["start", "--runtime", "binary"], {})).toBe(
+      false,
+    );
+    expect(runCli.shouldAutoBuildLocalRuntimeImage(["start", "--runtime=binary"], {})).toBe(
+      false,
+    );
+    expect(runCli.shouldAutoBuildLocalRuntimeImage(["start", "--runtime", "docker"], {})).toBe(
+      true,
+    );
+    expect(runCli.shouldAutoBuildLocalRuntimeImage(["start", "--runtime=docker"], {})).toBe(
+      true,
+    );
     expect(runCli.shouldAutoBuildLocalRuntimeImage(["start", "--help"], {})).toBe(false);
     expect(runCli.shouldAutoBuildLocalRuntimeImage(["start", "-h"], {})).toBe(false);
     expect(runCli.shouldAutoBuildLocalRuntimeImage(["--version"], {})).toBe(false);
@@ -112,7 +124,7 @@ describe("run-cli wrapper", () => {
     ).toBe(false);
   });
 
-  it("builds and injects the local image for start without an override", async () => {
+  it("does not build a local image for the default binary start runtime", async () => {
     const calls: string[] = [];
     const env = { PATH: "/bin" };
     let runEnv: Record<string, string | undefined> | undefined;
@@ -132,6 +144,39 @@ describe("run-cli wrapper", () => {
         expect(command).toBe(process.execPath);
         expect(args[0]).toMatch(/apps\/cli\/bin\/run\.js$/);
         expect(args.slice(1)).toEqual(["start"]);
+        expect(options.cwd).toBe(process.cwd());
+        runEnv = options.env;
+      },
+    });
+
+    expect(calls).toEqual(["build-cli", "run-cli"]);
+    expect(runEnv).toMatchObject({
+      PATH: "/bin",
+    });
+    expect(runEnv).not.toHaveProperty("ZITADEL_LOCAL_IMAGE");
+    expect(env).not.toHaveProperty("ZITADEL_LOCAL_IMAGE");
+  });
+
+  it("builds and injects the local image for explicit Docker start without an override", async () => {
+    const calls: string[] = [];
+    const env = { PATH: "/bin" };
+    let runEnv: Record<string, string | undefined> | undefined;
+
+    await runCli.main({
+      args: ["start", "--runtime", "docker"],
+      env,
+      buildCli: async () => {
+        calls.push("build-cli");
+      },
+      buildLocalRuntimeImage: async (options) => {
+        calls.push("build-image");
+        expect(options.env).toBe(env);
+      },
+      run: async (command, args, options) => {
+        calls.push("run-cli");
+        expect(command).toBe(process.execPath);
+        expect(args[0]).toMatch(/apps\/cli\/bin\/run\.js$/);
+        expect(args.slice(1)).toEqual(["start", "--runtime", "docker"]);
         expect(options.cwd).toBe(process.cwd());
         runEnv = options.env;
       },
@@ -219,8 +264,9 @@ describe("run-cli wrapper", () => {
     const prepareLocalRegistry = vi.fn(async (options: Record<string, unknown>) => {
       expect(options.registryUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
       expect(options.workDir).toMatch(/tmp\/cli-local-registry$/);
-      expect(options.compose).toMatchObject({
-        projectName: expect.stringMatching(/^zitadel-local-packages-[a-f0-9]{12}$/),
+      expect(options.paths).toMatchObject({
+        npmrcPath: expect.stringContaining("tmp/cli-local-registry/verdaccio.npmrc"),
+        registryLogPath: expect.stringContaining("tmp/cli-local-registry/verdaccio/verdaccio.log"),
       });
       return {
         env: {

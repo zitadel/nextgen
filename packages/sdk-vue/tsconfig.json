@@ -10,16 +10,5 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.spec.ts", "src/**/__tests__/**"],
-  "references": [
-    {
-      "path": "../sdk-core"
-    },
-    {
-      "path": "../components"
-    },
-    {
-      "path": "../api"
-    }
-  ]
+  "exclude": ["src/**/*.spec.ts", "src/**/__tests__/**"]
 }
