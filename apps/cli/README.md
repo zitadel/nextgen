@@ -15,8 +15,8 @@ automation when reproducibility matters.
 
 ## Requirements
 
-- Node 20+
-- Docker for the managed local Zitadel runtime
+- Node 24+
+- Docker for the managed local Zitadel runtime (`start` / `--server local`)
 - A Next.js project, or an empty directory where setup can scaffold one
 
 ## Quickstart
@@ -31,7 +31,9 @@ npm run dev
 ```
 
 `start` runs a Docker-backed local Zitadel server and stores runtime data
-under `.zitadel/local/`. Alpha CLI versions use the matching
+under `.zitadel/local/`. If Docker is not running, start Docker Desktop, Docker
+Engine, or Colima and rerun `doctor`; remote-server setup can use
+`--server <url>` without Docker. Alpha CLI versions use the matching
 `ghcr.io/zitadel/nextgen:<cli-version>` image by default; local/dev builds fall
 back to `ghcr.io/zitadel/nextgen:latest`. Override with `--image` or
 `ZITADEL_LOCAL_IMAGE` for advanced debugging.
