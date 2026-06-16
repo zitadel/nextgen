@@ -43,6 +43,4 @@ The flow definition is validated structurally (e.g., dead steps, cyclic graphs) 
 
 **Behavioral Simulation:** 
 The `POST /flows` endpoint (with a `simulate` option) allows developers to execute a flow definition.
-
-## Open Questions
-1. Currently, when the flow resolver resolves a flow definition based on purpose, it returns the latest one based on `created_at`. Should we consider `updated_at` instead?
+This is useful for testing and debugging flow definitions before they are resolved for live use.
