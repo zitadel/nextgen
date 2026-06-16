@@ -29,7 +29,7 @@
   },
   "scripts": {
     "build": "vite build && ngc -p tsconfig.lib.json",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "lint": "eslint ."
   },
@@ -44,27 +44,29 @@
     "@angular/core": ">=17"
   },
   "devDependencies": {
-    "@eslint/js": "^9.0.0",
-    "eslint": "^9.0.0",
     "@analogjs/vite-plugin-angular": "^2.6.1",
+    "@analogjs/vitest-angular": "catalog:",
     "@angular/build": "^22.0.0",
     "@angular/common": "^22.0.0",
     "@angular/compiler": "^22.0.0",
     "@angular/compiler-cli": "^22.0.0",
     "@angular/core": "^22.0.0",
-    "typescript": "~6.0.0",
-    "jsdom": "catalog:",
-    "vite": "^7.3.5",
-    "vitest": "^3.0.0",
-    "zone.js": "~0.16.0",
+    "@angular/platform-browser": "catalog:",
+    "@eslint/js": "^9.0.0",
     "@eslint/json": "^0.11.0",
     "@eslint/markdown": "^6.0.0",
+    "eslint": "^9.0.0",
     "eslint-config-prettier": "^10.0.0",
     "eslint-import-resolver-typescript": "^3.7.0",
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-perfectionist": "^4.0.0",
     "eslint-plugin-prettier": "^5.0.0",
+    "jsdom": "catalog:",
     "prettier": "^3.0.0",
-    "typescript-eslint": "^8.0.0"
+    "typescript": "~6.0.0",
+    "typescript-eslint": "^8.0.0",
+    "vite": "^7.3.5",
+    "vitest": "^3.0.0",
+    "zone.js": "~0.16.0"
   }
 }

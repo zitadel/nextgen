@@ -4,6 +4,8 @@ packages:
   - "packages/*"
 
 catalog:
+  '@analogjs/vitest-angular': ^2.6.1
+  '@angular/platform-browser': ^22.0.1
   "@clack/prompts": ^1.2.0
   "@faker-js/faker": ^10.4.0
   "@mswjs/http-middleware": ^0.10.3
