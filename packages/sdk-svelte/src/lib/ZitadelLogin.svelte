@@ -28,19 +28,8 @@
     if (!el) {
       return;
     }
-    const target = el as unknown as {
-      project?: ZitadelProject;
-      projectId?: string;
-      proxyPath?: string;
-    };
     if (project !== undefined) {
-      target.project = project;
-    }
-    if (projectId !== undefined) {
-      target.projectId = projectId;
-    }
-    if (proxyPath !== undefined) {
-      target.proxyPath = proxyPath;
+      (el as unknown as { project?: ZitadelProject }).project = project;
     }
   });
 
@@ -69,4 +58,10 @@
   });
 </script>
 
-<zitadel-login bind:this={el} {purpose} post-sign-in-url={postSignInUrl}></zitadel-login>
+<zitadel-login
+  bind:this={el}
+  {purpose}
+  project-id={projectId}
+  proxy-path={proxyPath}
+  post-sign-in-url={postSignInUrl}
+></zitadel-login>

@@ -20,7 +20,7 @@ Svelte 5 components for the Zitadel auth UI, for client-side SPAs (Vite, etc.).
 `<ZitadelLogout {project} postSignOutUrl="/login" />` works the same way.
 
 The widget's flow events are also surfaced as optional callbacks:
-`onFlowStep`, `onFlowComplete`, and `onFlowError`.
+`onFlowStep`, `onFlowInput`, `onFlowComplete`, and `onFlowError`.
 
 ## Proxying to the backend (deployment)
 

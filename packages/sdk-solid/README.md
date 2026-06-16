@@ -20,7 +20,7 @@ export default function LoginPage() {
 `<ZitadelLogout project={project} postSignOutUrl="/login" />` works the same way.
 
 The widget's flow events are also surfaced as optional callbacks:
-`onFlowStep`, `onFlowComplete`, and `onFlowError`.
+`onFlowStep`, `onFlowInput`, `onFlowComplete`, and `onFlowError`.
 
 ## Proxying to the backend (deployment)
 

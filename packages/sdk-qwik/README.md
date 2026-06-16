@@ -21,7 +21,7 @@ export default component$(() => {
 `<ZitadelLogout project={project} postSignOutUrl="/login" />` works the same way.
 
 The widget's flow events are surfaced as optional QRL callbacks:
-`onFlowStep$`, `onFlowComplete$`, and `onFlowError$`.
+`onFlowStep$`, `onFlowInput$`, `onFlowComplete$`, and `onFlowError$`.
 
 > The SDK binds `project` (and the discrete `projectId` / `proxyPath`) to the
 > element as DOM properties, the same as the other framework SDKs.

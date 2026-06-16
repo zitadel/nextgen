@@ -1,6 +1,7 @@
 import type { ZitadelProject } from '@zitadel/api/config';
 import type {
   CreateFlow201Step,
+  CreateFlow201StepComplete,
   CreateFlowBodyPurpose,
 } from '@zitadel/api/generated/model';
 
@@ -27,7 +28,7 @@ export interface ZitadelFlowInputDetail {
 
 /** Payload of the `zitadel-flow-complete` event. */
 export interface ZitadelFlowCompleteDetail {
-  readonly behavior: unknown;
+  readonly behavior: CreateFlow201StepComplete;
   readonly redirect_uri?: string;
   readonly handoff_token?: string;
   readonly handoff_token_expires_at?: string;
