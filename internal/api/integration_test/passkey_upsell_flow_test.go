@@ -131,6 +131,7 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	challenge := issueOK.Response.Step.Challenge.Value
 	challengeID, challengeIDSet := challenge.ChallengeID.Get()
 	require.True(t, challengeIDSet)
+	require.True(t, challenge.Options.Set, "expected creation options on passkey_register issue")
 
 	creationOptionsJSON, err := json.Marshal(challenge.Options.Value)
 	require.NoError(t, err)
@@ -194,7 +195,8 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 		Purpose:   api.CreateFlowRequestPurposeRegister,
 	})
 	require.NoError(t, err)
-	flowHeaders := createResp.(*api.FlowResponseHeaders)
+	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
+	require.True(t, ok, "expected FlowResponseHeaders, got %T: %+v", createResp, createResp)
 	flowID := flowHeaders.Response.ID
 	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
 
@@ -211,7 +213,9 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 		}),
 	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
 	require.NoError(t, err)
-	zflow = mustExtractZflow(t, regResp.(*api.SubmitFlowStepOK).SetCookie.Value)
+	regOK, ok := regResp.(*api.SubmitFlowStepOK)
+	require.True(t, ok, "expected SubmitFlowStepOK after register, got %T: %+v", regResp, regResp)
+	zflow = mustExtractZflow(t, regOK.SetCookie.Value)
 
 	pwResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "submit",
@@ -220,7 +224,8 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 		}),
 	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
 	require.NoError(t, err)
-	pwOK := pwResp.(*api.SubmitFlowStepOK)
+	pwOK, ok := pwResp.(*api.SubmitFlowStepOK)
+	require.True(t, ok, "expected SubmitFlowStepOK after register-password, got %T: %+v", pwResp, pwResp)
 	require.Equal(t, "passkey-upsell", pwOK.Response.Step.Name)
 	zflow = mustExtractZflow(t, pwOK.SetCookie.Value)
 
