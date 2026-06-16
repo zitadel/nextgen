@@ -2,6 +2,7 @@
 import { execFile as execFileCallback } from "node:child_process";
 import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
 
 const execFile = promisify(execFileCallback);
@@ -33,6 +34,8 @@ export const PUBLIC_PACKAGE_NAMES = [
 export const SERVER_IMAGE_NAME = "ghcr.io/zitadel/nextgen";
 
 const ALPHA_VERSION_RE = /^\d+\.\d+\.\d+-alpha\.\d+$/;
+const DEFAULT_NPM_TRAIN_LOOKUP_ATTEMPTS_AFTER_PUBLISH = 12;
+const DEFAULT_NPM_TRAIN_LOOKUP_DELAY_MS = 10_000;
 
 export async function prepareAlphaReleaseTrain(options = {}) {
   const cwd = options.cwd ?? process.cwd();
@@ -84,6 +87,7 @@ export async function inspectAlphaReleaseTrain(options = {}) {
   const readdirFn = options.readdir ?? readdir;
   const execFileFn = options.execFile ?? execFile;
   const publishedWasSpecified = options.published !== undefined;
+  const published = publishedWasSpecified ? normalizeBoolean(options.published) : undefined;
   const remote = options.remote === undefined ? true : normalizeBoolean(options.remote);
 
   const packages = await readPublicPackageManifests(cwd, readFileFn);
@@ -136,10 +140,26 @@ export async function inspectAlphaReleaseTrain(options = {}) {
   }
 
   const shouldVerifyNpmTrain = publishedWasSpecified;
-  const npmTrainExists = shouldVerifyNpmTrain
-    ? await publicNpmPackageTrainExists(packages, execFileFn, cwd)
+  const npmTrain = shouldVerifyNpmTrain
+    ? await publicNpmPackageTrainStatus(packages, execFileFn, cwd, {
+        attempts:
+          published === true
+            ? (options.npmLookupAttempts ?? DEFAULT_NPM_TRAIN_LOOKUP_ATTEMPTS_AFTER_PUBLISH)
+            : 1,
+        delayMs: options.npmLookupDelayMs ?? DEFAULT_NPM_TRAIN_LOOKUP_DELAY_MS,
+        sleep: options.sleep ?? sleep,
+      })
     : undefined;
+  const npmTrainExists = npmTrain?.exists;
   if (shouldVerifyNpmTrain && !npmTrainExists) {
+    if (published === true) {
+      throw new Error(
+        `npm train ${version} did not become visible after ${npmTrain.attempts} ${pluralize(
+          "attempt",
+          npmTrain.attempts,
+        )}: missing ${npmTrain.missing.join(", ")}`,
+      );
+    }
     return {
       version,
       tagName,
@@ -437,13 +457,31 @@ async function containerImageExists(image, execFileFn = execFile, cwd = process.
   }
 }
 
-async function publicNpmPackageTrainExists(packages, execFileFn = execFile, cwd = process.cwd()) {
-  for (const pkg of packages) {
-    if (!(await npmPackageVersionExists(pkg.name, pkg.version, execFileFn, cwd))) {
-      return false;
+async function publicNpmPackageTrainStatus(
+  packages,
+  execFileFn = execFile,
+  cwd = process.cwd(),
+  options = {},
+) {
+  const attempts = positiveInteger(options.attempts ?? 1);
+  const delayMs = nonNegativeInteger(options.delayMs ?? 0);
+  const sleepFn = typeof options.sleep === "function" ? options.sleep : sleep;
+  let missing = [];
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    missing = [];
+    for (const pkg of packages) {
+      if (!(await npmPackageVersionExists(pkg.name, pkg.version, execFileFn, cwd))) {
+        missing.push(`${pkg.name}@${pkg.version}`);
+      }
+    }
+    if (missing.length === 0) {
+      return { exists: true, attempts: attempt, missing: [] };
+    }
+    if (attempt < attempts && delayMs > 0) {
+      await sleepFn(delayMs);
     }
   }
-  return true;
+  return { exists: false, attempts, missing };
 }
 
 async function npmPackageVersionExists(name, version, execFileFn = execFile, cwd = process.cwd()) {
@@ -474,6 +512,26 @@ async function gitOutput(execFileFn, cwd, args) {
 
 function normalizeBoolean(value) {
   return value === true || value === "true";
+}
+
+function positiveInteger(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 1) {
+    return 1;
+  }
+  return Math.floor(number);
+}
+
+function nonNegativeInteger(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) {
+    return 0;
+  }
+  return Math.floor(number);
+}
+
+function pluralize(word, count) {
+  return count === 1 ? word : `${word}s`;
 }
 
 function isMissingPath(error) {
