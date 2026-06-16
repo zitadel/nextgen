@@ -19,8 +19,26 @@ import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helper
 const tempDirs: string[] = [];
 const servers: Server[] = [];
 const binaryPids: number[] = [];
+const dockerHealthPidLogs: string[] = [];
 
 afterEach(async () => {
+  for (const logPath of dockerHealthPidLogs.splice(0)) {
+    try {
+      const pids = (await readFile(logPath, "utf8"))
+        .split(/\r?\n/)
+        .map((line) => Number.parseInt(line, 10))
+        .filter((pid) => Number.isInteger(pid) && pid > 0);
+      for (const pid of pids) {
+        try {
+          process.kill(pid, "SIGKILL");
+        } catch {
+          // Already stopped.
+        }
+      }
+    } catch {
+      // No fake Docker health process was started.
+    }
+  }
   for (const pid of binaryPids.splice(0)) {
     try {
       process.kill(pid, "SIGKILL");
@@ -215,6 +233,66 @@ describe("local runtime commands", () => {
     });
   });
 
+  it("doctor fails with E_PORT_IN_USE when the requested local port is occupied", async () => {
+    const cwd = await tempProject("zitadel-doctor-port-conflict-");
+    const fake = await fakeServerBinary();
+    const serverUrl = await startHealthServer();
+    const port = Number(new URL(serverUrl).port);
+
+    const result = await runCliForTest(["doctor", "--cwd", cwd, "--json", "--port", String(port)], {
+      ZITADEL_SERVER_BINARY: fake.binPath,
+    });
+
+    expect(result.exitCode).toBe(5);
+    const envelope = parseJson(result.stdout) as {
+      code: string;
+      details: { checks: Array<{ name: string; status: string; message: string }> };
+      status: string;
+    };
+    expect(envelope.status).toBe("error");
+    expect(envelope.code).toBe("E_PORT_IN_USE");
+    expect(envelope.details.checks.find((check) => check.name === "port")).toMatchObject({
+      status: "fail",
+    });
+  });
+
+  it("doctor warns about other host-wide managed runtime processes and suggests stop --all", async () => {
+    const cwd = await tempProject("zitadel-doctor-orphan-");
+    const fake = await fakeServerBinary();
+    const fakePs = await fakeProcessTable([
+      {
+        pid: 999_991,
+        ppid: 1,
+        command: "/usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
+      },
+      { pid: 999_992, ppid: 1, command: "/usr/local/bin/node /tmp/not-zitadel.js" },
+    ]);
+    const port = await freePort();
+
+    const result = await runCliForTest(["doctor", "--cwd", cwd, "--json", "--port", String(port)], {
+      PATH: `${fakePs.binDir}:${process.env.PATH ?? ""}`,
+      ZITADEL_SERVER_BINARY: fake.binPath,
+    });
+
+    expect(result.exitCode).toBe(0);
+    const envelope = parseJson(result.stdout) as {
+      data: {
+        checks: Array<{ details?: { scope?: string }; message: string; name: string; status: string }>;
+        next_commands?: string[];
+      };
+      warnings: string[];
+    };
+    expect(envelope.warnings.join("\n")).toContain("managed-runtime-processes");
+    expect(envelope.data.next_commands).toContain(expectedPublicCliCommand("stop --all"));
+    expect(
+      envelope.data.checks.find((check) => check.name === "managed-runtime-processes"),
+    ).toMatchObject({
+      status: "warn",
+      message: expect.stringContaining("other host-wide managed local runtime"),
+      details: { scope: "host" },
+    });
+  });
+
   it("start fails before image work when Docker is unreachable", async () => {
     const cwd = await tempProject("zitadel-start-docker-fail-");
     const fake = await fakeDocker({ dockerAvailable: false });
@@ -301,11 +379,51 @@ describe("local runtime commands", () => {
     expect(stop.exitCode).toBe(0);
   });
 
+  it("start fails with E_PORT_IN_USE when a foreign listener owns the requested port", async () => {
+    const cwd = await tempProject("zitadel-start-port-conflict-");
+    const fake = await fakeServerBinary();
+    const serverUrl = await startHealthServer();
+    const port = Number(new URL(serverUrl).port);
+
+    const result = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
+      ZITADEL_SERVER_BINARY: fake.binPath,
+    });
+
+    expect(result.exitCode).toBe(5);
+    const envelope = parseJson(result.stdout) as {
+      code: string;
+      details: { listeners: unknown[]; port: number };
+      next_commands?: string[];
+      status: string;
+    };
+    expect(envelope.status).toBe("error");
+    expect(envelope.code).toBe("E_PORT_IN_USE");
+    expect(envelope.details.port).toBe(port);
+    expect(envelope.details.listeners.length).toBeGreaterThan(0);
+    expect(envelope.next_commands).toContain(expectedPublicCliCommand("stop --all"));
+  });
+
+  it("start fails if its spawned binary exits even when another health server appears", async () => {
+    const cwd = await tempProject("zitadel-start-dead-pid-");
+    const fake = await fakeExitingServerWithForeignHealth();
+    const port = await freePort();
+
+    const result = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
+      ZITADEL_SERVER_BINARY: fake.binPath,
+    });
+
+    expect(result.exitCode).toBe(4);
+    const envelope = parseJson(result.stdout) as { code: string; message: string; status: string };
+    expect(envelope.status).toBe("error");
+    expect(envelope.code).toBe("E_NETWORK");
+    expect(envelope.message).toContain("process exited before becoming healthy");
+  });
+
   it("start --json starts the single-container runtime and writes metadata", async () => {
     const cwd = await tempProject("zitadel-start-");
     const fake = await fakeDocker();
-    const serverUrl = await startHealthServer();
-    const port = Number(new URL(serverUrl).port);
+    const port = await freePort();
+    const serverUrl = `http://localhost:${String(port)}`;
 
     const result = await runCliForTest(
       ["start", "--cwd", cwd, "--json", "--runtime", "docker", "--port", String(port)],
@@ -344,8 +462,7 @@ describe("local runtime commands", () => {
   it("start uses a prebuilt local image without pulling it", async () => {
     const cwd = await tempProject("zitadel-start-local-image-");
     const fake = await fakeDocker({ imageExists: true });
-    const serverUrl = await startHealthServer();
-    const port = Number(new URL(serverUrl).port);
+    const port = await freePort();
 
     const result = await runCliForTest(
       ["start", "--cwd", cwd, "--json", "--port", String(port), "--image", "zitadel-nextgen:test"],
@@ -365,8 +482,7 @@ describe("local runtime commands", () => {
   it("start uses ZITADEL_LOCAL_IMAGE before the derived alpha image", async () => {
     const cwd = await tempProject("zitadel-start-env-image-");
     const fake = await fakeDocker({ imageExists: true });
-    const serverUrl = await startHealthServer();
-    const port = Number(new URL(serverUrl).port);
+    const port = await freePort();
 
     const result = await runCliForTest(
       ["start", "--cwd", cwd, "--json", "--runtime", "docker", "--port", String(port)],
@@ -385,8 +501,7 @@ describe("local runtime commands", () => {
   it("start --image overrides ZITADEL_LOCAL_IMAGE", async () => {
     const cwd = await tempProject("zitadel-start-replace-image-");
     const fake = await fakeDocker({ imageExists: true });
-    const serverUrl = await startHealthServer();
-    const port = Number(new URL(serverUrl).port);
+    const port = await freePort();
 
     const result = await runCliForTest(
       [
@@ -414,8 +529,7 @@ describe("local runtime commands", () => {
   it("start replaces an existing container from another image", async () => {
     const cwd = await tempProject("zitadel-start-replace-image-");
     const fake = await fakeDocker({ existingContainerImage: "ghcr.io/zitadel/nextgen:old" });
-    const serverUrl = await startHealthServer();
-    const port = Number(new URL(serverUrl).port);
+    const port = await freePort();
 
     const result = await runCliForTest(
       ["start", "--cwd", cwd, "--json", "--runtime", "docker", "--port", String(port)],
@@ -525,6 +639,43 @@ describe("local runtime commands", () => {
     expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("stop")]);
   });
 
+  it("stop --all reports only discovered CLI-managed runtime candidates", async () => {
+    const cwd = await tempProject("zitadel-stop-all-");
+    const fakePs = await fakeProcessTable([
+      {
+        pid: 999_981,
+        ppid: 1,
+        command: "/usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
+      },
+      { pid: 999_982, ppid: 1, command: "/usr/local/bin/node /tmp/unrelated.js" },
+    ]);
+
+    const result = await runCliForTest(["stop", "--cwd", cwd, "--json", "--all"], {
+      PATH: `${fakePs.binDir}:${process.env.PATH ?? ""}`,
+    });
+
+    expect(result.exitCode).toBe(0);
+    const envelope = parseJson(result.stdout) as {
+      data: {
+        sweep: {
+          count: number;
+          results: Array<{ process: { pid: number }; stop_result: { status: string } }>;
+          scope: string;
+        };
+      };
+      status: string;
+    };
+    expect(envelope.status).toBe("ok");
+    expect(envelope.data.sweep.scope).toBe("host");
+    expect(envelope.data.sweep.count).toBe(1);
+    expect(envelope.data.sweep.results).toEqual([
+      {
+        process: expect.objectContaining({ pid: 999_981 }),
+        stop_result: expect.objectContaining({ status: "stale" }),
+      },
+    ]);
+  });
+
   it("reset --force deletes local runtime data without suggesting a restart", async () => {
     const cwd = await tempProject("zitadel-reset-");
     const fake = await fakeDocker();
@@ -585,13 +736,42 @@ async function fakeDocker(
   const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-docker-"));
   tempDirs.push(binDir);
   const logPath = join(binDir, "docker.log");
+  const healthPidLog = join(binDir, "docker-health-pids.log");
+  dockerHealthPidLogs.push(healthPidLog);
   const dockerPath = join(binDir, "docker");
   await writeFile(
     dockerPath,
     `#!/usr/bin/env node
+const childProcess = require("node:child_process");
 const fs = require("node:fs");
 const args = process.argv.slice(2);
 fs.appendFileSync(process.env.DOCKER_LOG, JSON.stringify(args) + "\\n");
+function startHealthServer() {
+  const publishIndex = args.indexOf("--publish");
+  const publish = publishIndex >= 0 ? args[publishIndex + 1] : "";
+  const match = publish.match(/127\\.0\\.0\\.1:(\\d+):/);
+  if (!match) return;
+  const child = childProcess.spawn(process.execPath, ["-e", \`
+    const http = require("node:http");
+    const port = Number(process.env.FAKE_DOCKER_HEALTH_PORT);
+    const server = http.createServer((req, res) => {
+      if (req.url === "/healthz") {
+        res.writeHead(200).end("ok");
+        return;
+      }
+      res.writeHead(404).end();
+    });
+    server.listen(port, "127.0.0.1");
+    process.on("SIGTERM", () => server.close(() => process.exit(0)));
+    process.on("SIGINT", () => server.close(() => process.exit(0)));
+  \`], {
+    detached: true,
+    env: { ...process.env, FAKE_DOCKER_HEALTH_PORT: match[1] },
+    stdio: "ignore",
+  });
+  child.unref();
+  fs.appendFileSync(${JSON.stringify(healthPidLog)}, String(child.pid) + "\\n");
+}
 if (args[0] === "version") {
   if (${options.dockerAvailable === false ? "true" : "false"}) {
     console.error("Docker daemon is not running");
@@ -618,6 +798,7 @@ if (args[0] === "inspect") {
   process.exit(1);
 }
 if (args[0] === "run") {
+  startHealthServer();
   console.log("container-test-id");
   process.exit(0);
 }
@@ -665,6 +846,75 @@ process.on("SIGINT", () => {
   );
   await chmod(binPath, 0o755);
   return { binPath };
+}
+
+async function fakeExitingServerWithForeignHealth(): Promise<{ binPath: string }> {
+  const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-server-exit-"));
+  tempDirs.push(binDir);
+  const healthPidLog = join(binDir, "foreign-health-pids.log");
+  dockerHealthPidLogs.push(healthPidLog);
+  const binPath = join(binDir, "zitadel-server");
+  await writeFile(
+    binPath,
+    `#!/usr/bin/env node
+const childProcess = require("node:child_process");
+const fs = require("node:fs");
+const address = process.env.NEXTGEN_SERVER_ADDRESS || ":8080";
+const port = Number(address.split(":").at(-1));
+const child = childProcess.spawn(process.execPath, ["-e", \`
+  const http = require("node:http");
+  const port = Number(process.env.FOREIGN_HEALTH_PORT);
+  const server = http.createServer((req, res) => {
+    if (req.url === "/healthz") {
+      res.writeHead(200).end("ok");
+      return;
+    }
+    res.writeHead(404).end();
+  });
+  server.listen(port, "127.0.0.1");
+  process.on("SIGTERM", () => server.close(() => process.exit(0)));
+\`], {
+  detached: true,
+  env: { ...process.env, FOREIGN_HEALTH_PORT: String(port) },
+  stdio: "ignore",
+});
+child.unref();
+fs.appendFileSync(${JSON.stringify(healthPidLog)}, String(child.pid) + "\\n");
+process.exit(0);
+`,
+  );
+  await chmod(binPath, 0o755);
+  return { binPath };
+}
+
+async function fakeProcessTable(
+  rows: Array<{ command: string; pid: number; ppid: number }>,
+): Promise<{ binDir: string }> {
+  const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-ps-"));
+  tempDirs.push(binDir);
+  const psPath = join(binDir, "ps");
+  await writeFile(
+    psPath,
+    `#!/usr/bin/env node
+const rows = ${JSON.stringify(rows)};
+const args = process.argv.slice(2);
+if (args[0] === "axo") {
+  for (const row of rows) {
+    console.log(String(row.pid).padStart(6) + " " + String(row.ppid).padStart(6) + " " + row.command);
+  }
+  process.exit(0);
+}
+if (args[0] === "eww") {
+  const pid = Number(args[2]);
+  const row = rows.find((candidate) => candidate.pid === pid);
+  if (row) console.log(row.command);
+  process.exit(0);
+}
+process.exit(1);
+`,
+  );
+  await chmod(psPath, 0o755);
+  return { binDir };
 }
 
 async function readDockerCalls(logPath: string): Promise<string[][]> {

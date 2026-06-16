@@ -1,5 +1,14 @@
 # @zitadel/sdk-vue
 
+## 0.1.0-alpha.9
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @zitadel/api@0.1.0-alpha.9
+  - @zitadel/components@0.1.0-alpha.9
+  - @zitadel/sdk-core@0.1.0-alpha.9
+
 ## 0.1.0-alpha.8
 
 ### Patch Changes

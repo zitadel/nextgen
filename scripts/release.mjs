@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
+import { upsertProductGithubRelease } from "./release-github.mjs";
 import {
   detectReleaseAutomation,
   findUnrecordedPendingChangesets,
@@ -151,7 +152,8 @@ async function commandPublish(options) {
       push: true,
       platforms: CONTAINER_PLATFORMS,
     });
-    console.log("dry run: would publish npm packages and push container images");
+    await upsertProductGithubRelease({ repoRoot, outDir, dryRun: true, log: console.log });
+    console.log("dry run: would publish npm packages, push container images, and update the draft GitHub Release");
     return;
   }
 
@@ -159,6 +161,7 @@ async function commandPublish(options) {
   await run("corepack", ["pnpm", "exec", "changeset", "publish"], { cwd: repoRoot });
   await buildContainerImage({ repoRoot, outDir, release, push: true, platforms: CONTAINER_PLATFORMS });
   await commandVerify();
+  await upsertProductGithubRelease({ repoRoot, outDir, log: console.log });
 }
 
 function assertRecoverVersion(release, recoverVersion) {
