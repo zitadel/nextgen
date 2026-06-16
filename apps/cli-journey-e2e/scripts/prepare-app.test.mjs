@@ -62,6 +62,8 @@ test("prepares the customer local setup journey in the app root", async () => {
           "18080",
           "--runtime",
           "binary",
+          "--cwd",
+          appDir,
           "--non-interactive",
           "--json",
         ],
@@ -73,6 +75,8 @@ test("prepares the customer local setup journey in the app root", async () => {
           "18080",
           "--runtime",
           "binary",
+          "--cwd",
+          appDir,
           "--non-interactive",
           "--json",
         ],
@@ -86,6 +90,8 @@ test("prepares the customer local setup journey in the app root", async () => {
           "local",
           "--dev-port",
           "3010",
+          "--cwd",
+          appDir,
           "--non-interactive",
           "--json",
         ],
@@ -146,6 +152,10 @@ test("collects local runtime logs when a CLI step fails", async () => {
     );
 
     assert.ok(calls.some((call) => call.args.includes("logs")));
+    const logsCall = calls.find((call) => call.args.includes("logs"));
+    assert.ok(logsCall.args.includes("--cwd"));
+    assert.equal(logsCall.args[logsCall.args.indexOf("--cwd") + 1], join(workDir, "myapp"));
+    assert.equal(logsCall.cwd, join(workDir, "myapp"));
     const logs = JSON.parse(await readFile(join(workDir, "logs.json"), "utf8"));
     assert.equal(logs.data.logs, "runtime log");
     const start = JSON.parse(await readFile(join(workDir, "start.json"), "utf8"));
