@@ -18,10 +18,10 @@ Release orchestration is split by responsibility:
 3. **Moon publishes non-npm product artifacts.**
    The server release target reads `@zitadel/server`, stages the Go binaries
    into the platform npm packages, builds the Go archives, and pushes
-   `ghcr.io/zitadel/nextgen:<version>`. It also creates or updates the product
-   `v<version>` tag and draft GitHub Release shell with generated artifact and
-   package facts. Product GitHub Release prose is a manual maintainer artifact
-   when an announcement is needed.
+   `ghcr.io/zitadel/nextgen:<version>`. It also creates or updates the draft
+   GitHub Release shell for `v<version>` with generated artifact and package
+   facts. Product GitHub Release prose is a manual maintainer artifact when an
+   announcement is needed.
 
 Nx and GoReleaser are retired dependencies. They are not part of the target CI
 or release path.

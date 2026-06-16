@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { artifactImageRows, artifactPackageRows } from "./release-artifacts.mjs";
+
 const defaultRepoRoot = fileURLToPath(new URL("..", import.meta.url));
 const GITHUB_API_VERSION = "2022-11-28";
 const RELEASE_TITLE_PREFIX = "Zitadel NextGen";
@@ -27,7 +29,7 @@ export async function upsertProductGithubRelease(options = {}) {
   }
 
   const github = githubReleaseConfig(options.env ?? process.env, options.fetchImpl ?? globalThis.fetch);
-  const existing = await getGithubReleaseByTag({ ...github, tag });
+  const existing = await findGithubReleaseByTag({ ...github, tag });
 
   if (!existing) {
     const created = await createGithubRelease({
@@ -76,13 +78,13 @@ Release commit: \`${metadata.shortCommit ?? metadata.commit ?? "unknown"}\`
 
 | Image | Reference |
 |---|---|
-${(metadata.imageTags ?? []).map((tag) => `| container | \`${tag}\` |`).join("\n")}
+${artifactImageRows(metadata)}
 
 ### npm Packages
 
 | Package | Version |
 |---|---|
-${(metadata.packages ?? []).map((pkg) => `| \`${pkg.name}\` | \`${pkg.version}\` |`).join("\n")}
+${artifactPackageRows(metadata)}
 
 ### Package Changes
 
@@ -251,18 +253,31 @@ function githubReleaseConfig(env, fetchImpl) {
   };
 }
 
-async function getGithubReleaseByTag(options) {
-  const response = await options.fetchImpl(`${options.apiBase}/releases/tags/${encodeURIComponent(options.tag)}`, {
-    method: "GET",
-    headers: githubHeaders(options.token),
-  });
-  if (response.status === 404) {
-    return null;
+async function findGithubReleaseByTag(options) {
+  let page = 1;
+  while (true) {
+    const response = await options.fetchImpl(`${options.apiBase}/releases?per_page=100&page=${page}`, {
+      method: "GET",
+      headers: githubHeaders(options.token),
+    });
+    if (!response.ok) {
+      throw new Error(`GitHub Release lookup failed: ${await responseText(response)}`);
+    }
+
+    const releases = await response.json();
+    if (!Array.isArray(releases)) {
+      throw new Error("GitHub Release lookup failed: expected an array response");
+    }
+
+    const match = releases.find((release) => release?.tag_name === options.tag);
+    if (match) {
+      return match;
+    }
+    if (releases.length < 100) {
+      return null;
+    }
+    page += 1;
   }
-  if (!response.ok) {
-    throw new Error(`GitHub Release lookup failed: ${await responseText(response)}`);
-  }
-  return await response.json();
 }
 
 async function createGithubRelease(options) {

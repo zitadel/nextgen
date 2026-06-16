@@ -1,9 +1,9 @@
 # Release Runbook
 
 This repo uses Moon for CI/build orchestration, server artifacts, containers,
-and the product `v<version>` tag and draft GitHub Release shell. Changesets owns
-package versioning, changelogs, npm publishing, and public package tags. Product
-release prose is written manually by maintainers.
+and the draft GitHub Release shell for `v<version>`. Changesets owns package
+versioning, changelogs, npm publishing, and public package tags. Product release
+prose is written manually by maintainers.
 
 ## Normal release
 
@@ -18,8 +18,8 @@ release prose is written manually by maintainers.
 6. `release-publish` runs automatically from that merge commit on `main`,
    publishes npm packages with Changesets, and pushes the
    `ghcr.io/zitadel/nextgen:<version>` container image. It also creates or
-   updates the `v<version>` tag and draft GitHub Release with generated
-   artifact and package facts.
+   updates the draft GitHub Release for `v<version>` with generated artifact and
+   package facts.
 7. If a product announcement is needed, add the human-written product notes to
    the draft GitHub Release and publish it.
 

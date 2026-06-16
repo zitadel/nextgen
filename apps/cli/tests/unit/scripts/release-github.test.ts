@@ -31,6 +31,9 @@ type ReleaseMetadata = {
   packages: Array<{ name: string; version: string; path: string }>;
 };
 
+type FetchInit = { body?: string; method?: string };
+type FetchCall = { init: FetchInit; url: string };
+
 const tempDirs: string[] = [];
 
 async function loadModule(): Promise<ReleaseGithubModule> {
@@ -192,10 +195,10 @@ ${nextBlock}`,
 describe("product GitHub release API", () => {
   it("creates a draft prerelease when no release exists for the tag", async () => {
     const { upsertProductGithubRelease } = await loadModule();
-    const calls: Array<{ init: { body?: string; method?: string }; url: string }> = [];
-    const fetchImpl = async (url: unknown, init: { body?: string; method?: string }) => {
-      calls.push({ url: String(url), init });
-      return calls.length === 1 ? jsonResponse(404, { message: "Not Found" }) : jsonResponse(201, { id: 123 });
+    const calls: FetchCall[] = [];
+    const fetchImpl = async (url: unknown, init: unknown) => {
+      calls.push(fetchCall(url, init));
+      return calls.length === 1 ? jsonResponse(200, []) : jsonResponse(201, { id: 123 });
     };
 
     const result = await upsertProductGithubRelease({
@@ -207,6 +210,7 @@ describe("product GitHub release API", () => {
 
     expect(result.action).toBe("create");
     expect(calls[0].init.method).toBe("GET");
+    expect(calls[0].url).toContain("/releases?per_page=100&page=1");
     expect(calls[1].init.method).toBe("POST");
     const createBody = JSON.parse(calls[1].init.body ?? "{}");
     expect(createBody).toMatchObject({
@@ -220,20 +224,24 @@ describe("product GitHub release API", () => {
 
   it("patches only the generated block when a release already exists", async () => {
     const { GENERATED_BLOCK_END, GENERATED_BLOCK_START, upsertProductGithubRelease } = await loadModule();
-    const calls: Array<{ init: { body?: string; method?: string }; url: string }> = [];
-    const fetchImpl = async (url: unknown, init: { body?: string; method?: string }) => {
-      calls.push({ url: String(url), init });
+    const calls: FetchCall[] = [];
+    const fetchImpl = async (url: unknown, init: unknown) => {
+      calls.push(fetchCall(url, init));
       return calls.length === 1
-        ? jsonResponse(200, {
-            id: 456,
-            body: `Human intro.
+        ? jsonResponse(200, [
+            {
+              id: 456,
+              tag_name: "v0.1.0-alpha.9",
+              draft: true,
+              body: `Human intro.
 
 ${GENERATED_BLOCK_START}
 old generated facts
 ${GENERATED_BLOCK_END}
 
 Human tail.`,
-          })
+            },
+          ])
         : jsonResponse(200, { id: 456 });
     };
 
@@ -251,6 +259,50 @@ Human tail.`,
     expect(patchBody.body).toContain("Human tail.");
     expect(patchBody.body).toContain("Generated Release Facts");
     expect(patchBody.body).not.toContain("old generated facts");
+  });
+
+  it("finds existing draft releases by scanning paginated release listings", async () => {
+    const { GENERATED_BLOCK_END, GENERATED_BLOCK_START, upsertProductGithubRelease } = await loadModule();
+    const calls: FetchCall[] = [];
+    const firstPage = Array.from({ length: 100 }, (_, index) => ({
+      id: index + 1,
+      tag_name: `v0.0.0-alpha.${index}`,
+      body: "",
+    }));
+    const fetchImpl = async (url: unknown, init: unknown) => {
+      calls.push(fetchCall(url, init));
+      if (calls.length === 1) {
+        return jsonResponse(200, firstPage);
+      }
+      if (calls.length === 2) {
+        return jsonResponse(200, [
+          {
+            id: 789,
+            tag_name: "v0.1.0-alpha.9",
+            draft: true,
+            body: `${GENERATED_BLOCK_START}
+old generated facts
+${GENERATED_BLOCK_END}`,
+          },
+        ]);
+      }
+      return jsonResponse(200, { id: 789 });
+    };
+
+    const result = await upsertProductGithubRelease({
+      metadata: metadata(),
+      env: githubEnv(),
+      fetchImpl,
+      log: () => undefined,
+    });
+
+    expect(result.action).toBe("update");
+    expect(calls.map((call) => call.url)).toEqual([
+      "https://api.github.com/repos/zitadel/nextgen/releases?per_page=100&page=1",
+      "https://api.github.com/repos/zitadel/nextgen/releases?per_page=100&page=2",
+      "https://api.github.com/repos/zitadel/nextgen/releases/789",
+    ]);
+    expect(calls[2].init.method).toBe("PATCH");
   });
 
   it("does not call GitHub during dry runs", async () => {
@@ -316,6 +368,10 @@ function jsonResponse(status: number, body: unknown) {
     json: async () => body,
     text: async () => JSON.stringify(body),
   };
+}
+
+function fetchCall(url: unknown, init: unknown): FetchCall {
+  return { url: String(url), init: init as FetchInit };
 }
 
 function sourceFixture() {

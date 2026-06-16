@@ -18,8 +18,8 @@ The current release strategy is:
   group during alpha.
 - `@zitadel/server` is a public npm runtime package. Moon builds the Go binary,
   stages it into platform npm packages, and also uses the fixed version for Go
-  archives, containers, and the product `v<version>` tag and draft GitHub
-  Release shell. Product GitHub Release prose is manual when needed.
+  archives, containers, and the draft GitHub Release shell for `v<version>`.
+  Product GitHub Release prose is manual when needed.
 
 ## Historical context
 

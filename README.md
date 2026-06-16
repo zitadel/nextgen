@@ -111,10 +111,9 @@ days and are not release artifacts.
 ## Build & release
 
 This monorepo uses Moon for task execution, non-npm artifact builds, and the
-product `v<version>` tag and draft GitHub Release shell. Changesets owns
-package versions, changelogs, npm publishing, and public package tags. Product
-release prose is written manually by maintainers when a GitHub Release is
-published.
+draft GitHub Release shell for `v<version>`. Changesets owns package versions,
+changelogs, npm publishing, and public package tags. Product release prose is
+written manually by maintainers when a GitHub Release is published.
 The current alpha release model uses one fixed Changesets version across the
 CLI, server npm runtime, API packages, components, and SDKs. The full rationale
 lives in
