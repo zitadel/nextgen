@@ -203,16 +203,15 @@ async function proxyRequest(
 
   const upstreamHeaders = buildUpstreamHeaders(event);
 
-  // POST /sessions/exchange requires a project service-key bearer token.
-  // The browser can't hold a secret, so the middleware constructs one from
-  // the project_id query param. The server's security handler accepts any
-  // token of the form sk_proj_* at this stage (full validation is a TODO).
-  const isExchangeRequest =
-    method === 'POST' && suffix.startsWith('/sessions/exchange');
-  if (isExchangeRequest && !upstreamHeaders.has('authorization')) {
-    const projectId = url.searchParams.get('project_id');
-    if (projectId) {
-      upstreamHeaders.set('authorization', `Bearer sk_${projectId}`);
+  // Attach the project service-key secret as the bearer on every proxied
+  // request. The server's security handler verifies it cryptographically; the
+  // browser never sees the secret because Nuxt server middleware runs in the
+  // node runtime and reads it from `process.env.ZITADEL_PROJECT_SECRET`
+  // (populated from `.env.local`, which is gitignored).
+  if (!upstreamHeaders.has('authorization')) {
+    const secret = process.env.ZITADEL_PROJECT_SECRET;
+    if (secret) {
+      upstreamHeaders.set('authorization', `Bearer ${secret}`);
     }
   }
 

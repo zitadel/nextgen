@@ -5,20 +5,23 @@ import { viteProxyEdit } from "../../../../../../src/lib/orca/patchers/rule/vite
 const edit = viteProxyEdit(5173, "http://127.0.0.1:8099");
 
 describe("viteProxyEdit", () => {
-  it("adds the /__nextgen proxy with the env-derived sk_ bearer and the backend target", () => {
+  it("adds the /__nextgen proxy with the env-derived project-secret bearer and the backend target", () => {
     const out = edit('import { defineConfig } from "vite";\nexport default defineConfig({});');
     expect(out).toContain("/__nextgen");
     expect(out).toContain("loadEnv");
-    expect(out).toContain("ZITADEL_PROJECT_ID");
-    expect(out).toContain("Bearer sk_");
+    expect(out).toContain("ZITADEL_PROJECT_SECRET");
+    expect(out).toContain("Bearer ${secret}");
     expect(out).toContain("http://127.0.0.1:8099");
     expect(out).toContain("5173");
     // Bind the exact issuer port or fail — never drift to a port not in previewOrigins.
     expect(out).toContain("strictPort: true");
     expect(out).toContain("changeOrigin: false");
-    // No file reads — the bearer comes from env, not the secret file.
+    // The bearer comes from .env.local via Vite's loadEnv, never from the
+    // gitignored secret file directly.
     expect(out).not.toContain("readFileSync");
     expect(out).not.toContain(".zitadel/secret");
+    // Sanity: the project_id fallback the SDKs used to send is gone.
+    expect(out).not.toContain("Bearer sk_${projectId}");
   });
 
   it("preserves the user's existing plugins", () => {
