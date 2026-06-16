@@ -148,7 +148,9 @@ jobs:
           if [ -n "$RECOVER_VERSION" ]; then
             args+=(--recover-version "$RECOVER_VERSION")
           fi
-          env -u CI -u GITHUB_ACTIONS moon run "${args[@]}"
+          # Keep the GitHub Actions environment intact: npm trusted publishing
+          # uses it to exchange the workflow OIDC token during real publishes.
+          moon run "${args[@]}"
         env:
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -162,7 +164,9 @@ jobs:
           if [ -n "$RECOVER_VERSION" ]; then
             args+=(-- --recover-version "$RECOVER_VERSION")
           fi
-          env -u CI -u GITHUB_ACTIONS moon run "${args[@]}"
+          # Keep the GitHub Actions environment intact: npm trusted publishing
+          # uses it to exchange the workflow OIDC token during real publishes.
+          moon run "${args[@]}"
         env:
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
