@@ -15,7 +15,8 @@
  *                                       --SUBMIT(register)--> register
  *                                       --SUBMIT(passkey)--> passkey-login
  *                                       --SUBMIT(sso_provider_id)--> sso-redirect
- *      \--START(register)--> register --SUBMIT--> done
+ *      \--START(register)--> register --SUBMIT--> register-password --SUBMIT--> done
+ *                                     --SUBMIT(sign_in)--> identifier
  *
  *   password -- legacy split step; not reachable from any START transition;
  *               kept so tests can target it directly via actor injection
@@ -36,6 +37,7 @@ import { createMachine, type Actor, assign, createActor } from "xstate";
 export type FlowStepName =
   | "identifier"
   | "register"
+  | "register-password"
   | "password"
   | "recover"
   | "passkey-upsell"
@@ -149,6 +151,21 @@ export const flowMachine = createMachine({
       },
     },
     register: {
+      on: {
+        SUBMIT: [
+          {
+            guard: ({ event }) => event.action === "sign_in",
+            target: "identifier",
+            actions: [captureFields, rotateToken],
+          },
+          {
+            target: "register-password",
+            actions: [captureFields, rotateToken],
+          },
+        ],
+      },
+    },
+    "register-password": {
       on: {
         SUBMIT: { target: "done", actions: [captureFields, rotateToken] },
       },

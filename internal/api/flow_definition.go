@@ -96,14 +96,17 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 			Name:   step.GetName(),
 			Fields: step.GetFields(),
 		}
-		// actions
-		if step.GetActions().IsSet() {
-			actions := make(map[string]domain.FlowStepAction, len(step.GetActions().Value))
-			for name, apiAction := range step.GetActions().Value {
-				actions[name] = domain.FlowStepAction{
+		// actions — preserve the nil-vs-empty distinction so an explicit `[]`
+		// (deliberately no actions, e.g. terminal-step shape) survives the
+		// round-trip distinct from an omitted field (engine-default behavior).
+		if apiActions := step.GetActions(); apiActions != nil {
+			actions := make([]domain.FlowStepAction, 0, len(apiActions))
+			for _, apiAction := range apiActions {
+				actions = append(actions, domain.FlowStepAction{
+					Name:    apiAction.GetName(),
 					Primary: apiAction.GetPrimary().Value,
 					TextKey: apiAction.GetTextKey().Value,
-				}
+				})
 			}
 			s.Actions = actions
 		}
@@ -270,12 +273,9 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 			complete = step.Complete.String()
 		}
 		apiStep := api.FlowDefinitionStep{
-			Name:   step.Name,
-			Fields: step.Fields,
-			Actions: api.OptFlowDefinitionStepActions{
-				Value: actions,
-				Set:   actions != nil,
-			},
+			Name:    step.Name,
+			Fields:  step.Fields,
+			Actions: actions,
 			Gates: api.OptFlowDefinitionStepGates{
 				Value: gates,
 				Set:   gates != nil,
@@ -299,13 +299,17 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 	return steps
 }
 
-func mapActionsToAPI(domainActions map[string]domain.FlowStepAction) map[string]api.StepAction {
-	if len(domainActions) == 0 {
+// mapActionsToAPI preserves the nil-vs-empty distinction so a stored flow
+// definition's explicit `[]` round-trips back to the client as `[]` (not
+// omitted), keeping sync/diff tooling honest.
+func mapActionsToAPI(domainActions []domain.FlowStepAction) []api.StepAction {
+	if domainActions == nil {
 		return nil
 	}
-	actions := make(map[string]api.StepAction, len(domainActions))
-	for name, action := range domainActions {
-		actions[name] = api.StepAction{
+	actions := make([]api.StepAction, 0, len(domainActions))
+	for _, action := range domainActions {
+		actions = append(actions, api.StepAction{
+			Name: action.Name,
 			Primary: api.OptBool{
 				Value: action.Primary,
 				Set:   action.Primary,
@@ -314,7 +318,7 @@ func mapActionsToAPI(domainActions map[string]domain.FlowStepAction) map[string]
 				Value: action.TextKey,
 				Set:   action.TextKey != "",
 			},
-		}
+		})
 	}
 	return actions
 }

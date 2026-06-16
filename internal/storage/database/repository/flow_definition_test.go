@@ -51,9 +51,10 @@ func TestFlowDefinitionRepository_CreateAndGet(t *testing.T) {
 	assert.Nil(t, identifier.Complete)
 	require.Len(t, identifier.Transitions, 2)
 
-	require.Contains(t, identifier.Actions, "submit")
-	assert.Equal(t, "identifier.submit", identifier.Actions["submit"].TextKey)
-	assert.True(t, identifier.Actions["submit"].Primary)
+	require.Len(t, identifier.Actions, 1)
+	assert.Equal(t, "submit", identifier.Actions[0].Name)
+	assert.Equal(t, "identifier.submit", identifier.Actions[0].TextKey)
+	assert.True(t, identifier.Actions[0].Primary)
 
 	require.Contains(t, identifier.Gates, "bot")
 	bot := identifier.Gates["bot"]
@@ -258,8 +259,8 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 			{
 				Name:   "identifier",
 				Fields: []string{"email"},
-				Actions: map[string]domain.FlowStepAction{
-					"submit": {TextKey: "identifier.submit", Primary: true},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", TextKey: "identifier.submit", Primary: true},
 				},
 				Gates: map[string]domain.FlowStepGate{
 					"bot": {
