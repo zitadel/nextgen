@@ -13,15 +13,8 @@ Next iteration of the Zitadel identity platform.
 
 ### I am contributing to Zitadel
 
-| I want to...                       | Run                                      |
-| ---------------------------------- | ---------------------------------------- |
-| Check my setup                     | `moon run workspace:doctor`              |
-| Try the local Zitadel CLI          | `moon run workspace:cli -- --help`       |
-| Run the server from source         | `moon run workspace:server -- --help`    |
-| Test the fresh-app onboarding path | `moon run workspace:journey`             |
-| Run normal local checks            | `moon ci :lint :typecheck :build :test`  |
-| Mirror CI locally                  | `moon run workspace:check -- --full`     |
-| Rerun one failed task              | `moon run <project>:<task>`              |
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contributor setup, Moon commands,
+local checks, source builds, release workflows, and troubleshooting.
 
 ### I am adding Zitadel to my app
 
@@ -34,25 +27,10 @@ Next iteration of the Zitadel identity platform.
 | Stop local Zitadel, keeping data  | `npx @zitadel/cli@alpha stop`                                  |
 | Delete local Zitadel data         | `npx @zitadel/cli@alpha reset --force`                         |
 
-Moon owns the monorepo task graph for TypeScript, Go, release tooling, and
-journeys. The published `zitadel` runtime commands are customer workflow
-commands; they run the released local runtime through the `@zitadel/server` npm
-binary by default and do not require Docker, Go, Moon, or a source checkout.
-Docker remains available with `zitadel start --runtime docker`.
-
-For contributors, `moon run workspace:cli -- start` runs the local CLI against
-the workspace package train. Pass `--runtime docker`, `--image <tag>`, or set
-`ZITADEL_LOCAL_IMAGE=<tag>` when intentionally testing the Docker backend.
-
-`moon run workspace:cli -- setup ...` is the manual whole-local-train path for
-humans and agents. Before invoking the local CLI, the wrapper builds and packs
-the public workspace packages, publishes them to a persistent local Verdaccio
-registry under `tmp/cli-local-registry`, and points the generated app install at
-that registry. Set `ZITADEL_CLI_USE_PUBLIC_PACKAGES=1` when you intentionally
-want the generated app to install public npm packages instead.
-
-`moon run workspace:server` builds and syncs the embedded console/login UI before
-startup, then runs `go run .`; help output skips the UI sync.
+The published `zitadel` runtime commands run the released local runtime through
+the `@zitadel/server` npm binary by default and do not require Docker, Go, Moon,
+or a source checkout. Docker remains available with
+`zitadel start --runtime docker`.
 
 ## Customer quick start
 
@@ -100,68 +78,10 @@ CI produces installable snapshots for review, not official releases.
 
 For product direction and public-readiness notes, see [VISION.md](VISION.md).
 
-## Local checks
+## Contributor workflows
 
-Use Node.js from [.nvmrc](.nvmrc) and the pinned pnpm 10 workspace manager from
-`package.json`. Start with the local doctor, then run the fast check set:
-
-```sh
-moon run workspace:doctor
-moon ci :lint :typecheck :build :test
-```
-
-The repository doctor checks Moon and local toolchain prerequisites. Docker is
-needed for container builds, Docker fallback journeys, and container-backed
-integration tests; it is not required for the default npm-binary local runtime.
-Playwright browsers remain advisory for opt-in e2e and journey workflows.
-
-`moon run workspace:check -- --full` runs the slower CI-parity phases, including
-integration tests, demo e2e, package smoke checks, release snapshots, and the fresh-app
-journey. Use `moon run <project>:<task>` to rerun one named task, or
-`moon run workspace:check -- --only <phase>` to rerun one legacy check phase.
-
-To seed demo users for local login testing, pass bootstrap JSON files when starting the server (see [examples/bootstrap-users/](examples/bootstrap-users/)):
-
-```sh
-moon run workspace:server -- -c <config.yaml> --user-file examples/bootstrap-users/demo-admin.json
-```
-
-The server wrapper runs `scripts/sync-embedded-ui-dist.sh all` before startup so
-the default embedded UI routes work from source. Run that script manually only
-when bypassing the wrapper with direct `go run .`.
-
-Package smoke checks:
-
-```sh
-moon run workspace:cli -- --version
-moon run workspace:cli -- commands
-corepack pnpm --silent run cli -- status --json
-moon run release:pack
-```
-
-Use `corepack pnpm --silent run cli -- ... --json` when a script needs
-parseable CLI stdout. Plain `pnpm run` prints its own script prelude before
-the command output.
-
-Customer local setup journey check:
-
-```sh
-moon run workspace:journey
-```
-
-This opt-in check ensures the Playwright Chromium browsers are installed, builds
-the local npm packages including `@zitadel/server`, publishes them to a
-temporary Verdaccio registry, runs `npx @zitadel/cli@alpha doctor`, `start`, and
-`setup --framework <id> --server local` with the binary runtime in fresh app directories for every
-supported framework, starts the generated apps, and verifies registration/login
-journeys. Use `moon run workspace:journey -- --framework next` to run only the
-Next.js journey. Use `--runtime docker --image <tag>` to exercise the Docker
-fallback path.
-
-Use `moon run workspace:journey` for deterministic CI-style proof. Use
-`moon run workspace:cli -- ...` when you want to drive the same local package
-train manually in a browser and see whether the command guidance is clear enough
-for a human or agent.
+For source builds, local checks, package smoke checks, fresh-app journeys,
+server bootstrapping, and release tasks, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## CI
 

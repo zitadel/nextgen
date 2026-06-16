@@ -62,9 +62,23 @@ needed for container builds, Docker fallback journeys, and container-backed
 integration tests; it is not required for the default npm-binary local runtime.
 Playwright browsers remain advisory for opt-in e2e and journey workflows.
 
-`moon run workspace:check -- --full` runs the slower CI-parity phases. Use
-`moon run <project>:<task>` to rerun one named task, or
-`moon run workspace:check -- --only <phase>` to rerun one legacy check phase.
+If you are new to Moon, start by listing the project graph and available tasks:
+
+```sh
+moon projects
+moon tasks
+moon project cli
+moon task cli:test
+```
+
+Moon task targets use the `<project>:<task>` form, for example
+`moon run cli:test`.
+
+`moon run workspace:check -- --full` runs the repository's slower local
+CI-parity script, including integration tests, demo e2e, package smoke checks,
+release snapshots, and the fresh-app journey. Use `moon run <project>:<task>` to
+rerun one named task, or `moon run workspace:check -- --only <phase>` to rerun
+one legacy check phase.
 
 ## End-to-end checks
 
@@ -72,7 +86,7 @@ End-to-end checks are opt-in locally because they start real servers and need a
 browser install. The demo suites exercise the checked-in framework demos:
 
 ```sh
-corepack pnpm exec playwright install
+corepack pnpm --filter @zitadel/demo-next-e2e exec playwright install
 moon run demo-next-e2e:e2e
 moon run demo-nuxt-e2e:e2e
 ```

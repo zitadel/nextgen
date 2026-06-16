@@ -133,11 +133,11 @@ startup, then runs `go run .`. Direct `go run .` callers must sync the embed
 folders themselves or disable both embedded UI surfaces.
 
 Checked-in demo end-to-end tests are **opt-in locally** and main-only in CI.
-They are not part of the default `run-many -t lint,typecheck,build,test`
+They are not part of the default `moon ci :lint :typecheck :build :test`
 invocation because they boot real dev servers and need browsers installed:
 
 ```sh
-corepack pnpm exec playwright install
+corepack pnpm --filter @zitadel/demo-next-e2e exec playwright install
 moon run demo-next-e2e:e2e
 moon run demo-nuxt-e2e:e2e
 ```
