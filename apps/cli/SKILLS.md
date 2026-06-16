@@ -48,6 +48,11 @@ Each invocation prints one JSON object:
   Stop that process, run `npx @zitadel/cli@alpha stop --all` for host-wide
   CLI-managed local runtimes, or choose another `start --port`.
 
+Capture stdout and stderr separately when scripting. Some terminals and agent
+UIs display both streams together, but the machine contract is one parseable
+JSON object on stdout; installer, audit, and package-manager progress belongs
+on stderr.
+
 Exit codes mirror the error class (3 = validation, 4 = network, 5 = conflict,
 1 = auth, 2 = not-implemented). An unknown command is handled by the CLI's help
 layer, not the envelope.
@@ -117,10 +122,10 @@ Do not treat a rendered login or registration form as completion.
 
 `<zitadel-login>` and `<zitadel-logout>` are Lit elements with open shadow
 roots. The stable automation hooks live inside nested shadow roots, so a flat
-`document.querySelector('[data-testid="zitadel-field-email-input"]')` will not
-find them. Browser drivers with shadow-DOM-aware locators, such as Playwright,
-can target the hooks directly. Generic DOM-eval drivers should pierce shadow
-roots recursively:
+`document.querySelector('[data-testid="zitadel-input-email"]')` will not find
+the native control. Browser drivers with shadow-DOM-aware locators, such as
+Playwright, can target the hooks directly. Generic DOM-eval drivers should
+pierce shadow roots recursively:
 
 ```js
 function deepQuery(sel, root = document) {
@@ -136,11 +141,13 @@ function deepQuery(sel, root = document) {
 }
 ```
 
-Use `zitadel-field-email-input`, `zitadel-field-password-input`, and
-`zitadel-action-submit-button` for sign-in and registration. For sign-out, open
-the user menu button if needed, then pierce to `.signout-btn`; Playwright-style
-locators may use `zitadel-logout .signout-btn`. The canonical component hook
-list lives in `packages/components/README.md`.
+Use host hooks such as `zitadel-field-email`, `zitadel-field-password`, and
+`zitadel-action-submit` when targeting the Lit atoms. Use native shadow-control
+hooks such as `zitadel-input-email`, `zitadel-input-password`, and
+`zitadel-action-submit-button` when filling or clicking the underlying input or
+button. For sign-out, open the user menu button if needed, then pierce to
+`.signout-btn`; Playwright-style locators may use `zitadel-logout .signout-btn`.
+The canonical component hook list lives in `packages/components/README.md`.
 
 The checked-in automated regression path is `moon run workspace:journey`, which
 exercises fresh-app setup plus registration, logout, and login across the

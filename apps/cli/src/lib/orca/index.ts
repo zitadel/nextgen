@@ -114,6 +114,7 @@ export class Orca {
         details: { entries: target.entries },
       });
     }
+    assertNpmSafeScaffoldDirectoryName(cwd);
     const stash = await stashFreshScaffoldArtifacts(cwd, target);
     try {
       await this.scaffolderFor(framework).scaffold(cwd, framework);
@@ -164,6 +165,52 @@ export class Orca {
   private frameworkIds(): ReadonlyArray<string> {
     return this.detectors.map((detector) => detector.framework);
   }
+}
+
+function assertNpmSafeScaffoldDirectoryName(cwd: string): void {
+  const name = basename(cwd);
+  const errors = npmPackageNameErrors(name);
+  if (errors.length === 0) {
+    return;
+  }
+
+  throw new ZitadelError(
+    "E_VALIDATION",
+    `Fresh app directory name "${name}" is not npm-package-safe`,
+    {
+      hint:
+        "Rename the directory to a lowercase npm-package-safe name, for example `my-zitadel-app`, then rerun setup.",
+      details: { cwd, name, validation_errors: errors },
+    },
+  );
+}
+
+function npmPackageNameErrors(name: string): string[] {
+  // This local preflight catches common package-name failures before the
+  // scaffolder mutates disk; framework generators still own stricter checks.
+  const errors: string[] = [];
+  if (name.length === 0) {
+    errors.push("name is empty");
+  }
+  if (name.length > 214) {
+    errors.push("name is longer than 214 characters");
+  }
+  if (name !== name.trim()) {
+    errors.push("name contains leading or trailing whitespace");
+  }
+  if (/[A-Z]/.test(name)) {
+    errors.push("name can no longer contain capital letters");
+  }
+  if (name.startsWith(".") || name.startsWith("_")) {
+    errors.push("name cannot start with a period or underscore");
+  }
+  if (!/^[a-z0-9][a-z0-9._~-]*$/.test(name)) {
+    errors.push("name may only contain lowercase letters, numbers, dots, underscores, tildes, and hyphens");
+  }
+  if (name === "node_modules" || name === "favicon.ico") {
+    errors.push(`name "${name}" is reserved`);
+  }
+  return [...new Set(errors)];
 }
 
 /** {@link Orca} wired with the default detector, scaffolder, and patcher registries. */

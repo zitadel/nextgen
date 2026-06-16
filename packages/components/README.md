@@ -183,7 +183,9 @@ inner `.zl-mount` still claims `100vh`, so embedding it as a small inline card i
 limited until the component follow-up relaxes that layout.
 
 Automation can use the stable host and native shadow-root hooks that the default
-template emits, for example `zitadel-field-email`, `zitadel-field-email-input`,
+template emits. Host atoms expose hooks such as `zitadel-field-email`,
+`zitadel-field-password`, and `zitadel-action-submit`; their native shadow
+controls expose hooks such as `zitadel-input-email`, `zitadel-input-password`,
 and `zitadel-action-submit-button`.
 
 A tenant Liquid template can already be supplied through the branding
