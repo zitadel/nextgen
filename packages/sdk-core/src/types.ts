@@ -1,12 +1,12 @@
-import type { ZitadelProject } from '@zitadel/api/config';
+import type { ZitadelProject } from "@zitadel/api/config";
 import type {
   CreateFlow201Step,
   CreateFlow201StepComplete,
   CreateFlowBodyPurpose,
-} from '@zitadel/api/generated/model';
+} from "@zitadel/api/generated/model";
 
 /** Re-exported so consumers can type the `purpose` prop without a deep import. */
-export type { CreateFlowBodyPurpose } from '@zitadel/api/generated/model';
+export type { CreateFlowBodyPurpose } from "@zitadel/api/generated/model";
 
 /**
  * Shared types for the Nextgen SDKs: the middleware layer (`sdk-next`,
@@ -57,15 +57,15 @@ export interface ZitadelSignoutDetail {
 
 /** Events emitted by `<zitadel-login>`, keyed to their detail payload. */
 export interface ZitadelLoginEventMap {
-  'zitadel-flow-step': ZitadelFlowStepDetail;
-  'zitadel-flow-input': ZitadelFlowInputDetail;
-  'zitadel-flow-complete': ZitadelFlowCompleteDetail;
-  'zitadel-flow-error': ZitadelFlowErrorDetail;
+  "zitadel-flow-step": ZitadelFlowStepDetail;
+  "zitadel-flow-input": ZitadelFlowInputDetail;
+  "zitadel-flow-complete": ZitadelFlowCompleteDetail;
+  "zitadel-flow-error": ZitadelFlowErrorDetail;
 }
 
 /** Events emitted by `<zitadel-logout>`, keyed to their detail payload. */
 export interface ZitadelLogoutEventMap {
-  'zitadel-signout': ZitadelSignoutDetail;
+  "zitadel-signout": ZitadelSignoutDetail;
 }
 
 /**
@@ -75,15 +75,15 @@ export interface ZitadelLogoutEventMap {
  * behind for a removed event, fails `tsc`. Everything below derives from this.
  */
 export const ZITADEL_LOGIN_EVENT_HANDLERS = {
-  'zitadel-flow-step': 'onFlowStep',
-  'zitadel-flow-input': 'onFlowInput',
-  'zitadel-flow-complete': 'onFlowComplete',
-  'zitadel-flow-error': 'onFlowError',
+  "zitadel-flow-step": "onFlowStep",
+  "zitadel-flow-input": "onFlowInput",
+  "zitadel-flow-complete": "onFlowComplete",
+  "zitadel-flow-error": "onFlowError",
 } as const satisfies Record<keyof ZitadelLoginEventMap, `on${string}`>;
 
 /** Maps the `<zitadel-logout>` event to the callback prop the SDKs expose. */
 export const ZITADEL_LOGOUT_EVENT_HANDLERS = {
-  'zitadel-signout': 'onSignout',
+  "zitadel-signout": "onSignout",
 } as const satisfies Record<keyof ZitadelLogoutEventMap, `on${string}`>;
 
 /** Runtime list of `<zitadel-login>` event names (drives wiring + drift tests). */

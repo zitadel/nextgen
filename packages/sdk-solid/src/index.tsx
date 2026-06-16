@@ -1,10 +1,10 @@
 import type {
   ZitadelLogin as ZitadelLoginElement,
   ZitadelLogout as ZitadelLogoutElement,
-} from '@zitadel/components';
+} from "@zitadel/components";
 
-import '@zitadel/components';
-import type { JSX } from 'solid-js';
+import "@zitadel/components";
+import type { JSX } from "solid-js";
 
 import {
   configureZitadel,
@@ -12,7 +12,7 @@ import {
   getZitadelConfig,
   type ZitadelConfig,
   type ZitadelProject,
-} from '@zitadel/api/config';
+} from "@zitadel/api/config";
 
 import type {
   ZitadelFlowCompleteDetail,
@@ -22,41 +22,31 @@ import type {
   ZitadelLoginProps,
   ZitadelLogoutProps,
   ZitadelSignoutDetail,
-} from './types';
+} from "./types";
 
-declare module 'solid-js' {
+declare module "solid-js" {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {
-      'zitadel-login': Omit<HTMLAttributes<HTMLElement>, 'ref'> & {
+      "zitadel-login": Omit<HTMLAttributes<HTMLElement>, "ref"> & {
         ref?: ZitadelLoginElement | ((el: ZitadelLoginElement) => void);
-        'prop:project'?: ZitadelProject;
-        'project-id'?: string;
-        'proxy-path'?: string;
+        "prop:project"?: ZitadelProject;
+        "project-id"?: string;
+        "proxy-path"?: string;
         purpose?: string;
-        'post-sign-in-url'?: string;
-        'on:zitadel-flow-step'?: (
-          event: CustomEvent<ZitadelFlowStepDetail>,
-        ) => void;
-        'on:zitadel-flow-input'?: (
-          event: CustomEvent<ZitadelFlowInputDetail>,
-        ) => void;
-        'on:zitadel-flow-complete'?: (
-          event: CustomEvent<ZitadelFlowCompleteDetail>,
-        ) => void;
-        'on:zitadel-flow-error'?: (
-          event: CustomEvent<ZitadelFlowErrorDetail>,
-        ) => void;
+        "post-sign-in-url"?: string;
+        "on:zitadel-flow-step"?: (event: CustomEvent<ZitadelFlowStepDetail>) => void;
+        "on:zitadel-flow-input"?: (event: CustomEvent<ZitadelFlowInputDetail>) => void;
+        "on:zitadel-flow-complete"?: (event: CustomEvent<ZitadelFlowCompleteDetail>) => void;
+        "on:zitadel-flow-error"?: (event: CustomEvent<ZitadelFlowErrorDetail>) => void;
       };
-      'zitadel-logout': Omit<HTMLAttributes<HTMLElement>, 'ref'> & {
+      "zitadel-logout": Omit<HTMLAttributes<HTMLElement>, "ref"> & {
         ref?: ZitadelLogoutElement | ((el: ZitadelLogoutElement) => void);
-        'prop:project'?: ZitadelProject;
-        'project-id'?: string;
-        'proxy-path'?: string;
-        'post-sign-out-url'?: string;
-        'on:zitadel-signout'?: (
-          event: CustomEvent<ZitadelSignoutDetail>,
-        ) => void;
+        "prop:project"?: ZitadelProject;
+        "project-id"?: string;
+        "proxy-path"?: string;
+        "post-sign-out-url"?: string;
+        "on:zitadel-signout"?: (event: CustomEvent<ZitadelSignoutDetail>) => void;
       };
     }
   }
@@ -64,7 +54,7 @@ declare module 'solid-js' {
 
 export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
-export * from './types';
+export * from "./types";
 
 /**
  * Solid component wrapping the `<zitadel-login>` web component. Binds the
@@ -86,7 +76,7 @@ export function ZitadelLogin(
       prop:project={props.project}
       project-id={props.projectId}
       proxy-path={props.proxyPath}
-      purpose={props.purpose ?? 'login'}
+      purpose={props.purpose ?? "login"}
       post-sign-in-url={props.postSignInUrl}
       on:zitadel-flow-step={(event) => props.onFlowStep?.(event.detail)}
       on:zitadel-flow-input={(event) => props.onFlowInput?.(event.detail)}

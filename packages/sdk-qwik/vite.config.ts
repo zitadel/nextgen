@@ -1,6 +1,6 @@
-import { qwikVite } from '@builder.io/qwik/optimizer';
-import { defineConfig } from 'vite';
-import dts from 'vite-plugin-dts';
+import { qwikVite } from "@builder.io/qwik/optimizer";
+import { defineConfig } from "vite";
+import dts from "vite-plugin-dts";
 
 // Qwik library build (run with `--mode lib`): the optimizer emits QRL segments
 // and the `.qwik.mjs` entry the consuming app's qwikVite further processes;
@@ -9,11 +9,11 @@ import dts from 'vite-plugin-dts';
 // are externalized — the consumer provides them.
 export default defineConfig({
   build: {
-    target: 'es2020',
+    target: "es2020",
     lib: {
-      entry: './src/index.tsx',
-      formats: ['es'],
-      fileName: () => 'index.qwik.mjs',
+      entry: "./src/index.tsx",
+      formats: ["es"],
+      fileName: () => "index.qwik.mjs",
     },
     rollupOptions: {
       external: [/^@zitadel\//, /^@builder\.io\//],
@@ -22,9 +22,9 @@ export default defineConfig({
   plugins: [
     qwikVite(),
     dts({
-      include: ['src'],
-      exclude: ['src/**/*.spec.*'],
-      outDir: 'lib-types',
+      include: ["src"],
+      exclude: ["src/**/*.spec.*"],
+      outDir: "lib-types",
     }),
   ],
 });

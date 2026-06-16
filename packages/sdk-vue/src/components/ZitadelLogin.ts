@@ -1,19 +1,19 @@
-import type { ZitadelProject } from '@zitadel/api/config';
-import type { ZitadelLogin as ZitadelLoginElement } from '@zitadel/components';
+import type { ZitadelProject } from "@zitadel/api/config";
+import type { ZitadelLogin as ZitadelLoginElement } from "@zitadel/components";
 import type {
   CreateFlowBodyPurpose,
   ZitadelFlowCompleteDetail,
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,
   ZitadelFlowStepDetail,
-} from '@zitadel/sdk-core/types';
+} from "@zitadel/sdk-core/types";
 
-import { defineComponent, h, type PropType, ref, toRaw } from 'vue';
+import { defineComponent, h, type PropType, ref, toRaw } from "vue";
 // Registers <zitadel-login> / <zitadel-logout> with the browser. Imported at
 // module load (before render) so the element is upgraded by the time Vue
 // patches it — which means Vue binds `project` as a DOM *property* (not a
 // stringified attribute).
-import '@zitadel/components';
+import "@zitadel/components";
 
 /**
  * Vue wrapper for the `<zitadel-login>` Lit web component.
@@ -34,18 +34,18 @@ import '@zitadel/components';
  * `r.value.element`.
  */
 export default defineComponent({
-  name: 'ZitadelLogin',
+  name: "ZitadelLogin",
   props: {
     project: { type: Object as PropType<ZitadelProject>, default: undefined },
     projectId: { type: String, default: undefined },
     proxyPath: { type: String, default: undefined },
     purpose: {
       type: String as PropType<CreateFlowBodyPurpose>,
-      default: 'login',
+      default: "login",
     },
     postSignInUrl: { type: String, default: undefined },
   },
-  emits: ['flowStep', 'flowInput', 'flowComplete', 'flowError'],
+  emits: ["flowStep", "flowInput", "flowComplete", "flowError"],
   setup(props, { emit, expose }) {
     // Template ref to the rendered Lit element. Exposed so a consumer's
     // component `ref` (which resolves to this instance) can reach the DOM node.
@@ -53,7 +53,7 @@ export default defineComponent({
     expose({ element });
 
     return () =>
-      h('zitadel-login', {
+      h("zitadel-login", {
         ref: element,
         // Hand the Lit element the raw SDK handle, not Vue's reactive proxy:
         // the widget does identity checks on it (and `render` from test-utils
@@ -62,20 +62,18 @@ export default defineComponent({
         projectId: props.projectId,
         proxyPath: props.proxyPath,
         purpose: props.purpose,
-        'post-sign-in-url': props.postSignInUrl,
+        "post-sign-in-url": props.postSignInUrl,
         onZitadelFlowStep: (event: CustomEvent<ZitadelFlowStepDetail>) => {
-          emit('flowStep', event.detail);
+          emit("flowStep", event.detail);
         },
         onZitadelFlowInput: (event: CustomEvent<ZitadelFlowInputDetail>) => {
-          emit('flowInput', event.detail);
+          emit("flowInput", event.detail);
         },
-        onZitadelFlowComplete: (
-          event: CustomEvent<ZitadelFlowCompleteDetail>,
-        ) => {
-          emit('flowComplete', event.detail);
+        onZitadelFlowComplete: (event: CustomEvent<ZitadelFlowCompleteDetail>) => {
+          emit("flowComplete", event.detail);
         },
         onZitadelFlowError: (event: CustomEvent<ZitadelFlowErrorDetail>) => {
-          emit('flowError', event.detail);
+          emit("flowError", event.detail);
         },
       });
   },

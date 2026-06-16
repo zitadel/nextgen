@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from "vitest/config";
 
 /**
  * `resolve.conditions: ['browser']` makes Vitest resolve the *browser* build of
@@ -16,10 +16,10 @@ import { defineConfig } from 'vitest/config';
  */
 export default defineConfig({
   resolve: {
-    conditions: ['browser'],
+    conditions: ["browser"],
   },
   test: {
-    environment: 'jsdom',
+    environment: "jsdom",
     globals: true,
     dangerouslyIgnoreUnhandledErrors: true,
   },

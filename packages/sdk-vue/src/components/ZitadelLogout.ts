@@ -1,9 +1,9 @@
-import type { ZitadelProject } from '@zitadel/api/config';
-import type { ZitadelLogout as ZitadelLogoutElement } from '@zitadel/components';
-import type { ZitadelSignoutDetail } from '@zitadel/sdk-core/types';
+import type { ZitadelProject } from "@zitadel/api/config";
+import type { ZitadelLogout as ZitadelLogoutElement } from "@zitadel/components";
+import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
 
-import { defineComponent, h, type PropType, ref, toRaw } from 'vue';
-import '@zitadel/components';
+import { defineComponent, h, type PropType, ref, toRaw } from "vue";
+import "@zitadel/components";
 
 /**
  * Vue wrapper for the `<zitadel-logout>` Lit web component. See
@@ -20,14 +20,14 @@ import '@zitadel/components';
  * `r.value.element`.
  */
 export default defineComponent({
-  name: 'ZitadelLogout',
+  name: "ZitadelLogout",
   props: {
     project: { type: Object as PropType<ZitadelProject>, default: undefined },
     projectId: { type: String, default: undefined },
     proxyPath: { type: String, default: undefined },
     postSignOutUrl: { type: String, default: undefined },
   },
-  emits: ['signout'],
+  emits: ["signout"],
   setup(props, { emit, expose }) {
     // Template ref to the rendered Lit element. Exposed so a consumer's
     // component `ref` (which resolves to this instance) can reach the DOM node.
@@ -35,7 +35,7 @@ export default defineComponent({
     expose({ element });
 
     return () =>
-      h('zitadel-logout', {
+      h("zitadel-logout", {
         ref: element,
         // Hand the Lit element the raw SDK handle, not Vue's reactive proxy:
         // the widget does identity checks on it (and `render` from test-utils
@@ -43,9 +43,9 @@ export default defineComponent({
         project: toRaw(props.project),
         projectId: props.projectId,
         proxyPath: props.proxyPath,
-        'post-sign-out-url': props.postSignOutUrl,
+        "post-sign-out-url": props.postSignOutUrl,
         onZitadelSignout: (event: CustomEvent<ZitadelSignoutDetail>) => {
-          emit('signout', event.detail);
+          emit("signout", event.detail);
         },
       });
   },

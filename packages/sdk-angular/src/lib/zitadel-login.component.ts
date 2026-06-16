@@ -1,12 +1,12 @@
-import type { ElementRef } from '@angular/core';
-import type { ZitadelLogin as ZitadelLoginElement } from '@zitadel/components';
+import type { ElementRef } from "@angular/core";
+import type { ZitadelLogin as ZitadelLoginElement } from "@zitadel/components";
 import type {
   CreateFlowBodyPurpose,
   ZitadelFlowCompleteDetail,
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,
   ZitadelFlowStepDetail,
-} from '@zitadel/sdk-core/types';
+} from "@zitadel/sdk-core/types";
 
 import {
   Component,
@@ -15,12 +15,12 @@ import {
   Input,
   Output,
   ViewChild,
-} from '@angular/core';
+} from "@angular/core";
 
-import type { ZitadelProject } from './config';
+import type { ZitadelProject } from "./config";
 
 // Registers <zitadel-login> / <zitadel-logout> with the browser.
-import '@zitadel/components';
+import "@zitadel/components";
 
 /**
  * Angular wrapper for the `<zitadel-login>` Lit web component.
@@ -44,7 +44,7 @@ import '@zitadel/components';
  * ```
  */
 @Component({
-  selector: 'zitadel-auth-login',
+  selector: "zitadel-auth-login",
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `<zitadel-login
@@ -64,14 +64,14 @@ export class ZitadelLoginComponent {
   @Input() project?: ZitadelProject;
   @Input() projectId?: string;
   @Input() proxyPath?: string;
-  @Input() purpose: CreateFlowBodyPurpose = 'login';
+  @Input() purpose: CreateFlowBodyPurpose = "login";
   @Input() postSignInUrl?: string;
   @Output() flowStep = new EventEmitter<ZitadelFlowStepDetail>();
   @Output() flowInput = new EventEmitter<ZitadelFlowInputDetail>();
   @Output() flowComplete = new EventEmitter<ZitadelFlowCompleteDetail>();
   @Output() flowError = new EventEmitter<ZitadelFlowErrorDetail>();
 
-  @ViewChild('el') private elementRef?: ElementRef<ZitadelLoginElement>;
+  @ViewChild("el") private elementRef?: ElementRef<ZitadelLoginElement>;
 
   /** The underlying `<zitadel-login>` custom element, or `null` before view init. */
   get element(): ZitadelLoginElement | null {
@@ -87,9 +87,7 @@ export class ZitadelLoginComponent {
   }
 
   onFlowComplete(event: Event): void {
-    this.flowComplete.emit(
-      (event as CustomEvent<ZitadelFlowCompleteDetail>).detail,
-    );
+    this.flowComplete.emit((event as CustomEvent<ZitadelFlowCompleteDetail>).detail);
   }
 
   onFlowError(event: Event): void {

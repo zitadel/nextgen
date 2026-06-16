@@ -1,16 +1,16 @@
-import { createComponent, type EventName } from '@lit/react';
+import { createComponent, type EventName } from "@lit/react";
 import {
   configureZitadel,
   getApi,
   getZitadelConfig,
   type ZitadelConfig,
   type ZitadelProject,
-} from '@zitadel/api/config';
+} from "@zitadel/api/config";
 import {
   ZitadelLogin as ZitadelLoginElement,
   ZitadelLogout as ZitadelLogoutElement,
-} from '@zitadel/components';
-import * as React from 'react';
+} from "@zitadel/components";
+import * as React from "react";
 
 import type {
   ZitadelFlowCompleteDetail,
@@ -20,11 +20,11 @@ import type {
   ZitadelLoginProps,
   ZitadelLogoutProps,
   ZitadelSignoutDetail,
-} from './types';
+} from "./types";
 
 export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
-export * from './types';
+export * from "./types";
 
 /**
  * React components for the Zitadel auth widgets.
@@ -52,32 +52,24 @@ export * from './types';
  */
 const ZitadelLoginElementReact = createComponent({
   react: React,
-  tagName: 'zitadel-login',
+  tagName: "zitadel-login",
   elementClass: ZitadelLoginElement,
   events: {
-    onZitadelFlowStep: 'zitadel-flow-step' as EventName<
-      CustomEvent<ZitadelFlowStepDetail>
-    >,
-    onZitadelFlowInput: 'zitadel-flow-input' as EventName<
-      CustomEvent<ZitadelFlowInputDetail>
-    >,
-    onZitadelFlowComplete: 'zitadel-flow-complete' as EventName<
+    onZitadelFlowStep: "zitadel-flow-step" as EventName<CustomEvent<ZitadelFlowStepDetail>>,
+    onZitadelFlowInput: "zitadel-flow-input" as EventName<CustomEvent<ZitadelFlowInputDetail>>,
+    onZitadelFlowComplete: "zitadel-flow-complete" as EventName<
       CustomEvent<ZitadelFlowCompleteDetail>
     >,
-    onZitadelFlowError: 'zitadel-flow-error' as EventName<
-      CustomEvent<ZitadelFlowErrorDetail>
-    >,
+    onZitadelFlowError: "zitadel-flow-error" as EventName<CustomEvent<ZitadelFlowErrorDetail>>,
   },
 });
 
 const ZitadelLogoutElementReact = createComponent({
   react: React,
-  tagName: 'zitadel-logout',
+  tagName: "zitadel-logout",
   elementClass: ZitadelLogoutElement,
   events: {
-    onZitadelSignout: 'zitadel-signout' as EventName<
-      CustomEvent<ZitadelSignoutDetail>
-    >,
+    onZitadelSignout: "zitadel-signout" as EventName<CustomEvent<ZitadelSignoutDetail>>,
   },
 });
 
@@ -90,29 +82,26 @@ const ZitadelLogoutElementReact = createComponent({
  * A forwarded `ref` resolves to the underlying `<zitadel-login>` DOM element,
  * so consumers can imperatively access the upgraded web component.
  */
-export const ZitadelLogin = React.forwardRef<
-  ZitadelLoginElement,
-  ZitadelLoginProps
->(function ZitadelLogin(
-  { purpose, onFlowStep, onFlowInput, onFlowComplete, onFlowError, ...props },
-  ref,
-) {
-  return (
-    <ZitadelLoginElementReact
-      {...props}
-      ref={ref}
-      purpose={purpose ?? 'login'}
-      onZitadelFlowStep={onFlowStep && ((event) => onFlowStep(event.detail))}
-      onZitadelFlowInput={onFlowInput && ((event) => onFlowInput(event.detail))}
-      onZitadelFlowComplete={
-        onFlowComplete && ((event) => onFlowComplete(event.detail))
-      }
-      onZitadelFlowError={onFlowError && ((event) => onFlowError(event.detail))}
-    />
-  );
-});
+export const ZitadelLogin = React.forwardRef<ZitadelLoginElement, ZitadelLoginProps>(
+  function ZitadelLogin(
+    { purpose, onFlowStep, onFlowInput, onFlowComplete, onFlowError, ...props },
+    ref,
+  ) {
+    return (
+      <ZitadelLoginElementReact
+        {...props}
+        ref={ref}
+        purpose={purpose ?? "login"}
+        onZitadelFlowStep={onFlowStep && ((event) => onFlowStep(event.detail))}
+        onZitadelFlowInput={onFlowInput && ((event) => onFlowInput(event.detail))}
+        onZitadelFlowComplete={onFlowComplete && ((event) => onFlowComplete(event.detail))}
+        onZitadelFlowError={onFlowError && ((event) => onFlowError(event.detail))}
+      />
+    );
+  },
+);
 
-ZitadelLogin.displayName = 'ZitadelLogin';
+ZitadelLogin.displayName = "ZitadelLogin";
 
 /**
  * React component wrapping the `<zitadel-logout>` web component. Binds the
@@ -123,17 +112,16 @@ ZitadelLogin.displayName = 'ZitadelLogin';
  * A forwarded `ref` resolves to the underlying `<zitadel-logout>` DOM element,
  * so consumers can imperatively access the upgraded web component.
  */
-export const ZitadelLogout = React.forwardRef<
-  ZitadelLogoutElement,
-  ZitadelLogoutProps
->(function ZitadelLogout({ onSignout, ...props }, ref) {
-  return (
-    <ZitadelLogoutElementReact
-      {...props}
-      ref={ref}
-      onZitadelSignout={onSignout && ((event) => onSignout(event.detail))}
-    />
-  );
-});
+export const ZitadelLogout = React.forwardRef<ZitadelLogoutElement, ZitadelLogoutProps>(
+  function ZitadelLogout({ onSignout, ...props }, ref) {
+    return (
+      <ZitadelLogoutElementReact
+        {...props}
+        ref={ref}
+        onZitadelSignout={onSignout && ((event) => onSignout(event.detail))}
+      />
+    );
+  },
+);
 
-ZitadelLogout.displayName = 'ZitadelLogout';
+ZitadelLogout.displayName = "ZitadelLogout";

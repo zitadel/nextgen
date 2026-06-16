@@ -13,18 +13,18 @@
  * two directly connected peers and become invalid when proxied.
  */
 export const HOP_BY_HOP: ReadonlySet<string> = new Set([
-  'connection',
+  "connection",
   // host is not a hop-by-hop header per RFC 7230, but it must be stripped so
   // the fetch implementation derives the correct Host from the upstream URL
   // rather than forwarding the client's Host and causing SNI/vhost mismatches.
-  'host',
-  'keep-alive',
-  'proxy-authenticate',
-  'proxy-authorization',
-  'te',
-  'trailer',
-  'transfer-encoding',
-  'upgrade',
+  "host",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailer",
+  "transfer-encoding",
+  "upgrade",
 ]);
 
 /**
@@ -32,10 +32,7 @@ export const HOP_BY_HOP: ReadonlySet<string> = new Set([
  * These headers carry session data between the middleware and server components;
  * forwarding them upstream would expose internal state and allow header injection.
  */
-export const INTERNAL_HEADERS: ReadonlySet<string> = new Set([
-  'x-nextgen-auth-token',
-]);
-
+export const INTERNAL_HEADERS: ReadonlySet<string> = new Set(["x-nextgen-auth-token"]);
 
 // ─── Route matching ──────────────────────────────────────────────────────────
 
@@ -49,15 +46,12 @@ export const INTERNAL_HEADERS: ReadonlySet<string> = new Set([
  * @param routes   - The list of route patterns to match against.
  * @returns `true` if at least one pattern matches.
  */
-export function matchesRoutes(
-  pathname: string,
-  routes: readonly string[],
-): boolean {
+export function matchesRoutes(pathname: string, routes: readonly string[]): boolean {
   if (routes.length === 0) {
     return false;
   }
   return routes.some((pattern) => {
-    if (pattern.endsWith('*')) {
+    if (pattern.endsWith("*")) {
       return pathname.startsWith(pattern.slice(0, -1));
     }
     return pathname === pattern;
@@ -79,8 +73,8 @@ export function filterResponseHeaders(upstream: Headers): Headers {
   for (const [key, value] of upstream.entries()) {
     if (
       !HOP_BY_HOP.has(key.toLowerCase()) &&
-      key.toLowerCase() !== 'set-cookie' &&
-      key.toLowerCase() !== 'location'
+      key.toLowerCase() !== "set-cookie" &&
+      key.toLowerCase() !== "location"
     ) {
       filtered.set(key, value);
     }

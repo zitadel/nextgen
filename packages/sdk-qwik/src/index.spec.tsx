@@ -2,22 +2,21 @@
 import type {
   ZitadelLogin as ZitadelLoginElement,
   ZitadelLogout as ZitadelLogoutElement,
-} from '@zitadel/components';
+} from "@zitadel/components";
 
-import { $, render, type Signal } from '@builder.io/qwik';
+import { $, render, type Signal } from "@builder.io/qwik";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
-} from '@zitadel/sdk-core/types';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import '@zitadel/components';
+} from "@zitadel/sdk-core/types";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "@zitadel/components";
 
-import { ZitadelLogin, ZitadelLogout } from './index';
+import { ZitadelLogin, ZitadelLogout } from "./index";
 
-const project = { projectId: 'proj-test', proxyPath: '/__nextgen' };
+const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
-const macrotask = (): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, 0));
+const macrotask = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 /**
  * Qwik wires the widget's listeners in a `useVisibleTask$` that runs a turn
@@ -41,9 +40,7 @@ async function dispatchUntilForwarded(
       return;
     }
     if (Date.now() > deadline) {
-      throw new Error(
-        `listener for "${eventName}" never forwarded within 1000ms`,
-      );
+      throw new Error(`listener for "${eventName}" never forwarded within 1000ms`);
     }
     await macrotask();
   }
@@ -51,43 +48,40 @@ async function dispatchUntilForwarded(
 
 beforeEach(() => {
   vi.stubGlobal(
-    'fetch',
-    vi.fn(() => Promise.reject(new Error('no network'))),
+    "fetch",
+    vi.fn(() => Promise.reject(new Error("no network"))),
   );
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  document.body.innerHTML = '';
+  document.body.innerHTML = "";
 });
 
-describe('ZitadelLogin', () => {
-  it('binds the project handle as a property', async () => {
-    const host = document.createElement('div');
+describe("ZitadelLogin", () => {
+  it("binds the project handle as a property", async () => {
+    const host = document.createElement("div");
     document.body.appendChild(host);
     await render(host, <ZitadelLogin project={project} purpose="login" />);
-    const el = host.querySelector<ZitadelLoginElement>('zitadel-login');
+    const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
 
-  it('binds discrete projectId/proxyPath', async () => {
-    const host = document.createElement('div');
+  it("binds discrete projectId/proxyPath", async () => {
+    const host = document.createElement("div");
     document.body.appendChild(host);
-    await render(
-      host,
-      <ZitadelLogin projectId="proj-test" proxyPath="/__nextgen" />,
-    );
-    const el = host.querySelector<ZitadelLoginElement>('zitadel-login');
-    expect(el!.projectId).toBe('proj-test');
-    expect(el!.proxyPath).toBe('/__nextgen');
+    await render(host, <ZitadelLogin projectId="proj-test" proxyPath="/__nextgen" />);
+    const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(el!.projectId).toBe("proj-test");
+    expect(el!.proxyPath).toBe("/__nextgen");
   });
 
   it.each(Object.entries(ZITADEL_LOGIN_EVENT_HANDLERS))(
-    'forwards %s to its callback',
+    "forwards %s to its callback",
     async (eventName, handlerProp) => {
       const received: Record<string, unknown>[] = [];
-      const host = document.createElement('div');
+      const host = document.createElement("div");
       document.body.appendChild(host);
       await render(
         host,
@@ -100,7 +94,7 @@ describe('ZitadelLogin', () => {
           }}
         />,
       );
-      const el = host.querySelector('zitadel-login');
+      const el = host.querySelector("zitadel-login");
       expect(el).not.toBeNull();
       const detail = { probe: eventName };
       await dispatchUntilForwarded(el!, eventName, detail, received);
@@ -108,48 +102,43 @@ describe('ZitadelLogin', () => {
     },
   );
 
-  it('populates a consumer ref with the underlying element', async () => {
-    const consumerRef = { value: undefined } as Signal<
-      ZitadelLoginElement | undefined
-    >;
-    const host = document.createElement('div');
+  it("populates a consumer ref with the underlying element", async () => {
+    const consumerRef = { value: undefined } as Signal<ZitadelLoginElement | undefined>;
+    const host = document.createElement("div");
     document.body.appendChild(host);
     await render(host, <ZitadelLogin project={project} ref={consumerRef} />);
     await macrotask();
-    const el = host.querySelector<ZitadelLoginElement>('zitadel-login');
+    const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
     expect(el).not.toBeNull();
     expect(consumerRef.value).toBe(el);
-    expect(consumerRef.value?.tagName.toLowerCase()).toBe('zitadel-login');
+    expect(consumerRef.value?.tagName.toLowerCase()).toBe("zitadel-login");
   });
 });
 
-describe('ZitadelLogout', () => {
-  it('binds the project handle as a property', async () => {
-    const host = document.createElement('div');
+describe("ZitadelLogout", () => {
+  it("binds the project handle as a property", async () => {
+    const host = document.createElement("div");
     document.body.appendChild(host);
     await render(host, <ZitadelLogout project={project} />);
-    const el = host.querySelector<ZitadelLogoutElement>('zitadel-logout');
+    const el = host.querySelector<ZitadelLogoutElement>("zitadel-logout");
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
 
-  it('binds discrete projectId/proxyPath', async () => {
-    const host = document.createElement('div');
+  it("binds discrete projectId/proxyPath", async () => {
+    const host = document.createElement("div");
     document.body.appendChild(host);
-    await render(
-      host,
-      <ZitadelLogout projectId="proj-test" proxyPath="/__nextgen" />,
-    );
-    const el = host.querySelector<ZitadelLogoutElement>('zitadel-logout');
-    expect(el!.projectId).toBe('proj-test');
-    expect(el!.proxyPath).toBe('/__nextgen');
+    await render(host, <ZitadelLogout projectId="proj-test" proxyPath="/__nextgen" />);
+    const el = host.querySelector<ZitadelLogoutElement>("zitadel-logout");
+    expect(el!.projectId).toBe("proj-test");
+    expect(el!.proxyPath).toBe("/__nextgen");
   });
 
   it.each(Object.entries(ZITADEL_LOGOUT_EVENT_HANDLERS))(
-    'forwards %s to its callback',
+    "forwards %s to its callback",
     async (eventName, handlerProp) => {
       const received: Record<string, unknown>[] = [];
-      const host = document.createElement('div');
+      const host = document.createElement("div");
       document.body.appendChild(host);
       await render(
         host,
@@ -162,7 +151,7 @@ describe('ZitadelLogout', () => {
           }}
         />,
       );
-      const el = host.querySelector('zitadel-logout');
+      const el = host.querySelector("zitadel-logout");
       expect(el).not.toBeNull();
       const detail = { probe: eventName };
       await dispatchUntilForwarded(el!, eventName, detail, received);
@@ -170,17 +159,15 @@ describe('ZitadelLogout', () => {
     },
   );
 
-  it('populates a consumer ref with the underlying element', async () => {
-    const consumerRef = { value: undefined } as Signal<
-      ZitadelLogoutElement | undefined
-    >;
-    const host = document.createElement('div');
+  it("populates a consumer ref with the underlying element", async () => {
+    const consumerRef = { value: undefined } as Signal<ZitadelLogoutElement | undefined>;
+    const host = document.createElement("div");
     document.body.appendChild(host);
     await render(host, <ZitadelLogout project={project} ref={consumerRef} />);
     await macrotask();
-    const el = host.querySelector<ZitadelLogoutElement>('zitadel-logout');
+    const el = host.querySelector<ZitadelLogoutElement>("zitadel-logout");
     expect(el).not.toBeNull();
     expect(consumerRef.value).toBe(el);
-    expect(consumerRef.value?.tagName.toLowerCase()).toBe('zitadel-logout');
+    expect(consumerRef.value?.tagName.toLowerCase()).toBe("zitadel-logout");
   });
 });

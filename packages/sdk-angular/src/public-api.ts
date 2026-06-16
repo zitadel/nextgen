@@ -1,7 +1,7 @@
-export { ZitadelLoginComponent } from './lib/zitadel-login.component';
-export { ZitadelLogoutComponent } from './lib/zitadel-logout.component';
-export { configureZitadel } from './lib/config';
-export type { ZitadelConfig, ZitadelProject } from './lib/config';
+export { ZitadelLoginComponent } from "./lib/zitadel-login.component";
+export { ZitadelLogoutComponent } from "./lib/zitadel-logout.component";
+export { configureZitadel } from "./lib/config";
+export type { ZitadelConfig, ZitadelProject } from "./lib/config";
 // The shared SPA widget types, re-exported wholesale so this surface can never
 // drift from the core contract (a new type is picked up automatically).
-export type * from '@zitadel/sdk-core/types';
+export type * from "@zitadel/sdk-core/types";

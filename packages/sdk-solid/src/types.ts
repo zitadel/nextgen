@@ -6,4 +6,4 @@
  * hand. The server-middleware types live in a separate core module and stay out
  * of the browser SDK surface.
  */
-export type * from '@zitadel/sdk-core/types';
+export type * from "@zitadel/sdk-core/types";

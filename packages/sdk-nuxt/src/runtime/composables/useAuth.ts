@@ -1,6 +1,6 @@
-import { useState } from '#imports';
+import { useState } from "#imports";
 
-import type { ClientAuthResult } from '../types';
+import type { ClientAuthResult } from "../types";
 
 /**
  * Returns the current auth state in a Nuxt page or component.
@@ -26,7 +26,7 @@ import type { ClientAuthResult } from '../types';
  * @returns The current {@link ClientAuthResult}.
  */
 export const useAuth = (): ClientAuthResult =>
-  useState<ClientAuthResult>('nextgen-auth', () => ({
+  useState<ClientAuthResult>("nextgen-auth", () => ({
     isAuthenticated: false,
     session: null,
   })).value;

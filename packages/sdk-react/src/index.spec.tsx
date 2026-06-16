@@ -2,101 +2,91 @@
 import type {
   ZitadelLogin as ZitadelLoginElement,
   ZitadelLogout as ZitadelLogoutElement,
-} from '@zitadel/components';
+} from "@zitadel/components";
 
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, render } from "@testing-library/react";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
-} from '@zitadel/sdk-core/types';
-import * as React from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+} from "@zitadel/sdk-core/types";
+import * as React from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ZitadelLogin, ZitadelLogout } from './index';
+import { ZitadelLogin, ZitadelLogout } from "./index";
 
 // A representative project handle. The element still starts its flow before
 // @lit/react binds this prop (see vitest.config.ts), so the expected mount-time
 // rejection is ignored package-wide; these are light binding/event assertions.
-const project = { projectId: 'proj-test', proxyPath: '/__nextgen' };
+const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
 afterEach(cleanup);
 
-describe('ZitadelLogin', () => {
-  it('binds the project handle as a property', () => {
-    const { container } = render(
-      <ZitadelLogin project={project} purpose="login" />,
-    );
-    const el = container.querySelector<ZitadelLoginElement>('zitadel-login');
+describe("ZitadelLogin", () => {
+  it("binds the project handle as a property", () => {
+    const { container } = render(<ZitadelLogin project={project} purpose="login" />);
+    const el = container.querySelector<ZitadelLoginElement>("zitadel-login");
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
 
-  it('binds discrete projectId/proxyPath', () => {
-    const { container } = render(
-      <ZitadelLogin projectId="proj-test" proxyPath="/__nextgen" />,
-    );
-    const el = container.querySelector<ZitadelLoginElement>('zitadel-login');
-    expect(el!.projectId).toBe('proj-test');
-    expect(el!.proxyPath).toBe('/__nextgen');
+  it("binds discrete projectId/proxyPath", () => {
+    const { container } = render(<ZitadelLogin projectId="proj-test" proxyPath="/__nextgen" />);
+    const el = container.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(el!.projectId).toBe("proj-test");
+    expect(el!.proxyPath).toBe("/__nextgen");
   });
 
   it.each(Object.entries(ZITADEL_LOGIN_EVENT_HANDLERS))(
-    'forwards %s to its callback',
+    "forwards %s to its callback",
     (eventName, handlerProp) => {
       const spy = vi.fn();
-      const { container } = render(
-        <ZitadelLogin project={project} {...{ [handlerProp]: spy }} />,
-      );
-      const el = container.querySelector('zitadel-login');
+      const { container } = render(<ZitadelLogin project={project} {...{ [handlerProp]: spy }} />);
+      const el = container.querySelector("zitadel-login");
       const detail = { probe: eventName };
       el?.dispatchEvent(new CustomEvent(eventName, { detail }));
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
 
-  it('forwards a ref to the underlying element', () => {
+  it("forwards a ref to the underlying element", () => {
     const ref = React.createRef<ZitadelLoginElement>();
     const { container } = render(<ZitadelLogin ref={ref} project={project} />);
-    expect(ref.current).toBe(container.querySelector('zitadel-login'));
-    expect(ref.current?.tagName.toLowerCase()).toBe('zitadel-login');
+    expect(ref.current).toBe(container.querySelector("zitadel-login"));
+    expect(ref.current?.tagName.toLowerCase()).toBe("zitadel-login");
   });
 });
 
-describe('ZitadelLogout', () => {
-  it('binds the project handle as a property', () => {
+describe("ZitadelLogout", () => {
+  it("binds the project handle as a property", () => {
     const { container } = render(<ZitadelLogout project={project} />);
-    const el = container.querySelector<ZitadelLogoutElement>('zitadel-logout');
+    const el = container.querySelector<ZitadelLogoutElement>("zitadel-logout");
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
 
-  it('binds discrete projectId/proxyPath', () => {
-    const { container } = render(
-      <ZitadelLogout projectId="proj-test" proxyPath="/__nextgen" />,
-    );
-    const el = container.querySelector<ZitadelLogoutElement>('zitadel-logout');
-    expect(el!.projectId).toBe('proj-test');
-    expect(el!.proxyPath).toBe('/__nextgen');
+  it("binds discrete projectId/proxyPath", () => {
+    const { container } = render(<ZitadelLogout projectId="proj-test" proxyPath="/__nextgen" />);
+    const el = container.querySelector<ZitadelLogoutElement>("zitadel-logout");
+    expect(el!.projectId).toBe("proj-test");
+    expect(el!.proxyPath).toBe("/__nextgen");
   });
 
   it.each(Object.entries(ZITADEL_LOGOUT_EVENT_HANDLERS))(
-    'forwards %s to its callback',
+    "forwards %s to its callback",
     (eventName, handlerProp) => {
       const spy = vi.fn();
-      const { container } = render(
-        <ZitadelLogout project={project} {...{ [handlerProp]: spy }} />,
-      );
-      const el = container.querySelector('zitadel-logout');
+      const { container } = render(<ZitadelLogout project={project} {...{ [handlerProp]: spy }} />);
+      const el = container.querySelector("zitadel-logout");
       const detail = { probe: eventName };
       el?.dispatchEvent(new CustomEvent(eventName, { detail }));
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
 
-  it('forwards a ref to the underlying element', () => {
+  it("forwards a ref to the underlying element", () => {
     const ref = React.createRef<ZitadelLogoutElement>();
     const { container } = render(<ZitadelLogout ref={ref} project={project} />);
-    expect(ref.current).toBe(container.querySelector('zitadel-logout'));
-    expect(ref.current?.tagName.toLowerCase()).toBe('zitadel-logout');
+    expect(ref.current).toBe(container.querySelector("zitadel-logout"));
+    expect(ref.current?.tagName.toLowerCase()).toBe("zitadel-logout");
   });
 });

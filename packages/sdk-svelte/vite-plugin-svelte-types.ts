@@ -1,9 +1,9 @@
-import type { Plugin } from 'vite';
+import type { Plugin } from "vite";
 
-import * as fs from 'node:fs';
-import { createRequire } from 'node:module';
-import * as path from 'node:path';
-import { emitDts } from 'svelte2tsx';
+import * as fs from "node:fs";
+import { createRequire } from "node:module";
+import * as path from "node:path";
+import { emitDts } from "svelte2tsx";
 
 const require = createRequire(import.meta.url);
 
@@ -33,13 +33,13 @@ function walk(dir: string): readonly string[] {
  * `vite-plugin-solid` and Qwik optimizer plugins do for their frameworks.
  */
 export function svelteTypes(options: SvelteTypesOptions = {}): Plugin {
-  const inputRel = options.input ?? 'src';
-  let outDir = 'dist';
+  const inputRel = options.input ?? "src";
+  let outDir = "dist";
   let root = process.cwd();
 
   return {
-    name: 'vite-plugin-svelte-types',
-    apply: 'build',
+    name: "vite-plugin-svelte-types",
+    apply: "build",
 
     configResolved(config) {
       root = config.root;
@@ -47,13 +47,13 @@ export function svelteTypes(options: SvelteTypesOptions = {}): Plugin {
     },
 
     async closeBundle() {
-      const tmp = path.join(outDir, '.types-tmp');
+      const tmp = path.join(outDir, ".types-tmp");
       fs.rmSync(tmp, { recursive: true, force: true });
       fs.mkdirSync(tmp, { recursive: true });
 
       await emitDts({
         libRoot: path.resolve(root, inputRel),
-        svelteShimsPath: require.resolve('svelte2tsx/svelte-shims-v4.d.ts'),
+        svelteShimsPath: require.resolve("svelte2tsx/svelte-shims-v4.d.ts"),
         declarationDir: path.relative(root, tmp),
       });
 

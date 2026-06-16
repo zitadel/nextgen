@@ -1,33 +1,27 @@
 import type {
   ZitadelLogin as ZitadelLoginElement,
   ZitadelLogout as ZitadelLogoutElement,
-} from '@zitadel/components';
+} from "@zitadel/components";
 import type {
   ZitadelLoginConfig,
   ZitadelLoginHandlers,
   ZitadelLogoutConfig,
   ZitadelLogoutHandlers,
-} from '@zitadel/sdk-core/types';
+} from "@zitadel/sdk-core/types";
 
-import '@zitadel/components';
-import {
-  component$,
-  useSignal,
-  useVisibleTask$,
-  type QRL,
-  type Signal,
-} from '@builder.io/qwik';
+import "@zitadel/components";
+import { component$, useSignal, useVisibleTask$, type QRL, type Signal } from "@builder.io/qwik";
 import {
   configureZitadel,
   getApi,
   getZitadelConfig,
   type ZitadelConfig,
   type ZitadelProject,
-} from '@zitadel/api/config';
+} from "@zitadel/api/config";
 
 export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
-export * from './types';
+export * from "./types";
 
 /**
  * Passes the project config as a spread because `@zitadel/components`' Qwik JSX
@@ -54,9 +48,7 @@ function eventDetail<T>(event: Event): T {
  * widget emits. Adding a contract event surfaces a new `on…$` QRL prop here.
  */
 type Qrlify<H> = {
-  readonly [K in keyof H as `${K & string}$`]?: H[K] extends
-    | ((detail: infer D) => void)
-    | undefined
+  readonly [K in keyof H as `${K & string}$`]?: H[K] extends ((detail: infer D) => void) | undefined
     ? QRL<(detail: D) => void>
     : never;
 };
@@ -95,26 +87,22 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
       if (!el) {
         return;
       }
-      const onStep = (event: Event): void =>
-        void props.onFlowStep$?.(eventDetail(event));
-      const onInput = (event: Event): void =>
-        void props.onFlowInput$?.(eventDetail(event));
-      const onComplete = (event: Event): void =>
-        void props.onFlowComplete$?.(eventDetail(event));
-      const onError = (event: Event): void =>
-        void props.onFlowError$?.(eventDetail(event));
-      el.addEventListener('zitadel-flow-step', onStep);
-      el.addEventListener('zitadel-flow-input', onInput);
-      el.addEventListener('zitadel-flow-complete', onComplete);
-      el.addEventListener('zitadel-flow-error', onError);
+      const onStep = (event: Event): void => void props.onFlowStep$?.(eventDetail(event));
+      const onInput = (event: Event): void => void props.onFlowInput$?.(eventDetail(event));
+      const onComplete = (event: Event): void => void props.onFlowComplete$?.(eventDetail(event));
+      const onError = (event: Event): void => void props.onFlowError$?.(eventDetail(event));
+      el.addEventListener("zitadel-flow-step", onStep);
+      el.addEventListener("zitadel-flow-input", onInput);
+      el.addEventListener("zitadel-flow-complete", onComplete);
+      el.addEventListener("zitadel-flow-error", onError);
       cleanup(() => {
-        el.removeEventListener('zitadel-flow-step', onStep);
-        el.removeEventListener('zitadel-flow-input', onInput);
-        el.removeEventListener('zitadel-flow-complete', onComplete);
-        el.removeEventListener('zitadel-flow-error', onError);
+        el.removeEventListener("zitadel-flow-step", onStep);
+        el.removeEventListener("zitadel-flow-input", onInput);
+        el.removeEventListener("zitadel-flow-complete", onComplete);
+        el.removeEventListener("zitadel-flow-error", onError);
       });
     },
-    { strategy: 'document-ready' },
+    { strategy: "document-ready" },
   );
   return (
     <zitadel-login
@@ -125,7 +113,7 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
         }
       }}
       {...projectProp(props.project, props.projectId, props.proxyPath)}
-      purpose={props.purpose ?? 'login'}
+      purpose={props.purpose ?? "login"}
       post-sign-in-url={props.postSignInUrl}
     />
   );
@@ -163,14 +151,13 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
       if (!el) {
         return;
       }
-      const onSignout = (event: Event): void =>
-        void props.onSignout$?.(eventDetail(event));
-      el.addEventListener('zitadel-signout', onSignout);
+      const onSignout = (event: Event): void => void props.onSignout$?.(eventDetail(event));
+      el.addEventListener("zitadel-signout", onSignout);
       cleanup(() => {
-        el.removeEventListener('zitadel-signout', onSignout);
+        el.removeEventListener("zitadel-signout", onSignout);
       });
     },
-    { strategy: 'document-ready' },
+    { strategy: "document-ready" },
   );
   return (
     <zitadel-logout

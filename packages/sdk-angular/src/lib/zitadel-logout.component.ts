@@ -1,6 +1,6 @@
-import type { ElementRef } from '@angular/core';
-import type { ZitadelLogout as ZitadelLogoutElement } from '@zitadel/components';
-import type { ZitadelSignoutDetail } from '@zitadel/sdk-core/types';
+import type { ElementRef } from "@angular/core";
+import type { ZitadelLogout as ZitadelLogoutElement } from "@zitadel/components";
+import type { ZitadelSignoutDetail } from "@zitadel/sdk-core/types";
 
 import {
   Component,
@@ -9,11 +9,11 @@ import {
   Input,
   Output,
   ViewChild,
-} from '@angular/core';
+} from "@angular/core";
 
-import type { ZitadelProject } from './config';
+import type { ZitadelProject } from "./config";
 
-import '@zitadel/components';
+import "@zitadel/components";
 
 /**
  * Angular wrapper for the `<zitadel-logout>` Lit web component. See
@@ -28,7 +28,7 @@ import '@zitadel/components';
  * ```
  */
 @Component({
-  selector: 'zitadel-auth-logout',
+  selector: "zitadel-auth-logout",
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `<zitadel-logout
@@ -47,7 +47,7 @@ export class ZitadelLogoutComponent {
   @Input() postSignOutUrl?: string;
   @Output() signout = new EventEmitter<ZitadelSignoutDetail>();
 
-  @ViewChild('el') private elementRef?: ElementRef<ZitadelLogoutElement>;
+  @ViewChild("el") private elementRef?: ElementRef<ZitadelLogoutElement>;
 
   /** The underlying `<zitadel-logout>` custom element, or `null` before view init. */
   get element(): ZitadelLogoutElement | null {

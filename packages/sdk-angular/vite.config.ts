@@ -1,6 +1,6 @@
-import angular from '@analogjs/vite-plugin-angular';
-import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vite';
+import angular from "@analogjs/vite-plugin-angular";
+import { fileURLToPath } from "node:url";
+import { defineConfig } from "vite";
 
 // Angular library build via Vite (no ng-packagr). vite-plugin-angular drives
 // Angular's own compiler (NgtscProgram) to emit partial-Ivy JS; `ngc` emits the
@@ -13,19 +13,17 @@ export default defineConfig({
   plugins: [
     angular({
       jit: false,
-      tsconfig: fileURLToPath(
-        new URL('./tsconfig.lib.prod.json', import.meta.url),
-      ),
+      tsconfig: fileURLToPath(new URL("./tsconfig.lib.prod.json", import.meta.url)),
     }),
   ],
   build: {
     lib: {
-      entry: './src/public-api.ts',
-      formats: ['es'],
-      fileName: 'index',
+      entry: "./src/public-api.ts",
+      formats: ["es"],
+      fileName: "index",
     },
     rollupOptions: {
-      external: [/^@angular\//, /^@zitadel\//, /^rxjs($|\/)/, 'tslib'],
+      external: [/^@angular\//, /^@zitadel\//, /^rxjs($|\/)/, "tslib"],
     },
   },
 });

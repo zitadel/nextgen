@@ -1,14 +1,14 @@
-import { readFileSync, readdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { readFileSync, readdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGIN_EVENTS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENTS,
-} from './types.js';
+} from "./types.js";
 
 /**
  * The element↔contract drift guard.
@@ -23,9 +23,7 @@ import {
  * contract forces every SDK (via their contract-driven forwarding tests) to
  * wire or drop the event.
  */
-const componentsSrc = fileURLToPath(
-  new URL('../../components/src/', import.meta.url),
-);
+const componentsSrc = fileURLToPath(new URL("../../components/src/", import.meta.url));
 
 // Both dispatch forms, any quote style, digits allowed in the event name:
 //   emit(this, "zitadel-…")   emit(host, 'zitadel-…')   new CustomEvent(`zitadel-…`)
@@ -36,12 +34,12 @@ function dispatchedWidgetEvents(): string[] {
   const events = new Set<string>();
   for (const relativePath of readdirSync(componentsSrc, {
     recursive: true,
-    encoding: 'utf8',
+    encoding: "utf8",
   })) {
-    if (!relativePath.endsWith('.ts') || relativePath.endsWith('.spec.ts')) {
+    if (!relativePath.endsWith(".ts") || relativePath.endsWith(".spec.ts")) {
       continue;
     }
-    const source = readFileSync(`${componentsSrc}${relativePath}`, 'utf8');
+    const source = readFileSync(`${componentsSrc}${relativePath}`, "utf8");
     for (const match of source.matchAll(WIDGET_EVENT)) {
       const event = match[1];
       if (event) {
@@ -52,17 +50,14 @@ function dispatchedWidgetEvents(): string[] {
   return [...events].sort();
 }
 
-describe('SPA widget contract ↔ @zitadel/components', () => {
-  it('declares exactly the events the elements dispatch', () => {
+describe("SPA widget contract ↔ @zitadel/components", () => {
+  it("declares exactly the events the elements dispatch", () => {
     const declared = [...ZITADEL_LOGIN_EVENTS, ...ZITADEL_LOGOUT_EVENTS].sort();
     expect(dispatchedWidgetEvents()).toEqual(declared);
   });
 
-  it('maps every event to a distinct handler prop', () => {
-    for (const handlers of [
-      ZITADEL_LOGIN_EVENT_HANDLERS,
-      ZITADEL_LOGOUT_EVENT_HANDLERS,
-    ]) {
+  it("maps every event to a distinct handler prop", () => {
+    for (const handlers of [ZITADEL_LOGIN_EVENT_HANDLERS, ZITADEL_LOGOUT_EVENT_HANDLERS]) {
       const names = Object.values(handlers);
       expect(new Set(names).size).toBe(names.length);
     }

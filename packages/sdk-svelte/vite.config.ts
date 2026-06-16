@@ -1,7 +1,7 @@
-import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { defineConfig } from 'vite';
+import { svelte } from "@sveltejs/vite-plugin-svelte";
+import { defineConfig } from "vite";
 
-import { svelteTypes } from './vite-plugin-svelte-types';
+import { svelteTypes } from "./vite-plugin-svelte-types";
 
 // Svelte library build. vite-plugin-svelte compiles the components to JS;
 // svelteTypes() emits the `.d.ts` via svelte2tsx (the engine svelte-package
@@ -10,13 +10,13 @@ import { svelteTypes } from './vite-plugin-svelte-types';
 export default defineConfig({
   build: {
     lib: {
-      entry: './src/lib/index.ts',
-      formats: ['es'],
-      fileName: 'index',
+      entry: "./src/lib/index.ts",
+      formats: ["es"],
+      fileName: "index",
     },
     rollupOptions: {
       external: [/^@zitadel\//, /^svelte($|\/)/],
     },
   },
-  plugins: [svelte(), svelteTypes({ input: 'src/lib' })],
+  plugins: [svelte(), svelteTypes({ input: "src/lib" })],
 });
