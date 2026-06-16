@@ -4,15 +4,20 @@ set -eu
 
 root="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 
+build_project() {
+  project="$1"
+  (cd "$root" && moon run "$project:build")
+}
+
 build_console() {
   if [ -f "$root/apps/console/package.json" ]; then
-    (cd "$root" && COREPACK_DEFAULT_TO_LATEST=0 corepack pnpm --filter @zitadel/console run build)
+    build_project console
   fi
 }
 
 build_login() {
   if [ -f "$root/apps/login-ui/package.json" ]; then
-    (cd "$root" && COREPACK_DEFAULT_TO_LATEST=0 corepack pnpm --filter @zitadel/login-ui run build)
+    build_project login-ui
   fi
 }
 
