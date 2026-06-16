@@ -1,3 +1,7 @@
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 type CheckChangesetsStatusModule = {
@@ -45,6 +49,7 @@ type ReleaseAutomationModule = {
     entries?: Array<{ status: string; file: string }>;
     message?: string;
     pendingChangesets?: string[];
+    prereleaseChangesetIds?: string[];
   }) => Promise<{
     ok: boolean;
     shouldRun: boolean;
@@ -52,6 +57,10 @@ type ReleaseAutomationModule = {
     errors: string[];
   }>;
   isVersionPackageCommit: (message: string) => boolean;
+};
+
+type ReleaseModule = {
+  assertNoUnrecordedPendingChangesets: (repoRoot: string) => Promise<void>;
 };
 
 type CheckChangesetStatus = {
@@ -78,6 +87,12 @@ async function loadReleaseAutomationModule(): Promise<ReleaseAutomationModule> {
   return (await import(
     new URL("../../../../../scripts/release-automation.mjs", import.meta.url).href
   )) as ReleaseAutomationModule;
+}
+
+async function loadReleaseModule(): Promise<ReleaseModule> {
+  return (await import(
+    new URL("../../../../../scripts/release.mjs", import.meta.url).href
+  )) as ReleaseModule;
 }
 
 describe("check-changesets-status", () => {
@@ -370,12 +385,43 @@ describe("release-automation", () => {
     expect(result.shouldRun).toBe(false);
   });
 
+  it("skips prepare when prerelease mode already recorded the pending changesets", async () => {
+    const { detectReleaseAutomation } = await loadReleaseAutomationModule();
+    const result = await detectReleaseAutomation({
+      mode: "prepare",
+      pendingChangesets: [".changeset/cli-start.md"],
+      prereleaseChangesetIds: ["cli-start"],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.shouldRun).toBe(false);
+    expect(result.reason).toContain("already recorded");
+  });
+
   it("runs publish for a valid Changesets version package commit", async () => {
     const { detectReleaseAutomation } = await loadReleaseAutomationModule();
     const result = await detectReleaseAutomation({
       mode: "publish",
       message: "build: version packages (alpha)\n",
       pendingChangesets: [],
+      entries: [
+        { status: "M", file: ".changeset/pre.json" },
+        { status: "M", file: "apps/cli/package.json" },
+        { status: "M", file: "apps/cli/CHANGELOG.md" },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.shouldRun).toBe(true);
+  });
+
+  it("runs publish for a prerelease version commit with recorded pending changesets", async () => {
+    const { detectReleaseAutomation } = await loadReleaseAutomationModule();
+    const result = await detectReleaseAutomation({
+      mode: "publish",
+      message: "build: version packages (alpha)\n",
+      pendingChangesets: [".changeset/cli-start.md"],
+      prereleaseChangesetIds: ["cli-start"],
       entries: [
         { status: "M", file: ".changeset/pre.json" },
         { status: "M", file: "apps/cli/package.json" },
@@ -434,6 +480,49 @@ describe("release-automation", () => {
     expect(result.errors).toEqual(
       expect.arrayContaining([expect.stringContaining("outside Changesets version output")]),
     );
+  });
+
+  it("fails publish when a version package commit leaves unrecorded pending changesets", async () => {
+    const { detectReleaseAutomation } = await loadReleaseAutomationModule();
+    const result = await detectReleaseAutomation({
+      mode: "publish",
+      message: "build: version packages (alpha)\n",
+      pendingChangesets: [".changeset/cli-start.md", ".changeset/sdk-start.md"],
+      prereleaseChangesetIds: ["cli-start"],
+      entries: [
+        { status: "M", file: ".changeset/pre.json" },
+        { status: "M", file: "apps/cli/package.json" },
+        { status: "M", file: "apps/cli/CHANGELOG.md" },
+      ],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.shouldRun).toBe(false);
+    expect(result.errors).toEqual(
+      expect.arrayContaining([expect.stringContaining(".changeset/sdk-start.md")]),
+    );
+  });
+});
+
+describe("release publish guard", () => {
+  it("allows prerelease-recorded pending changesets and rejects unrecorded ones", async () => {
+    const { assertNoUnrecordedPendingChangesets } = await loadReleaseModule();
+    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-guard-"));
+    try {
+      await mkdir(join(repoRoot, ".changeset"));
+      await writeFile(join(repoRoot, ".changeset", "cli-start.md"), "---\n---\n");
+      await writeFile(
+        join(repoRoot, ".changeset", "pre.json"),
+        JSON.stringify({ mode: "pre", changesets: ["cli-start"] }),
+      );
+
+      await expect(assertNoUnrecordedPendingChangesets(repoRoot)).resolves.toBeUndefined();
+
+      await writeFile(join(repoRoot, ".changeset", "sdk-start.md"), "---\n---\n");
+      await expect(assertNoUnrecordedPendingChangesets(repoRoot)).rejects.toThrow("sdk-start");
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
   });
 });
 
