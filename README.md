@@ -130,7 +130,7 @@ release metadata.
 # Local snapshot without publishing
 moon run release:snapshot
 
-# Dry-run the manual publish graph
+# Dry-run the publish graph
 moon run release:publish -- --dry-run
 ```
 
@@ -150,13 +150,13 @@ user-visible change to those packages:
 corepack pnpm changeset
 ```
 
-The manual `release-prepare.yml` workflow runs Moon release validation,
-preflights pending Changesets, executes `changeset version`, and opens or
-updates the version PR with the release GitHub App so the required `full-pr`
-check runs normally. After that PR is reviewed and merged,
-`release-publish.yml` publishes npm packages with Changesets, pushes the
-product tag and container image, and creates or updates the single product
-GitHub Release.
+When pending changesets land on `main`, `release-prepare.yml` runs Moon release
+validation, preflights pending Changesets, executes `changeset version`, and
+opens or updates the version PR with the release GitHub App so the required
+`full-pr` check runs normally. After that PR is reviewed and merged,
+`release-publish.yml` automatically publishes npm packages with Changesets,
+pushes the product tag and container image, and creates or updates the single
+product GitHub Release.
 
 Check local Changesets status with:
 
@@ -164,14 +164,15 @@ Check local Changesets status with:
 moon run release:changesets -- --base origin/main --summary
 ```
 
-Before manually preparing a release, validate all pending changesets with:
+Before forcing release preparation manually, validate all pending changesets
+with:
 
 ```sh
 moon run release:changesets -- --pending --summary
 ```
 
-Follow the [manual release runbook](docs/runbooks/manual-release.md) when
-cutting a release.
+Follow the [release runbook](docs/runbooks/manual-release.md) when cutting or
+recovering a release.
 
 Release process checks can be run locally with:
 

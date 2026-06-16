@@ -4,6 +4,7 @@ type CheckChangesetsStatusModule = {
   checkChangesetsStatus: (options: {
     base?: string;
     pending?: boolean;
+    versionPr?: boolean;
     entries: Array<{ status: string; file: string }>;
     config: { fixed: string[][] };
     changesetSources?: Record<string, string>;
@@ -37,6 +38,22 @@ type CheckChangesetsStatusModule = {
   publicPackages: Array<{ name: string; root: string }>;
 };
 
+type ReleaseAutomationModule = {
+  detectReleaseAutomation: (options: {
+    mode: "prepare" | "publish";
+    base?: string;
+    entries?: Array<{ status: string; file: string }>;
+    message?: string;
+    pendingChangesets?: string[];
+  }) => Promise<{
+    ok: boolean;
+    shouldRun: boolean;
+    reason: string;
+    errors: string[];
+  }>;
+  isVersionPackageCommit: (message: string) => boolean;
+};
+
 type CheckChangesetStatus = {
   changesets?: Array<{
     id: string;
@@ -55,6 +72,12 @@ async function loadModule(): Promise<CheckChangesetsStatusModule> {
   return (await import(
     new URL("../../../../../scripts/check-changesets-status.mjs", import.meta.url).href
   )) as CheckChangesetsStatusModule;
+}
+
+async function loadReleaseAutomationModule(): Promise<ReleaseAutomationModule> {
+  return (await import(
+    new URL("../../../../../scripts/release-automation.mjs", import.meta.url).href
+  )) as ReleaseAutomationModule;
 }
 
 describe("check-changesets-status", () => {
@@ -124,6 +147,27 @@ Improve local start behavior.
 
     expect(report.ok).toBe(true);
     expect(report.nextAction).toContain("Changesets are present");
+  });
+
+  it("passes when an empty changeset covers non-shipping publishable path changes", async () => {
+    const { checkChangesetsStatus } = await loadModule();
+    const report = await checkChangesetsStatus({
+      entries: [
+        { status: "M", file: "apps/cli/tests/unit/scripts/check-changesets-status.test.ts" },
+        { status: "A", file: ".changeset/release-tests.md" },
+      ],
+      config: validConfig(),
+      changesetSources: {
+        ".changeset/release-tests.md": `---
+---
+
+Exercise release workflow scripts without changing published package behavior.
+`,
+      },
+    });
+
+    expect(report.ok).toBe(true);
+    expect(report.nextAction).toContain("Empty changeset");
   });
 
   it("passes pending mode when public changesets are valid", async () => {
@@ -259,6 +303,137 @@ This package is private.
     expect(report.ok).toBe(true);
     expect(report.analysis.versionOnly).toBe(true);
     expect(report.nextAction).toContain("Version PR output detected");
+  });
+
+  it("passes generated version PR output without deleted changeset files in version PR mode", async () => {
+    const { checkChangesetsStatus } = await loadModule();
+    const report = await checkChangesetsStatus({
+      versionPr: true,
+      entries: [
+        { status: "M", file: ".changeset/pre.json" },
+        { status: "M", file: "apps/cli/package.json" },
+        { status: "M", file: "apps/cli/CHANGELOG.md" },
+        { status: "M", file: "packages/sdk-core/package.json" },
+        { status: "M", file: "packages/sdk-core/CHANGELOG.md" },
+      ],
+      config: validConfig(),
+    });
+
+    expect(report.ok).toBe(true);
+    expect(report.analysis.versionOnly).toBe(true);
+    expect(report.nextAction).toContain("Version PR output detected");
+  });
+
+  it("does not treat package and changelog edits as version output outside version PR mode", async () => {
+    const { checkChangesetsStatus } = await loadModule();
+    const report = await checkChangesetsStatus({
+      entries: [
+        { status: "M", file: "apps/cli/package.json" },
+        { status: "M", file: "apps/cli/CHANGELOG.md" },
+      ],
+      config: validConfig(),
+    });
+
+    expect(report.ok).toBe(false);
+    expect(report.analysis.versionOnly).toBe(false);
+    expect(report.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "missing-changeset",
+        }),
+      ]),
+    );
+  });
+});
+
+describe("release-automation", () => {
+  it("runs prepare when pending changesets exist", async () => {
+    const { detectReleaseAutomation } = await loadReleaseAutomationModule();
+    const result = await detectReleaseAutomation({
+      mode: "prepare",
+      pendingChangesets: [".changeset/cli-start.md"],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.shouldRun).toBe(true);
+    expect(result.reason).toContain("pending changeset");
+  });
+
+  it("skips prepare when no pending changesets exist", async () => {
+    const { detectReleaseAutomation } = await loadReleaseAutomationModule();
+    const result = await detectReleaseAutomation({
+      mode: "prepare",
+      pendingChangesets: [],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.shouldRun).toBe(false);
+  });
+
+  it("runs publish for a valid Changesets version package commit", async () => {
+    const { detectReleaseAutomation } = await loadReleaseAutomationModule();
+    const result = await detectReleaseAutomation({
+      mode: "publish",
+      message: "build: version packages (alpha)\n",
+      pendingChangesets: [],
+      entries: [
+        { status: "M", file: ".changeset/pre.json" },
+        { status: "M", file: "apps/cli/package.json" },
+        { status: "M", file: "apps/cli/CHANGELOG.md" },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.shouldRun).toBe(true);
+  });
+
+  it("skips publish for ordinary main commits", async () => {
+    const { detectReleaseAutomation } = await loadReleaseAutomationModule();
+    const result = await detectReleaseAutomation({
+      mode: "publish",
+      message: "feat: update cli start\n",
+      pendingChangesets: [],
+      entries: [
+        { status: "M", file: "apps/cli/src/commands/start.ts" },
+        { status: "A", file: ".changeset/cli-start.md" },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.shouldRun).toBe(false);
+  });
+
+  it("skips publish for version package commits with only empty changeset output", async () => {
+    const { detectReleaseAutomation } = await loadReleaseAutomationModule();
+    const result = await detectReleaseAutomation({
+      mode: "publish",
+      message: "build: version packages (alpha)\n",
+      pendingChangesets: [],
+      entries: [{ status: "D", file: ".changeset/release-tests.md" }],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.shouldRun).toBe(false);
+    expect(result.reason).toContain("no publishable package version output");
+  });
+
+  it("fails publish when a version package commit changes non-version files", async () => {
+    const { detectReleaseAutomation } = await loadReleaseAutomationModule();
+    const result = await detectReleaseAutomation({
+      mode: "publish",
+      message: "build: version packages (alpha)\n",
+      pendingChangesets: [],
+      entries: [
+        { status: "M", file: "apps/cli/package.json" },
+        { status: "M", file: "docs/release.md" },
+      ],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.shouldRun).toBe(false);
+    expect(result.errors).toEqual(
+      expect.arrayContaining([expect.stringContaining("outside Changesets version output")]),
+    );
   });
 });
 

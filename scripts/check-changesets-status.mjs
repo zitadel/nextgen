@@ -34,6 +34,7 @@ export function parseArgs(args) {
     base: "origin/main",
     pending: false,
     summary: false,
+    versionPr: false,
     help: false,
   };
 
@@ -54,6 +55,10 @@ export function parseArgs(args) {
     }
     if (arg === "--pending") {
       parsed.pending = true;
+      continue;
+    }
+    if (arg === "--version-pr") {
+      parsed.versionPr = true;
       continue;
     }
     if (arg === "--help" || arg === "-h") {
@@ -84,7 +89,7 @@ export function parseNameStatus(output) {
     });
 }
 
-export function analyzeChangedEntries(entries) {
+export function analyzeChangedEntries(entries, options = {}) {
   const changedFiles = entries.map((entry) => entry.file);
   const currentChangesetFiles = entries
     .filter((entry) => entry.status !== "D" && isChangesetMarkdown(entry.file))
@@ -96,11 +101,14 @@ export function analyzeChangedEntries(entries) {
     .map((entry) => ({ ...entry, pkg: packageForFile(entry.file) }))
     .filter((entry) => entry.pkg);
   const changedPackages = groupPublishableEntries(publishableEntries);
-  const versionOnly =
+  const versionOutputOnly =
     entries.length > 0 &&
     currentChangesetFiles.length === 0 &&
-    deletedChangesetFiles.length > 0 &&
     entries.every((entry) => isVersionOutputFile(entry.file));
+  const versionOnly =
+    versionOutputOnly &&
+    publishableEntries.length > 0 &&
+    (deletedChangesetFiles.length > 0 || options.versionPr === true);
 
   return {
     changedFiles,
@@ -108,6 +116,7 @@ export function analyzeChangedEntries(entries) {
     deletedChangesetFiles,
     publishableEntries,
     changedPackages,
+    versionOutputOnly,
     versionOnly,
   };
 }
@@ -181,10 +190,11 @@ export function validateFixedGroup(config) {
 export async function checkChangesetsStatus(options) {
   const base = options.base ?? "origin/main";
   const pending = options.pending ?? false;
+  const versionPr = options.versionPr ?? false;
   const root = options.repoRoot ?? repoRoot;
   const entries = options.entries ?? (pending ? await pendingChangesetEntries(root) : await gitChangedEntries(root, base));
   const config = options.config ?? (await readChangesetsConfig(root));
-  const analysis = analyzeChangedEntries(entries);
+  const analysis = analyzeChangedEntries(entries, { versionPr });
   const errors = validateFixedGroup(config).map((message) => ({
     code: "fixed-group",
     message,
@@ -209,7 +219,12 @@ export async function checkChangesetsStatus(options) {
       }
     }
 
-    if (!changesetStatus && (pending || !errors.some((error) => error.code === "invalid-changeset-package"))) {
+    const hasPackageChangeset = parsedChangesets.some((changeset) => changeset.packages.length > 0);
+    if (
+      hasPackageChangeset &&
+      !changesetStatus &&
+      (pending || !errors.some((error) => error.code === "invalid-changeset-package"))
+    ) {
       try {
         changesetStatus = await (options.runChangesetStatus ?? readChangesetStatus)({
           repoRoot: root,
@@ -238,11 +253,12 @@ export async function checkChangesetsStatus(options) {
     ok: errors.length === 0,
     base,
     pending,
+    versionPr,
     analysis,
     errors,
     parsedChangesets,
     changesetStatus,
-    nextAction: nextAction({ analysis, errors, changesetStatus, pending }),
+    nextAction: nextAction({ analysis, errors, changesetStatus, pending, parsedChangesets }),
   };
 }
 
@@ -279,6 +295,7 @@ export function renderStepSummary(report) {
     "",
     `Status: ${report.ok ? "passed" : "failed"}`,
     `Mode: ${report.pending ? "pending changesets" : "diff against base"}`,
+    `Version PR: ${report.versionPr ? "yes" : "no"}`,
     ...(report.pending ? [] : [`Base: \`${report.base}\``]),
     "",
     "## Changed publishable paths",
@@ -352,6 +369,7 @@ export async function main(args = forwardedArgs(), options = {}) {
     repoRoot: options.repoRoot ?? repoRoot,
     base: parsed.base,
     pending: parsed.pending,
+    versionPr: parsed.versionPr,
     entries: options.entries,
     config: options.config,
     changesetSources: options.changesetSources,
@@ -460,7 +478,7 @@ function groupPublishableEntries(entries) {
   return groups;
 }
 
-function nextAction({ analysis, errors, changesetStatus, pending }) {
+function nextAction({ analysis, errors, changesetStatus, pending, parsedChangesets }) {
   if (errors.some((error) => error.code === "missing-changeset")) {
     return "Add a real changeset with `corepack pnpm changeset`, or rarely add an empty changeset if no published behavior changes.";
   }
@@ -474,7 +492,13 @@ function nextAction({ analysis, errors, changesetStatus, pending }) {
     return "Fix the Changesets status errors above, then rerun this check.";
   }
   if (analysis.versionOnly) {
-    return "Version PR output detected. Merge after CI is green, then run the manual publish workflow.";
+    return "Version PR output detected. Merge after CI is green; release-publish will run automatically from main.";
+  }
+  if (
+    analysis.currentChangesetFiles.length > 0 &&
+    parsedChangesets.every((changeset) => changeset.packages.length === 0)
+  ) {
+    return "Empty changeset is present for non-shipping publishable path changes.";
   }
   if (pending && analysis.currentChangesetFiles.length === 0) {
     return "No pending changesets found.";
@@ -494,10 +518,11 @@ function escapeMarkdown(value) {
 }
 
 function printUsage() {
-  console.log(`Usage: node scripts/check-changesets-status.mjs [--base <ref>] [--pending] [--summary]
+  console.log(`Usage: node scripts/check-changesets-status.mjs [--base <ref>] [--pending] [--version-pr] [--summary]
 
 Checks whether the current diff has valid Changesets coverage for public packages.
 Use --pending to validate all current pending .changeset/*.md files before release prepare.
+Use --version-pr only for generated Changesets Version Packages PRs.
 `);
 }
 
