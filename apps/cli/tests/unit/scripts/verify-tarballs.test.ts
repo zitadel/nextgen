@@ -20,6 +20,9 @@ const packageDirs = [
   "packages/sdk-react",
   "packages/sdk-vue",
   "packages/sdk-angular",
+  "packages/sdk-solid",
+  "packages/sdk-svelte",
+  "packages/sdk-qwik",
 ];
 const tempDirs: string[] = [];
 
@@ -37,7 +40,7 @@ describe("verify-tarballs script", () => {
     const tarballsDir = await fixtureTarballs();
 
     await expect(runVerify(tarballsDir)).resolves.toMatchObject({
-      stdout: expect.stringContaining("verified 9 installable tarballs"),
+      stdout: expect.stringContaining("verified 12 installable tarballs"),
     });
   });
 

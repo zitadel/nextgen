@@ -23,6 +23,9 @@ const publicPackageNames = [
   "@zitadel/sdk-react",
   "@zitadel/sdk-vue",
   "@zitadel/sdk-angular",
+  "@zitadel/sdk-solid",
+  "@zitadel/sdk-svelte",
+  "@zitadel/sdk-qwik",
 ];
 
 const releaseJobCondition =

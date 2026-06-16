@@ -17,6 +17,9 @@ export const PUBLIC_PACKAGE_MANIFESTS = [
   "packages/sdk-react/package.json",
   "packages/sdk-vue/package.json",
   "packages/sdk-angular/package.json",
+  "packages/sdk-solid/package.json",
+  "packages/sdk-svelte/package.json",
+  "packages/sdk-qwik/package.json",
 ];
 
 export const PUBLIC_PACKAGE_NAMES = [
@@ -29,6 +32,9 @@ export const PUBLIC_PACKAGE_NAMES = [
   "@zitadel/sdk-react",
   "@zitadel/sdk-vue",
   "@zitadel/sdk-angular",
+  "@zitadel/sdk-solid",
+  "@zitadel/sdk-svelte",
+  "@zitadel/sdk-qwik",
 ];
 
 export const SERVER_IMAGE_NAME = "ghcr.io/zitadel/nextgen";
