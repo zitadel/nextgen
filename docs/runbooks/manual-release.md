@@ -22,6 +22,9 @@ publishing, and public package tags.
 
 ## Manual controls
 
+- GitHub renders the `dry_run` workflow input as a checkbox: checked means no
+  remote mutations; unchecked allows publishing when the normal or recovery
+  gates pass.
 - Run `release-publish` manually with `dry_run=true` to build and verify
   server archives, checksums, npm tarballs, and Docker metadata without
   publishing.

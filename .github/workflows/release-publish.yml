@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Build and verify without publishing."
+        description: "Dry run: build and verify only. Uncheck to allow publishing."
         required: true
         default: true
         type: boolean
