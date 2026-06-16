@@ -154,6 +154,8 @@ moon run release:changesets -- --pending --summary
 The repo is currently in changesets **prerelease mode** with the `alpha` tag (see `.changeset/pre.json`). While in this mode:
 
 - `changeset version` cuts versions like `0.1.0-alpha.0`, `0.1.0-alpha.1`, …
+- Pending `.changeset/*.md` files remain in the tree after versioning; consumed
+  changesets are recorded in `.changeset/pre.json`.
 - Public product packages are versioned together through the fixed group.
 - `changeset publish` publishes public npm packages under the **`alpha`** npm dist-tag while prerelease mode is active.
 - A package that has never had a stable release is published to `latest` on its first publish (changesets behaviour), then to `alpha` thereafter until it has a stable release.

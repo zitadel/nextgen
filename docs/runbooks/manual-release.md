@@ -27,7 +27,9 @@ publishing, and public package tags.
 - Run `release-publish` manually with `dry_run=true` to build and verify server
   archives, checksums, npm tarballs, and Docker metadata without publishing.
 - Run `release-publish` manually with `dry_run=false` only to retry a publish
-  from the current `main` version commit.
+  from a detected version commit. If the version commit already merged and a
+  later release-infrastructure fix is needed, set `retry_current_version=true`
+  as well to publish the already-versioned current `main`.
 - Verify npm packages, `ghcr.io/zitadel/nextgen:<version>`, the product
   `v<version>` tag, and the GitHub Release after publish.
 
