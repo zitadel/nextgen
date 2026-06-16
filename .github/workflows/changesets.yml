@@ -36,6 +36,12 @@ jobs:
         run: corepack pnpm install --frozen-lockfile
 
       - name: Check Changesets status
-        run: moon run release:changesets -- --base "$BASE_REF" --summary
+        run: |
+          args=(--base "$BASE_REF" --summary)
+          if [[ "$VERSION_PR" == "true" ]]; then
+            args+=(--version-pr)
+          fi
+          moon run release:changesets -- "${args[@]}"
         env:
           BASE_REF: ${{ github.event.pull_request.base.sha || 'origin/main' }}
+          VERSION_PR: ${{ startsWith(github.head_ref || github.ref_name, 'changeset-release/') }}

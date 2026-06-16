@@ -1,9 +1,13 @@
 #!/usr/bin/env node
-import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
+import {
+  findUnrecordedPendingChangesets,
+  readPendingChangesets,
+  readPrereleaseChangesetIds,
+} from "./release-automation.mjs";
 import {
   CONTAINER_PLATFORMS,
   buildContainerImage,
@@ -93,7 +97,7 @@ async function commandPack() {
 async function commandPublish(options) {
   const release = await readServerRelease(repoRoot);
   const outDir = releaseDir(repoRoot, release.version);
-  await assertNoPendingChangesets();
+  await assertNoUnrecordedPendingChangesets();
   await assertMainBranch(options);
 
   if (options.dryRun) {
@@ -174,13 +178,14 @@ function parseOptions(args) {
   return parsed;
 }
 
-async function assertNoPendingChangesets() {
-  const entries = await readdir(join(repoRoot, ".changeset"), { withFileTypes: true });
-  const pending = entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".md") && entry.name !== "README.md")
-    .map((entry) => entry.name);
-  if (pending.length > 0) {
-    throw new Error(`release publish requires a versioned branch with no pending changesets: ${pending.join(", ")}`);
+export async function assertNoUnrecordedPendingChangesets(root = repoRoot) {
+  const pending = await readPendingChangesets(root);
+  const prereleaseChangesetIds = await readPrereleaseChangesetIds(root);
+  const unrecorded = findUnrecordedPendingChangesets(pending, prereleaseChangesetIds);
+  if (unrecorded.length > 0) {
+    throw new Error(
+      `release publish requires all pending changesets to be recorded in .changeset/pre.json: ${unrecorded.join(", ")}`,
+    );
   }
 }
 

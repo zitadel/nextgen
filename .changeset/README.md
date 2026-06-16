@@ -142,7 +142,8 @@ The public packages above are in one Changesets fixed group while the repo is
 in alpha, so a version PR moves the CLI, SDKs, API packages, and server npm
 runtime together.
 
-Before manually preparing a release, validate all pending changesets with:
+Before forcing release preparation manually, validate all pending changesets
+with:
 
 ```sh
 moon run release:changesets -- --pending --summary
@@ -153,6 +154,8 @@ moon run release:changesets -- --pending --summary
 The repo is currently in changesets **prerelease mode** with the `alpha` tag (see `.changeset/pre.json`). While in this mode:
 
 - `changeset version` cuts versions like `0.1.0-alpha.0`, `0.1.0-alpha.1`, …
+- Pending `.changeset/*.md` files remain in the tree after versioning; consumed
+  changesets are recorded in `.changeset/pre.json`.
 - Public product packages are versioned together through the fixed group.
 - `changeset publish` publishes public npm packages under the **`alpha`** npm dist-tag while prerelease mode is active.
 - A package that has never had a stable release is published to `latest` on its first publish (changesets behaviour), then to `alpha` thereafter until it has a stable release.
@@ -166,14 +169,16 @@ corepack pnpm changeset version   # strips the -alpha suffix
 
 ## Publishing (npm trusted publishing / OIDC)
 
-The manual `release-prepare.yml` workflow validates all pending changesets,
-then runs the [changesets GitHub Action](https://github.com/changesets/action)
-to open a "Version Packages" PR aggregating pending changesets. It uses the
-release GitHub App token rather than the default `GITHUB_TOKEN`, so the version
-PR triggers the required `full-pr` check normally. After that PR merges and CI
-is green, `release-publish.yml` runs Moon release tasks, publishes npm packages
-with `changeset publish`, pushes server containers, and updates the product
-GitHub Release.
+When pending changesets are merged to `main`, `release-prepare.yml` validates
+them, then runs the [changesets GitHub Action](https://github.com/changesets/action)
+to open or update a "Version Packages" PR aggregating pending changesets. It
+uses the release GitHub App token rather than the default `GITHUB_TOKEN`, so the
+version PR triggers the required `full-pr` check normally. After that PR merges
+and CI is green, `release-publish.yml` automatically runs Moon release tasks,
+publishes npm packages with `changeset publish`, pushes server containers, and
+updates the product GitHub Release. Manual workflow dispatch remains available
+for retrying prepare, dry-running publish, or recovering from external registry
+problems.
 
 Publishing authenticates with **npm trusted publishing (OIDC)** — there is **no `NPM_TOKEN`** secret. Before the first automated publish, a maintainer must, once per public package:
 
