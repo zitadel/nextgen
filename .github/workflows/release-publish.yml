@@ -23,6 +23,11 @@ on:
         required: true
         default: true
         type: boolean
+      recover_version:
+        description: "Exact already-versioned release to recover, for example 0.1.0-alpha.8. Leave empty for normal publish detection."
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: write
@@ -132,16 +137,28 @@ jobs:
 
       - name: Publish dry run
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
-        run: env -u CI -u GITHUB_ACTIONS moon run release:publish -- --dry-run
+        run: |
+          args=(release:publish -- --dry-run)
+          if [ -n "$RECOVER_VERSION" ]; then
+            args+=(--recover-version "$RECOVER_VERSION")
+          fi
+          env -u CI -u GITHUB_ACTIONS moon run "${args[@]}"
         env:
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: "false"
+          RECOVER_VERSION: ${{ inputs.recover_version }}
 
       - name: Publish release
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && ! inputs.dry_run) }}
-        run: env -u CI -u GITHUB_ACTIONS moon run release:publish
+        run: |
+          args=(release:publish)
+          if [ -n "$RECOVER_VERSION" ]; then
+            args+=(-- --recover-version "$RECOVER_VERSION")
+          fi
+          env -u CI -u GITHUB_ACTIONS moon run "${args[@]}"
         env:
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: "false"
+          RECOVER_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.recover_version || '' }}

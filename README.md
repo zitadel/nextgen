@@ -121,10 +121,10 @@ and [docs/adrs/023-lockstep-alpha-release-train.md](docs/adrs/023-lockstep-alpha
 
 ### Moon release artifacts
 
-Moon runs repo-owned scripts that build the console and login-ui SPAs, sync them
-into `internal/*/dist`, cross-compile the Go server, stage npm platform
-packages, create archives and checksums, build Docker images, and assemble
-release metadata.
+Moon runs repo-owned scripts that build the console and login-ui SPAs directly
+into `internal/staticui/*/dist`, cross-compile the Go server, stage npm
+platform packages, create archives and checksums, build Docker images, and
+assemble release metadata.
 
 ```sh
 # Local snapshot without publishing

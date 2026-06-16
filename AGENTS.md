@@ -128,9 +128,9 @@ Moon manages TypeScript workspace targets, Go checks, and release build tasks.
 Long-running customer-style local orchestration still runs through repository
 scripts so server processes are signaled and cleaned up directly.
 
-`moon run workspace:server` syncs the embedded console/login UI before non-help
-startup, then runs `go run .`. Direct `go run .` callers must sync the embed
-folders themselves or disable both embedded UI surfaces.
+`moon run workspace:server` builds the embedded console/login UI before non-help
+startup, then runs `go run .`. Direct `go run .` callers must build the embedded
+UI surfaces themselves or disable both embedded UI surfaces.
 
 Checked-in demo end-to-end tests are **opt-in locally** and main-only in CI.
 They are not part of the default `moon ci :lint :typecheck :build :test`

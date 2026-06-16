@@ -48,8 +48,8 @@ registry under `tmp/cli-local-registry`, and points the generated app install at
 that registry. Set `ZITADEL_CLI_USE_PUBLIC_PACKAGES=1` when you intentionally
 want the generated app to install public npm packages instead.
 
-`moon run workspace:server` builds and syncs the embedded console/login UI before
-startup, then runs `go run .`; help output skips the UI sync.
+`moon run workspace:server` builds the embedded console/login UI before startup,
+then runs `go run .`; help output skips the UI builds.
 
 ## Local checks
 
@@ -131,13 +131,12 @@ the runner keeps diagnostics automatically and prints the path.
 The Go binary embeds production builds from `internal/staticui/console/dist` and `internal/staticui/login/dist`:
 
 ```sh
-sh scripts/sync-embedded-ui-dist.sh all
+moon run console:build login-ui:build
 ```
 
-The `server` wrapper runs this automatically before startup. Run it manually
-only when bypassing the wrapper with direct `go run .`. It uses Moon for
-`@zitadel/console` and `@zitadel/login-ui`, then copies the build output into
-the internal embed folders.
+The `server` wrapper runs these builds automatically before startup. Run them
+manually only when bypassing the wrapper with direct `go run .`. The Vite
+production builds write directly into the internal embed folders.
 
 ### 2. Configure and start
 
@@ -167,7 +166,7 @@ Dev servers use `/` as the Vite base; production embeds use `/ui/console/` and `
 moon run release:snapshot
 ```
 
-The release task runs `scripts/sync-embedded-ui-dist.sh` automatically.
+The release task builds the embedded UI surfaces automatically.
 
 ### Local runtime image from source
 

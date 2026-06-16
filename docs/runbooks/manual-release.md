@@ -26,17 +26,24 @@ publishing, and public package tags.
   archives, checksums, npm tarballs, and Docker metadata without publishing.
 - Run `release-publish` manually with `dry_run=false` only to retry a publish
   while the current `main` commit is still the generated version commit.
-- Use `release-recover` when a later release-infrastructure fix is needed after
-  an already-versioned release partially failed.
+- Run `release-publish` manually with `recover_version=<version>` when a later
+  release-infrastructure fix is needed and npm publishing may not have
+  completed. Use `dry_run=true` first, then `dry_run=false`.
+- Use `release-recover` only when npm publishing is already handled and the
+  remaining recovery is container or product GitHub Release state.
 - Verify npm packages, `ghcr.io/zitadel/nextgen:<version>`, the product
   `v<version>` tag, and the GitHub Release after publish.
 
 ## Recover
 
-Use `release-recover` for an already-versioned release when local artifacts were
-built but a remote publish step failed. Recovery verifies the checked-out
-`@zitadel/server` version before republishing containers or updating the GitHub
-Release.
+Use `release-publish` with `recover_version=<version>` for an already-versioned
+release when npm publishing may not have completed. It verifies the checked-out
+`@zitadel/server` version, rebuilds release artifacts, runs Changesets publish,
+and then pushes the product tag, containers, and GitHub Release.
+
+Use `release-recover` only after npm publishing is already complete. It verifies
+the checked-out `@zitadel/server` version before republishing containers or
+updating the GitHub Release.
 
 ## Local checks
 
@@ -44,4 +51,5 @@ Release.
 moon ci
 moon run release:snapshot
 moon run release:publish -- --dry-run  # from a generated version commit
+moon run release:publish -- --dry-run --recover-version 0.1.0-alpha.8
 ```
