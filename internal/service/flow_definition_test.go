@@ -137,8 +137,8 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
-							Actions: map[string]domain.FlowStepAction{
-								"submit": {Primary: true},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Primary: true},
 							},
 						},
 						{
@@ -168,8 +168,8 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 						Transitions: map[string]domain.FlowStepTransition{
 							"submit": {Target: "step_2"},
 						},
-						Actions: map[string]domain.FlowStepAction{
-							"submit": {Primary: true},
+						Actions: []domain.FlowStepAction{
+							{Name: "submit", Primary: true},
 						},
 					},
 					{
@@ -241,9 +241,10 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 						{
 							Name:   "step_1",
 							Fields: []string{"email"},
-							Actions: map[string]domain.FlowStepAction{
-								"submit": {},
-								"next":   {},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit"},
+
+								{Name: "next"},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "done"},
@@ -275,9 +276,10 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					{
 						Name:   "step_1",
 						Fields: []string{"email"},
-						Actions: map[string]domain.FlowStepAction{
-							"submit": {},
-							"next":   {},
+						Actions: []domain.FlowStepAction{
+							{Name: "submit"},
+
+							{Name: "next"},
 						},
 						Transitions: map[string]domain.FlowStepTransition{
 							"submit": {Target: "done"},
@@ -344,8 +346,8 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
-							Actions: map[string]domain.FlowStepAction{
-								"submit": {Primary: true},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Primary: true},
 							},
 						},
 						{
@@ -373,9 +375,10 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					{
 						Name:   "step_1",
 						Fields: []string{"email"},
-						Actions: map[string]domain.FlowStepAction{
-							"submit": {},
-							"next":   {},
+						Actions: []domain.FlowStepAction{
+							{Name: "submit"},
+
+							{Name: "next"},
 						},
 						Transitions: map[string]domain.FlowStepTransition{
 							"submit": {Target: "done"},
@@ -441,9 +444,10 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 						{
 							Name:   "step_1",
 							Fields: []string{"email"},
-							Actions: map[string]domain.FlowStepAction{
-								"submit": {},
-								"next":   {},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit"},
+
+								{Name: "next"},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "done"},
@@ -506,9 +510,10 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 						{
 							Name:   "step_1",
 							Fields: []string{"email"},
-							Actions: map[string]domain.FlowStepAction{
-								"submit": {},
-								"next":   {},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit"},
+
+								{Name: "next"},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "done"},
@@ -577,8 +582,8 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
-							Actions: map[string]domain.FlowStepAction{
-								"submit": {Primary: true},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Primary: true},
 							},
 						},
 						{
@@ -639,8 +644,8 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
-							Actions: map[string]domain.FlowStepAction{
-								"submit": {Primary: true},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Primary: true},
 							},
 						},
 						{
@@ -702,8 +707,8 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
-							Actions: map[string]domain.FlowStepAction{
-								"submit": {Primary: true},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Primary: true},
 							},
 						},
 						{
@@ -761,8 +766,8 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
-							Actions: map[string]domain.FlowStepAction{
-								"submit": {Primary: true},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Primary: true},
 							},
 						},
 						{
@@ -885,8 +890,8 @@ func Test_flowDefinitionService_Get(t *testing.T) {
 								Transitions: map[string]domain.FlowStepTransition{
 									"submit": {Target: "step_2"},
 								},
-								Actions: map[string]domain.FlowStepAction{
-									"submit": {Primary: true},
+								Actions: []domain.FlowStepAction{
+									{Name: "submit", Primary: true},
 								},
 							},
 							{
@@ -918,8 +923,8 @@ func Test_flowDefinitionService_Get(t *testing.T) {
 						Transitions: map[string]domain.FlowStepTransition{
 							"submit": {Target: "step_2"},
 						},
-						Actions: map[string]domain.FlowStepAction{
-							"submit": {Primary: true},
+						Actions: []domain.FlowStepAction{
+							{Name: "submit", Primary: true},
 						},
 					},
 					{

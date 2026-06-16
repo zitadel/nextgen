@@ -75,7 +75,11 @@ function nextCodeFilePaths(
   renderer: RendererSpec,
 ): ReadonlyArray<string> {
   const appDir = framework.appDir;
-  const paths = [join(appDir, "login/page.tsx"), join(appDir, "register/page.tsx")];
+  const paths = [
+    join(appDir, "page.tsx"),
+    join(appDir, "login/page.tsx"),
+    join(appDir, "register/page.tsx"),
+  ];
   if (renderer.templates.profilePage) {
     paths.push(join(appDir, "profile/page.tsx"));
   }
@@ -97,6 +101,13 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
   const dts = renderer.templates.customElementsDts?.();
   const boundary = requestBoundaryFile(ctx.framework);
   return [
+    ctx.scaffoldedFramework
+      ? {
+          kind: "edit",
+          path: join(appDir, "page.tsx"),
+          edit: () => homePageTemplate(),
+        }
+      : undefined,
     {
       kind: "write",
       path: join(appDir, "login/page.tsx"),
@@ -134,6 +145,34 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
       version: dependencyVersionForCli(ctx.cliVersion, renderer.dependency.version),
     },
   ].filter((op): op is FileOp => op !== undefined);
+}
+
+function homePageTemplate(): string {
+  return `${MANAGED_MARKER}
+import Link from "next/link";
+
+export default function Home() {
+  return (
+    <main style={{ minHeight: "100vh", padding: "48px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <section style={{ width: "100%", maxWidth: "560px" }}>
+        <p style={{ margin: "0 0 12px", color: "#4b5563", fontSize: "14px" }}>Zitadel auth</p>
+        <h1 style={{ margin: "0 0 24px", fontSize: "32px", lineHeight: 1.15 }}>Sign in, create an account, or open your profile.</h1>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
+          <Link href="/login" style={{ padding: "10px 16px", borderRadius: "8px", background: "#111827", color: "#ffffff", textDecoration: "none", fontWeight: 600 }}>
+            Sign in
+          </Link>
+          <Link href="/register" style={{ padding: "10px 16px", borderRadius: "8px", border: "1px solid #d1d5db", color: "#111827", textDecoration: "none", fontWeight: 600 }}>
+            Create account
+          </Link>
+          <Link href="/profile" style={{ padding: "10px 16px", borderRadius: "8px", border: "1px solid #d1d5db", color: "#111827", textDecoration: "none", fontWeight: 600 }}>
+            Profile
+          </Link>
+        </div>
+      </section>
+    </main>
+  );
+}
+`;
 }
 
 function requestBoundaryFile(framework: PatchContext["framework"]): {

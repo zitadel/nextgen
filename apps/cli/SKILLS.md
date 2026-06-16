@@ -104,6 +104,44 @@ npx @zitadel/cli@0.1.0-alpha.N start --non-interactive --json
 npx @zitadel/cli@0.1.0-alpha.N setup --framework next --server local --non-interactive --json
 ```
 
+After `setup`, follow `data.next_commands` to start the app. Prove the generated
+auth flow in a visible browser by registering a unique user, logging out, logging
+back in with the same email/password, and ending on the signed-in profile page.
+Do not treat a rendered login or registration form as completion.
+
+### Driving the login UI
+
+`<zitadel-login>` and `<zitadel-logout>` are Lit elements with open shadow
+roots. The stable automation hooks live inside nested shadow roots, so a flat
+`document.querySelector('[data-testid="zitadel-field-email-input"]')` will not
+find them. Browser drivers with shadow-DOM-aware locators, such as Playwright,
+can target the hooks directly. Generic DOM-eval drivers should pierce shadow
+roots recursively:
+
+```js
+function deepQuery(sel, root = document) {
+  const hit = root.querySelector(sel);
+  if (hit) return hit;
+  for (const el of root.querySelectorAll("*")) {
+    if (el.shadowRoot) {
+      const result = deepQuery(sel, el.shadowRoot);
+      if (result) return result;
+    }
+  }
+  return null;
+}
+```
+
+Use `zitadel-field-email-input`, `zitadel-field-password-input`, and
+`zitadel-action-submit-button` for sign-in and registration. For sign-out, open
+the user menu button if needed, then pierce to `.signout-btn`; Playwright-style
+locators may use `zitadel-logout .signout-btn`. The canonical component hook
+list lives in `packages/components/README.md`.
+
+The checked-in automated regression path is `corepack pnpm run journey`, which
+exercises fresh-app setup plus registration, logout, and login across the
+supported frameworks.
+
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `plan` and `apply`. Managed files carry a marker comment; `eject`
 removes only files that still carry it, preserving anything the user replaced.

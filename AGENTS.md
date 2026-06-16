@@ -45,9 +45,10 @@ Secrets").
 - `apps/demo-next-e2e/` and `apps/demo-nuxt-e2e/` are the Playwright projects
   that exercise each demo through real framework middleware against the
   api-mock TCP server.
-- `apps/cli-journey-e2e/` contains the fresh Next.js consumer journey
-  Playwright project. It installs local package tarballs through a temporary
-  registry and verifies CLI setup plus real registration/login flows.
+- `apps/cli-journey-e2e/` contains the fresh consumer journey Playwright
+  project for every CLI-supported framework. It installs local package tarballs
+  through a temporary registry and verifies CLI setup plus real
+  registration/login flows.
 - `packages/components/` contains shared Lit components.
 - `packages/sdk-core/`, `packages/sdk-next/`, `packages/sdk-nuxt/`,
   `packages/sdk-react/`, `packages/sdk-vue/`, and `packages/sdk-angular/`
@@ -130,9 +131,9 @@ signaled and cleaned up directly.
 startup, then runs `go run .`. Direct `go run .` callers must sync the embed
 folders themselves or disable both embedded UI surfaces.
 
-End-to-end tests are **opt-in locally** — they're not part of the
-default `run-many -t lint,typecheck,build,test` invocation because they
-boot real dev servers and need browsers installed:
+Checked-in demo end-to-end tests are **opt-in locally** and main-only in CI.
+They are not part of the default `run-many -t lint,typecheck,build,test`
+invocation because they boot real dev servers and need browsers installed:
 
 ```sh
 corepack pnpm exec playwright install
@@ -148,20 +149,22 @@ corepack pnpm run journey
 This runner requires Docker for Verdaccio and the CLI-managed local runtime. By
 default it builds a local runtime image, ensures the Playwright Chromium
 browsers are installed, builds and packs local npm packages with pnpm, creates
-an empty app directory outside the repo, runs `npx @zitadel/cli@alpha doctor`,
-`start`, and `setup --framework next --server local`, starts the generated app
-on `localhost`, and runs Playwright with one worker. Use
-`-- --image <docker-tag>` to reuse an existing local runtime image.
+empty app directories outside the repo, runs `npx @zitadel/cli@alpha doctor`,
+`start`, and `setup --framework <id> --server local`, starts the generated apps
+on `localhost`, and runs Playwright with one worker per framework journey. Use
+`-- --framework next` to run one framework and `-- --image <docker-tag>` to
+reuse an existing local runtime image.
 
 Use `corepack pnpm run journey` for deterministic CI-style proof of the
 fresh-app path. Use `corepack pnpm run cli -- ...` for manual browser or agent
 experiments against the same local package train.
 
-In CI the dedicated `node-e2e` job (in `.github/workflows/ci.yml`) gates merges
-on the checked-in demo integrations. The separate `consumer-journey-e2e` job is
-the fresh-app quality gate: it consumes the current workflow's GoReleaser image
-and npm package artifacts instead of public Zitadel packages. Browsers are
-cached on the runner to reduce install cost.
+In CI the `consumer-journey-e2e` matrix is the required PR runtime gate: it
+consumes the current workflow's GoReleaser image and npm package artifacts
+instead of public Zitadel packages. The checked-in demo integrations
+(`node-e2e`), raw binary embedded-postgres smoke, and documented quick-start
+compose smoke run on pushes to `main` as release-surface confidence checks.
+Browsers are cached on the runner to reduce install cost.
 
 ## Testing Layers
 
@@ -230,33 +233,19 @@ For customer-local runtime workflows, agents should prefer
 - Agent-created or agent-updated PRs must include a concise description before
   handoff. Use sections for `Summary`, `Validation`,
   `Release notes / changeset`, and `Notes`. List the exact validation commands
-  run; if validation was not run, say so explicitly. Mention changeset status
-  for user-visible package changes.
-- User-visible changes to a public npm package need a changeset. The public
-  packages are `@zitadel/cli` (`apps/cli/`), `@zitadel/api`,
-  `@zitadel/components`, `@zitadel/sdk-core`, `@zitadel/sdk-next`,
-  `@zitadel/sdk-nuxt`, `@zitadel/sdk-react`, `@zitadel/sdk-vue`, and
-  `@zitadel/sdk-angular`. CI fails a PR that touches them without one
-  (`changeset-check` in `.github/workflows/ci.yml`).
-- Add a changeset by writing the file directly — do not depend on the
-  interactive `pnpm changeset` prompt. Create `.changeset/<short-slug>.md`:
+  run; if validation was not run, say so explicitly. In **Release notes /
+  changeset**, state one of the three outcomes from the
+  [decision table](.changeset/README.md#decision-table) — do not add a
+  `.changeset/*.md` file unless that table says you should.
 
-  ```md
-  ---
-  "@zitadel/cli": minor
-  ---
+### Changesets
 
-  One-line, user-facing summary of the change.
-  ```
+When a PR touches [publishable npm packages](.changeset/README.md#publishable-npm-packages)
+(the public `@zitadel/*` packages under `apps/cli/` and selected `packages/*`
+paths), follow the [decision table](.changeset/README.md#decision-table) and
+workflow in [`.changeset/README.md`](.changeset/README.md). Verify locally with
+`node scripts/check-changeset-required.mjs --base origin/main`.
 
-  List only public package names; pick `patch` (fixes), `minor` (features), or
-  `major` (breaking). The repo is in `alpha` prerelease mode
-  (`.changeset/pre.json`) and public packages are in one fixed group, so
-  versions cut as one `X.Y.Z-alpha.N` train automatically — no extra action
-  needed.
-
-- For changes that release nothing (docs, tests, CI, chores), add an empty
-  changeset: `corepack pnpm changeset --empty`.
 - npm packages under `apps/cli/` and `packages/*` must stay MIT-licensed.
 - Server and console application paths are AGPL-3.0-only by default.
 - Keep local secrets, private keys, tokens, and `.zitadel/secret`-style files out
@@ -331,7 +320,7 @@ Standard commands are documented in root `AGENTS.md` → **Local Checks** and
 
 - **Fast local checks:** `corepack pnpm run check`
 - **Full local checks:** `corepack pnpm run check -- --full`
-- **E2E:** `corepack pnpm nx run-many -t e2e -p @zitadel/demo-next-e2e,@zitadel/demo-nuxt-e2e`
+- **Demo E2E (manual/main-only):** `corepack pnpm run check -- --only node:e2e`
 - **Consumer journey E2E:** `corepack pnpm run journey`
 
 ### Running demo apps manually

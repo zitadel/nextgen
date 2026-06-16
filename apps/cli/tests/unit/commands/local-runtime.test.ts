@@ -69,11 +69,20 @@ describe("local runtime commands", () => {
     const envelope = parseJson(result.stdout) as {
       status: string;
       warnings: string[];
-      data: { ok: boolean; checks: Array<{ name: string; status: string; message: string }> };
+      data: {
+        ok: boolean;
+        checks: Array<{ name: string; status: string; message: string }>;
+        next_actions: string[];
+        next_commands: string[];
+      };
     };
     expect(envelope.status).toBe("ok");
     expect(envelope.data.ok).toBe(true);
     expect(envelope.warnings.join("\n")).toContain("Docker is not reachable");
+    expect(envelope.data.next_actions.join("\n")).toContain("managed local runtime");
+    expect(envelope.data.next_actions.join("\n")).toContain("--server <url>");
+    expect(envelope.data.next_commands).toContain("docker version");
+    expect(envelope.data.next_commands).toContain(expectedPublicCliCommand("doctor"));
     expect(envelope.data.checks.find((check) => check.name === "docker-cli")).toMatchObject({
       status: "warn",
     });
@@ -153,6 +162,36 @@ describe("local runtime commands", () => {
     expect(envelope.details.checks.find((check) => check.name === "runtime")).toMatchObject({
       status: "fail",
     });
+  });
+
+  it("start fails before image work when Docker is unreachable", async () => {
+    const cwd = await tempProject("zitadel-start-docker-fail-");
+    const fake = await fakeDocker({ dockerAvailable: false });
+    const port = await freePort();
+
+    const result = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
+      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: fake.logPath,
+    });
+
+    expect(result.exitCode).toBe(3);
+    const envelope = parseJson(result.stdout) as {
+      status: string;
+      code: string;
+      hint: string;
+      next_commands: string[];
+      details: { message: string };
+    };
+    expect(envelope.status).toBe("error");
+    expect(envelope.code).toBe("E_VALIDATION");
+    expect(envelope.hint).toContain("managed local runtime");
+    expect(envelope.hint).toContain("--server <url>");
+    expect(envelope.next_commands).toContain("docker version");
+    expect(envelope.next_commands).toContain(expectedPublicCliCommand("start"));
+    expect(envelope.details.message).toContain("remote or cloud setup can continue");
+
+    const dockerCalls = await readDockerCalls(fake.logPath);
+    expect(dockerCalls).toEqual([["version", "--format", "{{.Server.Version}}"]]);
   });
 
   it("start --json starts the single-container runtime and writes metadata", async () => {

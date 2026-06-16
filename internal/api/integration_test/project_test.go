@@ -15,6 +15,16 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
+// actionNames returns the names of the given step actions in order, useful
+// for assert.Contains checks now that Actions is an ordered slice.
+func actionNames(actions []domain.FlowStepAction) []string {
+	names := make([]string, len(actions))
+	for i, a := range actions {
+		names[i] = a.Name
+	}
+	return names
+}
+
 // stubFlowService satisfies [service.FlowService] while doing nothing.
 type stubFlowService struct{}
 
@@ -144,19 +154,19 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 
 	identifierStep, ok := flowDef.FindStep("identifier")
 	require.True(t, ok)
-	assert.Contains(t, identifierStep.Actions, domain.FlowActionPasskey)
+	assert.Contains(t, actionNames(identifierStep.Actions), domain.FlowActionPasskey)
 	assert.Equal(t, "done", identifierStep.Transitions[domain.FlowActionPasskey].Target)
 
 	passwordStep, ok := flowDef.FindStep("password")
 	require.True(t, ok)
 	assert.Equal(t, []string{"password"}, passwordStep.Fields)
-	assert.Contains(t, passwordStep.Actions, domain.FlowActionPasskey)
+	assert.Contains(t, actionNames(passwordStep.Actions), domain.FlowActionPasskey)
 	assert.Equal(t, "done", passwordStep.Transitions[domain.FlowActionPasskey].Target)
 
 	registerStep, ok := flowDef.FindStep("register")
 	require.True(t, ok)
 	assert.Equal(t, []string{"email", "givenName", "familyName", "dateOfBirth"}, registerStep.Fields)
-	assert.Contains(t, registerStep.Actions, domain.FlowActionPasskeyRegister)
+	assert.Contains(t, actionNames(registerStep.Actions), domain.FlowActionPasskeyRegister)
 	assert.Equal(t, "done", registerStep.Transitions[domain.FlowActionPasskeyRegister].Target)
 
 	registerPasswordStep, ok := flowDef.FindStep("register-password")
@@ -164,14 +174,12 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 	assert.Equal(t, []string{"password"}, registerPasswordStep.Fields)
 	require.NotNil(t, registerPasswordStep.OnSuccess)
 	assert.Equal(t, domain.FlowOnSuccessCreateUser, *registerPasswordStep.OnSuccess)
-	assert.Equal(t, "passkey-upsell", registerPasswordStep.Transitions[domain.FlowActionSubmit].Target)
+	// Registration completes directly — no passkey upsell step; passkey
+	// registration is offered up front on the register step instead.
+	assert.Equal(t, "done", registerPasswordStep.Transitions[domain.FlowActionSubmit].Target)
 
-	passkeyUpsellStep, ok := flowDef.FindStep("passkey-upsell")
-	require.True(t, ok)
-	assert.Contains(t, passkeyUpsellStep.Actions, domain.FlowActionPasskeyRegister)
-	assert.Contains(t, passkeyUpsellStep.Actions, "skip")
-	assert.Equal(t, "done", passkeyUpsellStep.Transitions[domain.FlowActionPasskeyRegister].Target)
-	assert.Equal(t, "done", passkeyUpsellStep.Transitions["skip"].Target)
+	_, ok = flowDef.FindStep("passkey-upsell")
+	assert.False(t, ok)
 }
 
 func TestGetProject(t *testing.T) {

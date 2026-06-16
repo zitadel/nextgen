@@ -65,11 +65,12 @@ documents the same table.
 | Sign in submit | `wrong@example.com` | Stays on identifier; `error.invalid_credentials` on password |
 | Sign in submit | `server@example.com` | Stays on identifier; `error.sign_in_server` form alert |
 | Sign up submit | `exists@example.com` | Stays on register; `error.email_exists` on email |
-| Passkey upsell, any action except `skip` | `passkey-cancel@example.com` (captured from sign-in) | Stays on passkey-upsell; `error.passkey_cancelled` |
-| Passkey upsell, any action except `skip` | `passkey-unsupported@example.com` | `error.passkey_unsupported` |
-| Passkey upsell, any action except `skip` | `passkey-fail@example.com` | `error.passkey_failed` |
 
-Happy path: any other email → identifier/register → passkey-upsell → (skip) `done` or (setup) passkey-setup → `done`.
+Happy path: any other email → identifier/register → `done`. The
+`passkey-upsell` / `passkey-setup` states still exist in the machine but are
+no longer routed to by the default paths (passkey registration is offered up
+front instead); their fixture emails (`passkey-cancel@…`, `passkey-unsupported@…`,
+`passkey-fail@…`) only matter for tests that inject those states directly.
 
 ## Branding
 

@@ -30,18 +30,21 @@ type FlowFieldResolver interface {
 
 // FlowResolvedFields is the output of [FlowFieldResolver.Resolve].
 type FlowResolvedFields struct {
-	// Fields holds the resolved per-field metadata. Keys match the
-	// property names passed to Resolve.
-	Fields map[string]FlowField
+	// Fields holds the resolved per-field metadata in the same order as
+	// the property names passed to Resolve.
+	Fields []FlowField
 
 	// ImplicitOutcomes lists the reserved transition outcomes each
-	// field contributes. The state machine uses it to validate flow
-	// definitions and route schema-derived transitions.
+	// field contributes, keyed by field name. The state machine uses it
+	// to validate flow definitions and route schema-derived transitions.
 	ImplicitOutcomes map[string][]string
 }
 
 // FlowField is the resolved per-field metadata.
 type FlowField struct {
+	// Name is the user-schema property name this field collects.
+	Name string
+
 	// Type is the UI input kind the client should render. It is
 	// derived from the property's JSON `type` and `format` in the user
 	// meta-schema. The property's `x-password: true` annotation forces

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Gate PRs: fail when a PR touches a public npm package without adding a
-// changeset, so no consumer-visible change merges without a release note.
+// Gate PRs: fail when a PR touches a public npm package path without adding a
+// changeset file, so no consumer-visible change merges without a release note.
 //
 // Only the public packages are listed here; private workspace packages
 // (apps, demos, mocks, lint, design-tokens, ui-react, ...) are never
-// published, so they do not require a changeset. For changes that release
-// nothing (docs/tests/CI/chores), add an empty changeset:
-// `corepack pnpm changeset --empty`.
+// published. PRs that do not touch these paths need no changeset at all.
+// If a publishable path changes but nothing should ship, add an empty
+// changeset: `corepack pnpm changeset --empty` (rare).
 import { execFileSync } from "node:child_process";
 
 const publishableRoots = [
@@ -62,10 +62,11 @@ if (packageChanges.length > 0 && !hasChangeset) {
     "Run `corepack pnpm changeset` to describe the release (or write the",
   );
   console.error(
-    "`.changeset/<slug>.md` file directly, see AGENTS.md), then commit it.",
+    "`.changeset/<slug>.md` file directly, see .changeset/README.md), then commit it.",
   );
   console.error(
-    "For changes that release nothing, use `corepack pnpm changeset --empty`.",
+    "For publishable-path-only changes that ship nothing, use",
   );
+  console.error("`corepack pnpm changeset --empty` (rare). See .changeset/README.md.");
   process.exit(1);
 }

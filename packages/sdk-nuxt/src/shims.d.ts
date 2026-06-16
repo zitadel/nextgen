@@ -15,4 +15,13 @@ declare module '#imports' {
   export function useRequestEvent():
     | { context: Record<string, unknown> }
     | undefined;
+  export function useRuntimeConfig(): {
+    nextgen?: {
+      url?: string;
+      issuerUrl?: string;
+      loginPath?: string;
+      protectedRoutes?: string[];
+    };
+    public: Record<string, unknown>;
+  };
 }

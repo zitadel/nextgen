@@ -154,7 +154,9 @@ export async function waitForHttp(url, label, child, log = () => undefined) {
         log(`${label} is ready at ${url}`);
         return;
       }
-      lastError = new Error(`${url} returned ${response.status}`);
+      const body = await response.text().catch(() => "");
+      const detail = body ? `: ${body.slice(0, 1000)}` : "";
+      lastError = new Error(`${url} returned ${response.status}${detail}`);
     } catch (error) {
       lastError = error;
     }

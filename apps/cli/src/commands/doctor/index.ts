@@ -4,6 +4,10 @@ import consola from "consola";
 import { ZitadelError } from "../../lib/errors";
 import { dockerAvailable, imageAvailable } from "../../lib/local-server/docker";
 import {
+  dockerRuntimeGuidance,
+  dockerUnavailableMessage,
+} from "../../lib/local-server/docker-guidance";
+import {
   DEFAULT_LOCAL_SERVER_PORT,
   assertLocalStateWritable,
   checkLocalServerHealth,
@@ -74,6 +78,7 @@ export default class Doctor extends BaseCommand {
     const checks = [...runtimeChecks, ...projectChecks];
     const failed = checks.filter((check) => check.status === "fail");
     const warnings = checks.filter((check) => check.status === "warn");
+    const warningAdvice = advisoryForWarnings(warnings, this.meta.cliVersion);
     const data = {
       title:
         failed.length > 0
@@ -88,6 +93,12 @@ export default class Doctor extends BaseCommand {
         lifecycle: hasConfig ? "configured" : "not-configured",
       },
       checks,
+      ...(warningAdvice
+        ? {
+            next_actions: warningAdvice.nextActions,
+            next_commands: warningAdvice.nextCommands,
+          }
+        : {}),
     };
 
     if (failed.length > 0) {
@@ -116,9 +127,10 @@ function failureAdvice(
   const failedNames = new Set(failed.map((check) => check.name));
 
   if (failedNames.has("docker-cli")) {
+    const advice = dockerRuntimeGuidance("doctor", cliVersion);
     return {
-      hint: "Docker is required for `zitadel start`, but the Docker daemon is not reachable. Install or start Docker, then rerun `zitadel doctor`.",
-      nextCommands: ["docker version", publicCliCommand("doctor", cliVersion)],
+      hint: advice.hint,
+      nextCommands: advice.nextCommands,
     };
   }
 
@@ -166,6 +178,17 @@ function failureAdvice(
     hint: "Fix the reported checks, then rerun `zitadel doctor`.",
     nextCommands: [publicCliCommand("doctor", cliVersion)],
   };
+}
+
+function advisoryForWarnings(
+  warnings: CheckOutcome[],
+  cliVersion: string,
+): { nextActions: string[]; nextCommands: string[] } | undefined {
+  if (!warnings.some((check) => check.name === "docker-cli")) {
+    return undefined;
+  }
+  const advice = dockerRuntimeGuidance("doctor", cliVersion);
+  return { nextActions: advice.nextActions, nextCommands: advice.nextCommands };
 }
 
 async function runLocalRuntimeChecks(
@@ -270,12 +293,6 @@ async function check(
       message: error instanceof Error ? error.message : fallback,
     };
   }
-}
-
-function dockerUnavailableMessage(error: unknown): string {
-  const detail = error instanceof Error ? error.message : String(error);
-  const suffix = detail.trim() ? ` (${detail.trim()})` : "";
-  return `Docker is not reachable${suffix}; \`zitadel start\` needs Docker, but cloud setup can continue.`;
 }
 
 function imageUnavailableMessage(image: string, error: unknown): string {
