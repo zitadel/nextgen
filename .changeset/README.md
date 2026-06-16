@@ -153,9 +153,10 @@ is green, the same workflow detects the generated version commit, runs Moon
 release tasks, publishes npm packages with `changeset publish`, pushes server
 containers, and updates the product GitHub Release. Manual workflow dispatch is
 available for dry-runs. Use `release-publish` with `recover_version=<version>`
-when npm publishing may not have completed for an already-versioned release; use
-`release-recover` only after npm publishing is already handled and the remaining
-work is container or product GitHub Release recovery.
+to recover any missing publish-side artifact for an already-versioned release.
+`changeset publish` publishes only package versions that are not already present
+on npm, so the same recovery path is used whether npm packages, containers, or
+the product GitHub Release are missing.
 
 Publishing authenticates with **npm trusted publishing (OIDC)** — there is **no `NPM_TOKEN`** secret. Before the first automated publish, a maintainer must, once per public package:
 

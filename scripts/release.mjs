@@ -51,8 +51,6 @@ export async function main(args = forwardedArgs()) {
       return await commandPack();
     case "publish":
       return await commandPublish(options);
-    case "recover":
-      return await commandRecover(options);
     case "verify":
       return await commandVerify();
     default:
@@ -174,29 +172,6 @@ function assertRecoverVersion(release, recoverVersion) {
   }
 }
 
-async function commandRecover(options) {
-  if (!options.version) {
-    usage("--version is required for recover");
-  }
-  const release = await readServerRelease(repoRoot);
-  if (release.version !== options.version) {
-    throw new Error(
-      `checked out server release version is ${release.version}, expected ${options.version}`,
-    );
-  }
-  await verifyLocalArtifacts({ repoRoot, release, outDir: releaseDir(repoRoot, release.version) });
-  if (!options.dryRun) {
-    await buildContainerImage({
-      repoRoot,
-      release,
-      outDir: releaseDir(repoRoot, release.version),
-      push: true,
-      platforms: CONTAINER_PLATFORMS,
-    });
-    await upsertGitHubRelease(release, releaseDir(repoRoot, release.version));
-  }
-}
-
 async function commandVerify() {
   const release = await readServerRelease(repoRoot);
   await verifyLocalArtifacts({ repoRoot, release, outDir: releaseDir(repoRoot, release.version) });
@@ -205,7 +180,7 @@ async function commandVerify() {
 }
 
 function parseOptions(args) {
-  const parsed = { dryRun: false, skipContainer: false, version: "", recoverVersion: "", base: "" };
+  const parsed = { dryRun: false, skipContainer: false, recoverVersion: "", base: "" };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     switch (arg) {
@@ -214,10 +189,6 @@ function parseOptions(args) {
         break;
       case "--skip-container":
         parsed.skipContainer = true;
-        break;
-      case "--version":
-        parsed.version = args[++index] ?? "";
-        if (!parsed.version) usage("--version requires a value");
         break;
       case "--recover-version":
         parsed.recoverVersion = args[++index] ?? "";
@@ -330,12 +301,11 @@ function usage(error) {
     console.error(error);
     console.error("");
   }
-  console.log(`usage: node scripts/release.mjs <version|pack|snapshot|publish|recover|verify> [options]
+  console.log(`usage: node scripts/release.mjs <version|pack|snapshot|publish|verify> [options]
 
 Options:
   --dry-run          Do not publish or mutate remote registries.
   --skip-container   Build release files without building a local Docker image.
-  --version <v>      Recovery target version.
   --recover-version <v>
                      Publish recovery target version from release-publish.
   --base <ref>       Base ref for release publish detection.

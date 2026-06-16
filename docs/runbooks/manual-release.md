@@ -22,28 +22,65 @@ publishing, and public package tags.
 
 ## Manual controls
 
-- Run `release-publish` manually with `dry_run=true` to build and verify server
-  archives, checksums, npm tarballs, and Docker metadata without publishing.
-- Run `release-publish` manually with `dry_run=false` only to retry a publish
-  while the current `main` commit is still the generated version commit.
-- Run `release-publish` manually with `recover_version=<version>` when a later
-  release-infrastructure fix is needed and npm publishing may not have
-  completed. Use `dry_run=true` first, then `dry_run=false`.
-- Use `release-recover` only when npm publishing is already handled and the
-  remaining recovery is container or product GitHub Release state.
+- Run `release-publish` manually with `dry_run=true` to build and verify
+  server archives, checksums, npm tarballs, and Docker metadata without
+  publishing.
+- Run `release-publish` manually with `dry_run=false` only when the current
+  `main` commit is still the generated `build: version packages` commit.
+- Run `release-publish` manually with `recover_version=<version>` when `main`
+  has moved past the generated version commit or any publish-side artifact may
+  be missing. Use `dry_run=true` first, then `dry_run=false`.
 - Verify npm packages, `ghcr.io/zitadel/nextgen:<version>`, the product
   `v<version>` tag, and the GitHub Release after publish.
 
 ## Recover
 
-Use `release-publish` with `recover_version=<version>` for an already-versioned
-release when npm publishing may not have completed. It verifies the checked-out
-`@zitadel/server` version, rebuilds release artifacts, runs Changesets publish,
-and then pushes the product tag, containers, and GitHub Release.
+### Pick the mode
 
-Use `release-recover` only after npm publishing is already complete. It verifies
-the checked-out `@zitadel/server` version before republishing containers or
-updating the GitHub Release.
+| Situation | Workflow | Inputs |
+| --- | --- | --- |
+| `main` is still on the generated version commit and the first publish failed before finishing | `release-publish` | `dry_run=true`, then `dry_run=false` |
+| `main` has moved past the generated version commit, or the missing artifact surface is unclear | `release-publish` | `recover_version=<version>` with `dry_run=true`, then `dry_run=false` |
+
+Use `release-publish` with `recover_version=<version>` for an already-versioned
+release when any publish-side artifact may be missing. This is the single
+recovery path. It verifies the checked-out `@zitadel/server` version, rebuilds
+release artifacts, runs Changesets publish, and then pushes the product tag,
+containers, and GitHub Release. `changeset publish` only publishes package
+versions that are not already present on npm, so the same recovery path is safe
+when npm packages are already complete and only Docker or the product GitHub
+Release needs repair.
+
+```sh
+gh workflow run release-publish.yml \
+  --repo zitadel/nextgen \
+  --ref main \
+  -f dry_run=true \
+  -f recover_version=0.1.0-alpha.8
+
+gh workflow run release-publish.yml \
+  --repo zitadel/nextgen \
+  --ref main \
+  -f dry_run=false \
+  -f recover_version=0.1.0-alpha.8
+```
+
+The `recover_version` path deliberately bypasses the normal "latest commit must
+be a generated version commit" gate, but it still requires:
+
+- the checked-out `@zitadel/server` version to equal `recover_version`;
+- the workflow to run from `main`;
+- no unrecorded pending release changesets;
+- the normal artifact preflight and snapshot verification to pass.
+
+After the recovery run, verify the public surfaces:
+
+```sh
+npm view @zitadel/server@0.1.0-alpha.8 version
+npm view @zitadel/sdk-angular@0.1.0-alpha.8 version
+gh release view v0.1.0-alpha.8 --repo zitadel/nextgen
+docker buildx imagetools inspect ghcr.io/zitadel/nextgen:0.1.0-alpha.8
+```
 
 ## Local checks
 

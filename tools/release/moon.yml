@@ -40,9 +40,3 @@ tasks:
     options:
       runFromWorkspaceRoot: true
       runInCI: false
-
-  recover:
-    command: "node scripts/release.mjs recover"
-    options:
-      runFromWorkspaceRoot: true
-      runInCI: false

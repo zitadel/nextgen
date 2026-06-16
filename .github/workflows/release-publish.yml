@@ -24,7 +24,7 @@ on:
         default: true
         type: boolean
       recover_version:
-        description: "Exact already-versioned release to recover, for example 0.1.0-alpha.8. Leave empty for normal publish detection."
+        description: "Exact already-versioned release to recover through the publish path, for example 0.1.0-alpha.8. Leave empty for normal publish detection."
         required: false
         default: ""
         type: string
