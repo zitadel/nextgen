@@ -1,6 +1,6 @@
 projects:
   sources:
-    server: "apps/server-release"
+    server: "apps/server"
     workspace: "."
     release: "tools/release"
     cli: "apps/cli"

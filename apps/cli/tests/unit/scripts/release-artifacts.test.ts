@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -12,6 +12,17 @@ type ReleaseArtifactsModule = {
     tag: string;
     prerelease: boolean;
   }>;
+  stageServerNpmBinaries: (options: {
+    repoRoot: string;
+    outDir: string;
+    version: string;
+    platformPackages: Array<{
+      goos: string;
+      goarch: string;
+      packageName: string;
+      packageDir: string;
+    }>;
+  }) => Promise<void>;
   validateSemver: (version: string) => void;
   verifyLocalArtifacts: (options: {
     repoRoot: string;
@@ -38,22 +49,21 @@ afterEach(async () => {
 });
 
 describe("release artifact helpers", () => {
-  it("reads the private server release record as the product version source", async () => {
+  it("reads the server npm package as the product version source", async () => {
     const { readServerRelease } = await loadModule();
-    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-record-"));
+    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-server-package-"));
     tempDirs.push(repoRoot);
-    await mkdir(join(repoRoot, "apps/server-release"), { recursive: true });
+    await mkdir(join(repoRoot, "apps/server"), { recursive: true });
     await writeFile(
-      join(repoRoot, "apps/server-release/package.json"),
+      join(repoRoot, "apps/server/package.json"),
       JSON.stringify({
-        name: "@zitadel/server-release",
+        name: "@zitadel/server",
         version: "0.1.0-alpha.6",
-        private: true,
       }),
     );
 
     await expect(readServerRelease(repoRoot)).resolves.toEqual({
-      name: "@zitadel/server-release",
+      name: "@zitadel/server",
       version: "0.1.0-alpha.6",
       tag: "v0.1.0-alpha.6",
       prerelease: true,
@@ -80,6 +90,34 @@ describe("release artifact helpers", () => {
     expect(() => validateSemver("v1.2.3")).toThrow("invalid release version");
   });
 
+  it("stages built server binaries into platform npm packages", async () => {
+    const { stageServerNpmBinaries } = await loadModule();
+    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-server-package-"));
+    tempDirs.push(repoRoot);
+    const outDir = join(repoRoot, "dist/release/0.1.0-alpha.6");
+    const source = join(outDir, "build/linux/amd64/nextgen");
+    await mkdir(join(outDir, "build/linux/amd64"), { recursive: true });
+    await writeFile(source, "server-binary");
+
+    await stageServerNpmBinaries({
+      repoRoot,
+      outDir,
+      version: "0.1.0-alpha.6",
+      platformPackages: [
+        {
+          goos: "linux",
+          goarch: "amd64",
+          packageName: "@zitadel/server-linux-x64",
+          packageDir: "apps/server-linux-x64",
+        },
+      ],
+    });
+
+    const destination = join(repoRoot, "apps/server-linux-x64/bin/nextgen");
+    await expect(readFile(destination, "utf8")).resolves.toBe("server-binary");
+    expect((await stat(destination)).mode & 0o111).toBeGreaterThan(0);
+  });
+
   it("rejects incomplete local release artifacts", async () => {
     const { verifyLocalArtifacts } = await loadModule();
     const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-artifacts-"));
@@ -92,7 +130,7 @@ describe("release artifact helpers", () => {
         repoRoot,
         outDir,
         release: {
-          name: "@zitadel/server-release",
+          name: "@zitadel/server",
           version: "0.1.0-alpha.6",
           tag: "v0.1.0-alpha.6",
           prerelease: true,

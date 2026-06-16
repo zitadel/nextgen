@@ -1,5 +1,5 @@
 import { execFile as execFileCallback } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,6 +12,12 @@ const repoRoot = fileURLToPath(new URL("../../../../../", import.meta.url));
 const verifyScript = join(repoRoot, "apps/cli-journey-e2e/scripts/verify-tarballs.mjs");
 const packageDirs = [
   "apps/cli",
+  "apps/server",
+  "apps/server-linux-x64",
+  "apps/server-linux-arm64",
+  "apps/server-darwin-x64",
+  "apps/server-darwin-arm64",
+  "apps/server-win32-x64",
   "packages/api",
   "packages/components",
   "packages/sdk-core",
@@ -40,7 +46,7 @@ describe("verify-tarballs script", () => {
     });
 
     await expect(runVerify(tarballsDir)).resolves.toMatchObject({
-      stdout: expect.stringContaining("verified 9 installable tarballs"),
+      stdout: expect.stringContaining("verified 15 installable tarballs"),
     });
   });
 
@@ -53,9 +59,23 @@ describe("verify-tarballs script", () => {
       stderr: expect.stringContaining("public package tarballs must use semver versions"),
     });
   });
+
+  it("rejects server platform tarballs without executable binaries", async () => {
+    const tarballsDir = await fixtureTarballs(
+      {},
+      { nonExecutablePackage: "@zitadel/server-darwin-arm64" },
+    );
+
+    await expect(runVerify(tarballsDir)).rejects.toMatchObject({
+      stderr: expect.stringContaining("contains non-executable bin/nextgen"),
+    });
+  });
 });
 
-async function fixtureTarballs(versionOverrides: Record<string, string> = {}): Promise<string> {
+async function fixtureTarballs(
+  versionOverrides: Record<string, string> = {},
+  options: { nonExecutablePackage?: string } = {},
+): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "zitadel-verify-tarballs-"));
   tempDirs.push(root);
   const tarballsDir = join(root, "tarballs");
@@ -66,24 +86,54 @@ async function fixtureTarballs(versionOverrides: Record<string, string> = {}): P
       name: string;
     };
     const version = versionOverrides[manifest.name] ?? "0.1.0-alpha.5";
-    await createTarball(tarballsDir, manifest.name, version);
+    await createTarball(tarballsDir, manifest.name, version, {
+      executable: manifest.name !== options.nonExecutablePackage,
+    });
   }
 
   return tarballsDir;
 }
 
-async function createTarball(tarballsDir: string, name: string, version: string): Promise<void> {
+async function createTarball(
+  tarballsDir: string,
+  name: string,
+  version: string,
+  options: { executable: boolean },
+): Promise<void> {
   const workDir = await mkdtemp(join(dirname(tarballsDir), "package-"));
   const packageDir = join(workDir, "package");
   await mkdir(packageDir);
+  const binaryPath = platformBinaryPath(name);
   await writeFile(
     join(packageDir, "package.json"),
-    `${JSON.stringify({ name, version, license: "MIT" }, null, 2)}\n`,
+    `${JSON.stringify(
+      {
+        name,
+        version,
+        license: "MIT",
+        ...(binaryPath ? { bin: { nextgen: `./${binaryPath}` } } : {}),
+      },
+      null,
+      2,
+    )}\n`,
   );
+  if (binaryPath) {
+    const absoluteBinaryPath = join(packageDir, binaryPath);
+    await mkdir(dirname(absoluteBinaryPath), { recursive: true });
+    await writeFile(absoluteBinaryPath, "binary");
+    await chmod(absoluteBinaryPath, options.executable ? 0o755 : 0o644);
+  }
   const fileName = `${name.replace("@", "").replace("/", "-")}-${version}.tgz`;
   await execFile("tar", ["-czf", join(tarballsDir, fileName), "-C", workDir, "package"]);
 }
 
 function runVerify(tarballsDir: string) {
   return execFile(process.execPath, [verifyScript, tarballsDir]);
+}
+
+function platformBinaryPath(name: string): string | undefined {
+  if (!name.startsWith("@zitadel/server-")) {
+    return undefined;
+  }
+  return name.includes("win32") ? "bin/nextgen.exe" : "bin/nextgen";
 }

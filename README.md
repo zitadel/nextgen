@@ -5,7 +5,7 @@ Next iteration of the Zitadel identity platform.
 > **Preview status:** This repository is a pre-release next-generation Zitadel
 > preview. The public name may change, and APIs, CLI flags, package surfaces,
 > and docs are still in flux. The checked-in CLI currently supports the local
-> Docker-backed flow documented below; create-first, claim-later is the product
+> npm-binary flow documented below; create-first, claim-later is the product
 > direction, but `zitadel claim` is not shipped in this repo yet. See
 > [VISION.md](VISION.md).
 
@@ -36,14 +36,13 @@ Next iteration of the Zitadel identity platform.
 
 Moon owns the monorepo task graph for TypeScript, Go, release tooling, and
 journeys. The published `zitadel` runtime commands are customer workflow
-commands; they run the released local runtime through Docker and do not require
-Go, Moon, or a source checkout.
+commands; they run the released local runtime through the `@zitadel/server` npm
+binary by default and do not require Docker, Go, Moon, or a source checkout.
+Docker remains available with `zitadel start --runtime docker`.
 
-For contributors, `moon run workspace:cli -- start` builds and uses a fresh
-local runtime image by default. The wrapper runs the CLI build, then builds
-`ghcr.io/zitadel/nextgen:local-dev` through the Moon-owned release build
-helpers before invoking `zitadel start`. Pass `--image <tag>` or set
-`ZITADEL_LOCAL_IMAGE=<tag>` to use an existing image instead.
+For contributors, `moon run workspace:cli -- start` runs the local CLI against
+the workspace package train. Pass `--runtime docker`, `--image <tag>`, or set
+`ZITADEL_LOCAL_IMAGE=<tag>` when intentionally testing the Docker backend.
 
 `moon run workspace:cli -- setup ...` is the manual whole-local-train path for
 humans and agents. Before invoking the local CLI, the wrapper builds and packs
@@ -67,7 +66,7 @@ npm run dev
 ```
 
 Open http://localhost:3000/login and register your first local user. The
-managed Zitadel runtime stores its container metadata and data under
+managed Zitadel runtime stores its metadata and data under
 `.zitadel/local/`; `stop` preserves that data and `reset --force`
 deletes it. In a fresh directory, `setup` asks which framework to scaffold and
 writes the app into the current directory. It installs dependencies with the
@@ -111,10 +110,10 @@ moon run workspace:doctor
 moon ci :lint :typecheck :build :test
 ```
 
-The repository doctor checks Docker and Moon because contributor
-`moon run workspace:cli -- start` auto-builds the local runtime image from this
-source checkout. Playwright browsers remain advisory for opt-in e2e and journey
-workflows.
+The repository doctor checks Moon and local toolchain prerequisites. Docker is
+needed for container builds, Docker fallback journeys, and container-backed
+integration tests; it is not required for the default npm-binary local runtime.
+Playwright browsers remain advisory for opt-in e2e and journey workflows.
 
 `moon run workspace:check -- --full` runs the slower CI-parity phases, including
 integration tests, demo e2e, package smoke checks, release snapshots, and the fresh-app
@@ -151,12 +150,13 @@ moon run workspace:journey
 ```
 
 This opt-in check ensures the Playwright Chromium browsers are installed, builds
-the local npm packages, publishes them to a temporary Verdaccio registry, runs
-`npx @zitadel/cli@alpha doctor`, `start`, and
-`setup --framework <id> --server local` in fresh app directories for every
+the local npm packages including `@zitadel/server`, publishes them to a
+temporary Verdaccio registry, runs `npx @zitadel/cli@alpha doctor`, `start`, and
+`setup --framework <id> --server local` with the binary runtime in fresh app directories for every
 supported framework, starts the generated apps, and verifies registration/login
 journeys. Use `moon run workspace:journey -- --framework next` to run only the
-Next.js journey.
+Next.js journey. Use `--runtime docker --image <tag>` to exercise the Docker
+fallback path.
 
 Use `moon run workspace:journey` for deterministic CI-style proof. Use
 `moon run workspace:cli -- ...` when you want to drive the same local package
@@ -165,17 +165,18 @@ for a human or agent.
 
 ## CI
 
-Pull requests and pushes to `main` run:
+Pull requests run one Moon-driven `ci / validate` job on a 16-core Depot runner:
 
 - Go vet and tests.
 - pnpm install and Moon lint/typecheck/build/test tasks.
 - Built CLI smoke checks.
 - npm package dry-run/pack checks.
-- A non-publishing Moon release snapshot.
-- `consumer-journey-e2e`, which downloads the current workflow's local runtime
-  image and npm package tarballs, installs the CLI through a temporary
-  npm registry, runs the customer local setup commands in a fresh app directory,
-  and runs the Playwright user journey against the generated app.
+- A non-publishing Moon release snapshot without building a container.
+- The fresh-app journey against the default npm server binary runtime.
+
+Changesets version PRs run a smaller release/package validation path. A
+separate `ci-docker-runtime` workflow runs on `main` and manually to exercise
+the Docker fallback journey.
 
 CI uploads short-lived workflow artifacts for review: Moon release snapshot output
 and npm package tarballs. On consumer journey failures it also uploads focused
@@ -188,16 +189,18 @@ days and are not release artifacts.
 This monorepo uses Moon for task execution, non-npm artifact builds, and the
 product GitHub Release. Changesets owns package versions, changelogs, npm
 publishing, and public package tags.
-The current release model intentionally separates product/server releases from
-independent SDK/component npm releases. The full rationale lives in
+The current alpha release model uses one fixed Changesets version across the
+CLI, server npm runtime, API packages, components, and SDKs. The full rationale
+lives in
 [docs/adrs/002-multi-package-release-strategy.md](docs/adrs/002-multi-package-release-strategy.md)
 and [docs/adrs/023-lockstep-alpha-release-train.md](docs/adrs/023-lockstep-alpha-release-train.md).
 
 ### Moon release artifacts
 
 Moon runs repo-owned scripts that build the console and login-ui SPAs, sync them
-into `internal/*/dist`, cross-compile the Go server, create archives and
-checksums, build Docker images, and assemble release metadata.
+into `internal/*/dist`, cross-compile the Go server, stage npm platform
+packages, create archives and checksums, build Docker images, and assemble
+release metadata.
 
 ```sh
 # Local snapshot without publishing
@@ -209,26 +212,25 @@ moon run release:publish -- --dry-run
 
 Release output lands in `dist/release/<version>`. Product tags remain
 `vX.Y.Z` or `vX.Y.Z-alpha.N` and are created by the Moon release task from the
-private `@zitadel/server-release` version record; prerelease images publish
-only immutable version tags, while stable releases may move
+fixed `@zitadel/server` version; prerelease images publish only immutable
+version tags, while stable releases may move
 `ghcr.io/zitadel/nextgen:latest`.
 
 ### npm packages (`changesets`)
 
-`apps/cli` and the public packages under `packages/` publish to npm via
-[changesets](https://github.com/changesets/changesets). On any user-visible
-change to those packages:
+`apps/cli`, `apps/server*`, and the public packages under `packages/` publish
+to npm via [changesets](https://github.com/changesets/changesets). On any
+user-visible change to those packages:
 
 ```sh
 corepack pnpm changeset
 ```
 
 The manual `release-prepare.yml` workflow runs Moon release validation,
-executes `changeset version`, and opens or updates the version PR. Include
-`@zitadel/server-release` in a changeset when the product/server version should
-move. After that PR is reviewed and merged, `release-publish.yml` publishes npm
-packages with Changesets, pushes the product tag and container image, and
-creates or updates the single product GitHub Release.
+executes `changeset version`, and opens or updates the version PR. After that
+PR is reviewed and merged, `release-publish.yml` publishes npm packages with
+Changesets, pushes the product tag and container image, and creates or updates
+the single product GitHub Release.
 
 Follow the [manual release runbook](docs/runbooks/manual-release.md) when
 cutting a release.

@@ -24,6 +24,7 @@ export async function prepareApp(options = {}) {
   const appUrl = env.JOURNEY_APP_URL ?? defaultAppUrl;
   const appPort = appPortFromUrl(appUrl);
   const zitadelPort = optionalPort(env.JOURNEY_ZITADEL_PORT, "JOURNEY_ZITADEL_PORT");
+  const runtime = localRuntime(env.JOURNEY_RUNTIME);
   const fs = {
     appendFile: options.appendFile ?? appendFile,
     mkdir: options.mkdir ?? mkdir,
@@ -40,7 +41,7 @@ export async function prepareApp(options = {}) {
     env.JOURNEY_SDK_PACKAGE ??
     env[`JOURNEY_SDK_${framework.id.toUpperCase()}_PACKAGE`] ??
     (await packageNameFn(framework.sdkPackageDir));
-  const npmEnv = npmEnvironment(env, registryUrl);
+  const npmEnv = npmEnvironment(env, registryUrl, outputDir);
 
   await fs.rm(appDir, { recursive: true, force: true });
   await fs.mkdir(appDir, { recursive: true });
@@ -56,7 +57,7 @@ export async function prepareApp(options = {}) {
       outputDir,
       runCapture: runCaptureFn,
       step: "doctor",
-      stepArgs: withPort(["doctor"], zitadelPort),
+      stepArgs: withRuntime(withPort(["doctor"], zitadelPort), runtime),
       writeFile: fs.writeFile,
     });
     startJson = await runCliJsonStep({
@@ -66,7 +67,7 @@ export async function prepareApp(options = {}) {
       outputDir,
       runCapture: runCaptureFn,
       step: "start",
-      stepArgs: withPort(["start"], zitadelPort),
+      stepArgs: withRuntime(withPort(["start"], zitadelPort), runtime),
       writeFile: fs.writeFile,
     });
     setupJson = await runCliJsonStep({
@@ -115,6 +116,7 @@ export async function prepareApp(options = {}) {
     framework: framework.id,
     frameworkDisplayName: framework.displayName,
     localRuntimeUrl: startJson?.data?.urls?.api ?? null,
+    runtime,
     outputDir,
     registryUrl,
     runtimeMetadataPath: join(appDir, ".zitadel/local/runtime.json"),
@@ -241,7 +243,7 @@ async function packageName(relativePath, options) {
   return pkg.name;
 }
 
-function npmEnvironment(env, registryUrl) {
+function npmEnvironment(env, registryUrl, outputDir) {
   const next = { ...env };
   for (const key of Object.keys(next)) {
     if (key.startsWith("npm_config_")) {
@@ -251,8 +253,11 @@ function npmEnvironment(env, registryUrl) {
   return {
     ...next,
     npm_config_audit: "false",
+    npm_config_cache: join(outputDir, ".npm-cache"),
     npm_config_fund: "false",
+    npm_config_prefer_online: "true",
     npm_config_registry: registryUrl,
+    npm_config_tmp: join(outputDir, ".npm-tmp"),
     npm_config_yes: "true",
   };
 }
@@ -269,6 +274,20 @@ function optionalPort(value, name) {
 function withPort(args, port) {
   if (!port) return args;
   return [...args, "--port", String(port)];
+}
+
+function withRuntime(args, runtime) {
+  return [...args, "--runtime", runtime];
+}
+
+function localRuntime(value) {
+  if (value === undefined || value === "") {
+    return "binary";
+  }
+  if (value === "binary" || value === "docker") {
+    return value;
+  }
+  throw new Error(`JOURNEY_RUNTIME must be binary or docker, got ${value}`);
 }
 
 function runCapture(command, args, options) {

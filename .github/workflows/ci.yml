@@ -1,0 +1,93 @@
+name: ci
+
+on:
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  validate:
+    runs-on: depot-ubuntu-24.04-16
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: moonrepo/setup-toolchain@v0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Detect CI mode
+        id: ci-mode
+        run: node scripts/ci-mode.mjs "${{ github.event.pull_request.base.sha || 'origin/main' }}"
+
+      - name: Run Moon build and test graph
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: moon ci :lint :typecheck :build :test
+
+      - name: Run Go checks
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: moon run server:test
+
+      - name: Build release snapshot without container
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: moon run release:snapshot -- --skip-container
+
+      - name: Run binary fresh-app journey
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: moon run cli-journey-e2e:e2e-local -- --runtime binary --work-dir tmp/ci-journey
+
+      - name: Validate version PR
+        if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
+        run: moon run release:version
+
+      - name: Pack version PR artifacts
+        if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
+        run: moon run release:pack
+
+      - name: Verify version PR tarballs
+        if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
+        run: |
+          version="$(node -p "require('./apps/server/package.json').version")"
+          node apps/cli-journey-e2e/scripts/verify-tarballs.mjs "dist/release/${version}/npm"
+
+      - name: Upload release snapshot
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-snapshot
+          path: dist/release
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload journey diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: journey-diagnostics
+          path: tmp/ci-journey/diagnostics
+          if-no-files-found: ignore
+          retention-days: 7

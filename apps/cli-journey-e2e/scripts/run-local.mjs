@@ -8,7 +8,6 @@ import net from "node:net";
 
 import { frameworkForId } from "./frameworks.mjs";
 import {
-  composeArgs,
   localRegistryPaths,
   npmEnvironment,
   packageName,
@@ -21,7 +20,6 @@ import { parseLocalJourneyArgs } from "./run-options.mjs";
 const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, "..");
 const repoRoot = resolve(projectRoot, "../..");
-const composeFile = join(projectRoot, "docker-compose.local.yaml");
 
 const options = parseArgsOrExit(process.argv.slice(2));
 if (options.help) {
@@ -35,25 +33,17 @@ const workDir = resolve(
 );
 const diagnosticsDir = join(workDir, "diagnostics");
 const registryPaths = localRegistryPaths(workDir);
-const composeLogPath = join(diagnosticsDir, "compose.log");
-const composeProjectName = `zitadel-journey-${process.pid}-${Date.now()}`;
 const registryPort = await resolvePort("JOURNEY_REGISTRY_PORT");
 const registryUrl = `http://127.0.0.1:${registryPort}`;
 const cliPackage = await packageName(repoRoot, "apps/cli");
-const compose = {
-  envPath: registryPaths.composeEnvPath,
-  file: composeFile,
-  projectName: composeProjectName,
-  repoRoot,
-};
 const childProcesses = new Set();
 const frameworkContexts = [];
 const usedPorts = new Set([registryPort]);
-let composeStarted = false;
-let composeLogsCollected = false;
+let registryProcess;
+let registryLogsCollected = false;
 let cleanupStarted = false;
 let success = false;
-let localRuntimeImage = process.env.ZITADEL_LOCAL_IMAGE || options.image;
+let localRuntimeImage = options.runtime === "docker" ? process.env.ZITADEL_LOCAL_IMAGE || options.image : "";
 
 process.on("SIGINT", () => void handleSignal("SIGINT"));
 process.on("SIGTERM", () => void handleSignal("SIGTERM"));
@@ -64,14 +54,16 @@ try {
 
   log(`work dir: ${workDir}`);
   log(`frameworks: ${selectedFrameworks.map((framework) => framework.id).join(", ")}`);
-  await assertDockerAvailable();
+  log(`runtime: ${options.runtime}`);
+  if (options.runtime === "docker") {
+    await assertDockerAvailable();
+  }
   await ensurePlaywrightBrowsers();
-  await prepareLocalRegistry({
-    compose,
+  const localRegistry = await prepareLocalRegistry({
     env: process.env,
     log,
-    onStarted: () => {
-      composeStarted = true;
+    onStarted: (registry) => {
+      registryProcess = registry;
     },
     paths: registryPaths,
     registryPort,
@@ -80,8 +72,9 @@ try {
     run,
     workDir,
   });
+  registryProcess = localRegistry.registry;
 
-  if (!localRuntimeImage) {
+  if (options.runtime === "docker" && !localRuntimeImage) {
     log("building local runtime image for npx @zitadel/cli@alpha start");
     localRuntimeImage = await buildJourneyRuntimeImage();
   }
@@ -99,7 +92,7 @@ try {
   success = true;
   log("customer local setup journey matrix passed");
 } catch (error) {
-  await collectComposeLogs();
+  await collectRegistryLogs();
   console.error("");
   console.error(`[journey-local] failed: ${errorMessage(error)}`);
   console.error(`[journey-local] diagnostics preserved in ${workDir}`);
@@ -130,6 +123,7 @@ function printUsage() {
 Options:
   --framework <id>         Run one framework: next, nuxt, react, vue, or angular
   --concurrency <n>        Number of framework journeys to run in parallel (default: 5)
+  --runtime <binary|docker> Local runtime backend (default: binary)
   --image <docker-tag>     Use an existing local runtime image instead of building one
   --keep                   Keep the temp work directory after success
   --work-dir <path>        Use an explicit work directory
@@ -208,9 +202,10 @@ async function runFrameworkJourney(context) {
         JOURNEY_FRAMEWORK: framework.id,
         JOURNEY_ZITADEL_PORT: String(context.zitadelPort),
         JOURNEY_REGISTRY_URL: registryUrl,
+        JOURNEY_RUNTIME: options.runtime,
         JOURNEY_WORK_DIR: context.frameworkWorkDir,
         NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
-        ZITADEL_LOCAL_IMAGE: localRuntimeImage,
+        ...(localRuntimeImage ? { ZITADEL_LOCAL_IMAGE: localRuntimeImage } : {}),
       },
     });
 
@@ -352,7 +347,6 @@ async function buildJourneyRuntimeImage() {
 
 async function assertDockerAvailable() {
   let engineVersion = "";
-  let composeVersion = "";
 
   try {
     const result = await runCapture("docker", ["info", "--format", "{{.ServerVersion}}"]);
@@ -360,7 +354,7 @@ async function assertDockerAvailable() {
   } catch (error) {
     throw new Error(
       [
-        "Docker is required for the local journey runner because Verdaccio runs through Docker Compose.",
+        "Docker is required for the Docker local runtime journey.",
         "Start Docker Desktop or another Docker daemon, wait until `docker ps` works, then rerun this command.",
         `Docker daemon check failed: ${commandErrorDetail(error)}`,
       ].join("\n"),
@@ -368,25 +362,7 @@ async function assertDockerAvailable() {
     );
   }
 
-  try {
-    const result = await runCapture("docker", ["compose", "version", "--short"]);
-    composeVersion = result.stdout.trim();
-  } catch (error) {
-    throw new Error(
-      [
-        "Docker Compose is required for the local journey runner because Verdaccio runs through Docker Compose.",
-        "Install or enable the Docker Compose plugin, then rerun this command.",
-        `Docker Compose check failed: ${commandErrorDetail(error)}`,
-      ].join("\n"),
-      { cause: error },
-    );
-  }
-
-  const versionDetails = [
-    engineVersion ? `engine ${engineVersion}` : "",
-    composeVersion ? `compose ${composeVersion}` : "",
-  ].filter(Boolean);
-  log(`Docker is available${versionDetails.length > 0 ? ` (${versionDetails.join(", ")})` : ""}`);
+  log(`Docker is available${engineVersion ? ` (engine ${engineVersion})` : ""}`);
 }
 
 function startChild(command, args, optionsForChild) {
@@ -519,16 +495,11 @@ async function collectDiagnostics(context) {
   await copyIfExists(context.playwrightOutputDir, join(context.diagnosticsDir, "playwright-output"));
 }
 
-async function collectComposeLogs() {
-  if (!composeStarted || composeLogsCollected) return;
-  composeLogsCollected = true;
+async function collectRegistryLogs() {
+  if (registryLogsCollected) return;
+  registryLogsCollected = true;
   await mkdir(diagnosticsDir, { recursive: true });
-  try {
-    const result = await runCapture("docker", composeArgs(compose, ["logs"]));
-    await writeFile(composeLogPath, `${result.stdout}${result.stderr}`);
-  } catch (error) {
-    await writeFile(composeLogPath, `failed to collect compose logs: ${errorMessage(error)}\n`);
-  }
+  await copyIfExists(registryPaths.registryLogPath, join(diagnosticsDir, "verdaccio.log"));
 }
 
 async function collectLocalRuntimeLogs(context) {
@@ -568,11 +539,11 @@ async function cleanup() {
 
   await Promise.all(frameworkContexts.map(resetLocalRuntime));
 
-  if (composeStarted) {
+  if (registryProcess) {
     try {
-      await stopLocalRegistry(compose, run, process.env);
+      await stopLocalRegistry(registryProcess);
     } catch (error) {
-      console.error(`[journey-local] docker compose cleanup failed: ${errorMessage(error)}`);
+      console.error(`[journey-local] Verdaccio cleanup failed: ${errorMessage(error)}`);
     }
   }
 }
@@ -620,7 +591,7 @@ function waitForExit(child, timeoutMs) {
 
 async function handleSignal(signal) {
   console.error(`[journey-local] received ${signal}, cleaning up`);
-  await collectComposeLogs();
+  await collectRegistryLogs();
   await Promise.all(frameworkContexts.map(collectDiagnostics));
   await cleanup();
   process.exit(130);
@@ -632,7 +603,8 @@ function cliArgs(args) {
 
 function npxEnv(_context) {
   const env = npmEnvironment(process.env, registryUrl, registryPaths.npmrcPath);
-  const image = localRuntimeImage || process.env.ZITADEL_LOCAL_IMAGE;
+  env.JOURNEY_RUNTIME = options.runtime;
+  const image = options.runtime === "docker" ? localRuntimeImage || process.env.ZITADEL_LOCAL_IMAGE : "";
   if (image) {
     env.ZITADEL_LOCAL_IMAGE = image;
   }

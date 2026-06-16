@@ -10,10 +10,9 @@ publishing, and public package tags.
    `.changeset/*.md`.
 2. Run the manual `release-prepare` workflow.
 3. Review the generated version PR. It should update package versions,
-   changelogs, and the private `@zitadel/server-release` record when the server
-   product version changes. The version PR should not create the product
-   GitHub Release; `release-publish` does that from the reviewed server-release
-   version.
+   changelogs, and the `@zitadel/server` npm runtime version. The version PR
+   should not create the product GitHub Release; `release-publish` does that
+   from the reviewed fixed package version.
 4. Merge the version PR only after split CI is green.
 
 ## Publish
@@ -29,8 +28,8 @@ publishing, and public package tags.
 
 Use `release-recover` for an already-versioned release when local artifacts were
 built but a remote publish step failed. Recovery verifies the checked-out
-`@zitadel/server-release` version before republishing containers or updating the
-GitHub Release.
+`@zitadel/server` version before republishing containers or updating the GitHub
+Release.
 
 ## Local checks
 

@@ -3,6 +3,12 @@
 This directory holds [changesets](https://github.com/changesets/changesets) for the npm-published packages in this monorepo. The **public** packages are:
 
 - `@zitadel/cli` (`apps/cli`)
+- `@zitadel/server` (`apps/server`)
+- `@zitadel/server-linux-x64` (`apps/server-linux-x64`)
+- `@zitadel/server-linux-arm64` (`apps/server-linux-arm64`)
+- `@zitadel/server-darwin-x64` (`apps/server-darwin-x64`)
+- `@zitadel/server-darwin-arm64` (`apps/server-darwin-arm64`)
+- `@zitadel/server-win32-x64` (`apps/server-win32-x64`)
 - `@zitadel/api` (`packages/api`)
 - `@zitadel/components` (`packages/components`)
 - `@zitadel/sdk-core` (`packages/sdk-core`)
@@ -12,7 +18,7 @@ This directory holds [changesets](https://github.com/changesets/changesets) for 
 - `@zitadel/sdk-vue` (`packages/sdk-vue`)
 - `@zitadel/sdk-angular` (`packages/sdk-angular`)
 
-Everything else (`@zitadel/api-mock`, `@zitadel/design-tokens`, `@zitadel/shared-component-styles`, `@zitadel/ui-react`, the demos, the console) is marked `"private": true` and is never published. The private `@zitadel/server-release` record is the exception: Changesets versions it so the Go server artifacts have a reviewed product version even though Moon publishes the non-npm files.
+Everything else (`@zitadel/api-mock`, `@zitadel/design-tokens`, `@zitadel/shared-component-styles`, `@zitadel/ui-react`, the demos, the console) is marked `"private": true` and is never published.
 
 When you make a user-visible change to one of the public packages, run:
 
@@ -22,19 +28,16 @@ corepack pnpm changeset
 
 Pick the affected packages, the bump type (patch / minor / major), and write a one-line summary. A markdown file appears in this directory and gets committed with your PR.
 
-When a change should move the product/server release version, include the
-private `@zitadel/server-release` record in the changeset. Do not add
-`@zitadel/server-release` to npm pack/publish lists: it is the version source
-for server archives, containers, the product `v<version>` tag, and the single
-product GitHub Release. A real npm server runtime would be a separate public
-package such as `@zitadel/server`, with its own ADR and package manifest.
+The public packages above are in one Changesets fixed group while the repo is
+in alpha, so a version PR moves the CLI, SDKs, API packages, and server npm
+runtime together.
 
 ## Alpha prerelease mode
 
 The repo is currently in changesets **prerelease mode** with the `alpha` tag (see `.changeset/pre.json`). While in this mode:
 
 - `changeset version` cuts versions like `0.1.0-alpha.0`, `0.1.0-alpha.1`, …
-- Public packages are versioned independently. A release includes only the packages and product release record named by pending changesets.
+- Public product packages are versioned together through the fixed group.
 - `changeset publish` publishes public npm packages under the **`alpha`** npm dist-tag while prerelease mode is active.
 - A package that has never had a stable release is published to `latest` on its first publish (changesets behaviour), then to `alpha` thereafter until it has a stable release.
 
@@ -65,17 +68,18 @@ short-lived OIDC credentials, but npm only accepts public provenance
 attestations from public source repositories. Re-enable provenance when
 `zitadel/nextgen` is public.
 
-Changesets does not build the Go server binary or create the product
-announcement. Moon release tasks read the Changesets-versioned
-`@zitadel/server-release` package, create `v<version>`, cross-build the Go
-server, publish containers, and update the single product GitHub Release. See
+Changesets publishes the npm packages, including `@zitadel/server`. Moon
+release tasks read the `@zitadel/server` version, create `v<version>`,
+cross-build the Go server, stage the platform npm package binaries, publish
+containers, and update the single product GitHub Release. See
 [docs/adrs/002-multi-package-release-strategy.md](../docs/adrs/002-multi-package-release-strategy.md)
 and [docs/adrs/023-lockstep-alpha-release-train.md](../docs/adrs/023-lockstep-alpha-release-train.md).
 
 ## Licensing reminder
 
-npm packages published from this repo are **MIT-licensed**, not AGPL like the
-server. Public packages under `apps/cli/` and `packages/*` must set
-`"license": "MIT"` and ship a package-level `LICENSE` file before publishing.
+Most npm packages published from this repo are **MIT-licensed**. Public
+packages under `apps/cli/` and `packages/*` must set `"license": "MIT"` and
+ship a package-level `LICENSE` file before publishing. The `apps/server*`
+packages ship the AGPL server binary and use `"license": "AGPL-3.0-only"`.
 Private demo, design-system, and integration workspaces are covered by the path
 exceptions in [/LICENSING.md](../LICENSING.md) while they remain private.

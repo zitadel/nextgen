@@ -32,14 +32,13 @@
 
 Moon owns the monorepo task graph for TypeScript, Go, release tooling, and
 journeys. Published `zitadel` runtime commands are for customers and agents
-adding Zitadel to an app; they manage a Docker-backed local runtime and do not
-require Go, Moon, or this source checkout.
+adding Zitadel to an app; they manage the `@zitadel/server` npm binary runtime
+by default and do not require Docker, Go, Moon, or this source checkout.
 
-For contributors, `moon run workspace:cli -- start` builds and uses a fresh
-local runtime image by default. The wrapper runs the CLI build, then builds
-`ghcr.io/zitadel/nextgen:local-dev` through the Moon-owned release build
-helpers before invoking `zitadel start`. Pass `--image <tag>` or set
-`ZITADEL_LOCAL_IMAGE=<tag>` to use an existing image instead.
+For contributors, `moon run workspace:cli -- start` builds the local CLI and
+runs it against the workspace package train. Pass `--runtime docker`,
+`--image <tag>`, or set `ZITADEL_LOCAL_IMAGE=<tag>` when intentionally testing
+the Docker backend.
 
 `moon run workspace:cli -- setup ...` is the manual whole-local-train path for
 humans and agents. Before invoking the local CLI, the wrapper builds and packs
@@ -58,10 +57,10 @@ moon run workspace:doctor
 moon ci :lint :typecheck :build :test
 ```
 
-The repository doctor checks Docker and Moon because contributor
-`moon run workspace:cli -- start` auto-builds the local runtime image from this
-source checkout. Playwright browsers remain advisory for opt-in e2e and journey
-workflows.
+The repository doctor checks Moon and local toolchain prerequisites. Docker is
+needed for container builds, Docker fallback journeys, and container-backed
+integration tests; it is not required for the default npm-binary local runtime.
+Playwright browsers remain advisory for opt-in e2e and journey workflows.
 
 `moon run workspace:check -- --full` runs the slower CI-parity phases. Use
 `moon run <project>:<task>` to rerun one named task, or
@@ -85,21 +84,21 @@ generated Next.js app:
 moon run workspace:journey
 ```
 
-The local runner needs Docker for Verdaccio and the CLI-managed local runtime.
-It ensures the Playwright Chromium browsers are installed, builds and packs the
-local publishable packages with pnpm, publishes them to the temporary registry,
-creates a Next.js app outside the repo, runs CLI setup through npm, starts the
-generated app on localhost, and runs Playwright with one worker.
+The local runner starts Verdaccio as a Node process, builds and packs the local
+publishable packages including `@zitadel/server`, publishes them to the
+temporary registry, creates a Next.js app outside the repo, runs CLI setup
+through npm, starts the generated app on localhost, and runs Playwright with one
+worker.
 
 Use `moon run workspace:journey` for deterministic CI-style proof. Use
 `moon run workspace:cli -- ...` when you want to drive the same local package
 train manually in a browser and see whether the command guidance is clear enough
 for a human or agent.
 
-For image parity with CI, provide a local backend image tag:
+To exercise the Docker fallback path, provide a local backend image tag:
 
 ```sh
-moon run workspace:journey -- --image nextgen:local
+moon run workspace:journey -- --runtime docker --image nextgen:local
 ```
 
 Use `--keep` to preserve the temporary work directory after success. On failure

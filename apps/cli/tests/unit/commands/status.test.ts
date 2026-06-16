@@ -161,6 +161,7 @@ describe("status command", () => {
 function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
   return {
     schema_version: 1,
+    backend: "docker",
     container_name: localContainerName(cwd),
     container_id: "container-test-id",
     image: "ghcr.io/zitadel/nextgen:test",

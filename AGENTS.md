@@ -84,13 +84,14 @@ product tag and GitHub Release (see "Release, Licensing, And Secrets").
 
 `moon run workspace:server` is a repository contributor command that runs the Go
 server from source. `zitadel start` is a published product CLI command that
-runs the released Docker image for app developers and agents; it must not rely
-on Go, Moon, or this source checkout.
+runs the released `@zitadel/server` npm binary for app developers and agents;
+it must not rely on Docker, Go, Moon, or this source checkout. Docker remains
+available through `zitadel start --runtime docker`.
 
 `moon run workspace:cli -- start` is the contributor exception: the root wrapper
-builds `ghcr.io/zitadel/nextgen:local-dev` through the Moon-owned release build
-helpers when neither `--image` nor `ZITADEL_LOCAL_IMAGE` is provided, then
-invokes the local CLI against that image.
+builds the local CLI and runs it against the workspace package train. Pass
+`--runtime docker`, `--image`, or `ZITADEL_LOCAL_IMAGE` when intentionally
+testing the Docker backend.
 
 `moon run workspace:cli -- setup ...` is also a contributor exception for manual
 human and agent testing. The wrapper builds and packs the public workspace npm
@@ -109,10 +110,11 @@ moon run workspace:doctor
 moon ci :lint :typecheck :build :test
 ```
 
-The root doctor treats Docker and Moon as required because the contributor
-CLI wrapper needs them for local runtime image auto-builds. Playwright browsers
-remain warning-only because they are needed only for opt-in e2e and journey
-workflows.
+The root doctor treats Moon and the local toolchain as required. Docker is
+needed for container builds, Docker fallback journeys, and container-backed
+integration tests; it is not required for the default npm-binary local runtime.
+Playwright browsers remain warning-only because they are needed only for opt-in
+e2e and journey workflows.
 
 Use `moon run workspace:check -- --full` for slower CI-parity phases and
 `moon run <project>:<task>` to rerun one named task.
@@ -146,25 +148,25 @@ The local reproduction command for the fresh-app consumer journey gate is:
 moon run workspace:journey
 ```
 
-This runner requires Docker for Verdaccio and the CLI-managed local runtime. By
-default it builds a local runtime image, ensures the Playwright Chromium
-browsers are installed, builds and packs local npm packages with pnpm, creates
-empty app directories outside the repo, runs `npx @zitadel/cli@alpha doctor`,
-`start`, and `setup --framework <id> --server local`, starts the generated apps
-on `localhost`, and runs Playwright with one worker per framework journey. Use
-`-- --framework next` to run one framework and `-- --image <docker-tag>` to
-reuse an existing local runtime image.
+By default this runner does not require Docker. It starts Verdaccio as a Node
+process, builds and packs local npm packages including `@zitadel/server`,
+creates empty app directories outside the repo, runs
+`npx @zitadel/cli@alpha doctor --runtime binary`, `start --runtime binary`, and
+`setup --framework <id> --server local`, starts the generated apps on
+`localhost`, and runs Playwright with one worker per framework journey. Use
+`-- --framework next` to run one framework and
+`-- --runtime docker --image <docker-tag>` to exercise the Docker fallback.
 
 Use `moon run workspace:journey` for deterministic CI-style proof of the
 fresh-app path. Use `moon run workspace:cli -- ...` for manual browser or agent
 experiments against the same local package train.
 
-In CI the `consumer-journey-e2e` matrix is the required PR runtime gate: it
-consumes the current workflow's Moon-built image and npm package artifacts
-instead of public Zitadel packages. The checked-in demo integrations
-(`node-e2e`), raw binary embedded-postgres smoke, and documented quick-start
-compose smoke run on pushes to `main` as release-surface confidence checks.
-Browsers are cached on the runner to reduce install cost.
+In CI the required PR runtime gate is `ci / validate`: it consumes current
+workflow npm package tarballs instead of public Zitadel packages and exercises
+the default npm-binary local runtime. The Docker fallback journey runs in the
+`ci-docker-runtime` workflow on `main` and by manual dispatch. The checked-in
+demo integrations, raw binary embedded-postgres smoke, and documented
+quick-start compose smoke remain release-surface confidence checks.
 
 ## Testing Layers
 
@@ -236,13 +238,13 @@ For customer-local runtime workflows, agents should prefer
   run; if validation was not run, say so explicitly. Mention changeset status
   for user-visible package changes.
 - User-visible changes to a public npm package need a changeset. The public
-  packages are `@zitadel/cli` (`apps/cli/`), `@zitadel/api`,
+  packages are `@zitadel/cli` (`apps/cli/`), `@zitadel/server`
+  (`apps/server/`), the `@zitadel/server-*` platform packages, `@zitadel/api`,
   `@zitadel/components`, `@zitadel/sdk-core`, `@zitadel/sdk-next`,
   `@zitadel/sdk-nuxt`, `@zitadel/sdk-react`, `@zitadel/sdk-vue`, and
-  `@zitadel/sdk-angular`. The private `@zitadel/server-release` manifest is
-  versioned by Changesets when product/server versions move, but is not an npm
-  package. Moon creates the single product `v<version>` tag and GitHub Release
-  from that private version record.
+  `@zitadel/sdk-angular`. These packages are in one Changesets fixed group for
+  alpha product releases. Moon still creates the product `v<version>` tag and
+  GitHub Release from the fixed package version.
 - Add a changeset by writing the file directly — do not depend on the
   interactive `pnpm changeset` prompt. Create `.changeset/<short-slug>.md`:
 
@@ -254,16 +256,16 @@ For customer-local runtime workflows, agents should prefer
   One-line, user-facing summary of the change.
   ```
 
-  List only packages whose release record should move; include
-  `@zitadel/server-release` for product/server releases. Pick `patch` (fixes),
+  List only packages whose release record should move. Pick `patch` (fixes),
   `minor` (features), or `major` (breaking). The repo is in `alpha` prerelease
-  mode (`.changeset/pre.json`), but public packages are independently
-  versioned unless an ADR explicitly reintroduces lockstep.
+  mode (`.changeset/pre.json`), and the product packages release together
+  through the Changesets fixed group.
 
 - For changes that release nothing (docs, tests, CI, chores), add an empty
   changeset: `corepack pnpm changeset --empty`.
 - npm packages under `apps/cli/` and `packages/*` must stay MIT-licensed.
-- Server and console application paths are AGPL-3.0-only by default.
+- Server npm packages under `apps/server*` and console application paths are
+  AGPL-3.0-only by default.
 - Keep local secrets, private keys, tokens, and `.zitadel/secret`-style files out
   of source control and browser-safe runtime metadata.
 

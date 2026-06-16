@@ -12,6 +12,12 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");
 const requiredPackageDirs = [
   "apps/cli",
+  "apps/server",
+  "apps/server-linux-x64",
+  "apps/server-linux-arm64",
+  "apps/server-darwin-x64",
+  "apps/server-darwin-arm64",
+  "apps/server-win32-x64",
   "packages/api",
   "packages/components",
   "packages/sdk-core",
@@ -33,6 +39,7 @@ const dependencyFields = [
 const unsupportedProtocol = /^(catalog|workspace):/;
 const semverVersion = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const manifests = new Map();
+const serverPlatformPackagePattern = /^@zitadel\/server-(?:darwin|linux|win32)-/;
 
 const tarballs = (await readdir(tarballsDir))
   .filter((file) => file.endsWith(".tgz"))
@@ -55,6 +62,7 @@ for (const file of tarballs) {
     throw new Error(`duplicate tarball for ${manifest.name}`);
   }
   assertInstallableManifest(tarball, manifest);
+  assertServerPlatformBinary(tarball, manifest);
   manifests.set(manifest.name, manifest);
 }
 
@@ -99,6 +107,26 @@ function assertInstallableManifest(tarball, manifest) {
         throw new Error(`${tarball} has unresolved ${field}.${name}: ${spec}`);
       }
     }
+  }
+}
+
+function assertServerPlatformBinary(tarball, manifest) {
+  if (!serverPlatformPackagePattern.test(manifest.name)) {
+    return;
+  }
+  const binaryPath = manifest.name.includes("win32") ? "bin/nextgen.exe" : "bin/nextgen";
+  if (!manifest.bin || manifest.bin.nextgen !== `./${binaryPath}`) {
+    throw new Error(`${tarball} must declare ${manifest.name} bin.nextgen as ./${binaryPath}`);
+  }
+  const result = spawnSync("tar", ["-tvf", tarball, `package/${binaryPath}`], {
+    encoding: "utf8",
+  });
+  if (result.status !== 0) {
+    throw new Error(`failed to inspect ${binaryPath} in ${tarball}: ${result.stderr}`);
+  }
+  const mode = result.stdout.trim().split(/\s+/, 1)[0] ?? "";
+  if (!mode.includes("x")) {
+    throw new Error(`${tarball} contains non-executable ${binaryPath}`);
   }
 }
 

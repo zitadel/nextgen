@@ -1,7 +1,0 @@
-{
-  "name": "@zitadel/server-release",
-  "version": "0.1.0-alpha.5",
-  "private": true,
-  "description": "Changesets-versioned product release record for the Zitadel server artifacts.",
-  "license": "AGPL-3.0-only"
-}

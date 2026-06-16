@@ -1,17 +1,51 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { run, runCapture } from "./dev-process.mjs";
 
 export const SERVER_IMAGE = "ghcr.io/zitadel/nextgen";
-export const SERVER_RELEASE_PACKAGE = "@zitadel/server-release";
-export const SERVER_RELEASE_MANIFEST = "apps/server-release/package.json";
+export const SERVER_PACKAGE = "@zitadel/server";
+export const SERVER_PACKAGE_MANIFEST = "apps/server/package.json";
+export const SERVER_PLATFORM_PACKAGES = [
+  {
+    goos: "linux",
+    goarch: "amd64",
+    packageName: "@zitadel/server-linux-x64",
+    packageDir: "apps/server-linux-x64",
+  },
+  {
+    goos: "linux",
+    goarch: "arm64",
+    packageName: "@zitadel/server-linux-arm64",
+    packageDir: "apps/server-linux-arm64",
+  },
+  {
+    goos: "darwin",
+    goarch: "amd64",
+    packageName: "@zitadel/server-darwin-x64",
+    packageDir: "apps/server-darwin-x64",
+  },
+  {
+    goos: "darwin",
+    goarch: "arm64",
+    packageName: "@zitadel/server-darwin-arm64",
+    packageDir: "apps/server-darwin-arm64",
+  },
+  {
+    goos: "windows",
+    goarch: "amd64",
+    packageName: "@zitadel/server-win32-x64",
+    packageDir: "apps/server-win32-x64",
+  },
+];
 export const PUBLIC_PACKAGE_DIRS = [
   "apps/cli",
+  "apps/server",
+  ...SERVER_PLATFORM_PACKAGES.map((platform) => platform.packageDir),
   "packages/api",
   "packages/components",
   "packages/sdk-core",
@@ -40,9 +74,9 @@ export async function readPackageManifest(repoRoot, relativePath) {
 }
 
 export async function readServerRelease(repoRoot = defaultRepoRoot) {
-  const manifest = await readPackageManifest(repoRoot, SERVER_RELEASE_MANIFEST);
-  if (manifest.name !== SERVER_RELEASE_PACKAGE) {
-    throw new Error(`${SERVER_RELEASE_MANIFEST} must be ${SERVER_RELEASE_PACKAGE}`);
+  const manifest = await readPackageManifest(repoRoot, SERVER_PACKAGE_MANIFEST);
+  if (manifest.name !== SERVER_PACKAGE) {
+    throw new Error(`${SERVER_PACKAGE_MANIFEST} must be ${SERVER_PACKAGE}`);
   }
   validateSemver(manifest.version);
   return {
@@ -130,6 +164,24 @@ export async function buildServerBinaries(options = {}) {
   }
 
   return { outDir, platforms, version, gitInfo: info };
+}
+
+export async function stageServerNpmBinaries(options = {}) {
+  const repoRoot = options.repoRoot ?? defaultRepoRoot;
+  const version = options.version ?? (await readServerRelease(repoRoot)).version;
+  const outDir = options.outDir ?? releaseDir(repoRoot, version);
+  const platforms = options.platformPackages ?? SERVER_PLATFORM_PACKAGES;
+
+  for (const platform of platforms) {
+    const source = join(platformDir(outDir, platform), binaryName(platform.goos));
+    const destination = join(repoRoot, platform.packageDir, "bin", binaryName(platform.goos));
+    await rm(join(repoRoot, platform.packageDir, "bin"), { recursive: true, force: true });
+    await mkdir(dirname(destination), { recursive: true });
+    await copyFile(source, destination);
+    if (platform.goos !== "windows") {
+      await chmod(destination, 0o755);
+    }
+  }
 }
 
 export async function prepareDockerContext(options = {}) {

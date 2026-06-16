@@ -14,6 +14,7 @@ import {
   prepareDockerContext,
   readServerRelease,
   releaseDir,
+  stageServerNpmBinaries,
   verifyLocalArtifacts,
   writeReleaseMetadata,
 } from "./release-artifacts.mjs";
@@ -56,6 +57,7 @@ async function commandSnapshot(options) {
   await run("sh", ["scripts/sync-embedded-ui-dist.sh", "all"], { cwd: repoRoot });
   await run("go", ["mod", "download"], { cwd: repoRoot });
   await buildServerBinaries({ repoRoot, outDir, version: release.version, gitInfo: info });
+  await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
   await createArchives({ repoRoot, outDir, version: release.version });
   await packPublicPackages({ repoRoot, outDir, version: release.version });
   await prepareDockerContext({ repoRoot, outDir, version: release.version });
@@ -79,6 +81,11 @@ async function commandSnapshot(options) {
 async function commandPack() {
   const release = await readServerRelease(repoRoot);
   const outDir = releaseDir(repoRoot, release.version);
+  const info = await gitInfo({ repoRoot });
+  await run("sh", ["scripts/sync-embedded-ui-dist.sh", "all"], { cwd: repoRoot });
+  await run("go", ["mod", "download"], { cwd: repoRoot });
+  await buildServerBinaries({ repoRoot, outDir, version: release.version, gitInfo: info });
+  await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
   await packPublicPackages({ repoRoot, outDir, version: release.version });
   console.log(`npm tarballs ready: ${join(outDir, "npm")}`);
 }

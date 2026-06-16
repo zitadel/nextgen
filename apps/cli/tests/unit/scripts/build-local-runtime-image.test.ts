@@ -60,7 +60,7 @@ describe("build-local-runtime-image", () => {
       nodeArch: "arm64",
       env: { CUSTOM_ENV: "1" },
       release: {
-        name: "@zitadel/server-release",
+        name: "@zitadel/server",
         version: "0.1.0-alpha.5",
         tag: "v0.1.0-alpha.5",
         prerelease: true,
@@ -147,7 +147,7 @@ describe("build-local-runtime-image", () => {
         repoRoot: "/repo",
         nodeArch: "x64",
         release: {
-          name: "@zitadel/server-release",
+          name: "@zitadel/server",
           version: "0.1.0-alpha.5",
           tag: "v0.1.0-alpha.5",
           prerelease: true,

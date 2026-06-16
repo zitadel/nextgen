@@ -1,0 +1,30 @@
+{
+  "name": "@zitadel/server-linux-x64",
+  "version": "0.1.0-alpha.5",
+  "description": "Linux x64 Zitadel server binary.",
+  "homepage": "https://github.com/zitadel/nextgen#readme",
+  "bugs": {
+    "url": "https://github.com/zitadel/nextgen/issues"
+  },
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zitadel/nextgen.git",
+    "directory": "apps/server-linux-x64"
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "bin": {
+    "nextgen": "./bin/nextgen"
+  },
+  "files": [
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
