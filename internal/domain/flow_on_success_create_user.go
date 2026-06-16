@@ -37,11 +37,11 @@ func (h *FlowCreateUserHandler) Handle(ctx context.Context, client database.Quer
 	if in.State != nil {
 		collected = in.State.CollectedData
 	}
-	identifierName, _, ok := findCollectedFieldByChallenge(in.Resolved.Fields, collected, FlowFieldChallengeIdentifier)
+	identifierName, _, _, ok := findCollectedFieldByChallenge(in.Resolved.Fields, collected, FlowFieldChallengeIdentifier)
 	if !ok {
 		return FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no identifier in collected data", ErrIntegrity)
 	}
-	_, _, passwordValue, hasPassword := findCollectedFieldByChallengeWithField(in.Resolved.Fields, collected, FlowFieldChallengePassword)
+	_, _, passwordValue, hasPassword := findCollectedFieldByChallenge(in.Resolved.Fields, collected, FlowFieldChallengePassword)
 	if !hasPassword {
 		return FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", ErrIntegrity)
 	}
@@ -112,7 +112,7 @@ func (h *FlowCreateUserHandler) GenerateUserID() (string, error) {
 // the passkey save for atomicity.
 func (h *FlowCreateUserHandler) HandleProvisional(ctx context.Context, client database.QueryExecutor, userID string, state *FlowState, resolved FlowResolvedFields) error {
 	var attrs []*CreateAttribute
-	if name, field, value, ok := findCollectedFieldByChallengeWithField(resolved.Fields, state.CollectedData, FlowFieldChallengeIdentifier); ok {
+	if name, field, value, ok := findCollectedFieldByChallenge(resolved.Fields, state.CollectedData, FlowFieldChallengeIdentifier); ok {
 		uniqueScope := attributeUniquenessFor(name, name, field.Unique)
 		attr, err := NewCreateAttribute(name, value, uniqueScope)
 		if err != nil {
@@ -134,23 +134,10 @@ func (h *FlowCreateUserHandler) HandleProvisional(ctx context.Context, client da
 }
 
 // findCollectedFieldByChallenge looks up a field whose resolved Challenge
-// matches target and whose name is present in collected. Returns the
-// field name and its collected value.
-func findCollectedFieldByChallenge(resolved []FlowField, collected map[string]any, target FlowFieldChallenge) (name string, value any, ok bool) {
-	for _, f := range resolved {
-		if f.Challenge != target {
-			continue
-		}
-		if v, present := collected[f.Name]; present {
-			return f.Name, v, true
-		}
-	}
-	return "", nil, false
-}
-
-// findCollectedFieldByChallengeWithField is like findCollectedFieldByChallenge
-// but also returns the matched FlowField, saving callers a second lookup.
-func findCollectedFieldByChallengeWithField(resolved []FlowField, collected map[string]any, target FlowFieldChallenge) (name string, field FlowField, value any, ok bool) {
+// matches target and whose name is present in collected. Returns the field
+// name, the matched [FlowField], and its collected value. Callers that don't
+// need the FlowField discard it.
+func findCollectedFieldByChallenge(resolved []FlowField, collected map[string]any, target FlowFieldChallenge) (name string, field FlowField, value any, ok bool) {
 	for _, f := range resolved {
 		if f.Challenge != target {
 			continue
