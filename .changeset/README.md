@@ -151,9 +151,11 @@ release GitHub App token rather than the default `GITHUB_TOKEN`, so the version
 PR triggers the required `full-pr` check normally. After that PR merges and CI
 is green, the same workflow detects the generated version commit, runs Moon
 release tasks, publishes npm packages with `changeset publish`, and pushes
-server containers. Manual workflow dispatch is
-available for dry-runs. Use `release-publish` with `recover_version=<version>`
-to recover any missing publish-side artifact for an already-versioned release.
+server containers. Moon also creates or updates the draft GitHub Release shell
+for `v<version>` with generated artifact and package facts. Manual
+workflow dispatch is available for dry-runs. Use `release-publish` with
+`recover_version=<version>` to recover any missing publish-side artifact for an
+already-versioned release.
 `changeset publish` publishes only package versions that are not already present
 on npm, so the same recovery path is used whether npm packages or containers
 are missing.
@@ -176,8 +178,10 @@ attestations from public source repositories. Re-enable provenance when
 
 Changesets publishes the npm packages, including `@zitadel/server`. Moon
 release tasks read the `@zitadel/server` version, cross-build the Go server,
-stage the platform npm package binaries, and publish containers. Product
-GitHub Release notes are created manually by maintainers when needed. See
+stage the platform npm package binaries, publish containers, and create or
+update the draft GitHub Release shell for `v<version>`. Product release prose is
+written manually by maintainers before they publish the draft.
+See
 [docs/adrs/002-multi-package-release-strategy.md](../docs/adrs/002-multi-package-release-strategy.md)
 and [docs/adrs/023-lockstep-alpha-release-train.md](../docs/adrs/023-lockstep-alpha-release-train.md).
 
