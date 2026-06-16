@@ -173,6 +173,19 @@ form-associated inputs.
 | Custom template | (planned) | tenant-supplied Liquid layouts |
 | Atoms-only | hand-built form | non-standard flow shells |
 
+For styling, start with the generated `--zl-*` variables from
+`@zitadel/design-tokens`, then use host CSS on `zitadel-login { ... }` for page
+placement and `::part(...)` hooks for targeted internals such as the form or
+field input. The design-token package README is the canonical token catalogue;
+the branding design notes explain the broader override ladder. The current
+orchestrator is page-oriented: the host element can be constrained, but the
+inner `.zl-mount` still claims `100vh`, so embedding it as a small inline card is
+limited until the component follow-up relaxes that layout.
+
+Automation can use the stable host and native shadow-root hooks that the default
+template emits, for example `zitadel-field-email`, `zitadel-field-email-input`,
+and `zitadel-action-submit-button`.
+
 A tenant Liquid template can already be supplied through the branding
 payload's `liquid_template` field; a dedicated declarative `template`
 surface on `<zitadel-login>` is not yet exposed. The orchestrator otherwise

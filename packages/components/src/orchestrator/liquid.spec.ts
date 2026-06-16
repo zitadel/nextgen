@@ -297,6 +297,7 @@ describe("LiquidJS engine", () => {
     const f = toArray({
       email: { type: "email", text_key: "register.field.email", required: true },
       password: { type: "password", text_key: "register.field.password", required: true },
+      dateOfBirth: { type: "date", text_key: "register.field.dateOfBirth", required: true },
     });
     const a = toArray({
       submit: { text_key: "register.action.submit", primary: true },
@@ -317,6 +318,8 @@ describe("LiquidJS engine", () => {
     expect(result).toContain('autocomplete="email"');
     expect(result).toContain('autocomplete="new-password"');
     expect(result).toContain("At least 8 characters");
+    expect(result).toContain('placeholder="YYYY-MM-DD"');
+    expect(result).toContain("Use YYYY-MM-DD.");
     expect(result).toContain("An account with this email already exists");
     expect(result).not.toContain("forgot-password-href");
     expect(result).not.toContain('<zl-alert severity="error">An account');

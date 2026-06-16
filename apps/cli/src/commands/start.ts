@@ -5,12 +5,17 @@ import { Flags } from "@oclif/core";
 import { ZitadelError } from "../lib/errors";
 import {
   currentUser,
+  dockerAvailable,
   ensureImage,
   inspectContainer,
   metadataFromStart,
   startContainer,
   stopAndRemoveContainer,
 } from "../lib/local-server/docker";
+import {
+  dockerRuntimeGuidance,
+  dockerUnavailableMessage,
+} from "../lib/local-server/docker-guidance";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
   checkLocalServerHealth,
@@ -65,6 +70,7 @@ export default class Start extends BaseCommand {
       });
     }
 
+    await assertDockerAvailable(this.meta.cliVersion);
     const paths = await ensureLocalState(this.meta.cwd);
 
     const existing = await inspectContainer(containerName);
@@ -119,6 +125,27 @@ export default class Start extends BaseCommand {
       data: readyData(metadata, false, this.meta.cliVersion),
     });
   }
+}
+
+async function assertDockerAvailable(cliVersion: string): Promise<void> {
+  let result: Awaited<ReturnType<typeof dockerAvailable>>;
+  try {
+    result = await dockerAvailable();
+  } catch (error) {
+    throw dockerUnavailableError(error, cliVersion);
+  }
+  if (result.status !== 0) {
+    throw dockerUnavailableError(result.stderr || "docker version failed", cliVersion);
+  }
+}
+
+function dockerUnavailableError(error: unknown, cliVersion: string): ZitadelError {
+  const advice = dockerRuntimeGuidance("start", cliVersion);
+  return new ZitadelError("E_VALIDATION", "Docker is not reachable", {
+    hint: advice.hint,
+    nextCommands: advice.nextCommands,
+    details: { message: dockerUnavailableMessage(error) },
+  });
 }
 
 function readyData(

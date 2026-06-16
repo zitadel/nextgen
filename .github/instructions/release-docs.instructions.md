@@ -16,7 +16,10 @@ state of the repo.
 - The release workflow is manual and draft-oriented while the repo is
   pre-release. Do not imply official npm publishing is enabled.
 - npm package changes use changesets; Go server releases use GoReleaser.
+  Changeset PR workflow (decision table, publishable paths, CI gate) lives in
+  [`.changeset/README.md`](../.changeset/README.md).
 - Keep licensing text aligned with `LICENSING.md`: AGPL-3.0-only by default,
   MIT exceptions for CLI, SDKs, API contracts, and docs.
 - Docs that mention repo behavior should point to `AGENTS.md`; docs that mention
-  the CLI agent contract should point to `apps/cli/SKILLS.md`.
+  changeset requirements should point to `.changeset/README.md`; docs that
+  mention the CLI agent contract should point to `apps/cli/SKILLS.md`.

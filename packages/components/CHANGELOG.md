@@ -1,5 +1,13 @@
 # @zitadel/components
 
+## 0.1.0-alpha.5
+
+### Patch Changes
+
+- [#299](https://github.com/zitadel/nextgen/pull/299) [`f77ca44`](https://github.com/zitadel/nextgen/commit/f77ca44e85565976d26de0b6444b7fc5b1616e8c) Thanks [@fforootd](https://github.com/fforootd)! - Make the generated Next.js auth app easier for agents and developers to prove end-to-end registration, logout, and login in a visible browser.
+
+- [#286](https://github.com/zitadel/nextgen/pull/286) [`3795b67`](https://github.com/zitadel/nextgen/commit/3795b6793c72b92300fc6a7d21c7562f0a25343e) Thanks [@bastionstack](https://github.com/bastionstack)! - Align the login flow with the latest Figma designs: load `branding.font_url` at document level so branded fonts (including the heading face) actually render, change the sign-in CTA from "Continue" to "Sign in", add the missing `identifier.field.password` label, drop the sign-up subheadline, and rename the passkey registration action to "Continue with a passkey". The default login flow no longer shows the post-registration passkey upsell screen — passkey registration is offered up front instead.
+
 ## 0.1.0-alpha.4
 
 ### Patch Changes

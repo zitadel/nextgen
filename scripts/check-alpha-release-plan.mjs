@@ -345,10 +345,20 @@ function assertAlphaRecoveryWorkflow(recoveryWorkflow) {
     "changeset publish",
     "alpha recovery must not publish npm packages",
   );
+  assertNotContains(
+    recoveryWorkflow,
+    "changeset status",
+    "alpha recovery must not depend on Changesets status from a detached recovery ref",
+  );
   assertContains(
     recoveryWorkflow,
-    'corepack pnpm changeset status --output "$RUNNER_TEMP/recovery-changeset-status.json"',
-    "alpha recovery must reject refs with pending release changesets",
+    "node scripts/release-alpha-train.mjs status --published true --remote false",
+    "alpha recovery must reject unready refs with release-train status",
+  );
+  assertContains(
+    recoveryWorkflow,
+    'values.should_complete !== "true"',
+    "alpha recovery must fail when the release-train status is not ready",
   );
   assertContains(
     recoveryWorkflow,

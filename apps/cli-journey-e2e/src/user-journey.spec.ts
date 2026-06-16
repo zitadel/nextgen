@@ -1,15 +1,24 @@
+/* oxlint-disable playwright/expect-expect, playwright/no-conditional-in-test */
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 test.describe.configure({ mode: "serial" });
+test.setTimeout(60_000);
 
-test("password-only registration, logout, and password login work in a fresh Next app", async ({
+const framework = process.env.JOURNEY_FRAMEWORK ?? "next";
+const expectsProtectedRouteRedirect = framework === "next" || framework === "nuxt";
+const loginUrl = /\/login(?:[/?#]|$)/;
+const profileUrl = /\/profile(?:[/?#]|$)/;
+
+test(`password-only registration, logout, and password login work in a fresh ${framework} app`, async ({
   page,
 }) => {
   const email = uniqueEmail("password");
   const password = "Correct-Horse-42!";
 
-  await expectProtectedRouteToRedirect(page);
-  await page.goto("/login");
+  if (expectsProtectedRouteRedirect) {
+    await expectProtectedRouteToRedirect(page);
+  }
+  await gotoLogin(page);
   await registerWithPassword(page, email, password);
   await expectSignedIn(page);
   await expectSessionCookie(page);
@@ -21,14 +30,14 @@ test("password-only registration, logout, and password login work in a fresh Nex
 });
 
 if (process.env.JOURNEY_ENABLE_PASSKEY !== "0") {
-  test("passkey-only registration, logout, and passkey login work in a fresh Next app", async ({
+  test(`passkey-only registration, logout, and passkey login work in a fresh ${framework} app`, async ({
     page,
   }) => {
     await enableVirtualAuthenticator(page);
 
     const email = uniqueEmail("passkey");
 
-    await page.goto("/login");
+    await gotoLogin(page);
     await registerWithPasskey(page, email);
     await expectSignedIn(page);
     await expectSessionCookie(page);
@@ -43,7 +52,27 @@ if (process.env.JOURNEY_ENABLE_PASSKEY !== "0") {
 
 async function expectProtectedRouteToRedirect(page: Page): Promise<void> {
   await page.goto("/profile");
-  await expect(page).toHaveURL(/\/login(?:\?|$)/);
+  await expect(page).toHaveURL(loginUrl);
+}
+
+async function gotoLogin(page: Page): Promise<void> {
+  if (loginUrl.test(page.url())) {
+    return;
+  }
+
+  await page.waitForLoadState("load", { timeout: 5000 }).catch(() => undefined);
+  if (loginUrl.test(page.url())) {
+    return;
+  }
+
+  await page.goto("/login").catch(async (error: unknown) => {
+    if (!isInterruptedByLoginNavigation(error) && !loginUrl.test(page.url())) {
+      throw error;
+    }
+    if (!loginUrl.test(page.url())) {
+      await page.waitForURL(loginUrl, { timeout: 5000 });
+    }
+  });
 }
 
 async function registerWithPassword(
@@ -58,9 +87,8 @@ async function registerWithPassword(
   await fillProfileFieldsIfVisible(page);
   await choosePasswordRegistration(page);
   await fillPassword(page, password);
-  // Registration completes directly — the default flow has no passkey
-  // upsell step; passkey registration is offered up front instead.
   await clickSubmit(page);
+  await skipPasskeyUpsellIfVisible(page);
 }
 
 async function loginWithPassword(
@@ -68,7 +96,7 @@ async function loginWithPassword(
   email: string,
   password: string,
 ): Promise<void> {
-  await page.goto("/login");
+  await gotoLogin(page);
   await fillEmail(page, email);
   if (!(await isPasswordVisible(page))) {
     await clickSubmit(page);
@@ -89,21 +117,69 @@ async function registerWithPasskey(page: Page, email: string): Promise<void> {
 }
 
 async function loginWithPasskey(page: Page, email: string): Promise<void> {
-  await page.goto("/login");
+  await gotoLogin(page);
   await fillEmail(page, email);
   await clickAction(page, /sign in with.*passkey|passkey/i, ["passkey"]);
 }
 
+async function skipPasskeyUpsellIfVisible(page: Page): Promise<void> {
+  const skip = page.getByRole("button", { name: /skip for now/i });
+  const nextState = await Promise.race([
+    skip
+      .waitFor({ state: "visible", timeout: 30_000 })
+      .then(() => "passkey-upsell" as const),
+    signedInLocator(page)
+      .first()
+      .waitFor({ state: "visible", timeout: 30_000 })
+      .then(() => "signed-in" as const),
+  ]).catch(() => {
+    throw new Error(
+      `Timed out waiting for signed-in surface or passkey upsell; current URL: ${page.url()}`,
+    );
+  });
+  if (nextState === "passkey-upsell") {
+    await skip.click();
+  }
+}
+
 async function expectSignedIn(page: Page): Promise<void> {
-  await page.waitForURL("**/profile", { timeout: 30_000 });
-  await expect(page.getByRole("heading", { name: /signed in/i })).toBeVisible();
+  if (expectsProtectedRouteRedirect) {
+    await expect(page).toHaveURL(profileUrl, { timeout: 30_000 });
+  } else {
+    await expect(signedInLocator(page).first()).toBeVisible({ timeout: 30_000 });
+    if (!profileUrl.test(page.url())) {
+      await gotoProfile(page);
+    }
+  }
+  await expect(signedInLocator(page).first()).toBeVisible({ timeout: 30_000 });
+}
+
+async function gotoProfile(page: Page): Promise<void> {
+  await page.goto("/profile").catch(async (error: unknown) => {
+    if (!isInterruptedByProfileNavigation(error) && !profileUrl.test(page.url())) {
+      throw error;
+    }
+    if (!profileUrl.test(page.url())) {
+      await page.waitForURL(profileUrl, { timeout: 5000 });
+    }
+  });
 }
 
 async function expectSessionCookie(page: Page): Promise<void> {
+  await expect
+    .poll(
+      async () =>
+        Boolean(
+          (await page.context().cookies()).find(
+            (cookie) => cookie.name === "__nextgen_session" && cookie.value,
+          ),
+        ),
+      { timeout: 10_000 },
+    )
+    .toBe(true);
   const sessionCookie = (await page.context().cookies()).find(
     (cookie) => cookie.name === "__nextgen_session",
   );
-  expect(sessionCookie?.value).toBeTruthy();
   expect(sessionCookie?.httpOnly).toBe(true);
 }
 
@@ -129,7 +205,10 @@ async function logout(page: Page): Promise<void> {
   }
   await expect(logout.first()).toBeVisible({ timeout: 5000 });
   await logout.first().click();
-  await expect(page).toHaveURL(/\/login(?:\?|$)/);
+  const loggedOutUrl = expectsProtectedRouteRedirect
+    ? loginUrl
+    : /\/(?:login)?(?:[/?#]|$)/;
+  await expect(page).toHaveURL(loggedOutUrl);
   await expectSessionCleared(page);
 }
 
@@ -193,10 +272,15 @@ async function isPasswordVisible(page: Page): Promise<boolean> {
 }
 
 async function expectSessionCleared(page: Page): Promise<void> {
-  const sessionCookie = (await page.context().cookies()).find(
-    (cookie) => cookie.name === "__nextgen_session",
-  );
-  expect(sessionCookie).toBeUndefined();
+  await expect
+    .poll(
+      async () =>
+        (await page.context().cookies()).some(
+          (cookie) => cookie.name === "__nextgen_session",
+        ),
+      { timeout: 5000 },
+    )
+    .toBe(false);
 }
 
 async function clickSubmit(page: Page): Promise<void> {
@@ -212,20 +296,64 @@ async function clickAction(
   name: RegExp,
   actionNames: readonly string[] = [],
 ): Promise<void> {
-  let locator = page.getByRole("button", { name }).or(page.getByRole("link", { name }));
+  const candidates: Locator[] = [];
   for (const actionName of actionNames) {
-    locator = page
-      .getByTestId(`zitadel-action-${actionName}-button`)
-      .or(page.getByTestId(`zitadel-action-${actionName}`))
-      .or(page.getByTestId(`zitadel-action-${actionName}-link`))
-      .or(actionLocator(page, actionName))
-      .or(locator);
+    candidates.push(
+      page.getByTestId(`zitadel-action-${actionName}-button`),
+      page.getByTestId(`zitadel-action-${actionName}`),
+      page.getByTestId(`zitadel-action-${actionName}-link`),
+      actionLocator(page, actionName),
+    );
   }
-  await locator.first().click();
+  candidates.push(page.getByRole("button", { name }), page.getByRole("link", { name }));
+
+  for (const candidate of candidates) {
+    const target = candidate.first();
+    if (await target.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await target.click();
+      return;
+    }
+  }
+
+  const fallback = candidates[candidates.length - 1];
+  if (!fallback) {
+    throw new Error("No action candidates configured");
+  }
+  await fallback.first().click();
 }
 
 function actionLocator(page: Page, actionName: string) {
   return page.locator(`zl-button[action="${actionName}"], [data-action="${actionName}"]`);
+}
+
+function isInterruptedByLoginNavigation(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    isExpectedNavigationRace(error.message, "/login")
+  );
+}
+
+function isInterruptedByProfileNavigation(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    isExpectedNavigationRace(error.message, "/profile")
+  );
+}
+
+function isExpectedNavigationRace(message: string, path: string): boolean {
+  return (
+    (message.includes('interrupted by another navigation to "') ||
+      message.includes("net::ERR_ABORTED at ")) &&
+    message.includes(path)
+  );
+}
+
+function profileActionLocator(page: Page): Locator {
+  return logoutLocator(page).or(page.getByRole("button", { name: /open user menu/i }));
+}
+
+function signedInLocator(page: Page): Locator {
+  return page.getByRole("heading", { name: /signed in/i }).or(profileActionLocator(page));
 }
 
 function fieldControl(page: Page, fieldName: string, label: RegExp): Locator {

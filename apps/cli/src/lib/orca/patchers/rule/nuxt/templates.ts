@@ -1,7 +1,7 @@
 import { MANAGED_MARKER } from "../../../../paths";
 
 const MAIN_STYLE =
-  "min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #f3f4f6";
+  "min-height: 100vh; background: #0f0f11";
 
 /** `app.vue` — renders the page router. Marker in an HTML comment. */
 export function appVueTemplate(): string {

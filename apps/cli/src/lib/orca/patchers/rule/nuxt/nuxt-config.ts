@@ -31,8 +31,18 @@ export function nuxtConfigEdit(opts: {
     let changed = ensureArrayItem(config, "modules", NUXT_MODULE);
 
     const nextgen = ensureEditableObject(config, "nextgen");
+    if (nextgen.url === undefined) {
+      nextgen.url = builders.raw(
+        `process.env.ZITADEL_URL ?? ${JSON.stringify(opts.server)}`,
+      );
+      changed = true;
+    }
     if (nextgen.loginPath === undefined) {
       nextgen.loginPath = "/login";
+      changed = true;
+    }
+    if (nextgen.protectedRoutes === undefined) {
+      nextgen.protectedRoutes = ["/profile"];
       changed = true;
     }
 
