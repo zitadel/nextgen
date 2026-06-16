@@ -1,11 +1,11 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import type {
   AuthResult,
   NextgenMiddlewareOptions,
 } from '@zitadel/sdk-core/types';
 import type { EventHandler, H3Event } from 'h3';
+
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import {
   HOP_BY_HOP,
@@ -13,6 +13,18 @@ import {
   filterResponseHeaders,
   matchesRoutes,
 } from '@zitadel/sdk-core/middleware';
+import {
+  defineEventHandler,
+  getCookie,
+  parseCookies,
+  deleteCookie,
+  sendRedirect,
+  getRequestURL,
+  getRequestHeader,
+  readRawBody,
+} from 'h3';
+
+import { verifyJwt, base64UrlDecode } from '../lib/jwt';
 
 /**
  * Resolve `ZITADEL_PROJECT_SECRET`, falling back to a one-time `.env.local`
@@ -37,18 +49,6 @@ const projectSecret = ((): string | undefined => {
   }
   return undefined;
 })();
-import {
-  defineEventHandler,
-  getCookie,
-  parseCookies,
-  deleteCookie,
-  sendRedirect,
-  getRequestURL,
-  getRequestHeader,
-  readRawBody,
-} from 'h3';
-
-import { verifyJwt, base64UrlDecode } from '../lib/jwt';
 
 declare module 'h3' {
   interface H3EventContext {
