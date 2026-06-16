@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
-import { render } from '@builder.io/qwik';
+import { $, render } from '@builder.io/qwik';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@zitadel/components';
+
+import type { ZitadelFlowStepDetail, ZitadelSignoutDetail } from './types';
 
 import { ZitadelLogin, ZitadelLogout } from './index';
 
@@ -12,6 +14,11 @@ type ConfiguredElement = HTMLElement & {
   projectId?: string;
   proxyPath?: string;
 };
+
+// Qwik wires the widget's listeners in a useVisibleTask$, which runs a turn after
+// render; await a tick so the listeners exist before the event is dispatched.
+const tick = (): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, 20));
 
 beforeEach(() => {
   vi.stubGlobal(
@@ -46,6 +53,27 @@ describe('ZitadelLogin', () => {
     expect(el!.projectId).toBe('proj-test');
     expect(el!.proxyPath).toBe('/__nextgen');
   });
+
+  it('forwards zitadel-flow-step as onFlowStep$(detail)', async () => {
+    const received: ZitadelFlowStepDetail[] = [];
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    await render(
+      host,
+      <ZitadelLogin
+        project={project}
+        onFlowStep$={$((detail) => {
+          received.push(detail);
+        })}
+      />,
+    );
+    await tick();
+    const el = host.querySelector('zitadel-login');
+    const detail = { step: { kind: 'register' } };
+    el?.dispatchEvent(new CustomEvent('zitadel-flow-step', { detail }));
+    await tick();
+    expect(received).toEqual([detail]);
+  });
 });
 
 describe('ZitadelLogout', () => {
@@ -68,5 +96,26 @@ describe('ZitadelLogout', () => {
     const el = host.querySelector<ConfiguredElement>('zitadel-logout');
     expect(el!.projectId).toBe('proj-test');
     expect(el!.proxyPath).toBe('/__nextgen');
+  });
+
+  it('forwards zitadel-signout as onSignout$(detail)', async () => {
+    const received: ZitadelSignoutDetail[] = [];
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    await render(
+      host,
+      <ZitadelLogout
+        project={project}
+        onSignout$={$((detail) => {
+          received.push(detail);
+        })}
+      />,
+    );
+    await tick();
+    const el = host.querySelector('zitadel-logout');
+    const detail = { name: 'Ada', email: 'ada@example.com' };
+    el?.dispatchEvent(new CustomEvent('zitadel-signout', { detail }));
+    await tick();
+    expect(received).toEqual([detail]);
   });
 });
