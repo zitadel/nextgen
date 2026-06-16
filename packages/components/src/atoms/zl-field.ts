@@ -328,6 +328,8 @@ export class ZlField extends LitElement {
 
   private nativeInputTestId(): string | undefined {
     if (this.name) {
+      // Field host hooks use zitadel-field-*; native hooks can be name-first
+      // without colliding with the host, unlike action buttons.
       return `zitadel-input-${this.name}`;
     }
     if (this.testId) {

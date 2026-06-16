@@ -196,12 +196,12 @@ describe("doctor command", () => {
     };
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_PORT_IN_USE");
-    expect(json.hint).toContain("zitadel stop --all");
     expect(json.next_commands).toEqual([
       expect.stringContaining("stop --all"),
       expect.stringContaining("doctor"),
       expect.stringContaining("doctor --port"),
     ]);
+    expect(json.hint).toContain(json.next_commands?.[0]);
   });
 
   it("fails the project-match check when secret and config disagree", async () => {
@@ -333,12 +333,12 @@ async function startHealthServer(): Promise<string> {
     res.writeHead(404).end();
   });
   servers.push(server);
-  await new Promise<void>((resolve) => server.listen(0, "localhost", () => resolve()));
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
   const address = server.address();
   if (!address || typeof address === "string") {
     throw new Error("health server did not expose a TCP address");
   }
-  return `http://localhost:${String(address.port)}`;
+  return `http://127.0.0.1:${String(address.port)}`;
 }
 
 async function freePort(): Promise<number> {

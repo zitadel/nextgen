@@ -186,6 +186,8 @@ function assertNpmSafeScaffoldDirectoryName(cwd: string): void {
 }
 
 function npmPackageNameErrors(name: string): string[] {
+  // This local preflight catches common package-name failures before the
+  // scaffolder mutates disk; framework generators still own stricter checks.
   const errors: string[] = [];
   if (name.length === 0) {
     errors.push("name is empty");

@@ -217,10 +217,12 @@ describe("<zitadel-login> form + focus (chromium)", () => {
   it("submits values filled through native input events", async () => {
     const element = await mount();
     const root = element.shadowRoot!;
-    expect(root.querySelector('[data-testid="zitadel-field-email"]')).toBeTruthy();
-    const emailField = root.querySelector('zl-field[name="email"]') as HTMLElement & {
-      updateComplete: Promise<unknown>;
-    };
+    const emailField = root.querySelector('[data-testid="zitadel-field-email"]') as
+      | (HTMLElement & { updateComplete: Promise<unknown> })
+      | null;
+    if (!emailField) {
+      throw new Error("Expected email field host hook to render");
+    }
     await emailField.updateComplete;
     expect(emailField.shadowRoot?.querySelector("input")?.getAttribute("data-testid")).toBe(
       "zitadel-input-email",

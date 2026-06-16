@@ -23,9 +23,10 @@ async function tmp(): Promise<string> {
   return dir;
 }
 async function tmpPackageSafe(): Promise<string> {
-  const dir = join(tmpdir(), `zitadel-orca-${String(Date.now())}-${String(dirs.length)}`);
-  dirs.push(dir);
-  await mkdir(dir, { recursive: true });
+  const parent = await mkdtemp(join(tmpdir(), "zitadel-orca-"));
+  dirs.push(parent);
+  const dir = join(parent, "my-zitadel-app");
+  await mkdir(dir);
   return dir;
 }
 async function nextProject(): Promise<string> {
@@ -217,9 +218,10 @@ describe("Orca.scaffold", () => {
   });
 
   it("rejects npm-invalid fresh directory names before running the scaffolder", async () => {
-    const cwd = join(tmpdir(), `Zitadel-Orca-Bad-${String(Date.now())}`);
-    dirs.push(cwd);
-    await mkdir(cwd, { recursive: true });
+    const parent = await mkdtemp(join(tmpdir(), "zitadel-orca-invalid-"));
+    dirs.push(parent);
+    const cwd = join(parent, "Zitadel-Orca-Bad");
+    await mkdir(cwd);
     const scaffold = vi.fn(async (scaffoldCwd: string) => {
       await writeFile(join(scaffoldCwd, "package.json"), "{}");
     });
