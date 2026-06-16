@@ -1,5 +1,11 @@
 # @zitadel/server
 
+## 0.1.0-alpha.8
+
+### Patch Changes
+
+- [#319](https://github.com/zitadel/nextgen/pull/319) [`0547b8c`](https://github.com/zitadel/nextgen/commit/0547b8c397b1016e199fa16f0b208a7115720806) Thanks [@fforootd](https://github.com/fforootd)! - Cut a fresh alpha package train with the embedded UI release build fix.
+
 ## 0.1.0-alpha.7
 
 ### Patch Changes
