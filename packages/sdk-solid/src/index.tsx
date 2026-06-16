@@ -1,6 +1,11 @@
-import type { JSX } from 'solid-js';
+import type {
+  ZitadelLogin as ZitadelLoginElement,
+  ZitadelLogout as ZitadelLogoutElement,
+} from '@zitadel/components';
 
 import '@zitadel/components';
+import type { JSX } from 'solid-js';
+
 import {
   configureZitadel,
   getApi,
@@ -23,7 +28,8 @@ declare module 'solid-js' {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {
-      'zitadel-login': HTMLAttributes<HTMLElement> & {
+      'zitadel-login': Omit<HTMLAttributes<HTMLElement>, 'ref'> & {
+        ref?: ZitadelLoginElement | ((el: ZitadelLoginElement) => void);
         'prop:project'?: ZitadelProject;
         'project-id'?: string;
         'proxy-path'?: string;
@@ -42,7 +48,8 @@ declare module 'solid-js' {
           event: CustomEvent<ZitadelFlowErrorDetail>,
         ) => void;
       };
-      'zitadel-logout': HTMLAttributes<HTMLElement> & {
+      'zitadel-logout': Omit<HTMLAttributes<HTMLElement>, 'ref'> & {
+        ref?: ZitadelLogoutElement | ((el: ZitadelLogoutElement) => void);
         'prop:project'?: ZitadelProject;
         'project-id'?: string;
         'proxy-path'?: string;
@@ -64,10 +71,18 @@ export * from './types';
  * {@link ZitadelProject} handle as a DOM property (or the discrete project id /
  * proxy path as attributes) and forwards the widget's `zitadel-*` events as
  * optional callbacks.
+ *
+ * A forwarded `ref` resolves to the underlying `<zitadel-login>` DOM element,
+ * so consumers can imperatively access the upgraded web component.
  */
-export function ZitadelLogin(props: ZitadelLoginProps): JSX.Element {
+export function ZitadelLogin(
+  props: ZitadelLoginProps & {
+    ref?: ZitadelLoginElement | ((el: ZitadelLoginElement) => void);
+  },
+): JSX.Element {
   return (
     <zitadel-login
+      ref={props.ref}
       prop:project={props.project}
       project-id={props.projectId}
       proxy-path={props.proxyPath}
@@ -86,10 +101,18 @@ export function ZitadelLogin(props: ZitadelLoginProps): JSX.Element {
  * {@link ZitadelProject} handle as a DOM property (or the discrete project id /
  * proxy path as attributes) and forwards the widget's `zitadel-signout` event
  * as an optional callback.
+ *
+ * A forwarded `ref` resolves to the underlying `<zitadel-logout>` DOM element,
+ * so consumers can imperatively access the upgraded web component.
  */
-export function ZitadelLogout(props: ZitadelLogoutProps): JSX.Element {
+export function ZitadelLogout(
+  props: ZitadelLogoutProps & {
+    ref?: ZitadelLogoutElement | ((el: ZitadelLogoutElement) => void);
+  },
+): JSX.Element {
   return (
     <zitadel-logout
+      ref={props.ref}
       prop:project={props.project}
       project-id={props.projectId}
       proxy-path={props.proxyPath}

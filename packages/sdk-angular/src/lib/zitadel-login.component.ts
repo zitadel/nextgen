@@ -1,3 +1,5 @@
+import type { ElementRef } from '@angular/core';
+import type { ZitadelLogin as ZitadelLoginElement } from '@zitadel/components';
 import type {
   CreateFlowBodyPurpose,
   ZitadelFlowCompleteDetail,
@@ -12,6 +14,7 @@ import {
   EventEmitter,
   Input,
   Output,
+  ViewChild,
 } from '@angular/core';
 
 import type { ZitadelProject } from './config';
@@ -30,6 +33,11 @@ import '@zitadel/components';
  * element reads. The widget's `zitadel-*` events are re-emitted with their
  * detail as the `flowStep` / `flowInput` / `flowComplete` / `flowError` outputs.
  *
+ * The underlying `<zitadel-login>` custom element is exposed via the
+ * {@link element} getter so a consumer holding the component (e.g. via
+ * `@ViewChild(ZitadelLoginComponent)`) can reach the real DOM element — the
+ * Angular analogue of React's `forwardRef`.
+ *
  * ```html
  * <zitadel-auth-login [project]="project" purpose="login" postSignInUrl="/"
  *   (flowComplete)="onComplete($event)" />
@@ -40,6 +48,7 @@ import '@zitadel/components';
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `<zitadel-login
+    #el
     [project]="project"
     [projectId]="projectId"
     [proxyPath]="proxyPath"
@@ -61,6 +70,13 @@ export class ZitadelLoginComponent {
   @Output() flowInput = new EventEmitter<ZitadelFlowInputDetail>();
   @Output() flowComplete = new EventEmitter<ZitadelFlowCompleteDetail>();
   @Output() flowError = new EventEmitter<ZitadelFlowErrorDetail>();
+
+  @ViewChild('el') private elementRef?: ElementRef<ZitadelLoginElement>;
+
+  /** The underlying `<zitadel-login>` custom element, or `null` before view init. */
+  get element(): ZitadelLoginElement | null {
+    return this.elementRef?.nativeElement ?? null;
+  }
 
   onFlowStep(event: Event): void {
     this.flowStep.emit((event as CustomEvent<ZitadelFlowStepDetail>).detail);

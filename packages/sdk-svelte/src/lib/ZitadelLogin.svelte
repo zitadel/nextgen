@@ -1,6 +1,7 @@
 <script lang="ts">
   import '@zitadel/components';
   import type { ZitadelProject } from '@zitadel/api/config';
+  import type { ZitadelLogin as ZitadelLoginElement } from '@zitadel/components';
 
   import type {
     ZitadelFlowCompleteDetail,
@@ -22,7 +23,16 @@
     onFlowError,
   }: ZitadelLoginProps = $props();
 
-  let el: HTMLElement | undefined = $state();
+  let el: ZitadelLoginElement | undefined = $state();
+
+  /**
+   * Returns the underlying `<zitadel-login>` custom element, or `undefined`
+   * before the component has mounted. Exposed as a component method, reachable
+   * from a parent via `bind:this` — the Svelte 5 analogue of a React `ref`.
+   */
+  export function getElement(): ZitadelLoginElement | undefined {
+    return el;
+  }
 
   $effect(() => {
     if (!el) {

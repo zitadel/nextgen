@@ -59,6 +59,20 @@ describe('ZitadelLogin', () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it('forwards the ref to the underlying element', () => {
+    let captured: ZitadelLoginElement | undefined;
+    const { container } = render(() => (
+      <ZitadelLogin
+        ref={(e) => {
+          captured = e;
+        }}
+        project={project}
+      />
+    ));
+    expect(captured).toBe(container.querySelector('zitadel-login'));
+    expect(captured?.tagName.toLowerCase()).toBe('zitadel-login');
+  });
 });
 
 describe('ZitadelLogout', () => {
@@ -91,4 +105,18 @@ describe('ZitadelLogout', () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it('forwards the ref to the underlying element', () => {
+    let captured: ZitadelLogoutElement | undefined;
+    const { container } = render(() => (
+      <ZitadelLogout
+        ref={(e) => {
+          captured = e;
+        }}
+        project={project}
+      />
+    ));
+    expect(captured).toBe(container.querySelector('zitadel-logout'));
+    expect(captured?.tagName.toLowerCase()).toBe('zitadel-logout');
+  });
 });

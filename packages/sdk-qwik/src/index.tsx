@@ -1,17 +1,22 @@
 import type {
+  ZitadelLogin as ZitadelLoginElement,
+  ZitadelLogout as ZitadelLogoutElement,
+} from '@zitadel/components';
+import type {
   ZitadelLoginConfig,
   ZitadelLoginHandlers,
   ZitadelLogoutConfig,
   ZitadelLogoutHandlers,
 } from '@zitadel/sdk-core/types';
 
+import '@zitadel/components';
 import {
   component$,
   useSignal,
   useVisibleTask$,
   type QRL,
+  type Signal,
 } from '@builder.io/qwik';
-import '@zitadel/components';
 import {
   configureZitadel,
   getApi,
@@ -60,10 +65,18 @@ type Qrlify<H> = {
  * Props for {@link ZitadelLogin}. Supply the SDK handle via {@link project}, or
  * the discrete `projectId` / `proxyPath` the widget reads as properties — the
  * widget uses whichever is present. The `on…$` QRL callbacks are derived from
- * the shared {@link ZitadelLoginHandlers} contract.
+ * the shared {@link ZitadelLoginHandlers} contract. Pass an optional {@link ref}
+ * signal to obtain the underlying `<zitadel-login>` element imperatively.
  */
 export type ZitadelLoginProps = ZitadelLoginConfig &
-  Qrlify<ZitadelLoginHandlers>;
+  Qrlify<ZitadelLoginHandlers> & {
+    /**
+     * Optional signal populated with the underlying `<zitadel-login>` element
+     * once it mounts, mirroring React's `forwardRef`. Wired alongside the
+     * component's internal host signal, so event forwarding stays intact.
+     */
+    readonly ref?: Signal<ZitadelLoginElement | undefined>;
+  };
 
 /**
  * Qwik component wrapping the `<zitadel-login>` web component. Binds the
@@ -105,7 +118,12 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
   );
   return (
     <zitadel-login
-      ref={host}
+      ref={(el) => {
+        host.value = el;
+        if (props.ref) {
+          props.ref.value = el;
+        }
+      }}
       {...projectProp(props.project, props.projectId, props.proxyPath)}
       purpose={props.purpose ?? 'login'}
       post-sign-in-url={props.postSignInUrl}
@@ -117,10 +135,18 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
  * Props for {@link ZitadelLogout}. Supply the SDK handle via {@link project}, or
  * the discrete `projectId` / `proxyPath` the widget reads as properties — the
  * widget uses whichever is present. The `on…$` QRL callbacks are derived from
- * the shared {@link ZitadelLogoutHandlers} contract.
+ * the shared {@link ZitadelLogoutHandlers} contract. Pass an optional {@link ref}
+ * signal to obtain the underlying `<zitadel-logout>` element imperatively.
  */
 export type ZitadelLogoutProps = ZitadelLogoutConfig &
-  Qrlify<ZitadelLogoutHandlers>;
+  Qrlify<ZitadelLogoutHandlers> & {
+    /**
+     * Optional signal populated with the underlying `<zitadel-logout>` element
+     * once it mounts, mirroring React's `forwardRef`. Wired alongside the
+     * component's internal host signal, so event forwarding stays intact.
+     */
+    readonly ref?: Signal<ZitadelLogoutElement | undefined>;
+  };
 
 /**
  * Qwik component wrapping the `<zitadel-logout>` web component. Binds the
@@ -148,7 +174,12 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
   );
   return (
     <zitadel-logout
-      ref={host}
+      ref={(el) => {
+        host.value = el;
+        if (props.ref) {
+          props.ref.value = el;
+        }
+      }}
       {...projectProp(props.project, props.projectId, props.proxyPath)}
       post-sign-out-url={props.postSignOutUrl}
     />

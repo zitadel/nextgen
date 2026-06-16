@@ -83,6 +83,18 @@ describe('ZitadelLogin', () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it('exposes the underlying element via the element getter', async () => {
+    const { fixture, container } = await render(ZitadelLoginComponent, {
+      inputs: { project },
+    });
+    fixture.detectChanges();
+    const el = container.querySelector<ZitadelLoginElement>('zitadel-login');
+    const exposed = fixture.componentInstance.element;
+    expect(exposed).not.toBeNull();
+    expect(exposed!.tagName.toLowerCase()).toBe('zitadel-login');
+    expect(exposed).toBe(el);
+  });
 });
 
 describe('ZitadelLogout', () => {
@@ -119,4 +131,16 @@ describe('ZitadelLogout', () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it('exposes the underlying element via the element getter', async () => {
+    const { fixture, container } = await render(ZitadelLogoutComponent, {
+      inputs: { project },
+    });
+    fixture.detectChanges();
+    const el = container.querySelector<ZitadelLogoutElement>('zitadel-logout');
+    const exposed = fixture.componentInstance.element;
+    expect(exposed).not.toBeNull();
+    expect(exposed!.tagName.toLowerCase()).toBe('zitadel-logout');
+    expect(exposed).toBe(el);
+  });
 });

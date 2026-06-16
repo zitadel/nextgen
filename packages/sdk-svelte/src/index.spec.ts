@@ -60,6 +60,15 @@ describe('ZitadelLogin', () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it('exposes the underlying element via getElement()', () => {
+    const { component, container } = render(ZitadelLogin, {
+      props: { project, purpose: 'login' },
+    });
+    const el = component.getElement();
+    expect(el?.tagName.toLowerCase()).toBe('zitadel-login');
+    expect(el).toBe(container.querySelector('zitadel-login'));
+  });
 });
 
 describe('ZitadelLogout', () => {
@@ -92,4 +101,13 @@ describe('ZitadelLogout', () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it('exposes the underlying element via getElement()', () => {
+    const { component, container } = render(ZitadelLogout, {
+      props: { project },
+    });
+    const el = component.getElement();
+    expect(el?.tagName.toLowerCase()).toBe('zitadel-logout');
+    expect(el).toBe(container.querySelector('zitadel-logout'));
+  });
 });

@@ -9,6 +9,7 @@ import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
 } from '@zitadel/sdk-core/types';
+import * as React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ZitadelLogin, ZitadelLogout } from './index';
@@ -52,6 +53,13 @@ describe('ZitadelLogin', () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it('forwards a ref to the underlying element', () => {
+    const ref = React.createRef<ZitadelLoginElement>();
+    const { container } = render(<ZitadelLogin ref={ref} project={project} />);
+    expect(ref.current).toBe(container.querySelector('zitadel-login'));
+    expect(ref.current?.tagName.toLowerCase()).toBe('zitadel-login');
+  });
 });
 
 describe('ZitadelLogout', () => {
@@ -84,4 +92,11 @@ describe('ZitadelLogout', () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it('forwards a ref to the underlying element', () => {
+    const ref = React.createRef<ZitadelLogoutElement>();
+    const { container } = render(<ZitadelLogout ref={ref} project={project} />);
+    expect(ref.current).toBe(container.querySelector('zitadel-logout'));
+    expect(ref.current?.tagName.toLowerCase()).toBe('zitadel-logout');
+  });
 });

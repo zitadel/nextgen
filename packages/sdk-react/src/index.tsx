@@ -86,18 +86,21 @@ const ZitadelLogoutElementReact = createComponent({
  * `ZitadelProject` handle as a DOM property (or the discrete project id /
  * proxy path as attributes) and forwards the widget's `zitadel-*` events as
  * optional callbacks.
+ *
+ * A forwarded `ref` resolves to the underlying `<zitadel-login>` DOM element,
+ * so consumers can imperatively access the upgraded web component.
  */
-export function ZitadelLogin({
-  purpose,
-  onFlowStep,
-  onFlowInput,
-  onFlowComplete,
-  onFlowError,
-  ...props
-}: ZitadelLoginProps): React.ReactElement {
+export const ZitadelLogin = React.forwardRef<
+  ZitadelLoginElement,
+  ZitadelLoginProps
+>(function ZitadelLogin(
+  { purpose, onFlowStep, onFlowInput, onFlowComplete, onFlowError, ...props },
+  ref,
+) {
   return (
     <ZitadelLoginElementReact
       {...props}
+      ref={ref}
       purpose={purpose ?? 'login'}
       onZitadelFlowStep={onFlowStep && ((event) => onFlowStep(event.detail))}
       onZitadelFlowInput={onFlowInput && ((event) => onFlowInput(event.detail))}
@@ -107,22 +110,30 @@ export function ZitadelLogin({
       onZitadelFlowError={onFlowError && ((event) => onFlowError(event.detail))}
     />
   );
-}
+});
+
+ZitadelLogin.displayName = 'ZitadelLogin';
 
 /**
  * React component wrapping the `<zitadel-logout>` web component. Binds the
  * `ZitadelProject` handle as a DOM property (or the discrete project id /
  * proxy path as attributes) and forwards the widget's `zitadel-signout` event
  * as an optional callback.
+ *
+ * A forwarded `ref` resolves to the underlying `<zitadel-logout>` DOM element,
+ * so consumers can imperatively access the upgraded web component.
  */
-export function ZitadelLogout({
-  onSignout,
-  ...props
-}: ZitadelLogoutProps): React.ReactElement {
+export const ZitadelLogout = React.forwardRef<
+  ZitadelLogoutElement,
+  ZitadelLogoutProps
+>(function ZitadelLogout({ onSignout, ...props }, ref) {
   return (
     <ZitadelLogoutElementReact
       {...props}
+      ref={ref}
       onZitadelSignout={onSignout && ((event) => onSignout(event.detail))}
     />
   );
-}
+});
+
+ZitadelLogout.displayName = 'ZitadelLogout';

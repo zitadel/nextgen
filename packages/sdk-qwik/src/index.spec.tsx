@@ -4,7 +4,7 @@ import type {
   ZitadelLogout as ZitadelLogoutElement,
 } from '@zitadel/components';
 
-import { $, render } from '@builder.io/qwik';
+import { $, render, type Signal } from '@builder.io/qwik';
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
@@ -107,6 +107,20 @@ describe('ZitadelLogin', () => {
       expect(received[received.length - 1]).toBe(detail);
     },
   );
+
+  it('populates a consumer ref with the underlying element', async () => {
+    const consumerRef = { value: undefined } as Signal<
+      ZitadelLoginElement | undefined
+    >;
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    await render(host, <ZitadelLogin project={project} ref={consumerRef} />);
+    await macrotask();
+    const el = host.querySelector<ZitadelLoginElement>('zitadel-login');
+    expect(el).not.toBeNull();
+    expect(consumerRef.value).toBe(el);
+    expect(consumerRef.value?.tagName.toLowerCase()).toBe('zitadel-login');
+  });
 });
 
 describe('ZitadelLogout', () => {
@@ -155,4 +169,18 @@ describe('ZitadelLogout', () => {
       expect(received[received.length - 1]).toBe(detail);
     },
   );
+
+  it('populates a consumer ref with the underlying element', async () => {
+    const consumerRef = { value: undefined } as Signal<
+      ZitadelLogoutElement | undefined
+    >;
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    await render(host, <ZitadelLogout project={project} ref={consumerRef} />);
+    await macrotask();
+    const el = host.querySelector<ZitadelLogoutElement>('zitadel-logout');
+    expect(el).not.toBeNull();
+    expect(consumerRef.value).toBe(el);
+    expect(consumerRef.value?.tagName.toLowerCase()).toBe('zitadel-logout');
+  });
 });

@@ -1,4 +1,5 @@
 import type { ZitadelProject } from '@zitadel/api/config';
+import type { ZitadelLogin as ZitadelLoginElement } from '@zitadel/components';
 import type {
   CreateFlowBodyPurpose,
   ZitadelFlowCompleteDetail,
@@ -7,7 +8,7 @@ import type {
   ZitadelFlowStepDetail,
 } from '@zitadel/sdk-core/types';
 
-import { defineComponent, h, type PropType, toRaw } from 'vue';
+import { defineComponent, h, type PropType, ref, toRaw } from 'vue';
 // Registers <zitadel-login> / <zitadel-logout> with the browser. Imported at
 // module load (before render) so the element is upgraded by the time Vue
 // patches it — which means Vue binds `project` as a DOM *property* (not a
@@ -25,6 +26,12 @@ import '@zitadel/components';
  * read by the widget at startup. The widget's `zitadel-*` events are re-emitted
  * with their detail as `flow-step`, `flow-input`, `flow-complete` and
  * `flow-error`.
+ *
+ * A Vue `ref` on this component resolves to the component *instance*, not the
+ * inner element, so the rendered `<zitadel-login>` DOM node is exposed as
+ * `element` (a `Ref` whose `.value` is the {@link ZitadelLoginElement}, or
+ * `null` before mount). A consumer with `<ZitadelLogin ref="r" />` reads it via
+ * `r.value.element`.
  */
 export default defineComponent({
   name: 'ZitadelLogin',
@@ -39,9 +46,15 @@ export default defineComponent({
     postSignInUrl: { type: String, default: undefined },
   },
   emits: ['flowStep', 'flowInput', 'flowComplete', 'flowError'],
-  setup(props, { emit }) {
+  setup(props, { emit, expose }) {
+    // Template ref to the rendered Lit element. Exposed so a consumer's
+    // component `ref` (which resolves to this instance) can reach the DOM node.
+    const element = ref<ZitadelLoginElement | null>(null);
+    expose({ element });
+
     return () =>
       h('zitadel-login', {
+        ref: element,
         // Hand the Lit element the raw SDK handle, not Vue's reactive proxy:
         // the widget does identity checks on it (and `render` from test-utils
         // would otherwise pass a wrapped clone).

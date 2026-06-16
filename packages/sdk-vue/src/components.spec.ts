@@ -10,9 +10,29 @@ import {
   ZITADEL_LOGOUT_EVENT_HANDLERS,
 } from '@zitadel/sdk-core/types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { defineComponent, h, ref, type Ref } from 'vue';
 
 import ZitadelLogin from './components/ZitadelLogin';
 import ZitadelLogout from './components/ZitadelLogout';
+
+// A consumer's `ref` on these components resolves to the component instance,
+// whose `expose({ element })` surfaces the inner DOM node. Vue's exposed proxy
+// auto-unwraps the exposed `Ref`, so the consumer reads the element directly as
+// `r.value.element`. Mount the component under a parent that holds such a ref
+// and forward the captured instance out, mirroring that consumer access.
+function mountWithInstanceRef<Element extends HTMLElement>(
+  child: typeof ZitadelLogin | typeof ZitadelLogout,
+): {
+  captured: Ref<{ element: Element | null } | null>;
+  container: HTMLElement;
+} {
+  const captured = ref<{ element: Element | null } | null>(null);
+  const parent = defineComponent({
+    setup: () => () => h(child, { ref: captured }),
+  });
+  const { container } = render(parent);
+  return { captured, container };
+}
 
 const project = { projectId: 'proj-test', proxyPath: '/__nextgen' };
 
@@ -60,6 +80,15 @@ describe('ZitadelLogin', () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it('exposes the rendered element via the instance ref', () => {
+    const { captured, container } =
+      mountWithInstanceRef<ZitadelLoginElement>(ZitadelLogin);
+    const element = captured.value!.element;
+    expect(element).not.toBeNull();
+    expect(element!.tagName.toLowerCase()).toBe('zitadel-login');
+    expect(element).toBe(container.querySelector('zitadel-login'));
+  });
 });
 
 describe('ZitadelLogout', () => {
@@ -92,4 +121,13 @@ describe('ZitadelLogout', () => {
       expect(spy).toHaveBeenCalledWith(detail);
     },
   );
+
+  it('exposes the rendered element via the instance ref', () => {
+    const { captured, container } =
+      mountWithInstanceRef<ZitadelLogoutElement>(ZitadelLogout);
+    const element = captured.value!.element;
+    expect(element).not.toBeNull();
+    expect(element!.tagName.toLowerCase()).toBe('zitadel-logout');
+    expect(element).toBe(container.querySelector('zitadel-logout'));
+  });
 });
