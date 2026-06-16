@@ -482,6 +482,10 @@ async function collectDiagnostics(context) {
     join(context.appDir, ".zitadel/local/runtime.json"),
     join(context.diagnosticsDir, "runtime.json"),
   );
+  await copyIfExists(
+    join(context.appDir, ".zitadel/local/server.log"),
+    join(context.diagnosticsDir, "server.log"),
+  );
   await mkdir(join(context.diagnosticsDir, "generated-app"), { recursive: true });
   await copyIfExists(
     join(context.appDir, "package.json"),
