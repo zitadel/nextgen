@@ -9,51 +9,47 @@ import (
 
 type Client struct {
 	client *spanner.Client
+	statements
+}
+
+func newClient(client *spanner.Client) *Client {
+	return &Client{
+		client:     client,
+		statements: statements{client: client},
+	}
 }
 
 // Release implements [database.Connection].
-func (c *Client) Release(ctx context.Context) error {
+// Since Spanner clients are designed to be long-lived and do not have a concept of acquiring and releasing connections, this method is a no-op.
+func (c Client) Release(ctx context.Context) error {
 	return nil
 }
 
 // Acquire implements [database.Pool].
-func (c *Client) Acquire(ctx context.Context) (database.Connection, error) {
+// Since Spanner clients are designed to be long-lived and do not have a concept of acquiring and releasing connections, this method returns the client itself as a connection.
+func (c Client) Acquire(ctx context.Context) (database.Connection, error) {
 	return c, nil
 }
 
 // Close implements [database.Pool].
-func (c *Client) Close(ctx context.Context) error {
+func (c Client) Close(ctx context.Context) error {
 	c.client.Close()
 	return nil
 }
 
-// Exec implements [database.Pool].
-func (c *Client) Exec(ctx context.Context, stmt string, args ...any) (int64, error) {
-	panic("unimplemented")
-}
-
 // Ping implements [database.Pool].
-//
-// Spanner does not have a built-in ping method, so we execute a simple query to check the connection.
-func (c *Client) Ping(ctx context.Context) error {
-	_, err := c.Query(ctx, "SELECT 1")
-	return err
-}
-
-// Query implements [database.Pool].
-func (c *Client) Query(ctx context.Context, stmt string, args ...any) (database.Rows, error) {
-	panic("unimplemented")
-}
-
-// QueryRow implements [database.Pool].
-func (c *Client) QueryRow(ctx context.Context, stmt string, args ...any) database.Row {
-	panic("unimplemented")
+func (c Client) Ping(ctx context.Context) error {
+	// Spanner does not have a built-in ping method, so we execute a simple query to check the connection.
+	iter := c.client.Single().Query(ctx, spanner.NewStatement("SELECT 1"))
+	return iter.Do(func(row *spanner.Row) error {
+		return nil
+	})
 }
 
 // Transaction implements [database.Pool].
-func (c *Client) Transaction(ctx context.Context, fn func(ctx context.Context, tx database.QueryExecutor) error) error {
+func (c Client) Transaction(ctx context.Context, fn func(ctx context.Context, tx database.Statementer) error) error {
 	_, err := c.client.ReadWriteTransaction(ctx, func(ctx context.Context, rwt *spanner.ReadWriteTransaction) error {
-		return fn(ctx, &Transaction{tx: rwt})
+		return fn(ctx, newTransaction(rwt))
 	})
 	return err
 }

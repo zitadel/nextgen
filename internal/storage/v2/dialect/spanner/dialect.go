@@ -18,17 +18,12 @@ func (d *Dialect) Connect(ctx context.Context) (database.Pool, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Client{client: client}, nil
+	return newClient(client), nil
 }
 
 // Name implements [database.Dialect].
 func (d *Dialect) Name() string {
 	return "spanner"
-}
-
-// Statements implements [database.Dialect].
-func (d *Dialect) Statements() database.Statements {
-	panic("unimplemented")
 }
 
 var _ database.Dialect = (*Dialect)(nil)

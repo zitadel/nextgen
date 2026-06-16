@@ -2,12 +2,13 @@ package database
 
 import (
 	"context"
+
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 // Pool is a connection pool. e.g. pgxpool
 type Pool interface {
-	// QueryExecutor
-	Tx
+	Transactional
 	Statementer
 
 	Acquire(ctx context.Context) (Connection, error)
@@ -18,8 +19,7 @@ type Pool interface {
 
 // Connection is a single database connection which can be released back to the pool.
 type Connection interface {
-	// QueryExecutor
-	Tx
+	Transactional
 	Statementer
 
 	Release(ctx context.Context) error
@@ -27,27 +27,33 @@ type Connection interface {
 	Ping(ctx context.Context) error
 }
 
-// Querier is a database client that can execute queries and return rows.
-// type Querier interface {
-// 	Query(ctx context.Context, stmt string, args ...any) (Rows, error)
-// 	QueryRow(ctx context.Context, stmt string, args ...any) Row
-// }
-
-// Executor is a database client that can execute statements.
-// It returns the number of rows affected or an error
-// type Executor interface {
-// 	Exec(ctx context.Context, stmt string, args ...any) (int64, error)
-// }
-
-// QueryExecutor is a database client that can execute queries and statements.
-// type QueryExecutor interface {
-// 	Querier
-// 	Executor
-// }
-
-type Statementer interface {
-	Statements() Statements
+type Transactional interface {
+	Transaction(ctx context.Context, fn func(ctx context.Context, tx Statementer) error) error
 }
 
-type Statement interface {
+type Statementer interface {
+	Project() ProjectStatements
+	FlowDefinition() FlowDefinitionStatements
+}
+
+type ProjectStatements interface {
+	CreateProject(project *domain.Project) Execution
+	GetProjectByID(id string) Query[*domain.Project]
+	ListProjects(filter Filter) Query[[]*domain.Project]
+	DeleteProjectByID(id string) Execution
+}
+
+type FlowDefinitionStatements interface {
+	CreateFlowDefinition(flowDef *domain.FlowDefinition) Execution
+	GetFlowDefinitionByID(id string) Query[*domain.FlowDefinition]
+	ListFlowDefinitions(filter Filter) Query[[]*domain.FlowDefinition]
+	DeleteFlowDefinitionByID(id string) Execution
+}
+
+type Execution interface {
+	Execute(ctx context.Context) error
+}
+
+type Query[R any] interface {
+	Execute(ctx context.Context) (R, error)
 }

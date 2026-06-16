@@ -9,46 +9,39 @@ import (
 
 type Pool struct {
 	pool *pgxpool.Pool
+	statements
+}
+
+func newPool(pool *pgxpool.Pool) *Pool {
+	return &Pool{
+		pool:       pool,
+		statements: statements{client: pool},
+	}
+}
+
+// Transaction implements [database.Pool].
+func (p Pool) Transaction(ctx context.Context, fn func(ctx context.Context, tx database.Statementer) error) error {
+	return executeTransaction(ctx, p.pool, fn)
 }
 
 // Acquire implements [database.Pool].
-func (p *Pool) Acquire(ctx context.Context) (database.Connection, error) {
+func (p Pool) Acquire(ctx context.Context) (database.Connection, error) {
 	conn, err := p.pool.Acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return &Connection{conn: conn}, nil
-}
-
-// Transaction implements [database.Pool].
-func (p *Pool) Transaction(ctx context.Context, fn func(ctx context.Context, tx database.QueryExecutor) error) error {
-	return executeTransaction(ctx, p.pool, fn)
+	return newConnection(conn), nil
 }
 
 // Close implements [database.Pool].
-func (p *Pool) Close(ctx context.Context) error {
+func (p Pool) Close(ctx context.Context) error {
 	p.pool.Close()
 	return nil
 }
 
-// Exec implements [database.Pool].
-func (p *Pool) Exec(ctx context.Context, stmt string, args ...any) (int64, error) {
-	panic("unimplemented")
-}
-
 // Ping implements [database.Pool].
-func (p *Pool) Ping(ctx context.Context) error {
+func (p Pool) Ping(ctx context.Context) error {
 	return p.pool.Ping(ctx)
-}
-
-// Query implements [database.Pool].
-func (p *Pool) Query(ctx context.Context, stmt string, args ...any) (database.Rows, error) {
-	panic("unimplemented")
-}
-
-// QueryRow implements [database.Pool].
-func (p *Pool) QueryRow(ctx context.Context, stmt string, args ...any) database.Row {
-	panic("unimplemented")
 }
 
 var _ database.Pool = (*Pool)(nil)

@@ -12,7 +12,7 @@ type Dialect struct {
 }
 
 // Connect implements [database.Dialect].
-func (p *Dialect) Connect(ctx context.Context) (database.Pool, error) {
+func (p Dialect) Connect(ctx context.Context) (database.Pool, error) {
 	config, err := pgxpool.ParseConfig(p.DSN)
 	if err != nil {
 		return nil, err
@@ -21,17 +21,12 @@ func (p *Dialect) Connect(ctx context.Context) (database.Pool, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Pool{pool: pool}, nil
+	return newPool(pool), nil
 }
 
 // Name implements [database.Dialect].
-func (p *Dialect) Name() string {
+func (p Dialect) Name() string {
 	return "postgres"
-}
-
-// Statements implements [database.Dialect].
-func (p *Dialect) Statements() database.Statements {
-	panic("unimplemented")
 }
 
 var _ database.Dialect = (*Dialect)(nil)
