@@ -1,4 +1,5 @@
 import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
@@ -39,7 +40,7 @@ function dispatchedWidgetEvents(): string[] {
     if (!relativePath.endsWith(".ts") || relativePath.endsWith(".spec.ts")) {
       continue;
     }
-    const source = readFileSync(`${componentsSrc}${relativePath}`, "utf8");
+    const source = readFileSync(join(componentsSrc, relativePath), "utf8");
     for (const match of source.matchAll(WIDGET_EVENT)) {
       const event = match[1];
       if (event) {
