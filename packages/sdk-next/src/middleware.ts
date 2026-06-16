@@ -1,5 +1,5 @@
 import type { ZitadelProject } from '@zitadel/api/config';
-import type { NextgenMiddlewareOptions } from '@zitadel/sdk-core/types';
+import type { NextgenMiddlewareOptions } from '@zitadel/sdk-core/middleware';
 import type { NextRequest } from 'next/server';
 
 import {

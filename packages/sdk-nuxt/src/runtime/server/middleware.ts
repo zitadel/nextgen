@@ -1,7 +1,7 @@
 import type {
   AuthResult,
   NextgenMiddlewareOptions,
-} from '@zitadel/sdk-core/types';
+} from '@zitadel/sdk-core/middleware';
 import type { EventHandler, H3Event } from 'h3';
 
 import {

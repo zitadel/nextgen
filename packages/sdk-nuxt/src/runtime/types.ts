@@ -10,9 +10,9 @@ export type {
   UnauthState,
   AuthResult,
   NextgenMiddlewareOptions,
-} from '@zitadel/sdk-core/types';
+} from '@zitadel/sdk-core/middleware';
 
-import type { UnauthState } from '@zitadel/sdk-core/types';
+import type { UnauthState } from '@zitadel/sdk-core/middleware';
 
 // ─── Nuxt-specific client-safe types ─────────────────────────────────────────
 
