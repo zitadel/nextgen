@@ -157,14 +157,12 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 	assert.Equal(t, []string{"password"}, registerPasswordStep.Fields)
 	require.NotNil(t, registerPasswordStep.OnSuccess)
 	assert.Equal(t, domain.FlowOnSuccessCreateUser, *registerPasswordStep.OnSuccess)
-	assert.Equal(t, "passkey-upsell", registerPasswordStep.Transitions[domain.FlowActionSubmit].Target)
+	// Registration completes directly — no passkey upsell step; passkey
+	// registration is offered up front on the register step instead.
+	assert.Equal(t, "done", registerPasswordStep.Transitions[domain.FlowActionSubmit].Target)
 
-	passkeyUpsellStep, ok := flowDef.FindStep("passkey-upsell")
-	require.True(t, ok)
-	assert.Contains(t, passkeyUpsellStep.Actions, domain.FlowActionPasskeyRegister)
-	assert.Contains(t, passkeyUpsellStep.Actions, "skip")
-	assert.Equal(t, "done", passkeyUpsellStep.Transitions[domain.FlowActionPasskeyRegister].Target)
-	assert.Equal(t, "done", passkeyUpsellStep.Transitions["skip"].Target)
+	_, ok = flowDef.FindStep("passkey-upsell")
+	assert.False(t, ok)
 }
 
 func TestGetProject(t *testing.T) {

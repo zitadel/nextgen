@@ -16,8 +16,9 @@ const phases = new Map([
   ["release", phaseRelease],
   ["journey", phaseJourney],
 ]);
-const fullOrder = [...phases.keys()];
+const fullOrder = [...phases.keys()].filter((phase) => phase !== "node:e2e");
 const fastOrder = ["openapi", "go", "node"];
+const explicitOnlyPhases = [...phases.keys()].filter((phase) => !fullOrder.includes(phase));
 
 const options = parseArgs(forwardedArgs());
 const selected = options.only ? [options.only] : options.full ? fullOrder : fastOrder;
@@ -84,8 +85,11 @@ function usage(error) {
 
 Default is --fast.
 
-Phases:
+Full phases:
   ${fullOrder.join("\n  ")}
+
+Explicit-only phases:
+  ${explicitOnlyPhases.join("\n  ")}
 `);
   process.exit(error ? 1 : 0);
 }

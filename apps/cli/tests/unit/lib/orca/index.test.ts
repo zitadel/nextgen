@@ -184,6 +184,9 @@ describe("Orca.scaffold", () => {
         await expect(stat(join(scaffoldCwd, ".zitadel"))).rejects.toMatchObject({
           code: "ENOENT",
         });
+        await expect(stat(join(scaffoldCwd, ".gitignore"))).rejects.toMatchObject({
+          code: "ENOENT",
+        });
         await writeFile(join(scaffoldCwd, ".gitignore"), "node_modules\n");
         await writeFile(join(scaffoldCwd, "package.json"), "{}");
       },
@@ -195,7 +198,9 @@ describe("Orca.scaffold", () => {
     await expect(readFile(join(cwd, ".zitadel/local/runtime.json"), "utf8")).resolves.toContain(
       "localhost",
     );
-    await expect(readFile(join(cwd, ".gitignore"), "utf8")).resolves.toContain(".zitadel/local/");
+    await expect(readFile(join(cwd, ".gitignore"), "utf8")).resolves.toBe(
+      "node_modules\n.zitadel/local/\n",
+    );
     await expect(stat(join(cwd, "myapp"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 

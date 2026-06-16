@@ -1,5 +1,20 @@
 # @zitadel/cli
 
+## 0.1.0-alpha.5
+
+### Minor Changes
+
+- [#257](https://github.com/zitadel/nextgen/pull/257) [`6f8dd2d`](https://github.com/zitadel/nextgen/commit/6f8dd2d612b06d1ca546a7c16c6fb5c6430de2c1) Thanks [@mridang](https://github.com/mridang)! - Add `setup --framework react|vue|angular|nuxt` support to the CLI. Each framework scaffolds its auth entry/pages and wires `/__nextgen/*` calls to the backend with a `sk_<project_id>` bearer attached: React and Vue get a dev proxy magicast-merged into the Vite config (`vite.config.*`) that reads the project id from `ZITADEL_PROJECT_ID`; Angular gets a `proxy.conf.cjs` wired into `angular.json` that reads it from `zitadel.json`; and Nuxt registers the `@zitadel/sdk-nuxt` module in the Nuxt config (`nuxt.config.*`), which adds the proxy via server middleware. A `--dev-port` flag sets the scaffolded dev-server port.
+
+- [#299](https://github.com/zitadel/nextgen/pull/299) [`f77ca44`](https://github.com/zitadel/nextgen/commit/f77ca44e85565976d26de0b6444b7fc5b1616e8c) Thanks [@fforootd](https://github.com/fforootd)! - Make the generated Next.js auth app easier for agents and developers to prove end-to-end registration, logout, and login in a visible browser.
+
+### Patch Changes
+
+- [#295](https://github.com/zitadel/nextgen/pull/295) [`f02718f`](https://github.com/zitadel/nextgen/commit/f02718f0499042569e13c1c67ae4135b6e943518) Thanks [@fforootd](https://github.com/fforootd)! - Allow fresh app scaffolding after `zitadel start` creates local runtime ignore files, and load Nuxt runtime config through the Nuxt virtual imports module.
+
+- Updated dependencies []:
+  - @zitadel/api@0.1.0-alpha.5
+
 ## 0.1.0-alpha.4
 
 ### Patch Changes

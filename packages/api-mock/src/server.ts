@@ -9,6 +9,7 @@
  * Custom-only routes added on top:
  *   POST   /sessions/exchange     — exchange handoff_token for session cookie
  *   GET    /sessions/me           — get current session from opaque cookie
+ *   DELETE /sessions/me           — revoke the current session (logout)
  *   GET    /auth/end-session      — OIDC-style end-session, clears cookies
  *   GET    /.well-known/jwks.json — JWKS for JWT verification (dev convenience)
  *   GET    /auth/keys             — JWKS, spec-defined endpoint (operation `getKeys`)
@@ -270,6 +271,33 @@ export function startMockServer(port: number): Server {
       return;
     }
     res.json(session);
+  });
+
+  // DELETE /sessions/me — revoke the current session (logout). Mirrors the
+  // Go server's revokeMySession handler and the SDK proxy's logout call.
+  app.delete("/sessions/me", (req: express.Request, res: express.Response) => {
+    const token = (req.cookies as Record<string, string>).__nextgen_session;
+    if (!token) {
+      res.status(401).json(errorBody("unauthenticated", "no session cookie"));
+      return;
+    }
+    const session = sessionStore.get(token);
+    if (!session) {
+      res.status(404).json(errorBody("session_not_found", "session not found"));
+      return;
+    }
+    if (new Date(session.expires_at) < new Date()) {
+      sessionStore.delete(token);
+      res.status(409).json(errorBody("session_revoked", "session already revoked or expired"));
+      return;
+    }
+    sessionStore.delete(token);
+    res.setHeader("Set-Cookie", [
+      `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
+      `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,
+      `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
+    ]);
+    res.status(204).end();
   });
 
   app.get("/auth/end-session", (req: express.Request, res: express.Response) => {

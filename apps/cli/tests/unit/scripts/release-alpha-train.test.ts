@@ -11,8 +11,11 @@ type ReleaseAlphaTrainModule = {
   inspectAlphaReleaseTrain: (options: {
     cwd: string;
     execFile?: ExecFileMock;
+    npmLookupAttempts?: number;
+    npmLookupDelayMs?: number;
     published?: boolean | string;
     remote?: boolean | string;
+    sleep?: (ms: number) => Promise<void>;
   }) => Promise<{
     npmTrainExists?: boolean;
     shouldComplete: boolean;
@@ -293,6 +296,40 @@ describe("release-alpha-train script", () => {
     });
   });
 
+  it("waits for the npm registry after Changesets publishes packages", async () => {
+    const cwd = await fixtureRepo();
+
+    await expect(
+      releaseAlphaTrain.inspectAlphaReleaseTrain({
+        cwd,
+        execFile: commandMock({ npmTrainMissingResponses: 1 }),
+        npmLookupAttempts: 2,
+        npmLookupDelayMs: 0,
+        published: true,
+        remote: false,
+      }),
+    ).resolves.toMatchObject({
+      npmTrainExists: true,
+      shouldComplete: true,
+      skipReason: "",
+    });
+  });
+
+  it("fails loudly when a just-published npm train stays invisible", async () => {
+    const cwd = await fixtureRepo();
+
+    await expect(
+      releaseAlphaTrain.inspectAlphaReleaseTrain({
+        cwd,
+        execFile: commandMock({ npmTrainExists: false }),
+        npmLookupAttempts: 2,
+        npmLookupDelayMs: 0,
+        published: true,
+        remote: false,
+      }),
+    ).rejects.toThrow("npm train 0.1.0-alpha.5 did not become visible after 2 attempts");
+  });
+
   it("prunes empty changesets before Changesets decides whether to publish", async () => {
     const cwd = await fixtureRepo({
       changesets: {
@@ -436,12 +473,14 @@ function commandMock(
     imageExists?: boolean;
     npmAuthFails?: boolean;
     npmLookupFailsUnexpectedly?: boolean;
+    npmTrainMissingResponses?: number;
     npmTrainExists?: boolean;
     releaseExists?: boolean;
     tagCommit?: string;
   } = {},
 ): ExecFileMock {
   const headCommit = options.headCommit ?? "head-commit";
+  let npmTrainMissingResponses = options.npmTrainMissingResponses ?? 0;
   return vi.fn(async (command: string, args: string[]) => {
     if (command === "git" && args.join(" ") === "rev-parse HEAD") {
       return { stdout: `${headCommit}\n`, stderr: "" };
@@ -470,6 +509,10 @@ function commandMock(
       }
       if (options.npmLookupFailsUnexpectedly) {
         throw Object.assign(new Error("npm exploded"), { code: 2 });
+      }
+      if (npmTrainMissingResponses > 0) {
+        npmTrainMissingResponses -= 1;
+        throw missingNpmPackage();
       }
       if (options.npmTrainExists ?? true) {
         return { stdout: '"0.1.0-alpha.5"\n', stderr: "" };

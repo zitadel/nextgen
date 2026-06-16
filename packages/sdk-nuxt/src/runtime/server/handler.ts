@@ -1,11 +1,8 @@
+import { useRuntimeConfig } from '#imports';
+
 import { createNextgenMiddleware } from './middleware';
 
-/**
- * `useRuntimeConfig` is auto-imported by Nitro when this file is bundled into
- * the consumer's Nuxt application. The declaration here satisfies TypeScript
- * during SDK compilation without introducing a hard runtime dependency.
- */
-declare function useRuntimeConfig(): {
+const config = useRuntimeConfig() as {
   nextgen?: {
     url?: string;
     issuerUrl?: string;
@@ -13,8 +10,6 @@ declare function useRuntimeConfig(): {
     protectedRoutes?: string[];
   };
 };
-
-const config = useRuntimeConfig();
 
 /**
  * Default Nitro/H3 event handler registered by the `@zitadel/sdk-nuxt` module

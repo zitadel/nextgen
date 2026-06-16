@@ -69,7 +69,10 @@ func (r *SchemaFieldResolver) Resolve(
 		if !ok {
 			return FlowResolvedFields{}, fmt.Errorf("%w: %q", ErrFlowFieldUnknown, name)
 		}
-		field := buildFlowField(stepName, name, propSchema, required, passwordEnabled)
+		field, err := buildFlowField(stepName, name, propSchema, required, passwordEnabled)
+		if err != nil {
+			return FlowResolvedFields{}, fmt.Errorf("flow field %q: %w", name, err)
+		}
 		fields[name] = field
 		if outcomes := ImplicitOutcomesForChallenge(field.Challenge); len(outcomes) > 0 {
 			implicit[name] = append(implicit[name], outcomes...)
@@ -83,11 +86,17 @@ func (r *SchemaFieldResolver) Resolve(
 }
 
 // buildFlowField translates a user-schema property into a [FlowField].
-func buildFlowField(stepName, name string, propSchema *jsonschema.Schema, required map[string]struct{}, passwordEnabled bool) FlowField {
+// Returns [ErrFlowFieldUnsupportedType] when the property's JSON `type`
+// keyword cannot be reduced to a single input kind.
+func buildFlowField(stepName, name string, propSchema *jsonschema.Schema, required map[string]struct{}, passwordEnabled bool) (FlowField, error) {
 	unique := deriveUnique(propSchema)
+	fieldType, err := deriveFieldType(propSchema)
+	if err != nil {
+		return FlowField{}, err
+	}
 	field := FlowField{
 		TextKey:   stepName + ".field." + name,
-		Type:      deriveFieldType(propSchema),
+		Type:      fieldType,
 		Challenge: deriveChallenge(propSchema, unique, passwordEnabled),
 		Unique:    unique,
 	}
@@ -97,24 +106,38 @@ func buildFlowField(stepName, name string, propSchema *jsonschema.Schema, requir
 	if v := buildValidation(propSchema); v != nil {
 		field.Validation = v
 	}
-	return field
+	return field, nil
 }
 
-// deriveFieldType maps the property's `format` to a [FlowFieldType].
-// `x-password: true` forces a password input regardless of `format`.
-func deriveFieldType(propSchema *jsonschema.Schema) FlowFieldType {
+// deriveFieldType maps the property's `enum`, `format`, and JSON
+// `type` keywords to a [FlowFieldType]. `x-password: true` forces a
+// password input regardless of the other keywords. A closed `enum`
+// surfaces as `select`; JSON `type: boolean` surfaces as `checkbox`.
+// Returns [ErrFlowFieldUnsupportedType] when the JSON `type` is an
+// ambiguous union the resolver cannot reduce to a single kind.
+func deriveFieldType(propSchema *jsonschema.Schema) (FlowFieldType, error) {
+	jsonType, err := lookupJSONType(propSchema)
+	if err != nil {
+		return "", err
+	}
 	if isPassword(propSchema) {
-		return FlowFieldTypePassword
+		return FlowFieldTypePassword, nil
+	}
+	if len(lookupStringEnum(propSchema)) > 0 {
+		return FlowFieldTypeSelect, nil
 	}
 	switch lookupString(propSchema, "format") {
 	case "email":
-		return FlowFieldTypeEmail
+		return FlowFieldTypeEmail, nil
 	case "uri":
-		return FlowFieldTypeURL
+		return FlowFieldTypeURL, nil
 	case "date", "date-time":
-		return FlowFieldTypeDate
+		return FlowFieldTypeDate, nil
 	}
-	return FlowFieldTypeText
+	if jsonType == "boolean" {
+		return FlowFieldTypeCheckbox, nil
+	}
+	return FlowFieldTypeText, nil
 }
 
 // deriveChallenge resolves the unified [FlowFieldChallenge]. A
@@ -148,11 +171,75 @@ func buildValidation(propSchema *jsonschema.Schema) *FlowFieldValidation {
 		Format:    lookupString(propSchema, "format"),
 		MinLength: lookupInt(propSchema, "minLength"),
 		MaxLength: lookupInt(propSchema, "maxLength"),
+		Enum:      lookupStringEnum(propSchema),
 	}
-	if v.Format == "" && v.MinLength == 0 && v.MaxLength == 0 {
+	if v.Format == "" && v.MinLength == 0 && v.MaxLength == 0 && len(v.Enum) == 0 {
 		return nil
 	}
 	return &v
+}
+
+// lookupJSONType returns the property's single JSON `type` keyword.
+// JSON Schema allows `type` to be either a string or an array of
+// strings; the nullable idiom `["null", X]` (in either order) is
+// reduced to X. Any other multi-entry union yields
+// [ErrFlowFieldUnsupportedType], since the resolver has no rule for
+// picking one input kind over the other.
+func lookupJSONType(schema *jsonschema.Schema) (string, error) {
+	v, ok := schema.LookupKeyword("type")
+	if !ok {
+		return "", nil
+	}
+	s, ok := v.(types.PartStringOrStrings)
+	if !ok {
+		return "", nil
+	}
+	if s.String != "" {
+		return s.String, nil
+	}
+	var nonNull []string
+	for _, t := range s.Strings {
+		if t != "null" {
+			nonNull = append(nonNull, t)
+		}
+	}
+	switch len(nonNull) {
+	case 0:
+		return "", nil
+	case 1:
+		return nonNull[0], nil
+	default:
+		return "", fmt.Errorf("%w: %v", ErrFlowFieldUnsupportedType, s.Strings)
+	}
+}
+
+// lookupStringEnum returns the property's `enum` keyword, restricted to
+// string entries. Non-string entries are skipped: the user meta-schema
+// surfaces enums only for closed text choices today; numeric/boolean
+// enums (if ever added) would need a richer wire type.
+func lookupStringEnum(schema *jsonschema.Schema) []string {
+	v, ok := schema.LookupKeyword("enum")
+	if !ok {
+		return nil
+	}
+	part, ok := v.(types.PartAny)
+	if !ok {
+		return nil
+	}
+	raw, ok := part.V.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(raw))
+	for _, item := range raw {
+		if s, ok := item.(string); ok {
+			out = append(out, s)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // passwordAuthEnabled reports whether the root schema declares
