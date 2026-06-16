@@ -1,5 +1,7 @@
 # @zitadel/components
 
+## 0.1.0-alpha.7
+
 ## 0.1.0-alpha.6
 
 ### Patch Changes

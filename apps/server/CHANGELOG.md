@@ -1,5 +1,11 @@
 # @zitadel/server
 
+## 0.1.0-alpha.7
+
+### Patch Changes
+
+- [#317](https://github.com/zitadel/nextgen/pull/317) [`0bacdf2`](https://github.com/zitadel/nextgen/commit/0bacdf23226a1e90c37f09b3cac245e1cf917091) Thanks [@fforootd](https://github.com/fforootd)! - Cut a fresh alpha package train after the release automation fixes.
+
 ## 0.1.0-alpha.6
 
 ### Minor Changes

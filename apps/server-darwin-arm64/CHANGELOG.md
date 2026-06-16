@@ -1,5 +1,7 @@
 # @zitadel/server-darwin-arm64
 
+## 0.1.0-alpha.7
+
 ## 0.1.0-alpha.6
 
 ### Minor Changes

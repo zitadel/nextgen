@@ -1,5 +1,13 @@
 # @zitadel/cli
 
+## 0.1.0-alpha.7
+
+### Patch Changes
+
+- Updated dependencies [[`0bacdf2`](https://github.com/zitadel/nextgen/commit/0bacdf23226a1e90c37f09b3cac245e1cf917091)]:
+  - @zitadel/server@0.1.0-alpha.7
+  - @zitadel/api@0.1.0-alpha.7
+
 ## 0.1.0-alpha.6
 
 ### Patch Changes
