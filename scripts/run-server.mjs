@@ -5,7 +5,7 @@ const args = forwardedArgs();
 
 try {
   if (!isHelp(args)) {
-    await run("sh", ["scripts/sync-embedded-ui-dist.sh", "all"]);
+    await run("moon", ["run", "console:build", "login-ui:build"]);
   }
   await run("go", ["run", ".", ...args]);
 } catch (error) {

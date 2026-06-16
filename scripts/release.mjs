@@ -59,7 +59,7 @@ async function commandSnapshot(options) {
   const info = await gitInfo({ repoRoot });
 
   await run("corepack", ["pnpm", "install", "--frozen-lockfile"], { cwd: repoRoot });
-  await run("sh", ["scripts/sync-embedded-ui-dist.sh", "all"], { cwd: repoRoot });
+  await buildEmbeddedUI();
   await run("go", ["mod", "download"], { cwd: repoRoot });
   await buildServerBinaries({ repoRoot, outDir, version: release.version, gitInfo: info });
   await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
@@ -87,12 +87,16 @@ async function commandPack() {
   const release = await readServerRelease(repoRoot);
   const outDir = releaseDir(repoRoot, release.version);
   const info = await gitInfo({ repoRoot });
-  await run("sh", ["scripts/sync-embedded-ui-dist.sh", "all"], { cwd: repoRoot });
+  await buildEmbeddedUI();
   await run("go", ["mod", "download"], { cwd: repoRoot });
   await buildServerBinaries({ repoRoot, outDir, version: release.version, gitInfo: info });
   await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
   await packPublicPackages({ repoRoot, outDir, version: release.version });
   console.log(`npm tarballs ready: ${join(outDir, "npm")}`);
+}
+
+async function buildEmbeddedUI() {
+  await run("moon", ["run", "console:build", "login-ui:build"], { cwd: repoRoot });
 }
 
 async function commandPublish(options) {

@@ -1,6 +1,9 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { defineConfig } from "vite";
 
 const uiBase = "/ui/login/";
+const loginOutDir = "../../internal/staticui/login/dist";
 
 export default defineConfig(({ command }) => ({
   root: import.meta.dirname,
@@ -11,9 +14,21 @@ export default defineConfig(({ command }) => ({
   },
   cacheDir: "../../node_modules/.vite/apps/login-ui",
   resolve: { conditions: ["@zitadel/source"] },
+  plugins: [keepGoEmbedPlaceholder(loginOutDir)],
   build: {
-    outDir: "./dist",
+    outDir: loginOutDir,
     emptyOutDir: true,
     reportCompressedSize: true,
   },
 }));
+
+function keepGoEmbedPlaceholder(outDir: string) {
+  return {
+    name: "zitadel-go-embed-placeholder",
+    closeBundle() {
+      const dir = resolve(import.meta.dirname, outDir);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(resolve(dir, ".gitkeep"), "");
+    },
+  };
+}

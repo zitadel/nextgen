@@ -25,7 +25,7 @@ tasks:
       - "design-tokens:build"
       - "ui-react:build"
     outputs:
-      - "dist/**/*"
+      - "/internal/staticui/console/dist/**/*"
 
   test:
     command: "corepack pnpm run test"
@@ -45,4 +45,3 @@ tasks:
     options:
       persistent: true
       runInCI: false
-

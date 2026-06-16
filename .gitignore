@@ -105,12 +105,6 @@ nextgen-data/
 # Keep the embed placeholder so //go:embed all:dist works in clean checkouts.
 # `dist/` above ignores the directory entirely, so we have to un-ignore the
 # directory before re-ignoring its contents and re-allowing the placeholder.
-!/apps/console/dist/
-/apps/console/dist/*
-!/apps/console/dist/.gitkeep
-!/apps/login-ui/dist/
-/apps/login-ui/dist/*
-!/apps/login-ui/dist/.gitkeep
 !/internal/staticui/console/dist/
 /internal/staticui/console/dist/*
 !/internal/staticui/console/dist/.gitkeep
