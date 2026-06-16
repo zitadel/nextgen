@@ -255,6 +255,7 @@ async function fakeDocker(): Promise<{ binDir: string; logPath: string }> {
   tempDirs.push(binDir);
   const logPath = join(binDir, "docker.log");
   const dockerPath = join(binDir, "docker");
+  const psPath = join(binDir, "ps");
   await writeFile(
     dockerPath,
     `#!/usr/bin/env node
@@ -273,6 +274,8 @@ process.exit(0);
 `,
   );
   await chmod(dockerPath, 0o755);
+  await writeFile(psPath, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await chmod(psPath, 0o755);
   return { binDir, logPath };
 }
 

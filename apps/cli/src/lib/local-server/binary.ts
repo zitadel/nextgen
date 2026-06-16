@@ -13,6 +13,8 @@ import {
 
 export const SERVER_NPM_PACKAGE = "@zitadel/server";
 const START_COMMAND_ENV = "ZITADEL_SERVER_BINARY";
+const STOP_TIMEOUT_MS = 10_000;
+const STOP_KILL_TIMEOUT_MS = 2_000;
 
 const require = createRequire(import.meta.url);
 
@@ -23,6 +25,13 @@ export type BinaryRunSpec = {
   port: number;
   serverUrl: string;
 };
+
+export type StopBinaryRuntimeResult = Readonly<{
+  pid: number;
+  signal?: NodeJS.Signals;
+  status: "failed" | "stale" | "stopped";
+  target: "process" | "process-group";
+}>;
 
 export function resolveServerCommand(env: NodeJS.ProcessEnv = process.env): {
   command: string;
@@ -86,23 +95,25 @@ export async function startBinaryRuntime(spec: BinaryRunSpec): Promise<BinaryRun
   }
 }
 
-export async function stopBinaryRuntime(pid: number): Promise<void> {
+export async function stopBinaryRuntime(pid: number): Promise<StopBinaryRuntimeResult> {
   if (!isProcessRunning(pid)) {
-    return;
+    return { pid, status: "stale", target: "process" };
   }
-  if (!signalProcess(pid, "SIGTERM")) {
-    return;
+  const term = signalRuntime(pid, "SIGTERM");
+  if (!term.sent) {
+    return { pid, status: "stale", target: term.target };
   }
-  const deadline = Date.now() + 10_000;
-  while (Date.now() < deadline) {
-    if (!isProcessRunning(pid)) {
-      return;
-    }
-    await delay(200);
+  if (await waitForExit(pid, STOP_TIMEOUT_MS)) {
+    return { pid, status: "stopped", target: term.target, signal: "SIGTERM" };
   }
+
   if (isProcessRunning(pid)) {
-    signalProcess(pid, "SIGKILL");
+    const kill = signalRuntime(pid, "SIGKILL");
+    if (kill.sent && (await waitForExit(pid, STOP_KILL_TIMEOUT_MS))) {
+      return { pid, status: "stopped", target: kill.target, signal: "SIGKILL" };
+    }
   }
+  return { pid, status: "failed", target: term.target, signal: "SIGKILL" };
 }
 
 export function isProcessRunning(pid: number): boolean {
@@ -217,6 +228,34 @@ function signalProcess(pid: number, signal: NodeJS.Signals): boolean {
     }
     throw error;
   }
+}
+
+function signalRuntime(
+  pid: number,
+  signal: NodeJS.Signals,
+): { sent: boolean; target: "process" | "process-group" } {
+  if (process.platform !== "win32") {
+    try {
+      process.kill(-pid, signal);
+      return { sent: true, target: "process-group" };
+    } catch (error) {
+      if (!isErrno(error, "ESRCH")) {
+        throw error;
+      }
+    }
+  }
+  return { sent: signalProcess(pid, signal), target: "process" };
+}
+
+async function waitForExit(pid: number, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!isProcessRunning(pid)) {
+      return true;
+    }
+    await delay(200);
+  }
+  return !isProcessRunning(pid);
 }
 
 function errorMessage(error: unknown): string {

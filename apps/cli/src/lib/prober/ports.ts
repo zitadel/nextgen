@@ -1,5 +1,13 @@
 import { execFile } from "node:child_process";
 
+export type TcpListener = Readonly<{
+  address: string;
+  command?: string;
+  host: string;
+  pid?: number;
+  port: number;
+}>;
+
 /**
  * Enumerate TCP ports currently in LISTEN state on the loopback interface
  * (`127.0.0.1`, `::1`, or the wildcard `*`). Spawns `lsof -iTCP -sTCP:LISTEN
@@ -14,13 +22,32 @@ import { execFile } from "node:child_process";
 export async function listListeningPorts(opts?: {
   readonly timeoutMs?: number;
 }): Promise<ReadonlyArray<number>> {
+  const listeners = await listListeningTcpListeners(opts);
+  return uniqueSortedPorts(listeners);
+}
+
+/**
+ * Enumerate TCP LISTEN sockets on loopback/wildcard interfaces with enough
+ * metadata for CLI diagnostics. Never throws; an empty array means either no
+ * visible listeners or that process inspection is unavailable.
+ */
+export async function listListeningTcpListeners(opts?: {
+  readonly timeoutMs?: number;
+}): Promise<ReadonlyArray<TcpListener>> {
   const timeoutMs = opts?.timeoutMs ?? 1000;
   try {
     const stdout = await runLsof(timeoutMs);
-    return parseLsofPorts(stdout);
+    return parseLsofListeners(stdout);
   } catch {
     return [];
   }
+}
+
+export async function listenersForPort(
+  port: number,
+  opts?: { readonly timeoutMs?: number },
+): Promise<ReadonlyArray<TcpListener>> {
+  return (await listListeningTcpListeners(opts)).filter((listener) => listener.port === port);
 }
 
 /**
@@ -33,7 +60,7 @@ function runLsof(timeoutMs: number): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     execFile(
       "lsof",
-      ["-iTCP", "-sTCP:LISTEN", "-P", "-n", "-F", "n"],
+      ["-iTCP", "-sTCP:LISTEN", "-P", "-n", "-F", "pcn"],
       { timeout: timeoutMs, encoding: "utf8" },
       (err, stdout) => {
         if (err) {
@@ -52,9 +79,21 @@ function runLsof(timeoutMs: number): Promise<string> {
  * `n127.0.0.1:3000`, `n[::1]:5050`). Only loopback/wildcard hosts are kept;
  * external interface bindings are ignored.
  */
-function parseLsofPorts(stdout: string): ReadonlyArray<number> {
-  const ports = new Set<number>();
+function parseLsofListeners(stdout: string): ReadonlyArray<TcpListener> {
+  const listeners: TcpListener[] = [];
+  let pid: number | undefined;
+  let command: string | undefined;
   for (const line of stdout.split(/\r?\n/)) {
+    if (line.startsWith("p")) {
+      const parsed = Number.parseInt(line.slice(1), 10);
+      pid = Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+      command = undefined;
+      continue;
+    }
+    if (line.startsWith("c")) {
+      command = line.slice(1) || undefined;
+      continue;
+    }
     if (!line.startsWith("n")) {
       continue;
     }
@@ -70,8 +109,16 @@ function parseLsofPorts(stdout: string): ReadonlyArray<number> {
     }
     const port = Number.parseInt(portStr, 10);
     if (Number.isFinite(port) && port > 0 && port < 65536) {
-      ports.add(port);
+      listeners.push({ address, command, host, pid, port });
     }
+  }
+  return listeners.sort((a, b) => a.port - b.port || (a.pid ?? 0) - (b.pid ?? 0));
+}
+
+function uniqueSortedPorts(listeners: ReadonlyArray<TcpListener>): ReadonlyArray<number> {
+  const ports = new Set<number>();
+  for (const listener of listeners) {
+    ports.add(listener.port);
   }
   return [...ports].sort((a, b) => a - b);
 }
