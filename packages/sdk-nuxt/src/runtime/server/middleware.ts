@@ -4,9 +4,6 @@ import type {
 } from '@zitadel/sdk-core/types';
 import type { EventHandler, H3Event } from 'h3';
 
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
@@ -23,6 +20,8 @@ import {
   getRequestHeader,
   readRawBody,
 } from 'h3';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { verifyJwt, base64UrlDecode } from '../lib/jwt';
 
