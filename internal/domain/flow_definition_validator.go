@@ -106,6 +106,25 @@ func validateSteps(steps []FlowDefinitionStep, userSchema *jsonschema.Schema) er
 			continue
 		}
 
+		// fields/actions/gates have ordered slice shape on the wire; ensure
+		// every entry has a non-empty unique name to keep them addressable by
+		// transitions and submit payloads.
+		if err := uniqueNonEmptyStrings(step.Name, "field", step.Fields); err != nil {
+			return err
+		}
+		actionNames := make(map[string]struct{}, len(step.Actions))
+		for _, a := range step.Actions {
+			if a.Name == "" {
+				return ErrFlowDefinitionInvalid(fmt.Sprintf(
+					"step %q: action has empty name", step.Name), nil)
+			}
+			if _, dup := actionNames[a.Name]; dup {
+				return ErrFlowDefinitionInvalid(fmt.Sprintf(
+					"step %q: duplicate action %q", step.Name, a.Name), nil)
+			}
+			actionNames[a.Name] = struct{}{}
+		}
+
 		// a non-terminal step must do something
 		_, hasCallback := step.Transitions["callback"]
 		if len(step.Fields) == 0 && len(step.Actions) == 0 && len(step.SSOProviders) == 0 &&
@@ -122,17 +141,17 @@ func validateSteps(steps []FlowDefinitionStep, userSchema *jsonschema.Schema) er
 			}
 		}
 
-		// every action key must have a matching transition key
-		for actionName := range step.Actions {
-			if _, ok := step.Transitions[actionName]; !ok {
+		// every action must have a matching transition key
+		for name := range actionNames {
+			if _, ok := step.Transitions[name]; !ok {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
-					"step %q: action %q has no matching transition", step.Name, actionName), nil)
+					"step %q: action %q has no matching transition", step.Name, name), nil)
 			}
 		}
 
 		// every transition key must be an action name or a reserved outcome
 		for transitionKey := range step.Transitions {
-			_, isAction := step.Actions[transitionKey]
+			_, isAction := actionNames[transitionKey]
 			_, isReserved := reservedOutcomes[transitionKey]
 			if !isAction && !isReserved {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
@@ -141,6 +160,25 @@ func validateSteps(steps []FlowDefinitionStep, userSchema *jsonschema.Schema) er
 		}
 
 		// todo (grvijayan): a step with an x-identifier field defines a user_not_found transition or return an error
+	}
+	return nil
+}
+
+// uniqueNonEmptyStrings rejects duplicate or empty entries in an ordered
+// string list (e.g. step.Fields). Returns a flow-definition-invalid error
+// pinned to stepName and a human-readable item label.
+func uniqueNonEmptyStrings(stepName, label string, items []string) error {
+	seen := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		if item == "" {
+			return ErrFlowDefinitionInvalid(fmt.Sprintf(
+				"step %q: %s entry is empty", stepName, label), nil)
+		}
+		if _, dup := seen[item]; dup {
+			return ErrFlowDefinitionInvalid(fmt.Sprintf(
+				"step %q: duplicate %s %q", stepName, label, item), nil)
+		}
+		seen[item] = struct{}{}
 	}
 	return nil
 }

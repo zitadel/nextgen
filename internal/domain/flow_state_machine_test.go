@@ -29,6 +29,24 @@ func findAttribute(attrs []*domain.CreateAttribute, key string) *domain.CreateAt
 	return nil
 }
 
+func containsFieldName(fields []domain.FlowField, name string) bool {
+	for _, f := range fields {
+		if f.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func findAction(actions []domain.FlowAction, name string) (domain.FlowAction, bool) {
+	for _, a := range actions {
+		if a.Name == name {
+			return a, true
+		}
+	}
+	return domain.FlowAction{}, false
+}
+
 // fakeUserRepo records the users create_user persists.
 type fakeUserRepo struct {
 	created []*domain.CreateUser
@@ -195,8 +213,8 @@ func loginDefinition() *domain.FlowDefinition {
 			{
 				Name:   "credentials",
 				Fields: []string{"email", "password"},
-				Actions: map[string]domain.FlowStepAction{
-					domain.FlowActionSubmit: {Primary: true},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit:                {Target: "done"},
@@ -233,8 +251,8 @@ func signupDefinition() *domain.FlowDefinition {
 				Name:      "credentials",
 				Fields:    []string{"email", "password"},
 				OnSuccess: &createUser,
-				Actions: map[string]domain.FlowStepAction{
-					domain.FlowActionSubmit: {Primary: true},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit: {Target: "done"},
@@ -264,8 +282,8 @@ func TestFlowStateMachine_Start_RendersInitialStep(t *testing.T) {
 	require.Equal(t, "credentials", result.State.CurrentStep)
 	assert.Equal(t, testProjectID, result.State.ProjectID)
 	assert.Equal(t, defaultSchemaURL, result.State.UserSchemaURL)
-	assert.Contains(t, result.Step.Fields, "email")
-	act, ok := result.Step.Actions[domain.FlowActionSubmit]
+	assert.True(t, containsFieldName(result.Step.Fields, "email"))
+	act, ok := findAction(result.Step.Actions, domain.FlowActionSubmit)
 	assert.True(t, ok)
 	assert.True(t, act.Primary)
 
@@ -536,8 +554,8 @@ func passkeyLoginDefinition() *domain.FlowDefinition {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name: "authenticate",
-				Actions: map[string]domain.FlowStepAction{
-					domain.FlowActionPasskey: {Primary: true},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionPasskey, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionPasskey: {Target: "done"},
@@ -641,9 +659,10 @@ func passkeyAbandonDefinition() *domain.FlowDefinition {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name: "authenticate",
-				Actions: map[string]domain.FlowStepAction{
-					domain.FlowActionPasskey: {Primary: true},
-					domain.FlowActionSubmit:  {},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionPasskey, Primary: true},
+
+					{Name: domain.FlowActionSubmit},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionPasskey: {Target: "done"},
@@ -835,8 +854,8 @@ func multiStepSignupDefinition() *domain.FlowDefinition {
 			{
 				Name:   "profile",
 				Fields: []string{"email"},
-				Actions: map[string]domain.FlowStepAction{
-					domain.FlowActionSubmit: {Primary: true},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit:                     {Target: "set-password"},
@@ -846,8 +865,8 @@ func multiStepSignupDefinition() *domain.FlowDefinition {
 			{
 				Name:   "set-password",
 				Fields: []string{"password"},
-				Actions: map[string]domain.FlowStepAction{
-					domain.FlowActionSubmit: {Primary: true},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit: {Target: "create"},
@@ -856,8 +875,8 @@ func multiStepSignupDefinition() *domain.FlowDefinition {
 			{
 				Name:      "create",
 				OnSuccess: &createUser,
-				Actions: map[string]domain.FlowStepAction{
-					domain.FlowActionSubmit: {Primary: true},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit: {Target: "done"},
@@ -884,8 +903,8 @@ func combinedSigninSignupDefinition() *domain.FlowDefinition {
 			{
 				Name:   "identify",
 				Fields: []string{"email"},
-				Actions: map[string]domain.FlowStepAction{
-					domain.FlowActionSubmit: {Primary: true},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit:                     {Target: "signin-password"},
@@ -896,8 +915,8 @@ func combinedSigninSignupDefinition() *domain.FlowDefinition {
 			{
 				Name:   "signin-password",
 				Fields: []string{"password"},
-				Actions: map[string]domain.FlowStepAction{
-					domain.FlowActionSubmit: {Primary: true},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit: {Target: "done"},
@@ -907,8 +926,8 @@ func combinedSigninSignupDefinition() *domain.FlowDefinition {
 				Name:      "register-password",
 				Fields:    []string{"password"},
 				OnSuccess: &createUser,
-				Actions: map[string]domain.FlowStepAction{
-					domain.FlowActionSubmit: {Primary: true},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit: {Target: "done"},
@@ -933,8 +952,8 @@ func recoveryDefinition() *domain.FlowDefinition {
 			{
 				Name:   "identify",
 				Fields: []string{"email"},
-				Actions: map[string]domain.FlowStepAction{
-					domain.FlowActionSubmit: {Primary: true},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit:                {Target: "new-password"},
@@ -944,8 +963,8 @@ func recoveryDefinition() *domain.FlowDefinition {
 			{
 				Name:   "new-password",
 				Fields: []string{"password"},
-				Actions: map[string]domain.FlowStepAction{
-					domain.FlowActionSubmit: {Primary: true},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit: {Target: "done"},
@@ -1137,8 +1156,8 @@ func passkeyRegisterDefinition() *domain.FlowDefinition {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name: "register",
-				Actions: map[string]domain.FlowStepAction{
-					domain.FlowActionPasskeyRegister: {Primary: true},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionPasskeyRegister, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionPasskeyRegister: {Target: "done"},
@@ -1265,4 +1284,48 @@ func TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID(t *testing.T) {
 	assert.NotEmpty(t, w.passkeyReg.issueCalls[0].UserID)
 	// The generated ID should be stored in CollectedData for use in the verify phase.
 	assert.Equal(t, w.passkeyReg.issueCalls[0].UserID, issued.State.CollectedData[domain.FlowCollectedUserIDKey])
+}
+
+// TestFlowStateMachine_Start_PreservesActionOrder pins ADR 021: the rendered
+// step's Actions list reflects the definition order, not Go map iteration.
+func TestFlowStateMachine_Start_PreservesActionOrder(t *testing.T) {
+	w := newFlowTestWorld(t)
+	show := domain.FlowStepCompleteShow
+	def := &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-order",
+		UserSchema: defaultSchemaURL,
+		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "step",
+				Fields: []string{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionPasskey},
+					{Name: domain.FlowActionSubmit, Primary: true},
+					{Name: "register"},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionPasskey: {Target: "done"},
+					domain.FlowActionSubmit:  {Target: "done"},
+					"register":               {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+
+	result, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result.Step)
+	gotNames := make([]string, len(result.Step.Actions))
+	for i, a := range result.Step.Actions {
+		gotNames[i] = a.Name
+	}
+	assert.Equal(t, []string{domain.FlowActionPasskey, domain.FlowActionSubmit, "register"}, gotNames)
 }

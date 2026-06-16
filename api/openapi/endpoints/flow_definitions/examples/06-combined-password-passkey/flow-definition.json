@@ -11,66 +11,129 @@
     "steps": [
       {
         "name": "identifier",
-        "fields": ["email"],
-        "actions": {
-          "submit":   { "primary": true },
-          "passkey":  {},
-          "register": {}
-        },
+        "fields": [
+          "email"
+        ],
+        "actions": [
+          {
+            "name": "submit",
+            "primary": true
+          },
+          {
+            "name": "passkey"
+          },
+          {
+            "name": "register"
+          }
+        ],
         "transitions": {
-          "submit":         { "target": "password" },
-          "passkey":        { "target": "done" },
-          "register":       { "target": "register" },
-          "user_not_found": { "target": "register" }
+          "submit": {
+            "target": "password"
+          },
+          "passkey": {
+            "target": "done"
+          },
+          "register": {
+            "target": "register"
+          },
+          "user_not_found": {
+            "target": "register"
+          }
         }
       },
       {
         "name": "password",
-        "fields": ["password"],
-        "actions": {
-          "submit":  { "primary": true },
-          "passkey": {}
-        },
+        "fields": [
+          "password"
+        ],
+        "actions": [
+          {
+            "name": "submit",
+            "primary": true
+          },
+          {
+            "name": "passkey"
+          }
+        ],
         "transitions": {
-          "submit":  { "target": "done" },
-          "passkey": { "target": "done" }
+          "submit": {
+            "target": "done"
+          },
+          "passkey": {
+            "target": "done"
+          }
         }
       },
       {
         "name": "register",
-        "fields": ["email", "name"],
-        "actions": {
-          "submit":            { "primary": true },
-          "passkey_register":  {},
-          "login":             {}
-        },
+        "fields": [
+          "email",
+          "name"
+        ],
+        "actions": [
+          {
+            "name": "submit",
+            "primary": true
+          },
+          {
+            "name": "passkey_register"
+          },
+          {
+            "name": "login"
+          }
+        ],
         "transitions": {
-          "submit":               { "target": "register-password" },
-          "passkey_register":     { "target": "done" },
-          "login":                { "target": "identifier" },
-          "user_already_exists":  { "target": "password" }
+          "submit": {
+            "target": "register-password"
+          },
+          "passkey_register": {
+            "target": "done"
+          },
+          "login": {
+            "target": "identifier"
+          },
+          "user_already_exists": {
+            "target": "password"
+          }
         }
       },
       {
         "name": "register-password",
-        "fields": ["password", "phoneNumber"],
-        "actions": {
-          "submit": { "primary": true }
-        },
+        "fields": [
+          "password",
+          "phoneNumber"
+        ],
+        "actions": [
+          {
+            "name": "submit",
+            "primary": true
+          }
+        ],
         "on_success": "create_user",
         "transitions": {
-          "submit": { "target": "passkey-upsell" }
+          "submit": {
+            "target": "passkey-upsell"
+          }
         }
       },
       {
         "name": "passkey-upsell",
-        "actions": {
-          "passkey_register": { "primary": true },
-          "skip":             {}
-        },
+        "actions": [
+          {
+            "name": "passkey_register",
+            "primary": true
+          },
+          {
+            "name": "skip"
+          }
+        ],
         "transitions": {
-          "passkey_register": { "target": "done" },
-          "skip":             { "target": "done" }
+          "passkey_register": {
+            "target": "done"
+          },
+          "skip": {
+            "target": "done"
+          }
         }
       },
       {
