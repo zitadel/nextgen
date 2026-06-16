@@ -103,18 +103,18 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 			Steps: []api.FlowDefinitionStep{
 				{
 					Name: "auth-step",
-					Actions: api.NewOptFlowDefinitionStepActions(api.FlowDefinitionStepActions{
-						"passkey": api.StepAction{Primary: api.NewOptBool(true)},
-					}),
+					Actions: []api.StepAction{
+						{Name: "passkey", Primary: api.NewOptBool(true)},
+					},
 					Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 						"passkey": api.FlowDefinitionStepTransitionsItem{Target: "register-step"},
 					}),
 				},
 				{
 					Name: "register-step",
-					Actions: api.NewOptFlowDefinitionStepActions(api.FlowDefinitionStepActions{
-						"passkey_register": api.StepAction{Primary: api.NewOptBool(true)},
-					}),
+					Actions: []api.StepAction{
+						{Name: "passkey_register", Primary: api.NewOptBool(true)},
+					},
 					Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 						"passkey_register": api.FlowDefinitionStepTransitionsItem{Target: "done"},
 					}),

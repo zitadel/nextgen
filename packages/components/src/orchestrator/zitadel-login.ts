@@ -455,14 +455,16 @@ export class ZitadelLogin extends LitElement {
         : [{ message: step.error }]
       : [];
 
+    const fields = step.fields ?? [];
+    const actions = step.actions ?? [];
     const context: LiquidContext = {
       step: {
         name: step.name,
         complete: step.complete,
         texts: step.texts ?? {},
       },
-      fields: step.fields ?? {},
-      actions: step.actions ?? {},
+      fields,
+      actions,
       gates: step.gates ?? {},
       sso_providers: step.sso_providers ?? [],
       challenge: step.challenge ?? null,
@@ -696,12 +698,12 @@ export class ZitadelLogin extends LitElement {
       // carries state across steps (e.g. email for the signed-in greeting)
       // but steps without fields should not leak prior values onto the wire.
       const formValues = this.captureValuesFromFields();
-      const stepFieldKeys = Object.keys(this.response.step.fields ?? {});
+      const stepFields = this.response.step.fields ?? [];
       const fields: Record<string, string> = {};
-      for (const key of stepFieldKeys) {
-        const value = formValues[key];
+      for (const f of stepFields) {
+        const value = formValues[f.name];
         if (value !== undefined) {
-          fields[key] = value;
+          fields[f.name] = value;
         }
       }
       const body: SubmitFlowStepBody = {
@@ -733,8 +735,8 @@ export class ZitadelLogin extends LitElement {
 function collectInitialValues(step: CreateFlow201Step): Record<string, string> {
   const values: Record<string, string> = {};
   if (!step.fields) return values;
-  for (const [name, field] of Object.entries(step.fields)) {
-    values[name] = typeof field.value === "string" ? field.value : "";
+  for (const field of step.fields) {
+    values[field.name] = typeof field.value === "string" ? field.value : "";
   }
   return values;
 }

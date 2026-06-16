@@ -37,11 +37,11 @@ func (h *FlowCreateUserHandler) Handle(ctx context.Context, client database.Quer
 	if in.State != nil {
 		collected = in.State.CollectedData
 	}
-	identifierName, _, ok := findCollectedFieldByChallenge(in.Resolved.Fields, collected, FlowFieldChallengeIdentifier)
+	identifierName, _, _, ok := findCollectedFieldByChallenge(in.Resolved.Fields, collected, FlowFieldChallengeIdentifier)
 	if !ok {
 		return FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no identifier in collected data", ErrIntegrity)
 	}
-	_, passwordValue, hasPassword := findCollectedFieldByChallenge(in.Resolved.Fields, collected, FlowFieldChallengePassword)
+	_, _, passwordValue, hasPassword := findCollectedFieldByChallenge(in.Resolved.Fields, collected, FlowFieldChallengePassword)
 	if !hasPassword {
 		return FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", ErrIntegrity)
 	}
@@ -51,9 +51,13 @@ func (h *FlowCreateUserHandler) Handle(ctx context.Context, client database.Quer
 		return FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: generate id: %w", err)
 	}
 
+	byName := make(map[string]FlowField, len(in.Resolved.Fields))
+	for _, f := range in.Resolved.Fields {
+		byName[f.Name] = f
+	}
 	attrs := make([]*CreateAttribute, 0, len(collected))
 	for name, value := range collected {
-		field, known := in.Resolved.Fields[name]
+		field, known := byName[name]
 		if !known || field.Challenge == FlowFieldChallengePassword {
 			continue
 		}
@@ -108,8 +112,7 @@ func (h *FlowCreateUserHandler) GenerateUserID() (string, error) {
 // the passkey save for atomicity.
 func (h *FlowCreateUserHandler) HandleProvisional(ctx context.Context, client database.QueryExecutor, userID string, state *FlowState, resolved FlowResolvedFields) error {
 	var attrs []*CreateAttribute
-	if name, value, ok := findCollectedFieldByChallenge(resolved.Fields, state.CollectedData, FlowFieldChallengeIdentifier); ok {
-		field := resolved.Fields[name]
+	if name, field, value, ok := findCollectedFieldByChallenge(resolved.Fields, state.CollectedData, FlowFieldChallengeIdentifier); ok {
 		uniqueScope := attributeUniquenessFor(name, name, field.Unique)
 		attr, err := NewCreateAttribute(name, value, uniqueScope)
 		if err != nil {
@@ -131,18 +134,19 @@ func (h *FlowCreateUserHandler) HandleProvisional(ctx context.Context, client da
 }
 
 // findCollectedFieldByChallenge looks up a field whose resolved Challenge
-// matches target and whose name is present in collected. Returns the
-// field name and its collected value.
-func findCollectedFieldByChallenge(resolved map[string]FlowField, collected map[string]any, target FlowFieldChallenge) (name string, value any, ok bool) {
-	for n, f := range resolved {
+// matches target and whose name is present in collected. Returns the field
+// name, the matched [FlowField], and its collected value. Callers that don't
+// need the FlowField discard it.
+func findCollectedFieldByChallenge(resolved []FlowField, collected map[string]any, target FlowFieldChallenge) (name string, field FlowField, value any, ok bool) {
+	for _, f := range resolved {
 		if f.Challenge != target {
 			continue
 		}
-		if v, present := collected[n]; present {
-			return n, v, true
+		if v, present := collected[f.Name]; present {
+			return f.Name, f, v, true
 		}
 	}
-	return "", nil, false
+	return "", FlowField{}, nil, false
 }
 
 // attributeUniquenessFor picks the [AttributeUniqueness] the user

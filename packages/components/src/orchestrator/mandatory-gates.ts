@@ -60,18 +60,17 @@ function collectMissingAtoms(
   const additions: Element[] = [];
 
   if (step.fields) {
-    for (const [name, field] of Object.entries(step.fields)) {
+    for (const field of step.fields) {
       if (!field.required) continue;
-      if (hasFieldFor(fragment, name)) continue;
-      additions.push(buildField(name, field.text_key, field.type, locale, field.required));
+      if (hasFieldFor(fragment, field.name)) continue;
+      additions.push(buildField(field.name, field.text_key, field.type, locale, field.required));
     }
   }
 
   if (step.actions && !hasPrimaryButton(fragment)) {
-    const primary = Object.entries(step.actions).find(([, action]) => action.primary);
+    const primary = step.actions.find((action) => action.primary);
     if (primary) {
-      const [name, action] = primary;
-      additions.push(buildSubmit(name, action.text_key, locale));
+      additions.push(buildSubmit(primary.name, primary.text_key, locale));
     }
   }
 

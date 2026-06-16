@@ -440,19 +440,21 @@ describe("<zitadel-login> against the typed Flow API", () => {
             step: {
               name: "identifier",
               texts: { title_key: "identifier.title" },
-              fields: {
-                email: {
+              fields: [
+                {
+                  name: "email",
                   type: "email",
                   text_key: "identifier.field.email",
                   required: true,
                 },
-                password: {
+                {
+                  name: "password",
                   type: "password",
                   text_key: "identifier.field.password",
                   required: true,
                 },
-              },
-              actions: { submit: { text_key: "submit.signin", primary: true } },
+              ],
+              actions: [{ name: "submit", text_key: "submit.signin", primary: true }],
               gates: {},
               error: "flow field email: format",
             },
