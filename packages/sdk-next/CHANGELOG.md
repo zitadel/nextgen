@@ -1,5 +1,14 @@
 # @zitadel/sdk-next
 
+## 0.1.0-alpha.6
+
+### Patch Changes
+
+- Updated dependencies [[`30b4b41`](https://github.com/zitadel/nextgen/commit/30b4b411a9c99fc61d991f739636f93d7bee5b1d)]:
+  - @zitadel/components@0.1.0-alpha.6
+  - @zitadel/api@0.1.0-alpha.6
+  - @zitadel/sdk-core@0.1.0-alpha.6
+
 ## 0.1.0-alpha.5
 
 ### Patch Changes

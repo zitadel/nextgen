@@ -1,5 +1,17 @@
 # @zitadel/cli
 
+## 0.1.0-alpha.6
+
+### Patch Changes
+
+- [#270](https://github.com/zitadel/nextgen/pull/270) [`30b4b41`](https://github.com/zitadel/nextgen/commit/30b4b411a9c99fc61d991f739636f93d7bee5b1d) Thanks [@vitorbari](https://github.com/vitorbari)! - Step `fields` and `actions` are now ordered `[{ name, ... }]` arrays on the wire (ADR 021). Templates iterate them in authorial order; the orchestrator builds `fields_by_name` / `actions_by_name` views for keyed lookups. The private `@zitadel/api-mock` workspace follows the same wire shape for tests. `gates` stays a name-keyed object for now.
+
+- [#303](https://github.com/zitadel/nextgen/pull/303) [`69e41b2`](https://github.com/zitadel/nextgen/commit/69e41b24275a5337b04b977dd3582f3f5c5c1461) Thanks [@fforootd](https://github.com/fforootd)! - Improve local bootstrap guidance for Docker prerequisites, generated auth pages, and agent browser proof.
+
+- Updated dependencies [[`2cf813e`](https://github.com/zitadel/nextgen/commit/2cf813e62d2d76346536911e3e4ccfe390fb3583)]:
+  - @zitadel/server@0.1.0-alpha.6
+  - @zitadel/api@0.1.0-alpha.6
+
 ## 0.1.0-alpha.5
 
 ### Minor Changes
