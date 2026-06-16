@@ -4,9 +4,10 @@ import { fileURLToPath } from "node:url";
 
 import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
 import {
+  detectReleaseAutomation,
   findUnrecordedPendingChangesets,
-  readPendingChangesets,
   readPrereleaseChangesetIds,
+  readReleaseChangesets,
 } from "./release-automation.mjs";
 import {
   CONTAINER_PLATFORMS,
@@ -95,6 +96,23 @@ async function commandPack() {
 }
 
 async function commandPublish(options) {
+  const preflight = await detectReleaseAutomation({
+    repoRoot,
+    mode: "publish",
+    base: options.base || process.env.BASE_SHA || "HEAD^",
+  });
+  if (!preflight.ok) {
+    const message = [
+      `release publish preflight failed: ${preflight.reason}`,
+      ...preflight.errors.map((error) => `- ${error}`),
+    ].join("\n");
+    throw new Error(message);
+  }
+  if (!preflight.shouldRun) {
+    console.log(`release publish: skip - ${preflight.reason}`);
+    return;
+  }
+
   const release = await readServerRelease(repoRoot);
   const outDir = releaseDir(repoRoot, release.version);
   await assertNoUnrecordedPendingChangesets();
@@ -153,7 +171,7 @@ async function commandVerify() {
 }
 
 function parseOptions(args) {
-  const parsed = { dryRun: false, skipContainer: false, version: "" };
+  const parsed = { dryRun: false, skipContainer: false, version: "", base: "" };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     switch (arg) {
@@ -167,6 +185,10 @@ function parseOptions(args) {
         parsed.version = args[++index] ?? "";
         if (!parsed.version) usage("--version requires a value");
         break;
+      case "--base":
+        parsed.base = args[++index] ?? "";
+        if (!parsed.base) usage("--base requires a value");
+        break;
       case "--help":
       case "-h":
         usage();
@@ -179,7 +201,7 @@ function parseOptions(args) {
 }
 
 export async function assertNoUnrecordedPendingChangesets(root = repoRoot) {
-  const pending = await readPendingChangesets(root);
+  const pending = await readReleaseChangesets(root);
   const prereleaseChangesetIds = await readPrereleaseChangesetIds(root);
   const unrecorded = findUnrecordedPendingChangesets(pending, prereleaseChangesetIds);
   if (unrecorded.length > 0) {
@@ -276,6 +298,7 @@ Options:
   --dry-run          Do not publish or mutate remote registries.
   --skip-container   Build release files without building a local Docker image.
   --version <v>      Recovery target version.
+  --base <ref>       Base ref for release publish detection.
 `);
   process.exit(error ? 1 : 0);
 }

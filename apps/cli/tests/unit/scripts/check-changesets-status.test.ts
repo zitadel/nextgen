@@ -44,11 +44,12 @@ type CheckChangesetsStatusModule = {
 
 type ReleaseAutomationModule = {
   detectReleaseAutomation: (options: {
-    mode: "prepare" | "publish";
+    mode: "publish";
     base?: string;
     entries?: Array<{ status: string; file: string }>;
     message?: string;
     pendingChangesets?: string[];
+    releasePendingChangesets?: string[];
     prereleaseChangesetIds?: string[];
   }) => Promise<{
     ok: boolean;
@@ -362,42 +363,6 @@ This package is private.
 });
 
 describe("release-automation", () => {
-  it("runs prepare when pending changesets exist", async () => {
-    const { detectReleaseAutomation } = await loadReleaseAutomationModule();
-    const result = await detectReleaseAutomation({
-      mode: "prepare",
-      pendingChangesets: [".changeset/cli-start.md"],
-    });
-
-    expect(result.ok).toBe(true);
-    expect(result.shouldRun).toBe(true);
-    expect(result.reason).toContain("pending changeset");
-  });
-
-  it("skips prepare when no pending changesets exist", async () => {
-    const { detectReleaseAutomation } = await loadReleaseAutomationModule();
-    const result = await detectReleaseAutomation({
-      mode: "prepare",
-      pendingChangesets: [],
-    });
-
-    expect(result.ok).toBe(true);
-    expect(result.shouldRun).toBe(false);
-  });
-
-  it("skips prepare when prerelease mode already recorded the pending changesets", async () => {
-    const { detectReleaseAutomation } = await loadReleaseAutomationModule();
-    const result = await detectReleaseAutomation({
-      mode: "prepare",
-      pendingChangesets: [".changeset/cli-start.md"],
-      prereleaseChangesetIds: ["cli-start"],
-    });
-
-    expect(result.ok).toBe(true);
-    expect(result.shouldRun).toBe(false);
-    expect(result.reason).toContain("already recorded");
-  });
-
   it("runs publish for a valid Changesets version package commit", async () => {
     const { detectReleaseAutomation } = await loadReleaseAutomationModule();
     const result = await detectReleaseAutomation({
@@ -422,6 +387,24 @@ describe("release-automation", () => {
       message: "build: version packages (alpha)\n",
       pendingChangesets: [".changeset/cli-start.md"],
       prereleaseChangesetIds: ["cli-start"],
+      entries: [
+        { status: "M", file: ".changeset/pre.json" },
+        { status: "M", file: "apps/cli/package.json" },
+        { status: "M", file: "apps/cli/CHANGELOG.md" },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.shouldRun).toBe(true);
+  });
+
+  it("ignores unrecorded empty changesets when publishing a version package commit", async () => {
+    const { detectReleaseAutomation } = await loadReleaseAutomationModule();
+    const result = await detectReleaseAutomation({
+      mode: "publish",
+      message: "build: version packages (alpha)\n",
+      pendingChangesets: [".changeset/release-tests.md"],
+      releasePendingChangesets: [],
       entries: [
         { status: "M", file: ".changeset/pre.json" },
         { status: "M", file: "apps/cli/package.json" },
@@ -510,7 +493,13 @@ describe("release publish guard", () => {
     const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-guard-"));
     try {
       await mkdir(join(repoRoot, ".changeset"));
-      await writeFile(join(repoRoot, ".changeset", "cli-start.md"), "---\n---\n");
+      await writeFile(
+        join(repoRoot, ".changeset", "cli-start.md"),
+        `---
+"@zitadel/cli": patch
+---
+`,
+      );
       await writeFile(
         join(repoRoot, ".changeset", "pre.json"),
         JSON.stringify({ mode: "pre", changesets: ["cli-start"] }),
@@ -518,7 +507,16 @@ describe("release publish guard", () => {
 
       await expect(assertNoUnrecordedPendingChangesets(repoRoot)).resolves.toBeUndefined();
 
-      await writeFile(join(repoRoot, ".changeset", "sdk-start.md"), "---\n---\n");
+      await writeFile(join(repoRoot, ".changeset", "empty-ci.md"), "---\n---\n");
+      await expect(assertNoUnrecordedPendingChangesets(repoRoot)).resolves.toBeUndefined();
+
+      await writeFile(
+        join(repoRoot, ".changeset", "sdk-start.md"),
+        `---
+"@zitadel/sdk-core": patch
+---
+`,
+      );
       await expect(assertNoUnrecordedPendingChangesets(repoRoot)).rejects.toThrow("sdk-start");
     } finally {
       await rm(repoRoot, { recursive: true, force: true });

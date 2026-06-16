@@ -3,7 +3,11 @@ import { appendFile, readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { analyzeChangedEntries, parseNameStatus } from "./check-changesets-status.mjs";
+import {
+  analyzeChangedEntries,
+  parseChangesetPackages,
+  parseNameStatus,
+} from "./check-changesets-status.mjs";
 import { forwardedArgs, isDirectRun, runCapture } from "./dev-process.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -51,27 +55,16 @@ export async function detectReleaseAutomation(options) {
   const mode = options.mode;
   const root = options.repoRoot ?? repoRoot;
   const pendingChangesets = options.pendingChangesets ?? (await readPendingChangesets(root));
+  const releasePendingChangesets =
+    options.releasePendingChangesets ??
+    (options.pendingChangesets ? pendingChangesets : await readReleaseChangesets(root, pendingChangesets));
   const prereleaseChangesetIds = normalizeChangesetIdSet(
     options.prereleaseChangesetIds ?? (await readPrereleaseChangesetIds(root)),
   );
   const unrecordedPendingChangesets = findUnrecordedPendingChangesets(
-    pendingChangesets,
+    releasePendingChangesets,
     prereleaseChangesetIds,
   );
-
-  if (mode === "prepare") {
-    const shouldRun = unrecordedPendingChangesets.length > 0;
-    return {
-      ok: true,
-      mode,
-      shouldRun,
-      reason: prepareReason({ pendingChangesets, unrecordedPendingChangesets }),
-      pendingChangesets,
-      unrecordedPendingChangesets,
-      changedFiles: [],
-      errors: [],
-    };
-  }
 
   if (mode !== "publish") {
     throw new Error(`unknown release automation mode: ${mode || "(empty)"}`);
@@ -102,6 +95,7 @@ export async function detectReleaseAutomation(options) {
     base,
     message,
     pendingChangesets,
+    releasePendingChangesets,
     unrecordedPendingChangesets,
     changedFiles: analysis.changedFiles,
     errors,
@@ -134,13 +128,15 @@ export function renderStepSummary(result) {
   }
 
   if (result.unrecordedPendingChangesets?.length > 0) {
-    lines.push("## Pending changesets not recorded in prerelease state", "");
+    lines.push("## Pending release changesets not recorded in prerelease state", "");
     for (const file of result.unrecordedPendingChangesets) {
       lines.push(`- \`${file}\``);
     }
     lines.push("");
+  } else if (result.releasePendingChangesets?.length > 0) {
+    lines.push("All pending release changesets are recorded in `.changeset/pre.json`.", "");
   } else if (result.pendingChangesets.length > 0) {
-    lines.push("All pending changesets are recorded in `.changeset/pre.json`.", "");
+    lines.push("No pending release changesets require prerelease recording.", "");
   }
 
   if (result.changedFiles.length > 0) {
@@ -207,6 +203,18 @@ export async function readPendingChangesets(root) {
     .sort((left, right) => left.localeCompare(right));
 }
 
+export async function readReleaseChangesets(root, pendingChangesets = undefined) {
+  const files = pendingChangesets ?? (await readPendingChangesets(root));
+  const releaseChangesets = [];
+  for (const file of files) {
+    const source = await readFile(join(root, file), "utf8");
+    if (parseChangesetPackages(source).length > 0) {
+      releaseChangesets.push(file);
+    }
+  }
+  return releaseChangesets;
+}
+
 export async function readPrereleaseChangesetIds(root) {
   try {
     const source = await readFile(join(root, ".changeset/pre.json"), "utf8");
@@ -261,16 +269,6 @@ async function writeSummary(summary, summaryPath) {
   console.log(summary);
 }
 
-function prepareReason({ pendingChangesets, unrecordedPendingChangesets }) {
-  if (pendingChangesets.length === 0) {
-    return "no pending changeset files";
-  }
-  if (unrecordedPendingChangesets.length === 0) {
-    return "pending changesets are already recorded in .changeset/pre.json";
-  }
-  return `found ${unrecordedPendingChangesets.length} pending changeset file(s) needing version prepare`;
-}
-
 function publishReason({ versionCommit, unrecordedPendingChangesets, analysis, errors }) {
   if (errors.length > 0) {
     return "release commit preflight failed";
@@ -310,9 +308,9 @@ function sanitizeOutput(value) {
 }
 
 function printUsage() {
-  console.log(`Usage: node scripts/release-automation.mjs <prepare|publish> [--base <ref>] [--message <text>] [--summary]
+  console.log(`Usage: node scripts/release-automation.mjs publish [--base <ref>] [--message <text>] [--summary]
 
-Detects whether automatic release prepare or publish should run for the current checkout.
+Detects whether automatic release publish should run for the current checkout.
 `);
 }
 
