@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import type {
   AuthResult,
   NextgenMiddlewareOptions,
@@ -10,6 +13,30 @@ import {
   filterResponseHeaders,
   matchesRoutes,
 } from '@zitadel/sdk-core/middleware';
+
+/**
+ * Resolve `ZITADEL_PROJECT_SECRET`, falling back to a one-time `.env.local`
+ * read at module load. Nuxt's CLI auto-loads `.env` but not `.env.local`, so
+ * the var the CLI scaffolds is invisible to `process.env` under standard
+ * `nuxt dev`. The fallback bridges that gap without touching the user's
+ * dev script. Cached so each request just reads the closure.
+ */
+const projectSecret = ((): string | undefined => {
+  if (process.env.ZITADEL_PROJECT_SECRET) {
+    return process.env.ZITADEL_PROJECT_SECRET;
+  }
+  const path = resolve(process.cwd(), '.env.local');
+  if (!existsSync(path)) {
+    return undefined;
+  }
+  for (const line of readFileSync(path, 'utf8').split('\n')) {
+    const match = line.match(/^ZITADEL_PROJECT_SECRET=(.*)$/);
+    if (match) {
+      return match[1];
+    }
+  }
+  return undefined;
+})();
 import {
   defineEventHandler,
   getCookie,
@@ -205,14 +232,11 @@ async function proxyRequest(
 
   // Attach the project service-key secret as the bearer on every proxied
   // request. The server's security handler verifies it cryptographically; the
-  // browser never sees the secret because Nuxt server middleware runs in the
-  // node runtime and reads it from `process.env.ZITADEL_PROJECT_SECRET`
-  // (populated from `.env.local`, which is gitignored).
-  if (!upstreamHeaders.has('authorization')) {
-    const secret = process.env.ZITADEL_PROJECT_SECRET;
-    if (secret) {
-      upstreamHeaders.set('authorization', `Bearer ${secret}`);
-    }
+  // browser never sees the secret because this middleware runs in the Nitro
+  // server runtime and the secret is loaded from `.env.local` (gitignored) at
+  // module init — see `projectSecret` above.
+  if (!upstreamHeaders.has('authorization') && projectSecret) {
+    upstreamHeaders.set('authorization', `Bearer ${projectSecret}`);
   }
 
   const upstream = await fetch(target, {
