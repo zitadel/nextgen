@@ -79,7 +79,7 @@ export type ZitadelLoginProps = ZitadelLoginConfig &
  * declarative `useOn` does not catch these programmatic custom events.
  */
 export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
-  const host = useSignal<HTMLElement>();
+  const host = useSignal<ZitadelLoginElement>();
   // eslint-disable-next-line qwik/no-use-visible-task
   useVisibleTask$(
     ({ track, cleanup }) => {
@@ -143,7 +143,7 @@ export type ZitadelLogoutProps = ZitadelLogoutConfig &
  * callback.
  */
 export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
-  const host = useSignal<HTMLElement>();
+  const host = useSignal<ZitadelLogoutElement>();
   // eslint-disable-next-line qwik/no-use-visible-task
   useVisibleTask$(
     ({ track, cleanup }) => {

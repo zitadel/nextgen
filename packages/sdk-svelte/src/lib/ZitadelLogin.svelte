@@ -38,13 +38,12 @@
     if (!el) {
       return;
     }
-    if (project !== undefined) {
-      (el as unknown as { project?: ZitadelProject }).project = project;
-    }
+    (el as unknown as { project?: ZitadelProject }).project = project;
   });
 
   $effect(() => {
-    if (!el) {
+    const node = el;
+    if (!node) {
       return;
     }
     const step = (event: Event): void =>
@@ -55,15 +54,15 @@
       onFlowComplete?.((event as CustomEvent<ZitadelFlowCompleteDetail>).detail);
     const error = (event: Event): void =>
       onFlowError?.((event as CustomEvent<ZitadelFlowErrorDetail>).detail);
-    el.addEventListener('zitadel-flow-step', step);
-    el.addEventListener('zitadel-flow-input', input);
-    el.addEventListener('zitadel-flow-complete', complete);
-    el.addEventListener('zitadel-flow-error', error);
+    node.addEventListener('zitadel-flow-step', step);
+    node.addEventListener('zitadel-flow-input', input);
+    node.addEventListener('zitadel-flow-complete', complete);
+    node.addEventListener('zitadel-flow-error', error);
     return () => {
-      el?.removeEventListener('zitadel-flow-step', step);
-      el?.removeEventListener('zitadel-flow-input', input);
-      el?.removeEventListener('zitadel-flow-complete', complete);
-      el?.removeEventListener('zitadel-flow-error', error);
+      node.removeEventListener('zitadel-flow-step', step);
+      node.removeEventListener('zitadel-flow-input', input);
+      node.removeEventListener('zitadel-flow-complete', complete);
+      node.removeEventListener('zitadel-flow-error', error);
     };
   });
 </script>

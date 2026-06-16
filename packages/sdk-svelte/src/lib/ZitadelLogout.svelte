@@ -28,20 +28,19 @@
     if (!el) {
       return;
     }
-    if (project !== undefined) {
-      (el as unknown as { project?: ZitadelProject }).project = project;
-    }
+    (el as unknown as { project?: ZitadelProject }).project = project;
   });
 
   $effect(() => {
-    if (!el) {
+    const node = el;
+    if (!node) {
       return;
     }
     const signout = (event: Event): void =>
       onSignout?.((event as CustomEvent<ZitadelSignoutDetail>).detail);
-    el.addEventListener('zitadel-signout', signout);
+    node.addEventListener('zitadel-signout', signout);
     return () => {
-      el?.removeEventListener('zitadel-signout', signout);
+      node.removeEventListener('zitadel-signout', signout);
     };
   });
 </script>
