@@ -69,9 +69,9 @@ const ${elementName} = dynamic(
 
 export default function ${componentName}() {
   return (
-    <main style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", padding: "48px 24px" }}>
-      <nav aria-label="Authentication" style={{ position: "absolute", top: "24px", right: "24px", display: "flex", gap: "12px" }}>
-        <Link href="${mode === "login" ? "/register" : "/login"}" style={{ color: "#111827", fontWeight: 700, textDecoration: "none" }}>
+    <main style={{ minHeight: "100vh", position: "relative", background: "#0f0f11" }}>
+      <nav aria-label="Authentication" style={{ position: "absolute", top: "24px", right: "24px", zIndex: 1, display: "flex", gap: "12px" }}>
+        <Link href="${mode === "login" ? "/register" : "/login"}" style={{ color: "#f4f4f6", fontWeight: 700, textDecoration: "none" }}>
           ${mode === "login" ? "Create account" : "Sign in"}
         </Link>
       </nav>
