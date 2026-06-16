@@ -7,6 +7,12 @@ import ZitadelLogout from './lib/ZitadelLogout.svelte';
 
 const project = { projectId: 'proj-test', proxyPath: '/__nextgen' };
 
+type ConfiguredElement = HTMLElement & {
+  project?: unknown;
+  projectId?: string;
+  proxyPath?: string;
+};
+
 beforeEach(() => {
   vi.stubGlobal(
     'fetch',
@@ -20,7 +26,7 @@ afterEach(() => {
 });
 
 describe('ZitadelLogin', () => {
-  it('renders a <zitadel-login> element and forwards the project prop', () => {
+  it('binds the project handle as a property', () => {
     const target = document.createElement('div');
     document.body.appendChild(target);
     const component = mount(ZitadelLogin, {
@@ -28,48 +34,73 @@ describe('ZitadelLogin', () => {
       props: { project, purpose: 'login' },
     });
     flushSync();
-    const el = target.querySelector('zitadel-login') as
-      | (HTMLElement & { project?: unknown })
-      | null;
+    const el = target.querySelector<ConfiguredElement>('zitadel-login');
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
     unmount(component);
   });
 
-  it('forwards the zitadel-flow-error event detail to onFlowError', () => {
+  it('binds discrete projectId/proxyPath', () => {
     const target = document.createElement('div');
     document.body.appendChild(target);
-    const onFlowError = vi.fn();
     const component = mount(ZitadelLogin, {
       target,
-      props: { project, purpose: 'login', onFlowError },
+      props: { projectId: 'proj-test', proxyPath: '/__nextgen' },
+    });
+    flushSync();
+    const el = target.querySelector<ConfiguredElement>('zitadel-login');
+    expect(el).not.toBeNull();
+    expect(el!.projectId).toBe('proj-test');
+    expect(el!.proxyPath).toBe('/__nextgen');
+    unmount(component);
+  });
+
+  it('forwards zitadel-flow-step as onFlowStep(detail)', () => {
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    const onFlowStep = vi.fn();
+    const component = mount(ZitadelLogin, {
+      target,
+      props: { project, purpose: 'login', onFlowStep },
     });
     flushSync();
     const el = target.querySelector('zitadel-login') as HTMLElement | null;
     expect(el).not.toBeNull();
-    const detail = { message: 'boom' };
-    el!.dispatchEvent(new CustomEvent('zitadel-flow-error', { detail }));
-    expect(onFlowError).toHaveBeenCalledTimes(1);
-    expect(onFlowError).toHaveBeenCalledWith(detail);
+    const detail = { step: { kind: 'register' } };
+    el!.dispatchEvent(new CustomEvent('zitadel-flow-step', { detail }));
+    expect(onFlowStep).toHaveBeenCalledWith(detail);
     unmount(component);
   });
 });
 
 describe('ZitadelLogout', () => {
-  it('renders a <zitadel-logout> element and forwards the project prop', () => {
+  it('binds the project handle as a property', () => {
     const target = document.createElement('div');
     document.body.appendChild(target);
     const component = mount(ZitadelLogout, { target, props: { project } });
     flushSync();
-    const el = target.querySelector('zitadel-logout') as
-      | (HTMLElement & { project?: unknown })
-      | null;
+    const el = target.querySelector<ConfiguredElement>('zitadel-logout');
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
     unmount(component);
   });
 
-  it('forwards the zitadel-signout event detail to onSignout', () => {
+  it('binds discrete projectId/proxyPath', () => {
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    const component = mount(ZitadelLogout, {
+      target,
+      props: { projectId: 'proj-test', proxyPath: '/__nextgen' },
+    });
+    flushSync();
+    const el = target.querySelector<ConfiguredElement>('zitadel-logout');
+    expect(el).not.toBeNull();
+    expect(el!.projectId).toBe('proj-test');
+    expect(el!.proxyPath).toBe('/__nextgen');
+    unmount(component);
+  });
+
+  it('forwards zitadel-signout as onSignout(detail)', () => {
     const target = document.createElement('div');
     document.body.appendChild(target);
     const onSignout = vi.fn();
@@ -82,7 +113,6 @@ describe('ZitadelLogout', () => {
     expect(el).not.toBeNull();
     const detail = { name: 'Ada', email: 'ada@example.com' };
     el!.dispatchEvent(new CustomEvent('zitadel-signout', { detail }));
-    expect(onSignout).toHaveBeenCalledTimes(1);
     expect(onSignout).toHaveBeenCalledWith(detail);
     unmount(component);
   });

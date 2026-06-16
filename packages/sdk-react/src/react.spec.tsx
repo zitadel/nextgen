@@ -6,17 +6,35 @@ import { ZitadelLogin, ZitadelLogout } from './react';
 
 // A representative project handle. The element still starts its flow before
 // @lit/react binds this prop (see vitest.config.ts), so the expected mount-time
-// rejection is ignored package-wide; these are light render/event assertions.
+// rejection is ignored package-wide; these are light binding/event assertions.
 const project = { projectId: 'proj-test', proxyPath: '/__nextgen' };
+
+type ConfiguredElement = HTMLElement & {
+  project?: unknown;
+  projectId?: string;
+  proxyPath?: string;
+};
 
 afterEach(cleanup);
 
 describe('ZitadelLogin', () => {
-  it('renders a <zitadel-login> element', () => {
+  it('binds the project handle as a property', () => {
     const { container } = render(
       <ZitadelLogin project={project} purpose="login" />,
     );
-    expect(container.querySelector('zitadel-login')).not.toBeNull();
+    const el = container.querySelector<ConfiguredElement>('zitadel-login');
+    expect(el).not.toBeNull();
+    expect(el!.project).toBe(project);
+  });
+
+  it('binds discrete projectId/proxyPath', () => {
+    const { container } = render(
+      <ZitadelLogin projectId="proj-test" proxyPath="/__nextgen" />,
+    );
+    const el = container.querySelector<ConfiguredElement>('zitadel-login');
+    expect(el).not.toBeNull();
+    expect(el!.projectId).toBe('proj-test');
+    expect(el!.proxyPath).toBe('/__nextgen');
   });
 
   it('forwards zitadel-flow-step as onFlowStep(detail)', () => {
@@ -32,9 +50,21 @@ describe('ZitadelLogin', () => {
 });
 
 describe('ZitadelLogout', () => {
-  it('renders a <zitadel-logout> element', () => {
+  it('binds the project handle as a property', () => {
     const { container } = render(<ZitadelLogout project={project} />);
-    expect(container.querySelector('zitadel-logout')).not.toBeNull();
+    const el = container.querySelector<ConfiguredElement>('zitadel-logout');
+    expect(el).not.toBeNull();
+    expect(el!.project).toBe(project);
+  });
+
+  it('binds discrete projectId/proxyPath', () => {
+    const { container } = render(
+      <ZitadelLogout projectId="proj-test" proxyPath="/__nextgen" />,
+    );
+    const el = container.querySelector<ConfiguredElement>('zitadel-logout');
+    expect(el).not.toBeNull();
+    expect(el!.projectId).toBe('proj-test');
+    expect(el!.proxyPath).toBe('/__nextgen');
   });
 
   it('forwards zitadel-signout as onSignout(detail)', () => {

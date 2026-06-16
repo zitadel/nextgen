@@ -29,12 +29,16 @@ import '@zitadel/components';
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `<zitadel-logout
     [project]="project"
+    [projectId]="projectId"
+    [proxyPath]="proxyPath"
     [attr.post-sign-out-url]="postSignOutUrl"
     (zitadel-signout)="onSignout($event)"
   ></zitadel-logout>`,
 })
 export class ZitadelLogoutComponent {
   @Input() project?: ZitadelProject;
+  @Input() projectId?: string;
+  @Input() proxyPath?: string;
   @Input() postSignOutUrl?: string;
   @Output() signout = new EventEmitter<ZitadelSignoutDetail>();
 

@@ -12,6 +12,8 @@
 
   let {
     project,
+    projectId,
+    proxyPath,
     purpose = 'login',
     postSignInUrl,
     onFlowStep,
@@ -23,8 +25,22 @@
   let el: HTMLElement | undefined = $state();
 
   $effect(() => {
-    if (el) {
-      (el as unknown as { project?: ZitadelProject }).project = project;
+    if (!el) {
+      return;
+    }
+    const target = el as unknown as {
+      project?: ZitadelProject;
+      projectId?: string;
+      proxyPath?: string;
+    };
+    if (project !== undefined) {
+      target.project = project;
+    }
+    if (projectId !== undefined) {
+      target.projectId = projectId;
+    }
+    if (proxyPath !== undefined) {
+      target.proxyPath = proxyPath;
     }
   });
 

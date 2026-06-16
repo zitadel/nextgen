@@ -28,21 +28,32 @@ export type { ZitadelConfig, ZitadelProject };
 export * from './types';
 
 /**
- * Passes `project` as a spread because `@zitadel/components`' Qwik JSX types omit
- * the property-only member. Qwik binds objects to custom elements as DOM
- * properties, so the handle reaches the element intact.
+ * Passes the project config as a spread because `@zitadel/components`' Qwik JSX
+ * types omit these property-only members. Qwik binds object and string values to
+ * custom elements as DOM properties, so the handle (or the discrete project id /
+ * proxy path) reaches the element intact. The widget uses whichever is present.
  */
-function projectProp(project: ZitadelProject): Record<string, unknown> {
-  return { project };
+function projectProp(
+  project: ZitadelProject | undefined,
+  projectId: string | undefined,
+  proxyPath: string | undefined,
+): Record<string, unknown> {
+  return { project, projectId, proxyPath };
 }
 
 function eventDetail<T>(event: Event): T {
   return (event as CustomEvent<T>).detail;
 }
 
-/** Props for {@link ZitadelLogin}. */
+/**
+ * Props for {@link ZitadelLogin}. Supply the SDK handle via {@link project}, or
+ * the discrete {@link projectId} / {@link proxyPath} the widget reads as
+ * properties — the widget uses whichever is present.
+ */
 export interface ZitadelLoginProps {
-  readonly project: ZitadelProject;
+  readonly project?: ZitadelProject;
+  readonly projectId?: string;
+  readonly proxyPath?: string;
   readonly purpose?: CreateFlowBodyPurpose;
   readonly postSignInUrl?: string;
   readonly onFlowStep$?: QRL<(detail: ZitadelFlowStepDetail) => void>;
@@ -53,10 +64,10 @@ export interface ZitadelLoginProps {
 
 /**
  * Qwik component wrapping the `<zitadel-login>` web component. Binds the
- * {@link ZitadelProject} handle as a DOM property and forwards the widget's
- * `zitadel-*` events as optional callbacks. `useVisibleTask$` wires the native
- * listeners; Qwik's declarative `useOn` does not catch these programmatic
- * custom events.
+ * {@link ZitadelProject} handle as a DOM property (or the discrete project id /
+ * proxy path) and forwards the widget's `zitadel-*` events as optional
+ * callbacks. `useVisibleTask$` wires the native listeners; Qwik's declarative
+ * `useOn` does not catch these programmatic custom events.
  */
 export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
   const host = useSignal<HTMLElement>();
@@ -88,24 +99,31 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
   return (
     <zitadel-login
       ref={host}
-      {...projectProp(props.project)}
+      {...projectProp(props.project, props.projectId, props.proxyPath)}
       purpose={props.purpose ?? 'login'}
       post-sign-in-url={props.postSignInUrl}
     />
   );
 });
 
-/** Props for {@link ZitadelLogout}. */
+/**
+ * Props for {@link ZitadelLogout}. Supply the SDK handle via {@link project}, or
+ * the discrete {@link projectId} / {@link proxyPath} the widget reads as
+ * properties — the widget uses whichever is present.
+ */
 export interface ZitadelLogoutProps {
-  readonly project: ZitadelProject;
+  readonly project?: ZitadelProject;
+  readonly projectId?: string;
+  readonly proxyPath?: string;
   readonly postSignOutUrl?: string;
   readonly onSignout$?: QRL<(detail: ZitadelSignoutDetail) => void>;
 }
 
 /**
  * Qwik component wrapping the `<zitadel-logout>` web component. Binds the
- * {@link ZitadelProject} handle as a DOM property and forwards the widget's
- * `zitadel-signout` event as an optional callback.
+ * {@link ZitadelProject} handle as a DOM property (or the discrete project id /
+ * proxy path) and forwards the widget's `zitadel-signout` event as an optional
+ * callback.
  */
 export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
   const host = useSignal<HTMLElement>();
@@ -125,7 +143,7 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
   return (
     <zitadel-logout
       ref={host}
-      {...projectProp(props.project)}
+      {...projectProp(props.project, props.projectId, props.proxyPath)}
       post-sign-out-url={props.postSignOutUrl}
     />
   );

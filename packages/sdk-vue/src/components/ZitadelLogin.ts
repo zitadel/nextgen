@@ -18,15 +18,19 @@ import '@zitadel/components';
  *
  * Render-function form (string tag) so Vue never tries to resolve
  * `zitadel-login` as a Vue component — no `compilerOptions.isCustomElement`
- * needed. Pass the SDK handle from `configureZitadel(...)` as `:project`; it is
- * bound as a DOM property and read by the widget at startup. The widget's
- * `zitadel-*` events are re-emitted with their detail as `flow-step`,
- * `flow-input`, `flow-complete` and `flow-error`.
+ * needed. Supply the SDK handle from `configureZitadel(...)` as `:project`, or
+ * the discrete `:project-id` / `:proxy-path` the widget reads instead — the
+ * widget uses whichever is present. All three are bound as DOM properties and
+ * read by the widget at startup. The widget's `zitadel-*` events are re-emitted
+ * with their detail as `flow-step`, `flow-input`, `flow-complete` and
+ * `flow-error`.
  */
 export default defineComponent({
   name: 'ZitadelLogin',
   props: {
     project: { type: Object as PropType<ZitadelProject>, default: undefined },
+    projectId: { type: String, default: undefined },
+    proxyPath: { type: String, default: undefined },
     purpose: { type: String, default: 'login' },
     postSignInUrl: { type: String, default: undefined },
   },
@@ -35,6 +39,8 @@ export default defineComponent({
     return () =>
       h('zitadel-login', {
         project: props.project,
+        projectId: props.projectId,
+        proxyPath: props.proxyPath,
         purpose: props.purpose,
         'post-sign-in-url': props.postSignInUrl,
         onZitadelFlowStep: (event: CustomEvent<ZitadelFlowStepDetail>) => {

@@ -7,6 +7,12 @@ import ZitadelLogout from './components/ZitadelLogout';
 
 const project = { projectId: 'proj-test', proxyPath: '/__nextgen' };
 
+type ConfiguredElement = HTMLElement & {
+  project?: unknown;
+  projectId?: string;
+  proxyPath?: string;
+};
+
 beforeEach(() => {
   // The widget starts a flow on mount; stub fetch so the attempt fails quietly.
   vi.stubGlobal(
@@ -32,16 +38,24 @@ function mount(
 }
 
 describe('ZitadelLogin', () => {
-  it('renders a <zitadel-login> element and forwards the project prop', () => {
+  it('binds the project handle as a property', () => {
     const host = mount(ZitadelLogin, { project, purpose: 'login' });
-    const el = host.querySelector('zitadel-login') as
-      | (HTMLElement & { project?: unknown })
-      | null;
+    const el = host.querySelector<ConfiguredElement>('zitadel-login');
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
 
-  it('re-emits zitadel-flow-step as flowStep(detail)', () => {
+  it('binds discrete projectId/proxyPath', () => {
+    const host = mount(ZitadelLogin, {
+      projectId: 'proj-test',
+      proxyPath: '/__nextgen',
+    });
+    const el = host.querySelector<ConfiguredElement>('zitadel-login');
+    expect(el!.projectId).toBe('proj-test');
+    expect(el!.proxyPath).toBe('/__nextgen');
+  });
+
+  it('forwards zitadel-flow-step as onFlowStep(detail)', () => {
     const onFlowStep = vi.fn();
     const host = mount(ZitadelLogin, { project, onFlowStep });
     const el = host.querySelector('zitadel-login');
@@ -52,16 +66,24 @@ describe('ZitadelLogin', () => {
 });
 
 describe('ZitadelLogout', () => {
-  it('renders a <zitadel-logout> element and forwards the project prop', () => {
+  it('binds the project handle as a property', () => {
     const host = mount(ZitadelLogout, { project });
-    const el = host.querySelector('zitadel-logout') as
-      | (HTMLElement & { project?: unknown })
-      | null;
+    const el = host.querySelector<ConfiguredElement>('zitadel-logout');
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
 
-  it('re-emits zitadel-signout as signout(detail)', () => {
+  it('binds discrete projectId/proxyPath', () => {
+    const host = mount(ZitadelLogout, {
+      projectId: 'proj-test',
+      proxyPath: '/__nextgen',
+    });
+    const el = host.querySelector<ConfiguredElement>('zitadel-logout');
+    expect(el!.projectId).toBe('proj-test');
+    expect(el!.proxyPath).toBe('/__nextgen');
+  });
+
+  it('forwards zitadel-signout as onSignout(detail)', () => {
     const onSignout = vi.fn();
     const host = mount(ZitadelLogout, { project, onSignout });
     const el = host.querySelector('zitadel-logout');

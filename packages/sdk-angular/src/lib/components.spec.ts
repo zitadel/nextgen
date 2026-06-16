@@ -16,6 +16,14 @@ describe('ZitadelLoginComponent', () => {
     expect(component.project).toBe(project);
   });
 
+  it('accepts discrete projectId/proxyPath inputs', () => {
+    const component = new ZitadelLoginComponent();
+    component.projectId = 'proj-test';
+    component.proxyPath = '/__nextgen';
+    expect(component.projectId).toBe('proj-test');
+    expect(component.proxyPath).toBe('/__nextgen');
+  });
+
   it('emits flowStep with the event detail', () => {
     const component = new ZitadelLoginComponent();
     const received: unknown[] = [];
@@ -31,6 +39,14 @@ describe('ZitadelLogoutComponent', () => {
     const component = new ZitadelLogoutComponent();
     component.project = project;
     expect(component.project).toBe(project);
+  });
+
+  it('accepts discrete projectId/proxyPath inputs', () => {
+    const component = new ZitadelLogoutComponent();
+    component.projectId = 'proj-test';
+    component.proxyPath = '/__nextgen';
+    expect(component.projectId).toBe('proj-test');
+    expect(component.proxyPath).toBe('/__nextgen');
   });
 
   it('emits signout with the event detail', () => {

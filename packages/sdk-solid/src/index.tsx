@@ -23,6 +23,8 @@ declare module 'solid-js' {
     interface IntrinsicElements {
       'zitadel-login': HTMLAttributes<HTMLElement> & {
         'prop:project'?: ZitadelProject;
+        'project-id'?: string;
+        'proxy-path'?: string;
         purpose?: string;
         'post-sign-in-url'?: string;
         'on:zitadel-flow-step'?: (
@@ -40,6 +42,8 @@ declare module 'solid-js' {
       };
       'zitadel-logout': HTMLAttributes<HTMLElement> & {
         'prop:project'?: ZitadelProject;
+        'project-id'?: string;
+        'proxy-path'?: string;
         'post-sign-out-url'?: string;
         'on:zitadel-signout'?: (
           event: CustomEvent<ZitadelSignoutDetail>,
@@ -53,9 +57,15 @@ export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
 export * from './types';
 
-/** Props for {@link ZitadelLogin}. */
+/**
+ * Props for {@link ZitadelLogin}. Supply the SDK handle via {@link project}, or
+ * the discrete {@link projectId} / {@link proxyPath} the widget reads as
+ * attributes — the widget uses whichever is present.
+ */
 export interface ZitadelLoginProps {
-  readonly project: ZitadelProject;
+  readonly project?: ZitadelProject;
+  readonly projectId?: string;
+  readonly proxyPath?: string;
   readonly purpose?: string;
   readonly postSignInUrl?: string;
   readonly onFlowStep?: (detail: ZitadelFlowStepDetail) => void;
@@ -66,13 +76,16 @@ export interface ZitadelLoginProps {
 
 /**
  * Solid component wrapping the `<zitadel-login>` web component. Binds the
- * {@link ZitadelProject} handle as a DOM property and forwards the widget's
- * `zitadel-*` events as optional callbacks.
+ * {@link ZitadelProject} handle as a DOM property (or the discrete project id /
+ * proxy path as attributes) and forwards the widget's `zitadel-*` events as
+ * optional callbacks.
  */
 export function ZitadelLogin(props: ZitadelLoginProps): JSX.Element {
   return (
     <zitadel-login
       prop:project={props.project}
+      project-id={props.projectId}
+      proxy-path={props.proxyPath}
       purpose={props.purpose ?? 'login'}
       post-sign-in-url={props.postSignInUrl}
       on:zitadel-flow-step={(event) => props.onFlowStep?.(event.detail)}
@@ -83,22 +96,31 @@ export function ZitadelLogin(props: ZitadelLoginProps): JSX.Element {
   );
 }
 
-/** Props for {@link ZitadelLogout}. */
+/**
+ * Props for {@link ZitadelLogout}. Supply the SDK handle via {@link project}, or
+ * the discrete {@link projectId} / {@link proxyPath} the widget reads as
+ * attributes — the widget uses whichever is present.
+ */
 export interface ZitadelLogoutProps {
-  readonly project: ZitadelProject;
+  readonly project?: ZitadelProject;
+  readonly projectId?: string;
+  readonly proxyPath?: string;
   readonly postSignOutUrl?: string;
   readonly onSignout?: (detail: ZitadelSignoutDetail) => void;
 }
 
 /**
  * Solid component wrapping the `<zitadel-logout>` web component. Binds the
- * {@link ZitadelProject} handle as a DOM property and forwards the widget's
- * `zitadel-signout` event as an optional callback.
+ * {@link ZitadelProject} handle as a DOM property (or the discrete project id /
+ * proxy path as attributes) and forwards the widget's `zitadel-signout` event
+ * as an optional callback.
  */
 export function ZitadelLogout(props: ZitadelLogoutProps): JSX.Element {
   return (
     <zitadel-logout
       prop:project={props.project}
+      project-id={props.projectId}
+      proxy-path={props.proxyPath}
       post-sign-out-url={props.postSignOutUrl}
       on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
     />

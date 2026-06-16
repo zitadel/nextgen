@@ -23,10 +23,11 @@ import '@zitadel/components';
  *
  * Uses a distinct selector (`zitadel-auth-login`) and renders the real custom
  * element in its template under `CUSTOM_ELEMENTS_SCHEMA`. The `project` handle
- * (from `configureZitadel(...)`) is bound as a DOM **property** via `[project]`;
- * `purpose` / `post-sign-in-url` are bound as attributes the Lit element reads.
- * The widget's `zitadel-*` events are re-emitted with their detail as the
- * `flowStep` / `flowInput` / `flowComplete` / `flowError` outputs.
+ * (from `configureZitadel(...)`) is bound as a DOM **property** via `[project]`,
+ * as are the discrete `projectId` / `proxyPath` the element reads when no handle
+ * is supplied; `purpose` / `post-sign-in-url` are bound as attributes the Lit
+ * element reads. The widget's `zitadel-*` events are re-emitted with their
+ * detail as the `flowStep` / `flowInput` / `flowComplete` / `flowError` outputs.
  *
  * ```html
  * <zitadel-auth-login [project]="project" purpose="login" postSignInUrl="/"
@@ -39,6 +40,8 @@ import '@zitadel/components';
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `<zitadel-login
     [project]="project"
+    [projectId]="projectId"
+    [proxyPath]="proxyPath"
     [attr.purpose]="purpose"
     [attr.post-sign-in-url]="postSignInUrl"
     (zitadel-flow-step)="onFlowStep($event)"
@@ -49,6 +52,8 @@ import '@zitadel/components';
 })
 export class ZitadelLoginComponent {
   @Input() project?: ZitadelProject;
+  @Input() projectId?: string;
+  @Input() proxyPath?: string;
   @Input() purpose = 'login';
   @Input() postSignInUrl?: string;
   @Output() flowStep = new EventEmitter<ZitadelFlowStepDetail>();

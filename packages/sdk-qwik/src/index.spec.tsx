@@ -7,6 +7,12 @@ import { ZitadelLogin, ZitadelLogout } from './index';
 
 const project = { projectId: 'proj-test', proxyPath: '/__nextgen' };
 
+type ConfiguredElement = HTMLElement & {
+  project?: unknown;
+  projectId?: string;
+  proxyPath?: string;
+};
+
 beforeEach(() => {
   vi.stubGlobal(
     'fetch',
@@ -20,27 +26,47 @@ afterEach(() => {
 });
 
 describe('ZitadelLogin', () => {
-  it('renders a <zitadel-login> element and forwards the project prop', async () => {
+  it('binds the project handle as a property', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     await render(host, <ZitadelLogin project={project} purpose="login" />);
-    const el = host.querySelector('zitadel-login') as
-      | (HTMLElement & { project?: unknown })
-      | null;
+    const el = host.querySelector<ConfiguredElement>('zitadel-login');
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
+  });
+
+  it('binds discrete projectId/proxyPath', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    await render(
+      host,
+      <ZitadelLogin projectId="proj-test" proxyPath="/__nextgen" />,
+    );
+    const el = host.querySelector<ConfiguredElement>('zitadel-login');
+    expect(el!.projectId).toBe('proj-test');
+    expect(el!.proxyPath).toBe('/__nextgen');
   });
 });
 
 describe('ZitadelLogout', () => {
-  it('renders a <zitadel-logout> element and forwards the project prop', async () => {
+  it('binds the project handle as a property', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     await render(host, <ZitadelLogout project={project} />);
-    const el = host.querySelector('zitadel-logout') as
-      | (HTMLElement & { project?: unknown })
-      | null;
+    const el = host.querySelector<ConfiguredElement>('zitadel-logout');
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
+  });
+
+  it('binds discrete projectId/proxyPath', async () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    await render(
+      host,
+      <ZitadelLogout projectId="proj-test" proxyPath="/__nextgen" />,
+    );
+    const el = host.querySelector<ConfiguredElement>('zitadel-logout');
+    expect(el!.projectId).toBe('proj-test');
+    expect(el!.proxyPath).toBe('/__nextgen');
   });
 });
