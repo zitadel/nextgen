@@ -39,4 +39,4 @@ tasks:
     command: "node scripts/release.mjs publish"
     options:
       runFromWorkspaceRoot: true
-      runInCI: false
+      runInCI: true
