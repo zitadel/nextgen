@@ -137,10 +137,10 @@ func combinedPasswordFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 			{
 				Name:   "identifier",
 				Fields: []string{"email"},
-				Actions: api.NewOptFlowDefinitionStepActions(api.FlowDefinitionStepActions{
-					"submit":   api.StepAction{Primary: api.NewOptBool(true)},
-					"register": api.StepAction{},
-				}),
+				Actions: []api.StepAction{
+					{Name: "submit", Primary: api.NewOptBool(true)},
+					{Name: "register"},
+				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 					"submit":         api.FlowDefinitionStepTransitionsItem{Target: "password"},
 					"register":       api.FlowDefinitionStepTransitionsItem{Target: "register-identifier"},
@@ -150,9 +150,9 @@ func combinedPasswordFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 			{
 				Name:   "password",
 				Fields: []string{"password"},
-				Actions: api.NewOptFlowDefinitionStepActions(api.FlowDefinitionStepActions{
-					"submit": api.StepAction{Primary: api.NewOptBool(true)},
-				}),
+				Actions: []api.StepAction{
+					{Name: "submit", Primary: api.NewOptBool(true)},
+				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 					"submit": api.FlowDefinitionStepTransitionsItem{Target: "done"},
 				}),
@@ -160,10 +160,10 @@ func combinedPasswordFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 			{
 				Name:   "register-identifier",
 				Fields: []string{"email", "givenName", "familyName"},
-				Actions: api.NewOptFlowDefinitionStepActions(api.FlowDefinitionStepActions{
-					"submit": api.StepAction{Primary: api.NewOptBool(true)},
-					"login":  api.StepAction{},
-				}),
+				Actions: []api.StepAction{
+					{Name: "submit", Primary: api.NewOptBool(true)},
+					{Name: "login"},
+				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 					"submit":              api.FlowDefinitionStepTransitionsItem{Target: "register-password"},
 					"login":               api.FlowDefinitionStepTransitionsItem{Target: "identifier"},
@@ -174,9 +174,9 @@ func combinedPasswordFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 				Name:      "register-password",
 				Fields:    []string{"password"},
 				OnSuccess: api.NewOptFlowDefinitionStepOnSuccess(createUser),
-				Actions: api.NewOptFlowDefinitionStepActions(api.FlowDefinitionStepActions{
-					"submit": api.StepAction{Primary: api.NewOptBool(true)},
-				}),
+				Actions: []api.StepAction{
+					{Name: "submit", Primary: api.NewOptBool(true)},
+				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 					"submit": api.FlowDefinitionStepTransitionsItem{Target: "done"},
 				}),
