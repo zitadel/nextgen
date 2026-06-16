@@ -16,9 +16,13 @@ import "strings"
 // [FlowFieldResolver.Resolve]); that is where schema loading and the
 // "unknown property in schema" check happen.
 func (r *SchemaFieldResolver) Validate(fields FlowResolvedFields, values map[string]any) error {
+	byName := make(map[string]FlowField, len(fields.Fields))
+	for _, f := range fields.Fields {
+		byName[f.Name] = f
+	}
 	var errs FlowFieldValidationErrors
 	for name, value := range values {
-		field, known := fields.Fields[name]
+		field, known := byName[name]
 		if !known {
 			errs = append(errs, FlowFieldValidationError{Field: name, Rule: FlowFieldValidationRuleUnknown})
 			continue

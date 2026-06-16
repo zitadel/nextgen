@@ -44,7 +44,7 @@ type flowDefinitionAudienceJSON struct {
 type flowDefinitionStepJSON struct {
 	Name         string                            `json:"name"`
 	Fields       []string                          `json:"fields,omitempty"`
-	Actions      map[string]flowStepActionJSON     `json:"actions,omitempty"`
+	Actions      []flowStepActionJSON              `json:"actions,omitempty"`
 	Gates        map[string]flowStepGateJSON       `json:"gates,omitempty"`
 	SSOProviders []flowSSOProviderJSON             `json:"sso_providers,omitempty"`
 	OnSuccess    *string                           `json:"on_success,omitempty"`
@@ -53,6 +53,7 @@ type flowDefinitionStepJSON struct {
 }
 
 type flowStepActionJSON struct {
+	Name    string `json:"name"`
 	TextKey string `json:"text_key,omitempty"`
 	Primary bool   `json:"primary,omitempty"`
 }
@@ -278,12 +279,13 @@ func marshalFlowDefinitionContent(def *domain.FlowDefinition) ([]byte, error) {
 			Transitions: transitions,
 		}
 		if len(s.Actions) > 0 {
-			stepJSON.Actions = make(map[string]flowStepActionJSON, len(s.Actions))
-			for name, a := range s.Actions {
-				stepJSON.Actions[name] = flowStepActionJSON{
+			stepJSON.Actions = make([]flowStepActionJSON, 0, len(s.Actions))
+			for _, a := range s.Actions {
+				stepJSON.Actions = append(stepJSON.Actions, flowStepActionJSON{
+					Name:    a.Name,
 					TextKey: a.TextKey,
 					Primary: a.Primary,
-				}
+				})
 			}
 		}
 		if len(s.Gates) > 0 {
@@ -365,12 +367,13 @@ func rowToFlowDefinition(row flowDefinitionRow) (*domain.FlowDefinition, error) 
 			Transitions: transitions,
 		}
 		if len(s.Actions) > 0 {
-			step.Actions = make(map[string]domain.FlowStepAction, len(s.Actions))
-			for name, a := range s.Actions {
-				step.Actions[name] = domain.FlowStepAction{
+			step.Actions = make([]domain.FlowStepAction, 0, len(s.Actions))
+			for _, a := range s.Actions {
+				step.Actions = append(step.Actions, domain.FlowStepAction{
+					Name:    a.Name,
 					TextKey: a.TextKey,
 					Primary: a.Primary,
-				}
+				})
 			}
 		}
 		if len(s.Gates) > 0 {

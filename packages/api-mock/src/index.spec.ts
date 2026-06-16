@@ -61,8 +61,8 @@ describe("setupMockHandlers", () => {
   test("walks combined sign-in -> done", async () => {
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
     expect(start.step.name).toBe("identifier");
-    expect(start.step.fields?.email).toBeTruthy();
-    expect(start.step.fields?.password).toBeTruthy();
+    expect(start.step.fields?.some((f) => f.name === "email")).toBe(true);
+    expect(start.step.fields?.some((f) => f.name === "password")).toBe(true);
     expect(start.id).toBeTruthy();
 
     const done = await submitFlowStep(start.id, {
@@ -110,20 +110,34 @@ describe("setupMockHandlers", () => {
     expect(start.session_token).not.toBe(submit.session_token);
   });
 
-  test("routes register through sign-up step straight to done", async () => {
+  test("routes register through two-step sign-up to done", async () => {
     const start = await createFlow({ purpose: "register", project_id: PROJECT_ID });
     expect(start.step.name).toBe("register");
-    const submit = await submitFlowStep(start.id, {
+    expect(start.step.fields?.some((f) => f.name === "email")).toBe(true);
+    expect(start.step.fields?.some((f) => f.name === "given_name")).toBe(true);
+    expect(start.step.fields?.some((f) => f.name === "family_name")).toBe(true);
+    expect(start.step.fields?.some((f) => f.name === "date_of_birth")).toBe(true);
+
+    const passwordStep = await submitFlowStep(start.id, {
       session_token: start.session_token,
       action: "submit",
       fields: {
         email: "alice@acme.com",
-        password: "hunter2",
+        given_name: "Alice",
+        family_name: "Acme",
       },
     });
-    expect(submit.step.name).toBe("done");
-    expect(submit.step.complete).toBe("show");
-    expect(submit.handoff_token).toBeTruthy();
+    expect(passwordStep.step.name).toBe("register-password");
+    expect(passwordStep.step.fields?.some((f) => f.name === "password")).toBe(true);
+
+    const done = await submitFlowStep(passwordStep.id, {
+      session_token: passwordStep.session_token,
+      action: "submit",
+      fields: { password: "hunter2" },
+    });
+    expect(done.step.name).toBe("done");
+    expect(done.step.complete).toBe("show");
+    expect(done.handoff_token).toBeTruthy();
   });
 
   test("redirects to SSO when sso_provider_id is set", async () => {

@@ -10,22 +10,36 @@
     "steps": [
       {
         "name": "identifier",
-        "fields": ["email"],
-        "actions": {
-          "submit": { "primary": true }
-        },
+        "fields": [
+          "email"
+        ],
+        "actions": [
+          {
+            "name": "submit",
+            "primary": true
+          }
+        ],
         "transitions": {
-          "submit": { "target": "password" }
+          "submit": {
+            "target": "password"
+          }
         }
       },
       {
         "name": "password",
-        "fields": ["password"],
-        "actions": {
-          "submit": { "primary": true }
-        },
+        "fields": [
+          "password"
+        ],
+        "actions": [
+          {
+            "name": "submit",
+            "primary": true
+          }
+        ],
         "transitions": {
-          "submit": { "target": "done" }
+          "submit": {
+            "target": "done"
+          }
         }
       },
       {
