@@ -110,10 +110,11 @@ days and are not release artifacts.
 
 ## Build & release
 
-This monorepo uses Moon for task execution and non-npm artifact builds.
-Changesets owns package versions, changelogs, npm publishing, and public
-package tags. Product release notes are written manually by maintainers when a
-GitHub Release is needed.
+This monorepo uses Moon for task execution, non-npm artifact builds, and the
+product `v<version>` tag and draft GitHub Release shell. Changesets owns
+package versions, changelogs, npm publishing, and public package tags. Product
+release prose is written manually by maintainers when a GitHub Release is
+published.
 The current alpha release model uses one fixed Changesets version across the
 CLI, server npm runtime, API packages, components, and SDKs. The full rationale
 lives in
@@ -136,8 +137,9 @@ moon run release:publish -- --dry-run
 ```
 
 Release output lands in `dist/release/<version>`. The workflow publishes
-immutable container version tags from the fixed `@zitadel/server` version;
-stable releases may also move `ghcr.io/zitadel/nextgen:latest`.
+immutable container version tags from the fixed `@zitadel/server` version and
+creates or updates the matching draft GitHub Release with generated artifact and
+package facts; stable releases may also move `ghcr.io/zitadel/nextgen:latest`.
 
 ### npm packages (`changesets`)
 
@@ -153,8 +155,9 @@ When pending changesets land on `main`, `release-publish.yml` runs the
 Changesets action and opens or updates the version PR with the release GitHub
 App so the required `full-pr` check runs normally. After that PR is reviewed
 and merged, the same workflow detects the generated version commit, publishes
-npm packages with Changesets, and pushes the matching container image. Product
-GitHub Release notes are created manually when needed.
+npm packages with Changesets, pushes the matching container image, and creates
+or updates the matching draft GitHub Release. Maintainers add product prose and
+publish the draft when an announcement is needed.
 
 Preview local Changesets status with:
 

@@ -31,7 +31,8 @@ proposals and implementations with recorded decisions.
 This repo is the pre-release next generation of Zitadel. Moon owns the
 monorepo task graph and release artifact builds. Changesets owns package
 versions, changelogs, npm publishing, and public package tags; Moon owns the
-product tag and GitHub Release (see "Release, Licensing, And Secrets").
+product `v<version>` tag and draft GitHub Release shell (see "Release,
+Licensing, And Secrets").
 
 - `internal/` contains Go server implementation code.
 - `cmd/` is reserved for Go command wiring.
@@ -258,8 +259,9 @@ The public packages are `@zitadel/cli`, `@zitadel/server`, the
 `@zitadel/sdk-core`, `@zitadel/sdk-next`, `@zitadel/sdk-nuxt`,
 `@zitadel/sdk-react`, `@zitadel/sdk-vue`, and `@zitadel/sdk-angular`. These
 packages are in one Changesets fixed group for alpha product releases. Moon
-still creates the product `v<version>` tag and GitHub Release from the fixed
-package version.
+still creates or updates the product `v<version>` tag and draft GitHub Release
+shell from the fixed package version; maintainers publish product notes
+manually.
 
 - npm packages under `apps/cli/` and `packages/*` must stay MIT-licensed.
 - Server npm packages under `apps/server*` and console application paths are
