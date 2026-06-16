@@ -7,21 +7,42 @@ PR?", see [Publishable npm packages](#publishable-npm-packages) and the
 
 ## PR workflow and CI gate
 
-CI (`changeset-check` in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml))
-runs [`scripts/check-changeset-required.mjs`](../scripts/check-changeset-required.mjs).
-It fails only when the PR diff touches a **publishable package path** and no
-`.changeset/*.md` file was added.
+CI runs a dedicated `changesets / status` check from
+[`.github/workflows/changesets.yml`](../.github/workflows/changesets.yml). The
+check runs
+[`scripts/check-changesets-status.mjs`](../scripts/check-changesets-status.mjs)
+through Moon:
+
+```sh
+moon run release:changesets -- --base origin/main --summary
+```
+
+It passes when no **publishable package path** changed, fails when publishable
+package paths changed without a `.changeset/*.md` file, validates that
+changesets name only public packages, and verifies that the fixed alpha group
+matches the product package list below.
+
+Branch protection currently requires the GitHub Actions context `full-pr`,
+shown in the pull request UI as `ci / full-pr`. The `changesets / status`
+workflow is fast release feedback unless repository settings are updated to
+require it too.
 
 Publishable paths are defined in
-[`scripts/check-changeset-required.mjs`](../scripts/check-changeset-required.mjs);
+[`scripts/check-changesets-status.mjs`](../scripts/check-changesets-status.mjs);
 update that script and this doc together.
 
 ## Publishable npm packages
 
-**Publishable npm packages** are the nine public `@zitadel/*` packages that ship
-to npm. CI checks **repo paths** (must match the script's `publishableRoots`):
+**Publishable npm packages** are the public `@zitadel/*` packages that ship
+to npm. CI checks **repo paths** (must match the script's `publicPackages`):
 
 - `apps/cli/` — `@zitadel/cli`
+- `apps/server/` — `@zitadel/server`
+- `apps/server-linux-x64/` — `@zitadel/server-linux-x64`
+- `apps/server-linux-arm64/` — `@zitadel/server-linux-arm64`
+- `apps/server-darwin-x64/` — `@zitadel/server-darwin-x64`
+- `apps/server-darwin-arm64/` — `@zitadel/server-darwin-arm64`
+- `apps/server-win32-x64/` — `@zitadel/server-win32-x64`
 - `packages/api/` — `@zitadel/api`
 - `packages/components/` — `@zitadel/components`
 - `packages/sdk-core/` — `@zitadel/sdk-core`
@@ -35,8 +56,8 @@ to npm. CI checks **repo paths** (must match the script's `publishableRoots`):
 changeset on their own.
 
 Everything else — `internal/`, `docs/`, `.github/`, `apps/console/`,
-`packages/api-mock/`, demos, Go server paths, and other private workspaces — does
-**not** require any changeset file. Other workspaces such as
+`packages/api-mock/`, demos, and other private workspaces — does **not** require
+any changeset file. Other workspaces such as
 `@zitadel/api-mock`, `@zitadel/design-tokens`, `@zitadel/shared-component-styles`,
 `@zitadel/ui-react`, and `@zitadel/lint` are marked `"private": true` and are
 never published.
@@ -81,47 +102,59 @@ interactive prompt. Create `.changeset/<short-slug>.md`:
 One-line, user-facing summary of the change.
 ```
 
-List only public package names (`@zitadel/cli`, `@zitadel/api`,
-`@zitadel/components`, `@zitadel/sdk-core`, `@zitadel/sdk-next`,
-`@zitadel/sdk-nuxt`, `@zitadel/sdk-react`, `@zitadel/sdk-vue`,
-`@zitadel/sdk-angular`). Pick `patch` (fixes), `minor` (features), or `major`
-(breaking). The repo is in `alpha` prerelease mode (`.changeset/pre.json`) and
-public packages are in one fixed group, so versions cut as one `X.Y.Z-alpha.N`
-train automatically — see [Alpha prerelease mode](#alpha-prerelease-mode).
+List only public package names (`@zitadel/cli`, `@zitadel/server`,
+`@zitadel/server-*`, `@zitadel/api`, `@zitadel/components`,
+`@zitadel/sdk-core`, `@zitadel/sdk-next`, `@zitadel/sdk-nuxt`,
+`@zitadel/sdk-react`, `@zitadel/sdk-vue`, `@zitadel/sdk-angular`). Pick `patch`
+(fixes), `minor` (features), or `major` (breaking). The repo is in `alpha`
+prerelease mode (`.changeset/pre.json`) and public packages are in one fixed
+group, so versions cut as one `X.Y.Z-alpha.N` train automatically — see
+[Alpha prerelease mode](#alpha-prerelease-mode).
 
 ## Empty changeset
 
 **Empty changeset** (rare) — only when publishable paths changed but nothing
-should ship: `corepack pnpm changeset --empty`. Do **not** use this for
-Go-only, server-only, root `docs/`, CI-only, or other PRs that never touch the
-publishable paths above.
+should ship: `corepack pnpm changeset --empty`. Do **not** use this for Go
+implementation-only paths (`internal/`, `cmd/`, `api/openapi/`), root `docs/`,
+CI-only, or other PRs that never touch the publishable paths above.
 
 ## Anti-patterns
 
 - Do **not** add an empty changeset on PRs that only touch non-publishable
   paths (for example `internal/`, `docs/`, `.github/`, storage migrations).
-- Do **not** skip a changeset when changing published CLI, SDK, or components
-  behavior under the publishable paths above.
+- Do **not** skip a changeset when changing published CLI, server runtime, SDK,
+  or components behavior under the publishable paths above.
 
 ## Verify locally
 
 Before handoff:
 
 ```sh
-node scripts/check-changeset-required.mjs --base origin/main
+moon run release:changesets -- --base origin/main --summary
 ```
 
-Exit `0` → the changeset gate is satisfied; use the decision table above to state the correct PR outcome. Exit `1` → add a changeset (real or, rarely,
-empty).
+Exit `0` -> the changeset gate is satisfied; use the decision table above to
+state the correct PR outcome. Exit `1` -> add a changeset (real or, rarely,
+empty), fix package names in changeset frontmatter, or repair the fixed alpha
+group.
+
+The public packages above are in one Changesets fixed group while the repo is
+in alpha, so a version PR moves the CLI, SDKs, API packages, and server npm
+runtime together.
+
+Before manually preparing a release, validate all pending changesets with:
+
+```sh
+moon run release:changesets -- --pending --summary
+```
 
 ## Alpha prerelease mode
 
 The repo is currently in changesets **prerelease mode** with the `alpha` tag (see `.changeset/pre.json`). While in this mode:
 
 - `changeset version` cuts versions like `0.1.0-alpha.0`, `0.1.0-alpha.1`, …
-- Public packages are in one fixed group, so an alpha train uses the same
-  version across `@zitadel/cli`, SDKs, components, and generated API packages.
-- `changeset publish` publishes them under the **`alpha`** npm dist-tag. During the public alpha, the release workflow also promotes only `@zitadel/cli` to `latest` so bare `npx @zitadel/cli` reaches the supported tester workflow. Other public packages stay opt-in via `@alpha` or exact alpha versions.
+- Public product packages are versioned together through the fixed group.
+- `changeset publish` publishes public npm packages under the **`alpha`** npm dist-tag while prerelease mode is active.
 - A package that has never had a stable release is published to `latest` on its first publish (changesets behaviour), then to `alpha` thereafter until it has a stable release.
 
 To leave alpha and cut a stable `latest` release:
@@ -133,7 +166,14 @@ corepack pnpm changeset version   # strips the -alpha suffix
 
 ## Publishing (npm trusted publishing / OIDC)
 
-The `release-alpha-train` job in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs the [changesets GitHub Action](https://github.com/changesets/action). Pushing changesets to `main` opens a "Version Packages" PR aggregating all pending changesets; merging that PR bumps versions, updates `CHANGELOG.md` files, waits for the CI aggregate gate, and publishes to npm (under the `alpha` dist-tag while in prerelease mode).
+The manual `release-prepare.yml` workflow validates all pending changesets,
+then runs the [changesets GitHub Action](https://github.com/changesets/action)
+to open a "Version Packages" PR aggregating pending changesets. It uses the
+release GitHub App token rather than the default `GITHUB_TOKEN`, so the version
+PR triggers the required `full-pr` check normally. After that PR merges and CI
+is green, `release-publish.yml` runs Moon release tasks, publishes npm packages
+with `changeset publish`, pushes server containers, and updates the product
+GitHub Release.
 
 Publishing authenticates with **npm trusted publishing (OIDC)** — there is **no `NPM_TOKEN`** secret. Before the first automated publish, a maintainer must, once per public package:
 
@@ -142,7 +182,7 @@ Publishing authenticates with **npm trusted publishing (OIDC)** — there is **n
    - Provider: **GitHub Actions**
    - Organization/owner: `zitadel`
    - Repository: `nextgen`
-   - Workflow filename: `ci.yml` (exact, case-sensitive)
+   - Workflow filename: `release-publish.yml` (exact, case-sensitive)
 3. Optionally, under **Publishing access**, require 2FA and disallow tokens so only this workflow can publish.
 
 While this repository is private, the workflow keeps npm provenance disabled
@@ -151,20 +191,18 @@ short-lived OIDC credentials, but npm only accepts public provenance
 attestations from public source repositories. Re-enable provenance when
 `zitadel/nextgen` is public.
 
-Changesets does not build the Go server binary. During alpha, the `release-alpha-train`
-job uses the lockstep npm version as the release train version, creates
-`v<version>`, and then runs GoReleaser so the server image and binaries publish
-into the same GitHub Release. The manual
-[`release.yml`](../.github/workflows/release.yml) workflow remains a server
-snapshot/fallback path. See
+Changesets publishes the npm packages, including `@zitadel/server`. Moon
+release tasks read the `@zitadel/server` version, create `v<version>`,
+cross-build the Go server, stage the platform npm package binaries, publish
+containers, and update the single product GitHub Release. See
 [docs/adrs/002-multi-package-release-strategy.md](../docs/adrs/002-multi-package-release-strategy.md)
-and
-[docs/adrs/023-lockstep-alpha-release-train.md](../docs/adrs/023-lockstep-alpha-release-train.md).
+and [docs/adrs/023-lockstep-alpha-release-train.md](../docs/adrs/023-lockstep-alpha-release-train.md).
 
 ## Licensing reminder
 
-npm packages published from this repo are **MIT-licensed**, not AGPL like the
-server. Public packages under `apps/cli/` and `packages/*` must set
-`"license": "MIT"` and ship a package-level `LICENSE` file before publishing.
+Most npm packages published from this repo are **MIT-licensed**. Public
+packages under `apps/cli/` and `packages/*` must set `"license": "MIT"` and
+ship a package-level `LICENSE` file before publishing. The `apps/server*`
+packages ship the AGPL server binary and use `"license": "AGPL-3.0-only"`.
 Private demo, design-system, and integration workspaces are covered by the path
 exceptions in [/LICENSING.md](../LICENSING.md) while they remain private.

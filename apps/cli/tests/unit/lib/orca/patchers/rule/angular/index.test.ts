@@ -50,10 +50,15 @@ describe("AngularPatcher.plan", () => {
   it("writes the managed root component, template, and proxy config", () => {
     const plan = new AngularPatcher().plan(ctx());
     expect(writeContents(plan, "src/app/app.ts")).toContain(MANAGED_MARKER);
-    expect(writeContents(plan, "src/app/app.html")).toContain(MANAGED_MARKER);
+    const appHtml = writeContents(plan, "src/app/app.html");
+    expect(appHtml).toContain(MANAGED_MARKER);
+    expect(appHtml).toContain(`[postSignInUrl]="'/profile'"`);
+    expect(appHtml).toContain(`[postSignOutUrl]="'/login'"`);
+    expect(
+      plan.ops.some((op) => op.kind === "edit" && op.path === "src/app/app.routes.ts"),
+    ).toBe(true);
     expect(writeContents(plan, "proxy.conf.cjs")).toContain(MANAGED_MARKER);
-    const edit = plan.ops.find((op): op is Extract<FileOp, { kind: "edit" }> => op.kind === "edit");
-    expect(edit?.path).toBe("angular.json");
+    expect(plan.ops.some((op) => op.kind === "edit" && op.path === "angular.json")).toBe(true);
   });
 
   it("adds a `dev` npm script so `npm run dev` works like the other frameworks", () => {
@@ -87,6 +92,10 @@ describe("AngularPatcher.artifacts", () => {
     });
     expect(artifacts.markedFiles).toContain("src/app/app.ts");
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-angular"]);
-    expect(artifacts.configEdits).toEqual(["angular.json", "package.json"]);
+    expect(artifacts.configEdits).toEqual([
+      "angular.json",
+      "src/app/app.routes.ts",
+      "package.json",
+    ]);
   });
 });

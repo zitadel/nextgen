@@ -205,6 +205,7 @@ export function metadataFromStart(input: {
 }): RuntimeMetadata {
   return {
     schema_version: 1,
+    backend: "docker",
     container_name: input.containerName,
     container_id: input.containerId,
     image: input.image,

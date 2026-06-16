@@ -1,0 +1,63 @@
+name: ci-docker-runtime
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-docker-runtime-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  docker-runtime:
+    runs-on: depot-ubuntu-24.04-16
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: moonrepo/setup-toolchain@v0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - uses: docker/setup-qemu-action@v4
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Build release snapshot with local container image
+        run: env -u CI -u GITHUB_ACTIONS moon run release:snapshot
+
+      - name: Run Docker fresh-app journey
+        run: |
+          version="$(node -p "require('./apps/server/package.json').version")"
+          image="ghcr.io/zitadel/nextgen:${version}-snapshot-local"
+          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- --runtime docker --framework next --image "${image}" --work-dir "${RUNNER_TEMP}/ci-docker-journey"
+
+      - name: Upload journey diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-journey-diagnostics
+          path: ${{ runner.temp }}/ci-docker-journey/diagnostics
+          if-no-files-found: ignore
+          retention-days: 7

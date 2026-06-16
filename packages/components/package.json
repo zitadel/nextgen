@@ -66,20 +66,6 @@
     "lit": "catalog:",
     "lucide": "catalog:"
   },
-  "nx": {
-    "targets": {
-      "build": {
-        "outputs": [
-          "{projectRoot}/dist"
-        ]
-      },
-      "typecheck": {
-        "dependsOn": [
-          "build"
-        ]
-      }
-    }
-  },
   "devDependencies": {
     "@tsdown/css": "catalog:",
     "@vitest/browser": "catalog:",

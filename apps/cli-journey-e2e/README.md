@@ -12,43 +12,43 @@ Next, Nuxt, React, Vue, and Angular.
 ## Local runner
 
 ```sh
-corepack pnpm run journey
+moon run workspace:journey
 ```
 
-The default mode runs the full framework matrix in parallel. It uses Docker for
-Verdaccio and for the CLI-managed local runtimes, and builds a local runtime
-image unless `--image` is provided:
+The default mode runs the full framework matrix in parallel. It uses the
+`@zitadel/server` npm binary runtime and does not require Docker:
 
 1. Ensure the Playwright Chromium browsers are installed.
-2. Build the public workspace packages.
-3. Pack package tarballs with `corepack pnpm --dir <package> pack`.
-4. Verify tarballs are installable and do not contain `catalog:` or
+2. Build and pack the public workspace packages with `moon run release:pack`.
+3. Verify tarballs are installable and do not contain `catalog:` or
    `workspace:` dependency specs.
-5. Start Verdaccio with npmjs proxying enabled.
-6. Publish tarballs to Verdaccio with `alpha` and `latest` tags.
-7. Build or use a local runtime Docker image for `zitadel start`.
-8. Create one empty app directory per selected framework in a temporary directory.
-9. Run `npx <cli-package>@alpha doctor --non-interactive --json`.
-10. Run `npx <cli-package>@alpha start --non-interactive --json`.
-11. Run `npx <cli-package>@alpha setup --framework <id> --server local --non-interactive --json`.
-12. Start each generated app on `localhost`.
-13. Run the Playwright tests with one worker per framework journey.
+4. Start Verdaccio as a Node process with npmjs proxying enabled.
+5. Publish tarballs to Verdaccio with `alpha` and `latest` tags.
+6. Install `@zitadel/cli` and `@zitadel/server` from the temporary registry.
+7. Create one empty app directory per selected framework in a temporary directory.
+8. Run `npx <cli-package>@alpha doctor --runtime binary --non-interactive --json`.
+9. Run `npx <cli-package>@alpha start --runtime binary --non-interactive --json`.
+10. Run `npx <cli-package>@alpha setup --framework <id> --server local --non-interactive --json`.
+11. Start each generated app on `localhost`.
+12. Run the Playwright tests with one worker per framework journey.
 
 ### Options
 
 ```sh
-corepack pnpm run journey -- --keep
-corepack pnpm run journey -- --work-dir /tmp/zitadel-journey
-corepack pnpm run journey -- --image nextgen:local
-corepack pnpm run journey -- --framework next
-corepack pnpm run journey -- --concurrency 2
+moon run workspace:journey -- --keep
+moon run workspace:journey -- --work-dir /tmp/zitadel-journey
+moon run workspace:journey -- --runtime docker --image nextgen:local
+moon run workspace:journey -- --framework next
+moon run workspace:journey -- --concurrency 2
 ```
 
 - `--framework <id>` runs one framework (`next`, `nuxt`, `react`, `vue`, or
   `angular`) instead of the full matrix.
 - `--concurrency <n>` controls local framework parallelism. The default is `5`.
+- `--runtime binary|docker` selects the local runtime backend. The default is
+  `binary`.
 - `--image <docker-tag>` uses an existing local runtime image instead of
-  building one.
+  building one and implies `--runtime docker`.
 - `--keep` keeps the temporary work directory after success.
 - `--work-dir <path>` uses an explicit work directory.
 
@@ -62,18 +62,17 @@ Useful environment overrides:
 
 ## CI gate
 
-The `consumer-journey-e2e` workflow job runs as a framework matrix. Each matrix
-leg does not use public Zitadel packages or GHCR images. It downloads the
-GoReleaser snapshot image and the public npm package tarballs produced by the
-same workflow, publishes those tarballs to Verdaccio, points
-`ZITADEL_LOCAL_IMAGE` at the loaded image, runs the same `npx` local setup flow,
-and runs the same Playwright project against the generated app. Private support
-packages such as design tokens are bundled into the public packages that need
-them and must not be uploaded or published.
+The required PR CI job runs the framework matrix against the default binary
+runtime. It does not use public Zitadel packages or GHCR images; it publishes
+the current workflow's package tarballs to Verdaccio and runs the same `npx`
+local setup flow against the generated app. The Docker fallback journey runs on
+`main` and by manual dispatch. Private support packages such as design tokens
+are bundled into the public packages that need them and must not be uploaded or
+published.
 
 Failure diagnostics intentionally stay small: Playwright report/output,
 doctor/start/setup JSON and stderr, local runtime metadata/logs, metadata,
-generated app `package.json` and `package-lock.json`, Verdaccio logs, and
+generated app `package.json` and lockfile, Verdaccio logs, and
 generated app logs. Do not upload generated app `node_modules` or framework
 build directories.
 

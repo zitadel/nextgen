@@ -1,18 +1,18 @@
 #!/usr/bin/env sh
-# Sync Vite build output into Go embed directories. Used by Goreleaser and CI.
+# Sync Vite build output into Go embed directories. Used by Moon release tasks and CI.
 set -eu
 
 root="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
 
 build_console() {
   if [ -f "$root/apps/console/package.json" ]; then
-    (cd "$root" && COREPACK_DEFAULT_TO_LATEST=0 corepack pnpm nx build @zitadel/console)
+    (cd "$root" && COREPACK_DEFAULT_TO_LATEST=0 corepack pnpm --filter @zitadel/console run build)
   fi
 }
 
 build_login() {
   if [ -f "$root/apps/login-ui/package.json" ]; then
-    (cd "$root" && COREPACK_DEFAULT_TO_LATEST=0 corepack pnpm nx build @zitadel/login-ui)
+    (cd "$root" && COREPACK_DEFAULT_TO_LATEST=0 corepack pnpm --filter @zitadel/login-ui run build)
   fi
 }
 

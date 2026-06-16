@@ -42,7 +42,7 @@ Each invocation prints one JSON object:
 - On failure: `code` (e.g. `E_VALIDATION`, `E_NETWORK`, `E_CONFLICT`) and
   `message`.
 - `next_commands`: the suggested follow-ups. Prefer these over free-text hints.
-- `E_LOCAL_SERVER_NOT_RUNNING`: start the local Docker runtime with
+- `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime with
   `npx @zitadel/cli@alpha start`, then retry with `--server local`.
 
 Exit codes mirror the error class (3 = validation, 4 = network, 5 = conflict,
@@ -65,25 +65,24 @@ layer, not the envelope.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
 - `doctor` — verify generated app files and local state once `zitadel.json`
-  exists. Local Docker runtime prerequisites are advisory warnings unless an
-  existing managed runtime is unhealthy; `--fix` re-applies missing managed
-  files.
-- `status` — summarize the local Docker runtime and project state.
+  exists. The default local runtime is the `@zitadel/server` npm binary;
+  Docker checks apply only when using `--runtime docker` or `--image`.
+  `--fix` re-applies missing managed files.
+- `status` — summarize the local runtime and project state.
 - `eject` (alias `uninstall`) — remove managed files and local Zitadel state;
   requires `--force` when non-interactive.
-- `start` — start the managed local Zitadel container and persist runtime
-  metadata under `.zitadel/local/runtime.json`.
-- `stop` — stop/remove the managed container while preserving
+- `start` — start the managed local Zitadel server and persist runtime metadata
+  under `.zitadel/local/runtime.json`. Use `--runtime docker` or `--image` for
+  the Docker backend.
+- `stop` — stop the managed runtime while preserving
   `.zitadel/local/nextgen-data`.
-- `logs` — print managed container logs; `--follow` streams in human mode.
-- `reset` — stop/remove the managed container and delete local runtime data;
+- `logs` — print managed runtime logs; `--follow` streams in human mode.
+- `reset` — stop/remove the managed runtime and delete local runtime data;
   requires `--force` when non-interactive.
 
-Alpha releases are lockstep trains. `npx @zitadel/cli@alpha start` runs the
-latest tested alpha server image, and
-`npx @zitadel/cli@0.1.0-alpha.N start` runs
-`ghcr.io/zitadel/nextgen:0.1.0-alpha.N`. `zitadel start --image <ref>` remains
-the explicit image override for debugging.
+Alpha releases are fixed product package trains. `npx @zitadel/cli@alpha start`
+uses the matching `@zitadel/server` package by default. `zitadel start --runtime
+docker --image <ref>` remains the explicit image override for debugging.
 
 ## Golden path
 
@@ -138,7 +137,7 @@ the user menu button if needed, then pierce to `.signout-btn`; Playwright-style
 locators may use `zitadel-logout .signout-btn`. The canonical component hook
 list lives in `packages/components/README.md`.
 
-The checked-in automated regression path is `corepack pnpm run journey`, which
+The checked-in automated regression path is `moon run workspace:journey`, which
 exercises fresh-app setup plus registration, logout, and login across the
 supported frameworks.
 

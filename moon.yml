@@ -1,0 +1,37 @@
+id: "workspace"
+language: "javascript"
+layer: "tool"
+stack: "infrastructure"
+
+tasks:
+  doctor:
+    command: "node scripts/doctor.mjs"
+    options:
+      cache: false
+      runInCI: false
+
+  cli:
+    command: "node scripts/run-cli.mjs"
+    options:
+      cache: false
+      interactive: true
+      runInCI: false
+
+  server:
+    command: "node scripts/run-server.mjs"
+    options:
+      cache: false
+      persistent: true
+      runInCI: false
+
+  journey:
+    command: "node scripts/run-journey.mjs"
+    options:
+      cache: false
+      runInCI: false
+
+  check:
+    command: "node scripts/check.mjs"
+    options:
+      cache: false
+      runInCI: false

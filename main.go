@@ -6,9 +6,8 @@ import (
 	"github.com/zitadel/nextgen/cmd/server"
 )
 
-// version, commit, and date are populated at build time via -ldflags
-// (see .goreleaser.yaml) and consumed by the cobra root command that
-// will be wired up together with the cmd/server subcommand.
+// version, commit, and date are populated at build time via -ldflags by the
+// Moon release tasks and consumed by the cobra root command.
 var (
 	version = "dev"
 	commit  = "none"

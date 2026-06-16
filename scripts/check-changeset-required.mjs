@@ -11,6 +11,12 @@ import { execFileSync } from "node:child_process";
 
 const publishableRoots = [
   "apps/cli/",
+  "apps/server/",
+  "apps/server-linux-x64/",
+  "apps/server-linux-arm64/",
+  "apps/server-darwin-x64/",
+  "apps/server-darwin-arm64/",
+  "apps/server-win32-x64/",
   "packages/api/",
   "packages/components/",
   "packages/sdk-core/",
