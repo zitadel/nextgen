@@ -8,13 +8,9 @@
     "skipLibCheck": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
-    "customConditions": [
-      "@zitadel/source"
-    ]
+    "customConditions": ["@zitadel/source"]
   },
-  "include": [
-    "src"
-  ],
+  "include": ["src"],
   "references": [
     {
       "path": "../sdk-core"

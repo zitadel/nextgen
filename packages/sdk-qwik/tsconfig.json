@@ -10,13 +10,9 @@
     "emitDeclarationOnly": true,
     "skipLibCheck": true,
     "outDir": "lib-types",
-    "customConditions": [
-      "@zitadel/source"
-    ]
+    "customConditions": ["@zitadel/source"]
   },
-  "include": [
-    "src"
-  ],
+  "include": ["src"],
   "references": [
     {
       "path": "../sdk-core"
