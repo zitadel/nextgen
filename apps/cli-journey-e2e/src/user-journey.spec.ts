@@ -143,26 +143,8 @@ async function skipPasskeyUpsellIfVisible(page: Page): Promise<void> {
 }
 
 async function expectSignedIn(page: Page): Promise<void> {
-  if (expectsProtectedRouteRedirect) {
-    await expect(page).toHaveURL(profileUrl, { timeout: 30_000 });
-  } else {
-    await expect(signedInLocator(page).first()).toBeVisible({ timeout: 30_000 });
-    if (!profileUrl.test(page.url())) {
-      await gotoProfile(page);
-    }
-  }
+  await expect(page).toHaveURL(profileUrl, { timeout: 30_000 });
   await expect(signedInLocator(page).first()).toBeVisible({ timeout: 30_000 });
-}
-
-async function gotoProfile(page: Page): Promise<void> {
-  await page.goto("/profile").catch(async (error: unknown) => {
-    if (!isInterruptedByProfileNavigation(error) && !profileUrl.test(page.url())) {
-      throw error;
-    }
-    if (!profileUrl.test(page.url())) {
-      await page.waitForURL(profileUrl, { timeout: 5000 });
-    }
-  });
 }
 
 async function expectSessionCookie(page: Page): Promise<void> {
@@ -330,13 +312,6 @@ function isInterruptedByLoginNavigation(error: unknown): boolean {
   return (
     error instanceof Error &&
     isExpectedNavigationRace(error.message, "/login")
-  );
-}
-
-function isInterruptedByProfileNavigation(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    isExpectedNavigationRace(error.message, "/profile")
   );
 }
 

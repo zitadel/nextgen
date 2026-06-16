@@ -1,0 +1,42 @@
+id: "cli"
+language: "typescript"
+layer: "tool"
+stack: "frontend"
+dependsOn:
+  - "api"
+  - "api-mock"
+  - "sdk-next"
+
+tasks:
+  lint:
+    command: "corepack pnpm exec oxlint ."
+    deps:
+      - "api:build"
+      - "sdk-next:build"
+
+  typecheck:
+    command: "corepack pnpm run typecheck"
+    deps:
+      - "api:build"
+      - "sdk-next:build"
+
+  build:
+    command: "corepack pnpm run build"
+    deps:
+      - "api:build"
+      - "sdk-next:build"
+    outputs:
+      - "dist/**/*"
+
+  test:
+    command: "corepack pnpm run test"
+    deps:
+      - "build"
+      - "api-mock:build"
+
+  readme:
+    command: "corepack pnpm run readme"
+    deps:
+      - "build"
+    options:
+      runInCI: false

@@ -1,4 +1,3 @@
-import { nxViteTsPaths } from "@nx/vite/plugins/nx-tsconfig-paths.plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { devtools } from "@tanstack/devtools-vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
@@ -31,7 +30,6 @@ export default defineConfig(({ command }) => ({
       autoCodeSplitting: true,
     }),
     react(),
-    nxViteTsPaths(),
   ],
   build: {
     outDir: "./dist",

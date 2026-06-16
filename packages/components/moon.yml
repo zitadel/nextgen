@@ -1,0 +1,55 @@
+id: "components"
+language: "typescript"
+layer: "library"
+stack: "frontend"
+dependsOn:
+  - "api"
+  - "api-mock"
+  - "design-tokens"
+  - "shared-component-styles"
+
+tasks:
+  lint:
+    command: "corepack pnpm exec oxlint ."
+    deps:
+      - "api:build"
+      - "design-tokens:build"
+      - "shared-component-styles:build"
+
+  typecheck:
+    command: "corepack pnpm exec tsc --noEmit -p tsconfig.json"
+    deps:
+      - "api:build"
+      - "design-tokens:build"
+      - "shared-component-styles:build"
+
+  build:
+    command: "corepack pnpm run build"
+    deps:
+      - "api:build"
+      - "design-tokens:build"
+      - "shared-component-styles:build"
+    outputs:
+      - "dist/**/*"
+
+  test:
+    command: "corepack pnpm run test"
+    deps:
+      - "api:build"
+      - "api-mock:build"
+      - "design-tokens:build"
+      - "shared-component-styles:build"
+
+  test-browser:
+    command: "corepack pnpm run test:browser"
+    deps:
+      - "build"
+    options:
+      runInCI: false
+
+  dev:
+    command: "corepack pnpm run dev"
+    options:
+      persistent: true
+      runInCI: false
+

@@ -1,6 +1,5 @@
 import { resolve } from "node:path";
 
-import { nxViteTsPaths } from "@nx/vite/plugins/nx-tsconfig-paths.plugin";
 import { apiMockPublicDir } from "@zitadel/api-mock/public-dir";
 import { defineConfig } from "vite";
 import { hmrPlugin, presets } from "vite-plugin-web-components-hmr";
@@ -39,7 +38,6 @@ export default defineConfig({
   publicDir: apiMockPublicDir,
   cacheDir: "../../node_modules/.vite/packages/components",
   plugins: [
-    nxViteTsPaths(),
     // Lit atoms only — dev/pages/*.ts is plain TS (innerHTML); wc-hmr breaks its HMR.
     hmrPlugin({
       include: [resolve(packageRoot, "src/**/*.ts")],

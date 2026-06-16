@@ -16,7 +16,7 @@ automation when reproducibility matters.
 ## Requirements
 
 - Node 24+
-- Docker for the managed local Zitadel runtime (`start` / `--server local`)
+- Docker only when using the optional Docker runtime backend
 - A Next.js project, or an empty directory where setup can scaffold one
 
 ## Quickstart
@@ -30,13 +30,10 @@ npx @zitadel/cli@alpha setup --server local
 npm run dev
 ```
 
-`start` runs a Docker-backed local Zitadel server and stores runtime data
-under `.zitadel/local/`. If Docker is not running, start Docker Desktop, Docker
-Engine, or Colima and rerun `doctor`; remote-server setup can use
-`--server <url>` without Docker. Alpha CLI versions use the matching
-`ghcr.io/zitadel/nextgen:<cli-version>` image by default; local/dev builds fall
-back to `ghcr.io/zitadel/nextgen:latest`. Override with `--image` or
-`ZITADEL_LOCAL_IMAGE` for advanced debugging.
+`start` runs the `@zitadel/server` npm binary by default and stores runtime data
+under `.zitadel/local/`. Remote-server setup can use `--server <url>` without
+starting a local runtime. Use `--runtime docker`, `--image`, or
+`ZITADEL_LOCAL_IMAGE` for advanced Docker backend debugging.
 `setup --server local` creates a project on that local server, asks which
 framework to scaffold when the directory is fresh, writes the Next.js app into
 the current directory, scaffolds `app/login`, `app/register`, `app/profile`, and
@@ -65,12 +62,12 @@ passkey can sign in with either credential.
 
 ## Other commands
 
-- `zitadel doctor` — verify the local Docker runtime and generated project files
-- `zitadel status` — summarise the local Docker runtime and project
+- `zitadel doctor` — verify the local runtime and generated project files
+- `zitadel status` — summarise the local runtime and project
 - `zitadel plan` — validate config and preview sync changes without mutation
 - `zitadel apply` — validate and upload repo config to Zitadel
 - `zitadel eject` — remove what setup wrote (alias: `zitadel uninstall`)
-- `zitadel start|stop|logs|reset` — manage the local Docker runtime
+- `zitadel start|stop|logs|reset` — manage the local runtime
 
 ## Reference
 
@@ -190,7 +187,7 @@ Verify local runtime and project state.
 ```
 USAGE
   $ zitadel doctor [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [--fix]
-    [--image <value>] [--port <value>]
+    [--image <value>] [--port <value>] [--runtime binary|docker]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -202,6 +199,8 @@ FLAGS
       --fix              Re-apply missing managed files.
       --image=<value>    Container image to check.
       --port=<value>     [default: 8080] Local HTTP port.
+      --runtime=<option> Local runtime backend.
+                         <options: binary|docker>
       --verbose          Verbose logging.
 
 GLOBAL FLAGS
@@ -396,7 +395,7 @@ Start a local Zitadel server.
 ```
 USAGE
   $ zitadel start [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [--image
-    <value>] [--port <value>]
+    <value>] [--port <value>] [--runtime binary|docker]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -407,6 +406,8 @@ FLAGS
       --dry-run          Preview without mutating files or the platform.
       --image=<value>    Container image to run.
       --port=<value>     [default: 8080] Local HTTP port.
+      --runtime=<option> Local runtime backend.
+                         <options: binary|docker>
       --verbose          Verbose logging.
 
 GLOBAL FLAGS

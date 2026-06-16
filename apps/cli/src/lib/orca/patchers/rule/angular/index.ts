@@ -5,6 +5,7 @@ import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
 import { angularProxyEdit } from "./angular-json";
+import { angularRoutesEdit } from "./angular-routes";
 import { appComponentTemplate, appTemplateHtml, proxyConfTemplate } from "./templates";
 
 const SDK_DEPENDENCY = "@zitadel/sdk-angular";
@@ -57,6 +58,7 @@ export class AngularPatcher extends AbstractRulePatcher {
         contents: appComponentTemplate(ctx.project.id),
       },
       { kind: "write", path: "src/app/app.html", contents: appTemplateHtml() },
+      { kind: "edit", path: "src/app/app.routes.ts", edit: angularRoutesEdit() },
       { kind: "write", path: "proxy.conf.cjs", contents: proxyConfTemplate() },
       {
         kind: "edit",
@@ -81,16 +83,17 @@ export class AngularPatcher extends AbstractRulePatcher {
   }
 
   protected override routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
-    // Both files are touched via `edit` ops eject can't auto-revert: the proxy
-    // wired into angular.json and the `dev` script added to package.json.
-    return ["angular.json", "package.json"];
+    // These files are touched via `edit` ops eject can't auto-revert: the proxy
+    // wired into angular.json, auth paths added to app.routes.ts, and the `dev`
+    // script added to package.json.
+    return ["angular.json", "src/app/app.routes.ts", "package.json"];
   }
 
   protected summary(_ctx: PatchContext): { title: string; detail: string } {
     return {
       title: "Angular integration",
       detail:
-        "Wrote the app root component + proxy.conf.cjs and wired the /__nextgen dev proxy into angular.json.",
+        "Wrote the app root component + proxy.conf.cjs, added auth routes, and wired the /__nextgen dev proxy into angular.json.",
     };
   }
 }

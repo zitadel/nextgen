@@ -1,0 +1,34 @@
+projects:
+  sources:
+    server: "apps/server"
+    workspace: "."
+    release: "tools/release"
+    cli: "apps/cli"
+    cli-journey-e2e: "apps/cli-journey-e2e"
+    console: "apps/console"
+    console-e2e: "apps/console-e2e"
+    demo-next: "apps/demo-next"
+    demo-next-e2e: "apps/demo-next-e2e"
+    demo-nuxt: "apps/demo-nuxt"
+    demo-nuxt-e2e: "apps/demo-nuxt-e2e"
+    login-ui: "apps/login-ui"
+    api: "packages/api"
+    api-mock: "packages/api-mock"
+    components: "packages/components"
+    design-tokens: "packages/design-tokens"
+    sdk-angular: "packages/sdk-angular"
+    sdk-core: "packages/sdk-core"
+    sdk-next: "packages/sdk-next"
+    sdk-nuxt: "packages/sdk-nuxt"
+    sdk-react: "packages/sdk-react"
+    sdk-vue: "packages/sdk-vue"
+    shared-component-styles: "packages/shared-component-styles"
+    ui-react: "packages/ui-react"
+
+vcs:
+  defaultBranch: "main"
+
+pipeline:
+  installDependencies: false
+
+telemetry: false
