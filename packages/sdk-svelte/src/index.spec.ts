@@ -1,4 +1,8 @@
 // @vitest-environment jsdom
+import {
+  ZITADEL_LOGIN_EVENT_HANDLERS,
+  ZITADEL_LOGOUT_EVENT_HANDLERS,
+} from '@zitadel/sdk-core/types';
 import { flushSync, mount, unmount } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -54,21 +58,24 @@ describe('ZitadelLogin', () => {
     unmount(component);
   });
 
-  it('forwards zitadel-flow-step as onFlowStep(detail)', () => {
-    const target = document.createElement('div');
-    document.body.appendChild(target);
-    const onFlowStep = vi.fn();
-    const component = mount(ZitadelLogin, {
-      target,
-      props: { project, purpose: 'login', onFlowStep },
-    });
-    flushSync();
-    const el = target.querySelector('zitadel-login');
-    const detail = { step: { kind: 'register' } };
-    el?.dispatchEvent(new CustomEvent('zitadel-flow-step', { detail }));
-    expect(onFlowStep).toHaveBeenCalledWith(detail);
-    unmount(component);
-  });
+  it.each(Object.entries(ZITADEL_LOGIN_EVENT_HANDLERS))(
+    'forwards %s to its callback',
+    (eventName, handlerProp) => {
+      const target = document.createElement('div');
+      document.body.appendChild(target);
+      const spy = vi.fn();
+      const component = mount(ZitadelLogin, {
+        target,
+        props: { project, [handlerProp]: spy },
+      });
+      flushSync();
+      const el = target.querySelector('zitadel-login');
+      const detail = { probe: eventName };
+      el?.dispatchEvent(new CustomEvent(eventName, { detail }));
+      expect(spy).toHaveBeenCalledWith(detail);
+      unmount(component);
+    },
+  );
 });
 
 describe('ZitadelLogout', () => {
@@ -97,19 +104,22 @@ describe('ZitadelLogout', () => {
     unmount(component);
   });
 
-  it('forwards zitadel-signout as onSignout(detail)', () => {
-    const target = document.createElement('div');
-    document.body.appendChild(target);
-    const onSignout = vi.fn();
-    const component = mount(ZitadelLogout, {
-      target,
-      props: { project, onSignout },
-    });
-    flushSync();
-    const el = target.querySelector('zitadel-logout');
-    const detail = { name: 'Ada', email: 'ada@example.com' };
-    el?.dispatchEvent(new CustomEvent('zitadel-signout', { detail }));
-    expect(onSignout).toHaveBeenCalledWith(detail);
-    unmount(component);
-  });
+  it.each(Object.entries(ZITADEL_LOGOUT_EVENT_HANDLERS))(
+    'forwards %s to its callback',
+    (eventName, handlerProp) => {
+      const target = document.createElement('div');
+      document.body.appendChild(target);
+      const spy = vi.fn();
+      const component = mount(ZitadelLogout, {
+        target,
+        props: { project, [handlerProp]: spy },
+      });
+      flushSync();
+      const el = target.querySelector('zitadel-logout');
+      const detail = { probe: eventName };
+      el?.dispatchEvent(new CustomEvent(eventName, { detail }));
+      expect(spy).toHaveBeenCalledWith(detail);
+      unmount(component);
+    },
+  );
 });

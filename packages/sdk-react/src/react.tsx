@@ -1,6 +1,3 @@
-import type { ZitadelProject } from '@zitadel/api/config';
-import type { CreateFlowBodyPurpose } from '@zitadel/api/generated/model';
-
 import { createComponent, type EventName } from '@lit/react';
 import {
   ZitadelLogin as ZitadelLoginElement,
@@ -13,6 +10,8 @@ import type {
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,
   ZitadelFlowStepDetail,
+  ZitadelLoginProps,
+  ZitadelLogoutProps,
   ZitadelSignoutDetail,
 } from './types';
 
@@ -72,25 +71,8 @@ const ZitadelLogoutElementReact = createComponent({
 });
 
 /**
- * Props for {@link ZitadelLogin}. Supply the SDK handle via {@link project}, or
- * the discrete {@link projectId} / {@link proxyPath} the widget reads as
- * attributes — the widget uses whichever is present.
- */
-export interface ZitadelLoginProps {
-  readonly project?: ZitadelProject;
-  readonly projectId?: string;
-  readonly proxyPath?: string;
-  readonly purpose?: CreateFlowBodyPurpose;
-  readonly postSignInUrl?: string;
-  readonly onFlowStep?: (detail: ZitadelFlowStepDetail) => void;
-  readonly onFlowInput?: (detail: ZitadelFlowInputDetail) => void;
-  readonly onFlowComplete?: (detail: ZitadelFlowCompleteDetail) => void;
-  readonly onFlowError?: (detail: ZitadelFlowErrorDetail) => void;
-}
-
-/**
  * React component wrapping the `<zitadel-login>` web component. Binds the
- * {@link ZitadelProject} handle as a DOM property (or the discrete project id /
+ * `ZitadelProject` handle as a DOM property (or the discrete project id /
  * proxy path as attributes) and forwards the widget's `zitadel-*` events as
  * optional callbacks.
  */
@@ -117,21 +99,8 @@ export function ZitadelLogin({
 }
 
 /**
- * Props for {@link ZitadelLogout}. Supply the SDK handle via {@link project}, or
- * the discrete {@link projectId} / {@link proxyPath} the widget reads as
- * attributes — the widget uses whichever is present.
- */
-export interface ZitadelLogoutProps {
-  readonly project?: ZitadelProject;
-  readonly projectId?: string;
-  readonly proxyPath?: string;
-  readonly postSignOutUrl?: string;
-  readonly onSignout?: (detail: ZitadelSignoutDetail) => void;
-}
-
-/**
  * React component wrapping the `<zitadel-logout>` web component. Binds the
- * {@link ZitadelProject} handle as a DOM property (or the discrete project id /
+ * `ZitadelProject` handle as a DOM property (or the discrete project id /
  * proxy path as attributes) and forwards the widget's `zitadel-signout` event
  * as an optional callback.
  */

@@ -4,6 +4,8 @@ export type {
   ZitadelFlowCompleteDetail,
   ZitadelFlowErrorDetail,
   ZitadelSignoutDetail,
+  ZitadelLoginProps,
+  ZitadelLogoutProps,
   NextgenSession,
   AuthState,
   UnauthState,

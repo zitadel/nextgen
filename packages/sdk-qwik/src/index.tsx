@@ -1,4 +1,9 @@
-import type { CreateFlowBodyPurpose } from '@zitadel/api/generated/model';
+import type {
+  ZitadelLoginConfig,
+  ZitadelLoginHandlers,
+  ZitadelLogoutConfig,
+  ZitadelLogoutHandlers,
+} from '@zitadel/sdk-core/types';
 
 import {
   component$,
@@ -6,6 +11,7 @@ import {
   useVisibleTask$,
   type QRL,
 } from '@builder.io/qwik';
+import '@zitadel/components';
 import {
   configureZitadel,
   getApi,
@@ -13,15 +19,6 @@ import {
   type ZitadelConfig,
   type ZitadelProject,
 } from '@zitadel/api/config';
-import '@zitadel/components';
-
-import type {
-  ZitadelFlowCompleteDetail,
-  ZitadelFlowErrorDetail,
-  ZitadelFlowInputDetail,
-  ZitadelFlowStepDetail,
-  ZitadelSignoutDetail,
-} from './types';
 
 export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
@@ -46,21 +43,27 @@ function eventDetail<T>(event: Event): T {
 }
 
 /**
- * Props for {@link ZitadelLogin}. Supply the SDK handle via {@link project}, or
- * the discrete {@link projectId} / {@link proxyPath} the widget reads as
- * properties — the widget uses whichever is present.
+ * Wraps each plain-callback handler from the shared SPA contract in a Qwik
+ * {@link QRL} and suffixes the prop name with `$`, so the Qwik prop set is
+ * derived from `@zitadel/sdk-core` and can never drift from the events the
+ * widget emits. Adding a contract event surfaces a new `on…$` QRL prop here.
  */
-export interface ZitadelLoginProps {
-  readonly project?: ZitadelProject;
-  readonly projectId?: string;
-  readonly proxyPath?: string;
-  readonly purpose?: CreateFlowBodyPurpose;
-  readonly postSignInUrl?: string;
-  readonly onFlowStep$?: QRL<(detail: ZitadelFlowStepDetail) => void>;
-  readonly onFlowInput$?: QRL<(detail: ZitadelFlowInputDetail) => void>;
-  readonly onFlowComplete$?: QRL<(detail: ZitadelFlowCompleteDetail) => void>;
-  readonly onFlowError$?: QRL<(detail: ZitadelFlowErrorDetail) => void>;
-}
+type Qrlify<H> = {
+  readonly [K in keyof H as `${K & string}$`]?: H[K] extends
+    | ((detail: infer D) => void)
+    | undefined
+    ? QRL<(detail: D) => void>
+    : never;
+};
+
+/**
+ * Props for {@link ZitadelLogin}. Supply the SDK handle via {@link project}, or
+ * the discrete `projectId` / `proxyPath` the widget reads as properties — the
+ * widget uses whichever is present. The `on…$` QRL callbacks are derived from
+ * the shared {@link ZitadelLoginHandlers} contract.
+ */
+export type ZitadelLoginProps = ZitadelLoginConfig &
+  Qrlify<ZitadelLoginHandlers>;
 
 /**
  * Qwik component wrapping the `<zitadel-login>` web component. Binds the
@@ -108,16 +111,12 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
 
 /**
  * Props for {@link ZitadelLogout}. Supply the SDK handle via {@link project}, or
- * the discrete {@link projectId} / {@link proxyPath} the widget reads as
- * properties — the widget uses whichever is present.
+ * the discrete `projectId` / `proxyPath` the widget reads as properties — the
+ * widget uses whichever is present. The `on…$` QRL callbacks are derived from
+ * the shared {@link ZitadelLogoutHandlers} contract.
  */
-export interface ZitadelLogoutProps {
-  readonly project?: ZitadelProject;
-  readonly projectId?: string;
-  readonly proxyPath?: string;
-  readonly postSignOutUrl?: string;
-  readonly onSignout$?: QRL<(detail: ZitadelSignoutDetail) => void>;
-}
+export type ZitadelLogoutProps = ZitadelLogoutConfig &
+  Qrlify<ZitadelLogoutHandlers>;
 
 /**
  * Qwik component wrapping the `<zitadel-logout>` web component. Binds the

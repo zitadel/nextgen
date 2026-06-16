@@ -1,5 +1,9 @@
 // @vitest-environment jsdom
 import { cleanup, render } from '@testing-library/react';
+import {
+  ZITADEL_LOGIN_EVENT_HANDLERS,
+  ZITADEL_LOGOUT_EVENT_HANDLERS,
+} from '@zitadel/sdk-core/types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ZitadelLogin, ZitadelLogout } from './react';
@@ -36,16 +40,19 @@ describe('ZitadelLogin', () => {
     expect(el!.proxyPath).toBe('/__nextgen');
   });
 
-  it('forwards zitadel-flow-step as onFlowStep(detail)', () => {
-    const onFlowStep = vi.fn();
-    const { container } = render(
-      <ZitadelLogin project={project} onFlowStep={onFlowStep} />,
-    );
-    const el = container.querySelector('zitadel-login');
-    const detail = { step: { kind: 'register' } };
-    el?.dispatchEvent(new CustomEvent('zitadel-flow-step', { detail }));
-    expect(onFlowStep).toHaveBeenCalledWith(detail);
-  });
+  it.each(Object.entries(ZITADEL_LOGIN_EVENT_HANDLERS))(
+    'forwards %s to its callback',
+    (eventName, handlerProp) => {
+      const spy = vi.fn();
+      const { container } = render(
+        <ZitadelLogin project={project} {...{ [handlerProp]: spy }} />,
+      );
+      const el = container.querySelector('zitadel-login');
+      const detail = { probe: eventName };
+      el?.dispatchEvent(new CustomEvent(eventName, { detail }));
+      expect(spy).toHaveBeenCalledWith(detail);
+    },
+  );
 });
 
 describe('ZitadelLogout', () => {
@@ -65,14 +72,17 @@ describe('ZitadelLogout', () => {
     expect(el!.proxyPath).toBe('/__nextgen');
   });
 
-  it('forwards zitadel-signout as onSignout(detail)', () => {
-    const onSignout = vi.fn();
-    const { container } = render(
-      <ZitadelLogout project={project} onSignout={onSignout} />,
-    );
-    const el = container.querySelector('zitadel-logout');
-    const detail = { name: 'Ada', email: 'ada@example.com' };
-    el?.dispatchEvent(new CustomEvent('zitadel-signout', { detail }));
-    expect(onSignout).toHaveBeenCalledWith(detail);
-  });
+  it.each(Object.entries(ZITADEL_LOGOUT_EVENT_HANDLERS))(
+    'forwards %s to its callback',
+    (eventName, handlerProp) => {
+      const spy = vi.fn();
+      const { container } = render(
+        <ZitadelLogout project={project} {...{ [handlerProp]: spy }} />,
+      );
+      const el = container.querySelector('zitadel-logout');
+      const detail = { probe: eventName };
+      el?.dispatchEvent(new CustomEvent(eventName, { detail }));
+      expect(spy).toHaveBeenCalledWith(detail);
+    },
+  );
 });

@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { $, render } from '@builder.io/qwik';
+import {
+  ZITADEL_LOGIN_EVENT_HANDLERS,
+  ZITADEL_LOGOUT_EVENT_HANDLERS,
+} from '@zitadel/sdk-core/types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@zitadel/components';
-
-import type { ZitadelFlowStepDetail, ZitadelSignoutDetail } from './types';
 
 import { ZitadelLogin, ZitadelLogout } from './index';
 
@@ -54,26 +56,31 @@ describe('ZitadelLogin', () => {
     expect(el!.proxyPath).toBe('/__nextgen');
   });
 
-  it('forwards zitadel-flow-step as onFlowStep$(detail)', async () => {
-    const received: ZitadelFlowStepDetail[] = [];
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    await render(
-      host,
-      <ZitadelLogin
-        project={project}
-        onFlowStep$={$((detail) => {
-          received.push(detail);
-        })}
-      />,
-    );
-    await tick();
-    const el = host.querySelector('zitadel-login');
-    const detail = { step: { kind: 'register' } };
-    el?.dispatchEvent(new CustomEvent('zitadel-flow-step', { detail }));
-    await tick();
-    expect(received).toEqual([detail]);
-  });
+  it.each(Object.entries(ZITADEL_LOGIN_EVENT_HANDLERS))(
+    'forwards %s to its callback',
+    async (eventName, handlerProp) => {
+      const received: Record<string, unknown>[] = [];
+      const host = document.createElement('div');
+      document.body.appendChild(host);
+      await render(
+        host,
+        <ZitadelLogin
+          project={project}
+          {...{
+            [`${handlerProp}$`]: $((detail: Record<string, unknown>) => {
+              received.push(detail);
+            }),
+          }}
+        />,
+      );
+      await tick();
+      const el = host.querySelector('zitadel-login');
+      const detail = { probe: eventName };
+      el?.dispatchEvent(new CustomEvent(eventName, { detail }));
+      await tick();
+      expect(received).toEqual([detail]);
+    },
+  );
 });
 
 describe('ZitadelLogout', () => {
@@ -98,24 +105,29 @@ describe('ZitadelLogout', () => {
     expect(el!.proxyPath).toBe('/__nextgen');
   });
 
-  it('forwards zitadel-signout as onSignout$(detail)', async () => {
-    const received: ZitadelSignoutDetail[] = [];
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    await render(
-      host,
-      <ZitadelLogout
-        project={project}
-        onSignout$={$((detail) => {
-          received.push(detail);
-        })}
-      />,
-    );
-    await tick();
-    const el = host.querySelector('zitadel-logout');
-    const detail = { name: 'Ada', email: 'ada@example.com' };
-    el?.dispatchEvent(new CustomEvent('zitadel-signout', { detail }));
-    await tick();
-    expect(received).toEqual([detail]);
-  });
+  it.each(Object.entries(ZITADEL_LOGOUT_EVENT_HANDLERS))(
+    'forwards %s to its callback',
+    async (eventName, handlerProp) => {
+      const received: Record<string, unknown>[] = [];
+      const host = document.createElement('div');
+      document.body.appendChild(host);
+      await render(
+        host,
+        <ZitadelLogout
+          project={project}
+          {...{
+            [`${handlerProp}$`]: $((detail: Record<string, unknown>) => {
+              received.push(detail);
+            }),
+          }}
+        />,
+      );
+      await tick();
+      const el = host.querySelector('zitadel-logout');
+      const detail = { probe: eventName };
+      el?.dispatchEvent(new CustomEvent(eventName, { detail }));
+      await tick();
+      expect(received).toEqual([detail]);
+    },
+  );
 });

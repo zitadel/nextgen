@@ -14,6 +14,8 @@ import type {
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,
   ZitadelFlowStepDetail,
+  ZitadelLoginProps,
+  ZitadelLogoutProps,
   ZitadelSignoutDetail,
 } from './types';
 
@@ -58,23 +60,6 @@ export type { ZitadelConfig, ZitadelProject };
 export * from './types';
 
 /**
- * Props for {@link ZitadelLogin}. Supply the SDK handle via {@link project}, or
- * the discrete {@link projectId} / {@link proxyPath} the widget reads as
- * attributes — the widget uses whichever is present.
- */
-export interface ZitadelLoginProps {
-  readonly project?: ZitadelProject;
-  readonly projectId?: string;
-  readonly proxyPath?: string;
-  readonly purpose?: string;
-  readonly postSignInUrl?: string;
-  readonly onFlowStep?: (detail: ZitadelFlowStepDetail) => void;
-  readonly onFlowInput?: (detail: ZitadelFlowInputDetail) => void;
-  readonly onFlowComplete?: (detail: ZitadelFlowCompleteDetail) => void;
-  readonly onFlowError?: (detail: ZitadelFlowErrorDetail) => void;
-}
-
-/**
  * Solid component wrapping the `<zitadel-login>` web component. Binds the
  * {@link ZitadelProject} handle as a DOM property (or the discrete project id /
  * proxy path as attributes) and forwards the widget's `zitadel-*` events as
@@ -94,19 +79,6 @@ export function ZitadelLogin(props: ZitadelLoginProps): JSX.Element {
       on:zitadel-flow-error={(event) => props.onFlowError?.(event.detail)}
     />
   );
-}
-
-/**
- * Props for {@link ZitadelLogout}. Supply the SDK handle via {@link project}, or
- * the discrete {@link projectId} / {@link proxyPath} the widget reads as
- * attributes — the widget uses whichever is present.
- */
-export interface ZitadelLogoutProps {
-  readonly project?: ZitadelProject;
-  readonly projectId?: string;
-  readonly proxyPath?: string;
-  readonly postSignOutUrl?: string;
-  readonly onSignout?: (detail: ZitadelSignoutDetail) => void;
 }
 
 /**
