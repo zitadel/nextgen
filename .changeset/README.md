@@ -150,12 +150,13 @@ update a "Version Packages" PR aggregating pending changesets. It uses the
 release GitHub App token rather than the default `GITHUB_TOKEN`, so the version
 PR triggers the required `full-pr` check normally. After that PR merges and CI
 is green, the same workflow detects the generated version commit, runs Moon
-release tasks, publishes npm packages with `changeset publish`, pushes server
-containers, and updates the product GitHub Release. Manual workflow dispatch is
+release tasks, publishes npm packages with `changeset publish`, and pushes
+server containers. Manual workflow dispatch is
 available for dry-runs. Use `release-publish` with `recover_version=<version>`
-when npm publishing may not have completed for an already-versioned release; use
-`release-recover` only after npm publishing is already handled and the remaining
-work is container or product GitHub Release recovery.
+to recover any missing publish-side artifact for an already-versioned release.
+`changeset publish` publishes only package versions that are not already present
+on npm, so the same recovery path is used whether npm packages or containers
+are missing.
 
 Publishing authenticates with **npm trusted publishing (OIDC)** — there is **no `NPM_TOKEN`** secret. Before the first automated publish, a maintainer must, once per public package:
 
@@ -174,9 +175,9 @@ attestations from public source repositories. Re-enable provenance when
 `zitadel/nextgen` is public.
 
 Changesets publishes the npm packages, including `@zitadel/server`. Moon
-release tasks read the `@zitadel/server` version, create `v<version>`,
-cross-build the Go server, stage the platform npm package binaries, publish
-containers, and update the single product GitHub Release. See
+release tasks read the `@zitadel/server` version, cross-build the Go server,
+stage the platform npm package binaries, and publish containers. Product
+GitHub Release notes are created manually by maintainers when needed. See
 [docs/adrs/002-multi-package-release-strategy.md](../docs/adrs/002-multi-package-release-strategy.md)
 and [docs/adrs/023-lockstep-alpha-release-train.md](../docs/adrs/023-lockstep-alpha-release-train.md).
 

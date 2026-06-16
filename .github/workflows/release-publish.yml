@@ -19,12 +19,12 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Build and verify without publishing."
+        description: "Dry run: build and verify only. Uncheck to allow publishing."
         required: true
         default: true
         type: boolean
       recover_version:
-        description: "Exact already-versioned release to recover, for example 0.1.0-alpha.8. Leave empty for normal publish detection."
+        description: "Exact already-versioned release to recover through the publish path, for example 0.1.0-alpha.8. Leave empty for normal publish detection."
         required: false
         default: ""
         type: string
@@ -134,6 +134,12 @@ jobs:
 
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
+
+      - name: Configure Changesets git tag author
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && ! inputs.dry_run) }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Publish dry run
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
