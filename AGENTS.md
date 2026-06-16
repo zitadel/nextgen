@@ -161,12 +161,13 @@ Use `moon run workspace:journey` for deterministic CI-style proof of the
 fresh-app path. Use `moon run workspace:cli -- ...` for manual browser or agent
 experiments against the same local package train.
 
-In CI the required PR runtime gate is `ci / validate`: it consumes current
-workflow npm package tarballs instead of public Zitadel packages and exercises
-the default npm-binary local runtime. The Docker fallback journey runs in the
-`ci-docker-runtime` workflow on `main` and by manual dispatch. The checked-in
-demo integrations, raw binary embedded-postgres smoke, and documented
-quick-start compose smoke remain release-surface confidence checks.
+In CI the required PR checks are `changesets / status` and `ci / full-pr`.
+`ci / full-pr` consumes current workflow npm package tarballs instead of public
+Zitadel packages and exercises the default npm-binary local runtime. The Docker
+fallback journey runs in the `ci-docker-runtime` workflow on `main` and by
+manual dispatch. The checked-in demo integrations, raw binary embedded-postgres
+smoke, and documented quick-start compose smoke remain release-surface
+confidence checks.
 
 ## Testing Layers
 
@@ -247,7 +248,7 @@ When a PR touches [publishable npm packages](.changeset/README.md#publishable-np
 selected `packages/*` paths), follow the
 [decision table](.changeset/README.md#decision-table) and workflow in
 [`.changeset/README.md`](.changeset/README.md). Verify locally with
-`node scripts/check-changeset-required.mjs --base origin/main`.
+`moon run release:changesets -- --base origin/main --summary`.
 
 The public packages are `@zitadel/cli`, `@zitadel/server`, the
 `@zitadel/server-*` platform packages, `@zitadel/api`, `@zitadel/components`,

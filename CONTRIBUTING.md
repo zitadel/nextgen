@@ -10,15 +10,16 @@
 
 ### I am contributing to Zitadel
 
-| I want to...                       | Run                                      |
-| ---------------------------------- | ---------------------------------------- |
-| Check my setup                     | `moon run workspace:doctor`              |
-| Try the local Zitadel CLI          | `moon run workspace:cli -- --help`       |
-| Run the server from source         | `moon run workspace:server -- --help`    |
-| Test the fresh-app onboarding path | `moon run workspace:journey`             |
-| Run normal local checks            | `moon ci :lint :typecheck :build :test`  |
-| Mirror CI locally                  | `moon run workspace:check -- --full`     |
-| Rerun one failed task              | `moon run <project>:<task>`              |
+| I want to...                       | Run                                        |
+| ---------------------------------- | ------------------------------------------ |
+| Check my setup                     | `moon run workspace:doctor`                |
+| Try the local Zitadel CLI          | `moon run workspace:cli -- --help`         |
+| Run the server from source         | `moon run workspace:server -- --help`      |
+| Test the fresh-app onboarding path | `moon run workspace:journey`               |
+| Run normal local checks            | `moon ci :lint :typecheck :build :test`    |
+| Check release notes status         | `moon run release:changesets -- --summary` |
+| Mirror CI locally                  | `moon run workspace:check -- --full`       |
+| Rerun one failed task              | `moon run <project>:<task>`                |
 
 ### I am adding Zitadel to my app
 
@@ -73,6 +74,9 @@ moon task cli:test
 
 Moon task targets use the `<project>:<task>` form, for example
 `moon run cli:test`.
+
+Use `moon run release:changesets -- --base origin/main --summary` for the fast
+local version of the required `changesets / status` PR check.
 
 `moon run workspace:check -- --full` runs the repository's slower local
 CI-parity script, including integration tests, demo e2e, package smoke checks,

@@ -7,13 +7,23 @@ PR?", see [Publishable npm packages](#publishable-npm-packages) and the
 
 ## PR workflow and CI gate
 
-CI (`changeset-check` in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml))
-runs [`scripts/check-changeset-required.mjs`](../scripts/check-changeset-required.mjs).
-It fails only when the PR diff touches a **publishable package path** and no
-`.changeset/*.md` file was added.
+CI runs a dedicated `changesets / status` check from
+[`.github/workflows/changesets.yml`](../.github/workflows/changesets.yml). The
+check runs
+[`scripts/check-changesets-status.mjs`](../scripts/check-changesets-status.mjs)
+through Moon:
+
+```sh
+moon run release:changesets -- --base origin/main --summary
+```
+
+It passes when no **publishable package path** changed, fails when publishable
+package paths changed without a `.changeset/*.md` file, validates that
+changesets name only public packages, and verifies that the fixed alpha group
+matches the product package list below.
 
 Publishable paths are defined in
-[`scripts/check-changeset-required.mjs`](../scripts/check-changeset-required.mjs);
+[`scripts/check-changesets-status.mjs`](../scripts/check-changesets-status.mjs);
 update that script and this doc together.
 
 ## Publishable npm packages
@@ -115,11 +125,13 @@ CI-only, or other PRs that never touch the publishable paths above.
 Before handoff:
 
 ```sh
-node scripts/check-changeset-required.mjs --base origin/main
+moon run release:changesets -- --base origin/main --summary
 ```
 
-Exit `0` → the changeset gate is satisfied; use the decision table above to state the correct PR outcome. Exit `1` → add a changeset (real or, rarely,
-empty).
+Exit `0` -> the changeset gate is satisfied; use the decision table above to
+state the correct PR outcome. Exit `1` -> add a changeset (real or, rarely,
+empty), fix package names in changeset frontmatter, or repair the fixed alpha
+group.
 
 The public packages above are in one Changesets fixed group while the repo is
 in alpha, so a version PR moves the CLI, SDKs, API packages, and server npm

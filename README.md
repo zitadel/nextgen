@@ -85,7 +85,9 @@ server bootstrapping, and release tasks, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## CI
 
-Pull requests run one Moon-driven `ci / validate` job on a 16-core Depot runner:
+Pull requests run two required checks in parallel. `changesets / status` gives
+fast package release feedback. `ci / full-pr` runs the Moon-driven PR
+confidence path on a 16-core Depot runner:
 
 - Go vet and tests.
 - pnpm install and Moon lint/typecheck/build/test tasks.
@@ -151,6 +153,12 @@ executes `changeset version`, and opens or updates the version PR. After that
 PR is reviewed and merged, `release-publish.yml` publishes npm packages with
 Changesets, pushes the product tag and container image, and creates or updates
 the single product GitHub Release.
+
+Check local Changesets status with:
+
+```sh
+moon run release:changesets -- --base origin/main --summary
+```
 
 Follow the [manual release runbook](docs/runbooks/manual-release.md) when
 cutting a release.
