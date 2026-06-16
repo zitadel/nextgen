@@ -1,8 +1,8 @@
 # Release Runbook
 
-This repo uses Moon for CI/build orchestration, server artifacts, and the
-product GitHub Release. Changesets owns package versioning, changelogs, npm
-publishing, and public package tags.
+This repo uses Moon for CI/build orchestration, server artifacts, and
+containers. Changesets owns package versioning, changelogs, npm publishing, and
+public package tags. Product release notes are written manually by maintainers.
 
 ## Normal release
 
@@ -12,13 +12,13 @@ publishing, and public package tags.
 3. `release-publish` runs the Changesets action and opens or updates the
    generated version PR.
 4. Review the generated version PR. It should update package versions,
-   changelogs, and the `@zitadel/server` npm runtime version. The version PR
-   should not create the product GitHub Release; `release-publish` does that
-   from the reviewed fixed package version.
+   changelogs, and the `@zitadel/server` npm runtime version.
 5. Merge the version PR only after CI is green.
 6. `release-publish` runs automatically from that merge commit on `main`,
-   publishes npm packages, pushes containers, creates the product tag, and
-   creates or updates the GitHub Release.
+   publishes npm packages with Changesets, and pushes the
+   `ghcr.io/zitadel/nextgen:<version>` container image.
+7. If a product announcement is needed, write the product release notes
+   manually and create a GitHub Release by hand.
 
 ## Manual controls
 
@@ -33,8 +33,7 @@ publishing, and public package tags.
 - Run `release-publish` manually with `recover_version=<version>` when `main`
   has moved past the generated version commit or any publish-side artifact may
   be missing. Use `dry_run=true` first, then `dry_run=false`.
-- Verify npm packages, `ghcr.io/zitadel/nextgen:<version>`, the product
-  `v<version>` tag, and the GitHub Release after publish.
+- Verify npm packages and `ghcr.io/zitadel/nextgen:<version>` after publish.
 
 ## Recover
 
@@ -48,11 +47,10 @@ publishing, and public package tags.
 Use `release-publish` with `recover_version=<version>` for an already-versioned
 release when any publish-side artifact may be missing. This is the single
 recovery path. It verifies the checked-out `@zitadel/server` version, rebuilds
-release artifacts, runs Changesets publish, and then pushes the product tag,
-containers, and GitHub Release. `changeset publish` only publishes package
-versions that are not already present on npm, so the same recovery path is safe
-when npm packages are already complete and only Docker or the product GitHub
-Release needs repair.
+release artifacts, runs Changesets publish, and then pushes containers.
+`changeset publish` only publishes package versions that are not already
+present on npm, so the same recovery path is safe when npm packages are already
+complete and only Docker needs repair.
 
 ```sh
 gh workflow run release-publish.yml \
@@ -81,9 +79,15 @@ After the recovery run, verify the public surfaces:
 ```sh
 npm view @zitadel/server@0.1.0-alpha.8 version
 npm view @zitadel/sdk-angular@0.1.0-alpha.8 version
-gh release view v0.1.0-alpha.8 --repo zitadel/nextgen
 docker buildx imagetools inspect ghcr.io/zitadel/nextgen:0.1.0-alpha.8
 ```
+
+## Product notes
+
+Product release notes are manual. Use the generated Changesets changelogs,
+`dist/release/<version>/artifact-summary.md`, and the merged product PRs as
+inputs, then create the GitHub Release manually only when the product needs an
+announcement.
 
 ## Local checks
 

@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -152,15 +151,13 @@ async function commandPublish(options) {
       push: true,
       platforms: CONTAINER_PLATFORMS,
     });
-    console.log("dry run: would publish npm packages, push product tag, push container images, and update GitHub Release");
+    console.log("dry run: would publish npm packages and push container images");
     return;
   }
 
   await commandSnapshot({ skipContainer: true });
   await run("corepack", ["pnpm", "exec", "changeset", "publish"], { cwd: repoRoot });
-  await ensureProductTag(release);
   await buildContainerImage({ repoRoot, outDir, release, push: true, platforms: CONTAINER_PLATFORMS });
-  await upsertGitHubRelease(release, outDir);
   await commandVerify();
 }
 
@@ -175,7 +172,6 @@ function assertRecoverVersion(release, recoverVersion) {
 async function commandVerify() {
   const release = await readServerRelease(repoRoot);
   await verifyLocalArtifacts({ repoRoot, release, outDir: releaseDir(repoRoot, release.version) });
-  await assertProductTagPointsAtHead(release);
   console.log(`release artifacts verified for ${release.version}`);
 }
 
@@ -227,67 +223,6 @@ async function assertMainBranch(options, { allowDryRunBypass = true } = {}) {
   const branch = (await runCapture("git", ["branch", "--show-current"], { cwd: repoRoot })).stdout.trim();
   if (branch !== "main") {
     throw new Error(`release publish must run from main, got ${branch || "detached HEAD"}`);
-  }
-}
-
-async function ensureProductTag(release) {
-  const head = (await runCapture("git", ["rev-parse", "HEAD"], { cwd: repoRoot })).stdout.trim();
-  let existing = "";
-  try {
-    existing = (await runCapture("git", ["rev-list", "-n", "1", release.tag], { cwd: repoRoot })).stdout.trim();
-  } catch {
-    await run("git", ["tag", "-a", release.tag, "-m", `ZITADEL ${release.version}`], { cwd: repoRoot });
-    await run("git", ["push", "origin", release.tag], { cwd: repoRoot });
-    return;
-  }
-  if (existing !== head) {
-    throw new Error(`${release.tag} points at ${existing}, expected ${head}`);
-  }
-  await run("git", ["push", "origin", release.tag], { cwd: repoRoot });
-}
-
-async function assertProductTagPointsAtHead(release) {
-  const head = (await runCapture("git", ["rev-parse", "HEAD"], { cwd: repoRoot })).stdout.trim();
-  const tagCommit = (await runCapture("git", ["rev-list", "-n", "1", release.tag], { cwd: repoRoot })).stdout.trim();
-  if (tagCommit !== head) {
-    throw new Error(`${release.tag} points at ${tagCommit}, expected ${head}`);
-  }
-}
-
-async function upsertGitHubRelease(release, outDir) {
-  const notes = join(outDir, "release-notes.md");
-  const archivesDir = join(outDir, "archives");
-  const archiveFiles = (await readdir(archivesDir))
-    .filter((name) => name !== ".DS_Store")
-    .map((name) => join(archivesDir, name));
-  if (archiveFiles.length === 0) {
-    throw new Error(`no release archives found in ${archivesDir}`);
-  }
-  const prereleaseArgs = release.prerelease ? ["--prerelease"] : ["--latest"];
-  const commonArgs = [
-    release.tag,
-    "--title",
-    `ZITADEL ${release.version}`,
-    "--notes-file",
-    notes,
-    "--draft",
-    ...prereleaseArgs,
-  ];
-  const exists = await ghReleaseExists(release.tag);
-  if (exists) {
-    await run("gh", ["release", "edit", ...commonArgs], { cwd: repoRoot });
-    await run("gh", ["release", "upload", release.tag, ...archiveFiles, "--clobber"], { cwd: repoRoot });
-    return;
-  }
-  await run("gh", ["release", "create", ...commonArgs, ...archiveFiles], { cwd: repoRoot });
-}
-
-async function ghReleaseExists(tag) {
-  try {
-    await runCapture("gh", ["release", "view", tag, "--json", "tagName"], { cwd: repoRoot });
-    return true;
-  } catch {
-    return false;
   }
 }
 

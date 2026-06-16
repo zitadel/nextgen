@@ -135,7 +135,7 @@ jobs:
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
 
-      - name: Configure release git author
+      - name: Configure Changesets git tag author
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && ! inputs.dry_run) }}
         run: |
           git config user.name "github-actions[bot]"

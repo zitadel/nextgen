@@ -359,16 +359,16 @@ export async function writeReleaseMetadata(options = {}) {
   };
   await mkdir(outDir, { recursive: true });
   await writeFile(join(outDir, "metadata.json"), `${JSON.stringify(metadata, null, 2)}\n`);
-  await writeFile(join(outDir, "release-notes.md"), releaseNotes(metadata));
+  await writeFile(join(outDir, "artifact-summary.md"), artifactSummary(metadata));
   return metadata;
 }
 
-export function releaseNotes(metadata) {
+export function artifactSummary(metadata) {
   const packageRows = metadata.packages
     .map((pkg) => `| \`${pkg.name}\` | \`${pkg.version}\` |`)
     .join("\n");
   const imageRows = metadata.imageTags.map((tag) => `| container | \`${tag}\` |`).join("\n");
-  return `# ZITADEL ${metadata.version}
+  return `# Release Artifact Summary ${metadata.version}
 
 Commit: \`${metadata.shortCommit}\`
 
