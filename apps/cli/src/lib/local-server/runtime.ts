@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import { access, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
-import { createServer } from "node:net";
 import { dirname, join, resolve } from "node:path";
 
 import { ZitadelError } from "../errors";
@@ -189,17 +188,6 @@ export async function checkLocalServerHealth(serverUrl: string, timeoutMs = 1500
   } catch {
     return false;
   }
-}
-
-export async function isPortAvailable(port: number): Promise<boolean> {
-  return new Promise((resolvePort) => {
-    const server = createServer();
-    server.once("error", () => resolvePort(false));
-    server.once("listening", () => {
-      server.close(() => resolvePort(true));
-    });
-    server.listen(port, "127.0.0.1");
-  });
 }
 
 export async function resolveLocalServer(cwd: string): Promise<string> {

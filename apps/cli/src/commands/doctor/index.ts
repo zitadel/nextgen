@@ -9,18 +9,23 @@ import {
   dockerUnavailableMessage,
 } from "../../lib/local-server/docker-guidance";
 import {
+  discoverManagedRuntimeProcesses,
+  type ManagedRuntimeProcess,
+} from "../../lib/local-server/processes";
+import {
   DEFAULT_LOCAL_SERVER_PORT,
   assertLocalStateWritable,
   checkLocalServerHealth,
   defaultLocalServerImageForCliVersion,
-  isPortAvailable,
   localServerUrl,
   readRuntimeMetadata,
   type RuntimeBackend,
+  type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import { createOrca } from "../../lib/orca";
 import { hasZitadelConfig } from "../../lib/project";
+import { listenersForPort } from "../../lib/prober/ports";
 import { publicCliCommand } from "../../lib/public-cli";
 import { SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
 
@@ -124,7 +129,8 @@ export default class Doctor extends BaseCommand {
 
     if (failed.length > 0) {
       const advice = failureAdvice(failed, image, port, this.meta.cliVersion);
-      throw new ZitadelError("E_VALIDATION", "Zitadel doctor found issues", {
+      const code = failed.some((check) => check.name === "port") ? "E_PORT_IN_USE" : "E_VALIDATION";
+      throw new ZitadelError(code, "Zitadel doctor found issues", {
         hint: advice.hint,
         nextCommands: advice.nextCommands,
         details: data,
@@ -212,11 +218,26 @@ function advisoryForWarnings(
   warnings: CheckOutcome[],
   cliVersion: string,
 ): { nextActions: string[]; nextCommands: string[] } | undefined {
-  if (!warnings.some((check) => check.name === "docker-cli")) {
+  const nextActions: string[] = [];
+  const nextCommands: string[] = [];
+  if (warnings.some((check) => check.name === "docker-cli")) {
+    const advice = dockerRuntimeGuidance("doctor", cliVersion);
+    nextActions.push(...advice.nextActions);
+    nextCommands.push(...advice.nextCommands);
+  }
+
+  const managedRuntimeWarning = warnings.find((check) => check.name === "managed-runtime-processes");
+  if (hasManagedRuntimeProcesses(managedRuntimeWarning)) {
+    nextActions.push(
+      "Review other host-wide CLI-managed local Zitadel runtimes before starting a new one.",
+    );
+    nextCommands.push(publicCliCommand("stop --all", cliVersion));
+  }
+
+  if (nextActions.length === 0 && nextCommands.length === 0) {
     return undefined;
   }
-  const advice = dockerRuntimeGuidance("doctor", cliVersion);
-  return { nextActions: advice.nextActions, nextCommands: advice.nextCommands };
+  return { nextActions: unique(nextActions), nextCommands: unique(nextCommands) };
 }
 
 async function runLocalRuntimeChecks(
@@ -226,6 +247,7 @@ async function runLocalRuntimeChecks(
   port: number,
 ): Promise<CheckOutcome[]> {
   const runtime = await readRuntimeMetadata(cwd);
+  const managedRuntimeCheck = await checkManagedRuntimeProcesses(runtime);
   if (runtimeBackend === "binary") {
     return [
       await check("server-binary", "Server npm package is available", async () => {
@@ -246,18 +268,10 @@ async function runLocalRuntimeChecks(
       await check(
         "port",
         `Port ${String(port)} is available`,
-        async () => {
-          if (runtime && (await checkLocalServerHealth(runtime.server_url))) {
-            return `${runtime.server_url} is already healthy`;
-          }
-          if (!(await isPortAvailable(port))) {
-            throw new Error(`Port ${String(port)} is already in use`);
-          }
-          return `Port ${String(port)} is available`;
-        },
-        "warn",
+        () => checkPortAvailability(runtime, port),
       ),
       await checkRuntime(runtime, runtimeBackend),
+      managedRuntimeCheck,
     ];
   }
 
@@ -319,19 +333,74 @@ async function runLocalRuntimeChecks(
     await check(
       "port",
       `Port ${String(port)} is available`,
-      async () => {
-        if (runtime && (await checkLocalServerHealth(runtime.server_url))) {
-          return `${runtime.server_url} is already healthy`;
-        }
-        if (!(await isPortAvailable(port))) {
-          throw new Error(`Port ${String(port)} is already in use`);
-        }
-        return `Port ${String(port)} is available`;
-      },
-      "warn",
+      () => checkPortAvailability(runtime, port),
     ),
     await checkRuntime(runtime, runtimeBackend),
+    managedRuntimeCheck,
   ];
+}
+
+async function checkPortAvailability(
+  runtime: RuntimeMetadata | undefined,
+  port: number,
+): Promise<string> {
+  if (runtime?.port === port && (await checkLocalServerHealth(runtime.server_url))) {
+    return `${runtime.server_url} is already healthy`;
+  }
+  const listeners = await listenersForPort(port);
+  if (listeners.length > 0) {
+    throw new PortInUseCheckError(port, localServerUrl(port), listeners);
+  }
+  return `Port ${String(port)} is available`;
+}
+
+class PortInUseCheckError extends Error {
+  constructor(
+    readonly port: number,
+    readonly serverUrl: string,
+    readonly listeners: Awaited<ReturnType<typeof listenersForPort>>,
+  ) {
+    super(`Port ${String(port)} is already in use by ${formatListeners(listeners)}`);
+  }
+}
+
+async function checkManagedRuntimeProcesses(
+  runtime: RuntimeMetadata | undefined,
+): Promise<CheckOutcome> {
+  const discovery = await discoverManagedRuntimeProcesses();
+  if (!discovery.supported) {
+    return {
+      name: "managed-runtime-processes",
+      status: "warn",
+      message: "Managed local runtime process discovery is unavailable.",
+      details: { supported: false, error: discovery.error },
+    };
+  }
+  const processes = additionalManagedRuntimeProcesses(discovery.processes, runtime);
+  if (processes.length === 0) {
+    return {
+      name: "managed-runtime-processes",
+      status: "pass",
+      message: "No additional host-wide managed local runtime processes found.",
+      details: { supported: true, scope: "host", processes: [] },
+    };
+  }
+  return {
+    name: "managed-runtime-processes",
+    status: "warn",
+    message: `${String(processes.length)} other host-wide managed local runtime process${processes.length === 1 ? "" : "es"} found.`,
+    details: { supported: true, scope: "host", processes },
+  };
+}
+
+function additionalManagedRuntimeProcesses(
+  processes: ReadonlyArray<ManagedRuntimeProcess>,
+  runtime: RuntimeMetadata | undefined,
+): ReadonlyArray<ManagedRuntimeProcess> {
+  if (runtime?.backend !== "binary") {
+    return processes;
+  }
+  return processes.filter((processInfo) => processInfo.pid !== runtime.pid && processInfo.ppid !== runtime.pid);
 }
 
 async function checkRuntime(
@@ -352,6 +421,35 @@ async function checkRuntime(
     }
     return `${runtime.server_url} is healthy`;
   });
+}
+
+function formatListeners(listeners: Awaited<ReturnType<typeof listenersForPort>>): string {
+  return listeners
+    .map((listener) =>
+      [listener.command ?? "unknown", listener.pid ? `pid ${String(listener.pid)}` : undefined]
+        .filter(Boolean)
+        .join(" "),
+    )
+    .join(", ");
+}
+
+function hasManagedRuntimeProcesses(check: CheckOutcome | undefined): boolean {
+  if (!check || check.status !== "warn") {
+    return false;
+  }
+  const details = check.details;
+  return (
+    typeof details === "object" &&
+    details !== null &&
+    "supported" in details &&
+    (details as { supported?: unknown }).supported === true &&
+    Array.isArray((details as { processes?: unknown }).processes) &&
+    ((details as { processes?: unknown[] }).processes?.length ?? 0) > 0
+  );
+}
+
+function unique(values: string[]): string[] {
+  return [...new Set(values)];
 }
 
 function resolveRuntimeBackend(input: {
@@ -381,6 +479,18 @@ async function check(
   try {
     return { name, status: "pass", message: await run() };
   } catch (error) {
+    if (error instanceof PortInUseCheckError) {
+      return {
+        name,
+        status: failureStatus,
+        message: error.message,
+        details: {
+          port: error.port,
+          server_url: error.serverUrl,
+          listeners: error.listeners,
+        },
+      };
+    }
     return {
       name,
       status: failureStatus,
