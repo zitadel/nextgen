@@ -29,10 +29,10 @@ const projectSecret = ((): string | undefined => {
   if (!existsSync(path)) {
     return undefined;
   }
-  for (const line of readFileSync(path, 'utf8').split('\n')) {
+  for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
     const match = line.match(/^ZITADEL_PROJECT_SECRET=(.*)$/);
     if (match) {
-      return match[1];
+      return match[1].trim().replace(/^(['"])(.*)\1$/, '$2');
     }
   }
   return undefined;

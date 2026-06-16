@@ -257,9 +257,10 @@ async function proxyRequest(
 
   // Attach the project service-key secret as the bearer on every proxied
   // request. The server's security handler verifies it cryptographically; the
-  // browser never sees the secret because Next.js middleware runs in the
-  // node runtime and reads `process.env.ZITADEL_PROJECT_SECRET` (Next auto-
-  // loads `.env.local`, which is gitignored).
+  // browser never sees the secret because this middleware runs server-side
+  // (Edge or Node runtime, depending on the host app's config) and reads
+  // `process.env.ZITADEL_PROJECT_SECRET`. Next auto-loads `.env.local` at dev
+  // time, which is gitignored; in production this comes from the host env.
   if (!upstreamHeaders.has('authorization')) {
     const secret = process.env.ZITADEL_PROJECT_SECRET;
     if (secret) {
