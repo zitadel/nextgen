@@ -119,6 +119,11 @@ export const de: Locale = {
   "register.field.password": "Passwort",
   "register.field.password.help":
     "Mindestens 8 Zeichen, einschließlich eines Sonderzeichens und einer Zahl.",
+  "register.field.givenName": "Vorname",
+  "register.field.familyName": "Nachname",
+  "register.field.dateOfBirth": "Geburtsdatum",
+  "register.field.dateOfBirth.placeholder": "JJJJ-MM-TT",
+  "register.field.dateOfBirth.help": "Verwende JJJJ-MM-TT.",
   "register.action.password": "Mit Passwort fortfahren",
   "register.action.passkey": "Weiter mit Passkey",
   "register.action.submit": "Registrieren",

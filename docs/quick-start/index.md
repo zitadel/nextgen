@@ -21,10 +21,10 @@ npx @zitadel/cli@alpha setup --server local
 npm run dev
 ```
 
-Open:
+Open the dev server URL printed by Next.js, then complete the browser proof:
 
 ```text
-http://localhost:3000/login
+register a user -> log out -> log in with the same user -> profile shows Signed in
 ```
 
 The managed local Zitadel server listens on http://localhost:8080 by default.

@@ -124,6 +124,8 @@ export const en: Record<string, string> = {
   "register.field.givenName": "Given name",
   "register.field.familyName": "Family name",
   "register.field.dateOfBirth": "Date of birth",
+  "register.field.dateOfBirth.placeholder": "YYYY-MM-DD",
+  "register.field.dateOfBirth.help": "Use YYYY-MM-DD.",
   "register.action.password": "Continue with password",
   "register.action.passkey": "Continue with a passkey",
   "register.action.submit": "Sign up",

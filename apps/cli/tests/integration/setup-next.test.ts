@@ -38,6 +38,7 @@ describe("Next setup integration", () => {
       status: string;
       data: {
         install: { status: string; package_manager: string; command: string };
+        next_actions: string[];
         next_commands: string[];
       };
     };
@@ -51,6 +52,9 @@ describe("Next setup integration", () => {
       command: "npm install",
     });
     expect(setupJson.data.next_commands).toEqual(["npm run dev"]);
+    expect(setupJson.data.next_actions.join("\n")).toContain("register a user");
+    expect(setupJson.data.next_actions.join("\n")).toContain("log in again");
+    expect(setupJson.data.next_actions.join("\n")).toContain("/profile shows Signed in");
     const installLog = JSON.parse((await readFile(fakeNpm.logPath, "utf8")).trim()) as {
       cwd: string;
       args: string[];
@@ -75,12 +79,20 @@ describe("Next setup integration", () => {
     expect(loginPage).toContain("project={project}");
     expect(loginPage).not.toContain("NEXT_PUBLIC_ZITADEL_API_BASE");
     expect(loginPage).toContain('post-sign-in-url="/profile"');
+    expect(loginPage).toContain('href="/register"');
+    expect(loginPage).not.toContain('href="/profile"');
+    const registerPage = await readFile(join(cwd, "app/register/page.tsx"), "utf8");
+    expect(registerPage).toContain('purpose="register"');
+    expect(registerPage).toContain('href="/login"');
+    expect(registerPage).not.toContain('href="/profile"');
     const profilePage = await readFile(join(cwd, "app/profile/page.tsx"), "utf8");
     expect(profilePage).toContain("zitadel-cli: managed-file v1");
     expect(profilePage).toContain("<zitadel-logout");
     expect(profilePage).toContain("configureZitadel");
     expect(profilePage).toContain("project={project}");
     expect(profilePage).toContain('post-sign-out-url="/login"');
+    expect(profilePage).toContain('fetch("/__nextgen/sessions/me"');
+    expect(profilePage).toContain("Signed in profile loaded");
     const proxy = await readFile(join(cwd, "proxy.ts"), "utf8");
     expect(proxy).toContain("zitadel-cli: managed-file v1");
     expect(proxy).toContain("nextgenMiddleware");

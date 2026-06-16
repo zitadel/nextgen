@@ -104,6 +104,14 @@ npx @zitadel/cli@0.1.0-alpha.N start --non-interactive --json
 npx @zitadel/cli@0.1.0-alpha.N setup --framework next --server local --non-interactive --json
 ```
 
+After `setup`, follow `data.next_commands` to start the app. Prove the generated
+auth flow in a visible browser by registering a unique user, logging out, logging
+back in with the same email/password, and ending on the signed-in profile page.
+Do not treat a rendered login or registration form as completion. If browser DOM
+snapshots are sparse, target the component hooks exposed by the generated UI:
+`zitadel-field-email-input`, `zitadel-field-password-input`, and
+`zitadel-action-submit-button`.
+
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `plan` and `apply`. Managed files carry a marker comment; `eject`
 removes only files that still carry it, preserving anything the user replaced.
