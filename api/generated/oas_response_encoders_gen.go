@@ -73,6 +73,12 @@ func encodeArchiveFlowDefinitionResponse(response ArchiveFlowDefinitionRes, w ht
 
 		return nil
 
+	case *ArchiveFlowDefinitionConflict:
+		w.WriteHeader(409)
+		span.SetStatus(codes.Error, http.StatusText(409))
+
+		return nil
+
 	case *ErrorDetailsStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
@@ -912,6 +918,12 @@ func encodeDeprecateFlowDefinitionResponse(response DeprecateFlowDefinitionRes, 
 	case *DeprecateFlowDefinitionBadRequest:
 		w.WriteHeader(400)
 		span.SetStatus(codes.Error, http.StatusText(400))
+
+		return nil
+
+	case *DeprecateFlowDefinitionConflict:
+		w.WriteHeader(409)
+		span.SetStatus(codes.Error, http.StatusText(409))
 
 		return nil
 

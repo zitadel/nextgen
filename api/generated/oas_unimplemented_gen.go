@@ -33,6 +33,8 @@ func (UnimplementedHandler) ActivateFlowDefinition(ctx context.Context, params A
 // if they reference an archived flow definition.
 // Alternatively, flow states can also be modified via `POST /flow_definitions` and `PUT
 // /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow definition payload.
+// Note: There must be at least one flow definition in the `active` state for a given `purpose` at
+// all times to ensure that new flows can be started.
 //
 // POST /flow_definitions/{id}/archive
 func (UnimplementedHandler) ArchiveFlowDefinition(ctx context.Context, params ArchiveFlowDefinitionParams) (r ArchiveFlowDefinitionRes, _ error) {
@@ -191,6 +193,8 @@ func (UnimplementedHandler) DeleteFlowDefinition(ctx context.Context, params Del
 // the deprecated flow definition can continue to operate until completion.
 // Alternatively, flow states can also be modified via `POST /flow_definitions` and `PUT
 // /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow definition payload.
+// Note: There must be at least one flow definition in the `active` state for a given `purpose` at
+// all times to ensure that new flows can be started.
 //
 // POST /flow_definitions/{id}/deprecate
 func (UnimplementedHandler) DeprecateFlowDefinition(ctx context.Context, params DeprecateFlowDefinitionParams) (r DeprecateFlowDefinitionRes, _ error) {

@@ -27,6 +27,11 @@ type ArchiveFlowDefinitionBadRequest struct{}
 
 func (*ArchiveFlowDefinitionBadRequest) archiveFlowDefinitionRes() {}
 
+// ArchiveFlowDefinitionConflict is response for ArchiveFlowDefinition operation.
+type ArchiveFlowDefinitionConflict struct{}
+
+func (*ArchiveFlowDefinitionConflict) archiveFlowDefinitionRes() {}
+
 // ArchiveFlowDefinitionOK is response for ArchiveFlowDefinition operation.
 type ArchiveFlowDefinitionOK struct{}
 
@@ -2103,6 +2108,11 @@ type DeprecateFlowDefinitionBadRequest struct{}
 
 func (*DeprecateFlowDefinitionBadRequest) deprecateFlowDefinitionRes() {}
 
+// DeprecateFlowDefinitionConflict is response for DeprecateFlowDefinition operation.
+type DeprecateFlowDefinitionConflict struct{}
+
+func (*DeprecateFlowDefinitionConflict) deprecateFlowDefinitionRes() {}
+
 // DeprecateFlowDefinitionOK is response for DeprecateFlowDefinition operation.
 type DeprecateFlowDefinitionOK struct{}
 
@@ -3080,7 +3090,8 @@ func (s *FlowDefinitionResponse) SetUpdatedAt(val time.Time) {
 // archived: The definition is removed from active use. It cannot be modified. The engine will not
 // select it for new flows, and existing flows will be terminated with an error if they reference
 // this definition.
-// At least one flow definition must be in the `active` state.
+// There must be at least one flow definition in the `active` state for a given `purpose` at all
+// times to ensure that new flows can be started.
 // Allowed transitions:
 // - draft -> active: To activate the flow definition.
 // - active -> deprecated: To phase out the flow definition.

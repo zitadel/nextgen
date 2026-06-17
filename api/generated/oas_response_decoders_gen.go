@@ -78,6 +78,9 @@ func decodeArchiveFlowDefinitionResponse(resp *http.Response) (res ArchiveFlowDe
 	case 400:
 		// Code 400.
 		return &ArchiveFlowDefinitionBadRequest{}, nil
+	case 409:
+		// Code 409.
+		return &ArchiveFlowDefinitionConflict{}, nil
 	}
 	// Default response.
 	res, err := func() (res ArchiveFlowDefinitionRes, err error) {
@@ -1709,6 +1712,9 @@ func decodeDeprecateFlowDefinitionResponse(resp *http.Response) (res DeprecateFl
 	case 400:
 		// Code 400.
 		return &DeprecateFlowDefinitionBadRequest{}, nil
+	case 409:
+		// Code 409.
+		return &DeprecateFlowDefinitionConflict{}, nil
 	}
 	// Default response.
 	res, err := func() (res DeprecateFlowDefinitionRes, err error) {

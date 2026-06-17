@@ -9,7 +9,7 @@ description: |
   deprecated: The flow definition is being phased out and will not be used to start new flows. However, existing flows that use this flow definition can continue to operate until completion. The flow definition can no longer be modified.
   archived: The definition is removed from active use. It cannot be modified. The engine will not select it for new flows, and existing flows will be terminated with an error if they reference this definition.
   
-  At least one flow definition must be in the `active` state.
+  There must be at least one flow definition in the `active` state for a given `purpose` at all times to ensure that new flows can be started. 
   
   Allowed transitions:
   - draft -> active: To activate the flow definition.

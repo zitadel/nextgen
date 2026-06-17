@@ -45,6 +45,8 @@ type Invoker interface {
 	// if they reference an archived flow definition.
 	// Alternatively, flow states can also be modified via `POST /flow_definitions` and `PUT
 	// /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow definition payload.
+	// Note: There must be at least one flow definition in the `active` state for a given `purpose` at
+	// all times to ensure that new flows can be started.
 	//
 	// POST /flow_definitions/{id}/archive
 	ArchiveFlowDefinition(ctx context.Context, params ArchiveFlowDefinitionParams) (ArchiveFlowDefinitionRes, error)
@@ -164,6 +166,8 @@ type Invoker interface {
 	// the deprecated flow definition can continue to operate until completion.
 	// Alternatively, flow states can also be modified via `POST /flow_definitions` and `PUT
 	// /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow definition payload.
+	// Note: There must be at least one flow definition in the `active` state for a given `purpose` at
+	// all times to ensure that new flows can be started.
 	//
 	// POST /flow_definitions/{id}/deprecate
 	DeprecateFlowDefinition(ctx context.Context, params DeprecateFlowDefinitionParams) (DeprecateFlowDefinitionRes, error)
@@ -626,6 +630,8 @@ func (c *Client) sendActivateFlowDefinition(ctx context.Context, params Activate
 // if they reference an archived flow definition.
 // Alternatively, flow states can also be modified via `POST /flow_definitions` and `PUT
 // /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow definition payload.
+// Note: There must be at least one flow definition in the `active` state for a given `purpose` at
+// all times to ensure that new flows can be started.
 //
 // POST /flow_definitions/{id}/archive
 func (c *Client) ArchiveFlowDefinition(ctx context.Context, params ArchiveFlowDefinitionParams) (ArchiveFlowDefinitionRes, error) {
@@ -2521,6 +2527,8 @@ func (c *Client) sendDeleteFlowDefinition(ctx context.Context, params DeleteFlow
 // the deprecated flow definition can continue to operate until completion.
 // Alternatively, flow states can also be modified via `POST /flow_definitions` and `PUT
 // /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow definition payload.
+// Note: There must be at least one flow definition in the `active` state for a given `purpose` at
+// all times to ensure that new flows can be started.
 //
 // POST /flow_definitions/{id}/deprecate
 func (c *Client) DeprecateFlowDefinition(ctx context.Context, params DeprecateFlowDefinitionParams) (DeprecateFlowDefinitionRes, error) {

@@ -5,6 +5,8 @@ post:
     Archives a flow definition in the `active` or `deprecated` state by ID. 
     Archived flow definitions cannot be used to start new flows. Existing flows will return an error if they reference an archived flow definition.
     Alternatively, flow states can also be modified via `POST /flow_definitions` and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow definition payload.
+    
+    Note: There must be at least one flow definition in the `active` state for a given `purpose` at all times to ensure that new flows can be started.
   tags:
     - Flow Definitions
   security:
@@ -18,6 +20,8 @@ post:
       description: Flow definition archived successfully.
     '400':
       description: Invalid request.
+    '409':
+      description: Conflict (e.g., attempting to archive the last active flow definition for a given purpose).
     default:
       description: Unexpected error.
       content:
