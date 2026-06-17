@@ -31,7 +31,8 @@ proposals and implementations with recorded decisions.
 This repo is the pre-release next generation of Zitadel. Moon owns the
 monorepo task graph and release artifact builds. Changesets owns package
 versions, changelogs, npm publishing, and public package tags; Moon owns the
-product tag and GitHub Release (see "Release, Licensing, And Secrets").
+draft GitHub Release shell for `v<version>` (see "Release, Licensing, And
+Secrets").
 
 - `internal/` contains Go server implementation code.
 - `cmd/` is reserved for Go command wiring.
@@ -128,9 +129,9 @@ Moon manages TypeScript workspace targets, Go checks, and release build tasks.
 Long-running customer-style local orchestration still runs through repository
 scripts so server processes are signaled and cleaned up directly.
 
-`moon run workspace:server` syncs the embedded console/login UI before non-help
-startup, then runs `go run .`. Direct `go run .` callers must sync the embed
-folders themselves or disable both embedded UI surfaces.
+`moon run workspace:server` builds the embedded console/login UI before non-help
+startup, then runs `go run .`. Direct `go run .` callers must build the embedded
+UI surfaces themselves or disable both embedded UI surfaces.
 
 Checked-in demo end-to-end tests are **opt-in locally** and main-only in CI.
 They are not part of the default `moon ci :lint :typecheck :build :test`
@@ -161,13 +162,15 @@ Use `moon run workspace:journey` for deterministic CI-style proof of the
 fresh-app path. Use `moon run workspace:cli -- ...` for manual browser or agent
 experiments against the same local package train.
 
-In CI the required PR checks are `changesets / status` and `ci / full-pr`.
-`ci / full-pr` consumes current workflow npm package tarballs instead of public
-Zitadel packages and exercises the default npm-binary local runtime. The Docker
-fallback journey runs in the `ci-docker-runtime` workflow on `main` and by
-manual dispatch. The checked-in demo integrations, raw binary embedded-postgres
-smoke, and documented quick-start compose smoke remain release-surface
-confidence checks.
+In CI the branch-protection check is the GitHub Actions context `full-pr`,
+shown in the pull request UI as `ci / full-pr`. It consumes current workflow
+npm package tarballs instead of public Zitadel packages and exercises the
+default npm-binary local runtime. Changesets PR comments are informational
+release-intent feedback and are not branch-protection requirements. The Docker
+fallback journey remains an opt-in local/manual check via
+`moon run workspace:journey -- --runtime docker --image <docker-tag>`. The
+checked-in demo integrations, raw binary embedded-postgres smoke, and
+documented quick-start compose smoke remain release-surface confidence checks.
 
 ## Testing Layers
 
@@ -248,15 +251,16 @@ When a PR touches [publishable npm packages](.changeset/README.md#publishable-np
 selected `packages/*` paths), follow the
 [decision table](.changeset/README.md#decision-table) and workflow in
 [`.changeset/README.md`](.changeset/README.md). Verify locally with
-`moon run release:changesets -- --base origin/main --summary`.
+`corepack pnpm exec changeset status --since origin/main` when you need to
+inspect planned package bumps.
 
 The public packages are `@zitadel/cli`, `@zitadel/server`, the
 `@zitadel/server-*` platform packages, `@zitadel/api`, `@zitadel/components`,
 `@zitadel/sdk-core`, `@zitadel/sdk-next`, `@zitadel/sdk-nuxt`,
 `@zitadel/sdk-react`, `@zitadel/sdk-vue`, and `@zitadel/sdk-angular`. These
 packages are in one Changesets fixed group for alpha product releases. Moon
-still creates the product `v<version>` tag and GitHub Release from the fixed
-package version.
+still creates or updates the draft GitHub Release shell for `v<version>` from
+the fixed package version; maintainers publish product notes manually.
 
 - npm packages under `apps/cli/` and `packages/*` must stay MIT-licensed.
 - Server npm packages under `apps/server*` and console application paths are

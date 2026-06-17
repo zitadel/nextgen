@@ -21,11 +21,11 @@ func Handler(prefix string) (http.Handler, error) {
 	return staticui.New(prefix, root), nil
 }
 
-// ValidateDist reports whether a production console build was synced into dist/.
+// ValidateDist reports whether a production console build was written into dist/.
 func ValidateDist() error {
 	if _, err := fs.Stat(dist, "dist/index.html"); err != nil {
 		return fmt.Errorf(
-			"console UI not embedded: run `moon run console:build` and `scripts/sync-embedded-ui-dist.sh` (see CONTRIBUTING.md): %w",
+			"console UI not embedded: run `moon run console:build` (see CONTRIBUTING.md): %w",
 			err,
 		)
 	}

@@ -85,8 +85,10 @@ server bootstrapping, and release tasks, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## CI
 
-Pull requests run two required checks in parallel. `changesets / status` gives
-fast package release feedback. `ci / full-pr` runs the Moon-driven PR
+Pull requests run parallel CI checks. Branch protection currently requires the
+GitHub Actions context `full-pr`, shown in the pull request UI as
+`ci / full-pr`. Changesets comments give package release intent feedback
+without adding a blocking CI gate. `ci / full-pr` runs the Moon-driven PR
 confidence path on a 16-core Depot runner:
 
 - Go vet and tests.
@@ -96,9 +98,9 @@ confidence path on a 16-core Depot runner:
 - A non-publishing Moon release snapshot without building a container.
 - The fresh-app journey against the default npm server binary runtime.
 
-Changesets version PRs run a smaller release/package validation path. A
-separate `ci-docker-runtime` workflow runs on `main` and manually to exercise
-the Docker fallback journey.
+Changesets version PRs run a smaller release/package validation path. The
+Docker fallback journey remains an opt-in local/manual check via
+`moon run workspace:journey -- --runtime docker --image <docker-tag>`.
 
 CI uploads short-lived workflow artifacts for review: Moon release snapshot output
 and npm package tarballs. On consumer journey failures it also uploads focused
@@ -109,8 +111,9 @@ days and are not release artifacts.
 ## Build & release
 
 This monorepo uses Moon for task execution, non-npm artifact builds, and the
-product GitHub Release. Changesets owns package versions, changelogs, npm
-publishing, and public package tags.
+draft GitHub Release shell for `v<version>`. Changesets owns package versions,
+changelogs, npm publishing, and public package tags. Product release prose is
+written manually by maintainers when a GitHub Release is published.
 The current alpha release model uses one fixed Changesets version across the
 CLI, server npm runtime, API packages, components, and SDKs. The full rationale
 lives in
@@ -119,24 +122,23 @@ and [docs/adrs/023-lockstep-alpha-release-train.md](docs/adrs/023-lockstep-alpha
 
 ### Moon release artifacts
 
-Moon runs repo-owned scripts that build the console and login-ui SPAs, sync them
-into `internal/*/dist`, cross-compile the Go server, stage npm platform
-packages, create archives and checksums, build Docker images, and assemble
-release metadata.
+Moon runs repo-owned scripts that build the console and login-ui SPAs directly
+into `internal/staticui/*/dist`, cross-compile the Go server, stage npm
+platform packages, create archives and checksums, build Docker images, and
+assemble release metadata.
 
 ```sh
 # Local snapshot without publishing
 moon run release:snapshot
 
-# Dry-run the manual publish graph
+# Dry-run the publish graph
 moon run release:publish -- --dry-run
 ```
 
-Release output lands in `dist/release/<version>`. Product tags remain
-`vX.Y.Z` or `vX.Y.Z-alpha.N` and are created by the Moon release task from the
-fixed `@zitadel/server` version; prerelease images publish only immutable
-version tags, while stable releases may move
-`ghcr.io/zitadel/nextgen:latest`.
+Release output lands in `dist/release/<version>`. The workflow publishes
+immutable container version tags from the fixed `@zitadel/server` version and
+creates or updates the matching draft GitHub Release with generated artifact and
+package facts; stable releases may also move `ghcr.io/zitadel/nextgen:latest`.
 
 ### npm packages (`changesets`)
 
@@ -148,20 +150,22 @@ user-visible change to those packages:
 corepack pnpm changeset
 ```
 
-The manual `release-prepare.yml` workflow runs Moon release validation,
-executes `changeset version`, and opens or updates the version PR. After that
-PR is reviewed and merged, `release-publish.yml` publishes npm packages with
-Changesets, pushes the product tag and container image, and creates or updates
-the single product GitHub Release.
+When pending changesets land on `main`, `release-publish.yml` runs the
+Changesets action and opens or updates the version PR with the release GitHub
+App so the required `full-pr` check runs normally. After that PR is reviewed
+and merged, the same workflow detects the generated version commit, publishes
+npm packages with Changesets, pushes the matching container image, and creates
+or updates the matching draft GitHub Release. Maintainers add product prose and
+publish the draft when an announcement is needed.
 
-Check local Changesets status with:
+Preview local Changesets status with:
 
 ```sh
-moon run release:changesets -- --base origin/main --summary
+corepack pnpm exec changeset status --since origin/main
 ```
 
-Follow the [manual release runbook](docs/runbooks/manual-release.md) when
-cutting a release.
+Follow the [release runbook](docs/runbooks/manual-release.md) when cutting or
+recovering a release.
 
 Release process checks can be run locally with:
 

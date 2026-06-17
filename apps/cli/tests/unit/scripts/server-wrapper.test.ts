@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { chmod, mkdtemp, stat, writeFile } from "node:fs/promises";
+import { EventEmitter } from "node:events";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 type ServerWrapperModule = {
   ensureExecutable: (binaryPath: string, platform?: string) => void;
+  forwardShutdownSignals: (child: FakeChildProcess, proc: EventEmitter) => void;
   platformPackageName: (platform?: string, arch?: string) => string;
+};
+
+type FakeChildProcess = EventEmitter & {
+  exitCode: number | null;
+  kill: (signal: NodeJS.Signals) => boolean;
+  signalCode: NodeJS.Signals | null;
 };
 
 async function loadModule(): Promise<ServerWrapperModule> {
@@ -43,5 +51,26 @@ describe("@zitadel/server wrapper", () => {
     ensureExecutable(binaryPath, "darwin");
 
     expect((await stat(binaryPath)).mode & 0o111).toBe(0o111);
+  });
+
+  it("forwards normal shutdown signals to the spawned binary", async () => {
+    const { forwardShutdownSignals } = await loadModule();
+    const proc = new EventEmitter();
+    const signals: NodeJS.Signals[] = [];
+    const child = Object.assign(new EventEmitter(), {
+      exitCode: null,
+      signalCode: null,
+      kill(signal: NodeJS.Signals) {
+        signals.push(signal);
+        return true;
+      },
+    }) satisfies FakeChildProcess;
+
+    forwardShutdownSignals(child, proc);
+    proc.emit("SIGTERM");
+    child.emit("exit", null, "SIGTERM");
+    proc.emit("SIGINT");
+
+    expect(signals).toEqual(["SIGTERM"]);
   });
 });

@@ -134,18 +134,35 @@ describe("setup command pre-flight", () => {
     ]);
   });
 
-  it("throws E_FRAMEWORK_NOT_DETECTED for a non-empty dir whose framework can't be inferred", async () => {
+  it("explains non-empty dirs whose framework can't be inferred or scaffolded", async () => {
     const cwd = await makeTempDir();
     // A non-empty dir that isn't a known framework — Orca's detector fails
     // and the empty-directory scaffold branch doesn't trigger.
     await writeFile(join(cwd, "README.md"), "Not a Next.js project.");
 
-    const res = await runCliForTest(["setup", "--cwd", cwd, "--non-interactive", "--json"]);
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--framework",
+      "next",
+      "--non-interactive",
+      "--json",
+    ]);
 
     expect(res.exitCode).not.toBe(0);
-    const json = parseJson(res.stdout) as { status: string; code: string };
+    const json = parseJson(res.stdout) as {
+      status: string;
+      code: string;
+      details: { entries: string[]; reason: string };
+      hint?: string;
+      message: string;
+    };
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_FRAMEWORK_NOT_DETECTED");
+    expect(json.message).toContain("not a fresh scaffold target");
+    expect(json.hint).toContain("Directory contains README.md");
+    expect(json.details.entries).toContain("README.md");
   });
 
   it("points cloud project creation failures at the local alpha path", async () => {

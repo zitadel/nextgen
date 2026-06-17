@@ -19,16 +19,6 @@ tasks:
 
   pack:
     command: "node scripts/release.mjs pack"
-    deps:
-      - "cli:build"
-      - "api:build"
-      - "components:build"
-      - "sdk-core:build"
-      - "sdk-next:build"
-      - "sdk-nuxt:build"
-      - "sdk-react:build"
-      - "sdk-vue:build"
-      - "sdk-angular:build"
     outputs:
       - "/dist/release/**/*"
     options:
@@ -39,15 +29,6 @@ tasks:
     command: "node scripts/release.mjs snapshot"
     deps:
       - "server:test"
-      - "cli:build"
-      - "api:build"
-      - "components:build"
-      - "sdk-core:build"
-      - "sdk-next:build"
-      - "sdk-nuxt:build"
-      - "sdk-react:build"
-      - "sdk-vue:build"
-      - "sdk-angular:build"
     outputs:
       - "/dist/release/**/*"
     options:
@@ -58,10 +39,4 @@ tasks:
     command: "node scripts/release.mjs publish"
     options:
       runFromWorkspaceRoot: true
-      runInCI: false
-
-  recover:
-    command: "node scripts/release.mjs recover"
-    options:
-      runFromWorkspaceRoot: true
-      runInCI: false
+      runInCI: true

@@ -514,7 +514,7 @@ async function collectRegistryLogs() {
 
 async function collectLocalRuntimeLogs(context) {
   try {
-    const result = await runCapture("npx", cliArgs(["logs", "--tail", "400"]), {
+    const result = await runCapture("npx", cliArgs(context, ["logs", "--tail", "400"]), {
       cwd: context.appDir,
       env: npxEnv(context),
     });
@@ -560,7 +560,7 @@ async function cleanup() {
 
 async function resetLocalRuntime(context) {
   try {
-    await runCapture("npx", cliArgs(["reset", "--force"]), {
+    await runCapture("npx", cliArgs(context, ["reset", "--force"]), {
       cwd: context.appDir,
       env: npxEnv(context),
     });
@@ -629,13 +629,23 @@ async function handleSignal(signal) {
   process.exit(130);
 }
 
-function cliArgs(args) {
-  return ["--yes", `${cliPackage}@alpha`, ...args, "--non-interactive", "--json"];
+function cliArgs(context, args) {
+  return [
+    "--yes",
+    `${cliPackage}@alpha`,
+    ...args,
+    "--cwd",
+    context.appDir,
+    "--non-interactive",
+    "--json",
+  ];
 }
 
-function npxEnv(_context) {
+function npxEnv(context) {
   const env = npmEnvironment(process.env, registryUrl, registryPaths.npmrcPath);
   env.JOURNEY_RUNTIME = options.runtime;
+  env.npm_config_cache = join(context.frameworkWorkDir, ".npm-cache");
+  env.npm_config_tmp = join(context.frameworkWorkDir, ".npm-tmp");
   const image = options.runtime === "docker" ? localRuntimeImage || process.env.ZITADEL_LOCAL_IMAGE : "";
   if (image) {
     env.ZITADEL_LOCAL_IMAGE = image;

@@ -66,7 +66,13 @@ export default class Reset extends BaseCommand {
     }
 
     if (runtime?.backend === "binary") {
-      await stopBinaryRuntime(runtime.pid);
+      const stopResult = await stopBinaryRuntime(runtime.pid);
+      if (stopResult.status === "failed") {
+        throw new ZitadelError("E_VALIDATION", "Local Zitadel server did not stop", {
+          hint: "Stop the local runtime manually, then rerun reset.",
+          details: { runtime, stop_result: stopResult },
+        });
+      }
     } else {
       await stopAndRemoveContainer(containerName);
     }

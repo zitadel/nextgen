@@ -1,9 +1,15 @@
 #!/usr/bin/env node
-import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
+import { upsertProductGithubRelease } from "./release-github.mjs";
+import {
+  detectReleaseAutomation,
+  findUnrecordedPendingChangesets,
+  readPrereleaseChangesetIds,
+  readReleaseChangesets,
+} from "./release-automation.mjs";
 import {
   CONTAINER_PLATFORMS,
   buildContainerImage,
@@ -20,6 +26,17 @@ import {
 } from "./release-artifacts.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
+const PUBLIC_PACKAGE_BUILD_TARGETS = [
+  "cli:build",
+  "api:build",
+  "components:build",
+  "sdk-core:build",
+  "sdk-next:build",
+  "sdk-nuxt:build",
+  "sdk-react:build",
+  "sdk-vue:build",
+  "sdk-angular:build",
+];
 
 export async function main(args = forwardedArgs()) {
   const command = args[0];
@@ -34,8 +51,6 @@ export async function main(args = forwardedArgs()) {
       return await commandPack();
     case "publish":
       return await commandPublish(options);
-    case "recover":
-      return await commandRecover(options);
     case "verify":
       return await commandVerify();
     default:
@@ -54,7 +69,8 @@ async function commandSnapshot(options) {
   const info = await gitInfo({ repoRoot });
 
   await run("corepack", ["pnpm", "install", "--frozen-lockfile"], { cwd: repoRoot });
-  await run("sh", ["scripts/sync-embedded-ui-dist.sh", "all"], { cwd: repoRoot });
+  await buildEmbeddedUI();
+  await buildPublicPackageArtifacts();
   await run("go", ["mod", "download"], { cwd: repoRoot });
   await buildServerBinaries({ repoRoot, outDir, version: release.version, gitInfo: info });
   await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
@@ -82,7 +98,8 @@ async function commandPack() {
   const release = await readServerRelease(repoRoot);
   const outDir = releaseDir(repoRoot, release.version);
   const info = await gitInfo({ repoRoot });
-  await run("sh", ["scripts/sync-embedded-ui-dist.sh", "all"], { cwd: repoRoot });
+  await buildEmbeddedUI();
+  await buildPublicPackageArtifacts();
   await run("go", ["mod", "download"], { cwd: repoRoot });
   await buildServerBinaries({ repoRoot, outDir, version: release.version, gitInfo: info });
   await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
@@ -90,11 +107,40 @@ async function commandPack() {
   console.log(`npm tarballs ready: ${join(outDir, "npm")}`);
 }
 
+async function buildEmbeddedUI() {
+  await run("moon", ["run", "console:build", "login-ui:build"], { cwd: repoRoot });
+}
+
+async function buildPublicPackageArtifacts() {
+  await run("moon", ["run", ...PUBLIC_PACKAGE_BUILD_TARGETS], { cwd: repoRoot });
+}
+
 async function commandPublish(options) {
   const release = await readServerRelease(repoRoot);
   const outDir = releaseDir(repoRoot, release.version);
-  await assertNoPendingChangesets();
-  await assertMainBranch(options);
+  if (options.recoverVersion) {
+    assertRecoverVersion(release, options.recoverVersion);
+  } else {
+    const preflight = await detectReleaseAutomation({
+      repoRoot,
+      mode: "publish",
+      base: options.base || process.env.BASE_SHA || "HEAD^",
+    });
+    if (!preflight.ok) {
+      const message = [
+        `release publish preflight failed: ${preflight.reason}`,
+        ...preflight.errors.map((error) => `- ${error}`),
+      ].join("\n");
+      throw new Error(message);
+    }
+    if (!preflight.shouldRun) {
+      console.log(`release publish: skip - ${preflight.reason}`);
+      return;
+    }
+  }
+
+  await assertNoUnrecordedPendingChangesets();
+  await assertMainBranch(options, { allowDryRunBypass: !options.recoverVersion });
 
   if (options.dryRun) {
     await commandSnapshot({ skipContainer: true });
@@ -106,50 +152,34 @@ async function commandPublish(options) {
       push: true,
       platforms: CONTAINER_PLATFORMS,
     });
-    console.log("dry run: would publish npm packages, push product tag, push container images, and update GitHub Release");
+    await upsertProductGithubRelease({ repoRoot, outDir, dryRun: true, log: console.log });
+    console.log("dry run: would publish npm packages, push container images, and update the draft GitHub Release");
     return;
   }
 
   await commandSnapshot({ skipContainer: true });
-  await ensureProductTag(release);
   await run("corepack", ["pnpm", "exec", "changeset", "publish"], { cwd: repoRoot });
   await buildContainerImage({ repoRoot, outDir, release, push: true, platforms: CONTAINER_PLATFORMS });
-  await upsertGitHubRelease(release, outDir);
   await commandVerify();
+  await upsertProductGithubRelease({ repoRoot, outDir, log: console.log });
 }
 
-async function commandRecover(options) {
-  if (!options.version) {
-    usage("--version is required for recover");
-  }
-  const release = await readServerRelease(repoRoot);
-  if (release.version !== options.version) {
+function assertRecoverVersion(release, recoverVersion) {
+  if (release.version !== recoverVersion) {
     throw new Error(
-      `checked out server release version is ${release.version}, expected ${options.version}`,
+      `release publish recovery requires checked-out server version ${recoverVersion}, got ${release.version}`,
     );
-  }
-  await verifyLocalArtifacts({ repoRoot, release, outDir: releaseDir(repoRoot, release.version) });
-  if (!options.dryRun) {
-    await buildContainerImage({
-      repoRoot,
-      release,
-      outDir: releaseDir(repoRoot, release.version),
-      push: true,
-      platforms: CONTAINER_PLATFORMS,
-    });
-    await upsertGitHubRelease(release, releaseDir(repoRoot, release.version));
   }
 }
 
 async function commandVerify() {
   const release = await readServerRelease(repoRoot);
   await verifyLocalArtifacts({ repoRoot, release, outDir: releaseDir(repoRoot, release.version) });
-  await assertProductTagPointsAtHead(release);
   console.log(`release artifacts verified for ${release.version}`);
 }
 
 function parseOptions(args) {
-  const parsed = { dryRun: false, skipContainer: false, version: "" };
+  const parsed = { dryRun: false, skipContainer: false, recoverVersion: "", base: "" };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     switch (arg) {
@@ -159,9 +189,13 @@ function parseOptions(args) {
       case "--skip-container":
         parsed.skipContainer = true;
         break;
-      case "--version":
-        parsed.version = args[++index] ?? "";
-        if (!parsed.version) usage("--version requires a value");
+      case "--recover-version":
+        parsed.recoverVersion = args[++index] ?? "";
+        if (!parsed.recoverVersion) usage("--recover-version requires a value");
+        break;
+      case "--base":
+        parsed.base = args[++index] ?? "";
+        if (!parsed.base) usage("--base requires a value");
         break;
       case "--help":
       case "-h":
@@ -174,84 +208,24 @@ function parseOptions(args) {
   return parsed;
 }
 
-async function assertNoPendingChangesets() {
-  const entries = await readdir(join(repoRoot, ".changeset"), { withFileTypes: true });
-  const pending = entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".md") && entry.name !== "README.md")
-    .map((entry) => entry.name);
-  if (pending.length > 0) {
-    throw new Error(`release publish requires a versioned branch with no pending changesets: ${pending.join(", ")}`);
+export async function assertNoUnrecordedPendingChangesets(root = repoRoot) {
+  const pending = await readReleaseChangesets(root);
+  const prereleaseChangesetIds = await readPrereleaseChangesetIds(root);
+  const unrecorded = findUnrecordedPendingChangesets(pending, prereleaseChangesetIds);
+  if (unrecorded.length > 0) {
+    throw new Error(
+      `release publish requires all pending changesets to be recorded in .changeset/pre.json: ${unrecorded.join(", ")}`,
+    );
   }
 }
 
-async function assertMainBranch(options) {
-  if (options.dryRun || process.env.GITHUB_REF === "refs/heads/main") {
+async function assertMainBranch(options, { allowDryRunBypass = true } = {}) {
+  if ((allowDryRunBypass && options.dryRun) || process.env.GITHUB_REF === "refs/heads/main") {
     return;
   }
   const branch = (await runCapture("git", ["branch", "--show-current"], { cwd: repoRoot })).stdout.trim();
   if (branch !== "main") {
     throw new Error(`release publish must run from main, got ${branch || "detached HEAD"}`);
-  }
-}
-
-async function ensureProductTag(release) {
-  const head = (await runCapture("git", ["rev-parse", "HEAD"], { cwd: repoRoot })).stdout.trim();
-  let existing = "";
-  try {
-    existing = (await runCapture("git", ["rev-list", "-n", "1", release.tag], { cwd: repoRoot })).stdout.trim();
-  } catch {
-    await run("git", ["tag", "-a", release.tag, "-m", `ZITADEL ${release.version}`], { cwd: repoRoot });
-    await run("git", ["push", "origin", release.tag], { cwd: repoRoot });
-    return;
-  }
-  if (existing !== head) {
-    throw new Error(`${release.tag} points at ${existing}, expected ${head}`);
-  }
-  await run("git", ["push", "origin", release.tag], { cwd: repoRoot });
-}
-
-async function assertProductTagPointsAtHead(release) {
-  const head = (await runCapture("git", ["rev-parse", "HEAD"], { cwd: repoRoot })).stdout.trim();
-  const tagCommit = (await runCapture("git", ["rev-list", "-n", "1", release.tag], { cwd: repoRoot })).stdout.trim();
-  if (tagCommit !== head) {
-    throw new Error(`${release.tag} points at ${tagCommit}, expected ${head}`);
-  }
-}
-
-async function upsertGitHubRelease(release, outDir) {
-  const notes = join(outDir, "release-notes.md");
-  const archivesDir = join(outDir, "archives");
-  const archiveFiles = (await readdir(archivesDir))
-    .filter((name) => name !== ".DS_Store")
-    .map((name) => join(archivesDir, name));
-  if (archiveFiles.length === 0) {
-    throw new Error(`no release archives found in ${archivesDir}`);
-  }
-  const prereleaseArgs = release.prerelease ? ["--prerelease"] : ["--latest"];
-  const commonArgs = [
-    release.tag,
-    "--title",
-    `ZITADEL ${release.version}`,
-    "--notes-file",
-    notes,
-    "--draft",
-    ...prereleaseArgs,
-  ];
-  const exists = await ghReleaseExists(release.tag);
-  if (exists) {
-    await run("gh", ["release", "edit", ...commonArgs], { cwd: repoRoot });
-    await run("gh", ["release", "upload", release.tag, ...archiveFiles, "--clobber"], { cwd: repoRoot });
-    return;
-  }
-  await run("gh", ["release", "create", ...commonArgs, ...archiveFiles], { cwd: repoRoot });
-}
-
-async function ghReleaseExists(tag) {
-  try {
-    await runCapture("gh", ["release", "view", tag, "--json", "tagName"], { cwd: repoRoot });
-    return true;
-  } catch {
-    return false;
   }
 }
 
@@ -265,12 +239,14 @@ function usage(error) {
     console.error(error);
     console.error("");
   }
-  console.log(`usage: node scripts/release.mjs <version|pack|snapshot|publish|recover|verify> [options]
+  console.log(`usage: node scripts/release.mjs <version|pack|snapshot|publish|verify> [options]
 
 Options:
   --dry-run          Do not publish or mutate remote registries.
   --skip-container   Build release files without building a local Docker image.
-  --version <v>      Recovery target version.
+  --recover-version <v>
+                     Publish recovery target version from release-publish.
+  --base <ref>       Base ref for release publish detection.
 `);
   process.exit(error ? 1 : 0);
 }

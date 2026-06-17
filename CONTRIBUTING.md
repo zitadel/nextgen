@@ -17,7 +17,7 @@
 | Run the server from source         | `moon run workspace:server -- --help`      |
 | Test the fresh-app onboarding path | `moon run workspace:journey`               |
 | Run normal local checks            | `moon ci :lint :typecheck :build :test`    |
-| Check release notes status         | `moon run release:changesets -- --summary` |
+| Preview planned Changesets bumps      | `corepack pnpm exec changeset status --since origin/main` |
 | Mirror CI locally                  | `moon run workspace:check -- --full`       |
 | Rerun one failed task              | `moon run <project>:<task>`                |
 
@@ -48,8 +48,8 @@ registry under `tmp/cli-local-registry`, and points the generated app install at
 that registry. Set `ZITADEL_CLI_USE_PUBLIC_PACKAGES=1` when you intentionally
 want the generated app to install public npm packages instead.
 
-`moon run workspace:server` builds and syncs the embedded console/login UI before
-startup, then runs `go run .`; help output skips the UI sync.
+`moon run workspace:server` builds the embedded console/login UI before startup,
+then runs `go run .`; help output skips the UI builds.
 
 ## Local checks
 
@@ -75,8 +75,10 @@ moon task cli:test
 Moon task targets use the `<project>:<task>` form, for example
 `moon run cli:test`.
 
-Use `moon run release:changesets -- --base origin/main --summary` for the fast
-local version of the required `changesets / status` PR check.
+Use `corepack pnpm exec changeset status --since origin/main` when you want to
+preview the package bumps Changesets will plan from your PR. Pull requests also
+get an informational Changesets comment; maintainers use that and
+`.changeset/README.md` to review release intent.
 
 `moon run workspace:check -- --full` runs the repository's slower local
 CI-parity script, including integration tests, demo e2e, package smoke checks,
@@ -129,13 +131,12 @@ the runner keeps diagnostics automatically and prints the path.
 The Go binary embeds production builds from `internal/staticui/console/dist` and `internal/staticui/login/dist`:
 
 ```sh
-sh scripts/sync-embedded-ui-dist.sh all
+moon run console:build login-ui:build
 ```
 
-The `server` wrapper runs this automatically before startup. Run it manually
-only when bypassing the wrapper with direct `go run .`. It uses Moon for
-`@zitadel/console` and `@zitadel/login-ui`, then copies the build output into
-the internal embed folders.
+The `server` wrapper runs these builds automatically before startup. Run them
+manually only when bypassing the wrapper with direct `go run .`. The Vite
+production builds write directly into the internal embed folders.
 
 ### 2. Configure and start
 
@@ -165,7 +166,7 @@ Dev servers use `/` as the Vite base; production embeds use `/ui/console/` and `
 moon run release:snapshot
 ```
 
-The release task runs `scripts/sync-embedded-ui-dist.sh` automatically.
+The release task builds the embedded UI surfaces automatically.
 
 ### Local runtime image from source
 

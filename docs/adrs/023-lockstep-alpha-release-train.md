@@ -8,7 +8,7 @@
 ## Decision
 
 This decision is superseded. The repository no longer uses a lockstep alpha
-train across npm packages, CLI, server image, and GoReleaser artifacts.
+train across npm packages, CLI, server image, and separate GoReleaser artifacts.
 
 The current release strategy is:
 
@@ -18,7 +18,8 @@ The current release strategy is:
   group during alpha.
 - `@zitadel/server` is a public npm runtime package. Moon builds the Go binary,
   stages it into platform npm packages, and also uses the fixed version for Go
-  archives, containers, the product tag, and the product GitHub Release.
+  archives, containers, and the draft GitHub Release shell for `v<version>`.
+  Product GitHub Release prose is manual when needed.
 
 ## Historical context
 
