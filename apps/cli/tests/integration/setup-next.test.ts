@@ -105,7 +105,10 @@ describe("Next setup integration", () => {
     expect(envLocal).toContain("ZITADEL_URL=");
     expect(envLocal).not.toContain("NEXT_PUBLIC_ZITADEL_API_BASE");
     expect(envLocal).toContain("NEXT_PUBLIC_ZITADEL_PROJECT_ID=");
-    expect(envLocal).not.toContain("ZITADEL_PROJECT_SECRET");
+    // The dev proxy/middleware sends the project service-key secret as the
+    // bearer; the SPA framework patchers read it from .env.local server-side.
+    // .env.local is gitignored, so the secret never leaves the machine.
+    expect(envLocal).toContain("ZITADEL_PROJECT_SECRET=");
     expect(envLocal).not.toContain("ZITADEL_PREVIEW_SECRET");
     expect((await stat(join(cwd, ".zitadel/secret"))).mode & 0o777).toBe(0o600);
     const packageJson = JSON.parse(await readFile(join(cwd, "package.json"), "utf8")) as {

@@ -4,6 +4,7 @@ import type {
 } from '@zitadel/sdk-core/types';
 import type { EventHandler, H3Event } from 'h3';
 
+import { useRuntimeConfig } from '#imports';
 import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
@@ -120,7 +121,6 @@ export function createNextgenMiddleware(
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
     opaqueTokenTimeoutMs = 5000,
-    onExchangeResponse,
   } = options;
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute
@@ -149,14 +149,7 @@ export function createNextgenMiddleware(
     }
 
     if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-      return proxyRequest(
-        event,
-        url,
-        proxyPath,
-        urlObj,
-        proxyTimeoutMs,
-        onExchangeResponse,
-      );
+      return proxyRequest(event, url, proxyPath, urlObj, proxyTimeoutMs);
     }
 
     return handleAuth(event, {
@@ -191,7 +184,6 @@ async function proxyRequest(
   proxyPath: string,
   url: URL,
   proxyTimeoutMs: number,
-  onExchangeResponse?: (response: Response) => Response | Promise<Response>,
 ): Promise<ReadableStream<Uint8Array> | null> {
   const suffix = url.pathname.slice(proxyPath.length);
   const target = `${authUrl}${suffix}${url.search}`;
@@ -203,16 +195,20 @@ async function proxyRequest(
 
   const upstreamHeaders = buildUpstreamHeaders(event);
 
-  // POST /sessions/exchange requires a project service-key bearer token.
-  // The browser can't hold a secret, so the middleware constructs one from
-  // the project_id query param. The server's security handler accepts any
-  // token of the form sk_proj_* at this stage (full validation is a TODO).
-  const isExchangeRequest =
-    method === 'POST' && suffix.startsWith('/sessions/exchange');
-  if (isExchangeRequest && !upstreamHeaders.has('authorization')) {
-    const projectId = url.searchParams.get('project_id');
-    if (projectId) {
-      upstreamHeaders.set('authorization', `Bearer sk_${projectId}`);
+  // Attach the project service-key secret as the bearer on every proxied
+  // request. Reads `runtimeConfig.nextgen.projectSecret`, which the bundled
+  // Nuxt module's setup() populates from `process.env.ZITADEL_PROJECT_SECRET`
+  // (with a `.env.local` fallback for dev). Apps that call
+  // `createNextgenMiddleware` directly must set the same key on their
+  // runtimeConfig or no bearer is attached. runtimeConfig is server-side
+  // only — never exposed to the client bundle.
+  if (!upstreamHeaders.has('authorization')) {
+    const config = useRuntimeConfig();
+    const projectSecret = (
+      config.nextgen as { projectSecret?: string } | undefined
+    )?.projectSecret;
+    if (projectSecret) {
+      upstreamHeaders.set('authorization', `Bearer ${projectSecret}`);
     }
   }
 
@@ -233,19 +229,12 @@ async function proxyRequest(
     responseHeaders.append('set-cookie', cookie);
   }
 
-  let response = new Response(upstream.body, {
+  const response = new Response(upstream.body, {
     status: upstream.status,
     headers: responseHeaders,
   });
 
-  // Call the exchange hook when the proxied request is POST /sessions/exchange.
-  const isExchange =
-    method === 'POST' && suffix.startsWith('/sessions/exchange');
-  if (isExchange && onExchangeResponse) {
-    response = await onExchangeResponse(response);
-  }
-
-  // Write the (potentially modified) response to the H3 event.
+  // Write the response to the H3 event.
   event.node.res.statusCode = response.status;
   for (const [key, value] of response.headers.entries()) {
     if (key.toLowerCase() === 'set-cookie') continue;
