@@ -9,6 +9,9 @@ scoped `AGENTS.md` files.
 - Supported databases are PostgreSQL and Spanner.
 - Keep dialect-specific SQL behavior, query building, and migrations in
   `internal/storage/database/dialect/`.
+- Storage v2 sketch lives in `internal/storage/v2/`; see
+  [docs/design/storage-v2.md](../../docs/design/storage-v2.md). v1 remains the
+  production path until entities are migrated.
 
 ## Sub-scoped Guidance
 

@@ -201,6 +201,50 @@ func (c *MockFlowDefinitionRepositoryListFlowDefinitionsCall) DoAndReturn(f func
 	return c
 }
 
+// ListFlowDefinitionsPage mocks base method.
+func (m *MockFlowDefinitionRepository) ListFlowDefinitionsPage(ctx context.Context, client database.QueryExecutor, projectID string, opts ...domain.FlowDefinitionListOption) (*domain.FlowDefinitionListResult, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, client, projectID}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ListFlowDefinitionsPage", varargs...)
+	ret0, _ := ret[0].(*domain.FlowDefinitionListResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListFlowDefinitionsPage indicates an expected call of ListFlowDefinitionsPage.
+func (mr *MockFlowDefinitionRepositoryMockRecorder) ListFlowDefinitionsPage(ctx, client, projectID any, opts ...any) *MockFlowDefinitionRepositoryListFlowDefinitionsPageCall {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, client, projectID}, opts...)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListFlowDefinitionsPage", reflect.TypeOf((*MockFlowDefinitionRepository)(nil).ListFlowDefinitionsPage), varargs...)
+	return &MockFlowDefinitionRepositoryListFlowDefinitionsPageCall{Call: call}
+}
+
+// MockFlowDefinitionRepositoryListFlowDefinitionsPageCall wrap *gomock.Call
+type MockFlowDefinitionRepositoryListFlowDefinitionsPageCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockFlowDefinitionRepositoryListFlowDefinitionsPageCall) Return(arg0 *domain.FlowDefinitionListResult, arg1 error) *MockFlowDefinitionRepositoryListFlowDefinitionsPageCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockFlowDefinitionRepositoryListFlowDefinitionsPageCall) Do(f func(context.Context, database.QueryExecutor, string, ...domain.FlowDefinitionListOption) (*domain.FlowDefinitionListResult, error)) *MockFlowDefinitionRepositoryListFlowDefinitionsPageCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockFlowDefinitionRepositoryListFlowDefinitionsPageCall) DoAndReturn(f func(context.Context, database.QueryExecutor, string, ...domain.FlowDefinitionListOption) (*domain.FlowDefinitionListResult, error)) *MockFlowDefinitionRepositoryListFlowDefinitionsPageCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // UpdateFlowDefinitionStatus mocks base method.
 func (m *MockFlowDefinitionRepository) UpdateFlowDefinitionStatus(ctx context.Context, client database.QueryExecutor, projectID, id string, status domain.FlowDefinitionStatus) error {
 	m.ctrl.T.Helper()

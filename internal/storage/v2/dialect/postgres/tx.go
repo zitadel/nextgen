@@ -4,32 +4,26 @@ import (
 	"context"
 	"errors"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	storagedb "github.com/zitadel/nextgen/internal/storage/database"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-type transaction struct {
-	tx pgx.Tx
-	statements
-}
-
 type beginner interface {
-	Begin(ctx context.Context) (pgx.Tx, error)
+	Begin(ctx context.Context, opts *storagedb.TransactionOptions) (storagedb.Transaction, error)
 }
 
-func executeTransaction(ctx context.Context, begin beginner, fn func(ctx context.Context, tx database.Statementer) error) error {
-	tx, err := begin.Begin(ctx)
+func executeTransaction(ctx context.Context, begin beginner, fn func(ctx context.Context, tx v2database.Statementer) error) error {
+	tx, err := begin.Begin(ctx, nil)
 	if err != nil {
 		return err
 	}
+	wrapped := WrapTx(tx)
 	defer func() {
 		if err != nil {
-			err = errors.Join(err, tx.Rollback(ctx))
+			err = errors.Join(err, wrapped.Rollback(ctx))
 			return
 		}
-		err = tx.Commit(ctx)
+		err = wrapped.Commit(ctx)
 	}()
-	return fn(ctx, &transaction{tx: tx, statements: statements{client: tx}})
+	return fn(ctx, wrapped)
 }
-
-var _ database.Statementer = (*transaction)(nil)

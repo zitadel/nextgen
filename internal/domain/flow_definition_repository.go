@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"time"
 
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -18,9 +19,11 @@ type FlowDefinitionRepository interface {
 	// including its purposes, audience, steps, and transitions.
 	GetFlowDefinition(ctx context.Context, client database.QueryExecutor, projectID, id string) (*FlowDefinition, error)
 
-	// ListFlowDefinitions returns the top-level metadata for all definitions
-	// belonging to the given instance. Child records are not populated.
+	// ListFlowDefinitions returns flow definitions for the given project.
 	ListFlowDefinitions(ctx context.Context, client database.QueryExecutor, projectID string, opts ...FlowDefinitionListOption) ([]*FlowDefinition, error)
+
+	// ListFlowDefinitionsPage returns a page of flow definitions and an optional cursor.
+	ListFlowDefinitionsPage(ctx context.Context, client database.QueryExecutor, projectID string, opts ...FlowDefinitionListOption) (*FlowDefinitionListResult, error)
 
 	// UpdateFlowDefinitionStatus transitions a definition to the given status.
 	UpdateFlowDefinitionStatus(ctx context.Context, client database.QueryExecutor, projectID, id string, status FlowDefinitionStatus) error
@@ -40,6 +43,19 @@ type FlowDefinitionListOpts struct {
 	SchemaVersion *string
 	Limit         uint32
 	Offset        uint32
+	Cursor        *FlowDefinitionListCursor
+}
+
+// FlowDefinitionListCursor is the storage-layer cursor for flow definition lists.
+type FlowDefinitionListCursor struct {
+	CreatedAt time.Time
+	ID        string
+}
+
+// FlowDefinitionListResult is a page of flow definitions with optional next cursor.
+type FlowDefinitionListResult struct {
+	Items      []*FlowDefinition
+	NextCursor *FlowDefinitionListCursor
 }
 
 // ApplyFlowDefinitionListOptions resolves a slice of options into a struct.
@@ -96,5 +112,12 @@ func WithFlowDefinitionLimit(limit uint32) FlowDefinitionListOption {
 func WithFlowDefinitionOffset(offset uint32) FlowDefinitionListOption {
 	return func(o *FlowDefinitionListOpts) {
 		o.Offset = offset
+	}
+}
+
+// WithFlowDefinitionCursor continues a list after the given cursor.
+func WithFlowDefinitionCursor(cursor FlowDefinitionListCursor) FlowDefinitionListOption {
+	return func(o *FlowDefinitionListOpts) {
+		o.Cursor = &cursor
 	}
 }

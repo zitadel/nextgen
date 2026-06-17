@@ -3,27 +3,27 @@ package spanner
 import (
 	"context"
 
-	"cloud.google.com/go/spanner"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	storagedb "github.com/zitadel/nextgen/internal/storage/database"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
+// Dialect connects through the v1 Spanner connector configuration.
 type Dialect struct {
-	// Database is the Spanner database string, in the format "projects/{project}/instances/{instance}/databases/{database}".
-	Database string
+	Connector storagedb.Connector
 }
 
-// Connect implements [database.Dialect].
-func (d *Dialect) Connect(ctx context.Context) (database.Pool, error) {
-	client, err := spanner.NewClient(ctx, d.Database)
+// Connect implements [v2database.Dialect].
+func (d Dialect) Connect(ctx context.Context) (v2database.Pool, error) {
+	pool, err := d.Connector.Connect(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return newClient(client), nil
+	return WrapPool(pool), nil
 }
 
-// Name implements [database.Dialect].
-func (d *Dialect) Name() string {
+// Name implements [v2database.Dialect].
+func (d Dialect) Name() string {
 	return "spanner"
 }
 
-var _ database.Dialect = (*Dialect)(nil)
+var _ v2database.Dialect = (*Dialect)(nil)

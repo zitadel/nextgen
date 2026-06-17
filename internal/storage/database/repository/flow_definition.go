@@ -223,6 +223,14 @@ func (r *FlowDefinitionRepository) ListFlowDefinitions(ctx context.Context, clie
 	return rowsToFlowDefinitions(rows)
 }
 
+func (r *FlowDefinitionRepository) ListFlowDefinitionsPage(ctx context.Context, client database.QueryExecutor, projectID string, opts ...domain.FlowDefinitionListOption) (*domain.FlowDefinitionListResult, error) {
+	items, err := r.ListFlowDefinitions(ctx, client, projectID, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &domain.FlowDefinitionListResult{Items: items}, nil
+}
+
 func (r *FlowDefinitionRepository) UpdateFlowDefinitionStatus(ctx context.Context, client database.QueryExecutor, projectID, id string, status domain.FlowDefinitionStatus) error {
 	t := r.meta.tableName
 	condition := database.And(
