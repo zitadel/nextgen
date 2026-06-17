@@ -13,8 +13,11 @@ import { PROXY_PATH } from "./proxy";
 /**
  * Shared Vite dev-server proxy merged into the project's Vite config for the SPA
  * frameworks (React, Vue). It forwards same-origin `/__nextgen/*` calls to the
- * backend, strips the prefix, and attaches the project's `sk_<project_id>`
- * bearer (read from `ZITADEL_PROJECT_ID` in the env) to every proxied request.
+ * backend, strips the prefix, and attaches the project's service-key secret
+ * (read from `ZITADEL_PROJECT_SECRET` in `.env.local`) as the bearer on every
+ * proxied request. The secret stays server-side: Vite only exposes vars with the
+ * configured `envPrefix` (default `VITE_`) to client bundles, so this server-only
+ * key never leaks into the browser.
  */
 function proxyEntryCode(server: string): string {
   return `{
@@ -22,11 +25,11 @@ function proxyEntryCode(server: string): string {
   changeOrigin: false,
   rewrite: (path) => path.replace(/^\\${PROXY_PATH}/, "").replace(/^(?!\\/)/, "/"),
   configure: (proxy) => {
-    const projectId = loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_ID;
-    if (!projectId) {
-      throw new Error("ZITADEL_PROJECT_ID is not set; add it to .env.local (zitadel setup writes it).");
+    const secret = loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_SECRET;
+    if (!secret) {
+      throw new Error("ZITADEL_PROJECT_SECRET is not set; add it to .env.local (zitadel setup writes it).");
     }
-    const bearer = \`Bearer sk_\${projectId}\`;
+    const bearer = \`Bearer \${secret}\`;
     proxy.on("proxyReq", (proxyReq) => {
       proxyReq.setHeader("authorization", bearer);
     });
