@@ -1,0 +1,18 @@
+id: "console-e2e"
+language: "typescript"
+layer: "automation"
+stack: "frontend"
+dependsOn:
+  - "console"
+
+tasks:
+  lint:
+    command: "corepack pnpm exec oxlint ."
+
+  e2e:
+    command: "corepack pnpm exec playwright test"
+    deps:
+      - "console:build"
+    options:
+      runInCI: false
+
