@@ -4,6 +4,7 @@ import type {
 } from '@zitadel/sdk-core/types';
 import type { EventHandler, H3Event } from 'h3';
 
+import { useRuntimeConfig } from '#imports';
 import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
@@ -20,34 +21,8 @@ import {
   getRequestHeader,
   readRawBody,
 } from 'h3';
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
 import { verifyJwt, base64UrlDecode } from '../lib/jwt';
-
-/**
- * Resolve `ZITADEL_PROJECT_SECRET`, falling back to a one-time `.env.local`
- * read at module load. Nuxt's CLI auto-loads `.env` but not `.env.local`, so
- * the var the CLI scaffolds is invisible to `process.env` under standard
- * `nuxt dev`. The fallback bridges that gap without touching the user's
- * dev script. Cached so each request just reads the closure.
- */
-const projectSecret = ((): string | undefined => {
-  if (process.env.ZITADEL_PROJECT_SECRET) {
-    return process.env.ZITADEL_PROJECT_SECRET;
-  }
-  const path = resolve(process.cwd(), '.env.local');
-  if (!existsSync(path)) {
-    return undefined;
-  }
-  for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
-    const match = line.match(/^ZITADEL_PROJECT_SECRET=(.*)$/);
-    if (match && match[1] !== undefined) {
-      return match[1].trim().replace(/^(['"])(.*)\1$/, '$2');
-    }
-  }
-  return undefined;
-})();
 
 declare module 'h3' {
   interface H3EventContext {
@@ -230,12 +205,18 @@ async function proxyRequest(
   const upstreamHeaders = buildUpstreamHeaders(event);
 
   // Attach the project service-key secret as the bearer on every proxied
-  // request. The server's security handler verifies it cryptographically; the
-  // browser never sees the secret because this middleware runs in the Nitro
-  // server runtime and the secret is loaded from `.env.local` (gitignored) at
-  // module init — see `projectSecret` above.
-  if (!upstreamHeaders.has('authorization') && projectSecret) {
-    upstreamHeaders.set('authorization', `Bearer ${projectSecret}`);
+  // request. The module's setup() puts the secret into Nuxt's server-only
+  // runtimeConfig (read from `process.env.ZITADEL_PROJECT_SECRET` at build/dev
+  // start, when Nuxt's env-loading has already populated `process.env`).
+  // runtimeConfig is server-side only — never exposed to the client bundle.
+  if (!upstreamHeaders.has('authorization')) {
+    const config = useRuntimeConfig();
+    const projectSecret = (
+      config.nextgen as { projectSecret?: string } | undefined
+    )?.projectSecret;
+    if (projectSecret) {
+      upstreamHeaders.set('authorization', `Bearer ${projectSecret}`);
+    }
   }
 
   const upstream = await fetch(target, {

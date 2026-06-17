@@ -27,6 +27,11 @@ export default defineNuxtModule<NextgenMiddlewareOptions>({
       loginPath: options.loginPath ?? '/login',
       protectedRoutes: options.protectedRoutes ?? [],
       jwtKey: options.jwtKey,
+      // Read at build/dev start where Nuxt's env-loading has already populated
+      // `process.env` (including from `.env.local`). Lands in server-only
+      // runtimeConfig — never exposed to the client. Override at deploy time
+      // via `NUXT_NEXTGEN_PROJECT_SECRET`.
+      projectSecret: process.env.ZITADEL_PROJECT_SECRET ?? '',
     };
 
     // Expose SDK-initializer values to the client-side plugin so it can
