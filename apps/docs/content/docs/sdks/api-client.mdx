@@ -5,6 +5,7 @@ description: Generated TypeScript client and runtime configuration.
 
 import { Callout } from "fumadocs-ui/components/callout";
 import { Card, Cards } from "fumadocs-ui/components/card";
+import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
 `@zitadel/api` is generated from the OpenAPI source under `api/openapi/`.
 
@@ -15,6 +16,28 @@ It exposes:
 - Zod schemas
 - MSW helpers
 - runtime helpers for base URL and auth
+
+## Install
+
+<Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
+  <Tab>
+    ```sh
+    pnpm add @zitadel/api
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    npm install @zitadel/api
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    yarn add @zitadel/api
+    ```
+  </Tab>
+</Tabs>
+
+## Usage
 
 Use the [API reference](/reference/api) to inspect endpoint shapes. Use package exports from `@zitadel/api` when writing CLI, SDK, or app code against the typed client.
 
@@ -27,3 +50,8 @@ Use the [API reference](/reference/api) to inspect endpoint shapes. Use package 
   <Card title="Sessions" href="/reference/api/sessions" description="Session lifecycle and session-token endpoints." />
   <Card title="Auth attempts" href="/reference/api/authentication-attempts" description="Ephemeral authentication state machine endpoints." />
 </Cards>
+
+## See also
+
+- [API reference](/reference/api) — every endpoint, generated from the same OpenAPI source.
+- [`@zitadel/api` source](https://github.com/zitadel/nextgen/tree/main/packages/api) and the [OpenAPI spec](https://github.com/zitadel/nextgen/tree/main/api/openapi).

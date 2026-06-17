@@ -16,9 +16,23 @@ The Nuxt SDK registers server middleware and plugins so Nuxt pages can read Zita
 
 ## Install
 
-```sh
-pnpm add @zitadel/sdk-nuxt
-```
+<Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
+  <Tab>
+    ```sh
+    pnpm add @zitadel/sdk-nuxt
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    npm install @zitadel/sdk-nuxt
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    yarn add @zitadel/sdk-nuxt
+    ```
+  </Tab>
+</Tabs>
 
 ## Setup
 
@@ -77,4 +91,8 @@ pnpm add @zitadel/sdk-nuxt
 - Confirm `/profile` shows signed-in state.
 - Log out and confirm protected pages redirect to `/login`.
 
-Source references: `packages/sdk-nuxt/README.md`, `apps/cli/src/lib/orca/patchers/rule/nuxt/README.md`.
+## See also
+
+- [SDK proxy](/docs/concepts/sdk-proxy) — why `/__nextgen/*` must be same-origin and how the project key is attached.
+- [`apps/demo-nuxt`](https://github.com/zitadel/nextgen/tree/main/apps/demo-nuxt) — a runnable Nuxt example in this repo.
+- [`@zitadel/sdk-nuxt` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-nuxt) and the [CLI Nuxt patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/nuxt).

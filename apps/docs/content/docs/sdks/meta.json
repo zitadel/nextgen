@@ -1,4 +1,16 @@
 {
   "title": "SDKs",
-  "pages": ["index", "next", "nuxt", "react", "vue", "angular", "components", "api-client"]
+  "pages": [
+    "index",
+    "---Server frameworks---",
+    "next",
+    "nuxt",
+    "---SPA frameworks---",
+    "react",
+    "vue",
+    "angular",
+    "---Building blocks---",
+    "components",
+    "api-client"
+  ]
 }

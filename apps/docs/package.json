@@ -16,6 +16,7 @@
   "dependencies": {
     "@fumapress/ai": "catalog:",
     "@scalar/api-client-react": "catalog:",
+    "@zitadel/design-tokens": "workspace:*",
     "fumadocs-core": "catalog:",
     "fumadocs-mdx": "catalog:",
     "fumadocs-openapi": "catalog:",

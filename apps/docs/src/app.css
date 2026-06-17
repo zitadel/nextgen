@@ -1,11 +1,42 @@
+@import url("https://fonts.googleapis.com/css2?family=Arimo:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap");
 @import "tailwindcss";
 @import "fumadocs-ui/css/neutral.css";
 @import "fumadocs-ui/css/preset.css";
 @import "fumapress/css/preset.css";
+@import "@zitadel/design-tokens/css/tokens.css";
+
+/* Brand the docs with the Zitadel design system (`--zl-*` from @zitadel/design-tokens).
+   Dark-only: ADR 014 §5 ships a single (dark) variable mode for the auth surface, and the
+   docs follow it (forced in press.config.tsx). Arimo is the brand face (ADR 025); the font
+   URL mirrors DEFAULT_BRAND_FONT_HREF in packages/components/src/orchestrator/font-loader.ts. */
 
 @theme {
-  --default-font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono:
-    "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --default-font-family: var(--zl-font-family-sans);
+  --font-sans: var(--zl-font-family-sans);
+  --font-mono: var(--zl-font-family-mono);
+}
+
+/* Map Fumadocs' chrome variables onto brand tokens. Declared for both `:root` and `.dark`
+   so the surface stays on-brand regardless of the theme class. */
+:root,
+.dark {
+  color-scheme: dark;
+
+  --color-fd-background: var(--zl-color-surface-default-black);
+  --color-fd-foreground: var(--zl-color-text-primary-white);
+  --color-fd-muted: var(--zl-color-surface-default-primary-gray);
+  --color-fd-muted-foreground: var(--zl-color-text-secondary-gray);
+  --color-fd-popover: var(--zl-color-surface-default-primary-gray);
+  --color-fd-popover-foreground: var(--zl-color-text-primary-white);
+  --color-fd-card: var(--zl-color-surface-default-primary-gray);
+  --color-fd-card-foreground: var(--zl-color-text-primary-white);
+  --color-fd-border: var(--zl-color-surface-default-secondary-gray);
+  --color-fd-primary: var(--zl-color-text-subtitle-purple);
+  --color-fd-primary-foreground: var(--zl-color-surface-default-black);
+  --color-fd-secondary: var(--zl-color-surface-default-primary-gray);
+  --color-fd-secondary-foreground: var(--zl-color-text-primary-white);
+  --color-fd-accent: var(--zl-color-surface-default-secondary-gray);
+  --color-fd-accent-foreground: var(--zl-color-text-primary-white);
+  --color-fd-ring: var(--zl-color-text-subtitle-purple);
+  --color-fd-error: var(--zl-color-text-error);
 }

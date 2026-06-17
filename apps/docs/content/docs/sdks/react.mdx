@@ -11,14 +11,28 @@ import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 The React SDK is the SPA wrapper for the shared Zitadel login and logout widgets.
 
 <Callout title="SPA proxy requirement" type="warn">
-  React apps do not have server middleware by default. The CLI configures a Vite dev proxy; production deployments need an equivalent same-origin proxy for `/__nextgen/*`.
+  React apps do not have server middleware by default. The CLI configures a Vite dev proxy; production deployments need an equivalent same-origin proxy for `/__nextgen/*`. See [SDK proxy](/docs/concepts/sdk-proxy).
 </Callout>
 
 ## Install
 
-```sh
-pnpm add @zitadel/sdk-react
-```
+<Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
+  <Tab>
+    ```sh
+    pnpm add @zitadel/sdk-react
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    npm install @zitadel/sdk-react
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    yarn add @zitadel/sdk-react
+    ```
+  </Tab>
+</Tabs>
 
 ## Setup
 
@@ -71,4 +85,8 @@ pnpm add @zitadel/sdk-react
 - Confirm logout returns to the configured login path.
 - In browser automation, use shadow-DOM-aware locators because the native inputs live inside shared web components.
 
-Source references: `packages/sdk-react/README.md`, `apps/cli/src/lib/orca/patchers/rule/react/README.md`.
+## See also
+
+- [SDK proxy](/docs/concepts/sdk-proxy) — why SPAs need a same-origin `/__nextgen/*` proxy and how to run one in production.
+- [Components](/docs/sdks/components) — the shared web components these wrappers render.
+- [`@zitadel/sdk-react` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-react) and the [CLI React patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/react).

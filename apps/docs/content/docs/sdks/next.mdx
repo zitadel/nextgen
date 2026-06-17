@@ -16,9 +16,23 @@ The Next.js SDK wires App Router applications through one server-side middleware
 
 ## Install
 
-```sh
-pnpm add @zitadel/sdk-next
-```
+<Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
+  <Tab>
+    ```sh
+    pnpm add @zitadel/sdk-next
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    npm install @zitadel/sdk-next
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    yarn add @zitadel/sdk-next
+    ```
+  </Tab>
+</Tabs>
 
 ## Setup
 
@@ -35,7 +49,7 @@ pnpm add @zitadel/sdk-next
     </Files>
   </Tab>
   <Tab>
-    Create `src/proxy.ts` or `middleware.ts` and call the middleware:
+    Create `src/proxy.ts` at the root of your Next.js app and call the middleware:
 
     ```ts
     import { nextgenMiddleware } from "@zitadel/sdk-next/middleware";
@@ -86,4 +100,8 @@ export default async function Page() {
 - Confirm `/profile` is reachable after login.
 - Log out and confirm `/profile` redirects back to `/login`.
 
-Source references: `packages/sdk-next/README.md`, `apps/cli/src/lib/orca/patchers/rule/next/README.md`.
+## See also
+
+- [SDK proxy](/docs/concepts/sdk-proxy) — why `/__nextgen/*` must be same-origin and how the project key is attached.
+- [`apps/demo-next`](https://github.com/zitadel/nextgen/tree/main/apps/demo-next) — a runnable Next.js example in this repo.
+- [`@zitadel/sdk-next` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-next) and the [CLI Next.js patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/next).

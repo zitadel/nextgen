@@ -11,14 +11,28 @@ import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 The Angular SDK exposes standalone components that wrap the shared Zitadel auth UI.
 
 <Callout title="Generated proxy" type="info">
-  Angular uses a dev-server proxy config rather than Vite middleware. Production still needs a same-origin proxy for `/__nextgen/*`.
+  Angular uses a dev-server proxy config rather than Vite middleware. Production still needs a same-origin proxy for `/__nextgen/*`. See [SDK proxy](/docs/concepts/sdk-proxy).
 </Callout>
 
 ## Install
 
-```sh
-pnpm add @zitadel/sdk-angular
-```
+<Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
+  <Tab>
+    ```sh
+    pnpm add @zitadel/sdk-angular
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    npm install @zitadel/sdk-angular
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    yarn add @zitadel/sdk-angular
+    ```
+  </Tab>
+</Tabs>
 
 ## Setup
 
@@ -70,4 +84,8 @@ pnpm add @zitadel/sdk-angular
 - Confirm logout works with `zitadel-auth-logout`.
 - Remember that the wrapper selector is `zitadel-auth-login`; the underlying custom element is `zitadel-login`.
 
-Source references: `packages/sdk-angular/README.md`, `apps/cli/src/lib/orca/patchers/rule/angular/README.md`.
+## See also
+
+- [SDK proxy](/docs/concepts/sdk-proxy) — why SPAs need a same-origin `/__nextgen/*` proxy and how to run one in production.
+- [Components](/docs/sdks/components) — the shared web components these wrappers render.
+- [`@zitadel/sdk-angular` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-angular) and the [CLI Angular patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/angular).

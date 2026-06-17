@@ -11,14 +11,28 @@ import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 The Vue SDK wraps the shared web components with Vue 3-friendly bindings.
 
 <Callout title="SPA proxy requirement" type="warn">
-  The CLI sets up a Vite dev proxy. Production deployments need a same-origin proxy for `/__nextgen/*`.
+  The CLI sets up a Vite dev proxy. Production deployments need a same-origin proxy for `/__nextgen/*`. See [SDK proxy](/docs/concepts/sdk-proxy).
 </Callout>
 
 ## Install
 
-```sh
-pnpm add @zitadel/sdk-vue
-```
+<Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
+  <Tab>
+    ```sh
+    pnpm add @zitadel/sdk-vue
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    npm install @zitadel/sdk-vue
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    yarn add @zitadel/sdk-vue
+    ```
+  </Tab>
+</Tabs>
 
 ## Setup
 
@@ -70,4 +84,8 @@ pnpm add @zitadel/sdk-vue
 - Confirm logout redirects to the configured path.
 - Use shadow-DOM-aware locators for browser automation.
 
-Source references: `packages/sdk-vue/README.md`, `apps/cli/src/lib/orca/patchers/rule/vue/README.md`.
+## See also
+
+- [SDK proxy](/docs/concepts/sdk-proxy) — why SPAs need a same-origin `/__nextgen/*` proxy and how to run one in production.
+- [Components](/docs/sdks/components) — the shared web components these wrappers render.
+- [`@zitadel/sdk-vue` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-vue) and the [CLI Vue patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/vue).

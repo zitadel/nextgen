@@ -5,6 +5,7 @@ import { mcpPlugin } from "@fumapress/ai";
 import { createOpenAPI } from "fumadocs-openapi/server";
 import { fumadocsMdx } from "fumapress/adapters/mdx";
 import { defineConfig } from "fumapress";
+import { createRootLayout } from "fumapress/layouts/root";
 import { flexsearchPlugin } from "fumapress/plugins/flexsearch";
 import { llmsPlugin } from "fumapress/plugins/llms.txt";
 import { openapiPlugin } from "fumapress/plugins/openapi";
@@ -51,4 +52,15 @@ export default defineConfig({
       pageToIndex: pageToMcpIndex,
     }),
   )
+  .layouts({
+    // Dark-only docs (ADR 014 §5). `createRootLayout()` is the default root factory
+    // (fumapress/layouts/root) — re-creating it here only adds the forced theme.
+    root: createRootLayout({
+      providerProps: {
+        theme: { defaultTheme: "dark", forcedTheme: "dark" },
+      },
+    }),
+    // The theme is forced, so hide the now-inert light/dark switch.
+    defaultProps: () => ({ themeSwitch: { enabled: false } }),
+  })
   .adapters(fumadocsMdx());
