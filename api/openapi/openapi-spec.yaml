@@ -12,8 +12,8 @@ info:
     identifier: MIT
 
 servers:
-  - url: http://localhost:8080
-    description: Local development server
+  - url: /
+    description: Current API origin. Use http://localhost:8080 for local development.
   # Add the public production API once that endpoint is available.
   # - url: https://api.zitadel.com
   #   description: Production API
