@@ -3,7 +3,11 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
+import {
+  resetPlatformStore,
+  setupPlatformHandlers,
+  snapshotPlatformStore,
+} from "@zitadel/api-mock/platform";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
@@ -64,9 +68,9 @@ describe("Next setup integration", () => {
     };
     expect(installLog).toEqual({ cwd: await realpath(cwd), args: ["install"] });
 
-    // The user schema and flow are provisioned server-side when the project
-    // is created. Setup pulls editable copies into `.zitadel/**` and seeds
-    // sync state with the server ids/hashes, so `plan` is immediately empty.
+    // Setup scaffolds the default schema and flow locally, uploads those files
+    // through the resource APIs, and seeds sync state with the returned
+    // ids/hashes, so `plan` is immediately empty.
     expect(await readFile(join(cwd, "zitadel.json"), "utf8")).toContain('"project"');
     const schema = JSON.parse(
       await readFile(join(cwd, ".zitadel/schemas/default-human-user.json"), "utf8"),
@@ -88,8 +92,14 @@ describe("Next setup integration", () => {
     expect(flow.name).toBe("default-login");
     expect(flow.user_schema).toBe(schema["$id"]);
     expect(flow.purposes).toMatchObject({ login: "identifier", register: "register" });
+    expect(snapshotPlatformStore()).toMatchObject({
+      projects: 1,
+      schemas: 1,
+      flowDefinitions: 1,
+      schemaIds: [schema["$id"]],
+    });
     const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
-      resources: Record<string, { id?: string; hash?: string }>;
+      resources: Record<string, { id?: string; hash?: string; name?: string; status?: string }>;
     };
     expect(state.resources[".zitadel/schemas/default-human-user.json"]).toMatchObject({
       id: schema["$id"],
@@ -98,6 +108,8 @@ describe("Next setup integration", () => {
     expect(state.resources[".zitadel/flows/default-login.json"]).toMatchObject({
       id: expect.stringMatching(/^flow_/),
       hash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      name: "default-login",
+      status: "active",
     });
     const loginPage = await readFile(join(cwd, "app/login/page.tsx"), "utf8");
     expect(loginPage).toContain("zitadel-cli: managed-file v1");

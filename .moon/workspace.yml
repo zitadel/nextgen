@@ -14,6 +14,7 @@ projects:
     login-ui: "apps/login-ui"
     api: "packages/api"
     api-mock: "packages/api-mock"
+    config: "packages/config"
     components: "packages/components"
     design-tokens: "packages/design-tokens"
     sdk-angular: "packages/sdk-angular"

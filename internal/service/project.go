@@ -17,7 +17,7 @@ import (
 type ProjectService interface {
 	// Create generates a new project with server-minted secrets and persists it.
 	// Returns the stored project including timestamps.
-	Create(ctx context.Context, previewOrigins []string) (*domain.Project, error)
+	Create(ctx context.Context, previewOrigins []string, seedDefaults ...bool) (*domain.Project, error)
 
 	// Get retrieves a project by ID.
 	// Returns [database.NoRowFoundError] when no project with the given ID exists.
@@ -57,7 +57,7 @@ type projectService struct {
 
 var _ ProjectService = (*projectService)(nil)
 
-func (s *projectService) Create(ctx context.Context, previewOrigins []string) (_ *domain.Project, err error) {
+func (s *projectService) Create(ctx context.Context, previewOrigins []string, seedDefaults ...bool) (_ *domain.Project, err error) {
 	tx, err := s.pool.Begin(ctx, nil)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to start transaction")
@@ -77,17 +77,19 @@ func (s *projectService) Create(ctx context.Context, previewOrigins []string) (_
 		return nil, domain.ErrInternal(err).WithMessage("failed to create project in the database")
 	}
 
-	userschema, err := s.createDefaultUserSchemas(ctx, tx, project.ID)
-	if err != nil {
-		return nil, err
-	}
-	var userSchema *jsonschema.Schema
-	err = json.Unmarshal(userschema.Schema, &userSchema)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to parse default user schema")
-	}
-	if err := s.createDefaultLoginFlowDefinitions(ctx, tx, project.ID, userSchema); err != nil {
-		return nil, err
+	if shouldSeedDefaults(seedDefaults) {
+		userschema, err := s.createDefaultUserSchemas(ctx, tx, project.ID)
+		if err != nil {
+			return nil, err
+		}
+		var userSchema *jsonschema.Schema
+		err = json.Unmarshal(userschema.Schema, &userSchema)
+		if err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to parse default user schema")
+		}
+		if err := s.createDefaultLoginFlowDefinitions(ctx, tx, project.ID, userSchema); err != nil {
+			return nil, err
+		}
 	}
 
 	err = tx.Commit(ctx)
@@ -96,6 +98,13 @@ func (s *projectService) Create(ctx context.Context, previewOrigins []string) (_
 	}
 
 	return project, nil
+}
+
+func shouldSeedDefaults(seedDefaults []bool) bool {
+	if len(seedDefaults) == 0 {
+		return true
+	}
+	return seedDefaults[0]
 }
 
 func (s *projectService) createDefaultUserSchemas(ctx context.Context, client database.QueryExecutor, projectID string) (*domain.JSONSchema, error) {

@@ -17,10 +17,9 @@ export type PatchView = Readonly<{
  * {@link PatchView} with the resolved project, issuer, and server it points
  * at, which fill file contents. Readonly: a patcher never mutates its input.
  *
- * Note: the user schema and flow definition are NOT here. The server
- * provisions those defaults when the project is created; setup pulls editable
- * copies after the patcher has created the base `.zitadel/` directories and
- * sync state.
+ * Note: the user schema and flow definition are NOT here. Setup scaffolds and
+ * uploads those editable resource files after the patcher has created the base
+ * `.zitadel/` directories and sync state.
  */
 export type PatchContext = PatchView &
   Readonly<{

@@ -167,7 +167,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const res = await fetch(`${BASE}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ previewOrigins: ["http://localhost:3000"] }),
+      body: JSON.stringify({ previewOrigins: ["http://localhost:3000"], seedDefaults: false }),
     });
     expect(res.status).toBe(201);
     const body = (await res.json()) as Record<string, unknown>;

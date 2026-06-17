@@ -42,12 +42,12 @@ scaffolds also replace the starter `app/page.tsx` with links to sign in, create
 an account, and profile. Setup writes `.env.local` and `.zitadel/`, and installs
 dependencies with the detected package manager. Pass `--skip-install` to install
 them yourself. The project's default user schema and login flow are provisioned
-server-side at creation time; setup pulls editable copies into
+from versioned local defaults; setup writes editable copies into
 `.zitadel/schemas/default-human-user.json` and
-`.zitadel/flows/default-login.json`, then seeds `.zitadel/state.json` so
-`zitadel plan` is immediately empty. Open the dev server URL printed by your
-framework, register a user, log out, log back in, and end on the signed-in
-profile page.
+`.zitadel/flows/default-login.json`, uploads them through the schema and flow
+APIs, then seeds `.zitadel/state.json` so `zitadel plan` is immediately empty.
+Open the dev server URL printed by your framework, register a user, log out,
+log back in, and end on the signed-in profile page.
 
 For a reproducible tester report, use the exact alpha train from the GitHub
 Release:
@@ -65,6 +65,8 @@ passkey can sign in with either credential.
 
 Repo config is authoritative: edit `zitadel.json`, `.zitadel/schemas/*.json`,
 or `.zitadel/flows/*.json`, then re-run `zitadel plan` and `zitadel apply`.
+Server-provisioned defaults remain a fallback for non-CLI project creation, but
+CLI-created projects are authored from local files first.
 Templates are not supported until the server exposes template storage and APIs.
 Flow create, read, list, and delete are available; updates to existing flows
 fail locally with `E_NOT_IMPLEMENTED` until the server flow lifecycle API lands.

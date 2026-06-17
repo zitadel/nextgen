@@ -29,6 +29,7 @@ to npm:
 - `apps/server-darwin-arm64/` — `@zitadel/server-darwin-arm64`
 - `apps/server-win32-x64/` — `@zitadel/server-win32-x64`
 - `packages/api/` — `@zitadel/api`
+- `packages/config/` — `@zitadel/config`
 - `packages/components/` — `@zitadel/components`
 - `packages/sdk-core/` — `@zitadel/sdk-core`
 - `packages/sdk-next/` — `@zitadel/sdk-next`
@@ -87,7 +88,7 @@ One-line, user-facing summary of the change.
 ```
 
 List only public package names (`@zitadel/cli`, `@zitadel/server`,
-`@zitadel/server-*`, `@zitadel/api`, `@zitadel/components`,
+`@zitadel/server-*`, `@zitadel/api`, `@zitadel/config`, `@zitadel/components`,
 `@zitadel/sdk-core`, `@zitadel/sdk-next`, `@zitadel/sdk-nuxt`,
 `@zitadel/sdk-react`, `@zitadel/sdk-vue`, `@zitadel/sdk-angular`). Pick `patch`
 (fixes), `minor` (features), or `major` (breaking). The repo is in `alpha`

@@ -5,7 +5,8 @@ import type {
   GetFlowDefinition200,
 } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "@zitadel/api/client";
-import { CreateSchemaBody as createSchemaBodySchema } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
+import { flowConfigSchema, schemaConfigSchema } from "@zitadel/config/schemas";
 
 import { FLOWS_DIR, flowEnvRefs, validateFlows } from "../flows";
 import { SCHEMAS_DIR } from "../user-schema";
@@ -65,7 +66,7 @@ class SchemaSyncer implements ResourceSyncer {
    * discriminated on `kind`; both are valid on-disk bodies.
    */
   validate(data: object): void {
-    const result = createSchemaBodySchema.safeParse(data);
+    const result = schemaConfigSchema.safeParse(data);
     if (!result.success) {
       throw new ZitadelError("E_VALIDATION", "Schema file is not a valid Zitadel schema body", {
         details: { issues: result.error.issues },
@@ -121,6 +122,12 @@ class FlowDefinitionSyncer implements ResourceSyncer {
    * lets us reuse the batch validator for one file.
    */
   validate(data: object): void {
+    const result = flowConfigSchema.safeParse(data);
+    if (!result.success) {
+      throw new ZitadelError("E_VALIDATION", "Flow file is not a valid Zitadel flow body", {
+        details: { issues: result.error.issues },
+      });
+    }
     validateFlows([data]);
     assertEnvRefs(data, this.env);
   }
@@ -135,6 +142,7 @@ class FlowDefinitionSyncer implements ResourceSyncer {
   async create(data: object): Promise<string> {
     const result = await this.client.createFlowDefinition({
       project_id: this.projectId,
+      schema_uri: DEFAULT_FLOW_SCHEMA_URI,
       flow_definition: data as CreateFlowDefinitionBodyFlowDefinition,
     });
     return result.id;

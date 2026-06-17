@@ -51,6 +51,12 @@ import {
   UpdateFlowDefinitionParams,
   UpdateFlowDefinitionResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import {
+  DEFAULT_FLOW_SCHEMA_URI,
+  defaultHumanUserSchemaUrl,
+  getDefaultHumanUserSchema,
+  getDefaultLoginFlow,
+} from "@zitadel/config/defaults";
 import { http, HttpResponse } from "msw";
 import type { z } from "zod";
 
@@ -171,12 +177,6 @@ function makeStore(): Store {
   };
 }
 
-const DEFAULT_SCHEMA_URI =
-  "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/components/flows/flow-definition.yaml";
-const DEFAULT_BUILTIN_SCHEMA_BASE = "https://nextgen.com/api/schemas";
-const DEFAULT_USER_SCHEMA_URL = `${DEFAULT_BUILTIN_SCHEMA_BASE}/default-human-user.json`;
-const DEFAULT_FLOW_SCHEMA_URI = "https://nextgen.com/flow-definition.json";
-
 /**
  * Build a `flow-definition-detail-response` envelope around a stored body, as
  * specified by `api/openapi/components/flows/flow-definition-detail-response.yaml`.
@@ -206,126 +206,15 @@ function flowListItemResponse(r: FlowDefinitionRecord): ListFlowDefinitions200Fl
 }
 
 function defaultHumanUserSchema(): GetSchemaById200 {
-  return {
-    title: "ExampleUserSchema",
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    metaSchema: `${DEFAULT_BUILTIN_SCHEMA_BASE}/user-schema.json`,
-    "$id": DEFAULT_USER_SCHEMA_URL,
-    kind: "user-schema",
-    type: "object",
-    description: "This is an example of a user schema definition.",
-    "x-auth-methods": {
-      password: {
-        enabled: true,
-        position: 1,
-      },
-      passkey: {
-        enabled: true,
-        position: 2,
-      },
-    },
-    required: ["email", "password"],
-    properties: {
-      email: {
-        type: "string",
-        format: "email",
-        "x-unique": "project",
-        description: "The user's email address.",
-      },
-      password: {
-        type: "string",
-        minLength: 8,
-        description: "The user's password.",
-        "x-password": true,
-      },
-      givenName: {
-        type: "string",
-        maxLength: 50,
-        description: "The user's given (first) name.",
-      },
-      familyName: {
-        type: "string",
-        maxLength: 50,
-        description: "The user's family (last) name.",
-      },
-      dateOfBirth: {
-        type: "string",
-        format: "date",
-        description: "The user's date of birth (ISO 8601, YYYY-MM-DD).",
-      },
-    },
-  } as unknown as GetSchemaById200;
+  return getDefaultHumanUserSchema() as unknown as GetSchemaById200;
 }
 
 function defaultLoginFlowBody(): Record<string, unknown> {
-  return {
-    name: "default-login",
-    user_schema: DEFAULT_USER_SCHEMA_URL,
-    purposes: {
-      login: "identifier",
-      register: "register",
-    },
-    steps: [
-      {
-        name: "identifier",
-        fields: ["email"],
-        actions: [
-          { name: "submit", primary: true, text_key: "identifier.action.continue" },
-          { name: "passkey", primary: false, text_key: "identifier.action.passkey" },
-        ],
-        transitions: {
-          submit: { target: "password" },
-          passkey: { target: "done" },
-          user_not_found: { target: "register" },
-        },
-      },
-      {
-        name: "password",
-        fields: ["password"],
-        actions: [
-          { name: "submit", primary: true, text_key: "password.action.signin" },
-          { name: "passkey", primary: false, text_key: "password.action.passkey" },
-        ],
-        transitions: {
-          submit: { target: "done" },
-          passkey: { target: "done" },
-        },
-      },
-      {
-        name: "register",
-        fields: ["email", "givenName", "familyName", "dateOfBirth"],
-        actions: [
-          { name: "submit", primary: true, text_key: "register.action.password" },
-          { name: "passkey_register", primary: false, text_key: "register.action.passkey" },
-        ],
-        transitions: {
-          submit: { target: "register-password" },
-          passkey_register: { target: "done" },
-          user_already_exists: { target: "password" },
-        },
-      },
-      {
-        name: "register-password",
-        fields: ["password"],
-        actions: [
-          { name: "submit", primary: true, text_key: "register-password.action.submit" },
-        ],
-        on_success: "create_user",
-        transitions: {
-          submit: { target: "done" },
-          user_already_exists: { target: "password" },
-        },
-      },
-      {
-        name: "done",
-        complete: "show",
-      },
-    ],
-  };
+  return getDefaultLoginFlow() as unknown as Record<string, unknown>;
 }
 
 function seedDefaultProjectResources(projectID: string, createdAt: string): void {
-  store.schemas.set(DEFAULT_USER_SCHEMA_URL, defaultHumanUserSchema());
+  store.schemas.set(defaultHumanUserSchemaUrl(), defaultHumanUserSchema());
   const id = `flow_${shortId()}`;
   store.flowDefinitions.set(id, {
     id,
@@ -369,6 +258,26 @@ export function resetPlatformStore(): void {
   store = makeStore();
 }
 
+export type PlatformStoreSnapshot = {
+  projects: number;
+  schemas: number;
+  flowDefinitions: number;
+  projectIds: string[];
+  schemaIds: string[];
+  flowDefinitionIds: string[];
+};
+
+export function snapshotPlatformStore(): PlatformStoreSnapshot {
+  return {
+    projects: store.projects.size,
+    schemas: store.schemas.size,
+    flowDefinitions: store.flowDefinitions.size,
+    projectIds: [...store.projects.keys()],
+    schemaIds: [...store.schemas.keys()],
+    flowDefinitionIds: [...store.flowDefinitions.keys()],
+  };
+}
+
 export function setupPlatformHandlers() {
   return [
     http.post("*/projects", async ({ request }) => {
@@ -392,7 +301,9 @@ export function setupPlatformHandlers() {
         updatedAt: createdAt,
       };
       store.projects.set(id, project);
-      seedDefaultProjectResources(project.id, createdAt);
+      if (body.data.seedDefaults ?? true) {
+        seedDefaultProjectResources(project.id, createdAt);
+      }
       const responseBody: CreateProject201 = {
         id: project.id,
         projectSecret: project.projectSecret,
@@ -440,8 +351,12 @@ export function setupPlatformHandlers() {
         return body.response;
       }
 
-      const id = `schema_${shortId()}`;
-      store.schemas.set(id, body.data as unknown as GetSchemaById200);
+      const schema = raw as unknown as GetSchemaById200;
+      const id =
+        typeof schema.$id === "string" && schema.$id.length > 0
+          ? schema.$id
+          : `schema_${shortId()}`;
+      store.schemas.set(id, schema);
       const responseBody: CreateSchema201 = { id };
       return HttpResponse.json(responseBody, { status: 201 });
     }),
@@ -497,7 +412,7 @@ export function setupPlatformHandlers() {
         id,
         name: flowDef.name as string,
         projectId: body.data.project_id,
-        schemaUri: body.data.schema_uri ?? DEFAULT_SCHEMA_URI,
+        schemaUri: body.data.schema_uri ?? DEFAULT_FLOW_SCHEMA_URI,
         status: "active",
         createdAt: now,
         updatedAt: now,

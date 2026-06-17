@@ -47,9 +47,9 @@ const FRAMEWORK_OPTIONS = createOrca()
  *
  * Detects (or, for an empty directory, scaffolds then re-detects) the
  * framework, runs the wizard prompts to fill in any answers not pre-supplied
- * by flags, creates the remote project (whose default user schema and login
- * flow are provisioned server-side), patches the local files via `Orca`'s
- * framework patcher, then pulls editable schema/flow config into `.zitadel/**`.
+ * by flags, creates the remote project without server fallback defaults,
+ * patches the local files via `Orca`'s framework patcher, then scaffolds and
+ * uploads editable schema/flow config from `.zitadel/**`.
  *
  * Every interactive question lives in {@link SETUP_PROMPTS} (the main wizard
  * — each entry is a small class) and {@link PickFrameworkPrompt} (the
@@ -171,10 +171,9 @@ export default class Setup extends BaseCommand {
     // origin (both derived from `answers.devPort`).
     framework = { ...framework, devPort: answers.devPort, url: issuer };
 
-    // `POST /projects` is unauthenticated. Creating the project also
-    // provisions its default user schema and login flow server-side; after the
-    // base files exist locally, setup pulls editable copies into `.zitadel/**`
-    // and seeds sync state with the server-provisioned resource identifiers.
+    // `POST /projects` is unauthenticated. CLI-managed projects opt out of
+    // server fallback defaults, then setup uploads the local default schema and
+    // flow files through the typed resource APIs and records the returned IDs.
     consola.start(`Creating project on ${answers.server}${dryRun ? " (dry run)" : ""}`);
     const unauthClient = createZitadelClient({ baseUrl: answers.server });
     // Register the app's own origin so the backend's origin check allows
@@ -343,7 +342,7 @@ async function createProjectWithLocalHint(
   try {
     // Register the app's own origin so the backend's origin check allows the
     // requests the dev proxy forwards from it.
-    return await client.createProject({ previewOrigins: [issuer] });
+    return await client.createProject({ previewOrigins: [issuer], seedDefaults: false });
   } catch (error) {
     const normalized = toZitadelError(error);
     throw new ZitadelError(normalized.code, normalized.message, {

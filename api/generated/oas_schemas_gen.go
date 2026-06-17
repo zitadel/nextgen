@@ -1706,6 +1706,10 @@ func (*CreateHandoffErrorResponseStatusCode) createHandoffRes() {}
 type CreateProjectRequest struct {
 	// Origins which are allowed for previewing and testing the project.
 	PreviewOrigins []string `json:"previewOrigins"`
+	// Whether the server should provision fallback default user schema and flow
+	// resources for the project. CLI-managed projects set this to false and
+	// upload their local .zitadel config files through the schema and flow APIs.
+	SeedDefaults OptBool `json:"seedDefaults"`
 }
 
 // GetPreviewOrigins returns the value of PreviewOrigins.
@@ -1713,9 +1717,19 @@ func (s *CreateProjectRequest) GetPreviewOrigins() []string {
 	return s.PreviewOrigins
 }
 
+// GetSeedDefaults returns the value of SeedDefaults.
+func (s *CreateProjectRequest) GetSeedDefaults() OptBool {
+	return s.SeedDefaults
+}
+
 // SetPreviewOrigins sets the value of PreviewOrigins.
 func (s *CreateProjectRequest) SetPreviewOrigins(val []string) {
 	s.PreviewOrigins = val
+}
+
+// SetSeedDefaults sets the value of SeedDefaults.
+func (s *CreateProjectRequest) SetSeedDefaults(val OptBool) {
+	s.SeedDefaults = val
 }
 
 // Ref: #

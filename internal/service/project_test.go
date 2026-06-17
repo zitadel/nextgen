@@ -21,6 +21,7 @@ func TestProjectService_Create(t *testing.T) {
 	tests := []struct {
 		name                    string
 		previewOrigins          []string
+		seedDefaults            []bool
 		setupProjectRepo        func(*domainmock.MockProjectRepository)
 		setupSchemaRepo         func(*domainmock.MockJSONSchemaRepository)
 		setupFlowDefinitionRepo func(call *domainmock.MockFlowDefinitionRepository)
@@ -78,6 +79,24 @@ func TestProjectService_Create(t *testing.T) {
 			},
 		},
 		{
+			name:         "ok — skip fallback defaults",
+			seedDefaults: []bool{false},
+			setupProjectRepo: func(r *domainmock.MockProjectRepository) {
+				r.EXPECT().
+					Create(gomock.Any(), gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ context.Context, _ database.QueryExecutor, p *domain.Project) error {
+						return nil
+					})
+			},
+			setupPool: func(pool *dbmock.MockPool, transaction *dbmock.MockTransaction) {
+				pool.EXPECT().Begin(gomock.Any(), gomock.Any()).Return(transaction, nil)
+				transaction.EXPECT().Commit(gomock.Any())
+			},
+			check: func(t *testing.T, got *domain.Project) {
+				assert.NotNil(t, got)
+			},
+		},
+		{
 			name:           "repo Create error",
 			previewOrigins: nil,
 			setupProjectRepo: func(r *domainmock.MockProjectRepository) {
@@ -125,7 +144,7 @@ func TestProjectService_Create(t *testing.T) {
 				baseURL,
 				schemaValidator,
 			)
-			got, err := svc.Create(context.Background(), tc.previewOrigins)
+			got, err := svc.Create(context.Background(), tc.previewOrigins, tc.seedDefaults...)
 
 			if tc.wantErr {
 				require.Error(t, err)

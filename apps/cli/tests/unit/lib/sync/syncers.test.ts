@@ -3,6 +3,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 
 import { createZitadelClient } from "@zitadel/api/client";
+import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
 
 import { FLOWS_DIR } from "../../../../src/lib/flows";
 import { SCHEMAS_DIR } from "../../../../src/lib/user-schema";
@@ -166,7 +167,7 @@ describe("FlowDefinitionSyncer", () => {
     expect(() => flow.validate(FLOW_WITH_ENV_REF)).not.toThrow();
   });
 
-  it("create POSTs the spec envelope `{project_id, flow_definition}` and returns the platform id", async () => {
+  it("create POSTs the spec envelope `{project_id, schema_uri, flow_definition}` and returns the platform id", async () => {
     let receivedBody: unknown;
     server.use(
       http.post(`${BASE}/flow_definitions`, async ({ request }) => {
@@ -180,7 +181,11 @@ describe("FlowDefinitionSyncer", () => {
     const id = await flow.create(data);
 
     expect(id).toBe("flow-id-1");
-    expect(receivedBody).toEqual({ project_id: "proj-1", flow_definition: data });
+    expect(receivedBody).toEqual({
+      project_id: "proj-1",
+      schema_uri: DEFAULT_FLOW_SCHEMA_URI,
+      flow_definition: data,
+    });
   });
 
   it("update fails locally until the server flow lifecycle API exists", async () => {

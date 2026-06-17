@@ -6,6 +6,8 @@
 export type ResourceEntry = {
   id?: string;
   hash?: string;
+  name?: string;
+  status?: string;
 };
 
 /**

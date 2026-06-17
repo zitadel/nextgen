@@ -62,6 +62,7 @@
     "@oclif/plugin-version": "catalog:",
     "@oclif/plugin-which": "catalog:",
     "@zitadel/api": "workspace:*",
+    "@zitadel/config": "workspace:*",
     "@zitadel/server": "workspace:*",
     "ajv": "catalog:",
     "consola": "^3.4.2",

@@ -118,14 +118,20 @@ func TestCreateProject(t *testing.T) {
 }
 
 func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	client := harness.EnsureAnonymousAPIClient(t)
+
+	resp, err := client.CreateProject(t.Context(), &api.CreateProjectRequest{
+		PreviewOrigins: make([]string, 0),
+	})
 	require.NoError(t, err)
+	require.IsType(t, &api.CreateProjectResponse{}, resp, helpers.MustMarshal(t, resp))
+	projectID := resp.(*api.CreateProjectResponse).ID
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 	schema, err := harness.EnsureSchemaRepo(t).GetByID(
 		t.Context(),
 		harness.EnsureDBPool(t),
-		project.ID,
+		projectID,
 		schemaURL,
 	)
 	require.NoError(t, err)
@@ -134,7 +140,7 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 	flowDefs, err := harness.EnsureFlowDefinitionRepo(t).ListFlowDefinitions(
 		t.Context(),
 		harness.EnsureDBPool(t),
-		project.ID,
+		projectID,
 		domain.WithFlowDefinitionName("default-login"),
 	)
 	require.NoError(t, err)
@@ -173,6 +179,36 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 
 	_, ok = flowDef.FindStep("passkey-upsell")
 	assert.False(t, ok)
+}
+
+func TestCreateProjectSkipsDefaultLoginFlow(t *testing.T) {
+	client := harness.EnsureAnonymousAPIClient(t)
+
+	resp, err := client.CreateProject(t.Context(), &api.CreateProjectRequest{
+		PreviewOrigins: make([]string, 0),
+		SeedDefaults:   api.NewOptBool(false),
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.CreateProjectResponse{}, resp, helpers.MustMarshal(t, resp))
+	projectID := resp.(*api.CreateProjectResponse).ID
+
+	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
+	_, err = harness.EnsureSchemaRepo(t).GetByID(
+		t.Context(),
+		harness.EnsureDBPool(t),
+		projectID,
+		schemaURL,
+	)
+	require.Error(t, err)
+
+	flowDefs, err := harness.EnsureFlowDefinitionRepo(t).ListFlowDefinitions(
+		t.Context(),
+		harness.EnsureDBPool(t),
+		projectID,
+		domain.WithFlowDefinitionName("default-login"),
+	)
+	require.NoError(t, err)
+	assert.Empty(t, flowDefs)
 }
 
 func TestGetProject(t *testing.T) {

@@ -1,0 +1,52 @@
+{
+  "title": "ExampleUserSchema",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "metaSchema": "${SERVER_URL}/user-schema.json",
+  "$id": "${USER_SCHEMA_URL}",
+  "kind": "user-schema",
+  "type": "object",
+  "description": "This is an example of a user schema definition.",
+  "x-auth-methods": {
+    "password": {
+      "enabled": true,
+      "position": 1
+    },
+    "passkey": {
+      "enabled": true,
+      "position": 2
+    }
+  },
+  "required": [
+    "email",
+    "password"
+  ],
+  "properties": {
+    "email": {
+      "type": "string",
+      "format": "email",
+      "x-unique": "project",
+      "description": "The user's email address."
+    },
+    "password": {
+      "type": "string",
+      "minLength": 8,
+      "description": "The user's password.",
+      "x-password": true
+    },
+    "givenName": {
+      "type": "string",
+      "maxLength": 50,
+      "description": "The user's given (first) name."
+    },
+    "familyName": {
+      "type": "string",
+      "maxLength": 50,
+      "description": "The user's family (last) name."
+    },
+    "dateOfBirth": {
+      "type": "string",
+      "format": "date",
+      "description": "The user's date of birth (ISO 8601, YYYY-MM-DD)."
+    }
+  }
+}

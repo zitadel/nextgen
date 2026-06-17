@@ -31,6 +31,7 @@
   "dependencies": {
     "@mswjs/http-middleware": "catalog:",
     "@zitadel/api": "workspace:*",
+    "@zitadel/config": "workspace:*",
     "cookie-parser": "catalog:",
     "express": "catalog:",
     "xstate": "catalog:"

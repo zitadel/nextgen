@@ -5,6 +5,7 @@ stack: "frontend"
 dependsOn:
   - "api"
   - "api-mock"
+  - "config"
   - "sdk-next"
 
 tasks:
@@ -12,18 +13,21 @@ tasks:
     command: "corepack pnpm exec oxlint ."
     deps:
       - "api:build"
+      - "config:build"
       - "sdk-next:build"
 
   typecheck:
     command: "corepack pnpm run typecheck"
     deps:
       - "api:build"
+      - "config:build"
       - "sdk-next:build"
 
   build:
     command: "corepack pnpm run build"
     deps:
       - "api:build"
+      - "config:build"
       - "sdk-next:build"
     outputs:
       - "dist/**/*"
