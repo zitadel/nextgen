@@ -104,6 +104,10 @@ const FRAMEWORK_FIXTURES = [
           projects: { demo: { architect: { serve: { options: {} } } } },
         }),
       );
+      await writeFile(
+        join(cwd, "src/app/app.routes.ts"),
+        "import { Routes } from '@angular/router';\n\nexport const routes: Routes = [];\n",
+      );
       return cwd;
     },
   },

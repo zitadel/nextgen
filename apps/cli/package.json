@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/cli",
-  "version": "0.1.0-alpha.5",
+  "version": "0.1.0-alpha.10",
   "description": "Agent-friendly Zitadel CLI",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/cli#readme",
   "bugs": {
@@ -62,6 +62,7 @@
     "@oclif/plugin-version": "catalog:",
     "@oclif/plugin-which": "catalog:",
     "@zitadel/api": "workspace:*",
+    "@zitadel/server": "workspace:*",
     "ajv": "catalog:",
     "consola": "^3.4.2",
     "magicast": "^0.5.3",
@@ -77,43 +78,5 @@
     "oclif": "catalog:",
     "tsdown": "^0.21.10",
     "vitest": "^3.0.0"
-  },
-  "nx": {
-    "targets": {
-      "build": {
-        "options": {
-          "cache": true
-        },
-        "inputs": [
-          "production",
-          "^production",
-          {
-            "externalDependencies": [
-              "tsdown"
-            ]
-          }
-        ],
-        "outputs": [
-          "{projectRoot}/dist/**/*.mjs",
-          "{projectRoot}/dist/**/*.mjs.map"
-        ],
-        "dependsOn": [
-          "^build",
-          "^typecheck"
-        ]
-      },
-      "readme": {
-        "dependsOn": [
-          "build"
-        ],
-        "inputs": [
-          "{projectRoot}/dist/**/*.mjs",
-          "{projectRoot}/README.md"
-        ],
-        "outputs": [
-          "{projectRoot}/README.md"
-        ]
-      }
-    }
   }
 }

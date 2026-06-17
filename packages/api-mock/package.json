@@ -48,16 +48,6 @@
     "tsx": "catalog:",
     "zod": "catalog:"
   },
-  "nx": {
-    "targets": {
-      "build": {
-        "executor": "nx:noop",
-        "dependsOn": [
-          "^build"
-        ]
-      }
-    }
-  },
   "msw": {
     "workerDirectory": [
       "public"

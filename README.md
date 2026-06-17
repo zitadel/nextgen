@@ -5,7 +5,7 @@ Next iteration of the Zitadel identity platform.
 > **Preview status:** This repository is a pre-release next-generation Zitadel
 > preview. The public name may change, and APIs, CLI flags, package surfaces,
 > and docs are still in flux. The checked-in CLI currently supports the local
-> Docker-backed flow documented below; create-first, claim-later is the product
+> npm-binary flow documented below; create-first, claim-later is the product
 > direction, but `zitadel claim` is not shipped in this repo yet. See
 > [VISION.md](VISION.md).
 
@@ -13,15 +13,8 @@ Next iteration of the Zitadel identity platform.
 
 ### I am contributing to Zitadel
 
-| I want to...                       | Run                                      |
-| ---------------------------------- | ---------------------------------------- |
-| Check my setup                     | `corepack pnpm run doctor`               |
-| Try the local Zitadel CLI          | `corepack pnpm run cli -- --help`        |
-| Run the server from source         | `corepack pnpm run server -- --help`     |
-| Test the fresh-app onboarding path | `corepack pnpm run journey`              |
-| Run normal local checks            | `corepack pnpm run check`                |
-| Mirror CI locally                  | `corepack pnpm run check -- --full`      |
-| Rerun one failed phase             | `corepack pnpm run check -- --only node` |
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contributor setup, Moon commands,
+local checks, source builds, release workflows, and troubleshooting.
 
 ### I am adding Zitadel to my app
 
@@ -34,27 +27,10 @@ Next iteration of the Zitadel identity platform.
 | Stop local Zitadel, keeping data  | `npx @zitadel/cli@alpha stop`                                  |
 | Delete local Zitadel data         | `npx @zitadel/cli@alpha reset --force`                         |
 
-Nx manages TypeScript workspace targets. Go commands and long-running local
-orchestration run through repository scripts so server processes are signaled
-and cleaned up directly. The published `zitadel` runtime commands are customer
-workflow commands; they run the released container image through Docker and do
-not require Go, Nx, or a source checkout.
-
-For contributors, `corepack pnpm run cli -- start` builds and uses a fresh
-local runtime image by default. The wrapper runs the CLI build, then builds
-`ghcr.io/zitadel/nextgen:local-dev` through GoReleaser's single-target build
-before invoking `zitadel start`. Pass `--image <tag>` or set
-`ZITADEL_LOCAL_IMAGE=<tag>` to use an existing image instead.
-
-`corepack pnpm run cli -- setup ...` is the manual whole-local-train path for
-humans and agents. Before invoking the local CLI, the wrapper builds and packs
-the public workspace packages, publishes them to a persistent local Verdaccio
-registry under `tmp/cli-local-registry`, and points the generated app install at
-that registry. Set `ZITADEL_CLI_USE_PUBLIC_PACKAGES=1` when you intentionally
-want the generated app to install public npm packages instead.
-
-`corepack pnpm run server` builds and syncs the embedded console/login UI before
-startup, then runs `go run .`; help output skips the UI sync.
+The published `zitadel` runtime commands run the released local runtime through
+the `@zitadel/server` npm binary by default and do not require Docker, Go, Moon,
+or a source checkout. Docker remains available with
+`zitadel start --runtime docker`.
 
 ## Customer quick start
 
@@ -68,7 +44,7 @@ npm run dev
 ```
 
 Open http://localhost:3000/login and register your first local user. The
-managed Zitadel runtime stores its container metadata and data under
+managed Zitadel runtime stores its metadata and data under
 `.zitadel/local/`; `stop` preserves that data and `reset --force`
 deletes it. In a fresh directory, `setup` asks which framework to scaffold and
 writes the app into the current directory. It installs dependencies with the
@@ -102,82 +78,31 @@ CI produces installable snapshots for review, not official releases.
 
 For product direction and public-readiness notes, see [VISION.md](VISION.md).
 
-## Local checks
+## Contributor workflows
 
-Use Node.js from [.nvmrc](.nvmrc) and the pinned pnpm 10 workspace manager from
-`package.json`. Start with the local doctor, then run the fast check set:
-
-```sh
-corepack pnpm run doctor
-corepack pnpm run check
-```
-
-The repository doctor checks Docker and GoReleaser because contributor
-`corepack pnpm run cli -- start` auto-builds the local runtime image from this
-source checkout. Playwright browsers remain advisory for opt-in e2e and journey
-workflows.
-
-`corepack pnpm run check -- --full` runs the slower CI-parity phases, including
-integration tests, demo e2e, package smoke checks, GoReleaser, and the fresh-app
-journey. Use `--only <phase>` to rerun one phase after a failure.
-
-To seed demo users for local login testing, pass bootstrap JSON files when starting the server (see [examples/bootstrap-users/](examples/bootstrap-users/)):
-
-```sh
-corepack pnpm run server -- -c <config.yaml> --user-file examples/bootstrap-users/demo-admin.json
-```
-
-The server wrapper runs `scripts/sync-embedded-ui-dist.sh all` before startup so
-the default embedded UI routes work from source. Run that script manually only
-when bypassing the wrapper with direct `go run .`.
-
-Package smoke checks:
-
-```sh
-corepack pnpm run cli -- --version
-corepack pnpm run cli -- commands
-corepack pnpm --silent run cli -- status --json
-corepack pnpm run check -- --only pack
-```
-
-Use `corepack pnpm --silent run cli -- ... --json` when a script needs
-parseable CLI stdout. Plain `pnpm run` prints its own script prelude before
-the command output.
-
-Customer local setup journey check:
-
-```sh
-corepack pnpm run journey
-```
-
-This opt-in check ensures the Playwright Chromium browsers are installed, builds
-the local npm packages, publishes them to a temporary Verdaccio registry, runs
-`npx @zitadel/cli@alpha doctor`, `start`, and
-`setup --framework <id> --server local` in fresh app directories for every
-supported framework, starts the generated apps, and verifies registration/login
-journeys. Use `corepack pnpm run journey -- --framework next` to run only the
-Next.js journey.
-
-Use `corepack pnpm run journey` for deterministic CI-style proof. Use
-`corepack pnpm run cli -- ...` when you want to drive the same local package
-train manually in a browser and see whether the command guidance is clear enough
-for a human or agent.
+For source builds, local checks, package smoke checks, fresh-app journeys,
+server bootstrapping, and release tasks, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## CI
 
-Pull requests and pushes to `main` run:
+Pull requests run parallel CI checks. Branch protection currently requires the
+GitHub Actions context `full-pr`, shown in the pull request UI as
+`ci / full-pr`. Changesets comments give package release intent feedback
+without adding a blocking CI gate. `ci / full-pr` runs the Moon-driven PR
+confidence path on a 16-core Depot runner:
 
 - Go vet and tests.
-- pnpm install and Nx lint/typecheck/build/test targets.
+- pnpm install and Moon lint/typecheck/build/test tasks.
 - Built CLI smoke checks.
 - npm package dry-run/pack checks.
-- A non-publishing GoReleaser snapshot.
-- `consumer-journey-e2e`, which downloads the current workflow's GoReleaser
-  snapshot image and npm package tarballs, installs the CLI through a temporary
-  npm registry, runs the customer local setup commands in a fresh app directory,
-  and runs the Playwright user journey against the generated app.
+- A non-publishing Moon release snapshot without building a container.
+- The fresh-app journey against the default npm server binary runtime.
 
-CI uploads short-lived workflow artifacts for review: GoReleaser snapshot output
+Changesets version PRs run a smaller release/package validation path. The
+Docker fallback journey remains an opt-in local/manual check via
+`moon run workspace:journey -- --runtime docker --image <docker-tag>`.
+
+CI uploads short-lived workflow artifacts for review: Moon release snapshot output
 and npm package tarballs. On consumer journey failures it also uploads focused
 diagnostics such as Playwright traces, doctor/start/setup JSON, package lock
 metadata, local runtime logs, and service logs. These artifacts expire after 7
@@ -185,59 +110,67 @@ days and are not release artifacts.
 
 ## Build & release
 
-This monorepo uses GoReleaser for Go artifacts and Changesets for npm package
-versioning. During the public alpha period, the release train intentionally
-publishes one version across the server image, server binary, CLI, and public
-npm packages. The full rationale lives in
+This monorepo uses Moon for task execution, non-npm artifact builds, and the
+draft GitHub Release shell for `v<version>`. Changesets owns package versions,
+changelogs, npm publishing, and public package tags. Product release prose is
+written manually by maintainers when a GitHub Release is published.
+The current alpha release model uses one fixed Changesets version across the
+CLI, server npm runtime, API packages, components, and SDKs. The full rationale
+lives in
 [docs/adrs/002-multi-package-release-strategy.md](docs/adrs/002-multi-package-release-strategy.md)
 and [docs/adrs/023-lockstep-alpha-release-train.md](docs/adrs/023-lockstep-alpha-release-train.md).
 
-### Go server binary + embedded UIs (`goreleaser`)
+### Moon release artifacts
 
-GoReleaser builds the console and login-ui SPAs, syncs them into `internal/*/dist`,
-and embeds them into the `nextgen` binary (`scripts/sync-embedded-ui-dist.sh`).
+Moon runs repo-owned scripts that build the console and login-ui SPAs directly
+into `internal/staticui/*/dist`, cross-compile the Go server, stage npm
+platform packages, create archives and checksums, build Docker images, and
+assemble release metadata.
 
 ```sh
-# Local snapshot (no publish, no signing)
-goreleaser release --snapshot --clean --skip=publish,sign
+# Local snapshot without publishing
+moon run release:snapshot
 
-# Run a snapshot Docker image (defaults to `nextgen server`)
-docker run --rm -p 8080:8080 \
-  -v "$PWD/.zitadel/local/nextgen-data:/var/lib/zitadel/nextgen-data" \
-  -e NEXTGEN_SERVER_DATA_DIR=/var/lib/zitadel/nextgen-data \
-  ghcr.io/zitadel/nextgen:<snapshot-tag>-amd64
+# Dry-run the publish graph
+moon run release:publish -- --dry-run
 ```
 
-The manual `.github/workflows/release.yml` workflow remains available for server
-snapshots and fallback releases. The normal public alpha path runs GoReleaser
-from [`release-npm.yml`](.github/workflows/release-npm.yml) after npm publishing
-succeeds, so the server image and npm packages share the same alpha version.
+Release output lands in `dist/release/<version>`. The workflow publishes
+immutable container version tags from the fixed `@zitadel/server` version and
+creates or updates the matching draft GitHub Release with generated artifact and
+package facts; stable releases may also move `ghcr.io/zitadel/nextgen:latest`.
 
 ### npm packages (`changesets`)
 
-`apps/cli` and the public packages under `packages/` publish to npm via
-[changesets](https://github.com/changesets/changesets). On any user-visible
-change to those packages:
+`apps/cli`, `apps/server*`, and the public packages under `packages/` publish
+to npm via [changesets](https://github.com/changesets/changesets). On any
+user-visible change to those packages:
 
 ```sh
 corepack pnpm changeset
 ```
 
-The changesets workflow opens a "Version Packages" PR. Merging that PR publishes
-the fixed alpha package group through npm trusted publishing, validates that all
-public packages share the same `0.1.0-alpha.N` version, creates `v<version>`,
-runs GoReleaser, and updates one draft GitHub Release titled
-`ZITADEL Alpha <version>`. Alpha releases are GitHub prereleases and publish only
-the immutable image tag, for example `ghcr.io/zitadel/nextgen:0.1.0-alpha.N`;
-they do not move `ghcr.io/zitadel/nextgen:latest`.
+When pending changesets land on `main`, `release-publish.yml` runs the
+Changesets action and opens or updates the version PR with the release GitHub
+App so the required `full-pr` check runs normally. After that PR is reviewed
+and merged, the same workflow detects the generated version commit, publishes
+npm packages with Changesets, pushes the matching container image, and creates
+or updates the matching draft GitHub Release. Maintainers add product prose and
+publish the draft when an announcement is needed.
 
-Follow the short [alpha release runbook](docs/runbooks/release-alpha-train.md)
-when cutting a public alpha train.
+Preview local Changesets status with:
+
+```sh
+corepack pnpm exec changeset status --since origin/main
+```
+
+Follow the [release runbook](docs/runbooks/manual-release.md) when cutting or
+recovering a release.
 
 Release process checks can be run locally with:
 
 ```sh
-corepack pnpm run check -- --only release
+moon run release:snapshot
 ```
 
 Tester commands use either the latest alpha stream or an exact train:

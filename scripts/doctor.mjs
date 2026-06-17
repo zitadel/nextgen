@@ -16,7 +16,7 @@ checkNodeModules();
 await checkGo();
 await checkDocker();
 await checkPlaywright();
-await checkGoReleaser();
+await checkMoon();
 
 printResults();
 process.exit(required.length > 0 ? 1 : 0);
@@ -58,7 +58,7 @@ async function checkPnpm() {
 }
 
 function checkNodeModules() {
-  if (existsSync(join(repoRoot, "node_modules", ".bin", "nx"))) {
+  if (existsSync(join(repoRoot, "node_modules", ".bin", "moon"))) {
     pass("workspace dependencies are installed");
     return;
   }
@@ -123,20 +123,16 @@ async function checkPlaywright() {
   );
 }
 
-async function checkGoReleaser() {
+async function checkMoon() {
   try {
-    const { stdout, stderr } = await runCapture("goreleaser", ["--version"], {
+    const { stdout } = await runCapture("moon", ["--version"], {
       cwd: repoRoot,
     });
-    const versionLine = `${stdout}${stderr}`
-      .split(/\r?\n/)
-      .find((line) => line.startsWith("GitVersion:"));
-    const version = versionLine?.split(/\s+/).at(1) ?? "available";
-    pass(`GoReleaser ${version}`);
+    pass(`Moon ${stdout.trim()}`);
   } catch {
     fail(
-      "GoReleaser is not available; local runtime image builds and release checks need it",
-      "Install GoReleaser v2: https://goreleaser.com/install/",
+      "Moon is not available; local checks and release tasks need it",
+      "Run: corepack pnpm install --frozen-lockfile",
     );
   }
 }

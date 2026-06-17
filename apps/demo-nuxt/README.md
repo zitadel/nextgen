@@ -4,12 +4,12 @@ A minimal Nuxt application demonstrating [Nextgen Auth](../../packages/sdk-nuxt)
 
 ## Running locally
 
-Use **Nx** from the repo root (`corepack pnpm install` first).
+Use **Moon** from the repo root (`corepack pnpm install` first).
 
 Build the SDK (and its transitive dependencies) once before the first run:
 
 ```bash
-corepack pnpm nx build @zitadel/sdk-nuxt
+moon run sdk-nuxt:build
 ```
 
 ### 1. Configure environment
@@ -33,14 +33,14 @@ Two terminals:
 
 ```bash
 # Terminal 1 — mock auth server on port 4000
-corepack pnpm nx start @zitadel/api-mock
+moon run api-mock:start
 
 # Terminal 2 — Nuxt on port 3001
-corepack pnpm nx dev @zitadel/demo-nuxt
+moon run demo-nuxt:dev
 
 # …or with inline env overrides:
 # ZITADEL_URL=https://my-instance.zitadel.cloud NUXT_PUBLIC_ZITADEL_PROJECT_ID=abc123 \
-#   corepack pnpm nx dev @zitadel/demo-nuxt
+#   moon run demo-nuxt:dev
 ```
 
 Open [http://localhost:3001/login](http://localhost:3001/login). Any email/password combination is accepted by the mock server.
@@ -48,18 +48,18 @@ Open [http://localhost:3001/login](http://localhost:3001/login). Any email/passw
 **UI-only iteration** (no Nuxt, no TCP mock):
 
 ```bash
-corepack pnpm nx dev @zitadel/components
+moon run components:dev
 # → http://localhost:5173/?route=login
 # → http://localhost:5173/?route=atoms
 
-corepack pnpm nx dev @zitadel/console
+moon run console:dev
 # → http://localhost:5174
 ```
 
 After changing `@zitadel/components`, rebuild before refreshing:
 
 ```bash
-corepack pnpm nx build @zitadel/components
+moon run components:build
 ```
 
 The demo imports the package from `dist/`, not source.
