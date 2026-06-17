@@ -156,23 +156,22 @@ func TestPasskeyRegistrationService_Begin_UsernameAndDisplayName(t *testing.T) {
 	svc := buildTestRegistrationSvc(regRepo, pkRepo)
 
 	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
-		ProjectID:   "proj-1",
-		UserID:      "user-1",
-		RPID:        "example.com",
-		RPOrigins:   []string{"https://example.com"},
-		Username:    "alice@example.com",
-		DisplayName: "Alice Smith",
+		ProjectID: "proj-1",
+		UserID:    "user-1",
+		RPID:      "example.com",
+		RPOrigins: []string{"https://example.com"},
+		Username:  "alice@example.com",
 	})
 	require.NoError(t, err)
 
 	var optMap map[string]any
 	require.NoError(t, json.Unmarshal(out.Options, &optMap))
 
-	// user.name and user.displayName should reflect the provided values.
+	// user.name and user.displayName both reflect the username.
 	user, ok := optMap["user"].(map[string]any)
 	require.True(t, ok, "options must contain a user object")
 	assert.Equal(t, "alice@example.com", user["name"])
-	assert.Equal(t, "Alice Smith", user["displayName"])
+	assert.Equal(t, "alice@example.com", user["displayName"])
 }
 
 func TestPasskeyRegistrationService_Begin_FallsBackToUserID(t *testing.T) {
@@ -185,7 +184,7 @@ func TestPasskeyRegistrationService_Begin_FallsBackToUserID(t *testing.T) {
 		UserID:    "user-1",
 		RPID:      "example.com",
 		RPOrigins: []string{"https://example.com"},
-		// Username and DisplayName left empty — should fall back to UserID.
+		// Username left empty — should fall back to UserID.
 	})
 	require.NoError(t, err)
 

@@ -39,12 +39,11 @@ func NewPasskeyRegistrationService(
 
 // BeginRegistrationInput carries the parameters needed to start a passkey registration ceremony.
 type BeginRegistrationInput struct {
-	ProjectID   string
-	UserID      string
-	RPID        string
-	RPOrigins   []string
-	Username    string // e.g. email; falls back to UserID when empty
-	DisplayName string // e.g. "Jane Doe"; falls back to Username then UserID
+	ProjectID string
+	UserID    string
+	RPID      string
+	RPOrigins []string
+	Username  string // e.g. email; falls back to UserID when empty
 }
 
 // BeginRegistrationOutput is returned by [PasskeyRegistrationService.Begin].
@@ -71,12 +70,8 @@ func (s *PasskeyRegistrationService) Begin(ctx context.Context, in BeginRegistra
 	if username == "" {
 		username = in.UserID
 	}
-	displayName := in.DisplayName
-	if displayName == "" {
-		displayName = username
-	}
 	challenge, err := domain.CreatePasskeyRegistrationChallenge(
-		in.UserID, username, displayName,
+		in.UserID, username, username,
 		existing,
 		in.RPID, origins,
 	)
