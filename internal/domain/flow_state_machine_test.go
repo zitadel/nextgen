@@ -797,7 +797,8 @@ func passkeyIdentifierDefinition() *domain.FlowDefinition {
 		ID:         "def-passkey-identifier",
 		UserSchema: defaultSchemaURL,
 		Purposes: map[domain.FlowDefinitionPurpose]string{
-			domain.FlowDefinitionPurposeLogin: "identifier",
+			domain.FlowDefinitionPurposeLogin:    "identifier",
+			domain.FlowDefinitionPurposeRegister: "register",
 		},
 		Steps: []domain.FlowDefinitionStep{
 			{
