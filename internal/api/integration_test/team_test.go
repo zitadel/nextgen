@@ -15,7 +15,7 @@ import (
 func TestCreateTeam(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
-		project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+		project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 		require.NoError(t, err)
 
 		req := &api.CreateTeamRequest{}
@@ -44,7 +44,7 @@ func TestCreateTeam(t *testing.T) {
 
 func TestGetTeam(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
-		project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+		project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 		require.NoError(t, err)
 		team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
 			ProjectID: project.ID,
@@ -64,7 +64,7 @@ func TestGetTeam(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 		t.Run("non existing team", func(t *testing.T) {
-			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 			require.NoError(t, err)
 
 			params := api.GetTeamParams{

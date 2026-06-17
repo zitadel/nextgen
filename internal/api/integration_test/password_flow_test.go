@@ -25,7 +25,7 @@ import (
 // shape so neither the dispatch nor the password challenge can regress
 // behind the unit suite.
 func TestPasswordLoginFlow(t *testing.T) {
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 	require.NoError(t, err)
 
 	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
@@ -128,7 +128,7 @@ func TestPasswordLoginFlow(t *testing.T) {
 // TestPasswordLoginFlow_UnknownEmail confirms an unknown identifier routes to
 // the `user_not_found` outcome without ever attempting password verification.
 func TestPasswordLoginFlow_UnknownEmail(t *testing.T) {
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
@@ -178,7 +178,7 @@ func TestPasswordLoginFlow_UnknownEmail(t *testing.T) {
 // the user + password row land in the database and a handoff token is issued
 // so the new user is auto-signed-in.
 func TestPasswordRegisterFlow(t *testing.T) {
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
@@ -253,7 +253,7 @@ func TestPasswordRegisterFlow(t *testing.T) {
 // the same email surfaces user_already_exists via the create_user writer
 // (UniqueError → StepError handled by the flow engine).
 func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)

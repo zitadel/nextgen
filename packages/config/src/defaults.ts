@@ -3,8 +3,12 @@ import type {
   CreateSchemaBody,
 } from "@zitadel/api/generated/model";
 
-import defaultHumanUserSchemaTemplate from "../defaults/default-human-user.json";
-import defaultLoginFlowTemplate from "../defaults/default-login.json";
+import defaultHumanUserSchemaTemplate from "../defaults/default-human-user.json" with {
+  type: "json",
+};
+import defaultLoginFlowTemplate from "../defaults/default-login.json" with {
+  type: "json",
+};
 
 export const DEFAULT_BUILTIN_SCHEMA_BASE = "https://nextgen.com/api/schemas";
 export const DEFAULT_FLOW_SCHEMA_URI = "https://nextgen.com/flow-definition.json";

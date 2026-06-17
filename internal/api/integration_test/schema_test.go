@@ -33,7 +33,7 @@ func TestCreateSchema(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+				project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 				require.NoError(t, err)
 
 				apiSchema := api.UserSchema{}
@@ -58,7 +58,7 @@ func TestCreateSchema(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 		t.Run("schema without known kind", func(t *testing.T) {
-			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 			require.NoError(t, err)
 
 			body, err := json.Marshal(map[string]any{
@@ -94,7 +94,7 @@ func TestCreateSchema(t *testing.T) {
 		})
 
 		t.Run("duplicates are not allowed", func(t *testing.T) {
-			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 			require.NoError(t, err)
 			harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
@@ -122,7 +122,7 @@ func TestGetSchema(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		t.Run("simple", func(t *testing.T) {
-			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 			require.NoError(t, err)
 			schemaID := harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
@@ -138,7 +138,7 @@ func TestGetSchema(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 		t.Run("schema not found", func(t *testing.T) {
-			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 			require.NoError(t, err)
 
 			resp, err := harness.EnsureAPIClient(t, project.ID).GetSchemaById(t.Context(), api.GetSchemaByIdParams{

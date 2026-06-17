@@ -69,16 +69,17 @@ export async function materializeSetupResources(opts: {
   const schema = (await opts.client.createSchema(schemaBody, {
     project_id: opts.projectId,
   })) as CreateSchema201;
+  await updateState(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH, {
+    id: requiredString(schema.id, "created schema id"),
+    hash: hashWrittenBody(schemaBody),
+  });
+
   const flow = (await opts.client.createFlowDefinition({
     project_id: opts.projectId,
     schema_uri: DEFAULT_FLOW_SCHEMA_URI,
     flow_definition: flowBody,
   })) as CreateFlowDefinition201;
 
-  await updateState(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH, {
-    id: requiredString(schema.id, "created schema id"),
-    hash: hashWrittenBody(schemaBody),
-  });
   await updateState(opts.cwd, DEFAULT_FLOW_CONFIG_PATH, {
     id: requiredString(flow.id, "created flow definition id"),
     hash: hashWrittenBody(flowBody),
@@ -110,6 +111,8 @@ async function writeResourceFile(
 }
 
 function hashWrittenBody(body: object): string {
+  // Match the exact normalized JSON shape written to disk so setup-seeded
+  // state is immediately comparable with the sync planner.
   return hashResourceContent(JSON.parse(stableStringify(body)) as object);
 }
 

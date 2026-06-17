@@ -27,7 +27,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	testServer := harness.EnsureTestServer(t)
 
 	// --- Seed project ---------------------------------------------------------
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 	require.NoError(t, err)
 
 	// Create the user schema so the resolver can look it up from the DB.  The

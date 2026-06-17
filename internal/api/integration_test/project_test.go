@@ -213,7 +213,7 @@ func TestCreateProjectSkipsDefaultLoginFlow(t *testing.T) {
 
 func TestGetProject(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
-		project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+		project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 		client := harness.EnsureAPIClient(t, project.ID)
 		require.NoError(t, err)
 
@@ -234,7 +234,7 @@ func TestGetProject(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 		t.Run("not found", func(t *testing.T) {
-			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 
 			client := harness.EnsureAPIClient(t, project.ID)
 

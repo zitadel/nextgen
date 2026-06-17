@@ -11,7 +11,7 @@ export default defineConfig({
   tsconfig: "tsconfig.lib.json",
   dts: true,
   sourcemap: true,
-  clean: false,
+  clean: true,
   target: "es2022",
   external: ["@zitadel/api"],
 });

@@ -16,8 +16,10 @@ import (
 // ProjectService is the project use-case surface.
 type ProjectService interface {
 	// Create generates a new project with server-minted secrets and persists it.
+	// If seedDefaults is true, server fallback schema and flow resources are
+	// created with the project for non-CLI creation paths.
 	// Returns the stored project including timestamps.
-	Create(ctx context.Context, previewOrigins []string, seedDefaults ...bool) (*domain.Project, error)
+	Create(ctx context.Context, previewOrigins []string, seedDefaults bool) (*domain.Project, error)
 
 	// Get retrieves a project by ID.
 	// Returns [database.NoRowFoundError] when no project with the given ID exists.
@@ -57,7 +59,7 @@ type projectService struct {
 
 var _ ProjectService = (*projectService)(nil)
 
-func (s *projectService) Create(ctx context.Context, previewOrigins []string, seedDefaults ...bool) (_ *domain.Project, err error) {
+func (s *projectService) Create(ctx context.Context, previewOrigins []string, seedDefaults bool) (_ *domain.Project, err error) {
 	tx, err := s.pool.Begin(ctx, nil)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to start transaction")
@@ -77,7 +79,7 @@ func (s *projectService) Create(ctx context.Context, previewOrigins []string, se
 		return nil, domain.ErrInternal(err).WithMessage("failed to create project in the database")
 	}
 
-	if shouldSeedDefaults(seedDefaults) {
+	if seedDefaults {
 		userschema, err := s.createDefaultUserSchemas(ctx, tx, project.ID)
 		if err != nil {
 			return nil, err
@@ -98,13 +100,6 @@ func (s *projectService) Create(ctx context.Context, previewOrigins []string, se
 	}
 
 	return project, nil
-}
-
-func shouldSeedDefaults(seedDefaults []bool) bool {
-	if len(seedDefaults) == 0 {
-		return true
-	}
-	return seedDefaults[0]
 }
 
 func (s *projectService) createDefaultUserSchemas(ctx context.Context, client database.QueryExecutor, projectID string) (*domain.JSONSchema, error) {

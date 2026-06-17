@@ -25,7 +25,7 @@ import (
 // drives the same behavior through the real HTTP service so the cookie
 // rotation + service-layer dispatch don't regress.
 func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)

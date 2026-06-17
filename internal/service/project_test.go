@@ -21,7 +21,7 @@ func TestProjectService_Create(t *testing.T) {
 	tests := []struct {
 		name                    string
 		previewOrigins          []string
-		seedDefaults            []bool
+		seedDefaults            bool
 		setupProjectRepo        func(*domainmock.MockProjectRepository)
 		setupSchemaRepo         func(*domainmock.MockJSONSchemaRepository)
 		setupFlowDefinitionRepo func(call *domainmock.MockFlowDefinitionRepository)
@@ -32,6 +32,7 @@ func TestProjectService_Create(t *testing.T) {
 		{
 			name:           "ok — no preview origins",
 			previewOrigins: nil,
+			seedDefaults:   true,
 			setupProjectRepo: func(r *domainmock.MockProjectRepository) {
 				r.EXPECT().
 					Create(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -56,6 +57,7 @@ func TestProjectService_Create(t *testing.T) {
 		{
 			name:           "ok — with preview origins",
 			previewOrigins: []string{"*.vercel.app", "*.netlify.app"},
+			seedDefaults:   true,
 			setupProjectRepo: func(r *domainmock.MockProjectRepository) {
 				r.EXPECT().
 					Create(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -80,7 +82,7 @@ func TestProjectService_Create(t *testing.T) {
 		},
 		{
 			name:         "ok — skip fallback defaults",
-			seedDefaults: []bool{false},
+			seedDefaults: false,
 			setupProjectRepo: func(r *domainmock.MockProjectRepository) {
 				r.EXPECT().
 					Create(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -99,6 +101,7 @@ func TestProjectService_Create(t *testing.T) {
 		{
 			name:           "repo Create error",
 			previewOrigins: nil,
+			seedDefaults:   true,
 			setupProjectRepo: func(r *domainmock.MockProjectRepository) {
 				r.EXPECT().
 					Create(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -144,7 +147,7 @@ func TestProjectService_Create(t *testing.T) {
 				baseURL,
 				schemaValidator,
 			)
-			got, err := svc.Create(context.Background(), tc.previewOrigins, tc.seedDefaults...)
+			got, err := svc.Create(context.Background(), tc.previewOrigins, tc.seedDefaults)
 
 			if tc.wantErr {
 				require.Error(t, err)
