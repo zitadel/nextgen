@@ -8,7 +8,7 @@
     "generate:openapi": "node scripts/bundle-openapi.mjs",
     "generate:source": "fumadocs-mdx",
     "generate": "pnpm run generate:openapi && pnpm run generate:source",
-    "dev": "pnpm run generate:openapi && waku dev --port 3003",
+    "dev": "pnpm run generate && waku dev --port 3003",
     "build": "pnpm run generate && waku build",
     "preview": "waku start --port 3003",
     "typecheck": "pnpm run generate && tsc --noEmit -p tsconfig.json"
