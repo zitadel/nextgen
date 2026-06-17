@@ -24,8 +24,8 @@ import "@zitadel/components";
  * the discrete `:project-id` / `:proxy-path` the widget reads instead — the
  * widget uses whichever is present. All three are bound as DOM properties and
  * read by the widget at startup. The widget's `zitadel-*` events are re-emitted
- * with their detail as `flow-step`, `flow-input`, `flow-complete` and
- * `flow-error`.
+ * with their detail as `flowStep`, `flowInput`, `flowComplete` and
+ * `flowError` (the names declared in `emits`).
  *
  * A Vue `ref` on this component resolves to the component *instance*, not the
  * inner element, so the rendered `<zitadel-login>` DOM node is exposed as

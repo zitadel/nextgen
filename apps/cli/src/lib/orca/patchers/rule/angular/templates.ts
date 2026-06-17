@@ -89,7 +89,7 @@ function loadEnvLocal() {
   if (!existsSync(".env.local")) return {};
   const out = {};
   for (const line of readFileSync(".env.local", "utf8").split(/\\r?\\n/)) {
-    const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+    const m = line.match(/^\\s*(?:export\\s+)?([A-Z_][A-Z0-9_]*)\\s*=\\s*(.*)$/);
     if (m) out[m[1]] = m[2].trim().replace(/^(['"])(.*)\\1$/, "$2");
   }
   return out;

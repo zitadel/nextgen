@@ -26,7 +26,7 @@ function loadProjectSecret(rootDir: string): string | undefined {
     return undefined;
   }
   for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
-    const match = line.match(/^ZITADEL_PROJECT_SECRET=(.*)$/);
+    const match = line.match(/^\s*(?:export\s+)?ZITADEL_PROJECT_SECRET\s*=\s*(.*)$/);
     if (match && match[1] !== undefined) {
       const value = match[1].trim().replace(/^(['"])(.*)\1$/, "$2");
       return value === "" ? undefined : value;
