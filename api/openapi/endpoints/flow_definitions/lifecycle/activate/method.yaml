@@ -1,0 +1,26 @@
+post:
+  operationId: activateFlowDefinition
+  summary: Activate a flow definition by ID.
+  description: |
+    Activate a flow definition in the `draft` or `deprecated` state by ID. 
+    Flow definitions are created in a `draft` state by default. They must be activated before they can be used in a flow.
+    Alternatively, flow states can also be modified via `POST /flow_definitions` and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow definition payload.
+  tags:
+    - Flow Definitions
+  security:
+    - oauth2:
+        - flow_definitions.write
+  parameters:
+    - $ref: ../../../../components/parameters/flow-definition-id.yaml
+    - $ref: ../../../../components/parameters/project-id.yaml
+  responses:
+    '200':
+      description: Flow definition activated successfully.
+    '400':
+      description: Invalid request (e.g., flow definition is not in a draft or deprecated state, invalid flow definition ID).
+    default:
+      description: Unexpected error.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml

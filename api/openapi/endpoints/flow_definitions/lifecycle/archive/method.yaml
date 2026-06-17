@@ -1,0 +1,26 @@
+post:
+  operationId: archiveFlowDefinition
+  summary: Archive a flow definition by ID.
+  description: |
+    Archives a flow definition in the `active` or `deprecated` state by ID. 
+    Archived flow definitions cannot be used to start new flows. Existing flows will return an error if they reference an archived flow definition.
+    Alternatively, flow states can also be modified via `POST /flow_definitions` and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow definition payload.
+  tags:
+    - Flow Definitions
+  security:
+    - oauth2:
+        - flow_definitions.write
+  parameters:
+    - $ref: ../../../../components/parameters/flow-definition-id.yaml
+    - $ref: ../../../../components/parameters/project-id.yaml
+  responses:
+    '200':
+      description: Flow definition archived successfully.
+    '400':
+      description: Invalid request.
+    default:
+      description: Unexpected error.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
