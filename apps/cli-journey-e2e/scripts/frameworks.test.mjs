@@ -7,7 +7,7 @@ import { appPortFromUrl, frameworkForId, frameworkIds, frameworks } from "./fram
 test("framework registry lists every CLI journey target", () => {
   assert.deepEqual(
     frameworks.map((framework) => framework.id),
-    ["next", "nuxt", "react", "vue", "angular"],
+    ["next", "nuxt", "react", "vue", "angular", "solid", "svelte", "qwik"],
   );
   assert.deepEqual(frameworkIds, frameworks.map((framework) => framework.id));
   for (const framework of frameworks) {
@@ -26,7 +26,7 @@ test("framework registry captures protected-route expectations", () => {
 });
 
 test("frameworkForId rejects unsupported frameworks", () => {
-  assert.throws(() => frameworkForId("svelte"), /unsupported journey framework/);
+  assert.throws(() => frameworkForId("ember"), /unsupported journey framework/);
 });
 
 test("appPortFromUrl derives explicit and default ports", () => {

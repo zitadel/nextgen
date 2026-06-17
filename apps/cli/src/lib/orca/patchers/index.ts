@@ -1,7 +1,10 @@
 import { AngularPatcher } from "./rule/angular";
 import { NextPatcher } from "./rule/next";
 import { NuxtPatcher } from "./rule/nuxt";
+import { QwikPatcher } from "./rule/qwik";
 import { ReactPatcher } from "./rule/react";
+import { SolidPatcher } from "./rule/solid";
+import { SveltePatcher } from "./rule/svelte";
 import { VuePatcher } from "./rule/vue";
 import type { Patcher } from "./types";
 
@@ -19,5 +22,8 @@ export const patchers = [
   new NuxtPatcher(),
   new ReactPatcher(),
   new VuePatcher(),
+  new SolidPatcher(),
+  new SveltePatcher(),
+  new QwikPatcher(),
   new AngularPatcher(),
 ] as const satisfies ReadonlyArray<Patcher>;
