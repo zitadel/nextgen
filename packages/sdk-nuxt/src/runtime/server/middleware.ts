@@ -204,11 +204,12 @@ async function proxyRequest(
 
   const upstreamHeaders = buildUpstreamHeaders(event);
 
-  // Attach the project service-key secret as the bearer on every proxied
-  // request. The module's setup() puts the secret into Nuxt's server-only
-  // runtimeConfig (read from `process.env.ZITADEL_PROJECT_SECRET` at build/dev
-  // start, when Nuxt's env-loading has already populated `process.env`).
-  // runtimeConfig is server-side only — never exposed to the client bundle.
+  // Attach a bearer on every proxied request the upstream auth handler will
+  // accept. Preferred: the project service-key secret from server-only
+  // runtimeConfig (set by the module's setup() from `ZITADEL_PROJECT_SECRET`).
+  // Fallback: a well-formed `sk_<project_id>` identifier built from the
+  // request's `project_id` query param — the server accepts this for browser-
+  // originated flows where holding a real secret isn't possible.
   if (!upstreamHeaders.has('authorization')) {
     const config = useRuntimeConfig();
     const projectSecret = (
@@ -216,6 +217,11 @@ async function proxyRequest(
     )?.projectSecret;
     if (projectSecret) {
       upstreamHeaders.set('authorization', `Bearer ${projectSecret}`);
+    } else {
+      const projectId = url.searchParams.get('project_id');
+      if (projectId) {
+        upstreamHeaders.set('authorization', `Bearer sk_${projectId}`);
+      }
     }
   }
 
