@@ -29,10 +29,12 @@ type FlowPasskeyRegistrationService interface {
 // parameters and the user context needed to begin a registration ceremony.
 // UserID must already be resolved on the attempt before this is called.
 type FlowIssuePasskeyRegistrationChallengeInput struct {
-	ProjectID string
-	UserID    string
-	RPID      string
-	RPOrigins []string
+	ProjectID   string
+	UserID      string
+	RPID        string
+	RPOrigins   []string
+	Username    string // e.g. the user's email address; falls back to UserID
+	DisplayName string // e.g. "Jane Doe"; falls back to Username then UserID
 }
 
 // FlowPasskeyRegistrationChallengeOutput is the issued challenge.

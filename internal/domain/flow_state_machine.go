@@ -333,7 +333,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	// field-shaped dispatch and short-circuits it when engaged. Only proceed into
 	// processPasskey when no dispatch outcome already overrode the route.
 	if routeOutcome == in.Action {
-		pk, err := r.processPasskey(ctx, client, state, currentStep, resolved, in)
+		pk, err := r.processPasskey(ctx, client, state, currentStep, resolved, def, userSchemaURL, in)
 		if err != nil {
 			return FlowStepResult{}, err
 		}
@@ -571,7 +571,7 @@ type passkeyPhaseResult struct {
 //     yet identified.
 //   - issue leg (register): step offers a `passkey_register` action and it
 //     was selected → user must already be identified; mint a creation challenge.
-func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client database.QueryExecutor, state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, in FlowSubmitInput) (passkeyPhaseResult, error) {
+func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client database.QueryExecutor, state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, def *FlowDefinition, userSchemaURL string, in FlowSubmitInput) (passkeyPhaseResult, error) {
 	switch {
 	// A ceremony is in flight but no proof arrived: resume or abandon.
 	case state.PendingChallenge != nil && in.ChallengeResponse == nil:
@@ -711,11 +711,34 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 			// The verify leg will call HandleProvisional + RegisterCreatedUser.
 			state.CollectedData[flowCollectedPasskeyProvisionalKey] = true
 		}
+		// Derive the WebAuthn user.name — a human-palatable label shown
+		// in the browser's passkey dialog and stored in password managers.
+		// Priority: format:email field → identifier field → UserID (service fallback).
+		//
+		// We resolve the union of all visited fields (not just the current
+		// step's) because passkey_register may appear on a step with no
+		// fields (e.g. a passkey-upsell step), while the email was collected
+		// on an earlier step.
+		var username string
+		visited, err := r.resolveVisitedFields(ctx, client, state.ProjectID, userSchemaURL, def, state, step)
+		if err == nil && len(visited.Fields) > 0 {
+			username = findCollectedEmailField(visited.Fields, state.CollectedData)
+			if username == "" {
+				if _, _, idValue, ok := findCollectedFieldByChallenge(visited.Fields, state.CollectedData, FlowFieldChallengeIdentifier); ok {
+					username, _ = idValue.(string)
+				}
+			}
+		}
+
 		out, err := r.passkeyRegistration.IssuePasskeyRegistrationChallenge(ctx, FlowIssuePasskeyRegistrationChallengeInput{
 			ProjectID: state.ProjectID,
 			UserID:    userID,
 			RPID:      in.PasskeyRP.RPID,
 			RPOrigins: in.PasskeyRP.Origins,
+			Username:  username,
+			// DisplayName left empty: the service layer falls back to
+			// Username, then UserID. A schema-level x-display-name
+			// annotation could drive this in the future.
 		})
 		if err != nil {
 			return passkeyPhaseResult{}, fmt.Errorf("flow state machine: issue passkey registration: %w", err)
@@ -966,4 +989,21 @@ func asValidationErrors(err error, out *FlowFieldValidationErrors) bool {
 		return true
 	}
 	return false
+}
+
+// findCollectedEmailField returns the collected value of the first
+// resolved field whose Type is [FlowFieldTypeEmail] (i.e. the schema
+// property has `format: email`). Email addresses are inherently
+// human-readable and make good WebAuthn user.name labels. Returns ""
+// when no email-typed field has a collected value.
+func findCollectedEmailField(fields []FlowField, collected map[string]any) string {
+	for _, f := range fields {
+		if f.Type != FlowFieldTypeEmail {
+			continue
+		}
+		if v, ok := collected[f.Name].(string); ok && v != "" {
+			return v
+		}
+	}
+	return ""
 }
