@@ -157,14 +157,14 @@ Use `server-debug` to build the binary with debug symbols and disabled inlining,
 VSCode's Go debugger by PID:
 
 ```sh
-moon run workspace:server-debug -- server --user-file examples/boostrap-users/demo-admin.json
+moon run workspace:server-debug -- server --user-file examples/bootstrap-users/demo-admin.json
 ```
 
 The task prints the exact `go build` invocation and the PID of the running process:
 
 ```
 [server-debug] build: go build -gcflags 'all=-N -l' -ldflags '-X main.version=debug' -o dist/server/nextgen-debug .
-[server-debug] run:   ./dist/server/nextgen-debug server --user-file examples/boostrap-users/demo-admin.json
+[server-debug] run:   ./dist/server/nextgen-debug server --user-file examples/bootstrap-users/demo-admin.json
 
 [server-debug] PID 98765 — VSCode: Run ▸ Start Debugging ▸ "Attach to Process"
 ```

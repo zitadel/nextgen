@@ -14,16 +14,18 @@ const out = "dist/server/nextgen-debug";
 const buildArgs = ["build", "-gcflags", "all=-N -l", "-ldflags", "-X main.version=debug", "-o", out, "."];
 
 try {
-  if (!isHelp(args)) {
+  if (isHelp(args)) {
+    await run("go", ["run", ".", ...args], { cwd: repoRoot });
+  } else {
     process.stderr.write(`\n[server-debug] build: ${formatCommand("go", buildArgs)}\n`);
     process.stderr.write(`[server-debug] run:   ${formatCommand(`./${out}`, args)}\n\n`);
     await run("moon", ["run", "console:build", "login-ui:build"], { cwd: repoRoot });
     await run("go", buildArgs, { cwd: repoRoot });
+    await runBinary(`./${out}`, args, repoRoot);
   }
-  await runBinary(`./${out}`, args, repoRoot);
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
-  process.exit(typeof error === "object" && error !== null && "code" in error ? (error.code ?? 1) : 1);
+  process.exit(typeof error === "object" && error !== null && typeof error.code === "number" ? error.code : 1);
 }
 
 async function runBinary(command, binaryArgs, cwd) {
