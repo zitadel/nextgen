@@ -89,7 +89,6 @@ export async function nextgenMiddleware(
     allowedTokenTypes = ['JWT', 'at+JWT'],
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
-    onExchangeResponse,
   } = options;
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute
@@ -114,13 +113,7 @@ export async function nextgenMiddleware(
   }
 
   if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-    return proxyRequest(
-      req,
-      url,
-      proxyPath,
-      proxyTimeoutMs,
-      onExchangeResponse,
-    );
+    return proxyRequest(req, url, proxyPath, proxyTimeoutMs);
   }
 
   return handleAuth(req, {
@@ -212,7 +205,6 @@ async function proxyRequest(
   authUrl: string,
   proxyPath: string,
   proxyTimeoutMs: number,
-  onExchangeResponse?: (response: Response) => Response | Promise<Response>,
 ): Promise<Response> {
   const url = new URL(req.url);
   const suffix = url.pathname.slice(proxyPath.length);
@@ -250,11 +242,6 @@ async function proxyRequest(
 
   const hasBody = !['GET', 'HEAD'].includes(req.method);
 
-  // POST /sessions/exchange has a separate post-response hook; keep the
-  // predicate so the `onExchangeResponse` block further down still fires.
-  const isExchangeRequest =
-    req.method === 'POST' && suffix.startsWith('/sessions/exchange');
-
   // Attach the project service-key secret as the bearer on every proxied
   // request. The server's security handler verifies it cryptographically; the
   // browser never sees the secret because this middleware runs in Next.js's
@@ -288,17 +275,10 @@ async function proxyRequest(
     responseHeaders.append('set-cookie', cookie);
   }
 
-  let response = new Response(upstream.body, {
+  return new Response(upstream.body, {
     status: upstream.status,
     headers: responseHeaders,
   });
-
-  // Call the exchange hook when the proxied request is POST /sessions/exchange.
-  if (isExchangeRequest && onExchangeResponse) {
-    response = await onExchangeResponse(response);
-  }
-
-  return response;
 }
 
 /**

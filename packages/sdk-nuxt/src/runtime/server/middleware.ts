@@ -121,7 +121,6 @@ export function createNextgenMiddleware(
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
     opaqueTokenTimeoutMs = 5000,
-    onExchangeResponse,
   } = options;
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute
@@ -150,14 +149,7 @@ export function createNextgenMiddleware(
     }
 
     if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-      return proxyRequest(
-        event,
-        url,
-        proxyPath,
-        urlObj,
-        proxyTimeoutMs,
-        onExchangeResponse,
-      );
+      return proxyRequest(event, url, proxyPath, urlObj, proxyTimeoutMs);
     }
 
     return handleAuth(event, {
@@ -192,7 +184,6 @@ async function proxyRequest(
   proxyPath: string,
   url: URL,
   proxyTimeoutMs: number,
-  onExchangeResponse?: (response: Response) => Response | Promise<Response>,
 ): Promise<ReadableStream<Uint8Array> | null> {
   const suffix = url.pathname.slice(proxyPath.length);
   const target = `${authUrl}${suffix}${url.search}`;
@@ -204,12 +195,11 @@ async function proxyRequest(
 
   const upstreamHeaders = buildUpstreamHeaders(event);
 
-  // Attach a bearer on every proxied request the upstream auth handler will
-  // accept. Preferred: the project service-key secret from server-only
-  // runtimeConfig (set by the module's setup() from `ZITADEL_PROJECT_SECRET`).
-  // Fallback: a well-formed `sk_<project_id>` identifier built from the
-  // request's `project_id` query param — the server accepts this for browser-
-  // originated flows where holding a real secret isn't possible.
+  // Attach the project service-key secret as the bearer on every proxied
+  // request. The module's setup() puts the secret into Nuxt's server-only
+  // runtimeConfig (read from `process.env.ZITADEL_PROJECT_SECRET`; falls back
+  // to a `.env.local` parse when Nuxt's dev runtime didn't auto-load it).
+  // runtimeConfig is server-side only — never exposed to the client bundle.
   if (!upstreamHeaders.has('authorization')) {
     const config = useRuntimeConfig();
     const projectSecret = (
@@ -217,11 +207,6 @@ async function proxyRequest(
     )?.projectSecret;
     if (projectSecret) {
       upstreamHeaders.set('authorization', `Bearer ${projectSecret}`);
-    } else {
-      const projectId = url.searchParams.get('project_id');
-      if (projectId) {
-        upstreamHeaders.set('authorization', `Bearer sk_${projectId}`);
-      }
     }
   }
 
@@ -242,19 +227,12 @@ async function proxyRequest(
     responseHeaders.append('set-cookie', cookie);
   }
 
-  let response = new Response(upstream.body, {
+  const response = new Response(upstream.body, {
     status: upstream.status,
     headers: responseHeaders,
   });
 
-  // Call the exchange hook when the proxied request is POST /sessions/exchange.
-  const isExchange =
-    method === 'POST' && suffix.startsWith('/sessions/exchange');
-  if (isExchange && onExchangeResponse) {
-    response = await onExchangeResponse(response);
-  }
-
-  // Write the (potentially modified) response to the H3 event.
+  // Write the response to the H3 event.
   event.node.res.statusCode = response.status;
   for (const [key, value] of response.headers.entries()) {
     if (key.toLowerCase() === 'set-cookie') continue;
