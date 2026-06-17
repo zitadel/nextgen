@@ -115,9 +115,9 @@ export const de: Locale = {
   "register.field.password": "Passwort",
   "register.field.givenName": "Vorname",
   "register.field.familyName": "Nachname",
+  // Native <input type="date"> localizes its own display format to the user's
+  // locale and submits ISO YYYY-MM-DD — no placeholder/help format hint needed.
   "register.field.dateOfBirth": "Geburtsdatum",
-  "register.field.dateOfBirth.placeholder": "JJJJ-MM-TT",
-  "register.field.dateOfBirth.help": "Verwende JJJJ-MM-TT.",
   "register.action.password": "Mit Passwort fortfahren",
   "register.action.passkey": "Weiter mit Passkey",
   "register.action.submit": "Registrieren",
