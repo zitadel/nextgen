@@ -66,7 +66,7 @@ catalog:
   playwright: ^1.60.0
   react: ^19.2.5
   react-dom: ^19.2.5
-  react-server-dom-webpack: 19.2.5
+  react-server-dom-webpack: 19.2.6
   safe-stable-stringify: ^2.5.0
   "@scalar/api-client-react": ^2.0.26
   sharp: ^0.34.5
