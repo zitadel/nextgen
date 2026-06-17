@@ -1,0 +1,21 @@
+---
+title: Vue SDK
+description: Vue wrappers for Zitadel login and logout UI.
+---
+
+Install manually when not using the CLI:
+
+```sh
+pnpm add @zitadel/sdk-vue
+```
+
+The Vue SDK wraps the shared web components and uses the same app-wide configuration model as the other SPA SDKs:
+
+```ts
+import { configureZitadel } from "@zitadel/sdk-vue";
+
+const project = configureZitadel({
+  projectId: "<project id>",
+  proxyPath: "/__nextgen",
+});
+```

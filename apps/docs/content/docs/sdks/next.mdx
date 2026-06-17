@@ -1,0 +1,18 @@
+---
+title: Next.js SDK
+description: Middleware and helpers for Next.js applications.
+---
+
+Install manually when not using the CLI:
+
+```sh
+pnpm add @zitadel/sdk-next
+```
+
+The Next.js SDK provides middleware for:
+
+- proxying `/__nextgen/*` to the Zitadel backend
+- verifying session JWTs through JWKS
+- redirecting unauthenticated requests to the login route
+
+The generated app uses the SDK to protect routes such as `/profile` and to render login/logout UI with the shared components.

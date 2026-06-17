@@ -1,0 +1,23 @@
+---
+title: React SDK
+description: Client-side React wrappers for the Zitadel login and logout components.
+---
+
+Install manually when not using the CLI:
+
+```sh
+pnpm add @zitadel/sdk-react
+```
+
+Configure Zitadel once, then render the login and logout widgets:
+
+```tsx
+import { ZitadelLogin, ZitadelLogout, configureZitadel } from "@zitadel/sdk-react";
+
+const project = configureZitadel({
+  projectId: "<project id>",
+  proxyPath: "/__nextgen",
+});
+```
+
+Pure SPAs need a deployment proxy for `/__nextgen/*` unless they intentionally call a backend URL directly in local development.

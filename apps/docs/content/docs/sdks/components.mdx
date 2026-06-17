@@ -1,0 +1,13 @@
+---
+title: Components
+description: Shared web components used by framework SDKs.
+---
+
+`@zitadel/components` contains Lit web components such as:
+
+- `<zitadel-login>`
+- `<zitadel-logout>`
+
+Framework SDKs wrap or register these components. The components speak to the configured API base, usually the same-origin `/__nextgen` proxy path in generated apps.
+
+For browser automation, remember that the native controls live inside shadow roots. Prefer Playwright-style shadow-DOM-aware locators when available.

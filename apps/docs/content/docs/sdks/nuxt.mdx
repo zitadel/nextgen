@@ -1,0 +1,18 @@
+---
+title: Nuxt SDK
+description: Nitro middleware and composables for Nuxt applications.
+---
+
+Install manually when not using the CLI:
+
+```sh
+pnpm add @zitadel/sdk-nuxt
+```
+
+The Nuxt SDK provides server middleware for:
+
+- proxying `/__nextgen/*`
+- verifying the session JWT
+- redirecting unauthenticated requests
+
+The package also provides helpers to read auth state from Nuxt server routes and pages.

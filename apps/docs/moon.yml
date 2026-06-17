@@ -1,0 +1,50 @@
+id: "docs"
+language: "typescript"
+layer: "application"
+stack: "frontend"
+
+tasks:
+  generate-openapi:
+    command: "corepack pnpm run generate:openapi"
+    inputs:
+      - "/api/openapi/**/*.yaml"
+      - "scripts/bundle-openapi.mjs"
+    outputs:
+      - ".generated/openapi.yaml"
+
+  generate:
+    command: "corepack pnpm run generate"
+    inputs:
+      - "/api/openapi/**/*.yaml"
+      - "content/**/*"
+      - "source.config.ts"
+      - "scripts/bundle-openapi.mjs"
+    outputs:
+      - ".generated/openapi.yaml"
+      - ".source/**/*"
+
+  typecheck:
+    command: "corepack pnpm run typecheck"
+    deps:
+      - "generate"
+
+  build:
+    command: "corepack pnpm run build"
+    deps:
+      - "generate"
+    outputs:
+      - "dist/**/*"
+
+  dev:
+    command: "corepack pnpm run dev"
+    options:
+      persistent: true
+      runInCI: false
+
+  preview:
+    command: "corepack pnpm run preview"
+    deps:
+      - "build"
+    options:
+      persistent: true
+      runInCI: false

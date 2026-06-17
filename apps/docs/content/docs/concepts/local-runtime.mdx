@@ -1,0 +1,28 @@
+---
+title: Local runtime
+description: How the CLI starts and stores local Zitadel state.
+---
+
+`zitadel start` starts a managed local Zitadel runtime for app development.
+
+The default runtime backend is the `@zitadel/server` npm binary that matches the selected alpha package train. It is intended for app developers and agents, so it does not require Docker, Go, Moon, or this repository.
+
+Runtime metadata is stored in:
+
+```text
+.zitadel/local/runtime.json
+```
+
+Runtime data is stored in:
+
+```text
+.zitadel/local/nextgen-data
+```
+
+`zitadel stop` preserves that data. `zitadel reset --force` deletes it.
+
+Use Docker only when intentionally testing the Docker backend:
+
+```sh
+npx @zitadel/cli@alpha start --runtime docker
+```
