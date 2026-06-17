@@ -11,9 +11,12 @@ info:
     name: MIT
     identifier: MIT
 
-servers: 
-  # TODO: put correct server here.
-  - url: https://acc.nextgen.zitadel.com 
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  # Add the public production API once that endpoint is available.
+  # - url: https://api.zitadel.com
+  #   description: Production API
 
 tags:
   - name: Authorization
