@@ -8,8 +8,8 @@ import { PROXY_PATH } from "../proxy";
  * `/register`, and the logout widget at `/profile`. Exports a named `App`
  * (`component$`) to match the create-vite Qwik entry (`main.tsx` imports
  * `{ App }`). The project id comes from `VITE_ZITADEL_PROJECT_ID`. No secret
- * reaches the browser: the dev proxy in `vite.config.*` attaches the
- * `sk_<project_id>` bearer (derived from the public project id) server-side.
+ * reaches the browser: the dev proxy in `vite.config.*` attaches the project
+ * service-key secret (from `ZITADEL_PROJECT_SECRET`) server-side.
  */
 export function appTemplate(): string {
   return `${MANAGED_MARKER}

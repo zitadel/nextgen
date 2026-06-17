@@ -11,8 +11,8 @@ const SDK_DEPENDENCY = "@zitadel/sdk-qwik";
  * Rule-based patcher for a Vite + Qwik single-page app. Inherits the shared
  * `.zitadel/` base files from {@link AbstractRulePatcher} and contributes the
  * managed `src/app.tsx` auth entry, a non-destructive `vite.config.*` merge
- * that adds the `/__nextgen` dev proxy (attaching the `sk_<project_id>` bearer
- * from `ZITADEL_PROJECT_ID` to every proxied request), the `VITE_`-prefixed
+ * that adds the `/__nextgen` dev proxy (attaching the project secret from
+ * `ZITADEL_PROJECT_SECRET` to every proxied request), the `VITE_`-prefixed
  * project id, and the SDK dep.
  *
  * The create-vite Qwik template uses a lowercase `src/app.tsx` exporting a named

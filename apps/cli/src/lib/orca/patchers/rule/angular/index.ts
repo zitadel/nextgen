@@ -38,8 +38,9 @@ function ensureDevScript(source: string | undefined): string {
  * Rule-based patcher for an Angular app. Inherits the shared `.zitadel/` base
  * files from {@link AbstractRulePatcher} and contributes the managed root
  * component (`app.ts`/`app.html`) that renders the `@zitadel/sdk-angular`
- * widgets, a `proxy.conf.cjs` dev proxy (attaching the `sk_<project_id>` bearer
- * to every proxied request) wired into `angular.json`, and the SDK dep.
+ * widgets, a `proxy.conf.cjs` dev proxy (attaching the project secret from
+ * `ZITADEL_PROJECT_SECRET` to every proxied request) wired into `angular.json`,
+ * and the SDK dep.
  *
  * Unlike React/Vue (whose dev proxy lives in `vite.config.ts`), Angular owns its
  * Vite config, so the proxy is a separate `proxy.conf.cjs` referenced from the

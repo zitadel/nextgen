@@ -8,8 +8,8 @@ import { PROXY_PATH } from "../proxy";
  * `/register`, and the logout widget at `/profile`. The managed marker lives in
  * the `<script lang="ts">` block (a JS comment) so eject/doctor stay
  * marker-aware. The project id comes from `VITE_ZITADEL_PROJECT_ID`. No secret
- * reaches the browser: the dev proxy in `vite.config.*` attaches the
- * `sk_<project_id>` bearer (derived from the public project id) server-side.
+ * reaches the browser: the dev proxy in `vite.config.*` attaches the project
+ * service-key secret (from `ZITADEL_PROJECT_SECRET`) server-side.
  */
 export function appTemplate(): string {
   return `<script lang="ts">
