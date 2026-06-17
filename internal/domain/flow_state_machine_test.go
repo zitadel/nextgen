@@ -874,6 +874,111 @@ func TestFlowStateMachine_FlipTable_PasskeyIssue_UnknownEmail_FlipsToRegister(t 
 	assert.Equal(t, "ghost@example.com", w.attempts.identifyCalls[0].Value)
 }
 
+// loginNoUserNotFoundDefinition is a login-only flow whose identifier
+// step does NOT wire a user_not_found transition. Lets a test exercise
+// the "outcome without a transition" path.
+func loginNoUserNotFoundDefinition() *domain.FlowDefinition {
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-login-no-unf",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "credentials",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "credentials",
+				Fields: []string{"email", "password"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+}
+
+// TestFlowStateMachine_FlipTable_OutcomeWithoutTransition_DoesNotFlip
+// pins the invariant that CurrentPurpose flips only when a flip outcome
+// is actually routed. Dispatch returns user_not_found but the step has
+// no transition for it; the engine surfaces a step error and the mode
+// must stay at login so the next submit doesn't silently dispatch as
+// register.
+func TestFlowStateMachine_FlipTable_OutcomeWithoutTransition_DoesNotFlip(t *testing.T) {
+	w := newFlowTestWorld(t)
+	def := loginNoUserNotFoundDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": "ghost@example.com", "password": "irrelevant"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "credentials", result.State.CurrentStep, "no transition for user_not_found keeps the user on the current step")
+	if assert.NotNil(t, result.Step.Error) {
+		assert.Equal(t, domain.FlowImplicitOutcomeUserNotFound, *result.Step.Error)
+	}
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, result.State.CurrentPurpose,
+		"CurrentPurpose must not flip when the routed outcome had no transition wired")
+}
+
+// TestFlowStateMachine_FlipTable_LoginTypoThenCorrectEmail_StillSignsIn
+// is the user-visible motivation for the no-phantom-flip invariant. The
+// user mistypes their email on a login-only flow with no user_not_found
+// transition; the engine renders a step error and the user retries with
+// the correct (existing) address. Without the gate, CurrentPurpose would
+// have flipped to register on the typo and the second attempt would see
+// the known email as user_already_exists, wedging the sign-in.
+func TestFlowStateMachine_FlipTable_LoginTypoThenCorrectEmail_StillSignsIn(t *testing.T) {
+	w := newFlowTestWorld(t)
+	w.attempts.identifierResult = map[string]string{
+		"alice@example.com": "user_alice",
+	}
+	def := loginNoUserNotFoundDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	// Typo: dispatch returns user_not_found, no transition wired,
+	// engine surfaces a step error and the user stays on credentials.
+	typo, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": "alic@example.com", "password": "irrelevant"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "credentials", typo.State.CurrentStep)
+	require.NotNil(t, typo.Step.Error)
+	require.Equal(t, domain.FlowDefinitionPurposeLogin, typo.State.CurrentPurpose,
+		"phantom flip on the typo would wedge the retry below")
+
+	// Retry with the correct (known) email: still in login mode, so
+	// identifier resolves, password verifies, and the user signs in.
+	result, err := w.sm.Process(t.Context(), nil, def, typo.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": "alice@example.com", "password": "correct-horse-battery-staple"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "done", result.State.CurrentStep)
+	assert.Equal(t, "user_alice", result.State.CollectedData[domain.FlowCollectedUserIDKey])
+	assert.NotEmpty(t, result.HandoffToken, "handoff issued for completed sign-in")
+}
+
 func TestFlowState_JSONRoundTrip_PreservesCurrentPurpose(t *testing.T) {
 	state := domain.FlowState{
 		ID:        "flow-1",

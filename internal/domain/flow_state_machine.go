@@ -324,12 +324,9 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 		}
 		if dispatch.Outcome != "" {
 			// User not found (or similar) — skip the passkey challenge and advance
-			// normally (e.g. transition to choose-register). Flip CurrentPurpose
-			// here for parity with the non-passkey path below; otherwise a login
-			// flow that hops to a register-mode step via passkey would still
-			// dispatch as login on the next submit.
+			// normally (e.g. transition to choose-register). CurrentPurpose flips
+			// at the transition commit site below.
 			routeOutcome = dispatch.Outcome
-			applyOutcomeFlip(state, routeOutcome)
 		}
 	}
 
@@ -356,7 +353,6 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 			}
 			if dispatch.Outcome != "" {
 				routeOutcome = dispatch.Outcome
-				applyOutcomeFlip(state, routeOutcome)
 			} else if currentStep.OnSuccess != nil {
 				// Resolve the union of fields collected so far so the handler
 				// can read the identifier (and any other attributes) from
@@ -412,6 +408,13 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 		return FlowStepResult{}, fmt.Errorf("%w: transition target %q missing from definition", ErrIntegrity, transition.Target)
 	}
 
+	// Flip CurrentPurpose atomically with the transition commit so the
+	// invariant holds for every outcome source (passkey early-dispatch,
+	// field-shaped dispatch, on_success). A flip outcome that has no
+	// transition wired surfaces a step error above and leaves
+	// CurrentPurpose untouched — no phantom mode change.
+	applyOutcomeFlip(state, routeOutcome)
+
 	r.advance(state, currentStep, nextStep.Name)
 
 	if nextStep.Complete != nil {
@@ -452,7 +455,10 @@ var challengeDispatchOrder = []FlowFieldChallenge{
 
 // applyOutcomeFlip flips CurrentPurpose on identifier outcomes:
 // login + user_not_found → register; register + user_already_exists → login.
-// Recovery never flips.
+// Recovery never flips. Called exactly once per Process call, after the
+// transition for routeOutcome is confirmed to exist — so an outcome
+// without a wired transition (rendered as a step error) leaves the mode
+// untouched.
 func applyOutcomeFlip(state *FlowState, outcome string) {
 	switch {
 	case state.CurrentPurpose == FlowDefinitionPurposeLogin && outcome == FlowImplicitOutcomeUserNotFound:
