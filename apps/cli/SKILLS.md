@@ -61,8 +61,10 @@ layer, not the envelope.
 
 - `setup` — create a Zitadel project and scaffold local auth (routes,
   middleware, `.zitadel/**`, env templates). The project's default user schema
-  and login flow are provisioned server-side at creation, so setup neither
-  scaffolds nor uploads them. Agents must pass `--framework` when scaffolding
+  and login flow are provisioned server-side at creation; setup pulls editable
+  copies into `.zitadel/schemas/default-human-user.json` and
+  `.zitadel/flows/default-login.json`, then seeds `.zitadel/state.json` so
+  `plan` is immediately empty. Agents must pass `--framework` when scaffolding
   into a fresh directory; interactive humans can omit it and choose from the
   prompt. Flags: `--framework next|react|vue|angular|nuxt`, `--renderer
   react|web-component` (selects the Next.js auth-page renderer; accepted for any
@@ -154,11 +156,15 @@ exercises fresh-app setup plus registration, logout, and login across the
 supported frameworks.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
-then re-run `plan` and `apply`. Managed files carry a marker comment; `eject`
-removes only files that still carry it, preserving anything the user replaced.
-For app-local development, `--server local` resolves through
-`.zitadel/local/runtime.json` and requires a healthy `npx @zitadel/cli@alpha start`
-runtime. Runtime-only `.zitadel/local/**` state does not block fresh
-same-directory scaffolding. `setup` installs dependencies with the detected
+then re-run `plan` and `apply`. Schema and flow files are synced from
+`.zitadel/schemas/*.json` and `.zitadel/flows/*.json`; templates are not
+supported until the server exposes template storage and APIs. Flow create, read,
+list, and delete are available, while updates to existing flows fail locally
+with `E_NOT_IMPLEMENTED` until the server flow lifecycle API lands. Managed
+files carry a marker comment; `eject` removes only files that still carry it,
+preserving anything the user replaced. For app-local development, `--server
+local` resolves through `.zitadel/local/runtime.json` and requires a healthy
+`npx @zitadel/cli@alpha start` runtime. Runtime-only `.zitadel/local/**` state
+does not block fresh same-directory scaffolding. `setup` installs dependencies with the detected
 package manager by default; pass `--skip-install` when the agent or host
 workflow will install dependencies separately.

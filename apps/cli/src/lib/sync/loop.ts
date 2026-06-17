@@ -66,7 +66,7 @@ export async function buildSyncPlan(
     for (const [absPath, content] of onDisk.entries()) {
       const relPath = absPath.slice(cwd.length + 1);
       const entry = state.resources[relPath];
-      const hash = sha256(content);
+      const hash = hashResourceContent(content);
 
       if (!entry?.id) {
         actions.push({ kind: "create", path: relPath, syncer, content, hash });
@@ -175,6 +175,6 @@ async function readJsonDir(dirPath: string): Promise<Map<string, object>> {
   return result;
 }
 
-function sha256(data: object): string {
+export function hashResourceContent(data: object): string {
   return createHash("sha256").update(JSON.stringify(data)).digest("hex");
 }

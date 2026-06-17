@@ -1,12 +1,13 @@
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { CreateSchemaBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 
+import { readJsonDir } from "../../../lib/json-dir";
+import { SCHEMAS_DIR } from "../../../lib/user-schema";
 import { AbstractSanityCheck, type CheckContext } from "./types";
 
 /**
- * Verifies `.zitadel/schemas/user.json` round-trips through the generated
+ * Verifies local schema config files round-trip through the generated
  * `CreateSchemaBody` Zod (the orval equivalent of
  * `api/openapi/endpoints/schemas/user-schema.yaml`). The Zod union enforces
  * the `kind` discriminator (`user-schema` / `schema-url`) and the
@@ -14,20 +15,23 @@ import { AbstractSanityCheck, type CheckContext } from "./types";
  */
 export class SchemaCheck extends AbstractSanityCheck {
   readonly name = "schema";
-  readonly path = ".zitadel/schemas/user.json";
-  protected readonly summary = "User schema is a valid Zitadel schema body";
+  readonly path = SCHEMAS_DIR;
+  protected readonly summary = "User schemas are valid Zitadel schema bodies";
 
   protected async verify(ctx: CheckContext): Promise<void> {
-    const schema = JSON.parse(
-      await readFile(join(ctx.cwd, ".zitadel/schemas/user.json"), "utf8"),
-    ) as unknown;
-    const result = CreateSchemaBody.safeParse(schema);
-    if (!result.success) {
-      throw new Error(
-        result.error.issues
-          .map((issue) => `${issue.path.join(".") || "/"} ${issue.message}`)
-          .join("; "),
-      );
+    const schemas = await readJsonDir(join(ctx.cwd, SCHEMAS_DIR));
+    if (schemas.length === 0) {
+      throw new Error(`No schema files found in ${SCHEMAS_DIR}`);
+    }
+    for (const schema of schemas) {
+      const result = CreateSchemaBody.safeParse(schema);
+      if (!result.success) {
+        throw new Error(
+          result.error.issues
+            .map((issue) => `${issue.path.join(".") || "/"} ${issue.message}`)
+            .join("; "),
+        );
+      }
     }
   }
 }

@@ -271,7 +271,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       }),
     });
     const { id } = (await create.json()) as { id: string };
-    const res = await fetch(`${BASE}/flow_definitions/${id}`);
+    const res = await fetch(`${BASE}/flow_definitions/${id}?project_id=proj_conformance_get`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(() => GetFlowDefinitionResponse.parse(body)).not.toThrow();
@@ -287,7 +287,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       }),
     });
     const { id } = (await create.json()) as { id: string };
-    const res = await fetch(`${BASE}/flow_definitions/${id}`, {
+    const res = await fetch(`${BASE}/flow_definitions/${id}?project_id=proj_conformance_patch`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(validFlowDefinitionBody()),

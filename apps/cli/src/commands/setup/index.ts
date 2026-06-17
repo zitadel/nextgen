@@ -18,6 +18,7 @@ import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/regist
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import { publicCliCommand } from "../../lib/public-cli";
+import { materializeSetupResources } from "../../lib/setup-resources";
 import { installDependenciesForSetup } from "./install";
 import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
 import {
@@ -47,8 +48,8 @@ const FRAMEWORK_OPTIONS = createOrca()
  * Detects (or, for an empty directory, scaffolds then re-detects) the
  * framework, runs the wizard prompts to fill in any answers not pre-supplied
  * by flags, creates the remote project (whose default user schema and login
- * flow are provisioned server-side), and patches the local files via
- * `Orca`'s framework patcher.
+ * flow are provisioned server-side), patches the local files via `Orca`'s
+ * framework patcher, then pulls editable schema/flow config into `.zitadel/**`.
  *
  * Every interactive question lives in {@link SETUP_PROMPTS} (the main wizard
  * — each entry is a small class) and {@link PickFrameworkPrompt} (the
@@ -171,8 +172,9 @@ export default class Setup extends BaseCommand {
     framework = { ...framework, devPort: answers.devPort, url: issuer };
 
     // `POST /projects` is unauthenticated. Creating the project also
-    // provisions its default user schema and login flow server-side, so the
-    // CLI no longer builds, scaffolds, or uploads those resources here.
+    // provisions its default user schema and login flow server-side; after the
+    // base files exist locally, setup pulls editable copies into `.zitadel/**`
+    // and seeds sync state with the server-provisioned resource identifiers.
     consola.start(`Creating project on ${answers.server}${dryRun ? " (dry run)" : ""}`);
     const unauthClient = createZitadelClient({ baseUrl: answers.server });
     // Register the app's own origin so the backend's origin check allows
@@ -206,8 +208,21 @@ export default class Setup extends BaseCommand {
     for (const file of result.filesSkipped) {
       consola.info(`Left ${relativeDisplay(cwd, file)} unchanged (already matches target)`);
     }
+    const resourceResult = dryRun
+      ? { filesWritten: [] }
+      : await materializeSetupResources({
+          cwd,
+          client: createZitadelClient({ baseUrl: answers.server, token: project.projectSecret }),
+          projectId: project.id,
+          force,
+        });
+    for (const file of resourceResult.filesWritten) {
+      const sentence = describeWrittenFile(relativeDisplay(cwd, file), dryRun);
+      if (sentence) consola.info(sentence);
+    }
+    const allFilesWritten = [...result.filesWritten, ...resourceResult.filesWritten];
     consola.success(
-      `Patched ${result.filesWritten.length} file${result.filesWritten.length === 1 ? "" : "s"}` +
+      `Patched ${allFilesWritten.length} file${allFilesWritten.length === 1 ? "" : "s"}` +
         (result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""),
     );
 
@@ -222,7 +237,7 @@ export default class Setup extends BaseCommand {
       skipInstall: Boolean(flags["skip-install"]),
     });
 
-    const writtenRel = result.filesWritten.map((file) => relativeDisplay(cwd, file));
+    const writtenRel = allFilesWritten.map((file) => relativeDisplay(cwd, file));
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
@@ -259,7 +274,7 @@ export default class Setup extends BaseCommand {
         project: { project_id: project.id, issuer },
         framework: framework.id,
         server: answers.server,
-        files_written: result.filesWritten.map((file) => relativeDisplay(cwd, file)),
+        files_written: allFilesWritten.map((file) => relativeDisplay(cwd, file)),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
         install: installOutcome.install,
         next_actions: installOutcome.nextActions,
@@ -434,7 +449,11 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   "zitadel.json": { subject: "the Zitadel project configuration" },
   ".env.example": { subject: "the .env example template" },
   ".env.local": { subject: "the local development environment variables" },
-  ".zitadel/state.json": { subject: "the empty sync state file" },
+  ".zitadel/state.json": { subject: "the sync state file" },
+  ".zitadel/flows/default-login.json": { subject: "the editable default login flow" },
+  ".zitadel/schemas/default-human-user.json": {
+    subject: "the editable default human user schema",
+  },
   "app/page.tsx": { subject: "the auth home page" },
   "app/login/page.tsx": { subject: "the login page" },
   "app/register/page.tsx": { subject: "the registration page" },

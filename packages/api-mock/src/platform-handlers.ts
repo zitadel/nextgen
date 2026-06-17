@@ -45,7 +45,6 @@ import {
   GetProjectResponse,
   GetSchemaByIdParams,
   GetSchemaByIdQueryParams,
-  GetSchemaByIdResponse,
   ListFlowDefinitionsQueryParams,
   ListFlowDefinitionsResponse,
   UpdateFlowDefinitionBody,
@@ -174,6 +173,9 @@ function makeStore(): Store {
 
 const DEFAULT_SCHEMA_URI =
   "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/components/flows/flow-definition.yaml";
+const DEFAULT_BUILTIN_SCHEMA_BASE = "https://nextgen.com/api/schemas";
+const DEFAULT_USER_SCHEMA_URL = `${DEFAULT_BUILTIN_SCHEMA_BASE}/default-human-user.json`;
+const DEFAULT_FLOW_SCHEMA_URI = "https://nextgen.com/flow-definition.json";
 
 /**
  * Build a `flow-definition-detail-response` envelope around a stored body, as
@@ -201,6 +203,163 @@ function flowListItemResponse(r: FlowDefinitionRecord): ListFlowDefinitions200Fl
     created_at: r.createdAt,
     updated_at: r.updatedAt,
   };
+}
+
+function defaultHumanUserSchema(): GetSchemaById200 {
+  return {
+    title: "ExampleUserSchema",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    metaSchema: `${DEFAULT_BUILTIN_SCHEMA_BASE}/user-schema.json`,
+    "$id": DEFAULT_USER_SCHEMA_URL,
+    kind: "user-schema",
+    type: "object",
+    description: "This is an example of a user schema definition.",
+    "x-auth-methods": {
+      password: {
+        enabled: true,
+        position: 1,
+      },
+      passkey: {
+        enabled: true,
+        position: 2,
+      },
+    },
+    required: ["email", "password"],
+    properties: {
+      email: {
+        type: "string",
+        format: "email",
+        "x-unique": "project",
+        description: "The user's email address.",
+      },
+      password: {
+        type: "string",
+        minLength: 8,
+        description: "The user's password.",
+        "x-password": true,
+      },
+      givenName: {
+        type: "string",
+        maxLength: 50,
+        description: "The user's given (first) name.",
+      },
+      familyName: {
+        type: "string",
+        maxLength: 50,
+        description: "The user's family (last) name.",
+      },
+      dateOfBirth: {
+        type: "string",
+        format: "date",
+        description: "The user's date of birth (ISO 8601, YYYY-MM-DD).",
+      },
+    },
+  } as unknown as GetSchemaById200;
+}
+
+function defaultLoginFlowBody(): Record<string, unknown> {
+  return {
+    name: "default-login",
+    user_schema: DEFAULT_USER_SCHEMA_URL,
+    purposes: {
+      login: "identifier",
+      register: "register",
+    },
+    steps: [
+      {
+        name: "identifier",
+        fields: ["email"],
+        actions: [
+          { name: "submit", primary: true, text_key: "identifier.action.continue" },
+          { name: "passkey", primary: false, text_key: "identifier.action.passkey" },
+        ],
+        transitions: {
+          submit: { target: "password" },
+          passkey: { target: "done" },
+          user_not_found: { target: "register" },
+        },
+      },
+      {
+        name: "password",
+        fields: ["password"],
+        actions: [
+          { name: "submit", primary: true, text_key: "password.action.signin" },
+          { name: "passkey", primary: false, text_key: "password.action.passkey" },
+        ],
+        transitions: {
+          submit: { target: "done" },
+          passkey: { target: "done" },
+        },
+      },
+      {
+        name: "register",
+        fields: ["email", "givenName", "familyName", "dateOfBirth"],
+        actions: [
+          { name: "submit", primary: true, text_key: "register.action.password" },
+          { name: "passkey_register", primary: false, text_key: "register.action.passkey" },
+        ],
+        transitions: {
+          submit: { target: "register-password" },
+          passkey_register: { target: "done" },
+          user_already_exists: { target: "password" },
+        },
+      },
+      {
+        name: "register-password",
+        fields: ["password"],
+        actions: [
+          { name: "submit", primary: true, text_key: "register-password.action.submit" },
+        ],
+        on_success: "create_user",
+        transitions: {
+          submit: { target: "done" },
+          user_already_exists: { target: "password" },
+        },
+      },
+      {
+        name: "done",
+        complete: "show",
+      },
+    ],
+  };
+}
+
+function seedDefaultProjectResources(projectID: string, createdAt: string): void {
+  store.schemas.set(DEFAULT_USER_SCHEMA_URL, defaultHumanUserSchema());
+  const id = `flow_${shortId()}`;
+  store.flowDefinitions.set(id, {
+    id,
+    name: "default-login",
+    projectId: projectID,
+    schemaUri: DEFAULT_FLOW_SCHEMA_URI,
+    status: "active",
+    createdAt,
+    updatedAt: createdAt,
+    body: defaultLoginFlowBody(),
+  });
+}
+
+function requiredProjectID(
+  request: Request,
+): { ok: true; data: string } | { ok: false; response: HttpResponse<ErrorBody> } {
+  const projectID = new URL(request.url).searchParams.get("project_id");
+  if (projectID) {
+    return { ok: true, data: projectID };
+  }
+  return {
+    ok: false,
+    response: HttpResponse.json(errorBody("invalid_query", "project_id is required"), {
+      status: 400,
+    }),
+  };
+}
+
+function schemaID(id: string): string {
+  try {
+    return decodeURIComponent(id);
+  } catch {
+    return id;
+  }
 }
 
 let store: Store = makeStore();
@@ -233,6 +392,7 @@ export function setupPlatformHandlers() {
         updatedAt: createdAt,
       };
       store.projects.set(id, project);
+      seedDefaultProjectResources(project.id, createdAt);
       const responseBody: CreateProject201 = {
         id: project.id,
         projectSecret: project.projectSecret,
@@ -296,15 +456,11 @@ export function setupPlatformHandlers() {
         return query.response;
       }
 
-      const schema = store.schemas.get(path.data.id);
+      const schema = store.schemas.get(schemaID(path.data.id));
       if (!schema) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
-      const out = parse(GetSchemaByIdResponse, schema, "mock_response_invalid");
-      if (!out.ok) {
-        return out.response;
-      }
-      return HttpResponse.json(out.data);
+      return HttpResponse.json(schema);
     }),
 
     http.delete("*/schemas/:id", ({ params, request }) => {
@@ -317,7 +473,7 @@ export function setupPlatformHandlers() {
         return query.response;
       }
 
-      const existed = store.schemas.delete(path.data.id);
+      const existed = store.schemas.delete(schemaID(path.data.id));
       if (!existed) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
@@ -363,7 +519,9 @@ export function setupPlatformHandlers() {
       }
 
       const responseBody: ListFlowDefinitions200 = {
-        flow_definitions: [...store.flowDefinitions.values()].map(flowListItemResponse),
+        flow_definitions: [...store.flowDefinitions.values()]
+          .filter((record) => record.projectId === query.data.project_id)
+          .map(flowListItemResponse),
         next_page_token: null,
       };
       const out = parse(ListFlowDefinitionsResponse, responseBody, "mock_response_invalid");
@@ -373,14 +531,18 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data);
     }),
 
-    http.get("*/flow_definitions/:id", ({ params }) => {
+    http.get("*/flow_definitions/:id", ({ params, request }) => {
       const path = parse(GetFlowDefinitionParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
       }
+      const query = requiredProjectID(request);
+      if (!query.ok) {
+        return query.response;
+      }
 
       const record = store.flowDefinitions.get(path.data.id);
-      if (!record) {
+      if (!record || record.projectId !== query.data) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
       const responseBody: GetFlowDefinition200 = flowDetailResponse(record);
@@ -396,9 +558,13 @@ export function setupPlatformHandlers() {
       if (!path.ok) {
         return path.response;
       }
+      const query = requiredProjectID(request);
+      if (!query.ok) {
+        return query.response;
+      }
 
       const record = store.flowDefinitions.get(path.data.id);
-      if (!record) {
+      if (!record || record.projectId !== query.data) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
       const raw = await readJson(request);
@@ -420,12 +586,20 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data, { status: 200 });
     }),
 
-    http.delete("*/flow_definitions/:id", ({ params }) => {
+    http.delete("*/flow_definitions/:id", ({ params, request }) => {
       const path = parse(DeleteFlowDefinitionParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
       }
+      const query = requiredProjectID(request);
+      if (!query.ok) {
+        return query.response;
+      }
 
+      const record = store.flowDefinitions.get(path.data.id);
+      if (!record || record.projectId !== query.data) {
+        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+      }
       const existed = store.flowDefinitions.delete(path.data.id);
       if (!existed) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });

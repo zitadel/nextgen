@@ -97,7 +97,9 @@ class SchemaSyncer implements ResourceSyncer {
   }
 
   async fetch(id: string): Promise<object> {
-    const body = await this.client.getSchemaById(id, { project_id: this.projectId });
+    const body = await this.client.getSchemaById(encodeURIComponent(id), {
+      project_id: this.projectId,
+    });
     return body as unknown as GetSchemaById200;
   }
 }
@@ -138,16 +140,20 @@ class FlowDefinitionSyncer implements ResourceSyncer {
     return result.id;
   }
 
-  /** PATCH body is the bare partial flow per `flow-definition-update-request` — no envelope. */
-  async update(id: string, data: object): Promise<void> {
-    await this.client.updateFlowDefinition(
-      id,
-      data as Partial<CreateFlowDefinitionBodyFlowDefinition>,
+  async update(id: string, _data: object): Promise<void> {
+    throw new ZitadelError(
+      "E_NOT_IMPLEMENTED",
+      `flow updates are not supported by the server yet (${id})`,
+      {
+        hint:
+          "The server currently supports flow create, read, list, and delete. " +
+          "Keep the edited flow file for review, but wait for the flow lifecycle API before applying updates.",
+      },
     );
   }
 
   async delete(id: string): Promise<void> {
-    await this.client.deleteFlowDefinition(id);
+    await this.client.deleteFlowDefinition(id, { project_id: this.projectId });
   }
 
   /**
@@ -158,7 +164,12 @@ class FlowDefinitionSyncer implements ResourceSyncer {
    * body.
    */
   async fetch(id: string): Promise<object> {
-    const envelope = (await this.client.getFlowDefinition(id)) as GetFlowDefinition200;
+    const envelope = (await this.client.getFlowDefinition(id, {
+      project_id: this.projectId,
+    })) as GetFlowDefinition200;
+    if ("flow_definition" in envelope && envelope.flow_definition) {
+      return envelope.flow_definition as unknown as object;
+    }
     const {
       id: _id,
       project_id: _projectId,

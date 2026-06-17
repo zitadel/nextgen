@@ -77,10 +77,9 @@ export abstract class AbstractRulePatcher implements Patcher {
   /**
    * The framework-agnostic `.zitadel/` base files every rule patcher writes:
    * the project secret, `zitadel.json`, env templates, and an empty sync
-   * state. The `schemas/` and `flows/` directories are created empty — the
-   * server provisions the default user schema and flow definition when the
-   * project is created, so nothing is scaffolded into them here. Pure: no
-   * filesystem or network.
+   * state. The `schemas/` and `flows/` directories are created empty here;
+   * setup fills them from the server-provisioned defaults after patching.
+   * Pure: no filesystem or network.
    */
   private baseOps(ctx: PatchContext): ReadonlyArray<FileOp> {
     return [
