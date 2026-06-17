@@ -18,5 +18,9 @@ export class QwikScaffolder extends AbstractCLIScaffolder {
     this.runCommand("npm", ["create", "vite@latest", ".", "--", "--template", "qwik-ts"], cwd);
     await rm(join(cwd, "src/app.tsx"), { force: true });
     await rm(join(cwd, "src/app.css"), { force: true });
+    // create-vite's Qwik template pairs qwik 1.x with vite 8, but qwik 1.x peers
+    // vite ">=5 <8", so a bare `npm install` fails with ERESOLVE. Pin vite to v7
+    // (what @zitadel/sdk-qwik builds against) so the generated app installs.
+    this.runCommand("npm", ["pkg", "set", "devDependencies.vite=^7.3.5"], cwd);
   }
 }

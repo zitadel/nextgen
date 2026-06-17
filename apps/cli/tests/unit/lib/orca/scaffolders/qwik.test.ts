@@ -24,7 +24,7 @@ beforeEach(() => {
 });
 
 describe("QwikScaffolder", () => {
-  it("runs create-vite then removes the starter app.tsx/app.css", async () => {
+  it("runs create-vite, removes the starter demo, and pins vite to v7", async () => {
     mockSpawn.mockReturnValue(spawnOk());
 
     await new QwikScaffolder().scaffold("/tmp/proj", "qwik");
@@ -35,6 +35,8 @@ describe("QwikScaffolder", () => {
     expect(opts).toMatchObject({ cwd: "/tmp/proj" });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/app.tsx"), { force: true });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/app.css"), { force: true });
+    // qwik 1.x can't run on vite 8; the scaffolder pins vite to v7.
+    expect(mockSpawn.mock.calls[1]?.[1]).toEqual(["pkg", "set", "devDependencies.vite=^7.3.5"]);
   });
 
   it("only supports qwik", () => {
