@@ -3,16 +3,25 @@ title: SDKs
 description: Framework packages and shared client surfaces for the Zitadel preview.
 ---
 
-The preview publishes framework SDKs and shared components in one alpha package train.
+import { Card, Cards } from "fumadocs-ui/components/card";
+import { Callout } from "fumadocs-ui/components/callout";
 
-## Packages
+The preview publishes framework SDKs, shared UI components, and the generated API client in one alpha package train.
 
-- `@zitadel/sdk-next`
-- `@zitadel/sdk-nuxt`
-- `@zitadel/sdk-react`
-- `@zitadel/sdk-vue`
-- `@zitadel/sdk-angular`
-- `@zitadel/components`
-- `@zitadel/api`
+<Callout title="Start with the CLI" type="info">
+  Prefer `npx @zitadel/cli@alpha setup --server local` for app setup. Use these SDK pages when reviewing generated files, customizing routes, or integrating manually.
+</Callout>
 
-Prefer the CLI for app setup. Use the SDK docs when reviewing generated files, customizing routes, or integrating manually.
+<Cards>
+  <Card title="Next.js" href="/docs/sdks/next" description="Middleware, same-origin proxying, server auth, and App Router helpers." />
+  <Card title="Nuxt" href="/docs/sdks/nuxt" description="Nitro middleware, runtime config, plugins, and server-side session access." />
+  <Card title="React" href="/docs/sdks/react" description="Client-side login/logout widgets for Vite and other SPA deployments." />
+  <Card title="Vue" href="/docs/sdks/vue" description="Vue wrappers around the shared login/logout components." />
+  <Card title="Angular" href="/docs/sdks/angular" description="Standalone Angular components for the shared Zitadel auth UI." />
+  <Card title="Components" href="/docs/sdks/components" description="Lit web components and the login orchestrator used by framework SDKs." />
+  <Card title="API client" href="/docs/sdks/api-client" description="Generated TypeScript endpoint functions, models, Zod schemas, and MSW helpers." />
+</Cards>
+
+## Runtime shape
+
+Server frameworks use middleware to proxy `/__nextgen/*`, verify sessions, and protect routes. SPA frameworks render the same auth widgets but need a deployment proxy for `/__nextgen/*` outside local development.

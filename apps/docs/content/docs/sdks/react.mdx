@@ -3,21 +3,72 @@ title: React SDK
 description: Client-side React wrappers for the Zitadel login and logout components.
 ---
 
-Install manually when not using the CLI:
+import { Callout } from "fumadocs-ui/components/callout";
+import { File, Files } from "fumadocs-ui/components/files";
+import { Step, Steps } from "fumadocs-ui/components/steps";
+import { Tab, Tabs } from "fumadocs-ui/components/tabs";
+
+The React SDK is the SPA wrapper for the shared Zitadel login and logout widgets.
+
+<Callout title="SPA proxy requirement" type="warn">
+  React apps do not have server middleware by default. The CLI configures a Vite dev proxy; production deployments need an equivalent same-origin proxy for `/__nextgen/*`.
+</Callout>
+
+## Install
 
 ```sh
 pnpm add @zitadel/sdk-react
 ```
 
-Configure Zitadel once, then render the login and logout widgets:
+## Setup
 
-```tsx
-import { ZitadelLogin, ZitadelLogout, configureZitadel } from "@zitadel/sdk-react";
+<Tabs items={["CLI generated", "Manual"]}>
+  <Tab>
+    The CLI configures the Vite proxy, writes app-level auth UI, adds environment files, and installs the SDK.
 
-const project = configureZitadel({
-  projectId: "<project id>",
-  proxyPath: "/__nextgen",
-});
-```
+    <Files>
+      <File name="src/App.tsx" />
+      <File name="vite.config.ts" />
+      <File name=".env.local" />
+      <File name=".env.example" />
+      <File name="package.json" />
+    </Files>
+  </Tab>
+  <Tab>
+    Configure Zitadel once, then render login and logout widgets:
 
-Pure SPAs need a deployment proxy for `/__nextgen/*` unless they intentionally call a backend URL directly in local development.
+    ```tsx
+    import { ZitadelLogin, ZitadelLogout, configureZitadel } from "@zitadel/sdk-react";
+
+    const project = configureZitadel({
+      projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID,
+      proxyPath: "/__nextgen",
+    });
+
+    export function LoginPage() {
+      return <ZitadelLogin project={project} purpose="login" postSignInUrl="/" />;
+    }
+
+    export function ProfilePage() {
+      return <ZitadelLogout project={project} postSignOutUrl="/login" />;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Runtime model
+
+<Steps>
+  <Step>The widgets call the configured proxy path on the same origin.</Step>
+  <Step>In local Vite development, the generated proxy forwards `/__nextgen/*` to Zitadel and attaches the project service key.</Step>
+  <Step>In production, deploy an equivalent edge/backend proxy or intentionally configure a backend URL for local-only experiments.</Step>
+</Steps>
+
+## Verify
+
+- Run the Vite app with generated environment variables.
+- Register or sign in through the rendered widget.
+- Confirm logout returns to the configured login path.
+- In browser automation, use shadow-DOM-aware locators because the native inputs live inside shared web components.
+
+Source references: `packages/sdk-react/README.md`, `apps/cli/src/lib/orca/patchers/rule/react/README.md`.

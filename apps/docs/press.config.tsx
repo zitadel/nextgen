@@ -21,6 +21,7 @@ export default defineConfig({
     docs: docs.toFumadocsSource(),
     openapi: await openapi.staticSource({
       baseDir: "reference/api",
+      groupBy: "tag",
     }),
   },
   site: {

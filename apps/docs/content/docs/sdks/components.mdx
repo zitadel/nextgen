@@ -3,11 +3,29 @@ title: Components
 description: Shared web components used by framework SDKs.
 ---
 
-`@zitadel/components` contains Lit web components such as:
+import { Callout } from "fumadocs-ui/components/callout";
+import { Step, Steps } from "fumadocs-ui/components/steps";
+
+`@zitadel/components` contains Lit web components and the `<zitadel-login>` orchestrator used by framework SDKs.
+
+<Callout title="Framework SDKs wrap this package" type="info">
+  Most applications should install the framework SDK first. Use this package directly when embedding the web components yourself.
+</Callout>
+
+## Components
 
 - `<zitadel-login>`
 - `<zitadel-logout>`
+- atoms such as fields, buttons, alerts, icons, pills, and page shells
 
-Framework SDKs wrap or register these components. The components speak to the configured API base, usually the same-origin `/__nextgen` proxy path in generated apps.
+## Runtime model
+
+<Steps>
+  <Step>Configure the project once with a project id and proxy path.</Step>
+  <Step>Render the login orchestrator for login or registration flows.</Step>
+  <Step>The component calls the flow API, renders each step, manages focus, and submits with native form semantics.</Step>
+</Steps>
+
+The components speak to the configured API base, usually the same-origin `/__nextgen` proxy path in generated apps.
 
 For browser automation, remember that the native controls live inside shadow roots. Prefer Playwright-style shadow-DOM-aware locators when available.

@@ -3,6 +3,9 @@ title: API client
 description: Generated TypeScript client and runtime configuration.
 ---
 
+import { Callout } from "fumadocs-ui/components/callout";
+import { Card, Cards } from "fumadocs-ui/components/card";
+
 `@zitadel/api` is generated from the OpenAPI source under `api/openapi/`.
 
 It exposes:
@@ -14,3 +17,13 @@ It exposes:
 - runtime helpers for base URL and auth
 
 Use the [API reference](/reference/api) to inspect endpoint shapes. Use package exports from `@zitadel/api` when writing CLI, SDK, or app code against the typed client.
+
+<Callout title="Edit the OpenAPI source" type="warn">
+  Do not hand-edit generated API package output. Update `api/openapi/**` and regenerate through the repo tasks.
+</Callout>
+
+<Cards>
+  <Card title="API reference" href="/reference/api" description="Generated endpoint docs grouped by OpenAPI tags." />
+  <Card title="Sessions" href="/reference/api/sessions" description="Session lifecycle and session-token endpoints." />
+  <Card title="Auth attempts" href="/reference/api/authentication-attempts" description="Ephemeral authentication state machine endpoints." />
+</Cards>

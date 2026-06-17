@@ -3,19 +3,71 @@ title: Vue SDK
 description: Vue wrappers for Zitadel login and logout UI.
 ---
 
-Install manually when not using the CLI:
+import { Callout } from "fumadocs-ui/components/callout";
+import { File, Files } from "fumadocs-ui/components/files";
+import { Step, Steps } from "fumadocs-ui/components/steps";
+import { Tab, Tabs } from "fumadocs-ui/components/tabs";
+
+The Vue SDK wraps the shared web components with Vue 3-friendly bindings.
+
+<Callout title="SPA proxy requirement" type="warn">
+  The CLI sets up a Vite dev proxy. Production deployments need a same-origin proxy for `/__nextgen/*`.
+</Callout>
+
+## Install
 
 ```sh
 pnpm add @zitadel/sdk-vue
 ```
 
-The Vue SDK wraps the shared web components and uses the same app-wide configuration model as the other SPA SDKs:
+## Setup
 
-```ts
-import { configureZitadel } from "@zitadel/sdk-vue";
+<Tabs items={["CLI generated", "Manual"]}>
+  <Tab>
+    The CLI writes the app entry, configures the Vite proxy, adds environment files, and installs the SDK.
 
-const project = configureZitadel({
-  projectId: "<project id>",
-  proxyPath: "/__nextgen",
-});
-```
+    <Files>
+      <File name="src/App.vue" />
+      <File name="vite.config.ts" />
+      <File name=".env.local" />
+      <File name=".env.example" />
+      <File name="package.json" />
+    </Files>
+  </Tab>
+  <Tab>
+    Configure Zitadel once, then render the components:
+
+    ```vue
+    <script setup lang="ts">
+    import { ZitadelLogin, ZitadelLogout, configureZitadel } from "@zitadel/sdk-vue";
+
+    const project = configureZitadel({
+      projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID,
+      proxyPath: "/__nextgen",
+    });
+    </script>
+
+    <template>
+      <ZitadelLogin :project="project" purpose="login" postSignInUrl="/" />
+      <ZitadelLogout :project="project" postSignOutUrl="/login" />
+    </template>
+    ```
+  </Tab>
+</Tabs>
+
+## Runtime model
+
+<Steps>
+  <Step>The Vue components call the same shared Zitadel web components as the other SPA SDKs.</Step>
+  <Step>The generated Vite proxy forwards `/__nextgen/*` to the backend during local development.</Step>
+  <Step>Production needs an equivalent proxy for same-origin auth API calls.</Step>
+</Steps>
+
+## Verify
+
+- Run the Vite app with generated environment variables.
+- Complete registration/login through the widget.
+- Confirm logout redirects to the configured path.
+- Use shadow-DOM-aware locators for browser automation.
+
+Source references: `packages/sdk-vue/README.md`, `apps/cli/src/lib/orca/patchers/rule/vue/README.md`.
