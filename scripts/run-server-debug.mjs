@@ -15,7 +15,7 @@ const buildArgs = ["build", "-gcflags", "all=-N -l", "-ldflags", "-X main.versio
 
 try {
   if (isHelp(args)) {
-    await run("go", ["run", ".", ...args], { cwd: repoRoot });
+    await run("go", ["run", ".", ...helpArgs(args)], { cwd: repoRoot });
   } else {
     process.stderr.write(`\n[server-debug] build: ${formatCommand("go", buildArgs)}\n`);
     process.stderr.write(`[server-debug] run:   ${formatCommand(`./${out}`, args)}\n\n`);
@@ -78,4 +78,8 @@ async function runBinary(command, binaryArgs, cwd) {
 
 function isHelp(a) {
   return a.includes("--help") || a.includes("-h") || a[0] === "help";
+}
+
+function helpArgs(a) {
+  return a[0] === "help" ? ["--help", ...a.slice(1)] : a;
 }
