@@ -324,8 +324,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 		}
 		if dispatch.Outcome != "" {
 			// User not found (or similar) — skip the passkey challenge and advance
-			// normally (e.g. transition to choose-register). CurrentPurpose flips
-			// at the transition commit site below.
+			// normally (e.g. transition to choose-register).
 			routeOutcome = dispatch.Outcome
 		}
 	}
@@ -408,11 +407,8 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 		return FlowStepResult{}, fmt.Errorf("%w: transition target %q missing from definition", ErrIntegrity, transition.Target)
 	}
 
-	// Flip CurrentPurpose atomically with the transition commit so the
-	// invariant holds for every outcome source (passkey early-dispatch,
-	// field-shaped dispatch, on_success). A flip outcome that has no
-	// transition wired surfaces a step error above and leaves
-	// CurrentPurpose untouched — no phantom mode change.
+	// Flip after the route is committed; an outcome with no wired
+	// transition leaves CurrentPurpose untouched.
 	applyOutcomeFlip(state, routeOutcome)
 
 	r.advance(state, currentStep, nextStep.Name)
@@ -455,10 +451,7 @@ var challengeDispatchOrder = []FlowFieldChallenge{
 
 // applyOutcomeFlip flips CurrentPurpose on identifier outcomes:
 // login + user_not_found → register; register + user_already_exists → login.
-// Recovery never flips. Called exactly once per Process call, after the
-// transition for routeOutcome is confirmed to exist — so an outcome
-// without a wired transition (rendered as a step error) leaves the mode
-// untouched.
+// Recovery never flips.
 func applyOutcomeFlip(state *FlowState, outcome string) {
 	switch {
 	case state.CurrentPurpose == FlowDefinitionPurposeLogin && outcome == FlowImplicitOutcomeUserNotFound:
