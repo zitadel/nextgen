@@ -196,10 +196,12 @@ async function proxyRequest(
   const upstreamHeaders = buildUpstreamHeaders(event);
 
   // Attach the project service-key secret as the bearer on every proxied
-  // request. The module's setup() puts the secret into Nuxt's server-only
-  // runtimeConfig (read from `process.env.ZITADEL_PROJECT_SECRET`; falls back
-  // to a `.env.local` parse when Nuxt's dev runtime didn't auto-load it).
-  // runtimeConfig is server-side only — never exposed to the client bundle.
+  // request. Reads `runtimeConfig.nextgen.projectSecret`, which the bundled
+  // Nuxt module's setup() populates from `process.env.ZITADEL_PROJECT_SECRET`
+  // (with a `.env.local` fallback for dev). Apps that call
+  // `createNextgenMiddleware` directly must set the same key on their
+  // runtimeConfig or no bearer is attached. runtimeConfig is server-side
+  // only — never exposed to the client bundle.
   if (!upstreamHeaders.has('authorization')) {
     const config = useRuntimeConfig();
     const projectSecret = (
