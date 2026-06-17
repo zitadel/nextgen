@@ -106,6 +106,7 @@ export abstract class AbstractRulePatcher implements Patcher {
         path: ".env.example",
         entries: {
           ZITADEL_PROJECT_ID: "",
+          ZITADEL_PROJECT_SECRET: "",
           ZITADEL_ENVIRONMENT: "",
           ZITADEL_ISSUER: "",
           ZITADEL_URL: "",
@@ -116,6 +117,7 @@ export abstract class AbstractRulePatcher implements Patcher {
         path: ".env.local",
         entries: {
           ZITADEL_PROJECT_ID: ctx.project.id,
+          ZITADEL_PROJECT_SECRET: ctx.project.projectSecret,
           ZITADEL_ENVIRONMENT: "development",
           ZITADEL_ISSUER: ctx.issuer,
           ZITADEL_URL: ctx.server,
