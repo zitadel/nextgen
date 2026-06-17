@@ -736,9 +736,6 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 			RPID:      in.PasskeyRP.RPID,
 			RPOrigins: in.PasskeyRP.Origins,
 			Username:  username,
-			// DisplayName left empty: the service layer falls back to
-			// Username, then UserID. A schema-level x-display-name
-			// annotation could drive this in the future.
 		})
 		if err != nil {
 			return passkeyPhaseResult{}, fmt.Errorf("flow state machine: issue passkey registration: %w", err)

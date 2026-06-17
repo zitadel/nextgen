@@ -34,7 +34,6 @@ type FlowIssuePasskeyRegistrationChallengeInput struct {
 	RPID        string
 	RPOrigins   []string
 	Username    string // e.g. the user's email address; falls back to UserID
-	DisplayName string // e.g. "Jane Doe"; falls back to Username then UserID
 }
 
 // FlowPasskeyRegistrationChallengeOutput is the issued challenge.
