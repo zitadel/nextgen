@@ -153,18 +153,18 @@ import Link from "next/link";
 
 export default function Home() {
   return (
-    <main style={{ minHeight: "100vh", padding: "48px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <main style={{ position: "fixed", inset: 0, padding: "48px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", background: "#ffffff", color: "#111827", fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", lineHeight: 1.5, letterSpacing: "normal" }}>
       <section style={{ width: "100%", maxWidth: "560px" }}>
         <p style={{ margin: "0 0 12px", color: "#4b5563", fontSize: "14px" }}>Zitadel auth</p>
-        <h1 style={{ margin: "0 0 24px", fontSize: "32px", lineHeight: 1.15 }}>Sign in, create an account, or open your profile.</h1>
+        <h1 style={{ margin: "0 0 24px", fontSize: "32px", lineHeight: 1.15, fontWeight: 600, color: "#111827" }}>Sign in, create an account, or open your profile.</h1>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
-          <Link href="/login" style={{ padding: "10px 16px", borderRadius: "8px", background: "#111827", color: "#ffffff", textDecoration: "none", fontWeight: 600 }}>
+          <Link href="/login" style={{ padding: "10px 16px", borderRadius: "8px", background: "#111827", color: "#ffffff", textDecoration: "none", fontWeight: 600, fontSize: "14px" }}>
             Sign in
           </Link>
-          <Link href="/register" style={{ padding: "10px 16px", borderRadius: "8px", border: "1px solid #d1d5db", color: "#111827", textDecoration: "none", fontWeight: 600 }}>
+          <Link href="/register" style={{ padding: "10px 16px", borderRadius: "8px", border: "1px solid #d1d5db", color: "#111827", textDecoration: "none", fontWeight: 600, fontSize: "14px" }}>
             Create account
           </Link>
-          <Link href="/profile" style={{ padding: "10px 16px", borderRadius: "8px", border: "1px solid #d1d5db", color: "#111827", textDecoration: "none", fontWeight: 600 }}>
+          <Link href="/profile" style={{ padding: "10px 16px", borderRadius: "8px", border: "1px solid #d1d5db", color: "#111827", textDecoration: "none", fontWeight: 600, fontSize: "14px" }}>
             Profile
           </Link>
         </div>

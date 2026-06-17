@@ -23,14 +23,14 @@ body {
 export function indexPageTemplate(): string {
   return `<!-- ${MANAGED_MARKER} -->
 <template>
-  <main style="min-height:100vh;padding:48px;display:flex;align-items:center;justify-content:center">
+  <main style="position:fixed;inset:0;padding:48px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:#ffffff;color:#111827;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.5;letter-spacing:normal">
     <section style="width:100%;max-width:560px">
       <p style="margin:0 0 12px;color:#4b5563;font-size:14px">Zitadel auth</p>
-      <h1 style="margin:0 0 24px;font-size:32px;line-height:1.15">Sign in, create an account, or open your profile.</h1>
+      <h1 style="margin:0 0 24px;font-size:32px;line-height:1.15;font-weight:600;color:#111827">Sign in, create an account, or open your profile.</h1>
       <div style="display:flex;flex-wrap:wrap;gap:12px">
-        <NuxtLink to="/login" style="padding:10px 16px;border-radius:8px;background:#111827;color:#ffffff;text-decoration:none;font-weight:600">Sign in</NuxtLink>
-        <NuxtLink to="/register" style="padding:10px 16px;border-radius:8px;border:1px solid #d1d5db;color:#111827;text-decoration:none;font-weight:600">Create account</NuxtLink>
-        <NuxtLink to="/profile" style="padding:10px 16px;border-radius:8px;border:1px solid #d1d5db;color:#111827;text-decoration:none;font-weight:600">Profile</NuxtLink>
+        <NuxtLink to="/login" style="padding:10px 16px;border-radius:8px;background:#111827;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px">Sign in</NuxtLink>
+        <NuxtLink to="/register" style="padding:10px 16px;border-radius:8px;border:1px solid #d1d5db;color:#111827;text-decoration:none;font-weight:600;font-size:14px">Create account</NuxtLink>
+        <NuxtLink to="/profile" style="padding:10px 16px;border-radius:8px;border:1px solid #d1d5db;color:#111827;text-decoration:none;font-weight:600;font-size:14px">Profile</NuxtLink>
       </div>
     </section>
   </main>
