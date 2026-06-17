@@ -63,7 +63,7 @@
     "prettier": "catalog:",
     "typescript": "catalog:",
     "typescript-eslint": "catalog:",
-    "vite": "^7.3.5",
-    "vitest": "^3.0.0"
+    "vite": "catalog:sdk",
+    "vitest": "catalog:sdk"
   }
 }

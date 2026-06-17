@@ -85,4 +85,12 @@ catalog:
   xstate: ^5.31.1
   zod: ^4.3.6
 
+# Named catalog for the client SDK toolchain. Pinned to Vite 7 / Vitest 3
+# (not the root catalog's Vite 8) because Qwik 1.x peers `vite >=5 <8`, so the
+# SDK family that includes @zitadel/sdk-qwik must build on Vite 7.
+catalogs:
+  sdk:
+    vite: ^7.3.5
+    vitest: ^3.0.0
+
 catalogMode: strict

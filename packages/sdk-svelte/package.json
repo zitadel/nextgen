@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-svelte",
-  "version": "0.1.0-alpha.5",
+  "version": "0.1.0-alpha.10",
   "description": "Svelte components for the Zitadel auth UI (client-side SPA).",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-svelte#readme",
   "bugs": {
@@ -62,7 +62,7 @@
     "svelte2tsx": "^0.7.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "catalog:",
-    "vite": "^7.3.5",
-    "vitest": "^3.0.0"
+    "vite": "catalog:sdk",
+    "vitest": "catalog:sdk"
   }
 }

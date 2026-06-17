@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-solid",
-  "version": "0.1.0-alpha.5",
+  "version": "0.1.0-alpha.10",
   "description": "Solid components for the Zitadel auth UI (client-side SPA).",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-solid#readme",
   "bugs": {
@@ -57,9 +57,9 @@
     "solid-js": "^1.9.12",
     "typescript": "catalog:",
     "typescript-eslint": "catalog:",
-    "vite": "^7.3.5",
+    "vite": "catalog:sdk",
     "vite-plugin-dts": "catalog:",
     "vite-plugin-solid": "^2.11.0",
-    "vitest": "^3.0.0"
+    "vitest": "catalog:sdk"
   }
 }
