@@ -3471,6 +3471,8 @@ func (s *FlowDefinitionStepTransitionsItemAction) UnmarshalText(data []byte) err
 // Completely replaces the existing flow definition.
 // Allowed to update only those flow definitions that are in the `draft` state to prevent breaking
 // changes to active flow definitions.
+// The status of the flow definition can also be updated by setting the `status` attribute in the
+// flow definition.
 // Ref: #
 type FlowDefinitionUpdateRequest struct {
 	ProjectID      ProjectID      `json:"project_id"`

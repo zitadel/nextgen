@@ -34,7 +34,8 @@ put:
   summary: Update a flow definition by id
   description: |
     Update a flow definition by id. This endpoint completely replaces the existing flow definition.
-    Allowed to update a flow definition in the `draft` state only.
+    Allowed to update only those flow definitions that are in the `draft` state to prevent breaking changes to active flow definitions. 
+    The status of the flow definition can also be updated by setting the `status` attribute in the flow definition.
   tags:
     - Flow Definitions
   security:

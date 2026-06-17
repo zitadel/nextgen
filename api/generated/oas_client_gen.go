@@ -33,7 +33,7 @@ type Invoker interface {
 	// Activate a flow definition in the `draft` or `deprecated` state by ID.
 	// Flow definitions are created in a `draft` state by default. They must be activated before they can
 	// be used in a flow.
-	// Alternatively, flow states can also be modified via `POST /flow_definitions` and `PUT
+	// Alternatively, flow states can also be set via the `POST /flow_definitions` and `PUT
 	// /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow definition payload.
 	//
 	// POST /flow_definitions/{id}/activate
@@ -91,8 +91,8 @@ type Invoker interface {
 	// Creates a new flow definition.
 	// Flow definitions are templates that define the sequence of steps (capabilities)
 	// for a particular user journey (e.g., registration, login, password reset).
-	// Flow definitions are created based on the flow meta schema, which includes the flow's purpose,
-	// audience, and the steps involved.
+	// Flow definitions are created based on the flow definition schema, which includes the flow's
+	// purpose, audience, and the steps involved.
 	//
 	// POST /flow_definitions
 	CreateFlowDefinition(ctx context.Context, request *CreateFlowDefinitionRequest) (CreateFlowDefinitionRes, error)
@@ -412,7 +412,10 @@ type Invoker interface {
 	// UpdateFlowDefinition invokes updateFlowDefinition operation.
 	//
 	// Update a flow definition by id. This endpoint completely replaces the existing flow definition.
-	// Allowed to update a flow definition in the `draft` state only.
+	// Allowed to update only those flow definitions that are in the `draft` state to prevent breaking
+	// changes to active flow definitions.
+	// The status of the flow definition can also be updated by setting the `status` attribute in the
+	// flow definition.
 	//
 	// PUT /flow_definitions/{id}
 	UpdateFlowDefinition(ctx context.Context, request *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (UpdateFlowDefinitionRes, error)
@@ -477,7 +480,7 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 // Activate a flow definition in the `draft` or `deprecated` state by ID.
 // Flow definitions are created in a `draft` state by default. They must be activated before they can
 // be used in a flow.
-// Alternatively, flow states can also be modified via `POST /flow_definitions` and `PUT
+// Alternatively, flow states can also be set via the `POST /flow_definitions` and `PUT
 // /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow definition payload.
 //
 // POST /flow_definitions/{id}/activate
@@ -1484,8 +1487,8 @@ func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest)
 // Creates a new flow definition.
 // Flow definitions are templates that define the sequence of steps (capabilities)
 // for a particular user journey (e.g., registration, login, password reset).
-// Flow definitions are created based on the flow meta schema, which includes the flow's purpose,
-// audience, and the steps involved.
+// Flow definitions are created based on the flow definition schema, which includes the flow's
+// purpose, audience, and the steps involved.
 //
 // POST /flow_definitions
 func (c *Client) CreateFlowDefinition(ctx context.Context, request *CreateFlowDefinitionRequest) (CreateFlowDefinitionRes, error) {
@@ -6547,7 +6550,10 @@ func (c *Client) sendSubmitFlowStep(ctx context.Context, request *FlowSubmitRequ
 // UpdateFlowDefinition invokes updateFlowDefinition operation.
 //
 // Update a flow definition by id. This endpoint completely replaces the existing flow definition.
-// Allowed to update a flow definition in the `draft` state only.
+// Allowed to update only those flow definitions that are in the `draft` state to prevent breaking
+// changes to active flow definitions.
+// The status of the flow definition can also be updated by setting the `status` attribute in the
+// flow definition.
 //
 // PUT /flow_definitions/{id}
 func (c *Client) UpdateFlowDefinition(ctx context.Context, request *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (UpdateFlowDefinitionRes, error) {
