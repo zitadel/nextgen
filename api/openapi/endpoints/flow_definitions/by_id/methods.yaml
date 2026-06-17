@@ -29,10 +29,12 @@ get:
           schema:
             $ref: ../../../components/error-details.yaml
 
-patch:
+put:
   operationId: updateFlowDefinition
   summary: Update a flow definition by id
-  description: Update a flow definition by id
+  description: |
+    Update a flow definition by id. This endpoint completely replaces the existing flow definition.
+    Allowed to update a flow definition in the `draft` state only.
   tags:
     - Flow Definitions
   security:

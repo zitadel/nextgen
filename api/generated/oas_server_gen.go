@@ -8,6 +8,26 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
+	// ActivateFlowDefinition implements activateFlowDefinition operation.
+	//
+	// Activate a flow definition in the `draft` or `deprecated` state by ID.
+	// Flow definitions are created in a `draft` state by default. They must be activated before they can
+	// be used in a flow.
+	// Alternatively, flow states can also be modified via `POST /flow_definitions` and `PUT
+	// /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow definition payload.
+	//
+	// POST /flow_definitions/{id}/activate
+	ActivateFlowDefinition(ctx context.Context, params ActivateFlowDefinitionParams) (ActivateFlowDefinitionRes, error)
+	// ArchiveFlowDefinition implements archiveFlowDefinition operation.
+	//
+	// Archives a flow definition in the `active` or `deprecated` state by ID.
+	// Archived flow definitions cannot be used to start new flows. Existing flows will return an error
+	// if they reference an archived flow definition.
+	// Alternatively, flow states can also be modified via `POST /flow_definitions` and `PUT
+	// /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow definition payload.
+	//
+	// POST /flow_definitions/{id}/archive
+	ArchiveFlowDefinition(ctx context.Context, params ArchiveFlowDefinitionParams) (ArchiveFlowDefinitionRes, error)
 	// AuthorizeDevice implements authorizeDevice operation.
 	//
 	// Authorize a device.
@@ -117,6 +137,16 @@ type Handler interface {
 	//
 	// DELETE /flow_definitions/{id}
 	DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (DeleteFlowDefinitionRes, error)
+	// DeprecateFlowDefinition implements deprecateFlowDefinition operation.
+	//
+	// Deprecates a flow definition in the `active` state by ID.
+	// Deprecated flow definitions cannot be used to start new flows, but existing flows that reference
+	// the deprecated flow definition can continue to operate until completion.
+	// Alternatively, flow states can also be modified via `POST /flow_definitions` and `PUT
+	// /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow definition payload.
+	//
+	// POST /flow_definitions/{id}/deprecate
+	DeprecateFlowDefinition(ctx context.Context, params DeprecateFlowDefinitionParams) (DeprecateFlowDefinitionRes, error)
 	// EndSession implements endSession operation.
 	//
 	// End a session.
@@ -357,9 +387,10 @@ type Handler interface {
 	SubmitFlowStep(ctx context.Context, req *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error)
 	// UpdateFlowDefinition implements updateFlowDefinition operation.
 	//
-	// Update a flow definition by id.
+	// Update a flow definition by id. This endpoint completely replaces the existing flow definition.
+	// Allowed to update a flow definition in the `draft` state only.
 	//
-	// PATCH /flow_definitions/{id}
+	// PUT /flow_definitions/{id}
 	UpdateFlowDefinition(ctx context.Context, req *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (UpdateFlowDefinitionRes, error)
 	// VerifyChallengeProof implements verifyChallengeProof operation.
 	//
