@@ -52,8 +52,6 @@ export const de: Locale = {
   "collect-credentials.field.email": "E-Mail",
   "collect-credentials.field.email.placeholder": "du@unternehmen.com",
   "collect-credentials.field.password": "Passwort",
-  "collect-credentials.field.password.help":
-    "Mindestens 8 Zeichen, einschließlich eines Sonderzeichens und einer Zahl.",
   "collect-credentials.action.submit": "Registrieren",
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -63,8 +61,6 @@ export const de: Locale = {
   "register-password.title": "Passwort erstellen",
   "register-password.description": "Wähle ein sicheres Passwort für dein Konto",
   "register-password.field.password": "Passwort",
-  "register-password.field.password.help":
-    "Mindestens 8 Zeichen, einschließlich eines Sonderzeichens und einer Zahl.",
   "register-password.action.submit": "Registrieren",
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -117,8 +113,6 @@ export const de: Locale = {
   "register.field.email": "E-Mail",
   "register.field.email.placeholder": "du@unternehmen.com",
   "register.field.password": "Passwort",
-  "register.field.password.help":
-    "Mindestens 8 Zeichen, einschließlich eines Sonderzeichens und einer Zahl.",
   "register.field.givenName": "Vorname",
   "register.field.familyName": "Nachname",
   "register.field.dateOfBirth": "Geburtsdatum",

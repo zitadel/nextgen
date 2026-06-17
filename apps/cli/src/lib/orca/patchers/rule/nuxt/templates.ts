@@ -1,7 +1,9 @@
 import { MANAGED_MARKER } from "../../../../paths";
 
+// Enforce the dark surface the Zitadel widgets are designed for, so pages never
+// follow the OS light/dark setting.
 const MAIN_STYLE =
-  "min-height: 100vh; background: #0f0f11";
+  "min-height: 100vh; background: #0f0f11; color: #f4f4f6; color-scheme: dark";
 
 /** `app.vue` — renders the page router. Marker in an HTML comment. */
 export function appVueTemplate(): string {
@@ -11,8 +13,13 @@ export function appVueTemplate(): string {
 </template>
 
 <style>
+:root {
+  color-scheme: dark;
+}
 body {
   margin: 0;
+  background: #0f0f11;
+  color: #f4f4f6;
   font-family: sans-serif;
 }
 </style>
@@ -60,7 +67,7 @@ const project = useZitadelProject();
 </script>
 
 <template>
-  <main style="padding: 24px">
+  <main style="${MAIN_STYLE}; padding: 24px">
     <h1>Signed in (Nuxt)</h1>
     <ClientOnly>
       <zitadel-logout :project="project" post-sign-out-url="/login" />

@@ -24,18 +24,22 @@ const path = window.location.pathname;
 </script>
 
 <template>
-  <ZitadelLogout
-    v-if="path.startsWith('/profile')"
-    :project="project"
-    postSignOutUrl="/login"
-  />
-  <ZitadelLogin
-    v-else-if="path.startsWith('/register')"
-    :project="project"
-    purpose="register"
-    postSignInUrl="/profile"
-  />
-  <ZitadelLogin v-else :project="project" purpose="login" postSignInUrl="/profile" />
+  <!-- Enforce the dark surface the Zitadel widgets are designed for, so the
+       page never follows the OS light/dark setting. -->
+  <main style="min-height: 100vh; background: #0f0f11; color: #f4f4f6; color-scheme: dark;">
+    <ZitadelLogout
+      v-if="path.startsWith('/profile')"
+      :project="project"
+      postSignOutUrl="/login"
+    />
+    <ZitadelLogin
+      v-else-if="path.startsWith('/register')"
+      :project="project"
+      purpose="register"
+      postSignInUrl="/profile"
+    />
+    <ZitadelLogin v-else :project="project" purpose="login" postSignInUrl="/profile" />
+  </main>
 </template>
 `;
 }

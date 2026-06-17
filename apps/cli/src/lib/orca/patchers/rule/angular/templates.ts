@@ -39,21 +39,25 @@ export class App {
  */
 export function appTemplateHtml(): string {
   return `<!-- ${MANAGED_MARKER} -->
-@if (path.startsWith('/profile')) {
-  <zitadel-auth-logout [project]="project" [postSignOutUrl]="'/login'"></zitadel-auth-logout>
-} @else if (path.startsWith('/register')) {
-  <zitadel-auth-login
-    [project]="project"
-    purpose="register"
-    [postSignInUrl]="'/profile'"
-  ></zitadel-auth-login>
-} @else {
-  <zitadel-auth-login
-    [project]="project"
-    purpose="login"
-    [postSignInUrl]="'/profile'"
-  ></zitadel-auth-login>
-}
+<!-- Enforce the dark surface the Zitadel widgets are designed for, so the page
+     never follows the OS light/dark setting. -->
+<main style="min-height: 100vh; background: #0f0f11; color: #f4f4f6; color-scheme: dark;">
+  @if (path.startsWith('/profile')) {
+    <zitadel-auth-logout [project]="project" [postSignOutUrl]="'/login'"></zitadel-auth-logout>
+  } @else if (path.startsWith('/register')) {
+    <zitadel-auth-login
+      [project]="project"
+      purpose="register"
+      [postSignInUrl]="'/profile'"
+    ></zitadel-auth-login>
+  } @else {
+    <zitadel-auth-login
+      [project]="project"
+      purpose="login"
+      [postSignInUrl]="'/profile'"
+    ></zitadel-auth-login>
+  }
+</main>
 `;
 }
 

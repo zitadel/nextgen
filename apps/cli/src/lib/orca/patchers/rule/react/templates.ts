@@ -23,13 +23,21 @@ const project = configureZitadel({
 export default function App() {
   const path = window.location.pathname;
 
-  if (path.startsWith("/profile")) {
-    return <ZitadelLogout project={project} postSignOutUrl="/login" />;
-  }
-  if (path.startsWith("/register")) {
-    return <ZitadelLogin project={project} purpose="register" postSignInUrl="/profile" />;
-  }
-  return <ZitadelLogin project={project} purpose="login" postSignInUrl="/profile" />;
+  const content = path.startsWith("/profile") ? (
+    <ZitadelLogout project={project} postSignOutUrl="/login" />
+  ) : path.startsWith("/register") ? (
+    <ZitadelLogin project={project} purpose="register" postSignInUrl="/profile" />
+  ) : (
+    <ZitadelLogin project={project} purpose="login" postSignInUrl="/profile" />
+  );
+
+  // Enforce the dark surface the Zitadel widgets are designed for, so the page
+  // never follows the OS light/dark setting.
+  return (
+    <main style={{ minHeight: "100vh", colorScheme: "dark", background: "#0f0f11", color: "#f4f4f6" }}>
+      {content}
+    </main>
+  );
 }
 `;
 }
