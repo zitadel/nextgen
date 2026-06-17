@@ -26,7 +26,12 @@ function loadProjectSecret(rootDir: string): string | undefined {
     return undefined;
   }
   for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
-    const match = line.match(/^ZITADEL_PROJECT_SECRET=(.*)$/);
+    // Allow `KEY=value`, `KEY="value"`, `KEY='value'`, and a trailing
+    // ` # comment` (the dotenv convention). Stop the value at the first
+    // unquoted `#`; trim and unwrap surrounding quotes.
+    const match = line.match(
+      /^ZITADEL_PROJECT_SECRET=("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^#\r\n]*)/,
+    );
     if (match && match[1] !== undefined) {
       const value = match[1].trim().replace(/^(['"])(.*)\1$/, '$2');
       return value === '' ? undefined : value;
