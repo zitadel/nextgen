@@ -2,7 +2,7 @@ get:
   operationId: getMyUser
   summary: Get my user information
   tags:
-    - User
+    - Users
   parameters:
     - $ref: ../../../components/parameters/session-cookie.yaml
   security: []

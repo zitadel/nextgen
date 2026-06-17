@@ -3,7 +3,7 @@ get:
   summary: Get schema by ID
   description: Get a schema by its ID. This will return the default revision of the schema.
   tags:
-    - Schema
+    - Schemas
   security:
     - oauth2:
         - schema.read

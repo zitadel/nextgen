@@ -1,0 +1,43 @@
+{
+  "name": "@zitadel/docs",
+  "version": "0.0.1",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "generate:openapi": "node scripts/bundle-openapi.mjs",
+    "generate:source": "fumadocs-mdx",
+    "generate": "pnpm run generate:openapi && pnpm run generate:source",
+    "dev": "pnpm run generate && waku dev --port 3003",
+    "build": "pnpm run generate && waku build",
+    "preview": "waku start --port 3003",
+    "typecheck": "pnpm run generate && tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@fumapress/ai": "catalog:",
+    "@scalar/api-client-react": "catalog:",
+    "@zitadel/design-tokens": "workspace:*",
+    "fumadocs-core": "catalog:",
+    "fumadocs-mdx": "catalog:",
+    "fumadocs-openapi": "catalog:",
+    "fumadocs-ui": "catalog:",
+    "fumapress": "catalog:",
+    "hono": "catalog:",
+    "json-schema-typed": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-server-dom-webpack": "catalog:",
+    "shiki": "catalog:",
+    "waku": "catalog:"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "catalog:",
+    "@types/mdx": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

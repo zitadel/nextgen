@@ -1,0 +1,58 @@
+---
+title: Components
+description: Shared web components used by framework SDKs.
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { Step, Steps } from "fumadocs-ui/components/steps";
+import { Tab, Tabs } from "fumadocs-ui/components/tabs";
+
+`@zitadel/components` contains Lit web components and the `<zitadel-login>` orchestrator used by framework SDKs.
+
+<Callout title="Framework SDKs wrap this package" type="info">
+  Most applications should install the framework SDK first. Use this package directly when embedding the web components yourself.
+</Callout>
+
+## Install
+
+<Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
+  <Tab>
+    ```sh
+    pnpm add @zitadel/components
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    npm install @zitadel/components
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    yarn add @zitadel/components
+    ```
+  </Tab>
+</Tabs>
+
+## Components
+
+- `<zitadel-login>`
+- `<zitadel-logout>`
+- atoms such as fields, buttons, alerts, icons, pills, and page shells
+
+## Runtime model
+
+<Steps>
+  <Step>Configure the project once with a project id and proxy path.</Step>
+  <Step>Render the login orchestrator for login or registration flows.</Step>
+  <Step>The component calls the flow API, renders each step, manages focus, and submits with native form semantics.</Step>
+</Steps>
+
+The components speak to the configured API base, usually the same-origin `/__nextgen` proxy path in generated apps.
+
+For browser automation, remember that the native controls live inside shadow roots. Prefer Playwright-style shadow-DOM-aware locators when available.
+
+## See also
+
+- [SDKs](/docs/sdks) — framework wrappers that bundle these components for you.
+- [SDK proxy](/docs/concepts/sdk-proxy) — the same-origin `/__nextgen/*` path the orchestrator calls.
+- [`@zitadel/components` source](https://github.com/zitadel/nextgen/tree/main/packages/components).

@@ -1,0 +1,107 @@
+---
+title: Next.js SDK
+description: Middleware and helpers for Next.js applications.
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { File, Files } from "fumadocs-ui/components/files";
+import { Step, Steps } from "fumadocs-ui/components/steps";
+import { Tab, Tabs } from "fumadocs-ui/components/tabs";
+
+The Next.js SDK wires App Router applications through one server-side middleware path.
+
+<Callout title="Recommended path" type="info">
+  Let the CLI generate this setup first. Manual setup is useful when reviewing or adapting the generated files.
+</Callout>
+
+## Install
+
+<Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
+  <Tab>
+    ```sh
+    pnpm add @zitadel/sdk-next
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    npm install @zitadel/sdk-next
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    yarn add @zitadel/sdk-next
+    ```
+  </Tab>
+</Tabs>
+
+## Setup
+
+<Tabs items={["CLI generated", "Manual"]}>
+  <Tab>
+    The CLI adds the SDK package, creates auth routes, writes a profile page, and installs middleware that runs `nextgenMiddleware`.
+
+    <Files>
+      <File name="app/login/page.tsx" />
+      <File name="app/register/page.tsx" />
+      <File name="app/profile/page.tsx" />
+      <File name="middleware.ts" />
+      <File name="package.json" />
+    </Files>
+  </Tab>
+  <Tab>
+    Create `src/proxy.ts` at the root of your Next.js app and call the middleware:
+
+    ```ts
+    import { nextgenMiddleware } from "@zitadel/sdk-next/middleware";
+    import type { NextRequest } from "next/server";
+
+    export function proxy(req: NextRequest) {
+      return nextgenMiddleware(req, {
+        url: process.env.ZITADEL_URL,
+        protectedRoutes: ["/profile"],
+        loginPath: "/login",
+      });
+    }
+
+    export const config = {
+      matcher: ["/__nextgen/:path*", "/profile", "/login"],
+    };
+    ```
+  </Tab>
+</Tabs>
+
+## Runtime model
+
+<Steps>
+  <Step>Proxy `/__nextgen/*` requests to the Zitadel backend.</Step>
+  <Step>Verify the session JWT via JWKS using Web Crypto.</Step>
+  <Step>Redirect unauthenticated users from protected routes to `loginPath`.</Step>
+</Steps>
+
+## Usage
+
+Read auth state in a server component:
+
+```tsx
+import { auth } from "@zitadel/sdk-next";
+
+export default async function Page() {
+  const session = await auth();
+  if (!session.isAuthenticated) return <p>Not signed in</p>;
+
+  return <p>Hello {session.session.email}</p>;
+}
+```
+
+## Verify
+
+- Start the app with the generated environment.
+- Visit `/login` and register a user.
+- Confirm `/profile` is reachable after login.
+- Log out and confirm `/profile` redirects back to `/login`.
+
+## See also
+
+- [SDK proxy](/docs/concepts/sdk-proxy) — why `/__nextgen/*` must be same-origin and how the project key is attached.
+- [`apps/demo-next`](https://github.com/zitadel/nextgen/tree/main/apps/demo-next) — a runnable Next.js example in this repo.
+- [`@zitadel/sdk-next` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-next) and the [CLI Next.js patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/next).
