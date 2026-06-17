@@ -26,14 +26,14 @@ export const App = component$(() => {
 
   if (path === "/") {
     return (
-      <main style={{ position: "fixed", inset: "0", padding: "48px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", background: "#ffffff", color: "#111827", fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", lineHeight: "1.5", letterSpacing: "normal" }}>
+      <main style={{ position: "fixed", inset: "0", padding: "48px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", background: "#0f0f11", color: "#f4f4f6", fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", lineHeight: "1.5", letterSpacing: "normal" }}>
         <section style={{ width: "100%", maxWidth: "560px" }}>
-          <p style={{ margin: "0 0 12px", color: "#4b5563", fontSize: "14px" }}>Zitadel auth</p>
-          <h1 style={{ margin: "0 0 24px", fontSize: "32px", lineHeight: "1.15", fontWeight: "600", color: "#111827" }}>Sign in, create an account, or open your profile.</h1>
+          <p style={{ margin: "0 0 12px", color: "#9ca3af", fontSize: "14px" }}>Zitadel auth</p>
+          <h1 style={{ margin: "0 0 24px", fontSize: "32px", lineHeight: "1.15", fontWeight: "600", color: "#f4f4f6" }}>Sign in, create an account, or open your profile.</h1>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
-            <a href="/login" style={{ padding: "10px 16px", borderRadius: "8px", background: "#111827", color: "#ffffff", textDecoration: "none", fontWeight: "600", fontSize: "14px" }}>Sign in</a>
-            <a href="/register" style={{ padding: "10px 16px", borderRadius: "8px", border: "1px solid #d1d5db", color: "#111827", textDecoration: "none", fontWeight: "600", fontSize: "14px" }}>Create account</a>
-            <a href="/profile" style={{ padding: "10px 16px", borderRadius: "8px", border: "1px solid #d1d5db", color: "#111827", textDecoration: "none", fontWeight: "600", fontSize: "14px" }}>Profile</a>
+            <a href="/login" style={{ padding: "10px 16px", borderRadius: "8px", background: "#f4f4f6", color: "#0f0f11", textDecoration: "none", fontWeight: "600", fontSize: "14px" }}>Sign in</a>
+            <a href="/register" style={{ padding: "10px 16px", borderRadius: "8px", border: "1px solid #3f3f46", color: "#f4f4f6", textDecoration: "none", fontWeight: "600", fontSize: "14px" }}>Create account</a>
+            <a href="/profile" style={{ padding: "10px 16px", borderRadius: "8px", border: "1px solid #3f3f46", color: "#f4f4f6", textDecoration: "none", fontWeight: "600", fontSize: "14px" }}>Profile</a>
           </div>
         </section>
       </main>
