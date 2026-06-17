@@ -83,4 +83,4 @@ The demo imports the package from `dist/`, not source.
 
 **Login widget** (`src/app/login/widget.tsx`) dynamically imports `@zitadel/components` with `ssr: false` so custom elements register only in the browser.
 
-**Fonts and branding** — the mock server ships a default `font_url` (Arimo via Google Fonts) on every flow response. `<zitadel-login>` injects it into its shadow root. Root `layout.tsx` sets `body { margin: 0; font-family: sans-serif; }`. **APK Futural** in heading tokens still needs a tenant font URL when you brand beyond the mock baseline.
+**Fonts and branding** — the mock server ships a default `font_url` (Arimo via Google Fonts) on every flow response. `<zitadel-login>` injects it as a `<link rel="stylesheet">` in the host document `<head>` — **not** the shadow root, because browsers ignore `@font-face` declared inside a shadow tree; the shadow DOM's `font-family` then resolves against the document-level face. Root `layout.tsx` sets `body { margin: 0; font-family: sans-serif; }`. Headings use the same Arimo family rendered bold (`--zl-font-family-heading` leads with `"Arimo"`). Tenants override the face via `branding.font_url`.
