@@ -68,8 +68,8 @@
   --zl-radius-m: 0.75rem;
   --zl-radius-l: 1rem;
   --zl-radius-xl: 1.5rem;
-  --zl-font-family-sans: "Arimo", "APK Futural", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
-  --zl-font-family-heading: "APK Futural", "Arimo", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --zl-font-family-sans: "Arimo", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --zl-font-family-heading: "Arimo", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
   --zl-font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --zl-duration-instant: 0ms;
   --zl-duration-fast: 120ms;

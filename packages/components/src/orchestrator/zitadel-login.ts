@@ -22,7 +22,7 @@ import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
 import type { Branding } from "./branding.js";
 import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { validateBranding } from "./branding-validator.js";
-import { applyFontUrl } from "./font-loader.js";
+import { applyDefaultFont, applyFontUrl } from "./font-loader.js";
 import { emit } from "../internal/emit.js";
 import { escapeHtml } from "../internal/escape-html.js";
 import { createLiquidEngine } from "./liquid.js";
@@ -255,7 +255,11 @@ export class ZitadelLogin extends LitElement {
     if (root) {
       applyBaseTokens(root);
       applyBrandingTokens(root, this.branding, this.themeController.theme);
-      applyFontUrl(root, this.branding?.font_url ?? null);
+      // Ship the design-system brand face by default; drop it when a tenant
+      // font takes over so we don't fire a redundant request.
+      const tenantFontUrl = this.branding?.font_url ?? null;
+      applyDefaultFont(root, tenantFontUrl ? null : undefined);
+      applyFontUrl(root, tenantFontUrl);
     }
     this.dataset.theme = this.themeController.theme;
     this.toggleAttribute("data-theme-dark", this.themeController.theme === "dark");
