@@ -16,6 +16,7 @@ export const publicPackages = [
   { name: "@zitadel/server-darwin-arm64", root: "apps/server-darwin-arm64/" },
   { name: "@zitadel/server-win32-x64", root: "apps/server-win32-x64/" },
   { name: "@zitadel/api", root: "packages/api/" },
+  { name: "@zitadel/config", root: "packages/config/" },
   { name: "@zitadel/components", root: "packages/components/" },
   { name: "@zitadel/sdk-core", root: "packages/sdk-core/" },
   { name: "@zitadel/sdk-next", root: "packages/sdk-next/" },

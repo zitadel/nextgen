@@ -12,6 +12,7 @@ export const packageDirs = [
   "apps/server-darwin-arm64",
   "apps/server-win32-x64",
   "packages/api",
+  "packages/config",
   "packages/components",
   "packages/sdk-core",
   "packages/sdk-next",

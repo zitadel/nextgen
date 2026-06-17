@@ -47,6 +47,7 @@ export const PUBLIC_PACKAGE_DIRS = [
   "apps/server",
   ...SERVER_PLATFORM_PACKAGES.map((platform) => platform.packageDir),
   "packages/api",
+  "packages/config",
   "packages/components",
   "packages/sdk-core",
   "packages/sdk-next",

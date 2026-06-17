@@ -19,6 +19,7 @@ const packageDirs = [
   "apps/server-darwin-arm64",
   "apps/server-win32-x64",
   "packages/api",
+  "packages/config",
   "packages/components",
   "packages/sdk-core",
   "packages/sdk-next",
@@ -46,7 +47,7 @@ describe("verify-tarballs script", () => {
     });
 
     await expect(runVerify(tarballsDir)).resolves.toMatchObject({
-      stdout: expect.stringContaining("verified 15 installable tarballs"),
+      stdout: expect.stringContaining("verified 16 installable tarballs"),
     });
   });
 

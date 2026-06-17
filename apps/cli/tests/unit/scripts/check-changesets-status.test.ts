@@ -536,6 +536,7 @@ function validConfig(): { fixed: string[][] } {
         "@zitadel/server-darwin-arm64",
         "@zitadel/server-win32-x64",
         "@zitadel/api",
+        "@zitadel/config",
         "@zitadel/components",
         "@zitadel/sdk-core",
         "@zitadel/sdk-next",
