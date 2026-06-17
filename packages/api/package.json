@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/api",
-  "version": "0.1.0-alpha.5",
+  "version": "0.1.0-alpha.10",
   "description": "Generated TypeScript API client for Zitadel NextGen",
   "license": "MIT",
   "type": "module",
@@ -73,50 +73,5 @@
   },
   "peerDependencies": {
     "@tanstack/react-query": "catalog:"
-  },
-  "nx": {
-    "targets": {
-      "generate": {
-        "cache": true,
-        "inputs": [
-          "{workspaceRoot}/pnpm-lock.yaml",
-          "{workspaceRoot}/api/openapi/**/*.yaml",
-          "{projectRoot}/package.json",
-          "{projectRoot}/orval.config.ts",
-          "{projectRoot}/src/runtime/base-url.ts",
-          "{projectRoot}/src/runtime/auth.ts",
-          "{projectRoot}/src/runtime/fetch.ts",
-          "{projectRoot}/src/runtime/api-factory.ts",
-          "{projectRoot}/src/runtime/config.ts"
-        ],
-        "outputs": [
-          "{projectRoot}/src/generated"
-        ]
-      },
-      "build": {
-        "dependsOn": [
-          "generate"
-        ],
-        "outputs": [
-          "{projectRoot}/dist"
-        ]
-      },
-      "typecheck": {
-        "dependsOn": [
-          "generate",
-          "build"
-        ]
-      },
-      "test": {
-        "dependsOn": [
-          "generate"
-        ]
-      },
-      "lint": {
-        "dependsOn": [
-          "generate"
-        ]
-      }
-    }
   }
 }

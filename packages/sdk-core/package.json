@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-core",
-  "version": "0.1.0-alpha.5",
+  "version": "0.1.0-alpha.10",
   "description": "Core types and shared utilities for Zitadel SDKs",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-core#readme",
   "bugs": {
@@ -16,6 +16,12 @@
     "dist"
   ],
   "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "oxlint ."
+  },
   "exports": {
     ".": {
       "@zitadel/source": "./src/index.ts",

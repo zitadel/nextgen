@@ -6,6 +6,7 @@ export function parseLocalJourneyArgs(args) {
     frameworkIds: [...frameworkIds],
     image: "",
     keep: false,
+    runtime: "binary",
     workDir: "",
   };
 
@@ -34,6 +35,11 @@ export function parseLocalJourneyArgs(args) {
       }
       case "--image": {
         parsed.image = readValue(args, ++index, arg);
+        parsed.runtime = "docker";
+        break;
+      }
+      case "--runtime": {
+        parsed.runtime = parseRuntime(readValue(args, ++index, arg));
         break;
       }
       case "--keep": {
@@ -54,7 +60,18 @@ export function parseLocalJourneyArgs(args) {
     }
   }
 
+  if (parsed.runtime === "binary" && parsed.image) {
+    throw new Error("--image requires --runtime docker");
+  }
+
   return parsed;
+}
+
+function parseRuntime(value) {
+  if (value === "binary" || value === "docker") {
+    return value;
+  }
+  throw new Error(`--runtime must be binary or docker, got ${value}`);
 }
 
 function parseConcurrency(value) {

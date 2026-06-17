@@ -1,6 +1,7 @@
-import { workspaceRoot } from "@nx/devkit";
-import { nxE2EPreset } from "@nx/playwright/preset";
 import { defineConfig, devices } from "@playwright/test";
+import { resolve } from "node:path";
+
+const workspaceRoot = resolve(import.meta.dirname, "../..");
 
 /**
  * E2E coverage for the embedded sign-in path:
@@ -17,7 +18,7 @@ import { defineConfig, devices } from "@playwright/test";
  * by `packages/components`'s Vitest suite — do not duplicate it here.
  */
 export default defineConfig({
-  ...nxE2EPreset(import.meta.filename, { testDir: "./src" }),
+  testDir: "./src",
   use: {
     baseURL: "http://localhost:3002",
     trace: "on-first-retry",
@@ -26,9 +27,8 @@ export default defineConfig({
   // it on the very first request. `reuseExistingServer` lets developers
   // run either server manually and have Playwright skip its own boot.
   //
-  // Direct pnpm filter commands (rather than `nx run …`) avoid the
-  // `@nx/playwright/plugin` task graph treating these long-running
-  // processes as e2e dependencies that must complete first.
+  // Direct pnpm filter commands keep these long-running processes outside
+  // Moon's task graph; Playwright owns their lifecycle for this e2e suite.
   webServer: [
     {
       command: "pnpm --filter @zitadel/api-mock start",

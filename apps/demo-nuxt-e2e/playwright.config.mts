@@ -1,6 +1,7 @@
-import { workspaceRoot } from "@nx/devkit";
-import { nxE2EPreset } from "@nx/playwright/preset";
 import { defineConfig, devices } from "@playwright/test";
+import { resolve } from "node:path";
+
+const workspaceRoot = resolve(import.meta.dirname, "../..");
 
 /**
  * E2E coverage for the embedded sign-in path on Nuxt:
@@ -19,19 +20,18 @@ import { defineConfig, devices } from "@playwright/test";
  * Vitest suite — do not duplicate it here. See `apps/demo-nuxt-e2e/AGENTS.md`.
  */
 export default defineConfig({
-  ...nxE2EPreset(import.meta.filename, { testDir: "./src" }),
+  testDir: "./src",
   use: {
     baseURL: "http://localhost:3001",
     trace: "on-first-retry",
   },
   // Boot the mock auth server first so Nitro can proxy to it on the very
-  // first request. Direct pnpm filter commands (rather than `nx run …`)
-  // avoid the `@nx/playwright/plugin` task graph treating these
-  // long-running processes as e2e dependencies that must complete first.
+  // first request. Direct pnpm filter commands keep these long-running
+  // processes outside Moon's task graph; Playwright owns their lifecycle.
   //
   // The api-mock listens on PORT 4001 here so this project can run in
   // parallel with `apps/demo-next-e2e/` (which uses the default 4000)
-  // under `nx run-many`. Both api-mock (`bin/start.ts` reads PORT) and
+  // alongside demo-next-e2e. Both api-mock (`bin/start.ts` reads PORT) and
   // the SDKs (ZITADEL_URL) already accept the override; no
   // application code changes.
   webServer: [

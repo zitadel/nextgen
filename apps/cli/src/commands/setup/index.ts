@@ -6,7 +6,14 @@ import { consola } from "consola";
 
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
-import { createOrca, issuerFromPort, type FrameworkFacts, type Orca } from "../../lib/orca";
+import {
+  createOrca,
+  inspectScaffoldTarget,
+  issuerFromPort,
+  type FrameworkFacts,
+  type Orca,
+  type ScaffoldTarget,
+} from "../../lib/orca";
 import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
@@ -99,9 +106,12 @@ export default class Setup extends BaseCommand {
     } catch (error) {
       if (
         error instanceof ZitadelError &&
-        error.code === "E_FRAMEWORK_NOT_DETECTED" &&
-        (await orca.isFreshScaffoldTarget(cwd))
+        error.code === "E_FRAMEWORK_NOT_DETECTED"
       ) {
+        const target = await inspectScaffoldTarget(cwd);
+        if (!target.scaffoldable) {
+          throw frameworkDetectionWithScaffoldTarget(error, cwd, target);
+        }
         consola.info("Fresh app directory — scaffolding a fresh project");
         framework = await orca.scaffold(
           cwd,
@@ -257,6 +267,23 @@ export default class Setup extends BaseCommand {
       },
     });
   }
+}
+
+function frameworkDetectionWithScaffoldTarget(
+  error: ZitadelError,
+  cwd: string,
+  target: ScaffoldTarget,
+): ZitadelError {
+  return new ZitadelError(
+    error.code,
+    "Could not detect a supported app framework, and this directory is not a fresh scaffold target",
+    {
+      hint:
+        `${target.reason ?? "Directory is not empty."} ` +
+        "Run setup from an empty directory to scaffold a new app, or run setup from an existing supported app project.",
+      details: { cwd, entries: target.entries, reason: target.reason },
+    },
+  );
 }
 
 /**

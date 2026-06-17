@@ -4,12 +4,12 @@ A minimal Next.js application demonstrating [Nextgen Auth](../../packages/sdk-ne
 
 ## Running locally
 
-Use **Nx** from the repo root (`corepack pnpm install` first).
+Use **Moon** from the repo root (`corepack pnpm install` first).
 
 Build the SDK (and its transitive dependencies) once before the first run:
 
 ```bash
-corepack pnpm nx build @zitadel/sdk-next
+moon run sdk-next:build
 ```
 
 ### 1. Configure environment
@@ -33,14 +33,14 @@ Two terminals:
 
 ```bash
 # Terminal 1 — mock auth server on port 4000
-corepack pnpm nx start @zitadel/api-mock
+moon run api-mock:start
 
 # Terminal 2 — Next.js on port 3002
-corepack pnpm nx dev @zitadel/demo-next
+moon run demo-next:dev
 
 # …or with inline env overrides:
 # ZITADEL_URL=https://my-instance.zitadel.cloud NEXT_PUBLIC_ZITADEL_PROJECT_ID=abc123 \
-#   corepack pnpm nx dev @zitadel/demo-next
+#   moon run demo-next:dev
 ```
 
 Open [http://localhost:3002/login](http://localhost:3002/login). Any email/password combination is accepted by the mock server.
@@ -49,19 +49,19 @@ Open [http://localhost:3002/login](http://localhost:3002/login). Any email/passw
 
 ```bash
 # Lit atoms + <zitadel-login> (source from packages/components/src)
-corepack pnpm nx dev @zitadel/components
+moon run components:dev
 # → http://localhost:5173/?route=login
 # → http://localhost:5173/?route=atoms
 
 # React paired atoms (@zitadel/ui-react) — compare Lit matrices in another tab
-corepack pnpm nx dev @zitadel/console
+moon run console:dev
 # → http://localhost:5174
 ```
 
 After changing `@zitadel/components`, rebuild before refreshing:
 
 ```bash
-corepack pnpm nx build @zitadel/components
+moon run components:build
 ```
 
 The demo imports the package from `dist/`, not source.

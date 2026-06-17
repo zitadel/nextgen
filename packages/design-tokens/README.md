@@ -31,9 +31,9 @@ contract is one rebuild away, never a copy-paste.
 only knob that controls what gets pulled.
 
 ```sh
-FIGMA_TOKEN=… pnpm nx run @zitadel/design-tokens:sync
-pnpm nx run @zitadel/design-tokens:generate
-pnpm nx run @zitadel/design-tokens:test       # snapshot guard
+FIGMA_TOKEN=... moon run design-tokens:sync
+moon run design-tokens:generate
+moon run design-tokens:test       # snapshot guard
 ```
 
 In CI, [`.github/workflows/sync-design-tokens.yml`](../../.github/workflows/sync-design-tokens.yml)
@@ -77,7 +77,8 @@ packages/design-tokens/
 
 1. Add the variable in Figma → publish the library → bump
    `figma-tokens.lock.version`.
-2. Run `:sync`, `:generate`, `:test`. Update the snapshot if the new
+2. Run `moon run design-tokens:sync`, `moon run design-tokens:generate`, and
+   `moon run design-tokens:test`. Update the snapshot if the new
    name is intentional; otherwise fix the input.
 3. Commit the resulting `figma.tokens.json`, `tokens.{css,ts}`, and
    `tailwind.css` together with the lockfile bump.

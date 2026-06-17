@@ -12,8 +12,8 @@ type RunCall = {
 
 type LocalRegistryModule = {
   localRegistryPaths: (workDir: string) => {
-    composeEnvPath: string;
     npmrcPath: string;
+    registryLogPath: string;
     storagePath: string;
     tarballsDir: string;
     verdaccioConfigPath: string;
@@ -26,25 +26,26 @@ type LocalRegistryModule = {
   ) => Record<string, string | undefined>;
   packageDirs: string[];
   prepareLocalRegistry: (options: {
-    compose: {
-      envPath: string;
-      file: string;
-      projectName: string;
-      repoRoot: string;
-    };
     env: Record<string, string | undefined>;
     log?: (message: string) => void;
-    onStarted?: () => void;
+    onStarted?: (registry: { exitCode: number | null; logFile: string }) => void;
     paths?: ReturnType<LocalRegistryModule["localRegistryPaths"]>;
     registryPort: number;
     registryUrl: string;
     repoRoot: string;
     run: (command: string, args: string[], options: RunCall["options"]) => Promise<void>;
+    startLocalRegistry?: (options: {
+      paths: ReturnType<LocalRegistryModule["localRegistryPaths"]>;
+      registryPort: number;
+      repoRoot: string;
+      env: Record<string, string | undefined>;
+    }) => Promise<{ exitCode: number | null; logFile: string }>;
     waitForHttp?: (url: string, label: string) => Promise<void>;
     workDir: string;
   }) => Promise<{
     env: Record<string, string | undefined>;
     paths: ReturnType<LocalRegistryModule["localRegistryPaths"]>;
+    registry: { exitCode: number | null; logFile: string };
   }>;
 };
 
@@ -72,17 +73,17 @@ describe("local registry helper", () => {
     const workDir = await mkdtemp(join(tmpdir(), "zitadel-local-registry-"));
     tempDirs.push(workDir);
     const paths = localRegistry.localRegistryPaths(workDir);
-    const calls: Array<RunCall | { type: "started" } | { type: "wait"; label: string; url: string }> = [];
+    const calls: Array<
+      | RunCall
+      | { type: "start-registry"; port: number }
+      | { type: "started" }
+      | { type: "wait"; label: string; url: string }
+    > = [];
     const logs: string[] = [];
     const env = { PATH: "/bin" };
+    const registry = { exitCode: null, logFile: paths.registryLogPath };
 
     const result = await localRegistry.prepareLocalRegistry({
-      compose: {
-        envPath: paths.composeEnvPath,
-        file: join(repoRoot, "docker-compose.local.yaml"),
-        projectName: "zitadel-local-test",
-        repoRoot,
-      },
       env,
       log: (message) => logs.push(message),
       onStarted: () => {
@@ -94,6 +95,13 @@ describe("local registry helper", () => {
       repoRoot,
       run: async (command, args, options) => {
         calls.push({ command, args, options });
+        if (command === "moon" && args.join(" ") === "run release:pack") {
+          await fixtureReleaseTarballs(repoRoot);
+        }
+      },
+      startLocalRegistry: async (options) => {
+        calls.push({ type: "start-registry", port: options.registryPort });
+        return registry;
       },
       waitForHttp: async (url, label) => {
         calls.push({ type: "wait", label, url });
@@ -102,60 +110,36 @@ describe("local registry helper", () => {
     });
 
     expect(logs).toContain(
-      "building @zitadel/cli, @zitadel/api, @zitadel/components, @zitadel/sdk-core, @zitadel/sdk-next, @zitadel/sdk-nuxt, @zitadel/sdk-react, @zitadel/sdk-vue, @zitadel/sdk-angular, @zitadel/sdk-solid, @zitadel/sdk-svelte, @zitadel/sdk-qwik",
-    );
-    expect(await readFile(paths.composeEnvPath, "utf8")).toContain(
-      "JOURNEY_REGISTRY_PORT=51234",
+      "building release npm tarballs for @zitadel/cli, @zitadel/server, @zitadel/server-linux-x64, @zitadel/server-linux-arm64, @zitadel/server-darwin-x64, @zitadel/server-darwin-arm64, @zitadel/server-win32-x64, @zitadel/api, @zitadel/components, @zitadel/sdk-core, @zitadel/sdk-next, @zitadel/sdk-nuxt, @zitadel/sdk-react, @zitadel/sdk-vue, @zitadel/sdk-angular",
     );
     expect(await readFile(paths.npmrcPath, "utf8")).toContain(
       "//127.0.0.1:51234/:_authToken=journey-token",
     );
     expect(await readFile(paths.verdaccioConfigPath, "utf8")).toContain("'@zitadel/*'");
+    expect(await readFile(paths.verdaccioConfigPath, "utf8")).toContain(paths.storagePath);
+    expect(await readFile(paths.verdaccioConfigPath, "utf8")).toContain(
+      "max_body_size: 200mb",
+    );
 
     const runCalls = calls.filter((call): call is RunCall => "command" in call);
-    expect(runCalls[0]).toMatchObject({
-      command: "corepack",
-      args: [
-        "pnpm",
-        "nx",
-        "run-many",
-        "-t",
-        "build",
-        "-p",
-        "@zitadel/cli,@zitadel/api,@zitadel/components,@zitadel/sdk-core,@zitadel/sdk-next,@zitadel/sdk-nuxt,@zitadel/sdk-react,@zitadel/sdk-vue,@zitadel/sdk-angular,@zitadel/sdk-solid,@zitadel/sdk-svelte,@zitadel/sdk-qwik",
-      ],
+    expect(runCalls[0]).toEqual({
+      command: "moon",
+      args: ["run", "release:pack"],
       options: { cwd: repoRoot, env },
     });
-    expect(runCalls.filter((call) => call.args.includes("pack"))).toHaveLength(
-      localRegistry.packageDirs.length,
-    );
     expect(runCalls).toContainEqual({
       command: "node",
       args: ["apps/cli-journey-e2e/scripts/verify-tarballs.mjs", paths.tarballsDir],
       options: { cwd: repoRoot, env },
     });
-    expect(runCalls).toContainEqual({
-      command: "docker",
-      args: [
-        "compose",
-        "--project-name",
-        "zitadel-local-test",
-        "--env-file",
-        paths.composeEnvPath,
-        "-f",
-        join(repoRoot, "docker-compose.local.yaml"),
-        "up",
-        "-d",
-        "verdaccio",
-      ],
-      options: { cwd: repoRoot, env },
-    });
+    expect(calls).toContainEqual({ type: "start-registry", port: 51_234 });
     expect(calls).toContainEqual({ type: "started" });
     expect(calls).toContainEqual({
       type: "wait",
       label: "Verdaccio",
       url: "http://127.0.0.1:51234/-/ping",
     });
+    expect(result.registry).toBe(registry);
     expect(runCalls.at(-1)).toMatchObject({
       command: "node",
       args: ["apps/cli-journey-e2e/scripts/publish-tarballs.mjs", paths.tarballsDir],
@@ -232,6 +216,16 @@ async function fixtureRepo(): Promise<string> {
   }
 
   return repoRoot;
+}
+
+async function fixtureReleaseTarballs(repoRoot: string): Promise<void> {
+  const outDir = join(repoRoot, "dist", "release", "0.1.0-alpha.5", "npm");
+  await mkdir(outDir, { recursive: true });
+  for (const dir of localRegistry.packageDirs) {
+    const name = packageNameForDir(dir);
+    const fileName = `${name.replace("@", "").replace("/", "-")}-0.1.0-alpha.5.tgz`;
+    await writeFile(join(outDir, fileName), `${name}\n`);
+  }
 }
 
 function packageNameForDir(dir: string): string {

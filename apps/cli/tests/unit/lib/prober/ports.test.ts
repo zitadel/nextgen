@@ -10,7 +10,7 @@ vi.mock("node:child_process", () => ({
 
 const mockExecFile = vi.mocked(execFile);
 
-import { listListeningPorts } from "../../../../src/lib/prober/ports";
+import { listListeningPorts, listListeningTcpListeners } from "../../../../src/lib/prober/ports";
 
 /**
  * Promisified `execFile` invokes the callback the mock provides. Each test
@@ -58,6 +58,28 @@ describe("listListeningPorts", () => {
     const ports = await listListeningPorts();
 
     expect(ports).toEqual([3000, 5050, 8080]);
+  });
+
+  it("keeps listener process metadata for diagnostics", async () => {
+    whenLsof((cb) =>
+      cb(
+        null,
+        [
+          "p12345",
+          "czitadel-server",
+          "n*:8080",
+          "p23456",
+          "cnode",
+          "n127.0.0.1:3000",
+          "",
+        ].join("\n"),
+      ),
+    );
+
+    await expect(listListeningTcpListeners()).resolves.toEqual([
+      { address: "127.0.0.1:3000", command: "node", host: "127.0.0.1", pid: 23456, port: 3000 },
+      { address: "*:8080", command: "zitadel-server", host: "*", pid: 12345, port: 8080 },
+    ]);
   });
 
   it("returns [] when lsof is not on PATH (ENOENT)", async () => {

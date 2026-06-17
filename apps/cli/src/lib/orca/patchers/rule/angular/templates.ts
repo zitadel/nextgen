@@ -40,18 +40,18 @@ export class App {
 export function appTemplateHtml(): string {
   return `<!-- ${MANAGED_MARKER} -->
 @if (path.startsWith('/profile')) {
-  <zitadel-auth-logout [project]="project" postSignOutUrl="/login"></zitadel-auth-logout>
+  <zitadel-auth-logout [project]="project" [postSignOutUrl]="'/login'"></zitadel-auth-logout>
 } @else if (path.startsWith('/register')) {
   <zitadel-auth-login
     [project]="project"
     purpose="register"
-    postSignInUrl="/profile"
+    [postSignInUrl]="'/profile'"
   ></zitadel-auth-login>
 } @else {
   <zitadel-auth-login
     [project]="project"
     purpose="login"
-    postSignInUrl="/profile"
+    [postSignInUrl]="'/profile'"
   ></zitadel-auth-login>
 }
 `;

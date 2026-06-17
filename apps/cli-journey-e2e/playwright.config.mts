@@ -1,4 +1,3 @@
-import { nxE2EPreset } from "@nx/playwright/preset";
 import { defineConfig, devices } from "@playwright/test";
 
 const baseURL = process.env.JOURNEY_APP_URL ?? "http://localhost:3000";
@@ -8,7 +7,7 @@ const reportDir =
   process.env.JOURNEY_PLAYWRIGHT_REPORT_DIR ?? "./test-output/playwright/report";
 
 export default defineConfig({
-  ...nxE2EPreset(import.meta.filename, { testDir: "./src" }),
+  testDir: "./src",
   fullyParallel: false,
   workers: 1,
   reporter: [["html", { outputFolder: reportDir, open: "never" }]],

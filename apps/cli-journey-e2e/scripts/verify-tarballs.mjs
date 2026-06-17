@@ -12,6 +12,12 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");
 const requiredPackageDirs = [
   "apps/cli",
+  "apps/server",
+  "apps/server-linux-x64",
+  "apps/server-linux-arm64",
+  "apps/server-darwin-x64",
+  "apps/server-darwin-arm64",
+  "apps/server-win32-x64",
   "packages/api",
   "packages/components",
   "packages/sdk-core",
@@ -34,8 +40,9 @@ const dependencyFields = [
   "optionalDependencies",
 ];
 const unsupportedProtocol = /^(catalog|workspace):/;
-const alphaVersion = /^\d+\.\d+\.\d+-alpha\.\d+$/;
+const semverVersion = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const manifests = new Map();
+const serverPlatformPackagePattern = /^@zitadel\/server-(?:darwin|linux|win32)-/;
 
 const tarballs = (await readdir(tarballsDir))
   .filter((file) => file.endsWith(".tgz"))
@@ -58,6 +65,7 @@ for (const file of tarballs) {
     throw new Error(`duplicate tarball for ${manifest.name}`);
   }
   assertInstallableManifest(tarball, manifest);
+  assertServerPlatformBinary(tarball, manifest);
   manifests.set(manifest.name, manifest);
 }
 
@@ -67,7 +75,7 @@ for (const expectedName of requiredPackageNames) {
   }
 }
 
-assertLockstepAlphaVersions(manifests);
+assertValidVersions(manifests);
 
 console.log(
   `verified ${manifests.size} installable tarballs; required packages present: ${[...requiredPackageNames].sort().join(", ")}`,
@@ -105,19 +113,33 @@ function assertInstallableManifest(tarball, manifest) {
   }
 }
 
-function assertLockstepAlphaVersions(manifests) {
-  const versions = new Set([...manifests.values()].map((manifest) => manifest.version));
-  if (versions.size !== 1) {
-    throw new Error(
-      `public package tarballs must use one lockstep alpha version: ${[...manifests.values()]
-        .map((manifest) => `${manifest.name}@${manifest.version}`)
-        .sort()
-        .join(", ")}`,
-    );
+function assertServerPlatformBinary(tarball, manifest) {
+  if (!serverPlatformPackagePattern.test(manifest.name)) {
+    return;
   }
-  const version = [...versions][0];
-  if (!alphaVersion.test(version)) {
-    throw new Error(`public package tarballs must use an alpha train version: ${version}`);
+  const binaryPath = manifest.name.includes("win32") ? "bin/nextgen.exe" : "bin/nextgen";
+  if (!manifest.bin || manifest.bin.nextgen !== `./${binaryPath}`) {
+    throw new Error(`${tarball} must declare ${manifest.name} bin.nextgen as ./${binaryPath}`);
+  }
+  const result = spawnSync("tar", ["-tvf", tarball, `package/${binaryPath}`], {
+    encoding: "utf8",
+  });
+  if (result.status !== 0) {
+    throw new Error(`failed to inspect ${binaryPath} in ${tarball}: ${result.stderr}`);
+  }
+  const mode = result.stdout.trim().split(/\s+/, 1)[0] ?? "";
+  if (!mode.includes("x")) {
+    throw new Error(`${tarball} contains non-executable ${binaryPath}`);
+  }
+}
+
+function assertValidVersions(manifests) {
+  const invalid = [...manifests.values()]
+    .filter((manifest) => !semverVersion.test(manifest.version))
+    .map((manifest) => `${manifest.name}@${manifest.version}`)
+    .sort();
+  if (invalid.length > 0) {
+    throw new Error(`public package tarballs must use semver versions: ${invalid.join(", ")}`);
   }
 }
 

@@ -1,0 +1,37 @@
+id: "api"
+language: "typescript"
+layer: "library"
+stack: "frontend"
+
+tasks:
+  generate:
+    command: "corepack pnpm run generate"
+    inputs:
+      - "/api/openapi/**/*.yaml"
+      - "orval.config.ts"
+      - "src/runtime/**/*.ts"
+    outputs:
+      - "src/generated/**/*"
+
+  lint:
+    command: "corepack pnpm exec oxlint ."
+    deps:
+      - "generate"
+
+  typecheck:
+    command: "corepack pnpm exec tsc --noEmit -p tsconfig.json"
+    deps:
+      - "generate"
+
+  build:
+    command: "corepack pnpm run build"
+    deps:
+      - "generate"
+    outputs:
+      - "dist/**/*"
+
+  test:
+    command: "corepack pnpm exec vitest run --passWithNoTests"
+    deps:
+      - "generate"
+
