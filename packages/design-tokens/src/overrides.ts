@@ -53,13 +53,11 @@ export interface ColorPrimitiveTokens {
 export interface FontTokens {
   family: {
     /**
-     * Brand sans-serif. Arimo (the design-system body face per Figma) leads
-     * so the auth screens render correctly even before a tenant loads APK
-     * Futural via branding URLs. System fallbacks at the tail keep
-     * unbranded environments readable.
+     * Brand sans-serif (Arimo). System fallbacks at the tail keep unbranded
+     * environments readable. Tenants override the face via branding URLs.
      */
     sans: string;
-    /** Marketing display face. APK Futural is loaded by tenant branding. */
+    /** Heading face. Same family as `sans` (Arimo), rendered bold by the chrome. */
     heading: string;
     /** Code blocks and any monospaced data display. */
     mono: string;
@@ -125,8 +123,8 @@ export const overrides: DesignTokenOverrides = {
   },
   font: {
     family: {
-      sans: '"Arimo", "APK Futural", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif',
-      heading: '"APK Futural", "Arimo", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif',
+      sans: '"Arimo", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif',
+      heading: '"Arimo", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif',
       mono: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
     },
   },

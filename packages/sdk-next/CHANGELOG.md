@@ -1,5 +1,50 @@
 # @zitadel/sdk-next
 
+## 0.1.0-alpha.10
+
+### Patch Changes
+
+- Updated dependencies [[`acb5b54`](https://github.com/zitadel/nextgen/commit/acb5b549386efcc5ede005871b145c1cd0f9ac5e)]:
+  - @zitadel/components@0.1.0-alpha.10
+  - @zitadel/api@0.1.0-alpha.10
+  - @zitadel/sdk-core@0.1.0-alpha.10
+
+## 0.1.0-alpha.9
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @zitadel/api@0.1.0-alpha.9
+  - @zitadel/components@0.1.0-alpha.9
+  - @zitadel/sdk-core@0.1.0-alpha.9
+
+## 0.1.0-alpha.8
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @zitadel/api@0.1.0-alpha.8
+  - @zitadel/components@0.1.0-alpha.8
+  - @zitadel/sdk-core@0.1.0-alpha.8
+
+## 0.1.0-alpha.7
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @zitadel/api@0.1.0-alpha.7
+  - @zitadel/components@0.1.0-alpha.7
+  - @zitadel/sdk-core@0.1.0-alpha.7
+
+## 0.1.0-alpha.6
+
+### Patch Changes
+
+- Updated dependencies [[`30b4b41`](https://github.com/zitadel/nextgen/commit/30b4b411a9c99fc61d991f739636f93d7bee5b1d)]:
+  - @zitadel/components@0.1.0-alpha.6
+  - @zitadel/api@0.1.0-alpha.6
+  - @zitadel/sdk-core@0.1.0-alpha.6
+
 ## 0.1.0-alpha.5
 
 ### Patch Changes

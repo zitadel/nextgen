@@ -132,7 +132,7 @@ describe("<zl-field> form participation (chromium)", () => {
     );
     await field.updateComplete;
     const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
-    expect(input.getAttribute("data-testid")).toBe("zitadel-field-email-input");
+    expect(input.getAttribute("data-testid")).toBe("zitadel-input-email");
     let inputEvents = 0;
     let changeEvents = 0;
     let hostInputEvent: Event | undefined;

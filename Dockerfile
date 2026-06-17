@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.7
 #
-# Consumed by goreleaser's `dockers_v2` builder. Goreleaser pre-builds the
-# cross-compiled `nextgen` binary for each platform and places it at
-# `$TARGETPLATFORM/nextgen` (e.g. `linux/amd64/nextgen`) in the build context.
+# Consumed by Moon release tasks. They pre-build the cross-compiled `nextgen`
+# binary for each platform and place it at `$TARGETPLATFORM/nextgen`
+# (for example, `linux/amd64/nextgen`) in the Docker build context.
 FROM debian:12-slim
 ARG TARGETPLATFORM
 

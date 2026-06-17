@@ -28,9 +28,10 @@ proposals and implementations with recorded decisions.
 
 ## Project Shape
 
-This repo is the pre-release next generation of Zitadel. The Go server ships
-through GoReleaser. The TypeScript workspace is managed by pnpm and Nx; the
-public npm packages publish through changesets (see "Release, Licensing, And
+This repo is the pre-release next generation of Zitadel. Moon owns the
+monorepo task graph and release artifact builds. Changesets owns package
+versions, changelogs, npm publishing, and public package tags; Moon owns the
+draft GitHub Release shell for `v<version>` (see "Release, Licensing, And
 Secrets").
 
 - `internal/` contains Go server implementation code.
@@ -55,7 +56,6 @@ Secrets").
   contain public TypeScript SDKs.
 - `packages/api-mock/` contains the in-process MSW handlers and standalone
   mock auth server used by demos and e2e tests.
-- `packages/lint/` contains the local Nx plugin that infers Oxlint targets.
 - `docs/` contains design notes and ADRs that explain product intent.
 
 ## Workflow Front Doors
@@ -64,13 +64,13 @@ Secrets").
 
 | I want to...                       | Run                                      |
 | ---------------------------------- | ---------------------------------------- |
-| Check my setup                     | `corepack pnpm run doctor`               |
-| Try the local Zitadel CLI          | `corepack pnpm run cli -- --help`        |
-| Run the server from source         | `corepack pnpm run server -- --help`     |
-| Test the fresh-app onboarding path | `corepack pnpm run journey`              |
-| Run normal local checks            | `corepack pnpm run check`                |
-| Mirror CI locally                  | `corepack pnpm run check -- --full`      |
-| Rerun one failed phase             | `corepack pnpm run check -- --only node` |
+| Check my setup                     | `moon run workspace:doctor`              |
+| Try the local Zitadel CLI          | `moon run workspace:cli -- --help`       |
+| Run the server from source         | `moon run workspace:server -- --help`    |
+| Test the fresh-app onboarding path | `moon run workspace:journey`             |
+| Run normal local checks            | `moon ci :lint :typecheck :build :test`  |
+| Mirror CI locally                  | `moon run workspace:check -- --full`     |
+| Rerun one failed task              | `moon run <project>:<task>`              |
 
 ### I am adding Zitadel to my app
 
@@ -83,17 +83,18 @@ Secrets").
 | Stop local Zitadel, keeping data  | `npx @zitadel/cli@alpha stop`                                  |
 | Delete local Zitadel data         | `npx @zitadel/cli@alpha reset --force`                         |
 
-`corepack pnpm run server` is a repository contributor command that runs the Go
+`moon run workspace:server` is a repository contributor command that runs the Go
 server from source. `zitadel start` is a published product CLI command that
-runs the released Docker image for app developers and agents; it must not rely
-on Go, Nx, or this source checkout.
+runs the released `@zitadel/server` npm binary for app developers and agents;
+it must not rely on Docker, Go, Moon, or this source checkout. Docker remains
+available through `zitadel start --runtime docker`.
 
-`corepack pnpm run cli -- start` is the contributor exception: the root wrapper
-builds `ghcr.io/zitadel/nextgen:local-dev` through GoReleaser's single-target
-build when neither `--image` nor `ZITADEL_LOCAL_IMAGE` is provided, then invokes
-the local CLI against that image.
+`moon run workspace:cli -- start` is the contributor exception: the root wrapper
+builds the local CLI and runs it against the workspace package train. Pass
+`--runtime docker`, `--image`, or `ZITADEL_LOCAL_IMAGE` when intentionally
+testing the Docker backend.
 
-`corepack pnpm run cli -- setup ...` is also a contributor exception for manual
+`moon run workspace:cli -- setup ...` is also a contributor exception for manual
 human and agent testing. The wrapper builds and packs the public workspace npm
 packages, publishes them to a persistent local Verdaccio registry under
 `tmp/cli-local-registry`, and forwards npm registry config so the generated app
@@ -106,65 +107,70 @@ packages.
 Use Node.js from `.nvmrc` and the pinned pnpm version from `package.json`.
 
 ```sh
-corepack pnpm run doctor
-corepack pnpm run check
+moon run workspace:doctor
+moon ci :lint :typecheck :build :test
 ```
 
-The root doctor treats Docker and GoReleaser as required because the contributor
-CLI wrapper needs them for local runtime image auto-builds. Playwright browsers
-remain warning-only because they are needed only for opt-in e2e and journey
-workflows.
+The root doctor treats Moon and the local toolchain as required. Docker is
+needed for container builds, Docker fallback journeys, and container-backed
+integration tests; it is not required for the default npm-binary local runtime.
+Playwright browsers remain warning-only because they are needed only for opt-in
+e2e and journey workflows.
 
-Use `corepack pnpm run check -- --full` for slower CI-parity phases and
-`corepack pnpm run check -- --only <phase>` to rerun one named phase.
-Use `corepack pnpm run check -- --only release` after touching Changesets,
-GoReleaser, release workflows, or alpha train behavior.
+Use `moon run workspace:check -- --full` for slower CI-parity phases and
+`moon run <project>:<task>` to rerun one named task.
+Use `moon run workspace:check -- --only release` after touching Changesets,
+Moon release workflows, or package versioning behavior.
 
-Prefer Nx project targets for narrow package work, for example
-`corepack pnpm nx test @zitadel/cli`.
+Prefer Moon project tasks for narrow package work, for example
+`moon run cli:test`.
 
-Nx manages TypeScript workspace targets. Go commands and long-running local
-orchestration run through repository scripts, not Nx, so server processes are
-signaled and cleaned up directly.
+Moon manages TypeScript workspace targets, Go checks, and release build tasks.
+Long-running customer-style local orchestration still runs through repository
+scripts so server processes are signaled and cleaned up directly.
 
-`corepack pnpm run server` syncs the embedded console/login UI before non-help
-startup, then runs `go run .`. Direct `go run .` callers must sync the embed
-folders themselves or disable both embedded UI surfaces.
+`moon run workspace:server` builds the embedded console/login UI before non-help
+startup, then runs `go run .`. Direct `go run .` callers must build the embedded
+UI surfaces themselves or disable both embedded UI surfaces.
 
 Checked-in demo end-to-end tests are **opt-in locally** and main-only in CI.
-They are not part of the default `run-many -t lint,typecheck,build,test`
+They are not part of the default `moon ci :lint :typecheck :build :test`
 invocation because they boot real dev servers and need browsers installed:
 
 ```sh
-corepack pnpm exec playwright install
-corepack pnpm nx run-many -t e2e -p @zitadel/demo-next-e2e,@zitadel/demo-nuxt-e2e
+corepack pnpm --filter @zitadel/demo-next-e2e exec playwright install
+moon run demo-next-e2e:e2e
+moon run demo-nuxt-e2e:e2e
 ```
 
 The local reproduction command for the fresh-app consumer journey gate is:
 
 ```sh
-corepack pnpm run journey
+moon run workspace:journey
 ```
 
-This runner requires Docker for Verdaccio and the CLI-managed local runtime. By
-default it builds a local runtime image, ensures the Playwright Chromium
-browsers are installed, builds and packs local npm packages with pnpm, creates
-empty app directories outside the repo, runs `npx @zitadel/cli@alpha doctor`,
-`start`, and `setup --framework <id> --server local`, starts the generated apps
-on `localhost`, and runs Playwright with one worker per framework journey. Use
-`-- --framework next` to run one framework and `-- --image <docker-tag>` to
-reuse an existing local runtime image.
+By default this runner does not require Docker. It starts Verdaccio as a Node
+process, builds and packs local npm packages including `@zitadel/server`,
+creates empty app directories outside the repo, runs
+`npx @zitadel/cli@alpha doctor --runtime binary`, `start --runtime binary`, and
+`setup --framework <id> --server local`, starts the generated apps on
+`localhost`, and runs Playwright with one worker per framework journey. Use
+`-- --framework next` to run one framework and
+`-- --runtime docker --image <docker-tag>` to exercise the Docker fallback.
 
-Use `corepack pnpm run journey` for deterministic CI-style proof of the
-fresh-app path. Use `corepack pnpm run cli -- ...` for manual browser or agent
+Use `moon run workspace:journey` for deterministic CI-style proof of the
+fresh-app path. Use `moon run workspace:cli -- ...` for manual browser or agent
 experiments against the same local package train.
 
-In CI the `consumer-journey-e2e` matrix is the required PR runtime gate: it
-consumes the current workflow's GoReleaser image and npm package artifacts
-instead of public Zitadel packages. The checked-in demo integrations
-(`node-e2e`), raw binary embedded-postgres smoke, and documented quick-start
-compose smoke run on pushes to `main` as release-surface confidence checks.
-Browsers are cached on the runner to reduce install cost.
+In CI the branch-protection check is the GitHub Actions context `full-pr`,
+shown in the pull request UI as `ci / full-pr`. It consumes current workflow
+npm package tarballs instead of public Zitadel packages and exercises the
+default npm-binary local runtime. Changesets PR comments are informational
+release-intent feedback and are not branch-protection requirements. The Docker
+fallback journey remains an opt-in local/manual check via
+`moon run workspace:journey -- --runtime docker --image <docker-tag>`. The
+checked-in demo integrations, raw binary embedded-postgres smoke, and
+documented quick-start compose smoke remain release-surface confidence checks.
 
 ## Testing Layers
 
@@ -192,7 +198,7 @@ exclusively the framework integration (middleware, cookie origin, full
 navigation). Component, atom, and orchestrator behaviour stays in
 Vitest.
 
-E2E targets `dependsOn: ["^build"]`, so the components `dist/` is rebuilt
+E2E tasks depend on the relevant build tasks, so the components `dist/` is rebuilt
 automatically before each run — be aware of this when iterating with a
 long-running dev server: stale `dist/` will silently mask orchestrator
 changes.
@@ -241,40 +247,37 @@ For customer-local runtime workflows, agents should prefer
 ### Changesets
 
 When a PR touches [publishable npm packages](.changeset/README.md#publishable-npm-packages)
-(the public `@zitadel/*` packages under `apps/cli/` and selected `packages/*`
-paths), follow the [decision table](.changeset/README.md#decision-table) and
-workflow in [`.changeset/README.md`](.changeset/README.md). Verify locally with
-`node scripts/check-changeset-required.mjs --base origin/main`.
+(the public `@zitadel/*` packages under `apps/cli/`, `apps/server*`, and
+selected `packages/*` paths), follow the
+[decision table](.changeset/README.md#decision-table) and workflow in
+[`.changeset/README.md`](.changeset/README.md). Verify locally with
+`corepack pnpm exec changeset status --since origin/main` when you need to
+inspect planned package bumps.
+
+The public packages are `@zitadel/cli`, `@zitadel/server`, the
+`@zitadel/server-*` platform packages, `@zitadel/api`, `@zitadel/components`,
+`@zitadel/sdk-core`, `@zitadel/sdk-next`, `@zitadel/sdk-nuxt`,
+`@zitadel/sdk-react`, `@zitadel/sdk-vue`, and `@zitadel/sdk-angular`. These
+packages are in one Changesets fixed group for alpha product releases. Moon
+still creates or updates the draft GitHub Release shell for `v<version>` from
+the fixed package version; maintainers publish product notes manually.
 
 - npm packages under `apps/cli/` and `packages/*` must stay MIT-licensed.
-- Server and console application paths are AGPL-3.0-only by default.
+- Server npm packages under `apps/server*` and console application paths are
+  AGPL-3.0-only by default.
 - Keep local secrets, private keys, tokens, and `.zitadel/secret`-style files out
   of source control and browser-safe runtime metadata.
 
-<!-- nx configuration start-->
-<!-- Leave the start & end comments to automatically receive updates. -->
+## General Guidelines for working with Moon
 
-## General Guidelines for working with Nx
-
-- For navigating/exploring the workspace, invoke the `nx-workspace` skill first - it has patterns for querying projects, targets, and dependencies
-- When running TypeScript workspace tasks (for example build, lint, test, e2e, etc.), always prefer running the task through `nx` (i.e. `nx run`, `nx run-many`, `nx affected`) instead of using the underlying tooling directly
-- Do not use Nx to own Go server lifecycle or multi-service local orchestration; use the root npm scripts for those workflows
-- Prefix nx commands with the workspace's package manager (e.g., `pnpm nx build`, `npm exec nx test`) - avoids using globally installed CLI
-- You have access to the Nx MCP server and its tools, use them to help the user
-- For Nx plugin best practices, check `node_modules/@nx/<plugin>/PLUGIN.md`. Not all plugins have this file - proceed without it if unavailable.
-- NEVER guess CLI flags - always check nx_docs or `--help` first when unsure
-
-## Scaffolding & Generators
-
-- For scaffolding tasks (creating apps, libs, project structure, setup), ALWAYS invoke the `nx-generate` skill FIRST before exploring or calling MCP tools
-
-## When to use nx_docs
-
-- USE for: advanced config options, unfamiliar flags, migration guides, plugin configuration, edge cases
-- DON'T USE for: basic generator syntax (`nx g @nx/react:app`), standard commands, things you already know
-- The `nx-generate` skill handles generator discovery internally - don't call nx_docs just to look up generator syntax
-
-<!-- nx configuration end-->
+- Use Moon as the task front door for workspace build graph work:
+  `moon ci`, `moon run <project>:<task>`, and release tasks under
+  `moon run release:*`.
+- Keep direct underlying tools for implementation details: `vite`, `vitest`,
+  `tsc`, `playwright`, `oxlint`, `go`, `docker buildx`, and `changeset`.
+- Do not reintroduce Nx or GoReleaser without updating the ADRs first.
+- When unsure about Moon flags, check `moon --help` or the task definition in
+  the nearest `moon.yml` before guessing.
 
 ## Cursor Cloud specific instructions
 
@@ -318,18 +321,18 @@ For the currently pinned `playwright-core@1.59.1` these are `147.0.7727.15` / `1
 Standard commands are documented in root `AGENTS.md` → **Local Checks** and
 **README.md**. Key quick-reference:
 
-- **Fast local checks:** `corepack pnpm run check`
-- **Full local checks:** `corepack pnpm run check -- --full`
-- **Demo E2E (manual/main-only):** `corepack pnpm run check -- --only node:e2e`
-- **Consumer journey E2E:** `corepack pnpm run journey`
+- **Fast local checks:** `moon ci :lint :typecheck :build :test`
+- **Full local checks:** `moon run workspace:check -- --full`
+- **Demo E2E (manual/main-only):** `moon run workspace:check -- --only node:e2e`
+- **Consumer journey E2E:** `moon run workspace:journey`
 
 ### Running demo apps manually
 
 To test the sign-in flow interactively (two terminals):
 
-1. Start the mock auth server: `corepack pnpm nx start @zitadel/api-mock`
-2. Start demo-next: `ZITADEL_URL=http://localhost:4000 corepack pnpm nx dev @zitadel/demo-next` (port 3002)
-3. Or demo-nuxt: `ZITADEL_URL=http://localhost:4000 corepack pnpm nx dev @zitadel/demo-nuxt` (port 3001)
+1. Start the mock auth server: `moon run api-mock:start`
+2. Start demo-next: `ZITADEL_URL=http://localhost:4000 moon run demo-next:dev` (port 3002)
+3. Or demo-nuxt: `ZITADEL_URL=http://localhost:4000 moon run demo-nuxt:dev` (port 3001)
 
 ### Stale Nuxt lock files
 
