@@ -1,6 +1,5 @@
 <script lang="ts">
   import '@zitadel/components';
-  import type { ZitadelProject } from '@zitadel/api/config';
   import type { ZitadelLogout as ZitadelLogoutElement } from '@zitadel/components';
 
   import type { ZitadelLogoutProps, ZitadelSignoutDetail } from './types';
@@ -25,13 +24,6 @@
   }
 
   $effect(() => {
-    if (!el) {
-      return;
-    }
-    (el as unknown as { project?: ZitadelProject }).project = project;
-  });
-
-  $effect(() => {
     const node = el;
     if (!node) {
       return;
@@ -47,6 +39,7 @@
 
 <zitadel-logout
   bind:this={el}
+  {project}
   project-id={projectId}
   proxy-path={proxyPath}
   post-sign-out-url={postSignOutUrl}

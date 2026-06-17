@@ -1,6 +1,5 @@
 <script lang="ts">
   import '@zitadel/components';
-  import type { ZitadelProject } from '@zitadel/api/config';
   import type { ZitadelLogin as ZitadelLoginElement } from '@zitadel/components';
 
   import type {
@@ -35,13 +34,6 @@
   }
 
   $effect(() => {
-    if (!el) {
-      return;
-    }
-    (el as unknown as { project?: ZitadelProject }).project = project;
-  });
-
-  $effect(() => {
     const node = el;
     if (!node) {
       return;
@@ -69,6 +61,7 @@
 
 <zitadel-login
   bind:this={el}
+  {project}
   {purpose}
   project-id={projectId}
   proxy-path={proxyPath}
