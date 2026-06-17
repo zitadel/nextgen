@@ -324,8 +324,12 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 		}
 		if dispatch.Outcome != "" {
 			// User not found (or similar) — skip the passkey challenge and advance
-			// normally (e.g. transition to choose-register).
+			// normally (e.g. transition to choose-register). Flip CurrentPurpose
+			// here for parity with the non-passkey path below; otherwise a login
+			// flow that hops to a register-mode step via passkey would still
+			// dispatch as login on the next submit.
 			routeOutcome = dispatch.Outcome
+			applyOutcomeFlip(state, routeOutcome)
 		}
 	}
 

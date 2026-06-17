@@ -785,6 +785,94 @@ func TestFlowStateMachine_FlipTable_RecoveryPassthrough(t *testing.T) {
 	assert.Equal(t, domain.FlowDefinitionPurposeRecovery, result.State.CurrentPurpose)
 }
 
+// passkeyIdentifierDefinition mirrors the default login flow's identifier
+// step: an email field plus `submit` (→ password) and `passkey` (→ done)
+// actions, with `user_not_found` routing to a register step. Lets a test
+// drive the passkey-issue path with an unknown email so the early dispatch
+// short-circuits and the engine routes via user_not_found.
+func passkeyIdentifierDefinition() *domain.FlowDefinition {
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-passkey-identifier",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "identifier",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "identifier",
+				Fields: []string{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Primary: true},
+					{Name: domain.FlowActionPasskey},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit:                {Target: "password"},
+					domain.FlowActionPasskey:               {Target: "done"},
+					domain.FlowImplicitOutcomeUserNotFound: {Target: "register"},
+				},
+			},
+			{
+				Name:   "password",
+				Fields: []string{"password"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "done"},
+				},
+			},
+			{
+				Name:   "register",
+				Fields: []string{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+}
+
+// TestFlowStateMachine_FlipTable_PasskeyIssue_UnknownEmail_FlipsToRegister
+// pins the bug where selecting `passkey` on the identifier step with an
+// unknown email routed via `user_not_found` to the register step but left
+// CurrentPurpose pinned at `login`. The next submit then ran identifier
+// verification in login mode and rejected the same email as user_not_found
+// again. Mirrors the flip the non-passkey dispatch path already applies.
+func TestFlowStateMachine_FlipTable_PasskeyIssue_UnknownEmail_FlipsToRegister(t *testing.T) {
+	w := newFlowTestWorld(t)
+	def := passkeyIdentifierDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, start.State.CurrentPurpose)
+
+	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskey,
+		Fields:    map[string]any{"email": "ghost@example.com"},
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "register", result.State.CurrentStep)
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, result.State.Purpose, "Purpose stays pinned")
+	assert.Equal(t, domain.FlowDefinitionPurposeRegister, result.State.CurrentPurpose,
+		"early-passkey dispatch must flip CurrentPurpose on user_not_found, parity with the non-passkey path")
+	assert.Nil(t, result.State.PendingChallenge, "passkey challenge must not be issued when identifier dispatch already produced an outcome")
+	assert.Empty(t, w.attempts.issueCalls, "IssuePasskeyChallenge must be skipped when the user wasn't resolved")
+	require.Len(t, w.attempts.identifyCalls, 1, "identifier dispatch ran exactly once")
+	assert.Equal(t, "ghost@example.com", w.attempts.identifyCalls[0].Value)
+}
+
 func TestFlowState_JSONRoundTrip_PreservesCurrentPurpose(t *testing.T) {
 	state := domain.FlowState{
 		ID:        "flow-1",
