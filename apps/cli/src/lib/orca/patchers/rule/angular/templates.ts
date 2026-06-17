@@ -77,8 +77,16 @@ function loadEnvLocal() {
   if (!existsSync(".env.local")) return {};
   const out = {};
   for (const line of readFileSync(".env.local", "utf8").split(/\\r?\\n/)) {
-    const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
-    if (m) out[m[1]] = m[2].trim().replace(/^(['"])(.*)\\1$/, "$2");
+    // Allow \`KEY=value\`, \`KEY="value"\`, \`KEY='value'\`, and a trailing
+    // \` # comment\` (the dotenv convention). Stop the value at the first
+    // unquoted \`#\`; trim and unwrap surrounding quotes.
+    const m = line.match(
+      /^([A-Z_][A-Z0-9_]*)=("(?:[^"\\\\]|\\\\.)*"|'(?:[^'\\\\]|\\\\.)*'|[^#\\r\\n]*)/,
+    );
+    if (m) {
+      const value = m[2].trim().replace(/^(['"])(.*)\\1$/, "$2");
+      if (value !== "") out[m[1]] = value;
+    }
   }
   return out;
 }
