@@ -26,10 +26,6 @@
             "kind": "passkey",
             "primary": false,
             "text_key": "identifier.action.passkey"
-          },
-          {
-            "name": "register",
-            "kind": "navigate"
           }
         ],
         "transitions": {
@@ -40,9 +36,6 @@
             "target": "done"
           },
           "user_not_found": {
-            "target": "register"
-          },
-          "register": {
             "target": "register"
           }
         }
@@ -95,10 +88,6 @@
             "kind": "passkey_register",
             "primary": false,
             "text_key": "register.action.passkey"
-          },
-          {
-            "name": "login",
-            "kind": "navigate"
           }
         ],
         "transitions": {
@@ -110,9 +99,6 @@
           },
           "user_already_exists": {
             "target": "password"
-          },
-          "login": {
-            "target": "identifier"
           }
         }
       },
