@@ -236,6 +236,40 @@ func (r *FlowDefinitionRepository) UpdateFlowDefinitionStatus(ctx context.Contex
 	return err
 }
 
+func (r *FlowDefinitionRepository) UpdateFlowDefinition(ctx context.Context, client database.QueryExecutor, def *domain.FlowDefinition) error {
+	content, err := marshalFlowDefinitionContent(def)
+	if err != nil {
+		return err
+	}
+
+	purposeStrs := make([]string, 0, len(def.Purposes))
+	for p := range def.Purposes {
+		purposeStrs = append(purposeStrs, p.String())
+	}
+
+	b := database.NewStatementBuilder("UPDATE ")
+	b.WriteString(r.meta.tableName)
+	b.WriteString(" SET name = ")
+	b.WriteArg(def.Name)
+	b.WriteString(", schema_version = ")
+	b.WriteArg(def.SchemaVersion)
+	b.WriteString(", status = ")
+	b.WriteString(b.AppendArg(def.Status.String()) + r.statusCast)
+	b.WriteString(", purposes = ")
+	b.WriteString(b.AppendArg(r.encodePurposes(purposeStrs)) + r.purposeArrCast)
+	b.WriteString(", definition = ")
+	b.WriteArg(r.encodeDefinition(content))
+	b.WriteString(", updated_at = ")
+	b.WriteArg(r.now)
+	b.WriteString(" WHERE project_id = ")
+	b.WriteArg(def.ProjectID)
+	b.WriteString(" AND id = ")
+	b.WriteArg(def.ID)
+
+	_, err = client.Exec(ctx, b.String(), b.Args()...)
+	return err
+}
+
 func (r *FlowDefinitionRepository) DeleteFlowDefinition(ctx context.Context, client database.QueryExecutor, projectID, id string) error {
 	t := r.meta.tableName
 	condition := database.And(

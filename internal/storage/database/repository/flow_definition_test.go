@@ -206,6 +206,58 @@ func TestFlowDefinitionRepository_UpdateStatus(t *testing.T) {
 	assert.Equal(t, domain.FlowDefinitionStatusActive, got.Status)
 }
 
+func TestFlowDefinitionRepository_UpdateFlowDefinition(t *testing.T) {
+	tx, rollback := transactionForRollback(t)
+	defer rollback()
+
+	repo := repository.NewFlowDefinitionRepository(tx)
+	def := sampleFlowDefinition("proj-jreplace", "flow-jreplace")
+	require.NoError(t, repo.CreateFlowDefinition(t.Context(), tx, def))
+
+	updated := sampleFlowDefinition("proj-jreplace", "flow-jreplace")
+	updated.Name = "Updated Login"
+	updated.SchemaVersion = "1.2.0"
+	updated.Status = domain.FlowDefinitionStatusActive
+	updated.UserSchema = "https://example.com/schemas/updated-user.json"
+	updated.Purposes = map[domain.FlowDefinitionPurpose]string{
+		domain.FlowDefinitionPurposeRegister: "start",
+	}
+	updated.Audience = domain.FlowDefinitionAudience{
+		AppIDs:  []string{"app-2"},
+		TeamIDs: []string{"team-1"},
+	}
+	updated.Steps = []domain.FlowDefinitionStep{
+		{
+			Name:   "start",
+			Fields: []string{"email"},
+			Actions: []domain.FlowStepAction{
+				{Name: "continue", TextKey: "start.continue", Primary: true},
+			},
+			Transitions: map[string]domain.FlowStepTransition{
+				"submit": {Target: "finish"},
+			},
+		},
+		{
+			Name: "finish",
+		},
+	}
+
+	require.NoError(t, repo.UpdateFlowDefinition(t.Context(), tx, updated))
+
+	got, err := repo.GetFlowDefinition(t.Context(), tx, "proj-jreplace", "flow-jreplace")
+	require.NoError(t, err)
+
+	assert.Equal(t, updated.Name, got.Name)
+	assert.Equal(t, updated.SchemaVersion, got.SchemaVersion)
+	assert.Equal(t, updated.Status, got.Status)
+	assert.Equal(t, updated.UserSchema, got.UserSchema)
+	assert.Equal(t, updated.Purposes, got.Purposes)
+	assert.Equal(t, updated.Audience, got.Audience)
+	require.Len(t, got.Steps, 2)
+	assert.Equal(t, "start", got.Steps[0].Name)
+	assert.Equal(t, "finish", got.Steps[1].Name)
+}
+
 func TestFlowDefinitionRepository_Delete(t *testing.T) {
 	tx, rollback := transactionForRollback(t)
 	defer rollback()

@@ -7139,14 +7139,10 @@ func (s *FlowDefinitionStatus) Decode(d *jx.Decoder) error {
 	}
 	// Try to use constant string.
 	switch FlowDefinitionStatus(v) {
-	case FlowDefinitionStatusDraft:
-		*s = FlowDefinitionStatusDraft
 	case FlowDefinitionStatusActive:
 		*s = FlowDefinitionStatusActive
-	case FlowDefinitionStatusDeprecated:
-		*s = FlowDefinitionStatusDeprecated
-	case FlowDefinitionStatusArchived:
-		*s = FlowDefinitionStatusArchived
+	case FlowDefinitionStatusDraft:
+		*s = FlowDefinitionStatusDraft
 	default:
 		*s = FlowDefinitionStatus(v)
 	}

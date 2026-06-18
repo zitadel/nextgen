@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ianlancetaylor/jsonschema"
-	"github.com/muhlemmer/gu"
 	"github.com/stretchr/testify/assert"
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
@@ -77,7 +76,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 	}
 	type args struct {
 		ctx context.Context
-		req service.CreateFlowDefinitionRequest
+		req service.FlowDefinitionRequest
 	}
 	tests := []struct {
 		name              string
@@ -119,7 +118,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
+				req: service.FlowDefinitionRequest{
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
@@ -143,7 +142,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 						},
 						{
 							Name:     "step_2",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+							Complete: new(domain.FlowStepCompleteRedirect),
 						},
 					},
 				},
@@ -174,7 +173,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					},
 					{
 						Name:     "step_2",
-						Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						Complete: new(domain.FlowStepCompleteRedirect),
 					},
 				},
 			},
@@ -226,7 +225,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
+				req: service.FlowDefinitionRequest{
 					ProjectID:     "project1",
 					Name:          "some-flow",
 					SchemaVersion: "1.0.0",
@@ -248,12 +247,12 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "done"},
-								"next":   {Target: "external-flow", Action: gu.Ptr(domain.Switch)},
+								"next":   {Target: "external-flow", Action: new(domain.Switch)},
 							},
 						},
 						{
 							Name:     "done",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+							Complete: new(domain.FlowStepCompleteRedirect),
 						},
 					},
 				},
@@ -283,12 +282,12 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 						},
 						Transitions: map[string]domain.FlowStepTransition{
 							"submit": {Target: "done"},
-							"next":   {Target: "external-flow", Action: gu.Ptr(domain.Switch)},
+							"next":   {Target: "external-flow", Action: new(domain.Switch)},
 						},
 					},
 					{
 						Name:     "done",
-						Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						Complete: new(domain.FlowStepCompleteRedirect),
 					},
 				},
 			},
@@ -328,7 +327,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
+				req: service.FlowDefinitionRequest{
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
@@ -352,7 +351,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 						},
 						{
 							Name:     "step_2",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+							Complete: new(domain.FlowStepCompleteRedirect),
 						},
 					},
 				},
@@ -382,12 +381,12 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 						},
 						Transitions: map[string]domain.FlowStepTransition{
 							"submit": {Target: "done"},
-							"next":   {Target: "external-flow", Action: gu.Ptr(domain.Switch)},
+							"next":   {Target: "external-flow", Action: new(domain.Switch)},
 						},
 					},
 					{
 						Name:     "done",
-						Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						Complete: new(domain.FlowStepCompleteRedirect),
 					},
 				},
 			},
@@ -429,7 +428,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
+				req: service.FlowDefinitionRequest{
 					ProjectID:     "project1",
 					Name:          "some-flow",
 					SchemaVersion: "1.0.0",
@@ -451,12 +450,12 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "done"},
-								"next":   {Target: "external-flow", Action: gu.Ptr(domain.Switch)},
+								"next":   {Target: "external-flow", Action: new(domain.Switch)},
 							},
 						},
 						{
 							Name:     "done",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+							Complete: new(domain.FlowStepCompleteRedirect),
 						},
 					},
 				},
@@ -495,7 +494,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
+				req: service.FlowDefinitionRequest{
 					ProjectID:     "project1",
 					Name:          "some-flow",
 					SchemaVersion: "1.0.0",
@@ -517,12 +516,12 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "done"},
-								"next":   {Target: "external-flow", Action: gu.Ptr(domain.Switch)},
+								"next":   {Target: "external-flow", Action: new(domain.Switch)},
 							},
 						},
 						{
 							Name:     "done",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+							Complete: new(domain.FlowStepCompleteRedirect),
 						},
 					},
 				},
@@ -564,7 +563,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
+				req: service.FlowDefinitionRequest{
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
@@ -588,7 +587,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 						},
 						{
 							Name:     "step_2",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+							Complete: new(domain.FlowStepCompleteRedirect),
 						},
 					},
 				},
@@ -626,7 +625,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
+				req: service.FlowDefinitionRequest{
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
@@ -650,7 +649,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 						},
 						{
 							Name:     "step_2",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+							Complete: new(domain.FlowStepCompleteRedirect),
 						},
 					},
 				},
@@ -689,7 +688,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
+				req: service.FlowDefinitionRequest{
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
@@ -713,7 +712,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 						},
 						{
 							Name:     "step_2",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+							Complete: new(domain.FlowStepCompleteRedirect),
 						},
 					},
 				},
@@ -748,7 +747,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 			},
 			args: args{
 				ctx: context.Background(),
-				req: service.CreateFlowDefinitionRequest{
+				req: service.FlowDefinitionRequest{
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
@@ -772,7 +771,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 						},
 						{
 							Name:     "step_2",
-							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+							Complete: new(domain.FlowStepCompleteRedirect),
 						},
 					},
 				},
@@ -802,6 +801,250 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 			assert.NoError(t, err)
 			assert.NotNil(t, gotFlowDef)
 			assertFlowDefinition(t, gotFlowDef, tt.want, before, after)
+		})
+	}
+}
+
+func Test_flowDefinitionService_Update(t *testing.T) {
+	userSchema := &domain.JSONSchema{Schema: tenantUserSchema}
+
+	type fields struct {
+		db                    database.Pool
+		schemaResolver        service.SchemaGetter
+		builtinSchemaProvider service.BuiltinSchemaProvider
+		validatorFn           func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error)
+		flowDefinitionRepo    func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository
+	}
+	type args struct {
+		ctx context.Context
+		req service.FlowDefinitionRequest
+	}
+
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *domain.FlowDefinition
+		wantErr error
+	}{
+		{
+			name: "flow definition updated successfully",
+			fields: fields{
+				db: stubPool(),
+				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
+					return userSchema, nil
+				}},
+				builtinSchemaProvider: &mockBuiltinSchemaProvider{latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
+					return "https://example.com/schemas/flow-definition.json", nil
+				}},
+				validatorFn: func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error) {
+					return nil, nil
+				},
+				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
+					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
+					repo.EXPECT().
+						GetFlowDefinition(gomock.Any(), gomock.Any(), "project1", "flowdef_123").
+						Times(1).
+						Return(&domain.FlowDefinition{ID: "flowdef_123", ProjectID: "project1", Name: "old-flow"}, nil)
+					repo.EXPECT().
+						UpdateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any()).
+						Times(1).
+						Return(nil)
+					return repo
+				},
+			},
+			args: args{
+				ctx: context.Background(),
+				req: service.FlowDefinitionRequest{
+					FlowDefinitionID: "flowdef_123",
+					ProjectID:        "project1",
+					Name:             "login-updated",
+					SchemaVersion:    "1.1.0",
+					UserSchema:       "https://tenant.com/schemas/my-user.json",
+					Purposes:         map[string]string{"login": "step_1"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []string{"email"},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Primary: true},
+							},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "step_2"},
+							},
+						},
+						{Name: "step_2", Complete: new(domain.FlowStepCompleteRedirect)},
+					},
+				},
+			},
+			want: &domain.FlowDefinition{
+				ID:            "flowdef_123",
+				ProjectID:     "project1",
+				Name:          "login-updated",
+				SchemaVersion: "1.1.0",
+				Status:        domain.FlowDefinitionStatusActive,
+				UserSchema:    "https://tenant.com/schemas/my-user.json",
+				Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+			},
+		},
+		{
+			name: "flow definition not found",
+			fields: fields{
+				db: stubPool(),
+				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
+					return userSchema, nil
+				}},
+				builtinSchemaProvider: &mockBuiltinSchemaProvider{},
+				validatorFn: func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error) {
+					return nil, nil
+				},
+				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
+					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
+					repo.EXPECT().
+						GetFlowDefinition(gomock.Any(), gomock.Any(), "project1", "flowdef_missing").
+						Times(1).
+						Return(nil, &database.NoRowFoundError{})
+					return repo
+				},
+			},
+			args: args{ctx: context.Background(), req: service.FlowDefinitionRequest{
+				FlowDefinitionID: "flowdef_missing",
+				ProjectID:        "project1",
+				Name:             "login",
+				SchemaVersion:    "1.0.0",
+				UserSchema:       "https://tenant.com/schemas/my-user.json",
+				Purposes:         map[string]string{"login": "step_1"},
+				Steps:            []domain.FlowDefinitionStep{{Name: "step_1"}},
+			}},
+			wantErr: domain.ErrFlowDefinitionNotFound(),
+		},
+		{
+			name: "invalid purpose",
+			fields: fields{
+				db: stubPool(),
+				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
+					return userSchema, nil
+				}},
+				builtinSchemaProvider: &mockBuiltinSchemaProvider{},
+				validatorFn: func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error) {
+					return nil, nil
+				},
+				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
+					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
+					repo.EXPECT().
+						GetFlowDefinition(gomock.Any(), gomock.Any(), "project1", "flowdef_123").
+						Times(1).
+						Return(&domain.FlowDefinition{ID: "flowdef_123", ProjectID: "project1"}, nil)
+					return repo
+				},
+			},
+			args: args{ctx: context.Background(), req: service.FlowDefinitionRequest{
+				FlowDefinitionID: "flowdef_123",
+				ProjectID:        "project1",
+				Name:             "login",
+				SchemaVersion:    "1.0.0",
+				UserSchema:       "https://tenant.com/schemas/my-user.json",
+				Purposes:         map[string]string{"not-a-purpose": "step_1"},
+				Steps:            []domain.FlowDefinitionStep{{Name: "step_1"}},
+			}},
+			wantErr: domain.ErrFlowDefinitionInvalid("invalid purpose", nil),
+		},
+		{
+			name: "validation fails",
+			fields: fields{
+				db: stubPool(),
+				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
+					return userSchema, nil
+				}},
+				builtinSchemaProvider: &mockBuiltinSchemaProvider{},
+				validatorFn: func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error) {
+					return nil, domain.ErrFlowDefinitionInvalid("validation failed", assert.AnError)
+				},
+				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
+					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
+					repo.EXPECT().
+						GetFlowDefinition(gomock.Any(), gomock.Any(), "project1", "flowdef_123").
+						Times(1).
+						Return(&domain.FlowDefinition{ID: "flowdef_123", ProjectID: "project1"}, nil)
+					return repo
+				},
+			},
+			args: args{ctx: context.Background(), req: service.FlowDefinitionRequest{
+				FlowDefinitionID: "flowdef_123",
+				ProjectID:        "project1",
+				Name:             "login",
+				SchemaVersion:    "1.0.0",
+				UserSchema:       "https://tenant.com/schemas/my-user.json",
+				Purposes:         map[string]string{"login": "step_1"},
+				Steps:            []domain.FlowDefinitionStep{{Name: "step_1"}},
+			}},
+			wantErr: domain.ErrFlowDefinitionInvalid("validation failed", assert.AnError),
+		},
+		{
+			name: "repo update error",
+			fields: fields{
+				db: stubPool(),
+				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
+					return userSchema, nil
+				}},
+				builtinSchemaProvider: &mockBuiltinSchemaProvider{},
+				validatorFn: func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error) {
+					return nil, nil
+				},
+				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
+					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
+					repo.EXPECT().
+						GetFlowDefinition(gomock.Any(), gomock.Any(), "project1", "flowdef_123").
+						Times(1).
+						Return(&domain.FlowDefinition{ID: "flowdef_123", ProjectID: "project1"}, nil)
+					repo.EXPECT().
+						UpdateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any()).
+						Times(1).
+						Return(assert.AnError)
+					return repo
+				},
+			},
+			args: args{ctx: context.Background(), req: service.FlowDefinitionRequest{
+				FlowDefinitionID: "flowdef_123",
+				ProjectID:        "project1",
+				Name:             "login",
+				SchemaVersion:    "1.0.0",
+				UserSchema:       "https://tenant.com/schemas/my-user.json",
+				Purposes:         map[string]string{"login": "step_1"},
+				Steps:            []domain.FlowDefinitionStep{{Name: "step_1"}},
+			}},
+			wantErr: assert.AnError,
+		},
+	}
+
+	for _, tt := range tests {
+		before := time.Now()
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			fd := service.NewFlowDefinitionService(
+				tt.fields.db,
+				tt.fields.schemaResolver,
+				tt.fields.builtinSchemaProvider,
+				tt.fields.validatorFn,
+				tt.fields.flowDefinitionRepo(ctrl),
+			)
+
+			got, err := fd.Update(tt.args.ctx, tt.args.req)
+			after := time.Now()
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				assertErrorDetails(t, err, tt.wantErr)
+				assert.Nil(t, got)
+				return
+			}
+
+			assert.NoError(t, err)
+			assertFlowDefinition(t, got, tt.want, before, after)
+			assert.Equal(t, tt.want.ID, got.ID)
 		})
 	}
 }
@@ -896,7 +1139,7 @@ func Test_flowDefinitionService_Get(t *testing.T) {
 							},
 							{
 								Name:     "step_2",
-								Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+								Complete: new(domain.FlowStepCompleteRedirect),
 							},
 						},
 					}, nil)
@@ -929,7 +1172,7 @@ func Test_flowDefinitionService_Get(t *testing.T) {
 					},
 					{
 						Name:     "step_2",
-						Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						Complete: new(domain.FlowStepCompleteRedirect),
 					},
 				},
 			},

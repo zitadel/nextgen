@@ -46,6 +46,7 @@ func DefaultLoginFlowDefinitions(serverURL string, projectID string, userSchemaU
 		}
 
 		defs[i], err = domain.NewFlowDefinition(
+			"",
 			projectID,
 			req.FlowDefinition.GetName(),
 			new(url.URL(req.GetSchemaURI().Value)).String(),
@@ -56,6 +57,7 @@ func DefaultLoginFlowDefinitions(serverURL string, projectID string, userSchemaU
 				TeamIDs: req.FlowDefinition.GetAudience().Value.TeamIds,
 			},
 			steps,
+			domain.FlowDefinitionStatusActive,
 		)
 	}
 

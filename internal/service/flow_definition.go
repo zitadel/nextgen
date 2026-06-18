@@ -12,7 +12,8 @@ import (
 )
 
 type FlowDefinitionService interface {
-	Create(ctx context.Context, req CreateFlowDefinitionRequest) (*domain.FlowDefinition, error)
+	Create(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error)
+	Update(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error)
 	Get(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error)
 	List(ctx context.Context, req ListFlowDefinitionsRequest) ([]*domain.FlowDefinition, error)
 	Delete(ctx context.Context, projectID string, id string) error
@@ -29,15 +30,17 @@ type BuiltinSchemaProvider interface {
 
 type flowDefinitionValidatorFunc func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error)
 
-type CreateFlowDefinitionRequest struct {
-	ProjectID     string
-	Name          string
-	SchemaVersion string // todo (grvijayan): currently empty as the request does not contain schema version
-	FlowSchemaURI string // todo (grvijayan): schema_version (semver) stored in the db vs schema_uri needed for validation
-	UserSchema    string
-	Purposes      map[string]string
-	Audience      domain.FlowDefinitionAudience
-	Steps         []domain.FlowDefinitionStep
+type FlowDefinitionRequest struct {
+	FlowDefinitionID string
+	ProjectID        string
+	Name             string
+	Status           string
+	SchemaVersion    string // todo (grvijayan): currently empty as the request does not contain schema version
+	FlowSchemaURI    string // todo (grvijayan): schema_version (semver) stored in the db vs schema_uri needed for validation
+	UserSchema       string
+	Purposes         map[string]string
+	Audience         domain.FlowDefinitionAudience
+	Steps            []domain.FlowDefinitionStep
 }
 
 type flowDefinitionService struct {
@@ -67,7 +70,7 @@ func NewFlowDefinitionService(
 	}
 }
 
-func (fd *flowDefinitionService) Create(ctx context.Context, req CreateFlowDefinitionRequest) (*domain.FlowDefinition, error) {
+func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error) {
 	// check if a flow definition (name + schema version) already exists in the project
 	opts := []domain.FlowDefinitionListOption{
 		domain.WithFlowDefinitionName(req.Name),
@@ -89,6 +92,7 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req CreateFlowDefin
 	}
 
 	flowDefinition, err := domain.NewFlowDefinition(
+		"",
 		req.ProjectID,
 		req.Name,
 		req.SchemaVersion,
@@ -96,6 +100,7 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req CreateFlowDefin
 		purposes,
 		req.Audience,
 		req.Steps,
+		domain.FlowDefinitionStatusActive,
 	)
 	if err != nil {
 		return nil, err
@@ -106,6 +111,49 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req CreateFlowDefin
 		return nil, err
 	}
 	err = fd.flowDefinitionRepo.CreateFlowDefinition(ctx, fd.db, flowDefinition)
+	if err != nil {
+		return nil, err
+	}
+	return flowDefinition, nil
+}
+
+func (fd *flowDefinitionService) Update(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error) {
+	_, err := fd.Get(ctx, req.ProjectID, req.FlowDefinitionID)
+	if err != nil {
+		return nil, err
+	}
+
+	// todo: before the purpose update: check if there are other flow definition in the `active` state with the old `purpose`
+
+	// todo: before the status update: check if there are other flow definitions that are `active` with the same purpose
+
+	status, err := domain.FlowDefinitionStatusString(req.Status)
+	if err != nil {
+		return nil, err
+	}
+	purposes, err := mapPurposesToDomain(req.Purposes)
+	if err != nil {
+		return nil, err
+	}
+	flowDefinition, err := domain.NewFlowDefinition(
+		req.FlowDefinitionID,
+		req.ProjectID,
+		req.Name,
+		req.SchemaVersion,
+		req.UserSchema,
+		purposes,
+		req.Audience,
+		req.Steps,
+		status,
+	)
+	if err != nil {
+		return nil, err
+	}
+	err = fd.Validate(ctx, flowDefinition)
+	if err != nil {
+		return nil, err
+	}
+	err = fd.flowDefinitionRepo.UpdateFlowDefinition(ctx, fd.db, flowDefinition)
 	if err != nil {
 		return nil, err
 	}

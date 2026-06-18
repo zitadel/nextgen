@@ -48,6 +48,20 @@ func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDef
 	return &api.FlowDefinitionListResponse{FlowDefinitions: respDefinitions}, nil
 }
 
+func (h Handler) UpdateFlowDefinition(ctx context.Context, req *api.FlowDefinitionUpdateRequest, params api.UpdateFlowDefinitionParams) (api.UpdateFlowDefinitionRes, error) {
+	svcReq, err := mapUpdateRequestToService(params, req)
+	if err != nil {
+		return nil, err
+	}
+
+	flowDefinition, err := h.flowDefinitionService.Update(ctx, svcReq)
+	if err != nil {
+		return nil, err
+	}
+
+	return flowDefinitionDetailResponse(flowDefinition), nil
+}
+
 func (h Handler) DeleteFlowDefinition(ctx context.Context, params api.DeleteFlowDefinitionParams) (api.DeleteFlowDefinitionRes, error) {
 	err := h.flowDefinitionService.Delete(ctx, string(params.ProjectID), params.ID)
 	if err != nil {
@@ -59,14 +73,35 @@ func (h Handler) DeleteFlowDefinition(ctx context.Context, params api.DeleteFlow
 /* ---------------- CONVERTERS ---------------- */
 
 /* API request to service/domain converters */
-func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.CreateFlowDefinitionRequest, error) {
+func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.FlowDefinitionRequest, error) {
 	definition := req.GetFlowDefinition()
 
+	// set the default status to active if not provided
+	status := api.FlowDefinitionStatusActive
+	if s, ok := definition.GetStatus().Get(); !ok || s != "" {
+		status = definition.GetStatus().Value
+	}
+	return mapFlowDefinitionRequestToService(string(req.GetProjectID()), req.GetSchemaURI(), req.GetFlowDefinition(), string(status))
+}
+
+func mapUpdateRequestToService(params api.UpdateFlowDefinitionParams, req *api.FlowDefinitionUpdateRequest) (service.FlowDefinitionRequest, error) {
+	definition := req.GetFlowDefinition()
+	status := string(definition.GetStatus().Value)
+	svcReq, err := mapFlowDefinitionRequestToService(string(params.ProjectID), req.GetSchemaURI(), definition, status)
+	if err != nil {
+		return svcReq, err
+	}
+	svcReq.FlowDefinitionID = params.ID
+	return svcReq, nil
+}
+
+func mapFlowDefinitionRequestToService(projectID string, schemaURI api.OptSchemaURI, definition api.FlowDefinition, status string) (service.FlowDefinitionRequest, error) {
 	userSchemaURI := definition.GetUserSchema()
-	svcReq := service.CreateFlowDefinitionRequest{
-		ProjectID:     string(req.GetProjectID()),
+	svcReq := service.FlowDefinitionRequest{
+		ProjectID:     projectID,
 		Name:          definition.GetName(),
 		UserSchema:    userSchemaURI.String(),
+		Status:        status,
 		SchemaVersion: "1.0.0.", // todo (grvijayan): find a way to set this based on the schema URI or the request (currently not set in the request)
 	}
 
@@ -76,7 +111,7 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Cr
 	}
 	svcReq.Purposes = purposes
 
-	reqFlowSchemaURI, ok := req.GetSchemaURI().Get()
+	reqFlowSchemaURI, ok := schemaURI.Get()
 	if ok {
 		u := (url.URL)(reqFlowSchemaURI)
 		svcReq.FlowSchemaURI = u.String()
