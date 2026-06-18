@@ -133,10 +133,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 						Set: true,
 					},
 					Steps: validSteps(),
-					Status: api.OptFlowDefinitionStatus{
-						Value: api.FlowDefinitionStatusDraft,
-						Set:   true,
-					},
+					Status: api.NewOptFlowDefinitionStatus(api.FlowDefinitionStatusActive),
 				},
 			},
 		},
