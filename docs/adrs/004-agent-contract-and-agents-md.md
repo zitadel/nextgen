@@ -1,4 +1,4 @@
-# ADR 004: Agent Contract and AGENTS.md
+# ADR 004: CLI Agent Contract and SKILLS.md
 
 > **Status:** Proposed
 > **Date:** 2026-04-26
@@ -6,7 +6,9 @@
 
 ## Decision
 
-`apps/cli/AGENTS.md` is the canonical generated agent contract. The CLI package does not ship tool-specific mirrors; agents and humans should point to `AGENTS.md`.
+`apps/cli/SKILLS.md` is the canonical CLI agent guidance. The CLI package does
+not ship multiple tool-specific mirrors; agents and humans should point to
+`SKILLS.md`.
 
 Agents should call `zitadel <command> --non-interactive --json`, parse the JSON envelope, and prefer `next_commands` over prose hints.
 
@@ -16,7 +18,8 @@ The CLI is part of the product surface for AI coding agents. Agents need stable 
 
 ## Consequences
 
-- `apps/cli/AGENTS.md`, generated from the command registry, is the source of truth; `zitadel help --json` exposes the same registry at runtime.
+- `apps/cli/SKILLS.md` is the source of truth for agent invocation rules;
+  `zitadel commands --json` and command help expose runtime command metadata.
 - Golden-path commands are marked supported.
 - Half-built surfaces stay callable only when marked experimental.
 - Failed commands must emit parseable JSON on stdout without stray text.

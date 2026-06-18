@@ -37,29 +37,35 @@ export interface ZitadelProject {
 export type { ZitadelApi };
 
 /**
- * The app-wide project handle lives on `globalThis` under a registered symbol,
- * not in a module-local variable. Bundlers can emit more than one copy of this
- * module — `@zitadel/components`, for instance, bundles its own copy —
- * and a module-local `let` gives each copy its own slot, so `configureZitadel()`
- * in the app and `getZitadelConfig()` inside the web component would read
- * different values. A `Symbol.for(...)` key on `globalThis` is shared across
- * every copy in the realm, so all of them observe the one handle.
+ * Slot for the configured project, stored on `globalThis` under a
+ * {@link Symbol.for} key. Every copy of this module evaluated in the
+ * same JS realm resolves the symbol through the global symbol registry
+ * to the same identity, so they all read and write a single slot —
+ * needed because the standalone components bundle inlines its own copy
+ * of this file, and dual-package hazards / monorepo duplicates can load
+ * a second copy alongside the app's. With a module-local `let` each
+ * instance kept its own singleton and `configureZitadel()` calls in one
+ * were invisible to `getZitadelConfig()` calls in another. Sharing is
+ * realm-scoped — separate realms (iframes, Node `vm` contexts, worker
+ * threads) have their own registries and are not unified by this.
  */
-const PROJECT_KEY = Symbol.for("@zitadel/api#currentProject");
+const PROJECT_SLOT = Symbol.for("@zitadel/api/config:currentProject");
 
-type ProjectStore = Record<symbol, ZitadelProject | null | undefined>;
-
-function getCurrentProject(): ZitadelProject | null {
-  return (globalThis as ProjectStore)[PROJECT_KEY] ?? null;
+function readSlot(): ZitadelProject | null {
+  const value = (globalThis as Record<symbol, unknown>)[PROJECT_SLOT];
+  return (value as ZitadelProject | null | undefined) ?? null;
 }
 
-function setCurrentProject(project: ZitadelProject | null): void {
-  (globalThis as ProjectStore)[PROJECT_KEY] = project;
+function writeSlot(value: ZitadelProject | null): void {
+  (globalThis as Record<symbol, unknown>)[PROJECT_SLOT] = value;
 }
 
 /**
  * Per-project API client cache. Ensures `getApi(project)` returns the
  * same instance for the same project handle — no re-wrapping on every call.
+ * Module-local on purpose: keyed by the shared frozen `ZitadelProject`
+ * object identity, so cross-instance reads still resolve through the
+ * same key and at worst memoize once per module instance.
  */
 const apiCache = new WeakMap<ZitadelProject, ZitadelApi>();
 
@@ -74,21 +80,22 @@ const apiCache = new WeakMap<ZitadelProject, ZitadelApi>();
  */
 export function configureZitadel(config: ZitadelConfig): ZitadelProject {
   const resolvedProxyPath = config.proxyPath ?? "/__nextgen";
+  const existing = readSlot();
 
-  const existing = getCurrentProject();
   if (existing !== null) {
-    // Same values → no-op (safe for HMR / React strict mode double-mount)
     if (
       existing.proxyPath === resolvedProxyPath &&
       existing.projectId === config.projectId &&
       existing.url === config.url
     ) {
+      setProxyPath(resolvedProxyPath);
       return existing;
     }
     console.warn(
       `[zitadel] configureZitadel() already called with different values. ` +
         `Ignoring: ${JSON.stringify(config)}`,
     );
+    setProxyPath(existing.proxyPath);
     return existing;
   }
 
@@ -97,11 +104,8 @@ export function configureZitadel(config: ZitadelConfig): ZitadelProject {
     projectId: config.projectId,
     url: config.url,
   });
-  setCurrentProject(project);
-
-  // Keep the global in sync for the generated code's internal use
+  writeSlot(project);
   setProxyPath(resolvedProxyPath);
-
   return project;
 }
 
@@ -128,15 +132,18 @@ export function getApi(project: ZitadelProject): ZitadelApi {
  * has not been called yet.
  */
 export function getZitadelConfig(): ZitadelProject | null {
-  return getCurrentProject();
+  return readSlot();
 }
 
 /**
- * Reset internal state. **Test-only** — not exported from the package's
- * public API. Allows tests to call `configureZitadel()` multiple times
- * across isolated test cases without the write-once guard rejecting them.
+ * Reset internal state. **Test-only**, and not part of the supported
+ * public API even though the `./config` subpath ships every binding in
+ * this module: the leading `_` marks it as private and the behaviour
+ * is free to change without notice. Lets tests call `configureZitadel()`
+ * multiple times across isolated cases without the write-once guard
+ * rejecting them.
  */
 export function _resetConfigForTesting(): void {
-  setCurrentProject(null);
+  writeSlot(null);
   setProxyPath("");
 }

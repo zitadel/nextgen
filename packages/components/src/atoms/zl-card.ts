@@ -52,17 +52,27 @@ export class ZlCard extends LitElement {
     return html`
       <section class=${cardClass} part="card">
         <header class=${headerClass} part="header">
-          <slot name="header"></slot>
+          <slot name="header" @slotchange=${this.onSlotChange}></slot>
         </header>
         <div class="zr-card__body" part="body">
           <slot></slot>
         </div>
         <footer class=${footerClass} part="footer">
-          <slot name="footer"></slot>
+          <slot name="footer" @slotchange=${this.onSlotChange}></slot>
         </footer>
       </section>
     `;
   }
+
+  /**
+   * `lightDomSlotFilled` is a render-time snapshot, so re-run render whenever a
+   * named slot's assignment changes (e.g. a header added after first paint).
+   * The initial render still reads children synchronously, avoiding the
+   * empty-then-filled flash a slotchange-only approach would introduce.
+   */
+  private onSlotChange = (): void => {
+    this.requestUpdate();
+  };
 
   /** Slotted nodes are always light-DOM children of the host in our templates. */
   private lightDomSlotFilled(slot: string): boolean {

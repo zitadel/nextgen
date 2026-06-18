@@ -165,7 +165,7 @@ main .grid .card h3 {
   margin: 0;
   font-family: var(--zl-font-family-heading, var(--zl-font-family-sans, system-ui, sans-serif));
   font-size: 2rem;
-  font-weight: 400;
+  font-weight: 700;
   line-height: 2.5rem;
   letter-spacing: -0.02em;
   color: var(--zl-color-text-primary-white, #f4f4f6);

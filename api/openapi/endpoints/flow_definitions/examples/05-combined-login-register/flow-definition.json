@@ -1,0 +1,107 @@
+{
+  "project_id": "${PROJECT_ID}",
+  "schema_uri": "https://nextgen.com/flow-definition.json",
+  "flow_definition": {
+    "name": "combined-password",
+    "user_schema": "${USER_SCHEMA_URL}",
+    "purposes": {
+      "login": "identifier",
+      "register": "register-identifier"
+    },
+    "steps": [
+      {
+        "name": "identifier",
+        "fields": [
+          "email"
+        ],
+        "actions": [
+          {
+            "name": "submit",
+            "primary": true
+          },
+          {
+            "name": "register"
+          }
+        ],
+        "transitions": {
+          "submit": {
+            "target": "password"
+          },
+          "register": {
+            "target": "register-identifier"
+          },
+          "user_not_found": {
+            "target": "register-identifier"
+          }
+        }
+      },
+      {
+        "name": "password",
+        "fields": [
+          "password"
+        ],
+        "actions": [
+          {
+            "name": "submit",
+            "primary": true
+          }
+        ],
+        "transitions": {
+          "submit": {
+            "target": "done"
+          }
+        }
+      },
+      {
+        "name": "register-identifier",
+        "fields": [
+          "email",
+          "name",
+          "phoneNumber"
+        ],
+        "actions": [
+          {
+            "name": "submit",
+            "primary": true
+          },
+          {
+            "name": "login"
+          }
+        ],
+        "transitions": {
+          "submit": {
+            "target": "register-password"
+          },
+          "login": {
+            "target": "identifier"
+          },
+          "user_already_exists": {
+            "target": "password"
+          }
+        }
+      },
+      {
+        "name": "register-password",
+        "fields": [
+          "password"
+        ],
+        "actions": [
+          {
+            "name": "submit",
+            "primary": true
+          }
+        ],
+        "on_success": "create_user",
+        "transitions": {
+          "submit": {
+            "target": "done"
+          }
+        }
+      },
+      {
+        "name": "done",
+        "complete": "show"
+      }
+    ]
+  }
+}

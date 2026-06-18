@@ -19,9 +19,10 @@ and the Liquid renderer reads it through the `LiquidContext` projection.
 Tests intercept at the network layer with MSW. The dev playground and the
 unit tests both source their handlers from `@zitadel/api-mock`
 (`setupMock(worker)` for the browser, `setupMockHandlers()` for
-`msw/node`). Configure the API base URL with `setProxyPath()` from
-`@zitadel/api/runtime/base-url`, or via the `api-base` attribute
-on `<zitadel-login>` for declarative setups.
+`msw/node`). Configure the SDK with `configureZitadel({ projectId, proxyPath })`
+from `@zitadel/api/config`; the element reads the global handle via
+`getZitadelConfig()`, or you can assign the returned handle to the element's
+`project` property. There is no `api-base` attribute.
 
 ## Type boundaries
 
@@ -95,10 +96,12 @@ in the allowlist is silently stripped.
 
 ### Tokens, not magic values
 
-Atom styles must consume design tokens through the `cssVar(...)` helper
-(`src/tokens/css-var.ts`). New tokens go in `src/tokens/catalogue.ts`. The
-orchestrator maps `branding` tokens to CSS variables on its own shadow root —
-do not reach for inline styles in atoms.
+Atom styles must consume design tokens through the `t` helper
+(`src/styles/tokens.ts`), which wraps the `@zitadel/design-tokens` `cssVars`
+tree as Lit `CSSResult` values (e.g. `t.color.surface.defaultWhite`). Tokens
+themselves are owned by the `@zitadel/design-tokens` package — add new ones
+there, not here. The orchestrator maps `branding` tokens to CSS variables on
+its own shadow root — do not reach for inline styles in atoms.
 
 ### Comments
 
@@ -126,20 +129,19 @@ stay consistent.
 The full sign-in handover (terminal step → session exchange → real
 `Set-Cookie` on the demo origin → full-page navigation to a protected
 route) is covered end-to-end in `apps/demo-next-e2e/` and
-`apps/demo-nuxt-e2e/`, not here. The exchange URL is controlled by
-`session-exchange-path` on `<zitadel-login>`: the default
-`/sessions/exchange` is prefixed with `api-base`; any other path is
-resolved from `location.origin` so SPAs can rewrite exchange separately
-from the flow API. Unit coverage lives in `api-client.spec.ts` and
-`zitadel-login.spec.ts`. When a change touches `maybeCompleteFlow`,
-`sessionExchangePath`, or the `postSignInUrl` path, run **both** e2e projects — they exercise
-different SDK middlewares against the same orchestrator code, which is
-how a regression in one framework slips past the other.
+`apps/demo-nuxt-e2e/`, not here. The terminal `handoff_token` is exchanged
+through the generated `exchangeSession` wrapper in `api-client.ts` (which
+hits the SDK proxy path); there is no `session-exchange-path` attribute. Unit
+coverage lives in `api-client.spec.ts` and `zitadel-login.spec.ts`. When a
+change touches `maybeCompleteFlow` or the `postSignInUrl` path, run **both**
+e2e projects — they exercise different SDK middlewares against the same
+orchestrator code, which is how a regression in one framework slips past the
+other.
 
 When iterating against a long-running demo dev server, remember the demo
-loads this package's built `dist/` (not source). The Nx `e2e` target has
-`dependsOn: ["^build"]` so CI is safe; manual loops need a fresh
-`nx build @zitadel/components` after orchestrator changes.
+loads this package's built `dist/` (not source). The Moon e2e tasks depend on
+the relevant build tasks so CI is safe; manual loops need a fresh
+`moon run components:build` after orchestrator changes.
 
 ### Lit dev playground (`:5173`) and caching
 

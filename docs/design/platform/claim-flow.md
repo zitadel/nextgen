@@ -2,6 +2,11 @@
 
 > **Status:** Draft
 > **See also:** [README](README.md) · [Overview](overview.md) · [Project Secret](secret.md) · [Configuration Surface](configuration-surface.md) · [Claim API](api/claim-api.yaml) · [Glossary](../glossary.md)
+>
+> **Current implementation note:** This is a target design for the future
+> claim lifecycle. The checked-in CLI and server do not currently expose these
+> endpoints or a `zitadel claim` command; see ADR 003 for the shipped-state
+> decision.
 
 Claim is the transaction that attaches ownership and accountability to a project. Before claim, the project exists but has no accountable owner. After claim, it belongs to a **team** with at least one accountable human. The transition is atomic — nothing partial.
 
@@ -140,7 +145,11 @@ Team owners invite members by email via the standard claim flow. The recipient a
 
 ### Membership vs. transfer
 
-Joining a team with a project attaches the project to the team. It does not transfer individual ownership of the human's account. Humans can be members of multiple teams; projects belong to exactly one team. This mirrors Linear, Vercel, and GitHub.
+Joining a team with a project attaches the project to the team. It does not
+transfer lifecycle ownership of the human's user identity. Humans can be members
+of multiple teams; projects belong to exactly one team. See
+[ADR 024](../../adrs/024-user-team-lifecycle-ownership.md) for the user/team
+lifecycle model.
 
 Post-hoc consolidation — transferring a project from one team to another — is supported via a dedicated `project transfer` operation (not via claim). The owner of the source team must also be a member of the destination team. A 30-day undo window applies.
 

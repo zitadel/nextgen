@@ -1,0 +1,4 @@
+{
+  "title": "System",
+  "pages": ["getHealth", "getLive", "getReady"]
+}

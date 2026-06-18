@@ -1,0 +1,63 @@
+---
+title: Agent setup
+description: Drive the Zitadel CLI with JSON envelopes and prove auth in a browser.
+---
+
+The CLI is an agent-facing product surface. Agents should prefer structured JSON over prose hints and should prove the generated app in a browser.
+
+## Invocation contract
+
+Always pass:
+
+```sh
+--non-interactive --json
+```
+
+When operating outside the current directory, also pass:
+
+```sh
+--cwd <path>
+```
+
+The CLI prints one parseable JSON object on stdout. Installer, audit, and package-manager progress belongs on stderr. Capture stdout and stderr separately when scripting.
+
+## Envelope shape
+
+Every JSON envelope includes:
+
+- `cli_version`
+- `command`
+- `source`
+- `status`
+
+Success responses include command-specific `data`. Failure responses include `code` and `message`. Agents should prefer `next_commands` over prose hints.
+
+## Agent prompt
+
+```text
+Create or use an empty local app directory. Run:
+
+1. npx @zitadel/cli@alpha doctor --non-interactive --json
+2. npx @zitadel/cli@alpha start --non-interactive --json
+3. npx @zitadel/cli@alpha setup --framework next --server local --non-interactive --json
+4. npm run dev
+
+Use the available browser automation to open the generated app. Register a unique user, verify the signed-in profile state, log out, log back in with the same user, and finish on the signed-in page.
+
+Summarize commands run, JSON statuses, files changed, browser steps completed, and any setup or UI friction.
+```
+
+## Stable UI proof
+
+`<zitadel-login>` and `<zitadel-logout>` are web components with shadow DOM. Browser drivers with shadow-DOM-aware locators can target the test hooks directly. Generic DOM-eval drivers need to recurse through shadow roots.
+
+Useful hooks include:
+
+- `zitadel-field-email`
+- `zitadel-field-password`
+- `zitadel-action-submit`
+- `zitadel-input-email`
+- `zitadel-input-password`
+- `zitadel-action-submit-button`
+
+For sign-out, open the user menu when needed and target `.signout-btn`.

@@ -54,17 +54,26 @@ export class ZlPageShell extends LitElement {
     return html`
       <div class="zr-page-shell" part="shell">
         <header class=${headerClass} part="header">
-          <slot name="header"></slot>
+          <slot name="header" @slotchange=${this.onSlotChange}></slot>
         </header>
         <main class="zr-page-shell__main" part="main">
           <slot></slot>
         </main>
         <footer class=${footerClass} part="footer">
-          <slot name="footer"></slot>
+          <slot name="footer" @slotchange=${this.onSlotChange}></slot>
         </footer>
       </div>
     `;
   }
+
+  /**
+   * Re-render when a named slot's assignment changes so a footer/header added
+   * after first paint updates the empty-region class. The initial render reads
+   * children synchronously (no empty-then-filled flash).
+   */
+  private onSlotChange = (): void => {
+    this.requestUpdate();
+  };
 
   private lightDomSlotFilled(slot: string): boolean {
     for (const child of this.children) {

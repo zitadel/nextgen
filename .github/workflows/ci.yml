@@ -2,248 +2,37 @@ name: ci
 
 on:
   pull_request:
-  push:
-    branches: [main]
+  merge_group:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-# Cancel an in-flight run when a newer commit is pushed to the same PR/branch.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  openapi-lint:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+  full-pr:
+    runs-on: depot-ubuntu-24.04-16
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v6
-      - name: Set up node
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-      - name: Lint OpenAPI spec
-        run: npx --yes @redocly/cli@2.31.5 lint api/openapi/openapi-spec.yaml --format=github-actions
-
-  go-unit-test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: Verify gofmt formatting
-        run: |
-          unformatted="$(git ls-files -z -- '*.go' | xargs -0 -r gofmt -l)"
-          if [ -n "$unformatted" ]; then
-            printf '%s\n' "$unformatted"
-            exit 1
-          fi
-      - run: go generate ./...
-      - name: Verify generated code is up to date
-        run: |
-          git diff --stat --exit-code -- .
-          test -z "$(git status --porcelain)"
-      - run: go vet ./...
-      # Unit tests only. The DB-backed tests live behind the `postgres_integration` /
-      # `spanner_integration` build tags and run in the dedicated jobs below, so
-      # this job needs neither the postgres runtime deps nor the binary cache.
-      - run: go test -v -timeout=10m ./...
-
-  go-integration-test-postgres:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-      # Postgres integration tests run against a Docker testcontainer (mirroring
-      # the spanner job); ubuntu-latest ships Docker, so no embedded-postgres
-      # runtime deps or Maven binary cache are needed here.
-      - name: Postgres integration tests
-        run: |
-          mkdir -p test-output/go
-          set -o pipefail
-          go test -json -v -tags postgres_integration -timeout=10m ./... | tee test-output/go/postgres-integration.json
-      - name: Upload Postgres test log on failure
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: postgres-integration-test-log
-          path: test-output/go/postgres-integration.json
-          if-no-files-found: ignore
-          retention-days: 7
-
-  go-integration-test-spanner:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-      # Spanner tests use a Docker testcontainer emulator, not the embedded
-      # postgres binary, so no Maven binary cache is needed here.
-      - run: go test -v -tags spanner_integration -timeout=10m ./...
-
-  goreleaser-snapshot:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: [go-unit-test, go-integration-test-postgres, go-integration-test-spanner, node-check]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Prune npm package tags for GoReleaser
-        run: |
-          # Changesets creates scoped package tags such as @zitadel/sdk-nuxt@0.1.0-alpha.0.
-          # GoReleaser should derive server versions only from server release tags.
-          git tag -l '@zitadel/*' | while read -r tag; do
-            git tag -d "$tag"
-          done
+      - uses: moonrepo/setup-toolchain@v0
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v5
         with:
           run_install: false
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Run GoReleaser (snapshot)
-        uses: goreleaser/goreleaser-action@v7
-        with:
-          distribution: goreleaser
-          version: "~> v2"
-          args: release --snapshot --clean --skip=publish,sign
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Export Docker image for smoke tests
-        run: |
-          # Goreleaser builds linux/amd64 and linux/arm64 with the same tag; pin amd64
-          # for ubuntu-latest smoke jobs (see quickstart-smoke).
-          IMAGE_ID=""
-          IMAGE_REF=""
-          for id in $(docker images ghcr.io/zitadel/nextgen --format '{{.ID}}' | sort -u); do
-            arch=$(docker image inspect -f '{{.Architecture}}' "$id")
-            ref=$(docker image inspect -f '{{index .RepoTags 0}}' "$id")
-            case "$ref" in *snapshot*) ;; *) continue ;; esac
-            if [ "$arch" = "amd64" ]; then
-              IMAGE_ID="$id"
-              IMAGE_REF="$ref"
-              break
-            fi
-          done
-          if [ -z "$IMAGE_ID" ]; then
-            echo "::error::no linux/amd64 snapshot image found for ghcr.io/zitadel/nextgen"
-            docker images ghcr.io/zitadel/nextgen
-            exit 1
-          fi
-          # Save by a stable local tag: docker save by ID drops repo tags from the tarball.
-          CI_IMAGE="ghcr.io/zitadel/nextgen:ci-snapshot-smoke-amd64"
-          docker tag "$IMAGE_ID" "$CI_IMAGE"
-          echo "$CI_IMAGE" > dist/nextgen-image.tag
-          docker save "$CI_IMAGE" -o dist/nextgen-image.tar
-
-      - name: Upload GoReleaser snapshot artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: goreleaser-snapshot
-          path: dist/**
-          if-no-files-found: error
-          retention-days: 7
-
-  go-smoke-test-embedded-postgres:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: [goreleaser-snapshot]
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Download GoReleaser snapshot
-        uses: actions/download-artifact@v6
-        with:
-          name: goreleaser-snapshot
-          path: goreleaser-dist
-      # Boots the Goreleaser-built binary on the embedded-postgres default connector:
-      # zero-config / single-binary path. UI is already embedded by GoReleaser hooks.
-      - name: Install embedded-postgres runtime deps
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libicu-dev libssl-dev
-      - name: Cache embedded-postgres binary
-        uses: actions/cache@v5
-        with:
-          path: ~/.embedded-postgres-go
-          key: embedded-postgres-${{ runner.os }}-${{ hashFiles('go.sum') }}
-      - name: Extract linux/amd64 server binary
-        run: |
-          TARBALL="$(find goreleaser-dist -name 'nextgen_*_linux_amd64.tar.gz' | head -1)"
-          test -n "$TARBALL"
-          tar -xzf "$TARBALL" -C .
-          test -x ./nextgen
-          chmod +x ./nextgen
-      - name: Smoke test (start, migrate, graceful exit 0)
-        run: |
-          export NEXTGEN_SERVER_ENCRYPTION_KEY=4D61737465726B65794E65656473546F48617665333243686172616374657273
-          ./nextgen > server.log 2>&1 &
-          pid=$!
-          # "server listening" is logged only after embedded PG is up, migrations
-          # ran, and services wired; the generous timeout covers a cold Maven download.
-          ready=0
-          for i in $(seq 1 240); do
-            if grep -q "server listening on" server.log; then ready=1; break; fi
-            if ! kill -0 "$pid" 2>/dev/null; then
-              echo "::error::server exited before becoming ready"; cat server.log; exit 1
-            fi
-            sleep 1
-          done
-          if [ "$ready" -ne 1 ]; then
-            echo "::error::timed out waiting for server readiness"; cat server.log
-            kill -TERM "$pid" 2>/dev/null || true; exit 1
-          fi
-          kill -TERM "$pid"
-          code=0; wait "$pid" || code=$?
-          cat server.log
-          [ "$code" -eq 0 ] || { echo "::error::non-zero exit after SIGTERM: $code"; exit 1; }
-          echo "embedded-postgres smoke test passed (start, migrate, graceful exit 0)"
-
-
-  node-check:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v5
-        with:
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
+      - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -251,444 +40,54 @@ jobs:
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
 
-      - name: Node checks
-        run: corepack pnpm nx run-many -t lint,typecheck,build,test
+      - name: Detect CI mode
+        id: ci-mode
+        run: node scripts/ci-mode.mjs "${{ github.event.pull_request.base.sha || 'origin/main' }}"
 
-  changeset-check:
-    # Gate PRs: fail when a PR changes a public npm package without adding a
-    # changeset, so no consumer-visible change merges without a release note.
-    # Private packages (apps, demos, mocks, lint, design-tokens, ui-react, ...)
-    # are never published and so do not require a changeset. Publishing itself
-    # runs on pushes to main in release-npm.yml.
-    #
-    # The check lives in scripts/check-changeset-required.mjs so the publishable
-    # package list and rules are testable and shared, rather than duplicated in
-    # inline shell.
-    #
-    # Skip the Changesets "Version Packages" PR: it legitimately edits public
-    # package manifests/changelogs and *removes* changesets (consuming them),
-    # which would otherwise trip this gate.
-    if: github.event_name == 'pull_request' && github.head_ref != 'changeset-release/main'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          # Full history so we can diff against the PR base branch.
-          fetch-depth: 0
+      - name: Run Moon build and test graph
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: moon ci :lint :typecheck :build :test
 
-      - name: Require a changeset for public package changes
+      - name: Run Go checks
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: moon run server:test
+
+      - name: Build release snapshot without container
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container
+
+      - name: Run binary fresh-app journey
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- --runtime binary --concurrency 5 --work-dir "${RUNNER_TEMP}/ci-journey"
+
+      - name: Validate version PR
+        if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
+        run: env -u CI -u GITHUB_ACTIONS moon run release:version
+
+      - name: Pack version PR artifacts
+        if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
+        run: env -u CI -u GITHUB_ACTIONS moon run release:pack
+
+      - name: Verify version PR tarballs
+        if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
         run: |
-          git fetch --no-tags origin "${{ github.base_ref }}"
-          node scripts/check-changeset-required.mjs --base "origin/${{ github.base_ref }}"
+          version="$(node -p "require('./apps/server/package.json').version")"
+          node apps/cli-journey-e2e/scripts/verify-tarballs.mjs "dist/release/${version}/npm"
 
-  quickstart-smoke:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: [goreleaser-snapshot]
-    env:
-      GHCR_READONLY_TOKEN: ${{ secrets.GHCR_READONLY_TOKEN }}
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Download GoReleaser snapshot
-        uses: actions/download-artifact@v6
+      - name: Upload release snapshot
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
         with:
-          name: goreleaser-snapshot
-          path: goreleaser-dist
-
-      - name: Load snapshot Docker image
-        run: |
-          test -f goreleaser-dist/nextgen-image.tar
-          test -f goreleaser-dist/nextgen-image.tag
-          docker load -i goreleaser-dist/nextgen-image.tar
-          docker image inspect -f '{{.Os}}/{{.Architecture}}' "$(cat goreleaser-dist/nextgen-image.tag)" | grep -q '^linux/amd64$'
-
-      - name: Prepare quick-start compose stack
-        run: |
-          mkdir -p nextgen_quickstart
-          cp docs/operations/docker-compose.yaml nextgen_quickstart/docker-compose.yaml
-          IMAGE="$(cat goreleaser-dist/nextgen-image.tag)"
-          {
-            echo "NEXTGEN_IMAGE=${IMAGE}"
-            echo "NEXTGEN_PORT=8080"
-            echo "NEXTGEN_SERVER_ENCRYPTION_KEY=4d61737465726b65794e65656473546f48617665333243686172616374657273"
-          } > nextgen_quickstart/.env
-          docker compose -f nextgen_quickstart/docker-compose.yaml --env-file nextgen_quickstart/.env config >/dev/null
-
-      - name: Optional GHCR auth-path smoke check
-        if: ${{ env.GHCR_READONLY_TOKEN != '' }}
-        env:
-          GH_USER: ${{ github.repository_owner }}
-        run: |
-          echo "$GHCR_READONLY_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
-          docker logout ghcr.io
-
-      - name: GHCR auth-path smoke check skipped
-        if: ${{ env.GHCR_READONLY_TOKEN == '' }}
-        run: echo "Skipping GHCR login smoke check because GHCR_READONLY_TOKEN is not configured."
-
-      - name: Start stack and verify HTTP endpoints
-        run: |
-          set -euo pipefail
-          COMPOSE=(docker compose -f nextgen_quickstart/docker-compose.yaml --env-file nextgen_quickstart/.env)
-          "${COMPOSE[@]}" up -d --wait
-          ready=0
-          for _ in $(seq 1 60); do
-            if curl -fsS http://localhost:8080/healthz >/dev/null; then
-              ready=1
-              break
-            fi
-            sleep 1
-          done
-          if [ "$ready" -ne 1 ]; then
-            echo "::error::timed out waiting for /healthz"
-            docker image inspect -f 'platform={{.Os}}/{{.Architecture}}' "$(cat goreleaser-dist/nextgen-image.tag)" || true
-            "${COMPOSE[@]}" logs nextgen || true
-            exit 1
-          fi
-          if ! curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:8080/ui/console/ | grep -q '^200$'; then
-            echo "::error::/ui/console/ did not return 200"
-            "${COMPOSE[@]}" logs nextgen || true
-            exit 1
-          fi
-          if ! curl -fsS -o /dev/null -w "%{http_code}\n" http://localhost:8080/ui/login/ | grep -q '^200$'; then
-            echo "::error::/ui/login/ did not return 200"
-            "${COMPOSE[@]}" logs nextgen || true
-            exit 1
-          fi
-          echo "quickstart compose smoke test passed"
-
-      - name: Tear down compose stack
-        if: always()
-        run: docker compose -f nextgen_quickstart/docker-compose.yaml --env-file nextgen_quickstart/.env down -v
-
-  node-e2e:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v5
-        with:
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-
-      - name: Install dependencies
-        run: corepack pnpm install --frozen-lockfile
-
-      # The Playwright cache is keyed by the resolved version in
-      # pnpm-lock.yaml so a Playwright bump invalidates it automatically.
-      # Browsers live under ~/.cache/ms-playwright on Linux.
-      - name: Restore Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-      # `pnpm exec` from the workspace root cannot find the `playwright`
-      # binary on a clean CI checkout because @playwright/test is a dep of
-      # the e2e packages only, not of root. Scoping the exec with --filter
-      # routes through that workspace's node_modules/.bin.
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: >-
-          corepack pnpm --filter @zitadel/demo-next-e2e
-          exec playwright install --with-deps chromium
-
-      - name: Install Playwright system deps
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: >-
-          corepack pnpm --filter @zitadel/demo-next-e2e
-          exec playwright install-deps chromium
-
-      # Boots the demo dev servers + api-mock through Playwright's webServer
-      # config; Nx rebuilds @zitadel/components first via ^build.
-      # console-e2e has no specs yet — it's intentionally excluded until
-      # Playwright would otherwise fail with "no tests found".
-      #
-      # demo-next-e2e and demo-nuxt-e2e use distinct api-mock ports
-      # (4000 / 4001) so Nx can run them in parallel without EADDRINUSE.
-      - name: End-to-end tests
-        run: >-
-          corepack pnpm nx run-many -t e2e
-          -p @zitadel/demo-next-e2e,@zitadel/demo-nuxt-e2e
-
-      - name: Upload Playwright reports on failure
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-report
-          path: |
-            apps/demo-next-e2e/test-output/playwright/report/**
-            apps/demo-nuxt-e2e/test-output/playwright/report/**
-            apps/demo-next-e2e/test-output/playwright/output/**
-            apps/demo-nuxt-e2e/test-output/playwright/output/**
+          name: release-snapshot
+          path: dist/release
           if-no-files-found: ignore
           retention-days: 7
 
-  npm-pack-smoke:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: node-check
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v5
+      - name: Upload journey diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
         with:
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-
-      - name: Install dependencies
-        run: corepack pnpm install --frozen-lockfile
-
-      - name: Build packages
-        run: corepack pnpm nx run-many -t build
-
-      - name: Smoke test built CLI
-        run: |
-          node apps/cli/bin/run.js --version
-          node apps/cli/bin/run.js commands
-
-      - name: Dry-run npm packs
-        run: |
-          for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt; do
-            corepack pnpm --dir "$dir" pack --dry-run
-          done
-
-      - name: Create npm package artifacts
-        run: |
-          mkdir -p "$RUNNER_TEMP/zitadel-npm-packages"
-          for dir in apps/cli packages/api packages/components packages/sdk-core packages/sdk-next packages/sdk-nuxt; do
-            corepack pnpm --dir "$dir" pack --pack-destination "$RUNNER_TEMP/zitadel-npm-packages"
-          done
-          ls -lh "$RUNNER_TEMP/zitadel-npm-packages"
-
-      - name: Verify npm package artifacts
-        run: node apps/cli-journey-e2e/scripts/verify-tarballs.mjs "$RUNNER_TEMP/zitadel-npm-packages"
-
-      - name: Upload npm package artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: npm-packages
-          path: ${{ runner.temp }}/zitadel-npm-packages/*.tgz
-          if-no-files-found: error
-          retention-days: 7
-
-  consumer-journey-e2e:
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
-    needs: [goreleaser-snapshot, npm-pack-smoke]
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v5
-        with:
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-
-      - name: Install dependencies
-        run: corepack pnpm install --frozen-lockfile
-
-      - name: Download GoReleaser snapshot
-        uses: actions/download-artifact@v6
-        with:
-          name: goreleaser-snapshot
-          path: goreleaser-dist
-
-      - name: Download npm package artifacts
-        uses: actions/download-artifact@v6
-        with:
-          name: npm-packages
-          path: ${{ runner.temp }}/zitadel-npm-packages
-
-      - name: Restore Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: >-
-          corepack pnpm --filter @zitadel/cli-journey-e2e
-          exec playwright install --with-deps chromium
-
-      - name: Install Playwright system deps
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: >-
-          corepack pnpm --filter @zitadel/cli-journey-e2e
-          exec playwright install-deps chromium
-
-      - name: Start temporary npm registry
-        env:
-          VERDACCIO_CONFIG: ${{ runner.temp }}/verdaccio/config.yaml
-          VERDACCIO_LOG: ${{ runner.temp }}/verdaccio.log
-          VERDACCIO_NPMRC: ${{ runner.temp }}/verdaccio.npmrc
-          VERDACCIO_STORAGE: ${{ runner.temp }}/verdaccio/storage
-        run: |
-          mkdir -p "$(dirname "$VERDACCIO_CONFIG")" "$VERDACCIO_STORAGE"
-          cat > "$VERDACCIO_CONFIG" <<EOF
-          storage: $VERDACCIO_STORAGE
-          uplinks:
-            npmjs:
-              url: https://registry.npmjs.org/
-          packages:
-            '@zitadel/*':
-              access: \$all
-              publish: \$all
-              unpublish: \$all
-            '@*/*':
-              access: \$all
-              publish: \$all
-              unpublish: \$all
-              proxy: npmjs
-            '**':
-              access: \$all
-              publish: \$all
-              unpublish: \$all
-              proxy: npmjs
-          logs:
-            - { type: stdout, format: pretty, level: http }
-          EOF
-          npm exec --yes verdaccio@6.2.2 -- --config "$VERDACCIO_CONFIG" --listen 127.0.0.1:4873 > "$VERDACCIO_LOG" 2>&1 &
-          echo "VERDACCIO_PID=$!" >> "$GITHUB_ENV"
-          ready=0
-          for _ in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:4873/-/ping >/dev/null; then
-              ready=1
-              break
-            fi
-            sleep 1
-          done
-          if [ "$ready" -ne 1 ]; then
-            echo "::error::timed out waiting for Verdaccio"
-            cat "$VERDACCIO_LOG"
-            exit 1
-          fi
-          {
-            echo "registry=http://127.0.0.1:4873/"
-            echo "//127.0.0.1:4873/:_authToken=journey-token"
-            echo "always-auth=true"
-          } > "$VERDACCIO_NPMRC"
-
-      - name: Publish current npm packages to temporary registry
-        env:
-          JOURNEY_REGISTRY_URL: http://127.0.0.1:4873
-          NPM_CONFIG_USERCONFIG: ${{ runner.temp }}/verdaccio.npmrc
-        run: >-
-          node apps/cli-journey-e2e/scripts/publish-tarballs.mjs
-          "$RUNNER_TEMP/zitadel-npm-packages"
-
-      - name: Load snapshot Docker image
-        run: |
-          test -f goreleaser-dist/nextgen-image.tar
-          test -f goreleaser-dist/nextgen-image.tag
-          docker load -i goreleaser-dist/nextgen-image.tar
-          docker image inspect -f '{{.Os}}/{{.Architecture}}' "$(cat goreleaser-dist/nextgen-image.tag)" | grep -q '^linux/amd64$'
-
-      - name: Start backend stack
-        run: |
-          mkdir -p "$RUNNER_TEMP/nextgen-journey"
-          cp docs/operations/docker-compose.yaml "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml"
-          IMAGE="$(cat goreleaser-dist/nextgen-image.tag)"
-          {
-            echo "NEXTGEN_IMAGE=${IMAGE}"
-            echo "NEXTGEN_PORT=8080"
-            echo "NEXTGEN_SERVER_ENCRYPTION_KEY=4d61737465726b65794e65656473546f48617665333243686172616374657273"
-          } > "$RUNNER_TEMP/nextgen-journey/.env"
-          docker compose -f "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml" --env-file "$RUNNER_TEMP/nextgen-journey/.env" up -d --wait
-          for _ in $(seq 1 90); do
-            if curl -fsS http://localhost:8080/healthz >/dev/null; then
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "::error::timed out waiting for backend /healthz"
-          docker compose -f "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml" --env-file "$RUNNER_TEMP/nextgen-journey/.env" logs nextgen
-          exit 1
-
-      - name: Prepare fresh Next.js app
-        id: prepare-app
-        env:
-          JOURNEY_BACKEND_URL: http://localhost:8080
-          JOURNEY_CREATE_NEXT_APP_VERSION: 16.2.4
-          JOURNEY_REGISTRY_URL: http://127.0.0.1:4873
-          JOURNEY_WORK_DIR: ${{ runner.temp }}/zitadel-cli-journey
-        run: node apps/cli-journey-e2e/scripts/prepare-next-app.mjs
-
-      - name: Start generated Next.js app
-        run: |
-          cd "$JOURNEY_APP_DIR"
-          npm run dev -- --hostname localhost --port 3000 > "$RUNNER_TEMP/next-app.log" 2>&1 &
-          echo "NEXT_APP_PID=$!" >> "$GITHUB_ENV"
-          for _ in $(seq 1 90); do
-            if curl -fsS http://localhost:3000/login >/dev/null; then
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "::error::timed out waiting for generated Next.js app"
-          cat "$RUNNER_TEMP/next-app.log"
-          exit 1
-
-      - name: Run consumer journey Playwright tests
-        run: >-
-          corepack pnpm --filter @zitadel/cli-journey-e2e
-          exec playwright test --config playwright.config.mts
-
-      - name: Collect diagnostics
-        if: failure()
-        run: |
-          docker compose -f "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml" --env-file "$RUNNER_TEMP/nextgen-journey/.env" logs > "$RUNNER_TEMP/backend-compose.log" 2>&1 || true
-          DIAG_DIR="$RUNNER_TEMP/consumer-journey-diagnostics"
-          mkdir -p "$DIAG_DIR/generated-app"
-          cp "$RUNNER_TEMP/backend-compose.log" "$DIAG_DIR/" 2>/dev/null || true
-          cp "$RUNNER_TEMP/next-app.log" "$DIAG_DIR/" 2>/dev/null || true
-          cp "$RUNNER_TEMP/verdaccio.log" "$DIAG_DIR/" 2>/dev/null || true
-          cp "$RUNNER_TEMP/zitadel-cli-journey/setup.json" "$DIAG_DIR/" 2>/dev/null || true
-          cp "$RUNNER_TEMP/zitadel-cli-journey/setup.stderr.log" "$DIAG_DIR/" 2>/dev/null || true
-          cp "$RUNNER_TEMP/zitadel-cli-journey/metadata.json" "$DIAG_DIR/" 2>/dev/null || true
-          cp "$RUNNER_TEMP/zitadel-cli-journey/myapp/package.json" "$DIAG_DIR/generated-app/" 2>/dev/null || true
-          cp "$RUNNER_TEMP/zitadel-cli-journey/myapp/package-lock.json" "$DIAG_DIR/generated-app/" 2>/dev/null || true
-
-      - name: Upload consumer journey diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: consumer-journey-diagnostics
-          path: |
-            apps/cli-journey-e2e/test-output/playwright/report/**
-            apps/cli-journey-e2e/test-output/playwright/output/**
-            ${{ runner.temp }}/consumer-journey-diagnostics/**
+          name: journey-diagnostics
+          path: ${{ runner.temp }}/ci-journey/diagnostics
           if-no-files-found: ignore
           retention-days: 7
-
-      - name: Tear down consumer journey services
-        if: always()
-        run: |
-          if [ -n "${NEXT_APP_PID:-}" ]; then kill "$NEXT_APP_PID" 2>/dev/null || true; fi
-          if [ -n "${VERDACCIO_PID:-}" ]; then kill "$VERDACCIO_PID" 2>/dev/null || true; fi
-          if [ -f "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml" ]; then
-            docker compose -f "$RUNNER_TEMP/nextgen-journey/docker-compose.yaml" --env-file "$RUNNER_TEMP/nextgen-journey/.env" down -v
-          fi

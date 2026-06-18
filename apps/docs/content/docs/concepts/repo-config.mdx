@@ -1,0 +1,19 @@
+---
+title: Repo configuration
+description: How Zitadel keeps app auth configuration reviewable.
+---
+
+Repo files describe configuration. Server APIs own runtime resources.
+
+The CLI writes:
+
+- `zitadel.json`
+- `.zitadel/**`
+- framework-specific app files
+- environment templates such as `.env.local`
+
+`zitadel plan` validates local configuration and previews the sync diff without mutating platform state.
+
+`zitadel apply` validates and uploads repo configuration.
+
+Local secrets and runtime-only state must stay out of source control. `.zitadel/local/**` is runtime data, not product configuration.

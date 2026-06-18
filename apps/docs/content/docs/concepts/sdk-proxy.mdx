@@ -1,0 +1,18 @@
+---
+title: SDK proxy
+description: Why framework SDKs proxy Zitadel requests through the app origin.
+---
+
+Framework SDKs keep auth traffic same-origin where possible.
+
+For Next.js and Nuxt, the SDK middleware proxies `/__nextgen/*` requests to the Zitadel backend, verifies session JWTs, and redirects unauthenticated users away from protected routes.
+
+This keeps the app in control of browser-visible routes and cookies while Zitadel remains the backend API.
+
+The default proxy path is:
+
+```text
+/__nextgen
+```
+
+The login and logout components call the same-origin proxy path by default when configured through the SDK.

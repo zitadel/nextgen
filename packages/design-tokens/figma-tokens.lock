@@ -6,5 +6,5 @@
   "version": "unpinned-seed",
   "pulledAt": null,
   "pulledBy": null,
-  "note": "The initial src/generated/figma.tokens.json was authored from MCP-enumerated variables. Running `pnpm nx run @zitadel/design-tokens:sync` with a FIGMA_TOKEN set will pin a real version here and overwrite the JSON with the canonical REST API response."
+  "note": "The initial src/generated/figma.tokens.json was authored from MCP-enumerated variables. Running `moon run design-tokens:sync` with a FIGMA_TOKEN set will pin a real version here and overwrite the JSON with the canonical REST API response."
 }

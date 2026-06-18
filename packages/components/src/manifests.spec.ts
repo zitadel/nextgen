@@ -34,6 +34,7 @@ describe("manifest registry", () => {
     const button = findManifest("zl-button");
     expect(button?.consumes?.action?.kind).toBe("submit");
     expect(button?.consumes?.action?.required).toBe(false);
+    expect(button?.attrs).toContain("data-testid");
     expect(button?.events).toContain("zl-submit");
   });
 
@@ -44,6 +45,7 @@ describe("manifest registry", () => {
         "name",
         "label",
         "type",
+        "data-testid",
         "autocomplete",
         "required",
         "pattern",
@@ -58,5 +60,32 @@ describe("manifest registry", () => {
     );
     expect(field?.slots).toEqual(expect.arrayContaining(["prefix", "suffix", "help"]));
     expect(field?.events).toContain("zl-input");
+  });
+
+  it("declares the zl-passkey attribute surface used by default.liquid", () => {
+    // `default.liquid` renders <zl-passkey ceremony method challenge-id options>;
+    // every attribute the bundled template sets must be on the manifest so the
+    // validator and editor tooling stay honest.
+    const passkey = findManifest("zl-passkey");
+    expect(passkey?.attrs).toEqual(
+      expect.arrayContaining(["ceremony", "method", "challenge-id", "options", "manual"]),
+    );
+  });
+
+  it("declares the default slot for atoms that project default content", () => {
+    // Atoms rendering a bare <slot></slot> expose the default ("") slot as a
+    // tier-3 override surface; keep the manifest in step with the markup.
+    for (const tag of ["zl-alert", "zl-button", "zl-card", "zl-pill"]) {
+      expect(findManifest(tag)?.slots, `${tag} default slot`).toContain("");
+    }
+  });
+
+  it("has no duplicate entries in any manifest list", () => {
+    for (const manifest of manifestRegistry) {
+      for (const key of ["attrs", "parts", "slots", "events"] as const) {
+        const list = manifest[key];
+        expect(new Set(list).size, `${manifest.tag}.${key} has duplicates`).toBe(list.length);
+      }
+    }
   });
 });

@@ -12,16 +12,5 @@
     "src/module.ts",
     "src/runtime/plugin.ts",
     "src/runtime/composables/useAuth.ts"
-  ],
-  "references": [
-    {
-      "path": "../sdk-core"
-    },
-    {
-      "path": "../components"
-    },
-    {
-      "path": "../api"
-    }
   ]
 }

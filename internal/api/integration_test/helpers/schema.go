@@ -85,7 +85,7 @@ func (h *Harness) CreateUserSchema(t *testing.T, projectID string, schema string
 
 	resp, err := client.CreateSchema(t.Context(), req, params)
 	require.NoError(t, err)
-	require.IsType(t, &api.CreateSchemaResponse{}, resp)
+	require.IsTypef(t, &api.CreateSchemaResponse{}, resp, "unexpected CreateSchema response: %s", MustMarshal(t, resp))
 	return resp.(*api.CreateSchemaResponse).ID
 }
 

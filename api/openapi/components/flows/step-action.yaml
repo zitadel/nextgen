@@ -1,9 +1,13 @@
 type: object
+required: [name]
 description: |
-  Configuration for a user-invokable action on a step. Keyed by action name
-  in the parent dictionary. The action name is sent back in the submit
-  request as `action`.
+  Configuration for a user-invokable action on a step. The `name` is sent
+  back in the submit request as `action`.
 properties:
+  name:
+    type: string
+    description: Action identifier. Sent back in the submit request as `action`.
+    example: submit
   primary:
     type: boolean
     default: false

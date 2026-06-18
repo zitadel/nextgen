@@ -33,13 +33,20 @@
       "description": "The user's password.",
       "x-password": true
     },
-    "name": {
+    "givenName": {
       "type": "string",
-      "description": "The user's name."
+      "maxLength": 50,
+      "description": "The user's given (first) name."
     },
-    "phoneNumber": {
+    "familyName": {
       "type": "string",
-      "description": "The user's phone number."
+      "maxLength": 50,
+      "description": "The user's family (last) name."
+    },
+    "dateOfBirth": {
+      "type": "string",
+      "format": "date",
+      "description": "The user's date of birth (ISO 8601, YYYY-MM-DD)."
     }
   }
 }

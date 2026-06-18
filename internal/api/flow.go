@@ -359,16 +359,17 @@ func toStepTexts(t domain.FlowStepTexts) api.StepTexts {
 	return out
 }
 
-func toFlowStepFields(fields map[string]domain.FlowField) api.FlowStepFields {
-	out := make(api.FlowStepFields, len(fields))
-	for name, f := range fields {
-		out[name] = toFlowField(f)
+func toFlowStepFields(fields []domain.FlowField) []api.Field {
+	out := make([]api.Field, len(fields))
+	for i, f := range fields {
+		out[i] = toFlowField(f)
 	}
 	return out
 }
 
 func toFlowField(f domain.FlowField) api.Field {
 	out := api.Field{
+		Name:     f.Name,
 		Type:     api.FieldType(f.Type),
 		TextKey:  f.TextKey,
 		Required: api.NewOptBool(f.Required),
@@ -413,10 +414,11 @@ func toFlowFieldValidation(v *domain.FlowFieldValidation) *api.FieldValidation {
 	return &out
 }
 
-func toFlowStepActions(actions map[string]domain.FlowAction) api.FlowStepActions {
-	out := make(api.FlowStepActions, len(actions))
-	for name, a := range actions {
-		out[name] = api.StepAction{
+func toFlowStepActions(actions []domain.FlowAction) []api.StepAction {
+	out := make([]api.StepAction, len(actions))
+	for i, a := range actions {
+		out[i] = api.StepAction{
+			Name:    a.Name,
 			TextKey: api.NewOptString(a.TextKey),
 			Primary: api.NewOptBool(a.Primary),
 		}
@@ -522,14 +524,37 @@ var (
 	codeFlowDefinitionNotFound        = domain.ErrFlowDefinitionNotFound().Code
 	codeFlowDefinitionPurposeMismatch = domain.ErrFlowDefinitionPurposeMismatch().Code
 	codeFlowDefinitionInvalid         = domain.ErrFlowDefinitionInvalid(nil, nil).Code
+	codeMissingFlowDefinitionID       = domain.ErrMissingFlowDefinitionID().Code
+	codeMissingProjectID              = domain.ErrMissingProjectID().Code
+	codeFlowDefinitionAlreadyExists   = domain.ErrFlowDefinitionAlreadyExists().Code
 )
 
 func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
 	case codeFlowDefinitionNotFound:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
-	case codeFlowDefinitionPurposeMismatch, codeFlowDefinitionInvalid:
+	case codeFlowDefinitionPurposeMismatch,
+		codeMissingFlowDefinitionID,
+		codeMissingProjectID:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
+	case codeFlowDefinitionInvalid:
+		errResp := errorResponseWithStatusCode(http.StatusBadRequest, err)
+		if err.Details != nil {
+			if details, ok := err.Details.(string); ok {
+				b, marshalErr := json.Marshal(details)
+				if marshalErr == nil {
+					errResp.Response.Details = api.OptErrorDetailsDetails{
+						Value: api.ErrorDetailsDetails{
+							"details": b,
+						},
+						Set: true,
+					}
+				}
+			}
+		}
+		return errResp
+	case codeFlowDefinitionAlreadyExists:
+		return errorResponseWithStatusCode(http.StatusConflict, err)
 	default:
 		return internalErrorResponse(err)
 	}

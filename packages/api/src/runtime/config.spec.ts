@@ -10,6 +10,7 @@ import {
 
 afterEach(() => {
   _resetConfigForTesting();
+  vi.restoreAllMocks();
 });
 
 describe("configureZitadel", () => {
@@ -55,16 +56,44 @@ describe("configureZitadel", () => {
     expect(getZitadelConfig()).toBe(project);
   });
 
-  test("handle is stored on globalThis so a duplicated module copy reads it", () => {
-    // `@zitadel/components` bundles its own copy of this module. That
-    // copy can't see this module's locals, but it CAN see globalThis. Simulate
-    // the other copy by reading the shared symbol slot directly — it must hold
-    // the very handle configureZitadel() returned here.
-    const project = configureZitadel({ proxyPath: "/__nextgen", projectId: "proj_1" });
-    const sharedSlot = (
-      globalThis as Record<symbol, unknown>
-    )[Symbol.for("@zitadel/api#currentProject")];
-    expect(sharedSlot).toBe(project);
+  test("shares state across distinct module instances via globalThis", async () => {
+    vi.resetModules();
+    const instanceA = await import("./config");
+    vi.resetModules();
+    const instanceB = await import("./config");
+
+    expect(instanceA.configureZitadel).not.toBe(instanceB.configureZitadel);
+
+    const projectFromA = instanceA.configureZitadel({
+      proxyPath: "/__nextgen",
+      projectId: "proj_shared",
+    });
+
+    expect(instanceB.getZitadelConfig()).toBe(projectFromA);
+
+    instanceA._resetConfigForTesting();
+    instanceB._resetConfigForTesting();
+  });
+
+  test("write-once guard fires across distinct module instances", async () => {
+    vi.resetModules();
+    const instanceA = await import("./config");
+    vi.resetModules();
+    const instanceB = await import("./config");
+
+    instanceA.configureZitadel({ proxyPath: "/__nextgen", projectId: "proj_first" });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(vi.fn());
+    const second = instanceB.configureZitadel({
+      proxyPath: "/__nextgen",
+      projectId: "proj_second",
+    });
+
+    expect(warnSpy).toHaveBeenCalledOnce();
+    expect(second.projectId).toBe("proj_first");
+    warnSpy.mockRestore();
+
+    instanceA._resetConfigForTesting();
+    instanceB._resetConfigForTesting();
   });
 });
 

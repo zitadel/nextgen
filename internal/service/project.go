@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
@@ -136,5 +137,7 @@ func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, 
 }
 
 func (s *projectService) Get(ctx context.Context, id string) (*domain.Project, error) {
+	logger := getLoggingContext(ctx, "project")
+	logger.Info("getting project", slog.String("project_id", id))
 	return s.projectRepo.Get(ctx, s.pool, id)
 }

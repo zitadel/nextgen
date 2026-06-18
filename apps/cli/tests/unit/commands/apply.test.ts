@@ -18,7 +18,7 @@ const VALID_FLOW = {
     {
       name: "identifier",
       fields: [],
-      actions: {},
+      actions: [],
       gates: {
         captcha: {
           kind: "captcha",

@@ -1,0 +1,86 @@
+id: "server"
+language: "go"
+layer: "application"
+stack: "backend"
+
+tasks:
+  openapi:
+    command: "npx --yes @redocly/cli@2.31.5 lint api/openapi/openapi-spec.yaml --format=github-actions"
+    options:
+      runFromWorkspaceRoot: true
+
+  format:
+    script: |
+      unformatted="$(git ls-files -z -- '*.go' | xargs -0 gofmt -l)"
+      if [ -n "$unformatted" ]; then
+        printf '%s\n' "$unformatted"
+        exit 1
+      fi
+    options:
+      runFromWorkspaceRoot: true
+
+  generate:
+    command: "node scripts/check-go-generate.mjs"
+    options:
+      runFromWorkspaceRoot: true
+
+  vet:
+    command: "go vet ./..."
+    deps:
+      - "generate"
+    options:
+      runFromWorkspaceRoot: true
+
+  test:
+    command: "go"
+    args:
+      - "test"
+      - "-v"
+      - "-timeout"
+      - "10m"
+      - "./..."
+    deps:
+      - "openapi"
+      - "format"
+      - "generate"
+      - "vet"
+    options:
+      runFromWorkspaceRoot: true
+
+  test-postgres:
+    command: "go"
+    args:
+      - "test"
+      - "-json"
+      - "-v"
+      - "-tags"
+      - "postgres_integration"
+      - "-timeout"
+      - "10m"
+      - "./..."
+    options:
+      runFromWorkspaceRoot: true
+      runInCI: false
+
+  test-spanner:
+    command: "go"
+    args:
+      - "test"
+      - "-v"
+      - "-tags"
+      - "spanner_integration"
+      - "-timeout"
+      - "10m"
+      - "./..."
+    options:
+      runFromWorkspaceRoot: true
+      runInCI: false
+
+  build:
+    command: "go build -trimpath -o dist/server/nextgen ."
+    deps:
+      - "generate"
+    outputs:
+      - "/dist/server/nextgen"
+    options:
+      runFromWorkspaceRoot: true

@@ -144,7 +144,7 @@ func (UnimplementedHandler) CreateTeam(ctx context.Context, req *CreateTeamReque
 //
 // Create user.
 //
-// POST /user
+// POST /users
 func (UnimplementedHandler) CreateUser(ctx context.Context, req *User, params CreateUserParams) (r CreateUserRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
@@ -261,6 +261,15 @@ func (UnimplementedHandler) GetMySession(ctx context.Context, params GetMySessio
 	return r, ht.ErrNotImplemented
 }
 
+// GetMyUser implements getMyUser operation.
+//
+// Get my user information.
+//
+// GET /users/me
+func (UnimplementedHandler) GetMyUser(ctx context.Context, params GetMyUserParams) (r GetMyUserRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetOpenIDConfiguration implements getOpenIDConfiguration operation.
 //
 // Retrieve the OpenID Connect configuration.
@@ -321,7 +330,7 @@ func (UnimplementedHandler) GetTeam(ctx context.Context, params GetTeamParams) (
 
 // GetToken implements getToken operation.
 //
-// Get accesstoken.
+// Get access token.
 //
 // POST /auth/token
 func (UnimplementedHandler) GetToken(ctx context.Context, req *PostTokenRequest) (r GetTokenRes, _ error) {
@@ -332,7 +341,7 @@ func (UnimplementedHandler) GetToken(ctx context.Context, req *PostTokenRequest)
 //
 // Get user by ID.
 //
-// GET /user/{user_id}
+// GET /users/{user_id}
 func (UnimplementedHandler) GetUserByID(ctx context.Context, params GetUserByIDParams) (r GetUserByIDRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
@@ -392,7 +401,7 @@ func (UnimplementedHandler) ListSessions(ctx context.Context, params ListSession
 //
 // List users.
 //
-// GET /user
+// GET /users
 func (UnimplementedHandler) ListUsers(ctx context.Context, params ListUsersParams) (r ListUsersRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
@@ -427,6 +436,15 @@ func (UnimplementedHandler) RevokeSession(ctx context.Context, params RevokeSess
 //
 // POST /auth/revoke
 func (UnimplementedHandler) RevokeToken(ctx context.Context, req *RevokeRequest) (r RevokeTokenRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// SetUserPassword implements setUserPassword operation.
+//
+// Set user password.
+//
+// PUT /users/{user_id}/password
+func (UnimplementedHandler) SetUserPassword(ctx context.Context, req *SetUserPasswordRequest, params SetUserPasswordParams) (r SetUserPasswordRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

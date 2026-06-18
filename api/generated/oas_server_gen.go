@@ -109,7 +109,7 @@ type Handler interface {
 	//
 	// Create user.
 	//
-	// POST /user
+	// POST /users
 	CreateUser(ctx context.Context, req *User, params CreateUserParams) (CreateUserRes, error)
 	// DeleteFlowDefinition implements deleteFlowDefinition operation.
 	//
@@ -193,6 +193,12 @@ type Handler interface {
 	//
 	// GET /sessions/me
 	GetMySession(ctx context.Context, params GetMySessionParams) (GetMySessionRes, error)
+	// GetMyUser implements getMyUser operation.
+	//
+	// Get my user information.
+	//
+	// GET /users/me
+	GetMyUser(ctx context.Context, params GetMyUserParams) (GetMyUserRes, error)
 	// GetOpenIDConfiguration implements getOpenIDConfiguration operation.
 	//
 	// Retrieve the OpenID Connect configuration.
@@ -235,7 +241,7 @@ type Handler interface {
 	GetTeam(ctx context.Context, params GetTeamParams) (GetTeamRes, error)
 	// GetToken implements getToken operation.
 	//
-	// Get accesstoken.
+	// Get access token.
 	//
 	// POST /auth/token
 	GetToken(ctx context.Context, req *PostTokenRequest) (GetTokenRes, error)
@@ -243,7 +249,7 @@ type Handler interface {
 	//
 	// Get user by ID.
 	//
-	// GET /user/{user_id}
+	// GET /users/{user_id}
 	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
 	// GetUserInfo implements getUserInfo operation.
 	//
@@ -285,7 +291,7 @@ type Handler interface {
 	//
 	// List users.
 	//
-	// GET /user
+	// GET /users
 	ListUsers(ctx context.Context, params ListUsersParams) (ListUsersRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
@@ -310,6 +316,12 @@ type Handler interface {
 	//
 	// POST /auth/revoke
 	RevokeToken(ctx context.Context, req *RevokeRequest) (RevokeTokenRes, error)
+	// SetUserPassword implements setUserPassword operation.
+	//
+	// Set user password.
+	//
+	// PUT /users/{user_id}/password
+	SetUserPassword(ctx context.Context, req *SetUserPasswordRequest, params SetUserPasswordParams) (SetUserPasswordRes, error)
 	// SubmitFlowEvent implements submitFlowEvent operation.
 	//
 	// Submits telemetry or fingerprint data from the frontend.

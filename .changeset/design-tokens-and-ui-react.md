@@ -1,7 +1,5 @@
 ---
 "@zitadel/components": minor
-"@zitadel/design-tokens": minor
-"@zitadel/ui-react": minor
 ---
 
 Introduce the design-token-driven foundation for the auth surface, replacing

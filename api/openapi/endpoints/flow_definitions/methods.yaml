@@ -21,7 +21,25 @@ post:
         examples:
           defaultLoginFlow:
             summary: The default login flow provided by the server.
-            externalValue: examples/default-login-flow-example.json
+            externalValue: examples/default-login-flow-definition.json
+          passwordLogin:
+            summary: Minimal login — identifier then password.
+            externalValue: examples/01-password-login/flow-definition.json
+          passwordRegister:
+            summary: Single-step password signup with on_success create_user.
+            externalValue: examples/02-password-register/flow-definition.json
+          passkeyLogin:
+            summary: Discoverable passkey login — no identifier collected up front.
+            externalValue: examples/03-passkey-login/flow-definition.json
+          passkeyRegister:
+            summary: Identifier-first passkey signup; provisional user finalized in the verify leg.
+            externalValue: examples/04-passkey-register/flow-definition.json
+          combinedPasswordLoginRegister:
+            summary: Combined login + register with user_not_found and user_already_exists wired between sub-flows.
+            externalValue: examples/05-combined-login-register/flow-definition.json
+          combinedPasswordPasskey:
+            summary: Combined login + register with password, passkey, and post-signup passkey upsell; terminal redirect.
+            externalValue: examples/06-combined-password-passkey/flow-definition.json
   responses:
     '201':
       description: Flow definition created successfully.
@@ -62,7 +80,12 @@ get:
   parameters:
     - $ref: ../../components/parameters/limit.yaml
     - $ref: ../../components/parameters/page-token.yaml
-    - $ref: ../../components/parameters/project-id.yaml
+    - name: project_id
+      in: query
+      description: The project id to filter by.
+      required: true
+      schema:
+        $ref: ../../components/schemas/project-id.yaml
     - name: purpose
       in: query
       required: false

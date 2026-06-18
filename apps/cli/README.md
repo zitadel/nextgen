@@ -1,42 +1,77 @@
 # @zitadel/cli
 
-Scaffolds Zitadel auth (login, register, profile, middleware) into a Next.js app.
+Scaffolds Zitadel auth (login, register, profile, middleware) into a Next.js, React, Vue, Angular, or Nuxt app.
 
 ```sh
-npx @zitadel/cli@latest setup --framework next --server <your-zitadel-server>
+npx @zitadel/cli@alpha start
+npx @zitadel/cli@alpha setup --server local
 ```
+
+During the public alpha, bare `npx @zitadel/cli` resolves to the same tested
+alpha CLI. Use `@alpha` or an exact `0.1.0-alpha.N` selector in bug reports and
+automation when reproducibility matters.
 
 > **Beta.** This is the **next-generation Zitadel**, a ground-up rewrite of the platform. It is distinct from the established Zitadel at [github.com/zitadel/zitadel](https://github.com/zitadel/zitadel). APIs and CLI flags will change.
 
 ## Requirements
 
-- Node 20+
-- A Next.js project created with `create-next-app`
-- A running next-generation Zitadel server to point at:
-  - **Zitadel Cloud** — coming soon
-  - **Self-hosted** — grab a binary from [github.com/zitadel/nextgen/releases](https://github.com/zitadel/nextgen/releases) and run it locally
+- Node 24+
+- Docker only when using the optional Docker runtime backend
+- A Next.js project, or an empty directory where setup can scaffold one
 
 ## Quickstart
 
 ```sh
-npx create-next-app@latest my-app
+mkdir my-app
 cd my-app
-npx @zitadel/cli@latest setup --framework next --server http://localhost:8080
+npx @zitadel/cli@alpha doctor
+npx @zitadel/cli@alpha start
+npx @zitadel/cli@alpha setup --server local
 npm run dev
 ```
 
-`setup` creates a project on the Zitadel server, scaffolds `app/login`, `app/register`, `app/profile`, and `middleware.ts`, and writes `.env.local` and `.zitadel/`. The project's default user schema and login flow are provisioned server-side at creation time, so the CLI does not scaffold or upload them. Open `http://localhost:3000/login` to see the login page.
+`start` runs the `@zitadel/server` npm binary by default and stores runtime data
+under `.zitadel/local/`. Remote-server setup can use `--server <url>` without
+starting a local runtime. Use `--runtime docker`, `--image`, or
+`ZITADEL_LOCAL_IMAGE` for advanced Docker backend debugging.
+`setup --server local` creates a project on that local server, asks which
+framework to scaffold when the directory is fresh, writes the Next.js app into
+the current directory, scaffolds `app/login`, `app/register`, `app/profile`, and
+`proxy.ts` for Next 16+ or `middleware.ts` for older Next versions. Fresh
+scaffolds also replace the starter `app/page.tsx` with links to sign in, create
+an account, and profile. Setup writes `.env.local` and `.zitadel/`, and installs
+dependencies with the detected package manager. Pass `--skip-install` to install
+them yourself. The project's default user schema and login flow are provisioned
+server-side at creation time, so the CLI does not scaffold or upload them. Open
+the dev server URL printed by your framework, register a user, log out, log back
+in, and end on the signed-in profile page.
+
+For a reproducible tester report, use the exact alpha train from the GitHub
+Release:
+
+```sh
+npx @zitadel/cli@0.1.0-alpha.N doctor
+npx @zitadel/cli@0.1.0-alpha.N start
+npx @zitadel/cli@0.1.0-alpha.N setup --server local
+```
 
 The default project flow supports password registration/login, passkey
 registration/login, and optional passkey setup after password registration.
 Users who skip passkey setup can still sign in with password; users who add a
 passkey can sign in with either credential.
 
+For agent scripts, pass `--non-interactive --json` and capture stdout and stderr
+separately. The CLI contract is one parseable JSON object on stdout; terminals
+and agent UIs may display stderr package-manager progress together with stdout.
+
 ## Other commands
 
-- `zitadel doctor` — verify the generated files and local state
-- `zitadel status` — summarise the local project
+- `zitadel doctor` — verify the local runtime and generated project files
+- `zitadel status` — summarise the local runtime and project
+- `zitadel plan` — validate config and preview sync changes without mutation
+- `zitadel apply` — validate and upload repo config to Zitadel
 - `zitadel eject` — remove what setup wrote (alias: `zitadel uninstall`)
+- `zitadel start|stop|logs|reset` — manage the local runtime
 
 ## Reference
 
@@ -44,17 +79,50 @@ passkey can sign in with either credential.
 <summary>Full command reference</summary>
 
 <!-- commands -->
+* [`zitadel apply`](#zitadel-apply)
 * [`zitadel autocomplete [SHELL]`](#zitadel-autocomplete-shell)
 * [`zitadel commands`](#zitadel-commands)
 * [`zitadel doctor`](#zitadel-doctor)
 * [`zitadel eject`](#zitadel-eject)
 * [`zitadel help [COMMAND]`](#zitadel-help-command)
+* [`zitadel logs`](#zitadel-logs)
+* [`zitadel plan`](#zitadel-plan)
+* [`zitadel reset`](#zitadel-reset)
 * [`zitadel search`](#zitadel-search)
 * [`zitadel setup`](#zitadel-setup)
+* [`zitadel start`](#zitadel-start)
 * [`zitadel status`](#zitadel-status)
+* [`zitadel stop`](#zitadel-stop)
 * [`zitadel uninstall`](#zitadel-uninstall)
 * [`zitadel version`](#zitadel-version)
 * [`zitadel which`](#zitadel-which)
+
+## `zitadel apply`
+
+Validate and upload repo config to the platform.
+
+```
+USAGE
+  $ zitadel apply [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [-e
+    development|preview|production]
+
+FLAGS
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --environment=<option>  Target environment (default: development).
+                              <options: development|preview|production>
+  -f, --force                 Overwrite protected files on conflict.
+  -n, --non-interactive       Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --verbose               Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Validate and upload repo config to the platform.
+```
 
 ## `zitadel autocomplete [SHELL]`
 
@@ -118,11 +186,12 @@ _See code: [@oclif/plugin-commands](https://github.com/oclif/plugin-commands/blo
 
 ## `zitadel doctor`
 
-Verify generated files and local state.
+Verify local runtime and project state.
 
 ```
 USAGE
   $ zitadel doctor [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [--fix]
+    [--image <value>] [--port <value>] [--runtime binary|docker]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -132,13 +201,17 @@ FLAGS
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --fix              Re-apply missing managed files.
+      --image=<value>    Container image to check.
+      --port=<value>     [default: 8080] Local HTTP port.
+      --runtime=<option> Local runtime backend.
+                         <options: binary|docker>
       --verbose          Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Verify generated files and local state.
+  Verify local runtime and project state.
 ```
 
 ## `zitadel eject`
@@ -188,6 +261,84 @@ DESCRIPTION
 
 _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/6.2.49/src/commands/help.ts)_
 
+## `zitadel logs`
+
+Show local Zitadel server logs.
+
+```
+USAGE
+  $ zitadel logs [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [--follow]
+    [--tail <value>]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -f, --force            Overwrite protected files on conflict.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --follow           Follow logs.
+      --tail=<value>     [default: 200] Number of lines to show.
+      --verbose          Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Show local Zitadel server logs.
+```
+
+## `zitadel plan`
+
+Validate config without mutation and preview the sync diff.
+
+```
+USAGE
+  $ zitadel plan [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [-e
+    development|preview|production]
+
+FLAGS
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --environment=<option>  Target environment (default: development).
+                              <options: development|preview|production>
+  -f, --force                 Overwrite protected files on conflict.
+  -n, --non-interactive       Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --verbose               Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Validate config without mutation and preview the sync diff.
+```
+
+## `zitadel reset`
+
+Delete the local Zitadel server runtime and data.
+
+```
+USAGE
+  $ zitadel reset [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -f, --force            Overwrite protected files on conflict.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --verbose          Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Delete the local Zitadel server runtime and data.
+```
+
 ## `zitadel search`
 
 Search for a command.
@@ -211,7 +362,7 @@ Create a Zitadel project and scaffold local auth.
 ```
 USAGE
   $ zitadel setup [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
-    [--framework next] [--renderer react|web-component]
+    [--framework next|nuxt|react|vue|angular] [--renderer react|web-component] [--dev-port <value>] [--skip-install]
 
 FLAGS
   -c, --cwd=<value>         Project directory to operate on.
@@ -219,11 +370,14 @@ FLAGS
   -n, --non-interactive     Disable prompts. Required when scripting or running as an agent.
   -s, --server=<value>      Override the resolved server URL.
       --debug               Debug logging.
+      --dev-port=<value>    Dev-server port; also the issuer origin registered with Zitadel. Defaults to the detected
+                            port. Use distinct ports to run several scaffolded apps side by side.
       --dry-run             Preview without mutating files or the platform.
       --framework=<option>  Framework to target.
-                            <options: next>
+                            <options: next|nuxt|react|vue|angular>
       --renderer=<option>   Renderer (default: react).
                             <options: react|web-component>
+      --skip-install        Do not install dependencies after setup updates package.json.
       --verbose             Verbose logging.
 
 GLOBAL FLAGS
@@ -234,11 +388,42 @@ DESCRIPTION
 
 EXAMPLES
   $ zitadel setup --framework next
+
+  $ zitadel setup --framework react --dev-port 3000
+```
+
+## `zitadel start`
+
+Start a local Zitadel server.
+
+```
+USAGE
+  $ zitadel start [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [--image
+    <value>] [--port <value>] [--runtime binary|docker]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -f, --force            Overwrite protected files on conflict.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --image=<value>    Container image to run.
+      --port=<value>     [default: 8080] Local HTTP port.
+      --runtime=<option> Local runtime backend.
+                         <options: binary|docker>
+      --verbose          Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Start a local Zitadel server.
 ```
 
 ## `zitadel status`
 
-Summarize the local project state.
+Summarize the local Zitadel server and project state.
 
 ```
 USAGE
@@ -257,7 +442,31 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Summarize the local project state.
+  Summarize the local Zitadel server and project state.
+```
+
+## `zitadel stop`
+
+Stop the local Zitadel server.
+
+```
+USAGE
+  $ zitadel stop [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -f, --force            Overwrite protected files on conflict.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --verbose          Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Stop the local Zitadel server.
 ```
 
 ## `zitadel uninstall`
