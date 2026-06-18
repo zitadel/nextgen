@@ -10,6 +10,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
+    setupFiles: ["src/test-setup.ts"],
     // Never run the svelte-package build output (a staged copy of the spec).
     exclude: [...configDefaults.exclude, ".svelte-kit/**"],
   },

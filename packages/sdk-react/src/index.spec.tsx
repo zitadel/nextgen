@@ -4,13 +4,13 @@ import type {
   ZitadelLogout as ZitadelLogoutElement,
 } from "@zitadel/components";
 
-import { cleanup, render } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
 } from "@zitadel/sdk-core/types";
 import * as React from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ZitadelLogin, ZitadelLogout } from "./index";
 
@@ -18,8 +18,6 @@ import { ZitadelLogin, ZitadelLogout } from "./index";
 // @lit/react binds this prop (see vitest.config.ts), so the expected mount-time
 // rejection is ignored package-wide; these are light binding/event assertions.
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
-
-afterEach(cleanup);
 
 describe("ZitadelLogin", () => {
   it("binds the project handle as a property", () => {

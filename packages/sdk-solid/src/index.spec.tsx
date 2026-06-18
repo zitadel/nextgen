@@ -4,12 +4,12 @@ import type {
   ZitadelLogout as ZitadelLogoutElement,
 } from "@zitadel/components";
 
-import { cleanup, render } from "@solidjs/testing-library";
+import { render } from "@solidjs/testing-library";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
 } from "@zitadel/sdk-core/types";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ZitadelLogin, ZitadelLogout } from "./index";
 
@@ -20,11 +20,6 @@ beforeEach(() => {
     "fetch",
     vi.fn(() => Promise.reject(new Error("no network"))),
   );
-});
-
-afterEach(() => {
-  cleanup();
-  vi.unstubAllGlobals();
 });
 
 describe("ZitadelLogin", () => {

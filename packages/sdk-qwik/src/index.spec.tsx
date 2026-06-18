@@ -9,7 +9,7 @@ import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
 } from "@zitadel/sdk-core/types";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import "@zitadel/components";
 
 import { ZitadelLogin, ZitadelLogout } from "./index";
@@ -51,11 +51,6 @@ beforeEach(() => {
     "fetch",
     vi.fn(() => Promise.reject(new Error("no network"))),
   );
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-  document.body.innerHTML = "";
 });
 
 describe("ZitadelLogin", () => {
