@@ -52,19 +52,25 @@ export function appTemplateHtml(): string {
     </section>
   </main>
 } @else if (path.startsWith('/profile')) {
-  <zitadel-auth-logout [project]="project" [postSignOutUrl]="'/login'"></zitadel-auth-logout>
+  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11">
+    <zitadel-auth-logout [project]="project" [postSignOutUrl]="'/login'"></zitadel-auth-logout>
+  </div>
 } @else if (path.startsWith('/register')) {
-  <zitadel-auth-login
-    [project]="project"
-    purpose="register"
-    [postSignInUrl]="'/profile'"
-  ></zitadel-auth-login>
+  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11">
+    <zitadel-auth-login
+      [project]="project"
+      purpose="register"
+      [postSignInUrl]="'/profile'"
+    ></zitadel-auth-login>
+  </div>
 } @else {
-  <zitadel-auth-login
-    [project]="project"
-    purpose="login"
-    [postSignInUrl]="'/profile'"
-  ></zitadel-auth-login>
+  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11">
+    <zitadel-auth-login
+      [project]="project"
+      purpose="login"
+      [postSignInUrl]="'/profile'"
+    ></zitadel-auth-login>
+  </div>
 }
 `;
 }
