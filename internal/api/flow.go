@@ -62,9 +62,7 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 		Purpose:    purpose,
 	}
 	if uri, ok := req.RedirectURI.Get(); ok {
-		// TODO: validate against RP's redirect_uri allowlist when OIDC lands.
-		s := uri.String()
-		startReq.RedirectURI = &s
+		startReq.RedirectURI = new(uri)
 	}
 	if id, ok := req.AuthRequestID.Get(); ok {
 		startReq.AuthRequestID = &id
@@ -261,9 +259,7 @@ func (h *Handler) buildFlowResponse(result service.FlowStepResult, terminal bool
 		Branding:  api.NewOptBranding(defaultBranding()),
 	}
 	if terminal && result.State.RedirectURI != nil {
-		if u, err := parseURI(*result.State.RedirectURI); err == nil {
-			resp.RedirectURI = api.NewOptURI(u)
-		}
+		resp.RedirectURI = api.NewOptURI(*result.State.RedirectURI)
 	}
 	if terminal && result.HandoffToken != "" {
 		resp.HandoffToken = api.NewOptString(result.HandoffToken)
@@ -290,9 +286,7 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 		out.Complete = api.NewOptFlowStepComplete(toFlowStepComplete(*step.Complete))
 	}
 	if step.RedirectURL != nil {
-		if u, err := parseURI(*step.RedirectURL); err == nil {
-			out.RedirectURL = api.NewOptURI(u)
-		}
+		out.RedirectURL = api.NewOptURI(*step.RedirectURL)
 	}
 	if step.Challenge != nil {
 		out.Challenge = api.NewOptFlowStepChallenge(toFlowStepChallenge(*step.Challenge))

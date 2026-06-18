@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -38,7 +39,7 @@ type FlowStepResult struct {
 type StartFlowRequest struct {
 	Definition    *domain.FlowDefinition
 	Purpose       domain.FlowDefinitionPurpose
-	RedirectURI   *string
+	RedirectURI   *url.URL
 	AuthRequestID *string
 	SessionID     *string
 }

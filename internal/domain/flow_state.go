@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"net/url"
+	"time"
+)
 
 // FlowState is the runtime state of a single in-flight flow. The handler
 // JSON-encodes it as the payload of the sealed `_zflow` cookie on every
@@ -64,7 +67,7 @@ type FlowState struct {
 	// RedirectURI is the terminal redirect destination for `complete:
 	// redirect` flows (typically the OIDC callback). Nil for `complete:
 	// show` flows that end on a success screen.
-	RedirectURI *string
+	RedirectURI *url.URL
 
 	// RequestedACR is the Authentication Context Class Reference asked
 	// for by the relying party. The implicit policy evaluator compares

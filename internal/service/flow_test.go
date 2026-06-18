@@ -3,10 +3,12 @@ package service_test
 import (
 	"context"
 	"errors"
+	"net/url"
 	"strconv"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -327,15 +329,17 @@ func TestFlowService_Start_PassesRedirectURIThrough(t *testing.T) {
 
 	svc := service.NewFlowService(stubPool(), nil, sm, &stubIDGen{})
 
-	redirect := "https://rp.example.com/cb"
+	redirect, err := url.Parse("https://rp.example.com/cb")
+	require.NoError(t, err)
+
 	if _, err := svc.Start(t.Context(), service.StartFlowRequest{
 		Definition:  def,
 		Purpose:     domain.FlowDefinitionPurposeLogin,
-		RedirectURI: &redirect,
+		RedirectURI: redirect,
 	}); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
-	if sm.gotStartInput.RedirectURI == nil || *sm.gotStartInput.RedirectURI != redirect {
+	if sm.gotStartInput.RedirectURI == nil || sm.gotStartInput.RedirectURI != redirect {
 		t.Errorf("RedirectURI = %v, want %q", sm.gotStartInput.RedirectURI, redirect)
 	}
 }

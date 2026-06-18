@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -30,7 +31,7 @@ type FlowStartInput struct {
 	Purpose       FlowDefinitionPurpose
 	Session       FlowSessionRef
 	AuthRequest   *FlowAuthRequestRef
-	RedirectURI   *string
+	RedirectURI   *url.URL
 	UserSchemaURL string
 }
 
@@ -90,7 +91,7 @@ type FlowStep struct {
 	Texts        FlowStepTexts
 	Error        *string
 	Complete     *FlowStepComplete
-	RedirectURL  *string
+	RedirectURL  *url.URL
 	Fields       []FlowField
 	Actions      []FlowAction
 	SSOProviders []FlowSSOProvider
@@ -893,7 +894,7 @@ func (r *FlowStateMachineRuntime) resolveVisitedFields(ctx context.Context, clie
 	return resolved, nil
 }
 
-func (r *FlowStateMachineRuntime) buildStep(step *FlowDefinitionStep, resolved FlowResolvedFields, errorKey *string, complete *FlowStepComplete, redirectURL *string) *FlowStep {
+func (r *FlowStateMachineRuntime) buildStep(step *FlowDefinitionStep, resolved FlowResolvedFields, errorKey *string, complete *FlowStepComplete, redirectURL *url.URL) *FlowStep {
 	// Surface only user-selectable actions declared on the step.
 	// Implicit outcomes (e.g. user_not_found) live in step.Transitions
 	// but are engine-emitted routing keys, not buttons for the client.
