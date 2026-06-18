@@ -4,7 +4,7 @@ get:
   description: |
     Returns the current state of a team.
   tags:
-    - Team
+    - Teams
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
     - name: team_id

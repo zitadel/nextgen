@@ -1,4 +1,4 @@
-export const frameworkIds = ["next", "nuxt", "react", "vue", "angular"];
+export const frameworkIds = ["next", "nuxt", "react", "vue", "angular", "solid", "svelte", "qwik"];
 
 const viteDevArgs = (port) => [
   "run",
@@ -55,6 +55,30 @@ export const frameworks = [
     id: "angular",
     displayName: "Angular",
     sdkPackageDir: "packages/sdk-angular",
+    readyPath: "/login",
+    expectsProtectedRouteRedirect: false,
+    devServerArgs: viteDevArgs,
+  },
+  {
+    id: "solid",
+    displayName: "Solid",
+    sdkPackageDir: "packages/sdk-solid",
+    readyPath: "/login",
+    expectsProtectedRouteRedirect: false,
+    devServerArgs: viteDevArgs,
+  },
+  {
+    id: "svelte",
+    displayName: "Svelte",
+    sdkPackageDir: "packages/sdk-svelte",
+    readyPath: "/login",
+    expectsProtectedRouteRedirect: false,
+    devServerArgs: viteDevArgs,
+  },
+  {
+    id: "qwik",
+    displayName: "Qwik",
+    sdkPackageDir: "packages/sdk-qwik",
     readyPath: "/login",
     expectsProtectedRouteRedirect: false,
     devServerArgs: viteDevArgs,

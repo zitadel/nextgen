@@ -1,5 +1,15 @@
 # @zitadel/components
 
+## 0.1.0-alpha.11
+
+### Minor Changes
+
+- [#309](https://github.com/zitadel/nextgen/pull/309) [`0b81768`](https://github.com/zitadel/nextgen/commit/0b8176857395d25c95343b5b320d074e0ba2c102) Thanks [@bastionstack](https://github.com/bastionstack)! - Load the design-system brand font (Arimo) by default in `<zitadel-login>` so the
+  auth UI paints the brand face even when the server returns no branding; headings
+  render in bold Arimo. Tenant `branding.font_url` still overrides it. Exposes
+  `applyDefaultFont` and `DEFAULT_BRAND_FONT_HREF` so deployments can self-host the
+  default face.
+
 ## 0.1.0-alpha.10
 
 ### Patch Changes

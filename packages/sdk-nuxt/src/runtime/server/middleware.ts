@@ -1,16 +1,13 @@
-import type {
-  AuthResult,
-  NextgenMiddlewareOptions,
-} from '@zitadel/sdk-core/types';
-import type { EventHandler, H3Event } from 'h3';
+import type { AuthResult, NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import type { EventHandler, H3Event } from "h3";
 
-import { useRuntimeConfig } from '#imports';
+import { useRuntimeConfig } from "#imports";
 import {
   HOP_BY_HOP,
   INTERNAL_HEADERS,
   filterResponseHeaders,
   matchesRoutes,
-} from '@zitadel/sdk-core/middleware';
+} from "@zitadel/sdk-core/middleware";
 import {
   defineEventHandler,
   getCookie,
@@ -20,11 +17,11 @@ import {
   getRequestURL,
   getRequestHeader,
   readRawBody,
-} from 'h3';
+} from "h3";
 
-import { verifyJwt, base64UrlDecode } from '../lib/jwt';
+import { verifyJwt, base64UrlDecode } from "../lib/jwt";
 
-declare module 'h3' {
+declare module "h3" {
   interface H3EventContext {
     nextgenAuth: AuthResult;
   }
@@ -55,7 +52,7 @@ function buildUpstreamHeaders(event: H3Event): Headers {
     if (!value || HOP_BY_HOP.has(lower) || INTERNAL_HEADERS.has(lower)) {
       continue;
     }
-    headers.set(key, Array.isArray(value) ? value.join(', ') : value);
+    headers.set(key, Array.isArray(value) ? value.join(", ") : value);
   }
 
   const url = getRequestURL(event);
@@ -64,23 +61,18 @@ function buildUpstreamHeaders(event: H3Event): Headers {
   // upstream auth server sees the full proxy path. We never skip this even when
   // a chain is already present — a load balancer may have set XFF before the
   // request reached this Nitro server, and our hop must still be recorded.
-  const socketIp = (
-    event.node.req.socket as { remoteAddress?: string } | undefined
-  )?.remoteAddress;
+  const socketIp = (event.node.req.socket as { remoteAddress?: string } | undefined)?.remoteAddress;
   if (socketIp) {
-    const existingXff = headers.get('x-forwarded-for');
-    headers.set(
-      'x-forwarded-for',
-      existingXff ? `${existingXff}, ${socketIp}` : socketIp,
-    );
+    const existingXff = headers.get("x-forwarded-for");
+    headers.set("x-forwarded-for", existingXff ? `${existingXff}, ${socketIp}` : socketIp);
   }
 
-  if (!headers.has('x-forwarded-host')) {
-    headers.set('x-forwarded-host', url.host);
+  if (!headers.has("x-forwarded-host")) {
+    headers.set("x-forwarded-host", url.host);
   }
 
-  if (!headers.has('x-forwarded-proto')) {
-    headers.set('x-forwarded-proto', url.protocol.replace(':', ''));
+  if (!headers.has("x-forwarded-proto")) {
+    headers.set("x-forwarded-proto", url.protocol.replace(":", ""));
   }
 
   return headers;
@@ -105,19 +97,17 @@ function buildUpstreamHeaders(event: H3Event): Headers {
  * @param options - Middleware configuration options.
  * @returns An H3 event handler suitable for use as a global server middleware.
  */
-export function createNextgenMiddleware(
-  options: NextgenMiddlewareOptions = {},
-): EventHandler {
+export function createNextgenMiddleware(options: NextgenMiddlewareOptions = {}): EventHandler {
   const {
-    url = process.env.ZITADEL_URL ?? 'http://localhost:8080',
-    proxyPath = '/__nextgen',
+    url = process.env.ZITADEL_URL ?? "http://localhost:8080",
+    proxyPath = "/__nextgen",
     protectedRoutes = [],
     ignoredRoutes = [],
-    loginPath = '/login',
-    allowedAlgorithms = ['RS256', 'ES256'] as const,
+    loginPath = "/login",
+    allowedAlgorithms = ["RS256", "ES256"] as const,
     clockSkewMs = 5000,
     audience,
-    allowedTokenTypes = ['JWT', 'at+JWT'],
+    allowedTokenTypes = ["JWT", "at+JWT"],
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
     opaqueTokenTimeoutMs = 5000,
@@ -126,7 +116,7 @@ export function createNextgenMiddleware(
   // Guard against open-redirect: loginPath must be a relative path. An absolute
   // URL (e.g. "https://evil.com/phish") or a protocol-relative URL
   // (e.g. "//evil.com") would redirect the browser to an external host.
-  if (!loginPath.startsWith('/') || loginPath.startsWith('//')) {
+  if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
     throw new Error(
       `[nextgen] loginPath must be a relative path starting with a single "/". ` +
         `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
@@ -142,9 +132,9 @@ export function createNextgenMiddleware(
       // Neutralise any client-supplied x-nextgen-auth-token on ignored routes.
       // handleAuth is skipped for ignored routes, so we must strip the header
       // here to prevent a forged value from reaching downstream route handlers.
-      delete (
-        event.node.req.headers as Record<string, string | string[] | undefined>
-      )['x-nextgen-auth-token'];
+      delete (event.node.req.headers as Record<string, string | string[] | undefined>)[
+        "x-nextgen-auth-token"
+      ];
       return;
     }
 
@@ -188,27 +178,23 @@ async function proxyRequest(
   const suffix = url.pathname.slice(proxyPath.length);
   const target = `${authUrl}${suffix}${url.search}`;
 
-  const method = event.node.req.method ?? 'GET';
-  const hasBody = !['GET', 'HEAD'].includes(method);
+  const method = event.node.req.method ?? "GET";
+  const hasBody = !["GET", "HEAD"].includes(method);
   const rawBody = hasBody ? await readRawBody(event, false) : undefined;
   const body = rawBody != null ? new Uint8Array(rawBody) : undefined;
 
   const upstreamHeaders = buildUpstreamHeaders(event);
 
   // Attach the project service-key secret as the bearer on every proxied
-  // request. Reads `runtimeConfig.nextgen.projectSecret`, which the bundled
-  // Nuxt module's setup() populates from `process.env.ZITADEL_PROJECT_SECRET`
-  // (with a `.env.local` fallback for dev). Apps that call
-  // `createNextgenMiddleware` directly must set the same key on their
-  // runtimeConfig or no bearer is attached. runtimeConfig is server-side
-  // only — never exposed to the client bundle.
-  if (!upstreamHeaders.has('authorization')) {
+  // request. The module's setup() puts the secret into Nuxt's server-only
+  // runtimeConfig (read from `process.env.ZITADEL_PROJECT_SECRET`; falls back
+  // to a `.env.local` parse when Nuxt's dev runtime didn't auto-load it).
+  // runtimeConfig is server-side only — never exposed to the client bundle.
+  if (!upstreamHeaders.has("authorization")) {
     const config = useRuntimeConfig();
-    const projectSecret = (
-      config.nextgen as { projectSecret?: string } | undefined
-    )?.projectSecret;
+    const projectSecret = (config.nextgen as { projectSecret?: string } | undefined)?.projectSecret;
     if (projectSecret) {
-      upstreamHeaders.set('authorization', `Bearer ${projectSecret}`);
+      upstreamHeaders.set("authorization", `Bearer ${projectSecret}`);
     }
   }
 
@@ -216,7 +202,7 @@ async function proxyRequest(
     method,
     headers: upstreamHeaders,
     body,
-    redirect: 'manual',
+    redirect: "manual",
     signal: AbortSignal.timeout(proxyTimeoutMs),
   });
 
@@ -226,7 +212,7 @@ async function proxyRequest(
 
   const setCookieHeaders = upstream.headers.getSetCookie?.() ?? [];
   for (const cookie of setCookieHeaders) {
-    responseHeaders.append('set-cookie', cookie);
+    responseHeaders.append("set-cookie", cookie);
   }
 
   const response = new Response(upstream.body, {
@@ -237,13 +223,13 @@ async function proxyRequest(
   // Write the response to the H3 event.
   event.node.res.statusCode = response.status;
   for (const [key, value] of response.headers.entries()) {
-    if (key.toLowerCase() === 'set-cookie') continue;
+    if (key.toLowerCase() === "set-cookie") continue;
     event.node.res.setHeader(key, value);
   }
   // Use getSetCookie() so multiple Set-Cookie values aren't collapsed.
   const finalCookies = response.headers.getSetCookie?.() ?? [];
   for (const cookie of finalCookies) {
-    event.node.res.appendHeader('set-cookie', cookie);
+    event.node.res.appendHeader("set-cookie", cookie);
   }
 
   return response.body;
@@ -267,13 +253,11 @@ const DECODER = new TextDecoder();
  * This is a structural check only — not a security check.
  */
 function isJwtShaped(token: string): boolean {
-  const parts = token.split('.');
+  const parts = token.split(".");
   if (parts.length < 3 || !parts[0]) return false;
   try {
-    const header = JSON.parse(
-      DECODER.decode(base64UrlDecode(parts[0])),
-    ) as Record<string, unknown>;
-    return typeof header?.alg === 'string' && !('enc' in header);
+    const header = JSON.parse(DECODER.decode(base64UrlDecode(parts[0]))) as Record<string, unknown>;
+    return typeof header?.alg === "string" && !("enc" in header);
   } catch {
     return false;
   }
@@ -294,7 +278,7 @@ async function validateOpaqueSessionToken(
 ): Promise<{ userId?: string } | null> {
   try {
     const res = await fetch(`${issuerUrl}/sessions/me`, {
-      method: 'GET',
+      method: "GET",
       headers: { cookie: `__nextgen_session=${token}` },
       signal: AbortSignal.timeout(timeoutMs),
     });
@@ -348,10 +332,7 @@ interface AuthHandlerOptions {
  * @param event - The current H3 event.
  * @param opts  - Auth handler options.
  */
-async function handleAuth(
-  event: H3Event,
-  opts: AuthHandlerOptions,
-): Promise<void> {
+async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<void> {
   const {
     url,
     protectedRoutes,
@@ -371,15 +352,13 @@ async function handleAuth(
   // handlers should call getAuth(event) rather than reading this header directly.
   // In sdk-next the equivalent protection is provided by tunnelHeaders, which
   // always overwrites the header value via Next.js's header-override mechanism.
-  delete (
-    event.node.req.headers as Record<string, string | string[] | undefined>
-  )['x-nextgen-auth-token'];
+  delete (event.node.req.headers as Record<string, string | string[] | undefined>)[
+    "x-nextgen-auth-token"
+  ];
 
-  const authHeader = getRequestHeader(event, 'authorization');
-  const bearerToken = authHeader?.startsWith('Bearer ')
-    ? authHeader.slice(7)
-    : null;
-  const cookieToken = getCookie(event, '__nextgen_session') ?? null;
+  const authHeader = getRequestHeader(event, "authorization");
+  const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const cookieToken = getCookie(event, "__nextgen_session") ?? null;
   // Bearer token takes explicit precedence over the session cookie. API clients
   // (e.g. mobile apps, CLIs) use Authorization headers while browsers use
   // cookies; when both are present the caller clearly intended the Bearer token.
@@ -415,16 +394,12 @@ async function handleAuth(
   // failed verification (bad sig, wrong typ/alg) must be rejected — never
   // accepted by a backend call that doesn't re-check the JWT claims.
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const opaqueResult = await validateOpaqueSessionToken(
-      cookieToken,
-      url,
-      opaqueTokenTimeoutMs,
-    );
+    const opaqueResult = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
     if (opaqueResult) {
       event.context.nextgenAuth = {
         isAuthenticated: true,
         session: {
-          userId: opaqueResult.userId ?? 'unknown',
+          userId: opaqueResult.userId ?? "unknown",
           email: null,
           name: null,
           token: cookieToken,
@@ -437,14 +412,14 @@ async function handleAuth(
   event.context.nextgenAuth = { isAuthenticated: false, session: null };
 
   for (const name of Object.keys(parseCookies(event))) {
-    if (name.startsWith('__nextgen')) {
+    if (name.startsWith("__nextgen")) {
       deleteCookie(event, name);
     }
   }
 
   if (matchesRoutes(pathname, protectedRoutes)) {
     const loginUrl = new URL(loginPath, getRequestURL(event));
-    loginUrl.searchParams.set('next', pathname);
+    loginUrl.searchParams.set("next", pathname);
     await sendRedirect(event, loginUrl.toString(), 302);
     return;
   }

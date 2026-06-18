@@ -2,6 +2,10 @@
 
 React components for the Zitadel auth UI, for client-side SPAs.
 
+## Requirements
+
+TypeScript ≥ 5.0 — the published type definitions re-export with `export type *`, which TypeScript introduced in 5.0.
+
 ## Usage
 
 ```tsx

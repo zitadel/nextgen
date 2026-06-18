@@ -39,25 +39,39 @@ export class App {
  */
 export function appTemplateHtml(): string {
   return `<!-- ${MANAGED_MARKER} -->
-<!-- Enforce the dark surface the Zitadel widgets are designed for, so the page
-     never follows the OS light/dark setting. -->
-<main style="min-height: 100vh; background: #0f0f11; color: #f4f4f6; color-scheme: dark;">
-  @if (path.startsWith('/profile')) {
+@if (path === '/') {
+  <main style="position:fixed;inset:0;padding:48px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:#0f0f11;color:#f4f4f6;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.5;letter-spacing:normal;text-align:center">
+    <section style="width:100%;max-width:560px">
+      <p style="margin:0 0 12px;color:#9ca3af;font-size:14px">Zitadel auth</p>
+      <h1 style="margin:0 0 24px;font-size:32px;line-height:1.15;font-weight:600;color:#f4f4f6">Sign in, create an account, or open your profile.</h1>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center">
+        <a href="/login" style="padding:10px 16px;border-radius:8px;background:#f4f4f6;color:#0f0f11;text-decoration:none;font-weight:600;font-size:14px">Sign in</a>
+        <a href="/register" style="padding:10px 16px;border-radius:8px;border:1px solid #3f3f46;color:#f4f4f6;text-decoration:none;font-weight:600;font-size:14px">Create account</a>
+        <a href="/profile" style="padding:10px 16px;border-radius:8px;border:1px solid #3f3f46;color:#f4f4f6;text-decoration:none;font-weight:600;font-size:14px">Profile</a>
+      </div>
+    </section>
+  </main>
+} @else if (path.startsWith('/profile')) {
+  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11">
     <zitadel-auth-logout [project]="project" [postSignOutUrl]="'/login'"></zitadel-auth-logout>
-  } @else if (path.startsWith('/register')) {
+  </div>
+} @else if (path.startsWith('/register')) {
+  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11">
     <zitadel-auth-login
       [project]="project"
       purpose="register"
       [postSignInUrl]="'/profile'"
     ></zitadel-auth-login>
-  } @else {
+  </div>
+} @else {
+  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11">
     <zitadel-auth-login
       [project]="project"
       purpose="login"
       [postSignInUrl]="'/profile'"
     ></zitadel-auth-login>
-  }
-</main>
+  </div>
+}
 `;
 }
 
@@ -81,16 +95,11 @@ function loadEnvLocal() {
   if (!existsSync(".env.local")) return {};
   const out = {};
   for (const line of readFileSync(".env.local", "utf8").split(/\\r?\\n/)) {
-    // Allow \`KEY=value\`, \`export KEY=value\`, optional whitespace around \`=\`,
-    // quoted (\`"..."\` / \`'...'\`), and a trailing \` # comment\` — the dotenv
-    // convention. Stop the value at the first unquoted \`#\`; trim and unwrap
-    // surrounding quotes.
-    const m = line.match(
-      /^\\s*(?:export\\s+)?([A-Z_][A-Z0-9_]*)\\s*=\\s*("(?:[^"\\\\]|\\\\.)*"|'(?:[^'\\\\]|\\\\.)*'|[^#\\r\\n]*)/,
-    );
+    const m = line.match(/^\\s*(?:export\\s+)?([A-Z_][A-Z0-9_]*)\\s*=\\s*(.*)$/);
     if (m) {
-      const value = m[2].trim().replace(/^(['"])(.*)\\1$/, "$2");
-      if (value !== "") out[m[1]] = value;
+      const raw = m[2].trim();
+      const quoted = raw.match(/^(['"])(.*)\\1\\s*(?:#.*)?$/);
+      out[m[1]] = quoted ? quoted[2] : raw.replace(/\\s+#.*$/, "").trim();
     }
   }
   return out;

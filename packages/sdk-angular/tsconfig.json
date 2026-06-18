@@ -27,6 +27,9 @@
   "exclude": ["src/**/*.spec.ts", "src/**/__tests__/**"],
   "references": [
     {
+      "path": "../sdk-core"
+    },
+    {
       "path": "../components"
     },
     {

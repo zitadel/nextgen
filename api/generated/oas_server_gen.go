@@ -241,7 +241,7 @@ type Handler interface {
 	GetTeam(ctx context.Context, params GetTeamParams) (GetTeamRes, error)
 	// GetToken implements getToken operation.
 	//
-	// Get accesstoken.
+	// Get access token.
 	//
 	// POST /auth/token
 	GetToken(ctx context.Context, req *PostTokenRequest) (GetTokenRes, error)

@@ -50,16 +50,6 @@ opencode.json
 # OSX
 .DS_Store
 
-# OSX
-.DS_Store
-
-# Editor/IDE
-.idea/
-.vscode/
-
-# System Files
-.DS_Store
-
 #Frontend
 ## compiled output
 dist
@@ -81,17 +71,21 @@ pnpm-debug.log*
 vite.config.*.timestamp*
 vitest.config.*.timestamp*
 test-output
-coverage
 
 ## moon
 .moon/cache
 .moon/docker
 
-## Next.js / Nuxt build outputs
+## Framework build outputs (Next.js / Nuxt / SvelteKit)
 .next/
 .nuxt/
 .nuxt-typecheck/
 .output/
+.svelte-kit/
+
+## Docs generated artifacts
+apps/docs/.source/
+apps/docs/.generated/
 
 ## Go build cache
 .go/
