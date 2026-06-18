@@ -9,13 +9,13 @@ Integrates Zitadel auth into a Vite + Vue single-page app.
   matching `vite.config.{ts,mts,js,mjs}`
 - `.env.example`, `.env.local` — `VITE_ZITADEL_PROJECT_ID` (client-exposed), plus
   the shared `ZITADEL_*` keys the base patcher writes (`ZITADEL_PROJECT_ID`,
-  `ZITADEL_ISSUER`, `ZITADEL_URL`, `ZITADEL_ENVIRONMENT`) — the dev proxy reads
-  `ZITADEL_PROJECT_ID`
+  `ZITADEL_PROJECT_SECRET`, `ZITADEL_ISSUER`, `ZITADEL_URL`,
+  `ZITADEL_ENVIRONMENT`) — the dev proxy reads `ZITADEL_PROJECT_SECRET`
 - `package.json` — adds `@zitadel/sdk-vue`
 
 ## How the proxy works
 
 The SDK widgets call `/__nextgen/*` same-origin. In dev, the Vite proxy forwards
-those to the backend and attaches the `sk_<project_id>` bearer (read from
-`ZITADEL_PROJECT_ID`) to every proxied request. Production needs
+those to the backend and attaches the project service-key secret (read from
+`ZITADEL_PROJECT_SECRET`) to every proxied request. Production needs
 `@zitadel/edge-proxy` in front.

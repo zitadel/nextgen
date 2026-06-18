@@ -1,0 +1,14 @@
+{
+  "title": "Authorization",
+  "pages": [
+    "getOpenIDConfiguration",
+    "getKeys",
+    "authorizeGet",
+    "authorizeDevice",
+    "getToken",
+    "getUserInfo",
+    "introspect",
+    "revokeToken",
+    "endSession"
+  ]
+}

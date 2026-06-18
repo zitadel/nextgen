@@ -16,6 +16,12 @@ Next iteration of the Zitadel identity platform.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contributor setup, Moon commands,
 local checks, source builds, release workflows, and troubleshooting.
 
+Preview the documentation site with:
+
+```sh
+moon run docs:dev
+```
+
 ### I am adding Zitadel to my app
 
 | I want to...                      | Run                                                            |
@@ -69,6 +75,19 @@ docker compose up -d
 | Health             | http://localhost:8080/healthz     |
 
 Details: [docs/quick-start/index.md](docs/quick-start/index.md). To build from source: [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Documentation site
+
+The Fumapress/Fumadocs documentation skeleton lives in `apps/docs`.
+
+```sh
+moon run docs:dev
+moon run docs:build
+```
+
+The docs app bundles the OpenAPI source into a generated reference, exposes
+static search, and publishes LLM-friendly text at `/llms.txt`,
+`/llms-full.txt`, page-level `.md` URLs, and `/mcp`.
 
 ## Current status
 

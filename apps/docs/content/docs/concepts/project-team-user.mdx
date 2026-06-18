@@ -1,0 +1,20 @@
+---
+title: Project, team, and user
+description: Core resource vocabulary for the preview.
+---
+
+## Project
+
+A project is the top-level tenant or deployment boundary. It owns branding, users, sessions, flows, schemas, teams, apps, and configuration.
+
+## Team
+
+A team is a tenant-grouping inside a project. It can represent a paying customer or a B2B end-customer depending on which project it lives in.
+
+## User
+
+A user is an identity inside a project. Users can be self-owned or team-owned depending on lifecycle policy.
+
+## Preview note
+
+Some design docs still describe target claim and platform lifecycle behavior. The shipped CLI does not currently expose `zitadel claim`, and the OpenAPI spec does not expose the claim endpoints.

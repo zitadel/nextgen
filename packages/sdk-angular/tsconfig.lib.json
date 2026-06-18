@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist/types",
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true
+  },
+  "angularCompilerOptions": {
+    "compilationMode": "partial",
+    "_experimentalAllowEmitDeclarationOnly": true
+  },
+  "references": [
+    {
+      "path": "../sdk-core/tsconfig.lib.json"
+    },
+    {
+      "path": "../components/tsconfig.lib.json"
+    },
+    {
+      "path": "../api/tsconfig.lib.json"
+    }
+  ]
+}

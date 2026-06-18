@@ -53,6 +53,7 @@ VISION.md
 api/
 docs/
 apps/cli/
+apps/docs/
 apps/demo-next/
 apps/demo-nuxt/
 packages/api/
