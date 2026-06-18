@@ -14,6 +14,7 @@
 | ---------------------------------- | ------------------------------------------ |
 | Check my setup                     | `moon run workspace:doctor`                |
 | Try the local Zitadel CLI          | `moon run workspace:cli -- --help`         |
+| Preview the docs site              | `moon run docs:dev`                        |
 | Run the server from source         | `moon run workspace:server -- --help`      |
 | Test the fresh-app onboarding path | `moon run workspace:journey`               |
 | Run normal local checks            | `moon ci :lint :typecheck :build :test`    |
@@ -50,6 +51,10 @@ want the generated app to install public npm packages instead.
 
 `moon run workspace:server` builds the embedded console/login UI before startup,
 then runs `go run .`; help output skips the UI builds.
+
+`moon run docs:dev` starts the Fumapress/Fumadocs documentation site from
+`apps/docs`. The docs build bundles the OpenAPI source and exposes search,
+`llms.txt`, page-level Markdown, and an MCP endpoint.
 
 ## Local checks
 

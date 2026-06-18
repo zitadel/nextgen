@@ -1,0 +1,30 @@
+---
+title: CLI
+description: Command groups for setup, local runtime management, and repo configuration.
+---
+
+The `@zitadel/cli` package scaffolds auth into Next.js, Nuxt, React, Vue, and Angular apps.
+
+## Golden path
+
+```sh
+npx @zitadel/cli@alpha doctor
+npx @zitadel/cli@alpha start
+npx @zitadel/cli@alpha setup --server local
+npm run dev
+```
+
+For automation:
+
+```sh
+npx @zitadel/cli@alpha setup --framework next --server local --non-interactive --json
+```
+
+## Command groups
+
+- `doctor` checks prerequisites and generated app state.
+- `start`, `stop`, `logs`, and `reset` manage local runtime state.
+- `setup` creates a Zitadel project and scaffolds app auth.
+- `plan` and `apply` validate and sync repo configuration.
+- `status` summarizes local runtime and project state.
+- `eject` or `uninstall` removes managed files and local Zitadel state.

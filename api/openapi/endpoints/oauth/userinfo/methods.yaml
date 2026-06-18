@@ -1,5 +1,7 @@
 get:
   operationId: getUserInfo
+  tags:
+    - Authorization
   summary: Get user info
   security:
     - oauth2: []
