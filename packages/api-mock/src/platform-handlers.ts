@@ -468,7 +468,7 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data);
     }),
 
-    http.patch("*/flow_definitions/:id", async ({ params, request }) => {
+    http.put("*/flow_definitions/:id", async ({ params, request }) => {
       const path = parse(UpdateFlowDefinitionParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
@@ -491,7 +491,12 @@ export function setupPlatformHandlers() {
         return body.response;
       }
 
-      record.body = { ...record.body, ...(body.data as unknown as Record<string, unknown>) };
+      const flowDefinition = body.data.flow_definition as unknown as Record<string, unknown>;
+      record.body = flowDefinition;
+      record.name = typeof flowDefinition.name === "string" ? flowDefinition.name : record.name;
+      record.schemaUri = body.data.schema_uri ?? record.schemaUri;
+      record.status =
+        typeof flowDefinition.status === "string" ? flowDefinition.status : record.status;
       record.updatedAt = nowIso();
       const responseBody: UpdateFlowDefinition200 = flowDetailResponse(record);
       const out = parse(UpdateFlowDefinitionResponse, responseBody, "mock_response_invalid");

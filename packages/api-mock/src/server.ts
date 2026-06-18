@@ -23,7 +23,7 @@
  *   POST   /flow_definitions          — create flow definition
  *   GET    /flow_definitions          — list flow definitions
  *   GET    /flow_definitions/:id      — get flow definition
- *   PATCH  /flow_definitions/:id      — update flow definition
+ *   PUT    /flow_definitions/:id      — update flow definition
  *   DELETE /flow_definitions/:id      — delete flow definition
  */
 import { randomBytes, randomUUID } from "node:crypto";
