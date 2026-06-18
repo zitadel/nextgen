@@ -7,7 +7,7 @@ type RunCliModule = {
     args?: string[];
     cwd?: string;
     env?: Record<string, string | undefined>;
-    buildCli?: () => Promise<void>;
+    buildCli?: (options: { env: Record<string, string | undefined> }) => Promise<void>;
     buildLocalServerBinary?: (options: {
       env: Record<string, string | undefined>;
     }) => Promise<string>;
@@ -143,8 +143,9 @@ describe("run-cli wrapper", () => {
     await runCli.main({
       args: ["start"],
       env,
-      buildCli: async () => {
+      buildCli: async (options) => {
         calls.push("build-cli");
+        expect(options.env).toBe(env);
       },
       buildLocalServerBinary: async (options) => {
         calls.push("build-server");
@@ -183,8 +184,9 @@ describe("run-cli wrapper", () => {
     await runCli.main({
       args: ["start", "--runtime", "docker"],
       env,
-      buildCli: async () => {
+      buildCli: async (options) => {
         calls.push("build-cli");
+        expect(options.env).toBe(env);
       },
       buildLocalServerBinary: async () => {
         calls.push("build-server");

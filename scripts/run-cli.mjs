@@ -32,7 +32,7 @@ export async function main(options = {}) {
   const cliCwd = options.cwd ?? cliCwdFor(env);
   let registryProcess;
 
-  await buildCliFn();
+  await buildCliFn({ env });
 
   if (shouldUseLocalServerBinary(args, env)) {
     cliEnv.ZITADEL_SERVER_BINARY = await buildLocalServerBinaryFn({ env });
@@ -202,8 +202,8 @@ function wrapperRun({ jsonMode, runCaptureFn, runFn, stderr }) {
   };
 }
 
-export function buildCli() {
-  return runMoonToStderr(["run", "cli:build"], "moon run cli:build");
+export function buildCli({ env = process.env } = {}) {
+  return runMoonToStderr(["run", "cli:build"], "moon run cli:build", env);
 }
 
 export async function buildLocalServerBinary({ env = process.env } = {}) {
