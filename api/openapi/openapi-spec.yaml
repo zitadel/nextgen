@@ -111,6 +111,12 @@ paths:
     $ref: endpoints/flow_definitions/methods.yaml
   /flow_definitions/{id}:
     $ref: endpoints/flow_definitions/by_id/methods.yaml
+  /flow_definitions/{id}/activate:
+    $ref: endpoints/flow_definitions/lifecycle/activate/method.yaml
+  /flow_definitions/{id}/deprecate:
+    $ref: endpoints/flow_definitions/lifecycle/deprecate/method.yaml
+  /flow_definitions/{id}/archive:
+    $ref: endpoints/flow_definitions/lifecycle/archive/method.yaml
   /teams:
     $ref: endpoints/teams/methods.yaml
   /teams/{team_id}:
