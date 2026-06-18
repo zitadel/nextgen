@@ -14,6 +14,7 @@ import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const cliBin = join(repoRoot, "apps/cli/bin/run.js");
+const localServerBinary = join(repoRoot, "dist/server/nextgen");
 const localRegistryWorkDir = join(repoRoot, "tmp", "cli-local-registry");
 
 export async function main(options = {}) {
@@ -22,6 +23,7 @@ export async function main(options = {}) {
   const runFn = options.run ?? run;
   const runCaptureFn = options.runCapture ?? runCapture;
   const buildCliFn = options.buildCli ?? buildCli;
+  const buildLocalServerBinaryFn = options.buildLocalServerBinary ?? buildLocalServerBinary;
   const buildLocalRuntimeImageFn = options.buildLocalRuntimeImage ?? buildLocalRuntimeImage;
   const prepareLocalRegistryFn = options.prepareLocalRegistry ?? prepareLocalRegistry;
   const stopLocalRegistryFn = options.stopLocalRegistry ?? stopLocalRegistry;
@@ -30,7 +32,11 @@ export async function main(options = {}) {
   const cliCwd = options.cwd ?? cliCwdFor(env);
   let registryProcess;
 
-  await buildCliFn();
+  await buildCliFn({ env });
+
+  if (shouldUseLocalServerBinary(args, env)) {
+    cliEnv.ZITADEL_SERVER_BINARY = await buildLocalServerBinaryFn({ env });
+  }
 
   if (shouldPrepareLocalPackages(args, env)) {
     const registryWorkDir = options.localRegistryWorkDir ?? localRegistryWorkDir;
@@ -71,18 +77,32 @@ export async function main(options = {}) {
 }
 
 export function shouldAutoBuildLocalRuntimeImage(args, env = process.env) {
-  return commandName(args) === "start" &&
+  return (
+    commandName(args) === "start" &&
     runtimeFlagValue(args, env) === "docker" &&
     !hasRuntimeImageSource(args, env) &&
-    !isHelpOrVersion(args);
+    !isHelpOrVersion(args)
+  );
+}
+
+export function shouldUseLocalServerBinary(args, env = process.env) {
+  return (
+    commandName(args) === "start" &&
+    runtimeFlagValue(args, env) === "binary" &&
+    !hasFlag(args, "--dry-run") &&
+    !env.ZITADEL_SERVER_BINARY &&
+    !isHelpOrVersion(args)
+  );
 }
 
 export function shouldPrepareLocalPackages(args, env = process.env) {
-  return commandName(args) === "setup" &&
+  return (
+    commandName(args) === "setup" &&
     !isHelpOrVersion(args) &&
     !hasFlag(args, "--dry-run") &&
     !hasFlag(args, "--skip-install") &&
-    !usesPublicPackages(env);
+    !usesPublicPackages(env)
+  );
 }
 
 export function commandName(args) {
@@ -141,9 +161,11 @@ function runtimeFlagValue(args, env = process.env) {
 
 function isHelpOrVersion(args) {
   const command = commandName(args);
-  return command === "help" ||
+  return (
+    command === "help" ||
     command === "version" ||
-    args.some((arg) => arg === "--help" || arg === "-h" || arg === "--version");
+    args.some((arg) => arg === "--help" || arg === "-h" || arg === "--version")
+  );
 }
 
 function usesPublicPackages(env) {
@@ -180,11 +202,25 @@ function wrapperRun({ jsonMode, runCaptureFn, runFn, stderr }) {
   };
 }
 
-export function buildCli() {
+export function buildCli({ env = process.env } = {}) {
+  return runMoonToStderr(["run", "cli:build"], "moon run cli:build", env);
+}
+
+export async function buildLocalServerBinary({ env = process.env } = {}) {
+  await runMoonToStderr(
+    ["run", "console:build", "login-ui:build"],
+    "moon run console:build login-ui:build",
+    env,
+  );
+  await runMoonToStderr(["run", "server:build"], "moon run server:build", env);
+  return localServerBinary;
+}
+
+function runMoonToStderr(args, label, env = process.env) {
   return new Promise((resolve, reject) => {
-    const child = spawn("moon", ["run", "cli:build"], {
+    const child = spawn("moon", args, {
       cwd: repoRoot,
-      env: process.env,
+      env,
       stdio: ["ignore", "pipe", "pipe"],
     });
 
@@ -197,7 +233,7 @@ export function buildCli() {
         return;
       }
       const detail = signal ? `signal ${signal}` : `exit ${code}`;
-      const error = new Error(`moon run cli:build failed with ${detail}`);
+      const error = new Error(`${label} failed with ${detail}`);
       error.code = code;
       error.signal = signal;
       reject(error);
