@@ -40,12 +40,24 @@ export const App = component$(() => {
     );
   }
   if (path.startsWith("/profile")) {
-    return <ZitadelLogout project={project} postSignOutUrl="/login" />;
+    return (
+      <div style={{ position: "fixed", inset: "0", overflow: "auto", background: "#0f0f11" }}>
+        <ZitadelLogout project={project} postSignOutUrl="/login" />
+      </div>
+    );
   }
   if (path.startsWith("/register")) {
-    return <ZitadelLogin project={project} purpose="register" postSignInUrl="/profile" />;
+    return (
+      <div style={{ position: "fixed", inset: "0", overflow: "auto", background: "#0f0f11" }}>
+        <ZitadelLogin project={project} purpose="register" postSignInUrl="/profile" />
+      </div>
+    );
   }
-  return <ZitadelLogin project={project} purpose="login" postSignInUrl="/profile" />;
+  return (
+    <div style={{ position: "fixed", inset: "0", overflow: "auto", background: "#0f0f11" }}>
+      <ZitadelLogin project={project} purpose="login" postSignInUrl="/profile" />
+    </div>
+  );
 });
 `;
 }

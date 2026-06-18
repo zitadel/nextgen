@@ -37,11 +37,17 @@ const path = window.location.pathname;
     </section>
   </main>
 {:else if path.startsWith("/profile")}
-  <ZitadelLogout {project} postSignOutUrl="/login" />
+  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11">
+    <ZitadelLogout {project} postSignOutUrl="/login" />
+  </div>
 {:else if path.startsWith("/register")}
-  <ZitadelLogin {project} purpose="register" postSignInUrl="/profile" />
+  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11">
+    <ZitadelLogin {project} purpose="register" postSignInUrl="/profile" />
+  </div>
 {:else}
-  <ZitadelLogin {project} purpose="login" postSignInUrl="/profile" />
+  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11">
+    <ZitadelLogin {project} purpose="login" postSignInUrl="/profile" />
+  </div>
 {/if}
 `;
 }

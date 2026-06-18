@@ -38,18 +38,21 @@ const path = window.location.pathname;
       </div>
     </section>
   </main>
-  <ZitadelLogout
+  <div
     v-else-if="path.startsWith('/profile')"
-    :project="project"
-    postSignOutUrl="/login"
-  />
-  <ZitadelLogin
+    style="position:fixed;inset:0;overflow:auto;background:#0f0f11"
+  >
+    <ZitadelLogout :project="project" postSignOutUrl="/login" />
+  </div>
+  <div
     v-else-if="path.startsWith('/register')"
-    :project="project"
-    purpose="register"
-    postSignInUrl="/profile"
-  />
-  <ZitadelLogin v-else :project="project" purpose="login" postSignInUrl="/profile" />
+    style="position:fixed;inset:0;overflow:auto;background:#0f0f11"
+  >
+    <ZitadelLogin :project="project" purpose="register" postSignInUrl="/profile" />
+  </div>
+  <div v-else style="position:fixed;inset:0;overflow:auto;background:#0f0f11">
+    <ZitadelLogin :project="project" purpose="login" postSignInUrl="/profile" />
+  </div>
 </template>
 `;
 }
