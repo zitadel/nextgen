@@ -1,0 +1,65 @@
+{
+  "name": "@zitadel/sdk-solid",
+  "version": "0.1.0-alpha.10",
+  "description": "Solid components for the Zitadel auth UI (client-side SPA).",
+  "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-solid#readme",
+  "bugs": {
+    "url": "https://github.com/zitadel/nextgen/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zitadel/nextgen.git",
+    "directory": "packages/sdk-solid"
+  },
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@zitadel/api": "workspace:*",
+    "@zitadel/components": "workspace:*",
+    "@zitadel/sdk-core": "workspace:*"
+  },
+  "peerDependencies": {
+    "solid-js": ">=1.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "catalog:",
+    "@eslint/json": "catalog:",
+    "@eslint/markdown": "catalog:",
+    "@solidjs/testing-library": "^0.8.10",
+    "@testing-library/jest-dom": "^6.0.0",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-import-resolver-typescript": "catalog:",
+    "eslint-plugin-import": "catalog:",
+    "eslint-plugin-perfectionist": "catalog:",
+    "eslint-plugin-prettier": "catalog:",
+    "eslint-plugin-solid": "^0.14.5",
+    "jsdom": "catalog:",
+    "prettier": "catalog:",
+    "solid-js": "^1.9.12",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:",
+    "vite": "catalog:sdk",
+    "vite-plugin-dts": "catalog:",
+    "vite-plugin-solid": "^2.11.0",
+    "vitest": "catalog:sdk"
+  }
+}

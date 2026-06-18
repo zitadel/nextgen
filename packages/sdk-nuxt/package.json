@@ -49,21 +49,21 @@
     "nuxt": ">=4"
   },
   "devDependencies": {
-    "@eslint/js": "^9.0.0",
-    "@eslint/json": "^0.11.0",
-    "@eslint/markdown": "^6.0.0",
+    "@eslint/js": "catalog:",
+    "@eslint/json": "catalog:",
+    "@eslint/markdown": "catalog:",
     "@nuxt/eslint-plugin": "^0.7.0",
-    "eslint": "^9.0.0",
-    "eslint-config-prettier": "^10.0.0",
-    "eslint-import-resolver-typescript": "^3.7.0",
-    "eslint-plugin-import": "^2.31.0",
-    "eslint-plugin-perfectionist": "^4.0.0",
-    "eslint-plugin-prettier": "^5.0.0",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-import-resolver-typescript": "catalog:",
+    "eslint-plugin-import": "catalog:",
+    "eslint-plugin-perfectionist": "catalog:",
+    "eslint-plugin-prettier": "catalog:",
     "h3": "^1.15.3",
-    "prettier": "^3.0.0",
-    "tsup": "^8.3.5",
+    "prettier": "catalog:",
+    "tsup": "catalog:",
     "typescript": "^5.7.3",
-    "typescript-eslint": "^8.0.0",
+    "typescript-eslint": "catalog:",
     "vitest": "^3.0.0"
   }
 }

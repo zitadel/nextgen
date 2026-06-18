@@ -1,0 +1,68 @@
+{
+  "name": "@zitadel/sdk-svelte",
+  "version": "0.1.0-alpha.10",
+  "description": "Svelte components for the Zitadel auth UI (client-side SPA).",
+  "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-svelte#readme",
+  "bugs": {
+    "url": "https://github.com/zitadel/nextgen/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zitadel/nextgen.git",
+    "directory": "packages/sdk-svelte"
+  },
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "svelte": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "svelte": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@zitadel/api": "workspace:*",
+    "@zitadel/components": "workspace:*",
+    "@zitadel/sdk-core": "workspace:*"
+  },
+  "peerDependencies": {
+    "svelte": "^5.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "catalog:",
+    "@eslint/json": "catalog:",
+    "@eslint/markdown": "catalog:",
+    "@sveltejs/vite-plugin-svelte": "^6.2.0",
+    "@testing-library/svelte": "^5.3.1",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-import-resolver-typescript": "catalog:",
+    "eslint-plugin-import": "catalog:",
+    "eslint-plugin-perfectionist": "catalog:",
+    "eslint-plugin-prettier": "catalog:",
+    "eslint-plugin-svelte": "^3.0.0",
+    "jsdom": "catalog:",
+    "prettier": "catalog:",
+    "svelte": "^5.0.0",
+    "svelte-check": "^4.0.0",
+    "svelte2tsx": "^0.7.0",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "catalog:",
+    "vite": "catalog:sdk",
+    "vitest": "catalog:sdk"
+  }
+}

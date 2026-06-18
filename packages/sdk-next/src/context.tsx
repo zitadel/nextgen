@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from "react";
 
-import type { AuthResult, NextgenSession } from './types';
+import type { AuthResult, NextgenSession } from "./types";
 
 const defaultValue: AuthResult = { isAuthenticated: false, session: null };
 
@@ -18,17 +18,13 @@ export function NextgenProvider({
   let value: AuthResult;
   if (!session) {
     value = { isAuthenticated: false, session: null };
-  } else if ('isAuthenticated' in session) {
+  } else if ("isAuthenticated" in session) {
     value = session as AuthResult;
   } else {
     value = { isAuthenticated: true, session: session as NextgenSession };
   }
 
-  return (
-    <NextgenAuthContext.Provider value={value}>
-      {children}
-    </NextgenAuthContext.Provider>
-  );
+  return <NextgenAuthContext.Provider value={value}>{children}</NextgenAuthContext.Provider>;
 }
 
 export function useAuthContext(): AuthResult {

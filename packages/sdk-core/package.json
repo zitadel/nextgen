@@ -20,7 +20,7 @@
     "build": "tsc -p tsconfig.lib.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "lint": "oxlint ."
+    "lint": "eslint ."
   },
   "exports": {
     ".": {
@@ -46,5 +46,24 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "dependencies": {
+    "@zitadel/api": "workspace:*"
+  },
+  "devDependencies": {
+    "@eslint/js": "catalog:",
+    "@eslint/json": "catalog:",
+    "@eslint/markdown": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-import-resolver-typescript": "catalog:",
+    "eslint-plugin-import": "catalog:",
+    "eslint-plugin-perfectionist": "catalog:",
+    "eslint-plugin-prettier": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:",
+    "vite": "catalog:sdk",
+    "vitest": "catalog:sdk"
   }
 }
