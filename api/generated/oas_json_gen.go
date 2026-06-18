@@ -15,82 +15,6 @@ import (
 	"github.com/zitadel/nextgen/internal/api/ogenx"
 )
 
-// Encode encodes ArchiveFlowDefinitionBadRequest as json.
-func (s *ArchiveFlowDefinitionBadRequest) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes ArchiveFlowDefinitionBadRequest from json.
-func (s *ArchiveFlowDefinitionBadRequest) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode ArchiveFlowDefinitionBadRequest to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = ArchiveFlowDefinitionBadRequest(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *ArchiveFlowDefinitionBadRequest) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ArchiveFlowDefinitionBadRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes ArchiveFlowDefinitionConflict as json.
-func (s *ArchiveFlowDefinitionConflict) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes ArchiveFlowDefinitionConflict from json.
-func (s *ArchiveFlowDefinitionConflict) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode ArchiveFlowDefinitionConflict to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = ArchiveFlowDefinitionConflict(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *ArchiveFlowDefinitionConflict) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ArchiveFlowDefinitionConflict) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode implements json.Marshaler.
 func (s *AttAlreadyCompleted) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -5135,17 +5059,17 @@ func (s *CreateUserUnauthorized) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes DeprecateFlowDefinitionBadRequest as json.
-func (s *DeprecateFlowDefinitionBadRequest) Encode(e *jx.Encoder) {
+// Encode encodes DeactivateFlowDefinitionBadRequest as json.
+func (s *DeactivateFlowDefinitionBadRequest) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes DeprecateFlowDefinitionBadRequest from json.
-func (s *DeprecateFlowDefinitionBadRequest) Decode(d *jx.Decoder) error {
+// Decode decodes DeactivateFlowDefinitionBadRequest from json.
+func (s *DeactivateFlowDefinitionBadRequest) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode DeprecateFlowDefinitionBadRequest to nil")
+		return errors.New("invalid: unable to decode DeactivateFlowDefinitionBadRequest to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -5156,34 +5080,34 @@ func (s *DeprecateFlowDefinitionBadRequest) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = DeprecateFlowDefinitionBadRequest(unwrapped)
+	*s = DeactivateFlowDefinitionBadRequest(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *DeprecateFlowDefinitionBadRequest) MarshalJSON() ([]byte, error) {
+func (s *DeactivateFlowDefinitionBadRequest) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *DeprecateFlowDefinitionBadRequest) UnmarshalJSON(data []byte) error {
+func (s *DeactivateFlowDefinitionBadRequest) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes DeprecateFlowDefinitionConflict as json.
-func (s *DeprecateFlowDefinitionConflict) Encode(e *jx.Encoder) {
+// Encode encodes DeactivateFlowDefinitionConflict as json.
+func (s *DeactivateFlowDefinitionConflict) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes DeprecateFlowDefinitionConflict from json.
-func (s *DeprecateFlowDefinitionConflict) Decode(d *jx.Decoder) error {
+// Decode decodes DeactivateFlowDefinitionConflict from json.
+func (s *DeactivateFlowDefinitionConflict) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode DeprecateFlowDefinitionConflict to nil")
+		return errors.New("invalid: unable to decode DeactivateFlowDefinitionConflict to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -5194,19 +5118,19 @@ func (s *DeprecateFlowDefinitionConflict) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = DeprecateFlowDefinitionConflict(unwrapped)
+	*s = DeactivateFlowDefinitionConflict(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *DeprecateFlowDefinitionConflict) MarshalJSON() ([]byte, error) {
+func (s *DeactivateFlowDefinitionConflict) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *DeprecateFlowDefinitionConflict) UnmarshalJSON(data []byte) error {
+func (s *DeactivateFlowDefinitionConflict) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -7139,14 +7063,10 @@ func (s *FlowDefinitionStatus) Decode(d *jx.Decoder) error {
 	}
 	// Try to use constant string.
 	switch FlowDefinitionStatus(v) {
-	case FlowDefinitionStatusDraft:
-		*s = FlowDefinitionStatusDraft
 	case FlowDefinitionStatusActive:
 		*s = FlowDefinitionStatusActive
-	case FlowDefinitionStatusDeprecated:
-		*s = FlowDefinitionStatusDeprecated
-	case FlowDefinitionStatusArchived:
-		*s = FlowDefinitionStatusArchived
+	case FlowDefinitionStatusDraft:
+		*s = FlowDefinitionStatusDraft
 	default:
 		*s = FlowDefinitionStatus(v)
 	}
