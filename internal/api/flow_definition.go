@@ -315,7 +315,7 @@ func mapActionsToAPI(domainActions []domain.FlowStepAction) []api.StepAction {
 	for _, action := range domainActions {
 		actions = append(actions, api.StepAction{
 			Name: action.Name,
-			Kind: toAPIStepActionKind(action.Kind),
+			Kind: api.StepActionKind(action.Kind.String()),
 			Primary: api.OptBool{
 				Value: action.Primary,
 				Set:   action.Primary,
