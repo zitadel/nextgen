@@ -9,7 +9,6 @@ import (
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -32,7 +31,7 @@ func NewProjectService(
 	repo domain.ProjectRepository,
 	schemaRepo domain.JSONSchemaRepository,
 	flowDefinitionRepo domain.FlowDefinitionRepository,
-	secretGenerator secrets.Generator,
+	tokenGenerator domain.TokenGenerator,
 	serverURL string,
 	schemaValidator *domain.SchemaValidator,
 ) ProjectService {
@@ -41,7 +40,7 @@ func NewProjectService(
 		projectRepo:        repo,
 		schemaRepo:         schemaRepo,
 		flowDefinitionRepo: flowDefinitionRepo,
-		secretGenerator:    secretGenerator,
+		tokenGenerator:     tokenGenerator,
 		serverURL:          serverURL,
 		schemaValidator:    schemaValidator,
 	}
@@ -52,7 +51,7 @@ type projectService struct {
 	projectRepo        domain.ProjectRepository
 	schemaRepo         domain.JSONSchemaRepository
 	flowDefinitionRepo domain.FlowDefinitionRepository
-	secretGenerator    secrets.Generator
+	tokenGenerator     domain.TokenGenerator
 	serverURL          string
 	schemaValidator    *domain.SchemaValidator
 }
@@ -70,7 +69,7 @@ func (s *projectService) Create(ctx context.Context, previewOrigins []string, se
 		}
 	}()
 
-	project, err := domain.NewProject(previewOrigins, s.secretGenerator)
+	project, err := domain.NewProject(previewOrigins, s.tokenGenerator)
 	if err != nil {
 		return nil, err
 	}

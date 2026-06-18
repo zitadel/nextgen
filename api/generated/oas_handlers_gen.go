@@ -33,6 +33,398 @@ func (c *codeRecorder) Unwrap() http.ResponseWriter {
 	return c.ResponseWriter
 }
 
+// handleActivateFlowDefinitionRequest handles activateFlowDefinition operation.
+//
+// Activate a flow definition in the `draft` or `deprecated` state by ID.
+// Alternatively, the status of a flow definition can also be set via the `POST /flow_definitions`
+// and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow
+// definition payload.
+//
+// POST /flow_definitions/{id}/activate
+func (s *Server) handleActivateFlowDefinitionRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("activateFlowDefinition"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.HTTPRouteKey.String("/flow_definitions/{id}/activate"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), ActivateFlowDefinitionOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(codeAttr)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: ActivateFlowDefinitionOperation,
+			ID:   "activateFlowDefinition",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, ActivateFlowDefinitionOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeActivateFlowDefinitionParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+
+	var response ActivateFlowDefinitionRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    ActivateFlowDefinitionOperation,
+			OperationSummary: "Activate a flow definition by ID.",
+			OperationID:      "activateFlowDefinition",
+			Body:             nil,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "id",
+					In:   "path",
+				}: params.ID,
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = struct{}
+			Params   = ActivateFlowDefinitionParams
+			Response = ActivateFlowDefinitionRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackActivateFlowDefinitionParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.ActivateFlowDefinition(ctx, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.ActivateFlowDefinition(ctx, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeActivateFlowDefinitionResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
+// handleArchiveFlowDefinitionRequest handles archiveFlowDefinition operation.
+//
+// Archives a flow definition in the `active` or `deprecated` state by ID.
+// Archived flow definitions cannot be used to start new flows. Existing flows will return an error
+// if they reference an archived flow definition.
+// Alternatively, the status of a flow definition can also be set via the `POST /flow_definitions`
+// and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow
+// definition payload.
+// Note: There must be at least one flow definition in the `active` state for a given `purpose` at
+// all times to ensure that new flows can be started.
+//
+// POST /flow_definitions/{id}/archive
+func (s *Server) handleArchiveFlowDefinitionRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("archiveFlowDefinition"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.HTTPRouteKey.String("/flow_definitions/{id}/archive"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), ArchiveFlowDefinitionOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(codeAttr)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: ArchiveFlowDefinitionOperation,
+			ID:   "archiveFlowDefinition",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, ArchiveFlowDefinitionOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeArchiveFlowDefinitionParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+
+	var response ArchiveFlowDefinitionRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    ArchiveFlowDefinitionOperation,
+			OperationSummary: "Archive a flow definition by ID.",
+			OperationID:      "archiveFlowDefinition",
+			Body:             nil,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "id",
+					In:   "path",
+				}: params.ID,
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = struct{}
+			Params   = ArchiveFlowDefinitionParams
+			Response = ArchiveFlowDefinitionRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackArchiveFlowDefinitionParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.ArchiveFlowDefinition(ctx, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.ArchiveFlowDefinition(ctx, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeArchiveFlowDefinitionResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
 // handleAuthorizeDeviceRequest handles authorizeDevice operation.
 //
 // Authorize a device.
@@ -774,8 +1166,8 @@ func (s *Server) handleCreateFlowRequest(args [0]string, argsEscaped bool, w htt
 // Creates a new flow definition.
 // Flow definitions are templates that define the sequence of steps (capabilities)
 // for a particular user journey (e.g., registration, login, password reset).
-// Flow definitions are created based on the flow meta schema, which includes the flow's purpose,
-// audience, and the steps involved.
+// Flow definitions are created based on the flow definition schema, which includes the flow's
+// purpose, audience, and the steps involved.
 //
 // POST /flow_definitions
 func (s *Server) handleCreateFlowDefinitionRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -2075,6 +2467,9 @@ func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w htt
 // handleDeleteFlowDefinitionRequest handles deleteFlowDefinition operation.
 //
 // Delete a flow definition by id.
+// If the flow definition is currently being used by a flow, the deletion will fail.
+// If the flow definition is the last active flow definition for a given purpose, the deletion will
+// fail to prevent disruption of new flows being started for that purpose.
 //
 // DELETE /flow_definitions/{id}
 func (s *Server) handleDeleteFlowDefinitionRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -2255,6 +2650,204 @@ func (s *Server) handleDeleteFlowDefinitionRequest(args [1]string, argsEscaped b
 	}
 
 	if err := encodeDeleteFlowDefinitionResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
+// handleDeprecateFlowDefinitionRequest handles deprecateFlowDefinition operation.
+//
+// Deprecates a flow definition in the `active` state by ID.
+// Deprecated flow definitions cannot be used to start new flows, but existing flows that reference
+// the deprecated flow definition can continue to operate until completion.
+// Alternatively, the status of a flow definition can also be set via the `POST /flow_definitions`
+// and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow
+// definition payload.
+// Note: There must be at least one flow definition in the `active` state for a given `purpose` at
+// all times to ensure that new flows can be started.
+//
+// POST /flow_definitions/{id}/deprecate
+func (s *Server) handleDeprecateFlowDefinitionRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("deprecateFlowDefinition"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.HTTPRouteKey.String("/flow_definitions/{id}/deprecate"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), DeprecateFlowDefinitionOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(codeAttr)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: DeprecateFlowDefinitionOperation,
+			ID:   "deprecateFlowDefinition",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, DeprecateFlowDefinitionOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeDeprecateFlowDefinitionParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+
+	var response DeprecateFlowDefinitionRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    DeprecateFlowDefinitionOperation,
+			OperationSummary: "Deprecate a flow definition by ID",
+			OperationID:      "deprecateFlowDefinition",
+			Body:             nil,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "id",
+					In:   "path",
+				}: params.ID,
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = struct{}
+			Params   = DeprecateFlowDefinitionParams
+			Response = DeprecateFlowDefinitionRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackDeprecateFlowDefinitionParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.DeprecateFlowDefinition(ctx, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.DeprecateFlowDefinition(ctx, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeDeprecateFlowDefinitionResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -4899,7 +5492,7 @@ func (s *Server) handleGetTeamRequest(args [1]string, argsEscaped bool, w http.R
 
 // handleGetTokenRequest handles getToken operation.
 //
-// Get accesstoken.
+// Get access token.
 //
 // POST /auth/token
 func (s *Server) handleGetTokenRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -5040,7 +5633,7 @@ func (s *Server) handleGetTokenRequest(args [0]string, argsEscaped bool, w http.
 		mreq := middleware.Request{
 			Context:          ctx,
 			OperationName:    GetTokenOperation,
-			OperationSummary: "Get accesstoken",
+			OperationSummary: "Get access token",
 			OperationID:      "getToken",
 			Body:             request,
 			RawBody:          rawBody,
@@ -7523,15 +8116,17 @@ func (s *Server) handleSubmitFlowStepRequest(args [1]string, argsEscaped bool, w
 
 // handleUpdateFlowDefinitionRequest handles updateFlowDefinition operation.
 //
-// Update a flow definition by id.
+// Update a flow definition by id. This endpoint completely replaces the existing flow definition.
+// The status of the flow definition can also be updated by setting the `status` attribute in the
+// flow definition.
 //
-// PATCH /flow_definitions/{id}
+// PUT /flow_definitions/{id}
 func (s *Server) handleUpdateFlowDefinitionRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("updateFlowDefinition"),
-		semconv.HTTPRequestMethodKey.String("PATCH"),
+		semconv.HTTPRequestMethodKey.String("PUT"),
 		semconv.HTTPRouteKey.String("/flow_definitions/{id}"),
 	}
 	// Add attributes from config.

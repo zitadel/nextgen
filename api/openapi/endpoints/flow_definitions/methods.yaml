@@ -6,7 +6,7 @@ post:
     Flow definitions are templates that define the sequence of steps (capabilities) 
     for a particular user journey (e.g., registration, login, password reset). 
     
-    Flow definitions are created based on the flow meta schema, which includes the flow's purpose, audience, and the steps involved.
+    Flow definitions are created based on the flow definition schema, which includes the flow's purpose, audience, and the steps involved.
   tags:
     - Flow Definitions
   security:

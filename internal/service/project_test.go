@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
-	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/dbmock"
@@ -26,6 +25,7 @@ func TestProjectService_Create(t *testing.T) {
 		setupSchemaRepo         func(*domainmock.MockJSONSchemaRepository)
 		setupFlowDefinitionRepo func(call *domainmock.MockFlowDefinitionRepository)
 		setupPool               func(*dbmock.MockPool, *dbmock.MockTransaction)
+		setupTokenGenerator     func(generator *domainmock.MockTokenGenerator)
 		wantErr                 bool
 		check                   func(t *testing.T, got *domain.Project)
 	}{
@@ -49,6 +49,11 @@ func TestProjectService_Create(t *testing.T) {
 			setupPool: func(pool *dbmock.MockPool, transaction *dbmock.MockTransaction) {
 				pool.EXPECT().Begin(gomock.Any(), gomock.Any()).Return(transaction, nil)
 				transaction.EXPECT().Commit(gomock.Any())
+			},
+			setupTokenGenerator: func(generator *domainmock.MockTokenGenerator) {
+				generator.EXPECT().
+					Generate(gomock.Any()).Return("token", nil).
+					Times(2)
 			},
 			check: func(t *testing.T, got *domain.Project) {
 				assert.NotNil(t, got)
@@ -76,6 +81,11 @@ func TestProjectService_Create(t *testing.T) {
 				pool.EXPECT().Begin(gomock.Any(), gomock.Any()).Return(transaction, nil)
 				transaction.EXPECT().Commit(gomock.Any())
 			},
+			setupTokenGenerator: func(generator *domainmock.MockTokenGenerator) {
+				generator.EXPECT().
+					Generate(gomock.Any()).Return("token", nil).
+					Times(2)
+			},
 			check: func(t *testing.T, got *domain.Project) {
 				assert.Equal(t, []string{"*.vercel.app", "*.netlify.app"}, got.PreviewOrigins)
 			},
@@ -94,6 +104,11 @@ func TestProjectService_Create(t *testing.T) {
 				pool.EXPECT().Begin(gomock.Any(), gomock.Any()).Return(transaction, nil)
 				transaction.EXPECT().Commit(gomock.Any())
 			},
+			setupTokenGenerator: func(generator *domainmock.MockTokenGenerator) {
+				generator.EXPECT().
+					Generate(gomock.Any()).Return("token", nil).
+					Times(2)
+			},
 			check: func(t *testing.T, got *domain.Project) {
 				assert.NotNil(t, got)
 			},
@@ -111,6 +126,11 @@ func TestProjectService_Create(t *testing.T) {
 				pool.EXPECT().Begin(gomock.Any(), gomock.Any()).Return(transaction, nil)
 				transaction.EXPECT().Rollback(gomock.Any())
 			},
+			setupTokenGenerator: func(generator *domainmock.MockTokenGenerator) {
+				generator.EXPECT().
+					Generate(gomock.Any()).Return("token", nil).
+					Times(2)
+			},
 			wantErr: true,
 		},
 	}
@@ -126,6 +146,7 @@ func TestProjectService_Create(t *testing.T) {
 			const baseURL = "https://example.com/api/schemas"
 			schemaValidator, err := domain.NewSchemaValidator(baseURL)
 			require.NoError(t, err)
+			tokenGenerator := domainmock.NewMockTokenGenerator(ctrl)
 
 			tc.setupProjectRepo(projectRepo)
 			if tc.setupSchemaRepo != nil {
@@ -137,13 +158,16 @@ func TestProjectService_Create(t *testing.T) {
 			if tc.setupPool != nil {
 				tc.setupPool(pool, transaction)
 			}
+			if tc.setupTokenGenerator != nil {
+				tc.setupTokenGenerator(tokenGenerator)
+			}
 
 			svc := service.NewProjectService(
 				pool,
 				projectRepo,
 				schemaRepo,
 				flowDefinitionRepo,
-				&secrets.RandomSecretGenerator{},
+				tokenGenerator,
 				baseURL,
 				schemaValidator,
 			)
@@ -210,13 +234,14 @@ func TestProjectService_Get(t *testing.T) {
 			schemaValidator, err := domain.NewSchemaValidator(baseURL)
 			require.NoError(t, err)
 			tc.setupRepo(projectRepo)
+			tokenGenerator := domainmock.NewMockTokenGenerator(ctrl)
 
 			svc := service.NewProjectService(
 				stubPool(),
 				projectRepo,
 				schemaRepo,
 				flowDefinitionRepo,
-				&secrets.RandomSecretGenerator{},
+				tokenGenerator,
 				baseURL,
 				schemaValidator,
 			)

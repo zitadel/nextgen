@@ -13,9 +13,18 @@ import (
 )
 
 func TestCreateSchema(t *testing.T) {
-	harness.EnsureTestServer(t)
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
 
 	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
+
 		testCases := []struct {
 			name   string
 			schema string
@@ -33,8 +42,7 @@ func TestCreateSchema(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
-				require.NoError(t, err)
+				t.Parallel()
 
 				apiSchema := api.UserSchema{}
 				err = apiSchema.UnmarshalJSON([]byte(tc.schema))
@@ -48,7 +56,7 @@ func TestCreateSchema(t *testing.T) {
 					ProjectID: api.ProjectID(project.ID),
 				}
 
-				resp, err := harness.EnsureAPIClient(t, project.ID).CreateSchema(t.Context(), req, params)
+				resp, err := client.CreateSchema(t.Context(), req, params)
 				assert.NoError(t, err)
 
 				assert.IsType(t, &api.CreateSchemaResponse{}, resp, helpers.MustMarshal(t, resp))
@@ -57,9 +65,10 @@ func TestCreateSchema(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
+		t.Parallel()
+
 		t.Run("schema without known kind", func(t *testing.T) {
-			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
-			require.NoError(t, err)
+			t.Parallel()
 
 			body, err := json.Marshal(map[string]any{
 				"metaSchema": "https://json-schema.org/draft/2020-12/schema",
@@ -87,20 +96,25 @@ func TestCreateSchema(t *testing.T) {
 				ProjectID: api.ProjectID(project.ID),
 			}
 
-			resp, err := harness.EnsureAPIClient(t, project.ID).CreateSchema(t.Context(), req, params)
+			resp, err := client.CreateSchema(t.Context(), req, params)
 			assert.NoError(t, err)
 			assert.IsType(t, &api.CreateSchemaBadRequest{}, resp, helpers.MustMarshal(t, resp))
-
 		})
 
 		t.Run("duplicates are not allowed", func(t *testing.T) {
+			t.Parallel()
+
 			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 			require.NoError(t, err)
-			harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+			harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
 			apiSchema := api.UserSchema{}
 			err = apiSchema.UnmarshalJSON([]byte(harness.TestData.Schemas.CreateSchemaRequestUserSchema))
 			require.NoError(t, err)
+
+			client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+			require.NoError(t, err)
+			client.SetToken(project.ProjectSecret)
 
 			req := api.CreateSchemaReq{
 				Type:       api.UserSchemaCreateSchemaReq,
@@ -110,7 +124,7 @@ func TestCreateSchema(t *testing.T) {
 				ProjectID: api.ProjectID(project.ID),
 			}
 
-			resp, err := harness.EnsureAPIClient(t, project.ID).CreateSchema(t.Context(), req, params)
+			resp, err := client.CreateSchema(t.Context(), req, params)
 			assert.NoError(t, err)
 
 			assert.IsType(t, &api.CreateSchemaConflict{}, resp, helpers.MustMarshal(t, resp))
@@ -119,14 +133,24 @@ func TestCreateSchema(t *testing.T) {
 }
 
 func TestGetSchema(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
 
 	t.Run("ok", func(t *testing.T) {
-		t.Run("simple", func(t *testing.T) {
-			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
-			require.NoError(t, err)
-			schemaID := harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+		t.Parallel()
 
-			resp, err := harness.EnsureAPIClient(t, project.ID).GetSchemaById(t.Context(), api.GetSchemaByIdParams{
+		t.Run("simple", func(t *testing.T) {
+			t.Parallel()
+
+			schemaID := harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+
+			resp, err := client.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
 				ID:        schemaID,
 				ProjectID: api.ProjectID(project.ID),
 			})
@@ -137,11 +161,12 @@ func TestGetSchema(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
-		t.Run("schema not found", func(t *testing.T) {
-			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
-			require.NoError(t, err)
+		t.Parallel()
 
-			resp, err := harness.EnsureAPIClient(t, project.ID).GetSchemaById(t.Context(), api.GetSchemaByIdParams{
+		t.Run("schema not found", func(t *testing.T) {
+			t.Parallel()
+
+			resp, err := client.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
 				ID:        "does-not-exist",
 				ProjectID: api.ProjectID(project.ID),
 			})

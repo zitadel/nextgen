@@ -11,6 +11,14 @@ func (s *Branding) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *CreateFlowRequest) setDefaults() {
+	{
+		val := bool(false)
+		s.DryRun.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *CreateProjectRequest) setDefaults() {
 	{
 		val := bool(true)
@@ -23,6 +31,30 @@ func (s *Field) setDefaults() {
 	{
 		val := bool(false)
 		s.Required.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *FlowDefinition) setDefaults() {
+	{
+		val := FlowDefinitionStatus("active")
+		s.Status.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *FlowDefinitionDetailResponse) setDefaults() {
+	{
+		val := FlowDefinitionStatus("active")
+		s.Status = val
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *FlowDefinitionResponse) setDefaults() {
+	{
+		val := FlowDefinitionStatus("active")
+		s.Status = val
 	}
 }
 

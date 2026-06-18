@@ -45,7 +45,9 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	auth := virtualwebauthn.NewAuthenticator()
 	cred := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
 
-	client := harness.EnsureAPIClient(t, project.ID)
+	client, err := helpers.NewApiClient(testServer.URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
@@ -183,7 +185,10 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 	userSchemaURL, err := url.Parse(schemaURL)
 	require.NoError(t, err)
 
-	client := harness.EnsureAPIClient(t, project.ID)
+	server := harness.EnsureTestServer(t)
+	client, err := helpers.NewApiClient(server.URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),

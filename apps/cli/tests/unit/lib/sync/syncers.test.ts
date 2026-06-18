@@ -188,12 +188,22 @@ describe("FlowDefinitionSyncer", () => {
     });
   });
 
-  it("update fails locally until the server flow lifecycle API exists", async () => {
+  it("update PUTs the `{flow_definition}` envelope with the project_id query param", async () => {
+    let receivedBody: unknown;
+    let receivedProjectId: string | null = null;
+    server.use(
+      http.put(`${BASE}/flow_definitions/flow-id-1`, async ({ request }) => {
+        receivedProjectId = new URL(request.url).searchParams.get("project_id");
+        receivedBody = await request.json();
+        return HttpResponse.json({});
+      }),
+    );
     const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {} });
 
-    await expect(flow.update("flow-id-1", { version: 3 })).rejects.toMatchObject({
-      code: "E_NOT_IMPLEMENTED",
-    });
+    await flow.update("flow-id-1", { version: 3 });
+
+    expect(receivedProjectId).toBe("proj-1");
+    expect(receivedBody).toEqual({ flow_definition: { version: 3 } });
   });
 
   it("delete DELETEs /flow_definitions/:id with project_id", async () => {

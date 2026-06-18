@@ -27,6 +27,9 @@ const requiredPackageDirs = [
   "packages/sdk-react",
   "packages/sdk-vue",
   "packages/sdk-angular",
+  "packages/sdk-solid",
+  "packages/sdk-svelte",
+  "packages/sdk-qwik",
 ];
 const requiredPackageNames = new Set(
   await Promise.all(requiredPackageDirs.map(packageName)),

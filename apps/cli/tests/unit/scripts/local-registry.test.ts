@@ -110,7 +110,7 @@ describe("local registry helper", () => {
     });
 
     expect(logs).toContain(
-      "building release npm tarballs for @zitadel/cli, @zitadel/server, @zitadel/server-linux-x64, @zitadel/server-linux-arm64, @zitadel/server-darwin-x64, @zitadel/server-darwin-arm64, @zitadel/server-win32-x64, @zitadel/api, @zitadel/config, @zitadel/components, @zitadel/sdk-core, @zitadel/sdk-next, @zitadel/sdk-nuxt, @zitadel/sdk-react, @zitadel/sdk-vue, @zitadel/sdk-angular",
+      "building release npm tarballs for @zitadel/cli, @zitadel/server, @zitadel/server-linux-x64, @zitadel/server-linux-arm64, @zitadel/server-darwin-x64, @zitadel/server-darwin-arm64, @zitadel/server-win32-x64, @zitadel/api, @zitadel/config, @zitadel/components, @zitadel/sdk-core, @zitadel/sdk-next, @zitadel/sdk-nuxt, @zitadel/sdk-react, @zitadel/sdk-vue, @zitadel/sdk-angular, @zitadel/sdk-solid, @zitadel/sdk-svelte, @zitadel/sdk-qwik",
     );
     expect(await readFile(paths.npmrcPath, "utf8")).toContain(
       "//127.0.0.1:51234/:_authToken=journey-token",

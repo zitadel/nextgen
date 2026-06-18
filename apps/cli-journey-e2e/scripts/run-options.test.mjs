@@ -7,7 +7,7 @@ import { parseLocalJourneyArgs } from "./run-options.mjs";
 test("local journey defaults to the full framework matrix", () => {
   assert.deepEqual(parseLocalJourneyArgs([]), {
     concurrency: 5,
-    frameworkIds: ["next", "nuxt", "react", "vue", "angular"],
+    frameworkIds: ["next", "nuxt", "react", "vue", "angular", "solid", "svelte", "qwik"],
     image: "",
     keep: false,
     runtime: "binary",
@@ -51,7 +51,7 @@ test("local journey can request the binary runtime explicitly", () => {
 });
 
 test("local journey rejects invalid options", () => {
-  assert.throws(() => parseLocalJourneyArgs(["--framework", "svelte"]), /unsupported/);
+  assert.throws(() => parseLocalJourneyArgs(["--framework", "ember"]), /unsupported/);
   assert.throws(() => parseLocalJourneyArgs(["--concurrency", "0"]), /positive integer/);
   assert.throws(() => parseLocalJourneyArgs(["--image"]), /requires a value/);
   assert.throws(() => parseLocalJourneyArgs(["--runtime", "podman"]), /binary or docker/);

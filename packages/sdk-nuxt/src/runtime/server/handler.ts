@@ -1,6 +1,6 @@
-import { useRuntimeConfig } from '#imports';
+import { useRuntimeConfig } from "#imports";
 
-import { createNextgenMiddleware } from './middleware';
+import { createNextgenMiddleware } from "./middleware";
 
 const config = useRuntimeConfig() as {
   nextgen?: {
@@ -18,8 +18,7 @@ const config = useRuntimeConfig() as {
  * their own `server/middleware/auth.ts` when using the module.
  */
 export default createNextgenMiddleware({
-  url:
-    config.nextgen?.url ?? config.nextgen?.issuerUrl ?? 'http://localhost:4000',
-  loginPath: config.nextgen?.loginPath ?? '/login',
+  url: config.nextgen?.url ?? config.nextgen?.issuerUrl ?? "http://localhost:4000",
+  loginPath: config.nextgen?.loginPath ?? "/login",
   protectedRoutes: config.nextgen?.protectedRoutes ?? [],
 });

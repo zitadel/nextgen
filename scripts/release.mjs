@@ -36,6 +36,9 @@ const PUBLIC_PACKAGE_BUILD_TARGETS = [
   "sdk-react:build",
   "sdk-vue:build",
   "sdk-angular:build",
+  "sdk-solid:build",
+  "sdk-svelte:build",
+  "sdk-qwik:build",
 ];
 
 export async function main(args = forwardedArgs()) {
