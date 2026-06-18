@@ -147,20 +147,20 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 
 	identifierStep, ok := flowDef.FindStep("identifier")
 	require.True(t, ok)
-	assert.Contains(t, actionNames(identifierStep.Actions), domain.FlowActionPasskey)
-	assert.Equal(t, "done", identifierStep.Transitions[domain.FlowActionPasskey].Target)
+	assert.Contains(t, actionNames(identifierStep.Actions), service.FlowActionPasskey)
+	assert.Equal(t, "done", identifierStep.Transitions[service.FlowActionPasskey].Target)
 
 	passwordStep, ok := flowDef.FindStep("password")
 	require.True(t, ok)
 	assert.Equal(t, []string{"password"}, passwordStep.Fields)
-	assert.Contains(t, actionNames(passwordStep.Actions), domain.FlowActionPasskey)
-	assert.Equal(t, "done", passwordStep.Transitions[domain.FlowActionPasskey].Target)
+	assert.Contains(t, actionNames(passwordStep.Actions), service.FlowActionPasskey)
+	assert.Equal(t, "done", passwordStep.Transitions[service.FlowActionPasskey].Target)
 
 	registerStep, ok := flowDef.FindStep("register")
 	require.True(t, ok)
 	assert.Equal(t, []string{"email", "givenName", "familyName", "dateOfBirth"}, registerStep.Fields)
-	assert.Contains(t, actionNames(registerStep.Actions), domain.FlowActionPasskeyRegister)
-	assert.Equal(t, "done", registerStep.Transitions[domain.FlowActionPasskeyRegister].Target)
+	assert.Contains(t, actionNames(registerStep.Actions), service.FlowActionPasskeyRegister)
+	assert.Equal(t, "done", registerStep.Transitions[service.FlowActionPasskeyRegister].Target)
 
 	registerPasswordStep, ok := flowDef.FindStep("register-password")
 	require.True(t, ok)
@@ -169,7 +169,7 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 	assert.Equal(t, domain.FlowOnSuccessCreateUser, *registerPasswordStep.OnSuccess)
 	// Registration completes directly — no passkey upsell step; passkey
 	// registration is offered up front on the register step instead.
-	assert.Equal(t, "done", registerPasswordStep.Transitions[domain.FlowActionSubmit].Target)
+	assert.Equal(t, "done", registerPasswordStep.Transitions[service.FlowActionSubmit].Target)
 
 	_, ok = flowDef.FindStep("passkey-upsell")
 	assert.False(t, ok)

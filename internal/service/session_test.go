@@ -87,7 +87,7 @@ func TestSessionService_Create(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &sessionRepoStub{
 				createFunc: func(_ context.Context, q database.QueryExecutor, gotSession *domain.Session) error {
-					if q != stubPool() {
+					if q != nil {
 						t.Fatalf("Create q = %v, want service pool", q)
 					}
 					if gotSession.ProjectID != tt.input.ProjectID {
@@ -104,7 +104,7 @@ func TestSessionService_Create(t *testing.T) {
 				},
 			}
 
-			got, err := service.NewSessionService(stubPool(), repo, sessionConfigForTest()).Create(t.Context(), tt.input)
+			got, err := service.NewSessionService(nil, repo, sessionConfigForTest()).Create(t.Context(), tt.input)
 			if tt.wantErr != nil {
 				assertSessionResult(t, "Create", got, err, nil, tt.wantErr)
 				return
@@ -210,7 +210,7 @@ func TestSessionService_Exchange(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &sessionRepoStub{
 				exchangeFunc: func(_ context.Context, q database.QueryExecutor, projectID, handoffToken string, gotIdempotencyKey *string, gotTTL time.Duration) (*domain.Session, error) {
-					if q != stubPool() {
+					if q != nil {
 						t.Fatalf("Exchange q = %v, want service pool", q)
 					}
 					if projectID != tt.input.ProjectID {
@@ -229,7 +229,7 @@ func TestSessionService_Exchange(t *testing.T) {
 				},
 			}
 
-			got, err := service.NewSessionService(stubPool(), repo, cfg).Exchange(t.Context(), tt.input)
+			got, err := service.NewSessionService(nil, repo, cfg).Exchange(t.Context(), tt.input)
 			assertSessionResult(t, "Exchange", got, err, tt.want, tt.wantErr)
 		})
 	}
@@ -277,7 +277,7 @@ func TestSessionService_Get(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &sessionRepoStub{
 				getFunc: func(_ context.Context, q database.QueryExecutor, projectID, sessionID string) (*domain.Session, error) {
-					if q != stubPool() {
+					if q != nil {
 						t.Fatalf("Get q = %v, want service pool", q)
 					}
 					if projectID != tt.input.ProjectID {
@@ -290,7 +290,7 @@ func TestSessionService_Get(t *testing.T) {
 				},
 			}
 
-			got, err := service.NewSessionService(stubPool(), repo, sessionConfigForTest()).Get(t.Context(), tt.input)
+			got, err := service.NewSessionService(nil, repo, sessionConfigForTest()).Get(t.Context(), tt.input)
 			assertSessionResult(t, "Get", got, err, tt.want, tt.wantErr)
 		})
 	}

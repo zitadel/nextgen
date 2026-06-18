@@ -161,7 +161,7 @@ func TestCreateFlow_ReturnsCookieAndFlowID(t *testing.T) {
 	ts.fake.def = &domain.FlowDefinition{ProjectID: "proj_1", ID: "def_1", Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"}}
 	ts.fake.startResult = service.FlowStepResult{
 		State: &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()},
-		Step:  &domain.FlowStep{Name: "identify"},
+		Step:  &service.FlowStep{Name: "identify"},
 	}
 
 	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow", map[string]any{
@@ -230,7 +230,7 @@ func TestSubmitFlowStep_HappyPath_RotatesCookie(t *testing.T) {
 	cookieVal := ts.sealCookie(t, state)
 
 	advanced := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
-	ts.fake.submitResult = service.FlowStepResult{State: advanced, Step: &domain.FlowStep{Name: "password"}}
+	ts.fake.submitResult = service.FlowStepResult{State: advanced, Step: &service.FlowStep{Name: "password"}}
 
 	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
 		"action": "submit",
@@ -254,7 +254,7 @@ func TestSubmitFlowStep_TerminalClearsCookie(t *testing.T) {
 
 	complete := domain.FlowStepCompleteShow
 	terminal := &domain.FlowState{ID: "flow_1", IssuedAt: time.Now()}
-	ts.fake.submitResult = service.FlowStepResult{State: terminal, Step: &domain.FlowStep{Name: "done", Complete: &complete}}
+	ts.fake.submitResult = service.FlowStepResult{State: terminal, Step: &service.FlowStep{Name: "done", Complete: &complete}}
 
 	resp, _ := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
 		"action": "submit",
@@ -277,7 +277,7 @@ func TestSubmitFlowStep_TerminalSurfacesHandoffToken(t *testing.T) {
 	expiresAt := time.Date(2026, 5, 27, 12, 0, 0, 0, time.UTC)
 	ts.fake.submitResult = service.FlowStepResult{
 		State:                 &domain.FlowState{ID: "flow_1", IssuedAt: time.Now()},
-		Step:                  &domain.FlowStep{Name: "done", Complete: &complete},
+		Step:                  &service.FlowStep{Name: "done", Complete: &complete},
 		HandoffToken:          "ht_abc",
 		HandoffTokenExpiresAt: expiresAt,
 	}
@@ -310,7 +310,7 @@ func TestGetFlowStep_ReturnsCurrentStep(t *testing.T) {
 		FlowProgress: domain.FlowProgress{CurrentStep: "identify"},
 	}
 	cookieVal := ts.sealCookie(t, state)
-	ts.fake.getResult = service.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "identify"}}
+	ts.fake.getResult = service.FlowStepResult{State: state, Step: &service.FlowStep{Name: "identify"}}
 
 	resp, body := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)
 	if resp.StatusCode != http.StatusOK {
@@ -333,7 +333,7 @@ func TestGetFlowStep_TerminalReturns410(t *testing.T) {
 	complete := domain.FlowStepCompleteShow
 	ts.fake.getResult = service.FlowStepResult{
 		State: state,
-		Step:  &domain.FlowStep{Name: "done", Complete: &complete},
+		Step:  &service.FlowStep{Name: "done", Complete: &complete},
 	}
 
 	resp, _ := doRequest(t, http.MethodGet, ts.srv.URL+"/flow/flow_1", nil, cookieVal)

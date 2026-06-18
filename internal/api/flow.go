@@ -123,7 +123,7 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 			}
 			proof = b
 		}
-		submitReq.ChallengeResponse = &domain.FlowChallengeResponse{
+		submitReq.ChallengeResponse = &service.FlowChallengeResponse{
 			ChallengeID: cr.ChallengeID.Value,
 			Method:      cr.Method.Value,
 			Proof:       proof,
@@ -268,7 +268,7 @@ func (h *Handler) buildFlowResponse(result service.FlowStepResult, terminal bool
 	return resp
 }
 
-func toFlowStep(step *domain.FlowStep) api.FlowStep {
+func toFlowStep(step *service.FlowStep) api.FlowStep {
 	if step == nil {
 		return api.FlowStep{}
 	}
@@ -297,7 +297,7 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 // toFlowStepChallenge maps a pending domain ceremony into the API step's
 // challenge object. Options carries the protocol options JSON (for passkey,
 // PublicKeyCredentialRequestOptions) verbatim for the browser.
-func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
+func toFlowStepChallenge(c service.FlowStepChallenge) api.FlowStepChallenge {
 	out := api.FlowStepChallenge{}
 	if c.Method != "" {
 		out.Method = api.NewOptFlowStepChallengeMethod(api.FlowStepChallengeMethodPasskey)
@@ -332,17 +332,17 @@ func validateOriginAgainstProject(originStr string, project *domain.Project) err
 // passkeyRPFromOrigin derives the WebAuthn relying-party id (the origin host,
 // without port) and the allowed origin from the browser Origin header. Returns
 // nil when the origin has no host.
-func passkeyRPFromOrigin(origin url.URL) *domain.FlowPasskeyRP {
+func passkeyRPFromOrigin(origin url.URL) *service.FlowPasskeyRP {
 	if origin.Hostname() == "" {
 		return nil
 	}
-	return &domain.FlowPasskeyRP{
+	return &service.FlowPasskeyRP{
 		RPID:    origin.Hostname(),
 		Origins: []string{origin.String()},
 	}
 }
 
-func toStepTexts(t domain.FlowStepTexts) api.StepTexts {
+func toStepTexts(t service.FlowStepTexts) api.StepTexts {
 	out := api.StepTexts{}
 	if t.TitleKey != "" {
 		out.TitleKey = api.NewOptString(t.TitleKey)
@@ -408,7 +408,7 @@ func toFlowFieldValidation(v *domain.FlowFieldValidation) *api.FieldValidation {
 	return &out
 }
 
-func toFlowStepActions(actions []domain.FlowAction) []api.StepAction {
+func toFlowStepActions(actions []service.FlowAction) []api.StepAction {
 	out := make([]api.StepAction, len(actions))
 	for i, a := range actions {
 		out[i] = api.StepAction{
@@ -471,13 +471,13 @@ func mapFlowErrorStatus(err error) *api.ErrorDetailsStatusCode {
 	case errors.Is(err, errFlowCompleted):
 		return errorResponseWithStatusCode(http.StatusGone,
 			domain.Error{Code: "flow_completed", Message: "flow has already completed"})
-	case errors.Is(err, domain.ErrInvalidAction):
+	case errors.Is(err, service.ErrInvalidAction):
 		return errorResponseWithStatusCode(http.StatusBadRequest,
 			domain.Error{Code: "invalid_action", Message: err.Error()})
-	case errors.Is(err, domain.ErrSessionConflict):
+	case errors.Is(err, service.ErrSessionConflict):
 		return errorResponseWithStatusCode(http.StatusConflict,
 			domain.Error{Code: "session_conflict", Message: err.Error()})
-	case errors.Is(err, domain.ErrUnsupported):
+	case errors.Is(err, service.ErrUnsupported):
 		return errorResponseWithStatusCode(http.StatusBadRequest,
 			domain.Error{Code: "unsupported", Message: err.Error()})
 	}

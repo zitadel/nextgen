@@ -90,7 +90,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 		{
 			name: "flow definition created successfully",
 			fields: fields{
-				db: stubPool(),
+				db: nil,
 				schemaResolver: &mockSchemaGetter{
 					getSchema: func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
 						return userSchema, nil
@@ -182,7 +182,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 		{
 			name: "flow definition created successfully - target with an existing external flow",
 			fields: fields{
-				db: stubPool(),
+				db: nil,
 				schemaResolver: &mockSchemaGetter{
 					getSchema: func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
 						return userSchema, nil
@@ -296,7 +296,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 		{
 			name: "flow definition created successfully - list flow definitions - no rows found error",
 			fields: fields{
-				db: stubPool(),
+				db: nil,
 				schemaResolver: &mockSchemaGetter{
 					getSchema: func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
 						return userSchema, nil
@@ -395,7 +395,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 		{
 			name: "failed to create flow definition - target with a non-existing external flow",
 			fields: fields{
-				db: stubPool(),
+				db: nil,
 				schemaResolver: &mockSchemaGetter{
 					getSchema: func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
 						return userSchema, nil
@@ -467,7 +467,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 		{
 			name: "failed to create flow definition - validation failed",
 			fields: fields{
-				db: stubPool(),
+				db: nil,
 				schemaResolver: &mockSchemaGetter{
 					getSchema: func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
 						return userSchema, nil
@@ -532,7 +532,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 		{
 			name: "failed to create flow definition - db error while creating",
 			fields: fields{
-				db: stubPool(),
+				db: nil,
 				schemaResolver: &mockSchemaGetter{
 					getSchema: func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
 						return userSchema, nil
@@ -598,7 +598,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 		{
 			name: "failed to create flow definition - db error while listing flow definitions",
 			fields: fields{
-				db: stubPool(),
+				db: nil,
 				schemaResolver: &mockSchemaGetter{
 					getSchema: func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
 						return userSchema, nil
@@ -660,7 +660,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 		{
 			name: "flow definition already exists",
 			fields: fields{
-				db: stubPool(),
+				db: nil,
 				schemaResolver: &mockSchemaGetter{
 					getSchema: func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
 						return userSchema, nil
@@ -723,7 +723,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 		{
 			name: "failed to get user schema",
 			fields: fields{
-				db: stubPool(),
+				db: nil,
 				schemaResolver: &mockSchemaGetter{
 					getSchema: func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
 						return nil, assert.AnError
@@ -984,7 +984,7 @@ func Test_flowDefinitionService_Get(t *testing.T) {
 
 			ctrl := gomock.NewController(t)
 			fd := service.NewFlowDefinitionService(
-				stubPool(),
+				nil,
 				schemaResolver,
 				builtinSchemaProvider,
 				validatorFn,
@@ -1095,7 +1095,7 @@ func Test_flowDefinitionService_List(t *testing.T) {
 
 			ctrl := gomock.NewController(t)
 			fd := service.NewFlowDefinitionService(
-				stubPool(),
+				nil,
 				schemaResolver,
 				builtinSchemaProvider,
 				validatorFn,
@@ -1186,7 +1186,7 @@ func TestFlowDefinitionService_Delete(t *testing.T) {
 
 			ctrl := gomock.NewController(t)
 			fd := service.NewFlowDefinitionService(
-				stubPool(),
+				nil,
 				schemaResolver,
 				builtinSchemaProvider,
 				validatorFn,

@@ -1,20 +1,21 @@
-package domain
+package service
 
 import (
 	"context"
 	"errors"
 	"fmt"
 
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 type flowUserWriter interface {
-	Create(ctx context.Context, client database.QueryExecutor, user *CreateUser) error
+	Create(ctx context.Context, client database.QueryExecutor, user *domain.CreateUser) error
 }
 
 type flowUserPasswordWriter interface {
-	Create(ctx context.Context, client database.QueryExecutor, password *CreateUserPassword) error
+	Create(ctx context.Context, client database.QueryExecutor, password *domain.CreateUserPassword) error
 }
 
 // FlowCreateUserHandler implements the `create_user` on_success:
@@ -23,58 +24,58 @@ type FlowCreateUserHandler struct {
 	ids       idgen.Generator
 	users     flowUserWriter
 	passwords flowUserPasswordWriter
-	hasher    FlowPasswordHasher
+	hasher    domain.FlowPasswordHasher
 }
 
-func NewFlowCreateUserHandler(ids idgen.Generator, users flowUserWriter, passwords flowUserPasswordWriter, hasher FlowPasswordHasher) *FlowCreateUserHandler {
+func NewFlowCreateUserHandler(ids idgen.Generator, users flowUserWriter, passwords flowUserPasswordWriter, hasher domain.FlowPasswordHasher) *FlowCreateUserHandler {
 	return &FlowCreateUserHandler{ids: ids, users: users, passwords: passwords, hasher: hasher}
 }
 
-var _ FlowOnSuccessHandler = (*FlowCreateUserHandler)(nil)
+var _ domain.FlowOnSuccessHandler = (*FlowCreateUserHandler)(nil)
 
-func (h *FlowCreateUserHandler) Handle(ctx context.Context, client database.QueryExecutor, in FlowOnSuccessInput) (FlowOnSuccessResult, error) {
+func (h *FlowCreateUserHandler) Handle(ctx context.Context, client database.QueryExecutor, in domain.FlowOnSuccessInput) (domain.FlowOnSuccessResult, error) {
 	collected := map[string]any{}
 	if in.State != nil {
 		collected = in.State.CollectedData
 	}
-	identifierName, _, _, ok := findCollectedFieldByChallenge(in.Resolved.Fields, collected, FlowFieldChallengeIdentifier)
+	identifierName, _, _, ok := findCollectedFieldByChallenge(in.Resolved.Fields, collected, domain.FlowFieldChallengeIdentifier)
 	if !ok {
-		return FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no identifier in collected data", ErrIntegrity)
+		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no identifier in collected data", ErrIntegrity)
 	}
-	_, _, passwordValue, hasPassword := findCollectedFieldByChallenge(in.Resolved.Fields, collected, FlowFieldChallengePassword)
+	_, _, passwordValue, hasPassword := findCollectedFieldByChallenge(in.Resolved.Fields, collected, domain.FlowFieldChallengePassword)
 	if !hasPassword {
-		return FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", ErrIntegrity)
+		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", ErrIntegrity)
 	}
 
 	userID, err := h.ids.New("user")
 	if err != nil {
-		return FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: generate id: %w", err)
+		return domain.FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: generate id: %w", err)
 	}
 
-	byName := make(map[string]FlowField, len(in.Resolved.Fields))
+	byName := make(map[string]domain.FlowField, len(in.Resolved.Fields))
 	for _, f := range in.Resolved.Fields {
 		byName[f.Name] = f
 	}
-	attrs := make([]*CreateAttribute, 0, len(collected))
+	attrs := make([]*domain.CreateAttribute, 0, len(collected))
 	for name, value := range collected {
 		field, known := byName[name]
-		if !known || field.Challenge == FlowFieldChallengePassword {
+		if !known || field.Challenge == domain.FlowFieldChallengePassword {
 			continue
 		}
 		uniqueScope := attributeUniquenessFor(name, identifierName, field.Unique)
-		attr, err := NewCreateAttribute(name, value, uniqueScope)
+		attr, err := domain.NewCreateAttribute(name, value, uniqueScope)
 		if err != nil {
-			return FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: build attribute %q: %w", name, err)
+			return domain.FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: build attribute %q: %w", name, err)
 		}
 		attrs = append(attrs, attr)
 	}
 
 	encodedHash, err := h.hasher.Hash(asString(passwordValue))
 	if err != nil {
-		return FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: hash password: %w", err)
+		return domain.FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: hash password: %w", err)
 	}
 
-	if err := h.users.Create(ctx, client, &CreateUser{
+	if err := h.users.Create(ctx, client, &domain.CreateUser{
 		ProjectID:  in.ProjectID,
 		SchemaURL:  in.UserSchemaURL,
 		ID:         userID,
@@ -83,20 +84,20 @@ func (h *FlowCreateUserHandler) Handle(ctx context.Context, client database.Quer
 		var uniqueErr *database.UniqueError
 		if errors.As(err, &uniqueErr) {
 			msg := "user_already_exists"
-			return FlowOnSuccessResult{StepError: &msg}, nil
+			return domain.FlowOnSuccessResult{StepError: &msg}, nil
 		}
-		return FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: insert user: %w", err)
+		return domain.FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: insert user: %w", err)
 	}
 
-	if err := h.passwords.Create(ctx, client, &CreateUserPassword{
+	if err := h.passwords.Create(ctx, client, &domain.CreateUserPassword{
 		ProjectID:   in.ProjectID,
 		UserID:      userID,
 		EncodedHash: encodedHash,
 	}); err != nil {
-		return FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: insert password: %w", err)
+		return domain.FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: insert password: %w", err)
 	}
 
-	return FlowOnSuccessResult{UserID: userID}, nil
+	return domain.FlowOnSuccessResult{UserID: userID}, nil
 }
 
 // GenerateUserID mints a new user ID. Used by the state machine to assign an
@@ -110,17 +111,17 @@ func (h *FlowCreateUserHandler) GenerateUserID() (string, error) {
 // on_success handler), the call succeeds silently. Intended to be called
 // within the passkey verify phase, sharing the same client transaction as
 // the passkey save for atomicity.
-func (h *FlowCreateUserHandler) HandleProvisional(ctx context.Context, client database.QueryExecutor, userID string, state *FlowState, resolved FlowResolvedFields) error {
-	var attrs []*CreateAttribute
-	if name, field, value, ok := findCollectedFieldByChallenge(resolved.Fields, state.CollectedData, FlowFieldChallengeIdentifier); ok {
+func (h *FlowCreateUserHandler) HandleProvisional(ctx context.Context, client database.QueryExecutor, userID string, state *domain.FlowState, resolved domain.FlowResolvedFields) error {
+	var attrs []*domain.CreateAttribute
+	if name, field, value, ok := findCollectedFieldByChallenge(resolved.Fields, state.CollectedData, domain.FlowFieldChallengeIdentifier); ok {
 		uniqueScope := attributeUniquenessFor(name, name, field.Unique)
-		attr, err := NewCreateAttribute(name, value, uniqueScope)
+		attr, err := domain.NewCreateAttribute(name, value, uniqueScope)
 		if err != nil {
 			return fmt.Errorf("flow create provisional user: build attribute: %w", err)
 		}
 		attrs = append(attrs, attr)
 	}
-	err := h.users.Create(ctx, client, &CreateUser{
+	err := h.users.Create(ctx, client, &domain.CreateUser{
 		ProjectID:  state.ProjectID,
 		SchemaURL:  state.UserSchemaURL,
 		ID:         userID,
@@ -137,7 +138,7 @@ func (h *FlowCreateUserHandler) HandleProvisional(ctx context.Context, client da
 // matches target and whose name is present in collected. Returns the field
 // name, the matched [FlowField], and its collected value. Callers that don't
 // need the FlowField discard it.
-func findCollectedFieldByChallenge(resolved []FlowField, collected map[string]any, target FlowFieldChallenge) (name string, field FlowField, value any, ok bool) {
+func findCollectedFieldByChallenge(resolved []domain.FlowField, collected map[string]any, target domain.FlowFieldChallenge) (name string, field domain.FlowField, value any, ok bool) {
 	for _, f := range resolved {
 		if f.Challenge != target {
 			continue
@@ -146,21 +147,21 @@ func findCollectedFieldByChallenge(resolved []FlowField, collected map[string]an
 			return f.Name, f, v, true
 		}
 	}
-	return "", FlowField{}, nil, false
+	return "", domain.FlowField{}, nil, false
 }
 
 // attributeUniquenessFor picks the [AttributeUniqueness] the user
 // repository writes for a given field. The field's own scope passes
 // through; the identifier field falls back to team-level when the
 // schema didn't pin it, so two users can't share the same login.
-func attributeUniquenessFor(name, identifierName string, scope AttributeUniqueness) AttributeUniqueness {
-	if scope != AttributeUniquenessUnspecified {
+func attributeUniquenessFor(name, identifierName string, scope domain.AttributeUniqueness) domain.AttributeUniqueness {
+	if scope != domain.AttributeUniquenessUnspecified {
 		return scope
 	}
 	if name == identifierName {
-		return AttributeUniquenessTeam
+		return domain.AttributeUniquenessTeam
 	}
-	return AttributeUniquenessUnspecified
+	return domain.AttributeUniquenessUnspecified
 }
 
 func asString(v any) string {

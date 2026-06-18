@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
@@ -26,16 +25,6 @@ type FlowService interface {
 	GetStep(ctx context.Context, req GetFlowStepRequest) (FlowStepResult, error)
 }
 
-// FlowStepResult is what Start/Submit/GetStep return. HandoffToken and
-// HandoffTokenExpiresAt are populated only on the submit that terminates
-// the flow; zero values on every other call.
-type FlowStepResult struct {
-	State                 *domain.FlowState
-	Step                  *domain.FlowStep
-	HandoffToken          string
-	HandoffTokenExpiresAt time.Time
-}
-
 type StartFlowRequest struct {
 	Definition    *domain.FlowDefinition
 	Purpose       domain.FlowDefinitionPurpose
@@ -52,10 +41,10 @@ type SubmitFlowRequest struct {
 	SSOProviderID *string
 	// ChallengeResponse carries the client's answer to a pending ceremony
 	// (e.g. a passkey assertion). Nil unless the step issued a challenge.
-	ChallengeResponse *domain.FlowChallengeResponse
+	ChallengeResponse *FlowChallengeResponse
 	// PasskeyRP carries the WebAuthn relying-party params derived from the
 	// request, needed when issuing a passkey challenge.
-	PasskeyRP *domain.FlowPasskeyRP
+	PasskeyRP *FlowPasskeyRP
 }
 
 type GetFlowStepRequest struct {
@@ -81,7 +70,7 @@ type ResolveFlowHint struct {
 func NewFlowService(
 	pool database.Pool,
 	flowDefs domain.FlowDefinitionRepository,
-	stateMachine domain.FlowStateMachine,
+	stateMachine FlowStateMachine,
 	ids idgen.Generator,
 ) FlowService {
 	return &flowService{
@@ -95,7 +84,7 @@ func NewFlowService(
 type flowService struct {
 	pool         database.Pool
 	flowDefs     domain.FlowDefinitionRepository
-	stateMachine domain.FlowStateMachine
+	stateMachine FlowStateMachine
 	ids          idgen.Generator
 }
 
@@ -169,15 +158,15 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (FlowStep
 		sessionID = id
 	}
 
-	in := domain.FlowStartInput{
+	in := FlowStartInput{
 		Definition:    req.Definition,
 		Purpose:       req.Purpose,
-		Session:       domain.FlowSessionRef{ID: sessionID},
+		Session:       FlowSessionRef{ID: sessionID},
 		RedirectURI:   req.RedirectURI,
 		UserSchemaURL: req.Definition.UserSchema,
 	}
 	if req.AuthRequestID != nil {
-		in.AuthRequest = &domain.FlowAuthRequestRef{ID: *req.AuthRequestID}
+		in.AuthRequest = &FlowAuthRequestRef{ID: *req.AuthRequestID}
 	}
 
 	result, err := s.stateMachine.Start(ctx, s.pool, in)
@@ -202,7 +191,7 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (FlowSt
 	if err != nil {
 		return FlowStepResult{}, err
 	}
-	in := domain.FlowSubmitInput{
+	in := FlowSubmitInput{
 		Action:            req.Action,
 		Fields:            req.Fields,
 		GateProofs:        req.GateProofs,
@@ -210,7 +199,7 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (FlowSt
 		PasskeyRP:         req.PasskeyRP,
 	}
 	if req.SSOProviderID != nil {
-		in.SSOProvider = &domain.FlowSSOProviderRef{ID: *req.SSOProviderID}
+		in.SSOProvider = &FlowSSOProviderRef{ID: *req.SSOProviderID}
 	}
 	result, err := s.stateMachine.Process(ctx, s.pool, def, req.State, in)
 	if err != nil {

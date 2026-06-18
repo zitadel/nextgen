@@ -190,7 +190,7 @@ func TestProjectService_Get(t *testing.T) {
 			tc.setupRepo(projectRepo)
 
 			svc := service.NewProjectService(
-				stubPool(),
+				nil,
 				projectRepo,
 				schemaRepo,
 				flowDefinitionRepo,
