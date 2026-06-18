@@ -17,19 +17,6 @@ type ActivateFlowDefinitionNoContent struct{}
 
 func (*ActivateFlowDefinitionNoContent) activateFlowDefinitionRes() {}
 
-type ArchiveFlowDefinitionBadRequest ErrorDetails
-
-func (*ArchiveFlowDefinitionBadRequest) archiveFlowDefinitionRes() {}
-
-type ArchiveFlowDefinitionConflict ErrorDetails
-
-func (*ArchiveFlowDefinitionConflict) archiveFlowDefinitionRes() {}
-
-// ArchiveFlowDefinitionNoContent is response for ArchiveFlowDefinition operation.
-type ArchiveFlowDefinitionNoContent struct{}
-
-func (*ArchiveFlowDefinitionNoContent) archiveFlowDefinitionRes() {}
-
 // Merged schema.
 // Ref: #
 type AttAlreadyCompleted struct {
@@ -2090,23 +2077,23 @@ type CreateUserUnauthorized ErrorDetails
 
 func (*CreateUserUnauthorized) createUserRes() {}
 
+type DeactivateFlowDefinitionBadRequest ErrorDetails
+
+func (*DeactivateFlowDefinitionBadRequest) deactivateFlowDefinitionRes() {}
+
+type DeactivateFlowDefinitionConflict ErrorDetails
+
+func (*DeactivateFlowDefinitionConflict) deactivateFlowDefinitionRes() {}
+
+// DeactivateFlowDefinitionNoContent is response for DeactivateFlowDefinition operation.
+type DeactivateFlowDefinitionNoContent struct{}
+
+func (*DeactivateFlowDefinitionNoContent) deactivateFlowDefinitionRes() {}
+
 // DeleteFlowDefinitionNoContent is response for DeleteFlowDefinition operation.
 type DeleteFlowDefinitionNoContent struct{}
 
 func (*DeleteFlowDefinitionNoContent) deleteFlowDefinitionRes() {}
-
-type DeprecateFlowDefinitionBadRequest ErrorDetails
-
-func (*DeprecateFlowDefinitionBadRequest) deprecateFlowDefinitionRes() {}
-
-type DeprecateFlowDefinitionConflict ErrorDetails
-
-func (*DeprecateFlowDefinitionConflict) deprecateFlowDefinitionRes() {}
-
-// DeprecateFlowDefinitionNoContent is response for DeprecateFlowDefinition operation.
-type DeprecateFlowDefinitionNoContent struct{}
-
-func (*DeprecateFlowDefinitionNoContent) deprecateFlowDefinitionRes() {}
 
 // Ref: #
 type DeviceAuthorizationResponse struct {
@@ -2286,48 +2273,47 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 	s.Response = val
 }
 
-func (*ErrorDetailsStatusCode) activateFlowDefinitionRes()  {}
-func (*ErrorDetailsStatusCode) archiveFlowDefinitionRes()   {}
-func (*ErrorDetailsStatusCode) authorizeDeviceRes()         {}
-func (*ErrorDetailsStatusCode) authorizeGetRes()            {}
-func (*ErrorDetailsStatusCode) createFlowDefinitionRes()    {}
-func (*ErrorDetailsStatusCode) createFlowRes()              {}
-func (*ErrorDetailsStatusCode) createProjectRes()           {}
-func (*ErrorDetailsStatusCode) createSchemaRes()            {}
-func (*ErrorDetailsStatusCode) createSessionRes()           {}
-func (*ErrorDetailsStatusCode) createTeamRes()              {}
-func (*ErrorDetailsStatusCode) createUserRes()              {}
-func (*ErrorDetailsStatusCode) deleteFlowDefinitionRes()    {}
-func (*ErrorDetailsStatusCode) deprecateFlowDefinitionRes() {}
-func (*ErrorDetailsStatusCode) endSessionRes()              {}
-func (*ErrorDetailsStatusCode) exchangeHandoffRes()         {}
-func (*ErrorDetailsStatusCode) getFlowDefinitionRes()       {}
-func (*ErrorDetailsStatusCode) getFlowStepRes()             {}
-func (*ErrorDetailsStatusCode) getHealthRes()               {}
-func (*ErrorDetailsStatusCode) getKeysRes()                 {}
-func (*ErrorDetailsStatusCode) getLiveRes()                 {}
-func (*ErrorDetailsStatusCode) getMySessionRes()            {}
-func (*ErrorDetailsStatusCode) getMyUserRes()               {}
-func (*ErrorDetailsStatusCode) getOpenIDConfigurationRes()  {}
-func (*ErrorDetailsStatusCode) getProjectRes()              {}
-func (*ErrorDetailsStatusCode) getReadyRes()                {}
-func (*ErrorDetailsStatusCode) getSchemaByIdRes()           {}
-func (*ErrorDetailsStatusCode) getSessionRes()              {}
-func (*ErrorDetailsStatusCode) getTeamRes()                 {}
-func (*ErrorDetailsStatusCode) getTokenRes()                {}
-func (*ErrorDetailsStatusCode) getUserByIDRes()             {}
-func (*ErrorDetailsStatusCode) getUserInfoRes()             {}
-func (*ErrorDetailsStatusCode) introspectRes()              {}
-func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()     {}
-func (*ErrorDetailsStatusCode) listSessionsRes()            {}
-func (*ErrorDetailsStatusCode) listUsersRes()               {}
-func (*ErrorDetailsStatusCode) revokeMySessionRes()         {}
-func (*ErrorDetailsStatusCode) revokeSessionRes()           {}
-func (*ErrorDetailsStatusCode) revokeTokenRes()             {}
-func (*ErrorDetailsStatusCode) setUserPasswordRes()         {}
-func (*ErrorDetailsStatusCode) submitFlowEventRes()         {}
-func (*ErrorDetailsStatusCode) submitFlowStepRes()          {}
-func (*ErrorDetailsStatusCode) updateFlowDefinitionRes()    {}
+func (*ErrorDetailsStatusCode) activateFlowDefinitionRes()   {}
+func (*ErrorDetailsStatusCode) authorizeDeviceRes()          {}
+func (*ErrorDetailsStatusCode) authorizeGetRes()             {}
+func (*ErrorDetailsStatusCode) createFlowDefinitionRes()     {}
+func (*ErrorDetailsStatusCode) createFlowRes()               {}
+func (*ErrorDetailsStatusCode) createProjectRes()            {}
+func (*ErrorDetailsStatusCode) createSchemaRes()             {}
+func (*ErrorDetailsStatusCode) createSessionRes()            {}
+func (*ErrorDetailsStatusCode) createTeamRes()               {}
+func (*ErrorDetailsStatusCode) createUserRes()               {}
+func (*ErrorDetailsStatusCode) deactivateFlowDefinitionRes() {}
+func (*ErrorDetailsStatusCode) deleteFlowDefinitionRes()     {}
+func (*ErrorDetailsStatusCode) endSessionRes()               {}
+func (*ErrorDetailsStatusCode) exchangeHandoffRes()          {}
+func (*ErrorDetailsStatusCode) getFlowDefinitionRes()        {}
+func (*ErrorDetailsStatusCode) getFlowStepRes()              {}
+func (*ErrorDetailsStatusCode) getHealthRes()                {}
+func (*ErrorDetailsStatusCode) getKeysRes()                  {}
+func (*ErrorDetailsStatusCode) getLiveRes()                  {}
+func (*ErrorDetailsStatusCode) getMySessionRes()             {}
+func (*ErrorDetailsStatusCode) getMyUserRes()                {}
+func (*ErrorDetailsStatusCode) getOpenIDConfigurationRes()   {}
+func (*ErrorDetailsStatusCode) getProjectRes()               {}
+func (*ErrorDetailsStatusCode) getReadyRes()                 {}
+func (*ErrorDetailsStatusCode) getSchemaByIdRes()            {}
+func (*ErrorDetailsStatusCode) getSessionRes()               {}
+func (*ErrorDetailsStatusCode) getTeamRes()                  {}
+func (*ErrorDetailsStatusCode) getTokenRes()                 {}
+func (*ErrorDetailsStatusCode) getUserByIDRes()              {}
+func (*ErrorDetailsStatusCode) getUserInfoRes()              {}
+func (*ErrorDetailsStatusCode) introspectRes()               {}
+func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()      {}
+func (*ErrorDetailsStatusCode) listSessionsRes()             {}
+func (*ErrorDetailsStatusCode) listUsersRes()                {}
+func (*ErrorDetailsStatusCode) revokeMySessionRes()          {}
+func (*ErrorDetailsStatusCode) revokeSessionRes()            {}
+func (*ErrorDetailsStatusCode) revokeTokenRes()              {}
+func (*ErrorDetailsStatusCode) setUserPasswordRes()          {}
+func (*ErrorDetailsStatusCode) submitFlowEventRes()          {}
+func (*ErrorDetailsStatusCode) submitFlowStepRes()           {}
+func (*ErrorDetailsStatusCode) updateFlowDefinitionRes()     {}
 
 type ExchangeHandoffBadRequest ErrorDetails
 
@@ -3072,55 +3058,34 @@ func (s *FlowDefinitionResponse) SetUpdatedAt(val time.Time) {
 }
 
 // The lifecycle state of this flow definition.
-// draft: The flow definition is not yet ready to be used. It can be modified and tested, but the
-// flow engine will not select it for new flows.
-// active: The flow definition is ready to be used and can no longer be modified. The flow engine can
-// select it for new flows.
-// deprecated: The flow definition is being phased out and will not be used to start new flows.
-// However, existing flows that use this flow definition can continue to operate until completion.
-// The flow definition can no longer be modified.
-// archived: The definition is removed from active use. It cannot be modified. The engine will not
-// select it for new flows, and existing flows will be terminated with an error if they reference
-// this definition.
-// There must be at least one flow definition in the `active` state for a given `purpose` at all
-// times to ensure that new flows can be started.
+// active: The flow definition is ready to be used. The flow engine can select it for new flows.
+// draft: The engine will not select it for new flows, and existing flows must handle it gracefully
+// if they reference this definition.
 // Allowed transitions:
 // - draft -> active: To activate the flow definition.
-// - active -> deprecated: To phase out the flow definition.
-// - deprecated -> active: To un-deprecate and make the flow definition active again.
-// - deprecated -> archived: To remove the flow definition from active use immediately.
-// - active -> archived: To remove the flow definition from active use immediately. Allows for quick
-// retirement of flow definitions with bugs, vulnerabilities, etc.
+// - active -> draft: To remove the flow definition from active use immediately.
 // Ref: #
 type FlowDefinitionStatus string
 
 const (
-	FlowDefinitionStatusDraft      FlowDefinitionStatus = "draft"
-	FlowDefinitionStatusActive     FlowDefinitionStatus = "active"
-	FlowDefinitionStatusDeprecated FlowDefinitionStatus = "deprecated"
-	FlowDefinitionStatusArchived   FlowDefinitionStatus = "archived"
+	FlowDefinitionStatusActive FlowDefinitionStatus = "active"
+	FlowDefinitionStatusDraft  FlowDefinitionStatus = "draft"
 )
 
 // AllValues returns all FlowDefinitionStatus values.
 func (FlowDefinitionStatus) AllValues() []FlowDefinitionStatus {
 	return []FlowDefinitionStatus{
-		FlowDefinitionStatusDraft,
 		FlowDefinitionStatusActive,
-		FlowDefinitionStatusDeprecated,
-		FlowDefinitionStatusArchived,
+		FlowDefinitionStatusDraft,
 	}
 }
 
 // MarshalText implements encoding.TextMarshaler.
 func (s FlowDefinitionStatus) MarshalText() ([]byte, error) {
 	switch s {
-	case FlowDefinitionStatusDraft:
-		return []byte(s), nil
 	case FlowDefinitionStatusActive:
 		return []byte(s), nil
-	case FlowDefinitionStatusDeprecated:
-		return []byte(s), nil
-	case FlowDefinitionStatusArchived:
+	case FlowDefinitionStatusDraft:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -3130,17 +3095,11 @@ func (s FlowDefinitionStatus) MarshalText() ([]byte, error) {
 // UnmarshalText implements encoding.TextUnmarshaler.
 func (s *FlowDefinitionStatus) UnmarshalText(data []byte) error {
 	switch FlowDefinitionStatus(data) {
-	case FlowDefinitionStatusDraft:
-		*s = FlowDefinitionStatusDraft
-		return nil
 	case FlowDefinitionStatusActive:
 		*s = FlowDefinitionStatusActive
 		return nil
-	case FlowDefinitionStatusDeprecated:
-		*s = FlowDefinitionStatusDeprecated
-		return nil
-	case FlowDefinitionStatusArchived:
-		*s = FlowDefinitionStatusArchived
+	case FlowDefinitionStatusDraft:
+		*s = FlowDefinitionStatusDraft
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -3461,8 +3420,6 @@ func (s *FlowDefinitionStepTransitionsItemAction) UnmarshalText(data []byte) err
 }
 
 // Completely replaces the existing flow definition.
-// Allowed to update only those flow definitions that are in the `draft` state to prevent breaking
-// changes to active flow definitions.
 // The status of the flow definition can also be updated by setting the `status` attribute in the
 // flow definition.
 // Ref: #
