@@ -11,10 +11,35 @@ info:
     name: MIT
     identifier: MIT
 
-servers: 
-  # TODO: put correct server here.
-  - url: https://acc.nextgen.zitadel.com 
-    
+servers:
+  - url: /
+    description: Current API origin. Use http://localhost:8080 for local development.
+  # Add the public production API once that endpoint is available.
+  # - url: https://api.zitadel.com
+  #   description: Production API
+
+tags:
+  - name: Authorization
+    description: OIDC and OAuth discovery, authorization, token, keys, revoke, introspection, and user info endpoints.
+  - name: System
+    description: Health, liveness, and readiness endpoints.
+  - name: Flows
+    description: Runtime flow orchestration endpoints for login, registration, and recovery screens.
+  - name: Flow Definitions
+    description: Flow definition templates that describe user journeys.
+  - name: Authentication Attempts
+    description: Authentication attempt state machine, challenges, verification, and handoff endpoints.
+  - name: Sessions
+    description: Session creation, lookup, exchange, and teardown endpoints.
+  - name: Projects
+    description: Project creation and lookup endpoints.
+  - name: Teams
+    description: Team creation and lookup endpoints.
+  - name: Users
+    description: User creation, lookup, current-user, and password endpoints.
+  - name: Schemas
+    description: User schema creation and lookup endpoints.
+
 paths:
   /.well-known/openid-configuration:
     $ref: endpoints/.well-known/openid-configuration/methods.yaml
@@ -86,6 +111,12 @@ paths:
     $ref: endpoints/flow_definitions/methods.yaml
   /flow_definitions/{id}:
     $ref: endpoints/flow_definitions/by_id/methods.yaml
+  /flow_definitions/{id}/activate:
+    $ref: endpoints/flow_definitions/lifecycle/activate/method.yaml
+  /flow_definitions/{id}/deprecate:
+    $ref: endpoints/flow_definitions/lifecycle/deprecate/method.yaml
+  /flow_definitions/{id}/archive:
+    $ref: endpoints/flow_definitions/lifecycle/archive/method.yaml
   /teams:
     $ref: endpoints/teams/methods.yaml
   /teams/{team_id}:

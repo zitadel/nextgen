@@ -10,7 +10,7 @@ post:
     The schema can either be a concrete schema, e.g. a user schema, or a 
     schema-url which will be resolved by the server.
   tags:
-    - Schema
+    - Schemas
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
     - $ref: ../../components/parameters/team-id.yaml

@@ -1,0 +1,18 @@
+---
+title: Authentication Attempts
+description: OpenAPI operations for the authentication attempt state machine.
+---
+
+import { Card, Cards } from "fumadocs-ui/components/card";
+
+Authentication attempts hold the short-lived state for a login, registration,
+step-up, or recovery journey. Use these endpoints to start an attempt, issue
+factor challenges, verify proofs, and mint a handoff token for session exchange.
+
+<Cards>
+  <Card title="Create a new authentication attempt" href="/reference/api/authentication-attempts/createAuthAttempt" />
+  <Card title="Get authentication attempt state" href="/reference/api/authentication-attempts/getAuthAttempt" />
+  <Card title="Issue a factor challenge" href="/reference/api/authentication-attempts/issueChallenge" />
+  <Card title="Verify a factor proof" href="/reference/api/authentication-attempts/verifyChallengeProof" />
+  <Card title="Complete authentication and create handoff token" href="/reference/api/authentication-attempts/createHandoff" />
+</Cards>

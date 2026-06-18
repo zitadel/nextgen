@@ -57,14 +57,29 @@ describe("Orca selection", () => {
     expect(orca.patcherFor("vue").canPatch("vue")).toBe(true);
   });
 
+  it("selects the Solid scaffolder and patcher", () => {
+    expect(orca.scaffolderFor("solid").canScaffold("solid")).toBe(true);
+    expect(orca.patcherFor("solid").canPatch("solid")).toBe(true);
+  });
+
+  it("selects the Svelte scaffolder and patcher", () => {
+    expect(orca.scaffolderFor("svelte").canScaffold("svelte")).toBe(true);
+    expect(orca.patcherFor("svelte").canPatch("svelte")).toBe(true);
+  });
+
+  it("selects the Qwik scaffolder and patcher", () => {
+    expect(orca.scaffolderFor("qwik").canScaffold("qwik")).toBe(true);
+    expect(orca.patcherFor("qwik").canPatch("qwik")).toBe(true);
+  });
+
   it("selects the Angular scaffolder and patcher", () => {
     expect(orca.scaffolderFor("angular").canScaffold("angular")).toBe(true);
     expect(orca.patcherFor("angular").canPatch("angular")).toBe(true);
   });
 
   it("throws E_VALIDATION for an unsupported framework", () => {
-    expect(() => orca.scaffolderFor("svelte")).toThrowError(/No scaffolder/);
-    expect(() => orca.patcherFor("svelte")).toThrowError(/No patcher/);
+    expect(() => orca.scaffolderFor("ember")).toThrowError(/No scaffolder/);
+    expect(() => orca.patcherFor("ember")).toThrowError(/No patcher/);
   });
 
   it("derives available frameworks from the scaffolder registry", () => {
@@ -73,6 +88,9 @@ describe("Orca selection", () => {
       "nuxt",
       "react",
       "vue",
+      "solid",
+      "svelte",
+      "qwik",
       "angular",
     ]);
   });

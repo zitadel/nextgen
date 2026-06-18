@@ -37,6 +37,12 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 
 // oauth2ScopesOAuth2 is a private map storing OAuth2 scopes per operation.
 var oauth2ScopesOAuth2 = map[string][]string{
+	ActivateFlowDefinitionOperation: []string{
+		"flow_definitions.write",
+	},
+	ArchiveFlowDefinitionOperation: []string{
+		"flow_definitions.write",
+	},
 	CreateAuthAttemptOperation: []string{
 		"auth_attempts.write",
 	},
@@ -57,6 +63,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	DeleteFlowDefinitionOperation: []string{
 		"flow_definitions.delete",
+	},
+	DeprecateFlowDefinitionOperation: []string{
+		"flow_definitions.write",
 	},
 	ExchangeHandoffOperation: []string{
 		"sessions.write",

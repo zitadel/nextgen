@@ -14,6 +14,7 @@
 | ---------------------------------- | ------------------------------------------ |
 | Check my setup                     | `moon run workspace:doctor`                |
 | Try the local Zitadel CLI          | `moon run workspace:cli -- --help`         |
+| Preview the docs site              | `moon run docs:dev`                        |
 | Run the server from source         | `moon run workspace:server -- --help`      |
 | Test the fresh-app onboarding path | `moon run workspace:journey`               |
 | Run normal local checks            | `moon ci :lint :typecheck :build :test`    |
@@ -50,6 +51,10 @@ want the generated app to install public npm packages instead.
 
 `moon run workspace:server` builds the embedded console/login UI before startup,
 then runs `go run .`; help output skips the UI builds.
+
+`moon run docs:dev` starts the Fumapress/Fumadocs documentation site from
+`apps/docs`. The docs build bundles the OpenAPI source and exposes search,
+`llms.txt`, page-level Markdown, and an MCP endpoint.
 
 ## Local checks
 
@@ -150,6 +155,42 @@ Use `-c docs/operations/nextgen.example.yaml` or `NEXTGEN_DATABASE_POSTGRES`
 when you want to point at a database you manage.
 
 Open http://localhost:8080/ui/console/ and http://localhost:8080/ui/login/
+
+### Debugging with VSCode
+
+Use `server-debug` to build the binary with debug symbols and disabled inlining, then attach
+VSCode's Go debugger by PID:
+
+```sh
+moon run workspace:server-debug -- server --user-file examples/bootstrap-users/demo-admin.json
+```
+
+The task prints the exact `go build` invocation and the PID of the running process:
+
+```
+[server-debug] build: go build -gcflags 'all=-N -l' -ldflags '-X main.version=debug' -o dist/server/nextgen-debug .
+[server-debug] run:   ./dist/server/nextgen-debug server --user-file examples/bootstrap-users/demo-admin.json
+
+[server-debug] PID 98765 — VSCode: Run ▸ Start Debugging ▸ "Attach to Process"
+```
+
+In VSCode, open the **Run and Debug** panel (`⇧⌘D`), select **"Attach to Process"**, and type
+`nextgen-debug` in the picker to filter.
+
+Add the following configuration to your `.vscode/launch.json` to enable it:
+
+```json
+{
+    "name": "Attach to Process",
+    "type": "go",
+    "request": "attach",
+    "mode": "local",
+    "processId": "${command:pickProcess}"
+}
+```
+
+The debug binary stamps `version=debug` so it is distinguishable from a production build
+(semver) and a plain `go run` build (`dev`).
 
 ### Frontends only (without Go)
 

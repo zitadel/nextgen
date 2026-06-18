@@ -10,4 +10,4 @@ export type {
   UnauthState,
   AuthResult,
   NextgenMiddlewareOptions,
-} from '@zitadel/sdk-core/types';
+} from "@zitadel/sdk-core/middleware";

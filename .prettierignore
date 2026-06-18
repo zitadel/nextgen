@@ -1,5 +1,26 @@
-dist
+# Dependencies
 node_modules
+
+# Build output (per-package generated dirs)
+# All SDK packages emit `dist`.
+dist
+build
+out
+out-tsc
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Framework build outputs
+.next
 .nuxt
+.nuxt-typecheck
 .output
+.svelte-kit
+
+# Test / coverage artifacts
+coverage
+test-output
+
+# Lockfile (do not reformat)
 pnpm-lock.yaml
