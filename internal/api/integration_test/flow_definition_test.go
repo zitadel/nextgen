@@ -52,6 +52,7 @@ func TestCreateFlowDefinitionUnauthenticated(t *testing.T) {
 
 func TestCreateFlowDefinition(t *testing.T) {
 	t.Parallel()
+
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
 	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
@@ -233,7 +234,9 @@ func TestUpdateFlowDefinitionUnauthenticated(t *testing.T) {
 	userSchemaURI, err := url.Parse(userSchema)
 	require.NoError(t, err)
 
-	client := harness.EnsureAnonymousAPIClient(t)
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+
 	resp, err := client.UpdateFlowDefinition(t.Context(), &api.FlowDefinitionUpdateRequest{
 		FlowDefinition: api.FlowDefinition{
 			Name:       "login-flow",
@@ -250,16 +253,21 @@ func TestUpdateFlowDefinitionUnauthenticated(t *testing.T) {
 		StatusCode: http.StatusUnauthorized,
 		Response: api.ErrorDetails{
 			Code:    "auth.unauthorized",
-			Message: `operation UpdateFlowDefinition: security "OAuth2": security requirement is not satisfied`,
+			Message: `operation UpdateFlowDefinition: security "": security requirement is not satisfied`,
 		},
 	}, resp)
 }
 
 func TestUpdateFlowDefinition(t *testing.T) {
 	t.Parallel()
+
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
-	harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
 
 	u := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 	userSchemaURI, err := url.Parse(u)
@@ -269,7 +277,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 	unknownUserSchemaURI, err := url.Parse(unknownUserSchema)
 	require.NoError(t, err)
 
-	createResp, err := harness.EnsureAPIClient(t, project.ID).CreateFlowDefinition(
+	createResp, err := client.CreateFlowDefinition(
 		t.Context(),
 		newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("login-flow", *userSchemaURI)),
 	)
@@ -359,7 +367,6 @@ func TestUpdateFlowDefinition(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			client := harness.EnsureAPIClient(t, project.ID)
 			resp, err := client.UpdateFlowDefinition(t.Context(), tt.req, tt.params)
 			assert.NoError(t, err)
 			assertFlowDefinitionResponse(t, tt.wantResp, resp)
