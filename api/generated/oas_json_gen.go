@@ -18805,6 +18805,10 @@ func (s *StepAction) encodeFields(e *jx.Encoder) {
 		e.Str(s.Name)
 	}
 	{
+		e.FieldStart("kind")
+		s.Kind.Encode(e)
+	}
+	{
 		if s.Primary.Set {
 			e.FieldStart("primary")
 			s.Primary.Encode(e)
@@ -18818,10 +18822,11 @@ func (s *StepAction) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfStepAction = [3]string{
+var jsonFieldsNameOfStepAction = [4]string{
 	0: "name",
-	1: "primary",
-	2: "text_key",
+	1: "kind",
+	2: "primary",
+	3: "text_key",
 }
 
 // Decode decodes StepAction from json.
@@ -18845,6 +18850,16 @@ func (s *StepAction) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"name\"")
+			}
+		case "kind":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.Kind.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"kind\"")
 			}
 		case "primary":
 			if err := func() error {
@@ -18876,7 +18891,7 @@ func (s *StepAction) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000001,
+		0b00000011,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -18918,6 +18933,50 @@ func (s *StepAction) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *StepAction) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes StepActionKind as json.
+func (s StepActionKind) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes StepActionKind from json.
+func (s *StepActionKind) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode StepActionKind to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch StepActionKind(v) {
+	case StepActionKindSubmit:
+		*s = StepActionKindSubmit
+	case StepActionKindPasskey:
+		*s = StepActionKindPasskey
+	case StepActionKindPasskeyRegister:
+		*s = StepActionKindPasskeyRegister
+	case StepActionKindNavigate:
+		*s = StepActionKindNavigate
+	default:
+		*s = StepActionKind(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s StepActionKind) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *StepActionKind) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

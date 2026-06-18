@@ -54,6 +54,7 @@ type flowDefinitionStepJSON struct {
 
 type flowStepActionJSON struct {
 	Name    string `json:"name"`
+	Kind    string `json:"kind"`
 	TextKey string `json:"text_key,omitempty"`
 	Primary bool   `json:"primary,omitempty"`
 }
@@ -283,6 +284,7 @@ func marshalFlowDefinitionContent(def *domain.FlowDefinition) ([]byte, error) {
 			for _, a := range s.Actions {
 				stepJSON.Actions = append(stepJSON.Actions, flowStepActionJSON{
 					Name:    a.Name,
+					Kind:    a.Kind.String(),
 					TextKey: a.TextKey,
 					Primary: a.Primary,
 				})
@@ -369,8 +371,13 @@ func rowToFlowDefinition(row flowDefinitionRow) (*domain.FlowDefinition, error) 
 		if len(s.Actions) > 0 {
 			step.Actions = make([]domain.FlowStepAction, 0, len(s.Actions))
 			for _, a := range s.Actions {
+				kind, err := domain.FlowActionKindString(a.Kind)
+				if err != nil {
+					return nil, err
+				}
 				step.Actions = append(step.Actions, domain.FlowStepAction{
 					Name:    a.Name,
+					Kind:    kind,
 					TextKey: a.TextKey,
 					Primary: a.Primary,
 				})

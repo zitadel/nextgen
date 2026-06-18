@@ -419,11 +419,26 @@ func toFlowStepActions(actions []domain.FlowAction) []api.StepAction {
 	for i, a := range actions {
 		out[i] = api.StepAction{
 			Name:    a.Name,
+			Kind:    toAPIStepActionKind(a.Kind),
 			TextKey: api.NewOptString(a.TextKey),
 			Primary: api.NewOptBool(a.Primary),
 		}
 	}
 	return out
+}
+
+func toAPIStepActionKind(k domain.FlowActionKind) api.StepActionKind {
+	switch k {
+	case domain.FlowActionKindSubmit:
+		return api.StepActionKindSubmit
+	case domain.FlowActionKindPasskey:
+		return api.StepActionKindPasskey
+	case domain.FlowActionKindPasskeyRegister:
+		return api.StepActionKindPasskeyRegister
+	case domain.FlowActionKindNavigate:
+		return api.StepActionKindNavigate
+	}
+	return api.StepActionKindSubmit
 }
 
 func toFlowStepComplete(c domain.FlowStepComplete) api.FlowStepComplete {

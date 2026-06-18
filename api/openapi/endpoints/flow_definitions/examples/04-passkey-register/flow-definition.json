@@ -16,6 +16,7 @@
         "actions": [
           {
             "name": "passkey_register",
+            "kind": "passkey_register",
             "primary": true
           }
         ],

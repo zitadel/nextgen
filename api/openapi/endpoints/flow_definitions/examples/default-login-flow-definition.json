@@ -17,11 +17,13 @@
         "actions": [
           {
             "name": "submit",
+            "kind": "submit",
             "primary": true,
             "text_key": "identifier.action.continue"
           },
           {
             "name": "passkey",
+            "kind": "passkey",
             "primary": false,
             "text_key": "identifier.action.passkey"
           }
@@ -46,11 +48,13 @@
         "actions": [
           {
             "name": "submit",
+            "kind": "submit",
             "primary": true,
             "text_key": "password.action.signin"
           },
           {
             "name": "passkey",
+            "kind": "passkey",
             "primary": false,
             "text_key": "password.action.passkey"
           }
@@ -75,11 +79,13 @@
         "actions": [
           {
             "name": "submit",
+            "kind": "submit",
             "primary": true,
             "text_key": "register.action.password"
           },
           {
             "name": "passkey_register",
+            "kind": "passkey_register",
             "primary": false,
             "text_key": "register.action.passkey"
           }
@@ -104,6 +110,7 @@
         "actions": [
           {
             "name": "submit",
+            "kind": "submit",
             "primary": true,
             "text_key": "register-password.action.submit"
           }
