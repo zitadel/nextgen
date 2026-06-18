@@ -2,10 +2,9 @@ package domain
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
-	"github.com/zitadel/nextgen/internal/crypto"
+	"github.com/muhlemmer/gu"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -118,39 +117,34 @@ func (s *Session) State() SessionState {
 	return SessionStateActive
 }
 
-func (s *Session) Token(encrypter crypto.Encrypter) (string, error) {
-	payload, err := json.Marshal(&SessionToken{
+func (s *Session) Token(generator TokenGenerator) (string, error) {
+	token, err := generator.Generate(&Token{
 		ProjectID: s.ProjectID,
-		SessionID: s.ID,
 		TokenID:   s.TokenID,
-		UserID:    s.UserID,
-		CreatedAt: s.UpdatedAt,
-		ExpiresAt: s.ExpiresAt,
+		UserID:    gu.Value(s.UserID),
+		Type:      TokenTypeSessionToken,
+		SessionID: new(s.ID),
+		CreatedAt: s.CreatedAt,
+		ExpiresAt: new(s.ExpiresAt),
 	})
-	if err != nil {
-		return "", ErrSessionTokenCreationFailed()
-	}
-	token, err := encrypter.Encrypt(string(payload))
 	if err != nil {
 		return "", ErrSessionTokenCreationFailed()
 	}
 	return token, nil
 }
 
-func DecryptSessionTokenString(tokenString string, decrypter crypto.Decrypter) (*SessionToken, error) {
-	if tokenString == "" {
-		return nil, ErrSessionTokenInvalid()
-	}
-	payload, err := decrypter.Decrypt(tokenString)
+func DecryptSessionTokenString(tokenString string, verifier TokenVerifier) (*Token, error) {
+	payload, err := verifier.Verify(tokenString)
 	if err != nil {
 		return nil, ErrSessionTokenInvalid()
 	}
-	var sessionToken SessionToken
-	err = json.Unmarshal([]byte(payload), &sessionToken)
-	if err != nil {
+	if payload.Type != TokenTypeSessionToken {
 		return nil, ErrSessionTokenInvalid()
 	}
-	return &sessionToken, err
+	if payload.SessionID == nil {
+		return nil, ErrSessionTokenInvalid()
+	}
+	return payload, nil
 }
 
 type SessionState uint8
@@ -167,15 +161,6 @@ type UserAgent struct {
 	ID   string
 	IP   string
 	Info map[string]any
-}
-
-type SessionToken struct {
-	ProjectID string
-	SessionID string
-	TokenID   string
-	UserID    *string
-	CreatedAt time.Time
-	ExpiresAt time.Time
 }
 
 type SessionRepository interface {

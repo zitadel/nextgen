@@ -12,6 +12,7 @@ require (
 	github.com/go-faker/faker/v4 v4.7.0
 	github.com/go-faster/errors v0.7.1
 	github.com/go-faster/jx v1.2.0
+	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/go-webauthn/webauthn v0.17.3
 	github.com/googleapis/go-sql-spanner v1.25.1
 	github.com/hashicorp/golang-lru/v2 v2.0.7
@@ -21,6 +22,7 @@ require (
 	github.com/muhlemmer/gu v0.3.1
 	github.com/ogen-go/ogen v1.20.3
 	github.com/oklog/ulid/v2 v2.1.1
+	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose/v3 v3.27.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
@@ -113,7 +115,6 @@ require (
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-chi/chi/v5 v5.2.5 // indirect
 	github.com/go-faster/yaml v0.4.6 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect

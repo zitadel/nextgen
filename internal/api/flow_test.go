@@ -12,12 +12,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/domain/tokengen"
+	"github.com/zitadel/oidc/v3/pkg/op"
+
 	gen "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
 // fakeFlowSvc lets handler tests exercise cookie + HTTP plumbing without
@@ -102,9 +104,14 @@ type testServer struct {
 func newTestServer(t *testing.T) *testServer {
 	t.Helper()
 	crypter := op.NewAES256GCMCrypto(fixedKey, "")
+	opaqueTokenGenerator := tokengen.NewOpaqueTokenGenerator(crypter)
 	fake := &fakeFlowSvc{}
-	handler := api.NewHandler(crypter, fake, stubAuthAttempt{}, nil, nil, nil, nil, nil, nil)
-	oas, err := gen.NewServer(handler, api.NewSecurityHandler(), gen.WithErrorHandler(api.OgenErrorHandler))
+	handler := api.NewHandler(crypter, nil, nil, fake, stubAuthAttempt{}, nil, nil, nil, nil, nil, nil)
+	oas, err := gen.NewServer(
+		handler,
+		api.NewSecurityHandler(opaqueTokenGenerator),
+		gen.WithErrorHandler(api.OgenErrorHandler),
+	)
 	if err != nil {
 		t.Fatalf("NewServer: %v", err)
 	}
