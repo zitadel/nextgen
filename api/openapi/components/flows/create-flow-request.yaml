@@ -14,6 +14,14 @@ properties:
       When omitted, the engine selects the best-matching definition
       based on purpose + audience context.
     example: custom-login
+  dry_run:
+    type: boolean
+    description: |
+      Set to true to simulate the flow without actually creating any
+      user or session. Useful for testing and validation of flow definitions.
+      This requires setting the `flow_definition_name` property as well.
+    example: false
+    default: false
   schema_version:
     type: string
     description: |

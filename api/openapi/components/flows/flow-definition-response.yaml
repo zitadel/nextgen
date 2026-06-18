@@ -31,9 +31,7 @@ properties:
       If the schema_uri was not provided in the request, the flow definition is validated against the latest version of the schema, and the response includes the schema_uri of the latest version.
     example: https://raw.githubusercontent.com/zitadel/nextgen/refs/tags/schema/v1.0.0/api/openapi/endpoints/schemas/flow-definition.yaml
   status:
-    type: string
-    description: Status of the flow definition.
-    example: active
+    $ref: flow-definition-status.yaml
   created_at:
     type: string
     description: Timestamp when the flow definition was created.

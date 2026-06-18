@@ -1008,6 +1008,24 @@ func (s *FlowDefinition) Validate() error {
 		})
 	}
 	if err := func() error {
+		if value, ok := s.Status.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "status",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.Purposes.Validate(); err != nil {
 			return err
 		}
@@ -1066,6 +1084,17 @@ func (s *FlowDefinitionDetailResponse) Validate() error {
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Status.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "status",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if err := s.FlowDefinition.Validate(); err != nil {
 			return err
@@ -1161,10 +1190,36 @@ func (s *FlowDefinitionResponse) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if err := s.Status.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "status",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
+}
+
+func (s FlowDefinitionStatus) Validate() error {
+	switch s {
+	case "draft":
+		return nil
+	case "active":
+		return nil
+	case "deprecated":
+		return nil
+	case "archived":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
 }
 
 func (s *FlowDefinitionStep) Validate() error {
@@ -1388,68 +1443,16 @@ func (s *FlowDefinitionUpdateRequest) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
-		if value, ok := s.Purposes.Get(); ok {
-			if err := func() error {
-				if err := value.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
+		if err := s.FlowDefinition.Validate(); err != nil {
+			return err
 		}
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "purposes",
+			Name:  "flow_definition",
 			Error: err,
 		})
 	}
-	if err := func() error {
-		if s.Steps == nil {
-			return nil // optional
-		}
-		if err := (validate.Array{
-			MinLength:    1,
-			MinLengthSet: true,
-			MaxLength:    0,
-			MaxLengthSet: false,
-		}).ValidateLength(len(s.Steps)); err != nil {
-			return errors.Wrap(err, "array")
-		}
-		var failures []validate.FieldError
-		for i, elem := range s.Steps {
-			if err := func() error {
-				if err := elem.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				failures = append(failures, validate.FieldError{
-					Name:  fmt.Sprintf("[%d]", i),
-					Error: err,
-				})
-			}
-		}
-		if len(failures) > 0 {
-			return &validate.Error{Fields: failures}
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "steps",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
-func (s FlowDefinitionUpdateRequestPurposes) Validate() error {
-	var failures []validate.FieldError
-
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}

@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "declaration": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "customConditions": ["@zitadel/source"]
+  },
+  "include": ["src"],
+  "references": [
+    {
+      "path": "../sdk-core"
+    },
+    {
+      "path": "../components"
+    },
+    {
+      "path": "../api"
+    }
+  ]
+}

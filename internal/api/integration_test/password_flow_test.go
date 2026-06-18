@@ -67,7 +67,10 @@ func TestPasswordLoginFlow(t *testing.T) {
 		EncodedHash: encodedHash,
 	}))
 
-	client := harness.EnsureAPIClient(t, project.ID)
+	server := harness.EnsureTestServer(t)
+	client, err := helpers.NewApiClient(server.URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
@@ -135,7 +138,10 @@ func TestPasswordLoginFlow_UnknownEmail(t *testing.T) {
 	userSchemaURL, err := url.Parse(schemaURL)
 	require.NoError(t, err)
 
-	client := harness.EnsureAPIClient(t, project.ID)
+	server := harness.EnsureTestServer(t)
+	client, err := helpers.NewApiClient(server.URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
@@ -185,7 +191,10 @@ func TestPasswordRegisterFlow(t *testing.T) {
 	userSchemaURL, err := url.Parse(schemaURL)
 	require.NoError(t, err)
 
-	client := harness.EnsureAPIClient(t, project.ID)
+	server := harness.EnsureTestServer(t)
+	client, err := helpers.NewApiClient(server.URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
@@ -277,7 +286,10 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 		Attributes: []*domain.CreateAttribute{emailAttr},
 	}))
 
-	client := harness.EnsureAPIClient(t, project.ID)
+	server := harness.EnsureTestServer(t)
+	client, err := helpers.NewApiClient(server.URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),

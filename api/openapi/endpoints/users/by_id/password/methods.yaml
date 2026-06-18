@@ -2,7 +2,7 @@ put:
   operationId: setUserPassword
   summary: Set user password
   tags:
-    - User
+    - Users
   parameters:
     - $ref: ../../../../components/parameters/project-id.yaml
     - name: user_id

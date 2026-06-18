@@ -13,15 +13,15 @@ This document defines the states a flow definition can occupy, its mutability ru
 
 ## Lifecycle
 A flow definition can have the following states:
-- `draft`: The flow definition is in a draft state and is ignored by the flow resolver. The flow definition can be modified via the `PUT /flow-definitions/{id}` endpoint, which allows for iterative development of the flow definition. Additionally, these flow definitions can also be simulated with dummy data to test the flow definition.
-- `active`: The flow definition is in an active state and is used by the flow resolver to resolve flows. The flow definition can no longer be modified.
-- `deprecated`: The flow definition is deprecated (being phased out) and should not be used for new flows. However, existing flows that use this flow definition can continue to function without interruption. The flow definition can no longer be modified.
-- `archived`: The flow definition is archived (terminal state) and should not be used for new flows or in-flight flows. Existing flows that use this flow definition will return an appropriate error message. The flow definition can no longer be modified.
+- `draft`: The flow definition is in a draft state and is ignored by the flow resolver. The flow definition can be modified via the `PUT /flow_definitions/{id}` endpoint, which allows for iterative development of the flow definition. Additionally, these flow definitions can also be simulated with dummy data to test the flow definition.
+- `active`: The flow definition is in an active state and is used by the flow resolver to resolve flows.
+- `deprecated`: The flow definition is deprecated (being phased out) and should not be used for new flows. However, existing flows that use this flow definition can continue to function without interruption.
+- `archived`: The flow definition is archived (terminal state) and should not be used for new flows or in-flight flows. Existing flows that use this flow definition will return an appropriate error message. 
 
 ## Transitioning Between States
 The following rules govern the transition between states:
 - `draft` -> `active`: Indicates that a flow definition is ready to be used to start flows.
-- `active` -> `deprecated`: Indicates that a flow definition is no longer required. This allows for gracefully retiring a flow definition without breaking existing flows that use it.
+- `active` -> `deprecated`: Indicates that a flow definition is being phased out. This allows for gracefully retiring a flow definition without breaking existing flows that use it.
 - `deprecated` -> `active`: Indicates that a flow definition is required again. This allows for quickly un-deprecating a flow definition if it was deprecated by mistake or if it becomes relevant again.
 - `deprecated` -> `archived`: Indicates that a flow definition is no longer required.
 - `active` -> `archived`: Indicates that a flow definition is no longer required. This also allows for quick retirement of flows that may have vulnerabilities.
@@ -30,17 +30,17 @@ The following rules govern the transition between states:
 
 ## Endpoints to Support Lifecycle
 To support the lifecycle defined above, the following endpoints can be utilized:
-- `POST /flow-definitions`: Create a new flow definition in the `draft` state by default. The flow definition can include a `state` attribute to specify the state to support creating a flow definition via CLI.
-- `PUT /flow-definitions/{id}`: Update a flow definition. Allowed to update only those flow definitions that are in the `draft` state to prevent breaking changes to active flow definitions. The state of the flow definition can also be modified via the `state` attribute in the flow definition payload.
-- `POST /flow-definitions/{id}/activate`: Activate a flow definition in the `draft` or `deprecated` state.
-- `POST /flow-definitions/{id}/deprecate`: Deprecate a flow definition in the `active` state.
-- `POST /flow-definitions/{id}/archive`: Archive a flow definition in the `active` or `deprecated` state.
+- `POST /flow_definitions`: Create a new flow definition in the `active` state by default. The flow definition can include a `status` attribute to specify the state to support creating a flow definition via CLI.
+- `PUT /flow_definitions/{id}`: Update a flow definition. The state of the flow definition can also be modified via the `status` attribute in the flow definition payload.
+- `POST /flow_definitions/{id}/activate`: Activate a flow definition in the `draft` or `deprecated` state.
+- `POST /flow_definitions/{id}/deprecate`: Deprecate a flow definition in the `active` state.
+- `POST /flow_definitions/{id}/archive`: Archive a flow definition in the `active` or `deprecated` state.
 
 
 ## Validation and Simulation
 **Write-Time Validation:** 
-The flow definition is validated structurally (e.g., dead steps, cyclic graphs) on POST and PUT while in the draft state according to the rules defined in [Flow Definition Rules](flow-definition-rules.md).
+The flow definition is validated structurally (e.g., dead steps, cyclic graphs) on POST and PUT according to the rules defined in [Flow Definition Rules](flow-definition-rules.md).
 
 **Behavioral Simulation:** 
-The `POST /flows` endpoint (with a `simulate` option) allows developers to execute a flow definition.
+The `POST /flows` endpoint (with a `dry_run` option) allows developers to execute a flow definition.
 This is useful for testing and debugging flow definitions before they are resolved for live use.

@@ -220,7 +220,7 @@ func flowDefinitionResponse(flowDefinition *domain.FlowDefinition) api.FlowDefin
 		ProjectID: flowDefinition.ProjectID,
 		CreatedAt: flowDefinition.CreatedAt,
 		UpdatedAt: flowDefinition.UpdatedAt,
-		Status:    flowDefinition.Status.String(),
+		Status:    api.FlowDefinitionStatus(flowDefinition.Status.String()),
 	}
 }
 
@@ -240,7 +240,7 @@ func flowDefinitionDetailResponse(flowDefinition *domain.FlowDefinition) *api.Fl
 	return &api.FlowDefinitionDetailResponse{
 		ID:        flowDefinition.ID,
 		ProjectID: flowDefinition.ProjectID,
-		Status:    flowDefinition.Status.String(),
+		Status:    api.FlowDefinitionStatus(flowDefinition.Status.String()),
 		FlowDefinition: api.FlowDefinition{
 			Name:       flowDefinition.Name,
 			Steps:      steps,
