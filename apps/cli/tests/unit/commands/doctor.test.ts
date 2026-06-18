@@ -1,16 +1,17 @@
 import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { createServer } from "node:http";
+import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
 import { MANAGED_MARKER } from "../../../src/lib/paths";
+import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
-type Check = { name: string; status: "pass" | "fail"; message: string; path?: string };
+type Check = { name: string; status: "pass" | "warn" | "fail"; message: string; path?: string };
 
 const tempDirs: string[] = [];
+const servers: Server[] = [];
 
 const VALID_USER_SCHEMA = {
   kind: "user-schema",
@@ -22,20 +23,23 @@ const VALID_USER_SCHEMA = {
 async function doctor(cwd: string, extra: string[] = []) {
   const fake = await fakeDocker();
   const port = await freePort();
-  return runCliForTest([
-    "doctor",
-    "--cwd",
-    cwd,
-    "--json",
-    "--port",
-    String(port),
-    "--server",
-    "https://api.zitadel.cloud",
-    ...extra,
-  ], {
-    PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
-    DOCKER_LOG: fake.logPath,
-  });
+  return runCliForTest(
+    [
+      "doctor",
+      "--cwd",
+      cwd,
+      "--json",
+      "--port",
+      String(port),
+      "--server",
+      "https://api.zitadel.cloud",
+      ...extra,
+    ],
+    {
+      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: fake.logPath,
+    },
+  );
 }
 
 /**
@@ -87,16 +91,25 @@ async function makeHealthyProject(): Promise<string> {
     ["ZITADEL_PROJECT_ID=", "ZITADEL_ENVIRONMENT=", "ZITADEL_ISSUER="].join("\n"),
   );
   await writeFile(join(cwd, ".zitadel/schemas/user.json"), JSON.stringify(VALID_USER_SCHEMA));
-  await writeFile(join(cwd, "app/login/page.tsx"), `${MANAGED_MARKER}\nexport default function L() {}\n`);
+  await writeFile(
+    join(cwd, "app/login/page.tsx"),
+    `${MANAGED_MARKER}\nexport default function L() {}\n`,
+  );
   await writeFile(
     join(cwd, "app/register/page.tsx"),
     `${MANAGED_MARKER}\nexport default function R() {}\n`,
   );
-  await writeFile(join(cwd, "middleware.ts"), `${MANAGED_MARKER}\nexport function middleware() {}\n`);
+  await writeFile(
+    join(cwd, "middleware.ts"),
+    `${MANAGED_MARKER}\nexport function middleware() {}\n`,
+  );
   return cwd;
 }
 
 afterEach(async () => {
+  for (const server of servers.splice(0)) {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop();
     if (dir) {
@@ -111,7 +124,10 @@ describe("doctor command", () => {
     const res = await doctor(cwd);
 
     expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { status: string; data: { ok: boolean; checks: Check[] } };
+    const json = parseJson(res.stdout) as {
+      status: string;
+      data: { ok: boolean; checks: Check[] };
+    };
     expect(json.status).toBe("ok");
     expect(json.data.ok).toBe(true);
     expect(json.data.checks.every((check) => check.status === "pass")).toBe(true);
@@ -136,11 +152,56 @@ describe("doctor command", () => {
     const res = await doctor(cwd);
 
     expect(res.exitCode).toBe(3);
-    const json = parseJson(res.stdout) as { status: string; code: string; details: { checks: Check[] } };
+    const json = parseJson(res.stdout) as {
+      status: string;
+      code: string;
+      details: { checks: Check[] };
+    };
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_VALIDATION");
     const dependency = json.details.checks.find((check) => check.name === "dependency");
     expect(dependency?.status).toBe("fail");
+  });
+
+  it("reports actionable recovery commands when the local runtime port is occupied", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-doctor-port-"));
+    tempDirs.push(cwd);
+    const occupiedUrl = await startHealthServer();
+    const occupiedPort = Number(new URL(occupiedUrl).port);
+
+    const fake = await fakeDocker();
+    const res = await runCliForTest(
+      [
+        "doctor",
+        "--cwd",
+        cwd,
+        "--json",
+        "--port",
+        String(occupiedPort),
+        "--server",
+        "https://api.zitadel.cloud",
+      ],
+      {
+        PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: fake.logPath,
+      },
+    );
+
+    expect(res.exitCode).toBe(5);
+    const json = parseJson(res.stdout) as {
+      status: string;
+      code: string;
+      hint?: string;
+      next_commands?: string[];
+    };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_PORT_IN_USE");
+    expect(json.next_commands).toEqual([
+      expect.stringContaining("stop --all"),
+      expect.stringContaining("doctor"),
+      expect.stringContaining("doctor --port"),
+    ]);
+    expect(json.hint).toContain(json.next_commands?.[0]);
   });
 
   it("fails the project-match check when secret and config disagree", async () => {
@@ -172,7 +233,10 @@ describe("doctor command", () => {
     const res = await doctor(cwd, ["--fix"]);
 
     expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { status: string; data: { ok: boolean; checks: Check[] } };
+    const json = parseJson(res.stdout) as {
+      status: string;
+      data: { ok: boolean; checks: Check[] };
+    };
     expect(json.status).toBe("ok");
     const perms = json.data.checks.find((check) => check.name === "secret-permissions");
     expect(perms?.status).toBe("pass");
@@ -197,10 +261,16 @@ describe("doctor command", () => {
     const res = await doctor(cwd, ["--fix"]);
 
     expect(res.exitCode).toBe(3);
-    const json = parseJson(res.stdout) as { status: string; code: string; details: { checks: Check[] } };
+    const json = parseJson(res.stdout) as {
+      status: string;
+      code: string;
+      details: { checks: Check[] };
+    };
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_VALIDATION");
-    expect(json.details.checks.find((check) => check.name === "project-match")?.status).toBe("fail");
+    expect(json.details.checks.find((check) => check.name === "project-match")?.status).toBe(
+      "fail",
+    );
   });
 
   it("re-applies a missing Zitadel dependency via --fix and then passes", async () => {
@@ -214,7 +284,10 @@ describe("doctor command", () => {
     const res = await doctor(cwd, ["--fix"]);
 
     expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { status: string; data: { ok: boolean; checks: Check[] } };
+    const json = parseJson(res.stdout) as {
+      status: string;
+      data: { ok: boolean; checks: Check[] };
+    };
     expect(json.status).toBe("ok");
     expect(json.data.ok).toBe(true);
     const dependency = json.data.checks.find((check) => check.name === "dependency");
@@ -227,6 +300,7 @@ async function fakeDocker(): Promise<{ binDir: string; logPath: string }> {
   tempDirs.push(binDir);
   const logPath = join(binDir, "docker.log");
   const dockerPath = join(binDir, "docker");
+  const psPath = join(binDir, "ps");
   await writeFile(
     dockerPath,
     `#!/usr/bin/env node
@@ -245,7 +319,26 @@ process.exit(0);
 `,
   );
   await chmod(dockerPath, 0o755);
+  await writeFile(psPath, "#!/usr/bin/env node\nprocess.exit(0);\n");
+  await chmod(psPath, 0o755);
   return { binDir, logPath };
+}
+
+async function startHealthServer(): Promise<string> {
+  const server = createServer((req, res) => {
+    if (req.url === "/healthz") {
+      res.writeHead(200).end("ok");
+      return;
+    }
+    res.writeHead(404).end();
+  });
+  servers.push(server);
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("health server did not expose a TCP address");
+  }
+  return `http://127.0.0.1:${String(address.port)}`;
 }
 
 async function freePort(): Promise<number> {

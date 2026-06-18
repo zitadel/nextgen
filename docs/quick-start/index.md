@@ -5,32 +5,42 @@ local Zitadel runtime.
 
 ## Prerequisites
 
-- Node.js 20 or newer for `npx`
-- Docker Engine or a Docker-compatible runtime
+- Node.js 24 or newer for `npx`
+- Docker Engine or a Docker-compatible runtime, only for the managed local
+  runtime (`start` / `--server local`)
+
+If the Docker daemon is down, start Docker Desktop, Docker Engine, or Colima
+and rerun `doctor`. Remote-server setup can skip Docker by passing
+`--server <url>` instead of `--server local`.
 
 ## Steps
 
 ```sh
-npx create-next-app@latest myapp
+mkdir myapp
 cd myapp
 
 npx @zitadel/cli@alpha doctor
 npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --framework next --server local
+npx @zitadel/cli@alpha setup --server local
 
-npm install
 npm run dev
 ```
 
-Open:
+Open the dev server URL printed by Next.js, then complete the browser proof:
 
 ```text
-http://localhost:3000/login
+register a user -> log out -> log in with the same user -> profile shows Signed in
 ```
+
+For deterministic automated proof from this repository, run
+`corepack pnpm run journey`; it exercises fresh-app setup plus registration,
+logout, and login across the supported frameworks.
 
 The managed local Zitadel server listens on http://localhost:8080 by default.
 The CLI stores runtime metadata in `.zitadel/local/runtime.json` and mounts
-`.zitadel/local/nextgen-data` into the container. Stop preserves that data:
+`.zitadel/local/nextgen-data` into the container. If you start from a fresh
+directory, `setup --server local` asks which framework to scaffold and writes
+the app into the current directory. Stop preserves runtime data:
 
 ```sh
 npx @zitadel/cli@alpha stop
@@ -41,6 +51,13 @@ Delete it explicitly:
 ```sh
 npx @zitadel/cli@alpha reset --force
 ```
+
+## Known Rough Edges
+
+The alpha default registration form may ask for date of birth, and the profile
+avatar may show a minimal `?` identity. These come from the current
+server-owned default user schema and profile surface; they are not setup
+failures.
 
 ## Local Runtime URLs
 

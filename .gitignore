@@ -63,6 +63,7 @@ opencode.json
 #Frontend
 ## compiled output
 dist
+apps/server-*/bin/
 tmp
 .tmp/
 out-tsc
@@ -82,15 +83,19 @@ vitest.config.*.timestamp*
 test-output
 coverage
 
-## nx
-.nx/cache
-.nx/workspace-data
+## moon
+.moon/cache
+.moon/docker
 
 ## Next.js / Nuxt build outputs
 .next/
 .nuxt/
 .nuxt-typecheck/
 .output/
+
+## Docs generated artifacts
+apps/docs/.source/
+apps/docs/.generated/
 
 ## Go build cache
 .go/
@@ -104,12 +109,6 @@ nextgen-data/
 # Keep the embed placeholder so //go:embed all:dist works in clean checkouts.
 # `dist/` above ignores the directory entirely, so we have to un-ignore the
 # directory before re-ignoring its contents and re-allowing the placeholder.
-!/apps/console/dist/
-/apps/console/dist/*
-!/apps/console/dist/.gitkeep
-!/apps/login-ui/dist/
-/apps/login-ui/dist/*
-!/apps/login-ui/dist/.gitkeep
 !/internal/staticui/console/dist/
 /internal/staticui/console/dist/*
 !/internal/staticui/console/dist/.gitkeep

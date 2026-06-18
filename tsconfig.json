@@ -16,9 +16,6 @@
       "path": "./packages/design-tokens"
     },
     {
-      "path": "./packages/lint"
-    },
-    {
       "path": "./packages/sdk-core"
     },
     {

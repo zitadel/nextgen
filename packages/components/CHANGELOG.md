@@ -1,5 +1,56 @@
 # @zitadel/components
 
+## 0.1.0-alpha.10
+
+### Patch Changes
+
+- [#328](https://github.com/zitadel/nextgen/pull/328) [`acb5b54`](https://github.com/zitadel/nextgen/commit/acb5b549386efcc5ede005871b145c1cd0f9ac5e) Thanks [@fforootd](https://github.com/fforootd)! - Improve fresh-app CLI recovery guidance and align agent automation hook docs with the rendered login controls.
+
+## 0.1.0-alpha.9
+
+## 0.1.0-alpha.8
+
+## 0.1.0-alpha.7
+
+## 0.1.0-alpha.6
+
+### Patch Changes
+
+- [#270](https://github.com/zitadel/nextgen/pull/270) [`30b4b41`](https://github.com/zitadel/nextgen/commit/30b4b411a9c99fc61d991f739636f93d7bee5b1d) Thanks [@vitorbari](https://github.com/vitorbari)! - Step `fields` and `actions` are now ordered `[{ name, ... }]` arrays on the wire (ADR 021). Templates iterate them in authorial order; the orchestrator builds `fields_by_name` / `actions_by_name` views for keyed lookups. The private `@zitadel/api-mock` workspace follows the same wire shape for tests. `gates` stays a name-keyed object for now.
+
+## 0.1.0-alpha.5
+
+### Patch Changes
+
+- [#299](https://github.com/zitadel/nextgen/pull/299) [`f77ca44`](https://github.com/zitadel/nextgen/commit/f77ca44e85565976d26de0b6444b7fc5b1616e8c) Thanks [@fforootd](https://github.com/fforootd)! - Make the generated Next.js auth app easier for agents and developers to prove end-to-end registration, logout, and login in a visible browser.
+
+- [#286](https://github.com/zitadel/nextgen/pull/286) [`3795b67`](https://github.com/zitadel/nextgen/commit/3795b6793c72b92300fc6a7d21c7562f0a25343e) Thanks [@bastionstack](https://github.com/bastionstack)! - Align the login flow with the latest Figma designs: load `branding.font_url` at document level so branded fonts (including the heading face) actually render, change the sign-in CTA from "Continue" to "Sign in", add the missing `identifier.field.password` label, drop the sign-up subheadline, and rename the passkey registration action to "Continue with a passkey". The default login flow no longer shows the post-registration passkey upsell screen — passkey registration is offered up front instead.
+
+## 0.1.0-alpha.4
+
+### Patch Changes
+
+- [#279](https://github.com/zitadel/nextgen/pull/279) [`ce237ef`](https://github.com/zitadel/nextgen/commit/ce237ef355422c666769eef20df78bdc8ec0e0f9) Thanks [@fforootd](https://github.com/fforootd)! - Harden local setup guidance, Next 16 scaffolding, and login form automation.
+
+## 0.1.0-alpha.3
+
+## 0.1.0-alpha.2
+
+### Minor Changes
+
+- [#266](https://github.com/zitadel/nextgen/pull/266) [`01aed1e`](https://github.com/zitadel/nextgen/commit/01aed1e0de4ffd1ec6d78f8fa73f0ce19b907aa0) Thanks [@mridang](https://github.com/mridang)! - Allow configuring `<zitadel-login>` and `<zitadel-logout>` declaratively from HTML via `project-id`, `proxy-path`, and `url` attributes, so the components work on a plain page without JS or `configureZitadel()`. Configuration resolves in this order, highest first: the `project` property, then the `configureZitadel()` global, then the HTML attributes. The existing JS paths still win — the attributes are the no-JS fallback.
+
+  Also fix the standalone bundle so it loads in a browser: it was built for Node and emitted an `import "node:module"` that browsers cannot resolve. It is now built for the browser, so `dist/standalone.mjs` is genuinely self-contained.
+
+- [#261](https://github.com/zitadel/nextgen/pull/261) [`09aa2b1`](https://github.com/zitadel/nextgen/commit/09aa2b13da9dd0e15453f46f4d62fb2863835a0c) Thanks [@mridang](https://github.com/mridang)! - Add a standalone browser bundle (`dist/standalone.mjs`) so the components work on a plain HTML page via `<script type="module">` with no import map or bundler. Exposed via the `./standalone` export and `unpkg`/`jsdelivr`.
+
+### Patch Changes
+
+- [#231](https://github.com/zitadel/nextgen/pull/231) [`ce89c59`](https://github.com/zitadel/nextgen/commit/ce89c5941b4ae90849fac720ecc4a2a0c49c245d) Thanks [@bastionstack](https://github.com/bastionstack)! - Tidy the web components package: align README/AGENTS docs with the real SDK-config API, adopt idiomatic Lit patterns (`classMap`, `live()`, `ifDefined`, `@query`, a shared `emit()` helper), make post-step focus deterministic via `updateComplete` instead of `requestAnimationFrame`, centralise SDK/API resolution in a `resolveApi()` helper, correct the manifest registry (e.g. `zl-passkey` `method` attribute), and expand unit/browser test coverage.
+
+- [#253](https://github.com/zitadel/nextgen/pull/253) [`c097a5f`](https://github.com/zitadel/nextgen/commit/c097a5f0b720e58920c692ec909960e9c44696e3) Thanks [@vitorbari](https://github.com/vitorbari)! - Add English labels for the `givenName`, `familyName`, and `dateOfBirth`
+  fields the default register step now collects.
+
 ## 0.1.0-alpha.0
 
 ### Minor Changes

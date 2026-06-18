@@ -38,6 +38,7 @@ describe("NextDetector", () => {
       appDir: "app",
       devPort: 3000,
       url: "http://localhost:3000",
+      versionMajor: 14,
     });
   });
 
@@ -58,6 +59,12 @@ describe("NextDetector", () => {
     await writeFile(join(dir, "package.json"), JSON.stringify({ devDependencies: { next: "14.0.0" } }));
     await mkdir(join(dir, "app"));
     expect(await detector.detect(dir)).toMatchObject({ id: "next" });
+  });
+
+  it("captures the Next major version for scaffold decisions", async () => {
+    await writeNextPackageJson({ dependencies: { next: "^16.2.4" } });
+    await mkdir(join(dir, "app"));
+    expect(await detector.detect(dir)).toMatchObject({ versionMajor: 16 });
   });
 
   it("extracts the dev-script port into devPort and url", async () => {

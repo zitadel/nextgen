@@ -1,16 +1,24 @@
-import { Flags } from "@oclif/core";
 import { intro, outro } from "@clack/prompts";
+import { Flags } from "@oclif/core";
+import { createZitadelClient } from "@zitadel/api/client";
+import type { CreateProject201 } from "@zitadel/api/generated/model";
 import { consola } from "consola";
 
+import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
-import { ZitadelError } from "../../lib/errors";
-import { createOrca, issuerFromPort, type FrameworkFacts, type Orca } from "../../lib/orca";
-import type { PatchContext } from "../../lib/orca/patchers/types";
+import {
+  createOrca,
+  inspectScaffoldTarget,
+  issuerFromPort,
+  type FrameworkFacts,
+  type Orca,
+  type ScaffoldTarget,
+} from "../../lib/orca";
 import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/registry";
-import type { CreateProject201 } from "@zitadel/api/generated/model";
-import { createZitadelClient } from "@zitadel/api/client";
-
+import type { PatchContext } from "../../lib/orca/patchers/types";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
+import { publicCliCommand } from "../../lib/public-cli";
+import { installDependenciesForSetup } from "./install";
 import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
 import {
   detectProjectFacts,
@@ -48,15 +56,32 @@ const FRAMEWORK_OPTIONS = createOrca()
  */
 export default class Setup extends BaseCommand {
   static override description = "Create a Zitadel project and scaffold local auth.";
-  static override examples = ["<%= config.bin %> setup --framework next"];
+  static override examples = [
+    "<%= config.bin %> setup --framework next",
+    "<%= config.bin %> setup --framework react --dev-port 3000",
+  ];
   static override flags = {
     framework: Flags.string({ description: "Framework to target.", options: FRAMEWORK_OPTIONS }),
-    renderer: Flags.string({ description: "Renderer (default: react).", options: [...RENDERER_IDS] }),
+    renderer: Flags.string({
+      description: "Renderer (default: react).",
+      options: [...RENDERER_IDS],
+    }),
+    "dev-port": Flags.integer({
+      description:
+        "Dev-server port; also the issuer origin registered with Zitadel. Defaults to the detected port. Use distinct ports to run several scaffolded apps side by side.",
+    }),
+    "skip-install": Flags.boolean({
+      description: "Do not install dependencies after setup updates package.json.",
+    }),
   };
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Setup);
-    await this.toMeta(flags);
+    try {
+      await this.toMeta(flags);
+    } catch (error) {
+      throw localSetupHint(error, flags.framework, this.config.version);
+    }
     const { cwd, nonInteractive, dryRun, force } = this.meta;
 
     if (await hasZitadelConfig(cwd)) {
@@ -75,20 +100,49 @@ export default class Setup extends BaseCommand {
     let scaffoldedFramework = false;
     try {
       framework = await orca.detect(cwd, flags.framework);
-      consola.success(`Detected ${framework.id}${framework.devPort ? ` (dev port ${framework.devPort})` : ""}`);
+      consola.success(
+        `Detected ${framework.id}${framework.devPort ? ` (dev port ${framework.devPort})` : ""}`,
+      );
     } catch (error) {
       if (
         error instanceof ZitadelError &&
-        error.code === "E_FRAMEWORK_NOT_DETECTED" &&
-        (await orca.isEmpty(cwd))
+        error.code === "E_FRAMEWORK_NOT_DETECTED"
       ) {
-        consola.info("Empty directory — scaffolding a fresh project");
-        framework = await orca.scaffold(cwd, await resolveScaffoldFramework(flags.framework, nonInteractive, orca));
+        const target = await inspectScaffoldTarget(cwd);
+        if (!target.scaffoldable) {
+          throw frameworkDetectionWithScaffoldTarget(error, cwd, target);
+        }
+        consola.info("Fresh app directory — scaffolding a fresh project");
+        framework = await orca.scaffold(
+          cwd,
+          await resolveScaffoldFramework(flags.framework, nonInteractive, orca),
+        );
         scaffoldedFramework = true;
         consola.success(`Scaffolded ${framework.id} skeleton`);
       } else {
         throw error;
       }
+    }
+
+    // An explicit --dev-port overrides the detected port for the whole run, so
+    // the issuer and the registered origin track the requested port (and several
+    // apps can be scaffolded on distinct ports). The config edits set the
+    // dev-server port only when it is unset, so a project that already pins a
+    // different port in vite.config.*/angular.json keeps it — pass --dev-port to
+    // match that pin (or remove it) if the origin check rejects requests.
+    if (flags["dev-port"] !== undefined) {
+      const devPort = flags["dev-port"];
+      if (!Number.isInteger(devPort) || devPort < 1 || devPort > 65535) {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `--dev-port must be an integer in 1..65535, got ${devPort}`,
+        );
+      }
+      framework = {
+        ...framework,
+        devPort,
+        url: issuerFromPort(devPort),
+      };
     }
 
     let answers: SetupAnswers = {
@@ -98,7 +152,11 @@ export default class Setup extends BaseCommand {
 
     if (!nonInteractive && !dryRun) {
       intro("Zitadel setup");
-      const promptCtx = { framework, serverFlag: this.meta.serverFlag };
+      const promptCtx = {
+        framework,
+        serverFlag: this.meta.serverFlag,
+        devPortFromFlag: flags["dev-port"] !== undefined,
+      };
       for (const prompt of SETUP_PROMPTS) {
         answers = await prompt.ask(answers, promptCtx);
       }
@@ -106,15 +164,28 @@ export default class Setup extends BaseCommand {
     }
 
     const issuer = issuerFromPort(answers.devPort);
+    // The DevPortPrompt can change the port interactively, so fold the answer
+    // back into the framework: the patched dev-server config reads
+    // `framework.devPort`, and it must agree with the issuer and the registered
+    // origin (both derived from `answers.devPort`).
+    framework = { ...framework, devPort: answers.devPort, url: issuer };
 
     // `POST /projects` is unauthenticated. Creating the project also
     // provisions its default user schema and login flow server-side, so the
     // CLI no longer builds, scaffolds, or uploads those resources here.
     consola.start(`Creating project on ${answers.server}${dryRun ? " (dry run)" : ""}`);
     const unauthClient = createZitadelClient({ baseUrl: answers.server });
+    // Register the app's own origin so the backend's origin check allows
+    // requests the dev proxy forwards from it.
     const project = dryRun
-      ? dryRunProject()
-      : await unauthClient.createProject({ previewOrigins: [] });
+      ? dryRunProject(issuer)
+      : await createProjectWithLocalHint(
+          unauthClient,
+          answers.server,
+          this.meta.cliVersion,
+          issuer,
+          framework.id,
+        );
     consola.success(`Created project ${project.id}`);
 
     const ctx: PatchContext = {
@@ -124,6 +195,7 @@ export default class Setup extends BaseCommand {
       issuer,
       server: answers.server,
       cliVersion: this.meta.cliVersion,
+      scaffoldedFramework,
     };
     consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
     const result = await orca.patcherFor(framework.id).patch(ctx, { cwd, dryRun, force });
@@ -138,6 +210,17 @@ export default class Setup extends BaseCommand {
       `Patched ${result.filesWritten.length} file${result.filesWritten.length === 1 ? "" : "s"}` +
         (result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""),
     );
+
+    const installOutcome = await installDependenciesForSetup({
+      cwd,
+      depsAdded: result.depsAdded,
+      dryRun,
+      env: this.meta.env,
+      issuer,
+      json: this.jsonEnabled(),
+      scaffoldedFramework,
+      skipInstall: Boolean(flags["skip-install"]),
+    });
 
     const writtenRel = result.filesWritten.map((file) => relativeDisplay(cwd, file));
     // The structured report is human-only. Under `--json` we let the
@@ -159,11 +242,7 @@ export default class Setup extends BaseCommand {
       // pre-coloured rows (path/url/id helpers) survive intact.
       consola.box({
         title: "Zitadel is ready",
-        message: [
-          renderSummary(sections),
-          "",
-          `Open your app on ${styleUrl(`${issuer}/login`)} and register your first user.`,
-        ].join("\n"),
+        message: [renderSummary(sections), "", installOutcome.nextActions.join("\n")].join("\n"),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
     }
@@ -182,11 +261,29 @@ export default class Setup extends BaseCommand {
         server: answers.server,
         files_written: result.filesWritten.map((file) => relativeDisplay(cwd, file)),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
-        next_actions: [`Start your project: npm install && npm run dev (then open ${issuer}/login)`],
-        next_commands: ["npm install", "npm run dev"],
+        install: installOutcome.install,
+        next_actions: installOutcome.nextActions,
+        next_commands: installOutcome.nextCommands,
       },
     });
   }
+}
+
+function frameworkDetectionWithScaffoldTarget(
+  error: ZitadelError,
+  cwd: string,
+  target: ScaffoldTarget,
+): ZitadelError {
+  return new ZitadelError(
+    error.code,
+    "Could not detect a supported app framework, and this directory is not a fresh scaffold target",
+    {
+      hint:
+        `${target.reason ?? "Directory is not empty."} ` +
+        "Run setup from an empty directory to scaffold a new app, or run setup from an existing supported app project.",
+      details: { cwd, entries: target.entries, reason: target.reason },
+    },
+  );
 }
 
 /**
@@ -204,21 +301,74 @@ async function resolveScaffoldFramework(
   }
   if (nonInteractive) {
     throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Empty directory — pass --framework", {
-      hint: "Example: --framework next",
+      hint: "Run without --json/--non-interactive to choose from a prompt, or pass --framework for scripted setup.",
     });
   }
   return new PickFrameworkPrompt().ask(orca.availableFrameworks());
 }
 
 /** A deterministic stand-in project for `--dry-run`, so no remote call is made. */
-function dryRunProject(): CreateProject201 {
+function dryRunProject(issuer: string): CreateProject201 {
   return {
     id: "dry-run-0000",
     projectSecret: "sk_proj_dry_run_full",
     previewSecret: "sk_proj_dry_run_preview",
-    previewOrigins: [],
+    previewOrigins: [issuer],
     createdAt: "2026-04-21T14:03:11.000Z",
   };
+}
+
+async function createProjectWithLocalHint(
+  client: ReturnType<typeof createZitadelClient>,
+  server: string,
+  cliVersion: string,
+  issuer: string,
+  framework: string,
+): Promise<CreateProject201> {
+  try {
+    // Register the app's own origin so the backend's origin check allows the
+    // requests the dev proxy forwards from it.
+    return await client.createProject({ previewOrigins: [issuer] });
+  } catch (error) {
+    const normalized = toZitadelError(error);
+    throw new ZitadelError(normalized.code, normalized.message, {
+      hint:
+        `${normalized.hint ? `${normalized.hint} ` : ""}` +
+        "If you meant to use a local Zitadel server, start it first " +
+        `and retry setup with --framework ${framework} --server local.`,
+      nextCommands: [
+        publicCliCommand("start", cliVersion),
+        publicCliCommand(`setup --framework ${framework} --server local`, cliVersion),
+      ],
+      details: {
+        server,
+        original: normalized.details,
+      },
+    });
+  }
+}
+
+function localSetupHint(error: unknown, framework: string | undefined, cliVersion: string): unknown {
+  const normalized = toZitadelError(error);
+  if (normalized.code !== "E_LOCAL_SERVER_NOT_RUNNING") {
+    return error;
+  }
+
+  const setupCommand = framework
+    ? `setup --framework ${framework} --server local`
+    : "setup --server local";
+
+  return new ZitadelError(normalized.code, normalized.message, {
+    hint:
+      `${normalized.hint ? `${normalized.hint} ` : ""}` +
+      "Start local Zitadel first, then rerun setup. " +
+      "After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+    nextCommands: [
+      publicCliCommand("start", cliVersion),
+      publicCliCommand(setupCommand, cliVersion),
+    ],
+    details: normalized.details,
+  });
 }
 
 /** Renders an absolute path relative to `cwd` for human-readable output. */
@@ -261,11 +411,7 @@ function describeWrittenFile(relPath: string, dryRun: boolean): string | null {
   // Mkdir ops surface in `filesWritten` alongside actual file writes.
   // They're noise at the per-step layer (the files inside them get
   // narrated on their own lines), so swallow them here.
-  if (
-    relPath === ".zitadel" ||
-    relPath === ".zitadel/flows" ||
-    relPath === ".zitadel/schemas"
-  ) {
+  if (relPath === ".zitadel" || relPath === ".zitadel/flows" || relPath === ".zitadel/schemas") {
     return null;
   }
   const verb = dryRun ? "Would write" : "Wrote";
@@ -289,10 +435,12 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   ".env.example": { subject: "the .env example template" },
   ".env.local": { subject: "the local development environment variables" },
   ".zitadel/state.json": { subject: "the empty sync state file" },
+  "app/page.tsx": { subject: "the auth home page" },
   "app/login/page.tsx": { subject: "the login page" },
   "app/register/page.tsx": { subject: "the registration page" },
   "app/profile/page.tsx": { subject: "the profile page" },
   "middleware.ts": { subject: "the Next.js middleware" },
+  "proxy.ts": { subject: "the Next.js proxy" },
   "custom-elements.d.ts": { subject: "the web-component type declarations" },
   "package.json": { subject: "package.json with the SDK dependency" },
 };
@@ -310,9 +458,7 @@ function buildSummary(opts: {
   const sdkPackage = "@zitadel/sdk-next";
   const packageJsonHit = pickWrittenFile(writtenRel, "package.json");
 
-  const detected: Row[] = [
-    { label: "Framework", value: formatFrameworkLine(projectFacts) },
-  ];
+  const detected: Row[] = [{ label: "Framework", value: formatFrameworkLine(projectFacts) }];
   if (scaffoldedFramework) {
     detected.push({ label: "Scaffold", value: "fresh project (no existing files)" });
   }
@@ -326,9 +472,11 @@ function buildSummary(opts: {
     });
   }
   for (const [label, suffix] of [
+    ["Home page", "app/page.tsx"],
     ["Login page", "app/login/page.tsx"],
     ["Register page", "app/register/page.tsx"],
     ["Profile page", "app/profile/page.tsx"],
+    ["Request proxy", "proxy.ts"],
     ["Middleware", "middleware.ts"],
     ["Env vars", ".env.local"],
   ] as const) {

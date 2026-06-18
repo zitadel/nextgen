@@ -4,6 +4,7 @@ import { customElement, property } from "lit/decorators.js";
 import alertHost from "@zitadel/shared-component-styles/lit/alert-host.css?inline";
 import alertSurface from "@zitadel/shared-component-styles/alert.css?inline";
 
+import { emit } from "../internal/emit.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
 
@@ -93,9 +94,7 @@ export class ZlAlert extends LitElement {
   }
 
   private handleDismiss = (): void => {
-    this.dispatchEvent(
-      new CustomEvent("zl-dismiss", { bubbles: true, composed: true }),
-    );
+    emit(this, "zl-dismiss");
     this.remove();
   };
 }
@@ -111,7 +110,7 @@ export const zlAlertManifest: AtomManifest = {
   tag: "zl-alert",
   attrs: ["severity", "heading", "dismissible"],
   parts: ["alert", "icon", "body", "title", "message", "close"],
-  slots: [],
+  slots: [""],
   events: ["zl-dismiss"],
 } as const;
 

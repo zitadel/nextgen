@@ -10,15 +10,14 @@
  * |--------|----------------|
  * | Combined sign-in | Purpose **Sign in** (default) |
  * | Sign up | Purpose **Sign up** |
- * | Passkey upsell | Happy-path sign-in/register → submit |
- * | Signed in | Passkey upsell → **Skip for now** or successful **Set up passkey** |
+ * | Passkey sign-in | **Sign in with a passkey** on the sign-in card |
+ * | Signed in | Submit sign-in or sign-up (no upsell screen — passkey registration is offered up front) |
  *
  * ## Happy path
  *
- * 1. Purpose **Sign in**, email `alice@acme.com` (any password), **Sign in**.
- * 2. Passkey upsell → **Skip for now** → “You're signed in as”.
+ * 1. Purpose **Sign in**, email `alice@acme.com` (any password), **Sign in** → “You're signed in as”.
  *
- * Register: Purpose **Sign up**, any email except `exists@example.com`, **Sign up** → same passkey step.
+ * Register: Purpose **Sign up**, any email except `exists@example.com`, **Sign up** → signed in.
  *
  * ## Fixture emails (error / edge demos)
  *
@@ -35,15 +34,8 @@
  * |-------|-----|
  * | `exists@example.com` | Inline email error “An account with this email already exists.” |
  *
- * **Passkey upsell** — use the sign-in email below, complete **Sign in**, then **Set up passkey**:
- *
- * | Email (on sign-in) | UI after **Set up passkey** |
- * |--------------------|-----------------------------|
- * | `passkey-cancel@example.com` | Alert: “Passkey setup was cancelled” |
- * | `passkey-unsupported@example.com` | Alert: “This device does not support passkeys” |
- * | `passkey-fail@example.com` | Alert: “Something went wrong. Please try again.” |
- *
- * Any other email on passkey upsell → advances to signed-in (mock WebAuthn success).
+ * **Passkey sign-in** — click **Sign in with a passkey** without a registered
+ * credential → “This passkey is not registered…” error on the passkey step.
  *
  * Restart the dev server after changing `handlers.ts` so the MSW worker reloads.
  */
@@ -237,11 +229,11 @@ export function renderLoginPage(host: HTMLElement): void {
             <div class="demo-item">
               <strong class="demo-outcome">Sign in</strong>
               <code class="demo-email">alice@acme.com</code>
-              <p class="demo-outcome">Any password → <strong>Sign in</strong> → passkey upsell → <strong>Skip for now</strong> → signed in</p>
+              <p class="demo-outcome">Any password → <strong>Sign in</strong> → signed in</p>
             </div>
             <div class="demo-item">
               <strong class="demo-outcome">Sign up</strong>
-              <p class="demo-outcome">Any email not listed below → <strong>Sign up</strong> → passkey → skip → signed in</p>
+              <p class="demo-outcome">Any email not listed below → <strong>Sign up</strong> → signed in</p>
             </div>
           </section>
 
@@ -268,22 +260,10 @@ export function renderLoginPage(host: HTMLElement): void {
           </section>
 
           <section class="demo-section">
-            <h3>Passkey fixtures</h3>
-            <p class="demo-lead">Enter email on <strong>Sign in</strong>, complete sign-in, then <strong>Set up passkey</strong>.</p>
+            <h3>Passkey sign-in</h3>
+            <p class="demo-lead">Click <strong>Sign in with a passkey</strong> on the sign-in card.</p>
             <div class="demo-item">
-              <code class="demo-email">passkey-cancel@example.com</code>
-              <p class="demo-outcome">“Passkey setup was cancelled”</p>
-            </div>
-            <div class="demo-item">
-              <code class="demo-email">passkey-unsupported@example.com</code>
-              <p class="demo-outcome">“This device does not support passkeys”</p>
-            </div>
-            <div class="demo-item">
-              <code class="demo-email">passkey-fail@example.com</code>
-              <p class="demo-outcome">“Something went wrong. Please try again.”</p>
-            </div>
-            <div class="demo-item">
-              <p class="demo-outcome"><strong>Any other email</strong> — mock success → signed in</p>
+              <p class="demo-outcome"><strong>No registered credential</strong> — “This passkey is not registered…” error on the passkey step</p>
             </div>
           </section>
 
@@ -329,7 +309,9 @@ export function renderLoginPage(host: HTMLElement): void {
     frame.innerHTML = "";
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.purpose = purposeSelect.value;
-    element.projectId = "dev-playground";
+    // The project handle is configured once globally in `dev/main.ts`
+    // (`configureZitadel({ projectId: "dev" })`); the element reads it via
+    // `getZitadelConfig()`, so nothing per-instance is needed here.
     element.addEventListener("zitadel-flow-input", (event) =>
       logEvent("zitadel-flow-input", (event as CustomEvent).detail),
     );

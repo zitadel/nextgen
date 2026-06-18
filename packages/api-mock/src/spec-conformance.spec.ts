@@ -84,7 +84,7 @@ function validFlowDefinitionBody(): Record<string, unknown> {
       {
         name: "identifier",
         fields: ["email"],
-        actions: { submit: { text_key: "submit", primary: true } },
+        actions: [{ name: "submit", text_key: "submit", primary: true }],
       },
     ],
   };
@@ -113,6 +113,54 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(res.status).toBe(400);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.code).toBe("sess.project_id_missing");
+  });
+
+  test("DELETE /sessions/me revokes an active session and clears the cookie", async () => {
+    const handoff = await signHandoffToken({ sub: "proj_revoke", iss: BASE });
+    const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_revoke`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ handoff_token: handoff }),
+    });
+    const setCookie = exchange.headers
+      .getSetCookie()
+      .find((c) => c.startsWith("__nextgen_session="));
+    expect(setCookie).toBeDefined();
+    const sessionCookie = setCookie?.split(";")[0] ?? "";
+
+    // Session is reachable before revocation.
+    const before = await fetch(`${BASE}/sessions/me`, { headers: { cookie: sessionCookie } });
+    expect(before.status).toBe(200);
+
+    const revoke = await fetch(`${BASE}/sessions/me`, {
+      method: "DELETE",
+      headers: { cookie: sessionCookie },
+    });
+    expect(revoke.status).toBe(204);
+    expect(
+      revoke.headers.getSetCookie().some((c) => /^__nextgen_session=;/.test(c)),
+    ).toBe(true);
+
+    // Session is gone after revocation.
+    const after = await fetch(`${BASE}/sessions/me`, { headers: { cookie: sessionCookie } });
+    expect(after.status).toBe(401);
+  });
+
+  test("DELETE /sessions/me without a session cookie returns 401", async () => {
+    const res = await fetch(`${BASE}/sessions/me`, { method: "DELETE" });
+    expect(res.status).toBe(401);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.code).toBe("unauthenticated");
+  });
+
+  test("DELETE /sessions/me with an unknown session token returns 404", async () => {
+    const res = await fetch(`${BASE}/sessions/me`, {
+      method: "DELETE",
+      headers: { cookie: "__nextgen_session=deadbeefdeadbeef" },
+    });
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.code).toBe("session_not_found");
   });
 
   test("POST /projects returns the spec-defined project shape", async () => {

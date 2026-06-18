@@ -1,5 +1,97 @@
 # @zitadel/cli
 
+## 0.1.0-alpha.10
+
+### Patch Changes
+
+- [#328](https://github.com/zitadel/nextgen/pull/328) [`acb5b54`](https://github.com/zitadel/nextgen/commit/acb5b549386efcc5ede005871b145c1cd0f9ac5e) Thanks [@fforootd](https://github.com/fforootd)! - Improve fresh-app CLI recovery guidance and align agent automation hook docs with the rendered login controls.
+
+- Updated dependencies []:
+  - @zitadel/server@0.1.0-alpha.10
+  - @zitadel/api@0.1.0-alpha.10
+
+## 0.1.0-alpha.9
+
+### Patch Changes
+
+- [#325](https://github.com/zitadel/nextgen/pull/325) [`ae99992`](https://github.com/zitadel/nextgen/commit/ae999926df674eb7ca777e0273789b8f58f83a19) Thanks [@fforootd](https://github.com/fforootd)! - Report local port conflicts clearly, sweep managed local runtime orphans with `stop --all`, and explain non-empty setup targets.
+
+- Updated dependencies [[`ae99992`](https://github.com/zitadel/nextgen/commit/ae999926df674eb7ca777e0273789b8f58f83a19)]:
+  - @zitadel/server@0.1.0-alpha.9
+  - @zitadel/api@0.1.0-alpha.9
+
+## 0.1.0-alpha.8
+
+### Patch Changes
+
+- Updated dependencies [[`0547b8c`](https://github.com/zitadel/nextgen/commit/0547b8c397b1016e199fa16f0b208a7115720806)]:
+  - @zitadel/server@0.1.0-alpha.8
+  - @zitadel/api@0.1.0-alpha.8
+
+## 0.1.0-alpha.7
+
+### Patch Changes
+
+- Updated dependencies [[`0bacdf2`](https://github.com/zitadel/nextgen/commit/0bacdf23226a1e90c37f09b3cac245e1cf917091)]:
+  - @zitadel/server@0.1.0-alpha.7
+  - @zitadel/api@0.1.0-alpha.7
+
+## 0.1.0-alpha.6
+
+### Patch Changes
+
+- [#270](https://github.com/zitadel/nextgen/pull/270) [`30b4b41`](https://github.com/zitadel/nextgen/commit/30b4b411a9c99fc61d991f739636f93d7bee5b1d) Thanks [@vitorbari](https://github.com/vitorbari)! - Step `fields` and `actions` are now ordered `[{ name, ... }]` arrays on the wire (ADR 021). Templates iterate them in authorial order; the orchestrator builds `fields_by_name` / `actions_by_name` views for keyed lookups. The private `@zitadel/api-mock` workspace follows the same wire shape for tests. `gates` stays a name-keyed object for now.
+
+- [#303](https://github.com/zitadel/nextgen/pull/303) [`69e41b2`](https://github.com/zitadel/nextgen/commit/69e41b24275a5337b04b977dd3582f3f5c5c1461) Thanks [@fforootd](https://github.com/fforootd)! - Improve local bootstrap guidance for Docker prerequisites, generated auth pages, and agent browser proof.
+
+- Updated dependencies [[`2cf813e`](https://github.com/zitadel/nextgen/commit/2cf813e62d2d76346536911e3e4ccfe390fb3583)]:
+  - @zitadel/server@0.1.0-alpha.6
+  - @zitadel/api@0.1.0-alpha.6
+
+## 0.1.0-alpha.5
+
+### Minor Changes
+
+- [#257](https://github.com/zitadel/nextgen/pull/257) [`6f8dd2d`](https://github.com/zitadel/nextgen/commit/6f8dd2d612b06d1ca546a7c16c6fb5c6430de2c1) Thanks [@mridang](https://github.com/mridang)! - Add `setup --framework react|vue|angular|nuxt` support to the CLI. Each framework scaffolds its auth entry/pages and wires `/__nextgen/*` calls to the backend with a `sk_<project_id>` bearer attached: React and Vue get a dev proxy magicast-merged into the Vite config (`vite.config.*`) that reads the project id from `ZITADEL_PROJECT_ID`; Angular gets a `proxy.conf.cjs` wired into `angular.json` that reads it from `zitadel.json`; and Nuxt registers the `@zitadel/sdk-nuxt` module in the Nuxt config (`nuxt.config.*`), which adds the proxy via server middleware. A `--dev-port` flag sets the scaffolded dev-server port.
+
+- [#299](https://github.com/zitadel/nextgen/pull/299) [`f77ca44`](https://github.com/zitadel/nextgen/commit/f77ca44e85565976d26de0b6444b7fc5b1616e8c) Thanks [@fforootd](https://github.com/fforootd)! - Make the generated Next.js auth app easier for agents and developers to prove end-to-end registration, logout, and login in a visible browser.
+
+### Patch Changes
+
+- [#295](https://github.com/zitadel/nextgen/pull/295) [`f02718f`](https://github.com/zitadel/nextgen/commit/f02718f0499042569e13c1c67ae4135b6e943518) Thanks [@fforootd](https://github.com/fforootd)! - Allow fresh app scaffolding after `zitadel start` creates local runtime ignore files, and load Nuxt runtime config through the Nuxt virtual imports module.
+
+- Updated dependencies []:
+  - @zitadel/api@0.1.0-alpha.5
+
+## 0.1.0-alpha.4
+
+### Patch Changes
+
+- [#279](https://github.com/zitadel/nextgen/pull/279) [`ce237ef`](https://github.com/zitadel/nextgen/commit/ce237ef355422c666769eef20df78bdc8ec0e0f9) Thanks [@fforootd](https://github.com/fforootd)! - Harden local setup guidance, Next 16 scaffolding, and login form automation.
+
+- Updated dependencies []:
+  - @zitadel/api@0.1.0-alpha.4
+
+## 0.1.0-alpha.3
+
+### Patch Changes
+
+- [#272](https://github.com/zitadel/nextgen/pull/272) [`08b7ab4`](https://github.com/zitadel/nextgen/commit/08b7ab44f13e104545f17f6f94244eb825a4dcf5) Thanks [@fforootd](https://github.com/fforootd)! - Allow same-directory setup after starting the local Zitadel runtime.
+
+- Updated dependencies []:
+  - @zitadel/api@0.1.0-alpha.3
+
+## 0.1.0-alpha.2
+
+### Patch Changes
+
+- [#265](https://github.com/zitadel/nextgen/pull/265) [`ceb74d5`](https://github.com/zitadel/nextgen/commit/ceb74d54c98fff07deb90c800a5aa08b2f46e30e) Thanks [@fforootd](https://github.com/fforootd)! - Derive alpha local runtime images from the installed CLI version, pin generated SDK dependencies to the same alpha train, and emit exact-version follow-up commands for reproducible tester reports.
+
+- [#255](https://github.com/zitadel/nextgen/pull/255) [`ca53f61`](https://github.com/zitadel/nextgen/commit/ca53f61ae249f81fd301f71f33cd9be416271ad7) Thanks [@fforootd](https://github.com/fforootd)! - Make doctor local-runtime checks advisory for cloud setup, harden fresh Next.js scaffolding, auto-install setup dependencies, normalize public follow-up commands, and avoid assuming Next.js in local-runtime setup guidance.
+
+- Updated dependencies [[`b0094f4`](https://github.com/zitadel/nextgen/commit/b0094f4255854c571664e746f70447c365c52af2)]:
+  - @zitadel/api@0.1.0-alpha.2
+
 ## 0.1.0-alpha.1
 
 ### Minor Changes

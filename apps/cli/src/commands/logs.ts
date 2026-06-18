@@ -1,9 +1,12 @@
 import { Flags } from "@oclif/core";
 
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { ZitadelError } from "../lib/errors";
+import { binaryLogs, followBinaryLogs } from "../lib/local-server/binary";
 import { containerLogs, followContainerLogs } from "../lib/local-server/docker";
 import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "../lib/local-server/runtime";
+import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { resolveCwd } from "../lib/paths";
+import { publicCliCommand } from "../lib/public-cli";
 
 export default class Logs extends BaseCommand {
   static override description = "Show local Zitadel server logs.";
@@ -14,7 +17,8 @@ export default class Logs extends BaseCommand {
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Logs);
-    const runtime = await readRuntimeMetadata(flags.cwd ? String(flags.cwd) : process.cwd());
+    const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
+    const runtime = await readRuntimeMetadata(cwd);
     await this.toMeta(flags, {
       resolveServer: false,
       source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
@@ -23,7 +27,7 @@ export default class Logs extends BaseCommand {
     if (!runtime) {
       throw new ZitadelError("E_VALIDATION", "Local Zitadel runtime has not been started", {
         hint: "Run `zitadel start` first.",
-        nextCommands: ["zitadel start"],
+        nextCommands: [publicCliCommand("start", this.meta.cliVersion)],
       });
     }
 
@@ -40,20 +44,30 @@ export default class Logs extends BaseCommand {
           hint: "Run without --json, or omit --follow.",
         });
       }
-      await followContainerLogs(runtime.container_name, tail);
+      if (runtime.backend === "binary") {
+        await followBinaryLogs(runtime.log_path, tail);
+      } else {
+        await followContainerLogs(runtime.container_name, tail);
+      }
       return this.emit({
         status: "ok",
         data: { title: "Stopped following local Zitadel logs." },
       });
     }
 
-    const logs = await containerLogs(runtime.container_name, tail);
+    const logs =
+      runtime.backend === "binary"
+        ? await binaryLogs(runtime.log_path, tail)
+        : await containerLogs(runtime.container_name, tail);
     return this.emit({
       status: "ok",
       pretty: logs.trimEnd(),
       data: {
         title: "Local Zitadel server logs.",
-        container_name: runtime.container_name,
+        runtime:
+          runtime.backend === "binary"
+            ? { backend: runtime.backend, pid: runtime.pid, log_path: runtime.log_path }
+            : { backend: runtime.backend, container_name: runtime.container_name },
         logs,
       },
     });

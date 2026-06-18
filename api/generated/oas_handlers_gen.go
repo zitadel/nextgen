@@ -4899,7 +4899,7 @@ func (s *Server) handleGetTeamRequest(args [1]string, argsEscaped bool, w http.R
 
 // handleGetTokenRequest handles getToken operation.
 //
-// Get accesstoken.
+// Get access token.
 //
 // POST /auth/token
 func (s *Server) handleGetTokenRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -5040,7 +5040,7 @@ func (s *Server) handleGetTokenRequest(args [0]string, argsEscaped bool, w http.
 		mreq := middleware.Request{
 			Context:          ctx,
 			OperationName:    GetTokenOperation,
-			OperationSummary: "Get accesstoken",
+			OperationSummary: "Get access token",
 			OperationID:      "getToken",
 			Body:             request,
 			RawBody:          rawBody,

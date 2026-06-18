@@ -261,7 +261,7 @@ type Invoker interface {
 	GetTeam(ctx context.Context, params GetTeamParams) (GetTeamRes, error)
 	// GetToken invokes getToken operation.
 	//
-	// Get accesstoken.
+	// Get access token.
 	//
 	// POST /auth/token
 	GetToken(ctx context.Context, request *PostTokenRequest) (GetTokenRes, error)
@@ -4094,7 +4094,7 @@ func (c *Client) sendGetTeam(ctx context.Context, params GetTeamParams) (res Get
 
 // GetToken invokes getToken operation.
 //
-// Get accesstoken.
+// Get access token.
 //
 // POST /auth/token
 func (c *Client) GetToken(ctx context.Context, request *PostTokenRequest) (GetTokenRes, error) {

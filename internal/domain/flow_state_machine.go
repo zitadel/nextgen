@@ -91,8 +91,8 @@ type FlowStep struct {
 	Error        *string
 	Complete     *FlowStepComplete
 	RedirectURL  *string
-	Fields       map[string]FlowField
-	Actions      map[string]FlowAction
+	Fields       []FlowField
+	Actions      []FlowAction
 	SSOProviders []FlowSSOProvider
 	// Challenge is a pending authentication ceremony the client must
 	// satisfy before re-submitting (e.g. a passkey assertion). Nil unless
@@ -119,6 +119,7 @@ type FlowStepTexts struct {
 
 // FlowAction is a single user action surfaced on [FlowStep.Actions].
 type FlowAction struct {
+	Name    string
 	TextKey string
 	Primary bool
 }
@@ -532,16 +533,16 @@ func anyVisitedStepOnSuccess(def *FlowDefinition, state *FlowState, current *Flo
 }
 
 func fieldValueByChallenge(resolved FlowResolvedFields, fields map[string]any, target FlowFieldChallenge) (name, value string, ok bool) {
-	for n, field := range resolved.Fields {
+	for _, field := range resolved.Fields {
 		if field.Challenge != target {
 			continue
 		}
-		raw, present := fields[n]
+		raw, present := fields[field.Name]
 		if !present {
 			continue
 		}
 		s, _ := raw.(string)
-		return n, s, true
+		return field.Name, s, true
 	}
 	return "", "", false
 }
@@ -661,7 +662,7 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 		}
 
 	case in.Action == FlowActionPasskey:
-		if _, ok := step.Actions[FlowActionPasskey]; !ok {
+		if !stepHasAction(step, FlowActionPasskey) {
 			return passkeyPhaseResult{}, nil
 		}
 		if in.PasskeyRP == nil {
@@ -689,7 +690,7 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 		return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
 
 	case in.Action == FlowActionPasskeyRegister:
-		if _, ok := step.Actions[FlowActionPasskeyRegister]; !ok {
+		if !stepHasAction(step, FlowActionPasskeyRegister) {
 			return passkeyPhaseResult{}, nil
 		}
 		if in.PasskeyRP == nil {
@@ -890,13 +891,14 @@ func (r *FlowStateMachineRuntime) buildStep(step *FlowDefinitionStep, resolved F
 	// Surface only user-selectable actions declared on the step.
 	// Implicit outcomes (e.g. user_not_found) live in step.Transitions
 	// but are engine-emitted routing keys, not buttons for the client.
-	actions := make(map[string]FlowAction, len(step.Actions))
-	for name, a := range step.Actions {
+	actions := make([]FlowAction, len(step.Actions))
+	for i, a := range step.Actions {
 		textKey := a.TextKey
 		if textKey == "" {
-			textKey = step.Name + ".action." + name
+			textKey = step.Name + ".action." + a.Name
 		}
-		actions[name] = FlowAction{
+		actions[i] = FlowAction{
+			Name:    a.Name,
 			TextKey: textKey,
 			Primary: a.Primary,
 		}
@@ -913,6 +915,16 @@ func (r *FlowStateMachineRuntime) buildStep(step *FlowDefinitionStep, resolved F
 	}
 }
 
+// stepHasAction reports whether the step declares an action with the given name.
+func stepHasAction(step *FlowDefinitionStep, name string) bool {
+	for _, a := range step.Actions {
+		if a.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 func recordResolvedUser(state *FlowState, userID string) {
 	if state.CollectedData == nil {
 		state.CollectedData = map[string]any{}
@@ -925,13 +937,13 @@ func recordResolvedUser(state *FlowState, userID string) {
 // (e.g. email entered in a prior step) into subsequent steps that collect the
 // same field, so the user doesn't have to retype them.
 func prefillFromCollected(resolved *FlowResolvedFields, collected map[string]any) {
-	for name, field := range resolved.Fields {
-		if field.Value != nil {
+	for i := range resolved.Fields {
+		if resolved.Fields[i].Value != nil {
 			continue
 		}
-		if v, ok := collected[name].(string); ok && v != "" {
-			field.Value = &v
-			resolved.Fields[name] = field
+		if v, ok := collected[resolved.Fields[i].Name].(string); ok && v != "" {
+			val := v
+			resolved.Fields[i].Value = &val
 		}
 	}
 }

@@ -1,0 +1,91 @@
+---
+title: Angular SDK
+description: Angular wrappers for Zitadel login and logout UI.
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { File, Files } from "fumadocs-ui/components/files";
+import { Step, Steps } from "fumadocs-ui/components/steps";
+import { Tab, Tabs } from "fumadocs-ui/components/tabs";
+
+The Angular SDK exposes standalone components that wrap the shared Zitadel auth UI.
+
+<Callout title="Generated proxy" type="info">
+  Angular uses a dev-server proxy config rather than Vite middleware. Production still needs a same-origin proxy for `/__nextgen/*`. See [SDK proxy](/docs/concepts/sdk-proxy).
+</Callout>
+
+## Install
+
+<Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
+  <Tab>
+    ```sh
+    pnpm add @zitadel/sdk-angular
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    npm install @zitadel/sdk-angular
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    yarn add @zitadel/sdk-angular
+    ```
+  </Tab>
+</Tabs>
+
+## Setup
+
+<Tabs items={["CLI generated", "Manual"]}>
+  <Tab>
+    The CLI writes the root component, adds a proxy config, wires `angular.json`, and installs the SDK.
+
+    <Files>
+      <File name="src/app/app.ts" />
+      <File name="src/app/app.html" />
+      <File name="proxy.conf.cjs" />
+      <File name="angular.json" />
+      <File name="package.json" />
+    </Files>
+  </Tab>
+  <Tab>
+    Configure Zitadel once and pass the handle to the standalone component:
+
+    ```ts
+    import { Component } from "@angular/core";
+    import { ZitadelLoginComponent, configureZitadel } from "@zitadel/sdk-angular";
+
+    const project = configureZitadel({ projectId: "proj_123", proxyPath: "/__nextgen" });
+
+    @Component({
+      standalone: true,
+      imports: [ZitadelLoginComponent],
+      template: `<zitadel-auth-login [project]="project" purpose="login" postSignInUrl="/" />`,
+    })
+    export class LoginPage {
+      project = project;
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Runtime model
+
+<Steps>
+  <Step>The Angular wrapper renders the underlying custom element.</Step>
+  <Step>The generated dev proxy forwards `/__nextgen/*` and attaches the project service key.</Step>
+  <Step>Production deployments need an equivalent proxy.</Step>
+</Steps>
+
+## Verify
+
+- Run the generated Angular dev script.
+- Register or sign in through the widget.
+- Confirm logout works with `zitadel-auth-logout`.
+- Remember that the wrapper selector is `zitadel-auth-login`; the underlying custom element is `zitadel-login`.
+
+## See also
+
+- [SDK proxy](/docs/concepts/sdk-proxy) — why SPAs need a same-origin `/__nextgen/*` proxy and how to run one in production.
+- [Components](/docs/sdks/components) — the shared web components these wrappers render.
+- [`@zitadel/sdk-angular` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-angular) and the [CLI Angular patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/angular).

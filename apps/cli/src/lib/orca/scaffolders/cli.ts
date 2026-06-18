@@ -33,9 +33,7 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
       const notFound = err.code === "ENOENT";
       throw new ZitadelError(
         "E_VALIDATION",
-        notFound
-          ? `Command not found: ${command}`
-          : `Failed to spawn "${command}": ${err.message}`,
+        notFound ? `Command not found: ${command}` : `Failed to spawn "${command}": ${err.message}`,
         {
           hint: notFound ? `Ensure '${command}' is installed and on PATH.` : undefined,
           details: { command, args: [...args], code: err.code },
@@ -44,11 +42,25 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
     }
     const status = result.status ?? 1;
     if (status !== 0) {
+      const stdout = String(result.stdout ?? "");
+      const stderr = String(result.stderr ?? "");
+      const output = truncateCommandOutput([stderr, stdout].filter(Boolean).join("\n").trim());
       throw new ZitadelError(
         "E_VALIDATION",
         `Command "${command} ${args.join(" ")}" exited with status ${String(status)}`,
-        { details: { stderr: result.stderr ?? "" } },
+        {
+          hint: output ? `Command output:\n${output}` : "Run the command directly for more detail.",
+          details: { command, args: [...args], cwd, stdout, stderr },
+        },
       );
     }
   }
+}
+
+function truncateCommandOutput(output: string): string {
+  const limit = 4000;
+  if (output.length <= limit) {
+    return output;
+  }
+  return `${output.slice(0, limit)}\n... output truncated ...`;
 }

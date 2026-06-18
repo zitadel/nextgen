@@ -30,18 +30,21 @@ type FlowFieldResolver interface {
 
 // FlowResolvedFields is the output of [FlowFieldResolver.Resolve].
 type FlowResolvedFields struct {
-	// Fields holds the resolved per-field metadata. Keys match the
-	// property names passed to Resolve.
-	Fields map[string]FlowField
+	// Fields holds the resolved per-field metadata in the same order as
+	// the property names passed to Resolve.
+	Fields []FlowField
 
 	// ImplicitOutcomes lists the reserved transition outcomes each
-	// field contributes. The state machine uses it to validate flow
-	// definitions and route schema-derived transitions.
+	// field contributes, keyed by field name. The state machine uses it
+	// to validate flow definitions and route schema-derived transitions.
 	ImplicitOutcomes map[string][]string
 }
 
 // FlowField is the resolved per-field metadata.
 type FlowField struct {
+	// Name is the user-schema property name this field collects.
+	Name string
+
 	// Type is the UI input kind the client should render. It is
 	// derived from the property's JSON `type` and `format` in the user
 	// meta-schema. The property's `x-password: true` annotation forces
@@ -115,6 +118,7 @@ const (
 //   - Format    ↔ `format` (enum: email, date-time, uuid, uri)
 //   - MinLength ↔ `minLength`
 //   - MaxLength ↔ `maxLength`
+//   - Enum      ↔ `enum` (closed set of allowed string values)
 //
 // Zero values mean "no rule". JSON Schema's `pattern` keyword is not
 // part of the user meta-schema and is intentionally not surfaced.
@@ -122,6 +126,7 @@ type FlowFieldValidation struct {
 	Format    string
 	MinLength int
 	MaxLength int
+	Enum      []string
 }
 
 // FlowFieldType names the input kind the client should render. Mirrors
@@ -137,6 +142,8 @@ const (
 	FlowFieldTypeURL      FlowFieldType = "url"
 	FlowFieldTypeDate     FlowFieldType = "date"
 	FlowFieldTypeHidden   FlowFieldType = "hidden"
+	FlowFieldTypeCheckbox FlowFieldType = "checkbox"
+	FlowFieldTypeSelect   FlowFieldType = "select"
 )
 
 // FlowFieldValidationRule names a schema-derived validation rule the
@@ -200,3 +207,10 @@ func ImplicitOutcomesForChallenge(c FlowFieldChallenge) []string {
 // ErrFlowFieldUnknown is returned by [FlowFieldResolver.Resolve] when a
 // requested field name is not part of the resolver's schema or catalog.
 var ErrFlowFieldUnknown = errors.New("flow field: not in resolver catalog")
+
+// ErrFlowFieldUnsupportedType is returned by [FlowFieldResolver.Resolve]
+// when a property declares a JSON `type` set the resolver cannot
+// reduce to a single input kind. The nullable idiom `["null", X]` is
+// reduced to X and does not trigger this error; any other multi-entry
+// union does.
+var ErrFlowFieldUnsupportedType = errors.New("flow field: unsupported JSON type")

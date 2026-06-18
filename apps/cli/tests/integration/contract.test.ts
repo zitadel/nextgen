@@ -1,10 +1,10 @@
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { parseJson, runCliForTest } from "../helpers/run-cli";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "../helpers/run-cli";
 
 async function scaffoldNextProject(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-contract-"));
@@ -25,6 +25,40 @@ function assertEnvelopeMeta(envelope: Record<string, unknown>): void {
   expect(envelope.command, "command missing").toBeTypeOf("string");
   expect(envelope.source, "source missing").toBeTypeOf("string");
   expect(envelope.status, "status missing").toMatch(/^(ok|skipped|error)$/);
+}
+
+async function sourceSuggestedCommandIds(dir: string): Promise<Set<string>> {
+  const commands = new Set<string>();
+  for (const file of await typescriptFiles(dir)) {
+    const source = await readFile(file, "utf8");
+    for (const match of source.matchAll(/publicCliCommand\(\s*(["`])([^"`$]*)/g)) {
+      const id = commandIdFromArgs(match[2]);
+      if (id) commands.add(id);
+    }
+    for (const match of source.matchAll(/["`]zitadel\s+([a-z][\w:-]*)/g)) {
+      commands.add(match[1]);
+    }
+  }
+  return commands;
+}
+
+async function typescriptFiles(dir: string): Promise<string[]> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files: string[] = [];
+  for (const entry of entries) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await typescriptFiles(path)));
+    } else if (entry.isFile() && entry.name.endsWith(".ts")) {
+      files.push(path);
+    }
+  }
+  return files;
+}
+
+function commandIdFromArgs(args: string): string | undefined {
+  const id = args.trim().split(/\s+/)[0];
+  return id && /^[a-z][\w:-]*$/.test(id) ? id : undefined;
 }
 
 describe("envelope contract", () => {
@@ -58,7 +92,7 @@ describe("envelope contract", () => {
     expect(envelope.status).toBe("error");
     expect(envelope.code).toBe("E_VALIDATION");
     expect(envelope.message).toBeTypeOf("string");
-    expect(envelope.next_commands).toContain("zitadel setup");
+    expect(envelope.next_commands).toContain(expectedPublicCliCommand("setup"));
   });
 
   it("renders a human-readable summary (and server suffix) without --json", async () => {
@@ -83,7 +117,13 @@ describe("envelope contract", () => {
       }),
     );
 
-    const result = await runCliForTest(["status", "--cwd", cwd, "--server", "https://self.example"]);
+    const result = await runCliForTest([
+      "status",
+      "--cwd",
+      cwd,
+      "--server",
+      "https://self.example",
+    ]);
     expect(result.exitCode).toBe(0);
     // Pretty (non-JSON) rendering: the title, the project section, the source
     // suffix for a non-default server, and the next-steps block.
@@ -100,6 +140,25 @@ describe("envelope contract", () => {
     expect(skills).toContain("name: zitadel-cli");
     expect(skills).toContain("## Golden path");
     expect(skills).toContain("--non-interactive --json");
+    expect(skills).toContain("E_PORT_IN_USE");
+    expect(skills).toContain("stop --all");
+  });
+
+  it("suggested zitadel next_commands target visible commands", async () => {
+    const commands = await runCliForTest(["commands", "--json"]);
+    expect(commands.exitCode).toBe(0);
+    const visible = new Set(
+      (parseJson(commands.stdout) as Array<{ id?: unknown }>)
+        .map((command) => command.id)
+        .filter((id): id is string => typeof id === "string"),
+    );
+    const suggested = await sourceSuggestedCommandIds(join(import.meta.dirname, "../../src"));
+    expect([...suggested].sort()).toEqual(expect.arrayContaining(["apply", "doctor", "setup"]));
+    for (const command of suggested) {
+      expect(visible, `${command} should be visible because it appears in next_commands`).toContain(
+        command,
+      );
+    }
   });
 
   it("version-only resolution defaults to real server, not mock", async () => {

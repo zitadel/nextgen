@@ -12,6 +12,7 @@ describe("EXIT_CODES", () => {
       E_LOCAL_SERVER_NOT_RUNNING: 4,
       E_AUTH: 1,
       E_CONFLICT: 5,
+      E_PORT_IN_USE: 5,
       E_VALIDATION: 3,
       E_NOT_IMPLEMENTED: 2,
     });

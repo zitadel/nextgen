@@ -89,7 +89,6 @@ export async function nextgenMiddleware(
     allowedTokenTypes = ['JWT', 'at+JWT'],
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
-    onExchangeResponse,
   } = options;
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute
@@ -114,13 +113,7 @@ export async function nextgenMiddleware(
   }
 
   if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-    return proxyRequest(
-      req,
-      url,
-      proxyPath,
-      proxyTimeoutMs,
-      onExchangeResponse,
-    );
+    return proxyRequest(req, url, proxyPath, proxyTimeoutMs);
   }
 
   return handleAuth(req, {
@@ -212,7 +205,6 @@ async function proxyRequest(
   authUrl: string,
   proxyPath: string,
   proxyTimeoutMs: number,
-  onExchangeResponse?: (response: Response) => Response | Promise<Response>,
 ): Promise<Response> {
   const url = new URL(req.url);
   const suffix = url.pathname.slice(proxyPath.length);
@@ -250,16 +242,16 @@ async function proxyRequest(
 
   const hasBody = !['GET', 'HEAD'].includes(req.method);
 
-  // POST /sessions/exchange requires a project service-key bearer token.
-  // The browser can't hold a secret, so the middleware constructs one from
-  // the project_id query param. The server's security handler accepts any
-  // token of the form sk_proj_* at this stage (full validation is a TODO).
-  const isExchangeRequest =
-    req.method === 'POST' && suffix.startsWith('/sessions/exchange');
-  if (isExchangeRequest && !upstreamHeaders.has('authorization')) {
-    const projectId = url.searchParams.get('project_id');
-    if (projectId) {
-      upstreamHeaders.set('authorization', `Bearer sk_${projectId}`);
+  // Attach the project service-key secret as the bearer on every proxied
+  // request. The server's security handler verifies it cryptographically; the
+  // browser never sees the secret because this middleware runs in Next.js's
+  // Edge runtime and reads `process.env.ZITADEL_PROJECT_SECRET`. Next auto-
+  // loads `.env.local` at dev time (which is gitignored) and inlines env vars
+  // referenced here into the Edge bundle at build time for production.
+  if (!upstreamHeaders.has('authorization')) {
+    const secret = process.env.ZITADEL_PROJECT_SECRET;
+    if (secret) {
+      upstreamHeaders.set('authorization', `Bearer ${secret}`);
     }
   }
 
@@ -283,17 +275,10 @@ async function proxyRequest(
     responseHeaders.append('set-cookie', cookie);
   }
 
-  let response = new Response(upstream.body, {
+  return new Response(upstream.body, {
     status: upstream.status,
     headers: responseHeaders,
   });
-
-  // Call the exchange hook when the proxied request is POST /sessions/exchange.
-  if (isExchangeRequest && onExchangeResponse) {
-    response = await onExchangeResponse(response);
-  }
-
-  return response;
 }
 
 /**

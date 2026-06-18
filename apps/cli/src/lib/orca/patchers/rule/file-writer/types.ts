@@ -8,7 +8,12 @@
  */
 export type FileOp =
   | { readonly kind: "mkdir"; readonly path: string; readonly mode?: number }
-  | { readonly kind: "write"; readonly path: string; readonly mode?: number; readonly contents: string }
+  | {
+      readonly kind: "write";
+      readonly path: string;
+      readonly mode?: number;
+      readonly contents: string;
+    }
   | {
       readonly kind: "append";
       readonly path: string;
@@ -26,7 +31,31 @@ export type FileOp =
       readonly patch: Readonly<Record<string, unknown>>;
     }
   | { readonly kind: "append-gitignore"; readonly entries: ReadonlyArray<string> }
-  | { readonly kind: "add-dep"; readonly name: string; readonly version: string; readonly dev?: boolean };
+  | {
+      readonly kind: "add-dep";
+      readonly name: string;
+      readonly version: string;
+      readonly dev?: boolean;
+    }
+  | {
+      /**
+       * Generic content edit. The file-writer reads the file (passing `undefined`
+       * when it is absent), runs the patcher-supplied {@link edit} transform, and
+       * writes the result — staying framework-agnostic. The transform owns ALL
+       * framework knowledge (e.g. a magicast merge into `vite.config.ts`, or a
+       * structured edit of `angular.json`) and lives next to its patcher. It must
+       * be pure (no I/O) and may throw a `ZitadelError` when it cannot proceed.
+       * Idempotent: a transform whose output equals the input is skipped.
+       *
+       * `path` may be a single path or a priority list of candidate paths (e.g.
+       * the `vite.config.{ts,mts,js,…}` variants) — the executor edits the first
+       * one that exists, falling back to the first candidate when none do. The
+       * candidate list itself is generic; which paths to try is the patcher's call.
+       */
+      readonly kind: "edit";
+      readonly path: string | ReadonlyArray<string>;
+      readonly edit: (source: string | undefined) => string;
+    };
 
 /**
  * A rule-based patcher's plan: the ordered file operations to apply plus a

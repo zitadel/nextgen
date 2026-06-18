@@ -35,14 +35,12 @@ this project.
 
 ```sh
 corepack pnpm exec playwright install        # one-time, browsers
-corepack pnpm exec nx run @zitadel/demo-next-e2e:e2e
+moon run demo-next-e2e:e2e
 ```
 
-Nx rebuilds `@zitadel/components` first via `^build`, then
+Moon rebuilds `@zitadel/components` first through task dependencies, then
 Playwright boots `api-mock` (`:4000`) and `demo-next` (`:3002`) through
-direct `pnpm --filter` commands. Using `nx run …` inside
-`webServer.command` makes `@nx/playwright/plugin` treat the dev servers
-as required deps and hangs the run — keep the direct invocations.
+direct `pnpm --filter` commands.
 
 ## When Adding A Spec
 

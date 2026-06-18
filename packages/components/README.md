@@ -39,22 +39,24 @@ externalised so npm consumers dedupe with their own copies.
 
 ## Quickstart — drop on a page
 
-The 90% case: render the element, point the typed Flow API client at your
-backend, set a locale.
+The 90% case: configure the SDK once, render the element, optionally set a
+language. `<zitadel-login>` reads the global project handle from
+`configureZitadel()` via `getZitadelConfig()` — no per-element wiring needed.
 
 ```html
-<script type="module" src="@zitadel/components"></script>
-
-<zitadel-login id="login" purpose="login" project-id="proj_123"></zitadel-login>
-
 <script type="module">
-  import { setProxyPath } from '@zitadel/api/runtime/base-url';
+  import '@zitadel/components';
+  import { configureZitadel } from '@zitadel/api/config';
 
-  setProxyPath('https://api.tenant.com');
+  // Write-once: sets the global project handle (and the proxy path the
+  // generated client uses). The element picks this up automatically.
+  configureZitadel({ projectId: 'proj_123', proxyPath: '/__nextgen' });
 
   const el = document.getElementById('login');
-  el.locale = await fetch('/i18n/en.json').then((r) => r.json());
+  el.lang = 'en'; // optional; defaults to <html lang> / navigator.language
 </script>
+
+<zitadel-login id="login" purpose="login"></zitadel-login>
 ```
 
 What `<zitadel-login>` handles for you:
@@ -75,22 +77,26 @@ What `<zitadel-login>` handles for you:
 
 Same element, lifted into JSX. Pass objects through `ref` rather than as
 attributes (web component properties are typed objects, not stringified
-attributes).
+attributes). Either configure the SDK globally with `configureZitadel()` and
+let the element read it, or assign the returned handle to `el.project`.
 
 ```tsx
 import '@zitadel/components';
-import { setProxyPath } from '@zitadel/api/runtime/base-url';
+import { configureZitadel } from '@zitadel/api/config';
 
-setProxyPath(import.meta.env.VITE_ZITADEL_API_BASE);
+const project = configureZitadel({
+  projectId: 'proj_123',
+  proxyPath: import.meta.env.VITE_ZITADEL_PROXY_PATH,
+});
 
-export function Login({ locale }: Props) {
+export function Login({ locales }: Props) {
   return (
     <zitadel-login
       purpose="login"
-      project-id="proj_123"
       ref={(el) => {
         if (!el) return;
-        el.locale = locale;
+        el.project = project;
+        el.locales = locales;
       }}
     />
   );
@@ -113,7 +119,7 @@ fixtures:
   [`dev/main.ts`](dev/main.ts) for a working setup. `applyBranding(...)`
   injects a tenant branding overlay merged into every response (presets
   include `font_url` for Inter).
-- **Framework demos (TCP server)** — `corepack pnpm nx start @zitadel/api-mock`
+- **Framework demos (TCP server)** — `moon run api-mock:start`
   serves the same handlers on port 4000 with `defaultDevBranding` (Arimo
   `font_url`) applied at boot. See [`apps/demo-next`](../../apps/demo-next/README.md)
   and [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md).
@@ -123,12 +129,12 @@ fixtures:
 Two places run the components against `@zitadel/api-mock`. They
 have different jobs — keep both:
 
-| Surface | Nx command | URLs | What it gives you |
+| Surface | Moon command | URLs | What it gives you |
 | --- | --- | --- | --- |
-| **Lit playground** | `corepack pnpm nx dev @zitadel/components` | [login](http://localhost:5173/?route=login) · [atoms](http://localhost:5173/?route=atoms) | Component author surface: branding presets, event log, source TS from `src/`. MSW runs in the browser — no TCP mock server. |
-| **React console playground** | `corepack pnpm nx dev @zitadel/console` | [http://localhost:5174](http://localhost:5174) | `@zitadel/ui-react` atom matrices in the pre-release console shell. MSW in `import.meta.env.DEV`. Compare against Lit `:5173/?route=atoms` in a second tab. |
-| **demo-next** | `corepack pnpm nx start @zitadel/api-mock` + `ZITADEL_URL=http://localhost:4000 corepack pnpm nx dev @zitadel/demo-next` | [http://localhost:3002/login](http://localhost:3002/login) (mock on `:4000`) | Next.js SDK, middleware, cookies, built `dist/`. See [`apps/demo-next`](../../apps/demo-next/README.md). |
-| **demo-nuxt** | mock on `:4000`, then `ZITADEL_URL=http://localhost:4000 corepack pnpm nx dev @zitadel/demo-nuxt` | [http://localhost:3001/login](http://localhost:3001/login) | Nuxt SDK, middleware, cookies, built `dist/`. See [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md). |
+| **Lit playground** | `moon run components:dev` | [login](http://localhost:5173/?route=login) · [atoms](http://localhost:5173/?route=atoms) | Component author surface: branding presets, event log, source TS from `src/`. MSW runs in the browser — no TCP mock server. |
+| **React console playground** | `moon run console:dev` | [http://localhost:5174](http://localhost:5174) | `@zitadel/ui-react` atom matrices in the pre-release console shell. MSW in `import.meta.env.DEV`. Compare against Lit `:5173/?route=atoms` in a second tab. |
+| **demo-next** | `moon run api-mock:start` + `ZITADEL_URL=http://localhost:4000 moon run demo-next:dev` | [http://localhost:3002/login](http://localhost:3002/login) (mock on `:4000`) | Next.js SDK, middleware, cookies, built `dist/`. See [`apps/demo-next`](../../apps/demo-next/README.md). |
+| **demo-nuxt** | mock on `:4000`, then `ZITADEL_URL=http://localhost:4000 moon run demo-nuxt:dev` | [http://localhost:3001/login](http://localhost:3001/login) | Nuxt SDK, middleware, cookies, built `dist/`. See [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md). |
 
 The Lit dev playground iterates on `<zl-*>` source; the React console
 playground exercises `@zitadel/ui-react` in the internal shell.
@@ -138,7 +144,7 @@ it round-trips faster. For React pair tweaks, use `:5174`.
 **Stale Lit styles on `:5173`?** Atom `.ts` changes use
 `vite-plugin-web-components-hmr` (Lit HMR). Edits to `shared-component-styles`
 CSS alone trigger a full reload. If it still looks old, run
-`corepack pnpm nx dev:clean @zitadel/components` and hard-refresh.
+`corepack pnpm --filter @zitadel/components run dev:clean` and hard-refresh.
 Console (`:5174`) will not pick up Lit-only edits until you rebuild or
 change the paired React/CSS path.
 
@@ -159,17 +165,33 @@ form-associated inputs.
 
 | Tier | Surface | Use when |
 | --- | --- | --- |
-| API base | `setProxyPath()` from `@zitadel/api/runtime/base-url` | every consumer — points at your backend |
+| SDK config | `configureZitadel({ projectId, proxyPath })` from `@zitadel/api/config` | every consumer — sets the project + proxy path the element reads |
 | Tokens | branding payload returned from the server | tenant colour / logo / font |
 | CSS hooks | `zitadel-login::part(form)`, `zl-field::part(input)` | targeted overrides from the host page |
-| Locale | `el.locale = { ... }` | i18n / custom copy |
+| Locale | `el.lang = 'de'` / `el.locales = { ... }` | i18n / custom copy |
 | MSW mocks | `setupWorker` / `setupServer` from `msw` | offline / staging / fixtures |
 | Custom template | (planned) | tenant-supplied Liquid layouts |
 | Atoms-only | hand-built form | non-standard flow shells |
 
-The "Custom template" surface is not yet exposed on `<zitadel-login>`; the
-orchestrator currently uses the bundled `auth_form.liquid`. Tracked as a
-follow-up.
+For styling, start with the generated `--zl-*` variables from
+`@zitadel/design-tokens`, then use host CSS on `zitadel-login { ... }` for page
+placement and `::part(...)` hooks for targeted internals such as the form or
+field input. The design-token package README is the canonical token catalogue;
+the branding design notes explain the broader override ladder. The current
+orchestrator is page-oriented: the host element can be constrained, but the
+inner `.zl-mount` still claims `100vh`, so embedding it as a small inline card is
+limited until the component follow-up relaxes that layout.
+
+Automation can use the stable host and native shadow-root hooks that the default
+template emits. Host atoms expose hooks such as `zitadel-field-email`,
+`zitadel-field-password`, and `zitadel-action-submit`; their native shadow
+controls expose hooks such as `zitadel-input-email`, `zitadel-input-password`,
+and `zitadel-action-submit-button`.
+
+A tenant Liquid template can already be supplied through the branding
+payload's `liquid_template` field; a dedicated declarative `template`
+surface on `<zitadel-login>` is not yet exposed. The orchestrator otherwise
+renders the bundled `default.liquid`. Tracked as a follow-up.
 
 ## Element APIs
 
@@ -178,31 +200,29 @@ follow-up.
 | Property | Type | Notes |
 | --- | --- | --- |
 | `purpose` | `'login' \| 'register' \| 'reset_password' \| string` | Which flow purpose to drive |
-| `projectId` / `project-id` | `string` | Project / tenant id sent with `POST /flow` |
-| `apiBase` / `api-base` | `string` | Optional declarative override for `setProxyPath()` |
-| `sessionExchangePath` / `session-exchange-path` | `string` | Handoff exchange path (default `/sessions/exchange`, prefixed with `api-base`). Any other value is resolved from `location.origin` instead — use when exchange is rewritten separately (e.g. `/api/auth/exchange`) |
-| `postSignInUrl` / `post-sign-in-url` | `string` | After `complete: "show"`, exchange the `handoff_token` at the configured exchange path and navigate here |
+| `project` | `ZitadelProject` | SDK handle from `configureZitadel()`. Object property (not an attribute). When unset, the element falls back to the global handle from `getZitadelConfig()` |
+| `lang` | `string` | BCP 47 tag (e.g. `"de"`, `"en-US"`). Resolves to a built-in dictionary; falls back to `<html lang>` / `navigator.language` |
+| `locales` | `Record<string, Locale>` | Custom locale dictionaries keyed by language code; spread over the built-in dictionary so partial overrides work |
+| `postSignInUrl` / `post-sign-in-url` | `string` | After `complete: "show"`, exchange the `handoff_token` for a session cookie and navigate here |
 | `resumeFlowId` / `resume-flow-id` | `string` | Resume an existing flow handle instead of starting fresh |
-| `locale` | `Record<string, string>` | i18n dictionary consumed by Liquid's `\| t` filter |
 
-Events: `zitadel-flow-input`, `zitadel-flow-action`, `zitadel-flow-step`,
-`zitadel-flow-complete`, `zitadel-flow-error`. The orchestrator exposes
-`::part(form)` for tenant-side CSS hooks. Adopts design tokens and
-`branding.font_url` into its shadow root on each update.
+Events: `zitadel-flow-input`, `zitadel-flow-step`, `zitadel-flow-complete`,
+`zitadel-flow-error`. The orchestrator exposes `::part(form)` for tenant-side
+CSS hooks. Adopts design tokens and `branding.font_url` into its shadow root
+on each update.
 
 ### `<zitadel-logout>`
 
 Session menu / sign-out control for embedded apps. Reads the
-`__nextgen_display` cookie set during sign-in, calls `GET /auth/end-session`
-through `api-base`, and clears the session. Uses the same token adoption as
-`<zitadel-login>` (`applyBaseTokens` + optional `font_url` when hosted on a
-page without global tokens).
+`__nextgen_display` cookie set during sign-in, calls `revokeMySession`
+(`DELETE /sessions/me`) through the SDK handle, and clears the session. Uses
+the same token adoption as `<zitadel-login>` (`applyBaseTokens`).
 
 | Property | Type | Notes |
 | --- | --- | --- |
-| `apiBase` / `api-base` | `string` | Proxied auth API prefix (e.g. `/__nextgen`) |
+| `project` | `ZitadelProject` | SDK handle from `configureZitadel()`. Object property; falls back to the global handle from `getZitadelConfig()` |
 | `postSignOutUrl` / `post-sign-out-url` | `string` | Navigate here after sign-out |
-| `clientId` / `client-id` | `string` | Optional OIDC client id forwarded to end-session |
+| `clientId` / `client-id` | `string` | Optional OIDC client id forwarded to `getEndSessionUrl()` |
 
 Supports a light-DOM `<template>` slot for a fully custom menu; default UI is
 the avatar trigger + dropdown.
@@ -270,7 +290,7 @@ packages/components/
 │   │                       zl-card, zl-page-shell + tests
 │   ├── orchestrator/      <zitadel-login>, <zitadel-logout>, api-client, liquid, branding
 │   │   ├── locales/       bundled English fallback
-│   │   └── templates/     auth-form / passkey-upsell / signed-in liquid partials
+│   │   └── templates/     default.liquid (all steps) + layout-chrome.css
 │   ├── tokens/            re-export of @zitadel/design-tokens
 │   ├── styles/            shared host styles, focus ring, t() css-var bridge
 │   ├── manifests.ts       per-atom attribute / part / event manifests
@@ -282,9 +302,10 @@ packages/components/
 
 ## Develop
 
-Use **Nx** for tasks in this monorepo (`corepack pnpm nx <target> <project>`).
-It matches CI caching and dependency order. Equivalent `pnpm --filter …` scripts
-still exist on some packages, but Nx is the documented path.
+Use **Moon** for tasks in this monorepo (`moon run <project>:<task>`).
+It matches CI caching and dependency order. Direct `pnpm --filter ...` scripts
+still exist on some packages for leaf-package debugging, but Moon is the
+documented path.
 
 ```sh
 # install once at the repo root
@@ -293,25 +314,25 @@ corepack pnpm install
 # --- Playgrounds (two terminals) ---
 
 # Lit: atoms + login, in-browser MSW
-corepack pnpm nx dev @zitadel/components
+moon run components:dev
 # → http://localhost:5173/?route=login
 # → http://localhost:5173/?route=atoms
 
 # React console: ui-react atom playground (compare to Lit ?route=atoms in another tab)
-corepack pnpm nx dev @zitadel/console
+moon run console:dev
 # → http://localhost:5174
 
 # Framework demos (TCP mock + SDK) — see apps/demo-*/README.md
-# corepack pnpm nx start @zitadel/api-mock   # → http://localhost:4000
-# ZITADEL_URL=http://localhost:4000 corepack pnpm nx dev @zitadel/demo-next  # → :3002
-# ZITADEL_URL=http://localhost:4000 corepack pnpm nx dev @zitadel/demo-nuxt  # → :3001
+# moon run api-mock:start   # → http://localhost:4000
+# ZITADEL_URL=http://localhost:4000 moon run demo-next:dev  # → :3002
+# ZITADEL_URL=http://localhost:4000 moon run demo-nuxt:dev  # → :3001
 
 # --- Package checks ---
 
-corepack pnpm nx test @zitadel/components
-corepack pnpm nx test:browser @zitadel/components
-corepack pnpm nx typecheck @zitadel/components
-corepack pnpm nx build @zitadel/components
+moon run components:test
+moon run components:test-browser
+moon run components:typecheck
+moon run components:build
 ```
 
 The components dev server imports source TS from `src/` and hot-reloads on edits.

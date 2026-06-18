@@ -4,16 +4,20 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/crypto"
+	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
+const Name = "zitadel/backend/v3/instrumentation/tracing"
+
 type Config struct {
-	Server         ServerConfig          `mapstructure:"server"`
-	Database       database.Config       `mapstructure:"database"`
-	PasswordHasher crypto.HashConfig     `mapstructure:"password_hasher"`
-	Schema         SchemaConfig          `mapstructure:"schema"`
-	Session        service.SessionConfig `mapstructure:"session"`
+	Server          ServerConfig           `mapstructure:"server"`
+	Database        database.Config        `mapstructure:"database"`
+	PasswordHasher  crypto.HashConfig      `mapstructure:"password_hasher"`
+	Schema          SchemaConfig           `mapstructure:"schema"`
+	Session         service.SessionConfig  `mapstructure:"session"`
+	Instrumentation instrumentation.Config `mapstructure:"instrumentation"`
 }
 
 func (c Config) Validate() error {

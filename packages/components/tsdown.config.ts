@@ -31,41 +31,75 @@ function liquidRaw(): Plugin {
  * registry deps. `@zitadel/api-mock` stays external because it's a
  * test-only helper consumers never import.
  */
-export default defineConfig({
-  plugins: [liquidRaw()],
-  entry: {
-    index: "src/index.ts",
-    "atoms/index": "src/atoms/index.ts",
-    manifests: "src/manifests.ts",
-    "tokens/index": "src/tokens/index.ts",
-    "orchestrator/index": "src/orchestrator/index.ts",
+/** Internal workspace deps are always inlined so the published package is self-contained. */
+const INLINE_INTERNAL = [
+  /^@zitadel\/api(\/|$)/,
+  /^@zitadel\/design-tokens(\/|$)/,
+  /^@zitadel\/shared-component-styles(\/|$)/,
+];
+
+/** Third-party runtime deps the components need in the browser. */
+const THIRD_PARTY = ["lit", /^lit\//, "liquidjs", "dompurify", "lucide", /^lucide\//] as const;
+
+export default defineConfig([
+  /**
+   * Library build — the npm entrypoints. `lit`/`liquidjs`/`dompurify`/`lucide`
+   * stay EXTERNAL so a consuming app's bundler resolves a single shared copy
+   * (no duplicate-Lit). This is what `import "@zitadel/components"` resolves to.
+   */
+  {
+    plugins: [liquidRaw()],
+    entry: {
+      index: "src/index.ts",
+      "atoms/index": "src/atoms/index.ts",
+      manifests: "src/manifests.ts",
+      "tokens/index": "src/tokens/index.ts",
+      "orchestrator/index": "src/orchestrator/index.ts",
+    },
+    outDir: "dist",
+    format: ["esm"],
+    tsconfig: "tsconfig.lib.json",
+    dts: true,
+    sourcemap: true,
+    // `clean: true` would wipe the .d.ts files tsgo emits during the
+    // `typecheck` target, breaking project-reference consumers
+    // (sdk-next, demo-next, demo-nuxt) whose tsgo --build expects those
+    // .d.ts files to exist. tsdown still overwrites its own .mjs/.d.mts
+    // outputs on each rebuild — stale files just accumulate harmlessly
+    // until a full `git clean`.
+    clean: false,
+    target: "es2022",
+    external: [...THIRD_PARTY, "@zitadel/api-mock"],
+    noExternal: INLINE_INTERNAL,
   },
-  outDir: "dist",
-  format: ["esm"],
-  tsconfig: "tsconfig.lib.json",
-  dts: true,
-  sourcemap: true,
-  // `clean: true` would wipe the .d.ts files tsgo emits during the
-  // `typecheck` target, breaking project-reference consumers
-  // (sdk-next, demo-next, demo-nuxt) whose tsgo --build expects those
-  // .d.ts files to exist. tsdown still overwrites its own .mjs/.d.mts
-  // outputs on each rebuild — stale files just accumulate harmlessly
-  // until a full `git clean` or `nx reset`.
-  clean: false,
-  target: "es2022",
-  external: [
-    "lit",
-    /^lit\//,
-    "liquidjs",
-    "dompurify",
-    "lucide",
-    /^lucide\//,
-    "@zitadel/api-mock",
-  ],
-  /** Inline internal workspace deps so the published package is self-contained. */
-  noExternal: [
-    /^@zitadel\/api(\/|$)/,
-    /^@zitadel\/design-tokens(\/|$)/,
-    /^@zitadel\/shared-component-styles(\/|$)/,
-  ],
-});
+
+  /**
+   * Standalone build — one self-contained file for a plain HTML page. Here the
+   * third-party UI deps ARE inlined, so `<script type="module"
+   * src="…/standalone.mjs">` works with no import map and no bundler. Kept
+   * separate from the library build above so npm/SDK consumers are unaffected.
+   *
+   * `platform: "browser"` is required: the default ("node") makes rolldown emit
+   * `import { createRequire } from "node:module"` for its CJS-interop helper,
+   * which a browser cannot resolve — the whole module then fails to load. The
+   * browser platform also picks the `browser`/`import` export conditions of the
+   * inlined deps so no Node-only entry points leak in.
+   */
+  {
+    plugins: [liquidRaw()],
+    entry: { standalone: "src/index.ts" },
+    outDir: "dist",
+    format: ["esm"],
+    platform: "browser",
+    // `platform: "browser"` would otherwise emit `standalone.js`; force `.mjs`
+    // so the `unpkg`/`jsdelivr`/`./standalone` paths in package.json still match.
+    fixedExtension: true,
+    tsconfig: "tsconfig.lib.json",
+    dts: false,
+    sourcemap: false,
+    clean: false,
+    target: "es2022",
+    external: ["@zitadel/api-mock"],
+    noExternal: [...INLINE_INTERNAL, ...THIRD_PARTY],
+  },
+]);

@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-nuxt",
-  "version": "0.1.0-alpha.0",
+  "version": "0.1.0-alpha.10",
   "description": "Nuxt proxy middleware and helpers for Nextgen Auth",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-nuxt#readme",
   "bugs": {
@@ -33,7 +33,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts src/server.ts src/runtime/types.ts src/runtime/server/middleware.ts src/runtime/server/handler.ts --format esm --dts --clean && tsup src/runtime/plugin.ts src/runtime/composables/useAuth.ts src/module.ts --format esm --no-clean --external @nuxt/kit --external '#imports'",
+    "build": "tsup src/index.ts src/server.ts src/runtime/types.ts src/runtime/server/middleware.ts src/runtime/server/handler.ts --format esm --dts --clean --external '#imports' && tsup src/runtime/plugin.ts src/runtime/composables/useAuth.ts src/module.ts --format esm --no-clean --external @nuxt/kit --external '#imports'",
     "dev": "tsup src/index.ts src/server.ts --format esm --dts --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",

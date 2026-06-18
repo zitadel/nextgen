@@ -1,0 +1,10 @@
+---
+title: Sessions and auth attempts
+description: Durable sessions and ephemeral authentication attempts.
+---
+
+An auth attempt is an ephemeral state machine for one authentication journey. It issues challenges, verifies proofs, and hands off a completed result.
+
+A session is the durable post-auth container. It carries the verified user and factors after an auth attempt succeeds.
+
+The generated OpenAPI reference exposes these resources as endpoint groups. The SDK middleware uses session cookies and JWT verification to protect routes and expose auth state to framework code.

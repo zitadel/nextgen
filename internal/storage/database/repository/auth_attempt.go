@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"strconv"
 	"time"
 
@@ -667,7 +667,7 @@ func newAuthChecks(
 			checks = append(checks, passkeyCheck)
 		}
 	default:
-		log.Println("unsupported auth check type:", checkType)
+		slog.Error("unsupported auth check type", slog.Any("check_type", checkType))
 	}
 	return checks, nil
 }

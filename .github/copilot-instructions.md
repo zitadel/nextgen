@@ -23,13 +23,14 @@ more than polish.
   server contract lands first.
 - Watch for secret leakage. Project, preview, token, and `.zitadel/secret` style
   values must not enter source control or browser-safe env metadata.
-- User-visible changes to a public npm package need a changeset; author the
-  `.changeset/<slug>.md` file directly rather than via the interactive prompt.
-  See `AGENTS.md` for the package list and file format. npm package manifests
-  must keep `"license": "MIT"`.
-- PR titles must pass Semantic PR. Use `<type>(optional-scope): <summary>` and
-  verify allowed types/scopes against `.github/semantic.yml`; for docs-only
-  changes, use a title such as `docs: add preview status disclaimer`.
+- User-visible changes to a public npm package need a changeset; follow the
+  [decision table in `.changeset/README.md`](.changeset/README.md#decision-table)
+  (paths, when to skip, when to add a real vs empty file). Author
+  `.changeset/<slug>.md` directly rather than via the interactive prompt. npm
+  package manifests must keep `"license": "MIT"`.
+- PR metadata must follow `AGENTS.md`: verify the title against
+  `.github/semantic.yml`, prefer a scope-free title when unsure, and keep the
+  PR description current with summary, validation, changeset, and notes.
 - Server and embedded console changes are AGPL-3.0-only by default; public API,
   docs, CLI, and SDK paths are MIT exceptions per `LICENSING.md`.
 - For `consumer-journey-e2e` or `apps/cli-journey-e2e/**` changes, verify that

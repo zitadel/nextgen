@@ -1,0 +1,40 @@
+---
+title: Local runtime commands
+description: Start, stop, inspect, and reset local Zitadel.
+---
+
+Start local Zitadel:
+
+```sh
+npx @zitadel/cli@alpha start
+```
+
+Show status:
+
+```sh
+npx @zitadel/cli@alpha status
+```
+
+Print logs:
+
+```sh
+npx @zitadel/cli@alpha logs
+```
+
+Stop the runtime while preserving data:
+
+```sh
+npx @zitadel/cli@alpha stop
+```
+
+Delete runtime data:
+
+```sh
+npx @zitadel/cli@alpha reset --force
+```
+
+The runtime listens on `http://localhost:8080` by default. Choose another port when needed:
+
+```sh
+npx @zitadel/cli@alpha start --port 8081
+```

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { runCapture } from "./dev-process.mjs";
 
@@ -16,7 +16,7 @@ checkNodeModules();
 await checkGo();
 await checkDocker();
 await checkPlaywright();
-await checkGoReleaser();
+await checkMoon();
 
 printResults();
 process.exit(required.length > 0 ? 1 : 0);
@@ -58,14 +58,11 @@ async function checkPnpm() {
 }
 
 function checkNodeModules() {
-  if (existsSync(join(repoRoot, "node_modules", ".bin", "nx"))) {
+  if (existsSync(join(repoRoot, "node_modules", ".bin", "moon"))) {
     pass("workspace dependencies are installed");
     return;
   }
-  fail(
-    "workspace dependencies are not installed",
-    "Run: corepack pnpm install --frozen-lockfile",
-  );
+  fail("workspace dependencies are not installed", "Run: corepack pnpm install --frozen-lockfile");
 }
 
 async function checkGo() {
@@ -93,8 +90,8 @@ async function checkDocker() {
     });
     pass(`Docker engine ${stdout.trim()} is running`);
   } catch {
-    warn(
-      "Docker is not available; journey and integration checks need it",
+    fail(
+      "Docker is not available; local runtime image builds need it",
       "Start Docker Desktop or another Docker daemon, then rerun doctor",
     );
   }
@@ -126,20 +123,16 @@ async function checkPlaywright() {
   );
 }
 
-async function checkGoReleaser() {
+async function checkMoon() {
   try {
-    const { stdout, stderr } = await runCapture("goreleaser", ["--version"], {
+    const { stdout } = await runCapture("moon", ["--version"], {
       cwd: repoRoot,
     });
-    const versionLine = `${stdout}${stderr}`
-      .split(/\r?\n/)
-      .find((line) => line.startsWith("GitVersion:"));
-    const version = versionLine?.split(/\s+/).at(1) ?? "available";
-    pass(`GoReleaser ${version}`);
+    pass(`Moon ${stdout.trim()}`);
   } catch {
-    warn(
-      "GoReleaser is not available; release checks need it",
-      "Install GoReleaser v2: https://goreleaser.com/install/",
+    fail(
+      "Moon is not available; local checks and release tasks need it",
+      "Run: corepack pnpm install --frozen-lockfile",
     );
   }
 }

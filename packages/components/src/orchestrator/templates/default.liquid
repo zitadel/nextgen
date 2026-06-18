@@ -5,7 +5,10 @@
   <zl-card>
     <h1 slot="header" class="zl-card-title">{{ step.texts.title_key | t: identity.display_name }}</h1>
     {% if step.texts.description_key %}
-      <p slot="header" class="zl-card-subtitle">{{ step.texts.description_key | t: identity.display_name }}</p>
+      {% assign card_subtitle = step.texts.description_key | t: identity.display_name %}
+      {% if card_subtitle != "" %}
+        <p slot="header" class="zl-card-subtitle">{{ card_subtitle }}</p>
+      {% endif %}
     {% endif %}
 
     {% if errors and errors.size > 0 %}
@@ -20,25 +23,26 @@
       {% endfor %}
     {% endif %}
 
-    {% for entry in fields %}
-      {% assign field_placeholder = entry[1].text_key | fieldPlaceholder %}
-      {% assign field_help = entry[1].text_key | fieldHelp %}
-      {% assign field_err = entry[0] | fieldError: errors %}
+    {% for f in fields %}
+      {% assign field_placeholder = f.text_key | fieldPlaceholder %}
+      {% assign field_help = f.text_key | fieldHelp %}
+      {% assign field_err = f.name | fieldError: errors %}
       {% assign autocomplete_val = '' %}
-      {% if entry[0] == 'email' %}
+      {% if f.name == 'email' %}
         {% assign autocomplete_val = 'email' %}
-      {% elsif entry[1].type == 'password' and step.name contains 'register' %}
+      {% elsif f.type == 'password' and step.name contains 'register' %}
         {% assign autocomplete_val = 'new-password' %}
-      {% elsif entry[1].type == 'password' %}
+      {% elsif f.type == 'password' %}
         {% assign autocomplete_val = 'current-password' %}
       {% endif %}
       <zl-field
-        name="{{ entry[0] }}"
-        label="{{ entry[1].text_key | t }}"
-        type="{{ entry[1].type }}"
-        value="{{ entry[1].value }}"
+        name="{{ f.name }}"
+        data-testid="zitadel-field-{{ f.name }}"
+        label="{{ f.text_key | t }}"
+        type="{{ f.type }}"
+        value="{{ f.value }}"
         {% if autocomplete_val != '' %}autocomplete="{{ autocomplete_val }}"{% endif %}
-        {% if entry[1].required %}required{% endif %}
+        {% if f.required %}required{% endif %}
         {% if field_placeholder != "" %}placeholder="{{ field_placeholder }}"{% endif %}
         {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
       >
@@ -48,59 +52,66 @@
       </zl-field>
     {% endfor %}
 
-    {% if fields.email and fields.password and step.name == 'identifier' %}
+    {% assign recover = actions | where: "name", "recover" | first %}
+    {% if recover %}
       <p class="zl-card-forgot">
-        <a href="#" class="zl-card-forgot__link" data-action="recover">{{ 'action.forgot_password' | t }}</a>
+        <a href="#" class="zl-card-forgot__link" data-action="recover">{{ recover.text_key | t }}</a>
       </p>
     {% endif %}
 
-    {% for entry in actions %}
-      {% if entry[1].primary %}
+    {% for a in actions %}
+      {% if a.primary %}
         <zl-button
           hierarchy="primary"
           size="medium"
           type="submit"
           block
-          action="{{ entry[0] }}"
-          label="{{ entry[1].text_key | t }}"
+          action="{{ a.name }}"
+          data-testid="zitadel-action-{{ a.name }}"
+          label="{{ a.text_key | t }}"
           {% if loading %}loading{% endif %}
         ></zl-button>
       {% endif %}
     {% endfor %}
 
-    {% for entry in actions %}
-      {% unless entry[1].primary or entry[0] == 'passkey' or entry[0] == 'register' or entry[0] == 'sign_in' %}
+    {% for a in actions %}
+      {% unless a.primary or a.name == 'passkey' or a.name == 'register' or a.name == 'sign_in' or a.name == 'recover' %}
         <zl-button
           hierarchy="secondary"
           size="medium"
           type="button"
           block
-          action="{{ entry[0] }}"
-          label="{{ entry[1].text_key | t }}"
+          action="{{ a.name }}"
+          data-testid="zitadel-action-{{ a.name }}"
+          label="{{ a.text_key | t }}"
         ></zl-button>
       {% endunless %}
     {% endfor %}
 
-    {% if actions.passkey %}
+    {% assign passkey = actions | where: "name", "passkey" | first %}
+    {% if passkey %}
       <zl-button
         hierarchy="secondary"
         size="medium"
         block
         action="passkey"
-        label="{{ actions.passkey.text_key | t }}"
+        data-testid="zitadel-action-passkey"
+        label="{{ passkey.text_key | t }}"
       ></zl-button>
     {% endif %}
 
 
-    {% if actions.register %}
+    {% assign register = actions | where: "name", "register" | first %}
+    {% if register %}
       <p class="zl-card-nav">
-        {{ 'identifier.action.register.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="register">{{ 'identifier.action.register.link' | t }}</a>
+        {{ 'identifier.action.register.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="register" data-testid="zitadel-action-register-link">{{ 'identifier.action.register.link' | t }}</a>
       </p>
     {% endif %}
 
-    {% if actions.sign_in %}
+    {% assign sign_in = actions | where: "name", "sign_in" | first %}
+    {% if sign_in %}
       <p class="zl-card-nav">
-        {{ 'register.action.sign_in.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="sign_in">{{ 'register.action.sign_in.link' | t }}</a>
+        {{ 'register.action.sign_in.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="sign_in" data-testid="zitadel-action-sign_in-link">{{ 'register.action.sign_in.link' | t }}</a>
       </p>
     {% endif %}
 
