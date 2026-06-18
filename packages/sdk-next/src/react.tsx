@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { createComponent } from '@lit/react';
+import { createComponent } from "@lit/react";
 import {
   ZitadelLogin as ZitadelLoginElement,
   ZitadelLogout as ZitadelLogoutElement,
-} from '@zitadel/components';
+} from "@zitadel/components";
 /**
  * React components for the Zitadel auth widgets.
  *
@@ -19,16 +19,16 @@ import {
  * `<zitadel-login>` / `<zitadel-logout>` tag and the browser upgrades it on
  * hydration. No `next/dynamic({ ssr: false })` needed at the call site.
  */
-import * as React from 'react';
+import * as React from "react";
 
 export const ZitadelLogin = createComponent({
   react: React,
-  tagName: 'zitadel-login',
+  tagName: "zitadel-login",
   elementClass: ZitadelLoginElement,
 });
 
 export const ZitadelLogout = createComponent({
   react: React,
-  tagName: 'zitadel-logout',
+  tagName: "zitadel-logout",
   elementClass: ZitadelLogoutElement,
 });
