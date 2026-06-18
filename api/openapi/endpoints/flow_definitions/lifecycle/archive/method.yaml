@@ -16,12 +16,20 @@ post:
     - $ref: ../../../../components/parameters/flow-definition-id.yaml
     - $ref: ../../../../components/parameters/project-id.yaml
   responses:
-    '200':
+    '204':
       description: Flow definition archived successfully.
     '400':
       description: Invalid request.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
     '409':
       description: Conflict (e.g., attempting to archive the last active flow definition for a given purpose).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
     default:
       description: Unexpected error.
       content:

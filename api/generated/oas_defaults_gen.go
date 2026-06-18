@@ -29,7 +29,7 @@ func (s *Field) setDefaults() {
 // setDefaults set default value of fields.
 func (s *FlowDefinition) setDefaults() {
 	{
-		val := FlowDefinitionStatus("draft")
+		val := FlowDefinitionStatus("active")
 		s.Status.SetTo(val)
 	}
 }
@@ -37,7 +37,7 @@ func (s *FlowDefinition) setDefaults() {
 // setDefaults set default value of fields.
 func (s *FlowDefinitionDetailResponse) setDefaults() {
 	{
-		val := FlowDefinitionStatus("draft")
+		val := FlowDefinitionStatus("active")
 		s.Status = val
 	}
 }
@@ -45,7 +45,7 @@ func (s *FlowDefinitionDetailResponse) setDefaults() {
 // setDefaults set default value of fields.
 func (s *FlowDefinitionResponse) setDefaults() {
 	{
-		val := FlowDefinitionStatus("draft")
+		val := FlowDefinitionStatus("active")
 		s.Status = val
 	}
 }

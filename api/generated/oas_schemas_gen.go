@@ -12,30 +12,23 @@ import (
 	"github.com/zitadel/nextgen/internal/api/ogenx"
 )
 
-// ActivateFlowDefinitionBadRequest is response for ActivateFlowDefinition operation.
-type ActivateFlowDefinitionBadRequest struct{}
+// ActivateFlowDefinitionNoContent is response for ActivateFlowDefinition operation.
+type ActivateFlowDefinitionNoContent struct{}
 
-func (*ActivateFlowDefinitionBadRequest) activateFlowDefinitionRes() {}
+func (*ActivateFlowDefinitionNoContent) activateFlowDefinitionRes() {}
 
-// ActivateFlowDefinitionOK is response for ActivateFlowDefinition operation.
-type ActivateFlowDefinitionOK struct{}
-
-func (*ActivateFlowDefinitionOK) activateFlowDefinitionRes() {}
-
-// ArchiveFlowDefinitionBadRequest is response for ArchiveFlowDefinition operation.
-type ArchiveFlowDefinitionBadRequest struct{}
+type ArchiveFlowDefinitionBadRequest ErrorDetails
 
 func (*ArchiveFlowDefinitionBadRequest) archiveFlowDefinitionRes() {}
 
-// ArchiveFlowDefinitionConflict is response for ArchiveFlowDefinition operation.
-type ArchiveFlowDefinitionConflict struct{}
+type ArchiveFlowDefinitionConflict ErrorDetails
 
 func (*ArchiveFlowDefinitionConflict) archiveFlowDefinitionRes() {}
 
-// ArchiveFlowDefinitionOK is response for ArchiveFlowDefinition operation.
-type ArchiveFlowDefinitionOK struct{}
+// ArchiveFlowDefinitionNoContent is response for ArchiveFlowDefinition operation.
+type ArchiveFlowDefinitionNoContent struct{}
 
-func (*ArchiveFlowDefinitionOK) archiveFlowDefinitionRes() {}
+func (*ArchiveFlowDefinitionNoContent) archiveFlowDefinitionRes() {}
 
 // Merged schema.
 // Ref: #
@@ -2103,20 +2096,18 @@ type DeleteFlowDefinitionNoContent struct{}
 
 func (*DeleteFlowDefinitionNoContent) deleteFlowDefinitionRes() {}
 
-// DeprecateFlowDefinitionBadRequest is response for DeprecateFlowDefinition operation.
-type DeprecateFlowDefinitionBadRequest struct{}
+type DeprecateFlowDefinitionBadRequest ErrorDetails
 
 func (*DeprecateFlowDefinitionBadRequest) deprecateFlowDefinitionRes() {}
 
-// DeprecateFlowDefinitionConflict is response for DeprecateFlowDefinition operation.
-type DeprecateFlowDefinitionConflict struct{}
+type DeprecateFlowDefinitionConflict ErrorDetails
 
 func (*DeprecateFlowDefinitionConflict) deprecateFlowDefinitionRes() {}
 
-// DeprecateFlowDefinitionOK is response for DeprecateFlowDefinition operation.
-type DeprecateFlowDefinitionOK struct{}
+// DeprecateFlowDefinitionNoContent is response for DeprecateFlowDefinition operation.
+type DeprecateFlowDefinitionNoContent struct{}
 
-func (*DeprecateFlowDefinitionOK) deprecateFlowDefinitionRes() {}
+func (*DeprecateFlowDefinitionNoContent) deprecateFlowDefinitionRes() {}
 
 // Ref: #
 type DeviceAuthorizationResponse struct {
@@ -2245,16 +2236,18 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 	s.Details = val
 }
 
-func (*ErrorDetails) authorizeDeviceRes()     {}
-func (*ErrorDetails) authorizeGetRes()        {}
-func (*ErrorDetails) createFlowRes()          {}
-func (*ErrorDetails) createProjectRes()       {}
-func (*ErrorDetails) createSessionRes()       {}
-func (*ErrorDetails) endSessionRes()          {}
-func (*ErrorDetails) getMyUserRes()           {}
-func (*ErrorDetails) introspectRes()          {}
-func (*ErrorDetails) listFlowDefinitionsRes() {}
-func (*ErrorDetails) submitFlowStepRes()      {}
+func (*ErrorDetails) activateFlowDefinitionRes() {}
+func (*ErrorDetails) authorizeDeviceRes()        {}
+func (*ErrorDetails) authorizeGetRes()           {}
+func (*ErrorDetails) createFlowRes()             {}
+func (*ErrorDetails) createProjectRes()          {}
+func (*ErrorDetails) createSessionRes()          {}
+func (*ErrorDetails) deleteFlowDefinitionRes()   {}
+func (*ErrorDetails) endSessionRes()             {}
+func (*ErrorDetails) getMyUserRes()              {}
+func (*ErrorDetails) introspectRes()             {}
+func (*ErrorDetails) listFlowDefinitionsRes()    {}
+func (*ErrorDetails) submitFlowStepRes()         {}
 
 // Additional error-specific context.
 type ErrorDetailsDetails map[string]jx.Raw

@@ -1,6 +1,6 @@
 type: string
 enum: [ draft, active, deprecated, archived ]
-default: draft
+default: active
 description: |
   The lifecycle state of this flow definition. 
   

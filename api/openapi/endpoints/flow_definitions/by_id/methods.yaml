@@ -34,7 +34,6 @@ put:
   summary: Update a flow definition by id
   description: |
     Update a flow definition by id. This endpoint completely replaces the existing flow definition.
-    Allowed to update only those flow definitions that are in the `draft` state to prevent breaking changes to active flow definitions. 
     The status of the flow definition can also be updated by setting the `status` attribute in the flow definition.
   tags:
     - Flow Definitions
@@ -84,7 +83,10 @@ put:
 delete:
   operationId: deleteFlowDefinition
   summary: Delete a flow definition by id
-  description: Delete a flow definition by id
+  description: |
+    Delete a flow definition by id.
+    If the flow definition is currently being used by a flow, the deletion will fail.
+    If the flow definition is the last active flow definition for a given purpose, the deletion will fail to prevent disruption of new flows being started for that purpose.
   tags:
     - Flow Definitions
   security:
@@ -101,6 +103,12 @@ delete:
   responses:
     '204':
       description: Flow definition deleted successfully. This is an idempotent operation, so if the flow definition does not exist, it will still return a 204 status code.
+    '409':
+      description: Conflict (e.g., flow definition is currently in use by a flow, attempting to delete the last active flow definition for a given purpose).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
     default:
       description: Unexpected error.
       content:

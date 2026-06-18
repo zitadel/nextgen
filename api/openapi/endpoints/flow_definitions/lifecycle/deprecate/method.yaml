@@ -16,12 +16,20 @@ post:
     - $ref: ../../../../components/parameters/flow-definition-id.yaml
     - $ref: ../../../../components/parameters/project-id.yaml
   responses:
-    '200':
+    '204':
       description: Flow definition deprecated successfully.
     '400':
       description: Invalid request (e.g., flow definition is not in an active state, invalid flow definition ID).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
     '409':
       description: Conflict (e.g., attempting to deprecate the last active flow definition for a given purpose).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
     default:
       description: Unexpected error.
       content:

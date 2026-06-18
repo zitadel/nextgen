@@ -31,10 +31,9 @@ type Invoker interface {
 	// ActivateFlowDefinition invokes activateFlowDefinition operation.
 	//
 	// Activate a flow definition in the `draft` or `deprecated` state by ID.
-	// Flow definitions are created in a `draft` state by default. They must be activated before they can
-	// be used in a flow.
-	// Alternatively, flow states can also be set via the `POST /flow_definitions` and `PUT
-	// /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow definition payload.
+	// Alternatively, the status of a flow definition can also be set via the `POST /flow_definitions`
+	// and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow
+	// definition payload.
 	//
 	// POST /flow_definitions/{id}/activate
 	ActivateFlowDefinition(ctx context.Context, params ActivateFlowDefinitionParams) (ActivateFlowDefinitionRes, error)
@@ -43,8 +42,9 @@ type Invoker interface {
 	// Archives a flow definition in the `active` or `deprecated` state by ID.
 	// Archived flow definitions cannot be used to start new flows. Existing flows will return an error
 	// if they reference an archived flow definition.
-	// Alternatively, flow states can also be modified via `POST /flow_definitions` and `PUT
-	// /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow definition payload.
+	// Alternatively, the status of a flow definition can also be set via the `POST /flow_definitions`
+	// and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow
+	// definition payload.
 	// Note: There must be at least one flow definition in the `active` state for a given `purpose` at
 	// all times to ensure that new flows can be started.
 	//
@@ -156,6 +156,9 @@ type Invoker interface {
 	// DeleteFlowDefinition invokes deleteFlowDefinition operation.
 	//
 	// Delete a flow definition by id.
+	// If the flow definition is currently being used by a flow, the deletion will fail.
+	// If the flow definition is the last active flow definition for a given purpose, the deletion will
+	// fail to prevent disruption of new flows being started for that purpose.
 	//
 	// DELETE /flow_definitions/{id}
 	DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (DeleteFlowDefinitionRes, error)
@@ -164,8 +167,9 @@ type Invoker interface {
 	// Deprecates a flow definition in the `active` state by ID.
 	// Deprecated flow definitions cannot be used to start new flows, but existing flows that reference
 	// the deprecated flow definition can continue to operate until completion.
-	// Alternatively, flow states can also be modified via `POST /flow_definitions` and `PUT
-	// /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow definition payload.
+	// Alternatively, the status of a flow definition can also be set via the `POST /flow_definitions`
+	// and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow
+	// definition payload.
 	// Note: There must be at least one flow definition in the `active` state for a given `purpose` at
 	// all times to ensure that new flows can be started.
 	//
@@ -412,8 +416,6 @@ type Invoker interface {
 	// UpdateFlowDefinition invokes updateFlowDefinition operation.
 	//
 	// Update a flow definition by id. This endpoint completely replaces the existing flow definition.
-	// Allowed to update only those flow definitions that are in the `draft` state to prevent breaking
-	// changes to active flow definitions.
 	// The status of the flow definition can also be updated by setting the `status` attribute in the
 	// flow definition.
 	//
@@ -478,10 +480,9 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 // ActivateFlowDefinition invokes activateFlowDefinition operation.
 //
 // Activate a flow definition in the `draft` or `deprecated` state by ID.
-// Flow definitions are created in a `draft` state by default. They must be activated before they can
-// be used in a flow.
-// Alternatively, flow states can also be set via the `POST /flow_definitions` and `PUT
-// /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow definition payload.
+// Alternatively, the status of a flow definition can also be set via the `POST /flow_definitions`
+// and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow
+// definition payload.
 //
 // POST /flow_definitions/{id}/activate
 func (c *Client) ActivateFlowDefinition(ctx context.Context, params ActivateFlowDefinitionParams) (ActivateFlowDefinitionRes, error) {
@@ -631,8 +632,9 @@ func (c *Client) sendActivateFlowDefinition(ctx context.Context, params Activate
 // Archives a flow definition in the `active` or `deprecated` state by ID.
 // Archived flow definitions cannot be used to start new flows. Existing flows will return an error
 // if they reference an archived flow definition.
-// Alternatively, flow states can also be modified via `POST /flow_definitions` and `PUT
-// /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow definition payload.
+// Alternatively, the status of a flow definition can also be set via the `POST /flow_definitions`
+// and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow
+// definition payload.
 // Note: There must be at least one flow definition in the `active` state for a given `purpose` at
 // all times to ensure that new flows can be started.
 //
@@ -2380,6 +2382,9 @@ func (c *Client) sendCreateUser(ctx context.Context, request *User, params Creat
 // DeleteFlowDefinition invokes deleteFlowDefinition operation.
 //
 // Delete a flow definition by id.
+// If the flow definition is currently being used by a flow, the deletion will fail.
+// If the flow definition is the last active flow definition for a given purpose, the deletion will
+// fail to prevent disruption of new flows being started for that purpose.
 //
 // DELETE /flow_definitions/{id}
 func (c *Client) DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (DeleteFlowDefinitionRes, error) {
@@ -2528,8 +2533,9 @@ func (c *Client) sendDeleteFlowDefinition(ctx context.Context, params DeleteFlow
 // Deprecates a flow definition in the `active` state by ID.
 // Deprecated flow definitions cannot be used to start new flows, but existing flows that reference
 // the deprecated flow definition can continue to operate until completion.
-// Alternatively, flow states can also be modified via `POST /flow_definitions` and `PUT
-// /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow definition payload.
+// Alternatively, the status of a flow definition can also be set via the `POST /flow_definitions`
+// and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow
+// definition payload.
 // Note: There must be at least one flow definition in the `active` state for a given `purpose` at
 // all times to ensure that new flows can be started.
 //
@@ -6550,8 +6556,6 @@ func (c *Client) sendSubmitFlowStep(ctx context.Context, request *FlowSubmitRequ
 // UpdateFlowDefinition invokes updateFlowDefinition operation.
 //
 // Update a flow definition by id. This endpoint completely replaces the existing flow definition.
-// Allowed to update only those flow definitions that are in the `draft` state to prevent breaking
-// changes to active flow definitions.
 // The status of the flow definition can also be updated by setting the `status` attribute in the
 // flow definition.
 //
