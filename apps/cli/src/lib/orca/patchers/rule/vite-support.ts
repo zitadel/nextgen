@@ -12,7 +12,8 @@ import { PROXY_PATH } from "./proxy";
 
 /**
  * Shared Vite dev-server proxy merged into the project's Vite config for the SPA
- * frameworks (React, Vue). It forwards same-origin `/__nextgen/*` calls to the
+ * frameworks (React, Vue, Solid, Svelte, Qwik). It forwards same-origin
+ * `/__nextgen/*` calls to the
  * backend, strips the prefix, and attaches the project's service-key secret
  * (read from `ZITADEL_PROJECT_SECRET` in `.env.local`) as the bearer on every
  * proxied request. The secret stays server-side: Vite only exposes vars with the

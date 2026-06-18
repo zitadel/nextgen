@@ -54,6 +54,9 @@ export const PUBLIC_PACKAGE_DIRS = [
   "packages/sdk-react",
   "packages/sdk-vue",
   "packages/sdk-angular",
+  "packages/sdk-solid",
+  "packages/sdk-svelte",
+  "packages/sdk-qwik",
 ];
 export const SERVER_PLATFORMS = [
   { goos: "linux", goarch: "amd64" },

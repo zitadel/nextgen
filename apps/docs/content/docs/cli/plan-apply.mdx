@@ -1,0 +1,25 @@
+---
+title: Plan and apply
+description: Validate local Zitadel configuration before uploading it.
+---
+
+`plan` previews the configuration sync diff without mutating files or platform state:
+
+```sh
+npx @zitadel/cli@alpha plan
+```
+
+`apply` validates and uploads repo configuration:
+
+```sh
+npx @zitadel/cli@alpha apply
+```
+
+For agents:
+
+```sh
+npx @zitadel/cli@alpha plan --non-interactive --json
+npx @zitadel/cli@alpha apply --non-interactive --json
+```
+
+Keep source-controlled configuration in `zitadel.json` and `.zitadel/**`. Keep `.zitadel/local/**` out of source control.

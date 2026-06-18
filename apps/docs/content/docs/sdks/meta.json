@@ -1,0 +1,16 @@
+{
+  "title": "SDKs",
+  "pages": [
+    "index",
+    "---Server frameworks---",
+    "next",
+    "nuxt",
+    "---SPA frameworks---",
+    "react",
+    "vue",
+    "angular",
+    "---Building blocks---",
+    "components",
+    "api-client"
+  ]
+}

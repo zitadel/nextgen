@@ -1,0 +1,12 @@
+{
+  "title": "Sessions",
+  "pages": [
+    "createSession",
+    "exchangeHandoff",
+    "getMySession",
+    "getSession",
+    "listSessions",
+    "revokeMySession",
+    "revokeSession"
+  ]
+}

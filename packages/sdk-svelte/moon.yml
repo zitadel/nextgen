@@ -1,0 +1,37 @@
+id: "sdk-svelte"
+language: "typescript"
+layer: "library"
+stack: "frontend"
+dependsOn:
+  - "api"
+  - "components"
+  - "sdk-core"
+
+tasks:
+  lint:
+    command: "corepack pnpm run lint"
+    deps:
+      - "api:build"
+      - "components:build"
+      - "sdk-core:build"
+
+  typecheck:
+    command: "corepack pnpm run typecheck"
+    deps:
+      - "api:build"
+      - "components:build"
+      - "sdk-core:build"
+
+  build:
+    command: "corepack pnpm run build"
+    deps:
+      - "api:build"
+      - "components:build"
+      - "sdk-core:build"
+    outputs:
+      - "dist/**/*"
+
+  test:
+    command: "corepack pnpm run test"
+    deps:
+      - "build"
