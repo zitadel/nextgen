@@ -195,7 +195,13 @@ type FlowStateMachineRuntime struct {
 
 // NewFlowStateMachine wires the runtime. The now hook is injectable so
 // tests can produce deterministic [FlowState.IssuedAt] values.
-func NewFlowStateMachine(fields FlowFieldResolver, createUser *FlowCreateUserHandler, authAttempts FlowAuthAttemptService, passkeyRegistration FlowPasskeyRegistrationService, now func() time.Time) *FlowStateMachineRuntime {
+func NewFlowStateMachine(
+	fields FlowFieldResolver,
+	createUser *FlowCreateUserHandler,
+	authAttempts FlowAuthAttemptService,
+	passkeyRegistration FlowPasskeyRegistrationService,
+	now func() time.Time,
+) *FlowStateMachineRuntime {
 	if now == nil {
 		now = time.Now
 	}
