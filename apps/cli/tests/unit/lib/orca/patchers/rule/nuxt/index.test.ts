@@ -39,6 +39,7 @@ describe("NuxtPatcher.plan", () => {
     expect(writeContents(plan, "app/app.vue")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "app/pages/login.vue")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "app/pages/login.vue")).toContain("background: #0f0f11");
+    expect(writeContents(plan, "app/pages/login.vue")).toContain("color-scheme: dark");
     expect(writeContents(plan, "app/pages/login.vue")).not.toContain("background: #f3f4f6");
     expect(writeContents(plan, "app/pages/login.vue")).not.toContain("align-items: center");
     expect(writeContents(plan, "app/plugins/auth.server.ts")).toContain(MANAGED_MARKER);

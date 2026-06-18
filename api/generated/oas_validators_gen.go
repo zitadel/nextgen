@@ -1209,13 +1209,9 @@ func (s *FlowDefinitionResponse) Validate() error {
 
 func (s FlowDefinitionStatus) Validate() error {
 	switch s {
-	case "draft":
-		return nil
 	case "active":
 		return nil
-	case "deprecated":
-		return nil
-	case "archived":
+	case "draft":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)

@@ -26,7 +26,7 @@ export const App = component$(() => {
 
   if (path === "/") {
     return (
-      <main style={{ position: "fixed", inset: "0", padding: "48px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", background: "#0f0f11", color: "#f4f4f6", fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", lineHeight: "1.5", letterSpacing: "normal", textAlign: "center" }}>
+      <main style={{ position: "fixed", inset: "0", padding: "48px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", background: "#0f0f11", colorScheme: "dark", color: "#f4f4f6", fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", lineHeight: "1.5", letterSpacing: "normal", textAlign: "center" }}>
         <section style={{ width: "100%", maxWidth: "560px" }}>
           <p style={{ margin: "0 0 12px", color: "#9ca3af", fontSize: "14px" }}>Zitadel auth</p>
           <h1 style={{ margin: "0 0 24px", fontSize: "32px", lineHeight: "1.15", fontWeight: "600", color: "#f4f4f6" }}>Sign in, create an account, or open your profile.</h1>
@@ -41,20 +41,20 @@ export const App = component$(() => {
   }
   if (path.startsWith("/profile")) {
     return (
-      <div style={{ position: "fixed", inset: "0", overflow: "auto", background: "#0f0f11" }}>
+      <div style={{ position: "fixed", inset: "0", overflow: "auto", background: "#0f0f11", colorScheme: "dark" }}>
         <ZitadelLogout project={project} postSignOutUrl="/login" />
       </div>
     );
   }
   if (path.startsWith("/register")) {
     return (
-      <div style={{ position: "fixed", inset: "0", overflow: "auto", background: "#0f0f11" }}>
+      <div style={{ position: "fixed", inset: "0", overflow: "auto", background: "#0f0f11", colorScheme: "dark" }}>
         <ZitadelLogin project={project} purpose="register" postSignInUrl="/profile" />
       </div>
     );
   }
   return (
-    <div style={{ position: "fixed", inset: "0", overflow: "auto", background: "#0f0f11" }}>
+    <div style={{ position: "fixed", inset: "0", overflow: "auto", background: "#0f0f11", colorScheme: "dark" }}>
       <ZitadelLogin project={project} purpose="login" postSignInUrl="/profile" />
     </div>
   );

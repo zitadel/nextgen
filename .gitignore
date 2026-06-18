@@ -108,7 +108,7 @@ nextgen-data/
 apps/demo-next/tsconfig.tsbuildinfo
 packages/api-mock/tsconfig.tsbuildinfo
 
-.nx/polygraph
+.nx/
 .cursor/debug-*
 # Root TS incremental build info (generated)
 tsconfig.tsbuildinfo

@@ -50,8 +50,6 @@ export const it: Locale = {
   "collect-credentials.field.email": "E-mail aziendale",
   "collect-credentials.field.email.placeholder": "tu@azienda.com",
   "collect-credentials.field.password": "Password",
-  "collect-credentials.field.password.help":
-    "Almeno 8 caratteri, incluso un simbolo e un numero.",
   "collect-credentials.action.submit": "Registrati",
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -61,8 +59,6 @@ export const it: Locale = {
   "register-password.title": "Crea la tua password",
   "register-password.description": "Scegli una password sicura per il tuo account",
   "register-password.field.password": "Password",
-  "register-password.field.password.help":
-    "Almeno 8 caratteri, incluso un simbolo e un numero.",
   "register-password.action.submit": "Registrati",
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -115,13 +111,11 @@ export const it: Locale = {
   "register.field.email": "E-mail aziendale",
   "register.field.email.placeholder": "tu@azienda.com",
   "register.field.password": "Password",
-  "register.field.password.help":
-    "Almeno 8 caratteri, incluso un simbolo e un numero.",
   "register.field.givenName": "Nome",
   "register.field.familyName": "Cognome",
+  // L'<input type="date"> nativo localizza il proprio formato di visualizzazione in base
+  // alla lingua dell'utente e invia ISO YYYY-MM-DD — nessun segnaposto/suggerimento di formato necessario.
   "register.field.dateOfBirth": "Data di nascita",
-  "register.field.dateOfBirth.placeholder": "AAAA-MM-GG",
-  "register.field.dateOfBirth.help": "Usa AAAA-MM-GG.",
   "register.action.password": "Continua con password",
   "register.action.passkey": "Continua con passkey",
   "register.action.submit": "Registrati",

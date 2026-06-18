@@ -317,9 +317,12 @@ describe("LiquidJS engine", () => {
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
     expect(result).toContain('autocomplete="email"');
     expect(result).toContain('autocomplete="new-password"');
-    expect(result).toContain("At least 8 characters");
-    expect(result).toContain('placeholder="YYYY-MM-DD"');
-    expect(result).toContain("Use YYYY-MM-DD.");
+    // Password complexity copy and the YYYY-MM-DD date hint were removed: only
+    // minLength is enforced server-side, and native <input type="date"> handles
+    // its own localized format (#251 tracks dynamic, rule-driven hints).
+    expect(result).not.toContain("At least 8 characters");
+    expect(result).not.toContain('placeholder="YYYY-MM-DD"');
+    expect(result).not.toContain("Use YYYY-MM-DD.");
     expect(result).toContain("An account with this email already exists");
     expect(result).not.toContain("forgot-password-href");
     expect(result).not.toContain('<zl-alert severity="error">An account');
