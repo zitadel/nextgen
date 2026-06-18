@@ -29,7 +29,7 @@ func executeTransaction(ctx context.Context, begin beginner, fn func(ctx context
 		}
 		err = tx.Commit(ctx)
 	}()
-	return fn(ctx, &transaction{tx: tx, statements: statements{client: tx}})
+	return fn(ctx, &transaction{tx: tx, statements: newStatements(tx)})
 }
 
 var _ database.Statementer = (*transaction)(nil)

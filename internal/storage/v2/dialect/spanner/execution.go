@@ -15,7 +15,8 @@ type execution struct {
 
 // Execute implements [database.Execution].
 func (e *execution) Execute(ctx context.Context) error {
-	err := e.client.
+	// err := e.client.
+	return nil
 }
 
 var _ database.Execution = (*execution)(nil)

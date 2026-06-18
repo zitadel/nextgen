@@ -7,12 +7,12 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-type Dialect struct {
+type Config struct {
 	DSN string
 }
 
 // Connect implements [database.Dialect].
-func (p Dialect) Connect(ctx context.Context) (database.Pool, error) {
+func (p Config) Connect(ctx context.Context) (database.Pool, error) {
 	config, err := pgxpool.ParseConfig(p.DSN)
 	if err != nil {
 		return nil, err
@@ -21,12 +21,12 @@ func (p Dialect) Connect(ctx context.Context) (database.Pool, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newPool(pool), nil
+	return NewPool(pool), nil
 }
 
 // Name implements [database.Dialect].
-func (p Dialect) Name() string {
+func (p Config) Name() string {
 	return "postgres"
 }
 
-var _ database.Dialect = (*Dialect)(nil)
+var _ database.Dialect = (*Config)(nil)

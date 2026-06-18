@@ -31,11 +31,11 @@ func CreateProject(ctx context.Context, previewOrigins []string) (*domain.Projec
 		// if err := s.projectRepo.Create(ctx, tx, project); err != nil {
 		// 	return nil, domain.ErrInternal(err).WithMessage("failed to create project in the database")
 		// }
-		if err := tx.Project().CreateProject(project).Execute(ctx); err != nil {
+		if err := tx.CreateProject(project).Execute(ctx); err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to create project in the database")
 		}
 
-		userschema, err := s.createDefaultUserSchemas(ctx, tx, project.ID)
+		userschema, err := createDefaultUserSchemas(ctx, tx, project.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -67,7 +67,7 @@ func createDefaultLoginFlowDefinitions(ctx context.Context, client database.Stat
 			return domain.ErrInternal(err).WithMessage("default login flow definition is invalid")
 		}
 
-		err = client.FlowDefinition().CreateFlowDefinition(flowDef).Execute(ctx)
+		err = client.CreateFlowDefinition(flowDef).Execute(ctx)
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to save default login flow definition to project")
 		}
@@ -84,7 +84,7 @@ func createDefaultUserSchemas(ctx context.Context, client database.Statementer, 
 	if err = s.schemaValidator.ValidateAgainstMetaSchema(schemabs); err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("default human user schema invalid")
 	}
-	if err := s.schemaRepo.Create(ctx, client, schema); err != nil {
+	if err := client.CreateJSONSchema(schema).Execute(ctx); err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to save default human schema to project")
 	}
 	return schema, nil

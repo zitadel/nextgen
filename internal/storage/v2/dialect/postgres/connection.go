@@ -15,7 +15,7 @@ type Connection struct {
 func newConnection(conn *pgxpool.Conn) *Connection {
 	return &Connection{
 		conn:       conn,
-		statements: statements{client: conn},
+		statements: newStatements(conn),
 	}
 }
 

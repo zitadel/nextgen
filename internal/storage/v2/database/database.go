@@ -31,22 +31,19 @@ type Transactional interface {
 	Transaction(ctx context.Context, fn func(ctx context.Context, tx Statementer) error) error
 }
 
+// Statementer collects all statement methods for the domain entities.
+// It is used by the service layer to execute database operations.
+// The service layer methods can still define smaller interfaces to fulfill their needs.
+// This interface might not strictly be needed, therefore look at it as a documentation part of the spike.
 type Statementer interface {
-	Project() ProjectStatements
-	FlowDefinition() FlowDefinitionStatements
-}
-
-type ProjectStatements interface {
-	CreateProject(project *domain.Project) Execution
+	CreateProject(entity *domain.Project) Execution
 	GetProjectByID(id string) Query[*domain.Project]
-	ListProjects(filter Filter) Query[[]*domain.Project]
+	ListProjects(filter *ListOptions) Query[*ListResult[*domain.Project]]
 	DeleteProjectByID(id string) Execution
-}
 
-type FlowDefinitionStatements interface {
-	CreateFlowDefinition(flowDef *domain.FlowDefinition) Execution
+	CreateFlowDefinition(entity *domain.FlowDefinition) Execution
 	GetFlowDefinitionByID(id string) Query[*domain.FlowDefinition]
-	ListFlowDefinitions(filter Filter) Query[[]*domain.FlowDefinition]
+	ListFlowDefinitions(filter *ListOptions) Query[*ListResult[*domain.FlowDefinition]]
 	DeleteFlowDefinitionByID(id string) Execution
 }
 
@@ -55,5 +52,6 @@ type Execution interface {
 }
 
 type Query[R any] interface {
-	Execute(ctx context.Context) (R, error)
+	Execution
+	Result() R
 }

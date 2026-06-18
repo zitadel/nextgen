@@ -15,17 +15,19 @@ type queryExecutor interface {
 }
 
 type statements struct {
+	projectStatements
+	flowDefinitionStatements
+}
+
+func newStatements(client queryExecutor) statements {
+	return statements{
+		projectStatements:        newProjectStatements(client),
+		flowDefinitionStatements: newFlowDefinitionStatements(client),
+	}
+}
+
+type statement struct {
 	client queryExecutor
-}
-
-// FlowDefinition implements [database.Statementer].
-func (s statements) FlowDefinition() database.FlowDefinitionStatements {
-	return s
-}
-
-// Project implements [database.Statementer].
-func (s statements) Project() database.ProjectStatements {
-	return s
 }
 
 var _ database.Statementer = (*statements)(nil)

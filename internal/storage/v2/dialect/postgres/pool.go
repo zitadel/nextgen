@@ -12,10 +12,10 @@ type Pool struct {
 	statements
 }
 
-func newPool(pool *pgxpool.Pool) *Pool {
+func NewPool(pool *pgxpool.Pool) *Pool {
 	return &Pool{
 		pool:       pool,
-		statements: statements{client: pool},
+		statements: newStatements(pool),
 	}
 }
 

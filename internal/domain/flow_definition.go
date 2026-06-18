@@ -214,3 +214,20 @@ type FlowStepTransition struct {
 func (fst FlowStepTransition) IsCurrentFlow() bool {
 	return fst.Action == nil
 }
+
+type FlowDefinitionField uint8
+
+const (
+	FlowDefinitionFieldUnspecified FlowDefinitionField = iota
+	FlowDefinitionFieldProjectID
+	FlowDefinitionFieldID
+	FlowDefinitionFieldName
+	FlowDefinitionFieldSchemaVersion
+	FlowDefinitionFieldStatus
+	FlowDefinitionFieldCreatedAt
+	FlowDefinitionFieldUpdatedAt
+	FlowDefinitionFieldUserSchema
+	FlowDefinitionFieldPurposes
+	FlowDefinitionFieldAudience
+	FlowDefinitionFieldSteps
+)

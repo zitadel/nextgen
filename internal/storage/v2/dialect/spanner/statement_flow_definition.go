@@ -21,8 +21,6 @@ func (s statements) GetFlowDefinitionByID(id string) database.Query[*domain.Flow
 }
 
 // ListFlowDefinitions implements [database.FlowDefinitionStatements].
-func (s statements) ListFlowDefinitions(filter database.Filter) database.Query[[]*domain.FlowDefinition] {
+func (s statements) ListFlowDefinitions(filter database.ListOptions[domain.FlowDefinitionField]) database.Query[[]*domain.FlowDefinition] {
 	panic("unimplemented")
 }
-
-var _ database.FlowDefinitionStatements = (*statements)(nil)

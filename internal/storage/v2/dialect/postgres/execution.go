@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
@@ -10,33 +11,40 @@ import (
 type execution struct {
 	client queryExecutor
 	stmt   string
-	scan   func(pgx.Rows) error
 	args   []any
-	fn     func(ctx context.Context) error
+
+	affectedRows int64
 }
 
-func (e execution) Execute(ctx context.Context) error {
-	if e.scan == nil {
-		return e.fn(ctx)
-	}
-	rows, err := e.client.Query(ctx, e.stmt, e.args...)
+func (e *execution) Execute(ctx context.Context) error {
+	res, err := e.client.Exec(ctx, e.stmt, e.args...)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
-	return e.scan(rows)
+	e.affectedRows = res.RowsAffected()
+	return nil
 }
 
 var _ database.Execution = (*execution)(nil)
 
 type query[R any] struct {
 	execution
+	scan   func(pgx.Rows, R) error
 	result R
 }
 
-func (q query[R]) Execute(ctx context.Context) (R, error) {
-	err := q.execution.Execute(ctx)
-	return q.result, err
+func (q *query[R]) Execute(ctx context.Context) error {
+	rows, err := q.client.Query(ctx, q.stmt, q.args...)
+	if err != nil {
+		return err
+	}
+	err = q.scan(rows, q.result)
+	rows.Close()
+	return errors.Join(err, rows.Err())
+}
+
+func (q *query[R]) Result() R {
+	return q.result
 }
 
 var _ database.Query[any] = (*query[any])(nil)

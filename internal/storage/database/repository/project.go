@@ -2,13 +2,14 @@ package repository
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres"
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
+	db_v2 "github.com/zitadel/nextgen/internal/storage/v2/database"
+	pg_v2 "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres"
 )
 
 const pgTableProjects = "zitadel_nextgen.projects"
@@ -42,13 +43,14 @@ var _ deletable = (*projectMeta)(nil)
 type ProjectRepository struct {
 	meta projectMeta
 	now  database.Instruction
+	v2   db_v2.Statementer
 }
 
 var _ domain.ProjectRepository = (*ProjectRepository)(nil)
 
 // NewProjectRepository returns a dialect-specific [ProjectRepository].
 func NewProjectRepository(client database.QueryExecutor) *ProjectRepository {
-	switch client.(type) {
+	switch c := client.(type) {
 	case spanner.SpannerPooler:
 		return &ProjectRepository{
 			meta: projectMeta{tableName: spannerTableProjects},
@@ -58,54 +60,20 @@ func NewProjectRepository(client database.QueryExecutor) *ProjectRepository {
 		return &ProjectRepository{
 			meta: projectMeta{tableName: pgTableProjects},
 			now:  database.NowInstruction,
+			v2:   pg_v2.NewPool(c.(*postgres.Pool).Pool),
 		}
 	}
 	panic("NewProjectRepository: unsupported client type")
 }
 
 func (r *ProjectRepository) Create(ctx context.Context, client database.QueryExecutor, project *domain.Project) error {
-	origins := project.PreviewOrigins
-	if origins == nil {
-		origins = []string{}
-	}
-	originsJSON, err := json.Marshal(origins)
-	if err != nil {
-		return err
-	}
-	b := database.NewStatementBuilder("INSERT INTO ")
-	b.WriteString(r.meta.tableName)
-	b.WriteString(" (id, created_at, updated_at, project_secret, preview_secret, preview_origins) VALUES (")
-	b.WriteArg(project.ID)
-	b.WriteString(", ")
-	b.WriteArg(r.now)
-	b.WriteString(", ")
-	b.WriteArg(r.now)
-	b.WriteString(", ")
-	b.WriteArg(project.ProjectSecret)
-	b.WriteString(", ")
-	b.WriteArg(project.PreviewSecret)
-	b.WriteString(", ")
-	b.WriteArg(string(originsJSON))
-	b.WriteString(")")
-	_, err = client.Exec(ctx, b.String(), b.Args()...)
-	return err
+	return r.v2.CreateProject(project).Execute(ctx)
 }
 
 func (r *ProjectRepository) Get(ctx context.Context, client database.QueryExecutor, id string) (*domain.Project, error) {
-	b := database.NewStatementBuilder("SELECT id, created_at, updated_at, project_secret, preview_secret, preview_origins FROM ")
-	b.WriteString(r.meta.tableName)
-	b.WriteString(" WHERE id = ")
-	b.WriteArg(id)
-	row, err := getOne[projectRow](ctx, client, b)
-	if err != nil {
+	stmt := r.v2.GetProjectByID(id)
+	if err := stmt.Execute(ctx); err != nil {
 		return nil, err
 	}
-	return &domain.Project{
-		ID:             row.ID,
-		CreatedAt:      row.CreatedAt,
-		UpdatedAt:      row.UpdatedAt,
-		ProjectSecret:  row.ProjectSecret,
-		PreviewSecret:  row.PreviewSecret,
-		PreviewOrigins: []string(row.PreviewOrigins),
-	}, nil
+	return stmt.Result(), nil
 }

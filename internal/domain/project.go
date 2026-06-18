@@ -73,3 +73,15 @@ type ProjectRepository interface {
 	// Returns a [database.NoRowFoundError] when no project with the given ID exists.
 	Get(ctx context.Context, client database.QueryExecutor, id string) (*Project, error)
 }
+
+type ProjectField database.Column
+
+const (
+	ProjectFieldUnspecified ProjectField = iota
+	ProjectFieldID
+	ProjectFieldCreatedAt
+	ProjectFieldUpdatedAt
+	ProjectFieldProjectSecret
+	ProjectFieldPreviewSecret
+	ProjectFieldPreviewOrigins
+)
