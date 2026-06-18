@@ -68,8 +68,8 @@ or `.zitadel/flows/*.json`, then re-run `zitadel plan` and `zitadel apply`.
 Server-provisioned defaults remain a fallback for non-CLI project creation, but
 CLI-created projects are authored from local files first.
 Templates are not supported until the server exposes template storage and APIs.
-Flow create, read, list, and delete are available; updates to existing flows
-fail locally with `E_NOT_IMPLEMENTED` until the server flow lifecycle API lands.
+Flow create, read, list, update, and delete are available; the server enforces
+flow lifecycle rules such as draft-only edits.
 
 For agent scripts, pass `--non-interactive --json` and capture stdout and stderr
 separately. The CLI contract is one parseable JSON object on stdout; terminals

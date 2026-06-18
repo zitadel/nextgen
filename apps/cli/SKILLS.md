@@ -162,11 +162,11 @@ then re-run `plan` and `apply`. Schema and flow files are synced from
 supported until the server exposes template storage and APIs. Server-provisioned
 defaults remain a fallback for non-CLI project creation, but CLI-created
 projects are authored from local files first. Flow create, read, list, and
-delete are available, while updates to existing flows fail locally with
-`E_NOT_IMPLEMENTED` until the server flow lifecycle API lands. Managed files
-carry a marker comment; `eject` removes only files that still carry it,
-preserving anything the user replaced. For app-local development, `--server
-local` resolves through `.zitadel/local/runtime.json` and requires a healthy
+update are available, while the server enforces lifecycle rules such as
+draft-only edits. Managed files carry a marker comment; `eject` removes only
+files that still carry it, preserving anything the user replaced. For app-local
+development, `--server local` resolves through `.zitadel/local/runtime.json` and
+requires a healthy
 `npx @zitadel/cli@alpha start` runtime. Runtime-only `.zitadel/local/**` state
 does not block fresh same-directory scaffolding. `setup` installs dependencies
 with the detected package manager by default; pass `--skip-install` when the
