@@ -1352,9 +1352,8 @@ type CreateFlowDefinitionConflict ErrorDetails
 func (*CreateFlowDefinitionConflict) createFlowDefinitionRes() {}
 
 // Creates a flow definition.
-// The flow definition is created in a `draft` state by default.
-// The state of the flow definition can also be set via the `status` attribute in the flow definition
-// payload.
+// The flow definition is created in an `active` state by default.
+// The status can also be set via the `status` attribute in the flow definition payload.
 // Ref: #
 type CreateFlowDefinitionRequest struct {
 	ProjectID      ProjectID      `json:"project_id"`
@@ -3468,14 +3467,8 @@ func (s *FlowDefinitionStepTransitionsItemAction) UnmarshalText(data []byte) err
 // flow definition.
 // Ref: #
 type FlowDefinitionUpdateRequest struct {
-	ProjectID      ProjectID      `json:"project_id"`
 	SchemaURI      OptSchemaURI   `json:"schema_uri"`
 	FlowDefinition FlowDefinition `json:"flow_definition"`
-}
-
-// GetProjectID returns the value of ProjectID.
-func (s *FlowDefinitionUpdateRequest) GetProjectID() ProjectID {
-	return s.ProjectID
 }
 
 // GetSchemaURI returns the value of SchemaURI.
@@ -3486,11 +3479,6 @@ func (s *FlowDefinitionUpdateRequest) GetSchemaURI() OptSchemaURI {
 // GetFlowDefinition returns the value of FlowDefinition.
 func (s *FlowDefinitionUpdateRequest) GetFlowDefinition() FlowDefinition {
 	return s.FlowDefinition
-}
-
-// SetProjectID sets the value of ProjectID.
-func (s *FlowDefinitionUpdateRequest) SetProjectID(val ProjectID) {
-	s.ProjectID = val
 }
 
 // SetSchemaURI sets the value of SchemaURI.
