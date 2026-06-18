@@ -1630,7 +1630,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							switch method {
 							case "POST":
 								r.name = GetTokenOperation
-								r.summary = "Get accesstoken"
+								r.summary = "Get access token"
 								r.operationID = "getToken"
 								r.operationGroup = ""
 								r.pathPattern = "/auth/token"

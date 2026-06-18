@@ -83,6 +83,10 @@ test-output
 .output/
 .svelte-kit/
 
+## Docs generated artifacts
+apps/docs/.source/
+apps/docs/.generated/
+
 ## Go build cache
 .go/
 

@@ -330,7 +330,7 @@ func (UnimplementedHandler) GetTeam(ctx context.Context, params GetTeamParams) (
 
 // GetToken implements getToken operation.
 //
-// Get accesstoken.
+// Get access token.
 //
 // POST /auth/token
 func (UnimplementedHandler) GetToken(ctx context.Context, req *PostTokenRequest) (r GetTokenRes, _ error) {
