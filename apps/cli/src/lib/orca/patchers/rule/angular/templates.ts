@@ -40,7 +40,7 @@ export class App {
 export function appTemplateHtml(): string {
   return `<!-- ${MANAGED_MARKER} -->
 @if (path === '/') {
-  <main style="position:fixed;inset:0;padding:48px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:#0f0f11;color:#f4f4f6;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.5;letter-spacing:normal;text-align:center">
+  <main style="position:fixed;inset:0;padding:48px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:#0f0f11;color-scheme:dark;color:#f4f4f6;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.5;letter-spacing:normal;text-align:center">
     <section style="width:100%;max-width:560px">
       <p style="margin:0 0 12px;color:#9ca3af;font-size:14px">Zitadel auth</p>
       <h1 style="margin:0 0 24px;font-size:32px;line-height:1.15;font-weight:600;color:#f4f4f6">Sign in, create an account, or open your profile.</h1>
@@ -52,11 +52,11 @@ export function appTemplateHtml(): string {
     </section>
   </main>
 } @else if (path.startsWith('/profile')) {
-  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11">
+  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
     <zitadel-auth-logout [project]="project" [postSignOutUrl]="'/login'"></zitadel-auth-logout>
   </div>
 } @else if (path.startsWith('/register')) {
-  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11">
+  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
     <zitadel-auth-login
       [project]="project"
       purpose="register"
@@ -64,7 +64,7 @@ export function appTemplateHtml(): string {
     ></zitadel-auth-login>
   </div>
 } @else {
-  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11">
+  <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
     <zitadel-auth-login
       [project]="project"
       purpose="login"

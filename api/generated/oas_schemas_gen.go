@@ -17,19 +17,6 @@ type ActivateFlowDefinitionNoContent struct{}
 
 func (*ActivateFlowDefinitionNoContent) activateFlowDefinitionRes() {}
 
-type ArchiveFlowDefinitionBadRequest ErrorDetails
-
-func (*ArchiveFlowDefinitionBadRequest) archiveFlowDefinitionRes() {}
-
-type ArchiveFlowDefinitionConflict ErrorDetails
-
-func (*ArchiveFlowDefinitionConflict) archiveFlowDefinitionRes() {}
-
-// ArchiveFlowDefinitionNoContent is response for ArchiveFlowDefinition operation.
-type ArchiveFlowDefinitionNoContent struct{}
-
-func (*ArchiveFlowDefinitionNoContent) archiveFlowDefinitionRes() {}
-
 // Merged schema.
 // Ref: #
 type AttAlreadyCompleted struct {
@@ -2090,23 +2077,23 @@ type CreateUserUnauthorized ErrorDetails
 
 func (*CreateUserUnauthorized) createUserRes() {}
 
+type DeactivateFlowDefinitionBadRequest ErrorDetails
+
+func (*DeactivateFlowDefinitionBadRequest) deactivateFlowDefinitionRes() {}
+
+type DeactivateFlowDefinitionConflict ErrorDetails
+
+func (*DeactivateFlowDefinitionConflict) deactivateFlowDefinitionRes() {}
+
+// DeactivateFlowDefinitionNoContent is response for DeactivateFlowDefinition operation.
+type DeactivateFlowDefinitionNoContent struct{}
+
+func (*DeactivateFlowDefinitionNoContent) deactivateFlowDefinitionRes() {}
+
 // DeleteFlowDefinitionNoContent is response for DeleteFlowDefinition operation.
 type DeleteFlowDefinitionNoContent struct{}
 
 func (*DeleteFlowDefinitionNoContent) deleteFlowDefinitionRes() {}
-
-type DeprecateFlowDefinitionBadRequest ErrorDetails
-
-func (*DeprecateFlowDefinitionBadRequest) deprecateFlowDefinitionRes() {}
-
-type DeprecateFlowDefinitionConflict ErrorDetails
-
-func (*DeprecateFlowDefinitionConflict) deprecateFlowDefinitionRes() {}
-
-// DeprecateFlowDefinitionNoContent is response for DeprecateFlowDefinition operation.
-type DeprecateFlowDefinitionNoContent struct{}
-
-func (*DeprecateFlowDefinitionNoContent) deprecateFlowDefinitionRes() {}
 
 // Ref: #
 type DeviceAuthorizationResponse struct {
@@ -2286,48 +2273,47 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 	s.Response = val
 }
 
-func (*ErrorDetailsStatusCode) activateFlowDefinitionRes()  {}
-func (*ErrorDetailsStatusCode) archiveFlowDefinitionRes()   {}
-func (*ErrorDetailsStatusCode) authorizeDeviceRes()         {}
-func (*ErrorDetailsStatusCode) authorizeGetRes()            {}
-func (*ErrorDetailsStatusCode) createFlowDefinitionRes()    {}
-func (*ErrorDetailsStatusCode) createFlowRes()              {}
-func (*ErrorDetailsStatusCode) createProjectRes()           {}
-func (*ErrorDetailsStatusCode) createSchemaRes()            {}
-func (*ErrorDetailsStatusCode) createSessionRes()           {}
-func (*ErrorDetailsStatusCode) createTeamRes()              {}
-func (*ErrorDetailsStatusCode) createUserRes()              {}
-func (*ErrorDetailsStatusCode) deleteFlowDefinitionRes()    {}
-func (*ErrorDetailsStatusCode) deprecateFlowDefinitionRes() {}
-func (*ErrorDetailsStatusCode) endSessionRes()              {}
-func (*ErrorDetailsStatusCode) exchangeHandoffRes()         {}
-func (*ErrorDetailsStatusCode) getFlowDefinitionRes()       {}
-func (*ErrorDetailsStatusCode) getFlowStepRes()             {}
-func (*ErrorDetailsStatusCode) getHealthRes()               {}
-func (*ErrorDetailsStatusCode) getKeysRes()                 {}
-func (*ErrorDetailsStatusCode) getLiveRes()                 {}
-func (*ErrorDetailsStatusCode) getMySessionRes()            {}
-func (*ErrorDetailsStatusCode) getMyUserRes()               {}
-func (*ErrorDetailsStatusCode) getOpenIDConfigurationRes()  {}
-func (*ErrorDetailsStatusCode) getProjectRes()              {}
-func (*ErrorDetailsStatusCode) getReadyRes()                {}
-func (*ErrorDetailsStatusCode) getSchemaByIdRes()           {}
-func (*ErrorDetailsStatusCode) getSessionRes()              {}
-func (*ErrorDetailsStatusCode) getTeamRes()                 {}
-func (*ErrorDetailsStatusCode) getTokenRes()                {}
-func (*ErrorDetailsStatusCode) getUserByIDRes()             {}
-func (*ErrorDetailsStatusCode) getUserInfoRes()             {}
-func (*ErrorDetailsStatusCode) introspectRes()              {}
-func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()     {}
-func (*ErrorDetailsStatusCode) listSessionsRes()            {}
-func (*ErrorDetailsStatusCode) listUsersRes()               {}
-func (*ErrorDetailsStatusCode) revokeMySessionRes()         {}
-func (*ErrorDetailsStatusCode) revokeSessionRes()           {}
-func (*ErrorDetailsStatusCode) revokeTokenRes()             {}
-func (*ErrorDetailsStatusCode) setUserPasswordRes()         {}
-func (*ErrorDetailsStatusCode) submitFlowEventRes()         {}
-func (*ErrorDetailsStatusCode) submitFlowStepRes()          {}
-func (*ErrorDetailsStatusCode) updateFlowDefinitionRes()    {}
+func (*ErrorDetailsStatusCode) activateFlowDefinitionRes()   {}
+func (*ErrorDetailsStatusCode) authorizeDeviceRes()          {}
+func (*ErrorDetailsStatusCode) authorizeGetRes()             {}
+func (*ErrorDetailsStatusCode) createFlowDefinitionRes()     {}
+func (*ErrorDetailsStatusCode) createFlowRes()               {}
+func (*ErrorDetailsStatusCode) createProjectRes()            {}
+func (*ErrorDetailsStatusCode) createSchemaRes()             {}
+func (*ErrorDetailsStatusCode) createSessionRes()            {}
+func (*ErrorDetailsStatusCode) createTeamRes()               {}
+func (*ErrorDetailsStatusCode) createUserRes()               {}
+func (*ErrorDetailsStatusCode) deactivateFlowDefinitionRes() {}
+func (*ErrorDetailsStatusCode) deleteFlowDefinitionRes()     {}
+func (*ErrorDetailsStatusCode) endSessionRes()               {}
+func (*ErrorDetailsStatusCode) exchangeHandoffRes()          {}
+func (*ErrorDetailsStatusCode) getFlowDefinitionRes()        {}
+func (*ErrorDetailsStatusCode) getFlowStepRes()              {}
+func (*ErrorDetailsStatusCode) getHealthRes()                {}
+func (*ErrorDetailsStatusCode) getKeysRes()                  {}
+func (*ErrorDetailsStatusCode) getLiveRes()                  {}
+func (*ErrorDetailsStatusCode) getMySessionRes()             {}
+func (*ErrorDetailsStatusCode) getMyUserRes()                {}
+func (*ErrorDetailsStatusCode) getOpenIDConfigurationRes()   {}
+func (*ErrorDetailsStatusCode) getProjectRes()               {}
+func (*ErrorDetailsStatusCode) getReadyRes()                 {}
+func (*ErrorDetailsStatusCode) getSchemaByIdRes()            {}
+func (*ErrorDetailsStatusCode) getSessionRes()               {}
+func (*ErrorDetailsStatusCode) getTeamRes()                  {}
+func (*ErrorDetailsStatusCode) getTokenRes()                 {}
+func (*ErrorDetailsStatusCode) getUserByIDRes()              {}
+func (*ErrorDetailsStatusCode) getUserInfoRes()              {}
+func (*ErrorDetailsStatusCode) introspectRes()               {}
+func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()      {}
+func (*ErrorDetailsStatusCode) listSessionsRes()             {}
+func (*ErrorDetailsStatusCode) listUsersRes()                {}
+func (*ErrorDetailsStatusCode) revokeMySessionRes()          {}
+func (*ErrorDetailsStatusCode) revokeSessionRes()            {}
+func (*ErrorDetailsStatusCode) revokeTokenRes()              {}
+func (*ErrorDetailsStatusCode) setUserPasswordRes()          {}
+func (*ErrorDetailsStatusCode) submitFlowEventRes()          {}
+func (*ErrorDetailsStatusCode) submitFlowStepRes()           {}
+func (*ErrorDetailsStatusCode) updateFlowDefinitionRes()     {}
 
 type ExchangeHandoffBadRequest ErrorDetails
 

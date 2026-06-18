@@ -40,9 +40,6 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	ActivateFlowDefinitionOperation: []string{
 		"flow_definitions.write",
 	},
-	ArchiveFlowDefinitionOperation: []string{
-		"flow_definitions.write",
-	},
 	CreateAuthAttemptOperation: []string{
 		"auth_attempts.write",
 	},
@@ -61,11 +58,11 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateUserOperation: []string{
 		"user.write",
 	},
+	DeactivateFlowDefinitionOperation: []string{
+		"flow_definitions.write",
+	},
 	DeleteFlowDefinitionOperation: []string{
 		"flow_definitions.delete",
-	},
-	DeprecateFlowDefinitionOperation: []string{
-		"flow_definitions.write",
 	},
 	ExchangeHandoffOperation: []string{
 		"sessions.write",

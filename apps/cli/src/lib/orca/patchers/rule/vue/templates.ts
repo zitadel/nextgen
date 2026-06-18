@@ -26,7 +26,7 @@ const path = window.location.pathname;
 <template>
   <main
     v-if="path === '/'"
-    style="position:fixed;inset:0;padding:48px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:#0f0f11;color:#f4f4f6;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.5;letter-spacing:normal;text-align:center"
+    style="position:fixed;inset:0;padding:48px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:#0f0f11;color-scheme:dark;color:#f4f4f6;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.5;letter-spacing:normal;text-align:center"
   >
     <section style="width:100%;max-width:560px">
       <p style="margin:0 0 12px;color:#9ca3af;font-size:14px">Zitadel auth</p>
@@ -40,17 +40,17 @@ const path = window.location.pathname;
   </main>
   <div
     v-else-if="path.startsWith('/profile')"
-    style="position:fixed;inset:0;overflow:auto;background:#0f0f11"
+    style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark"
   >
     <ZitadelLogout :project="project" postSignOutUrl="/login" />
   </div>
   <div
     v-else-if="path.startsWith('/register')"
-    style="position:fixed;inset:0;overflow:auto;background:#0f0f11"
+    style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark"
   >
     <ZitadelLogin :project="project" purpose="register" postSignInUrl="/profile" />
   </div>
-  <div v-else style="position:fixed;inset:0;overflow:auto;background:#0f0f11">
+  <div v-else style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
     <ZitadelLogin :project="project" purpose="login" postSignInUrl="/profile" />
   </div>
 </template>
