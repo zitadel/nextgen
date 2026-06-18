@@ -7,7 +7,10 @@ type RunCliModule = {
     args?: string[];
     cwd?: string;
     env?: Record<string, string | undefined>;
-    buildCli?: () => Promise<void>;
+    buildCli?: (options: { env: Record<string, string | undefined> }) => Promise<void>;
+    buildLocalServerBinary?: (options: {
+      env: Record<string, string | undefined>;
+    }) => Promise<string>;
     buildLocalRuntimeImage?: (options: {
       env: Record<string, string | undefined>;
     }) => Promise<unknown>;
@@ -33,10 +36,8 @@ type RunCliModule = {
     args: string[],
     env?: Record<string, string | undefined>,
   ) => boolean;
-  shouldPrepareLocalPackages: (
-    args: string[],
-    env?: Record<string, string | undefined>,
-  ) => boolean;
+  shouldPrepareLocalPackages: (args: string[], env?: Record<string, string | undefined>) => boolean;
+  shouldUseLocalServerBinary: (args: string[], env?: Record<string, string | undefined>) => boolean;
 };
 
 type BuildLocalRuntimeImageModule = {
@@ -75,15 +76,11 @@ describe("run-cli wrapper", () => {
     expect(runCli.shouldAutoBuildLocalRuntimeImage(["start", "--runtime", "binary"], {})).toBe(
       false,
     );
-    expect(runCli.shouldAutoBuildLocalRuntimeImage(["start", "--runtime=binary"], {})).toBe(
-      false,
-    );
+    expect(runCli.shouldAutoBuildLocalRuntimeImage(["start", "--runtime=binary"], {})).toBe(false);
     expect(runCli.shouldAutoBuildLocalRuntimeImage(["start", "--runtime", "docker"], {})).toBe(
       true,
     );
-    expect(runCli.shouldAutoBuildLocalRuntimeImage(["start", "--runtime=docker"], {})).toBe(
-      true,
-    );
+    expect(runCli.shouldAutoBuildLocalRuntimeImage(["start", "--runtime=docker"], {})).toBe(true);
     expect(runCli.shouldAutoBuildLocalRuntimeImage(["start", "--help"], {})).toBe(false);
     expect(runCli.shouldAutoBuildLocalRuntimeImage(["start", "-h"], {})).toBe(false);
     expect(runCli.shouldAutoBuildLocalRuntimeImage(["--version"], {})).toBe(false);
@@ -124,7 +121,21 @@ describe("run-cli wrapper", () => {
     ).toBe(false);
   });
 
-  it("does not build a local image for the default binary start runtime", async () => {
+  it("uses a local server binary only for executable binary start commands", () => {
+    expect(runCli.shouldUseLocalServerBinary(["start"], {})).toBe(true);
+    expect(runCli.shouldUseLocalServerBinary(["start", "--runtime", "binary"], {})).toBe(true);
+    expect(runCli.shouldUseLocalServerBinary(["start", "--runtime", "docker"], {})).toBe(false);
+    expect(runCli.shouldUseLocalServerBinary(["start", "--image", "custom:tag"], {})).toBe(false);
+    expect(runCli.shouldUseLocalServerBinary(["start", "--dry-run"], {})).toBe(false);
+    expect(runCli.shouldUseLocalServerBinary(["start", "--help"], {})).toBe(false);
+    expect(
+      runCli.shouldUseLocalServerBinary(["start"], {
+        ZITADEL_SERVER_BINARY: "/tmp/custom-nextgen",
+      }),
+    ).toBe(false);
+  });
+
+  it("builds and injects a local server binary for the default binary start runtime", async () => {
     const calls: string[] = [];
     const env = { PATH: "/bin" };
     let runEnv: Record<string, string | undefined> | undefined;
@@ -132,8 +143,14 @@ describe("run-cli wrapper", () => {
     await runCli.main({
       args: ["start"],
       env,
-      buildCli: async () => {
+      buildCli: async (options) => {
         calls.push("build-cli");
+        expect(options.env).toBe(env);
+      },
+      buildLocalServerBinary: async (options) => {
+        calls.push("build-server");
+        expect(options.env).toBe(env);
+        return "/repo/dist/server/nextgen";
       },
       buildLocalRuntimeImage: async (options) => {
         calls.push("build-image");
@@ -149,11 +166,13 @@ describe("run-cli wrapper", () => {
       },
     });
 
-    expect(calls).toEqual(["build-cli", "run-cli"]);
+    expect(calls).toEqual(["build-cli", "build-server", "run-cli"]);
     expect(runEnv).toMatchObject({
       PATH: "/bin",
+      ZITADEL_SERVER_BINARY: "/repo/dist/server/nextgen",
     });
     expect(runEnv).not.toHaveProperty("ZITADEL_LOCAL_IMAGE");
+    expect(env).not.toHaveProperty("ZITADEL_SERVER_BINARY");
     expect(env).not.toHaveProperty("ZITADEL_LOCAL_IMAGE");
   });
 
@@ -165,8 +184,13 @@ describe("run-cli wrapper", () => {
     await runCli.main({
       args: ["start", "--runtime", "docker"],
       env,
-      buildCli: async () => {
+      buildCli: async (options) => {
         calls.push("build-cli");
+        expect(options.env).toBe(env);
+      },
+      buildLocalServerBinary: async () => {
+        calls.push("build-server");
+        return "/repo/dist/server/nextgen";
       },
       buildLocalRuntimeImage: async (options) => {
         calls.push("build-image");
@@ -192,16 +216,19 @@ describe("run-cli wrapper", () => {
 
   it("skips the builder when start receives --image", async () => {
     const buildLocalRuntimeImage = vi.fn(noop);
+    const buildLocalServerBinary = vi.fn(async () => "/repo/dist/server/nextgen");
     const run = vi.fn(noop);
 
     await runCli.main({
       args: ["start", "--image", "custom:tag"],
       env: { PATH: "/bin" },
       buildCli: vi.fn(noop),
+      buildLocalServerBinary,
       buildLocalRuntimeImage,
       run,
     });
 
+    expect(buildLocalServerBinary).not.toHaveBeenCalled();
     expect(buildLocalRuntimeImage).not.toHaveBeenCalled();
     expect(run).toHaveBeenCalledOnce();
     expect(run.mock.calls[0]?.[2].env).not.toHaveProperty("ZITADEL_LOCAL_IMAGE");
@@ -209,32 +236,71 @@ describe("run-cli wrapper", () => {
 
   it("skips the builder when ZITADEL_LOCAL_IMAGE is set", async () => {
     const buildLocalRuntimeImage = vi.fn(noop);
+    const buildLocalServerBinary = vi.fn(async () => "/repo/dist/server/nextgen");
     const run = vi.fn(noop);
 
     await runCli.main({
       args: ["start"],
       env: { PATH: "/bin", ZITADEL_LOCAL_IMAGE: "custom:tag" },
       buildCli: vi.fn(noop),
+      buildLocalServerBinary,
       buildLocalRuntimeImage,
       run,
     });
 
+    expect(buildLocalServerBinary).not.toHaveBeenCalled();
     expect(buildLocalRuntimeImage).not.toHaveBeenCalled();
     expect(run).toHaveBeenCalledOnce();
     expect(run.mock.calls[0]?.[2].env.ZITADEL_LOCAL_IMAGE).toBe("custom:tag");
   });
 
+  it("preserves an explicit local server binary override for binary start", async () => {
+    const buildLocalServerBinary = vi.fn(async () => "/repo/dist/server/nextgen");
+    const run = vi.fn(noop);
+
+    await runCli.main({
+      args: ["start", "--runtime", "binary"],
+      env: { PATH: "/bin", ZITADEL_SERVER_BINARY: "/tmp/custom-nextgen" },
+      buildCli: vi.fn(noop),
+      buildLocalServerBinary,
+      buildLocalRuntimeImage: vi.fn(noop),
+      run,
+    });
+
+    expect(buildLocalServerBinary).not.toHaveBeenCalled();
+    expect(run).toHaveBeenCalledOnce();
+    expect(run.mock.calls[0]?.[2].env.ZITADEL_SERVER_BINARY).toBe("/tmp/custom-nextgen");
+  });
+
+  it("skips the local server binary build for dry-run start", async () => {
+    const buildLocalServerBinary = vi.fn(async () => "/repo/dist/server/nextgen");
+
+    await runCli.main({
+      args: ["start", "--dry-run"],
+      env: { PATH: "/bin" },
+      buildCli: vi.fn(noop),
+      buildLocalServerBinary,
+      buildLocalRuntimeImage: vi.fn(noop),
+      run: vi.fn(noop),
+    });
+
+    expect(buildLocalServerBinary).not.toHaveBeenCalled();
+  });
+
   it("skips the builder for non-start commands", async () => {
     const buildLocalRuntimeImage = vi.fn(noop);
+    const buildLocalServerBinary = vi.fn(async () => "/repo/dist/server/nextgen");
 
     await runCli.main({
       args: ["doctor"],
       env: { PATH: "/bin" },
       buildCli: vi.fn(noop),
+      buildLocalServerBinary,
       buildLocalRuntimeImage,
       run: vi.fn(noop),
     });
 
+    expect(buildLocalServerBinary).not.toHaveBeenCalled();
     expect(buildLocalRuntimeImage).not.toHaveBeenCalled();
   });
 
