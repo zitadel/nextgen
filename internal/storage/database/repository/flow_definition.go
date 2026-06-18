@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -373,7 +374,7 @@ func rowToFlowDefinition(row flowDefinitionRow) (*domain.FlowDefinition, error) 
 			for _, a := range s.Actions {
 				kind, err := domain.FlowActionKindString(a.Kind)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("step %q: action %q has invalid kind %q: %w", s.Name, a.Name, a.Kind, err)
 				}
 				step.Actions = append(step.Actions, domain.FlowStepAction{
 					Name:    a.Name,

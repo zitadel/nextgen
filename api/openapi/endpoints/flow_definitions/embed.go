@@ -4,6 +4,7 @@ package flow_definitions
 import (
 	_ "embed"
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"strings"
 
@@ -99,7 +100,7 @@ func convertSteps(steps []api.FlowDefinitionStep) ([]domain.FlowDefinitionStep, 
 
 		actions, err := convertStepActions(step.GetActions())
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("step %q: %w", step.GetName(), err)
 		}
 
 		ret[i] = domain.FlowDefinitionStep{
@@ -237,7 +238,7 @@ func convertStepActions(actions []api.StepAction) ([]domain.FlowStepAction, erro
 	for _, action := range actions {
 		kind, err := domain.FlowActionKindString(string(action.GetKind()))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("action %q: invalid kind %q: %w", action.GetName(), action.GetKind(), err)
 		}
 		ret = append(ret, domain.FlowStepAction{
 			Name:    action.GetName(),
