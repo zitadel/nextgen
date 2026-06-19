@@ -45,7 +45,7 @@ catalog:
   "@vitest/browser-playwright": ^4.1.7
   ajv: ^8.20.0
   cookie-parser: ^1.4.7
-  dompurify: ^3.2.6
+  dompurify: ^3.4.11
   eslint: ^9.0.0
   eslint-config-prettier: ^10.0.0
   eslint-import-resolver-typescript: ^3.7.0
