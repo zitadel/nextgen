@@ -68,6 +68,9 @@ func (e Error) WithParent(parent error) Error {
 
 func newError(code string, message string, details any, parent error) Error {
 	_, file, line, _ := runtime.Caller(2) // Skip 2: newErr + the Wrapper function
+	if details == nil || details == "" {
+		details = parent
+	}
 	return Error{
 		Code:     code,
 		Message:  message,

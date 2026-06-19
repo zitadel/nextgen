@@ -1,5 +1,6 @@
 import type {
   CreateFlowDefinitionBodyFlowDefinition,
+  UpdateFlowDefinitionBodyFlowDefinition,
   CreateSchemaBody,
   GetSchemaById200,
   GetFlowDefinition200,
@@ -138,11 +139,18 @@ class FlowDefinitionSyncer implements ResourceSyncer {
     return result.id;
   }
 
-  /** PATCH body is the bare partial flow per `flow-definition-update-request` — no envelope. */
+  /**
+   * PUT completely replaces the flow definition. The wire request wraps the
+   * bare on-disk flow in the `{ flow_definition }` update envelope
+   * (`api/openapi/components/flows/flow-definition-update-request.yaml`) and
+   * carries `project_id` as a query parameter; the file on disk stays bare so
+   * it is human-editable.
+   */
   async update(id: string, data: object): Promise<void> {
     await this.client.updateFlowDefinition(
       id,
-      data as Partial<CreateFlowDefinitionBodyFlowDefinition>,
+      { flow_definition: data as UpdateFlowDefinitionBodyFlowDefinition },
+      { project_id: this.projectId },
     );
   }
 

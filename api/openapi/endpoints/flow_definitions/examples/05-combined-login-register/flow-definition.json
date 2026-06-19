@@ -17,10 +17,12 @@
         "actions": [
           {
             "name": "submit",
+            "kind": "submit",
             "primary": true
           },
           {
-            "name": "register"
+            "name": "register",
+            "kind": "submit"
           }
         ],
         "transitions": {
@@ -43,6 +45,7 @@
         "actions": [
           {
             "name": "submit",
+            "kind": "submit",
             "primary": true
           }
         ],
@@ -62,10 +65,12 @@
         "actions": [
           {
             "name": "submit",
+            "kind": "submit",
             "primary": true
           },
           {
-            "name": "login"
+            "name": "login",
+            "kind": "submit"
           }
         ],
         "transitions": {
@@ -88,6 +93,7 @@
         "actions": [
           {
             "name": "submit",
+            "kind": "submit",
             "primary": true
           }
         ],
