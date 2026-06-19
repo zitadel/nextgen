@@ -92,7 +92,7 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 	}
 
 	flowDefinition, err := domain.NewFlowDefinition(
-		"",
+		"", // the flow definition ID is auto-generated
 		req.ProjectID,
 		req.Name,
 		req.SchemaVersion,
@@ -118,16 +118,7 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 }
 
 func (fd *flowDefinitionService) Update(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error) {
-	_, err := fd.Get(ctx, req.ProjectID, req.FlowDefinitionID)
-	if err != nil {
-		return nil, err
-	}
-
-	// todo: before the purpose update: check if there are other flow definition in the `active` state with the old `purpose`
-
-	// todo: before the status update: check if there are other flow definitions that are `active` with the same purpose
-
-	status, err := domain.FlowDefinitionStatusString(req.Status)
+	retrievedFlowDef, err := fd.Get(ctx, req.ProjectID, req.FlowDefinitionID)
 	if err != nil {
 		return nil, err
 	}
@@ -135,6 +126,22 @@ func (fd *flowDefinitionService) Update(ctx context.Context, req FlowDefinitionR
 	if err != nil {
 		return nil, err
 	}
+
+	// if the status is not set, use the existing status
+	if req.Status == "" {
+		req.Status = retrievedFlowDef.Status.String()
+	}
+	status, err := domain.FlowDefinitionStatusString(req.Status)
+	if err != nil {
+		return nil, domain.ErrFlowDefinitionInvalid("invalid status", err)
+	}
+	// status update
+	// before the status update: ensure that there are other flow definitions that are `active` with the same purpose
+	err = fd.isStatusUpdateAllowed(ctx, req.ProjectID, retrievedFlowDef.ID, retrievedFlowDef.Status, status, purposes)
+	if err != nil {
+		return nil, err
+	}
+
 	flowDefinition, err := domain.NewFlowDefinition(
 		req.FlowDefinitionID,
 		req.ProjectID,
@@ -158,6 +165,35 @@ func (fd *flowDefinitionService) Update(ctx context.Context, req FlowDefinitionR
 		return nil, err
 	}
 	return flowDefinition, nil
+}
+
+func (fd *flowDefinitionService) isStatusUpdateAllowed(ctx context.Context, projectID, flowDefID string, currentStatus, reqStatus domain.FlowDefinitionStatus, purposes map[domain.FlowDefinitionPurpose]string) error {
+	if reqStatus == domain.FlowDefinitionStatusActive || currentStatus == reqStatus {
+		return nil
+	}
+	for purpose := range purposes {
+		fds, err := fd.flowDefinitionRepo.ListFlowDefinitions(
+			ctx,
+			fd.db,
+			projectID,
+			domain.WithFlowDefinitionStatus(domain.FlowDefinitionStatusActive),
+			domain.WithFlowDefinitionPurpose(purpose),
+		)
+		if err != nil {
+			return domain.ErrInternal(err).WithMessage(fmt.Sprintf("failed to list flow definitions for old purpose %q", purpose))
+		}
+		hasActive := false
+		for _, fd := range fds {
+			if fd.ID != flowDefID {
+				hasActive = true
+				break
+			}
+		}
+		if !hasActive {
+			return domain.ErrFlowDefinitionUpdateConflict(fmt.Sprintf("cannot update status to %q: no other active flow definition found with this purpose", reqStatus.String()))
+		}
+	}
+	return nil
 }
 
 // Validate validates the flow definition steps and transitions

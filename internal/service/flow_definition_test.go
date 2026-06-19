@@ -828,7 +828,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name: "flow definition updated successfully",
+			name: "flow definition updated successfully (draft to active)",
 			fields: fields{
 				db: stubPool(),
 				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
@@ -845,7 +845,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 					repo.EXPECT().
 						GetFlowDefinition(gomock.Any(), gomock.Any(), "project1", "flowdef_123").
 						Times(1).
-						Return(&domain.FlowDefinition{ID: "flowdef_123", ProjectID: "project1", Name: "old-flow"}, nil)
+						Return(&domain.FlowDefinition{ID: "flowdef_123", ProjectID: "project1", Name: "old-flow", Status: domain.FlowDefinitionStatusDraft}, nil)
 					repo.EXPECT().
 						UpdateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any()).
 						Times(1).
@@ -859,6 +859,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 					FlowDefinitionID: "flowdef_123",
 					ProjectID:        "project1",
 					Name:             "login-updated",
+					Status:           "active",
 					SchemaVersion:    "1.1.0",
 					UserSchema:       "https://tenant.com/schemas/my-user.json",
 					Purposes:         map[string]string{"login": "step_1"},
@@ -887,6 +888,71 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 				Name:          "login-updated",
 				SchemaVersion: "1.1.0",
 				Status:        domain.FlowDefinitionStatusActive,
+				UserSchema:    "https://tenant.com/schemas/my-user.json",
+				Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+			},
+		},
+		{
+			name: "flow definition updated successfully - draft status unchanged",
+			fields: fields{
+				db: stubPool(),
+				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
+					return userSchema, nil
+				}},
+				builtinSchemaProvider: &mockBuiltinSchemaProvider{latestSchemaURIFunc: func(kind domain.KnownSchemaKind) (string, error) {
+					return "https://example.com/schemas/flow-definition.json", nil
+				}},
+				validatorFn: func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error) {
+					return nil, nil
+				},
+				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
+					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
+					repo.EXPECT().
+						GetFlowDefinition(gomock.Any(), gomock.Any(), "project1", "flowdef_123").
+						Times(1).
+						Return(&domain.FlowDefinition{ID: "flowdef_123", ProjectID: "project1", Name: "old-flow", Status: domain.FlowDefinitionStatusDraft}, nil)
+					repo.EXPECT().
+						UpdateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any()).
+						Times(1).
+						Return(nil)
+					return repo
+				},
+			},
+			args: args{
+				ctx: context.Background(),
+				req: service.FlowDefinitionRequest{
+					FlowDefinitionID: "flowdef_123",
+					ProjectID:        "project1",
+					Name:             "login-updated",
+					Status:           "draft",
+					SchemaVersion:    "1.1.0",
+					UserSchema:       "https://tenant.com/schemas/my-user.json",
+					Purposes:         map[string]string{"login": "step_1"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []string{"email"},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Primary: true},
+							},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "step_2"},
+							},
+						},
+						{Name: "step_2", Complete: new(domain.FlowStepCompleteRedirect)},
+					},
+				},
+			},
+			want: &domain.FlowDefinition{
+				ID:            "flowdef_123",
+				ProjectID:     "project1",
+				Name:          "login-updated",
+				SchemaVersion: "1.1.0",
+				Status:        domain.FlowDefinitionStatusDraft,
 				UserSchema:    "https://tenant.com/schemas/my-user.json",
 				Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
 			},
@@ -978,11 +1044,228 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 				ProjectID:        "project1",
 				Name:             "login",
 				SchemaVersion:    "1.0.0",
+				Status:           "active",
 				UserSchema:       "https://tenant.com/schemas/my-user.json",
 				Purposes:         map[string]string{"login": "step_1"},
 				Steps:            []domain.FlowDefinitionStep{{Name: "step_1"}},
 			}},
 			wantErr: domain.ErrFlowDefinitionInvalid("validation failed", assert.AnError),
+		},
+		{
+			name: "missing status in update request retains the current status",
+			fields: fields{
+				db: stubPool(),
+				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
+					return userSchema, nil
+				}},
+				builtinSchemaProvider: &mockBuiltinSchemaProvider{},
+				validatorFn: func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error) {
+					return nil, nil
+				},
+				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
+					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
+					repo.EXPECT().
+						GetFlowDefinition(gomock.Any(), gomock.Any(), "project1", "flowdef_123").
+						Times(1).
+						Return(&domain.FlowDefinition{ID: "flowdef_123", ProjectID: "project1"}, nil)
+					repo.EXPECT().
+						UpdateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any()).
+						Times(1).
+						Return(nil)
+					return repo
+				},
+			},
+			args: args{ctx: context.Background(), req: service.FlowDefinitionRequest{
+				FlowDefinitionID: "flowdef_123",
+				ProjectID:        "project1",
+				Name:             "login",
+				// Status missing
+				SchemaVersion: "1.0.0",
+				UserSchema:    "https://tenant.com/schemas/my-user.json",
+				Purposes:      map[string]string{"login": "step_1"},
+				Steps:         []domain.FlowDefinitionStep{{Name: "step_1"}},
+			}},
+			want: &domain.FlowDefinition{
+				ID:            "flowdef_123",
+				ProjectID:     "project1",
+				Name:          "login",
+				SchemaVersion: "1.0.0",
+				Status:        domain.FlowDefinitionStatusDraft, // retain old status
+				UserSchema:    "https://tenant.com/schemas/my-user.json",
+				Purposes: map[domain.FlowDefinitionPurpose]string{
+					domain.FlowDefinitionPurposeLogin: "step_1",
+				},
+			},
+		},
+		{
+			name: "deactivate fails - only self is active for purpose",
+			fields: fields{
+				db: stubPool(),
+				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
+					return userSchema, nil
+				}},
+				builtinSchemaProvider: &mockBuiltinSchemaProvider{},
+				validatorFn: func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error) {
+					return nil, nil
+				},
+				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
+					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
+					repo.EXPECT().
+						GetFlowDefinition(gomock.Any(), gomock.Any(), "project1", "flowdef_123").
+						Times(1).
+						Return(&domain.FlowDefinition{ID: "flowdef_123", ProjectID: "project1", Status: domain.FlowDefinitionStatusActive}, nil)
+					repo.EXPECT().
+						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any(), gomock.Any()).
+						Times(1).
+						Return([]*domain.FlowDefinition{
+							{ID: "flowdef_123", Status: domain.FlowDefinitionStatusActive},
+						}, nil)
+					return repo
+				},
+			},
+			args: args{ctx: context.Background(), req: service.FlowDefinitionRequest{
+				FlowDefinitionID: "flowdef_123",
+				ProjectID:        "project1",
+				Name:             "login",
+				Status:           "draft",
+				SchemaVersion:    "1.0.0",
+				UserSchema:       "https://tenant.com/schemas/my-user.json",
+				Purposes:         map[string]string{"login": "step_1"},
+				Steps:            []domain.FlowDefinitionStep{{Name: "step_1"}},
+			}},
+			wantErr: domain.ErrFlowDefinitionUpdateConflict(`cannot update status to "draft": no other active flow definition found with this purpose`),
+		},
+		{
+			name: "deactivate blocked - multi-purpose missing active alternative for one purpose",
+			fields: fields{
+				db: stubPool(),
+				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
+					return userSchema, nil
+				}},
+				builtinSchemaProvider: &mockBuiltinSchemaProvider{},
+				validatorFn: func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error) {
+					return nil, nil
+				},
+				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
+					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
+					repo.EXPECT().
+						GetFlowDefinition(gomock.Any(), gomock.Any(), "project1", "flowdef_123").
+						Times(1).
+						Return(&domain.FlowDefinition{ID: "flowdef_123", ProjectID: "project1", Status: domain.FlowDefinitionStatusActive}, nil)
+
+					// login has another active
+					repo.EXPECT().
+						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any(), gomock.Any()).
+						Times(1).
+						Return([]*domain.FlowDefinition{
+							{ID: "flowdef_123", Status: domain.FlowDefinitionStatusActive},
+							{ID: "flowdef_other_login", Status: domain.FlowDefinitionStatusActive},
+						}, nil)
+
+					// register has only self active
+					repo.EXPECT().
+						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any(), gomock.Any()).
+						Times(1).
+						Return([]*domain.FlowDefinition{
+							{ID: "flowdef_123", Status: domain.FlowDefinitionStatusActive},
+						}, nil)
+
+					return repo
+				},
+			},
+			args: args{ctx: context.Background(), req: service.FlowDefinitionRequest{
+				FlowDefinitionID: "flowdef_123",
+				ProjectID:        "project1",
+				Name:             "login-register",
+				Status:           "draft",
+				SchemaVersion:    "1.0.0",
+				UserSchema:       "https://tenant.com/schemas/my-user.json",
+				Purposes: map[string]string{
+					"login":    "step_1",
+					"register": "step_1",
+				},
+				Steps: []domain.FlowDefinitionStep{{Name: "step_1"}},
+			}},
+			wantErr: domain.ErrFlowDefinitionUpdateConflict(`cannot update status to "draft": no other active flow definition found with this purpose`),
+		},
+		{
+			name: "deactivate allowed - all purposes have another active definition", fields: fields{
+				db: stubPool(),
+				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
+					return userSchema, nil
+				}},
+				builtinSchemaProvider: &mockBuiltinSchemaProvider{},
+				validatorFn: func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error) {
+					return nil, nil
+				},
+				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
+					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
+					repo.EXPECT().
+						GetFlowDefinition(gomock.Any(), gomock.Any(), "project1", "flowdef_123").
+						Times(1).
+						Return(&domain.FlowDefinition{ID: "flowdef_123", ProjectID: "project1", Status: domain.FlowDefinitionStatusActive}, nil)
+
+					// login purpose
+					repo.EXPECT().
+						ListFlowDefinitions(
+							gomock.Any(),
+							gomock.Any(),
+							"project1",
+							gomock.Any(),
+						).
+						Times(1).
+						Return([]*domain.FlowDefinition{
+							{ID: "flowdef_123", Status: domain.FlowDefinitionStatusActive},
+							{ID: "flowdef_other_login", Status: domain.FlowDefinitionStatusActive},
+						}, nil)
+
+					// register purpose
+					repo.EXPECT().
+						ListFlowDefinitions(
+							gomock.Any(),
+							gomock.Any(),
+							"project1",
+							gomock.Any(),
+						).
+						Times(1).
+						Return([]*domain.FlowDefinition{
+							{ID: "flowdef_123", Status: domain.FlowDefinitionStatusActive},
+							{ID: "flowdef_other_register", Status: domain.FlowDefinitionStatusActive},
+						}, nil)
+
+					repo.EXPECT().
+						UpdateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any()).
+						Times(1).
+						Return(nil)
+
+					return repo
+				},
+			},
+			args: args{ctx: context.Background(), req: service.FlowDefinitionRequest{
+				FlowDefinitionID: "flowdef_123",
+				ProjectID:        "project1",
+				Name:             "login-register",
+				Status:           "draft",
+				SchemaVersion:    "1.0.0",
+				UserSchema:       "https://tenant.com/schemas/my-user.json",
+				Purposes: map[string]string{
+					"login":    "step_1",
+					"register": "step_1",
+				},
+				Steps: []domain.FlowDefinitionStep{{Name: "step_1"}},
+			}},
+			want: &domain.FlowDefinition{
+				ID:            "flowdef_123",
+				ProjectID:     "project1",
+				Name:          "login-register",
+				SchemaVersion: "1.0.0",
+				Status:        domain.FlowDefinitionStatusDraft,
+				UserSchema:    "https://tenant.com/schemas/my-user.json",
+				Purposes: map[domain.FlowDefinitionPurpose]string{
+					domain.FlowDefinitionPurposeLogin:    "step_1",
+					domain.FlowDefinitionPurposeRegister: "step_1",
+				},
+			},
 		},
 		{
 			name: "repo update error",
@@ -1012,6 +1295,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 				FlowDefinitionID: "flowdef_123",
 				ProjectID:        "project1",
 				Name:             "login",
+				Status:           "active",
 				SchemaVersion:    "1.0.0",
 				UserSchema:       "https://tenant.com/schemas/my-user.json",
 				Purposes:         map[string]string{"login": "step_1"},
@@ -1036,7 +1320,6 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 			got, err := fd.Update(tt.args.ctx, tt.args.req)
 			after := time.Now()
 			if tt.wantErr != nil {
-				assert.ErrorIs(t, err, tt.wantErr)
 				assertErrorDetails(t, err, tt.wantErr)
 				assert.Nil(t, got)
 				return
@@ -1074,6 +1357,9 @@ func assertErrorDetails(t *testing.T, err error, wantErr error) {
 	assert.Equal(t, wantDomainErr.Code, gotErr.Code)
 	assert.Equal(t, wantDomainErr.Message, gotErr.Message)
 	assert.Equal(t, wantDomainErr.Details, gotErr.Details)
+	if wantDomainErr.Parent != nil {
+		assert.EqualError(t, gotErr.Parent, wantDomainErr.Parent.Error())
+	}
 }
 
 func Test_flowDefinitionService_Get(t *testing.T) {

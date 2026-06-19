@@ -527,6 +527,7 @@ var (
 	codeMissingFlowDefinitionID       = domain.ErrMissingFlowDefinitionID().Code
 	codeMissingProjectID              = domain.ErrMissingProjectID().Code
 	codeFlowDefinitionAlreadyExists   = domain.ErrFlowDefinitionAlreadyExists().Code
+	codeFlowDefinitionUpdateConflict  = domain.ErrFlowDefinitionUpdateConflict(nil).Code
 )
 
 func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
@@ -553,7 +554,7 @@ func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 			}
 		}
 		return errResp
-	case codeFlowDefinitionAlreadyExists:
+	case codeFlowDefinitionAlreadyExists, codeFlowDefinitionUpdateConflict:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	default:
 		return internalErrorResponse(err)
