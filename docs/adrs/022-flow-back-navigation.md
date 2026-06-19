@@ -72,18 +72,9 @@ the native back gesture work without page reloads.
 #### Lifecycle
 
 1. **On each submit response** (after `applyResponse`):
-   - If `newStep.name === previousStep.name` → no history call. Same-name
-     responses are validation errors or re-renders; the engine treated
-     them as non-advancing, so the browser stack must not move either.
-   - Else if the new step's `actions` contains `back` →
-     `history.pushState(null, '', '#s' + this.stepSeq++)`. The fragment
-     (`#s1`, `#s2`, …) has no semantic meaning; it is never read back.
-   - Else → `history.replaceState(...)`. No new entry; back from here
-     leaves the flow (intercepted by step 2 below).
-
-   The presence of `back` in the response is the single signal — the
-   engine's injection rules (above) decide it; the client just reads it.
-   The two layers stay in lockstep by construction.
+   - New step has `back` and the step name changed →
+     `history.pushState(null, '', '#s' + this.stepSeq++)`.
+   - Otherwise → no history call.
 
 2. **On `popstate` event** (browser back button):
    - If the current step's `actions` contains `back` →
