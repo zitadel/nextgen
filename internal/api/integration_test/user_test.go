@@ -206,7 +206,7 @@ func TestSetUserPassword(t *testing.T) {
 		User:      harness.TestData.Generator.GenerateUser(t, "testsetuserpassword@example.com"),
 	})
 	require.NoError(t, err)
-	userID := user["id"].(string)
+	userID := user[domain.UserIDFieldName].(string)
 	userEmail := user["email"].(string)
 
 	params := api.SetUserPasswordParams{
@@ -322,7 +322,7 @@ func TestGetUser(t *testing.T) {
 
 	params := api.GetUserByIDParams{
 		ProjectID: api.ProjectID(project.ID),
-		UserID:    api.UserID(user["id"].(string)),
+		UserID:    api.UserID(user[domain.UserIDFieldName].(string)),
 	}
 
 	resp, err := client.GetUserByID(t.Context(), params)
@@ -351,7 +351,7 @@ func TestGetMyUser(t *testing.T) {
 			User:      harness.TestData.Generator.GenerateUser(t, "testgetuser@example.com"),
 		})
 		require.NoError(t, err)
-		userID := user["id"].(string)
+		userID := user[domain.UserIDFieldName].(string)
 		userEmail := user["email"].(string)
 
 		const password = "fake-password"

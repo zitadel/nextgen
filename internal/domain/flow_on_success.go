@@ -2,8 +2,6 @@ package domain
 
 import (
 	"context"
-
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // FlowOnSuccessHandler is the contract every on_success mutation
@@ -13,7 +11,7 @@ import (
 // Each [FlowOnSuccess] value maps to one handler. Implementations live
 // in their own file (e.g. flow_on_success_create_user.go).
 type FlowOnSuccessHandler interface {
-	Handle(ctx context.Context, client database.QueryExecutor, in FlowOnSuccessInput) (FlowOnSuccessResult, error)
+	Handle(ctx context.Context, in FlowOnSuccessInput) (FlowOnSuccessResult, error)
 }
 
 // ManifestForOnSuccess returns the credential kinds a mutation establishes.

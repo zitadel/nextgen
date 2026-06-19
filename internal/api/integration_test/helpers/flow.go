@@ -13,10 +13,11 @@ import (
 func (h *Harness) EnsureCreateUserHandler(t *testing.T) *service.FlowCreateUserHandler {
 	t.Helper()
 	return service.NewFlowCreateUserHandler(
-		idgen.NewULID(),
 		h.EnsureUserRepo(t),
 		h.EnsureUserPasswordRepo(t),
 		h.EnsureHasher(t),
+		h.EnsureUserService(t),
+		h.EnsureSchemaRepo(t),
 	)
 }
 

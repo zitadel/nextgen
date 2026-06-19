@@ -133,7 +133,7 @@ func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[
 		return nil, domain.ErrInternal(err).WithMessage("failed to parse user attributes")
 	}
 
-	user["id"] = flatUser.ID
+	user[domain.UserIDFieldName] = flatUser.ID
 	return user, nil
 }
 
@@ -167,7 +167,7 @@ func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]by
 	return userbs, nil
 }
 
-// ---- CreateUser opts -------------------------------------------------------------
+// ---- USER ACTIONS -------------------------------------------------------------
 
 type CreateUserAction struct {
 	CreateUserInput
@@ -195,7 +195,7 @@ func (o *CreateUserAction) Prepare(ctx context.Context, db database.QueryExecuto
 	schemaEntity, err := o.schemaRepo.GetByID(ctx, db, o.ProjectID, schemaURL)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return domain.ErrUserInvalid().WithDetails("$schema is not known to the system. First create a schema, then create users.")
+			return domain.ErrUserInvalid().WithDetails("schema is not known to the system. First create a schema, then create users.")
 		}
 		return domain.ErrInternal(err).WithMessage("failed to get schema from database")
 	}
@@ -205,9 +205,10 @@ func (o *CreateUserAction) Prepare(ctx context.Context, db database.QueryExecuto
 		return err
 	}
 
-	o.User["id"] = o.createUser.ID
+	o.User[domain.UserIDFieldName] = o.createUser.ID
 	return nil
 }
+
 func (o *CreateUserAction) Apply(ctx context.Context, db database.QueryExecutor) error {
 	err := o.userRepo.Create(ctx, db, o.createUser)
 	if err != nil {
@@ -236,6 +237,7 @@ func NewSetUserPasswordAction(input SetPasswordInput, hasher crypto.Hasher, pass
 		passwordRepo:     passwordRepo,
 	}
 }
+
 func (o *SetPasswordUserAction) Prepare(_ context.Context, _ database.QueryExecutor) (err error) {
 	o.hash, err = domain.HashPassword(o.Password, o.hasher)
 	return err
@@ -260,4 +262,44 @@ func (o *SetPasswordUserAction) Apply(ctx context.Context, db database.QueryExec
 		return domain.ErrInternal(err).WithMessage("failed to set initial password")
 	}
 	return nil
+}
+
+type UserActionFactory = func(ctx context.Context, db database.QueryExecutor) (UserAction, error)
+
+type LazyUserAction struct {
+	factory UserActionFactory
+	action  UserAction
+}
+
+func NewLazyUserAction(factory UserActionFactory) *LazyUserAction {
+	return &LazyUserAction{
+		factory: factory,
+	}
+}
+
+func (o *LazyUserAction) Prepare(ctx context.Context, db database.QueryExecutor) (err error) {
+	action, err := o.Action(ctx, db)
+	if err != nil {
+		return err
+	}
+	return action.Prepare(ctx, db)
+}
+
+func (o *LazyUserAction) Apply(ctx context.Context, db database.QueryExecutor) error {
+	action, err := o.Action(ctx, db)
+	if err != nil {
+		return err
+	}
+	return action.Apply(ctx, db)
+}
+
+func (o *LazyUserAction) Action(ctx context.Context, db database.QueryExecutor) (UserAction, error) {
+	if o.action == nil {
+		action, err := o.factory(ctx, db)
+		if err != nil {
+			return nil, err
+		}
+		o.action = action
+	}
+	return o.action, nil
 }

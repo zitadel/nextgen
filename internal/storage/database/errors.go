@@ -295,3 +295,26 @@ func (e *PermissionError) Is(target error) bool {
 func (e *PermissionError) Unwrap() error {
 	return e.original
 }
+
+type ConcurrentModificationError struct {
+	original error
+}
+
+func NewConcurrentModificationError(original error) error {
+	return &ConcurrentModificationError{
+		original: original,
+	}
+}
+
+func (e *ConcurrentModificationError) Error() string {
+	return fmt.Sprintf("permission error: %v", e.original)
+}
+
+func (e *ConcurrentModificationError) Is(target error) bool {
+	_, ok := target.(*ConcurrentModificationError)
+	return ok
+}
+
+func (e *ConcurrentModificationError) Unwrap() error {
+	return e.original
+}

@@ -23,6 +23,11 @@ const (
 	PrefixUser ResourcePrefix = "user"
 )
 
+const (
+	UserIDFieldName     = "id"
+	UserSchemaFieldName = "$schema"
+)
+
 func ErrUserInvalid() Error {
 	return newError(PrefixUser.ErrorCodePrefix("invalid"), "user invalid", nil, nil)
 }
@@ -100,10 +105,10 @@ func NewCreateUser(projectID string, teamID *string, schemabs []byte, muser map[
 }
 
 func SchemaFromUserMap(user map[string]any) (string, error) {
-	schemaURL, ok := maputil.Get[string](user, "$schema")
+	schemaURL, ok := maputil.Get[string](user, UserSchemaFieldName)
 	if !ok {
 		return "", ErrUserInvalid().
-			WithDetails("No $schema provided for the user. A schema must be provided when creating a new user. Against this schema, the user will be validated")
+			WithDetails("No " + UserSchemaFieldName + " provided for the user. A schema must be provided when creating a new user. Against this schema, the user will be validated")
 	}
 	return schemaURL, nil
 }

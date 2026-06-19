@@ -27,6 +27,11 @@ func wrapError(err error) error {
 			return database.NewUniqueError("", "", err)
 		case codes.FailedPrecondition, codes.InvalidArgument:
 			return database.NewCheckError("", "", err)
+		case codes.Aborted:
+			if s.Message() == "Transaction was aborted due to a concurrent modification" {
+				return database.NewConcurrentModificationError(err)
+			}
+			fallthrough
 		default:
 			return database.NewUnknownError(err)
 		}

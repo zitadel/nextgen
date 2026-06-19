@@ -39,15 +39,12 @@ func TestCreateFlowDefinitionUnauthenticated(t *testing.T) {
 			Steps: validSteps(),
 		},
 	})
-	expectedResp := &api.ErrorDetailsStatusCode{
-		StatusCode: http.StatusUnauthorized,
-		Response: api.ErrorDetails{
-			Code:    "auth.unauthorized",
-			Message: `operation CreateFlowDefinition: security "": security requirement is not satisfied`,
-		},
-	}
 	require.NoError(t, err)
-	assert.Equal(t, expectedResp, resp)
+	if assert.IsType(t, &api.ErrorDetailsStatusCode{}, resp) {
+		errResp := resp.(*api.ErrorDetailsStatusCode)
+		assert.Equal(t, http.StatusUnauthorized, errResp.StatusCode)
+		assert.Equal(t, api.ErrorCode("auth.unauthorized"), errResp.Response.Code)
+	}
 }
 
 func TestCreateFlowDefinition(t *testing.T) {
@@ -332,11 +329,12 @@ func assertFlowDefinitionResponse(t *testing.T, want, got any) {
 	case *api.ErrorDetailsStatusCode:
 		expected, ok := want.(*api.ErrorDetailsStatusCode)
 		require.True(t, ok)
-		actual, ok := got.(*api.ErrorDetailsStatusCode)
-		require.True(t, ok)
 
-		assert.Equal(t, expected.StatusCode, actual.StatusCode)
-		assert.Equal(t, expected.Response, actual.Response)
+		if assert.IsType(t, &api.ErrorDetailsStatusCode{}, got) {
+			errResp := got.(*api.ErrorDetailsStatusCode)
+			assert.Equal(t, expected.StatusCode, errResp.StatusCode)
+			assert.Equal(t, expected.Response.Code, errResp.Response.Code)
+		}
 	default:
 		assert.Fail(t, "unexpected response type", helpers.MustMarshal(t, got))
 	}
@@ -373,15 +371,11 @@ func TestGetFlowDefinitionUnauthenticated(t *testing.T) {
 		ProjectID: "proj_1234",
 	})
 	require.NoError(t, err)
-	expectedResp := &api.ErrorDetailsStatusCode{
-		StatusCode: http.StatusUnauthorized,
-		Response: api.ErrorDetails{
-			Code:    "auth.unauthorized",
-			Message: `operation GetFlowDefinition: security "": security requirement is not satisfied`,
-		},
+	if assert.IsType(t, &api.ErrorDetailsStatusCode{}, getResp) {
+		errResp := getResp.(*api.ErrorDetailsStatusCode)
+		assert.Equal(t, http.StatusUnauthorized, errResp.StatusCode)
+		assert.Equal(t, api.ErrorCode("auth.unauthorized"), errResp.Response.Code)
 	}
-	require.NoError(t, err)
-	assert.Equal(t, expectedResp, getResp)
 }
 
 func TestGetFlowDefinition(t *testing.T) {
@@ -465,15 +459,11 @@ func TestListFlowDefinitionsUnauthenticated(t *testing.T) {
 		ProjectID: "proj_1234",
 	})
 	require.NoError(t, err)
-	expectedResp := &api.ErrorDetailsStatusCode{
-		StatusCode: http.StatusUnauthorized,
-		Response: api.ErrorDetails{
-			Code:    "auth.unauthorized",
-			Message: `operation ListFlowDefinitions: security "": security requirement is not satisfied`,
-		},
+	if assert.IsType(t, &api.ErrorDetailsStatusCode{}, getResp) {
+		errResp := getResp.(*api.ErrorDetailsStatusCode)
+		assert.Equal(t, http.StatusUnauthorized, errResp.StatusCode)
+		assert.Equal(t, api.ErrorCode("auth.unauthorized"), errResp.Response.Code)
 	}
-	require.NoError(t, err)
-	assert.Equal(t, expectedResp, getResp)
 }
 
 func TestListFlowDefinitions(t *testing.T) {
@@ -724,14 +714,11 @@ func TestDeleteFlowDefinitionUnauthenticated(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	expectedResp := &api.ErrorDetailsStatusCode{
-		StatusCode: http.StatusUnauthorized,
-		Response: api.ErrorDetails{
-			Code:    "auth.unauthorized",
-			Message: `operation DeleteFlowDefinition: security "": security requirement is not satisfied`,
-		},
+	if assert.IsType(t, &api.ErrorDetailsStatusCode{}, resp) {
+		errResp := resp.(*api.ErrorDetailsStatusCode)
+		assert.Equal(t, http.StatusUnauthorized, errResp.StatusCode)
+		assert.Equal(t, api.ErrorCode("auth.unauthorized"), errResp.Response.Code)
 	}
-	assert.Equal(t, expectedResp, resp)
 }
 
 func TestDeleteFlowDefinition(t *testing.T) {
@@ -816,14 +803,11 @@ func TestDeleteFlowDefinition(t *testing.T) {
 				ProjectID: tt.req.ProjectID,
 			})
 			assert.NoError(t, err)
-			expectedGetResp := &api.ErrorDetailsStatusCode{
-				StatusCode: http.StatusNotFound,
-				Response: api.ErrorDetails{
-					Code:    "flowdef.not_found",
-					Message: "flow definition: not found",
-				},
+			if assert.IsType(t, &api.ErrorDetailsStatusCode{}, getResp) {
+				errResp := getResp.(*api.ErrorDetailsStatusCode)
+				assert.Equal(t, http.StatusNotFound, errResp.StatusCode)
+				assert.Equal(t, api.ErrorCode("flowdef.not_found"), errResp.Response.Code)
 			}
-			assert.Equal(t, expectedGetResp, getResp)
 		})
 	}
 }

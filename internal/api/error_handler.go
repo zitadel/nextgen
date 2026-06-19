@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -16,13 +17,38 @@ import (
 // the fallback so the response is always well-formed.
 func domainErrorDetails(err error) api.ErrorDetails {
 	var domErr domain.Error
+	details := make(api.ErrorDetailsDetails)
 	if !errors.As(err, &domErr) {
 		domErr = domain.ErrInternal(err)
 	}
-	return api.ErrorDetails{
+
+	if domErr.Details == nil {
+		if j, err := json.Marshal(domErr.Details); err == nil {
+			details["details"] = j
+		}
+	}
+	if domErr.Parent != nil {
+		strParent := domErr.Parent.Error()
+		if j, err := json.Marshal(strParent); err == nil {
+			details["parent"] = j
+		}
+	}
+	if domErr.Location != "" {
+		if j, err := json.Marshal(domErr.Location); err == nil {
+			details["location"] = j
+		}
+	}
+
+	errDetails := api.ErrorDetails{
 		Code:    api.ErrorCode(domErr.Code),
 		Message: domErr.Message,
 	}
+
+	if len(details) > 0 {
+		errDetails.Details = api.NewOptErrorDetailsDetails(details)
+	}
+
+	return errDetails
 }
 
 func errorResponse(err error) *api.ErrorDetailsStatusCode {

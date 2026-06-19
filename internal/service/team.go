@@ -49,7 +49,6 @@ func (s *TeamService) CreateTeam(ctx context.Context, input CreateTeamInput) (te
 
 	err = s.teamRepo.Create(ctx, tx, model)
 	if err != nil {
-		// TODO handle specific error cases
 		return nil, domain.ErrInternal(err).WithMessage("failed to create team in database")
 	}
 
