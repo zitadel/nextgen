@@ -714,11 +714,24 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 			// The verify leg will call HandleProvisional + RegisterCreatedUser.
 			state.CollectedData[flowCollectedPasskeyProvisionalKey] = true
 		}
+		// Derive the WebAuthn user.name — a human-palatable label shown
+		// in the browser's passkey dialog and stored in password managers.
+		// Priority: identifier field → UserID (service fallback).
+		//
+		// We resolve the union of all visited fields (not just the current
+		// step's) because passkey_register may appear on a step with no
+		// fields (e.g. a passkey-upsell step), while the identifier/ email
+		// was collected on an earlier step.
+		var username string
+		if _, _, idValue, ok := findCollectedFieldByChallenge(resolved.Fields, state.CollectedData, FlowFieldChallengeIdentifier); ok {
+			username, _ = idValue.(string)
+		}
 		out, err := r.passkeyRegistration.IssuePasskeyRegistrationChallenge(ctx, FlowIssuePasskeyRegistrationChallengeInput{
 			ProjectID: state.ProjectID,
 			UserID:    userID,
 			RPID:      in.PasskeyRP.RPID,
 			RPOrigins: in.PasskeyRP.Origins,
+			Username:  username,
 		})
 		if err != nil {
 			return passkeyPhaseResult{}, fmt.Errorf("flow state machine: issue passkey registration: %w", err)

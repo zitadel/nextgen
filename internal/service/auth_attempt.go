@@ -124,7 +124,7 @@ func (PasswordChallenge) ChallengeCheckType() domain.AuthCheckType {
 	return domain.AuthCheckTypePassword
 }
 
-// PasskeyChallenge carries the raw WebAuthn assertion response bytes.
+// PasskeyChallenge carries WebAuthn relying-party parameters for issue.
 type PasskeyChallenge struct {
 	UserVerification string
 	RPID             string
@@ -471,7 +471,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			}
 		}
 		verification, err := domain.VerifyPasskeyChallenge(
-			passkeyChallenge.PasskeyChallenge,
+			passkeyChallenge.PasskeyCeremony,
 			p.AssertionResponse,
 			userID,
 			passkeys,

@@ -41,6 +41,7 @@ func NewPasskeyRegistrationService(
 type BeginRegistrationInput struct {
 	ProjectID string
 	UserID    string
+	Username  string
 	RPID      string
 	RPOrigins []string
 }
@@ -65,8 +66,8 @@ func (s *PasskeyRegistrationService) Begin(ctx context.Context, in BeginRegistra
 		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: list passkeys: %w", err)
 	}
 
-	challenge, err := domain.CreatePasskeyRegistrationChallenge(
-		in.UserID, in.UserID, in.UserID, // username and displayName default to userID for MVP
+	ceremony, err := domain.CreatePasskeyRegistrationChallenge(
+		in.UserID, in.Username, in.Username,
 		existing,
 		in.RPID, origins,
 	)
@@ -83,21 +84,16 @@ func (s *PasskeyRegistrationService) Begin(ctx context.Context, in BeginRegistra
 		ID:        regID,
 		ProjectID: in.ProjectID,
 		UserID:    in.UserID,
-		Challenge: challenge,
+		Challenge: ceremony,
 		ExpiresAt: time.Now().Add(passkeyRegistrationTTL),
 	}); err != nil {
 		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: store challenge: %w", err)
 	}
 
-	chWrapper := &domain.AuthChallengePasskeyRegistration{
-		PasskeyRegistrationChallenge: challenge,
-	}
-	options, err := domain.BuildPasskeyCreationOptions(chWrapper)
-	if err != nil {
-		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: build options: %w", err)
-	}
-
-	return BeginRegistrationOutput{RegistrationID: regID, Options: options}, nil
+	return BeginRegistrationOutput{
+		RegistrationID: regID,
+		Options:        ceremony.ClientOptions(),
+	}, nil
 }
 
 // FinishRegistrationInput carries the parameters needed to complete a passkey registration.
@@ -123,7 +119,7 @@ func (s *PasskeyRegistrationService) FinishWith(ctx context.Context, client data
 		return err
 	}
 
-	newPasskey, err := domain.VerifyPasskeyRegistration(reg.Challenge, in.Attestation)
+	newPasskey, err := domain.VerifyPasskeyRegistrationChallenge(reg.Challenge, in.Attestation)
 	if err != nil {
 		return domain.ErrAuthAttemptProofRejected(err)
 	}

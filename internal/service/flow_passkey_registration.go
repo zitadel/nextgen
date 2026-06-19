@@ -28,6 +28,7 @@ func (a *FlowPasskeyRegistrationAdapter) IssuePasskeyRegistrationChallenge(ctx c
 		UserID:    in.UserID,
 		RPID:      in.RPID,
 		RPOrigins: in.RPOrigins,
+		Username:  in.Username,
 	})
 	if err != nil {
 		return domain.FlowPasskeyRegistrationChallengeOutput{}, err

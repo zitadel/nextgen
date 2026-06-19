@@ -2,9 +2,10 @@ package api
 
 import (
 	"context"
-	"encoding/base64"
+	"encoding/json"
 	"net/http"
 
+	"github.com/go-webauthn/webauthn/protocol"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -178,41 +179,36 @@ func challengeToAPI(challenge domain.AuthChallenge) *api.ChallengeResponse {
 }
 
 func challengePayloadToAPI(check domain.AuthChallenge) api.OptChallengeResponsePayload {
-	if passkey, ok := check.(*domain.AuthChallengePasskey); ok {
-		return api.NewOptChallengeResponsePayload(api.ChallengeResponsePayload{
-			Type: api.PasskeyChallengePayloadChallengeResponsePayload,
-			PasskeyChallengePayload: api.PasskeyChallengePayload{
-				PublicKey: api.PasskeyChallengePayloadPublicKey{
-					Challenge:          passkey.Challenge,
-					AllowedCredentials: allowedCredentialsToAPI(passkey.AllowedCredentialIDs),
-					UserVerification:   userVerificationToAPI(passkey.UserVerification),
-					RpID: api.OptString{
-						Value: passkey.RPID,
-						Set:   true,
-					},
-				},
-			},
-		})
+	passkey, ok := check.(*domain.AuthChallengePasskey)
+	if !ok || passkey.PasskeyCeremony == nil {
+		return api.OptChallengeResponsePayload{}
 	}
-	return api.OptChallengeResponsePayload{}
-}
-
-// allowedCredentialsToAPI maps the challenge's allowed credential IDs into the WebAuthn
-// allowCredentials list the browser needs for an identified login. The IDs are base64url
-// encoded, matching the encoding the browser expects for PublicKeyCredentialDescriptor.id.
-// A discoverable (usernameless) login has no allowed credentials and yields nil.
-func allowedCredentialsToAPI(ids [][]byte) []api.PasskeyChallengePayloadPublicKeyAllowedCredentialsItem {
-	if len(ids) == 0 {
-		return nil
+	var opts protocol.PublicKeyCredentialRequestOptions
+	if err := json.Unmarshal(passkey.ClientOptions(), &opts); err != nil {
+		return api.OptChallengeResponsePayload{}
 	}
-	out := make([]api.PasskeyChallengePayloadPublicKeyAllowedCredentialsItem, 0, len(ids))
-	for _, id := range ids {
-		out = append(out, api.PasskeyChallengePayloadPublicKeyAllowedCredentialsItem{
-			ID:   base64.RawURLEncoding.EncodeToString(id),
+	challenge := opts.Challenge.String()
+	allowed := make([]api.PasskeyChallengePayloadPublicKeyAllowedCredentialsItem, 0, len(opts.AllowedCredentials))
+	for _, cred := range opts.AllowedCredentials {
+		allowed = append(allowed, api.PasskeyChallengePayloadPublicKeyAllowedCredentialsItem{
+			ID:   cred.CredentialID.String(),
 			Type: api.PasskeyChallengePayloadPublicKeyAllowedCredentialsItemTypePublicKey,
 		})
 	}
-	return out
+	return api.NewOptChallengeResponsePayload(api.ChallengeResponsePayload{
+		Type: api.PasskeyChallengePayloadChallengeResponsePayload,
+		PasskeyChallengePayload: api.PasskeyChallengePayload{
+			PublicKey: api.PasskeyChallengePayloadPublicKey{
+				Challenge:          challenge,
+				AllowedCredentials: allowed,
+				UserVerification:   userVerificationToAPI(string(opts.UserVerification)),
+				RpID: api.OptString{
+					Value: opts.RelyingPartyID,
+					Set:   opts.RelyingPartyID != "",
+				},
+			},
+		},
+	})
 }
 
 // userVerificationToAPI maps the challenge's WebAuthn user verification requirement into the

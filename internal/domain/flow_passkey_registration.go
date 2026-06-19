@@ -31,6 +31,7 @@ type FlowPasskeyRegistrationService interface {
 type FlowIssuePasskeyRegistrationChallengeInput struct {
 	ProjectID string
 	UserID    string
+	Username  string
 	RPID      string
 	RPOrigins []string
 }
