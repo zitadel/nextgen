@@ -117,9 +117,10 @@ the two SPAs bundled directly into the server binary.
 
 Run `corepack pnpm install --frozen-lockfile` first.
 
-The dev servers use in-browser API mocking, so you do not need a running backend
-to iterate on UI. When you want to test against a live server, build the app(s)
-first and start the Go server with `go run . server`.
+The console dev server uses in-browser API mocking, so you do not need a running
+backend to iterate on the console. The login-UI dev server renders the real
+sign-in flow instead; so you do need a running backend server to test the
+authentication flows.
 
 Dev servers serve at `/`; the embedded production builds are served at
 `/ui/console/` and `/ui/login/`.
@@ -174,10 +175,11 @@ moon run demo-next-e2e:e2e
 moon run demo-nuxt-e2e:e2e
 ```
 
-The journey test creates a fresh Next.js app outside the repo, runs the full CLI
-setup flow against local workspace packages, and runs Playwright to verify the
-result. Use this to reproduce CI failures or verify the onboarding path
-end-to-end:
+The journey test creates one fresh app directory per selected framework outside
+the repo, runs the full CLI setup flow against local workspace packages, starts
+each generated app, and runs Playwright to verify the result. By default it runs
+the full framework matrix; use `moon run workspace:journey -- --framework next`
+for a single Next.js run:
 
 ```sh
 moon run workspace:journey
@@ -206,29 +208,19 @@ automatically.
 
 ### Building a Docker image from source
 
-The contributor CLI wrapper builds the image layout expected by the Dockerfile
-without publishing a snapshot:
+By default, `moon run workspace:cli -- start` uses the npm binary runtime and
+does not build a Docker image. To build and start a local Docker image instead,
+pass `--runtime docker`:
 
 ```sh
-moon run workspace:cli -- start
+moon run workspace:cli -- start --runtime docker
 ```
 
-When no image override is present, the wrapper runs:
+Use an existing image explicitly when you do not want to rebuild:
 
 ```sh
-go build -trimpath -ldflags "<version metadata>" -o <tmp>/linux/<arch>/nextgen .
-docker buildx build --platform linux/<arch> --load \
-  -t ghcr.io/zitadel/nextgen:local-dev <tmp>
-```
-
-The wrapper embeds version metadata from the private server release record and
-the current Git commit.
-
-Use an existing image explicitly when you do not want the wrapper to rebuild:
-
-```sh
-moon run workspace:cli -- start --image custom:tag
-ZITADEL_LOCAL_IMAGE=custom:tag moon run workspace:cli -- start
+moon run workspace:cli -- start --runtime docker --image custom:tag
+ZITADEL_LOCAL_IMAGE=custom:tag moon run workspace:cli -- start --runtime docker
 ```
 
 ## Project documentation and conventions
