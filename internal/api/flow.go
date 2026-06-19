@@ -62,6 +62,7 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 		Purpose:    purpose,
 	}
 	if uri, ok := req.RedirectURI.Get(); ok {
+		// TODO: validate against RP's redirect_uri allowlist when OIDC lands.
 		startReq.RedirectURI = new(uri)
 	}
 	if id, ok := req.AuthRequestID.Get(); ok {
