@@ -221,6 +221,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		passkeyRegAdapter,
 		userService,
 		time.Now,
+		ids,
 	)
 
 	flowService := service.NewFlowService(pool, flowDefinitionRepo, stateMachine, ids)

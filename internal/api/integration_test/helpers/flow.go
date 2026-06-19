@@ -53,6 +53,7 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *service.FlowStateMachine
 			passkeyRegAdapter,
 			h.EnsureUserService(t),
 			time.Now,
+			idgen.NewULID(),
 		)
 	}
 	return h.FlowStateMachine

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -195,6 +196,7 @@ type FlowStateMachineRuntime struct {
 	passkeyRegistration domain.FlowPasskeyRegistrationService
 	userService         *UserService
 	now                 func() time.Time
+	ids                 idgen.Generator
 }
 
 // NewFlowStateMachine wires the runtime. The now hook is injectable so
@@ -206,6 +208,7 @@ func NewFlowStateMachine(
 	passkeyRegistration domain.FlowPasskeyRegistrationService,
 	userService *UserService,
 	now func() time.Time,
+	ids idgen.Generator,
 ) *FlowStateMachineRuntime {
 	if now == nil {
 		now = time.Now
@@ -217,6 +220,7 @@ func NewFlowStateMachine(
 		passkeyRegistration: passkeyRegistration,
 		userService:         userService,
 		now:                 now,
+		ids:                 ids,
 	}
 }
 
@@ -734,6 +738,13 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 		}
 		userID, _ := state.CollectedData[FlowCollectedUserIDKey].(string)
 		if userID == "" {
+			// TODO move id generation to domain
+			newID, err := r.ids.New(string(domain.PrefixUser))
+			if err != nil {
+				return passkeyPhaseResult{}, fmt.Errorf("flow state machine: generate user id: %w", err)
+			}
+			userID = newID
+
 			state.CollectedData[FlowCollectedUserIDKey] = userID
 			// Mark as provisional: user doesn't exist in the DB yet.
 			// The verify leg will call HandleProvisional + RegisterCreatedUser.

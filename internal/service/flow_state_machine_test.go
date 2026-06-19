@@ -192,6 +192,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		passkeyRegService,
 		userService,
 		now,
+		ids,
 	)
 
 	return &flowTestWorld{
@@ -1844,8 +1845,7 @@ func passkeyRegisterDefinition() *domain.FlowDefinition {
 }
 
 func TestFlowStateMachine_Process_PasskeyRegisterIssueThenVerify(t *testing.T) {
-	// TODO fix user id
-	const userID = ""
+	const userID = "user_01TEST"
 	const challengeID = "reg-1"
 	const registrationOpts = `{"rp":{"id":"example.com"}}`
 	const proof = `{"attestation":"fake"}`
