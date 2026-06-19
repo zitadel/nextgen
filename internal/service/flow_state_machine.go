@@ -500,9 +500,6 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(ctx context.Context, def *d
 		}
 		switch challenge {
 		case domain.FlowFieldChallengeIdentifier:
-			if _, pinned := state.CollectedData[FlowCollectedUserIDKey]; pinned {
-				continue
-			}
 			userID, err := r.authAttempts.SubmitIdentifier(ctx, domain.FlowSubmitIdentifierInput{
 				ProjectID:     state.ProjectID,
 				AttemptID:     state.AuthAttemptID,
@@ -513,6 +510,7 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(ctx context.Context, def *d
 				if state.CurrentPurpose == domain.FlowDefinitionPurposeRegister {
 					continue
 				}
+				clearUserBoundState(state)
 				return flowDispatchResult{Outcome: domain.FlowImplicitOutcomeUserNotFound}, nil
 			}
 			if err != nil {
@@ -1010,11 +1008,26 @@ func stepActionKind(step *domain.FlowDefinitionStep, name string) domain.FlowAct
 	return 0
 }
 
+// recordResolvedUser stores the resolved user id; if it changed, any
+// state bound to the previous user is cleared.
 func recordResolvedUser(state *domain.FlowState, userID string) {
 	if state.CollectedData == nil {
 		state.CollectedData = map[string]any{}
 	}
+	if prev, ok := state.CollectedData[FlowCollectedUserIDKey].(string); !ok || prev != userID {
+		clearUserBoundState(state)
+	}
 	state.CollectedData[FlowCollectedUserIDKey] = userID
+}
+
+// clearUserBoundState drops the resolved user id, any in-flight
+// ceremony, and the passkey provisional marker.
+func clearUserBoundState(state *domain.FlowState) {
+	state.PendingChallenge = nil
+	if state.CollectedData != nil {
+		delete(state.CollectedData, FlowCollectedUserIDKey)
+		delete(state.CollectedData, flowCollectedPasskeyProvisionalKey)
+	}
 }
 
 // prefillFromCollected sets FlowField.Value from collectedData for any field
