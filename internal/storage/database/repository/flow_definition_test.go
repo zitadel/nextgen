@@ -211,10 +211,10 @@ func TestFlowDefinitionRepository_UpdateFlowDefinition(t *testing.T) {
 	defer rollback()
 
 	repo := repository.NewFlowDefinitionRepository(tx)
-	def := sampleFlowDefinition("proj-jreplace", "flow-jreplace")
+	def := sampleFlowDefinition("proj-j1", "flow-j1")
 	require.NoError(t, repo.CreateFlowDefinition(t.Context(), tx, def))
 
-	updated := sampleFlowDefinition("proj-jreplace", "flow-jreplace")
+	updated := sampleFlowDefinition("proj-j1", "flow-j1")
 	updated.Name = "Updated Login"
 	updated.SchemaVersion = "1.2.0"
 	updated.Status = domain.FlowDefinitionStatusActive
@@ -231,7 +231,7 @@ func TestFlowDefinitionRepository_UpdateFlowDefinition(t *testing.T) {
 			Name:   "start",
 			Fields: []string{"email"},
 			Actions: []domain.FlowStepAction{
-				{Name: "continue", TextKey: "start.continue", Primary: true},
+				{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 			},
 			Transitions: map[string]domain.FlowStepTransition{
 				"submit": {Target: "finish"},
@@ -244,7 +244,7 @@ func TestFlowDefinitionRepository_UpdateFlowDefinition(t *testing.T) {
 
 	require.NoError(t, repo.UpdateFlowDefinition(t.Context(), tx, updated))
 
-	got, err := repo.GetFlowDefinition(t.Context(), tx, "proj-jreplace", "flow-jreplace")
+	got, err := repo.GetFlowDefinition(t.Context(), tx, "proj-j1", "flow-j1")
 	require.NoError(t, err)
 
 	assert.Equal(t, updated.Name, got.Name)
@@ -256,6 +256,8 @@ func TestFlowDefinitionRepository_UpdateFlowDefinition(t *testing.T) {
 	require.Len(t, got.Steps, 2)
 	assert.Equal(t, "start", got.Steps[0].Name)
 	assert.Equal(t, "finish", got.Steps[1].Name)
+	assert.WithinDuration(t, time.Now(), got.CreatedAt, 5*time.Second)
+	assert.WithinDuration(t, time.Now(), got.UpdatedAt, 5*time.Second)
 }
 
 func TestFlowDefinitionRepository_Delete(t *testing.T) {
