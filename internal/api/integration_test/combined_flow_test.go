@@ -142,8 +142,8 @@ func combinedPasswordFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 				Name:   "identifier",
 				Fields: []string{"email"},
 				Actions: []api.StepAction{
-					{Name: "submit", Primary: api.NewOptBool(true)},
-					{Name: "register"},
+					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
+					{Name: "register", Kind: api.StepActionKindSubmit},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 					"submit":         api.FlowDefinitionStepTransitionsItem{Target: "password"},
@@ -155,7 +155,7 @@ func combinedPasswordFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 				Name:   "password",
 				Fields: []string{"password"},
 				Actions: []api.StepAction{
-					{Name: "submit", Primary: api.NewOptBool(true)},
+					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 					"submit": api.FlowDefinitionStepTransitionsItem{Target: "done"},
@@ -165,8 +165,8 @@ func combinedPasswordFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 				Name:   "register-identifier",
 				Fields: []string{"email", "givenName", "familyName"},
 				Actions: []api.StepAction{
-					{Name: "submit", Primary: api.NewOptBool(true)},
-					{Name: "login"},
+					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
+					{Name: "login", Kind: api.StepActionKindSubmit},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 					"submit":              api.FlowDefinitionStepTransitionsItem{Target: "register-password"},
@@ -179,7 +179,7 @@ func combinedPasswordFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 				Fields:    []string{"password"},
 				OnSuccess: api.NewOptFlowDefinitionStepOnSuccess(createUser),
 				Actions: []api.StepAction{
-					{Name: "submit", Primary: api.NewOptBool(true)},
+					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 					"submit": api.FlowDefinitionStepTransitionsItem{Target: "done"},

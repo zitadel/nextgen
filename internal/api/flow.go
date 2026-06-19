@@ -413,6 +413,7 @@ func toFlowStepActions(actions []service.FlowAction) []api.StepAction {
 	for i, a := range actions {
 		out[i] = api.StepAction{
 			Name:    a.Name,
+			Kind:    api.StepActionKind(a.Kind.String()),
 			TextKey: api.NewOptString(a.TextKey),
 			Primary: api.NewOptBool(a.Primary),
 		}

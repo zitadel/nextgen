@@ -221,7 +221,7 @@ func loginDefinition() *domain.FlowDefinition {
 				Name:   "credentials",
 				Fields: []string{"email", "password"},
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionSubmit, Primary: true},
+					{Name: service.FlowActionSubmit, Kind: service.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionSubmit:               {Target: "done"},
@@ -259,7 +259,7 @@ func signupDefinition() *domain.FlowDefinition {
 				Fields:    []string{"email", "password"},
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionSubmit, Primary: true},
+					{Name: service.FlowActionSubmit, Kind: service.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionSubmit: {Target: "done"},
@@ -694,7 +694,7 @@ func passkeyLoginDefinition() *domain.FlowDefinition {
 			{
 				Name: "authenticate",
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionPasskey, Primary: true},
+					{Name: service.FlowActionPasskey, Kind: service.FlowActionKindPasskey, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionPasskey: {Target: "done"},
@@ -827,9 +827,9 @@ func passkeyAbandonDefinition() *domain.FlowDefinition {
 			{
 				Name: "authenticate",
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionPasskey, Primary: true},
+					{Name: service.FlowActionPasskey, Kind: domain.FlowActionKindPasskey, Primary: true},
 
-					{Name: service.FlowActionSubmit},
+					{Name: service.FlowActionSubmit, Kind: domain.FlowActionKindSubmit},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionPasskey: {Target: "done"},
@@ -1269,7 +1269,7 @@ func multiStepSignupDefinition() *domain.FlowDefinition {
 				Name:   "profile",
 				Fields: []string{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionSubmit, Primary: true},
+					{Name: service.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionSubmit:                    {Target: "set-password"},
@@ -1280,7 +1280,7 @@ func multiStepSignupDefinition() *domain.FlowDefinition {
 				Name:   "set-password",
 				Fields: []string{"password"},
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionSubmit, Primary: true},
+					{Name: service.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionSubmit: {Target: "create"},
@@ -1290,7 +1290,7 @@ func multiStepSignupDefinition() *domain.FlowDefinition {
 				Name:      "create",
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionSubmit, Primary: true},
+					{Name: service.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionSubmit: {Target: "done"},
@@ -1318,7 +1318,7 @@ func combinedSigninSignupDefinition() *domain.FlowDefinition {
 				Name:   "identify",
 				Fields: []string{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionSubmit, Primary: true},
+					{Name: service.FlowActionSubmit, Kind: service.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionSubmit:                    {Target: "signin-password"},
@@ -1330,7 +1330,7 @@ func combinedSigninSignupDefinition() *domain.FlowDefinition {
 				Name:   "signin-password",
 				Fields: []string{"password"},
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionSubmit, Primary: true},
+					{Name: service.FlowActionSubmit, Kind: service.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionSubmit: {Target: "done"},
@@ -1341,7 +1341,7 @@ func combinedSigninSignupDefinition() *domain.FlowDefinition {
 				Fields:    []string{"password"},
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionSubmit, Primary: true},
+					{Name: service.FlowActionSubmit, Kind: service.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionSubmit: {Target: "done"},
@@ -1367,7 +1367,7 @@ func recoveryDefinition() *domain.FlowDefinition {
 				Name:   "identify",
 				Fields: []string{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionSubmit, Primary: true},
+					{Name: service.FlowActionSubmit, Kind: service.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionSubmit:               {Target: "new-password"},
@@ -1378,7 +1378,7 @@ func recoveryDefinition() *domain.FlowDefinition {
 				Name:   "new-password",
 				Fields: []string{"password"},
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionSubmit, Primary: true},
+					{Name: service.FlowActionSubmit, Kind: service.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionSubmit: {Target: "done"},
@@ -1644,7 +1644,7 @@ func passkeyRegisterDefinition() *domain.FlowDefinition {
 			{
 				Name: "register",
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionPasskeyRegister, Primary: true},
+					{Name: service.FlowActionPasskeyRegister, Kind: service.FlowActionKindPasskeyRegister, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionPasskeyRegister: {Target: "done"},
@@ -1841,9 +1841,9 @@ func TestFlowStateMachine_Start_PreservesActionOrder(t *testing.T) {
 				Name:   "step",
 				Fields: []string{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionPasskey},
-					{Name: service.FlowActionSubmit, Primary: true},
-					{Name: "register"},
+					{Name: service.FlowActionPasskey, Kind: service.FlowActionKindPasskey},
+					{Name: service.FlowActionSubmit, Kind: service.FlowActionKindSubmit, Primary: true},
+					{Name: "register", Kind: service.FlowActionKindSubmit},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionPasskey: {Target: "done"},
@@ -1868,4 +1868,86 @@ func TestFlowStateMachine_Start_PreservesActionOrder(t *testing.T) {
 		gotNames[i] = a.Name
 	}
 	assert.Equal(t, []string{service.FlowActionPasskey, service.FlowActionSubmit, "register"}, gotNames)
+}
+
+// TestFlowStateMachine_Process_NavigateSkipsValidation verifies that a
+// navigate-kind action on a step with required fields routes via its
+// transition without running field validation. This is the engine's
+// half of ADR 026 — a back-navigation action can be invoked with empty
+// fields and the engine must not block on missing email/password.
+func TestFlowStateMachine_Process_NavigateSkipsValidation(t *testing.T) {
+	w := newFlowTestWorld(t)
+	show := domain.FlowStepCompleteShow
+	def := &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-navigate",
+		UserSchema: defaultSchemaURL,
+		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "enter"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "enter",
+				Fields: []string{"email", "password"},
+				Actions: []domain.FlowStepAction{
+					{Name: service.FlowActionSubmit, Kind: service.FlowActionKindSubmit, Primary: true},
+					{Name: "back", Kind: service.FlowActionKindNavigate},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					service.FlowActionSubmit: {Target: "done"},
+					"back":                  {Target: "landing"},
+				},
+			},
+			{Name: "landing", Complete: &show},
+			{Name: "done", Complete: &show},
+		},
+	}
+
+	start, err := w.sm.Start(t.Context(), nil, service.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       service.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	// Empty fields would fail validation under a submit action; navigate
+	// must skip validation and follow the transition.
+	result, err := w.sm.Process(t.Context(), nil, def, start.State, service.FlowSubmitInput{
+		Action: "back",
+		Fields: map[string]any{},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result.Step)
+	assert.Equal(t, "landing", result.Step.Name)
+	assert.Nil(t, result.Step.Error, "navigate must not surface field-validation errors")
+}
+
+// TestFlowStateMachine_Process_SubmitKindRegression confirms that the
+// kind-based dispatch keeps the standard submit pipeline intact — a
+// malformed email under a submit action surfaces a field-validation error
+// rather than routing through, exactly as before.
+func TestFlowStateMachine_Process_SubmitKindRegression(t *testing.T) {
+	w := newFlowTestWorld(t)
+	def := loginDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, service.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       service.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	result, err := w.sm.Process(t.Context(), nil, def, start.State, service.FlowSubmitInput{
+		Action: service.FlowActionSubmit,
+		Fields: map[string]any{
+			"email":    "not-an-email",
+			"password": "correct-horse-battery-staple",
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result.Step)
+	require.Equal(t, "credentials", result.Step.Name)
+	if assert.NotNil(t, result.Step.Error, "submit kind must still run field validation") {
+		assert.Contains(t, *result.Step.Error, "email")
+	}
 }

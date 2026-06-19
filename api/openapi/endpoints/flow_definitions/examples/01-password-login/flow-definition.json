@@ -16,6 +16,7 @@
         "actions": [
           {
             "name": "submit",
+            "kind": "submit",
             "primary": true
           }
         ],
@@ -33,6 +34,7 @@
         "actions": [
           {
             "name": "submit",
+            "kind": "submit",
             "primary": true
           }
         ],
