@@ -3,7 +3,6 @@ package domain
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"net/url"
 	"time"
 
@@ -50,7 +49,7 @@ func (c *PasskeyCeremony) ClientOptions() []byte {
 func CreatePasskeyChallenge(id string, keys []*UserPasskey, verification string, rpID string, origins []url.URL) (*PasskeyCeremony, error) {
 	w, err := webAuthNConfig(rpID, origins...)
 	if err != nil {
-		return nil, err
+		return nil, ErrInternal(err)
 	}
 	opts := make([]webauthn.LoginOption, 0)
 	if verification != "" {
@@ -71,10 +70,10 @@ func CreatePasskeyChallenge(id string, keys []*UserPasskey, verification string,
 		assertion, sessionData, err = w.BeginLogin(user, opts...)
 	}
 	if err != nil {
-		return nil, err
+		return nil, ErrInternal(err)
 	}
 	if assertion == nil {
-		return nil, fmt.Errorf("passkey ceremony: login options missing from go-webauthn")
+		return nil, ErrInternal(nil)
 	}
 	return newPasskeyCeremony(sessionData, assertion.Response, origins)
 }
@@ -89,7 +88,7 @@ func VerifyPasskeyChallenge(ceremony *PasskeyCeremony, response []byte, userID s
 	}
 	w, err := webAuthNConfig(rpID, ceremony.RPOrigins...)
 	if err != nil {
-		return nil, err
+		return nil, ErrInternal(err)
 	}
 	parsedResponse, err := protocol.ParseCredentialRequestResponseBytes(response)
 	if err != nil {
@@ -141,7 +140,7 @@ func VerifyPasskeyChallenge(ceremony *PasskeyCeremony, response []byte, userID s
 func CreatePasskeyRegistrationChallenge(userID, username, displayName string, existing []*UserPasskey, rpID string, origins []url.URL) (*PasskeyCeremony, error) {
 	w, err := webAuthNConfig(rpID, origins...)
 	if err != nil {
-		return nil, err
+		return nil, ErrInternal(err)
 	}
 	user := &webAuthNUser{
 		userID:      userID,
@@ -151,10 +150,10 @@ func CreatePasskeyRegistrationChallenge(userID, username, displayName string, ex
 	}
 	creation, sessionData, err := w.BeginRegistration(user)
 	if err != nil {
-		return nil, err
+		return nil, ErrInternal(err)
 	}
 	if creation == nil {
-		return nil, fmt.Errorf("passkey ceremony: registration options missing from go-webauthn")
+		return nil, ErrInternal(nil)
 	}
 	return newPasskeyCeremony(sessionData, creation.Response, origins)
 }
@@ -173,7 +172,7 @@ func VerifyPasskeyRegistrationChallenge(ceremony *PasskeyCeremony, attestation [
 	}
 	w, err := webAuthNConfig(rpID, ceremony.RPOrigins...)
 	if err != nil {
-		return nil, err
+		return nil, ErrInternal(err)
 	}
 	parsedResponse, err := protocol.ParseCredentialCreationResponseBytes(attestation)
 	if err != nil {
@@ -207,11 +206,11 @@ func VerifyPasskeyRegistrationChallenge(ceremony *PasskeyCeremony, attestation [
 func newPasskeyCeremony(session *webauthn.SessionData, clientOptions any, origins []url.URL) (*PasskeyCeremony, error) {
 	sessionJSON, err := json.Marshal(session)
 	if err != nil {
-		return nil, fmt.Errorf("passkey ceremony: marshal session: %w", err)
+		return nil, ErrInternal(err).WithMessage("failed to marshal passkey session")
 	}
 	clientJSON, err := json.Marshal(clientOptions)
 	if err != nil {
-		return nil, fmt.Errorf("passkey ceremony: marshal client options: %w", err)
+		return nil, ErrInternal(err).WithMessage("failed to marshal passkey client options")
 	}
 	originsCopy := append([]url.URL(nil), origins...)
 	return &PasskeyCeremony{
@@ -223,21 +222,21 @@ func newPasskeyCeremony(session *webauthn.SessionData, clientOptions any, origin
 
 func (c *PasskeyCeremony) loginSession() (webauthn.SessionData, string, error) {
 	if c == nil {
-		return webauthn.SessionData{}, "", fmt.Errorf("passkey ceremony: nil ceremony")
+		return webauthn.SessionData{}, "", ErrAuthAttemptInvalidState()
 	}
 	var session webauthn.SessionData
 	if err := json.Unmarshal(c.SessionData, &session); err != nil {
-		return webauthn.SessionData{}, "", fmt.Errorf("passkey ceremony: unmarshal session: %w", err)
+		return webauthn.SessionData{}, "", ErrAuthAttemptInvalidState().WithParent(err)
 	}
 	if session.RelyingPartyID == "" {
-		return webauthn.SessionData{}, "", fmt.Errorf("passkey ceremony: missing relying party id in session")
+		return webauthn.SessionData{}, "", ErrAuthAttemptInvalidState()
 	}
 	return session, session.RelyingPartyID, nil
 }
 
 func (c *PasskeyCeremony) registrationUser() (*webAuthNUser, error) {
 	if c == nil {
-		return nil, fmt.Errorf("passkey ceremony: nil ceremony")
+		return nil, ErrAuthAttemptInvalidState()
 	}
 	session, _, err := c.loginSession()
 	if err != nil {
@@ -249,7 +248,7 @@ func (c *PasskeyCeremony) registrationUser() (*webAuthNUser, error) {
 	if optsJSON := c.ClientOptions(); len(optsJSON) > 0 {
 		var opts protocol.PublicKeyCredentialCreationOptions
 		if err := json.Unmarshal(optsJSON, &opts); err != nil {
-			return nil, fmt.Errorf("passkey ceremony: unmarshal creation options: %w", err)
+			return nil, ErrInternal(err).WithMessage("failed to unmarshal passkey creation options")
 		}
 		if opts.User.Name != "" {
 			username = opts.User.Name

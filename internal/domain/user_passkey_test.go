@@ -162,6 +162,19 @@ func TestVerifyPasskeyChallenge(t *testing.T) {
 		assert.Error(t, err)
 	})
 
+	t.Run("rejects nil ceremony", func(t *testing.T) {
+		_, err := domain.VerifyPasskeyChallenge(nil, []byte("{}"), testUserID, nil, nil)
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, domain.ErrAuthAttemptInvalidState()))
+	})
+
+	t.Run("rejects corrupt persisted session", func(t *testing.T) {
+		ceremony := &domain.PasskeyCeremony{SessionData: []byte("not-json")}
+		_, err := domain.VerifyPasskeyChallenge(ceremony, []byte("{}"), testUserID, nil, nil)
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, domain.ErrAuthAttemptInvalidState()))
+	})
+
 	t.Run("rejects garbage assertion bytes", func(t *testing.T) {
 		s := newPasskeyTestSetup(t)
 

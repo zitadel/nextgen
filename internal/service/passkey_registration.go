@@ -72,7 +72,7 @@ func (s *PasskeyRegistrationService) Begin(ctx context.Context, in BeginRegistra
 		in.RPID, origins,
 	)
 	if err != nil {
-		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: begin: %w", err)
+		return BeginRegistrationOutput{}, err
 	}
 
 	regID, err := s.ids.New(string(domain.PrefixPasskeyRegistration))
