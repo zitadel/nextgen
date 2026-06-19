@@ -1,4 +1,4 @@
-# ADR 016: Flow Back-Navigation
+# ADR 022: Flow Back-Navigation
 
 > **Status:** Proposed
 > **Date:** 2026-05-21
@@ -7,10 +7,11 @@
 ## Decision
 
 Back-navigation in the flow engine uses the **existing action contract**.
-The server declares a `back` action on steps where returning to the previous
-step is allowed. The orchestrator submits `{ action: "back" }` like any other
-action. The server follows the `back` transition in the flow definition and
-returns the target step.
+The engine **injects** a `back` action on steps where returning to the
+previous step is allowed — flow authors do not declare back transitions
+per step. The orchestrator submits `{ action: "back" }` like any other
+action. The engine pops the previous step from the runtime history and
+returns it.
 
 The `<zitadel-login>` orchestrator additionally integrates with the browser's
 **History API** so that the native back gesture (swipe, button, keyboard
@@ -40,36 +41,24 @@ When submitted:
 POST /flow/{id}/submit { session_token, action: "back" }
 ```
 
-The server resolves this like any other action: it looks up the `back`
-transition in the flow definition, follows it to the target step, and returns
-the new step response. The session token rotates as usual. No special API
-endpoint, no history stack popping — `back` is a regular edge in the
-definition's step graph:
+The engine pops the previous step from the runtime `history` array stored
+in the encrypted flow cookie and returns it as the new step response. The
+session token rotates as usual. No special API endpoint, no per-step
+`back` transition in the flow definition.
 
-```json
-{
-  "name": "passkey-upsell",
-  "transitions": {
-    "setup": { "target": "done" },
-    "skip":  { "target": "done" },
-    "back":  { "target": "identifier" }
-  }
-}
-```
+### When the engine injects `back`
 
-### Server-side contract
+The engine adds `back` to a step's `actions` dict iff **both** of the
+following hold:
 
-The server controls **whether** back is allowed. It includes `back` in the
-step's `actions` dict only when the flow definition declares a `back`
-transition for the current step.
+1. The runtime `history` array has at least one prior step.
+2. The current step is not terminal.
 
-Steps where `back` is **not** offered:
-
-| Step | Reason |
-|---|---|
-| Initial step (e.g. `identifier`) | No `back` transition defined — nowhere to go back to |
-| Post-mutation steps | User was already created / credential was reset — irreversible |
-| Terminal steps (`complete`) | Flow is done |
+Reversibility is folded into rule 1: the engine pushes onto `history`
+only on reversible transitions, and **clears** `history` on irreversible
+ones (e.g., the action just created the user or rotated a credential).
+The engine classifies reversibility from the semantics of the action it
+executed — flow definitions carry no reversibility metadata.
 
 The frontend never needs to hardcode which steps support back — the presence
 or absence of the `back` action in the response is the single source of truth.
@@ -82,13 +71,19 @@ the native back gesture work without page reloads.
 
 #### Lifecycle
 
-1. **On each step transition** (after `applyResponse`):
-   - If the new step's `actions` contains `back` →
-     `history.pushState(null, '', '#s' + this.stepSeq++)` — creates a
-     history entry with an opaque, incrementing fragment (`#s1`, `#s2`, …).
-     The fragment has no semantic meaning; it is never read back.
-   - If the new step has no `back` action → `history.replaceState(...)` (no
-     new entry — browser back navigates the host page, which is correct)
+1. **On each submit response** (after `applyResponse`):
+   - If `newStep.name === previousStep.name` → no history call. Same-name
+     responses are validation errors or re-renders; the engine treated
+     them as non-advancing, so the browser stack must not move either.
+   - Else if the new step's `actions` contains `back` →
+     `history.pushState(null, '', '#s' + this.stepSeq++)`. The fragment
+     (`#s1`, `#s2`, …) has no semantic meaning; it is never read back.
+   - Else → `history.replaceState(...)`. No new entry; back from here
+     leaves the flow (intercepted by step 2 below).
+
+   The presence of `back` in the response is the single signal — the
+   engine's injection rules (above) decide it; the client just reads it.
+   The two layers stay in lockstep by construction.
 
 2. **On `popstate` event** (browser back button):
    - If the current step's `actions` contains `back` →
@@ -147,17 +142,11 @@ action key name in the template:
 
 ### Mock server changes
 
-The xstate flow machine adds `back` transitions to steps that follow the
-initial step:
-
-```
-passkey-upsell → back → identifier
-register       → back → identifier
-password       → back → identifier
-```
-
-Step fixtures include `back: { text_key: "action.back" }` in their `actions`
-dict where appropriate.
+No per-step `back` transitions in the xstate machine — the mock engine
+derives back from its runtime history, same as production. The mock
+classifies the same action semantics as irreversible (e.g., the action
+that creates the user) so `back` is automatically omitted on the
+following step.
 
 ## Context
 
@@ -209,14 +198,15 @@ increases flow abandonment.
 - **`step-action.yaml`** — unchanged. `back` is a plain action.
 - **`flow-submit-request.yaml`** — unchanged. `back` is already documented
   as a valid action value.
-- **Flow definitions** — gain `back` transitions on steps where backtracking
-  is allowed. The `history` array in `flow-engine-storage.md` is unrelated
-  internal bookkeeping — `back` is resolved via the transition graph.
+- **Flow definitions** — unchanged. No per-step `back` transitions and no
+  reversibility metadata; the engine derives back from the runtime
+  `history` array (see `flow-engine-storage.md`) and from the semantics
+  of the actions it executes.
 - **`zitadel-login.ts`** — gains `pushState` calls on step transitions and a
   `popstate` listener.
 - **Locale files** — gain `action.back` translation key.
-- **Mock server** — `flow-machine.ts` gains `back` transitions;
-  `fixtures/login.ts` gains `back` actions on applicable steps.
+- **Mock server** — no `back` edges added to `flow-machine.ts`; the mock
+  engine applies the same back-injection rules as production.
 
 [storage]: ../design/flowengine/flow-engine-storage.md
 [submit]: ../../api/openapi/components/flows/flow-submit-request.yaml
