@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/go-faster/jx"
+	"github.com/muhlemmer/gu"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/ogenx"
-	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -29,7 +29,7 @@ func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionReques
 	if err != nil {
 		return nil, err
 	}
-	return sessionWithTokenToAPI(session, h.crypter)
+	return sessionWithTokenToAPI(session, h.sessionTokenGenerator)
 }
 
 func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, params api.ExchangeHandoffParams) (api.ExchangeHandoffRes, error) {
@@ -41,7 +41,7 @@ func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, 
 	if err != nil {
 		return nil, err
 	}
-	return sessionWithTokenToAPI(session, h.crypter)
+	return sessionWithTokenToAPI(session, h.sessionTokenGenerator)
 }
 
 func exchangeInputFromRequest(req *api.ExchangeRequest, params api.ExchangeHandoffParams) (service.ExchangeInput, error) {
@@ -72,13 +72,13 @@ func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (a
 }
 
 func (h Handler) GetMySession(ctx context.Context, params api.GetMySessionParams) (api.GetMySessionRes, error) {
-	sessionToken, err := domain.DecryptSessionTokenString(params.NextgenSession, h.crypter)
+	sessionToken, err := domain.DecryptSessionTokenString(params.NextgenSession, h.sessionTokenVerifier)
 	if err != nil {
 		return nil, err
 	}
 	input := service.GetSessionInput{
 		ProjectID: sessionToken.ProjectID,
-		SessionID: sessionToken.SessionID,
+		SessionID: gu.Value(sessionToken.SessionID),
 	}
 
 	session, err := h.sessionService.Get(ctx, input)
@@ -119,13 +119,13 @@ func (h Handler) RevokeSession(ctx context.Context, params api.RevokeSessionPara
 }
 
 func (h Handler) RevokeMySession(ctx context.Context, params api.RevokeMySessionParams) (api.RevokeMySessionRes, error) {
-	sessionToken, err := domain.DecryptSessionTokenString(params.NextgenSession, h.crypter)
+	sessionToken, err := domain.DecryptSessionTokenString(params.NextgenSession, h.sessionTokenVerifier)
 	if err != nil {
 		return nil, err
 	}
 	input := service.DeleteSessionInput{
 		ProjectID: sessionToken.ProjectID,
-		SessionID: sessionToken.SessionID,
+		SessionID: gu.Value(sessionToken.SessionID),
 	}
 
 	session, err := h.sessionService.Get(ctx, service.GetSessionInput(input))
@@ -145,7 +145,7 @@ func (h Handler) RevokeMySession(ctx context.Context, params api.RevokeMySession
 	}, nil
 }
 
-func validateSessionToken(session *domain.Session, token *domain.SessionToken) error {
+func validateSessionToken(session *domain.Session, token *domain.Token) error {
 	if session.TokenID != token.TokenID {
 		return domain.ErrSessionTokenInvalid()
 	}
@@ -171,8 +171,8 @@ func userAgentToDomain(agent api.OptCreateSessionRequestUserAgent) *domain.UserA
 	}
 }
 
-func sessionWithTokenToAPI(session *domain.Session, encrypter crypto.Encrypter) (*api.SessionWithTokenResponseHeaders, error) {
-	token, err := session.Token(encrypter)
+func sessionWithTokenToAPI(session *domain.Session, tokenGenerator domain.TokenGenerator) (*api.SessionWithTokenResponseHeaders, error) {
+	token, err := session.Token(tokenGenerator)
 	if err != nil {
 		return nil, err
 	}

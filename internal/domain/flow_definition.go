@@ -76,6 +76,31 @@ const (
 	FlowGateKindCaptcha FlowGateKind = iota
 )
 
+// FlowActionKind classifies what the engine should do when a user invokes
+// an action. Submit-style kinds run the input pipeline (field validation,
+// challenge dispatch, on_success); Navigate skips the pipeline and just
+// follows the matching transition.
+//
+//go:generate go tool enumer -type FlowActionKind -transform snake -trimprefix FlowActionKind -sql
+type FlowActionKind uint8
+
+const (
+	// FlowActionKindSubmit advances by collecting the step's fields and
+	// running the standard validate/dispatch/on_success pipeline.
+	FlowActionKindSubmit FlowActionKind = iota + 1
+	// FlowActionKindPasskey issues a WebAuthn assertion challenge and
+	// resolves the matching transition once the assertion verifies.
+	FlowActionKindPasskey
+	// FlowActionKindPasskeyRegister issues a WebAuthn registration
+	// challenge and resolves the matching transition once the attestation
+	// verifies.
+	FlowActionKindPasskeyRegister
+	// FlowActionKindNavigate routes through the transition without running
+	// the input pipeline. Used for back-navigation and similar pure-routing
+	// actions where the submitted fields are irrelevant.
+	FlowActionKindNavigate
+)
+
 // FlowDefinition is a customer-configured directed graph of authentication steps.
 // It is immutable: modifications produce a new revision with a new SchemaVersion.
 type FlowDefinition struct {
@@ -182,7 +207,10 @@ type FlowDefinitionStep struct {
 
 // FlowStepAction is a user-selectable action declared on a step.
 type FlowStepAction struct {
-	Name    string
+	Name string
+	// Kind classifies how the engine handles this action. See
+	// [FlowActionKind] for the available kinds.
+	Kind    FlowActionKind
 	TextKey string
 	Primary bool
 }

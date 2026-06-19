@@ -1,9 +1,16 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { cp, mkdir, open, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 export const packageDirs = [
   "apps/cli",
+  "apps/server",
+  "apps/server-linux-x64",
+  "apps/server-linux-arm64",
+  "apps/server-darwin-x64",
+  "apps/server-darwin-arm64",
+  "apps/server-win32-x64",
   "packages/api",
   "packages/components",
   "packages/sdk-core",
@@ -12,12 +19,15 @@ export const packageDirs = [
   "packages/sdk-react",
   "packages/sdk-vue",
   "packages/sdk-angular",
+  "packages/sdk-solid",
+  "packages/sdk-svelte",
+  "packages/sdk-qwik",
 ];
 
 export function localRegistryPaths(workDir) {
   return {
-    composeEnvPath: join(workDir, "compose.env"),
     npmrcPath: join(workDir, "verdaccio.npmrc"),
+    registryLogPath: join(workDir, "verdaccio", "verdaccio.log"),
     storagePath: join(workDir, "verdaccio", "storage"),
     tarballsDir: join(workDir, "npm-packages"),
     verdaccioConfigPath: join(workDir, "verdaccio", "config.yaml"),
@@ -38,16 +48,22 @@ export async function prepareLocalRegistry(input) {
     await mkdirFn(input)(paths.storagePath, { recursive: true });
   }
   await mkdirFn(input)(dirname(paths.verdaccioConfigPath), { recursive: true });
-  await writeVerdaccioConfig(paths.verdaccioConfigPath, input);
+  await writeVerdaccioConfig(paths.verdaccioConfigPath, paths.storagePath, input);
   await writeVerdaccioNpmrc(paths.npmrcPath, input.registryUrl, input);
-  await writeComposeEnv(paths.composeEnvPath, input.registryPort, paths, input);
 
   await buildPackages(input.repoRoot, input.run, env, log);
   await packPackages(input.repoRoot, paths.tarballsDir, input.run, env, log);
   await verifyTarballs(input.repoRoot, paths.tarballsDir, input.run, env);
-  await restartLocalRegistry(input.compose, input.run, env, log);
-  await input.onStarted?.();
-  await waitForHttpFn(input)(`${input.registryUrl}/-/ping`, "Verdaccio", undefined, log);
+  const startRegistry = input.startLocalRegistry ?? startLocalRegistry;
+  const registry = await startRegistry({
+    env,
+    log,
+    paths,
+    registryPort: input.registryPort,
+    repoRoot: input.repoRoot,
+  });
+  await input.onStarted?.(registry);
+  await waitForHttpFn(input)(`${input.registryUrl}/-/ping`, "Verdaccio", registry, log);
   await publishTarballs(
     input.repoRoot,
     paths.tarballsDir,
@@ -57,34 +73,25 @@ export async function prepareLocalRegistry(input) {
     env,
   );
 
-  return { paths, env: npmEnvironment(env, input.registryUrl, paths.npmrcPath) };
+  return { paths, registry, env: npmEnvironment(env, input.registryUrl, paths.npmrcPath) };
 }
 
 export async function buildPackages(repoRoot, run, env, log = () => undefined) {
   const projectNames = await Promise.all(packageDirs.map((dir) => packageName(repoRoot, dir)));
-  log(`building ${projectNames.join(", ")}`);
-  await run("corepack", [
-    "pnpm",
-    "nx",
-    "run-many",
-    "-t",
-    "build",
-    "-p",
-    projectNames.join(","),
-  ], { cwd: repoRoot, env });
+  log(`building release npm tarballs for ${projectNames.join(", ")}`);
+  await run("moon", ["run", "release:pack"], { cwd: repoRoot, env });
 }
 
-export async function packPackages(repoRoot, tarballsDir, run, env, log = () => undefined) {
-  log(`packing npm tarballs into ${tarballsDir}`);
-  for (const dir of packageDirs) {
-    await run("corepack", [
-      "pnpm",
-      "--dir",
-      dir,
-      "pack",
-      "--pack-destination",
-      tarballsDir,
-    ], { cwd: repoRoot, env });
+export async function packPackages(repoRoot, tarballsDir, _run, _env, log = () => undefined) {
+  log(`copying npm tarballs into ${tarballsDir}`);
+  const version = await packageVersion(repoRoot, "apps/server");
+  const sourceDir = join(repoRoot, "dist", "release", version, "npm");
+  const tarballs = (await readdir(sourceDir)).filter((file) => file.endsWith(".tgz")).sort();
+  if (tarballs.length === 0) {
+    throw new Error(`no release npm tarballs found in ${sourceDir}`);
+  }
+  for (const tarball of tarballs) {
+    await cp(join(sourceDir, tarball), join(tarballsDir, tarball));
   }
 }
 
@@ -109,42 +116,65 @@ export async function publishTarballs(repoRoot, tarballsDir, registryUrl, npmrcP
   });
 }
 
-export async function restartLocalRegistry(compose, run, env, log = () => undefined) {
+export async function startLocalRegistry(input) {
+  const log = input.log ?? (() => undefined);
   log("starting Verdaccio");
-  await run("docker", composeArgs(compose, ["down", "-v", "--remove-orphans"]), {
-    cwd: compose.repoRoot,
-    env,
-  }).catch(() => undefined);
-  await run("docker", composeArgs(compose, ["up", "-d", "verdaccio"]), {
-    cwd: compose.repoRoot,
-    env,
-  });
+  await mkdir(dirname(input.paths.registryLogPath), { recursive: true });
+  const logFile = await open(input.paths.registryLogPath, "a", 0o600);
+  try {
+    const child = spawn(
+      "corepack",
+      [
+        "pnpm",
+        "exec",
+        "verdaccio",
+        "--config",
+        input.paths.verdaccioConfigPath,
+        "--listen",
+        `127.0.0.1:${String(input.registryPort)}`,
+      ],
+      {
+        cwd: input.repoRoot,
+        env: input.env,
+        stdio: ["ignore", logFile.fd, logFile.fd],
+      },
+    );
+    child.logFile = input.paths.registryLogPath;
+    child.on("error", (error) => {
+      child.spawnError = error;
+    });
+    return child;
+  } finally {
+    await logFile.close();
+  }
 }
 
-export async function stopLocalRegistry(compose, run, env) {
-  await run("docker", composeArgs(compose, ["down", "-v", "--remove-orphans"]), {
-    cwd: compose.repoRoot,
-    env,
+export async function stopLocalRegistry(registry) {
+  if (!registry || registry.exitCode !== null) {
+    return;
+  }
+  registry.kill("SIGTERM");
+  await new Promise((resolveStop) => {
+    const timeout = setTimeout(() => {
+      if (registry.exitCode === null) {
+        registry.kill("SIGKILL");
+      }
+      resolveStop();
+    }, 5000);
+    registry.once("exit", () => {
+      clearTimeout(timeout);
+      resolveStop();
+    });
   });
-}
-
-export function composeArgs(compose, args) {
-  return [
-    "compose",
-    "--project-name",
-    compose.projectName,
-    "--env-file",
-    compose.envPath,
-    "-f",
-    compose.file,
-    ...args,
-  ];
 }
 
 export async function waitForHttp(url, label, child, log = () => undefined) {
   const deadline = Date.now() + 90_000;
   let lastError;
   while (Date.now() < deadline) {
+    if (child?.spawnError) {
+      throw new Error(`${label} failed to start; see ${child.logFile}: ${child.spawnError.message}`);
+    }
     if (child && child.exitCode !== null) {
       throw new Error(`${label} exited before becoming ready; see ${child.logFile}`);
     }
@@ -192,9 +222,14 @@ export async function packageName(repoRoot, relativePath) {
   return manifest.name;
 }
 
-export function localRegistryProjectName(repoRoot) {
-  const hash = createHash("sha256").update(repoRoot).digest("hex").slice(0, 12);
-  return `zitadel-local-packages-${hash}`;
+export async function packageVersion(repoRoot, relativePath) {
+  const manifest = JSON.parse(
+    await readFile(join(repoRoot, relativePath, "package.json"), "utf8"),
+  );
+  if (typeof manifest.version !== "string" || manifest.version.length === 0) {
+    throw new Error(`${relativePath}/package.json has no version`);
+  }
+  return manifest.version;
 }
 
 export function localRegistryPort(repoRoot, env = process.env) {
@@ -215,10 +250,11 @@ async function resetDirectory(path, input) {
   await mkdirFn(input)(path, { recursive: true });
 }
 
-async function writeVerdaccioConfig(path, input) {
+async function writeVerdaccioConfig(path, storagePath, input) {
   await writeFileFn(input)(
     path,
-    `storage: /verdaccio/storage
+    `storage: ${storagePath}
+max_body_size: 200mb
 uplinks:
   npmjs:
     url: https://registry.npmjs.org/
@@ -250,18 +286,6 @@ async function writeVerdaccioNpmrc(path, registryUrl, input) {
     `registry=${registryUrl}/
 //${url.host}/:_authToken=journey-token
 `,
-  );
-}
-
-async function writeComposeEnv(path, registryPort, paths, input) {
-  await writeFileFn(input)(
-    path,
-    [
-      `JOURNEY_REGISTRY_PORT=${registryPort}`,
-      `JOURNEY_VERDACCIO_CONFIG=${paths.verdaccioConfigPath}`,
-      `JOURNEY_VERDACCIO_STORAGE=${paths.storagePath}`,
-      "",
-    ].join("\n"),
   );
 }
 

@@ -66,7 +66,7 @@ export default defineConfig([
     // (sdk-next, demo-next, demo-nuxt) whose tsgo --build expects those
     // .d.ts files to exist. tsdown still overwrites its own .mjs/.d.mts
     // outputs on each rebuild — stale files just accumulate harmlessly
-    // until a full `git clean` or `nx reset`.
+    // until a full `git clean`.
     clean: false,
     target: "es2022",
     external: [...THIRD_PARTY, "@zitadel/api-mock"],

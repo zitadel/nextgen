@@ -55,6 +55,37 @@ describe("local server runtime metadata", () => {
     );
   });
 
+  it("round-trips binary runtime metadata", async () => {
+    const paths = localRuntimePaths(cwd);
+    const metadata: RuntimeMetadata = {
+      schema_version: 1,
+      backend: "binary",
+      pid: 12345,
+      command: "node /path/to/zitadel-server.js",
+      log_path: paths.logFile,
+      server_package: "@zitadel/server",
+      server_version: "0.1.0-alpha.5",
+      port: 8081,
+      server_url: "http://localhost:8081",
+      data_dir: paths.dataDir,
+      created_at: "2026-06-09T00:00:00.000Z",
+      cli_version: "0.0.0-test",
+    };
+
+    await writeRuntimeMetadata(cwd, metadata);
+
+    await expect(readRuntimeMetadata(cwd)).resolves.toEqual(metadata);
+  });
+
+  it("treats legacy runtime metadata without backend as Docker metadata", async () => {
+    const paths = await ensureLocalState(cwd);
+    const metadata = runtimeFor(cwd);
+    const { backend: _backend, ...legacy } = metadata;
+    await writeFile(paths.runtimeFile, `${JSON.stringify(legacy, null, 2)}\n`);
+
+    await expect(readRuntimeMetadata(cwd)).resolves.toEqual(metadata);
+  });
+
   it("accepts runtime metadata with an explicit default HTTP port", async () => {
     const metadata = { ...runtimeFor(cwd), port: 80, server_url: "http://localhost:80" };
 
@@ -110,6 +141,7 @@ function runtimeFor(cwd: string): RuntimeMetadata {
   const paths = localRuntimePaths(cwd);
   return {
     schema_version: 1,
+    backend: "docker",
     container_name: localContainerName(cwd),
     container_id: "container-1",
     image: "ghcr.io/zitadel/nextgen:test",

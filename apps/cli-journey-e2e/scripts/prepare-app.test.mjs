@@ -60,6 +60,10 @@ test("prepares the customer local setup journey in the app root", async () => {
           "doctor",
           "--port",
           "18080",
+          "--runtime",
+          "binary",
+          "--cwd",
+          appDir,
           "--non-interactive",
           "--json",
         ],
@@ -69,6 +73,10 @@ test("prepares the customer local setup journey in the app root", async () => {
           "start",
           "--port",
           "18080",
+          "--runtime",
+          "binary",
+          "--cwd",
+          appDir,
           "--non-interactive",
           "--json",
         ],
@@ -82,6 +90,8 @@ test("prepares the customer local setup journey in the app root", async () => {
           "local",
           "--dev-port",
           "3010",
+          "--cwd",
+          appDir,
           "--non-interactive",
           "--json",
         ],
@@ -89,6 +99,8 @@ test("prepares the customer local setup journey in the app root", async () => {
     );
     assert.deepEqual(calls.map((call) => call.cwd), [appDir, appDir, appDir]);
     assert.ok(calls.every((call) => call.env.ZITADEL_LOCAL_IMAGE === image));
+    assert.ok(calls.every((call) => call.env.npm_config_cache === join(workDir, ".npm-cache")));
+    assert.ok(calls.every((call) => call.env.npm_config_tmp === join(workDir, ".npm-tmp")));
     assert.ok(JSON.parse(await readFile(join(workDir, "doctor.json"), "utf8")));
     assert.ok(JSON.parse(await readFile(join(workDir, "start.json"), "utf8")));
     assert.ok(JSON.parse(await readFile(join(workDir, "setup.json"), "utf8")));
@@ -140,10 +152,48 @@ test("collects local runtime logs when a CLI step fails", async () => {
     );
 
     assert.ok(calls.some((call) => call.args.includes("logs")));
+    const logsCall = calls.find((call) => call.args.includes("logs"));
+    assert.ok(logsCall.args.includes("--cwd"));
+    assert.equal(logsCall.args[logsCall.args.indexOf("--cwd") + 1], join(workDir, "myapp"));
+    assert.equal(logsCall.cwd, join(workDir, "myapp"));
     const logs = JSON.parse(await readFile(join(workDir, "logs.json"), "utf8"));
     assert.equal(logs.data.logs, "runtime log");
     const start = JSON.parse(await readFile(join(workDir, "start.json"), "utf8"));
     assert.equal(start.status, "error");
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+});
+
+test("accepts generated apps that use pnpm lockfiles", async () => {
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-journey-prepare-pnpm-test-"));
+  const registryUrl = "http://127.0.0.1:4873";
+
+  try {
+    const metadata = await prepareApp({
+      env: {
+        JOURNEY_APP_URL: "http://localhost:3010",
+        JOURNEY_CLI_PACKAGE: "@zitadel/cli",
+        JOURNEY_FRAMEWORK: "angular",
+        JOURNEY_REGISTRY_URL: registryUrl,
+        JOURNEY_SDK_PACKAGE: "@zitadel/sdk-angular",
+        JOURNEY_WORK_DIR: workDir,
+      },
+      logMetadata: false,
+      runCapture: async (_command, args, options) => {
+        if (args.includes("setup")) {
+          await writeGeneratedApp(options.cwd, registryUrl, "@zitadel/sdk-angular", "pnpm");
+        }
+        return {
+          code: 0,
+          stdout: `${JSON.stringify(okEnvelope(args))}\n`,
+          stderr: "",
+        };
+      },
+    });
+
+    assert.equal(metadata.framework, "angular");
+    assert.equal(metadata.sdkPackage, "@zitadel/sdk-angular");
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }
@@ -190,11 +240,32 @@ test("records log collection failures thrown as non-Error values", async () => {
   }
 });
 
-async function writeGeneratedApp(appDir, registryUrl, sdkPackage) {
+async function writeGeneratedApp(appDir, registryUrl, sdkPackage, lockfile = "npm") {
   await writeFile(
     join(appDir, "package.json"),
     `${JSON.stringify({ dependencies: { [sdkPackage]: "alpha" } }, null, 2)}\n`,
   );
+  if (lockfile === "pnpm") {
+    await writeFile(
+      join(appDir, "pnpm-lock.yaml"),
+      [
+        "lockfileVersion: '9.0'",
+        "",
+        "importers:",
+        "  .:",
+        "    dependencies:",
+        `      ${sdkPackage}:`,
+        "        specifier: alpha",
+        "        version: 0.1.0-alpha.5",
+        "",
+        "packages:",
+        `  ${sdkPackage}@0.1.0-alpha.5:`,
+        `    resolution: {tarball: ${registryUrl}/${sdkPackage}/-/package.tgz}`,
+        "",
+      ].join("\n"),
+    );
+    return;
+  }
   await writeFile(
     join(appDir, "package-lock.json"),
     `${JSON.stringify(

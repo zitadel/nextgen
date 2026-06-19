@@ -276,11 +276,8 @@ const ENCODER = new TextEncoder();
  * @returns The decoded bytes.
  */
 export function base64UrlDecode(input: string): Uint8Array<ArrayBuffer> {
-  const base64 = input.replace(/-/g, '+').replace(/_/g, '/');
-  const padded = base64.padEnd(
-    base64.length + ((4 - (base64.length % 4)) % 4),
-    '=',
-  );
+  const base64 = input.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
   const binary = atob(padded);
   return Uint8Array.from(binary, (c) => c.charCodeAt(0));
 }
@@ -300,7 +297,7 @@ export function base64UrlDecode(input: string): Uint8Array<ArrayBuffer> {
  *   has fewer than three dot-separated segments.
  */
 function splitToken(token: string): readonly [string, string, string] | null {
-  const [h, p, s] = token.split('.');
+  const [h, p, s] = token.split(".");
   if (!h || !p || !s) {
     return null;
   }
@@ -325,7 +322,7 @@ export function decodeJwt(token: string): DecodedJwt {
   const segments = splitToken(token);
   if (!segments) {
     throw new TypeError(
-      `Invalid JWT: expected at least three dot-separated segments, received ${token.split('.').length}.`,
+      `Invalid JWT: expected at least three dot-separated segments, received ${token.split(".").length}.`,
     );
   }
   const [h, p] = segments;
@@ -343,12 +340,12 @@ export function decodeJwt(token: string): DecodedJwt {
  * anything not present throws {@link TypeError}.
  */
 const IMPORT_PARAMS = {
-  RS256: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-  RS384: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-384' },
-  RS512: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-512' },
-  ES256: { name: 'ECDSA', namedCurve: 'P-256' },
-  ES384: { name: 'ECDSA', namedCurve: 'P-384' },
-  ES512: { name: 'ECDSA', namedCurve: 'P-521' },
+  RS256: { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+  RS384: { name: "RSASSA-PKCS1-v1_5", hash: "SHA-384" },
+  RS512: { name: "RSASSA-PKCS1-v1_5", hash: "SHA-512" },
+  ES256: { name: "ECDSA", namedCurve: "P-256" },
+  ES384: { name: "ECDSA", namedCurve: "P-384" },
+  ES512: { name: "ECDSA", namedCurve: "P-521" },
 } satisfies Record<string, RsaHashedImportParams | EcKeyImportParams>;
 
 /**
@@ -356,27 +353,23 @@ const IMPORT_PARAMS = {
  * header value.
  */
 const VERIFY_PARAMS = {
-  RS256: { name: 'RSASSA-PKCS1-v1_5' },
-  RS384: { name: 'RSASSA-PKCS1-v1_5' },
-  RS512: { name: 'RSASSA-PKCS1-v1_5' },
-  ES256: { name: 'ECDSA', hash: 'SHA-256' },
-  ES384: { name: 'ECDSA', hash: 'SHA-384' },
-  ES512: { name: 'ECDSA', hash: 'SHA-512' },
+  RS256: { name: "RSASSA-PKCS1-v1_5" },
+  RS384: { name: "RSASSA-PKCS1-v1_5" },
+  RS512: { name: "RSASSA-PKCS1-v1_5" },
+  ES256: { name: "ECDSA", hash: "SHA-256" },
+  ES384: { name: "ECDSA", hash: "SHA-384" },
+  ES512: { name: "ECDSA", hash: "SHA-512" },
 } satisfies Record<string, EcdsaParams | Algorithm>;
 
-function assertSupportedAlgorithm(
-  alg: string,
-): asserts alg is keyof typeof IMPORT_PARAMS {
+function assertSupportedAlgorithm(alg: string): asserts alg is keyof typeof IMPORT_PARAMS {
   if (!Object.hasOwn(IMPORT_PARAMS, alg)) {
     throw new TypeError(
-      `Unsupported JWT algorithm: "${alg}". Supported algorithms are ${Object.keys(IMPORT_PARAMS).join(', ')}.`,
+      `Unsupported JWT algorithm: "${alg}". Supported algorithms are ${Object.keys(IMPORT_PARAMS).join(", ")}.`,
     );
   }
 }
 
-function resolveImportAlgorithm(
-  alg: string,
-): RsaHashedImportParams | EcKeyImportParams {
+function resolveImportAlgorithm(alg: string): RsaHashedImportParams | EcKeyImportParams {
   assertSupportedAlgorithm(alg);
   return IMPORT_PARAMS[alg];
 }
@@ -412,7 +405,7 @@ async function fetchAndCacheJwks(
   kid: string | undefined,
   timeoutMs: number,
 ): Promise<CryptoKey | null> {
-  const cacheKey = `${jwksUri}:${kid ?? '__default__'}`;
+  const cacheKey = `${jwksUri}:${kid ?? "__default__"}`;
   const cached = jwksCache.get(cacheKey);
   if (cached && Date.now() - cached.fetchedAt < JWKS_TTL_MS) {
     return cached.key;
@@ -436,14 +429,10 @@ async function fetchAndCacheJwks(
   // for RSA; kty/crv/x/y for EC) determines the key type. Fall back to RS256
   // when absent. The actual algorithm enforcement happens in verifyJwt via the
   // JWT header's 'alg' claim, not here.
-  const alg = jwk.alg ?? 'RS256';
-  const cryptoKey = await crypto.subtle.importKey(
-    'jwk',
-    jwk,
-    resolveImportAlgorithm(alg),
-    false,
-    ['verify'],
-  );
+  const alg = jwk.alg ?? "RS256";
+  const cryptoKey = await crypto.subtle.importKey("jwk", jwk, resolveImportAlgorithm(alg), false, [
+    "verify",
+  ]);
 
   jwksCache.set(cacheKey, { key: cryptoKey, fetchedAt: Date.now() });
   return cryptoKey;
@@ -475,10 +464,7 @@ async function fetchAndCacheJwks(
  * @param opts  - Verification options; see {@link VerifyJwtOptions}.
  * @returns The verified {@link JwtPayload}, or `null` if verification fails.
  */
-export async function verifyJwt(
-  token: string,
-  opts: VerifyJwtOptions,
-): Promise<JwtPayload | null> {
+export async function verifyJwt(token: string, opts: VerifyJwtOptions): Promise<JwtPayload | null> {
   try {
     const {
       issuerUrl,
@@ -495,12 +481,8 @@ export async function verifyJwt(
     }
     const [rawHeader, rawPayload, rawSig] = segments;
 
-    const header = JSON.parse(
-      DECODER.decode(base64UrlDecode(rawHeader)),
-    ) as JwtHeader;
-    const payload = JSON.parse(
-      DECODER.decode(base64UrlDecode(rawPayload)),
-    ) as JwtPayload;
+    const header = JSON.parse(DECODER.decode(base64UrlDecode(rawHeader))) as JwtHeader;
+    const payload = JSON.parse(DECODER.decode(base64UrlDecode(rawPayload))) as JwtPayload;
 
     // RFC 7515 §4.1.1 requires 'alg' in the JWT header. A token that omits it
     // is structurally invalid — we reject it rather than guessing an algorithm.
@@ -512,7 +494,7 @@ export async function verifyJwt(
     // 'none' means the token is unsigned; accepting it would allow anyone to
     // forge arbitrary claims without a key. The comparison is case-insensitive
     // so that "None", "NONE", or any other casing variant is also rejected.
-    if (alg.toLowerCase() === 'none') {
+    if (alg.toLowerCase() === "none") {
       return null;
     }
     if (allowedAlgorithms?.length && !allowedAlgorithms.includes(alg)) {
@@ -520,20 +502,14 @@ export async function verifyJwt(
     }
 
     if (allowedTokenTypes.length > 0) {
-      const typ = header.typ ?? '';
-      if (
-        !allowedTokenTypes.some((t) => t.toLowerCase() === typ.toLowerCase())
-      ) {
+      const typ = header.typ ?? "";
+      if (!allowedTokenTypes.some((t) => t.toLowerCase() === typ.toLowerCase())) {
         return null;
       }
     }
 
     const kid = header.kid;
-    const cryptoKey = await fetchAndCacheJwks(
-      `${issuerUrl}/auth/keys`,
-      kid,
-      jwksTimeoutMs,
-    );
+    const cryptoKey = await fetchAndCacheJwks(`${issuerUrl}/auth/keys`, kid, jwksTimeoutMs);
     if (!cryptoKey) {
       return null;
     }
@@ -586,7 +562,7 @@ export async function verifyJwt(
     // Any other unexpected error (network failure, malformed JWKS, Web Crypto
     // exception) is worth logging so operators can distinguish infrastructure
     // failures from genuine bad tokens.
-    console.error('[nextgen] verifyJwt unexpected error:', err);
+    console.error("[nextgen] verifyJwt unexpected error:", err);
     return null;
   }
 }

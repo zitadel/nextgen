@@ -1,0 +1,48 @@
+id: "demo-next"
+language: "typescript"
+layer: "application"
+stack: "frontend"
+dependsOn:
+  - "api"
+  - "components"
+  - "design-tokens"
+  - "sdk-next"
+  - "shared-component-styles"
+
+tasks:
+  lint:
+    command: "corepack pnpm exec oxlint ."
+    deps:
+      - "api:build"
+      - "sdk-next:build"
+
+  typecheck:
+    command: "corepack pnpm run typecheck"
+    deps:
+      - "api:build"
+      - "sdk-next:build"
+
+  build:
+    command: "corepack pnpm run build"
+    deps:
+      - "api:build"
+      - "sdk-next:build"
+    outputs:
+      - ".next/**/*"
+
+  dev:
+    command: "corepack pnpm run dev"
+    deps:
+      - "api:build"
+      - "sdk-next:build"
+    options:
+      persistent: true
+      runInCI: false
+
+  start:
+    command: "corepack pnpm run start"
+    deps:
+      - "build"
+    options:
+      persistent: true
+      runInCI: false

@@ -1,5 +1,17 @@
 # @zitadel/api
 
+## 0.1.0-alpha.11
+
+## 0.1.0-alpha.10
+
+## 0.1.0-alpha.9
+
+## 0.1.0-alpha.8
+
+## 0.1.0-alpha.7
+
+## 0.1.0-alpha.6
+
 ## 0.1.0-alpha.5
 
 ## 0.1.0-alpha.4

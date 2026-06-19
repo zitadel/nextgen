@@ -69,7 +69,7 @@ const ${elementName} = dynamic(
 
 export default function ${componentName}() {
   return (
-    <main style={{ minHeight: "100vh", position: "relative", background: "#0f0f11" }}>
+    <main style={{ minHeight: "100vh", position: "relative", colorScheme: "dark", background: "#0f0f11" }}>
       <nav aria-label="Authentication" style={{ position: "absolute", top: "24px", right: "24px", zIndex: 1, display: "flex", gap: "12px" }}>
         <Link href="${mode === "login" ? "/register" : "/login"}" style={{ color: "#f4f4f6", fontWeight: 700, textDecoration: "none" }}>
           ${mode === "login" ? "Create account" : "Sign in"}
@@ -146,28 +146,30 @@ export default function ProfilePage() {
   }, []);
 
   return (
-    <main style={{ padding: "48px", maxWidth: "680px", margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>
-        <h1 style={{ fontSize: "24px", fontWeight: 700, margin: 0 }}>Signed in</h1>
-        <ZitadelLogout />
+    <main style={{ minHeight: "100vh", colorScheme: "dark", background: "#0f0f11", color: "#f4f4f6", padding: "48px", fontFamily: "system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" }}>
+      <div style={{ maxWidth: "680px", margin: "0 auto" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>
+          <h1 style={{ fontSize: "24px", fontWeight: 700, margin: 0, color: "#f4f4f6" }}>Signed in</h1>
+          <ZitadelLogout />
+        </div>
+        <p style={{ color: "#33a779", fontWeight: 600 }}>Signed in profile loaded.</p>
+        {session ? (
+          <dl style={{ display: "grid", gap: "12px", marginTop: "24px" }}>
+            <div>
+              <dt style={{ color: "#bfbfcf", fontSize: "14px" }}>Session state</dt>
+              <dd style={{ margin: 0, fontWeight: 600, color: "#f4f4f6" }}>{session.state ?? "active"}</dd>
+            </div>
+            <div>
+              <dt style={{ color: "#bfbfcf", fontSize: "14px" }}>User id</dt>
+              <dd style={{ margin: 0, fontFamily: "monospace", color: "#f4f4f6" }}>{session.user_id ?? "available"}</dd>
+            </div>
+          </dl>
+        ) : (
+          <p style={{ color: sessionError ? "#ea4f70" : "#bfbfcf" }}>
+            {sessionError || "Checking session..."}
+          </p>
+        )}
       </div>
-      <p style={{ color: "#166534", fontWeight: 600 }}>Signed in profile loaded.</p>
-      {session ? (
-        <dl style={{ display: "grid", gap: "12px", marginTop: "24px" }}>
-          <div>
-            <dt style={{ color: "#6b7280", fontSize: "14px" }}>Session state</dt>
-            <dd style={{ margin: 0, fontWeight: 600 }}>{session.state ?? "active"}</dd>
-          </div>
-          <div>
-            <dt style={{ color: "#6b7280", fontSize: "14px" }}>User id</dt>
-            <dd style={{ margin: 0, fontFamily: "monospace" }}>{session.user_id ?? "available"}</dd>
-          </div>
-        </dl>
-      ) : (
-        <p style={{ color: sessionError ? "#b91c1c" : "#6b7280" }}>
-          {sessionError || "Checking session..."}
-        </p>
-      )}
     </main>
   );
 }

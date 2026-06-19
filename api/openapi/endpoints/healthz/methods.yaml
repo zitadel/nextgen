@@ -1,5 +1,7 @@
 get:
   operationId: getHealth
+  tags:
+    - System
   summary: Check server health
   description: Check whether the server is healthy
   security: []

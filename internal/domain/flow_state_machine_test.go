@@ -214,7 +214,7 @@ func loginDefinition() *domain.FlowDefinition {
 				Name:   "credentials",
 				Fields: []string{"email", "password"},
 				Actions: []domain.FlowStepAction{
-					{Name: domain.FlowActionSubmit, Primary: true},
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit:                {Target: "done"},
@@ -252,7 +252,7 @@ func signupDefinition() *domain.FlowDefinition {
 				Fields:    []string{"email", "password"},
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
-					{Name: domain.FlowActionSubmit, Primary: true},
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit: {Target: "done"},
@@ -555,7 +555,7 @@ func passkeyLoginDefinition() *domain.FlowDefinition {
 			{
 				Name: "authenticate",
 				Actions: []domain.FlowStepAction{
-					{Name: domain.FlowActionPasskey, Primary: true},
+					{Name: domain.FlowActionPasskey, Kind: domain.FlowActionKindPasskey, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionPasskey: {Target: "done"},
@@ -660,9 +660,9 @@ func passkeyAbandonDefinition() *domain.FlowDefinition {
 			{
 				Name: "authenticate",
 				Actions: []domain.FlowStepAction{
-					{Name: domain.FlowActionPasskey, Primary: true},
+					{Name: domain.FlowActionPasskey, Kind: domain.FlowActionKindPasskey, Primary: true},
 
-					{Name: domain.FlowActionSubmit},
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionPasskey: {Target: "done"},
@@ -706,6 +706,150 @@ func TestFlowStateMachine_Process_PasskeyAbandonedOnDifferentAction(t *testing.T
 	assert.Nil(t, abandoned.Step.Challenge, "the rendered step must not re-attach the abandoned passkey challenge")
 	assert.Len(t, w.attempts.passkeyCalls, 0, "no passkey verification should run when no proof was submitted")
 	require.NotNil(t, abandoned.Step.Complete, "submit action should advance to the fallback terminal")
+}
+
+// passkeyIdentifierLoginDefinition builds a login step that collects the
+// identifier on the same step that offers the passkey action — the shape
+// the discoverable/non-discoverable passkey UI submits (email + "Login
+// with passkey" click).
+func passkeyIdentifierLoginDefinition() *domain.FlowDefinition {
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-passkey-identifier",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "authenticate",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "authenticate",
+				Fields: []string{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionPasskey, Kind: domain.FlowActionKindPasskey, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionPasskey:               {Target: "done"},
+					domain.FlowImplicitOutcomeUserNotFound: {Target: "not_found"},
+				},
+			},
+			{Name: "done", Complete: &show},
+			{Name: "not_found", Complete: &show},
+		},
+	}
+}
+
+// Repro for the "passkey login only works after refresh when two users share
+// the browser" bug: after attempt 1 rejects (user1 has no passkey), the
+// stored _user_id from attempt 1 must not block re-identifying user2 on
+// attempt 2. Otherwise the new challenge is still scoped to user1 and the
+// second user can never log in.
+func TestFlowStateMachine_Process_PasskeyAfterRejectionRebindsIdentifier(t *testing.T) {
+	w := newFlowTestWorld(t)
+	w.attempts.identifierResult = map[string]string{
+		"user1@example.com": "user_one",
+		"user2@example.com": "user_two",
+	}
+	w.attempts.issueOut = domain.FlowPasskeyChallengeOutput{ChallengeID: "ch-1", Options: []byte(`{"publicKey":{}}`)}
+	def := passkeyIdentifierLoginDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	// Attempt 1, issue leg: user1 (password-only) types their email and
+	// clicks "Login with passkey". The dispatch loop identifies user1, then
+	// processPasskey mints a challenge scoped to user1 (empty allowCredentials
+	// since user1 has no passkey).
+	issued1, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskey,
+		Fields:    map[string]any{"email": "user1@example.com"},
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, issued1.State.PendingChallenge)
+	require.Len(t, w.attempts.identifyCalls, 1, "attempt 1 must identify user1")
+	assert.Equal(t, "user1@example.com", w.attempts.identifyCalls[0].Value)
+	assert.Equal(t, "user_one", issued1.State.CollectedData[domain.FlowCollectedUserIDKey])
+
+	// Attempt 1, verify leg: the assertion that comes back doesn't match any
+	// credential the attempt is constrained to → server rejects.
+	w.attempts.passkeyErr = domain.ErrAuthAttemptProofRejected(nil)
+	rejected, err := w.sm.Process(t.Context(), nil, def, issued1.State, domain.FlowSubmitInput{
+		Action:            domain.FlowActionPasskey,
+		ChallengeResponse: &domain.FlowChallengeResponse{ChallengeID: "ch-1", Method: domain.FlowChallengeMethodPasskey, Proof: []byte(`{}`)},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, rejected.Step.Error)
+	assert.Equal(t, "auth_attempt.passkey_invalid", *rejected.Step.Error)
+	assert.Nil(t, rejected.State.PendingChallenge, "rejection clears PendingChallenge")
+
+	// Attempt 2, issue leg: the user re-types user2's email (passkey-only)
+	// and clicks "Login with passkey" again. user2 must be re-identified so
+	// the new challenge is scoped to user2's credentials. Before this fix,
+	// the dispatch loop skipped SubmitIdentifier whenever a previous _user_id
+	// was stored, leaving the attempt bound to user1.
+	w.attempts.passkeyErr = nil
+	w.attempts.passkeyUserID = "user_two"
+	w.attempts.issueOut = domain.FlowPasskeyChallengeOutput{ChallengeID: "ch-2", Options: []byte(`{"publicKey":{}}`)}
+
+	issued2, err := w.sm.Process(t.Context(), nil, def, rejected.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskey,
+		Fields:    map[string]any{"email": "user2@example.com"},
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, issued2.State.PendingChallenge, "attempt 2 must issue a fresh passkey challenge")
+
+	require.Len(t, w.attempts.identifyCalls, 2,
+		"attempt 2 must re-run SubmitIdentifier for the new email; the stored _user_id from attempt 1 must not short-circuit it")
+	assert.Equal(t, "user2@example.com", w.attempts.identifyCalls[1].Value,
+		"attempt 2 must dispatch the user2 identifier")
+	assert.Equal(t, "user_two", issued2.State.CollectedData[domain.FlowCollectedUserIDKey],
+		"_user_id must be rebound to user_two so the new passkey challenge is scoped to their credentials")
+}
+
+// Re-submitting the same identifier resolves to the same user, so the
+// in-flight ceremony survives. The dispatch re-runs (the auth-attempt is
+// the source of truth for whether the binding should change); the resolved
+// user id is the same, so PendingChallenge is preserved.
+func TestFlowStateMachine_Process_PasskeyResubmitSameIdentifierKeepsPendingChallenge(t *testing.T) {
+	w := newFlowTestWorld(t)
+	w.attempts.identifierResult = map[string]string{"user1@example.com": "user_one"}
+	w.attempts.issueOut = domain.FlowPasskeyChallengeOutput{ChallengeID: "ch-1", Options: []byte(`{"publicKey":{}}`)}
+	def := passkeyIdentifierLoginDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	first, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskey,
+		Fields:    map[string]any{"email": "user1@example.com"},
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	require.Len(t, w.attempts.identifyCalls, 1)
+
+	// Same email re-submitted (e.g. user clicked the passkey action again
+	// after dismissing the browser prompt). Same user resolved → ceremony stays.
+	second, err := w.sm.Process(t.Context(), nil, def, first.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskey,
+		Fields:    map[string]any{"email": "user1@example.com"},
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	assert.Len(t, w.attempts.identifyCalls, 2, "every dispatch calls SubmitIdentifier")
+	require.NotNil(t, second.State.PendingChallenge, "same user resolved — ceremony survives")
+	assert.Equal(t, "user_one", second.State.CollectedData[domain.FlowCollectedUserIDKey])
 }
 
 // ---- CurrentPurpose + outcome flip ----
@@ -785,6 +929,200 @@ func TestFlowStateMachine_FlipTable_RecoveryPassthrough(t *testing.T) {
 	assert.Equal(t, domain.FlowDefinitionPurposeRecovery, result.State.CurrentPurpose)
 }
 
+// passkeyIdentifierDefinition mirrors the default login flow's identifier
+// step: an email field plus `submit` (→ password) and `passkey` (→ done)
+// actions, with `user_not_found` routing to a register step. Lets a test
+// drive the passkey-issue path with an unknown email so the early dispatch
+// short-circuits and the engine routes via user_not_found.
+func passkeyIdentifierDefinition() *domain.FlowDefinition {
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-passkey-identifier",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin:    "identifier",
+			domain.FlowDefinitionPurposeRegister: "register",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "identifier",
+				Fields: []string{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Primary: true},
+					{Name: domain.FlowActionPasskey},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit:                {Target: "password"},
+					domain.FlowActionPasskey:               {Target: "done"},
+					domain.FlowImplicitOutcomeUserNotFound: {Target: "register"},
+				},
+			},
+			{
+				Name:   "password",
+				Fields: []string{"password"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "done"},
+				},
+			},
+			{
+				Name:   "register",
+				Fields: []string{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+}
+
+// TestFlowStateMachine_FlipTable_PasskeyIssue_UnknownEmail_FlipsToRegister
+// pins the bug where selecting `passkey` on the identifier step with an
+// unknown email routed via `user_not_found` to the register step but left
+// CurrentPurpose pinned at `login`. The next submit then ran identifier
+// verification in login mode and rejected the same email as user_not_found
+// again. Mirrors the flip the non-passkey dispatch path already applies.
+func TestFlowStateMachine_FlipTable_PasskeyIssue_UnknownEmail_FlipsToRegister(t *testing.T) {
+	w := newFlowTestWorld(t)
+	def := passkeyIdentifierDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, start.State.CurrentPurpose)
+
+	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskey,
+		Fields:    map[string]any{"email": "ghost@example.com"},
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "register", result.State.CurrentStep)
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, result.State.Purpose, "Purpose stays pinned")
+	assert.Equal(t, domain.FlowDefinitionPurposeRegister, result.State.CurrentPurpose,
+		"early-passkey dispatch must flip CurrentPurpose on user_not_found, parity with the non-passkey path")
+	assert.Nil(t, result.State.PendingChallenge, "passkey challenge must not be issued when identifier dispatch already produced an outcome")
+	assert.Empty(t, w.attempts.issueCalls, "IssuePasskeyChallenge must be skipped when the user wasn't resolved")
+	require.Len(t, w.attempts.identifyCalls, 1, "identifier dispatch ran exactly once")
+	assert.Equal(t, "ghost@example.com", w.attempts.identifyCalls[0].Value)
+}
+
+// loginNoUserNotFoundDefinition is a login-only flow whose identifier
+// step does NOT wire a user_not_found transition. Lets a test exercise
+// the "outcome without a transition" path.
+func loginNoUserNotFoundDefinition() *domain.FlowDefinition {
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-login-no-unf",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "credentials",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "credentials",
+				Fields: []string{"email", "password"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+}
+
+// TestFlowStateMachine_FlipTable_OutcomeWithoutTransition_DoesNotFlip
+// pins the invariant that CurrentPurpose flips only when a flip outcome
+// is actually routed. Dispatch returns user_not_found but the step has
+// no transition for it; the engine surfaces a step error and the mode
+// must stay at login so the next submit doesn't silently dispatch as
+// register.
+func TestFlowStateMachine_FlipTable_OutcomeWithoutTransition_DoesNotFlip(t *testing.T) {
+	w := newFlowTestWorld(t)
+	def := loginNoUserNotFoundDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": "ghost@example.com", "password": "irrelevant"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "credentials", result.State.CurrentStep, "no transition for user_not_found keeps the user on the current step")
+	if assert.NotNil(t, result.Step.Error) {
+		assert.Equal(t, domain.FlowImplicitOutcomeUserNotFound, *result.Step.Error)
+	}
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, result.State.CurrentPurpose,
+		"CurrentPurpose must not flip when the routed outcome had no transition wired")
+}
+
+// TestFlowStateMachine_FlipTable_LoginTypoThenCorrectEmail_StillSignsIn
+// is the user-visible motivation for the no-phantom-flip invariant. The
+// user mistypes their email on a login-only flow with no user_not_found
+// transition; the engine renders a step error and the user retries with
+// the correct (existing) address. Without the gate, CurrentPurpose would
+// have flipped to register on the typo and the second attempt would see
+// the known email as user_already_exists, wedging the sign-in.
+func TestFlowStateMachine_FlipTable_LoginTypoThenCorrectEmail_StillSignsIn(t *testing.T) {
+	w := newFlowTestWorld(t)
+	w.attempts.identifierResult = map[string]string{
+		"alice@example.com": "user_alice",
+	}
+	def := loginNoUserNotFoundDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	// Typo: dispatch returns user_not_found, no transition wired,
+	// engine surfaces a step error and the user stays on credentials.
+	typo, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": "alic@example.com", "password": "irrelevant"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "credentials", typo.State.CurrentStep)
+	require.NotNil(t, typo.Step.Error)
+	require.Equal(t, domain.FlowDefinitionPurposeLogin, typo.State.CurrentPurpose,
+		"phantom flip on the typo would wedge the retry below")
+
+	// Retry with the correct (known) email: still in login mode, so
+	// identifier resolves, password verifies, and the user signs in.
+	result, err := w.sm.Process(t.Context(), nil, def, typo.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": "alice@example.com", "password": "correct-horse-battery-staple"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "done", result.State.CurrentStep)
+	assert.Equal(t, "user_alice", result.State.CollectedData[domain.FlowCollectedUserIDKey])
+	assert.NotEmpty(t, result.HandoffToken, "handoff issued for completed sign-in")
+}
+
 func TestFlowState_JSONRoundTrip_PreservesCurrentPurpose(t *testing.T) {
 	state := domain.FlowState{
 		ID:        "flow-1",
@@ -855,7 +1193,7 @@ func multiStepSignupDefinition() *domain.FlowDefinition {
 				Name:   "profile",
 				Fields: []string{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: domain.FlowActionSubmit, Primary: true},
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit:                     {Target: "set-password"},
@@ -866,7 +1204,7 @@ func multiStepSignupDefinition() *domain.FlowDefinition {
 				Name:   "set-password",
 				Fields: []string{"password"},
 				Actions: []domain.FlowStepAction{
-					{Name: domain.FlowActionSubmit, Primary: true},
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit: {Target: "create"},
@@ -876,7 +1214,7 @@ func multiStepSignupDefinition() *domain.FlowDefinition {
 				Name:      "create",
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
-					{Name: domain.FlowActionSubmit, Primary: true},
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit: {Target: "done"},
@@ -904,7 +1242,7 @@ func combinedSigninSignupDefinition() *domain.FlowDefinition {
 				Name:   "identify",
 				Fields: []string{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: domain.FlowActionSubmit, Primary: true},
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit:                     {Target: "signin-password"},
@@ -916,7 +1254,7 @@ func combinedSigninSignupDefinition() *domain.FlowDefinition {
 				Name:   "signin-password",
 				Fields: []string{"password"},
 				Actions: []domain.FlowStepAction{
-					{Name: domain.FlowActionSubmit, Primary: true},
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit: {Target: "done"},
@@ -927,7 +1265,7 @@ func combinedSigninSignupDefinition() *domain.FlowDefinition {
 				Fields:    []string{"password"},
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
-					{Name: domain.FlowActionSubmit, Primary: true},
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit: {Target: "done"},
@@ -953,7 +1291,7 @@ func recoveryDefinition() *domain.FlowDefinition {
 				Name:   "identify",
 				Fields: []string{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: domain.FlowActionSubmit, Primary: true},
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit:                {Target: "new-password"},
@@ -964,7 +1302,7 @@ func recoveryDefinition() *domain.FlowDefinition {
 				Name:   "new-password",
 				Fields: []string{"password"},
 				Actions: []domain.FlowStepAction{
-					{Name: domain.FlowActionSubmit, Primary: true},
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit: {Target: "done"},
@@ -1157,7 +1495,7 @@ func passkeyRegisterDefinition() *domain.FlowDefinition {
 			{
 				Name: "register",
 				Actions: []domain.FlowStepAction{
-					{Name: domain.FlowActionPasskeyRegister, Primary: true},
+					{Name: domain.FlowActionPasskeyRegister, Kind: domain.FlowActionKindPasskeyRegister, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionPasskeyRegister: {Target: "done"},
@@ -1301,9 +1639,9 @@ func TestFlowStateMachine_Start_PreservesActionOrder(t *testing.T) {
 				Name:   "step",
 				Fields: []string{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: domain.FlowActionPasskey},
-					{Name: domain.FlowActionSubmit, Primary: true},
-					{Name: "register"},
+					{Name: domain.FlowActionPasskey, Kind: domain.FlowActionKindPasskey},
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: "register", Kind: domain.FlowActionKindSubmit},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionPasskey: {Target: "done"},
@@ -1328,4 +1666,86 @@ func TestFlowStateMachine_Start_PreservesActionOrder(t *testing.T) {
 		gotNames[i] = a.Name
 	}
 	assert.Equal(t, []string{domain.FlowActionPasskey, domain.FlowActionSubmit, "register"}, gotNames)
+}
+
+// TestFlowStateMachine_Process_NavigateSkipsValidation verifies that a
+// navigate-kind action on a step with required fields routes via its
+// transition without running field validation. This is the engine's
+// half of ADR 026 — a back-navigation action can be invoked with empty
+// fields and the engine must not block on missing email/password.
+func TestFlowStateMachine_Process_NavigateSkipsValidation(t *testing.T) {
+	w := newFlowTestWorld(t)
+	show := domain.FlowStepCompleteShow
+	def := &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-navigate",
+		UserSchema: defaultSchemaURL,
+		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "enter"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "enter",
+				Fields: []string{"email", "password"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: "back", Kind: domain.FlowActionKindNavigate},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "done"},
+					"back":                  {Target: "landing"},
+				},
+			},
+			{Name: "landing", Complete: &show},
+			{Name: "done", Complete: &show},
+		},
+	}
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	// Empty fields would fail validation under a submit action; navigate
+	// must skip validation and follow the transition.
+	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action: "back",
+		Fields: map[string]any{},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result.Step)
+	assert.Equal(t, "landing", result.Step.Name)
+	assert.Nil(t, result.Step.Error, "navigate must not surface field-validation errors")
+}
+
+// TestFlowStateMachine_Process_SubmitKindRegression confirms that the
+// kind-based dispatch keeps the standard submit pipeline intact — a
+// malformed email under a submit action surfaces a field-validation error
+// rather than routing through, exactly as before.
+func TestFlowStateMachine_Process_SubmitKindRegression(t *testing.T) {
+	w := newFlowTestWorld(t)
+	def := loginDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{
+			"email":    "not-an-email",
+			"password": "correct-horse-battery-staple",
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result.Step)
+	require.Equal(t, "credentials", result.Step.Name)
+	if assert.NotNil(t, result.Step.Error, "submit kind must still run field validation") {
+		assert.Contains(t, *result.Step.Error, "email")
+	}
 }

@@ -20,6 +20,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	slogctx "github.com/veqryn/slog-context"
+
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/middleware"
@@ -27,10 +28,10 @@ import (
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
+	"github.com/zitadel/nextgen/internal/domain/tokengen"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
-	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/staticui/console"
 	"github.com/zitadel/nextgen/internal/staticui/login"
@@ -127,6 +128,8 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		return fmt.Errorf("failed to bootstrap users: %w", err)
 	}
 
+	opaqueTokenGenerator := tokengen.NewOpaqueTokenGenerator(crypter)
+
 	// ── Repositories ─────────────────
 	projectRepo := repository.NewProjectRepository(pool)
 	userRepo := repository.NewUserRepository()
@@ -182,7 +185,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		projectRepo,
 		schemaRepo,
 		flowDefinitionRepo,
-		secrets.NewRandomSecretGenerator(),
+		opaqueTokenGenerator,
 		builtinPublicBase.String(),
 		schemaValidator,
 	)
@@ -195,7 +198,14 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		flowDefinitionRepo,
 	)
 	teamService := service.NewTeamService(pool, teamRepo)
-	userService := service.NewUserService(pool, userRepo, userPasswordRepo, schemaRepo, crypter, passwordHasher)
+	userService := service.NewUserService(
+		pool,
+		userRepo,
+		userPasswordRepo,
+		schemaRepo,
+		passwordHasher,
+		opaqueTokenGenerator,
+	)
 
 	// ── Flow engine ──────────────────
 	ids := idgen.NewULID()
@@ -216,6 +226,8 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	oasServer, err := oasapi.NewServer(
 		api.NewHandler(
 			crypter,
+			opaqueTokenGenerator,
+			opaqueTokenGenerator,
 			flowService,
 			authAttemptSvc,
 			sessionService,
@@ -223,8 +235,9 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			userService,
 			schemaService,
 			flowDefinitionSvc,
-			teamService),
-		api.NewSecurityHandler(),
+			teamService,
+		),
+		api.NewSecurityHandler(opaqueTokenGenerator),
 		oasapi.WithMiddleware(
 			middleware.AddOperationIdToContext(),
 			// logging is done at net/http level

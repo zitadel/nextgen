@@ -5,6 +5,7 @@ import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
 import { angularProxyEdit } from "./angular-json";
+import { angularRoutesEdit } from "./angular-routes";
 import { appComponentTemplate, appTemplateHtml, proxyConfTemplate } from "./templates";
 
 const SDK_DEPENDENCY = "@zitadel/sdk-angular";
@@ -37,8 +38,9 @@ function ensureDevScript(source: string | undefined): string {
  * Rule-based patcher for an Angular app. Inherits the shared `.zitadel/` base
  * files from {@link AbstractRulePatcher} and contributes the managed root
  * component (`app.ts`/`app.html`) that renders the `@zitadel/sdk-angular`
- * widgets, a `proxy.conf.cjs` dev proxy (attaching the `sk_<project_id>` bearer
- * to every proxied request) wired into `angular.json`, and the SDK dep.
+ * widgets, a `proxy.conf.cjs` dev proxy (attaching the project secret from
+ * `ZITADEL_PROJECT_SECRET` to every proxied request) wired into `angular.json`,
+ * and the SDK dep.
  *
  * Unlike React/Vue (whose dev proxy lives in `vite.config.ts`), Angular owns its
  * Vite config, so the proxy is a separate `proxy.conf.cjs` referenced from the
@@ -57,6 +59,7 @@ export class AngularPatcher extends AbstractRulePatcher {
         contents: appComponentTemplate(ctx.project.id),
       },
       { kind: "write", path: "src/app/app.html", contents: appTemplateHtml() },
+      { kind: "edit", path: "src/app/app.routes.ts", edit: angularRoutesEdit() },
       { kind: "write", path: "proxy.conf.cjs", contents: proxyConfTemplate() },
       {
         kind: "edit",
@@ -81,16 +84,17 @@ export class AngularPatcher extends AbstractRulePatcher {
   }
 
   protected override routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
-    // Both files are touched via `edit` ops eject can't auto-revert: the proxy
-    // wired into angular.json and the `dev` script added to package.json.
-    return ["angular.json", "package.json"];
+    // These files are touched via `edit` ops eject can't auto-revert: the proxy
+    // wired into angular.json, auth paths added to app.routes.ts, and the `dev`
+    // script added to package.json.
+    return ["angular.json", "src/app/app.routes.ts", "package.json"];
   }
 
   protected summary(_ctx: PatchContext): { title: string; detail: string } {
     return {
       title: "Angular integration",
       detail:
-        "Wrote the app root component + proxy.conf.cjs and wired the /__nextgen dev proxy into angular.json.",
+        "Wrote the app root component + proxy.conf.cjs, added auth routes, and wired the /__nextgen dev proxy into angular.json.",
     };
   }
 }

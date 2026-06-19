@@ -1,13 +1,27 @@
 type: object
-required: [name]
+required: [name, kind]
 description: |
   Configuration for a user-invokable action on a step. The `name` is sent
-  back in the submit request as `action`.
+  back in the submit request as `action`; the engine resolves the action's
+  declared `kind` to decide how to handle the submission.
 properties:
   name:
     type: string
     description: Action identifier. Sent back in the submit request as `action`.
     example: submit
+  kind:
+    type: string
+    enum: [submit, passkey, passkey_register, navigate]
+    example: submit
+    description: |
+      Classifies how the engine handles this action:
+      - `submit`: collect the step's fields and run validate/dispatch/on_success.
+      - `passkey`: issue a WebAuthn assertion challenge; the matching transition
+        fires once the returned assertion verifies.
+      - `passkey_register`: issue a WebAuthn registration challenge; the matching
+        transition fires once the returned attestation verifies.
+      - `navigate`: route through the transition without running the input
+        pipeline. Used for back-navigation and similar pure-routing actions.
   primary:
     type: boolean
     default: false

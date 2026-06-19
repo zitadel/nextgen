@@ -1,5 +1,33 @@
 # @zitadel/components
 
+## 0.1.0-alpha.11
+
+### Minor Changes
+
+- [#309](https://github.com/zitadel/nextgen/pull/309) [`0b81768`](https://github.com/zitadel/nextgen/commit/0b8176857395d25c95343b5b320d074e0ba2c102) Thanks [@bastionstack](https://github.com/bastionstack)! - Load the design-system brand font (Arimo) by default in `<zitadel-login>` so the
+  auth UI paints the brand face even when the server returns no branding; headings
+  render in bold Arimo. Tenant `branding.font_url` still overrides it. Exposes
+  `applyDefaultFont` and `DEFAULT_BRAND_FONT_HREF` so deployments can self-host the
+  default face.
+
+## 0.1.0-alpha.10
+
+### Patch Changes
+
+- [#328](https://github.com/zitadel/nextgen/pull/328) [`acb5b54`](https://github.com/zitadel/nextgen/commit/acb5b549386efcc5ede005871b145c1cd0f9ac5e) Thanks [@fforootd](https://github.com/fforootd)! - Improve fresh-app CLI recovery guidance and align agent automation hook docs with the rendered login controls.
+
+## 0.1.0-alpha.9
+
+## 0.1.0-alpha.8
+
+## 0.1.0-alpha.7
+
+## 0.1.0-alpha.6
+
+### Patch Changes
+
+- [#270](https://github.com/zitadel/nextgen/pull/270) [`30b4b41`](https://github.com/zitadel/nextgen/commit/30b4b411a9c99fc61d991f739636f93d7bee5b1d) Thanks [@vitorbari](https://github.com/vitorbari)! - Step `fields` and `actions` are now ordered `[{ name, ... }]` arrays on the wire (ADR 021). Templates iterate them in authorial order; the orchestrator builds `fields_by_name` / `actions_by_name` views for keyed lookups. The private `@zitadel/api-mock` workspace follows the same wire shape for tests. `gates` stays a name-keyed object for now.
+
 ## 0.1.0-alpha.5
 
 ### Patch Changes

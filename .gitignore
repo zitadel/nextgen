@@ -50,19 +50,10 @@ opencode.json
 # OSX
 .DS_Store
 
-# OSX
-.DS_Store
-
-# Editor/IDE
-.idea/
-.vscode/
-
-# System Files
-.DS_Store
-
 #Frontend
 ## compiled output
 dist
+apps/server-*/bin/
 tmp
 .tmp/
 out-tsc
@@ -80,17 +71,21 @@ pnpm-debug.log*
 vite.config.*.timestamp*
 vitest.config.*.timestamp*
 test-output
-coverage
 
-## nx
-.nx/cache
-.nx/workspace-data
+## moon
+.moon/cache
+.moon/docker
 
-## Next.js / Nuxt build outputs
+## Framework build outputs (Next.js / Nuxt / SvelteKit)
 .next/
 .nuxt/
 .nuxt-typecheck/
 .output/
+.svelte-kit/
+
+## Docs generated artifacts
+apps/docs/.source/
+apps/docs/.generated/
 
 ## Go build cache
 .go/
@@ -104,12 +99,6 @@ nextgen-data/
 # Keep the embed placeholder so //go:embed all:dist works in clean checkouts.
 # `dist/` above ignores the directory entirely, so we have to un-ignore the
 # directory before re-ignoring its contents and re-allowing the placeholder.
-!/apps/console/dist/
-/apps/console/dist/*
-!/apps/console/dist/.gitkeep
-!/apps/login-ui/dist/
-/apps/login-ui/dist/*
-!/apps/login-ui/dist/.gitkeep
 !/internal/staticui/console/dist/
 /internal/staticui/console/dist/*
 !/internal/staticui/console/dist/.gitkeep
@@ -119,7 +108,7 @@ nextgen-data/
 apps/demo-next/tsconfig.tsbuildinfo
 packages/api-mock/tsconfig.tsbuildinfo
 
-.nx/polygraph
+.nx/
 .cursor/debug-*
 # Root TS incremental build info (generated)
 tsconfig.tsbuildinfo

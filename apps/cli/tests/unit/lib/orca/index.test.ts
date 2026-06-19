@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Orca } from "../../../../src/lib/orca";
 import type { Detector } from "../../../../src/lib/orca";
@@ -20,6 +20,13 @@ afterEach(async () => {
 async function tmp(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "zitadel-orca-"));
   dirs.push(dir);
+  return dir;
+}
+async function tmpPackageSafe(): Promise<string> {
+  const parent = await mkdtemp(join(tmpdir(), "zitadel-orca-"));
+  dirs.push(parent);
+  const dir = join(parent, "my-zitadel-app");
+  await mkdir(dir);
   return dir;
 }
 async function nextProject(): Promise<string> {
@@ -50,14 +57,29 @@ describe("Orca selection", () => {
     expect(orca.patcherFor("vue").canPatch("vue")).toBe(true);
   });
 
+  it("selects the Solid scaffolder and patcher", () => {
+    expect(orca.scaffolderFor("solid").canScaffold("solid")).toBe(true);
+    expect(orca.patcherFor("solid").canPatch("solid")).toBe(true);
+  });
+
+  it("selects the Svelte scaffolder and patcher", () => {
+    expect(orca.scaffolderFor("svelte").canScaffold("svelte")).toBe(true);
+    expect(orca.patcherFor("svelte").canPatch("svelte")).toBe(true);
+  });
+
+  it("selects the Qwik scaffolder and patcher", () => {
+    expect(orca.scaffolderFor("qwik").canScaffold("qwik")).toBe(true);
+    expect(orca.patcherFor("qwik").canPatch("qwik")).toBe(true);
+  });
+
   it("selects the Angular scaffolder and patcher", () => {
     expect(orca.scaffolderFor("angular").canScaffold("angular")).toBe(true);
     expect(orca.patcherFor("angular").canPatch("angular")).toBe(true);
   });
 
   it("throws E_VALIDATION for an unsupported framework", () => {
-    expect(() => orca.scaffolderFor("svelte")).toThrowError(/No scaffolder/);
-    expect(() => orca.patcherFor("svelte")).toThrowError(/No patcher/);
+    expect(() => orca.scaffolderFor("ember")).toThrowError(/No scaffolder/);
+    expect(() => orca.patcherFor("ember")).toThrowError(/No patcher/);
   });
 
   it("derives available frameworks from the scaffolder registry", () => {
@@ -66,6 +88,9 @@ describe("Orca selection", () => {
       "nuxt",
       "react",
       "vue",
+      "solid",
+      "svelte",
+      "qwik",
       "angular",
     ]);
   });
@@ -167,13 +192,13 @@ describe("Orca.scaffold", () => {
   const fakeOrca = new Orca([fakeDetector], [fakeScaffolder], []);
 
   it("scaffolds into an empty dir and re-detects the result", async () => {
-    const cwd = await tmp();
+    const cwd = await tmpPackageSafe();
     expect(await fakeOrca.scaffold(cwd, "fake")).toMatchObject({ id: "fake" });
     await expect(readFile(join(cwd, "package.json"), "utf8")).resolves.toBe("{}");
   });
 
   it("scaffolds in place while preserving runtime-only .zitadel/local state", async () => {
-    const cwd = await tmp();
+    const cwd = await tmpPackageSafe();
     await writeFile(join(cwd, ".gitignore"), ".zitadel/local/\n");
     await mkdir(join(cwd, ".zitadel/local"), { recursive: true });
     await writeFile(join(cwd, ".zitadel/local/runtime.json"), '{"server_url":"http://localhost"}');
@@ -208,5 +233,28 @@ describe("Orca.scaffold", () => {
     const cwd = await tmp();
     await writeFile(join(cwd, "package.json"), "{}");
     await expect(fakeOrca.scaffold(cwd, "fake")).rejects.toMatchObject({ code: "E_CONFLICT" });
+  });
+
+  it("rejects npm-invalid fresh directory names before running the scaffolder", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "zitadel-orca-invalid-"));
+    dirs.push(parent);
+    const cwd = join(parent, "Zitadel-Orca-Bad");
+    await mkdir(cwd);
+    const scaffold = vi.fn(async (scaffoldCwd: string) => {
+      await writeFile(join(scaffoldCwd, "package.json"), "{}");
+    });
+    const invalidNameOrca = new Orca([fakeDetector], [{ ...fakeScaffolder, scaffold }], []);
+
+    await expect(invalidNameOrca.scaffold(cwd, "fake")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      hint: expect.stringContaining("lowercase npm-package-safe"),
+      details: expect.objectContaining({
+        name: expect.stringContaining("Zitadel-Orca-Bad"),
+        validation_errors: expect.arrayContaining([
+          "name can no longer contain capital letters",
+        ]),
+      }),
+    });
+    expect(scaffold).not.toHaveBeenCalled();
   });
 });
