@@ -137,8 +137,13 @@ func mapFlowDefinitionRequestToService(projectID string, schemaURI api.OptSchema
 		if apiActions := step.GetActions(); apiActions != nil {
 			actions := make([]domain.FlowStepAction, 0, len(apiActions))
 			for _, apiAction := range apiActions {
+				kind, err := domain.FlowActionKindString(string(apiAction.GetKind()))
+				if err != nil {
+					return svcReq, fmt.Errorf("step %q: action %q has invalid kind %q: %w", step.GetName(), apiAction.GetName(), apiAction.GetKind(), err)
+				}
 				actions = append(actions, domain.FlowStepAction{
 					Name:    apiAction.GetName(),
+					Kind:    kind,
 					Primary: apiAction.GetPrimary().Value,
 					TextKey: apiAction.GetTextKey().Value,
 				})
@@ -345,6 +350,7 @@ func mapActionsToAPI(domainActions []domain.FlowStepAction) []api.StepAction {
 	for _, action := range domainActions {
 		actions = append(actions, api.StepAction{
 			Name: action.Name,
+			Kind: api.StepActionKind(action.Kind.String()),
 			Primary: api.OptBool{
 				Value: action.Primary,
 				Set:   action.Primary,

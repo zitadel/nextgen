@@ -312,7 +312,7 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 				Name:   "identifier",
 				Fields: []string{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: "submit", TextKey: "identifier.submit", Primary: true},
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, TextKey: "identifier.submit", Primary: true},
 				},
 				Gates: map[string]domain.FlowStepGate{
 					"bot": {

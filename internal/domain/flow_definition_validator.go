@@ -122,6 +122,10 @@ func validateSteps(steps []FlowDefinitionStep, userSchema *jsonschema.Schema) er
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
 					"step %q: duplicate action %q", step.Name, a.Name), nil)
 			}
+			if !a.Kind.IsAFlowActionKind() {
+				return ErrFlowDefinitionInvalid(fmt.Sprintf(
+					"step %q: action %q has no kind", step.Name, a.Name), nil)
+			}
 			actionNames[a.Name] = struct{}{}
 		}
 
