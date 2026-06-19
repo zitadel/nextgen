@@ -85,6 +85,16 @@ preview the package bumps Changesets will plan from your PR. Pull requests also
 get an informational Changesets comment; maintainers use that and
 `.changeset/README.md` to review release intent.
 
+Changesets are not only a path-based npm-package check. They feed the generated
+changelogs and the single GitHub Release notes draft for `v<version>`. The Go
+server release shares that version through containers, archives,
+`@zitadel/server`, and platform server packages. If a change under `internal/`,
+`cmd/`, `api/openapi/`, a migration, or embedded server assets changes shipped
+server/API/runtime behavior, add a real changeset for `@zitadel/server` so users
+can see the server change in the release notes. If the Go change is tests-only,
+comments-only, generated mocks, or a refactor with no shipped behavior change,
+no changeset is needed.
+
 `moon run workspace:check -- --full` runs the repository's slower local
 CI-parity script, including integration tests, demo e2e, package smoke checks,
 release snapshots, and the fresh-app journey. Use `moon run <project>:<task>` to
@@ -254,6 +264,13 @@ documentation-only changes, use the `docs` type, for example:
 docs: add preview status disclaimer
 ```
 
+Choose the title type from the release-note reader's perspective. Use `feat`
+for a new customer-usable capability, `fix` for customer-visible correctness or
+compatibility, and `refactor` for structural work with no intended behavior
+change. If structural Go work changes shipped server behavior, prefer a
+behavior-bearing title type such as `fix(...)` or `feat(...)` and add the
+matching `@zitadel/server` changeset.
+
 ## Pull request descriptions
 
 Include a concise PR description before handing work off for review. Use these
@@ -262,6 +279,6 @@ sections:
 - `Summary` — what changed and why.
 - `Validation` — exact commands run. If validation was not run, say so
   explicitly.
-- `Release notes / changeset` — changeset status for user-visible package
-  changes.
+- `Release notes / changeset` — changeset status for user-visible package or
+  shipped server/runtime changes.
 - `Notes` — reviewer context, follow-ups, risks, or `None`.

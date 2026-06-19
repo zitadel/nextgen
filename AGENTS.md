@@ -242,7 +242,7 @@ For customer-local runtime workflows, agents should prefer
   handoff. Use sections for `Summary`, `Validation`,
   `Release notes / changeset`, and `Notes`. List the exact validation commands
   run; if validation was not run, say so explicitly. In **Release notes /
-  changeset**, state one of the three outcomes from the
+  changeset**, state one of the outcomes from the
   [decision table](.changeset/README.md#decision-table) — do not add a
   `.changeset/*.md` file unless that table says you should.
 
@@ -250,16 +250,34 @@ For customer-local runtime workflows, agents should prefer
 
 When a PR touches [publishable npm packages](.changeset/README.md#publishable-npm-packages)
 (the public `@zitadel/*` packages under `apps/cli/`, `apps/server*`, and
-selected `packages/*` paths), follow the
+selected `packages/*` paths) or changes
+[shipped Go server runtime behavior](.changeset/README.md#go-server-runtime-changes),
+follow the
 [decision table](.changeset/README.md#decision-table) and workflow in
 [`.changeset/README.md`](.changeset/README.md). Verify locally with
 `corepack pnpm exec changeset status --since origin/main` when you need to
 inspect planned package bumps.
 
+Do not use file paths alone to decide release intent. Go changes under
+`internal/`, `cmd/`, `api/openapi/`, migrations, or embedded server assets can
+require a real `@zitadel/server` changeset when they change shipped server/API
+behavior. The primary reason is the single GitHub Release notes and shared
+container/server version tags; the npm server package is a distribution
+mechanism on that same release train. Pure tests, comments, generated mocks, and
+internal refactors with no shipped behavior change do not need one.
+
+Semantic PR title type should describe the change from a release-note reader's
+perspective: use `feat` for a new customer-usable capability, `fix` for
+customer-visible correctness or compatibility, and `refactor` for structural
+work with no intended behavior change. If a structural Go change changes shipped
+server behavior, prefer a behavior-bearing title type such as `fix(...)` or
+`feat(...)` and add the matching `@zitadel/server` changeset.
+
 The public packages are `@zitadel/cli`, `@zitadel/server`, the
 `@zitadel/server-*` platform packages, `@zitadel/api`, `@zitadel/components`,
 `@zitadel/sdk-core`, `@zitadel/sdk-next`, `@zitadel/sdk-nuxt`,
-`@zitadel/sdk-react`, `@zitadel/sdk-vue`, and `@zitadel/sdk-angular`. These
+`@zitadel/sdk-react`, `@zitadel/sdk-vue`, `@zitadel/sdk-angular`,
+`@zitadel/sdk-solid`, `@zitadel/sdk-svelte`, and `@zitadel/sdk-qwik`. These
 packages are in one Changesets fixed group for alpha product releases. Moon
 still creates or updates the draft GitHub Release shell for `v<version>` from
 the fixed package version; maintainers publish product notes manually.

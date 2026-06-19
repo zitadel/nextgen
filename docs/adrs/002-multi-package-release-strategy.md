@@ -1,7 +1,7 @@
 # ADR 002: Multi-package Release Strategy
 
 > **Status:** Accepted
-> **Date:** 2026-04-25 (revised 2026-06-16)
+> **Date:** 2026-04-25 (revised 2026-06-19)
 > **Context:** nextgen monorepo release pipelines
 
 ## Decision
@@ -11,10 +11,11 @@ Release orchestration is split by responsibility:
 1. **Moon owns the monorepo task graph and artifact builds.** CI, local checks,
    Go cross-builds, npm package packing, Docker Buildx image creation, and
    release verification run through `moon` targets.
-2. **Changesets owns versions, changelogs, npm publishing, and public package
-   tags.** The public product packages release as one fixed group while the
-   repo is in alpha: CLI, server npm runtime, server platform binaries, API,
-   components, and SDK packages share one version.
+2. **Changesets owns per-PR release intent, generated changelogs, versions, npm
+   publishing, and public package tags.** The public product surfaces release
+   as one fixed group while the repo is in alpha: CLI, Go server runtime,
+   server platform binaries, API, components, and SDK packages share one
+   version.
 3. **Moon publishes non-npm product artifacts.**
    The server release target reads `@zitadel/server`, stages the Go binaries
    into the platform npm packages, builds the Go archives, and pushes
@@ -49,6 +50,14 @@ state across multiple release systems.
 
 The new model keeps the explicit per-PR release notes from Changesets, but
 makes Moon the single task graph for both Go and TypeScript work.
+
+Because the product publishes one GitHub Release for a shared `v<version>`,
+server-runtime release intent is recorded in Changesets too. That lets users
+read one release note for the CLI, SDKs, API packages, Go server runtime,
+containers, archives, and server npm packages that share the same version tag. A
+PR that changes shipped Go server behavior needs an `@zitadel/server` changeset
+even when the source files are implementation paths such as `internal/`, `cmd/`,
+`api/openapi/`, or storage migrations.
 
 ## Consequences
 

@@ -130,11 +130,12 @@ days and are not release artifacts.
 ## Build & release
 
 This monorepo uses Moon for task execution, non-npm artifact builds, and the
-draft GitHub Release shell for `v<version>`. Changesets owns package versions,
-changelogs, npm publishing, and public package tags. Product release prose is
-written manually by maintainers when a GitHub Release is published.
+draft GitHub Release shell for `v<version>`. Changesets owns per-PR release
+intent, generated changelogs, package versions, npm publishing, and public
+package tags. Product release prose is written manually by maintainers when a
+GitHub Release is published.
 The current alpha release model uses one fixed Changesets version across the
-CLI, server npm runtime, API packages, components, and SDKs. The full rationale
+CLI, Go server runtime, API packages, components, and SDKs. The full rationale
 lives in
 [docs/adrs/002-multi-package-release-strategy.md](docs/adrs/002-multi-package-release-strategy.md)
 and [docs/adrs/023-lockstep-alpha-release-train.md](docs/adrs/023-lockstep-alpha-release-train.md).
@@ -159,15 +160,28 @@ immutable container version tags from the fixed `@zitadel/server` version and
 creates or updates the matching draft GitHub Release with generated artifact and
 package facts; stable releases may also move `ghcr.io/zitadel/nextgen:latest`.
 
-### npm packages (`changesets`)
+### Release notes and packages (`changesets`)
 
-`apps/cli`, `apps/server*`, and the public packages under `packages/` publish
-to npm via [changesets](https://github.com/changesets/changesets). On any
-user-visible change to those packages:
+[Changesets](https://github.com/changesets/changesets) records per-PR release
+intent for the single GitHub Release notes draft for `v<version>`. It also owns
+npm versions and publishing for `apps/cli`, `apps/server*`, and the public
+packages under `packages/`. The Go server shares that release version through
+containers, archives, `@zitadel/server`, and platform server packages. On any
+user-visible change to those packages, or any shipped Go server/API/runtime
+change from `internal/`, `cmd/`, `api/openapi/`, migrations, or embedded server
+assets:
 
 ```sh
 corepack pnpm changeset
 ```
+
+For Go runtime changes, add the changeset to `@zitadel/server` so the generated
+changelog and GitHub Release notes include the server change. If the same PR
+changes another public package surface such as `@zitadel/api` or an SDK
+contract, list that package too. The fixed alpha release group and Moon release
+tasks move the related server artifacts together. Pure tests, comments,
+generated mocks, contributor docs, and internal refactors with no shipped
+behavior change do not need a changeset.
 
 When pending changesets land on `main`, `release-publish.yml` runs the
 Changesets action and opens or updates the version PR with the release GitHub

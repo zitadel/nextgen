@@ -8,7 +8,11 @@ prose is written manually by maintainers.
 ## Normal release
 
 1. Make sure every user-visible public package or product change has a
-   `.changeset/*.md`.
+   `.changeset/*.md` so it appears in the generated changelogs and the draft
+   GitHub Release notes for `v<version>`. This includes shipped Go
+   server/API/runtime behavior changes implemented under `internal/`, `cmd/`,
+   `api/openapi/`, migrations, or embedded server assets; record those as
+   `@zitadel/server` changesets.
 2. Merge those changes to `main`.
 3. `release-publish` runs the Changesets action and opens or updates the
    generated version PR.
@@ -92,8 +96,11 @@ gh release view v0.1.0-alpha.8 --repo zitadel/nextgen
 Product release prose is manual. Use the draft GitHub Release's generated facts
 block, the generated Changesets changelogs,
 `dist/release/<version>/artifact-summary.md`, and the merged product PRs as
-inputs. Publish the draft GitHub Release only when the product needs an
-announcement.
+inputs. Server-runtime notes should come from `@zitadel/server` changesets even
+when the original PR only touched Go implementation paths, because users read
+the single GitHub Release to understand what changed for the matching container
+and server artifact tags. Publish the draft GitHub Release only when the product
+needs an announcement.
 
 ## Local checks
 
