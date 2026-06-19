@@ -74,6 +74,7 @@ func (s *PasskeyRegistrationService) Begin(ctx context.Context, in BeginRegistra
 		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: begin: %w", err)
 	}
 
+	// TODO(wim): move id generation to domain
 	regID, err := s.ids.New(string(domain.PrefixPasskeyRegistration))
 	if err != nil {
 		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: generate id: %w", err)

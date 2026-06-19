@@ -147,6 +147,7 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (FlowStep
 		return FlowStepResult{}, fmt.Errorf("flow service: start without definition")
 	}
 
+	// TODO(wim): use SessionService to create sessions
 	sessionID := ""
 	if req.SessionID != nil {
 		sessionID = *req.SessionID
@@ -174,6 +175,7 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (FlowStep
 		return FlowStepResult{}, err
 	}
 
+	// TODO(wim): move id-generation to domain
 	flowID, err := s.ids.New("flow")
 	if err != nil {
 		return FlowStepResult{}, fmt.Errorf("flow service: mint flow id: %w", err)
