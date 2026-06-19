@@ -5,10 +5,6 @@ type ActivateFlowDefinitionRes interface {
 	activateFlowDefinitionRes()
 }
 
-type ArchiveFlowDefinitionRes interface {
-	archiveFlowDefinitionRes()
-}
-
 type AuthorizeDeviceRes interface {
 	authorizeDeviceRes()
 }
@@ -53,12 +49,12 @@ type CreateUserRes interface {
 	createUserRes()
 }
 
-type DeleteFlowDefinitionRes interface {
-	deleteFlowDefinitionRes()
+type DeactivateFlowDefinitionRes interface {
+	deactivateFlowDefinitionRes()
 }
 
-type DeprecateFlowDefinitionRes interface {
-	deprecateFlowDefinitionRes()
+type DeleteFlowDefinitionRes interface {
+	deleteFlowDefinitionRes()
 }
 
 type EndSessionRes interface {

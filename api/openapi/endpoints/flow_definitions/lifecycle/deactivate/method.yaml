@@ -1,12 +1,10 @@
 post:
-  operationId: deprecateFlowDefinition
-  summary: Deprecate a flow definition by ID
+  operationId: deactivateFlowDefinition
+  summary: Deactivate a flow definition by ID.
   description: |
-    Deprecates a flow definition in the `active` state by ID. 
-    Deprecated flow definitions cannot be used to start new flows, but existing flows that reference the deprecated flow definition can continue to operate until completion.
+    Deactivates a flow definition in the `active` state by transitioning it to the `draft` state. 
+    Flow definitions in `draft` state cannot be used to start new flows. Existing flows that use the deactivated flow definition must gracefully handle this.
     Alternatively, the status of a flow definition can also be set via the `POST /flow_definitions` and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow definition payload.
-    
-    Note: There must be at least one flow definition in the `active` state for a given `purpose` at all times to ensure that new flows can be started.
   tags:
     - Flow Definitions
   security:
@@ -17,15 +15,15 @@ post:
     - $ref: ../../../../components/parameters/project-id.yaml
   responses:
     '204':
-      description: Flow definition deprecated successfully.
+      description: Flow definition deactivated successfully.
     '400':
-      description: Invalid request (e.g., flow definition is not in an active state, invalid flow definition ID).
+      description: Invalid request.
       content:
         application/json:
           schema:
             $ref: ../../../../components/error-details.yaml
     '409':
-      description: Conflict (e.g., attempting to deprecate the last active flow definition for a given purpose).
+      description: Conflict (e.g., attempting to deactivate the last active flow definition for a given purpose).
       content:
         application/json:
           schema:
