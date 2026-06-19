@@ -75,6 +75,10 @@ func (h *FlowCreateUserHandler) Handle(ctx context.Context, in domain.FlowOnSucc
 
 	err := h.userService.ApplyActions(ctx, createUserAction, setPasswordAction)
 	if err != nil {
+		if derr, ok := err.(domain.Error); ok && derr.Code == domain.ErrUserAlreadyExists().Code {
+			msg := "user_already_exists"
+			return domain.FlowOnSuccessResult{StepError: &msg}, nil
+		}
 		return domain.FlowOnSuccessResult{}, err
 	}
 
