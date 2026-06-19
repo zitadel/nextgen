@@ -122,10 +122,6 @@ func (fd *flowDefinitionService) Update(ctx context.Context, req FlowDefinitionR
 	if err != nil {
 		return nil, err
 	}
-	purposes, err := mapPurposesToDomain(req.Purposes)
-	if err != nil {
-		return nil, err
-	}
 
 	// if the status is not set, use the existing status
 	if req.Status == "" {
@@ -136,19 +132,23 @@ func (fd *flowDefinitionService) Update(ctx context.Context, req FlowDefinitionR
 		return nil, domain.ErrFlowDefinitionInvalid("invalid status", err)
 	}
 	// status update
-	// before the status update: ensure that there are other flow definitions that are `active` with the same purpose
-	err = fd.isStatusUpdateAllowed(ctx, req.ProjectID, retrievedFlowDef.ID, retrievedFlowDef.Status, status, purposes)
+	// before the status update (deactivation): ensure that there are other flow definitions that are `active` with the existing purpose
+	err = fd.isStatusUpdateAllowed(ctx, req.ProjectID, retrievedFlowDef.ID, retrievedFlowDef.Status, status, retrievedFlowDef.Purposes)
 	if err != nil {
 		return nil, err
 	}
 
+	reqPurposes, err := mapPurposesToDomain(req.Purposes)
+	if err != nil {
+		return nil, err
+	}
 	flowDefinition, err := domain.NewFlowDefinition(
 		req.FlowDefinitionID,
 		req.ProjectID,
 		req.Name,
 		req.SchemaVersion,
 		req.UserSchema,
-		purposes,
+		reqPurposes,
 		req.Audience,
 		req.Steps,
 		status,
@@ -168,11 +168,11 @@ func (fd *flowDefinitionService) Update(ctx context.Context, req FlowDefinitionR
 	return flowDefinition, nil
 }
 
-func (fd *flowDefinitionService) isStatusUpdateAllowed(ctx context.Context, projectID, flowDefID string, currentStatus, reqStatus domain.FlowDefinitionStatus, purposes map[domain.FlowDefinitionPurpose]string) error {
+func (fd *flowDefinitionService) isStatusUpdateAllowed(ctx context.Context, projectID, flowDefID string, currentStatus, reqStatus domain.FlowDefinitionStatus, currentPurposes map[domain.FlowDefinitionPurpose]string) error {
 	if reqStatus == domain.FlowDefinitionStatusActive || currentStatus == reqStatus {
 		return nil
 	}
-	for purpose := range purposes {
+	for purpose := range currentPurposes {
 		fds, err := fd.flowDefinitionRepo.ListFlowDefinitions(
 			ctx,
 			fd.db,

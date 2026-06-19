@@ -282,7 +282,22 @@ func TestUpdateFlowDefinition(t *testing.T) {
 		newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("login-flow", *userSchemaURI)),
 	)
 	require.NoError(t, err)
-	flowDef, ok := createResp.(*api.FlowDefinitionDetailResponse)
+	loginFlowDef, ok := createResp.(*api.FlowDefinitionDetailResponse)
+	require.True(t, ok)
+
+	multiPurposeResp, err := client.CreateFlowDefinition(
+		t.Context(),
+		newCreateFlowDefinitionRequest(api.ProjectID(project.ID), func() api.FlowDefinition {
+			def := newFlowDefinitionFixture("multi-purpose-flow", *userSchemaURI)
+			def.Purposes = map[string]string{
+				"login":    "step_1",
+				"recovery": "step_1",
+			}
+			return def
+		}()),
+	)
+	require.NoError(t, err)
+	loginRegisterFlowDef, ok := multiPurposeResp.(*api.FlowDefinitionDetailResponse)
 	require.True(t, ok)
 
 	tests := []struct {
@@ -301,9 +316,9 @@ func TestUpdateFlowDefinition(t *testing.T) {
 				}
 				return def
 			}()),
-			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: flowDef.ID},
+			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginFlowDef.ID},
 			wantResp: &api.FlowDefinitionDetailResponse{
-				ID:        flowDef.ID,
+				ID:        loginFlowDef.ID,
 				ProjectID: project.ID,
 				Status:    api.FlowDefinitionStatusActive,
 				FlowDefinition: api.FlowDefinition{
@@ -320,6 +335,58 @@ func TestUpdateFlowDefinition(t *testing.T) {
 			},
 		},
 		{
+			name: "flow definition updated successfully - when status omitted preserves existing status",
+			req: newUpdateFlowDefinitionRequest(func() api.FlowDefinition {
+				def := newFlowDefinitionFixture("updated-flow-omit-status", *userSchemaURI)
+				return def
+			}()),
+			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginFlowDef.ID},
+			wantResp: &api.FlowDefinitionDetailResponse{
+				ID:        loginFlowDef.ID,
+				ProjectID: project.ID,
+				Status:    api.FlowDefinitionStatusActive,
+				FlowDefinition: api.FlowDefinition{
+					Name:       "updated-flow-omit-status",
+					UserSchema: *userSchemaURI,
+					Purposes:   map[string]string{"login": "step_1"},
+					Audience: api.OptFlowAudience{
+						Value: api.FlowAudience{
+							TeamIds: []string{"team-1", "team-2"},
+							AppIds:  []string{"app-1", "app-2"},
+						},
+						Set: true,
+					},
+					Steps:  validSteps(),
+					Status: api.NewOptFlowDefinitionStatus(api.FlowDefinitionStatusActive),
+				},
+			},
+		},
+		{
+			name: "deactivate while removing old purpose fails when removed purpose has no alternate active definition",
+			req: newUpdateFlowDefinitionRequest(func() api.FlowDefinition {
+				def := newFlowDefinitionFixture("multi-purpose-flow-updated", *userSchemaURI)
+				def.Purposes = map[string]string{
+					"login": "step_1", // remove recovery
+				}
+				def.Status = api.NewOptFlowDefinitionStatus(api.FlowDefinitionStatusDraft)
+				return def
+			}()),
+			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginRegisterFlowDef.ID},
+			wantResp: &api.ErrorDetailsStatusCode{
+				StatusCode: http.StatusConflict,
+				Response: api.ErrorDetails{
+					Code:    "flowdef.update_conflict",
+					Message: "flow definition: update conflict",
+					Details: api.OptErrorDetailsDetails{
+						Value: api.ErrorDetailsDetails{
+							"details": jx.Raw(`"cannot update status to \"draft\": no other active flow definition found with this purpose"`),
+						},
+						Set: true,
+					},
+				},
+			},
+		},
+		{
 			name:   "flow definition not found",
 			req:    newUpdateFlowDefinitionRequest(newFlowDefinitionFixture("updated-flow", *userSchemaURI)),
 			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: "flowdef_missing"},
@@ -331,7 +398,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 		{
 			name:   "unknown user schema",
 			req:    newUpdateFlowDefinitionRequest(newFlowDefinitionFixture("updated-flow", *unknownUserSchemaURI)),
-			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: flowDef.ID},
+			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginFlowDef.ID},
 			wantResp: &api.UpdateFlowDefinitionBadRequest{
 				Code:    "flowdef.invalid",
 				Message: "flow definition: invalid",
@@ -350,7 +417,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 				def.Purposes = map[string]string{"login": "collect_identifier"}
 				return def
 			}()),
-			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: flowDef.ID},
+			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginFlowDef.ID},
 			wantResp: &api.UpdateFlowDefinitionBadRequest{
 				Code:    "flowdef.invalid",
 				Message: "flow definition: invalid",

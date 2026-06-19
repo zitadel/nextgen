@@ -1113,7 +1113,14 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 					repo.EXPECT().
 						GetFlowDefinition(gomock.Any(), gomock.Any(), "project1", "flowdef_123").
 						Times(1).
-						Return(&domain.FlowDefinition{ID: "flowdef_123", ProjectID: "project1", Status: domain.FlowDefinitionStatusActive}, nil)
+						Return(&domain.FlowDefinition{
+							ID:        "flowdef_123",
+							ProjectID: "project1",
+							Status:    domain.FlowDefinitionStatusActive,
+							Purposes: map[domain.FlowDefinitionPurpose]string{
+								domain.FlowDefinitionPurposeLogin: "step_1",
+							},
+						}, nil)
 					repo.EXPECT().
 						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any(), gomock.Any()).
 						Times(1).
@@ -1151,7 +1158,15 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 					repo.EXPECT().
 						GetFlowDefinition(gomock.Any(), gomock.Any(), "project1", "flowdef_123").
 						Times(1).
-						Return(&domain.FlowDefinition{ID: "flowdef_123", ProjectID: "project1", Status: domain.FlowDefinitionStatusActive}, nil)
+						Return(&domain.FlowDefinition{
+							ID:        "flowdef_123",
+							ProjectID: "project1",
+							Status:    domain.FlowDefinitionStatusActive,
+							Purposes: map[domain.FlowDefinitionPurpose]string{
+								domain.FlowDefinitionPurposeLogin:    "step_1",
+								domain.FlowDefinitionPurposeRegister: "step_1",
+							},
+						}, nil)
 
 					// login has another active
 					repo.EXPECT().
@@ -1203,8 +1218,15 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 					repo.EXPECT().
 						GetFlowDefinition(gomock.Any(), gomock.Any(), "project1", "flowdef_123").
 						Times(1).
-						Return(&domain.FlowDefinition{ID: "flowdef_123", ProjectID: "project1", Status: domain.FlowDefinitionStatusActive}, nil)
-
+						Return(&domain.FlowDefinition{
+							ID:        "flowdef_123",
+							ProjectID: "project1",
+							Status:    domain.FlowDefinitionStatusActive,
+							Purposes: map[domain.FlowDefinitionPurpose]string{
+								domain.FlowDefinitionPurposeLogin:    "step_1",
+								domain.FlowDefinitionPurposeRegister: "step_1",
+							},
+						}, nil)
 					// login purpose
 					repo.EXPECT().
 						ListFlowDefinitions(
