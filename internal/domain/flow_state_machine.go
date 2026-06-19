@@ -472,9 +472,10 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(ctx context.Context, def *F
 		}
 		switch challenge {
 		case FlowFieldChallengeIdentifier:
-			if _, pinned := state.CollectedData[FlowCollectedUserIDKey]; pinned {
-				continue
-			}
+			// Always look the user up. If the result differs from the
+			// previously resolved id, drop any ceremony that was scoped
+			// to the old user.
+			prevUserID, _ := state.CollectedData[FlowCollectedUserIDKey].(string)
 			userID, err := r.authAttempts.SubmitIdentifier(ctx, FlowSubmitIdentifierInput{
 				ProjectID:     state.ProjectID,
 				AttemptID:     state.AuthAttemptID,
@@ -485,6 +486,9 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(ctx context.Context, def *F
 				if state.CurrentPurpose == FlowDefinitionPurposeRegister {
 					continue
 				}
+				delete(state.CollectedData, FlowCollectedUserIDKey)
+				delete(state.CollectedData, flowCollectedPasskeyProvisionalKey)
+				state.PendingChallenge = nil
 				return flowDispatchResult{Outcome: FlowImplicitOutcomeUserNotFound}, nil
 			}
 			if err != nil {
@@ -492,6 +496,13 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(ctx context.Context, def *F
 			}
 			if state.CurrentPurpose == FlowDefinitionPurposeRegister {
 				return flowDispatchResult{Outcome: FlowImplicitOutcomeUserAlreadyExists}, nil
+			}
+			if prevUserID != userID {
+				// Any in-flight ceremony was scoped to a different user
+				// (or to a discoverable login with no user yet). Drop it
+				// and any provisional state along with it.
+				state.PendingChallenge = nil
+				delete(state.CollectedData, flowCollectedPasskeyProvisionalKey)
 			}
 			recordResolvedUser(state, userID)
 		case FlowFieldChallengePassword:
