@@ -20,17 +20,19 @@ losing widget state.
 
 ### The `back` action
 
-`back` is a plain action — same shape as `submit` or `register`:
+`back` is an action with `kind: "back"`. The name is conventionally
+`"back"` but only the `kind` is load-bearing — clients identify the
+back action by kind, never by name:
 
 ```json
 {
   "step": {
     "name": "passkey-upsell",
-    "actions": {
-      "setup": { "text_key": "passkey-upsell.action.setup", "primary": true },
-      "skip":  { "text_key": "passkey-upsell.action.skip" },
-      "back":  { "text_key": "action.back" }
-    }
+    "actions": [
+      { "name": "setup", "kind": "passkey_register", "text_key": "passkey-upsell.action.setup", "primary": true },
+      { "name": "skip",  "kind": "navigate",         "text_key": "passkey-upsell.action.skip" },
+      { "name": "back",  "kind": "back",             "text_key": "action.back" }
+    ]
   }
 }
 ```
@@ -48,8 +50,8 @@ session token rotates as usual. No special API endpoint, no per-step
 
 ### When the engine injects `back`
 
-The engine adds `back` to a step's `actions` dict iff **both** of the
-following hold:
+The engine adds a `kind: "back"` action to the step's `actions` iff
+**both** of the following hold:
 
 1. The runtime `history` array has at least one prior step.
 2. The current step is not terminal.
@@ -60,8 +62,9 @@ ones (e.g., the action just created the user or rotated a credential).
 The engine classifies reversibility from the semantics of the action it
 executed — flow definitions carry no reversibility metadata.
 
-The frontend never needs to hardcode which steps support back — the presence
-or absence of the `back` action in the response is the single source of truth.
+The frontend never needs to hardcode which steps support back — the
+presence or absence of a `kind: "back"` action in the response is the
+single source of truth.
 
 ### Browser History API integration
 
@@ -72,19 +75,20 @@ the native back gesture work without page reloads.
 #### Lifecycle
 
 1. **On each submit response** (after `applyResponse`):
-   - New step has `back` and the step name changed →
+   - New step has a `kind: "back"` action and the step name changed →
      `history.pushState(null, '', '#s' + this.stepSeq++)`.
    - Otherwise → no history call.
 
 2. **On `popstate` event** (browser back button):
-   - If the current step's `actions` contains `back` →
-     submit `{ action: "back" }` to the API, apply the response
-   - If no `back` action → call `history.forward()` to restore the
-     consumed entry without growing the stack, and surface a brief
-     visual indicator that going back is not available. This avoids
-     trapping the user in an ever-growing back loop — the history
-     stack stays fixed and the host page remains reachable once the
-     flow's entries are exhausted
+   - If the current step has a `kind: "back"` action →
+     submit `{ action: <that action's name> }` to the API, apply the
+     response.
+   - Else → call `history.forward()` to restore the consumed entry
+     without growing the stack, and surface a brief visual indicator
+     that going back is not available. This avoids trapping the user
+     in an ever-growing back loop — the history stack stays fixed and
+     the host page remains reachable once the flow's entries are
+     exhausted.
 
 3. **On `disconnectedCallback`** (widget removed):
    - Remove the `popstate` listener — clean up
@@ -108,7 +112,7 @@ identical to clicking an in-UI back button.
 
 | Scenario | Behavior |
 |---|---|
-| User presses back on the initial step | No `back` action → browser navigates the host page (leaves the flow) — correct behavior |
+| User presses back on the initial step | No `kind: "back"` action → browser navigates the host page (leaves the flow) — correct behavior |
 | User presses forward after going back | `popstate` fires with a forward state — orchestrator calls `history.back()` to undo the traversal and keep the URL aligned with the displayed step. The flow state is server-authoritative; the browser cannot skip ahead. |
 | Multiple rapid back presses | Each `popstate` triggers a sequential `submit("back")` — the session token rotation prevents race conditions |
 | Embedded in a SPA with its own router | The host router and the flow's fragment entries coexist — fragments are scoped and don't conflict with path-based routing |
@@ -116,17 +120,18 @@ identical to clicking an in-UI back button.
 ### Template rendering
 
 The `default.liquid` template already iterates all non-primary actions and
-renders them. A `back` action renders automatically as a secondary button or
-link — no template changes required.
+renders them. A `kind: "back"` action renders automatically as a secondary
+button or link — no template changes required.
 
-For visual consistency, the `back` action can be rendered as a left-arrow
-link above the card (matching common auth UI patterns) by checking the
-action key name in the template:
+For visual consistency, the back action can be rendered as a left-arrow
+link above the card (matching common auth UI patterns) by selecting it
+by kind in the template:
 
 ```liquid
-{% if actions.back %}
-  <a class="zl-card-nav__link" data-action="back">
-    {{ actions.back.text_key | t }}
+{% assign back = actions | where: "kind", "back" | first %}
+{% if back %}
+  <a class="zl-card-nav__link" data-action="{{ back.name }}">
+    {{ back.text_key | t }}
   </a>
 {% endif %}
 ```
@@ -186,7 +191,8 @@ increases flow abandonment.
 
 ## Consequences
 
-- **`step-action.yaml`** — unchanged. `back` is a plain action.
+- **`step-action.yaml`** — `kind` enum gains `back`. Clients identify the
+  back action by `kind: "back"`, never by name.
 - **`flow-submit-request.yaml`** — unchanged. `back` is already documented
   as a valid action value.
 - **Flow definitions** — unchanged. No per-step `back` transitions and no

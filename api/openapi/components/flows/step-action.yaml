@@ -11,7 +11,7 @@ properties:
     example: submit
   kind:
     type: string
-    enum: [submit, passkey, passkey_register, navigate]
+    enum: [submit, passkey, passkey_register, navigate, back]
     example: submit
     description: |
       Classifies how the engine handles this action:
@@ -21,7 +21,9 @@ properties:
       - `passkey_register`: issue a WebAuthn registration challenge; the matching
         transition fires once the returned attestation verifies.
       - `navigate`: route through the transition without running the input
-        pipeline. Used for back-navigation and similar pure-routing actions.
+        pipeline. Used for pure-routing actions like skip or switch-method.
+      - `back`: pop the previous step from the runtime history and return it.
+        The engine injects this kind; flow definitions do not declare it.
   primary:
     type: boolean
     default: false
