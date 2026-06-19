@@ -37,12 +37,12 @@ func createLifecycleUser(t *testing.T, tx database.Transaction, userRepo *reposi
 	attr, err := domain.NewCreateAttribute("nickname", userID, domain.AttributeUniquenessUnspecified)
 	require.NoError(t, err)
 	require.NoError(t, userRepo.Create(t.Context(), tx, &domain.CreateUser{
-		ProjectID:            projectID,
-		SchemaURL:            schemaURL,
-		ID:                   userID,
-		LifecycleOwnerTeamID: lifecycleOwner,
-		InitialMembershipTeamID:  participation,
-		Attributes:           []*domain.CreateAttribute{attr},
+		ProjectID:               projectID,
+		SchemaURL:               schemaURL,
+		ID:                      userID,
+		LifecycleOwnerTeamID:    lifecycleOwner,
+		InitialMembershipTeamID: participation,
+		Attributes:              []*domain.CreateAttribute{attr},
 	}))
 }
 

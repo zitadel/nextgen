@@ -91,7 +91,7 @@ type CreateUser struct {
 	// to their default workspace team; an enterprise provisioned user may set both fields to the
 	// same tenant team, but lifecycle ownership and roster membership remain separate concerns.
 	InitialMembershipTeamID *string
-	Attributes                []*CreateAttribute
+	Attributes              []*CreateAttribute
 }
 
 // AttributeTeamScope returns the team id used for team-scoped unique attributes on create.

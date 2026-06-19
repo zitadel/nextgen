@@ -48,11 +48,11 @@ func TestUserRepository_CreateGetListDelete(t *testing.T) {
 
 	teamCopy := tid
 	create := &domain.CreateUser{
-		ProjectID:           pid,
-		SchemaURL:           schemaURL,
-		ID:                  userID,
+		ProjectID:               pid,
+		SchemaURL:               schemaURL,
+		ID:                      userID,
 		InitialMembershipTeamID: &teamCopy,
-		Attributes:          []*domain.CreateAttribute{attr1, attr2, attrEmptyArray, attrEmptyObj},
+		Attributes:              []*domain.CreateAttribute{attr1, attr2, attrEmptyArray, attrEmptyObj},
 	}
 	require.NoError(t, repo.Create(ctx, tx, create))
 
@@ -174,11 +174,11 @@ func TestUserRepository_AttributesCondition(t *testing.T) {
 		require.NoError(t, err)
 		teamCopy := tid
 		require.NoError(t, repo.Create(ctx, tx, &domain.CreateUser{
-			ProjectID:           pid,
-			SchemaURL:           schemaURL,
-			ID:                  id,
+			ProjectID:               pid,
+			SchemaURL:               schemaURL,
+			ID:                      id,
 			InitialMembershipTeamID: &teamCopy,
-			Attributes:          []*domain.CreateAttribute{a1, a2},
+			Attributes:              []*domain.CreateAttribute{a1, a2},
 		}))
 	}
 	mkUser("u1", "CH", "alice")

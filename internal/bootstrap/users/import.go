@@ -81,11 +81,11 @@ func importFile(
 	}
 
 	if err := userRepo.Create(ctx, pool, &domain.CreateUser{
-		ProjectID:           doc.Header.ProjectID,
-		SchemaURL:           doc.Header.SchemaURL,
-		ID:                  doc.Header.ID,
+		ProjectID:               doc.Header.ProjectID,
+		SchemaURL:               doc.Header.SchemaURL,
+		ID:                      doc.Header.ID,
 		InitialMembershipTeamID: participationTeamID,
-		Attributes:          attrs,
+		Attributes:              attrs,
 	}); err != nil {
 		return fmt.Errorf("create user: %w", err)
 	}
