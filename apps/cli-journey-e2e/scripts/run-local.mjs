@@ -1,19 +1,13 @@
 import { createWriteStream } from "node:fs";
-import {
-  cp,
-  mkdir,
-  mkdtemp,
-  rm,
-  writeFile,
-} from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import net from "node:net";
 
+import { frameworkForId } from "./frameworks.mjs";
 import {
-  composeArgs,
   localRegistryPaths,
   npmEnvironment,
   packageName,
@@ -21,55 +15,55 @@ import {
   stopLocalRegistry,
   waitForHttp,
 } from "./local-registry.mjs";
+import { parseLocalJourneyArgs } from "./run-options.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, "..");
 const repoRoot = resolve(projectRoot, "../..");
-const composeFile = join(projectRoot, "docker-compose.local.yaml");
 
 const options = parseArgsOrExit(process.argv.slice(2));
+if (options.help) {
+  printUsage();
+  process.exit(0);
+}
+
+const selectedFrameworks = options.frameworkIds.map(frameworkForId);
 const workDir = resolve(
   options.workDir || (await mkdtemp(join(tmpdir(), "zitadel-cli-journey-local-"))),
 );
 const diagnosticsDir = join(workDir, "diagnostics");
-const appDir = join(workDir, "myapp");
 const registryPaths = localRegistryPaths(workDir);
-const nextLogPath = join(diagnosticsDir, "next-app.log");
-const composeLogPath = join(diagnosticsDir, "compose.log");
-const composeProjectName = `zitadel-journey-${process.pid}-${Date.now()}`;
 const registryPort = await resolvePort("JOURNEY_REGISTRY_PORT");
-const appPort = await resolvePort("JOURNEY_APP_PORT", 3000);
-const zitadelPort = await resolvePort("JOURNEY_ZITADEL_PORT");
 const registryUrl = `http://127.0.0.1:${registryPort}`;
-const appUrl = `http://localhost:${appPort}`;
 const cliPackage = await packageName(repoRoot, "apps/cli");
-const compose = {
-  envPath: registryPaths.composeEnvPath,
-  file: composeFile,
-  projectName: composeProjectName,
-  repoRoot,
-};
 const childProcesses = new Set();
-let composeStarted = false;
+const frameworkContexts = [];
+const usedPorts = new Set([registryPort]);
+let registryProcess;
+let registryLogsCollected = false;
 let cleanupStarted = false;
 let success = false;
-let localRuntimeImage = process.env.ZITADEL_LOCAL_IMAGE || options.image;
+let localRuntimeImage = options.runtime === "docker" ? process.env.ZITADEL_LOCAL_IMAGE || options.image : "";
 
 process.on("SIGINT", () => void handleSignal("SIGINT"));
 process.on("SIGTERM", () => void handleSignal("SIGTERM"));
 
 try {
+  assertMatrixPortsAreDynamic(selectedFrameworks);
   await mkdir(diagnosticsDir, { recursive: true });
 
   log(`work dir: ${workDir}`);
-  await assertDockerAvailable();
+  log(`frameworks: ${selectedFrameworks.map((framework) => framework.id).join(", ")}`);
+  log(`runtime: ${options.runtime}`);
+  if (options.runtime === "docker") {
+    await assertDockerAvailable();
+  }
   await ensurePlaywrightBrowsers();
-  await prepareLocalRegistry({
-    compose,
+  const localRegistry = await prepareLocalRegistry({
     env: process.env,
     log,
-    onStarted: () => {
-      composeStarted = true;
+    onStarted: (registry) => {
+      registryProcess = registry;
     },
     paths: registryPaths,
     registryPort,
@@ -78,65 +72,27 @@ try {
     run,
     workDir,
   });
+  registryProcess = localRegistry.registry;
 
-  if (!localRuntimeImage) {
+  if (options.runtime === "docker" && !localRuntimeImage) {
     log("building local runtime image for npx @zitadel/cli@alpha start");
     localRuntimeImage = await buildJourneyRuntimeImage();
   }
 
-  await run("node", ["apps/cli-journey-e2e/scripts/prepare-next-app.mjs"], {
-    env: {
-      ...process.env,
-      JOURNEY_APP_URL: appUrl,
-      JOURNEY_ZITADEL_PORT: String(zitadelPort),
-      JOURNEY_REGISTRY_URL: registryUrl,
-      JOURNEY_WORK_DIR: workDir,
-      NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
-      ZITADEL_LOCAL_IMAGE: localRuntimeImage,
-    },
-  });
+  for (const framework of selectedFrameworks) {
+    frameworkContexts.push(await createFrameworkContext(framework));
+  }
 
-  const nextProcess = startChild("npm", [
-    "run",
-    "dev",
-    "--",
-    "--hostname",
-    "localhost",
-    "--port",
-    String(appPort),
-  ], {
-    cwd: appDir,
-    env: process.env,
-    logFile: nextLogPath,
-  });
-  await waitForHttp(`${appUrl}/login`, "generated Next.js app", nextProcess);
-
-  await run(
-    "corepack",
-    [
-      "pnpm",
-      "--filter",
-      "@zitadel/cli-journey-e2e",
-      "exec",
-      "playwright",
-      "test",
-      "--config",
-      "playwright.config.mts",
-    ],
-    {
-      env: {
-        ...process.env,
-        JOURNEY_APP_DIR: appDir,
-        JOURNEY_APP_URL: appUrl,
-        JOURNEY_OUTPUT_DIR: workDir,
-      },
-    },
+  await runWithConcurrency(
+    frameworkContexts,
+    Math.min(options.concurrency, frameworkContexts.length),
+    runFrameworkJourney,
   );
 
   success = true;
-  log("customer local setup journey passed");
+  log("customer local setup journey matrix passed");
 } catch (error) {
-  await collectDiagnostics();
+  await collectRegistryLogs();
   console.error("");
   console.error(`[journey-local] failed: ${errorMessage(error)}`);
   console.error(`[journey-local] diagnostics preserved in ${workDir}`);
@@ -144,7 +100,7 @@ try {
 } finally {
   await cleanup();
   if (success && !options.keep) {
-    await rm(workDir, { recursive: true, force: true });
+    await removeWorkDirAfterSuccess(workDir);
   } else if (success) {
     log(`kept work dir: ${workDir}`);
   }
@@ -154,90 +110,190 @@ process.exit(process.exitCode ?? 0);
 
 function parseArgsOrExit(args) {
   try {
-    return parseArgs(args);
+    return parseLocalJourneyArgs(args);
   } catch (error) {
     console.error(`[journey-local] ${errorMessage(error)}`);
     process.exit(1);
   }
 }
 
-function parseArgs(args) {
-  const parsed = {
-    image: "",
-    keep: false,
-    workDir: "",
-  };
-
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index];
-    switch (arg) {
-      case "--backend": {
-        readValue(args, ++index, arg);
-        throw new Error(
-          [
-            "--backend was removed from the journey runner.",
-            "The journey now always exercises `npx @zitadel/cli@alpha start`.",
-            "Remove `--backend`, or pass `--image <docker-tag>` / set ZITADEL_LOCAL_IMAGE to choose the local runtime image.",
-          ].join(" "),
-        );
-      }
-      case "--image": {
-        parsed.image = readValue(args, ++index, arg);
-        break;
-      }
-      case "--keep": {
-        parsed.keep = true;
-        break;
-      }
-      case "--work-dir": {
-        parsed.workDir = readValue(args, ++index, arg);
-        break;
-      }
-      case "--help": {
-        printUsage();
-        process.exit(0);
-        break;
-      }
-      default: {
-        throw new Error(`unknown argument: ${arg}`);
-      }
-    }
-  }
-
-  return parsed;
-}
-
-function readValue(args, index, flag) {
-  const value = args[index];
-  if (!value || value.startsWith("--")) {
-    throw new Error(`${flag} requires a value`);
-  }
-  return value;
-}
-
 function printUsage() {
   console.log(`usage: node scripts/run-local.mjs [options]
 
 Options:
-  --image <docker-tag>      Use an existing local runtime image instead of building one
-  --keep                    Keep the temp work directory after success
-  --work-dir <path>         Use an explicit work directory
+  --framework <id>         Run one framework: next, nuxt, react, vue, or angular
+  --concurrency <n>        Number of framework journeys to run in parallel (default: 5)
+  --runtime <binary|docker> Local runtime backend (default: binary)
+  --image <docker-tag>     Use an existing local runtime image instead of building one
+  --keep                   Keep the temp work directory after success
+  --work-dir <path>        Use an explicit work directory
 `);
+}
+
+function assertMatrixPortsAreDynamic(frameworksToRun) {
+  if (frameworksToRun.length <= 1) return;
+  const fixedPorts = ["JOURNEY_APP_PORT", "JOURNEY_ZITADEL_PORT"].filter(
+    (name) => process.env[name],
+  );
+  if (fixedPorts.length === 0) return;
+  throw new Error(
+    [
+      `Cannot run the framework matrix with fixed ${fixedPorts.join(" and ")}.`,
+      "Unset those variables so the runner can allocate one port per framework,",
+      "or pass --framework <id> to run a single journey with fixed ports.",
+    ].join(" "),
+  );
+}
+
+async function createFrameworkContext(framework) {
+  const frameworkWorkDir = join(workDir, framework.id);
+  const appPort = await resolveFrameworkPort("JOURNEY_APP_PORT", 3000);
+  const zitadelPort = await resolveFrameworkPort("JOURNEY_ZITADEL_PORT");
+  const appUrl = `http://localhost:${appPort}`;
+  const appDir = join(frameworkWorkDir, "myapp");
+  const playwrightRoot = join(projectRoot, "test-output", "playwright", framework.id);
+  return {
+    appDir,
+    appPort,
+    appUrl,
+    diagnosticsDir: join(diagnosticsDir, framework.id),
+    framework,
+    frameworkWorkDir,
+    logPath: join(diagnosticsDir, framework.id, `${framework.id}-app.log`),
+    playwrightOutputDir: join(playwrightRoot, "output"),
+    playwrightReportDir: join(playwrightRoot, "report"),
+    zitadelPort,
+  };
+}
+
+async function resolveFrameworkPort(envName, preferred) {
+  const explicit = process.env[envName];
+  if (explicit) {
+    const port = validatePortValue(explicit, envName);
+    if (usedPorts.has(port)) {
+      throw new Error(`${envName}=${port} is already reserved by another journey service`);
+    }
+    usedPorts.add(port);
+    return port;
+  }
+
+  if (preferred && !usedPorts.has(preferred) && (await canListen(preferred))) {
+    usedPorts.add(preferred);
+    return preferred;
+  }
+
+  let port = await freePort();
+  while (usedPorts.has(port)) {
+    port = await freePort();
+  }
+  usedPorts.add(port);
+  return port;
+}
+
+async function runFrameworkJourney(context) {
+  const { framework } = context;
+  try {
+    await mkdir(context.diagnosticsDir, { recursive: true });
+    log(`[${framework.id}] preparing fresh ${framework.displayName} app`);
+    await run("node", ["apps/cli-journey-e2e/scripts/prepare-app.mjs"], {
+      env: {
+        ...process.env,
+        JOURNEY_APP_URL: context.appUrl,
+        JOURNEY_FRAMEWORK: framework.id,
+        JOURNEY_ZITADEL_PORT: String(context.zitadelPort),
+        JOURNEY_REGISTRY_URL: registryUrl,
+        JOURNEY_RUNTIME: options.runtime,
+        JOURNEY_WORK_DIR: context.frameworkWorkDir,
+        NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
+        ...(localRuntimeImage ? { ZITADEL_LOCAL_IMAGE: localRuntimeImage } : {}),
+      },
+    });
+
+    log(`[${framework.id}] starting generated app at ${context.appUrl}`);
+    const appProcess = startChild("npm", framework.devServerArgs(context.appPort), {
+      cwd: context.appDir,
+      env: process.env,
+      logFile: context.logPath,
+    });
+    context.appProcess = appProcess;
+    await waitForHttp(
+      `${context.appUrl}${framework.readyPath}`,
+      `generated ${framework.displayName} app`,
+      appProcess,
+      (message) => log(`[${framework.id}] ${message}`),
+    );
+
+    log(`[${framework.id}] running Playwright journey`);
+    await run(
+      "corepack",
+      [
+        "pnpm",
+        "--filter",
+        "@zitadel/cli-journey-e2e",
+        "exec",
+        "playwright",
+        "test",
+        "--config",
+        "playwright.config.mts",
+      ],
+      {
+        env: {
+          ...process.env,
+          JOURNEY_APP_DIR: context.appDir,
+          JOURNEY_APP_URL: context.appUrl,
+          JOURNEY_FRAMEWORK: framework.id,
+          JOURNEY_OUTPUT_DIR: context.frameworkWorkDir,
+          JOURNEY_PLAYWRIGHT_OUTPUT_DIR: context.playwrightOutputDir,
+          JOURNEY_PLAYWRIGHT_REPORT_DIR: context.playwrightReportDir,
+        },
+      },
+    );
+    log(`[${framework.id}] journey passed`);
+  } catch (error) {
+    await collectDiagnostics(context);
+    throw new Error(`${framework.id}: ${errorMessage(error)}`, { cause: error });
+  }
+}
+
+async function runWithConcurrency(items, limit, worker) {
+  const errors = [];
+  let index = 0;
+
+  async function runNext() {
+    while (index < items.length) {
+      const item = items[index];
+      index += 1;
+      try {
+        await worker(item);
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: limit }, () => runNext()));
+  if (errors.length > 0) {
+    throw new Error(errors.map(errorMessage).join("\n"));
+  }
 }
 
 async function resolvePort(envName, fallback) {
   const value = process.env[envName];
   if (value) {
-    const port = Number(value);
-    if (!Number.isInteger(port) || port <= 0 || port > 65535) {
-      throw new Error(`${envName} must be a TCP port, got ${value}`);
-    }
-    return port;
+    return validatePortValue(value, envName);
   }
   if (fallback) {
     return fallback;
   }
   return freePort();
+}
+
+function validatePortValue(value, name) {
+  const port = Number(value);
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+    throw new Error(`${name} must be a TCP port, got ${value}`);
+  }
+  return port;
 }
 
 function freePort() {
@@ -252,6 +308,17 @@ function freePort() {
         return;
       }
       server.close(() => resolvePortPromise(address.port));
+    });
+  });
+}
+
+function canListen(port) {
+  return new Promise((resolveCanListen) => {
+    const server = net.createServer();
+    server.unref();
+    server.once("error", () => resolveCanListen(false));
+    server.listen(port, "127.0.0.1", () => {
+      server.close(() => resolveCanListen(true));
     });
   });
 }
@@ -280,7 +347,6 @@ async function buildJourneyRuntimeImage() {
 
 async function assertDockerAvailable() {
   let engineVersion = "";
-  let composeVersion = "";
 
   try {
     const result = await runCapture("docker", ["info", "--format", "{{.ServerVersion}}"]);
@@ -288,7 +354,7 @@ async function assertDockerAvailable() {
   } catch (error) {
     throw new Error(
       [
-        "Docker is required for the local journey runner because Verdaccio runs through Docker Compose.",
+        "Docker is required for the Docker local runtime journey.",
         "Start Docker Desktop or another Docker daemon, wait until `docker ps` works, then rerun this command.",
         `Docker daemon check failed: ${commandErrorDetail(error)}`,
       ].join("\n"),
@@ -296,34 +362,18 @@ async function assertDockerAvailable() {
     );
   }
 
-  try {
-    const result = await runCapture("docker", ["compose", "version", "--short"]);
-    composeVersion = result.stdout.trim();
-  } catch (error) {
-    throw new Error(
-      [
-        "Docker Compose is required for the local journey runner because Verdaccio runs through Docker Compose.",
-        "Install or enable the Docker Compose plugin, then rerun this command.",
-        `Docker Compose check failed: ${commandErrorDetail(error)}`,
-      ].join("\n"),
-      { cause: error },
-    );
-  }
-
-  const versionDetails = [
-    engineVersion ? `engine ${engineVersion}` : "",
-    composeVersion ? `compose ${composeVersion}` : "",
-  ].filter(Boolean);
-  log(`Docker is available${versionDetails.length > 0 ? ` (${versionDetails.join(", ")})` : ""}`);
+  log(`Docker is available${engineVersion ? ` (engine ${engineVersion})` : ""}`);
 }
 
 function startChild(command, args, optionsForChild) {
   const output = createWriteStream(optionsForChild.logFile, { flags: "a" });
   const child = spawn(command, args, {
     cwd: optionsForChild.cwd,
+    detached: process.platform !== "win32",
     env: optionsForChild.env,
     stdio: ["ignore", "pipe", "pipe"],
   });
+  child.detachedForCleanup = process.platform !== "win32";
   child.logFile = optionsForChild.logFile;
   child.stdout.pipe(output, { end: false });
   child.stderr.pipe(output, { end: false });
@@ -402,76 +452,84 @@ function commandErrorDetail(error) {
   return (detailLines.length > 0 ? detailLines : lines).slice(-4).join("\n");
 }
 
-async function collectDiagnostics() {
-  await mkdir(diagnosticsDir, { recursive: true });
-  await collectLocalRuntimeLogs();
-  if (composeStarted) {
-    try {
-      const result = await runCapture(
-        "docker",
-        composeArgs(compose, ["logs"]),
-      );
-      await writeFile(composeLogPath, `${result.stdout}${result.stderr}`);
-    } catch (error) {
-      await writeFile(composeLogPath, `failed to collect compose logs: ${errorMessage(error)}\n`);
-    }
-  }
+async function collectDiagnostics(context) {
+  if (context.diagnosticsCollected) return;
+  context.diagnosticsCollected = true;
 
-  await copyIfExists(join(workDir, "doctor.json"), join(diagnosticsDir, "doctor.json"));
+  await mkdir(context.diagnosticsDir, { recursive: true });
+  await collectLocalRuntimeLogs(context);
+  await copyIfExists(context.logPath, join(context.diagnosticsDir, `${context.framework.id}-app.log`));
+  await copyIfExists(join(context.frameworkWorkDir, "doctor.json"), join(context.diagnosticsDir, "doctor.json"));
   await copyIfExists(
-    join(workDir, "doctor.stderr.log"),
-    join(diagnosticsDir, "doctor.stderr.log"),
+    join(context.frameworkWorkDir, "doctor.stderr.log"),
+    join(context.diagnosticsDir, "doctor.stderr.log"),
   );
-  await copyIfExists(join(workDir, "start.json"), join(diagnosticsDir, "start.json"));
+  await copyIfExists(join(context.frameworkWorkDir, "start.json"), join(context.diagnosticsDir, "start.json"));
   await copyIfExists(
-    join(workDir, "start.stderr.log"),
-    join(diagnosticsDir, "start.stderr.log"),
+    join(context.frameworkWorkDir, "start.stderr.log"),
+    join(context.diagnosticsDir, "start.stderr.log"),
   );
-  await copyIfExists(join(workDir, "setup.json"), join(diagnosticsDir, "setup.json"));
+  await copyIfExists(join(context.frameworkWorkDir, "setup.json"), join(context.diagnosticsDir, "setup.json"));
   await copyIfExists(
-    join(workDir, "setup.stderr.log"),
-    join(diagnosticsDir, "setup.stderr.log"),
+    join(context.frameworkWorkDir, "setup.stderr.log"),
+    join(context.diagnosticsDir, "setup.stderr.log"),
   );
-  await copyIfExists(join(workDir, "metadata.json"), join(diagnosticsDir, "metadata.json"));
-  await copyIfExists(join(workDir, "logs.json"), join(diagnosticsDir, "logs.json"));
-  await copyIfExists(join(workDir, "logs.stderr.log"), join(diagnosticsDir, "logs.stderr.log"));
+  await copyIfExists(join(context.frameworkWorkDir, "metadata.json"), join(context.diagnosticsDir, "metadata.json"));
+  await copyIfExists(join(context.frameworkWorkDir, "logs.json"), join(context.diagnosticsDir, "logs.json"));
   await copyIfExists(
-    join(appDir, ".zitadel/local/runtime.json"),
-    join(diagnosticsDir, "runtime.json"),
-  );
-  await mkdir(join(diagnosticsDir, "generated-app"), { recursive: true });
-  await copyIfExists(
-    join(appDir, "package.json"),
-    join(diagnosticsDir, "generated-app", "package.json"),
+    join(context.frameworkWorkDir, "logs.stderr.log"),
+    join(context.diagnosticsDir, "logs.stderr.log"),
   );
   await copyIfExists(
-    join(appDir, "package-lock.json"),
-    join(diagnosticsDir, "generated-app", "package-lock.json"),
+    join(context.appDir, ".zitadel/local/runtime.json"),
+    join(context.diagnosticsDir, "runtime.json"),
   );
   await copyIfExists(
-    join(projectRoot, "test-output", "playwright"),
-    join(diagnosticsDir, "playwright"),
+    join(context.appDir, ".zitadel/local/server.log"),
+    join(context.diagnosticsDir, "server.log"),
   );
+  await mkdir(join(context.diagnosticsDir, "generated-app"), { recursive: true });
+  await copyIfExists(
+    join(context.appDir, "package.json"),
+    join(context.diagnosticsDir, "generated-app", "package.json"),
+  );
+  await copyIfExists(
+    join(context.appDir, "package-lock.json"),
+    join(context.diagnosticsDir, "generated-app", "package-lock.json"),
+  );
+  await copyIfExists(
+    join(context.appDir, "pnpm-lock.yaml"),
+    join(context.diagnosticsDir, "generated-app", "pnpm-lock.yaml"),
+  );
+  await copyIfExists(context.playwrightReportDir, join(context.diagnosticsDir, "playwright-report"));
+  await copyIfExists(context.playwrightOutputDir, join(context.diagnosticsDir, "playwright-output"));
 }
 
-async function collectLocalRuntimeLogs() {
+async function collectRegistryLogs() {
+  if (registryLogsCollected) return;
+  registryLogsCollected = true;
+  await mkdir(diagnosticsDir, { recursive: true });
+  await copyIfExists(registryPaths.registryLogPath, join(diagnosticsDir, "verdaccio.log"));
+}
+
+async function collectLocalRuntimeLogs(context) {
   try {
-    const result = await runCapture(
-      "npx",
-      cliArgs(["logs", "--tail", "400"]),
-      { cwd: appDir, env: npxEnv() },
-    );
-    await writeFile(join(diagnosticsDir, "logs.json"), result.stdout);
-    await writeFile(join(diagnosticsDir, "logs.stderr.log"), result.stderr);
+    const result = await runCapture("npx", cliArgs(context, ["logs", "--tail", "400"]), {
+      cwd: context.appDir,
+      env: npxEnv(context),
+    });
+    await writeFile(join(context.diagnosticsDir, "logs.json"), result.stdout);
+    await writeFile(join(context.diagnosticsDir, "logs.stderr.log"), result.stderr);
   } catch (error) {
     await writeFile(
-      join(diagnosticsDir, "logs.stderr.log"),
+      join(context.diagnosticsDir, "logs.stderr.log"),
       `failed to collect local runtime logs: ${errorMessage(error)}\n`,
     );
   }
 }
 
 async function copyIfExists(source, destination) {
+  if (resolve(source) === resolve(destination)) return;
   try {
     await cp(source, destination, { recursive: true });
   } catch (error) {
@@ -489,36 +547,51 @@ async function cleanup() {
     await stopChild(child);
   }
 
-  await resetLocalRuntime();
+  await Promise.all(frameworkContexts.map(resetLocalRuntime));
 
-  if (composeStarted) {
+  if (registryProcess) {
     try {
-      await stopLocalRegistry(compose, run, process.env);
+      await stopLocalRegistry(registryProcess);
     } catch (error) {
-      console.error(`[journey-local] docker compose cleanup failed: ${errorMessage(error)}`);
+      console.error(`[journey-local] Verdaccio cleanup failed: ${errorMessage(error)}`);
     }
   }
 }
 
-async function resetLocalRuntime() {
+async function resetLocalRuntime(context) {
   try {
-    await runCapture(
-      "npx",
-      cliArgs(["reset", "--force"]),
-      { cwd: appDir, env: npxEnv() },
-    );
+    await runCapture("npx", cliArgs(context, ["reset", "--force"]), {
+      cwd: context.appDir,
+      env: npxEnv(context),
+    });
   } catch (error) {
-    console.error(`[journey-local] local runtime reset failed: ${errorMessage(error)}`);
+    console.error(
+      `[journey-local] ${context.framework.id} local runtime reset failed: ${errorMessage(error)}`,
+    );
   }
 }
 
 async function stopChild(child) {
   if (child.exitCode !== null) return;
-  child.kill("SIGTERM");
+  signalChild(child, "SIGTERM");
   const exited = await waitForExit(child, 5000);
   if (!exited && child.exitCode === null) {
-    child.kill("SIGKILL");
+    signalChild(child, "SIGKILL");
     await waitForExit(child, 5000);
+  }
+}
+
+function signalChild(child, signal) {
+  try {
+    if (child.detachedForCleanup && child.pid) {
+      process.kill(-child.pid, signal);
+      return;
+    }
+    child.kill(signal);
+  } catch (error) {
+    if (!isErrno(error, "ESRCH")) {
+      throw error;
+    }
   }
 }
 
@@ -540,20 +613,40 @@ function waitForExit(child, timeoutMs) {
   });
 }
 
+async function removeWorkDirAfterSuccess(path) {
+  try {
+    await rm(path, { recursive: true, force: true, maxRetries: 10, retryDelay: 250 });
+  } catch (error) {
+    console.error(`[journey-local] cleanup left work dir ${path}: ${errorMessage(error)}`);
+  }
+}
+
 async function handleSignal(signal) {
   console.error(`[journey-local] received ${signal}, cleaning up`);
-  await collectDiagnostics();
+  await collectRegistryLogs();
+  await Promise.all(frameworkContexts.map(collectDiagnostics));
   await cleanup();
   process.exit(130);
 }
 
-function cliArgs(args) {
-  return ["--yes", `${cliPackage}@alpha`, ...args, "--non-interactive", "--json"];
+function cliArgs(context, args) {
+  return [
+    "--yes",
+    `${cliPackage}@alpha`,
+    ...args,
+    "--cwd",
+    context.appDir,
+    "--non-interactive",
+    "--json",
+  ];
 }
 
-function npxEnv() {
+function npxEnv(context) {
   const env = npmEnvironment(process.env, registryUrl, registryPaths.npmrcPath);
-  const image = localRuntimeImage || process.env.ZITADEL_LOCAL_IMAGE;
+  env.JOURNEY_RUNTIME = options.runtime;
+  env.npm_config_cache = join(context.frameworkWorkDir, ".npm-cache");
+  env.npm_config_tmp = join(context.frameworkWorkDir, ".npm-tmp");
+  const image = options.runtime === "docker" ? localRuntimeImage || process.env.ZITADEL_LOCAL_IMAGE : "";
   if (image) {
     env.ZITADEL_LOCAL_IMAGE = image;
   }
@@ -566,4 +659,13 @@ function log(message) {
 
 function errorMessage(error) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function isErrno(error, code) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === code
+  );
 }

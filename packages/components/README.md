@@ -119,7 +119,7 @@ fixtures:
   [`dev/main.ts`](dev/main.ts) for a working setup. `applyBranding(...)`
   injects a tenant branding overlay merged into every response (presets
   include `font_url` for Inter).
-- **Framework demos (TCP server)** — `corepack pnpm nx start @zitadel/api-mock`
+- **Framework demos (TCP server)** — `moon run api-mock:start`
   serves the same handlers on port 4000 with `defaultDevBranding` (Arimo
   `font_url`) applied at boot. See [`apps/demo-next`](../../apps/demo-next/README.md)
   and [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md).
@@ -129,12 +129,12 @@ fixtures:
 Two places run the components against `@zitadel/api-mock`. They
 have different jobs — keep both:
 
-| Surface | Nx command | URLs | What it gives you |
+| Surface | Moon command | URLs | What it gives you |
 | --- | --- | --- | --- |
-| **Lit playground** | `corepack pnpm nx dev @zitadel/components` | [login](http://localhost:5173/?route=login) · [atoms](http://localhost:5173/?route=atoms) | Component author surface: branding presets, event log, source TS from `src/`. MSW runs in the browser — no TCP mock server. |
-| **React console playground** | `corepack pnpm nx dev @zitadel/console` | [http://localhost:5174](http://localhost:5174) | `@zitadel/ui-react` atom matrices in the pre-release console shell. MSW in `import.meta.env.DEV`. Compare against Lit `:5173/?route=atoms` in a second tab. |
-| **demo-next** | `corepack pnpm nx start @zitadel/api-mock` + `ZITADEL_URL=http://localhost:4000 corepack pnpm nx dev @zitadel/demo-next` | [http://localhost:3002/login](http://localhost:3002/login) (mock on `:4000`) | Next.js SDK, middleware, cookies, built `dist/`. See [`apps/demo-next`](../../apps/demo-next/README.md). |
-| **demo-nuxt** | mock on `:4000`, then `ZITADEL_URL=http://localhost:4000 corepack pnpm nx dev @zitadel/demo-nuxt` | [http://localhost:3001/login](http://localhost:3001/login) | Nuxt SDK, middleware, cookies, built `dist/`. See [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md). |
+| **Lit playground** | `moon run components:dev` | [login](http://localhost:5173/?route=login) · [atoms](http://localhost:5173/?route=atoms) | Component author surface: branding presets, event log, source TS from `src/`. MSW runs in the browser — no TCP mock server. |
+| **React console playground** | `moon run console:dev` | [http://localhost:5174](http://localhost:5174) | `@zitadel/ui-react` atom matrices in the pre-release console shell. MSW in `import.meta.env.DEV`. Compare against Lit `:5173/?route=atoms` in a second tab. |
+| **demo-next** | `moon run api-mock:start` + `ZITADEL_URL=http://localhost:4000 moon run demo-next:dev` | [http://localhost:3002/login](http://localhost:3002/login) (mock on `:4000`) | Next.js SDK, middleware, cookies, built `dist/`. See [`apps/demo-next`](../../apps/demo-next/README.md). |
+| **demo-nuxt** | mock on `:4000`, then `ZITADEL_URL=http://localhost:4000 moon run demo-nuxt:dev` | [http://localhost:3001/login](http://localhost:3001/login) | Nuxt SDK, middleware, cookies, built `dist/`. See [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md). |
 
 The Lit dev playground iterates on `<zl-*>` source; the React console
 playground exercises `@zitadel/ui-react` in the internal shell.
@@ -144,7 +144,7 @@ it round-trips faster. For React pair tweaks, use `:5174`.
 **Stale Lit styles on `:5173`?** Atom `.ts` changes use
 `vite-plugin-web-components-hmr` (Lit HMR). Edits to `shared-component-styles`
 CSS alone trigger a full reload. If it still looks old, run
-`corepack pnpm nx dev:clean @zitadel/components` and hard-refresh.
+`corepack pnpm --filter @zitadel/components run dev:clean` and hard-refresh.
 Console (`:5174`) will not pick up Lit-only edits until you rebuild or
 change the paired React/CSS path.
 
@@ -172,6 +172,21 @@ form-associated inputs.
 | MSW mocks | `setupWorker` / `setupServer` from `msw` | offline / staging / fixtures |
 | Custom template | (planned) | tenant-supplied Liquid layouts |
 | Atoms-only | hand-built form | non-standard flow shells |
+
+For styling, start with the generated `--zl-*` variables from
+`@zitadel/design-tokens`, then use host CSS on `zitadel-login { ... }` for page
+placement and `::part(...)` hooks for targeted internals such as the form or
+field input. The design-token package README is the canonical token catalogue;
+the branding design notes explain the broader override ladder. The current
+orchestrator is page-oriented: the host element can be constrained, but the
+inner `.zl-mount` still claims `100vh`, so embedding it as a small inline card is
+limited until the component follow-up relaxes that layout.
+
+Automation can use the stable host and native shadow-root hooks that the default
+template emits. Host atoms expose hooks such as `zitadel-field-email`,
+`zitadel-field-password`, and `zitadel-action-submit`; their native shadow
+controls expose hooks such as `zitadel-input-email`, `zitadel-input-password`,
+and `zitadel-action-submit-button`.
 
 A tenant Liquid template can already be supplied through the branding
 payload's `liquid_template` field; a dedicated declarative `template`
@@ -287,9 +302,10 @@ packages/components/
 
 ## Develop
 
-Use **Nx** for tasks in this monorepo (`corepack pnpm nx <target> <project>`).
-It matches CI caching and dependency order. Equivalent `pnpm --filter …` scripts
-still exist on some packages, but Nx is the documented path.
+Use **Moon** for tasks in this monorepo (`moon run <project>:<task>`).
+It matches CI caching and dependency order. Direct `pnpm --filter ...` scripts
+still exist on some packages for leaf-package debugging, but Moon is the
+documented path.
 
 ```sh
 # install once at the repo root
@@ -298,25 +314,25 @@ corepack pnpm install
 # --- Playgrounds (two terminals) ---
 
 # Lit: atoms + login, in-browser MSW
-corepack pnpm nx dev @zitadel/components
+moon run components:dev
 # → http://localhost:5173/?route=login
 # → http://localhost:5173/?route=atoms
 
 # React console: ui-react atom playground (compare to Lit ?route=atoms in another tab)
-corepack pnpm nx dev @zitadel/console
+moon run console:dev
 # → http://localhost:5174
 
 # Framework demos (TCP mock + SDK) — see apps/demo-*/README.md
-# corepack pnpm nx start @zitadel/api-mock   # → http://localhost:4000
-# ZITADEL_URL=http://localhost:4000 corepack pnpm nx dev @zitadel/demo-next  # → :3002
-# ZITADEL_URL=http://localhost:4000 corepack pnpm nx dev @zitadel/demo-nuxt  # → :3001
+# moon run api-mock:start   # → http://localhost:4000
+# ZITADEL_URL=http://localhost:4000 moon run demo-next:dev  # → :3002
+# ZITADEL_URL=http://localhost:4000 moon run demo-nuxt:dev  # → :3001
 
 # --- Package checks ---
 
-corepack pnpm nx test @zitadel/components
-corepack pnpm nx test:browser @zitadel/components
-corepack pnpm nx typecheck @zitadel/components
-corepack pnpm nx build @zitadel/components
+moon run components:test
+moon run components:test-browser
+moon run components:typecheck
+moon run components:build
 ```
 
 The components dev server imports source TS from `src/` and hot-reloads on edits.

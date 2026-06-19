@@ -10,13 +10,21 @@
     "steps": [
       {
         "name": "signup",
-        "fields": ["email", "password"],
-        "actions": {
-          "submit": { "primary": true }
-        },
+        "fields": [
+          "email",
+          "password"
+        ],
+        "actions": [
+          {
+            "name": "submit",
+            "primary": true
+          }
+        ],
         "on_success": "create_user",
         "transitions": {
-          "submit": { "target": "done" }
+          "submit": {
+            "target": "done"
+          }
         }
       },
       {

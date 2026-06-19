@@ -10,12 +10,19 @@
     "steps": [
       {
         "name": "signup",
-        "fields": ["email"],
-        "actions": {
-          "passkey_register": { "primary": true }
-        },
+        "fields": [
+          "email"
+        ],
+        "actions": [
+          {
+            "name": "passkey_register",
+            "primary": true
+          }
+        ],
         "transitions": {
-          "passkey_register": { "target": "done" }
+          "passkey_register": {
+            "target": "done"
+          }
         }
       },
       {

@@ -126,7 +126,7 @@ const VALID_FLOW = {
   user_schema:
     "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml",
   purposes: { login: "identifier" },
-  steps: [{ name: "identifier", fields: [], actions: {}, gates: {} }],
+  steps: [{ name: "identifier", fields: [], actions: [], gates: {} }],
 };
 
 describe("FlowDefinitionSyncer", () => {
@@ -183,10 +183,12 @@ describe("FlowDefinitionSyncer", () => {
     expect(receivedBody).toEqual({ project_id: "proj-1", flow_definition: data });
   });
 
-  it("update PATCHes the bare partial body with no envelope", async () => {
+  it("update PUTs the `{flow_definition}` envelope with the project_id query param", async () => {
     let receivedBody: unknown;
+    let receivedProjectId: string | null = null;
     server.use(
-      http.patch(`${BASE}/flow_definitions/flow-id-1`, async ({ request }) => {
+      http.put(`${BASE}/flow_definitions/flow-id-1`, async ({ request }) => {
+        receivedProjectId = new URL(request.url).searchParams.get("project_id");
         receivedBody = await request.json();
         return HttpResponse.json({});
       }),
@@ -195,7 +197,8 @@ describe("FlowDefinitionSyncer", () => {
 
     await flow.update("flow-id-1", { version: 3 });
 
-    expect(receivedBody).toEqual({ version: 3 });
+    expect(receivedProjectId).toBe("proj-1");
+    expect(receivedBody).toEqual({ flow_definition: { version: 3 } });
   });
 
   it("delete DELETEs /flow_definitions/:id", async () => {

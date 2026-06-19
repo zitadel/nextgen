@@ -2,7 +2,7 @@ post:
   operationId: createProject
   summary: Create project
   tags:
-    - Project
+    - Projects
   security: []
   requestBody:
     required: true

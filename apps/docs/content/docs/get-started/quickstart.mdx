@@ -1,0 +1,75 @@
+---
+title: Quickstart
+description: Add the Zitadel preview to a local app with the alpha CLI and npm-binary runtime.
+---
+
+Use this path when you want to add Zitadel auth to a local app without a source checkout.
+
+## Prerequisites
+
+- Node.js 24 or newer.
+- A package manager supported by your app.
+- Docker only if you intentionally choose the Docker runtime backend.
+
+## Create or enter an app directory
+
+```sh
+mkdir myapp
+cd myapp
+```
+
+## Check prerequisites
+
+```sh
+npx @zitadel/cli@alpha doctor
+```
+
+Before setup, `doctor` checks local runtime prerequisites. After setup, it also verifies generated app files and local config.
+
+## Start local Zitadel
+
+```sh
+npx @zitadel/cli@alpha start
+```
+
+By default this starts the matching `@zitadel/server` npm binary for the alpha train and stores runtime metadata under `.zitadel/local/runtime.json`. Runtime data is stored under `.zitadel/local/nextgen-data`.
+
+## Scaffold auth
+
+```sh
+npx @zitadel/cli@alpha setup --server local
+```
+
+In a fresh directory, setup asks which framework to scaffold. Scripted runs should pass `--framework next`, `--framework nuxt`, `--framework react`, `--framework vue`, or `--framework angular`.
+
+Setup writes the app files, `.env.local`, `zitadel.json`, and `.zitadel/**`, then installs dependencies with the detected package manager unless `--skip-install` is passed.
+
+## Prove the browser flow
+
+Start the generated app:
+
+```sh
+npm run dev
+```
+
+Then open the dev server URL, usually `http://localhost:3000/login`, and complete the browser proof:
+
+```text
+register a user -> log out -> log in with the same user -> profile shows signed in
+```
+
+Do not treat a rendered login form as completion. The useful proof is a full register, logout, and login loop in a real browser.
+
+## Stop or reset
+
+Stop local Zitadel while keeping runtime data:
+
+```sh
+npx @zitadel/cli@alpha stop
+```
+
+Delete local runtime data:
+
+```sh
+npx @zitadel/cli@alpha reset --force
+```

@@ -1,17 +1,3 @@
 {
-  "extends": "./.nuxt/tsconfig.json",
-  "references": [
-    {
-      "path": "../../packages/shared-component-styles"
-    },
-    {
-      "path": "../../packages/design-tokens"
-    },
-    {
-      "path": "../../packages/components"
-    },
-    {
-      "path": "../../packages/api"
-    }
-  ]
+  "extends": "./.nuxt/tsconfig.json"
 }

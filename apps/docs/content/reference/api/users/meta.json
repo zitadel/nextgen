@@ -1,0 +1,10 @@
+{
+  "title": "Users",
+  "pages": [
+    "createUser",
+    "listUsers",
+    "GetUserByID",
+    "getMyUser",
+    "setUserPassword"
+  ]
+}

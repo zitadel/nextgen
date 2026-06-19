@@ -19,9 +19,9 @@ func TestValidateSessionToken(t *testing.T) {
 		TokenID:   "100",
 		ExpiresAt: now.Add(time.Hour),
 	}
-	token := &domain.SessionToken{
+	token := &domain.Token{
 		TokenID:   "100",
-		ExpiresAt: now.Add(time.Hour),
+		ExpiresAt: new(now.Add(time.Hour)),
 	}
 
 	require.NoError(t, validateSessionToken(session, token))

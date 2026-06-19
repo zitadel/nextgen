@@ -1,5 +1,16 @@
-export type { NextgenSession, AuthState, UnauthState, AuthResult, NextgenMiddlewareOptions } from "./types.js";
-export { HOP_BY_HOP, INTERNAL_HEADERS, matchesRoutes, filterResponseHeaders } from "./middleware.js";
+export type {
+  NextgenSession,
+  AuthState,
+  UnauthState,
+  AuthResult,
+  NextgenMiddlewareOptions,
+} from "./middleware.js";
+export {
+  HOP_BY_HOP,
+  INTERNAL_HEADERS,
+  matchesRoutes,
+  filterResponseHeaders,
+} from "./middleware.js";
 export { verifyJwt, decodeJwt, base64UrlDecode, JWKS_TTL_MS } from "./jwt.js";
 export type { JwtPayload, JwtHeader, DecodedJwt, VerifyJwtOptions } from "./jwt.js";
 
@@ -46,10 +57,7 @@ export function resolveZitadelRuntime(input: ZitadelRuntimeInput): ZitadelRuntim
     );
   }
   if (environment === "production" && !input.issuer) {
-    throw new ZitadelRuntimeError(
-      "E_ZITADEL_CONFIG",
-      "ZITADEL_ISSUER is required in production.",
-    );
+    throw new ZitadelRuntimeError("E_ZITADEL_CONFIG", "ZITADEL_ISSUER is required in production.");
   }
   return {
     projectId: input.projectId,
@@ -62,16 +70,6 @@ function parseEnvironment(value: string | undefined): ZitadelEnvironment {
   if (!value || value === "development") return "development";
   if (value === "preview" || value === "production") return value;
   throw new ZitadelRuntimeError("E_ZITADEL_CONFIG", `Unsupported ZITADEL_ENVIRONMENT "${value}".`);
-}
-
-// @ts-expect-error will be used later
-// oxlint-disable-next-line no-unused-vars
-function requireEnv(env: Record<string, string | undefined>, key: string): string {
-  const value = env[key];
-  if (!value) {
-    throw new ZitadelRuntimeError("E_ZITADEL_CONFIG", `${key} is required for Zitadel runtime.`);
-  }
-  return value;
 }
 
 function currentEnv(): Record<string, string | undefined> {

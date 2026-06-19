@@ -6,16 +6,16 @@ import { fileURLToPath } from "node:url";
 import {
   localRegistryPaths,
   localRegistryPort,
-  localRegistryProjectName,
   prepareLocalRegistry,
+  stopLocalRegistry,
 } from "../apps/cli-journey-e2e/scripts/local-registry.mjs";
 import { buildLocalRuntimeImage, LOCAL_RUNTIME_IMAGE } from "./build-local-runtime-image.mjs";
 import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const cliBin = join(repoRoot, "apps/cli/bin/run.js");
+const localServerBinary = join(repoRoot, "dist/server/nextgen");
 const localRegistryWorkDir = join(repoRoot, "tmp", "cli-local-registry");
-const localRegistryComposeFile = join(repoRoot, "apps/cli-journey-e2e/docker-compose.local.yaml");
 
 export async function main(options = {}) {
   const args = options.args ?? forwardedArgs();
@@ -23,13 +23,20 @@ export async function main(options = {}) {
   const runFn = options.run ?? run;
   const runCaptureFn = options.runCapture ?? runCapture;
   const buildCliFn = options.buildCli ?? buildCli;
+  const buildLocalServerBinaryFn = options.buildLocalServerBinary ?? buildLocalServerBinary;
   const buildLocalRuntimeImageFn = options.buildLocalRuntimeImage ?? buildLocalRuntimeImage;
   const prepareLocalRegistryFn = options.prepareLocalRegistry ?? prepareLocalRegistry;
+  const stopLocalRegistryFn = options.stopLocalRegistry ?? stopLocalRegistry;
   const stderr = options.stderr ?? process.stderr;
   const cliEnv = { ...env };
   const cliCwd = options.cwd ?? cliCwdFor(env);
+  let registryProcess;
 
-  await buildCliFn();
+  await buildCliFn({ env });
+
+  if (shouldUseLocalServerBinary(args, env)) {
+    cliEnv.ZITADEL_SERVER_BINARY = await buildLocalServerBinaryFn({ env });
+  }
 
   if (shouldPrepareLocalPackages(args, env)) {
     const registryWorkDir = options.localRegistryWorkDir ?? localRegistryWorkDir;
@@ -37,15 +44,12 @@ export async function main(options = {}) {
     const registryUrl = `http://127.0.0.1:${registryPort}`;
     const registryPaths = localRegistryPaths(registryWorkDir);
     const packageRegistry = await prepareLocalRegistryFn({
-      compose: {
-        envPath: registryPaths.composeEnvPath,
-        file: localRegistryComposeFile,
-        projectName: localRegistryProjectName(repoRoot),
-        repoRoot,
-      },
       env,
       log: (message) => {
         stderr.write(`[zitadel-cli] ${message}\n`);
+      },
+      onStarted: (registry) => {
+        registryProcess = registry;
       },
       paths: registryPaths,
       registryPort,
@@ -54,6 +58,7 @@ export async function main(options = {}) {
       run: wrapperRun({ jsonMode: hasJsonFlag(args), runCaptureFn, runFn, stderr }),
       workDir: registryWorkDir,
     });
+    registryProcess = packageRegistry.registry;
     Object.assign(cliEnv, packageRegistry.env);
   }
 
@@ -62,19 +67,42 @@ export async function main(options = {}) {
     cliEnv.ZITADEL_LOCAL_IMAGE = LOCAL_RUNTIME_IMAGE;
   }
 
-  await runFn(process.execPath, [cliBin, ...args], { cwd: cliCwd, env: cliEnv });
+  try {
+    await runFn(process.execPath, [cliBin, ...args], { cwd: cliCwd, env: cliEnv });
+  } finally {
+    if (registryProcess) {
+      await stopLocalRegistryFn(registryProcess);
+    }
+  }
 }
 
 export function shouldAutoBuildLocalRuntimeImage(args, env = process.env) {
-  return commandName(args) === "start" && !hasRuntimeImageSource(args, env) && !isHelpOrVersion(args);
+  return (
+    commandName(args) === "start" &&
+    runtimeFlagValue(args, env) === "docker" &&
+    !hasRuntimeImageSource(args, env) &&
+    !isHelpOrVersion(args)
+  );
+}
+
+export function shouldUseLocalServerBinary(args, env = process.env) {
+  return (
+    commandName(args) === "start" &&
+    runtimeFlagValue(args, env) === "binary" &&
+    !hasFlag(args, "--dry-run") &&
+    !env.ZITADEL_SERVER_BINARY &&
+    !isHelpOrVersion(args)
+  );
 }
 
 export function shouldPrepareLocalPackages(args, env = process.env) {
-  return commandName(args) === "setup" &&
+  return (
+    commandName(args) === "setup" &&
     !isHelpOrVersion(args) &&
     !hasFlag(args, "--dry-run") &&
     !hasFlag(args, "--skip-install") &&
-    !usesPublicPackages(env);
+    !usesPublicPackages(env)
+  );
 }
 
 export function commandName(args) {
@@ -115,11 +143,29 @@ function hasFlag(args, flag) {
   return args.some((arg) => arg === flag || arg.startsWith(`${flag}=`));
 }
 
+function runtimeFlagValue(args, env = process.env) {
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--runtime") {
+      return args[index + 1];
+    }
+    if (arg.startsWith("--runtime=")) {
+      return arg.slice("--runtime=".length);
+    }
+  }
+  if (hasRuntimeImageSource(args, env)) {
+    return "docker";
+  }
+  return "binary";
+}
+
 function isHelpOrVersion(args) {
   const command = commandName(args);
-  return command === "help" ||
+  return (
+    command === "help" ||
     command === "version" ||
-    args.some((arg) => arg === "--help" || arg === "-h" || arg === "--version");
+    args.some((arg) => arg === "--help" || arg === "-h" || arg === "--version")
+  );
 }
 
 function usesPublicPackages(env) {
@@ -156,11 +202,25 @@ function wrapperRun({ jsonMode, runCaptureFn, runFn, stderr }) {
   };
 }
 
-export function buildCli() {
+export function buildCli({ env = process.env } = {}) {
+  return runMoonToStderr(["run", "cli:build"], "moon run cli:build", env);
+}
+
+export async function buildLocalServerBinary({ env = process.env } = {}) {
+  await runMoonToStderr(
+    ["run", "console:build", "login-ui:build"],
+    "moon run console:build login-ui:build",
+    env,
+  );
+  await runMoonToStderr(["run", "server:build"], "moon run server:build", env);
+  return localServerBinary;
+}
+
+function runMoonToStderr(args, label, env = process.env) {
   return new Promise((resolve, reject) => {
-    const child = spawn("corepack", ["pnpm", "nx", "build", "@zitadel/cli"], {
+    const child = spawn("moon", args, {
       cwd: repoRoot,
-      env: process.env,
+      env,
       stdio: ["ignore", "pipe", "pipe"],
     });
 
@@ -173,7 +233,7 @@ export function buildCli() {
         return;
       }
       const detail = signal ? `signal ${signal}` : `exit ${code}`;
-      const error = new Error(`corepack pnpm nx build @zitadel/cli failed with ${detail}`);
+      const error = new Error(`${label} failed with ${detail}`);
       error.code = code;
       error.signal = signal;
       reject(error);

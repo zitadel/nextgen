@@ -33,6 +33,86 @@ async function makeNextProject(): Promise<string> {
   return cwd;
 }
 
+const FRAMEWORK_FIXTURES = [
+  {
+    framework: "next",
+    expectedFile: "app/login/page.tsx",
+    async create() {
+      return makeNextProject();
+    },
+  },
+  {
+    framework: "nuxt",
+    expectedFile: "app/pages/login.vue",
+    async create() {
+      const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-nuxt-"));
+      tempDirs.push(cwd);
+      await mkdir(join(cwd, "app"), { recursive: true });
+      await writeFile(
+        join(cwd, "package.json"),
+        JSON.stringify({ name: "demo", dependencies: { nuxt: "^4.0.0" } }),
+      );
+      await writeFile(join(cwd, "nuxt.config.ts"), "export default defineNuxtConfig({})\n");
+      return cwd;
+    },
+  },
+  {
+    framework: "react",
+    expectedFile: "src/App.tsx",
+    async create() {
+      const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-react-"));
+      tempDirs.push(cwd);
+      await mkdir(join(cwd, "src"), { recursive: true });
+      await writeFile(
+        join(cwd, "package.json"),
+        JSON.stringify({ name: "demo", dependencies: { react: "^19.0.0", vite: "^7.0.0" } }),
+      );
+      await writeFile(join(cwd, "vite.config.ts"), "export default {}\n");
+      return cwd;
+    },
+  },
+  {
+    framework: "vue",
+    expectedFile: "src/App.vue",
+    async create() {
+      const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-vue-"));
+      tempDirs.push(cwd);
+      await mkdir(join(cwd, "src"), { recursive: true });
+      await writeFile(
+        join(cwd, "package.json"),
+        JSON.stringify({ name: "demo", dependencies: { vue: "^3.0.0", vite: "^7.0.0" } }),
+      );
+      await writeFile(join(cwd, "vite.config.ts"), "export default {}\n");
+      return cwd;
+    },
+  },
+  {
+    framework: "angular",
+    expectedFile: "src/app/app.ts",
+    async create() {
+      const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-angular-"));
+      tempDirs.push(cwd);
+      await mkdir(join(cwd, "src/app"), { recursive: true });
+      await writeFile(
+        join(cwd, "package.json"),
+        JSON.stringify({ name: "demo", dependencies: { "@angular/core": "^20.0.0" } }),
+      );
+      await writeFile(
+        join(cwd, "angular.json"),
+        JSON.stringify({
+          defaultProject: "demo",
+          projects: { demo: { architect: { serve: { options: {} } } } },
+        }),
+      );
+      await writeFile(
+        join(cwd, "src/app/app.routes.ts"),
+        "import { Routes } from '@angular/router';\n\nexport const routes: Routes = [];\n",
+      );
+      return cwd;
+    },
+  },
+] as const;
+
 afterEach(async () => {
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop();
@@ -91,6 +171,31 @@ describe("setup command", () => {
     });
     expect(json.data.next_commands).toEqual(["npm install", "npm run dev"]);
   });
+
+  it.each(FRAMEWORK_FIXTURES)(
+    "dry-run setup supports $framework projects",
+    async ({ create, expectedFile, framework }) => {
+      const cwd = await create();
+
+      const res = await setup(cwd, ["--dry-run", "--skip-install", "--framework", framework]);
+
+      expect(res.exitCode).toBe(0);
+      const json = parseJson(res.stdout) as {
+        status: string;
+        data: {
+          install: { status: string; reason: string };
+          framework: string;
+          files_written: string[];
+          next_commands: string[];
+        };
+      };
+      expect(json.status).toBe("ok");
+      expect(json.data.framework).toBe(framework);
+      expect(json.data.install).toMatchObject({ status: "skipped", reason: "dry-run" });
+      expect(json.data.files_written).toContain(expectedFile);
+      expect(json.data.next_commands).toEqual(["npm install", "npm run dev"]);
+    },
+  );
 
   it("errors in a non-interactive empty directory without --framework", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-empty-"));

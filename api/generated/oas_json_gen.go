@@ -3251,6 +3251,12 @@ func (s *CreateFlowRequest) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.DryRun.Set {
+			e.FieldStart("dry_run")
+			s.DryRun.Encode(e)
+		}
+	}
+	{
 		if s.SchemaVersion.Set {
 			e.FieldStart("schema_version")
 			s.SchemaVersion.Encode(e)
@@ -3288,16 +3294,17 @@ func (s *CreateFlowRequest) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfCreateFlowRequest = [9]string{
+var jsonFieldsNameOfCreateFlowRequest = [10]string{
 	0: "project_id",
 	1: "purpose",
 	2: "flow_definition_name",
-	3: "schema_version",
-	4: "challenge_nonce",
-	5: "session_id",
-	6: "auth_request_id",
-	7: "redirect_uri",
-	8: "hint",
+	3: "dry_run",
+	4: "schema_version",
+	5: "challenge_nonce",
+	6: "session_id",
+	7: "auth_request_id",
+	8: "redirect_uri",
+	9: "hint",
 }
 
 // Decode decodes CreateFlowRequest from json.
@@ -3306,6 +3313,7 @@ func (s *CreateFlowRequest) Decode(d *jx.Decoder) error {
 		return errors.New("invalid: unable to decode CreateFlowRequest to nil")
 	}
 	var requiredBitSet [2]uint8
+	s.setDefaults()
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
@@ -3338,6 +3346,16 @@ func (s *CreateFlowRequest) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"flow_definition_name\"")
+			}
+		case "dry_run":
+			if err := func() error {
+				s.DryRun.Reset()
+				if err := s.DryRun.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"dry_run\"")
 			}
 		case "schema_version":
 			if err := func() error {
@@ -5041,6 +5059,82 @@ func (s *CreateUserUnauthorized) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes DeactivateFlowDefinitionBadRequest as json.
+func (s *DeactivateFlowDefinitionBadRequest) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes DeactivateFlowDefinitionBadRequest from json.
+func (s *DeactivateFlowDefinitionBadRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode DeactivateFlowDefinitionBadRequest to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = DeactivateFlowDefinitionBadRequest(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *DeactivateFlowDefinitionBadRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *DeactivateFlowDefinitionBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes DeactivateFlowDefinitionConflict as json.
+func (s *DeactivateFlowDefinitionConflict) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes DeactivateFlowDefinitionConflict from json.
+func (s *DeactivateFlowDefinitionConflict) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode DeactivateFlowDefinitionConflict to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = DeactivateFlowDefinitionConflict(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *DeactivateFlowDefinitionConflict) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *DeactivateFlowDefinitionConflict) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode implements json.Marshaler.
 func (s *DeviceAuthorizationResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -5694,6 +5788,10 @@ func (s *Field) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *Field) encodeFields(e *jx.Encoder) {
 	{
+		e.FieldStart("name")
+		e.Str(s.Name)
+	}
+	{
 		e.FieldStart("type")
 		s.Type.Encode(e)
 	}
@@ -5721,12 +5819,13 @@ func (s *Field) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfField = [5]string{
-	0: "type",
-	1: "text_key",
-	2: "required",
-	3: "value",
-	4: "validation",
+var jsonFieldsNameOfField = [6]string{
+	0: "name",
+	1: "type",
+	2: "text_key",
+	3: "required",
+	4: "value",
+	5: "validation",
 }
 
 // Decode decodes Field from json.
@@ -5739,8 +5838,20 @@ func (s *Field) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "type":
+		case "name":
 			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Name = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"name\"")
+			}
+		case "type":
+			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
 				if err := s.Type.Decode(d); err != nil {
 					return err
@@ -5750,7 +5861,7 @@ func (s *Field) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"type\"")
 			}
 		case "text_key":
-			requiredBitSet[0] |= 1 << 1
+			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
 				v, err := d.Str()
 				s.TextKey = string(v)
@@ -5802,7 +5913,7 @@ func (s *Field) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000011,
+		0b00000111,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -6195,6 +6306,12 @@ func (s *FlowDefinition) encodeFields(e *jx.Encoder) {
 		e.Str(s.Name)
 	}
 	{
+		if s.Status.Set {
+			e.FieldStart("status")
+			s.Status.Encode(e)
+		}
+	}
+	{
 		e.FieldStart("user_schema")
 		json.EncodeURI(e, s.UserSchema)
 	}
@@ -6218,12 +6335,13 @@ func (s *FlowDefinition) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowDefinition = [5]string{
+var jsonFieldsNameOfFlowDefinition = [6]string{
 	0: "name",
-	1: "user_schema",
-	2: "purposes",
-	3: "audience",
-	4: "steps",
+	1: "status",
+	2: "user_schema",
+	3: "purposes",
+	4: "audience",
+	5: "steps",
 }
 
 // Decode decodes FlowDefinition from json.
@@ -6232,6 +6350,7 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 		return errors.New("invalid: unable to decode FlowDefinition to nil")
 	}
 	var requiredBitSet [1]uint8
+	s.setDefaults()
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
@@ -6247,8 +6366,18 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"name\"")
 			}
+		case "status":
+			if err := func() error {
+				s.Status.Reset()
+				if err := s.Status.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"status\"")
+			}
 		case "user_schema":
-			requiredBitSet[0] |= 1 << 1
+			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
 				v, err := json.DecodeURI(d)
 				s.UserSchema = v
@@ -6260,7 +6389,7 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"user_schema\"")
 			}
 		case "purposes":
-			requiredBitSet[0] |= 1 << 2
+			requiredBitSet[0] |= 1 << 3
 			if err := func() error {
 				if err := s.Purposes.Decode(d); err != nil {
 					return err
@@ -6280,7 +6409,7 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"audience\"")
 			}
 		case "steps":
-			requiredBitSet[0] |= 1 << 4
+			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
 				s.Steps = make([]FlowDefinitionStep, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
@@ -6307,7 +6436,7 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00010111,
+		0b00101101,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -6372,7 +6501,7 @@ func (s *FlowDefinitionDetailResponse) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("status")
-		e.Str(s.Status)
+		s.Status.Encode(e)
 	}
 	{
 		e.FieldStart("flow_definition")
@@ -6403,6 +6532,7 @@ func (s *FlowDefinitionDetailResponse) Decode(d *jx.Decoder) error {
 		return errors.New("invalid: unable to decode FlowDefinitionDetailResponse to nil")
 	}
 	var requiredBitSet [1]uint8
+	s.setDefaults()
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
@@ -6433,9 +6563,7 @@ func (s *FlowDefinitionDetailResponse) Decode(d *jx.Decoder) error {
 		case "status":
 			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
-				v, err := d.Str()
-				s.Status = string(v)
-				if err != nil {
+				if err := s.Status.Decode(d); err != nil {
 					return err
 				}
 				return nil
@@ -6751,7 +6879,7 @@ func (s *FlowDefinitionResponse) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("status")
-		e.Str(s.Status)
+		s.Status.Encode(e)
 	}
 	{
 		e.FieldStart("created_at")
@@ -6779,6 +6907,7 @@ func (s *FlowDefinitionResponse) Decode(d *jx.Decoder) error {
 		return errors.New("invalid: unable to decode FlowDefinitionResponse to nil")
 	}
 	var requiredBitSet [1]uint8
+	s.setDefaults()
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
@@ -6831,9 +6960,7 @@ func (s *FlowDefinitionResponse) Decode(d *jx.Decoder) error {
 		case "status":
 			requiredBitSet[0] |= 1 << 4
 			if err := func() error {
-				v, err := d.Str()
-				s.Status = string(v)
-				if err != nil {
+				if err := s.Status.Decode(d); err != nil {
 					return err
 				}
 				return nil
@@ -6920,6 +7047,46 @@ func (s *FlowDefinitionResponse) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes FlowDefinitionStatus as json.
+func (s FlowDefinitionStatus) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes FlowDefinitionStatus from json.
+func (s *FlowDefinitionStatus) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FlowDefinitionStatus to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch FlowDefinitionStatus(v) {
+	case FlowDefinitionStatusActive:
+		*s = FlowDefinitionStatusActive
+	case FlowDefinitionStatusDraft:
+		*s = FlowDefinitionStatusDraft
+	default:
+		*s = FlowDefinitionStatus(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s FlowDefinitionStatus) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FlowDefinitionStatus) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode implements json.Marshaler.
 func (s *FlowDefinitionStep) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -6944,9 +7111,13 @@ func (s *FlowDefinitionStep) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.Actions.Set {
+		if s.Actions != nil {
 			e.FieldStart("actions")
-			s.Actions.Encode(e)
+			e.ArrStart()
+			for _, elem := range s.Actions {
+				elem.Encode(e)
+			}
+			e.ArrEnd()
 		}
 	}
 	{
@@ -7038,8 +7209,15 @@ func (s *FlowDefinitionStep) Decode(d *jx.Decoder) error {
 			}
 		case "actions":
 			if err := func() error {
-				s.Actions.Reset()
-				if err := s.Actions.Decode(d); err != nil {
+				s.Actions = make([]StepAction, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem StepAction
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Actions = append(s.Actions, elem)
+					return nil
+				}); err != nil {
 					return err
 				}
 				return nil
@@ -7155,60 +7333,6 @@ func (s *FlowDefinitionStep) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *FlowDefinitionStep) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s FlowDefinitionStepActions) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields implements json.Marshaler.
-func (s FlowDefinitionStepActions) encodeFields(e *jx.Encoder) {
-	for k, elem := range s {
-		e.FieldStart(k)
-
-		elem.Encode(e)
-	}
-}
-
-// Decode decodes FlowDefinitionStepActions from json.
-func (s *FlowDefinitionStepActions) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode FlowDefinitionStepActions to nil")
-	}
-	m := s.init()
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		var elem StepAction
-		if err := func() error {
-			if err := elem.Decode(d); err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrapf(err, "decode field %q", k)
-		}
-		m[string(k)] = elem
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode FlowDefinitionStepActions")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s FlowDefinitionStepActions) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *FlowDefinitionStepActions) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -7562,40 +7686,20 @@ func (s *FlowDefinitionUpdateRequest) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *FlowDefinitionUpdateRequest) encodeFields(e *jx.Encoder) {
 	{
-		if s.UserSchema.Set {
-			e.FieldStart("user_schema")
-			s.UserSchema.Encode(e)
+		if s.SchemaURI.Set {
+			e.FieldStart("schema_uri")
+			s.SchemaURI.Encode(e)
 		}
 	}
 	{
-		if s.Purposes.Set {
-			e.FieldStart("purposes")
-			s.Purposes.Encode(e)
-		}
-	}
-	{
-		if s.Audience.Set {
-			e.FieldStart("audience")
-			s.Audience.Encode(e)
-		}
-	}
-	{
-		if s.Steps != nil {
-			e.FieldStart("steps")
-			e.ArrStart()
-			for _, elem := range s.Steps {
-				elem.Encode(e)
-			}
-			e.ArrEnd()
-		}
+		e.FieldStart("flow_definition")
+		s.FlowDefinition.Encode(e)
 	}
 }
 
-var jsonFieldsNameOfFlowDefinitionUpdateRequest = [4]string{
-	0: "user_schema",
-	1: "purposes",
-	2: "audience",
-	3: "steps",
+var jsonFieldsNameOfFlowDefinitionUpdateRequest = [2]string{
+	0: "schema_uri",
+	1: "flow_definition",
 }
 
 // Decode decodes FlowDefinitionUpdateRequest from json.
@@ -7603,55 +7707,29 @@ func (s *FlowDefinitionUpdateRequest) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode FlowDefinitionUpdateRequest to nil")
 	}
+	var requiredBitSet [1]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "user_schema":
+		case "schema_uri":
 			if err := func() error {
-				s.UserSchema.Reset()
-				if err := s.UserSchema.Decode(d); err != nil {
+				s.SchemaURI.Reset()
+				if err := s.SchemaURI.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"user_schema\"")
+				return errors.Wrap(err, "decode field \"schema_uri\"")
 			}
-		case "purposes":
+		case "flow_definition":
+			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
-				s.Purposes.Reset()
-				if err := s.Purposes.Decode(d); err != nil {
+				if err := s.FlowDefinition.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"purposes\"")
-			}
-		case "audience":
-			if err := func() error {
-				s.Audience.Reset()
-				if err := s.Audience.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"audience\"")
-			}
-		case "steps":
-			if err := func() error {
-				s.Steps = make([]FlowDefinitionStep, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem FlowDefinitionStep
-					if err := elem.Decode(d); err != nil {
-						return err
-					}
-					s.Steps = append(s.Steps, elem)
-					return nil
-				}); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"steps\"")
+				return errors.Wrap(err, "decode field \"flow_definition\"")
 			}
 		default:
 			return d.Skip()
@@ -7659,6 +7737,38 @@ func (s *FlowDefinitionUpdateRequest) Decode(d *jx.Decoder) error {
 		return nil
 	}); err != nil {
 		return errors.Wrap(err, "decode FlowDefinitionUpdateRequest")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000010,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfFlowDefinitionUpdateRequest) {
+					name = jsonFieldsNameOfFlowDefinitionUpdateRequest[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 
 	return nil
@@ -7673,73 +7783,6 @@ func (s *FlowDefinitionUpdateRequest) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *FlowDefinitionUpdateRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s FlowDefinitionUpdateRequestPurposes) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields implements json.Marshaler.
-func (s FlowDefinitionUpdateRequestPurposes) encodeFields(e *jx.Encoder) {
-	for k, elem := range s {
-		e.FieldStart(k)
-
-		e.Str(elem)
-	}
-}
-
-// Decode decodes FlowDefinitionUpdateRequestPurposes from json.
-func (s *FlowDefinitionUpdateRequestPurposes) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode FlowDefinitionUpdateRequestPurposes to nil")
-	}
-	m := s.init()
-	var propertiesCount int
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		propertiesCount++
-		var elem string
-		if err := func() error {
-			v, err := d.Str()
-			elem = string(v)
-			if err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrapf(err, "decode field %q", k)
-		}
-		m[string(k)] = elem
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode FlowDefinitionUpdateRequestPurposes")
-	}
-	// Validate properties count.
-	if err := (validate.Object{
-		MinProperties:    1,
-		MinPropertiesSet: true,
-		MaxProperties:    0,
-		MaxPropertiesSet: false,
-	}).ValidateProperties(propertiesCount); err != nil {
-		return errors.Wrap(err, "object")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s FlowDefinitionUpdateRequestPurposes) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *FlowDefinitionUpdateRequestPurposes) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -8336,11 +8379,19 @@ func (s *FlowStep) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("fields")
-		s.Fields.Encode(e)
+		e.ArrStart()
+		for _, elem := range s.Fields {
+			elem.Encode(e)
+		}
+		e.ArrEnd()
 	}
 	{
 		e.FieldStart("actions")
-		s.Actions.Encode(e)
+		e.ArrStart()
+		for _, elem := range s.Actions {
+			elem.Encode(e)
+		}
+		e.ArrEnd()
 	}
 	{
 		e.FieldStart("gates")
@@ -8441,7 +8492,15 @@ func (s *FlowStep) Decode(d *jx.Decoder) error {
 		case "fields":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				if err := s.Fields.Decode(d); err != nil {
+				s.Fields = make([]Field, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem Field
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Fields = append(s.Fields, elem)
+					return nil
+				}); err != nil {
 					return err
 				}
 				return nil
@@ -8451,7 +8510,15 @@ func (s *FlowStep) Decode(d *jx.Decoder) error {
 		case "actions":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				if err := s.Actions.Decode(d); err != nil {
+				s.Actions = make([]StepAction, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem StepAction
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Actions = append(s.Actions, elem)
+					return nil
+				}); err != nil {
 					return err
 				}
 				return nil
@@ -8548,60 +8615,6 @@ func (s *FlowStep) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *FlowStep) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s FlowStepActions) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields implements json.Marshaler.
-func (s FlowStepActions) encodeFields(e *jx.Encoder) {
-	for k, elem := range s {
-		e.FieldStart(k)
-
-		elem.Encode(e)
-	}
-}
-
-// Decode decodes FlowStepActions from json.
-func (s *FlowStepActions) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode FlowStepActions to nil")
-	}
-	m := s.init()
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		var elem StepAction
-		if err := func() error {
-			if err := elem.Decode(d); err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrapf(err, "decode field %q", k)
-		}
-		m[string(k)] = elem
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode FlowStepActions")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s FlowStepActions) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *FlowStepActions) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -8835,60 +8848,6 @@ func (s FlowStepComplete) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *FlowStepComplete) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s FlowStepFields) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields implements json.Marshaler.
-func (s FlowStepFields) encodeFields(e *jx.Encoder) {
-	for k, elem := range s {
-		e.FieldStart(k)
-
-		elem.Encode(e)
-	}
-}
-
-// Decode decodes FlowStepFields from json.
-func (s *FlowStepFields) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode FlowStepFields to nil")
-	}
-	m := s.init()
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		var elem Field
-		if err := func() error {
-			if err := elem.Decode(d); err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrapf(err, "decode field %q", k)
-		}
-		m[string(k)] = elem
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode FlowStepFields")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s FlowStepFields) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *FlowStepFields) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -14751,21 +14710,20 @@ func (s *OptFlowAudience) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes FlowDefinitionStepActions as json.
-func (o OptFlowDefinitionStepActions) Encode(e *jx.Encoder) {
+// Encode encodes FlowDefinitionStatus as json.
+func (o OptFlowDefinitionStatus) Encode(e *jx.Encoder) {
 	if !o.Set {
 		return
 	}
-	o.Value.Encode(e)
+	e.Str(string(o.Value))
 }
 
-// Decode decodes FlowDefinitionStepActions from json.
-func (o *OptFlowDefinitionStepActions) Decode(d *jx.Decoder) error {
+// Decode decodes FlowDefinitionStatus from json.
+func (o *OptFlowDefinitionStatus) Decode(d *jx.Decoder) error {
 	if o == nil {
-		return errors.New("invalid: unable to decode OptFlowDefinitionStepActions to nil")
+		return errors.New("invalid: unable to decode OptFlowDefinitionStatus to nil")
 	}
 	o.Set = true
-	o.Value = make(FlowDefinitionStepActions)
 	if err := o.Value.Decode(d); err != nil {
 		return err
 	}
@@ -14773,14 +14731,14 @@ func (o *OptFlowDefinitionStepActions) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s OptFlowDefinitionStepActions) MarshalJSON() ([]byte, error) {
+func (s OptFlowDefinitionStatus) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptFlowDefinitionStepActions) UnmarshalJSON(data []byte) error {
+func (s *OptFlowDefinitionStatus) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -14915,40 +14873,6 @@ func (s OptFlowDefinitionStepTransitions) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptFlowDefinitionStepTransitions) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes FlowDefinitionUpdateRequestPurposes as json.
-func (o OptFlowDefinitionUpdateRequestPurposes) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	o.Value.Encode(e)
-}
-
-// Decode decodes FlowDefinitionUpdateRequestPurposes from json.
-func (o *OptFlowDefinitionUpdateRequestPurposes) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptFlowDefinitionUpdateRequestPurposes to nil")
-	}
-	o.Set = true
-	o.Value = make(FlowDefinitionUpdateRequestPurposes)
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptFlowDefinitionUpdateRequestPurposes) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptFlowDefinitionUpdateRequestPurposes) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -18945,6 +18869,10 @@ func (s *StepAction) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *StepAction) encodeFields(e *jx.Encoder) {
 	{
+		e.FieldStart("name")
+		e.Str(s.Name)
+	}
+	{
 		if s.Primary.Set {
 			e.FieldStart("primary")
 			s.Primary.Encode(e)
@@ -18958,9 +18886,10 @@ func (s *StepAction) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfStepAction = [2]string{
-	0: "primary",
-	1: "text_key",
+var jsonFieldsNameOfStepAction = [3]string{
+	0: "name",
+	1: "primary",
+	2: "text_key",
 }
 
 // Decode decodes StepAction from json.
@@ -18968,10 +18897,23 @@ func (s *StepAction) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode StepAction to nil")
 	}
+	var requiredBitSet [1]uint8
 	s.setDefaults()
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
+		case "name":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Name = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"name\"")
+			}
 		case "primary":
 			if err := func() error {
 				s.Primary.Reset()
@@ -18998,6 +18940,38 @@ func (s *StepAction) Decode(d *jx.Decoder) error {
 		return nil
 	}); err != nil {
 		return errors.Wrap(err, "decode StepAction")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000001,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfStepAction) {
+					name = jsonFieldsNameOfStepAction[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 
 	return nil

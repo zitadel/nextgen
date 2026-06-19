@@ -2,7 +2,7 @@ post:
   operationId: createUser
   summary: Create user
   tags:
-    - User
+    - Users
   security:
     - oauth2:
         - user.write
@@ -64,7 +64,7 @@ get:
   #       following the pattern used in GET /sessions. offset.yaml should be removed
   #       and replaced with components/parameters/page-token.yaml.
   tags:
-    - User
+    - Users
   parameters:
     - $ref: ../../components/parameters/offset.yaml
     - $ref: ../../components/parameters/limit.yaml

@@ -13,6 +13,18 @@ type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
 
+// ActivateFlowDefinition implements activateFlowDefinition operation.
+//
+// Activate a flow definition by transitioning it from a `draft` state to an `active` state.
+// Alternatively, the status of a flow definition can also be set via the `POST /flow_definitions`
+// and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow
+// definition payload.
+//
+// POST /flow_definitions/{id}/activate
+func (UnimplementedHandler) ActivateFlowDefinition(ctx context.Context, params ActivateFlowDefinitionParams) (r ActivateFlowDefinitionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // AuthorizeDevice implements authorizeDevice operation.
 //
 // Authorize a device.
@@ -66,8 +78,8 @@ func (UnimplementedHandler) CreateFlow(ctx context.Context, req *CreateFlowReque
 // Creates a new flow definition.
 // Flow definitions are templates that define the sequence of steps (capabilities)
 // for a particular user journey (e.g., registration, login, password reset).
-// Flow definitions are created based on the flow meta schema, which includes the flow's purpose,
-// audience, and the steps involved.
+// Flow definitions are created based on the flow definition schema, which includes the flow's
+// purpose, audience, and the steps involved.
 //
 // POST /flow_definitions
 func (UnimplementedHandler) CreateFlowDefinition(ctx context.Context, req *CreateFlowDefinitionRequest) (r CreateFlowDefinitionRes, _ error) {
@@ -149,9 +161,26 @@ func (UnimplementedHandler) CreateUser(ctx context.Context, req *User, params Cr
 	return r, ht.ErrNotImplemented
 }
 
+// DeactivateFlowDefinition implements deactivateFlowDefinition operation.
+//
+// Deactivates a flow definition in the `active` state by transitioning it to the `draft` state.
+// Flow definitions in `draft` state cannot be used to start new flows. Existing flows that use the
+// deactivated flow definition must gracefully handle this.
+// Alternatively, the status of a flow definition can also be set via the `POST /flow_definitions`
+// and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow
+// definition payload.
+//
+// POST /flow_definitions/{id}/deactivate
+func (UnimplementedHandler) DeactivateFlowDefinition(ctx context.Context, params DeactivateFlowDefinitionParams) (r DeactivateFlowDefinitionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // DeleteFlowDefinition implements deleteFlowDefinition operation.
 //
 // Delete a flow definition by id.
+// If the flow definition is currently being used by a flow, the deletion will fail.
+// If the flow definition is the last active flow definition for a given purpose, the deletion will
+// fail to prevent disruption of new flows being started for that purpose.
 //
 // DELETE /flow_definitions/{id}
 func (UnimplementedHandler) DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (r DeleteFlowDefinitionRes, _ error) {
@@ -330,7 +359,7 @@ func (UnimplementedHandler) GetTeam(ctx context.Context, params GetTeamParams) (
 
 // GetToken implements getToken operation.
 //
-// Get accesstoken.
+// Get access token.
 //
 // POST /auth/token
 func (UnimplementedHandler) GetToken(ctx context.Context, req *PostTokenRequest) (r GetTokenRes, _ error) {
@@ -489,9 +518,11 @@ func (UnimplementedHandler) SubmitFlowStep(ctx context.Context, req *FlowSubmitR
 
 // UpdateFlowDefinition implements updateFlowDefinition operation.
 //
-// Update a flow definition by id.
+// Update a flow definition by id. This endpoint completely replaces the existing flow definition.
+// The status of the flow definition can also be updated by setting the `status` attribute in the
+// flow definition.
 //
-// PATCH /flow_definitions/{id}
+// PUT /flow_definitions/{id}
 func (UnimplementedHandler) UpdateFlowDefinition(ctx context.Context, req *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (r UpdateFlowDefinitionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }

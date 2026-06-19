@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-core",
-  "version": "0.1.0-alpha.4",
+  "version": "0.1.0-alpha.11",
   "description": "Core types and shared utilities for Zitadel SDKs",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-core#readme",
   "bugs": {
@@ -16,6 +16,12 @@
     "dist"
   ],
   "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
   "exports": {
     ".": {
       "@zitadel/source": "./src/index.ts",
@@ -40,5 +46,24 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "dependencies": {
+    "@zitadel/api": "workspace:*"
+  },
+  "devDependencies": {
+    "@eslint/js": "catalog:",
+    "@eslint/json": "catalog:",
+    "@eslint/markdown": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-import-resolver-typescript": "catalog:",
+    "eslint-plugin-import": "catalog:",
+    "eslint-plugin-perfectionist": "catalog:",
+    "eslint-plugin-prettier": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:",
+    "vite": "catalog:sdk",
+    "vitest": "catalog:sdk"
   }
 }

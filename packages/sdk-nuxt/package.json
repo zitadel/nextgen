@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-nuxt",
-  "version": "0.1.0-alpha.4",
+  "version": "0.1.0-alpha.11",
   "description": "Nuxt proxy middleware and helpers for Nextgen Auth",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-nuxt#readme",
   "bugs": {
@@ -33,7 +33,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts src/server.ts src/runtime/types.ts src/runtime/server/middleware.ts src/runtime/server/handler.ts --format esm --dts --clean && tsup src/runtime/plugin.ts src/runtime/composables/useAuth.ts src/module.ts --format esm --no-clean --external @nuxt/kit --external '#imports'",
+    "build": "tsup src/index.ts src/server.ts src/runtime/types.ts src/runtime/server/middleware.ts src/runtime/server/handler.ts --format esm --dts --clean --external '#imports' && tsup src/runtime/plugin.ts src/runtime/composables/useAuth.ts src/module.ts --format esm --no-clean --external @nuxt/kit --external '#imports'",
     "dev": "tsup src/index.ts src/server.ts --format esm --dts --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
@@ -49,21 +49,21 @@
     "nuxt": ">=4"
   },
   "devDependencies": {
-    "@eslint/js": "^9.0.0",
-    "@eslint/json": "^0.11.0",
-    "@eslint/markdown": "^6.0.0",
+    "@eslint/js": "catalog:",
+    "@eslint/json": "catalog:",
+    "@eslint/markdown": "catalog:",
     "@nuxt/eslint-plugin": "^0.7.0",
-    "eslint": "^9.0.0",
-    "eslint-config-prettier": "^10.0.0",
-    "eslint-import-resolver-typescript": "^3.7.0",
-    "eslint-plugin-import": "^2.31.0",
-    "eslint-plugin-perfectionist": "^4.0.0",
-    "eslint-plugin-prettier": "^5.0.0",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-import-resolver-typescript": "catalog:",
+    "eslint-plugin-import": "catalog:",
+    "eslint-plugin-perfectionist": "catalog:",
+    "eslint-plugin-prettier": "catalog:",
     "h3": "^1.15.3",
-    "prettier": "^3.0.0",
-    "tsup": "^8.3.5",
+    "prettier": "catalog:",
+    "tsup": "catalog:",
     "typescript": "^5.7.3",
-    "typescript-eslint": "^8.0.0",
+    "typescript-eslint": "catalog:",
     "vitest": "^3.0.0"
   }
 }

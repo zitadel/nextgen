@@ -11,7 +11,7 @@ import {
   writeRuntimeMetadata,
   type RuntimeMetadata,
 } from "../../../../src/lib/local-server/runtime";
-import { parseJson, runCliForTest } from "../../../helpers/run-cli";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../../helpers/run-cli";
 
 /**
  * Unit-level guardrails for the `setup` command. The happy path
@@ -102,18 +102,67 @@ describe("setup command pre-flight", () => {
     expect(json.hint).toContain("--framework");
   });
 
-  it("throws E_FRAMEWORK_NOT_DETECTED for a non-empty dir whose framework can't be inferred", async () => {
+  it("keeps the framework in local-runtime-missing setup guidance", async () => {
+    const cwd = await makeTempDir();
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--framework",
+      "next",
+      "--server",
+      "local",
+      "--non-interactive",
+      "--json",
+    ]);
+
+    expect(res.exitCode).toBe(4);
+    const json = parseJson(res.stdout) as {
+      status: string;
+      code: string;
+      hint?: string;
+      next_commands?: string[];
+    };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_LOCAL_SERVER_NOT_RUNNING");
+    expect(json.hint).toContain("Start local Zitadel first");
+    expect(json.next_commands).toEqual([
+      expectedPublicCliCommand("start"),
+      expectedPublicCliCommand("setup --framework next --server local"),
+    ]);
+  });
+
+  it("explains non-empty dirs whose framework can't be inferred or scaffolded", async () => {
     const cwd = await makeTempDir();
     // A non-empty dir that isn't a known framework — Orca's detector fails
     // and the empty-directory scaffold branch doesn't trigger.
     await writeFile(join(cwd, "README.md"), "Not a Next.js project.");
 
-    const res = await runCliForTest(["setup", "--cwd", cwd, "--non-interactive", "--json"]);
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--framework",
+      "next",
+      "--non-interactive",
+      "--json",
+    ]);
 
     expect(res.exitCode).not.toBe(0);
-    const json = parseJson(res.stdout) as { status: string; code: string };
+    const json = parseJson(res.stdout) as {
+      status: string;
+      code: string;
+      details: { entries: string[]; reason: string };
+      hint?: string;
+      message: string;
+    };
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_FRAMEWORK_NOT_DETECTED");
+    expect(json.message).toContain("not a fresh scaffold target");
+    expect(json.hint).toContain("Directory contains README.md");
+    expect(json.details.entries).toContain("README.md");
   });
 
   it("points cloud project creation failures at the local alpha path", async () => {
@@ -145,9 +194,11 @@ describe("setup command pre-flight", () => {
     };
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_VALIDATION");
-    expect(json.hint).toContain("npx @zitadel/cli@alpha start");
-    expect(json.hint).toContain("--server local");
-    expect(json.next_commands?.join(" ")).toContain("setup --server local");
+    expect(json.hint).toContain("--framework next --server local");
+    expect(json.next_commands).toEqual([
+      expectedPublicCliCommand("start"),
+      expectedPublicCliCommand("setup --framework next --server local"),
+    ]);
   });
 });
 
@@ -186,6 +237,7 @@ async function startNotFoundServer(): Promise<string> {
 function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
   return {
     schema_version: 1,
+    backend: "docker",
     container_name: localContainerName(cwd),
     container_id: "container-test-id",
     image: "ghcr.io/zitadel/nextgen:test",

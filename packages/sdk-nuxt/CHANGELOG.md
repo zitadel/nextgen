@@ -1,5 +1,74 @@
 # @zitadel/sdk-nuxt
 
+## 0.1.0-alpha.11
+
+### Patch Changes
+
+- [#310](https://github.com/zitadel/nextgen/pull/310) [`050f5d7`](https://github.com/zitadel/nextgen/commit/050f5d7a39a2a9160346276203e8da82db137478) Thanks [@mridang](https://github.com/mridang)! - CLI scaffolds now write the project service-key secret to `.env.local` as `ZITADEL_PROJECT_SECRET`, and the React/Vue/Angular dev proxies plus the Next.js and Nuxt server middlewares send it as the bearer on every proxied request instead of synthesising `sk_<project_id>` from the public project id. The secret stays server-side: `.env.local` is gitignored, Vite only exposes `VITE_`-prefixed vars to the client, Next.js auto-loads `.env.local` into `process.env` server-side, and the Nuxt module reads `process.env.ZITADEL_PROJECT_SECRET` in its `setup()` and pushes it into Nuxt's server-only `runtimeConfig.nextgen.projectSecret` (overridable at deploy time via `NUXT_NEXTGEN_PROJECT_SECRET`).
+
+  Also drops the unused `onExchangeResponse` hook from `NextgenMiddlewareOptions` (no callers anywhere; alpha so no external usage to break).
+
+- Updated dependencies [[`76e7381`](https://github.com/zitadel/nextgen/commit/76e7381f796ca04a7d34f349c456ee172dc714b6), [`0b81768`](https://github.com/zitadel/nextgen/commit/0b8176857395d25c95343b5b320d074e0ba2c102), [`050f5d7`](https://github.com/zitadel/nextgen/commit/050f5d7a39a2a9160346276203e8da82db137478)]:
+  - @zitadel/sdk-core@0.1.0-alpha.11
+  - @zitadel/components@0.1.0-alpha.11
+  - @zitadel/api@0.1.0-alpha.11
+
+## 0.1.0-alpha.10
+
+### Patch Changes
+
+- Updated dependencies [[`acb5b54`](https://github.com/zitadel/nextgen/commit/acb5b549386efcc5ede005871b145c1cd0f9ac5e)]:
+  - @zitadel/components@0.1.0-alpha.10
+  - @zitadel/api@0.1.0-alpha.10
+  - @zitadel/sdk-core@0.1.0-alpha.10
+
+## 0.1.0-alpha.9
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @zitadel/api@0.1.0-alpha.9
+  - @zitadel/components@0.1.0-alpha.9
+  - @zitadel/sdk-core@0.1.0-alpha.9
+
+## 0.1.0-alpha.8
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @zitadel/api@0.1.0-alpha.8
+  - @zitadel/components@0.1.0-alpha.8
+  - @zitadel/sdk-core@0.1.0-alpha.8
+
+## 0.1.0-alpha.7
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @zitadel/api@0.1.0-alpha.7
+  - @zitadel/components@0.1.0-alpha.7
+  - @zitadel/sdk-core@0.1.0-alpha.7
+
+## 0.1.0-alpha.6
+
+### Patch Changes
+
+- Updated dependencies [[`30b4b41`](https://github.com/zitadel/nextgen/commit/30b4b411a9c99fc61d991f739636f93d7bee5b1d)]:
+  - @zitadel/components@0.1.0-alpha.6
+  - @zitadel/api@0.1.0-alpha.6
+  - @zitadel/sdk-core@0.1.0-alpha.6
+
+## 0.1.0-alpha.5
+
+### Patch Changes
+
+- [#295](https://github.com/zitadel/nextgen/pull/295) [`f02718f`](https://github.com/zitadel/nextgen/commit/f02718f0499042569e13c1c67ae4135b6e943518) Thanks [@fforootd](https://github.com/fforootd)! - Allow fresh app scaffolding after `zitadel start` creates local runtime ignore files, and load Nuxt runtime config through the Nuxt virtual imports module.
+
+- Updated dependencies [[`f77ca44`](https://github.com/zitadel/nextgen/commit/f77ca44e85565976d26de0b6444b7fc5b1616e8c), [`3795b67`](https://github.com/zitadel/nextgen/commit/3795b6793c72b92300fc6a7d21c7562f0a25343e)]:
+  - @zitadel/components@0.1.0-alpha.5
+  - @zitadel/api@0.1.0-alpha.5
+  - @zitadel/sdk-core@0.1.0-alpha.5
+
 ## 0.1.0-alpha.4
 
 ### Patch Changes

@@ -13,6 +13,6 @@ Integrates Zitadel auth into an Angular app.
 ## How the proxy works
 
 The SDK widgets call `/__nextgen/*` same-origin. In dev, `proxy.conf.cjs`
-forwards those to the backend and attaches the `sk_<project_id>` bearer (read
-from `config.project` in `zitadel.json`) to every proxied request. Production
-needs `@zitadel/edge-proxy` in front.
+forwards those to the backend and attaches the project service-key secret (read
+from `ZITADEL_PROJECT_SECRET` in `.env.local`) to every proxied request.
+Production needs `@zitadel/edge-proxy` in front.

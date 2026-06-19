@@ -2,7 +2,7 @@ get:
   operationId: GetUserByID
   summary: Get user by ID
   tags:
-    - User
+    - Users
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/team-id.yaml

@@ -1,8 +1,8 @@
-import { headers } from 'next/headers';
+import { headers } from "next/headers";
 
-import type { AuthResult } from './types';
+import type { AuthResult } from "./types";
 
-import { decodeJwt } from './lib/jwt';
+import { decodeJwt } from "./lib/jwt";
 
 /**
  * Reads the auth state in a React Server Component or Next.js Route Handler.
@@ -28,7 +28,7 @@ import { decodeJwt } from './lib/jwt';
  */
 export async function auth(): Promise<AuthResult> {
   const headerStore = await headers();
-  const token = headerStore.get('x-nextgen-auth-token');
+  const token = headerStore.get("x-nextgen-auth-token");
 
   if (!token) {
     return { isAuthenticated: false, session: null };
@@ -60,7 +60,7 @@ export async function auth(): Promise<AuthResult> {
   return {
     isAuthenticated: true,
     session: {
-      userId: 'unknown',
+      userId: "unknown",
       email: null,
       name: null,
       token,

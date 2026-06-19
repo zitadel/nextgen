@@ -1,7 +1,10 @@
 import { AngularDetector } from "./angular";
 import { NextDetector } from "./next";
 import { NuxtDetector } from "./nuxt";
+import { QwikDetector } from "./qwik";
 import { ReactDetector } from "./react";
+import { SolidDetector } from "./solid";
+import { SvelteDetector } from "./svelte";
 import { VueDetector } from "./vue";
 import type { Detector } from "./types";
 
@@ -17,5 +20,8 @@ export const detectors = [
   new NuxtDetector(),
   new ReactDetector(),
   new VueDetector(),
+  new SolidDetector(),
+  new SvelteDetector(),
+  new QwikDetector(),
   new AngularDetector(),
 ] as const satisfies ReadonlyArray<Detector>;

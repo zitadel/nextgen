@@ -1,0 +1,174 @@
+name: release-publish
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".changeset/**"
+      - ".github/workflows/release-publish.yml"
+      - "apps/**/CHANGELOG.md"
+      - "apps/**/package.json"
+      - "go.mod"
+      - "go.sum"
+      - "packages/**/CHANGELOG.md"
+      - "packages/**/package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/check-changesets-status.mjs"
+      - "scripts/release*.mjs"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: build and verify only. Uncheck to allow publishing."
+        required: true
+        default: true
+        type: boolean
+      recover_version:
+        description: "Exact already-versioned release to recover through the publish path, for example 0.1.0-alpha.8. Leave empty for normal publish detection."
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  pull-requests: write
+
+concurrency:
+  group: release-publish
+  cancel-in-progress: false
+
+jobs:
+  changesets:
+    runs-on: depot-ubuntu-24.04-4
+    timeout-minutes: 20
+    outputs:
+      publish_should_run: ${{ steps.release-publish.outputs.should_run }}
+      publish_reason: ${{ steps.release-publish.outputs.reason }}
+    steps:
+      - name: Generate release app token
+        if: ${{ github.event_name == 'push' }}
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token || github.token }}
+
+      - name: Detect release publish
+        id: release-publish
+        run: node scripts/release-automation.mjs publish --base "$BASE_SHA" --summary
+        env:
+          BASE_SHA: ${{ github.event.before || 'HEAD^' }}
+
+      - uses: pnpm/action-setup@v5
+        if: ${{ github.event_name == 'push' && steps.release-publish.outputs.should_run != 'true' }}
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        if: ${{ github.event_name == 'push' && steps.release-publish.outputs.should_run != 'true' }}
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        if: ${{ github.event_name == 'push' && steps.release-publish.outputs.should_run != 'true' }}
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Open or update version PR
+        if: ${{ github.event_name == 'push' && steps.release-publish.outputs.should_run != 'true' }}
+        uses: changesets/action@v1
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          version: corepack pnpm exec changeset version
+          title: "build: version packages"
+          commit: "build: version packages"
+          createGithubReleases: false
+
+  publish:
+    needs: changesets
+    if: ${{ github.event_name == 'workflow_dispatch' || needs.changesets.outputs.publish_should_run == 'true' }}
+    runs-on: depot-ubuntu-24.04-16
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
+          fetch-depth: 0
+
+      - uses: moonrepo/setup-toolchain@v0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          registry-url: "https://registry.npmjs.org"
+          cache: pnpm
+
+      - uses: docker/setup-qemu-action@v4
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Login to GHCR
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && ! inputs.dry_run) }}
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Configure Changesets git tag author
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && ! inputs.dry_run) }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Publish dry run
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          args=(release:publish -- --dry-run)
+          if [ -n "$RECOVER_VERSION" ]; then
+            args+=(--recover-version "$RECOVER_VERSION")
+          fi
+          # Keep the GitHub Actions environment intact: npm trusted publishing
+          # uses it to exchange the workflow OIDC token during real publishes.
+          moon run "${args[@]}"
+        env:
+          BASE_SHA: ${{ github.event.before || 'HEAD^' }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "false"
+          RECOVER_VERSION: ${{ inputs.recover_version }}
+
+      - name: Publish release
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && ! inputs.dry_run) }}
+        run: |
+          args=(release:publish)
+          if [ -n "$RECOVER_VERSION" ]; then
+            args+=(-- --recover-version "$RECOVER_VERSION")
+          fi
+          # Keep the GitHub Actions environment intact: npm trusted publishing
+          # uses it to exchange the workflow OIDC token during real publishes.
+          moon run "${args[@]}"
+        env:
+          BASE_SHA: ${{ github.event.before || 'HEAD^' }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "false"
+          RECOVER_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.recover_version || '' }}

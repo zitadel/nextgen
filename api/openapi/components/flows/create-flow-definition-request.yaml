@@ -1,4 +1,8 @@
 type: object
+description: |
+  Creates a flow definition.
+  The flow definition is created in an `active` state by default.
+  The status can also be set via the `status` attribute in the flow definition payload.
 required:
   - project_id
   - flow_definition

@@ -5,8 +5,12 @@ import (
 	"math/big"
 )
 
+const (
+	SecretKeyPrefix = "sk_"
+)
+
 type Generator interface {
-	New() (string, error)
+	New(prefix string) (string, error)
 }
 
 type RandomSecretGenerator struct {
@@ -16,8 +20,12 @@ func NewRandomSecretGenerator() *RandomSecretGenerator {
 	return &RandomSecretGenerator{}
 }
 
-func (g *RandomSecretGenerator) New() (string, error) {
-	return generateRandomString(32)
+func (g *RandomSecretGenerator) New(prefix string) (string, error) {
+	s, err := generateRandomString(32)
+	if err != nil {
+		return "", err
+	}
+	return SecretKeyPrefix + prefix + "_" + s, nil
 }
 
 func generateRandomString(n int) (string, error) {

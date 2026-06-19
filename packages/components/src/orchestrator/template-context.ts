@@ -2,12 +2,12 @@
  * Liquid template context contract.
  *
  * The orchestrator feeds tenant Liquid templates a stable, renderer-friendly
- * projection of the wire `CreateFlow201` shape. Capability dictionaries
- * (`fields`, `actions`, `gates`, `sso_providers`) are typed straight from
+ * projection of the wire `CreateFlow201` shape. Capability arrays
+ * (`fields`, `actions`) and the gates object are typed straight from
  * the orval-generated wire so templates iterate over the same schema the
  * server promises.
  *
- * The orchestrator owns three projections that don't exist on the wire:
+ * The orchestrator owns these projections that don't exist on the wire:
  *
  * 1. `errors` — lifted from `step.error: string | null` so templates iterate
  *    uniformly even though the wire only carries one error string.
@@ -17,9 +17,9 @@
  */
 import type {
   CreateFlow201Step,
-  CreateFlow201StepActions,
+  CreateFlow201StepActionsItem,
   CreateFlow201StepChallenge,
-  CreateFlow201StepFields,
+  CreateFlow201StepFieldsItem,
   CreateFlow201StepGates,
   CreateFlow201StepSsoProvidersItem,
 } from "@zitadel/api/generated/model";
@@ -53,8 +53,8 @@ export type FlowIdentity = {
  */
 export type LiquidContext = {
   step: Pick<CreateFlow201Step, "name" | "complete" | "texts">;
-  fields: CreateFlow201StepFields;
-  actions: CreateFlow201StepActions;
+  fields: readonly CreateFlow201StepFieldsItem[];
+  actions: readonly CreateFlow201StepActionsItem[];
   gates: CreateFlow201StepGates;
   sso_providers: readonly CreateFlow201StepSsoProvidersItem[];
   challenge: CreateFlow201StepChallenge | null;

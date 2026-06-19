@@ -104,13 +104,15 @@ function outcome(input: {
   issuer: string;
   includeInstallCommand: boolean;
 }): SetupInstallOutcome {
-  const startAction = `Start your project: ${input.devCommand} (then open ${input.issuer}/login)`;
+  const startAction = `Start your project: ${input.devCommand} (then open ${input.issuer})`;
+  const verifyAction =
+    "Verify auth in the browser: register a user, log out, log in again with the same user, and confirm /profile shows Signed in.";
   return {
     install: input.install,
     devCommand: input.devCommand,
     nextActions: input.includeInstallCommand
-      ? [`Install dependencies: ${input.install.command}`, startAction]
-      : [startAction],
+      ? [`Install dependencies: ${input.install.command}`, startAction, verifyAction]
+      : [startAction, verifyAction],
     nextCommands: input.includeInstallCommand
       ? [input.install.command, input.devCommand]
       : [input.devCommand],
