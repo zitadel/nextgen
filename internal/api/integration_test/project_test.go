@@ -15,6 +15,16 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
+// actionNames returns the names of the given step actions in order, useful
+// for assert.Contains checks now that Actions is an ordered slice.
+func actionNames(actions []domain.FlowStepAction) []string {
+	names := make([]string, len(actions))
+	for i, a := range actions {
+		names[i] = a.Name
+	}
+	return names
+}
+
 // stubFlowService satisfies [service.FlowService] while doing nothing.
 type stubFlowService struct{}
 
@@ -69,7 +79,9 @@ func (s *stubAuthAttemptService) RegisterCreatedUser(ctx context.Context, projec
 var _ service.AuthAttemptService = (*stubAuthAttemptService)(nil)
 
 func TestCreateProject(t *testing.T) {
+	t.Parallel()
 	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
 		tcs := []struct {
 			name string
 			req  *api.CreateProjectRequest
@@ -90,7 +102,10 @@ func TestCreateProject(t *testing.T) {
 
 		for _, tc := range tcs {
 			t.Run(tc.name, func(t *testing.T) {
-				client := harness.EnsureAnonymousAPIClient(t)
+				t.Parallel()
+
+				client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+				require.NoError(t, err)
 
 				resp, err := client.CreateProject(t.Context(), tc.req)
 
@@ -108,6 +123,8 @@ func TestCreateProject(t *testing.T) {
 }
 
 func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
+	t.Parallel()
+
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
 
@@ -137,19 +154,19 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 
 	identifierStep, ok := flowDef.FindStep("identifier")
 	require.True(t, ok)
-	assert.Contains(t, identifierStep.Actions, domain.FlowActionPasskey)
+	assert.Contains(t, actionNames(identifierStep.Actions), domain.FlowActionPasskey)
 	assert.Equal(t, "done", identifierStep.Transitions[domain.FlowActionPasskey].Target)
 
 	passwordStep, ok := flowDef.FindStep("password")
 	require.True(t, ok)
 	assert.Equal(t, []string{"password"}, passwordStep.Fields)
-	assert.Contains(t, passwordStep.Actions, domain.FlowActionPasskey)
+	assert.Contains(t, actionNames(passwordStep.Actions), domain.FlowActionPasskey)
 	assert.Equal(t, "done", passwordStep.Transitions[domain.FlowActionPasskey].Target)
 
 	registerStep, ok := flowDef.FindStep("register")
 	require.True(t, ok)
 	assert.Equal(t, []string{"email", "givenName", "familyName", "dateOfBirth"}, registerStep.Fields)
-	assert.Contains(t, registerStep.Actions, domain.FlowActionPasskeyRegister)
+	assert.Contains(t, actionNames(registerStep.Actions), domain.FlowActionPasskeyRegister)
 	assert.Equal(t, "done", registerStep.Transitions[domain.FlowActionPasskeyRegister].Target)
 
 	registerPasswordStep, ok := flowDef.FindStep("register-password")
@@ -166,10 +183,17 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 }
 
 func TestGetProject(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
+
 	t.Run("ok", func(t *testing.T) {
-		project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
-		client := harness.EnsureAPIClient(t, project.ID)
-		require.NoError(t, err)
+		t.Parallel()
 
 		params := api.GetProjectParams{
 			ProjectID: api.ProjectID(project.ID),
@@ -187,10 +211,10 @@ func TestGetProject(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
-		t.Run("not found", func(t *testing.T) {
-			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+		t.Parallel()
 
-			client := harness.EnsureAPIClient(t, project.ID)
+		t.Run("not found", func(t *testing.T) {
+			t.Parallel()
 
 			params := api.GetProjectParams{
 				ProjectID: "does_not_exist",

@@ -1,0 +1,37 @@
+name: changesets-pr-status
+
+on:
+  pull_request_target:
+
+permissions: {}
+
+concurrency:
+  group: changesets-pr-status-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  pr-status:
+    runs-on: depot-ubuntu-24.04-4
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      comment-body: ${{ steps.pr-status.outputs.comment-body }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Generate Changesets status
+        id: pr-status
+        uses: changesets/action/pr-status@v1
+
+  pr-comment:
+    needs: pr-status
+    runs-on: depot-ubuntu-24.04-4
+    timeout-minutes: 10
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Comment on PR
+        uses: changesets/action/pr-comment@v1
+        with:
+          body: ${{ needs.pr-status.outputs.comment-body }}

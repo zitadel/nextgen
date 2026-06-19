@@ -1,30 +1,42 @@
 {
   "name": "@zitadel/sdk-angular",
-  "version": "0.1.0-alpha.4",
+  "version": "0.1.0-alpha.11",
   "description": "Angular components for the Zitadel auth UI (client-side SPA).",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-angular#readme",
   "bugs": {
     "url": "https://github.com/zitadel/nextgen/issues"
   },
-  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/zitadel/nextgen.git",
     "directory": "packages/sdk-angular"
   },
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "module": "./dist/index.js",
+  "types": "./dist/types/public-api.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/public-api.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "publishConfig": {
-    "access": "public",
-    "directory": "dist"
+    "access": "public"
   },
   "scripts": {
-    "build": "ng-packagr -p ng-package.json",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run --passWithNoTests",
+    "build": "vite build && ngc -p tsconfig.lib.json",
+    "typecheck": "tsc --noEmit -p tsconfig.spec.json",
+    "test": "vitest run",
     "lint": "eslint ."
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
     "@zitadel/components": "workspace:*",
+    "@zitadel/sdk-core": "workspace:*",
     "tslib": "^2.6.0"
   },
   "peerDependencies": {
@@ -32,25 +44,30 @@
     "@angular/core": ">=17"
   },
   "devDependencies": {
-    "@eslint/js": "^9.0.0",
-    "eslint": "^9.0.0",
+    "@analogjs/vite-plugin-angular": "^2.6.1",
+    "@analogjs/vitest-angular": "^2.6.1",
+    "@angular/build": "^22.0.0",
     "@angular/common": "^22.0.0",
     "@angular/compiler": "^22.0.0",
     "@angular/compiler-cli": "^22.0.0",
     "@angular/core": "^22.0.0",
-    "ng-packagr": "^22.0.0",
-    "typescript": "~6.0.0",
+    "@angular/platform-browser": "^22.0.1",
+    "@eslint/js": "catalog:",
+    "@eslint/json": "catalog:",
+    "@eslint/markdown": "catalog:",
+    "@testing-library/angular": "^19.4.1",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-import-resolver-typescript": "catalog:",
+    "eslint-plugin-import": "catalog:",
+    "eslint-plugin-perfectionist": "catalog:",
+    "eslint-plugin-prettier": "catalog:",
     "jsdom": "catalog:",
-    "vitest": "^3.0.0",
-    "zone.js": "~0.16.0",
-    "@eslint/json": "^0.11.0",
-    "@eslint/markdown": "^6.0.0",
-    "eslint-config-prettier": "^10.0.0",
-    "eslint-import-resolver-typescript": "^3.7.0",
-    "eslint-plugin-import": "^2.31.0",
-    "eslint-plugin-perfectionist": "^4.0.0",
-    "eslint-plugin-prettier": "^5.0.0",
-    "prettier": "^3.0.0",
-    "typescript-eslint": "^8.0.0"
+    "prettier": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:",
+    "vite": "catalog:sdk",
+    "vitest": "catalog:sdk",
+    "zone.js": "~0.16.0"
   }
 }

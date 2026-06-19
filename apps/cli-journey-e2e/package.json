@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "test": "node --test scripts/*.test.mjs",
-    "prepare-app": "node scripts/prepare-next-app.mjs",
+    "prepare-app": "node scripts/prepare-app.mjs",
     "publish-tarballs": "node scripts/publish-tarballs.mjs",
     "verify-tarballs": "node scripts/verify-tarballs.mjs",
     "e2e-local": "node scripts/run-local.mjs",

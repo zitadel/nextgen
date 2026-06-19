@@ -14,16 +14,18 @@
         "fields": [
           "email"
         ],
-        "actions": {
-          "submit": {
+        "actions": [
+          {
+            "name": "submit",
             "primary": true,
             "text_key": "identifier.action.continue"
           },
-          "passkey": {
+          {
+            "name": "passkey",
             "primary": false,
             "text_key": "identifier.action.passkey"
           }
-        },
+        ],
         "transitions": {
           "submit": {
             "target": "password"
@@ -41,16 +43,18 @@
         "fields": [
           "password"
         ],
-        "actions": {
-          "submit": {
+        "actions": [
+          {
+            "name": "submit",
             "primary": true,
             "text_key": "password.action.signin"
           },
-          "passkey": {
+          {
+            "name": "passkey",
             "primary": false,
             "text_key": "password.action.passkey"
           }
-        },
+        ],
         "transitions": {
           "submit": {
             "target": "done"
@@ -68,16 +72,18 @@
           "familyName",
           "dateOfBirth"
         ],
-        "actions": {
-          "submit": {
+        "actions": [
+          {
+            "name": "submit",
             "primary": true,
             "text_key": "register.action.password"
           },
-          "passkey_register": {
+          {
+            "name": "passkey_register",
             "primary": false,
             "text_key": "register.action.passkey"
           }
-        },
+        ],
         "transitions": {
           "submit": {
             "target": "register-password"
@@ -95,12 +101,13 @@
         "fields": [
           "password"
         ],
-        "actions": {
-          "submit": {
+        "actions": [
+          {
+            "name": "submit",
             "primary": true,
             "text_key": "register-password.action.submit"
           }
-        },
+        ],
         "on_success": "create_user",
         "transitions": {
           "submit": {

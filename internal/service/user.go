@@ -44,12 +44,12 @@ type GetMyUserInput struct {
 // ---- Implementation -------------------------------------------------------------
 
 type UserService struct {
-	pool         database.Pool
-	userRepo     domain.UserRepository
-	passwordRepo domain.UserPasswordRepository
-	schemaRepo   domain.JSONSchemaRepository
-	decrypter    crypto.Decrypter
-	hasher       crypto.Hasher
+	pool          database.Pool
+	userRepo      domain.UserRepository
+	passwordRepo  domain.UserPasswordRepository
+	schemaRepo    domain.JSONSchemaRepository
+	hasher        crypto.Hasher
+	tokenVerifier domain.TokenVerifier
 }
 
 func NewUserService(
@@ -57,16 +57,16 @@ func NewUserService(
 	userRepo domain.UserRepository,
 	passwordRepo domain.UserPasswordRepository,
 	schemaRepo domain.JSONSchemaRepository,
-	decrypter crypto.Decrypter,
 	hasher crypto.Hasher,
+	tokenVerifier domain.TokenVerifier,
 ) *UserService {
 	return &UserService{
-		pool:         pool,
-		userRepo:     userRepo,
-		passwordRepo: passwordRepo,
-		schemaRepo:   schemaRepo,
-		hasher:       hasher,
-		decrypter:    decrypter,
+		pool:          pool,
+		userRepo:      userRepo,
+		passwordRepo:  passwordRepo,
+		schemaRepo:    schemaRepo,
+		hasher:        hasher,
+		tokenVerifier: tokenVerifier,
 	}
 }
 
@@ -143,18 +143,15 @@ func (s *UserService) SetPassword(ctx context.Context, input SetPasswordInput) (
 }
 
 func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]byte, error) {
-	sessionToken, err := domain.DecryptSessionTokenString(input.SessionToken, s.decrypter)
+	sessionToken, err := domain.DecryptSessionTokenString(input.SessionToken, s.tokenVerifier)
 	if err != nil {
 		return nil, domain.ErrSessionTokenInvalid()
 	}
-	if time.Now().After(sessionToken.ExpiresAt) {
+	if sessionToken.ExpiresAt != nil && time.Now().After(*sessionToken.ExpiresAt) {
 		return nil, domain.ErrSessionTokenInvalid()
 	}
-	if sessionToken.UserID == nil {
-		return nil, domain.ErrUserNotFound()
-	}
 
-	user, err := s.userRepo.GetByID(ctx, s.pool, sessionToken.ProjectID, nil, *sessionToken.UserID)
+	user, err := s.userRepo.GetByID(ctx, s.pool, sessionToken.ProjectID, nil, sessionToken.UserID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrUserNotFound()

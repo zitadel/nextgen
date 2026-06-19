@@ -4,73 +4,84 @@ Fresh-app Playwright coverage for the customer local setup journey.
 
 This project is private test infrastructure. It does not test the checked-in
 demo apps. Instead, it builds the current workspace packages, publishes packed
-tarballs to a temporary registry, creates an empty app directory outside the
-repo, runs the customer local CLI flow through `npx`, starts the generated app,
-and verifies that a real user can register, log out, and log in again.
+tarballs to a temporary registry, creates empty app directories outside the
+repo, runs the customer local CLI flow through `npx`, starts the generated apps,
+and verifies that real users can register, log out, and log in again across
+Next, Nuxt, React, Vue, and Angular.
 
 ## Local runner
 
 ```sh
-corepack pnpm run journey
+moon run workspace:journey
 ```
 
-The default mode uses Docker for Verdaccio and for the CLI-managed local
-runtime. It builds a local runtime image unless `--image` is provided:
+The default mode runs the full framework matrix in parallel. It uses the
+`@zitadel/server` npm binary runtime and does not require Docker:
 
 1. Ensure the Playwright Chromium browsers are installed.
-2. Build the public workspace packages.
-3. Pack package tarballs with `corepack pnpm --dir <package> pack`.
-4. Verify tarballs are installable and do not contain `catalog:` or
+2. Build and pack the public workspace packages with `moon run release:pack`.
+3. Verify tarballs are installable and do not contain `catalog:` or
    `workspace:` dependency specs.
-5. Start Verdaccio with npmjs proxying enabled.
-6. Publish tarballs to Verdaccio with `alpha` and `latest` tags.
-7. Build or use a local runtime Docker image for `zitadel start`.
-8. Create an empty app directory in a temporary directory.
-9. Run `npx <cli-package>@alpha doctor --non-interactive --json`.
-10. Run `npx <cli-package>@alpha start --non-interactive --json`.
-11. Run `npx <cli-package>@alpha setup --framework next --server local --non-interactive --json`.
-12. Start the generated app on `localhost`.
-13. Run the Playwright tests with one worker.
+4. Start Verdaccio as a Node process with npmjs proxying enabled.
+5. Publish tarballs to Verdaccio with `alpha` and `latest` tags.
+6. Install `@zitadel/cli` and `@zitadel/server` from the temporary registry.
+7. Create one empty app directory per selected framework in a temporary directory.
+8. Run `npx <cli-package>@alpha doctor --runtime binary --non-interactive --json`.
+9. Run `npx <cli-package>@alpha start --runtime binary --non-interactive --json`.
+10. Run `npx <cli-package>@alpha setup --framework <id> --server local --non-interactive --json`.
+11. Start each generated app on `localhost`.
+12. Run the Playwright tests with one worker per framework journey.
 
 ### Options
 
 ```sh
-corepack pnpm run journey -- --keep
-corepack pnpm run journey -- --work-dir /tmp/zitadel-journey
-corepack pnpm run journey -- --image nextgen:local
+moon run workspace:journey -- --keep
+moon run workspace:journey -- --work-dir /tmp/zitadel-journey
+moon run workspace:journey -- --runtime docker --image nextgen:local
+moon run workspace:journey -- --framework next
+moon run workspace:journey -- --concurrency 2
 ```
 
+- `--framework <id>` runs one framework (`next`, `nuxt`, `react`, `vue`, or
+  `angular`) instead of the full matrix.
+- `--concurrency <n>` controls local framework parallelism. The default is `5`.
+- `--runtime binary|docker` selects the local runtime backend. The default is
+  `binary`.
 - `--image <docker-tag>` uses an existing local runtime image instead of
-  building one.
+  building one and implies `--runtime docker`.
 - `--keep` keeps the temporary work directory after success.
 - `--work-dir <path>` uses an explicit work directory.
 
 Useful environment overrides:
 
 - `JOURNEY_REGISTRY_PORT`
-- `JOURNEY_APP_PORT`
+- `JOURNEY_APP_PORT` for single-framework runs only
+- `JOURNEY_ZITADEL_PORT` for single-framework runs only
 - `JOURNEY_ENABLE_PASSKEY=0` as a local-only escape hatch while debugging
   passkey setup. CI must run passkey coverage.
 
 ## CI gate
 
-The `consumer-journey-e2e` workflow job does not use public Zitadel packages or
-GHCR images. It downloads the GoReleaser snapshot image and the public npm
-package tarballs produced by the same workflow, publishes those tarballs to
-Verdaccio, points `ZITADEL_LOCAL_IMAGE` at the loaded image, runs the same
-`npx` local setup flow, and runs the same Playwright project against the
-generated app. Private support packages such as design tokens are bundled into
-the public packages that need them and must not be uploaded or published.
+The required PR CI job runs the framework matrix against the default binary
+runtime. It does not use public Zitadel packages or GHCR images; it publishes
+the current workflow's package tarballs to Verdaccio and runs the same `npx`
+local setup flow against the generated app. The Docker fallback journey remains
+an opt-in local/manual check via
+`moon run workspace:journey -- --runtime docker --image <docker-tag>`. Private
+support packages such as design tokens are bundled into the public packages
+that need them and must not be uploaded or published.
 
 Failure diagnostics intentionally stay small: Playwright report/output,
 doctor/start/setup JSON and stderr, local runtime metadata/logs, metadata,
-generated app `package.json` and `package-lock.json`, Verdaccio logs, and Next
-logs. Do not upload generated app `node_modules` or `.next` directories.
+generated app `package.json` and lockfile, Verdaccio logs, and
+generated app logs. Do not upload generated app `node_modules` or framework
+build directories.
 
 ## Coverage
 
-The suite is serial and one-worker because every test shares the same fresh
-backend and generated app instance.
+Each framework suite is serial and one-worker because every test in that suite
+shares the same fresh backend and generated app instance. Local all-framework
+runs execute framework suites in parallel.
 
 - CLI local setup contract: doctor, start, and setup exit successfully, stdout
   parses as JSON, `status` is `ok`, the generated app depends on the local SDK
@@ -79,5 +90,3 @@ backend and generated app instance.
   out, and log in again with password.
 - Passkey-only account: register with email/passkey, log out, and log in again
   with passkey.
-- Password-plus-passkey account: register with password, accept passkey setup,
-  log out, log in with password, log out, and log in with passkey.

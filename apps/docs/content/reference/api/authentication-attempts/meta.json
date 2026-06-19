@@ -1,0 +1,10 @@
+{
+  "title": "Authentication Attempts",
+  "pages": [
+    "createAuthAttempt",
+    "getAuthAttempt",
+    "issueChallenge",
+    "verifyChallengeProof",
+    "createHandoff"
+  ]
+}

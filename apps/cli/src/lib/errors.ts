@@ -14,6 +14,7 @@ export type ZitadelErrorCode =
   | "E_AUTH"
   | "E_CONFLICT"
   | "E_LOCAL_SERVER_NOT_RUNNING"
+  | "E_PORT_IN_USE"
   | "E_VALIDATION"
   | "E_NOT_IMPLEMENTED";
 
@@ -30,6 +31,7 @@ export const EXIT_CODES: Record<ZitadelErrorCode, number> = {
   E_AUTH: 1,
   E_CONFLICT: 5,
   E_LOCAL_SERVER_NOT_RUNNING: 4,
+  E_PORT_IN_USE: 5,
   E_VALIDATION: 3,
   E_NOT_IMPLEMENTED: 2,
 };

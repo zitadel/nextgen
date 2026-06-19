@@ -40,6 +40,7 @@ export const reactRenderer: RendererSpec = {
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 
 const ${elementName} = dynamic(
   async () => {
@@ -47,7 +48,7 @@ const ${elementName} = dynamic(
     // Build the SDK project handle and pass it to the component via the
     // \`project\` prop. The component reads config from this prop directly, so
     // it works regardless of how the SDK packages are bundled. The backend URL
-    // stays server-side — requests go through the proxy path "/__nextgen",
+    // stays server-side: requests go through the proxy path "/__nextgen",
     // which the scaffolded request boundary forwards to the Zitadel server.
     const project = configureZitadel({
       projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "",
@@ -68,7 +69,12 @@ const ${elementName} = dynamic(
 
 export default function ${componentName}() {
   return (
-    <main style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <main style={{ minHeight: "100vh", position: "relative", colorScheme: "dark", background: "#0f0f11" }}>
+      <nav aria-label="Authentication" style={{ position: "absolute", top: "24px", right: "24px", zIndex: 1, display: "flex", gap: "12px" }}>
+        <Link href="${mode === "login" ? "/register" : "/login"}" style={{ color: "#f4f4f6", fontWeight: 700, textDecoration: "none" }}>
+          ${mode === "login" ? "Create account" : "Sign in"}
+        </Link>
+      </nav>
       <${elementName} />
     </main>
   );
@@ -82,6 +88,13 @@ export default function ${componentName}() {
 "use client";
 
 import dynamic from "next/dynamic";
+import { useEffect, useState } from "react";
+
+type SessionProof = {
+  session_id?: string;
+  state?: string;
+  user_id?: string;
+};
 
 const ZitadelLogout = dynamic(
   async () => {
@@ -103,13 +116,60 @@ const ZitadelLogout = dynamic(
 );
 
 export default function ProfilePage() {
+  const [session, setSession] = useState<SessionProof | null>(null);
+  const [sessionError, setSessionError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch("/__nextgen/sessions/me", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Session check failed: " + String(response.status));
+        }
+        return response.json() as Promise<SessionProof>;
+      })
+      .then((nextSession) => {
+        if (!cancelled) {
+          setSession(nextSession);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setSessionError(error instanceof Error ? error.message : "Session check failed");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
-    <main style={{ padding: "48px", maxWidth: "600px", margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>
-        <h1 style={{ fontSize: "24px", fontWeight: 700, margin: 0 }}>Signed in</h1>
-        <ZitadelLogout />
+    <main style={{ minHeight: "100vh", colorScheme: "dark", background: "#0f0f11", color: "#f4f4f6", padding: "48px", fontFamily: "system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" }}>
+      <div style={{ maxWidth: "680px", margin: "0 auto" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>
+          <h1 style={{ fontSize: "24px", fontWeight: 700, margin: 0, color: "#f4f4f6" }}>Signed in</h1>
+          <ZitadelLogout />
+        </div>
+        <p style={{ color: "#33a779", fontWeight: 600 }}>Signed in profile loaded.</p>
+        {session ? (
+          <dl style={{ display: "grid", gap: "12px", marginTop: "24px" }}>
+            <div>
+              <dt style={{ color: "#bfbfcf", fontSize: "14px" }}>Session state</dt>
+              <dd style={{ margin: 0, fontWeight: 600, color: "#f4f4f6" }}>{session.state ?? "active"}</dd>
+            </div>
+            <div>
+              <dt style={{ color: "#bfbfcf", fontSize: "14px" }}>User id</dt>
+              <dd style={{ margin: 0, fontFamily: "monospace", color: "#f4f4f6" }}>{session.user_id ?? "available"}</dd>
+            </div>
+          </dl>
+        ) : (
+          <p style={{ color: sessionError ? "#ea4f70" : "#bfbfcf" }}>
+            {sessionError || "Checking session..."}
+          </p>
+        )}
       </div>
-      <p style={{ color: "#6b7280" }}>You are signed in. Use the button above to log out.</p>
     </main>
   );
 }

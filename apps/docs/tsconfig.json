@@ -1,0 +1,25 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
+    "jsx": "react-jsx",
+    "lib": ["dom", "DOM.Iterable", "ES2023"],
+    "types": ["node", "vite/client", "react/experimental", "react-dom/experimental"],
+    "allowJs": true,
+    "checkJs": true,
+    "rootDir": ".",
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "emitDeclarationOnly": false
+  },
+  "exclude": ["dist", "node_modules"],
+  "include": [
+    "press.config.tsx",
+    "source.config.ts",
+    "waku.config.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ]
+}

@@ -140,6 +140,8 @@ describe("envelope contract", () => {
     expect(skills).toContain("name: zitadel-cli");
     expect(skills).toContain("## Golden path");
     expect(skills).toContain("--non-interactive --json");
+    expect(skills).toContain("E_PORT_IN_USE");
+    expect(skills).toContain("stop --all");
   });
 
   it("suggested zitadel next_commands target visible commands", async () => {

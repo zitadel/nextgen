@@ -1,0 +1,46 @@
+---
+title: API reference
+description: OpenAPI-generated endpoint docs for the next-generation Zitadel preview.
+---
+
+import { Card, Cards } from "fumadocs-ui/components/card";
+import { Callout } from "fumadocs-ui/components/callout";
+
+The API reference is generated from `api/openapi/openapi-spec.yaml` during the docs build.
+
+Use it when you need exact request bodies, response shapes, auth requirements, and operation names for the preview server. For the higher-level product path, start with the CLI and SDK docs first:
+
+- [Quickstart](/docs/get-started/quickstart)
+- [CLI](/docs/cli)
+- [SDKs](/docs/sdks)
+
+<Callout title="Grouped by OpenAPI tags" type="info">
+  Generated operation pages are grouped by domain tags from the OpenAPI source. Update the spec tags when an endpoint belongs in a different reference section.
+</Callout>
+
+## Runtime auth
+
+<Cards>
+  <Card title="Authorization" href="/reference/api/authorization" description="OIDC/OAuth discovery, authorize, token, keys, revoke, introspection, and userinfo endpoints." />
+  <Card title="Flows" href="/reference/api/flows" description="Flow start, step, submit, event, and session integration endpoints." />
+  <Card title="Authentication Attempts" href="/reference/api/authentication-attempts" description="Challenge, verification, handoff, and state-machine endpoints." />
+  <Card title="Sessions" href="/reference/api/sessions" description="Session creation, lookup, exchange, and teardown endpoints." />
+</Cards>
+
+## Configuration
+
+<Cards>
+  <Card title="Flow Definitions" href="/reference/api/flow-definitions" description="Templates that describe login, registration, and recovery flows." />
+  <Card title="Projects" href="/reference/api/projects" description="Project creation and lookup endpoints." />
+  <Card title="Teams" href="/reference/api/teams" description="Team creation and lookup endpoints." />
+  <Card title="Users" href="/reference/api/users" description="User creation, lookup, current-user, and password endpoints." />
+  <Card title="Schemas" href="/reference/api/schemas" description="User schema creation and lookup endpoints." />
+</Cards>
+
+## System
+
+<Cards>
+  <Card title="System" href="/reference/api/system" description="Health, liveness, and readiness endpoints." />
+</Cards>
+
+The source OpenAPI document is bundled into `apps/docs/.generated/openapi.yaml` before Fumapress creates the reference pages.

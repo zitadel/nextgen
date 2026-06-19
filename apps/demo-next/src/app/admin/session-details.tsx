@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { GetMySession200 } from "@zitadel/api/generated/model";
+import type { GetMySession200, GetMySession200FactorsItem } from "@zitadel/api/generated/model";
 
 /**
  * Client component that fetches session details via the generated API client's
@@ -62,7 +62,7 @@ export function SessionDetails() {
             Verified factors
           </h3>
           <ul style={{ listStyle: "none", padding: 0, margin: 0, fontSize: "14px" }}>
-            {session.factors.map((f, i) => (
+            {session.factors.map((f: GetMySession200FactorsItem, i: number) => (
               <li key={i} style={{ padding: "4px 0", color: "#374151" }}>
                 <strong>{f.method}</strong>{" "}
                 <span style={{ color: "#9ca3af" }}>

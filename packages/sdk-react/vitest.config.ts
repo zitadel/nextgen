@@ -1,25 +1,27 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from "vitest/config";
 
 /**
- * `dangerouslyIgnoreUnhandledErrors` is enabled for this package only.
+ * `resolve.conditions: ['browser']` makes Vitest resolve the *browser* build of
+ * `@lit/react`. Default Node resolution picks `@lit/react`'s SSR build, whose
+ * `createComponent` only collects props into a server-render bag and never
+ * attaches client event listeners — so the `events` map would not fire under
+ * test. The browser build attaches real listeners, matching a real app.
  *
- * `@lit/react` binds the `project` property a tick AFTER the custom element
- * upgrades, but `<zitadel-login>` reads its config during its one-shot startup
- * at upgrade time. In a unit test the element therefore starts before any prop
- * is bound and rejects with "requires a config". Passing a `project` prop or
- * calling `configureZitadel()` first does not help: the prop is still bound too
- * late, and the global-config fallback is a different module instance than the
- * one `@zitadel/components` reads under Vitest's resolution.
- *
- * These are light render tests (they only assert the wrapper renders the
- * element), so that single expected mount-time rejection is ignored. Vue and
- * Angular do not need this — Vue binds the prop synchronously and the Angular
- * test does not mount the element.
+ * `dangerouslyIgnoreUnhandledErrors` is enabled because `@lit/react` binds the
+ * `project` property a tick AFTER the custom element upgrades, but
+ * `<zitadel-login>` reads its config during its one-shot startup at upgrade
+ * time. In a unit test the element therefore starts before the prop is bound
+ * and rejects with "requires a config". These are light render/event tests, so
+ * that single expected mount-time rejection is ignored.
  */
 export default defineConfig({
+  resolve: {
+    conditions: ["browser"],
+  },
   test: {
-    environment: 'jsdom',
+    environment: "jsdom",
     globals: true,
+    setupFiles: ["src/test-setup.ts"],
     dangerouslyIgnoreUnhandledErrors: true,
   },
 });

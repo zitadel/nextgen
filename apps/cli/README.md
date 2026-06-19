@@ -15,8 +15,8 @@ automation when reproducibility matters.
 
 ## Requirements
 
-- Node 20+
-- Docker for the managed local Zitadel runtime
+- Node 24+
+- Docker only when using the optional Docker runtime backend
 - A Next.js project, or an empty directory where setup can scaffold one
 
 ## Quickstart
@@ -30,20 +30,21 @@ npx @zitadel/cli@alpha setup --server local
 npm run dev
 ```
 
-`start` runs a Docker-backed local Zitadel server and stores runtime data
-under `.zitadel/local/`. Alpha CLI versions use the matching
-`ghcr.io/zitadel/nextgen:<cli-version>` image by default; local/dev builds fall
-back to `ghcr.io/zitadel/nextgen:latest`. Override with `--image` or
-`ZITADEL_LOCAL_IMAGE` for advanced debugging.
+`start` runs the `@zitadel/server` npm binary by default and stores runtime data
+under `.zitadel/local/`. Remote-server setup can use `--server <url>` without
+starting a local runtime. Use `--runtime docker`, `--image`, or
+`ZITADEL_LOCAL_IMAGE` for advanced Docker backend debugging.
 `setup --server local` creates a project on that local server, asks which
 framework to scaffold when the directory is fresh, writes the Next.js app into
-the current directory, scaffolds `app/login`, `app/register`, and `proxy.ts`
-for Next 16+ or `middleware.ts` for older Next versions, writes `.env.local`
-and `.zitadel/`, and installs dependencies with the detected package manager.
-Pass `--skip-install` to install them yourself. The project's default user
-schema and login flow are provisioned server-side at creation time, so the CLI
-does not scaffold or upload them. Open `http://localhost:3000/login` to see the
-login page.
+the current directory, scaffolds `app/login`, `app/register`, `app/profile`, and
+`proxy.ts` for Next 16+ or `middleware.ts` for older Next versions. Fresh
+scaffolds also replace the starter `app/page.tsx` with links to sign in, create
+an account, and profile. Setup writes `.env.local` and `.zitadel/`, and installs
+dependencies with the detected package manager. Pass `--skip-install` to install
+them yourself. The project's default user schema and login flow are provisioned
+server-side at creation time, so the CLI does not scaffold or upload them. Open
+the dev server URL printed by your framework, register a user, log out, log back
+in, and end on the signed-in profile page.
 
 For a reproducible tester report, use the exact alpha train from the GitHub
 Release:
@@ -59,14 +60,18 @@ registration/login, and optional passkey setup after password registration.
 Users who skip passkey setup can still sign in with password; users who add a
 passkey can sign in with either credential.
 
+For agent scripts, pass `--non-interactive --json` and capture stdout and stderr
+separately. The CLI contract is one parseable JSON object on stdout; terminals
+and agent UIs may display stderr package-manager progress together with stdout.
+
 ## Other commands
 
-- `zitadel doctor` — verify the local Docker runtime and generated project files
-- `zitadel status` — summarise the local Docker runtime and project
+- `zitadel doctor` — verify the local runtime and generated project files
+- `zitadel status` — summarise the local runtime and project
 - `zitadel plan` — validate config and preview sync changes without mutation
 - `zitadel apply` — validate and upload repo config to Zitadel
 - `zitadel eject` — remove what setup wrote (alias: `zitadel uninstall`)
-- `zitadel start|stop|logs|reset` — manage the local Docker runtime
+- `zitadel start|stop|logs|reset` — manage the local runtime
 
 ## Reference
 
@@ -186,7 +191,7 @@ Verify local runtime and project state.
 ```
 USAGE
   $ zitadel doctor [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [--fix]
-    [--image <value>] [--port <value>]
+    [--image <value>] [--port <value>] [--runtime binary|docker]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -198,6 +203,8 @@ FLAGS
       --fix              Re-apply missing managed files.
       --image=<value>    Container image to check.
       --port=<value>     [default: 8080] Local HTTP port.
+      --runtime=<option> Local runtime backend.
+                         <options: binary|docker>
       --verbose          Verbose logging.
 
 GLOBAL FLAGS
@@ -392,7 +399,7 @@ Start a local Zitadel server.
 ```
 USAGE
   $ zitadel start [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [--image
-    <value>] [--port <value>]
+    <value>] [--port <value>] [--runtime binary|docker]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -403,6 +410,8 @@ FLAGS
       --dry-run          Preview without mutating files or the platform.
       --image=<value>    Container image to run.
       --port=<value>     [default: 8080] Local HTTP port.
+      --runtime=<option> Local runtime backend.
+                         <options: binary|docker>
       --verbose          Verbose logging.
 
 GLOBAL FLAGS

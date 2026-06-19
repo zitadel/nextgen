@@ -1,6 +1,8 @@
 post:
   operationId: getToken
-  summary: Get accesstoken
+  tags:
+    - Authorization
+  summary: Get access token
   security:
     - usernamePassword: []
   requestBody:

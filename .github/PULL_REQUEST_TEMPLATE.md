@@ -12,7 +12,11 @@
 
 ## Release notes / changeset
 
-<!-- Mention the changeset status for user-visible package changes. -->
+<!-- State one outcome from the .changeset/README.md decision table
+     (.changeset/README.md#decision-table):
+     - No changeset required — no public npm package files changed.
+     - Changeset: .changeset/<slug>.md — <summary>
+     - Empty changeset (rare) — <why publishable paths changed but nothing ships> -->
 
 -
 

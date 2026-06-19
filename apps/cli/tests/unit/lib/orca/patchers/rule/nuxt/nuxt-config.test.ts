@@ -8,7 +8,9 @@ describe("nuxtConfigEdit", () => {
   it("merges modules, nextgen, runtimeConfig, and build into an empty config", () => {
     const out = edit("export default defineNuxtConfig({})");
     expect(out).toContain("@zitadel/sdk-nuxt/module");
+    expect(out).toContain('url: process.env.ZITADEL_URL ?? "http://127.0.0.1:8080"');
     expect(out).toContain('loginPath: "/login"');
+    expect(out).toContain('protectedRoutes: ["/profile"]');
     expect(out).toContain('nextgenProxyPath: "/__nextgen"');
     expect(out).toContain("process.env.ZITADEL_URL");
     expect(out).toContain("process.env.NUXT_PUBLIC_ZITADEL_PROJECT_ID");

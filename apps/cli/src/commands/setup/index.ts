@@ -6,7 +6,14 @@ import { consola } from "consola";
 
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
-import { createOrca, issuerFromPort, type FrameworkFacts, type Orca } from "../../lib/orca";
+import {
+  createOrca,
+  inspectScaffoldTarget,
+  issuerFromPort,
+  type FrameworkFacts,
+  type Orca,
+  type ScaffoldTarget,
+} from "../../lib/orca";
 import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
@@ -70,7 +77,11 @@ export default class Setup extends BaseCommand {
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Setup);
-    await this.toMeta(flags);
+    try {
+      await this.toMeta(flags);
+    } catch (error) {
+      throw localSetupHint(error, flags.framework, this.config.version);
+    }
     const { cwd, nonInteractive, dryRun, force } = this.meta;
 
     if (await hasZitadelConfig(cwd)) {
@@ -95,9 +106,12 @@ export default class Setup extends BaseCommand {
     } catch (error) {
       if (
         error instanceof ZitadelError &&
-        error.code === "E_FRAMEWORK_NOT_DETECTED" &&
-        (await orca.isFreshScaffoldTarget(cwd))
+        error.code === "E_FRAMEWORK_NOT_DETECTED"
       ) {
+        const target = await inspectScaffoldTarget(cwd);
+        if (!target.scaffoldable) {
+          throw frameworkDetectionWithScaffoldTarget(error, cwd, target);
+        }
         consola.info("Fresh app directory — scaffolding a fresh project");
         framework = await orca.scaffold(
           cwd,
@@ -170,6 +184,7 @@ export default class Setup extends BaseCommand {
           answers.server,
           this.meta.cliVersion,
           issuer,
+          framework.id,
         );
     consola.success(`Created project ${project.id}`);
 
@@ -180,6 +195,7 @@ export default class Setup extends BaseCommand {
       issuer,
       server: answers.server,
       cliVersion: this.meta.cliVersion,
+      scaffoldedFramework,
     };
     consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
     const result = await orca.patcherFor(framework.id).patch(ctx, { cwd, dryRun, force });
@@ -253,6 +269,23 @@ export default class Setup extends BaseCommand {
   }
 }
 
+function frameworkDetectionWithScaffoldTarget(
+  error: ZitadelError,
+  cwd: string,
+  target: ScaffoldTarget,
+): ZitadelError {
+  return new ZitadelError(
+    error.code,
+    "Could not detect a supported app framework, and this directory is not a fresh scaffold target",
+    {
+      hint:
+        `${target.reason ?? "Directory is not empty."} ` +
+        "Run setup from an empty directory to scaffold a new app, or run setup from an existing supported app project.",
+      details: { cwd, entries: target.entries, reason: target.reason },
+    },
+  );
+}
+
 /**
  * Resolves which framework to scaffold into an empty directory: the explicit
  * `--framework`, else PickFrameworkPrompt, else a hard error in non-interactive
@@ -290,6 +323,7 @@ async function createProjectWithLocalHint(
   server: string,
   cliVersion: string,
   issuer: string,
+  framework: string,
 ): Promise<CreateProject201> {
   try {
     // Register the app's own origin so the backend's origin check allows the
@@ -300,11 +334,11 @@ async function createProjectWithLocalHint(
     throw new ZitadelError(normalized.code, normalized.message, {
       hint:
         `${normalized.hint ? `${normalized.hint} ` : ""}` +
-        "If you meant to use a local Zitadel server, run npx @zitadel/cli@alpha start " +
-        "and retry setup with --server local.",
+        "If you meant to use a local Zitadel server, start it first " +
+        `and retry setup with --framework ${framework} --server local.`,
       nextCommands: [
         publicCliCommand("start", cliVersion),
-        publicCliCommand("setup --server local", cliVersion),
+        publicCliCommand(`setup --framework ${framework} --server local`, cliVersion),
       ],
       details: {
         server,
@@ -312,6 +346,29 @@ async function createProjectWithLocalHint(
       },
     });
   }
+}
+
+function localSetupHint(error: unknown, framework: string | undefined, cliVersion: string): unknown {
+  const normalized = toZitadelError(error);
+  if (normalized.code !== "E_LOCAL_SERVER_NOT_RUNNING") {
+    return error;
+  }
+
+  const setupCommand = framework
+    ? `setup --framework ${framework} --server local`
+    : "setup --server local";
+
+  return new ZitadelError(normalized.code, normalized.message, {
+    hint:
+      `${normalized.hint ? `${normalized.hint} ` : ""}` +
+      "Start local Zitadel first, then rerun setup. " +
+      "After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+    nextCommands: [
+      publicCliCommand("start", cliVersion),
+      publicCliCommand(setupCommand, cliVersion),
+    ],
+    details: normalized.details,
+  });
 }
 
 /** Renders an absolute path relative to `cwd` for human-readable output. */
@@ -378,6 +435,7 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   ".env.example": { subject: "the .env example template" },
   ".env.local": { subject: "the local development environment variables" },
   ".zitadel/state.json": { subject: "the empty sync state file" },
+  "app/page.tsx": { subject: "the auth home page" },
   "app/login/page.tsx": { subject: "the login page" },
   "app/register/page.tsx": { subject: "the registration page" },
   "app/profile/page.tsx": { subject: "the profile page" },
@@ -414,6 +472,7 @@ function buildSummary(opts: {
     });
   }
   for (const [label, suffix] of [
+    ["Home page", "app/page.tsx"],
     ["Login page", "app/login/page.tsx"],
     ["Register page", "app/register/page.tsx"],
     ["Profile page", "app/profile/page.tsx"],

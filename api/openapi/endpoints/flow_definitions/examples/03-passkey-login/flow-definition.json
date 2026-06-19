@@ -10,11 +10,16 @@
     "steps": [
       {
         "name": "signin",
-        "actions": {
-          "passkey": { "primary": true }
-        },
+        "actions": [
+          {
+            "name": "passkey",
+            "primary": true
+          }
+        ],
         "transitions": {
-          "passkey": { "target": "done" }
+          "passkey": {
+            "target": "done"
+          }
         }
       },
       {

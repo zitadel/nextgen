@@ -1,0 +1,56 @@
+id: "docs"
+language: "typescript"
+layer: "application"
+stack: "frontend"
+
+tasks:
+  generate-openapi:
+    command: "corepack pnpm run generate:openapi"
+    inputs:
+      - "/api/openapi/**/*.yaml"
+      - "scripts/bundle-openapi.mjs"
+    outputs:
+      - ".generated/openapi.yaml"
+      - ".generated/openapi.json"
+      - ".generated/openapi.mjs"
+
+  generate:
+    command: "corepack pnpm run generate"
+    inputs:
+      - "/api/openapi/**/*.yaml"
+      - "content/**/*"
+      - "source.config.ts"
+      - "scripts/bundle-openapi.mjs"
+    outputs:
+      - ".generated/openapi.yaml"
+      - ".generated/openapi.json"
+      - ".generated/openapi.mjs"
+      - ".source/**/*"
+
+  typecheck:
+    command: "corepack pnpm exec tsc --noEmit -p tsconfig.json"
+    deps:
+      - "generate"
+
+  build:
+    command: "corepack pnpm exec waku build"
+    deps:
+      - "generate"
+    outputs:
+      - "dist/**/*"
+
+  dev:
+    command: "corepack pnpm exec waku dev --port 3003"
+    deps:
+      - "generate"
+    options:
+      persistent: true
+      runInCI: false
+
+  preview:
+    command: "corepack pnpm run preview"
+    deps:
+      - "build"
+    options:
+      persistent: true
+      runInCI: false

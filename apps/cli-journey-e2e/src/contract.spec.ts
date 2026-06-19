@@ -14,19 +14,65 @@ test("setup completed and installed local registry packages", async () => {
   expect(setup.source).toEqual(expect.any(String));
 
   const metadata = JSON.parse(await readFile(join(outputDir, "metadata.json"), "utf8"));
+  expect(setup.data.framework).toBe(metadata.framework);
   const packageJson = JSON.parse(await readFile(join(appDir, "package.json"), "utf8"));
-  expect(packageJson.dependencies?.[metadata.sdkNextPackage]).toBeTruthy();
+  expect(packageJson.dependencies?.[metadata.sdkPackage]).toBeTruthy();
 
-  const packageLock = JSON.parse(await readFile(join(appDir, "package-lock.json"), "utf8"));
-  const packageScope = metadata.sdkNextPackage.split("/")[0];
-  const lockedPackages = Object.entries(packageLock.packages ?? {}).filter(([name]) =>
+  await expectLocalLockfileResolution({
+    appDir,
+    registryUrl: metadata.registryUrl,
+    sdkPackage: metadata.sdkPackage,
+  });
+});
+
+async function expectLocalLockfileResolution(input: {
+  appDir: string;
+  registryUrl: string;
+  sdkPackage: string;
+}): Promise<void> {
+  const packageLockText = await readOptionalFile(join(input.appDir, "package-lock.json"));
+  if (packageLockText) {
+    expectNpmLockfileResolution({
+      lockfile: JSON.parse(packageLockText),
+      registryUrl: input.registryUrl,
+      sdkPackage: input.sdkPackage,
+    });
+    return;
+  }
+
+  const pnpmLockText = await readOptionalFile(join(input.appDir, "pnpm-lock.yaml"));
+  if (pnpmLockText === null) {
+    throw new Error("generated app has no supported lockfile");
+  }
+  expect(pnpmLockText).toContain(input.sdkPackage);
+  expect(pnpmLockText).toContain(input.registryUrl);
+}
+
+function expectNpmLockfileResolution(input: {
+  lockfile: { packages?: Record<string, { resolved?: string }> };
+  registryUrl: string;
+  sdkPackage: string;
+}): void {
+  const packageScope = input.sdkPackage.split("/")[0];
+  const lockedPackages = Object.entries(input.lockfile.packages ?? {}).filter(([name]) =>
     name.startsWith(`node_modules/${packageScope}/`),
   );
   expect(lockedPackages.length).toBeGreaterThan(0);
   for (const [, entry] of lockedPackages) {
-    expect((entry as { resolved?: string }).resolved).toContain(metadata.registryUrl);
+    expect(entry.resolved).toContain(input.registryUrl);
   }
-});
+}
+
+async function readOptionalFile(path: string): Promise<string | null> {
+  try {
+    return await readFile(path, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
+}
 
 function requiredEnv(name: string): string {
   const value = process.env[name];

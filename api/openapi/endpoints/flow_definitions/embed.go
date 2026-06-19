@@ -220,17 +220,21 @@ func convertStepGateConfig(config api.OptGateConfig) (map[string]any, error) {
 	return ret, nil
 }
 
-func convertStepActions(actions api.OptFlowDefinitionStepActions) map[string]domain.FlowStepAction {
-	if !actions.IsSet() {
+// convertStepActions preserves the nil-vs-empty distinction so an explicit
+// `actions: []` survives the embed-loader path without collapsing into a
+// nil that would re-read as "omitted, apply default" downstream.
+func convertStepActions(actions []api.StepAction) []domain.FlowStepAction {
+	if actions == nil {
 		return nil
 	}
 
-	ret := make(map[string]domain.FlowStepAction, len(actions.Value))
-	for name, action := range actions.Value {
-		ret[name] = domain.FlowStepAction{
+	ret := make([]domain.FlowStepAction, 0, len(actions))
+	for _, action := range actions {
+		ret = append(ret, domain.FlowStepAction{
+			Name:    action.GetName(),
 			TextKey: action.TextKey.Value,
 			Primary: action.Primary.Value,
-		}
+		})
 	}
 
 	return ret

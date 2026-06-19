@@ -1,54 +1,124 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createApp, h, type Component } from 'vue';
+import type {
+  ZitadelLogin as ZitadelLoginElement,
+  ZitadelLogout as ZitadelLogoutElement,
+} from "@zitadel/components";
 
-import ZitadelLogin from './components/ZitadelLogin';
-import ZitadelLogout from './components/ZitadelLogout';
+import { render } from "@testing-library/vue";
+import {
+  ZITADEL_LOGIN_EVENT_HANDLERS,
+  ZITADEL_LOGOUT_EVENT_HANDLERS,
+} from "@zitadel/sdk-core/types";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { defineComponent, h, shallowRef, type Ref } from "vue";
 
-const project = { projectId: 'proj-test', proxyPath: '/__nextgen' };
+import ZitadelLogin from "./components/ZitadelLogin";
+import ZitadelLogout from "./components/ZitadelLogout";
+
+// A consumer's `ref` on these components resolves to the component instance,
+// whose `expose({ element })` surfaces the inner DOM node. Vue's exposed proxy
+// auto-unwraps the exposed `Ref`, so the consumer reads the element directly as
+// `r.value.element`. Mount the component under a parent that holds such a ref
+// and forward the captured instance out, mirroring that consumer access.
+function mountWithInstanceRef(child: typeof ZitadelLogin | typeof ZitadelLogout): {
+  captured: Ref<{ element: HTMLElement | null } | null>;
+  container: Element;
+} {
+  const captured = shallowRef<{ element: HTMLElement | null } | null>(null);
+  const parent = defineComponent({
+    setup: () => () => h(child, { ref: captured }),
+  });
+  const { container } = render(parent);
+  return { captured, container };
+}
+
+const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
 beforeEach(() => {
-  // The widget starts a flow on mount; stub fetch so the attempt fails quietly.
   vi.stubGlobal(
-    'fetch',
-    vi.fn(() => Promise.reject(new Error('no network'))),
+    "fetch",
+    vi.fn(() => Promise.reject(new Error("no network"))),
   );
 });
 
-afterEach(() => {
-  // Restore the real fetch and drop mounted nodes so tests stay isolated.
-  vi.unstubAllGlobals();
-  document.body.innerHTML = '';
-});
-
-function mount(
-  component: Component,
-  props: Record<string, unknown>,
-): HTMLElement {
-  const host = document.createElement('div');
-  document.body.appendChild(host);
-  createApp({ render: () => h(component, props) }).mount(host);
-  return host;
-}
-
-describe('ZitadelLogin', () => {
-  it('renders a <zitadel-login> element and forwards the project prop', () => {
-    const host = mount(ZitadelLogin, { project, purpose: 'login' });
-    const el = host.querySelector('zitadel-login') as
-      | (HTMLElement & { project?: unknown })
-      | null;
+describe("ZitadelLogin", () => {
+  it("binds the project handle as a property", () => {
+    const { container } = render(ZitadelLogin, {
+      props: { project, purpose: "login" },
+    });
+    const el = container.querySelector<ZitadelLoginElement>("zitadel-login");
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
   });
+
+  it("binds discrete projectId/proxyPath", () => {
+    const { container } = render(ZitadelLogin, {
+      props: { projectId: "proj-test", proxyPath: "/__nextgen" },
+    });
+    const el = container.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(el!.projectId).toBe("proj-test");
+    expect(el!.proxyPath).toBe("/__nextgen");
+  });
+
+  it.each(Object.entries(ZITADEL_LOGIN_EVENT_HANDLERS))(
+    "forwards %s to its callback",
+    (eventName, handlerProp) => {
+      const spy = vi.fn();
+      const { container } = render(ZitadelLogin, {
+        props: { project, [handlerProp]: spy },
+      });
+      const el = container.querySelector("zitadel-login");
+      const detail = { probe: eventName };
+      el?.dispatchEvent(new CustomEvent(eventName, { detail }));
+      expect(spy).toHaveBeenCalledWith(detail);
+    },
+  );
+
+  it("exposes the rendered element via the instance ref", () => {
+    const { captured, container } = mountWithInstanceRef(ZitadelLogin);
+    const element = captured.value!.element;
+    expect(element).not.toBeNull();
+    expect(element!.tagName.toLowerCase()).toBe("zitadel-login");
+    expect(element).toBe(container.querySelector("zitadel-login"));
+  });
 });
 
-describe('ZitadelLogout', () => {
-  it('renders a <zitadel-logout> element and forwards the project prop', () => {
-    const host = mount(ZitadelLogout, { project });
-    const el = host.querySelector('zitadel-logout') as
-      | (HTMLElement & { project?: unknown })
-      | null;
+describe("ZitadelLogout", () => {
+  it("binds the project handle as a property", () => {
+    const { container } = render(ZitadelLogout, { props: { project } });
+    const el = container.querySelector<ZitadelLogoutElement>("zitadel-logout");
     expect(el).not.toBeNull();
     expect(el!.project).toBe(project);
+  });
+
+  it("binds discrete projectId/proxyPath", () => {
+    const { container } = render(ZitadelLogout, {
+      props: { projectId: "proj-test", proxyPath: "/__nextgen" },
+    });
+    const el = container.querySelector<ZitadelLogoutElement>("zitadel-logout");
+    expect(el!.projectId).toBe("proj-test");
+    expect(el!.proxyPath).toBe("/__nextgen");
+  });
+
+  it.each(Object.entries(ZITADEL_LOGOUT_EVENT_HANDLERS))(
+    "forwards %s to its callback",
+    (eventName, handlerProp) => {
+      const spy = vi.fn();
+      const { container } = render(ZitadelLogout, {
+        props: { project, [handlerProp]: spy },
+      });
+      const el = container.querySelector("zitadel-logout");
+      const detail = { probe: eventName };
+      el?.dispatchEvent(new CustomEvent(eventName, { detail }));
+      expect(spy).toHaveBeenCalledWith(detail);
+    },
+  );
+
+  it("exposes the rendered element via the instance ref", () => {
+    const { captured, container } = mountWithInstanceRef(ZitadelLogout);
+    const element = captured.value!.element;
+    expect(element).not.toBeNull();
+    expect(element!.tagName.toLowerCase()).toBe("zitadel-logout");
+    expect(element).toBe(container.querySelector("zitadel-logout"));
   });
 });

@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { nxViteTsPaths } from "@nx/vite/plugins/nx-tsconfig-paths.plugin";
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig, type Plugin } from "vitest/config";
 
@@ -35,7 +34,7 @@ function liquidRaw(): Plugin {
 }
 
 /** Shared plugins for all vitest projects. */
-const sharedPlugins = () => [nxViteTsPaths(), liquidRaw()];
+const sharedPlugins = () => [liquidRaw()];
 
 /**
  * Two test projects:
