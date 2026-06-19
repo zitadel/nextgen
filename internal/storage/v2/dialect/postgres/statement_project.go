@@ -55,7 +55,7 @@ const projectQuery = "SELECT id, created_at, updated_at, project_secret, preview
 func (ps projectStatements) GetProjectByID(id string) database.Query[*domain.Project] {
 	var compiler statementCompiler
 	compiler.compileRead(projectQuery, &database.ListOptions{
-		Filter: database.Equal(domain.ProjectFieldID, id),
+		Filter: database.Equal(database.Column(domain.ProjectFieldID), id),
 	})
 
 	return &query[*domain.Project]{
@@ -98,17 +98,17 @@ func (ps projectStatements) scanProjects(rows pgx.Rows, result *database.ListRes
 
 	for _, column := range result.NextCursor.OrderBy.Columns {
 		switch column {
-		case domain.ProjectFieldID:
+		case database.Column(domain.ProjectFieldID):
 			result.NextCursor.Values = append(result.NextCursor.Values, projects[len(projects)-1].ID)
-		case domain.ProjectFieldCreatedAt:
+		case database.Column(domain.ProjectFieldCreatedAt):
 			result.NextCursor.Values = append(result.NextCursor.Values, projects[len(projects)-1].CreatedAt)
-		case domain.ProjectFieldUpdatedAt:
+		case database.Column(domain.ProjectFieldUpdatedAt):
 			result.NextCursor.Values = append(result.NextCursor.Values, projects[len(projects)-1].UpdatedAt)
-		case domain.ProjectFieldProjectSecret:
+		case database.Column(domain.ProjectFieldProjectSecret):
 			result.NextCursor.Values = append(result.NextCursor.Values, projects[len(projects)-1].ProjectSecret)
-		case domain.ProjectFieldPreviewSecret:
+		case database.Column(domain.ProjectFieldPreviewSecret):
 			result.NextCursor.Values = append(result.NextCursor.Values, projects[len(projects)-1].PreviewSecret)
-		case domain.ProjectFieldPreviewOrigins:
+		case database.Column(domain.ProjectFieldPreviewOrigins):
 			result.NextCursor.Values = append(result.NextCursor.Values, projects[len(projects)-1].PreviewOrigins)
 		}
 	}

@@ -5,7 +5,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 type queryExecutor interface {
@@ -29,5 +28,3 @@ func newStatements(client queryExecutor) statements {
 type statement struct {
 	client queryExecutor
 }
-
-var _ database.Statementer = (*statements)(nil)

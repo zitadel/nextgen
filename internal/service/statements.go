@@ -1,25 +1,58 @@
 package service
 
 import (
+	"context"
+
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-type Pool interface {
-	database.Pool
-	Statementer
+func test() {
+	var d database.Dialect
+	p, _ := d.Connect(context.TODO())
+	stmtPool := database.PoolAs[StatementPool](p)
+	stmtPool.Transaction(context.TODO(), func(ctx context.Context, tx Statements) error {
+		tx.CreateProject(nil)
+		return nil
+	})
+	stmtPool.CreateProject(nil)
+
+	projectPool := database.PoolAs[ProjectPool](p)
+	projectPool.CreateProject(nil)
+	projectPool.Transaction(context.TODO(), func(ctx context.Context, ps ProjectStatements) error {
+		ps.CreateProject(nil)
+		return nil
+	})
 }
 
-// Statementer collects all statement methods for the domain entities.
-// It is used by the service layer to execute database operations.
-// The service layer methods can still define smaller interfaces to fulfill their needs.
-// This interface might not strictly be needed, therefore look at it as a documentation part of the spike.
-type Statementer interface {
+type StatementPool interface {
+	database.TypedTransactional[Statements]
+	Statements
+}
+
+type Statements interface {
+	ProjectStatements
+	FlowDefinitionStatements
+}
+
+type ProjectPool interface {
+	database.TypedTransactional[ProjectStatements]
+	ProjectStatements
+}
+
+type ProjectStatements interface {
 	CreateProject(entity *domain.Project) database.Execution
 	GetProjectByID(id string) database.Query[*domain.Project]
 	ListProjects(filter *database.ListOptions) database.Query[*database.ListResult[*domain.Project]]
 	DeleteProjectByID(id string) database.Execution
+}
 
+type FlowDefinitionPool interface {
+	database.TypedTransactional[FlowDefinitionStatements]
+	FlowDefinitionStatements
+}
+
+type FlowDefinitionStatements interface {
 	CreateFlowDefinition(entity *domain.FlowDefinition) database.Execution
 	GetFlowDefinitionByID(id string) database.Query[*domain.FlowDefinition]
 	ListFlowDefinitions(filter *database.ListOptions) database.Query[*database.ListResult[*domain.FlowDefinition]]

@@ -8,8 +8,6 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres"
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
-	db_v2 "github.com/zitadel/nextgen/internal/storage/v2/database"
-	pg_v2 "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres"
 )
 
 const pgTableProjects = "zitadel_nextgen.projects"
@@ -43,14 +41,13 @@ var _ deletable = (*projectMeta)(nil)
 type ProjectRepository struct {
 	meta projectMeta
 	now  database.Instruction
-	v2   db_v2.Statementer
 }
 
 var _ domain.ProjectRepository = (*ProjectRepository)(nil)
 
 // NewProjectRepository returns a dialect-specific [ProjectRepository].
 func NewProjectRepository(client database.QueryExecutor) *ProjectRepository {
-	switch c := client.(type) {
+	switch client.(type) {
 	case spanner.SpannerPooler:
 		return &ProjectRepository{
 			meta: projectMeta{tableName: spannerTableProjects},
@@ -60,20 +57,21 @@ func NewProjectRepository(client database.QueryExecutor) *ProjectRepository {
 		return &ProjectRepository{
 			meta: projectMeta{tableName: pgTableProjects},
 			now:  database.NowInstruction,
-			v2:   pg_v2.NewPool(c.(*postgres.Pool).Pool),
 		}
 	}
 	panic("NewProjectRepository: unsupported client type")
 }
 
 func (r *ProjectRepository) Create(ctx context.Context, client database.QueryExecutor, project *domain.Project) error {
-	return r.v2.CreateProject(project).Execute(ctx)
+	// return r.v2.CreateProject(project).Execute(ctx)
+	return nil
 }
 
 func (r *ProjectRepository) Get(ctx context.Context, client database.QueryExecutor, id string) (*domain.Project, error) {
-	stmt := r.v2.GetProjectByID(id)
-	if err := stmt.Execute(ctx); err != nil {
-		return nil, err
-	}
-	return stmt.Result(), nil
+	// stmt := r.v2.GetProjectByID(id)
+	// if err := stmt.Execute(ctx); err != nil {
+	// 	return nil, err
+	// }
+	// return stmt.Result(), nil
+	return nil, nil
 }

@@ -74,7 +74,7 @@ type ProjectRepository interface {
 	Get(ctx context.Context, client database.QueryExecutor, id string) (*Project, error)
 }
 
-type ProjectField database.Column
+type ProjectField uint8
 
 const (
 	ProjectFieldUnspecified ProjectField = iota

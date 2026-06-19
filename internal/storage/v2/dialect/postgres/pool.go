@@ -12,7 +12,7 @@ type Pool struct {
 	statements
 }
 
-func NewPool(pool *pgxpool.Pool) *Pool {
+func newPool(pool *pgxpool.Pool) *Pool {
 	return &Pool{
 		pool:       pool,
 		statements: newStatements(pool),
@@ -20,27 +20,18 @@ func NewPool(pool *pgxpool.Pool) *Pool {
 }
 
 // Transaction implements [database.Pool].
-func (p Pool) Transaction(ctx context.Context, fn func(ctx context.Context, tx database.Statementer) error) error {
+func (p *Pool) Transaction(ctx context.Context, fn func(ctx context.Context, tx database.Transaction) error) error {
 	return executeTransaction(ctx, p.pool, fn)
 }
 
-// Acquire implements [database.Pool].
-func (p Pool) Acquire(ctx context.Context) (database.Connection, error) {
-	conn, err := p.pool.Acquire(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return newConnection(conn), nil
-}
-
 // Close implements [database.Pool].
-func (p Pool) Close(ctx context.Context) error {
+func (p *Pool) Close(ctx context.Context) error {
 	p.pool.Close()
 	return nil
 }
 
 // Ping implements [database.Pool].
-func (p Pool) Ping(ctx context.Context) error {
+func (p *Pool) Ping(ctx context.Context) error {
 	return p.pool.Ping(ctx)
 }
 

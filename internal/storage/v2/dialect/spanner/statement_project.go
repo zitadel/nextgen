@@ -3,11 +3,20 @@ package spanner
 import (
 	"cloud.google.com/go/spanner"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
+type projectStatements statement
+
+func newProjectStatements(client queryExecutor) projectStatements {
+	return projectStatements{
+		client: client,
+	}
+}
+
 // CreateProject implements [database.ProjectStatements].
-func (s statements) CreateProject(project *domain.Project) database.Execution {
+func (s projectStatements) CreateProject(project *domain.Project) database.Execution {
 	return &execution{
 		client: s.client,
 		stmt: spanner.Statement{
@@ -28,7 +37,7 @@ func (s statements) CreateProject(project *domain.Project) database.Execution {
 }
 
 // DeleteProjectByID implements [database.ProjectStatements].
-func (s statements) DeleteProjectByID(id string) database.Execution {
+func (s projectStatements) DeleteProjectByID(id string) database.Execution {
 	return &execution{
 		client: s.client,
 		stmt: spanner.Statement{
@@ -41,11 +50,13 @@ func (s statements) DeleteProjectByID(id string) database.Execution {
 }
 
 // GetProjectByID implements [database.ProjectStatements].
-func (s statements) GetProjectByID(id string) database.Query[*domain.Project] {
+func (s projectStatements) GetProjectByID(id string) database.Query[*domain.Project] {
 	panic("unimplemented")
 }
 
 // ListProjects implements [database.ProjectStatements].
-func (s statements) ListProjects(filter database.ListOptions[domain.ProjectField]) database.Query[[]*domain.Project] {
+func (s projectStatements) ListProjects(filter *database.ListOptions) database.Query[*database.ListResult[*domain.Project]] {
 	panic("unimplemented")
 }
+
+var _ service.ProjectStatements = (*projectStatements)(nil)

@@ -56,10 +56,14 @@ type EqualsFilter struct {
 	Values  []any
 }
 
+// Equal creates a new EqualsFilter for a single column and value.
+// The condition will look like "column = value".
 func Equal(column Column, value any) *EqualsFilter {
 	return Equals([]Column{column}, []any{value})
 }
 
+// Equals creates a new EqualsFilter for multiple columns and values.
+// The condition will look like "(column1, column2, ...) = (value1, value2, ...)".
 func Equals(columns []Column, values []any) *EqualsFilter {
 	return &EqualsFilter{
 		Columns: columns,
@@ -82,10 +86,14 @@ type GreaterThanFilter struct {
 	Values  []any
 }
 
+// GreaterThan creates a new GreaterThanFilter for a single column and value.
+// The condition will look like "column > value".
 func GreaterThan(column Column, value any) *GreaterThanFilter {
 	return GreaterThans([]Column{column}, []any{value})
 }
 
+// GreaterThans creates a new GreaterThanFilter for multiple columns and values.
+// The condition will look like "(column1, column2, ...) > (value1, value2, ...)".
 func GreaterThans(columns []Column, values []any) *GreaterThanFilter {
 	return &GreaterThanFilter{
 		Columns: columns,
@@ -108,10 +116,14 @@ type LessThanFilter struct {
 	Values  []any
 }
 
+// LessThan creates a new LessThanFilter for a single column and value.
+// The condition will look like "column < value".
 func LessThan(column Column, value any) *LessThanFilter {
 	return LessThans([]Column{column}, []any{value})
 }
 
+// LessThans creates a new LessThanFilter for multiple columns and values.
+// The condition will look like "(column1, column2, ...) < (value1, value2, ...)".
 func LessThans(columns []Column, values []any) *LessThanFilter {
 	return &LessThanFilter{
 		Columns: columns,
