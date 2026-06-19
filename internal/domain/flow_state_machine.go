@@ -120,6 +120,7 @@ type FlowStepTexts struct {
 // FlowAction is a single user action surfaced on [FlowStep.Actions].
 type FlowAction struct {
 	Name    string
+	Kind    FlowActionKind
 	TextKey string
 	Primary bool
 }
@@ -286,6 +287,16 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	}
 
 	userSchemaURL := state.UserSchemaURL
+	actionKind := stepActionKind(currentStep, in.Action)
+
+	// Navigate actions skip the entire input pipeline (validation, dispatch,
+	// on_success) and route straight to the matching transition. Used for
+	// back-navigation and similar pure-routing actions where the submitted
+	// fields are irrelevant.
+	if actionKind == FlowActionKindNavigate {
+		return r.followTransition(ctx, client, def, state, currentStep, in.Action, userSchemaURL)
+	}
+
 	resolved, err := r.resolveStepFields(ctx, client, state.ProjectID, userSchemaURL, currentStep)
 	if err != nil {
 		return FlowStepResult{}, err
@@ -312,7 +323,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	// PreparePasskeyChallenge finds no AuthFactorUser and falls back to a discoverable
 	// login with an empty allowCredentials list — non-discoverable credentials won't
 	// be found by the browser.
-	if in.Action == FlowActionPasskey && in.ChallengeResponse == nil {
+	if actionKind == FlowActionKindPasskey && in.ChallengeResponse == nil {
 		dispatch, err := r.dispatchChallenges(ctx, def, state, currentStep, resolved, in.Fields)
 		if err != nil {
 			return FlowStepResult{}, err
@@ -333,7 +344,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	// field-shaped dispatch and short-circuits it when engaged. Only proceed into
 	// processPasskey when no dispatch outcome already overrode the route.
 	if routeOutcome == in.Action {
-		pk, err := r.processPasskey(ctx, client, state, currentStep, resolved, in)
+		pk, err := r.processPasskey(ctx, client, state, currentStep, resolved, in, actionKind)
 		if err != nil {
 			return FlowStepResult{}, err
 		}
@@ -574,11 +585,11 @@ type passkeyPhaseResult struct {
 //     yet identified.
 //   - issue leg (register): step offers a `passkey_register` action and it
 //     was selected → user must already be identified; mint a creation challenge.
-func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client database.QueryExecutor, state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, in FlowSubmitInput) (passkeyPhaseResult, error) {
+func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client database.QueryExecutor, state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, in FlowSubmitInput, actionKind FlowActionKind) (passkeyPhaseResult, error) {
 	switch {
 	// A ceremony is in flight but no proof arrived: resume or abandon.
 	case state.PendingChallenge != nil && in.ChallengeResponse == nil:
-		if !pendingMatchesAction(state.PendingChallenge.Method, in.Action) {
+		if !pendingMatchesKind(state.PendingChallenge.Method, in.Action, actionKind) {
 			state.PendingChallenge = nil
 			return passkeyPhaseResult{}, nil
 		}
@@ -664,8 +675,8 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 			return passkeyPhaseResult{handled: true}, nil
 		}
 
-	case in.Action == FlowActionPasskey:
-		if !stepHasAction(step, FlowActionPasskey) {
+	case actionKind == FlowActionKindPasskey:
+		if !stepHasActionKind(step, FlowActionKindPasskey) {
 			return passkeyPhaseResult{}, nil
 		}
 		if in.PasskeyRP == nil {
@@ -692,8 +703,8 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 		state.IssuedAt = r.now()
 		return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
 
-	case in.Action == FlowActionPasskeyRegister:
-		if !stepHasAction(step, FlowActionPasskeyRegister) {
+	case actionKind == FlowActionKindPasskeyRegister:
+		if !stepHasActionKind(step, FlowActionKindPasskeyRegister) {
 			return passkeyPhaseResult{}, nil
 		}
 		if in.PasskeyRP == nil {
@@ -737,19 +748,19 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 	return passkeyPhaseResult{}, nil
 }
 
-// pendingMatchesAction reports whether a no-proof POST should resume the
+// pendingMatchesKind reports whether a no-proof POST should resume the
 // pending ceremony (vs. abandon it). An empty submitted action covers
-// passive POSTs; an explicit action only resumes when it targets the same
-// method as the pending challenge.
-func pendingMatchesAction(pendingMethod, submittedAction string) bool {
+// passive POSTs; otherwise the submitted action's kind must match the
+// pending ceremony's method.
+func pendingMatchesKind(pendingMethod, submittedAction string, submittedKind FlowActionKind) bool {
 	if submittedAction == "" {
 		return true
 	}
 	switch pendingMethod {
 	case FlowChallengeMethodPasskey:
-		return submittedAction == FlowActionPasskey
+		return submittedKind == FlowActionKindPasskey
 	case FlowChallengeMethodPasskeyRegister:
-		return submittedAction == FlowActionPasskeyRegister
+		return submittedKind == FlowActionKindPasskeyRegister
 	}
 	return false
 }
@@ -786,6 +797,44 @@ func (r *FlowStateMachineRuntime) runOnSuccess(ctx context.Context, client datab
 		State:         state,
 		ResolvedFlow:  def,
 	})
+}
+
+// followTransition routes from currentStep via the transition keyed by
+// outcome, without running the input pipeline. Used by navigate-kind
+// actions (back, etc.) where field validation and dispatch are skipped.
+func (r *FlowStateMachineRuntime) followTransition(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, currentStep *FlowDefinitionStep, outcome, userSchemaURL string) (FlowStepResult, error) {
+	transition, ok := currentStep.Transitions[outcome]
+	if !ok {
+		return FlowStepResult{}, fmt.Errorf("%w: %q on step %q", ErrInvalidAction, outcome, currentStep.Name)
+	}
+	if transition.Action != nil {
+		return FlowStepResult{}, fmt.Errorf("%w: cross-flow transitions", ErrUnsupported)
+	}
+	nextStep, ok := def.FindStep(transition.Target)
+	if !ok {
+		return FlowStepResult{}, fmt.Errorf("%w: transition target %q missing from definition", ErrIntegrity, transition.Target)
+	}
+
+	r.advance(state, currentStep, nextStep.Name)
+
+	if nextStep.Complete != nil {
+		step, handoff, err := r.terminate(ctx, client, def, state, userSchemaURL, nextStep)
+		if err != nil {
+			return FlowStepResult{}, err
+		}
+		return FlowStepResult{
+			State:                 state,
+			Step:                  step,
+			HandoffToken:          handoff.Token,
+			HandoffTokenExpiresAt: handoff.ExpiresAt,
+		}, nil
+	}
+
+	step, err := r.renderStep(ctx, client, def, state, userSchemaURL, nextStep)
+	if err != nil {
+		return FlowStepResult{}, err
+	}
+	return FlowStepResult{State: state, Step: step}, nil
 }
 
 func (r *FlowStateMachineRuntime) advance(state *FlowState, prev *FlowDefinitionStep, nextStepName string) {
@@ -902,6 +951,7 @@ func (r *FlowStateMachineRuntime) buildStep(step *FlowDefinitionStep, resolved F
 		}
 		actions[i] = FlowAction{
 			Name:    a.Name,
+			Kind:    a.Kind,
 			TextKey: textKey,
 			Primary: a.Primary,
 		}
@@ -918,14 +968,30 @@ func (r *FlowStateMachineRuntime) buildStep(step *FlowDefinitionStep, resolved F
 	}
 }
 
-// stepHasAction reports whether the step declares an action with the given name.
-func stepHasAction(step *FlowDefinitionStep, name string) bool {
+// stepHasActionKind reports whether the step declares any action of the
+// given kind.
+func stepHasActionKind(step *FlowDefinitionStep, kind FlowActionKind) bool {
 	for _, a := range step.Actions {
-		if a.Name == name {
+		if a.Kind == kind {
 			return true
 		}
 	}
 	return false
+}
+
+// stepActionKind returns the kind of the step's action with the given name.
+// Returns the zero value (unset) when name does not match any action on the
+// step — including the empty action submitted by passive POSTs.
+func stepActionKind(step *FlowDefinitionStep, name string) FlowActionKind {
+	if name == "" {
+		return 0
+	}
+	for _, a := range step.Actions {
+		if a.Name == name {
+			return a.Kind
+		}
+	}
+	return 0
 }
 
 func recordResolvedUser(state *FlowState, userID string) {

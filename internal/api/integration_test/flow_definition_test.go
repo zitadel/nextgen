@@ -115,7 +115,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 								},
 							}),
 							Actions: []api.StepAction{
-								{Name: "submit", Primary: api.NewOptBool(true)},
+								{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 							},
 						},
 						{
@@ -221,7 +221,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 								},
 							}),
 							Actions: []api.StepAction{
-								{Name: "submit", Primary: api.NewOptBool(true)},
+								{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 							},
 						},
 						{
@@ -267,7 +267,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 								},
 							}),
 							Actions: []api.StepAction{
-								{Name: "submit", Primary: api.NewOptBool(true)},
+								{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 							},
 						},
 						{
@@ -353,7 +353,7 @@ func validSteps() []api.FlowDefinitionStep {
 				},
 			}),
 			Actions: []api.StepAction{
-				{Name: "submit", Primary: api.NewOptBool(true)},
+				{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 			},
 		},
 		{
