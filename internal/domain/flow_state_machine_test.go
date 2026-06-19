@@ -708,6 +708,150 @@ func TestFlowStateMachine_Process_PasskeyAbandonedOnDifferentAction(t *testing.T
 	require.NotNil(t, abandoned.Step.Complete, "submit action should advance to the fallback terminal")
 }
 
+// passkeyIdentifierLoginDefinition builds a login step that collects the
+// identifier on the same step that offers the passkey action — the shape
+// the discoverable/non-discoverable passkey UI submits (email + "Login
+// with passkey" click).
+func passkeyIdentifierLoginDefinition() *domain.FlowDefinition {
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-passkey-identifier",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "authenticate",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "authenticate",
+				Fields: []string{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionPasskey, Kind: domain.FlowActionKindPasskey, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionPasskey:               {Target: "done"},
+					domain.FlowImplicitOutcomeUserNotFound: {Target: "not_found"},
+				},
+			},
+			{Name: "done", Complete: &show},
+			{Name: "not_found", Complete: &show},
+		},
+	}
+}
+
+// Repro for the "passkey login only works after refresh when two users share
+// the browser" bug: after attempt 1 rejects (user1 has no passkey), the
+// stored _user_id from attempt 1 must not block re-identifying user2 on
+// attempt 2. Otherwise the new challenge is still scoped to user1 and the
+// second user can never log in.
+func TestFlowStateMachine_Process_PasskeyAfterRejectionRebindsIdentifier(t *testing.T) {
+	w := newFlowTestWorld(t)
+	w.attempts.identifierResult = map[string]string{
+		"user1@example.com": "user_one",
+		"user2@example.com": "user_two",
+	}
+	w.attempts.issueOut = domain.FlowPasskeyChallengeOutput{ChallengeID: "ch-1", Options: []byte(`{"publicKey":{}}`)}
+	def := passkeyIdentifierLoginDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	// Attempt 1, issue leg: user1 (password-only) types their email and
+	// clicks "Login with passkey". The dispatch loop identifies user1, then
+	// processPasskey mints a challenge scoped to user1 (empty allowCredentials
+	// since user1 has no passkey).
+	issued1, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskey,
+		Fields:    map[string]any{"email": "user1@example.com"},
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, issued1.State.PendingChallenge)
+	require.Len(t, w.attempts.identifyCalls, 1, "attempt 1 must identify user1")
+	assert.Equal(t, "user1@example.com", w.attempts.identifyCalls[0].Value)
+	assert.Equal(t, "user_one", issued1.State.CollectedData[domain.FlowCollectedUserIDKey])
+
+	// Attempt 1, verify leg: the assertion that comes back doesn't match any
+	// credential the attempt is constrained to → server rejects.
+	w.attempts.passkeyErr = domain.ErrAuthAttemptProofRejected(nil)
+	rejected, err := w.sm.Process(t.Context(), nil, def, issued1.State, domain.FlowSubmitInput{
+		Action:            domain.FlowActionPasskey,
+		ChallengeResponse: &domain.FlowChallengeResponse{ChallengeID: "ch-1", Method: domain.FlowChallengeMethodPasskey, Proof: []byte(`{}`)},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, rejected.Step.Error)
+	assert.Equal(t, "auth_attempt.passkey_invalid", *rejected.Step.Error)
+	assert.Nil(t, rejected.State.PendingChallenge, "rejection clears PendingChallenge")
+
+	// Attempt 2, issue leg: the user re-types user2's email (passkey-only)
+	// and clicks "Login with passkey" again. user2 must be re-identified so
+	// the new challenge is scoped to user2's credentials. Before this fix,
+	// the dispatch loop skipped SubmitIdentifier whenever a previous _user_id
+	// was stored, leaving the attempt bound to user1.
+	w.attempts.passkeyErr = nil
+	w.attempts.passkeyUserID = "user_two"
+	w.attempts.issueOut = domain.FlowPasskeyChallengeOutput{ChallengeID: "ch-2", Options: []byte(`{"publicKey":{}}`)}
+
+	issued2, err := w.sm.Process(t.Context(), nil, def, rejected.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskey,
+		Fields:    map[string]any{"email": "user2@example.com"},
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, issued2.State.PendingChallenge, "attempt 2 must issue a fresh passkey challenge")
+
+	require.Len(t, w.attempts.identifyCalls, 2,
+		"attempt 2 must re-run SubmitIdentifier for the new email; the stored _user_id from attempt 1 must not short-circuit it")
+	assert.Equal(t, "user2@example.com", w.attempts.identifyCalls[1].Value,
+		"attempt 2 must dispatch the user2 identifier")
+	assert.Equal(t, "user_two", issued2.State.CollectedData[domain.FlowCollectedUserIDKey],
+		"_user_id must be rebound to user_two so the new passkey challenge is scoped to their credentials")
+}
+
+// Re-submitting the same identifier resolves to the same user, so the
+// in-flight ceremony survives. The dispatch re-runs (the auth-attempt is
+// the source of truth for whether the binding should change); the resolved
+// user id is the same, so PendingChallenge is preserved.
+func TestFlowStateMachine_Process_PasskeyResubmitSameIdentifierKeepsPendingChallenge(t *testing.T) {
+	w := newFlowTestWorld(t)
+	w.attempts.identifierResult = map[string]string{"user1@example.com": "user_one"}
+	w.attempts.issueOut = domain.FlowPasskeyChallengeOutput{ChallengeID: "ch-1", Options: []byte(`{"publicKey":{}}`)}
+	def := passkeyIdentifierLoginDefinition()
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	first, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskey,
+		Fields:    map[string]any{"email": "user1@example.com"},
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	require.Len(t, w.attempts.identifyCalls, 1)
+
+	// Same email re-submitted (e.g. user clicked the passkey action again
+	// after dismissing the browser prompt). Same user resolved → ceremony stays.
+	second, err := w.sm.Process(t.Context(), nil, def, first.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskey,
+		Fields:    map[string]any{"email": "user1@example.com"},
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	assert.Len(t, w.attempts.identifyCalls, 2, "every dispatch calls SubmitIdentifier")
+	require.NotNil(t, second.State.PendingChallenge, "same user resolved — ceremony survives")
+	assert.Equal(t, "user_one", second.State.CollectedData[domain.FlowCollectedUserIDKey])
+}
+
 // ---- CurrentPurpose + outcome flip ----
 
 func TestFlowStateMachine_Start_InitializesCurrentPurpose(t *testing.T) {
