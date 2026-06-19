@@ -10,9 +10,7 @@ properties:
     description: Identifier of the project this flow definition belongs to.
     example: proj_789ghi012jkl
   status:
-    type: string
-    description: Status of the flow definition.
-    example: active
+    $ref: flow-definition-status.yaml
   flow_definition:
     $ref: flow-definition.yaml
   created_at:

@@ -3,13 +3,22 @@ package api
 import (
 	"context"
 	"net/http"
-	"strings"
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 type SecurityHandler struct {
+	tokenVerifier domain.TokenVerifier
+}
+
+func NewSecurityHandler(
+	tokenVerifier domain.TokenVerifier,
+) *SecurityHandler {
+	return &SecurityHandler{
+		tokenVerifier: tokenVerifier,
+	}
 }
 
 func (s SecurityHandler) HandleUsernamePassword(ctx context.Context, operationName api.OperationName, t api.UsernamePassword) (context.Context, error) {
@@ -21,22 +30,22 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 	if t.Token == "" {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
-	// TODO: add proper token validation
-	projectID, ok := strings.CutPrefix(t.Token, "sk_")
-	if !ok {
+
+	payload, err := s.tokenVerifier.Verify(t.Token)
+	if err != nil {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
-	if !strings.HasPrefix(projectID, "proj_") {
-		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+
+	scope := ScopeContext{
+		ProjectID: payload.ProjectID,
 	}
-	return WithScopeContext(ctx, ScopeContext{ProjectID: projectID}), nil
+
+	ctx = WithScopeContext(ctx, scope)
+
+	return ctx, nil
 }
 
 var _ api.SecurityHandler = (*SecurityHandler)(nil)
-
-func NewSecurityHandler() *SecurityHandler {
-	return &SecurityHandler{}
-}
 
 type contextKey struct{}
 

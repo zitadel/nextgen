@@ -1,42 +1,40 @@
 package helpers
 
 import (
+	"crypto/rsa"
 	"net/http"
 	"net/http/httptest"
-	"sync"
 
+	"github.com/go-jose/go-jose/v4"
 	generated "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/tokengen"
 	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 type Harness struct {
-	mu sync.Mutex
+	EncryptionKey []byte
+	SigningKey    *rsa.PrivateKey
 
-	DBPool          database.Pool
-	HttpClient      *http.Client
-	TestServer      *httptest.Server
-	Hasher          *crypto.PasswapHasher
-	Crypter         crypto.Crypter
-	SecretGenerator secrets.Generator
+	DBPool               database.Pool
+	HttpClient           *http.Client
+	TestServer           *httptest.Server
+	Hasher               *crypto.PasswapHasher
+	Crypter              crypto.Crypter
+	SecretGenerator      secrets.Generator
+	JWTGenerator         *tokengen.JWTGenerator
+	OpaqueTokenGenerator *tokengen.OpaqueTokenGenerator
+	TokenVerifier        *tokengen.AnyTokenTypeVerifier
+	JoseSigner           jose.Signer
 
 	GeneratedServer *generated.Server
 	Handler         *api.Handler
 	SecurityHandler *api.SecurityHandler
-
-	// apiClients is a map of API clients, keyed by project ID.
-	// This allows tests to have multiple clients with different credentials if needed.
-	// Use [harness.EnsureAPIClient] to get a client for a specific project ID, which will create and cache the client as needed.
-	apiClients      map[string]*generated.Client
-	anonymousClient *generated.Client
-	// fakeSecuritySources is a map of fake security sources, keyed by project ID, to support multiple clients with different credentials if needed.
-	fakeSecuritySources     map[string]*FakeSecuritySource
-	anonymousSecuritySource *FakeSecuritySource
 
 	SchemaService         *service.SchemaService
 	SessionService        service.SessionService

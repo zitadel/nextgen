@@ -360,7 +360,6 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 			}
 			if dispatch.Outcome != "" {
 				routeOutcome = dispatch.Outcome
-				applyOutcomeFlip(state, routeOutcome)
 			} else if currentStep.OnSuccess != nil {
 				// Resolve the union of fields collected so far so the handler
 				// can read the identifier (and any other attributes) from
@@ -415,6 +414,10 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	if !ok {
 		return FlowStepResult{}, fmt.Errorf("%w: transition target %q missing from definition", ErrIntegrity, transition.Target)
 	}
+
+	// Flip after the route is committed; an outcome with no wired
+	// transition leaves CurrentPurpose untouched.
+	applyOutcomeFlip(state, routeOutcome)
 
 	r.advance(state, currentStep, nextStep.Name)
 
