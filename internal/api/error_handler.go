@@ -22,7 +22,7 @@ func domainErrorDetails(err error) api.ErrorDetails {
 		domErr = domain.ErrInternal(err)
 	}
 
-	if domErr.Details == nil {
+	if domErr.Details != nil {
 		if j, err := json.Marshal(domErr.Details); err == nil {
 			details["details"] = j
 		}
