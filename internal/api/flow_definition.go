@@ -78,8 +78,8 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Fl
 
 	// set the default status to active if not provided
 	status := api.FlowDefinitionStatusActive
-	if s, ok := definition.GetStatus().Get(); !ok || s != "" {
-		status = definition.GetStatus().Value
+	if s, ok := definition.GetStatus().Get(); ok && s != "" {
+		status = s
 	}
 	return mapFlowDefinitionRequestToService(string(req.GetProjectID()), req.GetSchemaURI(), req.GetFlowDefinition(), string(status))
 }
@@ -102,7 +102,7 @@ func mapFlowDefinitionRequestToService(projectID string, schemaURI api.OptSchema
 		Name:          definition.GetName(),
 		UserSchema:    userSchemaURI.String(),
 		Status:        status,
-		SchemaVersion: "1.0.0.", // todo (grvijayan): find a way to set this based on the schema URI or the request (currently not set in the request)
+		SchemaVersion: "1.0.0", // todo (grvijayan): find a way to set this based on the schema URI or the request (currently not set in the request)
 	}
 
 	purposes := make(map[string]string, len(definition.GetPurposes()))
