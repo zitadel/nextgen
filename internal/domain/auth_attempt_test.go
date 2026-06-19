@@ -523,6 +523,48 @@ func TestAuthAttempt_SetFactors(t *testing.T) {
 	})
 }
 
+// A user factor that was installed without going through a credential
+// verification cycle — RegisterCreatedUser is the production example,
+// promoting a synthetic challenge to a factor inside the same transaction
+// that inserts the user row — must not be silently replaced by a subsequent
+// SubmitIdentifier for a different value. Today the entity's only
+// structural protection is the "non-user factor present?" check at
+// auth_attempt.go:321-325, which misses this case because the direct-set
+// path installs only a user factor. Result: the just-created user binding
+// is overwritten and the row it inserted is orphaned.
+//
+// Not reachable from any current flow definition (no flow places an
+// identifier step after create_user / passkey_register), but the entity
+// must structurally prevent the subject-switch — relying on flow-definition
+// discipline is fragile, and the same shape will resurface as soon as a
+// step layout puts an identifier collection downstream of a creation path.
+func TestAuthAttempt_PrepareUserVerification_RejectsRebindAfterDirectUserFactorSet(t *testing.T) {
+	ttl := time.Minute
+	attempt := &domain.AuthAttempt{
+		CreatedAt:  time.Now(),
+		TimeToLive: &ttl,
+	}
+
+	// Direct user-factor install, mirroring RegisterCreatedUser (see
+	// service/auth_attempt.go's RegisterCreatedUser, which calls
+	// SetChallenge + ChallengeSucceeded with a synthetic challenge and
+	// promotes a *domain.AuthFactorUser without any credential proof).
+	attempt.SetUserFactor(&domain.User{ID: "user_A_created_here"})
+
+	// Simulate the SubmitIdentifier path for a different user: issue a
+	// user challenge, prepare verification. If the entity allows the
+	// prep, SetUserFactor will overwrite without protest.
+	attempt.Checks = append(attempt.Checks, domain.SetAuthChallengeUser("ch-1", time.Now(), time.Time{}, 0))
+	if _, err := attempt.PrepareUserVerification("ch-1"); err == nil {
+		attempt.SetUserFactor(&domain.User{ID: "user_B_existing"})
+	}
+
+	got, ok := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
+	require.True(t, ok)
+	assert.Equal(t, "user_A_created_here", got.UserID,
+		"the user factor installed by the direct path must survive a subsequent SubmitIdentifier; orphaning the just-created user is a subject-switch hazard")
+}
+
 func TestAuthAttempt_PrepareHandoff(t *testing.T) {
 	ttl := time.Minute
 
