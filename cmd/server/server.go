@@ -214,7 +214,14 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	)
 	passkeyRegSvc := service.NewPasskeyRegistrationService(pool, passkeyRegRepo, userPasskeyRepo, ids)
 	passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
-	stateMachine := service.NewFlowStateMachine(fields, createUserHandler, flowAuth, passkeyRegAdapter, time.Now)
+	stateMachine := service.NewFlowStateMachine(
+		fields,
+		createUserHandler,
+		flowAuth,
+		passkeyRegAdapter,
+		userService,
+		time.Now,
+	)
 
 	flowService := service.NewFlowService(pool, flowDefinitionRepo, stateMachine, ids)
 

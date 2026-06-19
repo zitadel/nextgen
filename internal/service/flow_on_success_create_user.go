@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/zitadel/nextgen/internal/crypto"
@@ -48,8 +47,17 @@ func (h *FlowCreateUserHandler) Handle(ctx context.Context, in domain.FlowOnSucc
 		h.schemaRepo,
 	)
 
-	_, _, passwordValue, hasPassword := findCollectedFieldByChallenge(in.Resolved.Fields, in.State.CollectedData, domain.FlowFieldChallengePassword)
-	if !hasPassword {
+	var passwordValue string
+	for _, f := range in.Resolved.Fields {
+		if f.Challenge != domain.FlowFieldChallengePassword {
+			continue
+		}
+		if v, present := in.State.CollectedData[f.Name]; present {
+			passwordValue, _ = v.(string)
+			break
+		}
+	}
+	if passwordValue == "" {
 		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", ErrIntegrity)
 	}
 
@@ -58,7 +66,7 @@ func (h *FlowCreateUserHandler) Handle(ctx context.Context, in domain.FlowOnSucc
 			SetPasswordInput{
 				ProjectID: in.ProjectID,
 				UserID:    createUserAction.User[domain.UserIDFieldName].(string),
-				Password:  passwordValue.(string),
+				Password:  passwordValue,
 			},
 			h.hasher,
 			h.passwordRepo,
@@ -73,63 +81,4 @@ func (h *FlowCreateUserHandler) Handle(ctx context.Context, in domain.FlowOnSucc
 	return domain.FlowOnSuccessResult{
 		UserID: createUserAction.User[domain.UserIDFieldName].(string),
 	}, nil
-}
-
-// state.CollectedData. If the user already exists (UniqueError from a prior
-// on_success handler), the call succeeds silently. Intended to be called
-// within the passkey verify phase, sharing the same client transaction as
-// the passkey save for atomicity.
-func (h *FlowCreateUserHandler) HandleProvisional(ctx context.Context, client database.QueryExecutor, userID string, state *domain.FlowState, resolved domain.FlowResolvedFields) error {
-	var attrs []*domain.CreateAttribute
-	if name, field, value, ok := findCollectedFieldByChallenge(resolved.Fields, state.CollectedData, domain.FlowFieldChallengeIdentifier); ok {
-		uniqueScope := attributeUniquenessFor(name, name, field.Unique)
-		attr, err := domain.NewCreateAttribute(name, value, uniqueScope)
-		if err != nil {
-			return fmt.Errorf("flow create provisional user: build attribute: %w", err)
-		}
-		attrs = append(attrs, attr)
-	}
-	_, err := h.userService.CreateUser(ctx, CreateUserInput{
-		ProjectID: state.ProjectID,
-		User:      collectedDataToUserData(state.CollectedData, state.UserSchemaURL),
-	})
-	if derr, ok := errors.AsType[domain.Error](err); ok && derr.Code == domain.ErrUserAlreadyExists().Code {
-		return nil
-	}
-	return err
-}
-
-// findCollectedFieldByChallenge looks up a field whose resolved Challenge
-// matches target and whose name is present in collected. Returns the field
-// name, the matched [FlowField], and its collected value. Callers that don't
-// need the FlowField discard it.
-func findCollectedFieldByChallenge(resolved []domain.FlowField, collected map[string]any, target domain.FlowFieldChallenge) (name string, field domain.FlowField, value any, ok bool) {
-	for _, f := range resolved {
-		if f.Challenge != target {
-			continue
-		}
-		if v, present := collected[f.Name]; present {
-			return f.Name, f, v, true
-		}
-	}
-	return "", domain.FlowField{}, nil, false
-}
-
-// attributeUniquenessFor picks the [AttributeUniqueness] the user
-// repository writes for a given field. The field's own scope passes
-// through; the identifier field falls back to team-level when the
-// schema didn't pin it, so two users can't share the same login.
-func attributeUniquenessFor(name, identifierName string, scope domain.AttributeUniqueness) domain.AttributeUniqueness {
-	if scope != domain.AttributeUniquenessUnspecified {
-		return scope
-	}
-	if name == identifierName {
-		return domain.AttributeUniquenessTeam
-	}
-	return domain.AttributeUniquenessUnspecified
-}
-
-func asString(v any) string {
-	s, _ := v.(string)
-	return s
 }

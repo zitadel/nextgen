@@ -185,7 +185,14 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 	)
 	resolver := newDefaultResolver(t)
 	now := func() time.Time { return time.Unix(1700000000, 0).UTC() }
-	sm := service.NewFlowStateMachine(resolver, createUser, authAttemptService, passkeyRegService, now)
+	sm := service.NewFlowStateMachine(
+		resolver,
+		createUser,
+		authAttemptService,
+		passkeyRegService,
+		userService,
+		now,
+	)
 
 	return &flowTestWorld{
 		mock:               mock,
@@ -1789,7 +1796,9 @@ func TestFlowStateMachine_Process_PasskeyRegisterRejectedKeepsStep(t *testing.T)
 func TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID(t *testing.T) {
 	const challengeID = "reg-1"
 	const registrationOpts = `{"rp":{"id":"example.com"}}`
+
 	const userID = "NOT EMPTY"
+
 	w := newFlowTestWorld(t)
 	def := passkeyRegisterDefinition()
 

@@ -193,6 +193,7 @@ type FlowStateMachineRuntime struct {
 	createUser          *FlowCreateUserHandler
 	authAttempts        domain.FlowAuthAttemptService
 	passkeyRegistration domain.FlowPasskeyRegistrationService
+	userService         *UserService
 	now                 func() time.Time
 }
 
@@ -203,12 +204,20 @@ func NewFlowStateMachine(
 	createUser *FlowCreateUserHandler,
 	authAttempts domain.FlowAuthAttemptService,
 	passkeyRegistration domain.FlowPasskeyRegistrationService,
+	userService *UserService,
 	now func() time.Time,
 ) *FlowStateMachineRuntime {
 	if now == nil {
 		now = time.Now
 	}
-	return &FlowStateMachineRuntime{fields: fields, createUser: createUser, authAttempts: authAttempts, passkeyRegistration: passkeyRegistration, now: now}
+	return &FlowStateMachineRuntime{
+		fields:              fields,
+		createUser:          createUser,
+		authAttempts:        authAttempts,
+		passkeyRegistration: passkeyRegistration,
+		userService:         userService,
+		now:                 now,
+	}
 }
 
 var _ FlowStateMachine = (*FlowStateMachineRuntime)(nil)
@@ -379,7 +388,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 				if err != nil {
 					return FlowStepResult{}, err
 				}
-				result, err := r.runOnSuccess(ctx, client, def, state, userSchemaURL, currentStep, in.Fields, visitedResolved)
+				result, err := r.runOnSuccess(ctx, def, state, userSchemaURL, currentStep, in.Fields, visitedResolved)
 				if err != nil {
 					return FlowStepResult{}, err
 				}
@@ -626,7 +635,11 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 			_, provisional := state.CollectedData[flowCollectedPasskeyProvisionalKey]
 			if provisional {
 				delete(state.CollectedData, flowCollectedPasskeyProvisionalKey)
-				if err := r.createUser.HandleProvisional(ctx, client, userID, state, resolved); err != nil {
+				_, err := r.userService.CreateUser(ctx, CreateUserInput{
+					ProjectID: state.ProjectID,
+					User:      collectedDataToUserData(state.CollectedData, state.UserSchemaURL),
+				})
+				if derr, ok := errors.AsType[domain.Error](err); ok && derr.Code == domain.ErrUserAlreadyExists().Code {
 					return passkeyPhaseResult{}, fmt.Errorf("flow state machine: ensure user exists: %w", err)
 				}
 			}
@@ -784,7 +797,7 @@ func attachPendingChallenge(step *FlowStep, pc *domain.FlowPendingChallenge) {
 
 // runOnSuccess dispatches the step's on_success mutation. Add a case
 // when a new [FlowOnSuccess] handler lands.
-func (r *FlowStateMachineRuntime) runOnSuccess(ctx context.Context, client database.QueryExecutor, def *domain.FlowDefinition, state *domain.FlowState, userSchemaURL string, step *domain.FlowDefinitionStep, fields map[string]any, resolved domain.FlowResolvedFields) (domain.FlowOnSuccessResult, error) {
+func (r *FlowStateMachineRuntime) runOnSuccess(ctx context.Context, def *domain.FlowDefinition, state *domain.FlowState, userSchemaURL string, step *domain.FlowDefinitionStep, fields map[string]any, resolved domain.FlowResolvedFields) (domain.FlowOnSuccessResult, error) {
 	var handler domain.FlowOnSuccessHandler
 	switch *step.OnSuccess {
 	case domain.FlowOnSuccessCreateUser:
