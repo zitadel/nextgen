@@ -1140,7 +1140,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 				Purposes:         map[string]string{"login": "step_1"},
 				Steps:            []domain.FlowDefinitionStep{{Name: "step_1"}},
 			}},
-			wantErr: domain.ErrFlowDefinitionUpdateConflict(`cannot update status to "draft": no other active flow definition found with this purpose`),
+			wantErr: domain.ErrFlowDefinitionUpdateConflict("cannot update: no other active flow definition found with purpose \"login\""),
 		},
 		{
 			name: "deactivate blocked - multi-purpose missing active alternative for one purpose",
@@ -1201,7 +1201,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 				},
 				Steps: []domain.FlowDefinitionStep{{Name: "step_1"}},
 			}},
-			wantErr: domain.ErrFlowDefinitionUpdateConflict(`cannot update status to "draft": no other active flow definition found with this purpose`),
+			wantErr: domain.ErrFlowDefinitionUpdateConflict("cannot update: no other active flow definition found with purpose \"register\""),
 		},
 		{
 			name: "deactivate allowed - all purposes have another active definition", fields: fields{
@@ -1286,6 +1286,118 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 				Purposes: map[domain.FlowDefinitionPurpose]string{
 					domain.FlowDefinitionPurposeLogin:    "step_1",
 					domain.FlowDefinitionPurposeRegister: "step_1",
+				},
+			},
+		},
+		{
+			name: "active update removing purpose fails - removed purpose has no alternate active definition",
+			fields: fields{
+				db: stubPool(),
+				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
+					return userSchema, nil
+				}},
+				builtinSchemaProvider: &mockBuiltinSchemaProvider{},
+				validatorFn: func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error) {
+					return nil, nil
+				},
+				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
+					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
+					repo.EXPECT().
+						GetFlowDefinition(gomock.Any(), gomock.Any(), "project1", "flowdef_123").
+						Times(1).
+						Return(&domain.FlowDefinition{
+							ID:        "flowdef_123",
+							ProjectID: "project1",
+							Status:    domain.FlowDefinitionStatusActive,
+							Purposes: map[domain.FlowDefinitionPurpose]string{
+								domain.FlowDefinitionPurposeLogin:    "step_1",
+								domain.FlowDefinitionPurposeRecovery: "step_1",
+							},
+						}, nil)
+					// only self remains active for removed "recovery" purpose
+					repo.EXPECT().
+						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any(), gomock.Any()).
+						Times(1).
+						Return([]*domain.FlowDefinition{
+							{ID: "flowdef_123", Status: domain.FlowDefinitionStatusActive},
+						}, nil)
+					return repo
+				},
+			},
+			args: args{ctx: context.Background(), req: service.FlowDefinitionRequest{
+				FlowDefinitionID: "flowdef_123",
+				ProjectID:        "project1",
+				Name:             "login-only",
+				Status:           "active",
+				SchemaVersion:    "1.0.0",
+				UserSchema:       "https://tenant.com/schemas/my-user.json",
+				Purposes: map[string]string{
+					"login": "step_1", // remove recovery while active
+				},
+				Steps: []domain.FlowDefinitionStep{{Name: "step_1"}},
+			}},
+			wantErr: domain.ErrFlowDefinitionUpdateConflict("cannot update: no other active flow definition found with purpose \"recovery\""),
+		},
+		{
+			name: "active update removing purpose succeeds - alternate active definition exists for removed purpose",
+			fields: fields{
+				db: stubPool(),
+				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
+					return userSchema, nil
+				}},
+				builtinSchemaProvider: &mockBuiltinSchemaProvider{},
+				validatorFn: func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error) {
+					return nil, nil
+				},
+				flowDefinitionRepo: func(ctrl *gomock.Controller) *domainmock.MockFlowDefinitionRepository {
+					repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
+					repo.EXPECT().
+						GetFlowDefinition(gomock.Any(), gomock.Any(), "project1", "flowdef_123").
+						Times(1).
+						Return(&domain.FlowDefinition{
+							ID:        "flowdef_123",
+							ProjectID: "project1",
+							Status:    domain.FlowDefinitionStatusActive,
+							Purposes: map[domain.FlowDefinitionPurpose]string{
+								domain.FlowDefinitionPurposeLogin:    "step_1",
+								domain.FlowDefinitionPurposeRecovery: "step_1",
+							},
+						}, nil)
+					repo.EXPECT().
+						ListFlowDefinitions(gomock.Any(), gomock.Any(), "project1", gomock.Any(), gomock.Any()).
+						Times(1).
+						Return([]*domain.FlowDefinition{
+							{ID: "flowdef_123", Status: domain.FlowDefinitionStatusActive},
+							{ID: "flowdef_other_recovery", Status: domain.FlowDefinitionStatusActive},
+						}, nil)
+					repo.EXPECT().
+						UpdateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any()).
+						Times(1).
+						Return(nil)
+					return repo
+				},
+			},
+			args: args{ctx: context.Background(), req: service.FlowDefinitionRequest{
+				FlowDefinitionID: "flowdef_123",
+				ProjectID:        "project1",
+				Name:             "login-only",
+				Status:           "active",
+				SchemaVersion:    "1.0.0",
+				UserSchema:       "https://tenant.com/schemas/my-user.json",
+				Purposes: map[string]string{
+					"login": "step_1", // remove recovery while active
+				},
+				Steps: []domain.FlowDefinitionStep{{Name: "step_1"}},
+			}},
+			want: &domain.FlowDefinition{
+				ID:            "flowdef_123",
+				ProjectID:     "project1",
+				Name:          "login-only",
+				SchemaVersion: "1.0.0",
+				Status:        domain.FlowDefinitionStatusActive,
+				UserSchema:    "https://tenant.com/schemas/my-user.json",
+				Purposes: map[domain.FlowDefinitionPurpose]string{
+					domain.FlowDefinitionPurposeLogin: "step_1",
 				},
 			},
 		},

@@ -131,14 +131,11 @@ func (fd *flowDefinitionService) Update(ctx context.Context, req FlowDefinitionR
 	if err != nil {
 		return nil, domain.ErrFlowDefinitionInvalid("invalid status", err)
 	}
-	// status update
-	// before the status update (deactivation): ensure that there are other flow definitions that are `active` with the existing purpose
-	err = fd.isStatusUpdateAllowed(ctx, req.ProjectID, retrievedFlowDef.ID, retrievedFlowDef.Status, status, retrievedFlowDef.Purposes)
+	reqPurposes, err := mapPurposesToDomain(req.Purposes)
 	if err != nil {
 		return nil, err
 	}
-
-	reqPurposes, err := mapPurposesToDomain(req.Purposes)
+	err = fd.isUpdateAllowed(ctx, req.ProjectID, retrievedFlowDef.ID, retrievedFlowDef.Status, status, retrievedFlowDef.Purposes, reqPurposes)
 	if err != nil {
 		return nil, err
 	}
@@ -168,11 +165,38 @@ func (fd *flowDefinitionService) Update(ctx context.Context, req FlowDefinitionR
 	return flowDefinition, nil
 }
 
-func (fd *flowDefinitionService) isStatusUpdateAllowed(ctx context.Context, projectID, flowDefID string, currentStatus, reqStatus domain.FlowDefinitionStatus, currentPurposes map[domain.FlowDefinitionPurpose]string) error {
-	if reqStatus == domain.FlowDefinitionStatusActive || currentStatus == reqStatus {
+func (fd *flowDefinitionService) isUpdateAllowed(
+	ctx context.Context,
+	projectID,
+	flowDefID string,
+	currentStatus, reqStatus domain.FlowDefinitionStatus,
+	currentPurposes, reqPurposes map[domain.FlowDefinitionPurpose]string) error {
+	// no status change and no purpose change -> the update is allowed implicitly
+	if currentStatus == reqStatus && samePurposes(currentPurposes, reqPurposes) {
 		return nil
 	}
-	for purpose := range currentPurposes {
+
+	purposesToCheck := make(map[domain.FlowDefinitionPurpose]struct{})
+
+	if reqStatus != domain.FlowDefinitionStatusActive {
+		// deactivation: to check if there are other active flow definitions with the current purpose
+		for p := range currentPurposes {
+			purposesToCheck[p] = struct{}{}
+		}
+	} else {
+		// purpose change: to check if there are other active flow definitions to support the purpose being removed
+		for p := range currentPurposes {
+			if _, ok := reqPurposes[p]; !ok {
+				purposesToCheck[p] = struct{}{}
+			}
+		}
+	}
+
+	if len(purposesToCheck) == 0 {
+		return nil
+	}
+
+	for purpose := range purposesToCheck {
 		fds, err := fd.flowDefinitionRepo.ListFlowDefinitions(
 			ctx,
 			fd.db,
@@ -191,7 +215,7 @@ func (fd *flowDefinitionService) isStatusUpdateAllowed(ctx context.Context, proj
 			}
 		}
 		if !hasActive {
-			return domain.ErrFlowDefinitionUpdateConflict(fmt.Sprintf("cannot update status to %q: no other active flow definition found with this purpose", reqStatus.String()))
+			return domain.ErrFlowDefinitionUpdateConflict(fmt.Sprintf("cannot update: no other active flow definition found with purpose %q", purpose))
 		}
 	}
 	return nil
@@ -256,6 +280,18 @@ func mapPurposesToDomain(reqPurposes map[string]string) (map[domain.FlowDefiniti
 		purposes[purpose] = entryStep
 	}
 	return purposes, nil
+}
+
+func samePurposes(current, req map[domain.FlowDefinitionPurpose]string) bool {
+	if len(current) != len(req) {
+		return false
+	}
+	for purpose, entryStep := range current {
+		if reqStep, ok := req[purpose]; !ok || entryStep != reqStep {
+			return false
+		}
+	}
+	return true
 }
 
 func (fd *flowDefinitionService) Get(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error) {

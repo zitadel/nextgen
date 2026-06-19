@@ -368,7 +368,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 				def.Purposes = map[string]string{
 					"login": "step_1", // remove recovery
 				}
-				def.Status = api.NewOptFlowDefinitionStatus(api.FlowDefinitionStatusDraft)
+				def.Status = api.NewOptFlowDefinitionStatus(api.FlowDefinitionStatusDraft) // deactivate while removing recovery
 				return def
 			}()),
 			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginRegisterFlowDef.ID},
@@ -379,10 +379,66 @@ func TestUpdateFlowDefinition(t *testing.T) {
 					Message: "flow definition: update conflict",
 					Details: api.OptErrorDetailsDetails{
 						Value: api.ErrorDetailsDetails{
-							"details": jx.Raw(`"cannot update status to \"draft\": no other active flow definition found with this purpose"`),
+							"details": jx.Raw(`"cannot update: no other active flow definition found with purpose \"recovery\""`),
 						},
 						Set: true,
 					},
+				},
+			},
+		},
+		{
+			name: "active update removing old purpose fails when removed purpose has no alternate active definition",
+			req: newUpdateFlowDefinitionRequest(func() api.FlowDefinition {
+				def := newFlowDefinitionFixture("multi-purpose-flow-remove-recovery", *userSchemaURI)
+				def.Purposes = map[string]string{
+					"login": "step_1", // remove recovery while staying active
+				}
+				def.Status = api.NewOptFlowDefinitionStatus(api.FlowDefinitionStatusActive)
+				return def
+			}()),
+			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginRegisterFlowDef.ID},
+			wantResp: &api.ErrorDetailsStatusCode{
+				StatusCode: http.StatusConflict,
+				Response: api.ErrorDetails{
+					Code:    "flowdef.update_conflict",
+					Message: "flow definition: update conflict",
+					Details: api.OptErrorDetailsDetails{
+						Value: api.ErrorDetailsDetails{
+							"details": jx.Raw(`"cannot update: no other active flow definition found with purpose \"recovery\""`),
+						},
+						Set: true,
+					},
+				},
+			},
+		},
+		{
+			name: "active update removing purpose succeeds when alternate active definition exists",
+			req: newUpdateFlowDefinitionRequest(func() api.FlowDefinition {
+				def := newFlowDefinitionFixture("multi-purpose-flow-remove-login", *userSchemaURI)
+				def.Purposes = map[string]string{
+					"recovery": "step_1", // remove login
+				}
+				def.Status = api.NewOptFlowDefinitionStatus(api.FlowDefinitionStatusActive)
+				return def
+			}()),
+			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginRegisterFlowDef.ID},
+			wantResp: &api.FlowDefinitionDetailResponse{
+				ID:        loginRegisterFlowDef.ID,
+				ProjectID: project.ID,
+				Status:    api.FlowDefinitionStatusActive,
+				FlowDefinition: api.FlowDefinition{
+					Name:       "multi-purpose-flow-remove-login",
+					UserSchema: *userSchemaURI,
+					Purposes:   map[string]string{"recovery": "step_1"},
+					Audience: api.OptFlowAudience{
+						Value: api.FlowAudience{
+							TeamIds: []string{"team-1", "team-2"},
+							AppIds:  []string{"app-1", "app-2"},
+						},
+						Set: true,
+					},
+					Steps:  validSteps(),
+					Status: api.NewOptFlowDefinitionStatus(api.FlowDefinitionStatusActive),
 				},
 			},
 		},
