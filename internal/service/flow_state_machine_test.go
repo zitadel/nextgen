@@ -221,7 +221,7 @@ func loginDefinition() *domain.FlowDefinition {
 				Name:   "credentials",
 				Fields: []string{"email", "password"},
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionSubmit, Kind: service.FlowActionKindSubmit, Primary: true},
+					{Name: service.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionSubmit:               {Target: "done"},
@@ -259,7 +259,7 @@ func signupDefinition() *domain.FlowDefinition {
 				Fields:    []string{"email", "password"},
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionSubmit, Kind: service.FlowActionKindSubmit, Primary: true},
+					{Name: service.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionSubmit: {Target: "done"},
@@ -694,7 +694,7 @@ func passkeyLoginDefinition() *domain.FlowDefinition {
 			{
 				Name: "authenticate",
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionPasskey, Kind: service.FlowActionKindPasskey, Primary: true},
+					{Name: service.FlowActionPasskey, Kind: domain.FlowActionKindPasskey, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionPasskey: {Target: "done"},
@@ -1318,7 +1318,7 @@ func combinedSigninSignupDefinition() *domain.FlowDefinition {
 				Name:   "identify",
 				Fields: []string{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionSubmit, Kind: service.FlowActionKindSubmit, Primary: true},
+					{Name: service.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionSubmit:                    {Target: "signin-password"},
@@ -1330,7 +1330,7 @@ func combinedSigninSignupDefinition() *domain.FlowDefinition {
 				Name:   "signin-password",
 				Fields: []string{"password"},
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionSubmit, Kind: service.FlowActionKindSubmit, Primary: true},
+					{Name: service.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionSubmit: {Target: "done"},
@@ -1341,7 +1341,7 @@ func combinedSigninSignupDefinition() *domain.FlowDefinition {
 				Fields:    []string{"password"},
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionSubmit, Kind: service.FlowActionKindSubmit, Primary: true},
+					{Name: service.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionSubmit: {Target: "done"},
@@ -1367,7 +1367,7 @@ func recoveryDefinition() *domain.FlowDefinition {
 				Name:   "identify",
 				Fields: []string{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionSubmit, Kind: service.FlowActionKindSubmit, Primary: true},
+					{Name: service.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionSubmit:               {Target: "new-password"},
@@ -1378,7 +1378,7 @@ func recoveryDefinition() *domain.FlowDefinition {
 				Name:   "new-password",
 				Fields: []string{"password"},
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionSubmit, Kind: service.FlowActionKindSubmit, Primary: true},
+					{Name: service.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionSubmit: {Target: "done"},
@@ -1644,7 +1644,7 @@ func passkeyRegisterDefinition() *domain.FlowDefinition {
 			{
 				Name: "register",
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionPasskeyRegister, Kind: service.FlowActionKindPasskeyRegister, Primary: true},
+					{Name: service.FlowActionPasskeyRegister, Kind: domain.FlowActionKindPasskeyRegister, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionPasskeyRegister: {Target: "done"},
@@ -1841,9 +1841,9 @@ func TestFlowStateMachine_Start_PreservesActionOrder(t *testing.T) {
 				Name:   "step",
 				Fields: []string{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionPasskey, Kind: service.FlowActionKindPasskey},
-					{Name: service.FlowActionSubmit, Kind: service.FlowActionKindSubmit, Primary: true},
-					{Name: "register", Kind: service.FlowActionKindSubmit},
+					{Name: service.FlowActionPasskey, Kind: domain.FlowActionKindPasskey},
+					{Name: service.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: "register", Kind: domain.FlowActionKindSubmit},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionPasskey: {Target: "done"},
@@ -1888,18 +1888,20 @@ func TestFlowStateMachine_Process_NavigateSkipsValidation(t *testing.T) {
 				Name:   "enter",
 				Fields: []string{"email", "password"},
 				Actions: []domain.FlowStepAction{
-					{Name: service.FlowActionSubmit, Kind: service.FlowActionKindSubmit, Primary: true},
-					{Name: "back", Kind: service.FlowActionKindNavigate},
+					{Name: service.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: "back", Kind: domain.FlowActionKindNavigate},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					service.FlowActionSubmit: {Target: "done"},
-					"back":                  {Target: "landing"},
+					"back":                   {Target: "landing"},
 				},
 			},
 			{Name: "landing", Complete: &show},
 			{Name: "done", Complete: &show},
 		},
 	}
+
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 
 	start, err := w.sm.Start(t.Context(), nil, service.FlowStartInput{
 		Definition:    def,
@@ -1928,6 +1930,8 @@ func TestFlowStateMachine_Process_NavigateSkipsValidation(t *testing.T) {
 func TestFlowStateMachine_Process_SubmitKindRegression(t *testing.T) {
 	w := newFlowTestWorld(t)
 	def := loginDefinition()
+
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 
 	start, err := w.sm.Start(t.Context(), nil, service.FlowStartInput{
 		Definition:    def,

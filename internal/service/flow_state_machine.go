@@ -122,7 +122,7 @@ type FlowStepTexts struct {
 // FlowAction is a single user action surfaced on [FlowStep.Actions].
 type FlowAction struct {
 	Name    string
-	Kind    FlowActionKind
+	Kind    domain.FlowActionKind
 	TextKey string
 	Primary bool
 }
@@ -301,7 +301,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	// on_success) and route straight to the matching transition. Used for
 	// back-navigation and similar pure-routing actions where the submitted
 	// fields are irrelevant.
-	if actionKind == FlowActionKindNavigate {
+	if actionKind == domain.FlowActionKindNavigate {
 		return r.followTransition(ctx, client, def, state, currentStep, in.Action, userSchemaURL)
 	}
 
@@ -331,7 +331,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	// PreparePasskeyChallenge finds no AuthFactorUser and falls back to a discoverable
 	// login with an empty allowCredentials list — non-discoverable credentials won't
 	// be found by the browser.
-	if actionKind == FlowActionKindPasskey && in.ChallengeResponse == nil {
+	if actionKind == domain.FlowActionKindPasskey && in.ChallengeResponse == nil {
 		dispatch, err := r.dispatchChallenges(ctx, def, state, currentStep, resolved, in.Fields)
 		if err != nil {
 			return FlowStepResult{}, err
@@ -683,8 +683,8 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 			return passkeyPhaseResult{handled: true}, nil
 		}
 
-	case actionKind == FlowActionKindPasskey:
-		if !stepHasActionKind(step, FlowActionKindPasskey) {
+	case actionKind == domain.FlowActionKindPasskey:
+		if !stepHasActionKind(step, domain.FlowActionKindPasskey) {
 			return passkeyPhaseResult{}, nil
 		}
 		if in.PasskeyRP == nil {
@@ -711,8 +711,8 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 		state.IssuedAt = r.now()
 		return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
 
-	case actionKind == FlowActionKindPasskeyRegister:
-		if !stepHasActionKind(step, FlowActionKindPasskeyRegister) {
+	case actionKind == domain.FlowActionKindPasskeyRegister:
+		if !stepHasActionKind(step, domain.FlowActionKindPasskeyRegister) {
 			return passkeyPhaseResult{}, nil
 		}
 		if in.PasskeyRP == nil {
@@ -756,15 +756,15 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 // pending ceremony (vs. abandon it). An empty submitted action covers
 // passive POSTs; otherwise the submitted action's kind must match the
 // pending ceremony's method.
-func pendingMatchesKind(pendingMethod, submittedAction string, submittedKind FlowActionKind) bool {
+func pendingMatchesKind(pendingMethod, submittedAction string, submittedKind domain.FlowActionKind) bool {
 	if submittedAction == "" {
 		return true
 	}
 	switch pendingMethod {
 	case FlowChallengeMethodPasskey:
-		return submittedKind == FlowActionKindPasskey
+		return submittedKind == domain.FlowActionKindPasskey
 	case FlowChallengeMethodPasskeyRegister:
-		return submittedKind == FlowActionKindPasskeyRegister
+		return submittedKind == domain.FlowActionKindPasskeyRegister
 	}
 	return false
 }
@@ -840,7 +840,6 @@ func (r *FlowStateMachineRuntime) followTransition(ctx context.Context, client d
 	}
 	return FlowStepResult{State: state, Step: step}, nil
 }
-
 
 func (r *FlowStateMachineRuntime) advance(state *domain.FlowState, prev *domain.FlowDefinitionStep, nextStepName string) {
 	state.History = append(state.History, prev.Name)
@@ -975,7 +974,7 @@ func (r *FlowStateMachineRuntime) buildStep(step *domain.FlowDefinitionStep, res
 
 // stepHasActionKind reports whether the step declares any action of the
 // given kind.
-func stepHasAction(step *domain.FlowDefinitionStep, kind domain.FlowActionKind) bool {
+func stepHasActionKind(step *domain.FlowDefinitionStep, kind domain.FlowActionKind) bool {
 	for _, a := range step.Actions {
 		if a.Kind == kind {
 			return true
