@@ -872,7 +872,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 							Name:   "step_1",
 							Fields: []string{"email"},
 							Actions: []domain.FlowStepAction{
-								{Name: "submit", Primary: true},
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
@@ -937,7 +937,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 							Name:   "step_1",
 							Fields: []string{"email"},
 							Actions: []domain.FlowStepAction{
-								{Name: "submit", Primary: true},
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},

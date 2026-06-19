@@ -156,9 +156,9 @@ func (fd *flowDefinitionService) Update(ctx context.Context, req FlowDefinitionR
 	if err != nil {
 		return nil, err
 	}
-	flowDefinition.CreatedAt = retrievedFlowDef.CreatedAt
 
 	err = fd.Validate(ctx, flowDefinition)
+	if err != nil {
 		return nil, err
 	}
 	err = fd.flowDefinitionRepo.UpdateFlowDefinition(ctx, fd.db, flowDefinition)
