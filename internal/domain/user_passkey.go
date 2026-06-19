@@ -137,7 +137,13 @@ func VerifyPasskeyChallenge(ceremony *PasskeyCeremony, response []byte, userID s
 
 // CreatePasskeyRegistrationChallenge starts a WebAuthn registration ceremony
 // for userID and returns persisted challenge state.
-func CreatePasskeyRegistrationChallenge(userID, username, displayName string, existing []*UserPasskey, rpID string, origins []url.URL) (*PasskeyCeremony, error) {
+func CreatePasskeyRegistrationChallenge(
+	userID, username, displayName string,
+	existing []*UserPasskey,
+	rpID string,
+	origins []url.URL,
+	userVerification string,
+) (*PasskeyCeremony, error) {
 	w, err := webAuthNConfig(rpID, origins...)
 	if err != nil {
 		return nil, ErrInternal(err)
@@ -148,7 +154,7 @@ func CreatePasskeyRegistrationChallenge(userID, username, displayName string, ex
 		displayName: displayName,
 		creds:       PasskeysToCredentials(existing),
 	}
-	creation, sessionData, err := w.BeginRegistration(user)
+	creation, sessionData, err := w.BeginRegistration(user, passkeyRegistrationOptions(existing, userVerification)...)
 	if err != nil {
 		return nil, ErrInternal(err)
 	}
@@ -156,6 +162,26 @@ func CreatePasskeyRegistrationChallenge(userID, username, displayName string, ex
 		return nil, ErrInternal(nil)
 	}
 	return newPasskeyCeremony(sessionData, creation.Response, origins)
+}
+
+// passkeyRegistrationOptions returns go-webauthn registration options for
+// [CreatePasskeyRegistrationChallenge]. Attestation and resident-key defaults
+// are fixed here; userVerification is supplied by the service / flow engine.
+func passkeyRegistrationOptions(existing []*UserPasskey, userVerification string) []webauthn.RegistrationOption {
+	opts := []webauthn.RegistrationOption{
+		webauthn.WithConveyancePreference(protocol.PreferNoAttestation),
+		webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementPreferred),
+	}
+	if userVerification != "" {
+		uv := protocol.UserVerificationRequirement(userVerification)
+		opts = append(opts, func(cco *protocol.PublicKeyCredentialCreationOptions) {
+			cco.AuthenticatorSelection.UserVerification = uv
+		})
+	}
+	if len(existing) > 0 {
+		opts = append(opts, webauthn.WithExclusions(webauthn.Credentials(PasskeysToCredentials(existing)).CredentialDescriptors()))
+	}
+	return opts
 }
 
 // VerifyPasskeyRegistrationChallenge validates an attestation against a

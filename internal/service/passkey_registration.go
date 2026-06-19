@@ -39,11 +39,12 @@ func NewPasskeyRegistrationService(
 
 // BeginRegistrationInput carries the parameters needed to start a passkey registration ceremony.
 type BeginRegistrationInput struct {
-	ProjectID string
-	UserID    string
-	Username  string
-	RPID      string
-	RPOrigins []string
+	ProjectID        string
+	UserID           string
+	Username         string
+	RPID             string
+	RPOrigins        []string
+	UserVerification string
 }
 
 // BeginRegistrationOutput is returned by [PasskeyRegistrationService.Begin].
@@ -70,6 +71,7 @@ func (s *PasskeyRegistrationService) Begin(ctx context.Context, in BeginRegistra
 		in.UserID, in.Username, in.Username,
 		existing,
 		in.RPID, origins,
+		in.UserVerification,
 	)
 	if err != nil {
 		return BeginRegistrationOutput{}, err

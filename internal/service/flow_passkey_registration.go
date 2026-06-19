@@ -24,11 +24,12 @@ var _ domain.FlowPasskeyRegistrationService = (*FlowPasskeyRegistrationAdapter)(
 // IssuePasskeyRegistrationChallenge implements [domain.FlowPasskeyRegistrationService].
 func (a *FlowPasskeyRegistrationAdapter) IssuePasskeyRegistrationChallenge(ctx context.Context, in domain.FlowIssuePasskeyRegistrationChallengeInput) (domain.FlowPasskeyRegistrationChallengeOutput, error) {
 	out, err := a.svc.Begin(ctx, BeginRegistrationInput{
-		ProjectID: in.ProjectID,
-		UserID:    in.UserID,
-		RPID:      in.RPID,
-		RPOrigins: in.RPOrigins,
-		Username:  in.Username,
+		ProjectID:        in.ProjectID,
+		UserID:           in.UserID,
+		RPID:             in.RPID,
+		RPOrigins:        in.RPOrigins,
+		Username:         in.Username,
+		UserVerification: in.UserVerification,
 	})
 	if err != nil {
 		return domain.FlowPasskeyRegistrationChallengeOutput{}, err

@@ -727,11 +727,12 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 			username, _ = idValue.(string)
 		}
 		out, err := r.passkeyRegistration.IssuePasskeyRegistrationChallenge(ctx, FlowIssuePasskeyRegistrationChallengeInput{
-			ProjectID: state.ProjectID,
-			UserID:    userID,
-			RPID:      in.PasskeyRP.RPID,
-			RPOrigins: in.PasskeyRP.Origins,
-			Username:  username,
+			ProjectID:        state.ProjectID,
+			UserID:           userID,
+			RPID:             in.PasskeyRP.RPID,
+			RPOrigins:        in.PasskeyRP.Origins,
+			Username:         username,
+			UserVerification: flowPasskeyDefaultUserVerification,
 		})
 		if err != nil {
 			return passkeyPhaseResult{}, fmt.Errorf("flow state machine: issue passkey registration: %w", err)

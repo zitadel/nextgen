@@ -200,15 +200,57 @@ func TestVerifyPasskeyChallenge(t *testing.T) {
 }
 
 func TestCreatePasskeyRegistrationChallenge(t *testing.T) {
-	s := newPasskeyTestSetup(t)
+	t.Run("exposes parseable creation options", func(t *testing.T) {
+		s := newPasskeyTestSetup(t)
 
-	ceremony, err := domain.CreatePasskeyRegistrationChallenge(testUserID, testUserID, testUserID, nil, testRPID, s.origins)
-	require.NoError(t, err)
+		ceremony, err := domain.CreatePasskeyRegistrationChallenge(testUserID, testUserID, testUserID, nil, testRPID, s.origins, "")
+		require.NoError(t, err)
 
-	opts, err := virtualwebauthn.ParseAttestationOptions(string(ceremony.ClientOptions()))
-	require.NoError(t, err)
-	assert.NotEmpty(t, opts.Challenge)
-	assert.Equal(t, testRPID, opts.RelyingPartyID)
+		opts, err := virtualwebauthn.ParseAttestationOptions(string(ceremony.ClientOptions()))
+		require.NoError(t, err)
+		assert.NotEmpty(t, opts.Challenge)
+		assert.Equal(t, testRPID, opts.RelyingPartyID)
+		assert.Empty(t, opts.ExcludeCredentials)
+	})
+
+	t.Run("excludes existing credentials", func(t *testing.T) {
+		s := newPasskeyTestSetup(t)
+
+		ceremony, err := domain.CreatePasskeyRegistrationChallenge(testUserID, testUserID, testUserID, []*domain.UserPasskey{s.passkey}, testRPID, s.origins, "")
+		require.NoError(t, err)
+
+		opts, err := virtualwebauthn.ParseAttestationOptions(string(ceremony.ClientOptions()))
+		require.NoError(t, err)
+		require.Len(t, opts.ExcludeCredentials, 1)
+		assert.Equal(t, domain.EncodePasskeyCredentialID([]byte(s.cred.ID)), opts.ExcludeCredentials[0])
+	})
+
+	t.Run("prefers discoverable credentials", func(t *testing.T) {
+		s := newPasskeyTestSetup(t)
+
+		ceremony, err := domain.CreatePasskeyRegistrationChallenge(testUserID, testUserID, testUserID, nil, testRPID, s.origins, "")
+		require.NoError(t, err)
+
+		var raw map[string]any
+		require.NoError(t, json.Unmarshal(ceremony.ClientOptions(), &raw))
+		selection, ok := raw["authenticatorSelection"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "preferred", selection["residentKey"])
+	})
+
+	t.Run("passes user verification requirement", func(t *testing.T) {
+		s := newPasskeyTestSetup(t)
+
+		ceremony, err := domain.CreatePasskeyRegistrationChallenge(testUserID, testUserID, testUserID, nil, testRPID, s.origins, "required")
+		require.NoError(t, err)
+
+		var raw map[string]any
+		require.NoError(t, json.Unmarshal(ceremony.ClientOptions(), &raw))
+		selection, ok := raw["authenticatorSelection"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "required", selection["userVerification"])
+		assert.Equal(t, "none", raw["attestation"])
+	})
 }
 
 func TestVerifyPasskeyRegistrationChallenge(t *testing.T) {
@@ -219,7 +261,7 @@ func TestVerifyPasskeyRegistrationChallenge(t *testing.T) {
 	})
 	credNew := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
 
-	ceremony, err := domain.CreatePasskeyRegistrationChallenge(testUserID, testUserID, testUserID, nil, testRPID, s.origins)
+	ceremony, err := domain.CreatePasskeyRegistrationChallenge(testUserID, testUserID, testUserID, nil, testRPID, s.origins, "")
 	require.NoError(t, err)
 
 	attestOpts, err := virtualwebauthn.ParseAttestationOptions(string(ceremony.ClientOptions()))
@@ -261,7 +303,7 @@ func TestVerifyPasskeyRegistrationChallenge_AfterPersistenceRoundTrip(t *testing
 	})
 	credNew := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
 
-	ceremony, err := domain.CreatePasskeyRegistrationChallenge(testUserID, testUserID, testUserID, nil, testRPID, s.origins)
+	ceremony, err := domain.CreatePasskeyRegistrationChallenge(testUserID, testUserID, testUserID, nil, testRPID, s.origins, "")
 	require.NoError(t, err)
 
 	attestOpts, err := virtualwebauthn.ParseAttestationOptions(string(ceremony.ClientOptions()))
