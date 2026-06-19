@@ -307,7 +307,7 @@ func NewConcurrentModificationError(original error) error {
 }
 
 func (e *ConcurrentModificationError) Error() string {
-	return fmt.Sprintf("permission error: %v", e.original)
+	return fmt.Sprintf("concurrent modification error: %v", e.original)
 }
 
 func (e *ConcurrentModificationError) Is(target error) bool {
