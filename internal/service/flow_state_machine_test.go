@@ -906,10 +906,10 @@ func passkeyIdentifierLoginDefinition() *domain.FlowDefinition {
 				Name:   "authenticate",
 				Fields: []string{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: domain.FlowActionPasskey, Kind: domain.FlowActionKindPasskey, Primary: true},
+					{Name: service.FlowActionPasskey, Kind: domain.FlowActionKindPasskey, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					domain.FlowActionPasskey:               {Target: "done"},
+					service.FlowActionPasskey:              {Target: "done"},
 					domain.FlowImplicitOutcomeUserNotFound: {Target: "not_found"},
 				},
 			},
@@ -926,17 +926,57 @@ func passkeyIdentifierLoginDefinition() *domain.FlowDefinition {
 // second user can never log in.
 func TestFlowStateMachine_Process_PasskeyAfterRejectionRebindsIdentifier(t *testing.T) {
 	w := newFlowTestWorld(t)
-	w.attempts.identifierResult = map[string]string{
-		"user1@example.com": "user_one",
-		"user2@example.com": "user_two",
-	}
-	w.attempts.issueOut = domain.FlowPasskeyChallengeOutput{ChallengeID: "ch-1", Options: []byte(`{"publicKey":{}}`)}
 	def := passkeyIdentifierLoginDefinition()
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	const userID1 = "user_one"
+	const email1 = "user1@example.com"
+	const challengeID1 = "ch-1"
+	const falseProof = "{}"
+	const userID2 = "user_two"
+	const email2 = "user2@example.com"
+	const challengeID2 = "ch-1"
+	const validProof = `{"publicKey":{}}`
+
+	var attemptCount = 0
+
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+			return in.Value == email1
+		})).
+		Return(userID1, nil).
+		Times(1)
+	w.authAttemptService.EXPECT().
+		IssuePasskeyChallenge(gomock.Any(), gomock.Any()).
+		Return(domain.FlowPasskeyChallengeOutput{ChallengeID: challengeID1, Options: []byte(falseProof)}, nil).
+		Times(1)
+
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+			return in.Value == email2
+		})).
+		Return(userID2, nil).
+		Times(1)
+	w.authAttemptService.EXPECT().
+		IssuePasskeyChallenge(gomock.Any(), gomock.Any()).
+		Return(domain.FlowPasskeyChallengeOutput{ChallengeID: challengeID2, Options: []byte(validProof)}, nil).
+		Times(1)
+
+	w.authAttemptService.EXPECT().
+		SubmitPasskey(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, input domain.FlowSubmitPasskeyInput) (string, error) {
+			if attemptCount == 0 {
+				attemptCount++
+				return "", domain.ErrAuthAttemptProofRejected(nil)
+			}
+			return userID2, nil
+		}).
+		Times(1)
+
+	start, err := w.sm.Start(t.Context(), nil, service.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       service.FlowSessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
@@ -945,23 +985,19 @@ func TestFlowStateMachine_Process_PasskeyAfterRejectionRebindsIdentifier(t *test
 	// clicks "Login with passkey". The dispatch loop identifies user1, then
 	// processPasskey mints a challenge scoped to user1 (empty allowCredentials
 	// since user1 has no passkey).
-	issued1, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
-		Action:    domain.FlowActionPasskey,
-		Fields:    map[string]any{"email": "user1@example.com"},
-		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	issued1, err := w.sm.Process(t.Context(), nil, def, start.State, service.FlowSubmitInput{
+		Action:    service.FlowActionPasskey,
+		Fields:    map[string]any{"email": email1},
+		PasskeyRP: &service.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, issued1.State.PendingChallenge)
-	require.Len(t, w.attempts.identifyCalls, 1, "attempt 1 must identify user1")
-	assert.Equal(t, "user1@example.com", w.attempts.identifyCalls[0].Value)
-	assert.Equal(t, "user_one", issued1.State.CollectedData[domain.FlowCollectedUserIDKey])
 
 	// Attempt 1, verify leg: the assertion that comes back doesn't match any
 	// credential the attempt is constrained to → server rejects.
-	w.attempts.passkeyErr = domain.ErrAuthAttemptProofRejected(nil)
-	rejected, err := w.sm.Process(t.Context(), nil, def, issued1.State, domain.FlowSubmitInput{
-		Action:            domain.FlowActionPasskey,
-		ChallengeResponse: &domain.FlowChallengeResponse{ChallengeID: "ch-1", Method: domain.FlowChallengeMethodPasskey, Proof: []byte(`{}`)},
+	rejected, err := w.sm.Process(t.Context(), nil, def, issued1.State, service.FlowSubmitInput{
+		Action:            service.FlowActionPasskey,
+		ChallengeResponse: &service.FlowChallengeResponse{ChallengeID: challengeID1, Method: service.FlowChallengeMethodPasskey, Proof: []byte(falseProof)},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, rejected.Step.Error)
@@ -973,23 +1009,15 @@ func TestFlowStateMachine_Process_PasskeyAfterRejectionRebindsIdentifier(t *test
 	// the new challenge is scoped to user2's credentials. Before this fix,
 	// the dispatch loop skipped SubmitIdentifier whenever a previous _user_id
 	// was stored, leaving the attempt bound to user1.
-	w.attempts.passkeyErr = nil
-	w.attempts.passkeyUserID = "user_two"
-	w.attempts.issueOut = domain.FlowPasskeyChallengeOutput{ChallengeID: "ch-2", Options: []byte(`{"publicKey":{}}`)}
-
-	issued2, err := w.sm.Process(t.Context(), nil, def, rejected.State, domain.FlowSubmitInput{
-		Action:    domain.FlowActionPasskey,
-		Fields:    map[string]any{"email": "user2@example.com"},
-		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	issued2, err := w.sm.Process(t.Context(), nil, def, rejected.State, service.FlowSubmitInput{
+		Action:    service.FlowActionPasskey,
+		Fields:    map[string]any{"email": email2},
+		PasskeyRP: &service.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, issued2.State.PendingChallenge, "attempt 2 must issue a fresh passkey challenge")
 
-	require.Len(t, w.attempts.identifyCalls, 2,
-		"attempt 2 must re-run SubmitIdentifier for the new email; the stored _user_id from attempt 1 must not short-circuit it")
-	assert.Equal(t, "user2@example.com", w.attempts.identifyCalls[1].Value,
-		"attempt 2 must dispatch the user2 identifier")
-	assert.Equal(t, "user_two", issued2.State.CollectedData[domain.FlowCollectedUserIDKey],
+	assert.Equal(t, "user_two", issued2.State.CollectedData[service.FlowCollectedUserIDKey],
 		"_user_id must be rebound to user_two so the new passkey challenge is scoped to their credentials")
 }
 
@@ -999,37 +1027,46 @@ func TestFlowStateMachine_Process_PasskeyAfterRejectionRebindsIdentifier(t *test
 // user id is the same, so PendingChallenge is preserved.
 func TestFlowStateMachine_Process_PasskeyResubmitSameIdentifierKeepsPendingChallenge(t *testing.T) {
 	w := newFlowTestWorld(t)
-	w.attempts.identifierResult = map[string]string{"user1@example.com": "user_one"}
-	w.attempts.issueOut = domain.FlowPasskeyChallengeOutput{ChallengeID: "ch-1", Options: []byte(`{"publicKey":{}}`)}
+
+	const email = "user1@example.com"
+	const userID = "user_one"
+
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		Return(userID, nil).
+		Times(2)
+	w.authAttemptService.EXPECT().
+		IssuePasskeyChallenge(gomock.Any(), gomock.Any()).
+		Times(1)
+
 	def := passkeyIdentifierLoginDefinition()
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), nil, service.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		Session:       service.FlowSessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
 
-	first, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
-		Action:    domain.FlowActionPasskey,
-		Fields:    map[string]any{"email": "user1@example.com"},
-		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	first, err := w.sm.Process(t.Context(), nil, def, start.State, service.FlowSubmitInput{
+		Action:    service.FlowActionPasskey,
+		Fields:    map[string]any{"email": email},
+		PasskeyRP: &service.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
-	require.Len(t, w.attempts.identifyCalls, 1)
 
 	// Same email re-submitted (e.g. user clicked the passkey action again
 	// after dismissing the browser prompt). Same user resolved → ceremony stays.
-	second, err := w.sm.Process(t.Context(), nil, def, first.State, domain.FlowSubmitInput{
-		Action:    domain.FlowActionPasskey,
+	second, err := w.sm.Process(t.Context(), nil, def, first.State, service.FlowSubmitInput{
+		Action:    service.FlowActionPasskey,
 		Fields:    map[string]any{"email": "user1@example.com"},
-		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+		PasskeyRP: &service.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
-	assert.Len(t, w.attempts.identifyCalls, 2, "every dispatch calls SubmitIdentifier")
 	require.NotNil(t, second.State.PendingChallenge, "same user resolved — ceremony survives")
-	assert.Equal(t, "user_one", second.State.CollectedData[domain.FlowCollectedUserIDKey])
+	assert.Equal(t, "user_one", second.State.CollectedData[service.FlowCollectedUserIDKey])
 }
 
 // ---- CurrentPurpose + outcome flip ----
