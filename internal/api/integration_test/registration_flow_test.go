@@ -11,6 +11,7 @@ import (
 	"github.com/descope/virtualwebauthn"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -25,12 +26,14 @@ import (
 //
 // This avoids the need for an identifier field with x-unique in the schema.
 func TestPasskeyRegistrationFlow(t *testing.T) {
+	t.Parallel()
+
 	testServer := harness.EnsureTestServer(t)
 
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
 	require.NoError(t, err)
 
-	harness.CreateUserSchema(t, project.ID, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
 	userSchemaURL, err := url.Parse(
 		"https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
@@ -91,7 +94,9 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 		SignCount:    1,
 	}))
 
-	client := harness.EnsureAPIClient(t, project.ID)
+	client, err := helpers.NewApiClient(testServer.URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
 
 	// Two-step flow: passkey auth → passkey_register → done.
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
@@ -104,7 +109,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 				{
 					Name: "auth-step",
 					Actions: []api.StepAction{
-						{Name: "passkey", Primary: api.NewOptBool(true)},
+						{Name: "passkey", Kind: api.StepActionKindPasskey, Primary: api.NewOptBool(true)},
 					},
 					Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 						"passkey": api.FlowDefinitionStepTransitionsItem{Target: "register-step"},
@@ -113,7 +118,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 				{
 					Name: "register-step",
 					Actions: []api.StepAction{
-						{Name: "passkey_register", Primary: api.NewOptBool(true)},
+						{Name: "passkey_register", Kind: api.StepActionKindPasskeyRegister, Primary: api.NewOptBool(true)},
 					},
 					Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 						"passkey_register": api.FlowDefinitionStepTransitionsItem{Target: "done"},

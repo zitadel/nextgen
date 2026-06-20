@@ -131,7 +131,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 								"submit": {Target: "step_2"},
 							},
 							Actions: []domain.FlowStepAction{
-								{Name: "submit", Primary: true},
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 							},
 						},
 						{
@@ -161,9 +161,9 @@ func TestValidateFlowDefinition(t *testing.T) {
 							Name:   "identify",
 							Fields: []string{"email"},
 							Actions: []domain.FlowStepAction{
-								{Name: "submit"},
+								{Name: "submit", Kind: domain.FlowActionKindSubmit},
 
-								{Name: "get_help"},
+								{Name: "get_help", Kind: domain.FlowActionKindSubmit},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit":   {Target: "done"},
@@ -173,7 +173,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 						{
 							Name: "help",
 							Actions: []domain.FlowStepAction{
-								{Name: "go_back"},
+								{Name: "go_back", Kind: domain.FlowActionKindNavigate},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"go_back": {Target: "identify"}, // cycle back to identify
@@ -206,9 +206,9 @@ func TestValidateFlowDefinition(t *testing.T) {
 							Name:   "start",
 							Fields: []string{"email"},
 							Actions: []domain.FlowStepAction{
-								{Name: "loop"},
+								{Name: "loop", Kind: domain.FlowActionKindSubmit},
 
-								{Name: "pivot"},
+								{Name: "pivot", Kind: domain.FlowActionKindSubmit},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"loop":  {Target: "middle"},
@@ -218,7 +218,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 						{
 							Name: "middle",
 							Actions: []domain.FlowStepAction{
-								{Name: "back"},
+								{Name: "back", Kind: domain.FlowActionKindNavigate},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"back": {Target: "start"}, // cycle back to identify
@@ -326,7 +326,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 						{
 							Name: "enter",
 							Actions: []domain.FlowStepAction{
-								{Name: "next"},
+								{Name: "next", Kind: domain.FlowActionKindSubmit},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"next": {Target: "trap_a"},
@@ -335,7 +335,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 						{
 							Name: "trap_a",
 							Actions: []domain.FlowStepAction{
-								{Name: "loop"},
+								{Name: "loop", Kind: domain.FlowActionKindSubmit},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"loop": {Target: "trap_b"},
@@ -344,7 +344,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 						{
 							Name: "trap_b",
 							Actions: []domain.FlowStepAction{
-								{Name: "loop"},
+								{Name: "loop", Kind: domain.FlowActionKindSubmit},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"loop": {Target: "trap_a"},
@@ -373,7 +373,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 						{
 							Name: "start",
 							Actions: []domain.FlowStepAction{
-								{Name: "next"},
+								{Name: "next", Kind: domain.FlowActionKindSubmit},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"next": {Target: "broken_step"},
@@ -406,7 +406,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 						{
 							Name: "start",
 							Actions: []domain.FlowStepAction{
-								{Name: "next"},
+								{Name: "next", Kind: domain.FlowActionKindSubmit},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"next": {Target: "done"},
@@ -416,7 +416,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 							Name:   "catch_me_if_you_can",
 							Fields: []string{"email"},
 							Actions: []domain.FlowStepAction{
-								{Name: "next"},
+								{Name: "next", Kind: domain.FlowActionKindSubmit},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"next": {Target: "done"},
@@ -483,7 +483,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 								"submit": {Target: "step_2"},
 							},
 							Actions: []domain.FlowStepAction{
-								{Name: "submit", Primary: true},
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 							},
 						},
 						{
@@ -517,7 +517,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 								"submit": {Target: "step_2"},
 							},
 							Actions: []domain.FlowStepAction{
-								{Name: "submit", Primary: true},
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 							},
 						},
 						{
@@ -550,7 +550,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 								"submit": {Target: "step_2"},
 							},
 							Actions: []domain.FlowStepAction{
-								{Name: "submit", Primary: true},
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 							},
 						},
 						{
@@ -584,7 +584,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 								"submit": {Target: "step_2"},
 							},
 							Actions: []domain.FlowStepAction{
-								{Name: "submit", Primary: true},
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 							},
 						},
 						{
@@ -618,7 +618,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 								"submit": {Target: "step_2"},
 							},
 							Actions: []domain.FlowStepAction{
-								{Name: "submit", Primary: true},
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 							},
 						},
 						{
@@ -652,7 +652,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 								"submit": {Target: "step_2"},
 							},
 							Actions: []domain.FlowStepAction{
-								{Name: "submit", Primary: true},
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 							},
 						},
 						{
@@ -686,7 +686,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 								"submit": {Target: "step_2"},
 							},
 							Actions: []domain.FlowStepAction{
-								{Name: "submit", Primary: true},
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 							},
 						},
 						{
@@ -720,7 +720,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 								"submit": {Target: "step_2"},
 							},
 							Actions: []domain.FlowStepAction{
-								{Name: "submit", Primary: true},
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 							},
 						},
 						{
@@ -752,7 +752,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 							Name:   "step_1",
 							Fields: []string{"email"},
 							Actions: []domain.FlowStepAction{
-								{Name: "submit", Primary: true},
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit11": {Target: "step_2"},
@@ -786,7 +786,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 							Name:   "start",
 							Fields: []string{"email"},
 							Actions: []domain.FlowStepAction{
-								{Name: "submit", Primary: true},
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit":     {Target: "done"},
@@ -821,7 +821,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 							Name:   "step_1",
 							Fields: []string{"email"},
 							Actions: []domain.FlowStepAction{
-								{Name: "submit"},
+								{Name: "submit", Kind: domain.FlowActionKindSubmit},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "done"},
@@ -831,7 +831,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 							Name:   "step_1",
 							Fields: []string{"email"},
 							Actions: []domain.FlowStepAction{
-								{Name: "next"},
+								{Name: "next", Kind: domain.FlowActionKindSubmit},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"next": {Target: "done"},
@@ -865,9 +865,9 @@ func TestValidateFlowDefinition(t *testing.T) {
 							Name:   "step_1",
 							Fields: []string{"email"},
 							Actions: []domain.FlowStepAction{
-								{Name: "submit"},
+								{Name: "submit", Kind: domain.FlowActionKindSubmit},
 
-								{Name: "next"},
+								{Name: "next", Kind: domain.FlowActionKindSubmit},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "done"},
@@ -902,9 +902,9 @@ func TestValidateFlowDefinition(t *testing.T) {
 							Name:   "step_1",
 							Fields: []string{"email"},
 							Actions: []domain.FlowStepAction{
-								{Name: "submit"},
+								{Name: "submit", Kind: domain.FlowActionKindSubmit},
 
-								{Name: "next"},
+								{Name: "next", Kind: domain.FlowActionKindSubmit},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "done"},
@@ -968,7 +968,7 @@ func TestValidator_FlipTable_CombinedLoginRegisterRequiresCounterOutcome(t *test
 				Name:   "identify",
 				Fields: []string{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: "submit", Primary: true},
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					"submit": {Target: "signin"},
@@ -979,7 +979,7 @@ func TestValidator_FlipTable_CombinedLoginRegisterRequiresCounterOutcome(t *test
 				Fields:    []string{"email", "password"},
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
-					{Name: "submit", Primary: true},
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					"submit": {Target: "done"},
@@ -1014,7 +1014,7 @@ func TestValidator_FlipTable_SoloLoginNoFlipRequired(t *testing.T) {
 				Name:   "credentials",
 				Fields: []string{"email", "password"},
 				Actions: []domain.FlowStepAction{
-					{Name: "submit", Primary: true},
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					"submit": {Target: "done"},
@@ -1046,7 +1046,7 @@ func TestValidator_Manifest_CreateUserRequiresPasswordUpstream(t *testing.T) {
 				Name:   "identify",
 				Fields: []string{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: "submit", Primary: true},
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					"submit": {Target: "create"},
@@ -1057,7 +1057,7 @@ func TestValidator_Manifest_CreateUserRequiresPasswordUpstream(t *testing.T) {
 				Fields:    []string{"email"},
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
-					{Name: "submit", Primary: true},
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					"submit": {Target: "done"},
@@ -1089,7 +1089,7 @@ func TestValidator_PositiveWorkedExampleA(t *testing.T) {
 				Name:   "profile",
 				Fields: []string{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: "submit", Primary: true},
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					"submit": {Target: "set-password"},
@@ -1099,7 +1099,7 @@ func TestValidator_PositiveWorkedExampleA(t *testing.T) {
 				Name:   "set-password",
 				Fields: []string{"password"},
 				Actions: []domain.FlowStepAction{
-					{Name: "submit", Primary: true},
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					"submit": {Target: "confirm"},
@@ -1110,7 +1110,7 @@ func TestValidator_PositiveWorkedExampleA(t *testing.T) {
 				Fields:    []string{"email"},
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
-					{Name: "submit", Primary: true},
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					"submit": {Target: "done"},
@@ -1141,7 +1141,7 @@ func TestValidator_PositiveWorkedExampleC(t *testing.T) {
 				Name:   "identify",
 				Fields: []string{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: "submit", Primary: true},
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					"submit":              {Target: "signin"},
@@ -1153,7 +1153,7 @@ func TestValidator_PositiveWorkedExampleC(t *testing.T) {
 				Name:   "signin",
 				Fields: []string{"password"},
 				Actions: []domain.FlowStepAction{
-					{Name: "submit", Primary: true},
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					"submit": {Target: "done"},
@@ -1164,7 +1164,7 @@ func TestValidator_PositiveWorkedExampleC(t *testing.T) {
 				Fields:    []string{"email", "password"},
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
-					{Name: "submit", Primary: true},
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					"submit": {Target: "done"},
@@ -1190,8 +1190,8 @@ func TestValidator_DuplicateActionRejected(t *testing.T) {
 			{
 				Name: "step", Fields: []string{"email"},
 				Actions: []domain.FlowStepAction{
-					{Name: "submit", Primary: true},
-					{Name: "submit"},
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: "submit", Kind: domain.FlowActionKindSubmit},
 				},
 				Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
 			},
@@ -1223,4 +1223,27 @@ func TestValidator_EmptyActionNameRejected(t *testing.T) {
 	_, err := domain.ValidateFlowDefinition(schema, def)
 	require.Error(t, err)
 	assert.Contains(t, errorDetails(t, err), "action has empty name")
+}
+
+// TestValidator_MissingActionKindRejected guards against actions declared
+// without the required `kind` field — the engine has no way to decide how
+// to route an action whose kind is unset.
+func TestValidator_MissingActionKindRejected(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	def := domain.FlowDefinition{
+		ProjectID: "p", Name: "f", SchemaVersion: "1",
+		UserSchema: "https://tenant.com/schemas/idpw-user.json",
+		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "step", Fields: []string{"email"},
+				Actions:     []domain.FlowStepAction{{Name: "submit"}},
+				Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
+			},
+			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
+		},
+	}
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err), `action "submit" has no kind`)
 }

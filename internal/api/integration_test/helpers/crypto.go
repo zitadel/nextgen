@@ -1,12 +1,32 @@
 package helpers
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
+
+func (h *Harness) EnsureEncryptionKey(t *testing.T) [32]byte {
+	t.Helper()
+	if h.EncryptionKey == nil {
+		h.EncryptionKey = []byte("MasterkeyNeedsToHave32Characters")
+	}
+	return [32]byte(h.EncryptionKey)
+}
+
+func (h *Harness) EnsureSigningKey(t *testing.T) *rsa.PrivateKey {
+	t.Helper()
+	if h.SigningKey == nil {
+		signingKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		require.NoError(t, err)
+		h.SigningKey = signingKey
+	}
+	return h.SigningKey
+}
 
 func (h *Harness) EnsureHasher(t *testing.T) crypto.Hasher {
 	t.Helper()
@@ -56,8 +76,10 @@ func createNewHasher(t *testing.T) *crypto.PasswapHasher {
 func (h *Harness) EnsureCrypter(t *testing.T) crypto.Crypter {
 	t.Helper()
 	if h.Crypter == nil {
-		key := [32]byte([]byte("MasterkeyNeedsToHave32Characters"))
-		h.Crypter = op.NewAES256GCMCrypto(key, "")
+		h.Crypter = op.NewAES256GCMCrypto(
+			h.EnsureEncryptionKey(t),
+			"",
+		)
 	}
 	return h.Crypter
 }

@@ -56,6 +56,7 @@ describe("NextPatcher.plan", () => {
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('href="/profile"');
     expect(writeContents(plan, "app/login/page.tsx")).toContain('background: "#0f0f11"');
     expect(writeContents(plan, "app/login/page.tsx")).toContain('color: "#f4f4f6"');
+    expect(writeContents(plan, "app/login/page.tsx")).toContain('colorScheme: "dark"');
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('alignItems: "center"');
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('padding: "48px 24px"');
     expect(writeContents(plan, "app/register/page.tsx")).toContain(MANAGED_MARKER);
@@ -63,6 +64,7 @@ describe("NextPatcher.plan", () => {
     expect(writeContents(plan, "app/register/page.tsx")).not.toContain('href="/profile"');
     expect(writeContents(plan, "app/register/page.tsx")).toContain('background: "#0f0f11"');
     expect(writeContents(plan, "app/register/page.tsx")).toContain('color: "#f4f4f6"');
+    expect(writeContents(plan, "app/register/page.tsx")).toContain('colorScheme: "dark"');
     expect(writeContents(plan, "middleware.ts")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "middleware.ts")).toContain("export function middleware(");
     expect(plan.ops.some((op) => op.kind === "add-dep")).toBe(true);
@@ -76,6 +78,7 @@ describe("NextPatcher.plan", () => {
     expect(homePage).toContain('href="/login"');
     expect(homePage).toContain('href="/register"');
     expect(homePage).toContain('href="/profile"');
+    expect(homePage).toContain('colorScheme: "dark"');
   });
 
   it("emits proxy.ts for Next 16 projects", () => {

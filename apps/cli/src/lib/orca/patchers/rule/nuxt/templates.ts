@@ -1,7 +1,9 @@
 import { MANAGED_MARKER } from "../../../../paths";
 
+// Enforce the dark surface the Zitadel widgets are designed for, so pages never
+// follow the OS light/dark setting.
 const MAIN_STYLE =
-  "min-height: 100vh; background: #0f0f11";
+  "min-height: 100vh; background: #0f0f11; color: #f4f4f6; color-scheme: dark";
 
 /** `app.vue` — renders the page router. Marker in an HTML comment. */
 export function appVueTemplate(): string {
@@ -11,8 +13,13 @@ export function appVueTemplate(): string {
 </template>
 
 <style>
+:root {
+  color-scheme: dark;
+}
 body {
   margin: 0;
+  background: #0f0f11;
+  color: #f4f4f6;
   font-family: sans-serif;
 }
 </style>
@@ -23,7 +30,7 @@ body {
 export function indexPageTemplate(): string {
   return `<!-- ${MANAGED_MARKER} -->
 <template>
-  <main style="position:fixed;inset:0;padding:48px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:#0f0f11;color:#f4f4f6;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.5;letter-spacing:normal;text-align:center">
+  <main style="position:fixed;inset:0;padding:48px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:#0f0f11;color-scheme:dark;color:#f4f4f6;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.5;letter-spacing:normal;text-align:center">
     <section style="width:100%;max-width:560px">
       <p style="margin:0 0 12px;color:#9ca3af;font-size:14px">Zitadel auth</p>
       <h1 style="margin:0 0 24px;font-size:32px;line-height:1.15;font-weight:600;color:#f4f4f6">Sign in, create an account, or open your profile.</h1>
@@ -79,7 +86,7 @@ const project = useZitadelProject();
 </script>
 
 <template>
-  <main style="padding: 24px">
+  <main style="${MAIN_STYLE}; padding: 24px">
     <h1>Signed in (Nuxt)</h1>
     <ClientOnly>
       <zitadel-logout :project="project" post-sign-out-url="/login" />
