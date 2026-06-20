@@ -9,13 +9,13 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-type transaction struct {
+type transaction[T database.TypedTransaction] struct {
 	tx pgx.Tx
 	statements
 }
 
 // Exec implements [database.QueryExecutor].
-func (t *transaction) Exec(ctx context.Context, stmt string, args ...any) (int64, error) {
+func (t *transaction[T]) Exec(ctx context.Context, stmt string, args ...any) (int64, error) {
 	tag, err := t.tx.Exec(ctx, stmt, args...)
 	if err != nil {
 		return 0, err
@@ -24,7 +24,7 @@ func (t *transaction) Exec(ctx context.Context, stmt string, args ...any) (int64
 }
 
 // Query implements [database.QueryExecutor].
-func (t *transaction) Query(ctx context.Context, stmt string, args ...any) (dbold.Rows, error) {
+func (t *transaction[T]) Query(ctx context.Context, stmt string, args ...any) (dbold.Rows, error) {
 	r, err := t.tx.Query(ctx, stmt, args...)
 	if err != nil {
 		return nil, err
@@ -43,7 +43,7 @@ func (r *rows) Close() error {
 }
 
 // QueryRow implements [database.QueryExecutor].
-func (t *transaction) QueryRow(ctx context.Context, stmt string, args ...any) dbold.Row {
+func (t *transaction[T]) QueryRow(ctx context.Context, stmt string, args ...any) dbold.Row {
 	row := t.tx.QueryRow(ctx, stmt, args...)
 	return row
 }
@@ -52,7 +52,7 @@ type beginner interface {
 	Begin(ctx context.Context) (pgx.Tx, error)
 }
 
-func executeTransaction(ctx context.Context, begin beginner, fn func(ctx context.Context, tx database.Transaction) error) error {
+func executeTransaction[T database.TypedTransaction](ctx context.Context, begin beginner, fn func(ctx context.Context, tx T) error) error {
 	tx, err := begin.Begin(ctx)
 	if err != nil {
 		return err
@@ -64,10 +64,10 @@ func executeTransaction(ctx context.Context, begin beginner, fn func(ctx context
 		}
 		err = tx.Commit(ctx)
 	}()
-	return fn(ctx, &transaction{tx: tx, statements: newStatements(tx)})
+	return fn(ctx, any(&transaction[T]{tx: tx, statements: newStatements(tx)}).(T))
 }
 
 var (
-	_ database.Transaction = (*transaction)(nil)
-	_ dbold.QueryExecutor  = (*transaction)(nil)
+	_ database.Transaction = (*transaction[database.TypedTransaction])(nil)
+	_ dbold.QueryExecutor  = (*transaction[database.TypedTransaction])(nil)
 )

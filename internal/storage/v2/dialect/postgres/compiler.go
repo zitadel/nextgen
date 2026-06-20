@@ -4,7 +4,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -158,52 +157,53 @@ func (c *statementCompiler) writeArg(arg any) {
 }
 
 func compileColumnName(column any) string {
-	switch col := column.(type) {
-	case domain.ProjectField:
-		switch col {
-		case domain.ProjectFieldID:
-			return "id"
-		case domain.ProjectFieldCreatedAt:
-			return "created_at"
-		case domain.ProjectFieldUpdatedAt:
-			return "updated_at"
-		case domain.ProjectFieldProjectSecret:
-			return "project_secret"
-		case domain.ProjectFieldPreviewSecret:
-			return "preview_secret"
-		case domain.ProjectFieldPreviewOrigins:
-			return "preview_origins"
-		default:
-			panic("unknown column type")
-		}
-	case domain.FlowDefinitionField:
-		switch col {
-		case domain.FlowDefinitionFieldProjectID:
-			return "project_id"
-		case domain.FlowDefinitionFieldID:
-			return "id"
-		case domain.FlowDefinitionFieldName:
-			return "name"
-		case domain.FlowDefinitionFieldSchemaVersion:
-			return "schema_version"
-		case domain.FlowDefinitionFieldStatus:
-			return "status"
-		case domain.FlowDefinitionFieldCreatedAt:
-			return "created_at"
-		case domain.FlowDefinitionFieldUpdatedAt:
-			return "updated_at"
-		case domain.FlowDefinitionFieldUserSchema:
-			return "user_schema"
-		case domain.FlowDefinitionFieldPurposes:
-			return "purposes"
-		case domain.FlowDefinitionFieldAudience:
-			return "audience"
-		case domain.FlowDefinitionFieldSteps:
-			return "steps"
-		default:
-			panic("unknown column type")
-		}
-	default:
-		panic("unknown column type")
-	}
+	return "id"
+	// switch col := column.(type) {
+	// case domain.ProjectField:
+	// 	switch col {
+	// 	case domain.ProjectFieldID:
+	// 		return "id"
+	// 	case domain.ProjectFieldCreatedAt:
+	// 		return "created_at"
+	// 	case domain.ProjectFieldUpdatedAt:
+	// 		return "updated_at"
+	// 	case domain.ProjectFieldProjectSecret:
+	// 		return "project_secret"
+	// 	case domain.ProjectFieldPreviewSecret:
+	// 		return "preview_secret"
+	// 	case domain.ProjectFieldPreviewOrigins:
+	// 		return "preview_origins"
+	// 	default:
+	// 		panic("unknown column type")
+	// 	}
+	// case domain.FlowDefinitionField:
+	// 	switch col {
+	// 	case domain.FlowDefinitionFieldProjectID:
+	// 		return "project_id"
+	// 	case domain.FlowDefinitionFieldID:
+	// 		return "id"
+	// 	case domain.FlowDefinitionFieldName:
+	// 		return "name"
+	// 	case domain.FlowDefinitionFieldSchemaVersion:
+	// 		return "schema_version"
+	// 	case domain.FlowDefinitionFieldStatus:
+	// 		return "status"
+	// 	case domain.FlowDefinitionFieldCreatedAt:
+	// 		return "created_at"
+	// 	case domain.FlowDefinitionFieldUpdatedAt:
+	// 		return "updated_at"
+	// 	case domain.FlowDefinitionFieldUserSchema:
+	// 		return "user_schema"
+	// 	case domain.FlowDefinitionFieldPurposes:
+	// 		return "purposes"
+	// 	case domain.FlowDefinitionFieldAudience:
+	// 		return "audience"
+	// 	case domain.FlowDefinitionFieldSteps:
+	// 		return "steps"
+	// 	default:
+	// 		panic("unknown column type")
+	// 	}
+	// default:
+	// 	panic("unknown column type")
+	// }
 }

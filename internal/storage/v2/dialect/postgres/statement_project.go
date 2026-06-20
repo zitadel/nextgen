@@ -6,7 +6,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-const createProjectStmt = `INSERT INTO zitadel_nextgen.projects (id, created_at, updated_at, project_secret, preview_secret, preview_origins) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at, updated_at`
+const createProjectStmt = `INSERT INTO zitadel_nextgen.projects (id, project_secret, preview_secret, preview_origins) VALUES ($1, $2, $3, $4) RETURNING id, created_at, updated_at`
 
 type projectStatements statement
 
@@ -16,14 +16,12 @@ func newProjectStatements(client queryExecutor) projectStatements {
 
 // CreateProject implements [database.ProjectStatements].
 func (ps projectStatements) CreateProject(project *domain.Project) database.Execution {
-	return &query[*domain.Project]{
+	return &query[domain.Project]{
 		execution: execution{
 			client: ps.client,
 			stmt:   createProjectStmt,
 			args: []any{
 				project.ID,
-				project.CreatedAt,
-				project.UpdatedAt,
 				project.ProjectSecret,
 				project.PreviewSecret,
 				project.PreviewOrigins,
@@ -52,13 +50,13 @@ func (ps projectStatements) DeleteProjectByID(id string) database.Execution {
 const projectQuery = "SELECT id, created_at, updated_at, project_secret, preview_secret, preview_origins FROM zitadel_nextgen.projects"
 
 // GetProjectByID implements [database.ProjectStatements].
-func (ps projectStatements) GetProjectByID(id string) database.Query[*domain.Project] {
+func (ps projectStatements) GetProjectByID(id string) database.Query[domain.Project] {
 	var compiler statementCompiler
 	compiler.compileRead(projectQuery, &database.ListOptions{
 		Filter: database.Equal(database.Column(domain.ProjectFieldID), id),
 	})
 
-	return &query[*domain.Project]{
+	return &query[domain.Project]{
 		execution: execution{
 			client: ps.client,
 			stmt:   compiler.String(),
@@ -69,11 +67,11 @@ func (ps projectStatements) GetProjectByID(id string) database.Query[*domain.Pro
 }
 
 // ListProjects implements [database.ProjectStatements].
-func (ps projectStatements) ListProjects(filter *database.ListOptions) database.Query[*database.ListResult[*domain.Project]] {
+func (ps projectStatements) ListProjects(filter *database.ListOptions) database.Query[database.ListResult[*domain.Project]] {
 	var compiler statementCompiler
 	compiler.compileRead(projectQuery, filter)
 
-	return &query[*database.ListResult[*domain.Project]]{
+	return &query[database.ListResult[*domain.Project]]{
 		execution: execution{
 			client: ps.client,
 			stmt:   compiler.String(),
@@ -117,7 +115,7 @@ func (ps projectStatements) scanProjects(rows pgx.Rows, result *database.ListRes
 }
 
 func (ps projectStatements) scanProject(rows pgx.Rows, result *domain.Project) error {
-	res, err := ps.scan(rows)
+	res, err := pgx.CollectExactlyOneRow(rows, ps.scan)
 	if err != nil {
 		return err
 	}

@@ -50,12 +50,12 @@ func (s projectStatements) DeleteProjectByID(id string) database.Execution {
 }
 
 // GetProjectByID implements [database.ProjectStatements].
-func (s projectStatements) GetProjectByID(id string) database.Query[*domain.Project] {
+func (s projectStatements) GetProjectByID(id string) database.Query[domain.Project] {
 	panic("unimplemented")
 }
 
 // ListProjects implements [database.ProjectStatements].
-func (s projectStatements) ListProjects(filter *database.ListOptions) database.Query[*database.ListResult[*domain.Project]] {
+func (s projectStatements) ListProjects(filter *database.ListOptions) database.Query[database.ListResult[*domain.Project]] {
 	panic("unimplemented")
 }
 

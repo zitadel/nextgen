@@ -25,12 +25,12 @@ func (f *flowDefinitionStatements) DeleteFlowDefinitionByID(id string) database.
 }
 
 // GetFlowDefinitionByID implements [service.FlowDefinitionStatements].
-func (f *flowDefinitionStatements) GetFlowDefinitionByID(id string) database.Query[*domain.FlowDefinition] {
+func (f *flowDefinitionStatements) GetFlowDefinitionByID(id string) database.Query[domain.FlowDefinition] {
 	panic("unimplemented")
 }
 
 // ListFlowDefinitions implements [service.FlowDefinitionStatements].
-func (f *flowDefinitionStatements) ListFlowDefinitions(filter *database.ListOptions) database.Query[*database.ListResult[*domain.FlowDefinition]] {
+func (f *flowDefinitionStatements) ListFlowDefinitions(filter *database.ListOptions) database.Query[database.ListResult[*domain.FlowDefinition]] {
 	panic("unimplemented")
 }
 

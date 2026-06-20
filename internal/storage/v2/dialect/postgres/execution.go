@@ -29,8 +29,8 @@ var _ database.Execution = (*execution)(nil)
 
 type query[R any] struct {
 	execution
-	scan   func(pgx.Rows, R) error
-	result R
+	scan   func(pgx.Rows, *R) error
+	result *R
 }
 
 func (q *query[R]) Execute(ctx context.Context) error {
@@ -38,12 +38,15 @@ func (q *query[R]) Execute(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if q.result == nil {
+		q.result = new(R)
+	}
 	err = q.scan(rows, q.result)
 	rows.Close()
 	return errors.Join(err, rows.Err())
 }
 
-func (q *query[R]) Result() R {
+func (q *query[R]) Result() *R {
 	return q.result
 }
 

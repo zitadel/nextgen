@@ -132,6 +132,9 @@ func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, 
 func (s *projectService) Get(ctx context.Context, id string) (*domain.Project, error) {
 	logger := getLoggingContext(ctx, "project")
 	logger.Info("getting project", slog.String("project_id", id))
-	return nil, nil
-	// return s.projectRepo.Get(ctx, s.pool, id)
+	query := v2db.TransactionAs[ProjectStatements](s.v2Pool).GetProjectByID(id)
+	if err := query.Execute(ctx); err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to execute query")
+	}
+	return query.Result(), nil
 }

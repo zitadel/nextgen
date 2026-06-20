@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS zitadel_nextgen.projects(
     , updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     , project_secret TEXT     NOT NULL DEFAULT ''
     , preview_secret TEXT     NOT NULL DEFAULT ''
-    , preview_origins TEXT    NOT NULL DEFAULT '[]'
+    , preview_origins TEXT[]    NOT NULL DEFAULT '{}'
 
     , PRIMARY KEY (id)
 );

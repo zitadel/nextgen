@@ -14,12 +14,12 @@ func init() {
 	database.MustRegisterDialect("pg", DecodeConfig)
 }
 
-type Config struct {
+type Config[T database.TypedTransaction] struct {
 	*pgxpool.Config
 }
 
 // Connect implements [database.Dialect].
-func (p Config) Connect(ctx context.Context) (database.Pool, error) {
+func (p Config[T]) Connect(ctx context.Context) (database.Pool, error) {
 	pool, err := pgxpool.NewWithConfig(ctx, p.Config)
 	if err != nil {
 		return nil, err
@@ -28,11 +28,11 @@ func (p Config) Connect(ctx context.Context) (database.Pool, error) {
 }
 
 // Name implements [database.Dialect].
-func (p Config) Name() string {
+func (p Config[T]) Name() string {
 	return "postgres"
 }
 
-var _ database.Dialect = (*Config)(nil)
+var _ database.Dialect = (*Config[database.TypedTransaction])(nil)
 
 func DecodeConfig(input any) (database.Dialect, error) {
 	switch c := input.(type) {
@@ -41,9 +41,9 @@ func DecodeConfig(input any) (database.Dialect, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &Config{Config: config}, nil
+		return &Config[database.TypedTransaction]{Config: config}, nil
 	case map[string]any:
-		connector := new(Config)
+		connector := new(Config[database.TypedTransaction])
 		decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 			DecodeHook:       mapstructure.StringToTimeDurationHookFunc(),
 			WeaklyTypedInput: true,
