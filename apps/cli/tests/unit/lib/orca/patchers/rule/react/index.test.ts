@@ -67,3 +67,28 @@ describe("ReactPatcher.artifacts", () => {
     expect(artifacts.configEdits).toEqual(["vite.config.*"]);
   });
 });
+
+describe("ReactPatcher edge proxy", () => {
+  it("scaffolds the edge proxy only when a deploy target is set", () => {
+    const without = new ReactPatcher().plan(ctx());
+    expect(writeContents(without, "zitadel-edge-proxy.ts")).toBeUndefined();
+
+    const withTarget = new ReactPatcher().plan({ ...ctx(), deployTarget: "cloudflare" });
+    expect(writeContents(withTarget, "zitadel-edge-proxy.ts")).toContain(MANAGED_MARKER);
+    const deps = withTarget.ops.filter(
+      (op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep",
+    );
+    expect(deps.some((op) => op.name === "@zitadel/edge-proxy")).toBe(true);
+  });
+
+  it("includes the edge-proxy file and dependency in artifacts when a target is set", () => {
+    const artifacts = new ReactPatcher().artifacts({
+      framework: { id: "react", appDir: "src", devPort: 3000, url: "http://localhost:3000" },
+      rendererId: "react",
+      deployTarget: "netlify",
+    });
+    expect(artifacts.markedFiles).toContain("netlify/edge-functions/zitadel-nextgen.ts");
+    expect(artifacts.dependencies).toContain("@zitadel/edge-proxy");
+    expect(artifacts.configEdits).toContain("netlify.toml");
+  });
+});

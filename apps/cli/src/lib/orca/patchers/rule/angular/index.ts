@@ -1,9 +1,10 @@
 import { ZitadelError } from "../../../../errors";
 import { isObject, parseJsonObject, stableStringify } from "../../../../json";
 import { npmDistTagForCliVersion } from "../../../../public-cli";
-import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
+import { EDGE_PROXY_DEP, edgeProxyConfigEdits, edgeProxyFiles, edgeProxyOps } from "../edge-proxy";
+import type { FileOp } from "../file-writer/types";
 import { angularProxyEdit } from "./angular-json";
 import { angularRoutesEdit } from "./angular-routes";
 import { appComponentTemplate, appTemplateHtml, proxyConfTemplate } from "./templates";
@@ -72,22 +73,33 @@ export class AngularPatcher extends AbstractRulePatcher {
         name: SDK_DEPENDENCY,
         version: npmDistTagForCliVersion(ctx.cliVersion),
       },
+      ...(ctx.deployTarget ? edgeProxyOps(ctx.deployTarget, ctx) : []),
     ];
   }
 
-  protected routeFiles(_view: PatchView): ReadonlyArray<string> {
-    return ["src/app/app.ts", "src/app/app.html", "proxy.conf.cjs"];
+  protected routeFiles(view: PatchView): ReadonlyArray<string> {
+    return [
+      "src/app/app.ts",
+      "src/app/app.html",
+      "proxy.conf.cjs",
+      ...(view.deployTarget ? edgeProxyFiles(view.deployTarget) : []),
+    ];
   }
 
-  protected routeDeps(_view: PatchView): ReadonlyArray<string> {
-    return [SDK_DEPENDENCY];
+  protected routeDeps(view: PatchView): ReadonlyArray<string> {
+    return [SDK_DEPENDENCY, ...(view.deployTarget ? [EDGE_PROXY_DEP] : [])];
   }
 
-  protected override routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
+  protected override routeConfigEdits(view: PatchView): ReadonlyArray<string> {
     // These files are touched via `edit` ops eject can't auto-revert: the proxy
     // wired into angular.json, auth paths added to app.routes.ts, and the `dev`
     // script added to package.json.
-    return ["angular.json", "src/app/app.routes.ts", "package.json"];
+    return [
+      "angular.json",
+      "src/app/app.routes.ts",
+      "package.json",
+      ...(view.deployTarget ? edgeProxyConfigEdits(view.deployTarget) : []),
+    ];
   }
 
   protected summary(_ctx: PatchContext): { title: string; detail: string } {

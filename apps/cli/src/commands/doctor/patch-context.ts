@@ -3,7 +3,13 @@ import { join } from "node:path";
 
 import { issuerFromPort, type FrameworkFacts, type Orca } from "../../lib/orca";
 import type { PatchContext } from "../../lib/orca/patchers/types";
-import { readDevelopmentIssuer, readRendererId, readZitadelConfig, readZitadelSecret } from "../../lib/project";
+import {
+  readDeployTarget,
+  readDevelopmentIssuer,
+  readRendererId,
+  readZitadelConfig,
+  readZitadelSecret,
+} from "../../lib/project";
 
 /**
  * Reconstructs a {@link PatchContext} from the on-disk project (config, secret)
@@ -23,6 +29,7 @@ export async function loadPatchContext(
   return {
     framework,
     rendererId: readRendererId(config),
+    deployTarget: readDeployTarget(config),
     issuer: await resolveIssuer(cwd, config, framework),
     server: typeof config.server === "string" ? config.server : "",
     cliVersion,

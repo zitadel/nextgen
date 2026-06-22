@@ -1,12 +1,12 @@
 import { readFile, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { ZitadelError } from "../lib/errors";
+import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { createOrca } from "../lib/orca";
 import type { EjectActions } from "../lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../lib/paths";
-import { readRendererId, readZitadelConfig } from "../lib/project";
+import { readDeployTarget, readRendererId, readZitadelConfig } from "../lib/project";
 
 /**
  * Asks the framework patcher which artifacts it owns. Falls back to the
@@ -33,6 +33,7 @@ async function resolveEjectActions(cwd: string): Promise<EjectActions> {
     return orca.patcherFor(framework.id).artifacts({
       framework,
       rendererId: readRendererId(config),
+      deployTarget: readDeployTarget(config),
     });
   } catch {
     return fallback;

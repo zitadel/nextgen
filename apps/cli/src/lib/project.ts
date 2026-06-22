@@ -108,6 +108,21 @@ export function readRendererId(config: Record<string, unknown>): string {
   return value === "default" ? "react" : value;
 }
 
+/**
+ * Reads the persisted deploy target (`deploy.target`) from a parsed
+ * `zitadel.json`. Returns `undefined` when absent or not one of the known
+ * platforms, so `eject`/`doctor` skip edge-proxy artifacts they never wrote.
+ */
+export function readDeployTarget(
+  config: Record<string, unknown>,
+): "cloudflare" | "vercel" | "netlify" | undefined {
+  const deploy = isObject(config.deploy) ? config.deploy : undefined;
+  const target = deploy && typeof deploy.target === "string" ? deploy.target : undefined;
+  return target === "cloudflare" || target === "vercel" || target === "netlify"
+    ? target
+    : undefined;
+}
+
 /** Reads `environments.development.issuer` from a parsed `zitadel.json`, if present. */
 export function readDevelopmentIssuer(config: Record<string, unknown>): string | undefined {
   if (isObject(config.environments) && isObject(config.environments.development)) {

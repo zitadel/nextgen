@@ -1,5 +1,6 @@
-import type { FrameworkFacts } from "../detectors/types";
 import type { CreateProjectResponse } from "../../api/client";
+import type { DeployTarget } from "../detectors/deploy-target";
+import type { FrameworkFacts } from "../detectors/types";
 
 /**
  * The minimal, project-independent view a patcher needs to enumerate the files
@@ -10,6 +11,13 @@ import type { CreateProjectResponse } from "../../api/client";
 export type PatchView = Readonly<{
   framework: FrameworkFacts;
   rendererId: string;
+  /**
+   * The detected deployment platform for the production edge proxy, or
+   * `undefined` when none was detected (no platform CLI installed). SPA
+   * patchers scaffold the edge proxy only when this is set; SSR patchers
+   * (Next, Nuxt) ignore it since their own middleware runs the proxy.
+   */
+  deployTarget?: DeployTarget;
 }>;
 
 /**

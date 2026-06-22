@@ -14,6 +14,11 @@ import {
   type Orca,
   type ScaffoldTarget,
 } from "../../lib/orca";
+import { detectDeployTarget } from "../../lib/orca/detectors/deploy-target";
+import {
+  edgeProxySecretCommands,
+  isEdgeProxyFramework,
+} from "../../lib/orca/patchers/rule/edge-proxy";
 import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
@@ -104,10 +109,7 @@ export default class Setup extends BaseCommand {
         `Detected ${framework.id}${framework.devPort ? ` (dev port ${framework.devPort})` : ""}`,
       );
     } catch (error) {
-      if (
-        error instanceof ZitadelError &&
-        error.code === "E_FRAMEWORK_NOT_DETECTED"
-      ) {
+      if (error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED") {
         const target = await inspectScaffoldTarget(cwd);
         if (!target.scaffoldable) {
           throw frameworkDetectionWithScaffoldTarget(error, cwd, target);
@@ -188,9 +190,16 @@ export default class Setup extends BaseCommand {
         );
     consola.success(`Created project ${project.id}`);
 
+    // SPA frameworks have no server runtime, so the production `/__nextgen`
+    // proxy must run as a platform edge function. Detect which platform the
+    // user deploys to (by installed CLI) and let the SPA patcher scaffold it;
+    // SSR frameworks (Next, Nuxt) run the proxy in their own middleware.
+    const deployTarget = isEdgeProxyFramework(framework.id) ? detectDeployTarget(cwd) : undefined;
+
     const ctx: PatchContext = {
       framework,
       rendererId: flags.renderer ?? "react",
+      deployTarget,
       project,
       issuer,
       server: answers.server,
@@ -210,6 +219,17 @@ export default class Setup extends BaseCommand {
       `Patched ${result.filesWritten.length} file${result.filesWritten.length === 1 ? "" : "s"}` +
         (result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""),
     );
+
+    // For SPAs with a detected deploy target, the edge proxy is scaffolded but
+    // the secret cannot live in a committed config file — it must be pushed to
+    // the platform's secret store. Surface the exact commands.
+    const edgeProxySecretSteps = deployTarget ? edgeProxySecretCommands(deployTarget) : [];
+    if (deployTarget && edgeProxySecretSteps.length > 0) {
+      consola.info(
+        `Scaffolded the ${deployTarget} edge proxy. Before deploying, push the secret to the platform store:\n` +
+          edgeProxySecretSteps.map((cmd) => `  ${cmd}`).join("\n"),
+      );
+    }
 
     const installOutcome = await installDependenciesForSetup({
       cwd,
@@ -348,7 +368,11 @@ async function createProjectWithLocalHint(
   }
 }
 
-function localSetupHint(error: unknown, framework: string | undefined, cliVersion: string): unknown {
+function localSetupHint(
+  error: unknown,
+  framework: string | undefined,
+  cliVersion: string,
+): unknown {
   const normalized = toZitadelError(error);
   if (normalized.code !== "E_LOCAL_SERVER_NOT_RUNNING") {
     return error;

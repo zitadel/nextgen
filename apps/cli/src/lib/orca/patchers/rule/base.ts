@@ -1,7 +1,5 @@
 import { stableStringify } from "../../../json";
 import { DEFAULT_SERVER } from "../../../server";
-import { scaffold } from "./file-writer";
-import type { FileOp, ScaffoldPlan } from "./file-writer/types";
 import type {
   EjectActions,
   Patcher,
@@ -10,6 +8,8 @@ import type {
   PatchResult,
   PatchView,
 } from "../types";
+import { scaffold } from "./file-writer";
+import type { FileOp, ScaffoldPlan } from "./file-writer/types";
 import { reclaimableOps } from "./reclaim";
 
 /**
@@ -154,7 +154,7 @@ function projectConfig(ctx: PatchContext): Record<string, unknown> {
       issuer_pattern: [...ctx.project.previewOrigins],
     };
   }
-  return {
+  const config: Record<string, unknown> = {
     $schema: "https://schemas.zitadel.com/v2/project.schema.json",
     project: ctx.project.id,
     server: resolveServerOrigin(ctx.server),
@@ -162,6 +162,12 @@ function projectConfig(ctx: PatchContext): Record<string, unknown> {
     branding: { renderer: ctx.rendererId, attribution: "visible" },
     environments,
   };
+  // Persist the detected deploy target so `eject`/`doctor` can reconstruct the
+  // edge-proxy artifacts without re-detecting the installed platform CLI.
+  if (ctx.deployTarget) {
+    config.deploy = { target: ctx.deployTarget };
+  }
+  return config;
 }
 
 /** Normalizes a server URL to its origin, falling back to {@link DEFAULT_SERVER}. */

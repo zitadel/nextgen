@@ -1,7 +1,8 @@
 import { npmDistTagForCliVersion } from "../../../../public-cli";
-import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
+import { EDGE_PROXY_DEP, edgeProxyConfigEdits, edgeProxyFiles, edgeProxyOps } from "../edge-proxy";
+import type { FileOp } from "../file-writer/types";
 import { type ViteSupport, buildViteProxyOp } from "../vite-support";
 import { appTemplate } from "./templates";
 
@@ -46,19 +47,20 @@ export class QwikPatcher extends AbstractRulePatcher implements ViteSupport {
         name: SDK_DEPENDENCY,
         version: npmDistTagForCliVersion(ctx.cliVersion),
       },
+      ...(ctx.deployTarget ? edgeProxyOps(ctx.deployTarget, ctx) : []),
     ];
   }
 
-  protected routeFiles(_view: PatchView): ReadonlyArray<string> {
-    return ["src/app.tsx"];
+  protected routeFiles(view: PatchView): ReadonlyArray<string> {
+    return ["src/app.tsx", ...(view.deployTarget ? edgeProxyFiles(view.deployTarget) : [])];
   }
 
-  protected routeDeps(_view: PatchView): ReadonlyArray<string> {
-    return [SDK_DEPENDENCY];
+  protected routeDeps(view: PatchView): ReadonlyArray<string> {
+    return [SDK_DEPENDENCY, ...(view.deployTarget ? [EDGE_PROXY_DEP] : [])];
   }
 
-  protected override routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
-    return ["vite.config.*"];
+  protected override routeConfigEdits(view: PatchView): ReadonlyArray<string> {
+    return ["vite.config.*", ...(view.deployTarget ? edgeProxyConfigEdits(view.deployTarget) : [])];
   }
 
   protected summary(_ctx: PatchContext): { title: string; detail: string } {
