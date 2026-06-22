@@ -5,8 +5,8 @@ import { ZitadelError } from "../lib/errors";
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { createOrca } from "../lib/orca";
 import {
-  EDGE_PROXY_DEP,
   edgeProxyConfigEdits,
+  edgeProxyDeps,
   edgeProxyEnvBackups,
   edgeProxyFiles,
 } from "../lib/orca/patchers/rule/edge-proxy";
@@ -31,7 +31,7 @@ async function resolveEjectActions(cwd: string): Promise<EjectActions> {
     rootConfigFiles: ["zitadel.json"],
     directories: [".zitadel"],
     envBackups: [".env.local", ...(deployTarget ? edgeProxyEnvBackups(deployTarget) : [])],
-    dependencies: deployTarget ? [EDGE_PROXY_DEP] : [],
+    dependencies: deployTarget ? edgeProxyDeps(deployTarget) : [],
     configEdits: deployTarget ? edgeProxyConfigEdits(deployTarget) : [],
   };
   const orca = createOrca();

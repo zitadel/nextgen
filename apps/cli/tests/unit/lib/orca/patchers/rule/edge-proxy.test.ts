@@ -6,6 +6,7 @@ import { AbstractRulePatcher } from "../../../../../../src/lib/orca/patchers/rul
 import {
   EDGE_PROXY_DEP,
   edgeProxyConfigEdits,
+  edgeProxyDeps,
   edgeProxyEnvBackups,
   edgeProxyFiles,
   edgeProxyOps,
@@ -190,6 +191,12 @@ describe("edge-proxy artifact enumeration", () => {
     const cmds = edgeProxySecretCommands("cloudflare");
     expect(cmds).toEqual(["wrangler secret put ZITADEL_PROJECT_SECRET"]);
     expect(cmds.some((c) => c.includes("NEXTGEN_API_URL"))).toBe(false);
+  });
+
+  it("lists the platform type dep alongside the runtime dep (for eject uninstall hints)", () => {
+    expect(edgeProxyDeps("cloudflare")).toEqual([EDGE_PROXY_DEP, "@cloudflare/workers-types"]);
+    expect(edgeProxyDeps("netlify")).toEqual([EDGE_PROXY_DEP, "@netlify/edge-functions"]);
+    expect(edgeProxyDeps("vercel")).toEqual([EDGE_PROXY_DEP]);
   });
 
   it("backs up the platform's local secret file on eject", () => {

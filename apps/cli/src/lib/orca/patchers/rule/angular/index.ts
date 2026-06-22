@@ -3,7 +3,7 @@ import { isObject, parseJsonObject, stableStringify } from "../../../../json";
 import { npmDistTagForCliVersion } from "../../../../public-cli";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
-import { EDGE_PROXY_DEP, edgeProxyConfigEdits, edgeProxyFiles, edgeProxyOps } from "../edge-proxy";
+import { edgeProxyDeps, edgeProxyConfigEdits, edgeProxyFiles, edgeProxyOps } from "../edge-proxy";
 import type { FileOp } from "../file-writer/types";
 import { angularProxyEdit } from "./angular-json";
 import { angularRoutesEdit } from "./angular-routes";
@@ -87,7 +87,7 @@ export class AngularPatcher extends AbstractRulePatcher {
   }
 
   protected routeDeps(view: PatchView): ReadonlyArray<string> {
-    return [SDK_DEPENDENCY, ...(view.deployTarget ? [EDGE_PROXY_DEP] : [])];
+    return [SDK_DEPENDENCY, ...(view.deployTarget ? edgeProxyDeps(view.deployTarget) : [])];
   }
 
   protected override routeConfigEdits(view: PatchView): ReadonlyArray<string> {

@@ -1,7 +1,7 @@
 import { npmDistTagForCliVersion } from "../../../../public-cli";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
-import { EDGE_PROXY_DEP, edgeProxyConfigEdits, edgeProxyFiles, edgeProxyOps } from "../edge-proxy";
+import { edgeProxyDeps, edgeProxyConfigEdits, edgeProxyFiles, edgeProxyOps } from "../edge-proxy";
 import type { FileOp } from "../file-writer/types";
 import { type ViteSupport, buildViteProxyOp } from "../vite-support";
 import { appTemplate } from "./templates";
@@ -54,7 +54,7 @@ export class SolidPatcher extends AbstractRulePatcher implements ViteSupport {
   }
 
   protected routeDeps(view: PatchView): ReadonlyArray<string> {
-    return [SDK_DEPENDENCY, ...(view.deployTarget ? [EDGE_PROXY_DEP] : [])];
+    return [SDK_DEPENDENCY, ...(view.deployTarget ? edgeProxyDeps(view.deployTarget) : [])];
   }
 
   protected override routeConfigEdits(view: PatchView): ReadonlyArray<string> {

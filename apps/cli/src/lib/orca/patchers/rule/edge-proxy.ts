@@ -46,6 +46,22 @@ export function isEdgeProxyFramework(framework: string): boolean {
   return EDGE_PROXY_FRAMEWORKS.has(framework);
 }
 
+/**
+ * Every dependency the edge-proxy scaffolding adds for `target` — the runtime
+ * `@zitadel/edge-proxy` plus the platform type packages installed as dev-deps.
+ * Used by patchers' `routeDeps` so `eject` suggests uninstalling all of them.
+ */
+export function edgeProxyDeps(target: DeployTarget): string[] {
+  switch (target) {
+    case "cloudflare":
+      return [EDGE_PROXY_DEP, "@cloudflare/workers-types"];
+    case "netlify":
+      return [EDGE_PROXY_DEP, "@netlify/edge-functions"];
+    case "vercel":
+      return [EDGE_PROXY_DEP];
+  }
+}
+
 const CLOUDFLARE_WORKER_PATH = "zitadel-edge-proxy.ts";
 const VERCEL_FUNCTION_PATH = "api/__nextgen/[...path].ts";
 /** Prefix the Vercel edge function sees after the vercel.json rewrite. */
