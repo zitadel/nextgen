@@ -52,8 +52,8 @@ export function buildFlow(
         name: "identifier",
         fields: ["email"],
         actions: [
-          { name: "submit", primary: true },
-          { name: "register" },
+          { name: "submit", kind: "submit", primary: true },
+          { name: "register", kind: "navigate" },
         ],
         gates: {},
         transitions: {
@@ -67,7 +67,7 @@ export function buildFlow(
       {
         name: "credential",
         fields: ["password"],
-        actions: [{ name: "submit", primary: true }],
+        actions: [{ name: "submit", kind: "submit", primary: true }],
         gates: {},
         transitions: { submit: { target: "complete" } },
       },
@@ -79,8 +79,8 @@ export function buildFlow(
         // the user row and the password row in one transaction.
         fields: [...fields, "password"],
         actions: [
-          { name: "submit", primary: true },
-          { name: "login" },
+          { name: "submit", kind: "submit", primary: true },
+          { name: "login", kind: "navigate" },
         ],
         gates: {},
         on_success: "create_user",
