@@ -126,6 +126,44 @@ authentication flows.
 Dev servers serve at `/`; the embedded production builds are served at
 `/ui/console/` and `/ui/login/`.
 
+### First-run setup for the login-UI dev server
+
+The Go backend does **not** create a project or flow definition on startup —
+you must create one before the login UI can boot a flow.
+
+**1. Start the backend:**
+
+```sh
+go run . server
+```
+
+**2. Create a project:**
+
+```sh
+curl -s -X POST http://localhost:8080/projects \
+  -H "Content-Type: application/json" \
+  -d '{}' | jq .
+```
+
+The response contains an `id` field — that is your project ID.
+
+**3. Configure the dev server:**
+
+Copy the example env file and fill in your project ID:
+
+```sh
+cp apps/login-ui/.env.example apps/login-ui/.env.local
+# edit .env.local and uncomment VITE_PROJECT_ID=<id-from-step-2>
+```
+
+`VITE_PROXY_PATH` tells the login UI to prefix all API requests with
+`/__nextgen`, which the Vite dev server proxies to the Go backend on port 8080.
+Set `VITE_BACKEND_URL` in `.env.local` to override the target (default:
+`http://localhost:8080`).
+
+As a one-off alternative, pass `?project_id=<id>` in the browser URL instead
+of setting `VITE_PROJECT_ID`.
+
 ---
 
 ## Verifying your changes before pushing

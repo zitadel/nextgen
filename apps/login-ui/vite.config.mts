@@ -11,6 +11,13 @@ export default defineConfig(({ command }) => ({
   server: {
     port: 5175,
     strictPort: true,
+    proxy: {
+      "/__nextgen": {
+        target: process.env.VITE_BACKEND_URL ?? "http://localhost:8080",
+        rewrite: (path) => path.replace(/^\/__nextgen/, "") || "/",
+        changeOrigin: true,
+      },
+    },
   },
   cacheDir: "../../node_modules/.vite/apps/login-ui",
   resolve: { conditions: ["@zitadel/source"] },
