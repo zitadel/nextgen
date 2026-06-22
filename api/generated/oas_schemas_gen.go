@@ -10664,7 +10664,9 @@ type StepAction struct {
 	// - `passkey_register`: issue a WebAuthn registration challenge; the matching
 	// transition fires once the returned attestation verifies.
 	// - `navigate`: route through the transition without running the input
-	// pipeline. Used for back-navigation and similar pure-routing actions.
+	// pipeline. Used for pure-routing actions declared in the flow definition.
+	// - `back`: return the user to the previous step. Surfaced by the engine
+	// when going back is available.
 	Kind StepActionKind `json:"kind"`
 	// Marks this as the default/primary action. The runtime template uses
 	// this hint to choose visual emphasis. At most one action per step
@@ -10724,7 +10726,9 @@ func (s *StepAction) SetTextKey(val OptString) {
 // - `passkey_register`: issue a WebAuthn registration challenge; the matching
 // transition fires once the returned attestation verifies.
 // - `navigate`: route through the transition without running the input
-// pipeline. Used for back-navigation and similar pure-routing actions.
+// pipeline. Used for pure-routing actions declared in the flow definition.
+// - `back`: return the user to the previous step. Surfaced by the engine
+// when going back is available.
 type StepActionKind string
 
 const (
@@ -10732,6 +10736,7 @@ const (
 	StepActionKindPasskey         StepActionKind = "passkey"
 	StepActionKindPasskeyRegister StepActionKind = "passkey_register"
 	StepActionKindNavigate        StepActionKind = "navigate"
+	StepActionKindBack            StepActionKind = "back"
 )
 
 // AllValues returns all StepActionKind values.
@@ -10741,6 +10746,7 @@ func (StepActionKind) AllValues() []StepActionKind {
 		StepActionKindPasskey,
 		StepActionKindPasskeyRegister,
 		StepActionKindNavigate,
+		StepActionKindBack,
 	}
 }
 
@@ -10754,6 +10760,8 @@ func (s StepActionKind) MarshalText() ([]byte, error) {
 	case StepActionKindPasskeyRegister:
 		return []byte(s), nil
 	case StepActionKindNavigate:
+		return []byte(s), nil
+	case StepActionKindBack:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -10774,6 +10782,9 @@ func (s *StepActionKind) UnmarshalText(data []byte) error {
 		return nil
 	case StepActionKindNavigate:
 		*s = StepActionKindNavigate
+		return nil
+	case StepActionKindBack:
+		*s = StepActionKindBack
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)

@@ -96,9 +96,14 @@ const (
 	// verifies.
 	FlowActionKindPasskeyRegister
 	// FlowActionKindNavigate routes through the transition without running
-	// the input pipeline. Used for back-navigation and similar pure-routing
-	// actions where the submitted fields are irrelevant.
+	// the input pipeline. Used for pure-routing actions declared in the flow
+	// definition where the submitted fields are irrelevant.
 	FlowActionKindNavigate
+	// FlowActionKindBack pops the previous step from runtime history and
+	// re-renders it. Injected by the engine on rendered step responses when
+	// history is non-empty and the current step is non-terminal; rejected by
+	// the validator on inbound flow definitions — flow authors never declare it.
+	FlowActionKindBack
 )
 
 // FlowDefinition is a customer-configured directed graph of authentication steps.
