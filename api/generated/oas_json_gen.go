@@ -19029,6 +19029,8 @@ func (s *StepActionKind) Decode(d *jx.Decoder) error {
 		*s = StepActionKindPasskeyRegister
 	case StepActionKindNavigate:
 		*s = StepActionKindNavigate
+	case StepActionKindBack:
+		*s = StepActionKindBack
 	default:
 		*s = StepActionKind(v)
 	}
