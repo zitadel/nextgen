@@ -114,8 +114,8 @@ func TestCreateFlowDefinition(t *testing.T) {
 									Target: "step_2",
 								},
 							}),
-							Actions: []api.StepAction{
-								{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
+							Actions: []api.FlowDefinitionAction{
+								{Name: "submit", Kind: api.FlowDefinitionActionKindSubmit, Primary: api.NewOptBool(true)},
 							},
 						},
 						{
@@ -220,8 +220,8 @@ func TestCreateFlowDefinition(t *testing.T) {
 									Target: "step_2",
 								},
 							}),
-							Actions: []api.StepAction{
-								{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
+							Actions: []api.FlowDefinitionAction{
+								{Name: "submit", Kind: api.FlowDefinitionActionKindSubmit, Primary: api.NewOptBool(true)},
 							},
 						},
 						{
@@ -266,8 +266,8 @@ func TestCreateFlowDefinition(t *testing.T) {
 									Target: "step_2",
 								},
 							}),
-							Actions: []api.StepAction{
-								{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
+							Actions: []api.FlowDefinitionAction{
+								{Name: "submit", Kind: api.FlowDefinitionActionKindSubmit, Primary: api.NewOptBool(true)},
 							},
 						},
 						{
@@ -352,8 +352,8 @@ func validSteps() []api.FlowDefinitionStep {
 					Target: "step_2",
 				},
 			}),
-			Actions: []api.StepAction{
-				{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
+			Actions: []api.FlowDefinitionAction{
+				{Name: "submit", Kind: api.FlowDefinitionActionKindSubmit, Primary: api.NewOptBool(true)},
 			},
 		},
 		{

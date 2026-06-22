@@ -2847,6 +2847,136 @@ func (s *FlowDefinition) SetSteps(val []FlowDefinitionStep) {
 	s.Steps = val
 }
 
+// Configuration for a user-invokable action on a step. The `name` is sent
+// back in the submit request as `action`; the engine resolves the action's
+// declared `kind` to decide how to handle the submission.
+// Ref: #
+type FlowDefinitionAction struct {
+	// Action identifier. Sent back in the submit request as `action`.
+	Name string `json:"name"`
+	// Classifies how the engine handles this action:
+	// - `submit`: collect the step's fields and run validate/dispatch/on_success.
+	// - `passkey`: issue a WebAuthn assertion challenge; the matching transition
+	// fires once the returned assertion verifies.
+	// - `passkey_register`: issue a WebAuthn registration challenge; the matching
+	// transition fires once the returned attestation verifies.
+	// - `navigate`: route through the transition without running the input
+	// pipeline. Used for back-navigation and similar pure-routing actions.
+	Kind FlowDefinitionActionKind `json:"kind"`
+	// Marks this as the default/primary action. The runtime template uses
+	// this hint to choose visual emphasis. At most one action per step
+	// should be primary; this is not enforced here.
+	Primary OptBool `json:"primary"`
+	// Optional localization key override for the action's label. When
+	// omitted, the engine derives a key from the step and action names.
+	// Display text is resolved client-side from a locale dictionary, never
+	// by the engine.
+	TextKey OptString `json:"text_key"`
+}
+
+// GetName returns the value of Name.
+func (s *FlowDefinitionAction) GetName() string {
+	return s.Name
+}
+
+// GetKind returns the value of Kind.
+func (s *FlowDefinitionAction) GetKind() FlowDefinitionActionKind {
+	return s.Kind
+}
+
+// GetPrimary returns the value of Primary.
+func (s *FlowDefinitionAction) GetPrimary() OptBool {
+	return s.Primary
+}
+
+// GetTextKey returns the value of TextKey.
+func (s *FlowDefinitionAction) GetTextKey() OptString {
+	return s.TextKey
+}
+
+// SetName sets the value of Name.
+func (s *FlowDefinitionAction) SetName(val string) {
+	s.Name = val
+}
+
+// SetKind sets the value of Kind.
+func (s *FlowDefinitionAction) SetKind(val FlowDefinitionActionKind) {
+	s.Kind = val
+}
+
+// SetPrimary sets the value of Primary.
+func (s *FlowDefinitionAction) SetPrimary(val OptBool) {
+	s.Primary = val
+}
+
+// SetTextKey sets the value of TextKey.
+func (s *FlowDefinitionAction) SetTextKey(val OptString) {
+	s.TextKey = val
+}
+
+// Classifies how the engine handles this action:
+// - `submit`: collect the step's fields and run validate/dispatch/on_success.
+// - `passkey`: issue a WebAuthn assertion challenge; the matching transition
+// fires once the returned assertion verifies.
+// - `passkey_register`: issue a WebAuthn registration challenge; the matching
+// transition fires once the returned attestation verifies.
+// - `navigate`: route through the transition without running the input
+// pipeline. Used for back-navigation and similar pure-routing actions.
+type FlowDefinitionActionKind string
+
+const (
+	FlowDefinitionActionKindSubmit          FlowDefinitionActionKind = "submit"
+	FlowDefinitionActionKindPasskey         FlowDefinitionActionKind = "passkey"
+	FlowDefinitionActionKindPasskeyRegister FlowDefinitionActionKind = "passkey_register"
+	FlowDefinitionActionKindNavigate        FlowDefinitionActionKind = "navigate"
+)
+
+// AllValues returns all FlowDefinitionActionKind values.
+func (FlowDefinitionActionKind) AllValues() []FlowDefinitionActionKind {
+	return []FlowDefinitionActionKind{
+		FlowDefinitionActionKindSubmit,
+		FlowDefinitionActionKindPasskey,
+		FlowDefinitionActionKindPasskeyRegister,
+		FlowDefinitionActionKindNavigate,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowDefinitionActionKind) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowDefinitionActionKindSubmit:
+		return []byte(s), nil
+	case FlowDefinitionActionKindPasskey:
+		return []byte(s), nil
+	case FlowDefinitionActionKindPasskeyRegister:
+		return []byte(s), nil
+	case FlowDefinitionActionKindNavigate:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowDefinitionActionKind) UnmarshalText(data []byte) error {
+	switch FlowDefinitionActionKind(data) {
+	case FlowDefinitionActionKindSubmit:
+		*s = FlowDefinitionActionKindSubmit
+		return nil
+	case FlowDefinitionActionKindPasskey:
+		*s = FlowDefinitionActionKindPasskey
+		return nil
+	case FlowDefinitionActionKindPasskeyRegister:
+		*s = FlowDefinitionActionKindPasskeyRegister
+		return nil
+	case FlowDefinitionActionKindNavigate:
+		*s = FlowDefinitionActionKindNavigate
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Ref: #
 type FlowDefinitionDetailResponse struct {
 	// Unique identifier for the flow definition.
@@ -3127,7 +3257,7 @@ type FlowDefinitionStep struct {
 	// Ordered list of actions the user can take. The action name is what the
 	// frontend sends back in the submit request. If omitted, the engine
 	// provides a default `submit` action.
-	Actions []StepAction `json:"actions"`
+	Actions []FlowDefinitionAction `json:"actions"`
 	// Security gates that must be satisfied before submission. Keyed by gate
 	// name. Each gate selects a kind (e.g. "captcha") and provider-specific
 	// configuration. The engine may also inject gates dynamically based on
@@ -3162,7 +3292,7 @@ func (s *FlowDefinitionStep) GetFields() []string {
 }
 
 // GetActions returns the value of Actions.
-func (s *FlowDefinitionStep) GetActions() []StepAction {
+func (s *FlowDefinitionStep) GetActions() []FlowDefinitionAction {
 	return s.Actions
 }
 
@@ -3202,7 +3332,7 @@ func (s *FlowDefinitionStep) SetFields(val []string) {
 }
 
 // SetActions sets the value of Actions.
-func (s *FlowDefinitionStep) SetActions(val []StepAction) {
+func (s *FlowDefinitionStep) SetActions(val []FlowDefinitionAction) {
 	s.Actions = val
 }
 
@@ -3751,7 +3881,7 @@ type FlowStep struct {
 	Fields []Field `json:"fields"`
 	// Ordered list of available user actions. The LiquidJS template iterates
 	// this array and builds a name-indexed map locally for keyed lookup.
-	Actions []StepAction `json:"actions"`
+	Actions []FlowStepAction `json:"actions"`
 	// Security gates that must be satisfied before the step can be submitted.
 	// The engine injects gates dynamically based on policy, even if they
 	// are not declared in the flow definition.
@@ -3798,7 +3928,7 @@ func (s *FlowStep) GetFields() []Field {
 }
 
 // GetActions returns the value of Actions.
-func (s *FlowStep) GetActions() []StepAction {
+func (s *FlowStep) GetActions() []FlowStepAction {
 	return s.Actions
 }
 
@@ -3848,7 +3978,7 @@ func (s *FlowStep) SetFields(val []Field) {
 }
 
 // SetActions sets the value of Actions.
-func (s *FlowStep) SetActions(val []StepAction) {
+func (s *FlowStep) SetActions(val []FlowStepAction) {
 	s.Actions = val
 }
 
@@ -3865,6 +3995,152 @@ func (s *FlowStep) SetSSOProviders(val []SSOProvider) {
 // SetChallenge sets the value of Challenge.
 func (s *FlowStep) SetChallenge(val OptFlowStepChallenge) {
 	s.Challenge = val
+}
+
+// A user-invokable action on a rendered step. The `name` is sent back in
+// the submit request as `action`; the `kind` tells the client how to
+// handle activation (in particular, whether the engine injected this
+// action — see `back`).
+// Ref: #
+type FlowStepAction struct {
+	// Action identifier. Sent back in the submit request as `action`.
+	Name string `json:"name"`
+	// Classifies how the engine handles this action:
+	// - `submit`: collect the step's fields and run validate/dispatch/on_success.
+	// - `passkey`: issue a WebAuthn assertion challenge; the matching transition
+	// fires once the returned assertion verifies.
+	// - `passkey_register`: issue a WebAuthn registration challenge; the matching
+	// transition fires once the returned attestation verifies.
+	// - `navigate`: route through the transition without running the input
+	// pipeline. Used for pure-routing actions declared in the flow definition.
+	// - `back`: pop the previous step from runtime history and re-render.
+	// Injected by the engine when history is non-empty and the current step
+	// is non-terminal; never authored in flow definitions. Clients identify
+	// the back action by `kind`, not by `name`.
+	Kind FlowStepActionKind `json:"kind"`
+	// Marks this as the default/primary action. The runtime template uses
+	// this hint to choose visual emphasis. At most one action per step
+	// should be primary; this is not enforced here.
+	Primary OptBool `json:"primary"`
+	// Optional localization key override for the action's label. When
+	// omitted, the engine derives a key from the step and action names.
+	// Display text is resolved client-side from a locale dictionary, never
+	// by the engine.
+	TextKey OptString `json:"text_key"`
+}
+
+// GetName returns the value of Name.
+func (s *FlowStepAction) GetName() string {
+	return s.Name
+}
+
+// GetKind returns the value of Kind.
+func (s *FlowStepAction) GetKind() FlowStepActionKind {
+	return s.Kind
+}
+
+// GetPrimary returns the value of Primary.
+func (s *FlowStepAction) GetPrimary() OptBool {
+	return s.Primary
+}
+
+// GetTextKey returns the value of TextKey.
+func (s *FlowStepAction) GetTextKey() OptString {
+	return s.TextKey
+}
+
+// SetName sets the value of Name.
+func (s *FlowStepAction) SetName(val string) {
+	s.Name = val
+}
+
+// SetKind sets the value of Kind.
+func (s *FlowStepAction) SetKind(val FlowStepActionKind) {
+	s.Kind = val
+}
+
+// SetPrimary sets the value of Primary.
+func (s *FlowStepAction) SetPrimary(val OptBool) {
+	s.Primary = val
+}
+
+// SetTextKey sets the value of TextKey.
+func (s *FlowStepAction) SetTextKey(val OptString) {
+	s.TextKey = val
+}
+
+// Classifies how the engine handles this action:
+// - `submit`: collect the step's fields and run validate/dispatch/on_success.
+// - `passkey`: issue a WebAuthn assertion challenge; the matching transition
+// fires once the returned assertion verifies.
+// - `passkey_register`: issue a WebAuthn registration challenge; the matching
+// transition fires once the returned attestation verifies.
+// - `navigate`: route through the transition without running the input
+// pipeline. Used for pure-routing actions declared in the flow definition.
+// - `back`: pop the previous step from runtime history and re-render.
+// Injected by the engine when history is non-empty and the current step
+// is non-terminal; never authored in flow definitions. Clients identify
+// the back action by `kind`, not by `name`.
+type FlowStepActionKind string
+
+const (
+	FlowStepActionKindSubmit          FlowStepActionKind = "submit"
+	FlowStepActionKindPasskey         FlowStepActionKind = "passkey"
+	FlowStepActionKindPasskeyRegister FlowStepActionKind = "passkey_register"
+	FlowStepActionKindNavigate        FlowStepActionKind = "navigate"
+	FlowStepActionKindBack            FlowStepActionKind = "back"
+)
+
+// AllValues returns all FlowStepActionKind values.
+func (FlowStepActionKind) AllValues() []FlowStepActionKind {
+	return []FlowStepActionKind{
+		FlowStepActionKindSubmit,
+		FlowStepActionKindPasskey,
+		FlowStepActionKindPasskeyRegister,
+		FlowStepActionKindNavigate,
+		FlowStepActionKindBack,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowStepActionKind) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowStepActionKindSubmit:
+		return []byte(s), nil
+	case FlowStepActionKindPasskey:
+		return []byte(s), nil
+	case FlowStepActionKindPasskeyRegister:
+		return []byte(s), nil
+	case FlowStepActionKindNavigate:
+		return []byte(s), nil
+	case FlowStepActionKindBack:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowStepActionKind) UnmarshalText(data []byte) error {
+	switch FlowStepActionKind(data) {
+	case FlowStepActionKindSubmit:
+		*s = FlowStepActionKindSubmit
+		return nil
+	case FlowStepActionKindPasskey:
+		*s = FlowStepActionKindPasskey
+		return nil
+	case FlowStepActionKindPasskeyRegister:
+		*s = FlowStepActionKindPasskeyRegister
+		return nil
+	case FlowStepActionKindNavigate:
+		*s = FlowStepActionKindNavigate
+		return nil
+	case FlowStepActionKindBack:
+		*s = FlowStepActionKindBack
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // A pending authentication challenge issued by the server. Present when the
@@ -10649,136 +10925,6 @@ func (s *SetUserPasswordRequest) SetPassword(val string) {
 // SetIsChangeRequired sets the value of IsChangeRequired.
 func (s *SetUserPasswordRequest) SetIsChangeRequired(val OptBool) {
 	s.IsChangeRequired = val
-}
-
-// Configuration for a user-invokable action on a step. The `name` is sent
-// back in the submit request as `action`; the engine resolves the action's
-// declared `kind` to decide how to handle the submission.
-// Ref: #
-type StepAction struct {
-	// Action identifier. Sent back in the submit request as `action`.
-	Name string `json:"name"`
-	// Classifies how the engine handles this action:
-	// - `submit`: collect the step's fields and run validate/dispatch/on_success.
-	// - `passkey`: issue a WebAuthn assertion challenge; the matching transition
-	// fires once the returned assertion verifies.
-	// - `passkey_register`: issue a WebAuthn registration challenge; the matching
-	// transition fires once the returned attestation verifies.
-	// - `navigate`: route through the transition without running the input
-	// pipeline. Used for back-navigation and similar pure-routing actions.
-	Kind StepActionKind `json:"kind"`
-	// Marks this as the default/primary action. The runtime template uses
-	// this hint to choose visual emphasis. At most one action per step
-	// should be primary; this is not enforced here.
-	Primary OptBool `json:"primary"`
-	// Optional localization key override for the action's label. When
-	// omitted, the engine derives a key from the step and action names.
-	// Display text is resolved client-side from a locale dictionary, never
-	// by the engine.
-	TextKey OptString `json:"text_key"`
-}
-
-// GetName returns the value of Name.
-func (s *StepAction) GetName() string {
-	return s.Name
-}
-
-// GetKind returns the value of Kind.
-func (s *StepAction) GetKind() StepActionKind {
-	return s.Kind
-}
-
-// GetPrimary returns the value of Primary.
-func (s *StepAction) GetPrimary() OptBool {
-	return s.Primary
-}
-
-// GetTextKey returns the value of TextKey.
-func (s *StepAction) GetTextKey() OptString {
-	return s.TextKey
-}
-
-// SetName sets the value of Name.
-func (s *StepAction) SetName(val string) {
-	s.Name = val
-}
-
-// SetKind sets the value of Kind.
-func (s *StepAction) SetKind(val StepActionKind) {
-	s.Kind = val
-}
-
-// SetPrimary sets the value of Primary.
-func (s *StepAction) SetPrimary(val OptBool) {
-	s.Primary = val
-}
-
-// SetTextKey sets the value of TextKey.
-func (s *StepAction) SetTextKey(val OptString) {
-	s.TextKey = val
-}
-
-// Classifies how the engine handles this action:
-// - `submit`: collect the step's fields and run validate/dispatch/on_success.
-// - `passkey`: issue a WebAuthn assertion challenge; the matching transition
-// fires once the returned assertion verifies.
-// - `passkey_register`: issue a WebAuthn registration challenge; the matching
-// transition fires once the returned attestation verifies.
-// - `navigate`: route through the transition without running the input
-// pipeline. Used for back-navigation and similar pure-routing actions.
-type StepActionKind string
-
-const (
-	StepActionKindSubmit          StepActionKind = "submit"
-	StepActionKindPasskey         StepActionKind = "passkey"
-	StepActionKindPasskeyRegister StepActionKind = "passkey_register"
-	StepActionKindNavigate        StepActionKind = "navigate"
-)
-
-// AllValues returns all StepActionKind values.
-func (StepActionKind) AllValues() []StepActionKind {
-	return []StepActionKind{
-		StepActionKindSubmit,
-		StepActionKindPasskey,
-		StepActionKindPasskeyRegister,
-		StepActionKindNavigate,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s StepActionKind) MarshalText() ([]byte, error) {
-	switch s {
-	case StepActionKindSubmit:
-		return []byte(s), nil
-	case StepActionKindPasskey:
-		return []byte(s), nil
-	case StepActionKindPasskeyRegister:
-		return []byte(s), nil
-	case StepActionKindNavigate:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *StepActionKind) UnmarshalText(data []byte) error {
-	switch StepActionKind(data) {
-	case StepActionKindSubmit:
-		*s = StepActionKindSubmit
-		return nil
-	case StepActionKindPasskey:
-		*s = StepActionKindPasskey
-		return nil
-	case StepActionKindPasskeyRegister:
-		*s = StepActionKindPasskeyRegister
-		return nil
-	case StepActionKindNavigate:
-		*s = StepActionKindNavigate
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
 }
 
 // Step-level localization keys. Resolved client-side via the `| t` LiquidJS filter.

@@ -229,7 +229,7 @@ func convertStepGateConfig(config api.OptGateConfig) (map[string]any, error) {
 // convertStepActions preserves the nil-vs-empty distinction so an explicit
 // `actions: []` survives the embed-loader path without collapsing into a
 // nil that would re-read as "omitted, apply default" downstream.
-func convertStepActions(actions []api.StepAction) ([]domain.FlowStepAction, error) {
+func convertStepActions(actions []api.FlowDefinitionAction) ([]domain.FlowStepAction, error) {
 	if actions == nil {
 		return nil, nil
 	}

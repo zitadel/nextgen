@@ -81,7 +81,7 @@ properties:
       Ordered list of available user actions. The LiquidJS template iterates
       this array and builds a name-indexed map locally for keyed lookup.
     items:
-      $ref: step-action.yaml
+      $ref: flow-step-action.yaml
     default: []
   gates:
     type: object

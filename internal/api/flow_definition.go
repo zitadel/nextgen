@@ -307,15 +307,15 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 // mapActionsToAPI preserves the nil-vs-empty distinction so a stored flow
 // definition's explicit `[]` round-trips back to the client as `[]` (not
 // omitted), keeping sync/diff tooling honest.
-func mapActionsToAPI(domainActions []domain.FlowStepAction) []api.StepAction {
+func mapActionsToAPI(domainActions []domain.FlowStepAction) []api.FlowDefinitionAction {
 	if domainActions == nil {
 		return nil
 	}
-	actions := make([]api.StepAction, 0, len(domainActions))
+	actions := make([]api.FlowDefinitionAction, 0, len(domainActions))
 	for _, action := range domainActions {
-		actions = append(actions, api.StepAction{
+		actions = append(actions, api.FlowDefinitionAction{
 			Name: action.Name,
-			Kind: api.StepActionKind(action.Kind.String()),
+			Kind: api.FlowDefinitionActionKind(action.Kind.String()),
 			Primary: api.OptBool{
 				Value: action.Primary,
 				Set:   action.Primary,

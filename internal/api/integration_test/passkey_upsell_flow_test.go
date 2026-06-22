@@ -259,8 +259,8 @@ func passkeyUpsellFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 			{
 				Name:   "register",
 				Fields: []string{"email", "givenName"},
-				Actions: []api.StepAction{
-					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
+				Actions: []api.FlowDefinitionAction{
+					{Name: "submit", Kind: api.FlowDefinitionActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 					"submit": api.FlowDefinitionStepTransitionsItem{Target: "register-password"},
@@ -270,8 +270,8 @@ func passkeyUpsellFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 				Name:      "register-password",
 				Fields:    []string{"password"},
 				OnSuccess: api.NewOptFlowDefinitionStepOnSuccess(createUser),
-				Actions: []api.StepAction{
-					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
+				Actions: []api.FlowDefinitionAction{
+					{Name: "submit", Kind: api.FlowDefinitionActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 					"submit": api.FlowDefinitionStepTransitionsItem{Target: "passkey-upsell"},
@@ -279,9 +279,9 @@ func passkeyUpsellFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 			},
 			{
 				Name: "passkey-upsell",
-				Actions: []api.StepAction{
-					{Name: "passkey_register", Kind: api.StepActionKindPasskeyRegister, Primary: api.NewOptBool(true)},
-					{Name: "skip", Kind: api.StepActionKindSubmit},
+				Actions: []api.FlowDefinitionAction{
+					{Name: "passkey_register", Kind: api.FlowDefinitionActionKindPasskeyRegister, Primary: api.NewOptBool(true)},
+					{Name: "skip", Kind: api.FlowDefinitionActionKindSubmit},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 					"passkey_register": api.FlowDefinitionStepTransitionsItem{Target: "done"},

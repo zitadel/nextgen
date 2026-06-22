@@ -107,8 +107,8 @@ func TestPasskeyFlowLogin(t *testing.T) {
 			Steps: []api.FlowDefinitionStep{
 				{
 					Name: "passkey-step",
-					Actions: []api.StepAction{
-						{Name: "passkey", Kind: api.StepActionKindPasskey, Primary: api.NewOptBool(true)},
+					Actions: []api.FlowDefinitionAction{
+						{Name: "passkey", Kind: api.FlowDefinitionActionKindPasskey, Primary: api.NewOptBool(true)},
 					},
 					Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 						"passkey": api.FlowDefinitionStepTransitionsItem{Target: "done"},

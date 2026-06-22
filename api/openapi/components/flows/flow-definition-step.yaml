@@ -38,7 +38,7 @@ properties:
       frontend sends back in the submit request. If omitted, the engine
       provides a default `submit` action.
     items:
-      $ref: step-action.yaml
+      $ref: flow-definition-action.yaml
     default: []
     example:
       - name: submit

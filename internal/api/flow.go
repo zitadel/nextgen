@@ -414,12 +414,12 @@ func toFlowFieldValidation(v *domain.FlowFieldValidation) *api.FieldValidation {
 	return &out
 }
 
-func toFlowStepActions(actions []domain.FlowAction) []api.StepAction {
-	out := make([]api.StepAction, len(actions))
+func toFlowStepActions(actions []domain.FlowAction) []api.FlowStepAction {
+	out := make([]api.FlowStepAction, len(actions))
 	for i, a := range actions {
-		out[i] = api.StepAction{
+		out[i] = api.FlowStepAction{
 			Name:    a.Name,
-			Kind:    api.StepActionKind(a.Kind.String()),
+			Kind:    api.FlowStepActionKind(a.Kind.String()),
 			TextKey: api.NewOptString(a.TextKey),
 			Primary: api.NewOptBool(a.Primary),
 		}

@@ -35,6 +35,14 @@ func (s *FlowDefinition) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *FlowDefinitionAction) setDefaults() {
+	{
+		val := bool(false)
+		s.Primary.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *FlowDefinitionDetailResponse) setDefaults() {
 	{
 		val := FlowDefinitionStatus("active")
@@ -47,6 +55,14 @@ func (s *FlowDefinitionResponse) setDefaults() {
 	{
 		val := FlowDefinitionStatus("active")
 		s.Status = val
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *FlowStepAction) setDefaults() {
+	{
+		val := bool(false)
+		s.Primary.SetTo(val)
 	}
 }
 
@@ -67,14 +83,6 @@ func (s *OpenidConfiguration) setDefaults() {
 	{
 		val := bool(false)
 		s.RequireRequestURIRegistration.SetTo(val)
-	}
-}
-
-// setDefaults set default value of fields.
-func (s *StepAction) setDefaults() {
-	{
-		val := bool(false)
-		s.Primary.SetTo(val)
 	}
 }
 
