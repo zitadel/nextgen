@@ -132,6 +132,11 @@ describe("edgeProxyOps — vercel", () => {
     expect(once.rewrites).toHaveLength(1);
   });
 
+  it("throws a clear error when an existing vercel.json is invalid JSON", () => {
+    const transform = editOp(ops, "vercel.json")?.edit;
+    expect(() => transform?.('{ "rewrites": [], }')).toThrow(/vercel\.json is not valid JSON/);
+  });
+
   it("adds only the backend URL to .env.local (secret already written by the base patcher)", () => {
     expect(mergeEnv(ops, ".env.local")).toEqual({ NEXTGEN_API_URL: "https://api.zitadel.cloud" });
   });

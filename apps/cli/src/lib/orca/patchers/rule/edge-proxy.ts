@@ -1,3 +1,4 @@
+import { ZitadelError } from "../../../errors";
 import { MANAGED_MARKER } from "../../../paths";
 import { npmDistTagForCliVersion } from "../../../public-cli";
 import type { DeployTarget } from "../../detectors/deploy-target";
@@ -101,8 +102,23 @@ const VERCEL_REWRITE = { source: `${PROXY_PATH}/(.*)`, destination: `${VERCEL_PR
  */
 function vercelJsonEdit(): (source: string | undefined) => string {
   return (source) => {
-    const parsed: { rewrites?: Array<{ source?: string; destination?: string }> } =
-      source === undefined ? {} : (JSON.parse(source) as Record<string, never>);
+    let parsed: { rewrites?: Array<{ source?: string; destination?: string }> };
+    if (source === undefined) {
+      parsed = {};
+    } else {
+      try {
+        parsed = JSON.parse(source) as {
+          rewrites?: Array<{ source?: string; destination?: string }>;
+        };
+      } catch (error) {
+        // A malformed vercel.json (comments, trailing commas, …) would otherwise
+        // crash setup with a context-free SyntaxError.
+        throw new ZitadelError("E_VALIDATION", "vercel.json is not valid JSON", {
+          hint: "Fix vercel.json (no comments or trailing commas) and re-run setup, or add the /__nextgen rewrite by hand.",
+          details: { cause: error instanceof Error ? error.message : String(error) },
+        });
+      }
+    }
     const rewrites = Array.isArray(parsed.rewrites) ? parsed.rewrites : [];
     if (rewrites.some((r) => r.source === VERCEL_REWRITE.source)) {
       return source ?? `${JSON.stringify({ rewrites }, null, 2)}\n`;

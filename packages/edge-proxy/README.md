@@ -4,7 +4,7 @@ A platform-agnostic edge proxy handler that lets any SPA (React, Vue, Angular, S
 
 Built entirely from WinterTC-standard web platform globals (`fetch`, `Request`, `Response`, `URL`, `Headers`). No platform-specific imports — the same handler runs on Cloudflare Workers, Vercel Edge Functions, and Netlify Edge Functions.
 
-> The `zitadel` CLI scaffolds these files for you when you run `setup` in an SPA project with a platform CLI installed. The steps below are for wiring it up by hand; the shapes match what the CLI generates.
+> The `zitadel` CLI scaffolds equivalent files for you when you run `setup` in an SPA project with a platform CLI installed (it may use different filenames, e.g. `zitadel-edge-proxy.ts`). The steps below are for wiring it up by hand.
 
 ## Install
 
