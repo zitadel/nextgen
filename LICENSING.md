@@ -47,8 +47,10 @@ licensed under the MIT License:
 ```text
 README.md
 CONTRIBUTING.md
+CODE_OF_CONDUCT.md
 AGENTS.md
 LICENSING.md
+SUPPORT.md
 VISION.md
 api/
 docs/

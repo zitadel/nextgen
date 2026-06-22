@@ -53,7 +53,8 @@ Secrets").
   registration/login flows.
 - `packages/components/` contains shared Lit components.
 - `packages/sdk-core/`, `packages/sdk-next/`, `packages/sdk-nuxt/`,
-  `packages/sdk-react/`, `packages/sdk-vue/`, and `packages/sdk-angular/`
+  `packages/sdk-react/`, `packages/sdk-vue/`, `packages/sdk-angular/`,
+  `packages/sdk-solid/`, `packages/sdk-svelte/`, and `packages/sdk-qwik/`
   contain public TypeScript SDKs.
 - `packages/api-mock/` contains the in-process MSW handlers and standalone
   mock auth server used by demos and e2e tests.
@@ -259,7 +260,8 @@ inspect planned package bumps.
 The public packages are `@zitadel/cli`, `@zitadel/server`, the
 `@zitadel/server-*` platform packages, `@zitadel/api`, `@zitadel/components`,
 `@zitadel/sdk-core`, `@zitadel/sdk-next`, `@zitadel/sdk-nuxt`,
-`@zitadel/sdk-react`, `@zitadel/sdk-vue`, and `@zitadel/sdk-angular`. These
+`@zitadel/sdk-react`, `@zitadel/sdk-vue`, `@zitadel/sdk-angular`,
+`@zitadel/sdk-solid`, `@zitadel/sdk-svelte`, and `@zitadel/sdk-qwik`. These
 packages are in one Changesets fixed group for alpha product releases. Moon
 still creates or updates the draft GitHub Release shell for `v<version>` from
 the fixed package version; maintainers publish product notes manually.

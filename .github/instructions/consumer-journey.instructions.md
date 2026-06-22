@@ -11,7 +11,7 @@ gate, not as a demo-app e2e suite.
   tarballs. Do not replace this with public npm packages for Zitadel packages.
 - The journey must exercise the customer local runtime flow through `npx`:
   `doctor`, `start`, then
-  `setup --framework <next|nuxt|react|vue|angular> --server local` with
+  `setup --framework <next|nuxt|react|vue|angular|solid|svelte|qwik> --server local` with
   `--non-interactive --json`.
 - Produce package artifacts with `corepack pnpm --dir <package> pack` and keep
   tarball verification for required package presence plus unresolved

@@ -11,16 +11,18 @@ dashboard detours, or hand-copied client IDs. When the project is ready to be
 shared, deployed, or governed, a human claims it, the work stays in place, and
 the system becomes a team-owned identity platform configured like code.
 
-This preview is not the finished product, and its public name may change. The
-direction is clear: ship auth before signup, claim ownership when it matters,
-and grow into production trust without surprising developers, agents, or
-downstream applications.
+This preview is not the finished product, and its public name may change. It is
+not production software: APIs, storage, CLI flags, package surfaces, and docs
+may change without a migration guarantee. The direction is clear: ship auth
+before signup, claim ownership when it matters, and grow into production trust
+without surprising developers, agents, or downstream applications.
 
 ## Current Reality
 
 This repository is pre-release. The current checked-in CLI supports the local
-Docker-backed setup flow documented in [README.md](README.md); it does not
-currently ship a `zitadel claim` command.
+`@zitadel/server` npm-binary setup flow documented in [README.md](README.md);
+Docker remains an explicit fallback/operator-style runtime, and the repo does
+not currently ship a `zitadel claim` command.
 
 Create-first, claim-later remains the product direction. The previous mock-only
 claim lifecycle was removed until the real server-side claim contract exists;
@@ -33,6 +35,9 @@ claim flow, but those examples are target design, not shipped CLI behavior.
 - **Vision and naming:** Use "next-generation Zitadel preview" and say the
   public name may change. Avoid treating `nextgen` as a permanent product name
   outside literal repository, package, Docker, or artifact identifiers.
+- **Non-production honesty:** Say this preview is for testing and feedback, not
+  production use. Do not imply stable APIs, stable storage, migration
+  guarantees, production support, or production security-advisory coverage.
 - **Claim/link-first honesty:** Keep "ship auth before signup, claim later" as
   the direction, but label claim flow docs as target design until OpenAPI,
   server, and CLI support exist.

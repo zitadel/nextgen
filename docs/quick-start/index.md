@@ -1,16 +1,20 @@
 # Quick start
 
-Add Zitadel to a local Next.js app with the published CLI and a Docker-managed
-local Zitadel runtime.
+Add Zitadel to a local Next.js app with the published CLI and the default
+`@zitadel/server` npm-binary local runtime.
+
+> **Preview status:** This is preview software for testing and feedback, not
+> production use. APIs, storage, CLI flags, packages, and docs may change
+> without a migration guarantee.
 
 ## Prerequisites
 
 - Node.js 24 or newer for `npx`
-- Docker Engine or a Docker-compatible runtime, only for the managed local
-  runtime (`start` / `--server local`)
+- Docker Engine or a Docker-compatible runtime only when you explicitly choose
+  `zitadel start --runtime docker` or the manual Docker Compose path
 
-If the Docker daemon is down, start Docker Desktop, Docker Engine, or Colima
-and rerun `doctor`. Remote-server setup can skip Docker by passing
+The default local runtime does not require Docker, Go, Moon, or a source
+checkout. Remote-server setup can skip the local runtime entirely by passing
 `--server <url>` instead of `--server local`.
 
 ## Steps
@@ -38,7 +42,7 @@ logout, and login across the supported frameworks.
 
 The managed local Zitadel server listens on http://localhost:8080 by default.
 The CLI stores runtime metadata in `.zitadel/local/runtime.json` and mounts
-`.zitadel/local/nextgen-data` into the container. If you start from a fresh
+`.zitadel/local/nextgen-data` for the server binary. If you start from a fresh
 directory, `setup --server local` asks which framework to scaffold and writes
 the app into the current directory. Stop preserves runtime data:
 

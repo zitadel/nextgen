@@ -1,6 +1,12 @@
 # Zitadel Design Glossary
 
 > Canonical vocabulary for the next-generation design docs. All sub-areas (`api/`, `platform/`, `flowengine/`) reference this file rather than redefining terms. When in doubt, come back here.
+>
+> **Preview note:** These are design terms, not a shipped public contract. Claim
+> and pre-claim lifecycle entries describe target design only; the public
+> preview does not currently ship claim endpoints or a `zitadel claim` command.
+> See [ADR 003](../adrs/003-create-first-claim-later.md) for the current
+> implementation state.
 
 ## Conventions
 
@@ -72,8 +78,8 @@ Core nouns used across the API. Full endpoint map in [`api/resource-map.md`](api
 | **auth_attempt** | Ephemeral state machine driving a single authentication attempt. Exposes *auth primitives* (challenges, verify, handoff). OIDC context is owned by the OIDC adapter (`auth_requests`), not by auth_attempt. Long-form in [`api/authn-and-auth-flows.md`](api/authn-and-auth-flows.md). |
 | **handoff_token** | Short-lived, audience-bound token produced by `POST /auth_attempts/{id}/handoff`, consumed by `POST /sessions/exchange`. |
 | **challenge** | A single-factor challenge (password prompt, OTP, passkey, OIDC redirect) issued inside an auth_attempt. |
-| **bootstrap** | The `/bootstrap/*` endpoint family. Two distinct concepts share the prefix: *project bootstrap* (`POST /projects` for anonymous project creation — see [`platform/claim-flow.md`](platform/claim-flow.md)) and *challenge bootstrap* (`POST /bootstrap/challenge` for origin-bound browser nonces — see [`api/authn-and-auth-flows.md`](api/authn-and-auth-flows.md)). |
-| **claim** | The transaction that attaches a team (in the platform project) and an accountable human to a customer project. Free. Forced at first production deploy. See [`platform/claim-flow.md`](platform/claim-flow.md). |
+| **bootstrap** | The `/bootstrap/*` endpoint family. Two distinct concepts share the prefix: *project bootstrap* (`POST /projects` for anonymous project creation — target design, not currently shipped; see [`platform/claim-flow.md`](platform/claim-flow.md) and [ADR 003](../adrs/003-create-first-claim-later.md)) and *challenge bootstrap* (`POST /bootstrap/challenge` for origin-bound browser nonces — see [`api/authn-and-auth-flows.md`](api/authn-and-auth-flows.md)). |
+| **claim** | Target-design transaction that attaches a team (in the platform project) and an accountable human to a customer project. It is not currently exposed by the preview CLI or OpenAPI; see [ADR 003](../adrs/003-create-first-claim-later.md). |
 
 ---
 

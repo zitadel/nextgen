@@ -14,7 +14,8 @@ Vitest.
   contract updates when user-facing.
 - The public npm packages (`apps/cli`, `packages/api`, `packages/components`,
   `packages/sdk-core`, `packages/sdk-next`, `packages/sdk-nuxt`,
-  `packages/sdk-react`, `packages/sdk-vue`, `packages/sdk-angular`) must keep
+  `packages/sdk-react`, `packages/sdk-vue`, `packages/sdk-angular`,
+  `packages/sdk-solid`, `packages/sdk-svelte`, `packages/sdk-qwik`) must keep
   `"license": "MIT"`.
 - Follow the [decision table in `.changeset/README.md`](../../.changeset/README.md#decision-table)
   for publishable package paths; add a real changeset for user-visible changes,

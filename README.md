@@ -3,11 +3,15 @@
 Next iteration of the Zitadel identity platform.
 
 > **Preview status:** This repository is a pre-release next-generation Zitadel
-> preview. The public name may change, and APIs, CLI flags, package surfaces,
-> and docs are still in flux. The checked-in CLI currently supports the local
-> npm-binary flow documented below; create-first, claim-later is the product
-> direction, but `zitadel claim` is not shipped in this repo yet. See
-> [VISION.md](VISION.md).
+> preview for testing and feedback. It is not production software: APIs,
+> storage, CLI flags, package surfaces, and docs may change without a migration
+> guarantee. The checked-in CLI currently supports the local npm-binary flow
+> documented below; create-first, claim-later is the product direction, but
+> `zitadel claim` is not shipped in this repo yet. See [VISION.md](VISION.md).
+>
+> This preview does not yet participate in Zitadel's production security
+> advisory process. For security-sensitive production evaluation, use the main
+> Zitadel project and policies instead.
 
 ## Workflow front doors
 
@@ -15,6 +19,7 @@ Next iteration of the Zitadel identity platform.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contributor setup, Moon commands,
 local checks, source builds, release workflows, and troubleshooting.
+For preview feedback routing, see [SUPPORT.md](SUPPORT.md).
 
 Preview the documentation site with:
 

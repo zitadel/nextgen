@@ -154,7 +154,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_CONFIG_PROVENANCE: "false"
+          NPM_CONFIG_PROVENANCE: ${{ github.event.repository.private == false }}
           RECOVER_VERSION: ${{ inputs.recover_version }}
 
       - name: Publish release
@@ -170,5 +170,5 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_CONFIG_PROVENANCE: "false"
+          NPM_CONFIG_PROVENANCE: ${{ github.event.repository.private == false }}
           RECOVER_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.recover_version || '' }}

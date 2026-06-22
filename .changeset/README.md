@@ -36,6 +36,9 @@ to npm:
 - `packages/sdk-react/` — `@zitadel/sdk-react`
 - `packages/sdk-vue/` — `@zitadel/sdk-vue`
 - `packages/sdk-angular/` — `@zitadel/sdk-angular`
+- `packages/sdk-solid/` — `@zitadel/sdk-solid`
+- `packages/sdk-svelte/` — `@zitadel/sdk-svelte`
+- `packages/sdk-qwik/` — `@zitadel/sdk-qwik`
 
 `AGENTS.md` files under those roots do not require a changeset on their own.
 
@@ -89,10 +92,11 @@ One-line, user-facing summary of the change.
 List only public package names (`@zitadel/cli`, `@zitadel/server`,
 `@zitadel/server-*`, `@zitadel/api`, `@zitadel/components`,
 `@zitadel/sdk-core`, `@zitadel/sdk-next`, `@zitadel/sdk-nuxt`,
-`@zitadel/sdk-react`, `@zitadel/sdk-vue`, `@zitadel/sdk-angular`). Pick `patch`
-(fixes), `minor` (features), or `major` (breaking). The repo is in `alpha`
-prerelease mode (`.changeset/pre.json`) and public packages are in one fixed
-group, so versions cut as one `X.Y.Z-alpha.N` train automatically — see
+`@zitadel/sdk-react`, `@zitadel/sdk-vue`, `@zitadel/sdk-angular`,
+`@zitadel/sdk-solid`, `@zitadel/sdk-svelte`, `@zitadel/sdk-qwik`). Pick
+`patch` (fixes), `minor` (features), or `major` (breaking). The repo is in
+`alpha` prerelease mode (`.changeset/pre.json`) and public packages are in one
+fixed group, so versions cut as one `X.Y.Z-alpha.N` train automatically — see
 [Alpha prerelease mode](#alpha-prerelease-mode).
 
 ## Empty changeset
@@ -170,11 +174,10 @@ Publishing authenticates with **npm trusted publishing (OIDC)** — there is **n
    - Workflow filename: `release-publish.yml` (exact, case-sensitive)
 3. Optionally, under **Publishing access**, require 2FA and disallow tokens so only this workflow can publish.
 
-While this repository is private, the workflow keeps npm provenance disabled
-with `NPM_CONFIG_PROVENANCE=false`. Trusted publishing still authenticates with
-short-lived OIDC credentials, but npm only accepts public provenance
-attestations from public source repositories. Re-enable provenance when
-`zitadel/nextgen` is public.
+The workflow sets `NPM_CONFIG_PROVENANCE` from the repository visibility:
+`false` while this repository is private and `true` once it is public. Trusted
+publishing still authenticates with short-lived OIDC credentials, but npm only
+accepts public provenance attestations from public source repositories.
 
 Changesets publishes the npm packages, including `@zitadel/server`. Moon
 release tasks read the `@zitadel/server` version, cross-build the Go server,

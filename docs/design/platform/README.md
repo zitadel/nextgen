@@ -7,11 +7,12 @@
 > **What needs feedback:** The Model-A-only MVP, domains as a security + context primitive, the `preview_origins` declaration at project creation, the three deferred capability tiers (SPA, hosted login, white-label mapping).
 > **What's early draft:** OpenAPI stubs for claim and config APIs (endpoints and schemas marked `TODO` where the team still needs to converge). Flow v1 (the named versioned protocol between UI renderers and the flow engine) is referenced throughout but specified in a follow-up pass.
 >
-> **Current implementation note:** This folder describes target platform design.
-> The shipped CLI and server do not currently expose the claim lifecycle or a
-> `zitadel claim` command. ADR 003 records the current implementation state:
-> claim/link-first was removed from the CLI and api-mock until a real
-> server-side claim contract exists.
+> **Current implementation note:** This folder describes target platform design,
+> not the public preview's shipped contract. The shipped CLI and server do not
+> currently expose the claim lifecycle, claim endpoints, or a `zitadel claim`
+> command. ADR 003 records the current implementation state: claim/link-first
+> was removed from the CLI and api-mock until a real server-side claim contract
+> exists.
 
 ## How this relates to the flow engine
 

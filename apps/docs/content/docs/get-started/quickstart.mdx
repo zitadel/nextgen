@@ -5,6 +5,8 @@ description: Add the Zitadel preview to a local app with the alpha CLI and npm-b
 
 Use this path when you want to add Zitadel auth to a local app without a source checkout.
 
+This is preview software for testing and feedback, not production use. APIs, storage, CLI flags, packages, and docs may change without a migration guarantee.
+
 ## Prerequisites
 
 - Node.js 24 or newer.
@@ -40,7 +42,7 @@ By default this starts the matching `@zitadel/server` npm binary for the alpha t
 npx @zitadel/cli@alpha setup --server local
 ```
 
-In a fresh directory, setup asks which framework to scaffold. Scripted runs should pass `--framework next`, `--framework nuxt`, `--framework react`, `--framework vue`, or `--framework angular`.
+In a fresh directory, setup asks which framework to scaffold. Scripted runs should pass `--framework next`, `--framework nuxt`, `--framework react`, `--framework vue`, `--framework angular`, `--framework solid`, `--framework svelte`, or `--framework qwik`.
 
 Setup writes the app files, `.env.local`, `zitadel.json`, and `.zitadel/**`, then installs dependencies with the detected package manager unless `--skip-install` is passed.
 
