@@ -40,6 +40,20 @@ const HOP_BY_HOP: ReadonlySet<string> = new Set([
   "upgrade",
 ]);
 
+/**
+ * RFC 7230 §6.1: the `Connection` header may name additional headers that are
+ * hop-by-hop for this specific connection and must also be stripped. Applied to
+ * both the incoming request and the upstream response.
+ */
+function connectionHopByHop(headers: Headers): ReadonlySet<string> {
+  return new Set(
+    (headers.get("connection") ?? "")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
 // ─── Public types ─────────────────────────────────────────────────────────────
 
 /** Thrown by {@link resolveConfig} when the supplied configuration is invalid. */
@@ -145,13 +159,22 @@ export function resolveConfig(config: EdgeProxyConfig): ResolvedConfig {
     pathPrefix = pathPrefix.slice(0, -1);
   }
 
+  const proxyTimeoutMs = config.proxyTimeoutMs ?? 5000;
+  // Validate up front: a non-finite or <1 timeout makes AbortSignal.timeout
+  // throw, which would otherwise surface as an opaque 502 at request time.
+  if (!Number.isFinite(proxyTimeoutMs) || proxyTimeoutMs < 1) {
+    throw new EdgeProxyConfigError(
+      `proxyTimeoutMs must be a finite number >= 1, got: ${String(config.proxyTimeoutMs)}`,
+    );
+  }
+
   return {
     apiUrl: config.apiUrl,
     pathPrefix,
     stripPrefix: config.stripPrefix ?? true,
     projectSecret: config.projectSecret ?? "",
     additionalHeaders: config.additionalHeaders ?? {},
-    proxyTimeoutMs: config.proxyTimeoutMs ?? 5000,
+    proxyTimeoutMs,
   };
 }
 
@@ -176,15 +199,7 @@ export function resolveConfig(config: EdgeProxyConfig): ResolvedConfig {
  * Not exported — internal implementation detail.
  */
 function buildUpstreamHeaders(req: Request, url: URL, config: ResolvedConfig): Headers {
-  // RFC 7230 §6.1: the Connection header may name additional headers that are
-  // hop-by-hop for this specific connection and must also be stripped.
-  const connectionValue = req.headers.get("connection") ?? "";
-  const dynamicHopByHop = new Set(
-    connectionValue
-      .split(",")
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean),
-  );
+  const dynamicHopByHop = connectionHopByHop(req.headers);
 
   const headers = new Headers();
 
@@ -316,10 +331,13 @@ export async function handleProxy(req: Request, config: ResolvedConfig): Promise
   // when it doesn't, we must still forward the collapsed value rather than drop
   // cookies entirely (which would break login/session flows).
   const setCookies = upstreamRes.headers.getSetCookie?.();
+  // Mirror the request side: also strip headers the upstream names in its own
+  // `Connection` header (RFC 7230 §6.1), which are hop-by-hop for this hop.
+  const responseDynamicHopByHop = connectionHopByHop(upstreamRes.headers);
   const responseHeaders = new Headers();
   for (const [k, v] of upstreamRes.headers.entries()) {
     const lower = k.toLowerCase();
-    if (HOP_BY_HOP.has(lower)) {
+    if (HOP_BY_HOP.has(lower) || responseDynamicHopByHop.has(lower)) {
       continue;
     }
     if (lower === "location" && isRedirect) {

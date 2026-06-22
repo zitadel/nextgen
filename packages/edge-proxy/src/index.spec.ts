@@ -83,6 +83,19 @@ describe("resolveConfig", () => {
     expect(() => resolveConfig({ apiUrl: "https://api.example.com" })).not.toThrow();
   });
 
+  it("throws for a non-finite or <1 proxyTimeoutMs", () => {
+    expect(() => resolveConfig({ apiUrl: UPSTREAM, proxyTimeoutMs: 0 })).toThrow(
+      EdgeProxyConfigError,
+    );
+    expect(() => resolveConfig({ apiUrl: UPSTREAM, proxyTimeoutMs: -5 })).toThrow(
+      EdgeProxyConfigError,
+    );
+    expect(() => resolveConfig({ apiUrl: UPSTREAM, proxyTimeoutMs: Number.NaN })).toThrow(
+      EdgeProxyConfigError,
+    );
+    expect(resolveConfig({ apiUrl: UPSTREAM, proxyTimeoutMs: 1000 }).proxyTimeoutMs).toBe(1000);
+  });
+
   it("normalizes a trailing slash on pathPrefix (but keeps root '/')", () => {
     expect(resolveConfig({ apiUrl: UPSTREAM, pathPrefix: "/__nextgen/" }).pathPrefix).toBe(
       "/__nextgen",
@@ -539,6 +552,19 @@ describe("handleProxy", () => {
     expect(res?.headers.has("transfer-encoding")).toBe(false);
     expect(res?.headers.get("x-custom")).toBe("kept");
     expect(res?.headers.get("content-type")).toBe("application/json");
+  });
+
+  it("strips response headers named in the upstream Connection value (RFC 7230 §6.1)", async () => {
+    const upstreamHeaders = new Headers({
+      connection: "keep-alive, X-Upstream-Internal",
+      "x-upstream-internal": "secret",
+      "x-custom": "kept",
+    });
+    stubFetch(new Response("{}", { status: 200, headers: upstreamHeaders }));
+    const cfg = makeConfig();
+    const res = await handleProxy(new Request("http://edge.local/__nextgen/ping"), cfg);
+    expect(res?.headers.has("x-upstream-internal")).toBe(false);
+    expect(res?.headers.get("x-custom")).toBe("kept");
   });
 
   it("strips location on a 3xx response to prevent internal URL leakage", async () => {
