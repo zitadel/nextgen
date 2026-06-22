@@ -1247,3 +1247,27 @@ func TestValidator_MissingActionKindRejected(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, errorDetails(t, err), `action "submit" has no kind`)
 }
+
+// TestValidator_DeclaredBackKindRejected guards against authors declaring
+// `kind: back` directly on a flow definition. The engine injects back on
+// rendered responses; declaring it on the definition would let an author
+// override the engine's reversibility rules and is not permitted.
+func TestValidator_DeclaredBackKindRejected(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	def := domain.FlowDefinition{
+		ProjectID: "p", Name: "f", SchemaVersion: "1",
+		UserSchema: "https://tenant.com/schemas/idpw-user.json",
+		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "step", Fields: []string{"email"},
+				Actions:     []domain.FlowStepAction{{Name: "back", Kind: domain.FlowActionKindBack}},
+				Transitions: map[string]domain.FlowStepTransition{"back": {Target: "done"}},
+			},
+			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
+		},
+	}
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err), `action "back" has kind=back, which is engine-injected and cannot be declared`)
+}

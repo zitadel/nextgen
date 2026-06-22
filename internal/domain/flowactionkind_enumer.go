@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _FlowActionKindName = "submitpasskeypasskey_registernavigate"
+const _FlowActionKindName = "submitpasskeypasskey_registernavigateback"
 
-var _FlowActionKindIndex = [...]uint8{0, 6, 13, 29, 37}
+var _FlowActionKindIndex = [...]uint8{0, 6, 13, 29, 37, 41}
 
-const _FlowActionKindLowerName = "submitpasskeypasskey_registernavigate"
+const _FlowActionKindLowerName = "submitpasskeypasskey_registernavigateback"
 
 func (i FlowActionKind) String() string {
 	i -= 1
@@ -30,9 +30,10 @@ func _FlowActionKindNoOp() {
 	_ = x[FlowActionKindPasskey-(2)]
 	_ = x[FlowActionKindPasskeyRegister-(3)]
 	_ = x[FlowActionKindNavigate-(4)]
+	_ = x[FlowActionKindBack-(5)]
 }
 
-var _FlowActionKindValues = []FlowActionKind{FlowActionKindSubmit, FlowActionKindPasskey, FlowActionKindPasskeyRegister, FlowActionKindNavigate}
+var _FlowActionKindValues = []FlowActionKind{FlowActionKindSubmit, FlowActionKindPasskey, FlowActionKindPasskeyRegister, FlowActionKindNavigate, FlowActionKindBack}
 
 var _FlowActionKindNameToValueMap = map[string]FlowActionKind{
 	_FlowActionKindName[0:6]:        FlowActionKindSubmit,
@@ -43,6 +44,8 @@ var _FlowActionKindNameToValueMap = map[string]FlowActionKind{
 	_FlowActionKindLowerName[13:29]: FlowActionKindPasskeyRegister,
 	_FlowActionKindName[29:37]:      FlowActionKindNavigate,
 	_FlowActionKindLowerName[29:37]: FlowActionKindNavigate,
+	_FlowActionKindName[37:41]:      FlowActionKindBack,
+	_FlowActionKindLowerName[37:41]: FlowActionKindBack,
 }
 
 var _FlowActionKindNames = []string{
@@ -50,6 +53,7 @@ var _FlowActionKindNames = []string{
 	_FlowActionKindName[6:13],
 	_FlowActionKindName[13:29],
 	_FlowActionKindName[29:37],
+	_FlowActionKindName[37:41],
 }
 
 // FlowActionKindString retrieves an enum value from the enum constants string name.
