@@ -304,22 +304,31 @@ export async function handleProxy(req: Request, config: ResolvedConfig): Promise
   // internal upstream URL the browser can't reach. It is preserved for other
   // statuses (e.g. a 201 Created pointing at the new resource).
   const isRedirect = upstreamRes.status >= 300 && upstreamRes.status < 400;
+  // getSetCookie() preserves multiple Set-Cookie headers individually (the
+  // iterator collapses them into one comma-joined value). When the runtime
+  // provides it we re-add cookies from it below and skip set-cookie in the loop;
+  // when it doesn't, we must still forward the collapsed value rather than drop
+  // cookies entirely (which would break login/session flows).
+  const setCookies = upstreamRes.headers.getSetCookie?.();
   const responseHeaders = new Headers();
   for (const [k, v] of upstreamRes.headers.entries()) {
     const lower = k.toLowerCase();
-    if (HOP_BY_HOP.has(lower) || lower === "set-cookie") {
+    if (HOP_BY_HOP.has(lower)) {
       continue;
     }
     if (lower === "location" && isRedirect) {
       continue;
     }
+    if (lower === "set-cookie") {
+      if (setCookies === undefined) {
+        responseHeaders.append("set-cookie", v);
+      }
+      continue;
+    }
     responseHeaders.set(k, v);
   }
 
-  // getSetCookie() preserves multiple Set-Cookie headers individually.
-  // Headers.get('set-cookie') collapses them into a comma-joined string,
-  // which breaks cookies whose values contain commas (e.g. Expires dates).
-  for (const cookie of upstreamRes.headers.getSetCookie?.() ?? []) {
+  for (const cookie of setCookies ?? []) {
     responseHeaders.append("set-cookie", cookie);
   }
 

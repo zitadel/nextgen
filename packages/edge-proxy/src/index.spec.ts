@@ -553,6 +553,28 @@ describe("handleProxy", () => {
     expect(res?.headers.get("location")).toBe("/sessions/abc123");
   });
 
+  it("forwards set-cookie from entries() on runtimes without getSetCookie()", async () => {
+    // Fake an upstream whose Headers lacks getSetCookie() (older edge runtimes):
+    // the cookie must still be forwarded, not dropped.
+    const fakeUpstream = {
+      status: 200,
+      body: null,
+      headers: {
+        entries: () =>
+          [
+            ["content-type", "application/json"],
+            ["set-cookie", "__nextgen_session=abc; Path=/"],
+          ][Symbol.iterator](),
+        get: () => null,
+        // no getSetCookie
+      },
+    } as unknown as Response;
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(fakeUpstream));
+    const cfg = makeConfig();
+    const res = await handleProxy(new Request("http://edge.local/__nextgen/login"), cfg);
+    expect(res?.headers.get("set-cookie")).toContain("__nextgen_session=abc");
+  });
+
   it("preserves multiple Set-Cookie headers individually", async () => {
     stubFetch(
       mockResponse("{}", {
