@@ -1,0 +1,19 @@
+id: "edge-proxy"
+language: "typescript"
+layer: "library"
+stack: "frontend"
+
+tasks:
+  lint:
+    command: "corepack pnpm run lint"
+
+  typecheck:
+    command: "corepack pnpm run typecheck"
+
+  build:
+    command: "corepack pnpm run build"
+    outputs:
+      - "dist/**/*"
+
+  test:
+    command: "corepack pnpm run test"

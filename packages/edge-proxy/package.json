@@ -1,6 +1,6 @@
 {
-  "name": "@zitadel-nextgen/edge-proxy",
-  "version": "0.0.0",
+  "name": "@zitadel/edge-proxy",
+  "version": "0.1.0-alpha.11",
   "description": "Platform-agnostic edge proxy handler for the Zitadel nextgen flow API",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/edge-proxy#readme",
   "bugs": {
@@ -12,10 +12,20 @@
     "url": "git+https://github.com/zitadel/nextgen.git",
     "directory": "packages/edge-proxy"
   },
-  "files": ["dist", "etc"],
+  "files": [
+    "dist",
+    "etc"
+  ],
   "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
   "exports": {
     ".": {
+      "@zitadel/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
@@ -23,26 +33,20 @@
   "publishConfig": {
     "access": "public"
   },
-  "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
-    "lint": "eslint ."
-  },
   "devDependencies": {
-    "@eslint/js": "^9.0.0",
-    "@eslint/json": "^0.11.0",
-    "@eslint/markdown": "^6.0.0",
-    "eslint": "^9.0.0",
-    "eslint-config-prettier": "^10.0.0",
-    "eslint-import-resolver-typescript": "^3.7.0",
-    "eslint-plugin-import": "^2.31.0",
-    "eslint-plugin-perfectionist": "^4.0.0",
-    "eslint-plugin-prettier": "^5.0.0",
-    "prettier": "^3.0.0",
-    "tsup": "^8.3.5",
-    "typescript": "^5.7.3",
-    "typescript-eslint": "^8.0.0",
-    "vitest": "^3.0.0"
+    "@eslint/js": "catalog:",
+    "@eslint/json": "catalog:",
+    "@eslint/markdown": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-import-resolver-typescript": "catalog:",
+    "eslint-plugin-import": "catalog:",
+    "eslint-plugin-perfectionist": "catalog:",
+    "eslint-plugin-prettier": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:",
+    "vite": "catalog:sdk",
+    "vitest": "catalog:sdk"
   }
 }
