@@ -126,6 +126,10 @@ func validateSteps(steps []FlowDefinitionStep, userSchema *jsonschema.Schema) er
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
 					"step %q: action %q has no kind", step.Name, a.Name), nil)
 			}
+			if a.Kind == FlowActionKindBack {
+				return ErrFlowDefinitionInvalid(fmt.Sprintf(
+					"step %q: action %q has kind=back, which is engine-injected and cannot be declared", step.Name, a.Name), nil)
+			}
 			actionNames[a.Name] = struct{}{}
 		}
 

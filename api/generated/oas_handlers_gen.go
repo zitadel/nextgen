@@ -7916,9 +7916,8 @@ func (s *Server) handleSubmitFlowStepRequest(args [1]string, argsEscaped bool, w
 
 // handleUpdateFlowDefinitionRequest handles updateFlowDefinition operation.
 //
-// Update a flow definition by id. This endpoint completely replaces the existing flow definition.
-// The status of the flow definition can also be updated by setting the `status` attribute in the
-// flow definition.
+// Update a flow definition by id. This endpoint replaces the existing flow definition.
+// If `flow_definition.status` is omitted, the current status is preserved.
 //
 // PUT /flow_definitions/{id}
 func (s *Server) handleUpdateFlowDefinitionRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

@@ -189,6 +189,7 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (FlowSt
 	if req.State == nil {
 		return FlowStepResult{}, fmt.Errorf("flow service: submit without state")
 	}
+	// todo: gracefully handle when the definition was updated (status, steps, etc.,) since the flow started
 	def, err := s.flowDefs.GetFlowDefinition(ctx, s.pool, req.State.ProjectID, req.State.DefinitionID)
 	if err != nil {
 		return FlowStepResult{}, err
