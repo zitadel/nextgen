@@ -102,6 +102,14 @@ describe("handleProxy with a trailing-slash pathPrefix", () => {
     const [url] = mock.mock.calls[0] ?? [];
     expect(url).toBe("http://api.example.com/auth");
   });
+
+  it("keeps a leading slash with pathPrefix '/' and an apiUrl base path", async () => {
+    const mock = stubFetch(mockResponse());
+    const cfg = resolveConfig({ apiUrl: "https://api.example.com/v2", pathPrefix: "/" });
+    await handleProxy(new Request("http://edge.local/foo"), cfg);
+    const [url] = mock.mock.calls[0] ?? [];
+    expect(url).toBe("https://api.example.com/v2/foo");
+  });
 });
 
 // ─── handleProxy ──────────────────────────────────────────────────────────────

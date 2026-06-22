@@ -258,8 +258,10 @@ export async function handleProxy(req: Request, config: ResolvedConfig): Promise
   }
   // Prevent matching a path that shares a prefix but continues with non-slash
   // characters (e.g. pathPrefix='/__nextgen' must NOT match '/__nextgen_other').
+  // The root prefix "/" matches every path, so it is exempt from this check
+  // (the char after "/" is the first path segment, never another "/").
   const charAfterPrefix = url.pathname[config.pathPrefix.length];
-  if (charAfterPrefix !== undefined && charAfterPrefix !== "/") {
+  if (config.pathPrefix !== "/" && charAfterPrefix !== undefined && charAfterPrefix !== "/") {
     return null;
   }
 
@@ -270,9 +272,13 @@ export async function handleProxy(req: Request, config: ResolvedConfig): Promise
   // Preserve any base path embedded in apiUrl (e.g. https://api.example.com/v2).
   // Trailing slash on base path is stripped to avoid double-slash when joining.
   const basePath = base.pathname.replace(/\/$/, "");
-  upstream.pathname = config.stripPrefix
-    ? basePath + (url.pathname.slice(config.pathPrefix.length) || "/")
-    : basePath + url.pathname;
+  // When stripping, the remainder must keep a leading slash. A non-root
+  // pathPrefix is bounded by "/" so the slice already starts with one, but
+  // pathPrefix="/" slices off the leading slash (e.g. "/foo" -> "foo"), which
+  // would join as "/v2foo" — re-add the slash so it becomes "/v2/foo".
+  const stripped = url.pathname.slice(config.pathPrefix.length);
+  const suffix = stripped === "" ? "/" : stripped.startsWith("/") ? stripped : `/${stripped}`;
+  upstream.pathname = config.stripPrefix ? basePath + suffix : basePath + url.pathname;
 
   const headers = buildUpstreamHeaders(req, url, config);
   const hasBody = !["GET", "HEAD"].includes(req.method);

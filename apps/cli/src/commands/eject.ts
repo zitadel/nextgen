@@ -171,7 +171,18 @@ export default class Eject extends BaseCommand {
     // can't be auto-reverted, so surface them as manual cleanup steps. The
     // Angular patcher also edits package.json (a `dev` script, not a config
     // block), so word that one accurately.
-    const manualSteps = actions.configEdits.map((rel) => {
+    //
+    // Drop concrete paths that don't exist (e.g. wrangler.jsonc when the project
+    // only has wrangler.toml and setup never created the jsonc), so the guidance
+    // never points at a file that isn't there. Glob entries (vite.config.*) are
+    // kept since they never match a literal path.
+    const presentConfigEdits: string[] = [];
+    for (const rel of actions.configEdits) {
+      if (rel.includes("*") || (await pathExists(join(cwd, rel)))) {
+        presentConfigEdits.push(rel);
+      }
+    }
+    const manualSteps = presentConfigEdits.map((rel) => {
       if (rel === "package.json" || rel.endsWith("/package.json")) {
         return `Remove the "dev" script setup added to ${rel}`;
       }
