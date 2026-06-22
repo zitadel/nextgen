@@ -10666,11 +10666,8 @@ type StepAction struct {
 	// transition fires once the returned attestation verifies.
 	// - `navigate`: route through the transition without running the input
 	// pipeline. Used for pure-routing actions declared in the flow definition.
-	// - `back`: pop the previous step from runtime history and re-render.
-	// Injected by the engine on rendered step responses when history is
-	// non-empty and the current step is non-terminal; **rejected on inbound
-	// flow definitions** — flow authors never declare it. Clients identify
-	// the back action by `kind`, not by `name`.
+	// - `back`: return the user to the previous step. Surfaced by the engine
+	// when going back is available.
 	Kind StepActionKind `json:"kind"`
 	// Marks this as the default/primary action. The runtime template uses
 	// this hint to choose visual emphasis. At most one action per step
@@ -10731,11 +10728,8 @@ func (s *StepAction) SetTextKey(val OptString) {
 // transition fires once the returned attestation verifies.
 // - `navigate`: route through the transition without running the input
 // pipeline. Used for pure-routing actions declared in the flow definition.
-// - `back`: pop the previous step from runtime history and re-render.
-// Injected by the engine on rendered step responses when history is
-// non-empty and the current step is non-terminal; **rejected on inbound
-// flow definitions** — flow authors never declare it. Clients identify
-// the back action by `kind`, not by `name`.
+// - `back`: return the user to the previous step. Surfaced by the engine
+// when going back is available.
 type StepActionKind string
 
 const (
