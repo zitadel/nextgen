@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -12,7 +13,8 @@ import (
 )
 
 type FlowDefinitionService interface {
-	Create(ctx context.Context, req CreateFlowDefinitionRequest) (*domain.FlowDefinition, error)
+	Create(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error)
+	Update(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error)
 	Get(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error)
 	List(ctx context.Context, req ListFlowDefinitionsRequest) ([]*domain.FlowDefinition, error)
 	Delete(ctx context.Context, projectID string, id string) error
@@ -29,15 +31,17 @@ type BuiltinSchemaProvider interface {
 
 type flowDefinitionValidatorFunc func(userSchema *jsonschema.Schema, flowDefinition domain.FlowDefinition) ([]domain.PivotingTarget, error)
 
-type CreateFlowDefinitionRequest struct {
-	ProjectID     string
-	Name          string
-	SchemaVersion string // todo (grvijayan): currently empty as the request does not contain schema version
-	FlowSchemaURI string // todo (grvijayan): schema_version (semver) stored in the db vs schema_uri needed for validation
-	UserSchema    string
-	Purposes      map[string]string
-	Audience      domain.FlowDefinitionAudience
-	Steps         []domain.FlowDefinitionStep
+type FlowDefinitionRequest struct {
+	FlowDefinitionID string
+	ProjectID        string
+	Name             string
+	Status           string
+	SchemaVersion    string // todo (grvijayan): currently empty as the request does not contain schema version
+	FlowSchemaURI    string // todo (grvijayan): schema_version (semver) stored in the db vs schema_uri needed for validation
+	UserSchema       string
+	Purposes         map[string]string
+	Audience         domain.FlowDefinitionAudience
+	Steps            []domain.FlowDefinitionStep
 }
 
 type flowDefinitionService struct {
@@ -67,7 +71,7 @@ func NewFlowDefinitionService(
 	}
 }
 
-func (fd *flowDefinitionService) Create(ctx context.Context, req CreateFlowDefinitionRequest) (*domain.FlowDefinition, error) {
+func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error) {
 	// check if a flow definition (name + schema version) already exists in the project
 	opts := []domain.FlowDefinitionListOption{
 		domain.WithFlowDefinitionName(req.Name),
@@ -89,6 +93,7 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req CreateFlowDefin
 	}
 
 	flowDefinition, err := domain.NewFlowDefinition(
+		"", // the flow definition ID is auto-generated
 		req.ProjectID,
 		req.Name,
 		req.SchemaVersion,
@@ -96,6 +101,7 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req CreateFlowDefin
 		purposes,
 		req.Audience,
 		req.Steps,
+		domain.FlowDefinitionStatusActive,
 	)
 	if err != nil {
 		return nil, err
@@ -110,6 +116,105 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req CreateFlowDefin
 		return nil, err
 	}
 	return flowDefinition, nil
+}
+
+func (fd *flowDefinitionService) Update(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error) {
+	retrievedFlowDef, err := fd.Get(ctx, req.ProjectID, req.FlowDefinitionID)
+	if err != nil {
+		return nil, err
+	}
+
+	// if the status is not set, use the existing status
+	if req.Status == "" {
+		req.Status = retrievedFlowDef.Status.String()
+	}
+	status, err := domain.FlowDefinitionStatusString(req.Status)
+	if err != nil {
+		return nil, domain.ErrFlowDefinitionInvalid("invalid status", err)
+	}
+	reqPurposes, err := mapPurposesToDomain(req.Purposes)
+	if err != nil {
+		return nil, err
+	}
+	err = fd.isUpdateAllowed(ctx, req.ProjectID, retrievedFlowDef.ID, retrievedFlowDef.Status, status, retrievedFlowDef.Purposes, reqPurposes)
+	if err != nil {
+		return nil, err
+	}
+	flowDefinition, err := domain.NewFlowDefinition(
+		req.FlowDefinitionID,
+		req.ProjectID,
+		req.Name,
+		req.SchemaVersion,
+		req.UserSchema,
+		reqPurposes,
+		req.Audience,
+		req.Steps,
+		status,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	err = fd.Validate(ctx, flowDefinition)
+	if err != nil {
+		return nil, err
+	}
+	err = fd.flowDefinitionRepo.UpdateFlowDefinition(ctx, fd.db, flowDefinition)
+	if err != nil {
+		return nil, err
+	}
+	return flowDefinition, nil
+}
+
+func (fd *flowDefinitionService) isUpdateAllowed(
+	ctx context.Context,
+	projectID,
+	flowDefID string,
+	currentStatus, reqStatus domain.FlowDefinitionStatus,
+	currentPurposes, reqPurposes map[domain.FlowDefinitionPurpose]string) error {
+	// no status change and no purpose change -> the update is allowed implicitly
+	if currentStatus == reqStatus && maps.Equal(currentPurposes, reqPurposes) {
+		return nil
+	}
+
+	purposesToCheck := make(map[domain.FlowDefinitionPurpose]struct{})
+
+	if reqStatus != domain.FlowDefinitionStatusActive {
+		// deactivation: to check if there are other active flow definitions with the current purpose
+		for p := range currentPurposes {
+			purposesToCheck[p] = struct{}{}
+		}
+	} else {
+		// purpose change: to check if there are other active flow definitions to support the purpose being removed
+		for p := range currentPurposes {
+			if _, ok := reqPurposes[p]; !ok {
+				purposesToCheck[p] = struct{}{}
+			}
+		}
+	}
+
+	if len(purposesToCheck) == 0 {
+		return nil
+	}
+
+	// todo (@grvijayan): refactor once the repository layer supports querying by multiple purposes at once
+	//  (excluding the current flow definition ID) to avoid multiple calls to the database
+	for purpose := range purposesToCheck {
+		fds, err := fd.flowDefinitionRepo.ListFlowDefinitions(
+			ctx,
+			fd.db,
+			projectID,
+			domain.WithFlowDefinitionStatus(domain.FlowDefinitionStatusActive),
+			domain.WithFlowDefinitionPurpose(purpose),
+		)
+		if err != nil {
+			return domain.ErrInternal(err).WithMessage(fmt.Sprintf("failed to list flow definitions for old purpose %q", purpose))
+		}
+		if !(len(fds) > 1) {
+			return domain.ErrFlowDefinitionUpdateConflict(fmt.Sprintf("cannot update: no other active flow definition found with purpose %q", purpose))
+		}
+	}
+	return nil
 }
 
 // Validate validates the flow definition steps and transitions

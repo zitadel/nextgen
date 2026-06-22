@@ -126,6 +126,7 @@ type FlowDefinition struct {
 }
 
 func NewFlowDefinition(
+	flowDefID string,
 	projectID string,
 	name string,
 	schemaVersion string,
@@ -133,19 +134,21 @@ func NewFlowDefinition(
 	purposes map[FlowDefinitionPurpose]string,
 	audience FlowDefinitionAudience,
 	steps []FlowDefinitionStep,
-) (*FlowDefinition, error) {
-	id, err := newID(FlowDefinitionPrefix)
-	if err != nil {
-		return nil, ErrInternal(err).WithMessage("failed to generate flow-definition id")
+	status FlowDefinitionStatus,
+) (_ *FlowDefinition, err error) {
+
+	if flowDefID == "" {
+		flowDefID, err = newID(FlowDefinitionPrefix)
+		if err != nil {
+			return nil, ErrInternal(err).WithMessage("failed to generate flow-definition id")
+		}
 	}
 	return &FlowDefinition{
 		ProjectID:     projectID,
-		ID:            id,
+		ID:            flowDefID,
 		Name:          name,
 		SchemaVersion: schemaVersion,
-		Status:        FlowDefinitionStatusActive,
-		CreatedAt:     time.Now().UTC(),
-		UpdatedAt:     time.Now().UTC(),
+		Status:        status,
 		UserSchema:    userSchema,
 		Purposes:      purposes,
 		Audience:      audience,
