@@ -1,0 +1,3 @@
+{
+  "rewrites": [{ "source": "/__nextgen/(.*)", "destination": "/api/__nextgen/$1" }]
+}

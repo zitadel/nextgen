@@ -513,7 +513,7 @@ describe("handleProxy", () => {
     expect(res?.headers.get("content-type")).toBe("application/json");
   });
 
-  it("strips location header from upstream response to prevent internal URL leakage", async () => {
+  it("strips location on a 3xx response to prevent internal URL leakage", async () => {
     const upstreamHeaders = new Headers({
       "content-type": "application/json",
       location: "http://internal-auth.corp:4000/callback",
@@ -523,6 +523,14 @@ describe("handleProxy", () => {
     const res = await handleProxy(new Request("http://edge.local/__nextgen/ping"), cfg);
     expect(res?.headers.has("location")).toBe(false);
     expect(res?.headers.get("content-type")).toBe("application/json");
+  });
+
+  it("preserves location on a non-3xx response (e.g. 201 Created)", async () => {
+    const upstreamHeaders = new Headers({ location: "/sessions/abc123" });
+    stubFetch(new Response("{}", { status: 201, headers: upstreamHeaders }));
+    const cfg = makeConfig();
+    const res = await handleProxy(new Request("http://edge.local/__nextgen/sessions"), cfg);
+    expect(res?.headers.get("location")).toBe("/sessions/abc123");
   });
 
   it("preserves multiple Set-Cookie headers individually", async () => {

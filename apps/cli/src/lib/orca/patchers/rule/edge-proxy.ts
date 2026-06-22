@@ -44,7 +44,9 @@ export function isEdgeProxyFramework(framework: string): boolean {
 }
 
 const CLOUDFLARE_WORKER_PATH = "zitadel-edge-proxy.ts";
-const VERCEL_MIDDLEWARE_PATH = "middleware.ts";
+const VERCEL_FUNCTION_PATH = "api/__nextgen/[...path].ts";
+/** Prefix the Vercel edge function sees after the vercel.json rewrite. */
+const VERCEL_PROXY_PREFIX = "/api/__nextgen";
 const NETLIFY_FUNCTION_PATH = "netlify/edge-functions/zitadel-nextgen.ts";
 
 function cloudflareWorker(): string {
@@ -69,21 +71,43 @@ export default {
 `;
 }
 
-function vercelMiddleware(): string {
+function vercelFunction(): string {
   return `${MANAGED_MARKER}
 import { handleProxy, resolveConfig } from "${EDGE_PROXY_DEP}";
 
-export const config = { matcher: ["${PROXY_PATH}", "${PROXY_PATH}/:path*"] };
+export const config = { runtime: "edge" };
 
+// vercel.json rewrites ${PROXY_PATH}/* to this function, which Vercel invokes at
+// ${VERCEL_PROXY_PREFIX}/* — so the proxy uses that prefix to match.
 const proxyConfig = resolveConfig({
   apiUrl: process.env.NEXTGEN_API_URL ?? "",
   projectSecret: process.env.ZITADEL_PROJECT_SECRET ?? "",
+  pathPrefix: "${VERCEL_PROXY_PREFIX}",
 });
 
-export default async function middleware(req: Request): Promise<Response | undefined> {
-  return (await handleProxy(req, proxyConfig)) ?? undefined;
-}
+export default (req: Request): Promise<Response | null> => handleProxy(req, proxyConfig);
 `;
+}
+
+/** The vercel.json rewrite that routes /__nextgen/* to the edge function. */
+const VERCEL_REWRITE = { source: `${PROXY_PATH}/(.*)`, destination: `${VERCEL_PROXY_PREFIX}/$1` };
+
+/**
+ * Adds the `/__nextgen` rewrite to `vercel.json`, creating the file when absent
+ * and merging into an existing `rewrites` array otherwise. Idempotent: a rewrite
+ * with the same source is left in place.
+ */
+function vercelJsonEdit(): (source: string | undefined) => string {
+  return (source) => {
+    const parsed: { rewrites?: Array<{ source?: string; destination?: string }> } =
+      source === undefined ? {} : (JSON.parse(source) as Record<string, never>);
+    const rewrites = Array.isArray(parsed.rewrites) ? parsed.rewrites : [];
+    if (rewrites.some((r) => r.source === VERCEL_REWRITE.source)) {
+      return source ?? `${JSON.stringify({ rewrites }, null, 2)}\n`;
+    }
+    parsed.rewrites = [...rewrites, VERCEL_REWRITE];
+    return `${JSON.stringify(parsed, null, 2)}\n`;
+  };
 }
 
 function netlifyFunction(): string {
@@ -189,7 +213,11 @@ export function edgeProxyOps(target: DeployTarget, ctx: PatchContext): FileOp[] 
     case "vercel":
       return [
         dep,
-        { kind: "write", path: VERCEL_MIDDLEWARE_PATH, contents: vercelMiddleware() },
+        // An Edge Function plus a vercel.json rewrite — the pattern the repo's
+        // SPA SDK guidance uses. (Root middleware.ts does not run for non-Next
+        // Vite SPAs.) The function's pathPrefix matches the rewritten path.
+        { kind: "write", path: VERCEL_FUNCTION_PATH, contents: vercelFunction() },
+        { kind: "edit", path: "vercel.json", edit: vercelJsonEdit() },
         // vercel dev reads .env.local; the secret is already written there by
         // the base patcher, so only the backend URL needs adding.
         { kind: "merge-env", path: ".env.local", entries: { NEXTGEN_API_URL: ctx.server } },
@@ -227,7 +255,7 @@ export function edgeProxyFiles(target: DeployTarget): string[] {
     case "cloudflare":
       return [CLOUDFLARE_WORKER_PATH];
     case "vercel":
-      return [VERCEL_MIDDLEWARE_PATH];
+      return [VERCEL_FUNCTION_PATH];
     case "netlify":
       return [NETLIFY_FUNCTION_PATH];
   }
@@ -235,10 +263,16 @@ export function edgeProxyFiles(target: DeployTarget): string[] {
 
 /** Config files the edge-proxy scaffolding edits in place, for ejection. */
 export function edgeProxyConfigEdits(target: DeployTarget): string[] {
-  // Cloudflare may create wrangler.jsonc; Vercel uses a managed middleware file
-  // (a marked file, not a config edit); Netlify auto-discovers the edge function
-  // with no config file to edit.
-  return target === "cloudflare" ? ["wrangler.jsonc"] : [];
+  // Cloudflare may create wrangler.jsonc; Vercel merges a rewrite into
+  // vercel.json; Netlify auto-discovers the edge function with no config to edit.
+  switch (target) {
+    case "cloudflare":
+      return ["wrangler.jsonc"];
+    case "vercel":
+      return ["vercel.json"];
+    case "netlify":
+      return [];
+  }
 }
 
 /**

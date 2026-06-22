@@ -1,6 +1,6 @@
 # @zitadel/edge-proxy
 
-A platform-agnostic edge proxy handler that lets React, Vue, and Angular SPAs call the Zitadel nextgen flow API without exposing backend URLs or fighting CORS.
+A platform-agnostic edge proxy handler that lets any SPA (React, Vue, Angular, Solid, Svelte, Qwik, …) call the Zitadel nextgen flow API without exposing backend URLs or fighting CORS. The handler itself is framework-agnostic; the `zitadel` CLI scaffolds it for each supported SPA framework.
 
 Built entirely from WinterTC-standard web platform globals (`fetch`, `Request`, `Response`, `URL`, `Headers`). No platform-specific imports — the same handler runs on Cloudflare Workers, Vercel Edge Functions, and Netlify Edge Functions.
 
@@ -20,7 +20,7 @@ The handler intercepts all `/__nextgen/*` requests from the browser, proxies the
 - Hop-by-hop headers stripped in both directions
 - `X-Forwarded-*` headers injected when absent, preserved when already set by a CDN
 - Multiple `Set-Cookie` headers preserved without collapsing
-- Pure API proxy: `redirect: 'manual'` plus the upstream `Location` header is stripped (internal backend URLs never leak), so a 3xx status is forwarded without its redirect target
+- `redirect: 'manual'`, and on 3xx responses the upstream `Location` header is stripped so internal backend URLs never leak — a 3xx status is forwarded without its redirect target, while `Location` on other statuses (e.g. `201 Created`) is preserved
 - Upstream timeout returns `504`, connection failure returns `502`
 - Returns `null` for non-matching paths — lets the platform serve static assets
 
@@ -28,7 +28,7 @@ This secret injection is why a worker / edge function is required: a static rewr
 
 ## Setup
 
-All three platforms intercept `/__nextgen/*` directly, so the handler's default `pathPrefix` matches with no extra rewrite.
+Cloudflare and Netlify intercept `/__nextgen/*` directly (so the default `pathPrefix` matches); Vercel routes it to an edge function via a `vercel.json` rewrite, and the function is configured with the matching prefix.
 
 ### Cloudflare Workers
 
@@ -55,7 +55,7 @@ The worker serves all non-`/__nextgen` requests via the `ASSETS` binding, so you
 
 ### Vercel
 
-1. Copy `etc/vercel/middleware.ts` to your project root. As Vercel Edge Middleware it runs before routing and its `matcher` intercepts `/__nextgen/*` directly — no `vercel.json` rewrite or `api/` function needed.
+1. Copy `etc/vercel/nextgen.ts` to `api/__nextgen/[...path].ts` and `etc/vercel/vercel.json` to your project root (merge the `rewrites` if you already have one). The rewrite forwards `/__nextgen/*` to the edge function, which is configured with `pathPrefix: "/api/__nextgen"` so it matches the rewritten path.
 
 2. Set the backend URL and secret (read from `.env.local` under `vercel dev`):
 
@@ -132,5 +132,6 @@ if (response) return response;
 | `pathPrefix` | `string` | `'/__nextgen'` | Path prefix to intercept. Must start with `/`. |
 | `stripPrefix` | `boolean` | `true` | Strip prefix before forwarding to upstream. |
 | `additionalHeaders` | `Record<string, string>` | `{}` | Extra headers on every upstream request. |
+| `proxyTimeoutMs` | `number` | `5000` | Upstream request timeout in ms. On timeout the proxy returns `504`. |
 
 `resolveConfig` throws `EdgeProxyConfigError` for invalid input (missing `apiUrl`, bad URL, non-http/s protocol, `pathPrefix` without a leading slash).

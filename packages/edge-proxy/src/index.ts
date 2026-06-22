@@ -83,9 +83,10 @@ export interface EdgeProxyConfig {
    */
   projectSecret?: string | undefined;
   /**
-   * Additional headers injected into every upstream request.
-   * Applied after hop-by-hop stripping and X-Forwarded-* injection,
-   * so these can override any forwarded header.
+   * Additional headers injected into every upstream request. Applied after
+   * hop-by-hop stripping and before the `X-Forwarded-*` defaults; since those
+   * defaults only fill in absent values, anything set here still takes
+   * precedence over them.
    */
   additionalHeaders?: Record<string, string> | undefined;
   /**
@@ -232,11 +233,12 @@ function buildUpstreamHeaders(req: Request, url: URL, config: ResolvedConfig): H
  * fall through to static asset serving (Cloudflare ASSETS, Vercel CDN, etc.).
  *
  * Hop-by-hop headers are stripped in both directions. Multiple `Set-Cookie`
- * headers are preserved individually via `Headers.getSetCookie()`. This is a
- * pure API proxy: it uses `redirect: 'manual'` and strips the upstream
- * `Location` header (so internal backend URLs never leak to the browser), so a
- * 3xx status is forwarded but its redirect target is not. An upstream timeout
- * yields `504` and a connection failure `502`, rather than throwing.
+ * headers are preserved individually via `Headers.getSetCookie()`. It uses
+ * `redirect: 'manual'` and, on 3xx responses only, strips the upstream
+ * `Location` header so internal backend URLs never leak — a 3xx status is
+ * forwarded without its redirect target, while `Location` on other statuses
+ * (e.g. `201 Created`) is preserved. An upstream timeout yields `504` and a
+ * connection failure `502`, rather than throwing.
  *
  * @param req    - The incoming edge request.
  * @param config - Resolved proxy configuration from {@link resolveConfig}.
@@ -292,17 +294,20 @@ export async function handleProxy(req: Request, config: ResolvedConfig): Promise
     return new Response(null, { status: name === "TimeoutError" ? 504 : 502 });
   }
 
+  // `Location` is stripped only for 3xx redirects, where it would leak an
+  // internal upstream URL the browser can't reach. It is preserved for other
+  // statuses (e.g. a 201 Created pointing at the new resource).
+  const isRedirect = upstreamRes.status >= 300 && upstreamRes.status < 400;
   const responseHeaders = new Headers();
   for (const [k, v] of upstreamRes.headers.entries()) {
-    if (
-      !HOP_BY_HOP.has(k.toLowerCase()) &&
-      k.toLowerCase() !== "set-cookie" &&
-      // location is stripped to prevent leaking internal upstream URLs to the
-      // browser — this proxy is a pure API proxy and never issues redirects.
-      k.toLowerCase() !== "location"
-    ) {
-      responseHeaders.set(k, v);
+    const lower = k.toLowerCase();
+    if (HOP_BY_HOP.has(lower) || lower === "set-cookie") {
+      continue;
     }
+    if (lower === "location" && isRedirect) {
+      continue;
+    }
+    responseHeaders.set(k, v);
   }
 
   // getSetCookie() preserves multiple Set-Cookie headers individually.

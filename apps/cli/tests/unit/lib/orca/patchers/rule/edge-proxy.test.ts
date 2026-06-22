@@ -114,11 +114,22 @@ describe("edgeProxyOps — cloudflare", () => {
 describe("edgeProxyOps — vercel", () => {
   const ops = edgeProxyOps("vercel", ctx("vercel"));
 
-  it("writes a managed middleware that matches /__nextgen and reads process.env", () => {
-    const mw = writeOp(ops, "middleware.ts");
-    expect(mw?.contents).toContain(MANAGED_MARKER);
-    expect(mw?.contents).toContain('matcher: ["/__nextgen", "/__nextgen/:path*"]');
-    expect(mw?.contents).toContain("process.env.ZITADEL_PROJECT_SECRET");
+  it("writes a managed edge function configured with the rewritten path prefix", () => {
+    const fn = writeOp(ops, "api/__nextgen/[...path].ts");
+    expect(fn?.contents).toContain(MANAGED_MARKER);
+    expect(fn?.contents).toContain('pathPrefix: "/api/__nextgen"');
+    expect(fn?.contents).toContain("process.env.ZITADEL_PROJECT_SECRET");
+  });
+
+  it("merges the /__nextgen rewrite into vercel.json, creating it and idempotently", () => {
+    const transform = editOp(ops, "vercel.json")?.edit;
+    expect(transform).toBeDefined();
+    const created = transform?.(undefined) ?? "";
+    expect(created).toContain('"source": "/__nextgen/(.*)"');
+    expect(created).toContain('"destination": "/api/__nextgen/$1"');
+    // Re-running leaves the existing rewrite in place (no duplicate).
+    const once = JSON.parse(transform?.(created) ?? "{}") as { rewrites: unknown[] };
+    expect(once.rewrites).toHaveLength(1);
   });
 
   it("adds only the backend URL to .env.local (secret already written by the base patcher)", () => {
@@ -157,8 +168,8 @@ describe("edge-proxy artifact enumeration", () => {
   it("lists the managed file and config edits per target", () => {
     expect(edgeProxyFiles("cloudflare")).toEqual(["zitadel-edge-proxy.ts"]);
     expect(edgeProxyConfigEdits("cloudflare")).toEqual(["wrangler.jsonc"]);
-    expect(edgeProxyFiles("vercel")).toEqual(["middleware.ts"]);
-    expect(edgeProxyConfigEdits("vercel")).toEqual([]);
+    expect(edgeProxyFiles("vercel")).toEqual(["api/__nextgen/[...path].ts"]);
+    expect(edgeProxyConfigEdits("vercel")).toEqual(["vercel.json"]);
     expect(edgeProxyFiles("netlify")).toEqual(["netlify/edge-functions/zitadel-nextgen.ts"]);
     // Netlify edge functions are auto-discovered, so there is no config to edit.
     expect(edgeProxyConfigEdits("netlify")).toEqual([]);
