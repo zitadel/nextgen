@@ -12,7 +12,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/service"
-	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
@@ -95,23 +94,6 @@ type v2TestTx struct {
 
 func (t v2TestTx) Statements() service.AllStatements {
 	return t.stmts
-}
-
-func newTestV2Pool(
-	ctrl *gomock.Controller,
-	transaction func(context.Context, func(context.Context, service.Statementer[service.AllStatements]) error) error,
-	statements testAllStatements,
-) *service.DB {
-	mockPool := servicemocks.NewMockPool(ctrl)
-	if transaction != nil {
-		mockPool.EXPECT().
-			Transaction(gomock.Any(), gomock.Any()).
-			DoAndReturn(transaction)
-	}
-	if statements.getProjectByID != nil {
-		mockPool.EXPECT().Statements().Return(statements).AnyTimes()
-	}
-	return service.NewPool(mockPool)
 }
 
 // stubListFlowDefinitions wires the mock's ListFlowDefinitions to filter the
