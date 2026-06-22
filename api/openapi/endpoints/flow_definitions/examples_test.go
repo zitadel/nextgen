@@ -95,6 +95,7 @@ func TestExampleFlowDefinitions(t *testing.T) {
 			userSchemaRef := req.FlowDefinition.GetUserSchema()
 
 			flowDef, err := domain.NewFlowDefinition(
+				"",
 				projectID,
 				req.FlowDefinition.GetName(),
 				schemaURI.String(),
@@ -105,6 +106,7 @@ func TestExampleFlowDefinitions(t *testing.T) {
 					TeamIDs: req.FlowDefinition.GetAudience().Value.TeamIds,
 				},
 				steps,
+				domain.FlowDefinitionStatusActive,
 			)
 			require.NoError(t, err, "domain NewFlowDefinition")
 

@@ -380,9 +380,8 @@ type Handler interface {
 	SubmitFlowStep(ctx context.Context, req *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error)
 	// UpdateFlowDefinition implements updateFlowDefinition operation.
 	//
-	// Update a flow definition by id. This endpoint completely replaces the existing flow definition.
-	// The status of the flow definition can also be updated by setting the `status` attribute in the
-	// flow definition.
+	// Update a flow definition by id. This endpoint replaces the existing flow definition.
+	// If `flow_definition.status` is omitted, the current status is preserved.
 	//
 	// PUT /flow_definitions/{id}
 	UpdateFlowDefinition(ctx context.Context, req *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (UpdateFlowDefinitionRes, error)
