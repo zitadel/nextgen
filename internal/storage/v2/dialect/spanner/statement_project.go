@@ -7,15 +7,17 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-type projectStatements statement
+type projectStatements struct{ statement }
 
 func newProjectStatements(client queryExecutor) projectStatements {
 	return projectStatements{
-		client: client,
+		statement: statement{
+			client: client,
+		},
 	}
 }
 
-// CreateProject implements [database.ProjectStatements].
+// CreateProject implements [service.ProjectStatements].
 func (s projectStatements) CreateProject(project *domain.Project) database.Execution {
 	return &execution{
 		client: s.client,
@@ -36,7 +38,7 @@ func (s projectStatements) CreateProject(project *domain.Project) database.Execu
 	}
 }
 
-// DeleteProjectByID implements [database.ProjectStatements].
+// DeleteProjectByID implements [service.ProjectStatements].
 func (s projectStatements) DeleteProjectByID(id string) database.Execution {
 	return &execution{
 		client: s.client,
@@ -49,12 +51,12 @@ func (s projectStatements) DeleteProjectByID(id string) database.Execution {
 	}
 }
 
-// GetProjectByID implements [database.ProjectStatements].
+// GetProjectByID implements [service.ProjectStatements].
 func (s projectStatements) GetProjectByID(id string) database.Query[domain.Project] {
 	panic("unimplemented")
 }
 
-// ListProjects implements [database.ProjectStatements].
+// ListProjects implements [service.ProjectStatements].
 func (s projectStatements) ListProjects(filter *database.ListOptions) database.Query[database.ListResult[*domain.Project]] {
 	panic("unimplemented")
 }

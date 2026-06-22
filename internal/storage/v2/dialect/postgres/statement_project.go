@@ -3,18 +3,23 @@ package postgres
 import (
 	"github.com/jackc/pgx/v5"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 const createProjectStmt = `INSERT INTO zitadel_nextgen.projects (id, project_secret, preview_secret, preview_origins) VALUES ($1, $2, $3, $4) RETURNING id, created_at, updated_at`
 
-type projectStatements statement
+type projectStatements struct{ statement }
 
 func newProjectStatements(client queryExecutor) projectStatements {
-	return projectStatements{client: client}
+	return projectStatements{
+		statement: statement{
+			client: client,
+		},
+	}
 }
 
-// CreateProject implements [database.ProjectStatements].
+// CreateProject implements [service.ProjectStatements].
 func (ps projectStatements) CreateProject(project *domain.Project) database.Execution {
 	return &query[domain.Project]{
 		execution: execution{
@@ -38,7 +43,7 @@ func (ps projectStatements) CreateProject(project *domain.Project) database.Exec
 
 const deleteByIDProjectStmt = `DELETE FROM zitadel_nextgen.projects WHERE id = $1`
 
-// DeleteProjectByID implements [database.ProjectStatements].
+// DeleteProjectByID implements [service.ProjectStatements].
 func (ps projectStatements) DeleteProjectByID(id string) database.Execution {
 	return &execution{
 		client: ps.client,
@@ -49,7 +54,7 @@ func (ps projectStatements) DeleteProjectByID(id string) database.Execution {
 
 const projectQuery = "SELECT id, created_at, updated_at, project_secret, preview_secret, preview_origins FROM zitadel_nextgen.projects"
 
-// GetProjectByID implements [database.ProjectStatements].
+// GetProjectByID implements [service.ProjectStatements].
 func (ps projectStatements) GetProjectByID(id string) database.Query[domain.Project] {
 	var compiler statementCompiler
 	compiler.compileRead(projectQuery, &database.ListOptions{
@@ -66,7 +71,7 @@ func (ps projectStatements) GetProjectByID(id string) database.Query[domain.Proj
 	}
 }
 
-// ListProjects implements [database.ProjectStatements].
+// ListProjects implements [service.ProjectStatements].
 func (ps projectStatements) ListProjects(filter *database.ListOptions) database.Query[database.ListResult[*domain.Project]] {
 	var compiler statementCompiler
 	compiler.compileRead(projectQuery, filter)
@@ -130,3 +135,5 @@ func (ps projectStatements) scan(row pgx.CollectableRow) (*domain.Project, error
 	}
 	return project, nil
 }
+
+var _ service.ProjectStatements = (*projectStatements)(nil)

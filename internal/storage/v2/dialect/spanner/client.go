@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"cloud.google.com/go/spanner"
+	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -12,15 +13,15 @@ type Client struct {
 	statements
 }
 
-func newClient(client *spanner.Client) *Client {
+func newClient(spannerClient *spanner.Client) *Client {
 	return &Client{
-		client:     client,
-		statements: newStatements(client),
+		client:     spannerClient,
+		statements: newStatements(spannerClient),
 	}
 }
 
 // Close implements [database.Pool].
-func (c Client) Close(ctx context.Context) error {
+func (c *Client) Close(ctx context.Context) error {
 	c.client.Close()
 	return nil
 }
@@ -36,13 +37,18 @@ func (c Client) Ping(ctx context.Context) error {
 }
 
 // Transaction implements [database.Pool].
-func (c Client) Transaction(ctx context.Context, fn func(ctx context.Context, tx database.Transaction) error) error {
+func (c Client) Transaction(ctx context.Context, fn func(ctx context.Context, tx service.AllStatements) error) error {
 	_, err := c.client.ReadWriteTransaction(ctx, func(ctx context.Context, rwt *spanner.ReadWriteTransaction) error {
 		return fn(ctx, newTransaction(rwt))
 	})
 	return err
 }
 
+func (c Client) Statements() service.AllStatements {
+	return newStatements(c.client)
+}
+
 var (
-	_ database.Pool = (*Client)(nil)
+	_ database.Pool      = (*Client)(nil)
+	_ service.AllStatements = (*Client)(nil)
 )

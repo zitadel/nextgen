@@ -9,6 +9,14 @@ import (
 	"sync"
 )
 
+func Connect(ctx context.Context, dialect Dialect) (Pool, error) {
+	pool, err := dialect.Connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return pool, nil
+}
+
 // Dialect is a database dialect. e.g. postgres, mysql, sqlite.
 type Dialect interface {
 	// Name returns the name of the dialect. e.g. "postgres", "mysql", "sqlite".

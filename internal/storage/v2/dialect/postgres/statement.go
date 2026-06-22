@@ -5,6 +5,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 type queryExecutor interface {
@@ -18,6 +19,13 @@ type statements struct {
 	flowDefinitionStatements
 }
 
+func (s statements) Statements() service.AllStatements {
+	return s
+}
+
+// IsStatements implements [service.Statements].
+func (s statements) IsStatements() {}
+
 func newStatements(client queryExecutor) statements {
 	return statements{
 		projectStatements:        newProjectStatements(client),
@@ -25,6 +33,13 @@ func newStatements(client queryExecutor) statements {
 	}
 }
 
+var _ service.Statements = (*statements)(nil)
+
 type statement struct {
 	client queryExecutor
 }
+
+// IsStatements implements [service.Statements].
+func (s *statement) IsStatements() {}
+
+var _ service.Statements = (*statement)(nil)

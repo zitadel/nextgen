@@ -5,7 +5,6 @@ import (
 
 	"cloud.google.com/go/spanner"
 	dbold "github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 type Transaction struct {
@@ -40,6 +39,5 @@ type Statement struct {
 }
 
 var (
-	_ database.Transaction = (*Transaction)(nil)
-	_ dbold.QueryExecutor  = (*Transaction)(nil)
+	_ dbold.QueryExecutor = (*Transaction)(nil)
 )

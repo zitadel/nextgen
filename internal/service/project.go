@@ -10,7 +10,6 @@ import (
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	v2db "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // ProjectService is the project use-case surface.
@@ -27,7 +26,7 @@ type ProjectService interface {
 // NewProjectService returns a [ProjectService] backed by the given repository.
 func NewProjectService(
 	pool database.Pool,
-	v2Pool v2db.Pool,
+	v2Pool *DB,
 	repo domain.ProjectRepository,
 	schemaRepo domain.JSONSchemaRepository,
 	flowDefinitionRepo domain.FlowDefinitionRepository,
@@ -49,7 +48,7 @@ func NewProjectService(
 
 type projectService struct {
 	pool               database.Pool
-	v2Pool             v2db.Pool
+	v2Pool             *DB
 	projectRepo        domain.ProjectRepository
 	schemaRepo         domain.JSONSchemaRepository
 	flowDefinitionRepo domain.FlowDefinitionRepository
@@ -66,10 +65,8 @@ func (s *projectService) Create(ctx context.Context, previewOrigins []string) (_
 		return nil, err
 	}
 
-	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, t v2db.Transaction) error {
-		tx := v2db.TransactionAs[ProjectStatements](t)
-
-		if err := tx.CreateProject(project).Execute(ctx); err != nil {
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().CreateProject(project).Execute(ctx); err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to create project in the database")
 		}
 
@@ -132,9 +129,5 @@ func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, 
 func (s *projectService) Get(ctx context.Context, id string) (*domain.Project, error) {
 	logger := getLoggingContext(ctx, "project")
 	logger.Info("getting project", slog.String("project_id", id))
-	query := v2db.TransactionAs[ProjectStatements](s.v2Pool).GetProjectByID(id)
-	if err := query.Execute(ctx); err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to execute query")
-	}
-	return query.Result(), nil
+	return s.v2Pool.Statements().GetProjectByID(id).Query(ctx)
 }

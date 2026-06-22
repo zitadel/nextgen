@@ -41,6 +41,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 	v2db "github.com/zitadel/nextgen/internal/storage/v2/database"
 	_ "github.com/zitadel/nextgen/internal/storage/v2/dialect/all"
+
 	"github.com/zitadel/oidc/v3/pkg/op"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/otel/log"
@@ -142,6 +143,8 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	schemaRepo := repository.NewJSONSchemaRepository(pool)
 	teamRepo := repository.NewTeamRepository(pool)
 
+	serviceDBPool := service.NewPool(v2Pool.(service.Pool))
+
 	// ── Schema Stuff ─────────────────
 	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](cfg.Schema.LRUCacheSize)
 	if err != nil {
@@ -181,7 +184,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	})
 	projectService := service.NewProjectService(
 		pool,
-		v2Pool,
+		serviceDBPool,
 		projectRepo,
 		schemaRepo,
 		flowDefinitionRepo,
@@ -422,7 +425,7 @@ func startDatabase(ctx context.Context, cfg Config) (database.Pool, v2db.Pool, e
 	if err != nil {
 		return nil, nil, err
 	}
-	v2Pool, err := dialect.Connect(ctx)
+	v2Pool, err := v2db.Connect(ctx, dialect)
 	if err != nil {
 		return nil, nil, err
 	}

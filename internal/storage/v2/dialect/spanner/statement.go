@@ -10,8 +10,6 @@ type statements struct {
 	flowDefinitionStatements
 }
 
-var _ service.Statements = (*statements)(nil)
-
 func newStatements(client queryExecutor) statements {
 	return statements{
 		projectStatements:        newProjectStatements(client),
@@ -19,6 +17,20 @@ func newStatements(client queryExecutor) statements {
 	}
 }
 
+func (s statements) Statements() service.AllStatements {
+	return s
+}
+
+// IsStatements implements [service.Statements].
+func (s statements) IsStatements() {}
+
+var _ service.AllStatements = (*statements)(nil)
+
 type statement struct {
 	client queryExecutor
 }
+
+// IsStatements implements [service.Statements].
+func (s *statement) IsStatements() {}
+
+var _ service.Statements = (*statement)(nil)
