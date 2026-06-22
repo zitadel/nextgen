@@ -227,10 +227,14 @@ export default class Setup extends BaseCommand {
     // the secret cannot live in a committed config file — it must be pushed to
     // the platform's secret store. Surface the exact commands, plus any
     // platform-specific wiring notes.
+    // Computed once so the same steps appear in the human log AND the --json
+    // envelope (consola is silenced under --json, so agents need them there).
+    const edgeProxyCommands = deployTarget ? edgeProxySecretCommands(deployTarget) : [];
+    const edgeProxyNotes = deployTarget ? edgeProxyDeployNotes(deployTarget) : [];
     if (deployTarget) {
       const steps = [
-        ...edgeProxySecretCommands(deployTarget).map((cmd) => `  ${cmd}`),
-        ...edgeProxyDeployNotes(deployTarget).map((note) => `  - ${note}`),
+        ...edgeProxyCommands.map((cmd) => `  ${cmd}`),
+        ...edgeProxyNotes.map((note) => `  - ${note}`),
       ];
       consola.info(
         `${dryRun ? "Would scaffold" : "Scaffolded"} the ${deployTarget} edge proxy` +
@@ -289,8 +293,8 @@ export default class Setup extends BaseCommand {
         files_written: result.filesWritten.map((file) => relativeDisplay(cwd, file)),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
         install: installOutcome.install,
-        next_actions: installOutcome.nextActions,
-        next_commands: installOutcome.nextCommands,
+        next_actions: [...installOutcome.nextActions, ...edgeProxyNotes],
+        next_commands: [...installOutcome.nextCommands, ...edgeProxyCommands],
       },
     });
   }

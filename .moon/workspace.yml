@@ -17,6 +17,7 @@ projects:
     api-mock: "packages/api-mock"
     components: "packages/components"
     design-tokens: "packages/design-tokens"
+    edge-proxy: "packages/edge-proxy"
     sdk-angular: "packages/sdk-angular"
     sdk-core: "packages/sdk-core"
     sdk-next: "packages/sdk-next"

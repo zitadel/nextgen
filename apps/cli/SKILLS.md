@@ -70,6 +70,17 @@ layer, not the envelope.
   generated templates by it), `--dev-port` (dev-server port, also the issuer
   origin registered with Zitadel — use distinct ports to run several scaffolded
   apps side by side), `--skip-install`.
+  For SPA frameworks (react/vue/angular/solid/svelte/qwik), which have no server
+  runtime, setup also scaffolds a production edge proxy when it detects an
+  installed platform CLI (`wrangler`/`vercel`/`netlify`): a Cloudflare Worker, a
+  Vercel Edge Function + `vercel.json` rewrite, or a Netlify Edge Function, all
+  forwarding `/__nextgen/*` to the backend with the project secret injected. The
+  backend URL goes in the platform's local env file (`.dev.vars` for Cloudflare,
+  `.env` for Netlify, `.env.local` for Vercel); the secret must be pushed to the
+  platform store before deploying — setup surfaces the exact `wrangler secret
+  put` / `vercel env add` / `netlify env:set` commands in the summary and, under
+  `--json`, in `data.next_commands`. The detected target is recorded under
+  `deploy.target` in `zitadel.json`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
 - `doctor` — verify generated app files and local state once `zitadel.json`
