@@ -47,7 +47,8 @@ function mergeEnv(ops: FileOp[], path: string): Record<string, string> | undefin
 
 function editOp(ops: FileOp[], path: string): Extract<FileOp, { kind: "edit" }> | undefined {
   return ops.find(
-    (op): op is Extract<FileOp, { kind: "edit" }> => op.kind === "edit" && op.path === path,
+    (op): op is Extract<FileOp, { kind: "edit" }> =>
+      op.kind === "edit" && (Array.isArray(op.path) ? op.path.includes(path) : op.path === path),
   );
 }
 
@@ -68,6 +69,15 @@ describe("edgeProxyOps — cloudflare", () => {
     expect(ops).toContainEqual({ kind: "add-dep", name: EDGE_PROXY_DEP, version: "alpha" });
   });
 
+  it("adds @cloudflare/workers-types so the worker typechecks on deploy", () => {
+    expect(ops).toContainEqual({
+      kind: "add-dep",
+      name: "@cloudflare/workers-types",
+      version: "^4.0.0",
+      dev: true,
+    });
+  });
+
   it("writes a managed worker that injects the secret from env", () => {
     const worker = writeOp(ops, "zitadel-edge-proxy.ts");
     expect(worker?.contents).toContain(MANAGED_MARKER);
@@ -83,10 +93,14 @@ describe("edgeProxyOps — cloudflare", () => {
     expect(ops).toContainEqual({ kind: "append-gitignore", entries: [".dev.vars"] });
   });
 
-  it("creates wrangler.jsonc when absent and leaves an existing one untouched", () => {
+  it("creates wrangler.jsonc when absent and leaves any existing wrangler config untouched", () => {
     const edit = editOp(ops, "wrangler.jsonc");
     expect(edit?.edit(undefined)).toContain('"main": "./zitadel-edge-proxy.ts"');
-    expect(edit?.edit('{ "name": "mine" }')).toBe('{ "name": "mine" }');
+    // An existing wrangler.toml (the edit op resolves it from the candidate list)
+    // is returned verbatim — never clobbered by a new jsonc.
+    expect(edit?.edit('name = "mine"\nmain = "src/worker.ts"\n')).toBe(
+      'name = "mine"\nmain = "src/worker.ts"\n',
+    );
   });
 });
 
@@ -112,6 +126,15 @@ describe("edgeProxyOps — netlify", () => {
     const fn = writeOp(ops, "netlify/edge-functions/zitadel-nextgen.ts");
     expect(fn?.contents).toContain(MANAGED_MARKER);
     expect(fn?.contents).toContain('path: "/__nextgen/*"');
+  });
+
+  it("adds @netlify/edge-functions so the function typechecks", () => {
+    expect(ops).toContainEqual({
+      kind: "add-dep",
+      name: "@netlify/edge-functions",
+      version: "^2.0.0",
+      dev: true,
+    });
   });
 
   it("creates netlify.toml when absent, appends once, and is idempotent", () => {

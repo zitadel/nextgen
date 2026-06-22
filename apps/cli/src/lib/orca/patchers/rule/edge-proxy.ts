@@ -107,30 +107,40 @@ export const config: Config = { path: "${PROXY_PATH}/*" };
 `;
 }
 
+/** Candidate Cloudflare config filenames, in resolution priority. */
+const WRANGLER_CONFIG_PATHS = ["wrangler.jsonc", "wrangler.toml", "wrangler.json"];
+
 function wranglerConfig(server: string): string {
-  return `${JSON.stringify(
-    {
-      $schema:
-        "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
-      name: "my-app",
-      compatibility_date: "2025-01-01",
-      main: `./${CLOUDFLARE_WORKER_PATH}`,
-      assets: {
-        directory: "./dist",
-        not_found_handling: "single-page-application",
-        run_worker_first: [`${PROXY_PATH}/*`],
-      },
-      vars: { NEXTGEN_API_URL: server },
-    },
-    null,
-    2,
-  )}\n`;
+  // A JSONC template (not JSON.stringify) so the placeholder values carry
+  // inline guidance — the project name and asset directory are framework- and
+  // user-specific and must be reviewed.
+  return `{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  // Replace "my-app" with your project name.
+  "name": "my-app",
+  // 2025-01-01 or later is required for Headers.getSetCookie() support.
+  "compatibility_date": "2025-01-01",
+  "main": "./${CLOUDFLARE_WORKER_PATH}",
+  "assets": {
+    // Point this at your SPA build output (e.g. Angular: dist/<project>/browser).
+    "directory": "./dist",
+    "not_found_handling": "single-page-application",
+    // Run the Worker first for all /__nextgen/* requests.
+    "run_worker_first": ["${PROXY_PATH}/*"]
+  },
+  "vars": {
+    "NEXTGEN_API_URL": ${JSON.stringify(server)}
+  }
+}
+`;
 }
 
 /**
- * Creates `wrangler.jsonc` when absent; leaves an existing Cloudflare config
- * untouched so a user's hand-tuned worker config is never clobbered (the setup
- * summary prints the keys to add manually in that case).
+ * Creates `wrangler.jsonc` only when no Cloudflare config exists yet. The edit
+ * op is given every wrangler config candidate (`.jsonc`/`.toml`/`.json`), so if
+ * the user already has one it is edited in place — and this transform returns it
+ * untouched, never clobbering a hand-tuned worker config. Only when none exist
+ * does the executor fall back to creating the first candidate (`wrangler.jsonc`).
  */
 function wranglerEdit(server: string): (source: string | undefined) => string {
   return (source) => (source === undefined ? wranglerConfig(server) : source);
@@ -175,8 +185,13 @@ export function edgeProxyOps(target: DeployTarget, ctx: PatchContext): FileOp[] 
     case "cloudflare":
       return [
         dep,
+        // The worker's `Fetcher`/`ExportedHandler` types come from this package;
+        // `wrangler deploy` typechecks the worker, so it must be installed.
+        { kind: "add-dep", name: "@cloudflare/workers-types", version: "^4.0.0", dev: true },
         { kind: "write", path: CLOUDFLARE_WORKER_PATH, contents: cloudflareWorker() },
-        { kind: "edit", path: "wrangler.jsonc", edit: wranglerEdit(ctx.server) },
+        // Given every wrangler config candidate so an existing .toml/.json is
+        // edited (and left untouched) rather than shadowed by a new .jsonc.
+        { kind: "edit", path: [...WRANGLER_CONFIG_PATHS], edit: wranglerEdit(ctx.server) },
         // wrangler dev reads .dev.vars (not .env.local); it carries the secret
         // locally and must stay out of git.
         {
@@ -202,6 +217,9 @@ export function edgeProxyOps(target: DeployTarget, ctx: PatchContext): FileOp[] 
     case "netlify":
       return [
         dep,
+        // The edge function imports the `Config` type and `Netlify` global from
+        // this package; install it so the scaffolded function typechecks.
+        { kind: "add-dep", name: "@netlify/edge-functions", version: "^2.0.0", dev: true },
         { kind: "write", path: NETLIFY_FUNCTION_PATH, contents: netlifyFunction() },
         { kind: "edit", path: "netlify.toml", edit: netlifyTomlEdit() },
         { kind: "merge-env", path: ".env.local", entries: { NEXTGEN_API_URL: ctx.server } },
