@@ -33,6 +33,16 @@ The current design docs already lock several adjacent invariants:
 - `internal/storage/AGENTS.md` requires SQL-first storage that works on both
   PostgreSQL and Spanner.
 
+Three related issue areas constrain the decision:
+
+- Tenant isolation and data residency need project/tenant boundaries that can
+  be enforced before resource data is fetched.
+- Cross-project identity needs explicit grants for agencies, consultants,
+  staff, and operators instead of assuming a global human account can see every
+  duplicated project-scoped user.
+- Agent identity needs first-class principals and scoped delegations, not broad
+  inherited user authority.
+
 Fine-grained authorization products are useful references, but external
 sidecars are not the implementation target. They need their own tuple store and
 must learn about resource existence and attributes through synchronization,
@@ -57,7 +67,8 @@ Internal and external permissions use the same primitives:
 | Permission | Stable dotted action string such as `users.read` or `orders.refund`. |
 | Role | Named bundle of permissions inside a permission catalog. |
 | Grant / assignment | Principal, role, and scope binding. |
-| Principal | User token, `sk_proj_`, `sk_team_`, origin-bound browser nonce, or future machine principal. |
+| Delegation | Explicit authority granted to an agent or machine principal. |
+| Principal | User token, agent, `sk_proj_`, `sk_team_`, origin-bound browser nonce, or future machine principal. |
 | Scope | Resolved project/team/resource boundary from the credential, request body/query, or `resource_scope_index`. |
 
 There are two catalogs:
@@ -72,11 +83,39 @@ The permission resolver does not know whether a permission is "internal" or
 "external" after catalog lookup. It evaluates the same assignment and scope
 rules in both cases.
 
-### 2. OpenFGA profile, not OpenFGA runtime dependency
+### 2. OpenFGA parser and profile compiler
 
 Zitadel should accept and emit a documented OpenFGA-compatible profile for
 app-group policies, but it must not run an external OpenFGA service or store the
 canonical policy as opaque OpenFGA tuples.
+
+Use the maintained OpenFGA language package for parsing and syntax support:
+`github.com/openfga/language/pkg/go`. Do not build a custom OpenFGA DSL parser.
+
+The compiler pipeline is:
+
+```
+OpenFGA DSL / JSON
+  -> upstream OpenFGA language parser / transformer
+  -> Zitadel profile validator
+  -> Zitadel authz IR
+  -> relational catalog rows + query plans
+```
+
+The upstream parser owns grammar compatibility, source locations, DSL/JSON
+round-tripping, and syntactic validation. Zitadel owns semantic validation
+against our supported profile, because the Go package does not currently
+provide enough semantic/profile validation for our portability and performance
+requirements.
+
+The internal package boundary should be:
+
+| Package | Responsibility |
+|---|---|
+| `internal/authz/openfga` | Parse DSL/JSON with the upstream language package and normalize it into Zitadel's IR. |
+| `internal/authz/profile` | Reject unsupported OpenFGA constructs and enforce bounded, portable rules. |
+| `internal/authz/compiler` | Compute role/relation closure and produce relational catalog mutations/query-plan metadata. |
+| `internal/authz/resolver` | Evaluate single-resource checks and produce list predicates against repository metadata. |
 
 The supported profile starts with:
 
@@ -117,6 +156,11 @@ Role implication closure is computed on policy/schema update, not on every
 membership or grant write. Ordinary access changes write ordinary indexed rows.
 This avoids a noisy-neighbour write penalty from maintaining per-resource
 transitive closure tables while still making checks cheap.
+
+Agent delegations are stored as assignments with an explicit grantor,
+delegation id, expiry/revocation state, and scope. An agent never receives
+permissions by copying all permissions from its owner. The resolver must be able
+to explain which delegation authorized or denied an agent action for audit.
 
 ### 4. Resolver and list filtering
 
@@ -165,6 +209,12 @@ permissions authorize app/API access and are exposed as claims. A future
 customer-resource FGA API must define how external resources are imported,
 versioned, and made causally fresh before Zitadel evaluates checks for them.
 
+Tenant partitioning and cross-project human identity remain separate ADRs. This
+ADR requires authorization rows to be stored with the same residency/partition
+metadata as the resources they protect, and it requires all cross-project staff,
+operator, agency, and support access to be represented as explicit grants with
+scope, expiry, grantor, and audit provenance.
+
 ## Consequences
 
 ### Positive
@@ -180,6 +230,9 @@ versioned, and made causally fresh before Zitadel evaluates checks for them.
 - OpenFGA remains useful for customer-facing policy literacy and future
   interoperability without forcing an external consistency boundary into the
   hot path.
+- The implementation does not start with parser work: it reuses the maintained
+  OpenFGA language parser and focuses local code on validation, compilation,
+  storage, and query planning.
 
 ### Negative / Risks
 
@@ -187,6 +240,9 @@ versioned, and made causally fresh before Zitadel evaluates checks for them.
   delegating them to OpenFGA or Melange.
 - The OpenFGA profile is intentionally smaller than full OpenFGA; customers may
   expect unsupported constructs unless the product clearly labels the profile.
+- The upstream OpenFGA Go language package is only a parser/transformer and
+  syntactic validator for our purposes; semantic checks and performance bounds
+  remain Zitadel-owned.
 - Predicate injection increases repository/query-builder complexity and needs
   focused tests for every scoped resource type.
 - App-group role claims can grow large; token issuance must define audience,
@@ -217,6 +273,13 @@ functions and relies on PostgreSQL execution features. It is a strong reference
 for schema compilation, role closure, and optional PostgreSQL acceleration, but
 not a portable contract for Spanner.
 
+### Build a custom OpenFGA parser
+
+Rejected because OpenFGA already maintains Go parser/transformer packages for
+the DSL and JSON syntax. Building a parser would spend implementation effort on
+grammar compatibility instead of Zitadel-specific validation, relational
+compilation, and query planning.
+
 ### Pure RBAC without ReBAC/FGA
 
 Rejected because it cannot naturally express team membership, parent/child
@@ -228,9 +291,13 @@ policies without reintroducing hard-coded levels and special cases.
 1. Define the exact system permission catalog and default system roles.
 2. Design relational migrations for catalogs, roles, grants, assignments,
    app grants, and `resource_scope_index`.
-3. Define the OpenFGA profile grammar and upload diagnostics.
-4. Add resolver conformance tests that compare single-resource checks and list
+3. Add the upstream OpenFGA language package and implement the IR/profile
+   compiler behind `internal/authz/openfga`.
+4. Define the OpenFGA profile grammar and upload diagnostics.
+5. Add resolver conformance tests that compare single-resource checks and list
    predicates across PostgreSQL and Spanner.
-5. Update OpenAPI security declarations to use the final permission names.
-6. Define token claim shape, app-group grouping, and claim-size limits for
+6. Update OpenAPI security declarations to use the final permission names.
+7. Define token claim shape, app-group grouping, and claim-size limits for
    external permissions.
+8. Define agent delegation schema, audit record shape, and denial explanation
+   fields.
