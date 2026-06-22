@@ -5,9 +5,11 @@ package helpers
 import (
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	pgold "github.com/zitadel/nextgen/internal/storage/database/dialect/postgres"
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/embedded"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres"
 )
@@ -29,7 +31,14 @@ func (h *Harness) ServiceDB(t *testing.T) *service.DB {
 	t.Helper()
 
 	if h.DB == nil {
-		pool, err := (&postgres.PoolConfig{Pool: h.EnsureDBPool(t).(*embedded.Pool).Pool.Pool}).Connect(t.Context())
+		var pgxPool *pgxpool.Pool
+		switch p := h.EnsureDBPool(t).(type) {
+		case *embedded.Pool:
+			pgxPool = p.Pool.Pool
+		case *pgold.Pool:
+			pgxPool = p.Pool
+		}
+		pool, err := (&postgres.PoolConfig{Pool: pgxPool}).Connect(t.Context())
 		require.NoError(t, err)
 		h.DB = service.NewPool(pool.(service.Pool))
 	}

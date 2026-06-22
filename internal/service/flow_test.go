@@ -13,6 +13,7 @@ import (
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // stubPool returns nil typed as database.Pool. The mock repository does not
@@ -21,6 +22,79 @@ import (
 func stubPool() database.Pool { return nil }
 
 func stubV2Pool() *service.DB { return nil }
+
+type stubV2Execution struct {
+	err error
+}
+
+func (e stubV2Execution) Execute(context.Context) error {
+	return e.err
+}
+
+type stubV2Query[T any] struct {
+	result *T
+	err    error
+}
+
+func (q stubV2Query[T]) Query(context.Context) (*T, error) {
+	return q.result, q.err
+}
+
+type testAllStatements struct {
+	createProject  func(*domain.Project) v2database.Execution
+	getProjectByID func(string) v2database.Query[domain.Project]
+}
+
+func (testAllStatements) IsStatements() {}
+
+func (s testAllStatements) CreateProject(project *domain.Project) v2database.Execution {
+	if s.createProject != nil {
+		return s.createProject(project)
+	}
+	return stubV2Execution{}
+}
+
+func (s testAllStatements) GetProjectByID(id string) v2database.Query[domain.Project] {
+	if s.getProjectByID != nil {
+		return s.getProjectByID(id)
+	}
+	return stubV2Query[domain.Project]{}
+}
+
+func (testAllStatements) ListProjects(*v2database.ListOptions) v2database.Query[v2database.ListResult[*domain.Project]] {
+	panic("unexpected call to ListProjects")
+}
+
+func (testAllStatements) DeleteProjectByID(string) v2database.Execution {
+	panic("unexpected call to DeleteProjectByID")
+}
+
+func (testAllStatements) CreateFlowDefinition(*domain.FlowDefinition) v2database.Execution {
+	panic("unexpected call to CreateFlowDefinition")
+}
+
+func (testAllStatements) GetFlowDefinitionByID(string) v2database.Query[domain.FlowDefinition] {
+	panic("unexpected call to GetFlowDefinitionByID")
+}
+
+func (testAllStatements) ListFlowDefinitions(*v2database.ListOptions) v2database.Query[v2database.ListResult[*domain.FlowDefinition]] {
+	panic("unexpected call to ListFlowDefinitions")
+}
+
+func (testAllStatements) DeleteFlowDefinitionByID(string) v2database.Execution {
+	panic("unexpected call to DeleteFlowDefinitionByID")
+}
+
+var _ service.AllStatements = testAllStatements{}
+
+type v2TestTx struct {
+	database.QueryExecutor
+	stmts service.AllStatements
+}
+
+func (t v2TestTx) Statements() service.AllStatements {
+	return t.stmts
+}
 
 // stubListFlowDefinitions wires the mock's ListFlowDefinitions to filter the
 // given slice in-memory the same way the storage layer does. Tests stay focused
