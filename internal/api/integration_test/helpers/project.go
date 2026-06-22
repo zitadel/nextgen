@@ -24,6 +24,7 @@ func (h *Harness) EnsureProjectService(t *testing.T) service.ProjectService {
 	if h.ProjectService == nil {
 		h.ProjectService = service.NewProjectService(
 			h.EnsureDBPool(t),
+			h.ServiceDB(t),
 			h.EnsureProjectRepo(t),
 			h.EnsureSchemaRepo(t),
 			h.EnsureFlowDefinitionRepo(t),

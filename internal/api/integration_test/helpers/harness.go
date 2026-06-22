@@ -22,6 +22,7 @@ type Harness struct {
 	SigningKey    *rsa.PrivateKey
 
 	DBPool               database.Pool
+	DB                   *service.DB
 	HttpClient           *http.Client
 	TestServer           *httptest.Server
 	Hasher               *crypto.PasswapHasher
