@@ -4,6 +4,7 @@ import type { DeployTarget } from "../../../../../../src/lib/orca/detectors/depl
 import {
   EDGE_PROXY_DEP,
   edgeProxyConfigEdits,
+  edgeProxyEnvBackups,
   edgeProxyFiles,
   edgeProxyOps,
   edgeProxySecretCommands,
@@ -114,15 +115,16 @@ describe("edgeProxyOps — netlify", () => {
   });
 
   it("creates netlify.toml when absent, appends once, and is idempotent", () => {
-    const edit = editOp(ops, "netlify.toml");
-    const created = edit!.edit(undefined);
+    const transform = editOp(ops, "netlify.toml")?.edit;
+    expect(transform).toBeDefined();
+    const created = transform?.(undefined) ?? "";
     expect(created).toContain("[build]");
     expect(created).toContain('function = "zitadel-nextgen"');
     // Appended to an existing file without our block.
-    const appended = edit!.edit('[build]\n  publish = "out"\n');
+    const appended = transform?.('[build]\n  publish = "out"\n') ?? "";
     expect(appended).toContain('function = "zitadel-nextgen"');
     // Re-running on the appended result leaves it unchanged.
-    expect(edit!.edit(appended)).toBe(appended);
+    expect(transform?.(appended)).toBe(appended);
   });
 });
 
@@ -140,5 +142,17 @@ describe("edge-proxy artifact enumeration", () => {
     expect(edgeProxySecretCommands("cloudflare")[0]).toContain("wrangler secret put");
     expect(edgeProxySecretCommands("vercel")[0]).toContain("vercel env add");
     expect(edgeProxySecretCommands("netlify")[0]).toContain("netlify env:set");
+  });
+
+  it("only puts the secret (not the URL var) into Cloudflare's secret store", () => {
+    const cmds = edgeProxySecretCommands("cloudflare");
+    expect(cmds).toEqual(["wrangler secret put ZITADEL_PROJECT_SECRET"]);
+    expect(cmds.some((c) => c.includes("NEXTGEN_API_URL"))).toBe(false);
+  });
+
+  it("backs up Cloudflare's .dev.vars on eject, nothing extra for vercel/netlify", () => {
+    expect(edgeProxyEnvBackups("cloudflare")).toEqual([".dev.vars"]);
+    expect(edgeProxyEnvBackups("vercel")).toEqual([]);
+    expect(edgeProxyEnvBackups("netlify")).toEqual([]);
   });
 });

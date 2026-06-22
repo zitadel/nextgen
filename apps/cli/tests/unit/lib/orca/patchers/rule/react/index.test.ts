@@ -91,4 +91,14 @@ describe("ReactPatcher edge proxy", () => {
     expect(artifacts.dependencies).toContain("@zitadel/edge-proxy");
     expect(artifacts.configEdits).toContain("netlify.toml");
   });
+
+  it("backs up Cloudflare's .dev.vars (holds the secret) on eject", () => {
+    const artifacts = new ReactPatcher().artifacts({
+      framework: { id: "react", appDir: "src", devPort: 3000, url: "http://localhost:3000" },
+      rendererId: "react",
+      deployTarget: "cloudflare",
+    });
+    expect(artifacts.envBackups).toContain(".dev.vars");
+    expect(artifacts.envBackups).toContain(".env.local");
+  });
 });

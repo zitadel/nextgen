@@ -8,6 +8,7 @@ import type {
   PatchResult,
   PatchView,
 } from "../types";
+import { edgeProxyEnvBackups } from "./edge-proxy";
 import { scaffold } from "./file-writer";
 import type { FileOp, ScaffoldPlan } from "./file-writer/types";
 import { reclaimableOps } from "./reclaim";
@@ -45,7 +46,12 @@ export abstract class AbstractRulePatcher implements Patcher {
       markedFiles: this.routeFiles(view),
       rootConfigFiles: ["zitadel.json"],
       directories: [".zitadel"],
-      envBackups: [".env.local"],
+      // `.dev.vars` (Cloudflare edge proxy) holds the project secret and must be
+      // backed up on eject like `.env.local`, not left behind.
+      envBackups: [
+        ".env.local",
+        ...(view.deployTarget ? edgeProxyEnvBackups(view.deployTarget) : []),
+      ],
       dependencies: this.routeDeps(view),
       configEdits: this.routeConfigEdits(view),
     };

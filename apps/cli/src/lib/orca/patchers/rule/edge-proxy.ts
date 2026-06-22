@@ -235,6 +235,16 @@ export function edgeProxyConfigEdits(target: DeployTarget): string[] {
 }
 
 /**
+ * Env files the edge-proxy scaffolding writes a secret into, for ejection.
+ * Cloudflare gets its own gitignored `.dev.vars` (the local secret store
+ * `wrangler dev` reads); Vercel/Netlify reuse `.env.local`, which the base
+ * patcher already backs up, so they contribute nothing here.
+ */
+export function edgeProxyEnvBackups(target: DeployTarget): string[] {
+  return target === "cloudflare" ? [".dev.vars"] : [];
+}
+
+/**
  * The commands a user runs to put the project secret into the platform's secret
  * store for production (it must not live in a committed config file). Surfaced
  * in the setup summary.
@@ -242,7 +252,9 @@ export function edgeProxyConfigEdits(target: DeployTarget): string[] {
 export function edgeProxySecretCommands(target: DeployTarget): string[] {
   switch (target) {
     case "cloudflare":
-      return ["wrangler secret put ZITADEL_PROJECT_SECRET", "wrangler secret put NEXTGEN_API_URL"];
+      // NEXTGEN_API_URL is a plaintext `var` in wrangler.jsonc; only the secret
+      // goes to the encrypted secret store.
+      return ["wrangler secret put ZITADEL_PROJECT_SECRET"];
     case "vercel":
       return ["vercel env add ZITADEL_PROJECT_SECRET", "vercel env add NEXTGEN_API_URL"];
     case "netlify":
