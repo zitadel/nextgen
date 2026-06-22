@@ -8,6 +8,9 @@
   "assets": {
     // Point this at your SPA build output directory.
     "directory": "./dist",
+    // Required when "main" is set: exposes the static assets to the Worker as
+    // env.ASSETS. Without it the Worker's fallback throws on every page request.
+    "binding": "ASSETS",
     "not_found_handling": "single-page-application",
     // Run the Worker first for all /__nextgen/* requests.
     "run_worker_first": ["/__nextgen/*"]

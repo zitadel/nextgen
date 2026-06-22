@@ -194,10 +194,9 @@ export default class Setup extends BaseCommand {
     // proxy must run as a platform edge function. Detect which platform the
     // user deploys to (by installed CLI) and let the SPA patcher scaffold it;
     // SSR frameworks (Next, Nuxt) run the proxy in their own middleware.
-    // Skipped on dry runs: detection spawns platform CLIs, and a dry run must
-    // stay side-effect-free.
-    const deployTarget =
-      !dryRun && isEdgeProxyFramework(framework.id) ? detectDeployTarget(cwd) : undefined;
+    // Detection runs on dry runs too — it only reads which CLIs are installed
+    // (a `--version` probe, no writes), so the dry-run preview stays faithful.
+    const deployTarget = isEdgeProxyFramework(framework.id) ? detectDeployTarget(cwd) : undefined;
 
     const ctx: PatchContext = {
       framework,

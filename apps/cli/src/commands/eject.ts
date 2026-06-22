@@ -171,9 +171,6 @@ export default class Eject extends BaseCommand {
       if (rel === "wrangler.jsonc") {
         return `Remove the edge-proxy worker config from ${rel} (delete the file if setup created it)`;
       }
-      if (rel === "netlify.toml") {
-        return `Remove the [[edge_functions]] block for "zitadel-nextgen" from ${rel}`;
-      }
       return `Remove the Zitadel configuration block from ${rel}`;
     });
 

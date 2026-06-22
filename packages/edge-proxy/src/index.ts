@@ -70,8 +70,10 @@ export interface EdgeProxyConfig {
   stripPrefix?: boolean | undefined;
   /**
    * The project service-key secret. When set, it is attached as
-   * `Authorization: Bearer <projectSecret>` on every proxied upstream request
-   * (unless the request already carries an `Authorization` header). The
+   * `Authorization: Bearer <projectSecret>` on every proxied upstream request.
+   * Any client-supplied `Authorization` is stripped first (the browser must not
+   * control the upstream credential), so this is only skipped when a caller
+   * sets `Authorization` via {@link EdgeProxyConfig.additionalHeaders}. The
    * backend's security handler verifies it cryptographically.
    *
    * This is what keeps the secret server-side: the value is read from a
@@ -151,12 +153,14 @@ export function resolveConfig(config: EdgeProxyConfig): ResolvedConfig {
 /**
  * Builds the header set to forward to the upstream server.
  *
- * - Strips all hop-by-hop headers from the incoming request.
+ * - Strips all hop-by-hop headers, plus any client-supplied `Authorization`
+ *   (the proxy is the trust boundary; the browser must not set the upstream
+ *   credential).
  * - Injects `additionalHeaders` (can override any forwarded header).
  * - Attaches the project service-key as `Authorization: Bearer <secret>` when
- *   `config.projectSecret` is set and the request carries no `Authorization`
- *   header — the secret never reaches the browser because this runs in the
- *   edge runtime, not the client.
+ *   `config.projectSecret` is set and `additionalHeaders` did not already set
+ *   one — the secret never reaches the browser because this runs in the edge
+ *   runtime, not the client.
  * - Sets `X-Forwarded-For` only when absent, from `cf-connecting-ip` or
  *   `x-real-ip`. Never overwrites an existing CDN chain.
  * - Sets `X-Forwarded-Host` and `X-Forwarded-Proto` only when absent,
@@ -178,7 +182,12 @@ function buildUpstreamHeaders(req: Request, url: URL, config: ResolvedConfig): H
   const headers = new Headers();
 
   for (const [k, v] of req.headers.entries()) {
-    if (!HOP_BY_HOP.has(k.toLowerCase()) && !dynamicHopByHop.has(k.toLowerCase())) {
+    const lower = k.toLowerCase();
+    // The proxy is the trust boundary: never forward a client-supplied
+    // Authorization header. The backend is authenticated by the project
+    // service-key injected below, and letting the browser set Authorization
+    // would let it suppress or replace that trusted credential.
+    if (!HOP_BY_HOP.has(lower) && !dynamicHopByHop.has(lower) && lower !== "authorization") {
       headers.set(k, v);
     }
   }
@@ -187,10 +196,10 @@ function buildUpstreamHeaders(req: Request, url: URL, config: ResolvedConfig): H
     headers.set(k, v);
   }
 
-  // Attach the project service-key as the bearer token, unless the request
-  // already carries an Authorization header (forwarded or via additionalHeaders).
-  // The secret is read from a platform env var inside the edge runtime, so it
-  // never reaches the browser.
+  // Attach the project service-key as the bearer token. The client's own
+  // Authorization was stripped above, so this is set unless a caller explicitly
+  // provided one via additionalHeaders. The secret is read from a platform env
+  // var inside the edge runtime, so it never reaches the browser.
   if (config.projectSecret && !headers.has("authorization")) {
     headers.set("authorization", `Bearer ${config.projectSecret}`);
   }
@@ -288,7 +297,13 @@ export async function handleProxy(req: Request, config: ResolvedConfig): Promise
     responseHeaders.append("set-cookie", cookie);
   }
 
-  return new Response(upstreamRes.body, {
+  // The Fetch spec forbids a body on null-body statuses; constructing a Response
+  // with one throws on strict runtimes. Upstream 204/205/304 responses normally
+  // have a null body already, but guard explicitly so a non-conformant upstream
+  // can't crash the proxy.
+  const nullBodyStatus =
+    upstreamRes.status === 204 || upstreamRes.status === 205 || upstreamRes.status === 304;
+  return new Response(nullBodyStatus ? null : upstreamRes.body, {
     status: upstreamRes.status,
     headers: responseHeaders,
   });

@@ -110,7 +110,7 @@ describe("edgeProxyOps — vercel", () => {
   it("writes a managed middleware that matches /__nextgen and reads process.env", () => {
     const mw = writeOp(ops, "middleware.ts");
     expect(mw?.contents).toContain(MANAGED_MARKER);
-    expect(mw?.contents).toContain('matcher: ["/__nextgen/:path*"]');
+    expect(mw?.contents).toContain('matcher: ["/__nextgen", "/__nextgen/:path*"]');
     expect(mw?.contents).toContain("process.env.ZITADEL_PROJECT_SECRET");
   });
 
@@ -137,17 +137,12 @@ describe("edgeProxyOps — netlify", () => {
     });
   });
 
-  it("creates netlify.toml when absent, appends once, and is idempotent", () => {
-    const transform = editOp(ops, "netlify.toml")?.edit;
-    expect(transform).toBeDefined();
-    const created = transform?.(undefined) ?? "";
-    expect(created).toContain("[build]");
-    expect(created).toContain('function = "zitadel-nextgen"');
-    // Appended to an existing file without our block.
-    const appended = transform?.('[build]\n  publish = "out"\n') ?? "";
-    expect(appended).toContain('function = "zitadel-nextgen"');
-    // Re-running on the appended result leaves it unchanged.
-    expect(transform?.(appended)).toBe(appended);
+  it("writes both vars to .env (what netlify dev loads) and edits no netlify.toml", () => {
+    expect(mergeEnv(ops, ".env")).toMatchObject({
+      NEXTGEN_API_URL: "https://api.zitadel.cloud",
+      ZITADEL_PROJECT_SECRET: "sk_full",
+    });
+    expect(editOp(ops, "netlify.toml")).toBeUndefined();
   });
 });
 
@@ -158,7 +153,8 @@ describe("edge-proxy artifact enumeration", () => {
     expect(edgeProxyFiles("vercel")).toEqual(["middleware.ts"]);
     expect(edgeProxyConfigEdits("vercel")).toEqual([]);
     expect(edgeProxyFiles("netlify")).toEqual(["netlify/edge-functions/zitadel-nextgen.ts"]);
-    expect(edgeProxyConfigEdits("netlify")).toEqual(["netlify.toml"]);
+    // Netlify edge functions are auto-discovered, so there is no config to edit.
+    expect(edgeProxyConfigEdits("netlify")).toEqual([]);
   });
 
   it("surfaces the platform secret-push commands", () => {
@@ -173,9 +169,9 @@ describe("edge-proxy artifact enumeration", () => {
     expect(cmds.some((c) => c.includes("NEXTGEN_API_URL"))).toBe(false);
   });
 
-  it("backs up Cloudflare's .dev.vars on eject, nothing extra for vercel/netlify", () => {
+  it("backs up the platform's local secret file on eject", () => {
     expect(edgeProxyEnvBackups("cloudflare")).toEqual([".dev.vars"]);
+    expect(edgeProxyEnvBackups("netlify")).toEqual([".env"]);
     expect(edgeProxyEnvBackups("vercel")).toEqual([]);
-    expect(edgeProxyEnvBackups("netlify")).toEqual([]);
   });
 });

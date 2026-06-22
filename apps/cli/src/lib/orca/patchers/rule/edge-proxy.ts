@@ -43,9 +43,6 @@ export function isEdgeProxyFramework(framework: string): boolean {
   return EDGE_PROXY_FRAMEWORKS.has(framework);
 }
 
-/** Marker line the Netlify-toml edit keys off for idempotency. */
-const NETLIFY_FUNCTION_NAME = "zitadel-nextgen";
-
 const CLOUDFLARE_WORKER_PATH = "zitadel-edge-proxy.ts";
 const VERCEL_MIDDLEWARE_PATH = "middleware.ts";
 const NETLIFY_FUNCTION_PATH = "netlify/edge-functions/zitadel-nextgen.ts";
@@ -76,7 +73,7 @@ function vercelMiddleware(): string {
   return `${MANAGED_MARKER}
 import { handleProxy, resolveConfig } from "${EDGE_PROXY_DEP}";
 
-export const config = { matcher: ["${PROXY_PATH}/:path*"] };
+export const config = { matcher: ["${PROXY_PATH}", "${PROXY_PATH}/:path*"] };
 
 const proxyConfig = resolveConfig({
   apiUrl: process.env.NEXTGEN_API_URL ?? "",
@@ -124,6 +121,9 @@ function wranglerConfig(server: string): string {
   "assets": {
     // Point this at your SPA build output (e.g. Angular: dist/<project>/browser).
     "directory": "./dist",
+    // Required when "main" is set: exposes the static assets to the Worker as
+    // env.ASSETS. Without it the Worker's fallback throws on every page request.
+    "binding": "ASSETS",
     "not_found_handling": "single-page-application",
     // Run the Worker first for all /__nextgen/* requests.
     "run_worker_first": ["${PROXY_PATH}/*"]
@@ -144,25 +144,6 @@ function wranglerConfig(server: string): string {
  */
 function wranglerEdit(server: string): (source: string | undefined) => string {
   return (source) => (source === undefined ? wranglerConfig(server) : source);
-}
-
-const NETLIFY_BLOCK = `\n[[edge_functions]]\n  function = "${NETLIFY_FUNCTION_NAME}"\n  path = "${PROXY_PATH}/*"\n`;
-
-/**
- * Appends the `[[edge_functions]]` block to `netlify.toml` (creating the file
- * with a `[build]` publish dir when absent). Idempotent: keyed off the function
- * name, so a second run leaves the file unchanged.
- */
-function netlifyTomlEdit(): (source: string | undefined) => string {
-  return (source) => {
-    if (source === undefined) {
-      return `[build]\n  publish = "dist"\n${NETLIFY_BLOCK}`;
-    }
-    if (source.includes(`function = "${NETLIFY_FUNCTION_NAME}"`)) {
-      return source;
-    }
-    return source.endsWith("\n") ? `${source}${NETLIFY_BLOCK}` : `${source}\n${NETLIFY_BLOCK}`;
-  };
 }
 
 /**
@@ -220,9 +201,21 @@ export function edgeProxyOps(target: DeployTarget, ctx: PatchContext): FileOp[] 
         // The edge function imports the `Config` type and `Netlify` global from
         // this package; install it so the scaffolded function typechecks.
         { kind: "add-dep", name: "@netlify/edge-functions", version: "^2.0.0", dev: true },
+        // Functions in netlify/edge-functions/ are auto-discovered and routed by
+        // the inline `config.path`, so no netlify.toml entry is needed (which
+        // also avoids hardcoding a wrong publish dir for Angular et al.).
         { kind: "write", path: NETLIFY_FUNCTION_PATH, contents: netlifyFunction() },
-        { kind: "edit", path: "netlify.toml", edit: netlifyTomlEdit() },
-        { kind: "merge-env", path: ".env.local", entries: { NEXTGEN_API_URL: ctx.server } },
+        // `netlify dev` loads .env (not .env.local), and edge functions only see
+        // env injected by the platform — so write both vars where dev picks them
+        // up. .env is gitignored, so the secret stays out of git.
+        {
+          kind: "merge-env",
+          path: ".env",
+          entries: {
+            NEXTGEN_API_URL: ctx.server,
+            ZITADEL_PROJECT_SECRET: ctx.project.projectSecret,
+          },
+        },
         apiUrlExample,
       ];
   }
@@ -242,24 +235,27 @@ export function edgeProxyFiles(target: DeployTarget): string[] {
 
 /** Config files the edge-proxy scaffolding edits in place, for ejection. */
 export function edgeProxyConfigEdits(target: DeployTarget): string[] {
-  switch (target) {
-    case "cloudflare":
-      return ["wrangler.jsonc"];
-    case "vercel":
-      return [];
-    case "netlify":
-      return ["netlify.toml"];
-  }
+  // Cloudflare may create wrangler.jsonc; Vercel uses a managed middleware file
+  // (a marked file, not a config edit); Netlify auto-discovers the edge function
+  // with no config file to edit.
+  return target === "cloudflare" ? ["wrangler.jsonc"] : [];
 }
 
 /**
  * Env files the edge-proxy scaffolding writes a secret into, for ejection.
- * Cloudflare gets its own gitignored `.dev.vars` (the local secret store
- * `wrangler dev` reads); Vercel/Netlify reuse `.env.local`, which the base
- * patcher already backs up, so they contribute nothing here.
+ * Cloudflare gets `.dev.vars` (what `wrangler dev` reads); Netlify gets `.env`
+ * (what `netlify dev` reads); Vercel reuses `.env.local`, which the base patcher
+ * already backs up, so it contributes nothing here.
  */
 export function edgeProxyEnvBackups(target: DeployTarget): string[] {
-  return target === "cloudflare" ? [".dev.vars"] : [];
+  switch (target) {
+    case "cloudflare":
+      return [".dev.vars"];
+    case "netlify":
+      return [".env"];
+    case "vercel":
+      return [];
+  }
 }
 
 /**

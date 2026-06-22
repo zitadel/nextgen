@@ -89,7 +89,7 @@ describe("ReactPatcher edge proxy", () => {
     });
     expect(artifacts.markedFiles).toContain("netlify/edge-functions/zitadel-nextgen.ts");
     expect(artifacts.dependencies).toContain("@zitadel/edge-proxy");
-    expect(artifacts.configEdits).toContain("netlify.toml");
+    expect(artifacts.envBackups).toContain(".env");
   });
 
   it("backs up Cloudflare's .dev.vars (holds the secret) on eject", () => {

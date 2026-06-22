@@ -355,7 +355,7 @@ describe("handleProxy", () => {
     expect((init!.headers as Headers).has("authorization")).toBe(false);
   });
 
-  it("does not overwrite an Authorization header already on the request", async () => {
+  it("strips a client-supplied Authorization and injects the project secret instead", async () => {
     const mock = stubFetch(mockResponse());
     const cfg = resolveConfig({ apiUrl: UPSTREAM, projectSecret: "sk_proj_abc" });
     const req = new Request("http://edge.local/__nextgen/ping", {
@@ -363,7 +363,19 @@ describe("handleProxy", () => {
     });
     await handleProxy(req, cfg);
     const [, init] = mock.mock.calls[0] ?? [];
-    expect((init!.headers as Headers).get("authorization")).toBe("Bearer client-token");
+    // The browser must not be able to control the credential sent upstream.
+    expect((init!.headers as Headers).get("authorization")).toBe("Bearer sk_proj_abc");
+  });
+
+  it("strips a client Authorization even when no projectSecret is configured", async () => {
+    const mock = stubFetch(mockResponse());
+    const cfg = resolveConfig({ apiUrl: UPSTREAM });
+    const req = new Request("http://edge.local/__nextgen/ping", {
+      headers: { authorization: "Bearer client-token" },
+    });
+    await handleProxy(req, cfg);
+    const [, init] = mock.mock.calls[0] ?? [];
+    expect((init!.headers as Headers).has("authorization")).toBe(false);
   });
 
   // ── Request body ──────────────────────────────────────────────────────────
@@ -455,6 +467,14 @@ describe("handleProxy", () => {
     const cfg = makeConfig();
     const res = await handleProxy(new Request("http://edge.local/__nextgen/missing"), cfg);
     expect(res?.status).toBe(404);
+  });
+
+  it("returns a null-body Response for 204 without throwing", async () => {
+    stubFetch(new Response(null, { status: 204 }));
+    const cfg = makeConfig();
+    const res = await handleProxy(new Request("http://edge.local/__nextgen/empty"), cfg);
+    expect(res?.status).toBe(204);
+    expect(res?.body).toBeNull();
   });
 
   it("strips hop-by-hop headers from upstream response", async () => {
