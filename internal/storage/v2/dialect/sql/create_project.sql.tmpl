@@ -1,3 +1,0 @@
-INSERT INTO {{ .TableName }} 
-({{ .IDColumnName }}, {{ .CreatedAtColumnName }}, {{ .UpdatedAtColumnName }}, {{ .ProjectSecretColumnName }}, {{ .PreviewSecretColumnName }}, {{ .PreviewOriginsColumnName }}) 
-VALUES ($1, $2, $3, $4, $5, $6) {{ .Returning }} {{ .IDColumnName }}, {{ .CreatedAtColumnName }}, {{ .UpdatedAtColumnName }}
