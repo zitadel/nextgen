@@ -15,6 +15,13 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+// stubPool returns nil typed as database.Pool. The flow definition service
+// receives a pool but never calls into it under these mock-based tests;
+// the helper exists to keep call sites readable. Mirrors the helper in
+// the internal-package test file (flow_test.go) that this external-package
+// test cannot reach.
+func stubPool() database.Pool { return nil }
+
 var tenantUserSchema = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "metaSchema": "https://nextgen.com/schemas/user-meta-schema.json",

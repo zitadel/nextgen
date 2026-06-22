@@ -45,6 +45,11 @@ type FlowOnSuccessResult struct {
 	// UserID is set when a handler creates a new user. The state machine
 	// records it and registers the user on the auth attempt.
 	UserID string
+	// ClearBackStack signals the engine to drop the runtime back stack
+	// after this handler runs. Set when the mutation is irreversible
+	// (e.g. created a user) so subsequent steps don't surface `back`
+	// across the mutation boundary.
+	ClearBackStack bool
 }
 
 // FlowPasswordHasher hashes plaintext passwords into the PHC string
