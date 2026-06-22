@@ -10,8 +10,8 @@ nextgen needs one permission model for two surfaces:
 
 1. **Internal permissions** decide whether a principal can read or write a
    Zitadel resource such as a project, team, user, app, flow, or policy.
-2. **External permissions** assign app/API roles to users or teams so customer
-   applications can authorize their own resources from token claims,
+2. **External permissions** assign app/API permissions to users or teams so
+   customer applications can authorize their own resources from token claims,
    introspection, or future authorization APIs.
 
 Legacy Zitadel used runtime-configured internal roles at fixed levels such as
@@ -64,20 +64,26 @@ Internal and external permissions use the same primitives:
 
 | Primitive | Meaning |
 |---|---|
-| Permission | Stable dotted action string such as `users.read` or `orders.refund`. |
-| Role | Named bundle of permissions inside a permission catalog. |
-| Grant / assignment | Principal, role, and scope binding. |
+| Permission / relation | Stable action or relation name such as `users.read`, `orders.refund`, `viewer`, or `can_manage`. |
+| Permission expression | The compiled rule that derives a permission/relation from direct assignments, usersets, unions, and bounded inheritance. |
+| Grant / assignment | Principal, permission/relation, and scope binding. |
 | Delegation | Explicit authority granted to an agent or machine principal. |
 | Principal | User token, agent, `sk_proj_`, `sk_team_`, origin-bound browser nonce, or future machine principal. |
 | Scope | Resolved project/team/resource boundary from the credential, request body/query, or `resource_scope_index`. |
 
 There are two catalogs:
 
-- **System catalog:** Zitadel-owned permissions and roles for internal API
+- **System catalog:** Zitadel-owned permissions and optional bundles for internal API
   resources. These replace legacy level-specific role semantics.
-- **App-group catalog:** customer-owned roles and permissions for apps/APIs.
+- **App-group catalog:** customer-owned permissions, relations, and optional
+  role-like bundles for apps/APIs.
   These replace legacy project authorizations and are emitted in tokens and
   introspection responses grouped by app group / app audience.
+
+Roles are not a required primitive. They are an optional catalog convenience
+when a policy author wants RBAC-style bundles such as `admin` or `support`.
+OpenFGA schemas that model access only through relations, attributes encoded as
+relations, or computed permissions compile without role definitions.
 
 The permission resolver does not know whether a permission is "internal" or
 "external" after catalog lookup. It evaluates the same assignment and scope
@@ -114,17 +120,17 @@ The internal package boundary should be:
 |---|---|
 | `internal/authz/openfga` | Parse DSL/JSON with the upstream language package and normalize it into Zitadel's IR. |
 | `internal/authz/profile` | Reject unsupported OpenFGA constructs and enforce bounded, portable rules. |
-| `internal/authz/compiler` | Compute role/relation closure and produce relational catalog mutations/query-plan metadata. |
+| `internal/authz/compiler` | Compute relation/permission closure and produce relational catalog mutations/query-plan metadata. |
 | `internal/authz/resolver` | Evaluate single-resource checks and produce list predicates against repository metadata. |
 
 The supported profile starts with:
 
 - direct relations,
-- role implication / computed usersets,
+- relation implication / computed usersets,
 - union,
 - bounded tuple-to-userset through known Zitadel hierarchy edges
   (`project`, `team`, `app_group`, `app`, `user`),
-- userset references for team membership and role assignment.
+- userset references for team membership and assignment.
 
 The MVP rejects constructs that cannot be planned predictably across
 PostgreSQL and Spanner:
@@ -147,12 +153,12 @@ sidecar-synchronized facts:
   scope.
 - `team_memberships` owns roster/status/provisioning state and can feed FGA
   facts, but remains separate from lifecycle ownership per ADR 024.
-- role definitions, permission definitions, role-permission edges, and
-  role-implication closure are stored per catalog/version.
-- assignments bind principals to roles at explicit scopes.
+- relation/permission definitions, expression edges, optional bundle aliases,
+  and relation-implication closure are stored per catalog/version.
+- assignments bind principals to permissions or relations at explicit scopes.
 - app grants bind users or teams to apps/app groups for token claims.
 
-Role implication closure is computed on policy/schema update, not on every
+Relation implication closure is computed on policy/schema update, not on every
 membership or grant write. Ordinary access changes write ordinary indexed rows.
 This avoids a noisy-neighbour write penalty from maintaining per-resource
 transitive closure tables while still making checks cheap.
@@ -180,7 +186,7 @@ credential -> resolve path/body/query scope -> permission resolver -> scope-boun
 ```
 
 Single-resource checks use indexed semi-joins over the principal's assignments,
-role-permission closure, credential class constraints, and resolved scope.
+relation/permission closure, credential class constraints, and resolved scope.
 
 List endpoints receive a permission predicate from the resolver and inject it
 into the resource query. Repositories tell the predicate builder which resource
@@ -200,7 +206,7 @@ the resources they protect and are updated in the same transaction whenever a
 resource mutation changes access.
 
 Permission decisions are cached only inside a request. Compiled policy metadata,
-permission ids, and role closure by catalog version may be cached across
+permission ids, and relation closure by catalog version may be cached across
 requests because they are immutable by version. Cross-request decision caching
 requires an explicit invalidation design and is out of scope for MVP.
 
@@ -220,7 +226,7 @@ scope, expiry, grantor, and audit provenance.
 ### Positive
 
 - One authorization model covers platform administrators, customer project
-  admins, service credentials, and end-user app roles.
+  admins, service credentials, and end-user app permissions.
 - Internal checks are resource-based and compatible with flat-by-ID APIs.
 - Listing queries remain single-roundtrip SQL with injected predicates.
 - Local resource authorization is strongly consistent with local resource
@@ -245,7 +251,7 @@ scope, expiry, grantor, and audit provenance.
   remain Zitadel-owned.
 - Predicate injection increases repository/query-builder complexity and needs
   focused tests for every scoped resource type.
-- App-group role claims can grow large; token issuance must define audience,
+- App-group permission claims can grow large; token issuance must define audience,
   scope request, and claim-size limits.
 - Optional PostgreSQL accelerators can drift from portable behavior unless they
   run the same conformance tests.
@@ -270,7 +276,7 @@ query.
 
 Rejected as the primary engine because Melange generates PostgreSQL-specific
 functions and relies on PostgreSQL execution features. It is a strong reference
-for schema compilation, role closure, and optional PostgreSQL acceleration, but
+for schema compilation, relation closure, and optional PostgreSQL acceleration, but
 not a portable contract for Spanner.
 
 ### Build a custom OpenFGA parser
@@ -288,9 +294,9 @@ policies without reintroducing hard-coded levels and special cases.
 
 ## Follow-ups
 
-1. Define the exact system permission catalog and default system roles.
-2. Design relational migrations for catalogs, roles, grants, assignments,
-   app grants, and `resource_scope_index`.
+1. Define the exact system permission catalog and optional default bundles.
+2. Design relational migrations for catalogs, permissions/relations, grants,
+   assignments, app grants, and `resource_scope_index`.
 3. Add the upstream OpenFGA language package and implement the IR/profile
    compiler behind `internal/authz/openfga`.
 4. Define the OpenFGA profile grammar and upload diagnostics.
