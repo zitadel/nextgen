@@ -233,7 +233,8 @@ export default class Setup extends BaseCommand {
         ...edgeProxyDeployNotes(deployTarget).map((note) => `  - ${note}`),
       ];
       consola.info(
-        `Scaffolded the ${deployTarget} edge proxy. Before deploying:\n${steps.join("\n")}`,
+        `${dryRun ? "Would scaffold" : "Scaffolded"} the ${deployTarget} edge proxy` +
+          `${dryRun ? " (dry run)" : ""}. Before deploying:\n${steps.join("\n")}`,
       );
     }
 

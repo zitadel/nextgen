@@ -32,7 +32,11 @@ Cloudflare and Netlify intercept `/__nextgen/*` directly (so the default `pathPr
 
 ### Cloudflare Workers
 
-1. Copy `etc/cloudflare/worker.ts` and `etc/cloudflare/wrangler.jsonc` to your project root, and set `assets.directory` to your SPA build output.
+1. Copy `etc/cloudflare/worker.ts` and `etc/cloudflare/wrangler.jsonc` to your project root, set `assets.directory` to your SPA build output, and install the Worker types so `worker.ts` typechecks:
+
+   ```bash
+   pnpm add -D @cloudflare/workers-types
+   ```
 
 2. Set the secret (the backend URL stays a plaintext `var` in `wrangler.jsonc`):
 
@@ -74,7 +78,13 @@ The worker serves all non-`/__nextgen` requests via the `ASSETS` binding, so you
 
 ### Netlify
 
-1. Copy `etc/netlify/nextgen.ts` to `netlify/edge-functions/nextgen.ts`. Netlify auto-discovers functions in that directory and routes this one via its inline `config.path` — no `netlify.toml` entry needed.
+1. Copy `etc/netlify/nextgen.ts` to `netlify/edge-functions/nextgen.ts`, and install the edge-function types so it typechecks (it imports `Config` from `@netlify/edge-functions`):
+
+   ```bash
+   pnpm add -D @netlify/edge-functions
+   ```
+
+   Netlify auto-discovers functions in that directory and routes this one via its inline `config.path` — no `netlify.toml` entry needed.
 
 2. Set the backend URL and secret. `netlify dev` reads them from `.env`; for deploys use the dashboard or CLI (edge functions don't see `netlify.toml` `[vars]`):
 
