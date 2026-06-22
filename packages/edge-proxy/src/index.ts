@@ -8,9 +8,12 @@
  * @example
  * ```ts
  * // Cloudflare Workers
- * import { handleProxy, resolveConfig } from '@zitadel-nextgen/edge-proxy';
+ * import { handleProxy, resolveConfig } from '@zitadel/edge-proxy';
  *
- * const config = resolveConfig({ apiUrl: env.NEXTGEN_API_URL });
+ * const config = resolveConfig({
+ *   apiUrl: env.NEXTGEN_API_URL,
+ *   projectSecret: env.ZITADEL_PROJECT_SECRET,
+ * });
  * const res = await handleProxy(req, config);
  * if (res) return res;
  * return env.ASSETS.fetch(req); // fall through to static assets
@@ -23,18 +26,18 @@
  * connected peers — they become invalid when proxied.
  */
 const HOP_BY_HOP: ReadonlySet<string> = new Set([
-  'connection',
+  "connection",
   // host is not a hop-by-hop header per RFC 7230, but it must be stripped so
   // the fetch implementation derives the correct Host from the upstream URL
   // rather than forwarding the client's Host and causing SNI/vhost mismatches.
-  'host',
-  'keep-alive',
-  'proxy-authenticate',
-  'proxy-authorization',
-  'te',
-  'trailer',
-  'transfer-encoding',
-  'upgrade',
+  "host",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailer",
+  "transfer-encoding",
+  "upgrade",
 ]);
 
 // ─── Public types ─────────────────────────────────────────────────────────────
@@ -43,7 +46,7 @@ const HOP_BY_HOP: ReadonlySet<string> = new Set([
 export class EdgeProxyConfigError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'EdgeProxyConfigError';
+    this.name = "EdgeProxyConfigError";
   }
 }
 
@@ -66,6 +69,18 @@ export interface EdgeProxyConfig {
    */
   stripPrefix?: boolean | undefined;
   /**
+   * The project service-key secret. When set, it is attached as
+   * `Authorization: Bearer <projectSecret>` on every proxied upstream request
+   * (unless the request already carries an `Authorization` header). The
+   * backend's security handler verifies it cryptographically.
+   *
+   * This is what keeps the secret server-side: the value is read from a
+   * platform env var inside the edge runtime (`ZITADEL_PROJECT_SECRET`) and
+   * never reaches the browser. A static rewrite rule cannot do this, which is
+   * why a worker / edge function is required rather than plain config.
+   */
+  projectSecret?: string | undefined;
+  /**
    * Additional headers injected into every upstream request.
    * Applied after hop-by-hop stripping and X-Forwarded-* injection,
    * so these can override any forwarded header.
@@ -85,6 +100,7 @@ export interface ResolvedConfig {
   readonly apiUrl: string;
   readonly pathPrefix: string;
   readonly stripPrefix: boolean;
+  readonly projectSecret: string;
   readonly additionalHeaders: Record<string, string>;
   readonly proxyTimeoutMs: number;
 }
@@ -99,7 +115,7 @@ export interface ResolvedConfig {
  */
 export function resolveConfig(config: EdgeProxyConfig): ResolvedConfig {
   if (!config.apiUrl) {
-    throw new EdgeProxyConfigError('apiUrl is required');
+    throw new EdgeProxyConfigError("apiUrl is required");
   }
 
   let parsed: URL;
@@ -109,23 +125,22 @@ export function resolveConfig(config: EdgeProxyConfig): ResolvedConfig {
     throw new EdgeProxyConfigError(`Invalid apiUrl: "${config.apiUrl}"`);
   }
 
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     throw new EdgeProxyConfigError(
       `apiUrl must use http or https protocol, got: "${parsed.protocol}"`,
     );
   }
 
-  const pathPrefix = config.pathPrefix ?? '/__nextgen';
-  if (!pathPrefix.startsWith('/')) {
-    throw new EdgeProxyConfigError(
-      `pathPrefix must start with "/", got: "${pathPrefix}"`,
-    );
+  const pathPrefix = config.pathPrefix ?? "/__nextgen";
+  if (!pathPrefix.startsWith("/")) {
+    throw new EdgeProxyConfigError(`pathPrefix must start with "/", got: "${pathPrefix}"`);
   }
 
   return {
     apiUrl: config.apiUrl,
     pathPrefix,
     stripPrefix: config.stripPrefix ?? true,
+    projectSecret: config.projectSecret ?? "",
     additionalHeaders: config.additionalHeaders ?? {},
     proxyTimeoutMs: config.proxyTimeoutMs ?? 5000,
   };
@@ -137,7 +152,11 @@ export function resolveConfig(config: EdgeProxyConfig): ResolvedConfig {
  * Builds the header set to forward to the upstream server.
  *
  * - Strips all hop-by-hop headers from the incoming request.
- * - Injects `additionalHeaders` last (can override any forwarded header).
+ * - Injects `additionalHeaders` (can override any forwarded header).
+ * - Attaches the project service-key as `Authorization: Bearer <secret>` when
+ *   `config.projectSecret` is set and the request carries no `Authorization`
+ *   header — the secret never reaches the browser because this runs in the
+ *   edge runtime, not the client.
  * - Sets `X-Forwarded-For` only when absent, from `cf-connecting-ip` or
  *   `x-real-ip`. Never overwrites an existing CDN chain.
  * - Sets `X-Forwarded-Host` and `X-Forwarded-Proto` only when absent,
@@ -145,17 +164,13 @@ export function resolveConfig(config: EdgeProxyConfig): ResolvedConfig {
  *
  * Not exported — internal implementation detail.
  */
-function buildUpstreamHeaders(
-  req: Request,
-  url: URL,
-  config: ResolvedConfig,
-): Headers {
+function buildUpstreamHeaders(req: Request, url: URL, config: ResolvedConfig): Headers {
   // RFC 7230 §6.1: the Connection header may name additional headers that are
   // hop-by-hop for this specific connection and must also be stripped.
-  const connectionValue = req.headers.get('connection') ?? '';
+  const connectionValue = req.headers.get("connection") ?? "";
   const dynamicHopByHop = new Set(
     connectionValue
-      .split(',')
+      .split(",")
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean),
   );
@@ -172,20 +187,27 @@ function buildUpstreamHeaders(
     headers.set(k, v);
   }
 
-  if (!headers.has('x-forwarded-for')) {
-    const ip =
-      req.headers.get('cf-connecting-ip') ?? req.headers.get('x-real-ip');
+  // Attach the project service-key as the bearer token, unless the request
+  // already carries an Authorization header (forwarded or via additionalHeaders).
+  // The secret is read from a platform env var inside the edge runtime, so it
+  // never reaches the browser.
+  if (config.projectSecret && !headers.has("authorization")) {
+    headers.set("authorization", `Bearer ${config.projectSecret}`);
+  }
+
+  if (!headers.has("x-forwarded-for")) {
+    const ip = req.headers.get("cf-connecting-ip") ?? req.headers.get("x-real-ip");
     if (ip !== null) {
-      headers.set('x-forwarded-for', ip);
+      headers.set("x-forwarded-for", ip);
     }
   }
 
-  if (!headers.has('x-forwarded-host')) {
-    headers.set('x-forwarded-host', url.host);
+  if (!headers.has("x-forwarded-host")) {
+    headers.set("x-forwarded-host", url.host);
   }
 
-  if (!headers.has('x-forwarded-proto')) {
-    headers.set('x-forwarded-proto', url.protocol.replace(':', ''));
+  if (!headers.has("x-forwarded-proto")) {
+    headers.set("x-forwarded-proto", url.protocol.replace(":", ""));
   }
 
   return headers;
@@ -208,10 +230,7 @@ function buildUpstreamHeaders(
  * @param config - Resolved proxy configuration from {@link resolveConfig}.
  * @returns The proxied upstream `Response`, or `null` if the path does not match.
  */
-export async function handleProxy(
-  req: Request,
-  config: ResolvedConfig,
-): Promise<Response | null> {
+export async function handleProxy(req: Request, config: ResolvedConfig): Promise<Response | null> {
   const url = new URL(req.url);
 
   if (!url.pathname.startsWith(config.pathPrefix)) {
@@ -220,7 +239,7 @@ export async function handleProxy(
   // Prevent matching a path that shares a prefix but continues with non-slash
   // characters (e.g. pathPrefix='/__nextgen' must NOT match '/__nextgen_other').
   const charAfterPrefix = url.pathname[config.pathPrefix.length];
-  if (charAfterPrefix !== undefined && charAfterPrefix !== '/') {
+  if (charAfterPrefix !== undefined && charAfterPrefix !== "/") {
     return null;
   }
 
@@ -230,33 +249,33 @@ export async function handleProxy(
   upstream.host = base.host;
   // Preserve any base path embedded in apiUrl (e.g. https://api.example.com/v2).
   // Trailing slash on base path is stripped to avoid double-slash when joining.
-  const basePath = base.pathname.replace(/\/$/, '');
+  const basePath = base.pathname.replace(/\/$/, "");
   upstream.pathname = config.stripPrefix
-    ? basePath + (url.pathname.slice(config.pathPrefix.length) || '/')
+    ? basePath + (url.pathname.slice(config.pathPrefix.length) || "/")
     : basePath + url.pathname;
 
   const headers = buildUpstreamHeaders(req, url, config);
-  const hasBody = !['GET', 'HEAD'].includes(req.method);
+  const hasBody = !["GET", "HEAD"].includes(req.method);
 
   const upstreamRes = await fetch(upstream.toString(), {
     method: req.method,
     headers,
     body: hasBody ? req.body : undefined,
-    redirect: 'manual',
+    redirect: "manual",
     signal: AbortSignal.timeout(config.proxyTimeoutMs),
     // duplex is required by the Fetch spec for streaming request bodies but is
     // not yet present in TypeScript's RequestInit. Cast suppresses the error.
-    ...(hasBody ? { duplex: 'half' } : {}),
+    ...(hasBody ? { duplex: "half" } : {}),
   } as RequestInit);
 
   const responseHeaders = new Headers();
   for (const [k, v] of upstreamRes.headers.entries()) {
     if (
       !HOP_BY_HOP.has(k.toLowerCase()) &&
-      k.toLowerCase() !== 'set-cookie' &&
+      k.toLowerCase() !== "set-cookie" &&
       // location is stripped to prevent leaking internal upstream URLs to the
       // browser — this proxy is a pure API proxy and never issues redirects.
-      k.toLowerCase() !== 'location'
+      k.toLowerCase() !== "location"
     ) {
       responseHeaders.set(k, v);
     }
@@ -266,7 +285,7 @@ export async function handleProxy(
   // Headers.get('set-cookie') collapses them into a comma-joined string,
   // which breaks cookies whose values contain commas (e.g. Expires dates).
   for (const cookie of upstreamRes.headers.getSetCookie?.() ?? []) {
-    responseHeaders.append('set-cookie', cookie);
+    responseHeaders.append("set-cookie", cookie);
   }
 
   return new Response(upstreamRes.body, {
