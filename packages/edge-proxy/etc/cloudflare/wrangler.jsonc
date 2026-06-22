@@ -16,8 +16,9 @@
     "run_worker_first": ["/__nextgen/*"]
   },
   "vars": {
-    // Override with your real backend URL via the Cloudflare dashboard
-    // or `wrangler secret put NEXTGEN_API_URL`.
+    // The backend URL is a plaintext var (not a secret); edit it here or in the
+    // Cloudflare dashboard. Only ZITADEL_PROJECT_SECRET goes to the secret store
+    // via `wrangler secret put ZITADEL_PROJECT_SECRET`.
     "NEXTGEN_API_URL": "https://your-backend.example.com"
   }
 }

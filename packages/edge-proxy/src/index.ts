@@ -232,8 +232,11 @@ function buildUpstreamHeaders(req: Request, url: URL, config: ResolvedConfig): H
  * fall through to static asset serving (Cloudflare ASSETS, Vercel CDN, etc.).
  *
  * Hop-by-hop headers are stripped in both directions. Multiple `Set-Cookie`
- * headers are preserved individually via `Headers.getSetCookie()`.
- * 3xx redirects are passed through unchanged (`redirect: 'manual'`).
+ * headers are preserved individually via `Headers.getSetCookie()`. This is a
+ * pure API proxy: it uses `redirect: 'manual'` and strips the upstream
+ * `Location` header (so internal backend URLs never leak to the browser), so a
+ * 3xx status is forwarded but its redirect target is not. An upstream timeout
+ * yields `504` and a connection failure `502`, rather than throwing.
  *
  * @param req    - The incoming edge request.
  * @param config - Resolved proxy configuration from {@link resolveConfig}.
@@ -266,16 +269,25 @@ export async function handleProxy(req: Request, config: ResolvedConfig): Promise
   const headers = buildUpstreamHeaders(req, url, config);
   const hasBody = !["GET", "HEAD"].includes(req.method);
 
-  const upstreamRes = await fetch(upstream.toString(), {
-    method: req.method,
-    headers,
-    body: hasBody ? req.body : undefined,
-    redirect: "manual",
-    signal: AbortSignal.timeout(config.proxyTimeoutMs),
-    // duplex is required by the Fetch spec for streaming request bodies but is
-    // not yet present in TypeScript's RequestInit. Cast suppresses the error.
-    ...(hasBody ? { duplex: "half" } : {}),
-  } as RequestInit);
+  let upstreamRes: Response;
+  try {
+    upstreamRes = await fetch(upstream.toString(), {
+      method: req.method,
+      headers,
+      body: hasBody ? req.body : undefined,
+      redirect: "manual",
+      signal: AbortSignal.timeout(config.proxyTimeoutMs),
+      // duplex is required by the Fetch spec for streaming request bodies but is
+      // not yet present in TypeScript's RequestInit. Cast suppresses the error.
+      ...(hasBody ? { duplex: "half" } : {}),
+    } as RequestInit);
+  } catch (error) {
+    // Translate upstream timeout/connection failures into a clean gateway
+    // status instead of letting the rejection surface as an opaque platform
+    // 500. AbortSignal.timeout rejects with a "TimeoutError".
+    const timedOut = error instanceof Error && error.name === "TimeoutError";
+    return new Response(null, { status: timedOut ? 504 : 502 });
+  }
 
   const responseHeaders = new Headers();
   for (const [k, v] of upstreamRes.headers.entries()) {

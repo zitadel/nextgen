@@ -4,6 +4,8 @@ A platform-agnostic edge proxy handler that lets React, Vue, and Angular SPAs ca
 
 Built entirely from WinterTC-standard web platform globals (`fetch`, `Request`, `Response`, `URL`, `Headers`). No platform-specific imports — the same handler runs on Cloudflare Workers, Vercel Edge Functions, and Netlify Edge Functions.
 
+> The `zitadel` CLI scaffolds these files for you when you run `setup` in an SPA project with a platform CLI installed. The steps below are for wiring it up by hand; the shapes match what the CLI generates.
+
 ## Install
 
 ```bash
@@ -14,27 +16,29 @@ pnpm add @zitadel/edge-proxy
 
 The handler intercepts all `/__nextgen/*` requests from the browser, proxies them to your backend API, and streams the response back. Everything else (static assets, other routes) is left untouched.
 
-- Project service-key injected as `Authorization: Bearer <secret>` from a server-side env var — the secret never reaches the browser
+- Project service-key injected as `Authorization: Bearer <secret>` from a server-side env var — the secret never reaches the browser. Any client-supplied `Authorization` is stripped first, so the browser can't control the upstream credential.
 - Hop-by-hop headers stripped in both directions
 - `X-Forwarded-*` headers injected when absent, preserved when already set by a CDN
 - Multiple `Set-Cookie` headers preserved without collapsing
-- 3xx redirects passed through unchanged
+- Pure API proxy: `redirect: 'manual'` plus the upstream `Location` header is stripped (internal backend URLs never leak), so a 3xx status is forwarded without its redirect target
+- Upstream timeout returns `504`, connection failure returns `502`
 - Returns `null` for non-matching paths — lets the platform serve static assets
 
 This secret injection is why a worker / edge function is required: a static rewrite rule (`vercel.json`, `netlify.toml`, Cloudflare `_redirects`) can route the path but cannot attach a secret env var to the upstream request.
 
 ## Setup
 
+All three platforms intercept `/__nextgen/*` directly, so the handler's default `pathPrefix` matches with no extra rewrite.
+
 ### Cloudflare Workers
 
-1. Copy `etc/cloudflare/worker.ts` and `etc/cloudflare/wrangler.jsonc` to your project root.
+1. Copy `etc/cloudflare/worker.ts` and `etc/cloudflare/wrangler.jsonc` to your project root, and set `assets.directory` to your SPA build output.
 
-2. Set your backend URL and project secret:
+2. Set the secret (the backend URL stays a plaintext `var` in `wrangler.jsonc`):
 
    ```bash
    wrangler secret put ZITADEL_PROJECT_SECRET
-   # NEXTGEN_API_URL can be a plain var in wrangler.jsonc; the secret must not.
-   # For local `wrangler dev`, put both in `.dev.vars` (gitignored).
+   # For local `wrangler dev`, put both NEXTGEN_API_URL and the secret in .dev.vars (gitignored).
    ```
 
 3. Deploy:
@@ -43,49 +47,43 @@ This secret injection is why a worker / edge function is required: a static rewr
    wrangler deploy
    ```
 
-The worker uses `env.ASSETS.fetch(req)` for all non-`/__nextgen` requests, so your SPA static files are served normally.
+The worker serves all non-`/__nextgen` requests via the `ASSETS` binding, so your SPA static files are served normally.
 
-> **Requirement:** `compatibility_date` must be `2025-01-01` or later for `Headers.getSetCookie()` support. The provided `wrangler.jsonc` already sets this.
+> **Requirement:** `compatibility_date` must be `2025-01-01` or later for `Headers.getSetCookie()` support, and `assets.binding` must be set so the worker can reach the static files. The provided `wrangler.jsonc` already sets both.
 
 ---
 
 ### Vercel
 
-1. Copy `etc/vercel/nextgen.ts` to `api/__nextgen/[...path].ts` in your project.
+1. Copy `etc/vercel/middleware.ts` to your project root. As Vercel Edge Middleware it runs before routing and its `matcher` intercepts `/__nextgen/*` directly — no `vercel.json` rewrite or `api/` function needed.
 
-2. Copy `etc/vercel/vercel.json` to your project root (or merge with an existing one). The rewrite routes `/__nextgen/*` browser requests to the edge function — without it, the function only handles `/api/__nextgen/*` and the proxy will not intercept requests.
-
-3. Set your backend URL and project secret in the Vercel dashboard or via CLI (read from `.env.local` under `vercel dev`):
+2. Set the backend URL and secret (read from `.env.local` under `vercel dev`):
 
    ```bash
    vercel env add NEXTGEN_API_URL
    vercel env add ZITADEL_PROJECT_SECRET
    ```
 
-4. Deploy:
+3. Deploy:
 
    ```bash
    vercel deploy
    ```
 
-Vercel routes `/__nextgen/*` to the edge function via the rewrite and serves everything else from your SPA build output.
-
 ---
 
 ### Netlify
 
-1. Copy `etc/netlify/nextgen.ts` to `netlify/edge-functions/nextgen.ts`.
+1. Copy `etc/netlify/nextgen.ts` to `netlify/edge-functions/nextgen.ts`. Netlify auto-discovers functions in that directory and routes this one via its inline `config.path` — no `netlify.toml` entry needed.
 
-2. Copy `etc/netlify/netlify.toml` to your project root (or merge with an existing one).
-
-3. Set your backend URL and project secret — **must** use the Netlify dashboard or CLI, not `netlify.toml` vars (which are not available to edge functions):
+2. Set the backend URL and secret. `netlify dev` reads them from `.env`; for deploys use the dashboard or CLI (edge functions don't see `netlify.toml` `[vars]`):
 
    ```bash
    netlify env:set NEXTGEN_API_URL https://your-backend.example.com
    netlify env:set ZITADEL_PROJECT_SECRET <secret>
    ```
 
-4. Deploy:
+3. Deploy:
 
    ```bash
    netlify deploy --prod
@@ -102,9 +100,9 @@ const config = resolveConfig({
   // Required. Base URL of the Zitadel nextgen API backend.
   apiUrl: 'https://api.example.com',
 
-  // Optional. Project service-key. Attached as `Authorization: Bearer <secret>`
-  // on every upstream request (unless one is already present). Read from a
-  // server-side env var so it never reaches the browser.
+  // Optional. Project service-key, attached as `Authorization: Bearer <secret>`
+  // on every upstream request. Client-supplied Authorization is stripped first.
+  // Read from a server-side env var so it never reaches the browser.
   projectSecret: process.env.ZITADEL_PROJECT_SECRET,
 
   // Optional. URL path prefix to intercept. Default: '/__nextgen'
@@ -114,7 +112,8 @@ const config = resolveConfig({
   stripPrefix: true,
 
   // Optional. Headers injected into every upstream request.
-  // Applied after hop-by-hop stripping; can override forwarded headers.
+  // Applied after hop-by-hop stripping; can override forwarded headers,
+  // including Authorization if you need a custom credential.
   additionalHeaders: {
     'X-Tenant-Id': 'acme',
   },
@@ -129,7 +128,7 @@ if (response) return response;
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `apiUrl` | `string` | — | Backend base URL (http or https). Required. |
-| `projectSecret` | `string` | `''` | Project service-key. Attached as `Authorization: Bearer <secret>` unless one is already present. |
+| `projectSecret` | `string` | `''` | Project service-key. Attached as `Authorization: Bearer <secret>` after stripping any client Authorization, unless `additionalHeaders` sets one. |
 | `pathPrefix` | `string` | `'/__nextgen'` | Path prefix to intercept. Must start with `/`. |
 | `stripPrefix` | `boolean` | `true` | Strip prefix before forwarding to upstream. |
 | `additionalHeaders` | `Record<string, string>` | `{}` | Extra headers on every upstream request. |

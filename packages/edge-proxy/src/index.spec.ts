@@ -477,6 +477,22 @@ describe("handleProxy", () => {
     expect(res?.body).toBeNull();
   });
 
+  it("returns 504 when the upstream request times out", async () => {
+    const timeout = new Error("timed out");
+    timeout.name = "TimeoutError";
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(timeout));
+    const cfg = makeConfig();
+    const res = await handleProxy(new Request("http://edge.local/__nextgen/slow"), cfg);
+    expect(res?.status).toBe(504);
+  });
+
+  it("returns 502 when the upstream connection fails", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
+    const cfg = makeConfig();
+    const res = await handleProxy(new Request("http://edge.local/__nextgen/down"), cfg);
+    expect(res?.status).toBe(502);
+  });
+
   it("strips hop-by-hop headers from upstream response", async () => {
     const upstreamHeaders = new Headers({
       "content-type": "application/json",
