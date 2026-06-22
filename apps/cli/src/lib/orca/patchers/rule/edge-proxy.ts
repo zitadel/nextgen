@@ -122,10 +122,9 @@ function vercelJsonEdit(): (source: string | undefined) => string {
     if (source === undefined) {
       parsed = {};
     } else {
+      let raw: unknown;
       try {
-        parsed = JSON.parse(source) as {
-          rewrites?: Array<{ source?: string; destination?: string }>;
-        };
+        raw = JSON.parse(source);
       } catch (error) {
         // A malformed vercel.json (comments, trailing commas, …) would otherwise
         // crash setup with a context-free SyntaxError.
@@ -134,6 +133,15 @@ function vercelJsonEdit(): (source: string | undefined) => string {
           details: { cause: error instanceof Error ? error.message : String(error) },
         });
       }
+      // Valid JSON that isn't an object (an array, null, string, …) can't carry
+      // a `rewrites` key — bail clearly rather than throwing later or silently
+      // dropping the rewrite when stringified back.
+      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+        throw new ZitadelError("E_VALIDATION", "vercel.json must be a JSON object", {
+          hint: "Expected an object with a `rewrites` array; add the /__nextgen rewrite by hand if your vercel.json has a different shape.",
+        });
+      }
+      parsed = raw as { rewrites?: Array<{ source?: string; destination?: string }> };
     }
     const rewrites = Array.isArray(parsed.rewrites) ? parsed.rewrites : [];
     if (rewrites.some((r) => r.source === VERCEL_REWRITE.source)) {

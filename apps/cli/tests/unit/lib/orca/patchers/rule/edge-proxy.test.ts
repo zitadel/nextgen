@@ -138,6 +138,12 @@ describe("edgeProxyOps — vercel", () => {
     expect(() => transform?.('{ "rewrites": [], }')).toThrow(/vercel\.json is not valid JSON/);
   });
 
+  it("throws when vercel.json is valid JSON but not an object", () => {
+    const transform = editOp(ops, "vercel.json")?.edit;
+    expect(() => transform?.("[]")).toThrow(/vercel\.json must be a JSON object/);
+    expect(() => transform?.("null")).toThrow(/vercel\.json must be a JSON object/);
+  });
+
   it("adds only the backend URL to .env.local (secret already written by the base patcher)", () => {
     expect(mergeEnv(ops, ".env.local")).toEqual({ NEXTGEN_API_URL: "https://api.zitadel.cloud" });
   });
