@@ -266,6 +266,13 @@ func (o *SetPasswordUserAction) Apply(ctx context.Context, db database.QueryExec
 
 type UserActionFactory = func(ctx context.Context, db database.QueryExecutor) (UserAction, error)
 
+// LazyUserAction allows for lazy initialization of a user-action. It forwards
+// the `Prepare` and `Apply` methods to the generated action. The UserAction is
+// only right before it is used in those functions.
+//
+// This action can be wrapped around an action when the wrapped action requires
+// an output of a previous action. It can then use a clojure to get the data
+// from the other action.
 type LazyUserAction struct {
 	factory UserActionFactory
 	action  UserAction
