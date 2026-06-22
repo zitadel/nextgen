@@ -134,9 +134,15 @@ export function resolveConfig(config: EdgeProxyConfig): ResolvedConfig {
     );
   }
 
-  const pathPrefix = config.pathPrefix ?? "/__nextgen";
+  let pathPrefix = config.pathPrefix ?? "/__nextgen";
   if (!pathPrefix.startsWith("/")) {
     throw new EdgeProxyConfigError(`pathPrefix must start with "/", got: "${pathPrefix}"`);
+  }
+  // Normalize away a trailing slash (e.g. "/__nextgen/" -> "/__nextgen") so the
+  // boundary check in handleProxy still matches child paths like
+  // "/__nextgen/auth". The root prefix "/" is left as-is.
+  if (pathPrefix.length > 1 && pathPrefix.endsWith("/")) {
+    pathPrefix = pathPrefix.slice(0, -1);
   }
 
   return {

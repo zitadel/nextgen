@@ -14,11 +14,13 @@ import { PROXY_PATH } from "./proxy";
  * this covers production by writing the platform's edge entry, wiring the
  * `@zitadel/edge-proxy` handler, and recording the backend URL.
  *
- * All three platforms intercept `/__nextgen/*` directly (Cloudflare
- * `run_worker_first`, Netlify edge-function `path`, Vercel Edge Middleware
- * `matcher`), so the handler's default `pathPrefix` matches without an extra
- * rewrite hop. The secret is read from a server-side env var inside the edge
- * runtime and never reaches the browser.
+ * Cloudflare (`run_worker_first`) and Netlify (edge-function `path`) intercept
+ * `/__nextgen/*` directly, so the handler's default `pathPrefix` matches. Vercel
+ * routes it through a `vercel.json` rewrite to an Edge Function at
+ * `api/__nextgen/[...path].ts`, which is configured with
+ * `pathPrefix: "/api/__nextgen"` to match the rewritten path. The secret is read
+ * from a server-side env var inside the edge runtime and never reaches the
+ * browser.
  */
 
 /** The npm package the scaffolded edge entry imports. */

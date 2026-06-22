@@ -82,6 +82,26 @@ describe("resolveConfig", () => {
   it("accepts https apiUrl", () => {
     expect(() => resolveConfig({ apiUrl: "https://api.example.com" })).not.toThrow();
   });
+
+  it("normalizes a trailing slash on pathPrefix (but keeps root '/')", () => {
+    expect(resolveConfig({ apiUrl: UPSTREAM, pathPrefix: "/__nextgen/" }).pathPrefix).toBe(
+      "/__nextgen",
+    );
+    expect(resolveConfig({ apiUrl: UPSTREAM, pathPrefix: "/" }).pathPrefix).toBe("/");
+  });
+});
+
+describe("handleProxy with a trailing-slash pathPrefix", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("matches child paths after the trailing slash is normalized", async () => {
+    const mock = stubFetch(mockResponse());
+    const cfg = resolveConfig({ apiUrl: UPSTREAM, pathPrefix: "/__nextgen/" });
+    const res = await handleProxy(new Request("http://edge.local/__nextgen/auth"), cfg);
+    expect(res).not.toBeNull();
+    const [url] = mock.mock.calls[0] ?? [];
+    expect(url).toBe("http://api.example.com/auth");
+  });
 });
 
 // ─── handleProxy ──────────────────────────────────────────────────────────────
