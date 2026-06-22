@@ -38,6 +38,8 @@ var _ Pool = (*DB)(nil)
 
 // TODO(adlerhurst): the code below is prepared for go 1.27
 // it then replaces [abstractPool.Transaction] and [abstractPool.Statements] with generic versions
+// Visit https://gotipplay.golang.org/p/nVKh1r65BJ- to see the generic version of [abstractPool.Transaction] and [abstractPool.Statements] in action.
+
 // func (p *abstractPool) Transaction[S any](ctx context.Context, callback func(ctx context.Context, tx Statementer[S]) error) error {
 // 	return ap.pool.Transaction(ctx, func(ctx context.Context, tx Statementer[Statements]) error {
 // 		return callback(ctx, abstractStatementer[S]{tx})

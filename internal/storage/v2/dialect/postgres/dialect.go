@@ -32,6 +32,22 @@ func (p Config) Name() string {
 	return "postgres"
 }
 
+type PoolConfig struct {
+	*pgxpool.Pool
+}
+
+// Connect implements [database.Dialect].
+func (p *PoolConfig) Connect(ctx context.Context) (database.Pool, error) {
+	return newPool(p.Pool), nil
+}
+
+// Name implements [database.Dialect].
+func (p *PoolConfig) Name() string {
+	return "postgres"
+}
+
+var _ database.Dialect = (*PoolConfig)(nil)
+
 var _ database.Dialect = (*Config)(nil)
 
 func DecodeConfig(input any) (database.Dialect, error) {

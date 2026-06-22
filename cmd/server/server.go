@@ -41,6 +41,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 	v2db "github.com/zitadel/nextgen/internal/storage/v2/database"
 	_ "github.com/zitadel/nextgen/internal/storage/v2/dialect/all"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres"
 
 	"github.com/zitadel/oidc/v3/pkg/op"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
@@ -425,6 +426,11 @@ func startDatabase(ctx context.Context, cfg Config) (database.Pool, v2db.Pool, e
 	if err != nil {
 		return nil, nil, err
 	}
+	if dialect == nil {
+		if p, ok := pool.(*embedded.Pool); ok {
+			dialect = &postgres.PoolConfig{Pool: p.Pool.Pool}
+		}
+	}
 	v2Pool, err := v2db.Connect(ctx, dialect)
 	if err != nil {
 		return nil, nil, err
@@ -437,11 +443,11 @@ func startDatabase(ctx context.Context, cfg Config) (database.Pool, v2db.Pool, e
 }
 
 func buildDatabaseConnector(cfg Config) (database.Connector, v2db.Dialect, error) {
-	// if len(cfg.Database.Raw) == 0 {
-	// 	options := embeddedPostgresOptions(cfg.Server.DataDir)
-	// 	slog.Info("no database dialect configured, starting embedded postgres", slog.String("filePath", filepath.Dir(options.DataPath)))
-	// 	return embedded.NewConnector(options), nil, nil
-	// }
+	if len(cfg.Database.Raw) == 0 {
+		options := embeddedPostgresOptions(cfg.Server.DataDir)
+		slog.Info("no database dialect configured, starting embedded postgres", slog.String("filePath", filepath.Dir(options.DataPath)))
+		return embedded.NewConnector(options), nil, nil
+	}
 	connector, err := cfg.Database.Build()
 	if err != nil {
 		return nil, nil, fmt.Errorf("build database connector: %w", err)

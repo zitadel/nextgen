@@ -78,6 +78,7 @@ type ProjectRepository interface {
 	Get(ctx context.Context, client database.QueryExecutor, id string) (*Project, error)
 }
 
+// ProjectField enumerates the fields of Project which can be used for ordering in list operations.
 type ProjectField uint8
 
 const (

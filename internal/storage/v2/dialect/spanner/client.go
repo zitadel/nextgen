@@ -49,6 +49,6 @@ func (c Client) Statements() service.AllStatements {
 }
 
 var (
-	_ database.Pool      = (*Client)(nil)
+	_ database.Pool         = (*Client)(nil)
 	_ service.AllStatements = (*Client)(nil)
 )

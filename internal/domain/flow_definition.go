@@ -243,6 +243,7 @@ func (fst FlowStepTransition) IsCurrentFlow() bool {
 	return fst.Action == nil
 }
 
+// FlowDefinitionField enumerates the fields of FlowDefinition which can be used for ordering in list operations.
 type FlowDefinitionField uint8
 
 const (

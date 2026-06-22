@@ -41,7 +41,7 @@ func (p *Pool) Statements() service.AllStatements {
 }
 
 var (
-	_ database.Pool      = (*Pool)(nil)
+	_ database.Pool         = (*Pool)(nil)
 	_ service.AllStatements = (*Pool)(nil)
 	_ service.AllStatements = (*transaction)(nil)
 )
