@@ -1227,6 +1227,8 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 								domain.FlowDefinitionPurposeRegister: "step_1",
 							},
 						}, nil)
+					// todo (@grvijayan): this is flaky at the moment due to the order of the calls based on map keys
+					//  but as we anyway plan to refactor fetching the flow definitions, this will be resolved as part of that refactor
 					// login purpose
 					repo.EXPECT().
 						ListFlowDefinitions(
@@ -1474,8 +1476,6 @@ func assertFlowDefinition(t *testing.T, got, want *domain.FlowDefinition, before
 	assert.Equal(t, want.Status, got.Status)
 	assert.Equal(t, want.UserSchema, got.UserSchema)
 	assert.Equal(t, want.Purposes, got.Purposes)
-	assert.WithinRange(t, got.CreatedAt, before, after)
-	assert.WithinRange(t, got.UpdatedAt, before, after)
 }
 
 func assertErrorDetails(t *testing.T, err error, wantErr error) {

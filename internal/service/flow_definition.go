@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -172,7 +173,7 @@ func (fd *flowDefinitionService) isUpdateAllowed(
 	currentStatus, reqStatus domain.FlowDefinitionStatus,
 	currentPurposes, reqPurposes map[domain.FlowDefinitionPurpose]string) error {
 	// no status change and no purpose change -> the update is allowed implicitly
-	if currentStatus == reqStatus && samePurposes(currentPurposes, reqPurposes) {
+	if currentStatus == reqStatus && maps.Equal(currentPurposes, reqPurposes) {
 		return nil
 	}
 
@@ -196,6 +197,8 @@ func (fd *flowDefinitionService) isUpdateAllowed(
 		return nil
 	}
 
+	// todo (@grvijayan): refactor once the repository layer supports querying by multiple purposes at once
+	//  (excluding the current flow definition ID) to avoid multiple calls to the database
 	for purpose := range purposesToCheck {
 		fds, err := fd.flowDefinitionRepo.ListFlowDefinitions(
 			ctx,
@@ -207,14 +210,7 @@ func (fd *flowDefinitionService) isUpdateAllowed(
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage(fmt.Sprintf("failed to list flow definitions for old purpose %q", purpose))
 		}
-		hasActive := false
-		for _, fd := range fds {
-			if fd.ID != flowDefID {
-				hasActive = true
-				break
-			}
-		}
-		if !hasActive {
+		if !(len(fds) > 1) {
 			return domain.ErrFlowDefinitionUpdateConflict(fmt.Sprintf("cannot update: no other active flow definition found with purpose %q", purpose))
 		}
 	}
@@ -280,18 +276,6 @@ func mapPurposesToDomain(reqPurposes map[string]string) (map[domain.FlowDefiniti
 		purposes[purpose] = entryStep
 	}
 	return purposes, nil
-}
-
-func samePurposes(current, req map[domain.FlowDefinitionPurpose]string) bool {
-	if len(current) != len(req) {
-		return false
-	}
-	for purpose, entryStep := range current {
-		if reqStep, ok := req[purpose]; !ok || entryStep != reqStep {
-			return false
-		}
-	}
-	return true
 }
 
 func (fd *flowDefinitionService) Get(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error) {

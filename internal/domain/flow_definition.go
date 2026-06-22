@@ -144,8 +144,6 @@ func NewFlowDefinition(
 		Name:          name,
 		SchemaVersion: schemaVersion,
 		Status:        status,
-		CreatedAt:     time.Now().UTC(),
-		UpdatedAt:     time.Now().UTC(),
 		UserSchema:    userSchema,
 		Purposes:      purposes,
 		Audience:      audience,
