@@ -4,6 +4,12 @@ import { join } from "node:path";
 import { ZitadelError } from "../lib/errors";
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { createOrca } from "../lib/orca";
+import {
+  EDGE_PROXY_DEP,
+  edgeProxyConfigEdits,
+  edgeProxyEnvBackups,
+  edgeProxyFiles,
+} from "../lib/orca/patchers/rule/edge-proxy";
 import type { EjectActions } from "../lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../lib/paths";
 import { readDeployTarget, readRendererId, readZitadelConfig } from "../lib/project";
@@ -15,13 +21,18 @@ import { readDeployTarget, readRendererId, readZitadelConfig } from "../lib/proj
  * can still be cleaned up.
  */
 async function resolveEjectActions(cwd: string): Promise<EjectActions> {
+  // Read the persisted config up front so the fallback (used when no framework
+  // patcher is available) still cleans up the edge-proxy artifacts recorded in
+  // zitadel.json — otherwise the worker file and its secret env file leak.
+  const config = await readZitadelConfig(cwd).catch(() => ({}) as Record<string, unknown>);
+  const deployTarget = readDeployTarget(config);
   const fallback: EjectActions = {
-    markedFiles: [],
+    markedFiles: deployTarget ? edgeProxyFiles(deployTarget) : [],
     rootConfigFiles: ["zitadel.json"],
     directories: [".zitadel"],
-    envBackups: [".env.local"],
-    dependencies: [],
-    configEdits: [],
+    envBackups: [".env.local", ...(deployTarget ? edgeProxyEnvBackups(deployTarget) : [])],
+    dependencies: deployTarget ? [EDGE_PROXY_DEP] : [],
+    configEdits: deployTarget ? edgeProxyConfigEdits(deployTarget) : [],
   };
   const orca = createOrca();
   const framework = await orca.tryDetect(cwd);
@@ -29,11 +40,10 @@ async function resolveEjectActions(cwd: string): Promise<EjectActions> {
     return fallback;
   }
   try {
-    const config = await readZitadelConfig(cwd).catch(() => ({}) as Record<string, unknown>);
     return orca.patcherFor(framework.id).artifacts({
       framework,
       rendererId: readRendererId(config),
-      deployTarget: readDeployTarget(config),
+      deployTarget,
     });
   } catch {
     return fallback;

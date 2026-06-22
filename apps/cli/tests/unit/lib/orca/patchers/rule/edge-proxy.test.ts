@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { DeployTarget } from "../../../../../../src/lib/orca/detectors/deploy-target";
+import { AngularPatcher } from "../../../../../../src/lib/orca/patchers/rule/angular";
+import { AbstractRulePatcher } from "../../../../../../src/lib/orca/patchers/rule/base";
 import {
   EDGE_PROXY_DEP,
   edgeProxyConfigEdits,
@@ -11,6 +13,11 @@ import {
   isEdgeProxyFramework,
 } from "../../../../../../src/lib/orca/patchers/rule/edge-proxy";
 import type { FileOp } from "../../../../../../src/lib/orca/patchers/rule/file-writer/types";
+import { QwikPatcher } from "../../../../../../src/lib/orca/patchers/rule/qwik";
+import { ReactPatcher } from "../../../../../../src/lib/orca/patchers/rule/react";
+import { SolidPatcher } from "../../../../../../src/lib/orca/patchers/rule/solid";
+import { SveltePatcher } from "../../../../../../src/lib/orca/patchers/rule/svelte";
+import { VuePatcher } from "../../../../../../src/lib/orca/patchers/rule/vue";
 import type { PatchContext } from "../../../../../../src/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../../../../../../src/lib/paths";
 
@@ -174,4 +181,35 @@ describe("edge-proxy artifact enumeration", () => {
     expect(edgeProxyEnvBackups("netlify")).toEqual([".env"]);
     expect(edgeProxyEnvBackups("vercel")).toEqual([]);
   });
+});
+
+describe("every SPA patcher wires the edge proxy when a target is set", () => {
+  const patchers: ReadonlyArray<readonly [string, AbstractRulePatcher]> = [
+    ["react", new ReactPatcher()],
+    ["vue", new VuePatcher()],
+    ["solid", new SolidPatcher()],
+    ["svelte", new SveltePatcher()],
+    ["qwik", new QwikPatcher()],
+    ["angular", new AngularPatcher()],
+  ];
+
+  for (const [id, patcher] of patchers) {
+    it(`${id}: scaffolds the worker and ejects it`, () => {
+      const view = {
+        framework: { id, appDir: "src", devPort: 3000, url: "http://localhost:3000" },
+        rendererId: "react",
+        deployTarget: "cloudflare" as const,
+      };
+      const plan = patcher.plan({ ...ctx("cloudflare"), framework: view.framework });
+      const wroteWorker = plan.ops.some(
+        (op) => op.kind === "write" && op.path === "zitadel-edge-proxy.ts",
+      );
+      expect(wroteWorker).toBe(true);
+
+      const artifacts = patcher.artifacts(view);
+      expect(artifacts.markedFiles).toContain("zitadel-edge-proxy.ts");
+      expect(artifacts.dependencies).toContain("@zitadel/edge-proxy");
+      expect(artifacts.envBackups).toContain(".dev.vars");
+    });
+  }
 });

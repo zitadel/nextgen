@@ -259,6 +259,23 @@ export function edgeProxyEnvBackups(target: DeployTarget): string[] {
 }
 
 /**
+ * Extra deploy guidance surfaced in the setup summary. Cloudflare needs a note
+ * because, when the project already has a wrangler config, the scaffolder leaves
+ * it untouched — so the worker is written but not wired, and the user must add
+ * the keys themselves.
+ */
+export function edgeProxyDeployNotes(target: DeployTarget): string[] {
+  if (target === "cloudflare") {
+    return [
+      `If you already have a wrangler config, wire the worker into it: ` +
+        `main "./${CLOUDFLARE_WORKER_PATH}", assets.binding "ASSETS", and ` +
+        `run_worker_first ["${PROXY_PATH}/*"].`,
+    ];
+  }
+  return [];
+}
+
+/**
  * The commands a user runs to put the project secret into the platform's secret
  * store for production (it must not live in a committed config file). Surfaced
  * in the setup summary.

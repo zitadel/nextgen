@@ -478,9 +478,13 @@ describe("handleProxy", () => {
   });
 
   it("returns 504 when the upstream request times out", async () => {
-    const timeout = new Error("timed out");
-    timeout.name = "TimeoutError";
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(timeout));
+    // AbortSignal.timeout rejects with a DOMException, which does not extend
+    // Error on workerd/Deno — reject with the real type so the 504 path is
+    // exercised the way the runtimes actually behave.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new DOMException("timed out", "TimeoutError")),
+    );
     const cfg = makeConfig();
     const res = await handleProxy(new Request("http://edge.local/__nextgen/slow"), cfg);
     expect(res?.status).toBe(504);

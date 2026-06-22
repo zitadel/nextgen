@@ -284,9 +284,12 @@ export async function handleProxy(req: Request, config: ResolvedConfig): Promise
   } catch (error) {
     // Translate upstream timeout/connection failures into a clean gateway
     // status instead of letting the rejection surface as an opaque platform
-    // 500. AbortSignal.timeout rejects with a "TimeoutError".
-    const timedOut = error instanceof Error && error.name === "TimeoutError";
-    return new Response(null, { status: timedOut ? 504 : 502 });
+    // 500. AbortSignal.timeout rejects with a DOMException named "TimeoutError"
+    // — and DOMException does not extend Error on workerd/Deno, so check the
+    // name structurally rather than via `instanceof Error`.
+    const name =
+      typeof error === "object" && error !== null ? (error as { name?: unknown }).name : undefined;
+    return new Response(null, { status: name === "TimeoutError" ? 504 : 502 });
   }
 
   const responseHeaders = new Headers();

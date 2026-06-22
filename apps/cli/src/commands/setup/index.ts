@@ -16,6 +16,7 @@ import {
 } from "../../lib/orca";
 import { detectDeployTarget } from "../../lib/orca/detectors/deploy-target";
 import {
+  edgeProxyDeployNotes,
   edgeProxySecretCommands,
   isEdgeProxyFramework,
 } from "../../lib/orca/patchers/rule/edge-proxy";
@@ -224,12 +225,15 @@ export default class Setup extends BaseCommand {
 
     // For SPAs with a detected deploy target, the edge proxy is scaffolded but
     // the secret cannot live in a committed config file — it must be pushed to
-    // the platform's secret store. Surface the exact commands.
-    const edgeProxySecretSteps = deployTarget ? edgeProxySecretCommands(deployTarget) : [];
-    if (deployTarget && edgeProxySecretSteps.length > 0) {
+    // the platform's secret store. Surface the exact commands, plus any
+    // platform-specific wiring notes.
+    if (deployTarget) {
+      const steps = [
+        ...edgeProxySecretCommands(deployTarget).map((cmd) => `  ${cmd}`),
+        ...edgeProxyDeployNotes(deployTarget).map((note) => `  - ${note}`),
+      ];
       consola.info(
-        `Scaffolded the ${deployTarget} edge proxy. Before deploying, push the secret to the platform store:\n` +
-          edgeProxySecretSteps.map((cmd) => `  ${cmd}`).join("\n"),
+        `Scaffolded the ${deployTarget} edge proxy. Before deploying:\n${steps.join("\n")}`,
       );
     }
 
