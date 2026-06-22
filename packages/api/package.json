@@ -1,0 +1,77 @@
+{
+  "name": "@zitadel/api",
+  "version": "0.1.0-alpha.11",
+  "description": "Generated TypeScript API client for Zitadel NextGen",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    "./generated/model": {
+      "@zitadel/source": "./src/generated/model/index.ts",
+      "types": "./dist/generated/model/index.d.mts",
+      "import": "./dist/generated/model/index.mjs"
+    },
+    "./generated/endpoints/zitadelNextGen": {
+      "@zitadel/source": "./src/generated/endpoints/zitadelNextGen.ts",
+      "types": "./dist/generated/endpoints/zitadelNextGen.d.mts",
+      "import": "./dist/generated/endpoints/zitadelNextGen.mjs"
+    },
+    "./generated/endpoints/zitadelNextGen.msw": {
+      "@zitadel/source": "./src/generated/endpoints/zitadelNextGen.msw.ts",
+      "types": "./dist/generated/endpoints/zitadelNextGen.msw.d.mts",
+      "import": "./dist/generated/endpoints/zitadelNextGen.msw.mjs"
+    },
+    "./generated/endpoints/zitadelNextGen.zod": {
+      "@zitadel/source": "./src/generated/endpoints/zitadelNextGen.zod.ts",
+      "types": "./dist/generated/endpoints/zitadelNextGen.zod.d.mts",
+      "import": "./dist/generated/endpoints/zitadelNextGen.zod.mjs"
+    },
+    "./runtime/base-url": {
+      "@zitadel/source": "./src/runtime/base-url.ts",
+      "types": "./dist/runtime/base-url.d.mts",
+      "import": "./dist/runtime/base-url.mjs"
+    },
+    "./runtime/auth": {
+      "@zitadel/source": "./src/runtime/auth.ts",
+      "types": "./dist/runtime/auth.d.mts",
+      "import": "./dist/runtime/auth.mjs"
+    },
+    "./runtime/fetch": {
+      "@zitadel/source": "./src/runtime/fetch.ts",
+      "types": "./dist/runtime/fetch.d.mts",
+      "import": "./dist/runtime/fetch.mjs"
+    },
+    "./client": {
+      "@zitadel/source": "./src/runtime/api-factory.ts",
+      "types": "./dist/runtime/api-factory.d.mts",
+      "import": "./dist/runtime/api-factory.mjs"
+    },
+    "./config": {
+      "@zitadel/source": "./src/runtime/config.ts",
+      "types": "./dist/runtime/config.d.mts",
+      "import": "./dist/runtime/config.mjs"
+    }
+  },
+  "scripts": {
+    "generate": "orval --config orval.config.ts --clean",
+    "build": "tsdown"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "catalog:",
+    "msw": "catalog:",
+    "orval": "catalog:",
+    "tsdown": "catalog:",
+    "tslib": "catalog:",
+    "zod": "catalog:"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "catalog:"
+  }
+}

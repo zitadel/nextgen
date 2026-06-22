@@ -28,28 +28,5 @@ post:
         application/json:
           schema:
             $ref: challenge-response.yaml
-    '400':
-      description: Invalid request or invalid attempt state
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../components/error-details.yaml
-    '404':
-      description: Attempt not found
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../components/error-details.yaml
-    '409':
-      description: Attempt in invalid state for issuing challenges (e.g., already completed)
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../components/error-details.yaml
     default:
-      description: Unexpected error
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../components/error-details.yaml
-
+      $ref: issueChallenge-error-response.yaml

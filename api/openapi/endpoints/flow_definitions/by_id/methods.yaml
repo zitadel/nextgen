@@ -1,0 +1,117 @@
+get:
+  operationId: getFlowDefinition
+  summary: Get a flow definition by id
+  description: Get a flow definition by id
+  tags:
+    - Flow Definitions
+  security:
+    - oauth2:
+        - flow_definitions.read
+  parameters:
+    - $ref: ../../../components/parameters/flow-definition-id.yaml
+    - name: project_id
+      in: query
+      description: The project id to filter by.
+      required: true
+      schema:
+        $ref: ../../../components/schemas/project-id.yaml
+  responses:
+    '200':
+      description: Flow definition found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/flows/flow-definition-detail-response.yaml
+    default:
+      description: Unexpected error.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+
+put:
+  operationId: updateFlowDefinition
+  summary: Update a flow definition by id
+  description: |
+    Update a flow definition by id. This endpoint completely replaces the existing flow definition.
+    The status of the flow definition can also be updated by setting the `status` attribute in the flow definition.
+  tags:
+    - Flow Definitions
+  security:
+    - oauth2:
+        - flow_definitions.write
+  parameters:
+    - $ref: ../../../components/parameters/flow-definition-id.yaml
+    - name: project_id
+      in: query
+      description: The project id to filter by.
+      required: true
+      schema:
+        $ref: ../../../components/schemas/project-id.yaml
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../../../components/flows/flow-definition-update-request.yaml
+  responses:
+    '200':
+      description: Flow definition updated successfully.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/flows/flow-definition-detail-response.yaml
+    '400':
+      description: Invalid request body.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: Flow definition not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Unexpected error.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+
+delete:
+  operationId: deleteFlowDefinition
+  summary: Delete a flow definition by id
+  description: |
+    Delete a flow definition by id.
+    If the flow definition is currently being used by a flow, the deletion will fail.
+    If the flow definition is the last active flow definition for a given purpose, the deletion will fail to prevent disruption of new flows being started for that purpose.
+  tags:
+    - Flow Definitions
+  security:
+    - oauth2:
+        - flow_definitions.delete
+  parameters:
+    - $ref: ../../../components/parameters/flow-definition-id.yaml
+    - name: project_id
+      in: query
+      description: The project id to filter by.
+      required: true
+      schema:
+        $ref: ../../../components/schemas/project-id.yaml
+  responses:
+    '204':
+      description: Flow definition deleted successfully. This is an idempotent operation, so if the flow definition does not exist, it will still return a 204 status code.
+    '409':
+      description: Conflict (e.g., flow definition is currently in use by a flow, attempting to delete the last active flow definition for a given purpose).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Unexpected error.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml

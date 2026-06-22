@@ -1,8 +1,11 @@
+//go:build postgres_integration || spanner_integration
+
 package repository_test
 
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
@@ -111,6 +114,29 @@ func TestJSONArray_Scan(t *testing.T) {
 			gotErr := a.Scan(tt.src)
 			require.ErrorIs(t, gotErr, tt.want.err)
 			require.Len(t, a, len(tt.want.res))
+		})
+	}
+}
+
+func TestStringArray_String(t *testing.T) {
+	t.Parallel()
+	tt := []struct {
+		name     string
+		input    repository.StringArray
+		expected string
+	}{
+		{"nil", nil, "{}"},
+		{"empty", repository.StringArray{}, "{}"},
+		{"single", repository.StringArray{"a"}, "{a}"},
+		{"multiple", repository.StringArray{"a", "b"}, "{a,b}"},
+		{"with single quote", repository.StringArray{"ab"}, "{ab}"},
+		{"with comma", repository.StringArray{"a,b"}, "{a,b}"},
+		{"with spaces", repository.StringArray{"a b"}, "{a b}"},
+	}
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.expected, tc.input.String())
 		})
 	}
 }

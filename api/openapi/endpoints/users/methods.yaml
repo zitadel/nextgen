@@ -1,3 +1,62 @@
+post:
+  operationId: createUser
+  summary: Create user
+  tags:
+    - Users
+  security:
+    - oauth2:
+        - user.write
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+    - $ref: ../../components/parameters/team-id.yaml
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: user.yaml
+  responses:
+    '201':
+      description: The user was created successfully
+      content:
+        application/json:
+          schema:
+            $ref: create-user-response.yaml
+    '400':
+      description: The provided input was not valid
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '403':
+      description: You do not have permission to create a user.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '409':
+      description: |
+        A user already exists with one of the unique values. E.g.: when the
+        schema indicates that the email field should be unique across the team,
+        only one user can have a given `email` attribute. See the body for more
+        details.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+
 get:
   operationId: listUsers
   summary: List users
@@ -5,13 +64,13 @@ get:
   #       following the pattern used in GET /sessions. offset.yaml should be removed
   #       and replaced with components/parameters/page-token.yaml.
   tags:
-    - User
+    - Users
   parameters:
     - $ref: ../../components/parameters/offset.yaml
     - $ref: ../../components/parameters/limit.yaml
   security:
     - oauth2:
-        - openid
+        - user.read
   responses:
     '200':
       description: A list of users was returned
@@ -19,6 +78,9 @@ get:
         application/json:
           schema:
             type: array
+            items:
+              type: object
+              additionalProperties: true
     '400':
       description: The provided input was not valid
       content:

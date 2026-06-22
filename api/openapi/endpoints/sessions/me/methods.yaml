@@ -1,0 +1,85 @@
+get:
+  operationId: getMySession
+  summary: Get my session state
+  description: |
+    Returns the current state of the current session including its factors and all currently
+    satisfied assurance levels.
+
+    `assurance_levels[]` may shrink over time as factor freshness windows expire,
+    without the session itself expiring. Use step-up authentication (a new `auth_attempt`
+    against the same `session_id`) to restore a dropped assurance level.
+  tags:
+    - Sessions
+  parameters:
+    - $ref: ../../../components/parameters/session-cookie.yaml
+  security: []
+  responses:
+    '200':
+      description: Session state.
+      content:
+        application/json:
+          schema:
+            $ref: ../session-response.yaml
+    '401':
+      description: Missing or invalid session token.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: Session not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Unexpected error.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+
+delete:
+  operationId: revokeMySession
+  summary: Revoke my session
+  description: |
+    Revokes the session immediately (`state: revoked`). This is the logout operation.
+
+    The __nextgen_session cookie issued at creation (or superseded by a handoff exchange) is required.
+    After revocation, any tokens derived from this session are invalidated including the cookie itself, which is cleared in the response.
+  tags:
+    - Sessions
+  parameters:
+    - $ref: ../../../components/parameters/session-cookie.yaml
+  security: []
+  responses:
+    '204':
+      description: Session revoked successfully.
+      headers:
+        Set-Cookie:
+          $ref: ../../../components/headers/set-cookie-session-token.yaml
+    '401':
+      description: Missing or invalid session token.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: Session not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '409':
+      description: Session already revoked or expired.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Unexpected error.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+

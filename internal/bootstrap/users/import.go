@@ -1,0 +1,133 @@
+package users
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"log/slog"
+
+	"github.com/zitadel/nextgen/internal/crypto"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/database/repository"
+)
+
+// Import loads bootstrap users from JSON files into the database.
+// dialect is the configured database dialect name (e.g. "postgres"); used to reject unsupported backends.
+func Import(ctx context.Context, pool database.Pool, hashValidator crypto.HashValidator, dialect string, paths []string) error {
+	if len(paths) == 0 {
+		return nil
+	}
+	if err := checkDialectSupported(dialect); err != nil {
+		return err
+	}
+
+	userRepo := repository.NewUserRepository()
+	passwordRepo := repository.NewUserPasswordRepository()
+
+	for _, path := range paths {
+		if err := importFile(ctx, pool, hashValidator, userRepo, passwordRepo, path); err != nil {
+			return fmt.Errorf("user file %q: %w", path, err)
+		}
+	}
+	return nil
+}
+
+func importFile(
+	ctx context.Context,
+	pool database.Pool,
+	hashValidator crypto.HashValidator,
+	userRepo *repository.UserRepository,
+	passwordRepo *repository.UserPasswordRepository,
+	path string,
+) error {
+	doc, err := ParseFile(path)
+	if err != nil {
+		return err
+	}
+	if err := Validate(doc, hashValidator); err != nil {
+		return err
+	}
+	pw, err := parsePasswordAuthenticator(doc.Authenticators)
+	if err != nil {
+		return err
+	}
+
+	if err := ensureDependencies(ctx, pool, doc.Header); err != nil {
+		return err
+	}
+
+	_, err = userRepo.Get(ctx, pool,
+		database.WithCondition(userRepo.PrimaryKeyCondition(doc.Header.ProjectID, doc.Header.ID)),
+	)
+	if err == nil {
+		slog.Info("bootstrap user: skipped user because they already exists)", slog.String("path", path), slog.String("id", doc.Header.ID))
+		return nil
+	}
+	if !errors.Is(err, new(database.NoRowFoundError)) {
+		return fmt.Errorf("check existing user: %w", err)
+	}
+
+	attrs, err := buildCreateAttributes(doc.Attributes)
+	if err != nil {
+		return err
+	}
+
+	var teamID *string
+	if doc.Header.TeamID != "" {
+		tid := doc.Header.TeamID
+		teamID = &tid
+	}
+
+	if err := userRepo.Create(ctx, pool, &domain.CreateUser{
+		ProjectID:  doc.Header.ProjectID,
+		SchemaURL:  doc.Header.SchemaURL,
+		ID:         doc.Header.ID,
+		TeamID:     teamID,
+		Attributes: attrs,
+	}); err != nil {
+		return fmt.Errorf("create user: %w", err)
+	}
+
+	if err := passwordRepo.Create(ctx, pool, &domain.CreateUserPassword{
+		ProjectID:      doc.Header.ProjectID,
+		UserID:         doc.Header.ID,
+		EncodedHash:    pw.EncodedHash,
+		ChangeRequired: pw.ChangeRequired,
+	}); err != nil {
+		return fmt.Errorf("create password: %w", err)
+	}
+
+	slog.Info("bootstrap user: loaded user", slog.String("path", path), slog.String("id", doc.Header.ID))
+
+	return nil
+}
+
+func buildCreateAttributes(attrs map[string]json.RawMessage) ([]*domain.CreateAttribute, error) {
+	out := make([]*domain.CreateAttribute, 0, len(attrs))
+	for key, raw := range attrs {
+		value, err := decodeScalar(raw, key)
+		if err != nil {
+			return nil, err
+		}
+		scope := domain.AttributeUniquenessUnspecified
+		if key == attrKeyUsername {
+			scope = domain.AttributeUniquenessProject
+		}
+		attr, err := domain.NewCreateAttribute(key, value, scope)
+		if err != nil {
+			return nil, fmt.Errorf("attribute %q: %w", key, err)
+		}
+		out = append(out, attr)
+	}
+	return out, nil
+}
+
+// DialectFromConfig returns the sole configured database dialect name, or "" if unset.
+func DialectFromConfig(raw map[string]any) string {
+	for name := range raw {
+		return name
+	}
+	return ""
+}

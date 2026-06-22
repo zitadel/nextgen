@@ -1,0 +1,56 @@
+{
+  "name": "@zitadel/api-mock",
+  "version": "0.0.0",
+  "description": "Mock support library for @zitadel/api",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./platform": {
+      "types": "./src/platform-handlers.ts",
+      "import": "./src/platform-handlers.ts"
+    },
+    "./public-dir": {
+      "types": "./src/public-dir.ts",
+      "import": "./src/public-dir.ts"
+    }
+  },
+  "bin": {
+    "api-mock": "./bin/start.ts"
+  },
+  "scripts": {
+    "start": "tsx bin/start.ts",
+    "dev": "tsx watch bin/start.ts",
+    "test": "vitest run --project unit",
+    "test:browser": "vitest run --project browser",
+    "test:all": "vitest run"
+  },
+  "dependencies": {
+    "@mswjs/http-middleware": "catalog:",
+    "@zitadel/api": "workspace:*",
+    "cookie-parser": "catalog:",
+    "express": "catalog:",
+    "xstate": "catalog:"
+  },
+  "peerDependencies": {
+    "msw": "catalog:"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "catalog:",
+    "@types/express": "catalog:",
+    "@types/node": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "msw": "catalog:",
+    "playwright": "catalog:",
+    "tsx": "catalog:",
+    "zod": "catalog:"
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
+  }
+}

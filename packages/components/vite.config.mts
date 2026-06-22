@@ -1,64 +1,58 @@
-import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { nxViteTsPaths } from "@nx/vite/plugins/nx-tsconfig-paths.plugin";
-import { defineConfig, type Plugin } from "vite";
+import { apiMockPublicDir } from "@zitadel/api-mock/public-dir";
+import { defineConfig } from "vite";
+import { hmrPlugin, presets } from "vite-plugin-web-components-hmr";
+
+import { workspaceStylesFullReload } from "./vite/lit-dev-hmr";
+
+const workspaceRoot = resolve(import.meta.dirname, "../..");
+const packageRoot = resolve(import.meta.dirname, ".");
 
 /**
  * Dev playground only. The library itself is built by `tsdown` (see
  * `tsdown.config.ts`) and tests run via `vitest.config.ts`.
  *
- * `vite dev` serves `dev/index.html` (atom playground + `<zitadel-login>` demo)
- * and additionally aliases `/visualizer.html` to the static visualizer at
- * `docs/design/flowengine/visualizer.html`. Both routes import the components
- * directly from `src/`, so there is no separate build step.
- */
-
-const repoRoot = resolve(import.meta.dirname, "..", "..");
-const componentsSrc = resolve(import.meta.dirname, "src", "index.ts");
-const visualizerHtml = resolve(
-  repoRoot,
-  "docs/design/flowengine/visualizer.html",
-);
-
-/**
- * Serve the docs visualizer through Vite so its dynamic `import()` resolves
- * the components package via Vite's TS pipeline (no build, hot reload).
+ * `vite dev` serves `dev/index.html` (atom playground + `<zitadel-login>`
+ * demo). The flow-engine visualizer at `docs/design/flowengine/visualizer.html`
+ * is a self-contained static page — open it directly in a browser, no dev
+ * server required.
  *
- * The HTML contains the placeholder `__COMPONENTS_BUNDLE__` which is replaced
- * with a `/@fs/...` URL pointing at `packages/components/src/index.ts`. Vite
- * already allows `/@fs/<repo-root>` access via `server.fs.allow`.
+ * `publicDir` is pointed at `@zitadel/api-mock`'s public folder so
+ * the canonical MSW worker shim (`mockServiceWorker.js`) is served from
+ * `/mockServiceWorker.js`. Keeping the worker file inside the api-mock
+ * package means MSW's postinstall hook only manages one copy in the
+ * workspace.
  */
-function visualizerAlias(): Plugin {
-  const componentsBundleUrl = `/@fs${componentsSrc}`;
-  return {
-    name: "zitadel:serve-visualizer",
-    configureServer(server) {
-      server.middlewares.use("/visualizer.html", async (req, res, next) => {
-        if (req.method && req.method !== "GET" && req.method !== "HEAD") {
-          return next();
-        }
-        try {
-          const raw = await readFile(visualizerHtml, "utf8");
-          const html = raw.replace(/__COMPONENTS_BUNDLE__/g, componentsBundleUrl);
-          res.setHeader("Content-Type", "text/html; charset=utf-8");
-          res.setHeader("Cache-Control", "no-store");
-          res.end(html);
-        } catch (error) {
-          next(error as Error);
-        }
-      });
-    },
-  };
-}
 
 export default defineConfig({
-  root: resolve(import.meta.dirname, "dev"),
-  cacheDir: "../../node_modules/.vite/packages/components",
-  plugins: [nxViteTsPaths(), visualizerAlias()],
+  root: resolve(packageRoot, "dev"),
   server: {
-    fs: {
-      allow: [repoRoot],
+    port: 5173,
+    strictPort: true,
+    fs: { allow: [workspaceRoot] },
+    watch: {
+      ignored: ["**/.git/**", "**/node_modules/**", "**/dist/**"],
     },
+  },
+  publicDir: apiMockPublicDir,
+  cacheDir: "../../node_modules/.vite/packages/components",
+  plugins: [
+    // Lit atoms only — dev/pages/*.ts is plain TS (innerHTML); wc-hmr breaks its HMR.
+    hmrPlugin({
+      include: [resolve(packageRoot, "src/**/*.ts")],
+      presets: [presets.lit],
+    }),
+    workspaceStylesFullReload(),
+  ],
+  resolve: { conditions: ["@zitadel/source"] },
+  optimizeDeps: {
+    exclude: [
+      "@zitadel/components",
+      "@zitadel/shared-component-styles",
+      "@zitadel/design-tokens",
+      "@zitadel/api",
+      "@zitadel/api-mock",
+    ],
   },
 });

@@ -39,7 +39,7 @@ describe("resolveZitadelRuntimeEnv", () => {
         projectId: "proj_123",
         environment: "production",
       }),
-    ).toThrow("claim");
+    ).toThrow("ZITADEL_ISSUER");
   });
 
   it("requires project metadata without accepting browser secrets", () => {

@@ -1,17 +1,27 @@
 type: object
-required: [purpose]
+required: [project_id, purpose]
 properties:
+  project_id:
+    $ref: ../schemas/project-id.yaml
   purpose:
     type: string
     enum: [login, register, recovery, profiling, reauth, link_account]
-  slug:
+  flow_definition_name:
     type: string
     pattern: '^[a-z][a-z0-9-]*$'
     description: |
-      Human-readable identifier of a specific flow definition to use.
+      Name of a specific flow definition to use.
       When omitted, the engine selects the best-matching definition
       based on purpose + audience context.
     example: custom-login
+  dry_run:
+    type: boolean
+    description: |
+      Set to true to simulate the flow without actually creating any
+      user or session. Useful for testing and validation of flow definitions.
+      This requires setting the `flow_definition_name` property as well.
+    example: false
+    default: false
   schema_version:
     type: string
     description: |
@@ -20,11 +30,7 @@ properties:
     pattern: '^\d+\.\d+\.\d+$'
     example: "1.0.0"
   challenge_nonce:
-    type: string
-    description: |
-      Origin-bound nonce obtained from `POST /bootstrap/challenge`.
-      Binds the flow to the browser that requested it, preventing
-      cross-origin replay of flow cookies.
+    $ref: ../schemas/challenge-nonce.yaml
   session_id:
     type: string
     description: |

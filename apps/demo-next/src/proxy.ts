@@ -1,14 +1,4 @@
-import { nextgenMiddleware } from "@zitadel-nextgen/sdk-next/middleware";
-import type { NextRequest } from "next/server";
-
-export function proxy(req: NextRequest) {
-  return nextgenMiddleware(req, {
-    issuerUrl: process.env.NEXTGEN_ISSUER_URL ?? "http://localhost:4000",
-    proxyPath: "/__nextgen",
-    protectedRoutes: ["/admin"],
-    loginPath: "/login",
-  });
-}
+export { proxy } from "./zitadel";
 
 export const config = {
   matcher: ["/__nextgen/:path*", "/admin", "/admin/:path*", "/login"],

@@ -7,6 +7,8 @@
 *.dll
 *.so
 *.dylib
+api/openapi/bundled.yaml
+bruno/
 
 # Test binary, built with `go test -c`
 *.test
@@ -24,33 +26,44 @@ profile.cov
 go.work
 go.work.sum
 
-# env file
-.env
-
-# Editor/IDE
-# .idea/
-
-.vscode/
-__debug_bin*
-
-# Local Codex/Claude workspace metadata
-.claude/
+# env files (keep .env.example tracked)
+.env*
+!.env.example
 
 # Editor/IDE
 .idea/
 .vscode/
 
-# System Files
+__debug_bin*
+
+# API clients
+.kreya/
+
+# Local agent workspace metadata (Nx writes these on update; not project-owned)
+.claude/
+.codex/
+.opencode/
+opencode.json
+.agents/
+.cursor/agents/
+
+# OSX
 .DS_Store
 
 #Frontend
 ## compiled output
 dist
+apps/server-*/bin/
 tmp
+.tmp/
 out-tsc
+coverage/
+**/.vitest-attachments/
+**/__screenshots__/
 
 ## dependencies
 node_modules
+npm-debug.log*
 pnpm-debug.log*
 *.code-workspace
 
@@ -58,26 +71,44 @@ pnpm-debug.log*
 vite.config.*.timestamp*
 vitest.config.*.timestamp*
 test-output
-coverage
 
-## nx
-.nx/cache
-.nx/workspace-data
+## moon
+.moon/cache
+.moon/docker
 
-## Next.js / Nuxt build outputs
+## Framework build outputs (Next.js / Nuxt / SvelteKit)
 .next/
 .nuxt/
+.nuxt-typecheck/
 .output/
+.svelte-kit/
+
+## Docs generated artifacts
+apps/docs/.source/
+apps/docs/.generated/
 
 ## Go build cache
 .go/
 
 ## Local runtime config
 nextgen.yaml
+/nextgen
+nextgen-data/
+.zitadel/local/
 
 # Keep the embed placeholder so //go:embed all:dist works in clean checkouts.
 # `dist/` above ignores the directory entirely, so we have to un-ignore the
 # directory before re-ignoring its contents and re-allowing the placeholder.
-!/apps/console/dist/
-/apps/console/dist/*
-!/apps/console/dist/.gitkeep
+!/internal/staticui/console/dist/
+/internal/staticui/console/dist/*
+!/internal/staticui/console/dist/.gitkeep
+!/internal/staticui/login/dist/
+/internal/staticui/login/dist/*
+!/internal/staticui/login/dist/.gitkeep
+apps/demo-next/tsconfig.tsbuildinfo
+packages/api-mock/tsconfig.tsbuildinfo
+
+.nx/
+.cursor/debug-*
+# Root TS incremental build info (generated)
+tsconfig.tsbuildinfo

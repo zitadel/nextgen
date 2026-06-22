@@ -1,4 +1,19 @@
-export type ZitadelFlowPurpose = "login" | "register";
+export type {
+  NextgenSession,
+  AuthState,
+  UnauthState,
+  AuthResult,
+  NextgenMiddlewareOptions,
+} from "./middleware.js";
+export {
+  HOP_BY_HOP,
+  INTERNAL_HEADERS,
+  matchesRoutes,
+  filterResponseHeaders,
+} from "./middleware.js";
+export { verifyJwt, decodeJwt, base64UrlDecode, JWKS_TTL_MS } from "./jwt.js";
+export type { JwtPayload, JwtHeader, DecodedJwt, VerifyJwtOptions } from "./jwt.js";
+
 export type ZitadelEnvironment = "development" | "preview" | "production";
 
 export type ZitadelRuntime = {
@@ -23,57 +38,6 @@ export class ZitadelRuntimeError extends Error {
   }
 }
 
-export type MockFlowField = {
-  name: string;
-  label: string;
-  type: "text" | "email" | "password";
-  required: boolean;
-};
-
-export type MockFlow = {
-  purpose: ZitadelFlowPurpose;
-  title: string;
-  fields: MockFlowField[];
-  actions: string[];
-};
-
-export function createMockFlow(purpose: ZitadelFlowPurpose): MockFlow {
-  if (purpose === "login") {
-    return {
-      purpose,
-      title: "Sign in",
-      fields: [{ name: "email", label: "Email address", type: "email", required: true }],
-      actions: ["Continue with passkey", "Continue with password"],
-    };
-  }
-
-  return {
-    purpose,
-    title: "Create account",
-    fields: [
-      { name: "email", label: "Email address", type: "email", required: true },
-      { name: "given_name", label: "First name", type: "text", required: true },
-      { name: "family_name", label: "Last name", type: "text", required: true },
-    ],
-    actions: ["Create passkey account"],
-  };
-}
-
-export function mockSubmit(
-  purpose: ZitadelFlowPurpose,
-  values: Record<string, FormDataEntryValue>,
-): {
-  ok: true;
-  message: string;
-  user: Record<string, string>;
-} {
-  return {
-    ok: true,
-    message: purpose === "login" ? "Mock session created." : "Mock user registered.",
-    user: Object.fromEntries(Object.entries(values).map(([key, value]) => [key, String(value)])),
-  };
-}
-
 export function resolveZitadelRuntimeEnv(
   env: Record<string, string | undefined> = currentEnv(),
 ): ZitadelRuntime {
@@ -93,10 +57,7 @@ export function resolveZitadelRuntime(input: ZitadelRuntimeInput): ZitadelRuntim
     );
   }
   if (environment === "production" && !input.issuer) {
-    throw new ZitadelRuntimeError(
-      "E_ZITADEL_CONFIG",
-      "ZITADEL_ISSUER is required in production. Run `npx zitadel@latest claim` before production deploys.",
-    );
+    throw new ZitadelRuntimeError("E_ZITADEL_CONFIG", "ZITADEL_ISSUER is required in production.");
   }
   return {
     projectId: input.projectId,
@@ -109,16 +70,6 @@ function parseEnvironment(value: string | undefined): ZitadelEnvironment {
   if (!value || value === "development") return "development";
   if (value === "preview" || value === "production") return value;
   throw new ZitadelRuntimeError("E_ZITADEL_CONFIG", `Unsupported ZITADEL_ENVIRONMENT "${value}".`);
-}
-
-// @ts-expect-error will be used later
-// oxlint-disable-next-line no-unused-vars
-function requireEnv(env: Record<string, string | undefined>, key: string): string {
-  const value = env[key];
-  if (!value) {
-    throw new ZitadelRuntimeError("E_ZITADEL_CONFIG", `${key} is required for Zitadel runtime.`);
-  }
-  return value;
 }
 
 function currentEnv(): Record<string, string | undefined> {

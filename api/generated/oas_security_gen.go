@@ -37,14 +37,32 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 
 // oauth2ScopesOAuth2 is a private map storing OAuth2 scopes per operation.
 var oauth2ScopesOAuth2 = map[string][]string{
+	ActivateFlowDefinitionOperation: []string{
+		"flow_definitions.write",
+	},
 	CreateAuthAttemptOperation: []string{
 		"auth_attempts.write",
+	},
+	CreateFlowDefinitionOperation: []string{
+		"flow_definitions.write",
 	},
 	CreateHandoffOperation: []string{
 		"auth_attempts.write",
 	},
+	CreateSchemaOperation: []string{
+		"schema.write",
+	},
 	CreateSessionOperation: []string{
 		"sessions.write",
+	},
+	CreateUserOperation: []string{
+		"user.write",
+	},
+	DeactivateFlowDefinitionOperation: []string{
+		"flow_definitions.write",
+	},
+	DeleteFlowDefinitionOperation: []string{
+		"flow_definitions.delete",
 	},
 	ExchangeHandoffOperation: []string{
 		"sessions.write",
@@ -52,24 +70,48 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetAuthAttemptOperation: []string{
 		"auth_attempts.read",
 	},
+	GetFlowDefinitionOperation: []string{
+		"flow_definitions.read",
+	},
+	GetProjectOperation: []string{
+		"projects.read",
+	},
+	GetSchemaByIdOperation: []string{
+		"schema.read",
+	},
 	GetSessionOperation: []string{
 		"session.read",
+	},
+	GetTeamOperation: []string{
+		"teams.read",
+	},
+	GetUserByIDOperation: []string{
+		"users.read",
 	},
 	GetUserInfoOperation: []string{},
 	IntrospectOperation:  []string{},
 	IssueChallengeOperation: []string{
 		"auth_attempts.write",
 	},
+	ListFlowDefinitionsOperation: []string{
+		"flow_definitions.read",
+	},
 	ListSessionsOperation: []string{
 		"sessions.read",
 	},
 	ListUsersOperation: []string{
-		"openid",
+		"user.read",
 	},
 	RevokeSessionOperation: []string{
 		"session.delete",
 	},
 	RevokeTokenOperation: []string{},
+	SetUserPasswordOperation: []string{
+		"user.write",
+	},
+	UpdateFlowDefinitionOperation: []string{
+		"flow_definitions.write",
+	},
 	VerifyChallengeProofOperation: []string{
 		"auth_attempts.write",
 	},

@@ -1,19 +1,25 @@
 {
-  "name": "@zitadel-nextgen/console",
+  "name": "@zitadel/console",
   "version": "0.0.1",
   "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
+    "test": "vitest run"
+  },
   "dependencies": {
-    "@lit/react": "catalog:",
     "@tanstack/react-devtools": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-router-devtools": "catalog:",
-    "@zitadel-nextgen/components": "workspace:*",
+    "@zitadel/design-tokens": "workspace:*",
+    "@zitadel/ui-react": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:",
     "tailwindcss": "catalog:"
   },
   "devDependencies": {
-    "@nx/react": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "@tanstack/devtools-vite": "catalog:",
     "@tanstack/eslint-plugin-router": "catalog:",
@@ -25,9 +31,9 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
-    "jsdom": "catalog:"
-  },
-  "nx": {
-    "projectType": "application"
+    "jsdom": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
   }
 }

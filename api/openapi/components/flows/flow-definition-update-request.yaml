@@ -1,0 +1,11 @@
+type: object
+required:
+    - flow_definition
+description: |
+    Completely replaces the existing flow definition.
+    The status of the flow definition can also be updated by setting the `status` attribute in the flow definition.
+properties:
+    schema_uri:
+        $ref: ../../components/schemas/schema-uri.yaml
+    flow_definition:
+        $ref: flow-definition.yaml

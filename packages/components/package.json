@@ -1,6 +1,6 @@
 {
-  "name": "@zitadel-nextgen/components",
-  "version": "0.0.1",
+  "name": "@zitadel/components",
+  "version": "0.1.0-alpha.11",
   "description": "Lit-based atomic web components and the <zitadel-login> orchestrator for the Zitadel auth UI.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/components#readme",
   "bugs": {
@@ -19,12 +19,18 @@
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
+  "unpkg": "./dist/standalone.mjs",
+  "jsdelivr": "./dist/standalone.mjs",
   "exports": {
     "./package.json": "./package.json",
     ".": {
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
+    },
+    "./standalone": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/standalone.mjs"
     },
     "./atoms": {
       "types": "./dist/atoms/index.d.mts",
@@ -41,35 +47,40 @@
     "./orchestrator": {
       "types": "./dist/orchestrator/index.d.mts",
       "import": "./dist/orchestrator/index.mjs"
-    },
-    "./orchestrator/transport": {
-      "types": "./dist/orchestrator/transport.d.mts",
-      "import": "./dist/orchestrator/transport.mjs"
     }
-  },
-  "scripts": {
-    "dev": "vite",
-    "build": "tsdown",
-    "test": "vitest run --project unit",
-    "test:browser": "vitest run --project browser",
-    "test:all": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.lib.json"
   },
   "publishConfig": {
     "access": "public"
   },
+  "scripts": {
+    "dev": "vite",
+    "dev:clean": "rm -rf ../../node_modules/.vite/packages/components && vite",
+    "build": "tsdown",
+    "test": "vitest run --project unit",
+    "test:browser": "vitest run --project browser",
+    "test:all": "vitest run"
+  },
   "dependencies": {
     "dompurify": "catalog:",
     "liquidjs": "catalog:",
-    "lit": "catalog:"
+    "lit": "catalog:",
+    "lucide": "catalog:"
   },
   "devDependencies": {
+    "@tsdown/css": "catalog:",
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
+    "@zitadel/api-mock": "workspace:*",
     "jsdom": "catalog:",
+    "msw": "catalog:",
     "playwright": "catalog:",
     "ts-lit-plugin": "catalog:",
+    "vite-plugin-web-components-hmr": "catalog:",
+    "lightningcss": "catalog:",
     "tsdown": "catalog:",
-    "tslib": "catalog:"
+    "tslib": "catalog:",
+    "@zitadel/api": "workspace:*",
+    "@zitadel/design-tokens": "workspace:*",
+    "@zitadel/shared-component-styles": "workspace:*"
   }
 }

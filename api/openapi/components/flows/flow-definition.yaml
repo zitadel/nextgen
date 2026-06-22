@@ -1,5 +1,5 @@
 type: object
-required: [slug, name, purposes, initial_steps, steps]
+required: [ name, user_schema, purposes, steps ]
 description: |
   A flow definition is the server-side configuration that describes a complete
   authentication or identity flow. It is NOT sent to the frontend — the flow
@@ -10,43 +10,48 @@ description: |
   configuration hierarchy. The engine selects the matching definition based on
   the purpose + audience when a flow is created via POST /flow.
 properties:
-  slug:
-    type: string
-    pattern: '^[a-z][a-z0-9-]*$'
-    description: |
-      Stable identifier for this flow. Used in pivot/switch transitions to
-      reference other flows. Must be unique within the project. Renaming
-      the flow does not change the slug.
-    example: default-login
-
   name:
     type: string
-    description: Human-readable display name for this flow definition.
-    example: Default Login
+    pattern: '^[a-z][a-z0-9-]*$'
+    examples: [ standard-login, combined-auth ]
+    description: |
+      Stable identifier for this flow, used as the target of cross-flow
+      `switch` and `pivot` transitions. Renaming is not supported — the
+      `name` is part of the public contract another definition may
+      reference. Acts as the human display label as well; no separate slug.
+
+  status:
+    $ref: flow-definition-status.yaml
+
+  user_schema:
+    type: string
+    format: uri
+    description: |
+      User schema this flow operates on. Step `fields` reference properties
+      defined in this schema. The engine resolves field types, validation,
+      and implicit outcomes from schema annotations at runtime.
+    example: https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml
 
   purposes:
-    type: array
-    items:
-      type: string
-      enum: [login, register, recovery, profiling, reauth, link_account]
-    minItems: 1
-    description: |
-      Which flow purposes this definition handles. A definition can serve
-      multiple purposes (e.g. a combined login/register flow).
-
-  initial_steps:
     type: object
     description: |
-      Maps each purpose to the step name that starts the flow for that purpose.
-      Keys must be a subset of `purposes`.
+      Maps each purpose this definition handles to its entry-point step.
+      Keys are purpose names; values must match a `name` in `steps`. A
+      definition can serve multiple purposes (e.g. a combined login/register
+      flow) by listing one entry per purpose.
+    minProperties: 1
+    propertyNames:
+      type: string
+      enum: [ login, register, recovery, profiling, reauth, link_account ]
     additionalProperties:
       type: string
     example:
-      login: identifier
-      register: profile
+      login: identify
 
   audience:
     $ref: flow-audience.yaml
+    example:
+      app_ids: [ app_saas ]
 
   steps:
     type: array
@@ -56,3 +61,19 @@ properties:
     description: |
       Ordered list of steps in this flow. The order is for human readability —
       actual step sequencing is determined by transitions.
+    example:
+      - name: identify
+        fields: [ email ]
+        actions:
+          submit: { primary: true }
+        transitions:
+          submit: { target: authenticate }
+          user_not_found: { target: register, action: switch }
+      - name: authenticate
+        fields: [ password ]
+        actions:
+          submit: { primary: true }
+        transitions:
+          submit: { target: done }
+      - name: done
+        complete: redirect

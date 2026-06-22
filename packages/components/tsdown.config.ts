@@ -1,27 +1,105 @@
-import { defineConfig } from "tsdown";
+import { readFileSync } from "node:fs";
+
+import { defineConfig, type Plugin } from "tsdown";
 
 /**
- * Library build for `@zitadel-nextgen/components`.
+ * Rolldown plugin that turns `.liquid` files into default-exported strings.
+ * Mirrors what Vite does natively so `import tpl from "./file.liquid"` works
+ * in both dev (Vite) and production (tsdown/rolldown) builds.
+ */
+function liquidRaw(): Plugin {
+  return {
+    name: "liquid-raw",
+    load(id) {
+      if (!id.endsWith(".liquid")) return null;
+      const content = readFileSync(id, "utf-8");
+      return `export default ${JSON.stringify(content)};`;
+    },
+  };
+}
+
+/**
+ * Library build for `@zitadel/components`.
  *
  * Each subpath in `package.json` `exports` has its own entry so consumers can
- * `import { ... } from "@zitadel-nextgen/components/atoms"` without dragging
+ * `import { ... } from "@zitadel/components/atoms"` without dragging
  * in the orchestrator (and its `liquidjs` + `dompurify` dependencies).
+ *
+ * Internal `@zitadel/*` workspace packages (`api`, `design-tokens`,
+ * `shared-component-styles`) are inlined into the dist so consumers only
+ * need to install `@zitadel/components` itself — no transitive
+ * registry deps. `@zitadel/api-mock` stays external because it's a
+ * test-only helper consumers never import.
  */
-export default defineConfig({
-  entry: {
-    index: "src/index.ts",
-    "atoms/index": "src/atoms/index.ts",
-    manifests: "src/manifests.ts",
-    "tokens/index": "src/tokens/index.ts",
-    "orchestrator/index": "src/orchestrator/index.ts",
-    "orchestrator/transport": "src/orchestrator/transport.ts",
+/** Internal workspace deps are always inlined so the published package is self-contained. */
+const INLINE_INTERNAL = [
+  /^@zitadel\/api(\/|$)/,
+  /^@zitadel\/design-tokens(\/|$)/,
+  /^@zitadel\/shared-component-styles(\/|$)/,
+];
+
+/** Third-party runtime deps the components need in the browser. */
+const THIRD_PARTY = ["lit", /^lit\//, "liquidjs", "dompurify", "lucide", /^lucide\//] as const;
+
+export default defineConfig([
+  /**
+   * Library build — the npm entrypoints. `lit`/`liquidjs`/`dompurify`/`lucide`
+   * stay EXTERNAL so a consuming app's bundler resolves a single shared copy
+   * (no duplicate-Lit). This is what `import "@zitadel/components"` resolves to.
+   */
+  {
+    plugins: [liquidRaw()],
+    entry: {
+      index: "src/index.ts",
+      "atoms/index": "src/atoms/index.ts",
+      manifests: "src/manifests.ts",
+      "tokens/index": "src/tokens/index.ts",
+      "orchestrator/index": "src/orchestrator/index.ts",
+    },
+    outDir: "dist",
+    format: ["esm"],
+    tsconfig: "tsconfig.lib.json",
+    dts: true,
+    sourcemap: true,
+    // `clean: true` would wipe the .d.ts files tsgo emits during the
+    // `typecheck` target, breaking project-reference consumers
+    // (sdk-next, demo-next, demo-nuxt) whose tsgo --build expects those
+    // .d.ts files to exist. tsdown still overwrites its own .mjs/.d.mts
+    // outputs on each rebuild — stale files just accumulate harmlessly
+    // until a full `git clean`.
+    clean: false,
+    target: "es2022",
+    external: [...THIRD_PARTY, "@zitadel/api-mock"],
+    noExternal: INLINE_INTERNAL,
   },
-  outDir: "dist",
-  format: ["esm"],
-  tsconfig: "tsconfig.lib.json",
-  dts: true,
-  sourcemap: true,
-  clean: true,
-  target: "es2022",
-  external: ["lit", /^lit\//, "liquidjs", "dompurify"],
-});
+
+  /**
+   * Standalone build — one self-contained file for a plain HTML page. Here the
+   * third-party UI deps ARE inlined, so `<script type="module"
+   * src="…/standalone.mjs">` works with no import map and no bundler. Kept
+   * separate from the library build above so npm/SDK consumers are unaffected.
+   *
+   * `platform: "browser"` is required: the default ("node") makes rolldown emit
+   * `import { createRequire } from "node:module"` for its CJS-interop helper,
+   * which a browser cannot resolve — the whole module then fails to load. The
+   * browser platform also picks the `browser`/`import` export conditions of the
+   * inlined deps so no Node-only entry points leak in.
+   */
+  {
+    plugins: [liquidRaw()],
+    entry: { standalone: "src/index.ts" },
+    outDir: "dist",
+    format: ["esm"],
+    platform: "browser",
+    // `platform: "browser"` would otherwise emit `standalone.js`; force `.mjs`
+    // so the `unpkg`/`jsdelivr`/`./standalone` paths in package.json still match.
+    fixedExtension: true,
+    tsconfig: "tsconfig.lib.json",
+    dts: false,
+    sourcemap: false,
+    clean: false,
+    target: "es2022",
+    external: ["@zitadel/api-mock"],
+    noExternal: [...INLINE_INTERNAL, ...THIRD_PARTY],
+  },
+]);

@@ -1,0 +1,24 @@
+title: PasskeyFactorPayload
+type: object
+description: Passkey-specific factor metadata including credential and verification details
+required:
+  - credential_id
+  - user_verified
+properties:
+  credential_id:
+    type: string
+    description: The credential ID that was used
+    example: 'Y3JlZGVudGlhbDE='
+  user_verified:
+    type: boolean
+    description: Whether user verification was performed (PIN/biometric)
+  backup_eligible:
+    type: boolean
+    description: Whether the credential is backup eligible (can be synced)
+  backup_state:
+    type: boolean
+    description: Whether the credential is currently backed up
+  authenticator_attachment:
+    type: string
+    enum: [platform, cross-platform]
+    description: Authenticator attachment modality

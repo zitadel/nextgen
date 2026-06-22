@@ -1,0 +1,324 @@
+/**
+ * Standalone HTTP server for the api-mock.
+ *
+ * Flow routes (POST /flow, GET /flow/:id, POST /flow/:id/submit) and the
+ * platform CRUD routes (projects, schemas, flow_definitions) are served by
+ * reusing the existing MSW handlers via @mswjs/http-middleware — zero
+ * duplication of routing logic.
+ *
+ * Custom-only routes added on top:
+ *   POST   /sessions/exchange     — exchange handoff_token for session cookie
+ *   GET    /sessions/me           — get current session from opaque cookie
+ *   DELETE /sessions/me           — revoke the current session (logout)
+ *   GET    /auth/end-session      — OIDC-style end-session, clears cookies
+ *   GET    /.well-known/jwks.json — JWKS for JWT verification (dev convenience)
+ *   GET    /auth/keys             — JWKS, spec-defined endpoint (operation `getKeys`)
+ *
+ * Platform routes (mounted via setupPlatformHandlers):
+ *   POST   /projects                  — create project
+ *   GET    /projects/:id              — fetch project
+ *   POST   /schemas                   — create user schema
+ *   GET    /schemas/:id               — fetch user schema
+ *   DELETE /schemas/:id               — delete user schema
+ *   POST   /flow_definitions          — create flow definition
+ *   GET    /flow_definitions          — list flow definitions
+ *   GET    /flow_definitions/:id      — get flow definition
+ *   PATCH  /flow_definitions/:id      — update flow definition
+ *   DELETE /flow_definitions/:id      — delete flow definition
+ */
+import { randomBytes, randomUUID } from "node:crypto";
+import { type Server } from "node:http";
+
+import type { ExchangeHandoff200, GetMySession200 } from "@zitadel/api/generated/model";
+import express from "express";
+import cookieParser from "cookie-parser";
+import { createMiddleware } from "@mswjs/http-middleware";
+
+import { applyBranding } from "./branding.js";
+import { HandoffError, JWK, verifyHandoffToken } from "./crypto.js";
+import { defaultDevBranding } from "./default-dev-branding.js";
+import { setupMockHandlers } from "./handlers.js";
+import { errorBody, setupPlatformHandlers } from "./platform-handlers.js";
+
+const SESSION_TTL_SECONDS = 3600;
+
+/**
+ * Tracks handoff tokens (by `jti`) we've already consumed so a replay
+ * surfaces as 410 Gone. Per the spec a handoff is single-use — a real
+ * backend rejects the second exchange.
+ *
+ * Module-scoped because each process keeps one set; for the dev loop the
+ * mock runs for the whole session and we want consumption state to persist
+ * across requests. Vitest workers get their own copy via worker isolation.
+ */
+const consumedHandoffJtis = new Set<string>();
+
+/**
+ * In-memory session store. Maps opaque session tokens to session data.
+ * Mimics the Go server's encrypted opaque tokens without actual encryption.
+ * We extend the API type with an `email` field for client lookups.
+ */
+type StoredSession = GetMySession200 & { email?: string | null };
+const sessionStore = new Map<string, StoredSession>();
+
+/**
+ * Generates an opaque session token (random hex, not a JWT).
+ * This matches the Go server's behaviour of issuing encrypted opaque tokens.
+ */
+function generateOpaqueToken(): string {
+  return randomBytes(32).toString("hex");
+}
+
+/**
+ * Cache of completed `/sessions/exchange` responses keyed by the caller's
+ * `Idempotency-Key` header. Per `api/openapi/components/parameters/idempotency-key.yaml`,
+ * a retry with the same key within the call window returns the cached
+ * payload without consuming a fresh handoff token. The TTL matches the
+ * 60-second handoff lifetime so stale keys don't pile up.
+ */
+type IdempotencyCacheEntry = {
+  body: ExchangeHandoff200;
+  setCookie: string[];
+};
+const IDEMPOTENCY_TTL_MS = 60_000;
+const idempotencyCache = new Map<string, IdempotencyCacheEntry>();
+
+export function startMockServer(port: number): Server {
+  applyBranding(defaultDevBranding);
+  const iss = `http://localhost:${port}`;
+  const app = express();
+  app.use(cookieParser());
+
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const origin = req.headers.origin;
+    res.setHeader("Vary", "Origin");
+    res.setHeader("Access-Control-Allow-Origin", origin ?? "*");
+    if (origin) {
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+    }
+    if (req.method === "OPTIONS") {
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Idempotency-Key");
+      res.status(204).end();
+      return;
+    }
+    next();
+  });
+
+  app.get("/.well-known/jwks.json", (_req: express.Request, res: express.Response) => {
+    res.json({ keys: [JWK] });
+  });
+  app.get("/auth/keys", (_req: express.Request, res: express.Response) => {
+    res.json({ keys: [JWK] });
+  });
+  // Minimal OIDC discovery document — every real Zitadel server publishes
+  // one. The CLI's setup prompt uses this to auto-discover localhost OIDC
+  // servers (see lib/prober).
+  app.get(
+    "/.well-known/openid-configuration",
+    (_req: express.Request, res: express.Response) => {
+      res.json({
+        issuer: iss,
+        jwks_uri: `${iss}/.well-known/jwks.json`,
+        authorization_endpoint: `${iss}/auth`,
+        token_endpoint: `${iss}/auth/token`,
+        end_session_endpoint: `${iss}/auth/end-session`,
+        response_types_supported: ["code"],
+        subject_types_supported: ["public"],
+        id_token_signing_alg_values_supported: ["RS256"],
+      });
+    },
+  );
+
+  const jsonBodyParser: express.RequestHandler = (req, res, next) => {
+    express.json()(req, res, (err) => {
+      if (err) {
+        res.status(400).json(errorBody("invalid_json", "request body must be valid JSON"));
+        return;
+      }
+      next();
+    });
+  };
+  app.post(
+    "/sessions/exchange",
+    jsonBodyParser,
+    async (req: express.Request, res: express.Response) => {
+      const projectId = req.query.project_id;
+      if (!projectId || typeof projectId !== "string") {
+        res
+          .status(400)
+          .json(
+            errorBody(
+              "sess.project_id_missing",
+              "The session API currently requires the project_id query parameter to fulfill requests.",
+            ),
+          );
+        return;
+      }
+
+      const idempotencyKey = req.header("Idempotency-Key");
+      if (idempotencyKey) {
+        const cached = idempotencyCache.get(idempotencyKey);
+        if (cached) {
+          res.setHeader("Set-Cookie", cached.setCookie);
+          res.json(cached.body);
+          return;
+        }
+      }
+
+      const { handoff_token } = req.body as { handoff_token?: unknown };
+      if (!handoff_token || typeof handoff_token !== "string") {
+        res
+          .status(400)
+          .json(
+            errorBody("missing_handoff_token", "handoff_token is required and must be a string"),
+          );
+        return;
+      }
+      let claims: { sub: string; iss: string; jti?: string };
+      try {
+        claims = await verifyHandoffToken(handoff_token, { expectedIss: iss });
+      } catch (err) {
+        if (err instanceof HandoffError && err.kind === "expired") {
+          res
+            .status(410)
+            .json(errorBody("handoff_consumed", "handoff token expired or already consumed"));
+          return;
+        }
+        res
+          .status(401)
+          .json(errorBody("invalid_handoff_token", "handoff token failed verification"));
+        return;
+      }
+      const { jti } = claims;
+      if (jti !== undefined && consumedHandoffJtis.has(jti)) {
+        res
+          .status(410)
+          .json(errorBody("handoff_consumed", "handoff token expired or already consumed"));
+        return;
+      }
+      if (jti !== undefined) {
+        consumedHandoffJtis.add(jti);
+      }
+
+      const opaqueToken = generateOpaqueToken();
+      const createdAt = new Date();
+      const expiresAt = new Date(createdAt.getTime() + SESSION_TTL_SECONDS * 1000);
+      const sessionId = `sess_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
+      const userId = `user_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
+
+      // Store the session data for GET /sessions/me lookups.
+      // The `email` field is kept alongside the spec-typed fields for
+      // client display purposes (same as the Go server's response).
+      const sessionData: StoredSession = {
+        session_id: sessionId,
+        project_id: projectId,
+        state: "active",
+        user_id: userId,
+        factors: [],
+        assurance_levels: [],
+        created_at: createdAt.toISOString(),
+        expires_at: expiresAt.toISOString(),
+        email: claims.sub,
+      };
+      sessionStore.set(opaqueToken, sessionData);
+
+      const setCookie = [
+        `__nextgen_session=${opaqueToken}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`,
+        `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
+      ];
+      res.setHeader("Set-Cookie", setCookie);
+      const body: ExchangeHandoff200 = {
+        session: {
+          session_id: sessionId,
+          project_id: projectId,
+          state: "active",
+          user_id: userId,
+          factors: [],
+          assurance_levels: [],
+          created_at: createdAt.toISOString(),
+          expires_at: expiresAt.toISOString(),
+        },
+        session_token: opaqueToken,
+      };
+
+      if (idempotencyKey) {
+        idempotencyCache.set(idempotencyKey, { body, setCookie });
+        setTimeout(() => idempotencyCache.delete(idempotencyKey), IDEMPOTENCY_TTL_MS).unref();
+      }
+
+      res.json(body);
+    },
+  );
+
+  // GET /sessions/me — validate opaque session cookie and return session data.
+  // Mirrors the Go server's GetMySession handler.
+  app.get("/sessions/me", (req: express.Request, res: express.Response) => {
+    const token = (req.cookies as Record<string, string>).__nextgen_session;
+    if (!token) {
+      res.status(401).json(errorBody("unauthenticated", "no session cookie"));
+      return;
+    }
+    const session = sessionStore.get(token);
+    if (!session) {
+      res.status(401).json(errorBody("unauthenticated", "invalid or expired session"));
+      return;
+    }
+    // Check expiry
+    if (new Date(session.expires_at) < new Date()) {
+      sessionStore.delete(token);
+      res.status(401).json(errorBody("unauthenticated", "session expired"));
+      return;
+    }
+    res.json(session);
+  });
+
+  // DELETE /sessions/me — revoke the current session (logout). Mirrors the
+  // Go server's revokeMySession handler and the SDK proxy's logout call.
+  app.delete("/sessions/me", (req: express.Request, res: express.Response) => {
+    const token = (req.cookies as Record<string, string>).__nextgen_session;
+    if (!token) {
+      res.status(401).json(errorBody("unauthenticated", "no session cookie"));
+      return;
+    }
+    const session = sessionStore.get(token);
+    if (!session) {
+      res.status(404).json(errorBody("session_not_found", "session not found"));
+      return;
+    }
+    if (new Date(session.expires_at) < new Date()) {
+      sessionStore.delete(token);
+      res.status(409).json(errorBody("session_revoked", "session already revoked or expired"));
+      return;
+    }
+    sessionStore.delete(token);
+    res.setHeader("Set-Cookie", [
+      `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
+      `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,
+      `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
+    ]);
+    res.status(204).end();
+  });
+
+  app.get("/auth/end-session", (req: express.Request, res: express.Response) => {
+    // Clean up session from store when logging out
+    const token = (req.cookies as Record<string, string>).__nextgen_session;
+    if (token) {
+      sessionStore.delete(token);
+    }
+    res.setHeader("Set-Cookie", [
+      `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
+      `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,
+      `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
+    ]);
+    res.status(204).end();
+  });
+
+  app.use(createMiddleware(...setupMockHandlers({ iss }).handlers, ...setupPlatformHandlers()));
+
+  return app.listen(port, () => {
+    console.log(`\napi-mock server listening on http://localhost:${port}`);
+    console.log(`  JWKS: http://localhost:${port}/.well-known/jwks.json`);
+    console.log(`  Sessions exchange: http://localhost:${port}/sessions/exchange\n`);
+  });
+}

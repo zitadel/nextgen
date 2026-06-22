@@ -1,0 +1,114 @@
+post:
+  operationId: createFlowDefinition
+  summary: Create a new flow definition
+  description: |
+    Creates a new flow definition. 
+    Flow definitions are templates that define the sequence of steps (capabilities) 
+    for a particular user journey (e.g., registration, login, password reset). 
+    
+    Flow definitions are created based on the flow definition schema, which includes the flow's purpose, audience, and the steps involved.
+  tags:
+    - Flow Definitions
+  security:
+    - oauth2:
+        - flow_definitions.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../../components/flows/create-flow-definition-request.yaml
+        examples:
+          defaultLoginFlow:
+            summary: The default login flow provided by the server.
+            externalValue: examples/default-login-flow-definition.json
+          passwordLogin:
+            summary: Minimal login — identifier then password.
+            externalValue: examples/01-password-login/flow-definition.json
+          passwordRegister:
+            summary: Single-step password signup with on_success create_user.
+            externalValue: examples/02-password-register/flow-definition.json
+          passkeyLogin:
+            summary: Discoverable passkey login — no identifier collected up front.
+            externalValue: examples/03-passkey-login/flow-definition.json
+          passkeyRegister:
+            summary: Identifier-first passkey signup; provisional user finalized in the verify leg.
+            externalValue: examples/04-passkey-register/flow-definition.json
+          combinedPasswordLoginRegister:
+            summary: Combined login + register with user_not_found and user_already_exists wired between sub-flows.
+            externalValue: examples/05-combined-login-register/flow-definition.json
+          combinedPasswordPasskey:
+            summary: Combined login + register with password, passkey, and post-signup passkey upsell; terminal redirect.
+            externalValue: examples/06-combined-password-passkey/flow-definition.json
+  responses:
+    '201':
+      description: Flow definition created successfully.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/flows/flow-definition-detail-response.yaml
+    '400':
+      description: Invalid request (e.g., missing required fields, invalid step configuration).
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '409':
+      description: Conflict (e.g., flow definition with the same name already exists in the project).
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+
+get:
+  operationId: listFlowDefinitions
+  summary: List flow definitions
+  description: |
+    Retrieves a list of all flow definitions. 
+    This endpoint can be used to view existing flow definitions and their configurations.
+  tags:
+    - Flow Definitions
+  security:
+    - oauth2:
+        - flow_definitions.read
+  parameters:
+    - $ref: ../../components/parameters/limit.yaml
+    - $ref: ../../components/parameters/page-token.yaml
+    - name: project_id
+      in: query
+      description: The project id to filter by.
+      required: true
+      schema:
+        $ref: ../../components/schemas/project-id.yaml
+    - name: purpose
+      in: query
+      required: false
+      description: Filter flow definitions by purpose (e.g., registration, login).
+      schema:
+        type: string
+        enum: [ login, register, recovery, profiling, reauth, link_account ]
+  responses:
+    '200':
+      description: A list of flow definitions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/flows/flow-definition-list-response.yaml
+    '400':
+      description: Invalid request (e.g., invalid query parameters).
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml

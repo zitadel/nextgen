@@ -2,44 +2,37 @@ name: ci
 
 on:
   pull_request:
-  push:
-    branches: [main]
+  merge_group:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-# Cancel an in-flight run when a newer commit is pushed to the same PR/branch.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  go-test:
-    runs-on: ubuntu-latest
+  full-pr:
+    runs-on: depot-ubuntu-24.04-16
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: moonrepo/setup-toolchain@v0
+
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
-      - name: Install embedded-postgres runtime deps
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libicu-dev libssl-dev
-      - run: go vet ./...
-      - run: go test -v -timeout=10m ./...
 
-  node-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v5
         with:
-          version: 10.33.2
           run_install: false
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
+      - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -47,106 +40,54 @@ jobs:
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
 
-      - name: Node checks
-        run: corepack pnpm nx run-many -t lint,typecheck,build,test
+      - name: Detect CI mode
+        id: ci-mode
+        run: node scripts/ci-mode.mjs "${{ github.event.pull_request.base.sha || 'origin/main' }}"
 
-  npm-pack-smoke:
-    runs-on: ubuntu-latest
-    needs: node-check
-    steps:
-      - uses: actions/checkout@v6
+      - name: Run Moon build and test graph
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: moon ci :lint :typecheck :build :test
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v5
-        with:
-          version: 10.33.2
-          run_install: false
+      - name: Run Go checks
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: moon run server:test
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
+      - name: Build release snapshot without container
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container
 
-      - name: Install dependencies
-        run: corepack pnpm install --frozen-lockfile
+      - name: Run binary fresh-app journey
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- --runtime binary --concurrency 5 --work-dir "${RUNNER_TEMP}/ci-journey"
 
-      - name: Build packages
-        run: corepack pnpm -r build
+      - name: Validate version PR
+        if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
+        run: env -u CI -u GITHUB_ACTIONS moon run release:version
 
-      - name: Smoke test built CLI
+      - name: Pack version PR artifacts
+        if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
+        run: env -u CI -u GITHUB_ACTIONS moon run release:pack
+
+      - name: Verify version PR tarballs
+        if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
         run: |
-          node apps/cli/dist/zitadel.mjs --version
-          node apps/cli/dist/zitadel.mjs capabilities --json
+          version="$(node -p "require('./apps/server/package.json').version")"
+          node apps/cli-journey-e2e/scripts/verify-tarballs.mjs "dist/release/${version}/npm"
 
-      - name: Dry-run npm packs
-        run: |
-          for dir in apps/cli packages/sdk-core packages/sdk-next; do
-            (cd "$dir" && npm pack --dry-run)
-          done
-
-      - name: Create npm package artifacts
-        run: |
-          mkdir -p "$RUNNER_TEMP/zitadel-npm-packages"
-          for dir in apps/cli packages/sdk-core packages/sdk-next; do
-            (cd "$dir" && npm pack --pack-destination "$RUNNER_TEMP/zitadel-npm-packages")
-          done
-          ls -lh "$RUNNER_TEMP/zitadel-npm-packages"
-
-      - name: Upload npm package artifacts
-        uses: actions/upload-artifact@v7
+      - name: Upload release snapshot
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
         with:
-          name: npm-packages
-          path: ${{ runner.temp }}/zitadel-npm-packages/*.tgz
-          if-no-files-found: error
+          name: release-snapshot
+          path: dist/release
+          if-no-files-found: ignore
           retention-days: 7
 
-  goreleaser-snapshot:
-    runs-on: ubuntu-latest
-    needs: [go-test, node-check]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - name: Upload journey diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
         with:
-          fetch-depth: 0
-
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v5
-        with:
-          version: 10.33.2
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Run GoReleaser (snapshot)
-        uses: goreleaser/goreleaser-action@v7
-        with:
-          distribution: goreleaser
-          version: "~> v2"
-          args: release --snapshot --clean --skip=publish,sign
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload GoReleaser snapshot artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: goreleaser-snapshot
-          path: dist/**
-          if-no-files-found: error
+          name: journey-diagnostics
+          path: ${{ runner.temp }}/ci-journey/diagnostics
+          if-no-files-found: ignore
           retention-days: 7

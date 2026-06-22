@@ -1,0 +1,20 @@
+id: "demo-next-e2e"
+language: "typescript"
+layer: "automation"
+stack: "frontend"
+dependsOn:
+  - "api-mock"
+  - "demo-next"
+
+tasks:
+  lint:
+    command: "corepack pnpm exec oxlint ."
+
+  e2e:
+    command: "corepack pnpm exec playwright test"
+    deps:
+      - "api-mock:build"
+      - "demo-next:build"
+    options:
+      runInCI: false
+

@@ -1,0 +1,18 @@
+services:
+  verdaccio:
+    image: verdaccio/verdaccio:6.2.2
+    user: "0"
+    ports:
+      - "127.0.0.1:${JOURNEY_REGISTRY_PORT:-4873}:4873"
+    volumes:
+      - "${JOURNEY_VERDACCIO_CONFIG:?JOURNEY_VERDACCIO_CONFIG is required}:/verdaccio/conf/config.yaml:ro"
+      - "${JOURNEY_VERDACCIO_STORAGE:?JOURNEY_VERDACCIO_STORAGE is required}:/verdaccio/storage"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:4873/-/ping').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 2s
+      timeout: 5s
+      retries: 30

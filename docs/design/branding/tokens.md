@@ -192,7 +192,8 @@ Asset URLs live on branding; the host loads them (img, link, background). They a
 | ------------------------------------ | ---------------------------------------------------------------------------------- |
 | `logo_url` (baseline)                | `<img>` in the default template; `<zl-logo>` atom reads the attribute if bundled   |
 | `hero_url` (baseline)                | `background-image` on `:host` when the `split` layout is active                    |
-| `font_url` (baseline)                | Injected by the orchestrator as `<link rel="stylesheet">` before the widget paints |
+| design-system default font           | Loaded by the orchestrator as `<link rel="stylesheet">` (`applyDefaultFont`, default Arimo) so the brand face paints with no branding; dropped when `font_url` is set. See [ADR 025](../../adrs/025-default-brand-font-loading.md) |
+| `font_url` (baseline)                | Tenant override; injected by the orchestrator as `<link rel="stylesheet">` before the widget paints, replacing the default font |
 | `assets.logo_dark` (proposed)        | Swapped by `data-theme="dark"`                                                     |
 | `assets.favicon` (proposed)          | Written to `<link rel="icon">` by the widget on mount                              |
 | `assets.background_image` (proposed) | Additional background slot not covered by `hero_url`                               |

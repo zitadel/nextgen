@@ -2,16 +2,17 @@
 
 import dynamic from "next/dynamic";
 
-const NextgenLogout = dynamic(
+const ZitadelLogout = dynamic(
   async () => {
-    await import("@nextgen/ui-lit");
-    return function NextgenLogoutElement() {
-      return <nextgen-logout proxy-base="/__nextgen" post-sign-out-url="/login" />;
+    const { demoProject } = await import("@/zitadel");
+    await import("@zitadel/components");
+    return function ZitadelLogoutElement() {
+      return <zitadel-logout project={demoProject} post-sign-out-url="/login" />;
     };
   },
   { ssr: false },
 );
 
 export function LogoutWidget() {
-  return <NextgenLogout />;
+  return <ZitadelLogout />;
 }

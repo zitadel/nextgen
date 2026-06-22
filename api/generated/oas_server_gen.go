@@ -8,6 +8,15 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
+	// ActivateFlowDefinition implements activateFlowDefinition operation.
+	//
+	// Activate a flow definition by transitioning it from a `draft` state to an `active` state.
+	// Alternatively, the status of a flow definition can also be set via the `POST /flow_definitions`
+	// and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow
+	// definition payload.
+	//
+	// POST /flow_definitions/{id}/activate
+	ActivateFlowDefinition(ctx context.Context, params ActivateFlowDefinitionParams) (ActivateFlowDefinitionRes, error)
 	// AuthorizeDevice implements authorizeDevice operation.
 	//
 	// Authorize a device.
@@ -44,6 +53,16 @@ type Handler interface {
 	//
 	// POST /flow
 	CreateFlow(ctx context.Context, req *CreateFlowRequest) (CreateFlowRes, error)
+	// CreateFlowDefinition implements createFlowDefinition operation.
+	//
+	// Creates a new flow definition.
+	// Flow definitions are templates that define the sequence of steps (capabilities)
+	// for a particular user journey (e.g., registration, login, password reset).
+	// Flow definitions are created based on the flow definition schema, which includes the flow's
+	// purpose, audience, and the steps involved.
+	//
+	// POST /flow_definitions
+	CreateFlowDefinition(ctx context.Context, req *CreateFlowDefinitionRequest) (CreateFlowDefinitionRes, error)
 	// CreateHandoff implements createHandoff operation.
 	//
 	// Completes the authentication attempt and mints a `handoff_token`.
@@ -57,6 +76,23 @@ type Handler interface {
 	//
 	// POST /auth_attempts/{attempt_id}/handoff
 	CreateHandoff(ctx context.Context, params CreateHandoffParams) (CreateHandoffRes, error)
+	// CreateProject implements createProject operation.
+	//
+	// Create project.
+	//
+	// POST /projects
+	CreateProject(ctx context.Context, req *CreateProjectRequest) (CreateProjectRes, error)
+	// CreateSchema implements createSchema operation.
+	//
+	// Create a new schema. The schema definition must include a unique $id field,
+	// which will be used to identify the schema in future requests. The $id must
+	// be a valid URI and should ideally point to the location where the schema
+	// can be accessed.
+	// The schema can either be a concrete schema, e.g. a user schema, or a
+	// schema-url which will be resolved by the server.
+	//
+	// POST /schemas
+	CreateSchema(ctx context.Context, req CreateSchemaReq, params CreateSchemaParams) (CreateSchemaRes, error)
 	// CreateSession implements createSession operation.
 	//
 	// Creates an anonymous session shell with no user and no factors (`state: building`).
@@ -72,6 +108,38 @@ type Handler interface {
 	//
 	// POST /sessions
 	CreateSession(ctx context.Context, req *CreateSessionRequest) (CreateSessionRes, error)
+	// CreateTeam implements createTeam operation.
+	//
+	// Create team.
+	//
+	// POST /teams
+	CreateTeam(ctx context.Context, req *CreateTeamRequest, params CreateTeamParams) (CreateTeamRes, error)
+	// CreateUser implements createUser operation.
+	//
+	// Create user.
+	//
+	// POST /users
+	CreateUser(ctx context.Context, req *User, params CreateUserParams) (CreateUserRes, error)
+	// DeactivateFlowDefinition implements deactivateFlowDefinition operation.
+	//
+	// Deactivates a flow definition in the `active` state by transitioning it to the `draft` state.
+	// Flow definitions in `draft` state cannot be used to start new flows. Existing flows that use the
+	// deactivated flow definition must gracefully handle this.
+	// Alternatively, the status of a flow definition can also be set via the `POST /flow_definitions`
+	// and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow
+	// definition payload.
+	//
+	// POST /flow_definitions/{id}/deactivate
+	DeactivateFlowDefinition(ctx context.Context, params DeactivateFlowDefinitionParams) (DeactivateFlowDefinitionRes, error)
+	// DeleteFlowDefinition implements deleteFlowDefinition operation.
+	//
+	// Delete a flow definition by id.
+	// If the flow definition is currently being used by a flow, the deletion will fail.
+	// If the flow definition is the last active flow definition for a given purpose, the deletion will
+	// fail to prevent disruption of new flows being started for that purpose.
+	//
+	// DELETE /flow_definitions/{id}
+	DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (DeleteFlowDefinitionRes, error)
 	// EndSession implements endSession operation.
 	//
 	// End a session.
@@ -107,6 +175,12 @@ type Handler interface {
 	//
 	// GET /auth_attempts/{attempt_id}
 	GetAuthAttempt(ctx context.Context, params GetAuthAttemptParams) (GetAuthAttemptRes, error)
+	// GetFlowDefinition implements getFlowDefinition operation.
+	//
+	// Get a flow definition by id.
+	//
+	// GET /flow_definitions/{id}
+	GetFlowDefinition(ctx context.Context, params GetFlowDefinitionParams) (GetFlowDefinitionRes, error)
 	// GetFlowStep implements getFlowStep operation.
 	//
 	// Returns the current capability step without advancing the state machine.
@@ -132,18 +206,46 @@ type Handler interface {
 	//
 	// GET /livez
 	GetLive(ctx context.Context) (GetLiveRes, error)
+	// GetMySession implements getMySession operation.
+	//
+	// Returns the current state of the current session including its factors and all currently
+	// satisfied assurance levels.
+	// `assurance_levels[]` may shrink over time as factor freshness windows expire,
+	// without the session itself expiring. Use step-up authentication (a new `auth_attempt`
+	// against the same `session_id`) to restore a dropped assurance level.
+	//
+	// GET /sessions/me
+	GetMySession(ctx context.Context, params GetMySessionParams) (GetMySessionRes, error)
+	// GetMyUser implements getMyUser operation.
+	//
+	// Get my user information.
+	//
+	// GET /users/me
+	GetMyUser(ctx context.Context, params GetMyUserParams) (GetMyUserRes, error)
 	// GetOpenIDConfiguration implements getOpenIDConfiguration operation.
 	//
 	// Retrieve the OpenID Connect configuration.
 	//
 	// GET /.well-known/openid-configuration
 	GetOpenIDConfiguration(ctx context.Context) (GetOpenIDConfigurationRes, error)
+	// GetProject implements getProject operation.
+	//
+	// Returns the current state of a project.
+	//
+	// GET /projects/{project_id}
+	GetProject(ctx context.Context, params GetProjectParams) (GetProjectRes, error)
 	// GetReady implements getReady operation.
 	//
 	// Check whether the server is ready to accept requests.
 	//
 	// GET /readyz
 	GetReady(ctx context.Context) (GetReadyRes, error)
+	// GetSchemaById implements getSchemaById operation.
+	//
+	// Get a schema by its ID. This will return the default revision of the schema.
+	//
+	// GET /schemas/{id}
+	GetSchemaById(ctx context.Context, params GetSchemaByIdParams) (GetSchemaByIdRes, error)
 	// GetSession implements getSession operation.
 	//
 	// Returns the current state of a session including its factors and all currently
@@ -154,12 +256,24 @@ type Handler interface {
 	//
 	// GET /sessions/{session_id}
 	GetSession(ctx context.Context, params GetSessionParams) (GetSessionRes, error)
+	// GetTeam implements getTeam operation.
+	//
+	// Returns the current state of a team.
+	//
+	// GET /teams/{team_id}
+	GetTeam(ctx context.Context, params GetTeamParams) (GetTeamRes, error)
 	// GetToken implements getToken operation.
 	//
-	// Get accesstoken.
+	// Get access token.
 	//
 	// POST /auth/token
 	GetToken(ctx context.Context, req *PostTokenRequest) (GetTokenRes, error)
+	// GetUserByID implements GetUserByID operation.
+	//
+	// Get user by ID.
+	//
+	// GET /users/{user_id}
+	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
 	// GetUserInfo implements getUserInfo operation.
 	//
 	// Get user info.
@@ -182,6 +296,13 @@ type Handler interface {
 	//
 	// POST /auth_attempts/{attempt_id}/challenges
 	IssueChallenge(ctx context.Context, req *IssueChallengeRequest, params IssueChallengeParams) (IssueChallengeRes, error)
+	// ListFlowDefinitions implements listFlowDefinitions operation.
+	//
+	// Retrieves a list of all flow definitions.
+	// This endpoint can be used to view existing flow definitions and their configurations.
+	//
+	// GET /flow_definitions
+	ListFlowDefinitions(ctx context.Context, params ListFlowDefinitionsParams) (ListFlowDefinitionsRes, error)
 	// ListSessions implements listSessions operation.
 	//
 	// Returns a paginated list of sessions for a project.
@@ -193,8 +314,17 @@ type Handler interface {
 	//
 	// List users.
 	//
-	// GET /user
+	// GET /users
 	ListUsers(ctx context.Context, params ListUsersParams) (ListUsersRes, error)
+	// RevokeMySession implements revokeMySession operation.
+	//
+	// Revokes the session immediately (`state: revoked`). This is the logout operation.
+	// The __nextgen_session cookie issued at creation (or superseded by a handoff exchange) is required.
+	// After revocation, any tokens derived from this session are invalidated including the cookie itself,
+	//  which is cleared in the response.
+	//
+	// DELETE /sessions/me
+	RevokeMySession(ctx context.Context, params RevokeMySessionParams) (RevokeMySessionRes, error)
 	// RevokeSession implements revokeSession operation.
 	//
 	// Revokes the session immediately (`state: revoked`). This is the logout operation.
@@ -209,6 +339,12 @@ type Handler interface {
 	//
 	// POST /auth/revoke
 	RevokeToken(ctx context.Context, req *RevokeRequest) (RevokeTokenRes, error)
+	// SetUserPassword implements setUserPassword operation.
+	//
+	// Set user password.
+	//
+	// PUT /users/{user_id}/password
+	SetUserPassword(ctx context.Context, req *SetUserPasswordRequest, params SetUserPasswordParams) (SetUserPasswordRes, error)
 	// SubmitFlowEvent implements submitFlowEvent operation.
 	//
 	// Submits telemetry or fingerprint data from the frontend.
@@ -242,6 +378,14 @@ type Handler interface {
 	//
 	// POST /flow/{id}/submit
 	SubmitFlowStep(ctx context.Context, req *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error)
+	// UpdateFlowDefinition implements updateFlowDefinition operation.
+	//
+	// Update a flow definition by id. This endpoint completely replaces the existing flow definition.
+	// The status of the flow definition can also be updated by setting the `status` attribute in the
+	// flow definition.
+	//
+	// PUT /flow_definitions/{id}
+	UpdateFlowDefinition(ctx context.Context, req *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (UpdateFlowDefinitionRes, error)
 	// VerifyChallengeProof implements verifyChallengeProof operation.
 	//
 	// Submits a proof (credential, code, assertion) to verify a factor challenge.
@@ -255,10 +399,6 @@ type Handler interface {
 	//
 	// POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
 	VerifyChallengeProof(ctx context.Context, req *VerifyChallengeRequest, params VerifyChallengeProofParams) (VerifyChallengeProofRes, error)
-	// NewError creates *ErrorDetailsStatusCode from error returned by handler.
-	//
-	// Used for common default response.
-	NewError(ctx context.Context, err error) *ErrorDetailsStatusCode
 }
 
 // Server implements http server based on OpenAPI v3 specification and

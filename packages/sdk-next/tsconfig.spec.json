@@ -3,8 +3,8 @@
   "compilerOptions": {
     "outDir": "./out-tsc/vitest",
     "types": ["vitest/globals", "vitest/importMeta", "node", "vitest"],
-    "module": "nodenext",
-    "moduleResolution": "nodenext"
+    "module": "esnext",
+    "moduleResolution": "bundler"
   },
   "include": ["vite.config.mts", "src/**/*.spec.ts", "src/**/*.d.ts"],
   "references": [

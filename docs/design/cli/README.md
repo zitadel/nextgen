@@ -2,7 +2,7 @@
 
 > **Status:** Draft — plan + two concept docs for team feedback before implementation.
 > **Date:** 2026-04-23
-> **Context:** The [POC CLI](../../../apps/cli) (`client-cli` branch) has strong foundations — JSON envelope, pre-claim/claim split, capabilities registry — but needs to align with the [flow engine](../flowengine/README.md) design and gain the identity-management surface that the product vision requires.
+> **Context:** The [POC CLI](../../../apps/cli) (`client-cli` branch) has strong foundations — JSON envelope, capabilities registry — but needs to align with the [flow engine](../flowengine/README.md) design and gain the identity-management surface that the product vision requires.
 
 ## What needs feedback
 
@@ -41,7 +41,7 @@ The canonical directory list is read at [apps/cli/src/commands/apply.ts:144-150]
 - *"Bootstrap a couple of admin users in staging."* → Planned imperative bootstrap surface (not yet in the registry), not a file in `.zitadel/`.
 - *"Map `groups` from my customer's runtime-created IdP into a role claim."* → Subordinate config follows the parent: the IdP was created via API, so its claim mapping lives in that API call. Dev-side flow actions can transform claims after the fact, but they don't live in `.zitadel/idps/`.
 
-The per-resource sections in [identity-surface.md](identity-surface.md) carry a *Scope* callout restating this for each kind. AI agents reading [apps/cli/AGENTS.md](../../../apps/cli/AGENTS.md) see the same rule in the "CLI vs. runtime API" section.
+The per-resource sections in [identity-surface.md](identity-surface.md) carry a *Scope* callout restating this for each kind. AI agents reading [apps/cli/SKILLS.md](../../../apps/cli/SKILLS.md) see the current invocation rules.
 
 ## Plan
 
@@ -52,7 +52,6 @@ The gap analysis against the product vision is tracked in [PLAN.md](PLAN.md). Or
 3. Build the identity surface commands.
 4. Introduce the renderer abstraction and the Lit plug-in point.
 5. Add the diff/plan/apply reconciliation loop.
-6. Harden the claim lifecycle + agent ergonomics.
 
 ## Related
 
@@ -62,4 +61,4 @@ The gap analysis against the product vision is tracked in [PLAN.md](PLAN.md). Or
 - [Template Security](../flowengine/template-security.md) — invariants the CLI validates on `apply`
 - [User Schema Integration](../flowengine/user-schema.md)
 - [CLI source](../../../apps/cli)
-- [CLI agent contract (generated)](../../../apps/cli/AGENTS.md)
+- [CLI agent guidance](../../../apps/cli/SKILLS.md)

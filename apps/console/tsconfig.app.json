@@ -5,19 +5,9 @@
     "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo",
     "jsx": "react-jsx",
     "lib": ["dom", "DOM.Iterable"],
-    "types": [
-      "node",
-      "@nx/react/typings/cssmodule.d.ts",
-      "@nx/react/typings/image.d.ts",
-      "vite/client"
-    ],
+    "types": ["node", "vite/client"],
     "rootDir": "src"
   },
   "exclude": ["out-tsc", "dist", "src/**/*.spec.ts", "src/**/*.spec.tsx", "src/test-setup.ts"],
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "references": [
-    {
-      "path": "../../packages/components/tsconfig.lib.json"
-    }
-  ]
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

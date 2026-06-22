@@ -1,6 +1,7 @@
-import { workspaceRoot } from "@nx/devkit";
-import { nxE2EPreset } from "@nx/playwright/preset";
 import { defineConfig, devices } from "@playwright/test";
+import { resolve } from "node:path";
+
+const workspaceRoot = resolve(import.meta.dirname, "../..");
 
 /**
  * Read environment variables from file.
@@ -12,7 +13,7 @@ import { defineConfig, devices } from "@playwright/test";
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
-  ...nxE2EPreset(import.meta.filename, { testDir: "./src" }),
+  testDir: "./src",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     baseURL: "http://localhost:4173",
@@ -21,7 +22,7 @@ export default defineConfig({
   },
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: "npx nx run @zitadel-nextgen/console:preview",
+    command: "corepack pnpm --filter @zitadel/console run build && corepack pnpm --filter @zitadel/console run preview",
     url: "http://localhost:4173",
     reuseExistingServer: true,
     cwd: workspaceRoot,

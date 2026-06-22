@@ -1,0 +1,122 @@
+# ADR 014: Design tokens and paired React components for the auth surface
+
+## Status
+
+Accepted — 2026-05-19
+
+## Context
+
+The Zitadel NextGen auth surface ships as two parallel renderers:
+
+1. **`@zitadel/components`** — Lit web components plus the
+   `<zitadel-login>` orchestrator. Embedded by tenants on their own pages
+   and by the demo SDK adapters.
+2. **`apps/console`** — the internal Zitadel console, a pure React app
+   that needs the same visual primitives without the Lit runtime.
+
+Both surfaces are driven by the Figma file
+[`Zitadel - Design System - External`](https://www.figma.com/design/8UjCXw8yemgljmbkWGrSfE/Zitadel---Design-System---External).
+The four target screens for the first release are Sign In, Sign Up,
+Passkey upsell, and Signed In.
+
+We needed to answer three coupled questions:
+
+1. Where do design tokens live, and how do code and Figma stay in sync?
+2. How do Lit and React render the same visuals?
+3. How does the console pick up the Lit orchestrator without dragging
+   in a Lit adapter?
+
+## Decision
+
+### 1. A standalone `@zitadel/design-tokens` package
+
+The package is the only producer of `--zl-*` CSS variables, the typed
+`tokens` / `cssVars` constants, and the Tailwind v4 `@theme` block:
+
+```
+@zitadel/design-tokens
+├── figma-tokens.lock              # pinned Figma library version
+├── scripts/sync-from-figma.ts     # Figma REST API → figma.tokens.json
+├── scripts/build.ts               # JSON + overrides → CSS/TS/Tailwind
+└── src/
+    ├── overrides.ts               # tokens not exposed by Figma yet
+    ├── generated/tokens.css
+    ├── generated/tokens.ts
+    └── generated/tailwind.css
+```
+
+The lockfile, sync script, and generator are wrapped by a manual-trigger
+GitHub workflow that opens a PR with the regenerated files. A snapshot
+test in `tokens.snapshot.spec.ts` locks the public token surface so a
+designer renaming a variable can't ship silently.
+
+We deliberately did **not** adopt Style Dictionary or Token Studio: the
+amount of state to manage was small, and we wanted full control of the
+JSON → output shape (especially the Tailwind namespace mapping) for a
+clean Lit + React story.
+
+### 2. Lit atoms and paired React components, both consuming the same tokens
+
+Two thin layers:
+
+- **Lit atoms** in `packages/components/src/atoms/` consume tokens via the
+  `t` wrapper in `packages/components/src/styles/tokens.ts`, which
+  `unsafeCSS`-wraps the `cssVars` tree so atom CSS can write
+  `background: ${t.color.surface.defaultBlack};`.
+- **Paired React components** in `packages/ui-react/src/` are pure React.
+  They reach the same tokens via CSS variables in
+  `packages/ui-react/src/styles.css` (e.g. `.zr-btn--primary { background:
+  var(--zl-color-surface-default-white); }`).
+
+We did not use `@lit/react` for the React side — the goal is a console
+that ships zero Lit runtime. The Playwright spec in
+`apps/console-e2e/visual-parity.spec.ts` keeps the surfaces locked
+visually.
+
+### 3. Console embeds the Lit orchestrator via a tiny `createElement` wrapper
+
+The console is the only React surface that hosts the actual
+`<zitadel-login>` orchestrator (so reviewers can see the end-to-end
+flow). It does so through a 12-line `React.createElement("zitadel-login",
+…)` wrapper, not `@lit/react`. This keeps the dependency story honest:
+the console depends on `@zitadel/components` (the Lit element
+package) for the orchestrator side effect, on `@zitadel/ui-react`
+for chrome and previews, and on `@zitadel/design-tokens` for the
+shared variable layer.
+
+### 4. Branding attribution is a first-class branding flag
+
+`Branding.attribution` (new in this PR) toggles the "Secured with
+Zitadel" pill rendered by the orchestrator footer. Tenants can suppress
+it entirely (paid licence) or swap it for a `custom_link`. The
+attribution chip itself is a `<zl-pill>` so the visual treatment matches
+the rest of the chrome.
+
+### 5. Dark mode is the only mode for v1
+
+Figma currently publishes only a dark variable mode. The orchestrator's
+`ThemeController` and `branding-to-tokens.resolveTheme` both default to
+dark; light mode is opt-in (`branding.theme.mode = "light"` or
+auto-detected via `prefers-color-scheme`), but it falls through to dark
+until Figma publishes a light variable mode and the build emits a
+matching `[data-theme="light"]` block in `tokens.css`.
+
+## Consequences
+
+- One source of truth for visuals across Lit and React; both
+  packages own their own CSS but read the same variables.
+- Designers can rename or restructure tokens; the snapshot test catches
+  it before the sync PR merges.
+- Tenants can't ship custom React without consuming
+  `@zitadel/ui-react`; that's a deliberate constraint to keep
+  the visual contract stable.
+- The console gives up the `@lit/react` typed-prop ergonomics; that's
+  fine — the `createElement` wrapper is one line per attribute and the
+  orchestrator's properties are accessed via `ref`.
+
+## Related work
+
+- [`packages/design-tokens/README.md`](../../packages/design-tokens/README.md)
+- [`packages/ui-react/README.md`](../../packages/ui-react/README.md)
+- [`packages/components/README.md`](../../packages/components/README.md)
+- [`.github/workflows/sync-design-tokens.yml`](../../.github/workflows/sync-design-tokens.yml)

@@ -6,13 +6,17 @@
  * real implementations.
  */
 
-declare module '#imports' {
-  export function useState<T>(
-    key: string,
-    init: () => T,
-  ): { readonly value: T };
+declare module "#imports" {
+  export function useState<T>(key: string, init: () => T): { readonly value: T };
   export function defineNuxtPlugin(setup: () => void): unknown;
-  export function useRequestEvent():
-    | { context: Record<string, unknown> }
-    | undefined;
+  export function useRequestEvent(): { context: Record<string, unknown> } | undefined;
+  export function useRuntimeConfig(): {
+    nextgen?: {
+      url?: string;
+      issuerUrl?: string;
+      loginPath?: string;
+      protectedRoutes?: string[];
+    };
+    public: Record<string, unknown>;
+  };
 }

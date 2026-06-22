@@ -1,18 +1,19 @@
 type: object
 description: |
-  Scopes which teams, apps, or projects this flow definition applies to.
-  When all fields are empty/omitted, the definition is a project-wide default.
-  The engine picks the most specific matching definition: app > team > project.
+  Scopes which teams or apps this flow definition applies to. Empty or
+  omitted fields mean "no restriction"; when both are empty the definition
+  matches every request in the project. The engine picks the most specific
+  matching definition: app > team > project-wide.
 properties:
   team_ids:
     type: array
     items:
       type: string
-    description: Restrict to specific teams (organizations).
+    description: Restrict to specific teams (organizations). Empty means no team restriction.
     example: ["team_acme"]
   app_ids:
     type: array
     items:
       type: string
-    description: Restrict to specific applications.
+    description: Restrict to specific applications. Empty means no app restriction.
     example: ["app_saas"]

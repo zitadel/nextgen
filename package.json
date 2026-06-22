@@ -1,36 +1,53 @@
 {
-  "name": "@zitadel-nextgen/source",
+  "name": "@zitadel/source",
   "version": "0.0.0",
   "private": true,
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "scripts": {
-    "build": "corepack pnpm -r build",
-    "typecheck": "corepack pnpm -r typecheck",
-    "test": "corepack pnpm -r test",
-    "zitadel": "node scripts/zitadel-dev.mjs"
+    "doctor": "node scripts/doctor.mjs",
+    "cli": "node scripts/run-cli.mjs",
+    "server": "node scripts/run-server.mjs",
+    "docs": "moon run docs:dev",
+    "journey": "node scripts/run-journey.mjs",
+    "check": "node scripts/check.mjs",
+    "release:snapshot": "moon run release:snapshot",
+    "release:publish": "moon run release:publish"
   },
   "devDependencies": {
-    "@nx/devkit": "catalog:",
-    "@nx/eslint-plugin": "catalog:",
-    "@nx/js": "catalog:",
-    "@nx/playwright": "catalog:",
-    "@nx/vite": "catalog:",
-    "@nx/vitest": "catalog:",
+    "@changesets/changelog-github": "^0.7.0",
+    "@changesets/cli": "^2.31.0",
+    "@moonrepo/cli": "catalog:",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
-    "nx": "catalog:",
     "oxfmt": "catalog:",
     "oxlint": "catalog:",
     "sharp": "catalog:",
     "typescript": "catalog:",
+    "verdaccio": "6.2.2",
     "vite": "catalog:",
     "vitest": "catalog:"
   },
-  "packageManager": "pnpm@10.33.2",
+  "packageManager": "pnpm@10.33.2+sha256.7a7bcf13d7f6ceb3946c03978373d99be9fde1cafc3000bdfed4c4f791167610",
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",
       "sharp"
-    ]
+    ],
+    "supportedArchitectures": {
+      "os": [
+        "current",
+        "darwin",
+        "linux",
+        "win32"
+      ],
+      "cpu": [
+        "current",
+        "x64",
+        "arm64"
+      ]
+    },
+    "overrides": {
+      "@types/react": "^19.2.14"
+    }
   }
 }

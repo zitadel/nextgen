@@ -1,0 +1,50 @@
+# yaml-language-server: $schema=../flow-definition.yaml
+#
+# Example flow definition: a login flow with identifier + password,
+# a captcha gate, two SSO providers, a switch to register when the
+# identifier doesn't match a user, and a pivot to recovery.
+#
+# Demonstrates: multi-step graph, schema-driven fields, gates,
+# sso_providers, reserved outcomes (user_not_found, callback),
+# switch vs pivot transitions, and a terminal step.
+
+name: standard-login
+user_schema: https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml
+
+purposes:
+  login: identify
+
+steps:
+  - name: identify
+    fields: [email]
+    actions:
+      submit:
+        primary: true
+      forgot_password: {}
+    gates:
+      bot_check:
+        kind: captcha
+        provider: altcha
+    sso_providers:
+      - id: google
+        name: Google
+        template: google
+      - id: corp_idp
+        name: Acme SSO
+        template: entraid
+    transitions:
+      submit: { target: authenticate }
+      user_not_found: { target: register, action: switch }
+      forgot_password: { target: recovery, action: pivot }
+      callback: { target: done }
+
+  - name: authenticate
+    fields: [password]
+    actions:
+      submit:
+        primary: true
+    transitions:
+      submit: { target: done }
+
+  - name: done
+    complete: redirect

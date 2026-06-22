@@ -1,0 +1,116 @@
+/**
+ * Layout chrome injected as an `adoptedStyleSheet` on the orchestrator's
+ * shadow root. Provides the page background and the attribution-footer
+ * positioning that lives *outside* any template — the rest of the visual
+ * surface is owned by the `<zl-page-shell>` / `<zl-card>` atoms the
+ * templates render. Token references resolve against the
+ * `@zitadel/design-tokens` CSS variables that are present on
+ * `:host` via the branding stylesheet.
+ */
+
+:host {
+  display: block;
+  min-height: 100%;
+  background: var(--zl-color-surface-default-black, #0f0f11);
+  color: var(--zl-color-text-primary-white, #f4f4f6);
+  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
+}
+.zl-mount {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: inherit;
+  color: inherit;
+}
+.zl-mount > zl-page-shell,
+.zl-mount > [data-zl-template-root] {
+  flex: 1 1 auto;
+}
+.zl-attribution {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: transparent;
+}
+.zl-attribution[hidden] {
+  display: none;
+}
+/* Card header typography — Figma "Desktop/Headings/Small" + "Body Small
+   Regular" pattern shared by sign-in (6593:141740), passkey upsell
+   (6594:89142 / 6594:12796), and signed-in (6596:132845). Templates
+   slot raw <h1>/<p> elements into <zl-card>, which keeps them in the
+   light DOM where the orchestrator's stylesheet can reach them — the
+   atom intentionally doesn't dictate typography. */
+.zl-card-title {
+  margin: 0;
+  font-family: var(--zl-font-family-heading, var(--zl-font-family-sans, system-ui, sans-serif));
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 2.5rem;
+  letter-spacing: -0.02em;
+  color: var(--zl-color-text-primary-white, #f4f4f6);
+  text-align: left;
+}
+.zl-card-subtitle {
+  margin: 0;
+  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 400;
+  color: var(--zl-color-text-primary-white, #f4f4f6);
+}
+/* Figma 6593:141989 / 6594:12882 — left-aligned in Field+CTAs (x=0, items-start). */
+.zl-card-nav {
+  margin: 0;
+  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 400;
+  color: var(--zl-color-text-primary-white, #f4f4f6);
+  text-align: left;
+}
+.zl-card-nav__link {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  line-height: inherit;
+  color: var(--zl-color-icon-default-purple, #bba5e4);
+  text-decoration: none;
+  cursor: pointer;
+}
+.zl-card-nav__link:hover {
+  text-decoration: underline;
+}
+.zl-card-nav__link:focus-visible {
+  outline: var(--zl-focus-width, 2px) solid var(--zl-focus-color, #f4f4f6);
+  outline-offset: var(--zl-focus-offset, 2px);
+}
+/* Figma 6593:141989 — forgot password row (left-aligned, before CTAs). */
+.zl-card-forgot {
+  margin: 0;
+  text-align: left;
+}
+.zl-card-forgot__link {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 400;
+  color: var(--zl-color-icon-default-purple, #bba5e4);
+  text-decoration: none;
+  cursor: pointer;
+}
+.zl-card-forgot__link:hover {
+  text-decoration: underline;
+}
+.zl-card-forgot__link:focus-visible {
+  outline: var(--zl-focus-width, 2px) solid var(--zl-focus-color, #f4f4f6);
+  outline-offset: var(--zl-focus-offset, 2px);
+}

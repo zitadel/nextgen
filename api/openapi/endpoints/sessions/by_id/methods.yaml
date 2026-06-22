@@ -11,6 +11,7 @@ get:
   tags:
     - Sessions
   parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/session-id.yaml
   security:
     - oauth2:
@@ -52,6 +53,7 @@ delete:
   tags:
     - Sessions
   parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/session-id.yaml
   security:
     - oauth2:
@@ -59,6 +61,9 @@ delete:
   responses:
     '204':
       description: Session revoked successfully.
+      headers:
+        Set-Cookie:
+          $ref: ../../../components/headers/set-cookie-session-token.yaml
     '401':
       description: Missing or invalid session token.
       content:

@@ -1,7 +1,7 @@
 # Bot Detection & Captcha
 
-> **Status:** Preliminary — depends on policy engine design
-> **See also:** [Overview](README.md) · [Flow Engine](flow-engine.md) · [Session API](session-api.md)
+> **Status:** Contract decided in [ADR 019](../../adrs/019-captcha-gate-and-bot-signals.md); risk-based activation still depends on policy engine design
+> **See also:** [Overview](README.md) · [Flow Engine](flow-engine.md) · [Session API](session-api.md) · [ADR 019](../../adrs/019-captcha-gate-and-bot-signals.md)
 > **POC ADRs:** [021](https://github.com/zitadel/oxidel/blob/main/docs/adr/021-login-flow-schema.md) Bot Detection & Telemetry, [024](https://github.com/zitadel/oxidel/blob/main/docs/adr/024-risk-evaluation-policy-consumers.md) Risk Evaluation
 
 Bot detection is a **first-class, composable subsystem** — not an afterthought bolted onto login.
@@ -39,6 +39,26 @@ Bot detection is a **first-class, composable subsystem** — not an afterthought
               Policy Engine consumes
               RiskResult and decides
 ```
+
+### Platform / edge signals
+
+Apps deployed behind an edge platform (e.g. Cloudflare, Vercel, Netlify) often already
+run bot management there — Cloudflare managed challenge / WAF, Vercel BotID, etc. —
+producing a **server-side verdict with no widget**. The provider list is open; the
+contract is provider-agnostic. That verdict is a first-class signal:
+
+- **Capture:** the SDK Edge proxy (`/__nextgen`, running in the customer's deployment)
+  reads the platform verdict server-side and stamps it on the proxied flow request as the
+  reserved header `X-Zitadel-Risk-Signal` (structured-field: `provider`, `level`, optional
+  `score`/`reasons`).
+- **Trust:** Zitadel honors the header only when the request also carries a valid
+  origin-scoped `sk_proj_` secret (the `ZITADEL_PREVIEW_SECRET` already provisioned to the
+  deploy platform — see [secret.md](../platform/secret.md)). Browser-relayed signals are
+  ignored.
+- **Effect:** the risk evaluator fuses it like any other signal — a `clean` verdict can
+  suppress an otherwise-required captcha; a `suspicious` verdict can inject one.
+
+Full contract and trust model: [ADR 019](../../adrs/019-captcha-gate-and-bot-signals.md).
 
 ## Captcha Providers
 
@@ -92,10 +112,8 @@ Third-party providers require configuration (site key, secret key) at the projec
 ```json
 {
   "kind": "captcha",
-  "name": "captcha",
-  "label": "Complete the challenge",
+  "provider": "recaptcha",
   "config": {
-    "provider": "recaptcha",
     "site_key": "6Lc..."
   }
 }
@@ -106,10 +124,8 @@ vs. the built-in Altcha:
 ```json
 {
   "kind": "captcha",
-  "name": "captcha",
-  "label": "Complete the challenge",
+  "provider": "altcha",
   "config": {
-    "provider": "altcha",
     "algorithm": "SHA-256",
     "challenge": "abc...",
     "salt": "xyz...",
@@ -118,7 +134,7 @@ vs. the built-in Altcha:
 }
 ```
 
-The frontend dispatches on `config.provider` to render the right widget. The submit payload varies by provider (Altcha sends `{ salt, number }`, reCAPTCHA/hCaptcha/Turnstile send `{ token }`).
+The frontend dispatches on the gate's `provider` to render the right widget. The submit payload varies by provider (Altcha sends `{ salt, number }`, reCAPTCHA/hCaptcha/Turnstile send `{ token }`).
 
 ### Schema Annotation
 
@@ -173,19 +189,26 @@ Exceeding soft limits elevates risk (triggering captcha). Exceeding hard limits 
 
 Three modes:
 
-1. **Explicit step** — for flows that always want captcha (e.g., public registration):
-   ```json
+1. **Step-level gate** — for flows that always want captcha (e.g., public registration):
+
+```json
    {
-     "name": "bot_check",
-     "type": "captcha",
-     "config": { "provider": "altcha", "difficulty": 3 },
-     "transitions": { "verified": "register_profile" }
+     "name": "profile",
+     "fields": ["email", "given_name", "family_name"],
+     "gates": {
+       "captcha": { "kind": "captcha", "provider": "altcha" }
+     },
+     "transitions": {
+       "submit": { "target": "set_password" }
+     }
    }
-   ```
+```
+   
+The `gates.captcha` declaration means the frontend must solve a captcha (using the configured provider) before submission is accepted.
 
-2. **Dynamic injection** — policy evaluates risk and injects captcha via the step injection mechanism.
+2. **Dynamic injection** — policy evaluates risk and injects a captcha gate on any step dynamically, even if the definition doesn't declare it.
 
-3. **Invisible assessment** — a `policy_check` step evaluates risk. Low score → skip. High score → inject captcha.
+3. **Risk-based activation** — the engine evaluates risk after every submit. Low score → proceed. High score → inject captcha gate on the current or next step.
 
 ## Integration: Auth Attempts
 

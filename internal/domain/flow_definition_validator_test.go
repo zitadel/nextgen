@@ -1,0 +1,1249 @@
+package domain_test
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+	"testing"
+
+	"github.com/ianlancetaylor/jsonschema"
+	"github.com/muhlemmer/gu"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/internal/domain"
+)
+
+func errorDetails(t *testing.T, err error) string {
+	t.Helper()
+	var domErr domain.Error
+	if !errors.As(err, &domErr) {
+		return err.Error()
+	}
+	if domErr.Details == nil {
+		return domErr.Error()
+	}
+	return fmt.Sprint(domErr.Details)
+}
+
+func mustSchema(t *testing.T, raw []byte) *jsonschema.Schema {
+	t.Helper()
+	var s jsonschema.Schema
+	require.NoError(t, json.Unmarshal(raw, &s))
+	return &s
+}
+
+var userSchemaIDAndPassword = []byte(`{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant.com/schemas/idpw-user.json",
+  "type": "object",
+  "required": ["email"],
+  "x-auth-methods": {
+    "password": { "enabled": true, "position": 0 }
+  },
+  "properties": {
+    "email":    { "type": "string", "format": "email", "x-unique": "team" },
+    "password": { "type": "string", "minLength": 8, "x-password": true }
+  }
+}`)
+
+var tenantUserSchema = []byte(`{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "metaSchema": "https://nextgen.com/schemas/user-meta-schema.json",
+  "$id": "https://tenant.com/schemas/my-user.json",
+  "kind": "user-schema",
+  "type": "object",
+  "required": [
+    "email"
+  ],
+  "x-auth-methods": {
+    "password": {
+      "enabled": true,
+      "position": 0
+    }
+  },
+  "properties": {
+    "email": {
+      "title": "Email Address",
+      "type": "string",
+      "format": "email",
+      "x-identifier": true,
+      "x-unique": "project"
+    }
+  }
+}`)
+
+var tenantUserSchemaNoProps = []byte(`{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "metaSchema": "https://nextgen.com/schemas/user-meta-schema.json",
+  "$id": "https://tenant.com/schemas/my-user.json",
+  "kind": "user-schema",
+  "type": "object",
+  "required": [
+    "email"
+  ],
+  "x-auth-methods": {
+    "password": {
+      "enabled": true,
+      "position": 0
+    }
+  }
+}`)
+
+func TestValidateFlowDefinition(t *testing.T) {
+	var userSchema jsonschema.Schema
+	marshalErr := json.Unmarshal(tenantUserSchema, &userSchema)
+	require.NoError(t, marshalErr, "failed to unmarshal tenant user schema")
+
+	var userSchemaNoProps jsonschema.Schema
+	marshalErr = json.Unmarshal(tenantUserSchemaNoProps, &userSchemaNoProps)
+	require.NoError(t, marshalErr, "failed to unmarshal tenant user schema")
+
+	type args struct {
+		userSchema     *jsonschema.Schema
+		flowDefinition domain.FlowDefinition
+	}
+	tests := []struct {
+		name                string
+		args                args
+		wantPivotingTargets []domain.PivotingTarget
+		wantErr             error
+	}{
+		{
+			name: "valid simple flow definition",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []string{"email"},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "step_2"},
+							},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+							},
+						},
+						{
+							Name:     "step_2",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "valid flow with cycles",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "identify",
+							Fields: []string{"email"},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit},
+
+								{Name: "get_help", Kind: domain.FlowActionKindSubmit},
+							},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit":   {Target: "done"},
+								"get_help": {Target: "help"},
+							},
+						},
+						{
+							Name: "help",
+							Actions: []domain.FlowStepAction{
+								{Name: "go_back", Kind: domain.FlowActionKindNavigate},
+							},
+							Transitions: map[string]domain.FlowStepTransition{
+								"go_back": {Target: "identify"}, // cycle back to identify
+							},
+						},
+						{
+							Name:     "done",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "valid flow with pivoting",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "start",
+							Fields: []string{"email"},
+							Actions: []domain.FlowStepAction{
+								{Name: "loop", Kind: domain.FlowActionKindSubmit},
+
+								{Name: "pivot", Kind: domain.FlowActionKindSubmit},
+							},
+							Transitions: map[string]domain.FlowStepTransition{
+								"loop":  {Target: "middle"},
+								"pivot": {Target: "external-flow", Action: gu.Ptr(domain.Switch)}, // switch to external flow
+							},
+						},
+						{
+							Name: "middle",
+							Actions: []domain.FlowStepAction{
+								{Name: "back", Kind: domain.FlowActionKindNavigate},
+							},
+							Transitions: map[string]domain.FlowStepTransition{
+								"back": {Target: "start"}, // cycle back to identify
+							},
+						},
+					},
+				},
+			},
+			wantPivotingTargets: []domain.PivotingTarget{
+				{
+					Name:       "external-flow",
+					Step:       "start",
+					Transition: "pivot",
+				},
+			},
+		},
+		{
+			name: "valid with sso providers",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name: "identify",
+							SSOProviders: []domain.FlowSSOProvider{
+								{
+									ID:       "google",
+									Name:     "Google",
+									Template: "google",
+								},
+							},
+							Transitions: map[string]domain.FlowStepTransition{
+								"callback": {Target: "done"},
+							},
+						},
+						{
+							Name:     "done",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "invalid with sso providers",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name: "identify",
+							SSOProviders: []domain.FlowSSOProvider{
+								{
+									ID:       "google",
+									Name:     "Google",
+									Template: "google",
+								},
+							},
+							Transitions: map[string]domain.FlowStepTransition{
+								"cancel": {Target: "done"},
+							},
+						},
+						{
+							Name:     "done",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "identify": has sso_providers but is missing transitions.callback`, nil),
+		},
+		{
+			name: "invalid with inescapable cycle",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "enter"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name: "enter",
+							Actions: []domain.FlowStepAction{
+								{Name: "next", Kind: domain.FlowActionKindSubmit},
+							},
+							Transitions: map[string]domain.FlowStepTransition{
+								"next": {Target: "trap_a"},
+							},
+						},
+						{
+							Name: "trap_a",
+							Actions: []domain.FlowStepAction{
+								{Name: "loop", Kind: domain.FlowActionKindSubmit},
+							},
+							Transitions: map[string]domain.FlowStepTransition{
+								"loop": {Target: "trap_b"},
+							},
+						},
+						{
+							Name: "trap_b",
+							Actions: []domain.FlowStepAction{
+								{Name: "loop", Kind: domain.FlowActionKindSubmit},
+							},
+							Transitions: map[string]domain.FlowStepTransition{
+								"loop": {Target: "trap_a"},
+							},
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "enter" is trapped: no path to a terminal step or another flow`, nil),
+		},
+		{
+			name: "invalid with a dead end",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name: "start",
+							Actions: []domain.FlowStepAction{
+								{Name: "next", Kind: domain.FlowActionKindSubmit},
+							},
+							Transitions: map[string]domain.FlowStepTransition{
+								"next": {Target: "broken_step"},
+							},
+						},
+						{
+							Name:   "broken_step",
+							Fields: []string{"email"},
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "broken_step" is non-terminal but has no outgoing transitions`, nil),
+		},
+		{
+			name: "invalid flow with unreachable step",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name: "start",
+							Actions: []domain.FlowStepAction{
+								{Name: "next", Kind: domain.FlowActionKindSubmit},
+							},
+							Transitions: map[string]domain.FlowStepTransition{
+								"next": {Target: "done"},
+							},
+						},
+						{
+							Name:   "catch_me_if_you_can",
+							Fields: []string{"email"},
+							Actions: []domain.FlowStepAction{
+								{Name: "next", Kind: domain.FlowActionKindSubmit},
+							},
+							Transitions: map[string]domain.FlowStepTransition{
+								"next": {Target: "done"},
+							},
+						},
+						{
+							Name:     "done",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "catch_me_if_you_can" is unreachable from any entry point`, nil),
+		},
+		{
+			name: "invalid flow with a non-terminal step which does nothing",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "doing_nothing"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name: "doing_nothing",
+							Transitions: map[string]domain.FlowStepTransition{
+								"next": {Target: "done"},
+							},
+						},
+						{
+							Name:     "done",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "doing_nothing" is non-terminal but has no fields, actions, sso_providers, gates, or transitions.callback`, nil),
+		},
+		{
+			name: "invalid flow with missing entry point in steps",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []string{"email"},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "step_2"},
+							},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+							},
+						},
+						{
+							Name:     "step_2",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`purpose "login" targets unknown entry-point step "start"`, nil),
+		},
+		{
+			name: "invalid flow with missing entry point in steps",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []string{"email"},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "step_2"},
+							},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+							},
+						},
+						{
+							Name:     "step_2",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`purpose "login" targets unknown entry-point step "start"`, nil),
+		},
+		{
+			name: "invalid flow with no purpose",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []string{"email"},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "step_2"},
+							},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+							},
+						},
+						{
+							Name:     "step_2",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`no purposes defined`, nil),
+		},
+		{
+			name: "invalid flow with an invalid purpose",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{6: "step_1"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []string{"email"},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "step_2"},
+							},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+							},
+						},
+						{
+							Name:     "step_2",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`'FlowDefinitionPurpose(6)' is not a valid purpose`, nil),
+		},
+		{
+			name: "invalid flow with no entry step",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1", domain.FlowDefinitionPurposeRegister: ""},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []string{"email"},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "step_2"},
+							},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+							},
+						},
+						{
+							Name:     "step_2",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`initial step for purpose 'register' is empty`, nil),
+		},
+		{
+			name: "user schema with no properties",
+			args: args{
+				userSchema: &userSchemaNoProps,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []string{"email"},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "step_2"},
+							},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+							},
+						},
+						{
+							Name:     "step_2",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`user schema has no properties`, nil),
+		},
+		{
+			name: "fields not in user schema",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []string{"username", "password"},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "step_2"},
+							},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+							},
+						},
+						{
+							Name:     "step_2",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "step_1": field "username" is not a property in the user schema`, nil),
+		},
+		{
+			name: "invalid flow - a terminal step with fields",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []string{"email"},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "step_2"},
+							},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+							},
+						},
+						{
+							Name:     "step_2",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+							Fields:   []string{"email"},
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "step_2" is terminal (complete is set) but has fields, actions, transitions, gates, or sso_providers`, nil),
+		},
+		{
+			name: "invalid flow - action without a matching transition",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []string{"email"},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+							},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit11": {Target: "step_2"},
+							},
+						},
+						{
+							Name:     "step_2",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "step_1": action "submit" has no matching transition`, nil),
+		},
+		{
+			name: "invalid flow - transaction is not a declared action or a reserved outcome",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "start"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "start",
+							Fields: []string{"email"},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+							},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit":     {Target: "done"},
+								"magic_link": {Target: "done"},
+							},
+						},
+						{
+							Name:     "done",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "start": transition key "magic_link" is not an action name or reserved outcome (user_not_found, user_already_exists, callback)`, nil),
+		},
+		{
+			name: "invalid flow - duplicate step names",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []string{"email"},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit},
+							},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "done"},
+							},
+						},
+						{
+							Name:   "step_1",
+							Fields: []string{"email"},
+							Actions: []domain.FlowStepAction{
+								{Name: "next", Kind: domain.FlowActionKindSubmit},
+							},
+							Transitions: map[string]domain.FlowStepTransition{
+								"next": {Target: "done"},
+							},
+						},
+						{
+							Name:     "done",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`duplicate step name "step_1"`, nil),
+		},
+		{
+			name: "invalid flow - target not a step name",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []string{"email"},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit},
+
+								{Name: "next", Kind: domain.FlowActionKindSubmit},
+							},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "done"},
+								"next":   {Target: "step_2"},
+							},
+						},
+						{
+							Name:     "done",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "step_1": transition "next" targets unknown step "step_2"`, nil),
+		},
+		{
+			name: "invalid flow - target not a step name",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/my-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []string{"email"},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit},
+
+								{Name: "next", Kind: domain.FlowActionKindSubmit},
+							},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "done"},
+								"next":   {Target: "step_2"},
+							},
+						},
+						{
+							Name:     "done",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "step_1": transition "next" targets unknown step "step_2"`, nil),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := domain.ValidateFlowDefinition(tt.args.userSchema, tt.args.flowDefinition)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, got)
+				assertErrorDetails(t, err, tt.wantErr)
+				return
+			}
+			assert.Equal(t, tt.wantPivotingTargets, got)
+		})
+	}
+}
+
+func assertErrorDetails(t *testing.T, err error, wantErr error) {
+	var gotErr domain.Error
+	assert.ErrorAs(t, err, &gotErr)
+
+	var wantDomainErr domain.Error
+	assert.ErrorAs(t, wantErr, &wantDomainErr)
+
+	assert.Equal(t, wantDomainErr.Code, gotErr.Code)
+	assert.Equal(t, wantDomainErr.Message, gotErr.Message)
+	assert.Equal(t, wantDomainErr.Details, gotErr.Details)
+}
+
+// ---- Flip-table coverage ----
+
+// Combined login + register entry must wire the counter outcome
+// (user_not_found or user_already_exists).
+func TestValidator_FlipTable_CombinedLoginRegisterRequiresCounterOutcome(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	createUser := domain.FlowOnSuccessCreateUser
+	def := domain.FlowDefinition{
+		ProjectID:     "p",
+		Name:          "combined",
+		SchemaVersion: "1.0.0",
+		UserSchema:    "https://tenant.com/schemas/idpw-user.json",
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin:    "identify",
+			domain.FlowDefinitionPurposeRegister: "identify",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "identify",
+				Fields: []string{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit": {Target: "signin"},
+				},
+			},
+			{
+				Name:      "signin",
+				Fields:    []string{"email", "password"},
+				OnSuccess: &createUser,
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit": {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
+		},
+	}
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.Error(t, err)
+	details := errorDetails(t, err)
+	// Map iteration order is non-deterministic; either missing flip
+	// outcome is a valid surfacing.
+	assert.True(t,
+		strings.Contains(details, "user_not_found") || strings.Contains(details, "user_already_exists"),
+		"want flip-coverage error, got: %s", details)
+}
+
+// Solo-purpose login flow does NOT need user_not_found wired.
+func TestValidator_FlipTable_SoloLoginNoFlipRequired(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	def := domain.FlowDefinition{
+		ProjectID:     "p",
+		Name:          "solo-login",
+		SchemaVersion: "1.0.0",
+		UserSchema:    "https://tenant.com/schemas/idpw-user.json",
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "credentials",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "credentials",
+				Fields: []string{"email", "password"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit": {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
+		},
+	}
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.NoError(t, err)
+}
+
+// ---- on_success manifest cross-check ----
+
+// create_user must have password collected somewhere upstream.
+func TestValidator_Manifest_CreateUserRequiresPasswordUpstream(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	createUser := domain.FlowOnSuccessCreateUser
+	def := domain.FlowDefinition{
+		ProjectID:     "p",
+		Name:          "missing-password",
+		SchemaVersion: "1.0.0",
+		UserSchema:    "https://tenant.com/schemas/idpw-user.json",
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeRegister: "identify",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "identify",
+				Fields: []string{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit": {Target: "create"},
+				},
+			},
+			{
+				Name:      "create",
+				Fields:    []string{"email"},
+				OnSuccess: &createUser,
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit": {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
+		},
+	}
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err), "password")
+}
+
+// Worked example A: register-only, multi-step. Identifier on profile,
+// password on set-password, create_user on confirm.
+func TestValidator_PositiveWorkedExampleA(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	createUser := domain.FlowOnSuccessCreateUser
+	def := domain.FlowDefinition{
+		ProjectID:     "p",
+		Name:          "multi-signup",
+		SchemaVersion: "1.0.0",
+		UserSchema:    "https://tenant.com/schemas/idpw-user.json",
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeRegister: "profile",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "profile",
+				Fields: []string{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit": {Target: "set-password"},
+				},
+			},
+			{
+				Name:   "set-password",
+				Fields: []string{"password"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit": {Target: "confirm"},
+				},
+			},
+			{
+				Name:      "confirm",
+				Fields:    []string{"email"},
+				OnSuccess: &createUser,
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit": {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
+		},
+	}
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.NoError(t, err)
+}
+
+// Worked example C: combined login+register with both flip outcomes wired.
+func TestValidator_PositiveWorkedExampleC(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	createUser := domain.FlowOnSuccessCreateUser
+	def := domain.FlowDefinition{
+		ProjectID:     "p",
+		Name:          "combined",
+		SchemaVersion: "1.0.0",
+		UserSchema:    "https://tenant.com/schemas/idpw-user.json",
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin:    "identify",
+			domain.FlowDefinitionPurposeRegister: "identify",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "identify",
+				Fields: []string{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit":              {Target: "signin"},
+					"user_not_found":      {Target: "register"},
+					"user_already_exists": {Target: "signin"},
+				},
+			},
+			{
+				Name:   "signin",
+				Fields: []string{"password"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit": {Target: "done"},
+				},
+			},
+			{
+				Name:      "register",
+				Fields:    []string{"email", "password"},
+				OnSuccess: &createUser,
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit": {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
+		},
+	}
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.NoError(t, err)
+}
+
+// TestValidator_DuplicateActionRejected pins ADR 021: with Actions as an
+// ordered slice, two entries sharing a name are no longer collapsed by map
+// semantics; the validator must reject them.
+func TestValidator_DuplicateActionRejected(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	def := domain.FlowDefinition{
+		ProjectID: "p", Name: "f", SchemaVersion: "1",
+		UserSchema: "https://tenant.com/schemas/idpw-user.json",
+		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "step", Fields: []string{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: "submit", Kind: domain.FlowActionKindSubmit},
+				},
+				Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
+			},
+			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
+		},
+	}
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err), `duplicate action "submit"`)
+}
+
+// TestValidator_EmptyActionNameRejected guards against array entries lacking
+// the required name selector.
+func TestValidator_EmptyActionNameRejected(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	def := domain.FlowDefinition{
+		ProjectID: "p", Name: "f", SchemaVersion: "1",
+		UserSchema: "https://tenant.com/schemas/idpw-user.json",
+		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "step", Fields: []string{"email"},
+				Actions:     []domain.FlowStepAction{{Primary: true}},
+				Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
+			},
+			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
+		},
+	}
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err), "action has empty name")
+}
+
+// TestValidator_MissingActionKindRejected guards against actions declared
+// without the required `kind` field — the engine has no way to decide how
+// to route an action whose kind is unset.
+func TestValidator_MissingActionKindRejected(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	def := domain.FlowDefinition{
+		ProjectID: "p", Name: "f", SchemaVersion: "1",
+		UserSchema: "https://tenant.com/schemas/idpw-user.json",
+		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "step", Fields: []string{"email"},
+				Actions:     []domain.FlowStepAction{{Name: "submit"}},
+				Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
+			},
+			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
+		},
+	}
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err), `action "submit" has no kind`)
+}

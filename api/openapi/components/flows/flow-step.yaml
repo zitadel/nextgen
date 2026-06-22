@@ -1,86 +1,94 @@
 type: object
-required: [name, type, fields, actions, gates]
+required: [name, fields, actions, gates]
 description: |
-  A step contains unordered capability dictionaries: what to collect (fields),
+  A step contains ordered capability arrays: what to collect (fields),
   what the user can do (actions), and what security gates must be satisfied (gates).
-  Layout and element ordering are controlled by the LiquidJS template in `branding.liquid_template`.
+  The LiquidJS template in `branding.liquid_template` iterates these arrays in order
+  and builds name-keyed indexes locally for lookup.
+example:
+  name: login
+  texts:
+    title_key: login.title
+    description_key: login.description
+  fields:
+    - name: email
+      type: email
+      text_key: login.field.email
+      required: true
+    - name: password
+      type: password
+      text_key: login.field.password
+      required: true
+  actions:
+    - name: submit
+      text_key: login.action.submit
+      primary: true
+    - name: register
+      text_key: login.action.register
+    - name: recover
+      text_key: login.action.recover
+  gates:
+    captcha:
+      kind: captcha
+      provider: altcha
+      config:
+        algorithm: SHA-256
+        challenge: abc123
+        salt: xyz789
+        max_number: 100000
+  sso_providers:
+    - id: google-1
+      name: Google
+      template: google
+    - id: entra-1
+      name: Microsoft
+      template: entraid
 properties:
   name:
     type: string
     description: Step name from the flow definition.
-  type:
-    type: string
-    enum: [identifier, credential, form, verification, consent, info, redirect, captcha, complete]
-    description: |
-      Semantic step type. This is a hint, not a rendering instruction — the
-      LiquidJS template controls layout. The frontend does NOT switch on type
-      to decide what to render; it renders the capability dictionaries
-      (fields, actions, gates, sso_providers) using the template.
-
-      Type is useful for:
-      - Accessibility: screen readers can announce "credential step"
-      - Analytics: track drop-off rates per step type
-      - Special behavior: `redirect` and `complete` have hardcoded
-        frontend behavior (navigate away) that templates cannot override
-      - Gate auto-injection: backend uses type to enforce gates even if
-        the template omits them (e.g. `captcha` type always requires a
-        captcha gate)
-
-      The following types are rendered by the frontend:
-      - identifier: collect login handle (email, phone, username)
-      - credential: collect secret (password, OTP, passkey proof)
-      - form: generic data collection (profile, address)
-      - verification: email/phone code entry
-      - consent: terms, scopes, permissions (approve/deny)
-      - info: read-only screen (success message, warning)
-      - captcha: dedicated captcha challenge
-      - redirect: navigate to redirect_url immediately, no UI rendered
-      - complete: flow is done — check `behavior` field
-
-      The following types exist only in flow definitions and are never
-      sent to the frontend (the engine auto-transitions through them):
-      - policy_check: evaluate a policy condition, pick next step
-      - action: execute a server-side mutation (create session, etc.)
   texts:
     $ref: step-texts.yaml
   error:
     oneOf:
       - type: string
       - type: 'null'
-    type: string
     description: Error message from a previous failed submission.
-  behavior:
+  complete:
     type: string
     enum: [redirect, show]
     description: |
-      Only present on `complete` steps. Tells the frontend what to do:
+      Present only on terminal steps. Tells the frontend what to do:
       - redirect: navigate to redirect_uri immediately (OIDC/SAML done)
       - show: render the step as a success screen (e.g., registration confirmed)
   redirect_url:
     type: string
     format: uri
-    description: For `redirect` steps — URL to navigate to (e.g., SSO provider).
+    description: URL to navigate to (e.g., SSO provider redirect).
   fields:
-    type: object
+    type: array
     description: |
-      Unordered dictionary of input fields to collect. Keyed by field name.
-      The LiquidJS template controls which fields appear and in what order.
-    additionalProperties:
+      Ordered list of input fields to collect. Field metadata (type, validation)
+      is resolved by the engine from the flow's user schema. The LiquidJS
+      template iterates this array; for keyed lookup it builds a name-indexed
+      map locally.
+    items:
       $ref: field.yaml
-    default: {}
+    default: []
   actions:
-    type: object
+    type: array
     description: |
-      Unordered dictionary of available user actions. Keyed by action name.
-      The LiquidJS template controls positioning and presentation.
-    additionalProperties:
+      Ordered list of available user actions. The LiquidJS template iterates
+      this array and builds a name-indexed map locally for keyed lookup.
+    items:
       $ref: step-action.yaml
-    default: {}
+    default: []
   gates:
     type: object
     description: |
       Security gates that must be satisfied before the step can be submitted.
-      The orchestrator appends any required but unrendered gates as a safety net.
+      The engine injects gates dynamically based on policy, even if they
+      are not declared in the flow definition.
     additionalProperties:
       $ref: gate.yaml
     default: {}
@@ -90,3 +98,31 @@ properties:
     items:
       $ref: sso-provider.yaml
     default: []
+  challenge:
+    type: object
+    description: |
+      A pending authentication challenge issued by the server. Present when the
+      flow engine has issued a challenge via auth_attempts (e.g., after the user
+      submits `action: "passkey"`). The `<zl-passkey>` component reads this and
+      triggers the appropriate WebAuthn ceremony.
+
+      The challenge is NOT present on the initial step — it appears only after
+      the user explicitly selects a ceremony-based action.
+    properties:
+      method:
+        type: string
+        enum: [passkey]
+        description: Challenge method. Determines which component handles the ceremony.
+      challenge_id:
+        type: string
+        description: |
+          Server-side challenge identifier. Included in the proof submission
+          so the server can match the response to the original challenge.
+      options:
+        type: object
+        description: |
+          Protocol-specific challenge options. For passkey, this is the
+          `PublicKeyCredentialRequestOptions` (authenticate) or
+          `PublicKeyCredentialCreationOptions` (register). Passed directly
+          to the browser's `navigator.credentials` API.
+        additionalProperties: true

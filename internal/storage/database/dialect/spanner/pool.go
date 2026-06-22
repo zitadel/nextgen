@@ -2,63 +2,95 @@ package spanner
 
 import (
 	"context"
-	"errors"
+	"database/sql"
 
-	"cloud.google.com/go/spanner"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/database/dialect/spanner/migration"
 )
 
-type pool struct {
-	client *spanner.Client
+type spannerPool struct {
+	db         *sql.DB
+	isMigrated bool
 }
 
-var errNotImplemented = errors.New("spanner: not implemented")
-
-type row struct{}
-
-func (r row) Scan(_ ...any) error {
-	return errNotImplemented
+type SpannerPooler interface {
+	isSpanner()
 }
+
+var _ database.Pool = (*spannerPool)(nil)
+var _ database.PoolTest = (*spannerPool)(nil)
+var _ SpannerPooler = (*spannerPool)(nil)
+
+func (p *spannerPool) isSpanner() {}
+
+// RawDB implements [database.PoolTest].
+func (p *spannerPool) RawDB() *sql.DB { return p.db }
 
 // Acquire implements [database.Pool].
-func (p *pool) Acquire(_ context.Context) (database.Connection, error) {
-	return nil, errNotImplemented
-}
-
-// Begin implements [database.Pool].
-func (p *pool) Begin(_ context.Context, _ *database.TransactionOptions) (database.Transaction, error) {
-	return nil, errNotImplemented
-}
-
-// Close implements [database.Pool].
-func (p *pool) Close(_ context.Context) error {
-	p.client.Close()
-	return nil
-}
-
-// Exec implements [database.Pool].
-func (p *pool) Exec(_ context.Context, _ string, _ ...any) (int64, error) {
-	return 0, errNotImplemented
-}
-
-// Migrate implements [database.Pool].
-func (p *pool) Migrate(_ context.Context) error {
-	return errNotImplemented
-}
-
-// Ping implements [database.Pool].
-func (p *pool) Ping(_ context.Context) error {
-	return errNotImplemented
+func (p *spannerPool) Acquire(ctx context.Context) (database.Connection, error) {
+	conn, err := p.db.Conn(ctx)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return &spannerConn{conn: conn, pool: p}, nil
 }
 
 // Query implements [database.Pool].
-func (p *pool) Query(_ context.Context, _ string, _ ...any) (database.Rows, error) {
-	return nil, errNotImplemented
+func (p *spannerPool) Query(ctx context.Context, query string, args ...any) (database.Rows, error) {
+	rows, err := p.db.QueryContext(ctx, convertPlaceholders(query), args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return newRows(rows), nil
 }
 
 // QueryRow implements [database.Pool].
-func (p *pool) QueryRow(_ context.Context, _ string, _ ...any) database.Row {
-	return row{}
+func (p *spannerPool) QueryRow(ctx context.Context, query string, args ...any) database.Row {
+	return newRow(p.db.QueryRowContext(ctx, convertPlaceholders(query), args...))
 }
 
-var _ database.Pool = (*pool)(nil)
+// Exec implements [database.Pool].
+func (p *spannerPool) Exec(ctx context.Context, query string, args ...any) (int64, error) {
+	res, err := p.db.ExecContext(ctx, convertPlaceholders(query), args...)
+	if err != nil {
+		return 0, wrapError(err)
+	}
+	n, err := res.RowsAffected()
+	return n, wrapError(err)
+}
+
+// Begin implements [database.Pool].
+func (p *spannerPool) Begin(ctx context.Context, opts *database.TransactionOptions) (database.Transaction, error) {
+	tx, err := p.db.BeginTx(ctx, transactionOptions(opts))
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return newTransaction(tx), nil
+}
+
+// Close implements [database.Pool].
+func (p *spannerPool) Close(_ context.Context) error {
+	return wrapError(p.db.Close())
+}
+
+// Ping implements [database.Pool].
+func (p *spannerPool) Ping(ctx context.Context) error {
+	return wrapError(p.db.PingContext(ctx))
+}
+
+// Migrate implements [database.Migrator].
+func (p *spannerPool) Migrate(ctx context.Context) error {
+	if p.isMigrated {
+		return nil
+	}
+	err := migration.Migrate(ctx, p.db)
+	p.isMigrated = err == nil
+	return wrapError(err)
+}
+
+// MigrateTest implements [database.PoolTest].
+func (p *spannerPool) MigrateTest(ctx context.Context) error {
+	err := migration.Migrate(ctx, p.db)
+	p.isMigrated = err == nil
+	return err
+}

@@ -1,5 +1,5 @@
 {
-  "name": "@nextgen/demo-next",
+  "name": "@zitadel/demo-next",
   "version": "0.0.0",
   "description": "Next.js demo app for Nextgen Auth",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/demo-next#readme",
@@ -20,8 +20,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@nextgen/ui-lit": "workspace:*",
-    "@zitadel-nextgen/sdk-next": "workspace:*",
+    "@zitadel/api": "workspace:*",
+    "@zitadel/components": "workspace:*",
+    "@zitadel/design-tokens": "workspace:*",
+    "@zitadel/shared-component-styles": "workspace:*",
+    "@zitadel/sdk-next": "workspace:*",
     "next": "^16.2.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

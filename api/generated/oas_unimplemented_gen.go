@@ -13,6 +13,18 @@ type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
 
+// ActivateFlowDefinition implements activateFlowDefinition operation.
+//
+// Activate a flow definition by transitioning it from a `draft` state to an `active` state.
+// Alternatively, the status of a flow definition can also be set via the `POST /flow_definitions`
+// and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow
+// definition payload.
+//
+// POST /flow_definitions/{id}/activate
+func (UnimplementedHandler) ActivateFlowDefinition(ctx context.Context, params ActivateFlowDefinitionParams) (r ActivateFlowDefinitionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // AuthorizeDevice implements authorizeDevice operation.
 //
 // Authorize a device.
@@ -61,6 +73,19 @@ func (UnimplementedHandler) CreateFlow(ctx context.Context, req *CreateFlowReque
 	return r, ht.ErrNotImplemented
 }
 
+// CreateFlowDefinition implements createFlowDefinition operation.
+//
+// Creates a new flow definition.
+// Flow definitions are templates that define the sequence of steps (capabilities)
+// for a particular user journey (e.g., registration, login, password reset).
+// Flow definitions are created based on the flow definition schema, which includes the flow's
+// purpose, audience, and the steps involved.
+//
+// POST /flow_definitions
+func (UnimplementedHandler) CreateFlowDefinition(ctx context.Context, req *CreateFlowDefinitionRequest) (r CreateFlowDefinitionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CreateHandoff implements createHandoff operation.
 //
 // Completes the authentication attempt and mints a `handoff_token`.
@@ -74,6 +99,29 @@ func (UnimplementedHandler) CreateFlow(ctx context.Context, req *CreateFlowReque
 //
 // POST /auth_attempts/{attempt_id}/handoff
 func (UnimplementedHandler) CreateHandoff(ctx context.Context, params CreateHandoffParams) (r CreateHandoffRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// CreateProject implements createProject operation.
+//
+// Create project.
+//
+// POST /projects
+func (UnimplementedHandler) CreateProject(ctx context.Context, req *CreateProjectRequest) (r CreateProjectRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// CreateSchema implements createSchema operation.
+//
+// Create a new schema. The schema definition must include a unique $id field,
+// which will be used to identify the schema in future requests. The $id must
+// be a valid URI and should ideally point to the location where the schema
+// can be accessed.
+// The schema can either be a concrete schema, e.g. a user schema, or a
+// schema-url which will be resolved by the server.
+//
+// POST /schemas
+func (UnimplementedHandler) CreateSchema(ctx context.Context, req CreateSchemaReq, params CreateSchemaParams) (r CreateSchemaRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -92,6 +140,50 @@ func (UnimplementedHandler) CreateHandoff(ctx context.Context, params CreateHand
 //
 // POST /sessions
 func (UnimplementedHandler) CreateSession(ctx context.Context, req *CreateSessionRequest) (r CreateSessionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// CreateTeam implements createTeam operation.
+//
+// Create team.
+//
+// POST /teams
+func (UnimplementedHandler) CreateTeam(ctx context.Context, req *CreateTeamRequest, params CreateTeamParams) (r CreateTeamRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// CreateUser implements createUser operation.
+//
+// Create user.
+//
+// POST /users
+func (UnimplementedHandler) CreateUser(ctx context.Context, req *User, params CreateUserParams) (r CreateUserRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// DeactivateFlowDefinition implements deactivateFlowDefinition operation.
+//
+// Deactivates a flow definition in the `active` state by transitioning it to the `draft` state.
+// Flow definitions in `draft` state cannot be used to start new flows. Existing flows that use the
+// deactivated flow definition must gracefully handle this.
+// Alternatively, the status of a flow definition can also be set via the `POST /flow_definitions`
+// and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow
+// definition payload.
+//
+// POST /flow_definitions/{id}/deactivate
+func (UnimplementedHandler) DeactivateFlowDefinition(ctx context.Context, params DeactivateFlowDefinitionParams) (r DeactivateFlowDefinitionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// DeleteFlowDefinition implements deleteFlowDefinition operation.
+//
+// Delete a flow definition by id.
+// If the flow definition is currently being used by a flow, the deletion will fail.
+// If the flow definition is the last active flow definition for a given purpose, the deletion will
+// fail to prevent disruption of new flows being started for that purpose.
+//
+// DELETE /flow_definitions/{id}
+func (UnimplementedHandler) DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (r DeleteFlowDefinitionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -139,6 +231,15 @@ func (UnimplementedHandler) GetAuthAttempt(ctx context.Context, params GetAuthAt
 	return r, ht.ErrNotImplemented
 }
 
+// GetFlowDefinition implements getFlowDefinition operation.
+//
+// Get a flow definition by id.
+//
+// GET /flow_definitions/{id}
+func (UnimplementedHandler) GetFlowDefinition(ctx context.Context, params GetFlowDefinitionParams) (r GetFlowDefinitionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetFlowStep implements getFlowStep operation.
 //
 // Returns the current capability step without advancing the state machine.
@@ -176,6 +277,28 @@ func (UnimplementedHandler) GetLive(ctx context.Context) (r GetLiveRes, _ error)
 	return r, ht.ErrNotImplemented
 }
 
+// GetMySession implements getMySession operation.
+//
+// Returns the current state of the current session including its factors and all currently
+// satisfied assurance levels.
+// `assurance_levels[]` may shrink over time as factor freshness windows expire,
+// without the session itself expiring. Use step-up authentication (a new `auth_attempt`
+// against the same `session_id`) to restore a dropped assurance level.
+//
+// GET /sessions/me
+func (UnimplementedHandler) GetMySession(ctx context.Context, params GetMySessionParams) (r GetMySessionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetMyUser implements getMyUser operation.
+//
+// Get my user information.
+//
+// GET /users/me
+func (UnimplementedHandler) GetMyUser(ctx context.Context, params GetMyUserParams) (r GetMyUserRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetOpenIDConfiguration implements getOpenIDConfiguration operation.
 //
 // Retrieve the OpenID Connect configuration.
@@ -185,12 +308,30 @@ func (UnimplementedHandler) GetOpenIDConfiguration(ctx context.Context) (r GetOp
 	return r, ht.ErrNotImplemented
 }
 
+// GetProject implements getProject operation.
+//
+// Returns the current state of a project.
+//
+// GET /projects/{project_id}
+func (UnimplementedHandler) GetProject(ctx context.Context, params GetProjectParams) (r GetProjectRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetReady implements getReady operation.
 //
 // Check whether the server is ready to accept requests.
 //
 // GET /readyz
 func (UnimplementedHandler) GetReady(ctx context.Context) (r GetReadyRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetSchemaById implements getSchemaById operation.
+//
+// Get a schema by its ID. This will return the default revision of the schema.
+//
+// GET /schemas/{id}
+func (UnimplementedHandler) GetSchemaById(ctx context.Context, params GetSchemaByIdParams) (r GetSchemaByIdRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -207,12 +348,30 @@ func (UnimplementedHandler) GetSession(ctx context.Context, params GetSessionPar
 	return r, ht.ErrNotImplemented
 }
 
+// GetTeam implements getTeam operation.
+//
+// Returns the current state of a team.
+//
+// GET /teams/{team_id}
+func (UnimplementedHandler) GetTeam(ctx context.Context, params GetTeamParams) (r GetTeamRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetToken implements getToken operation.
 //
-// Get accesstoken.
+// Get access token.
 //
 // POST /auth/token
 func (UnimplementedHandler) GetToken(ctx context.Context, req *PostTokenRequest) (r GetTokenRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetUserByID implements GetUserByID operation.
+//
+// Get user by ID.
+//
+// GET /users/{user_id}
+func (UnimplementedHandler) GetUserByID(ctx context.Context, params GetUserByIDParams) (r GetUserByIDRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -247,6 +406,16 @@ func (UnimplementedHandler) IssueChallenge(ctx context.Context, req *IssueChalle
 	return r, ht.ErrNotImplemented
 }
 
+// ListFlowDefinitions implements listFlowDefinitions operation.
+//
+// Retrieves a list of all flow definitions.
+// This endpoint can be used to view existing flow definitions and their configurations.
+//
+// GET /flow_definitions
+func (UnimplementedHandler) ListFlowDefinitions(ctx context.Context, params ListFlowDefinitionsParams) (r ListFlowDefinitionsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListSessions implements listSessions operation.
 //
 // Returns a paginated list of sessions for a project.
@@ -261,8 +430,21 @@ func (UnimplementedHandler) ListSessions(ctx context.Context, params ListSession
 //
 // List users.
 //
-// GET /user
+// GET /users
 func (UnimplementedHandler) ListUsers(ctx context.Context, params ListUsersParams) (r ListUsersRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// RevokeMySession implements revokeMySession operation.
+//
+// Revokes the session immediately (`state: revoked`). This is the logout operation.
+// The __nextgen_session cookie issued at creation (or superseded by a handoff exchange) is required.
+// After revocation, any tokens derived from this session are invalidated including the cookie itself,
+//
+//	which is cleared in the response.
+//
+// DELETE /sessions/me
+func (UnimplementedHandler) RevokeMySession(ctx context.Context, params RevokeMySessionParams) (r RevokeMySessionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -283,6 +465,15 @@ func (UnimplementedHandler) RevokeSession(ctx context.Context, params RevokeSess
 //
 // POST /auth/revoke
 func (UnimplementedHandler) RevokeToken(ctx context.Context, req *RevokeRequest) (r RevokeTokenRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// SetUserPassword implements setUserPassword operation.
+//
+// Set user password.
+//
+// PUT /users/{user_id}/password
+func (UnimplementedHandler) SetUserPassword(ctx context.Context, req *SetUserPasswordRequest, params SetUserPasswordParams) (r SetUserPasswordRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -325,6 +516,17 @@ func (UnimplementedHandler) SubmitFlowStep(ctx context.Context, req *FlowSubmitR
 	return r, ht.ErrNotImplemented
 }
 
+// UpdateFlowDefinition implements updateFlowDefinition operation.
+//
+// Update a flow definition by id. This endpoint completely replaces the existing flow definition.
+// The status of the flow definition can also be updated by setting the `status` attribute in the
+// flow definition.
+//
+// PUT /flow_definitions/{id}
+func (UnimplementedHandler) UpdateFlowDefinition(ctx context.Context, req *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (r UpdateFlowDefinitionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // VerifyChallengeProof implements verifyChallengeProof operation.
 //
 // Submits a proof (credential, code, assertion) to verify a factor challenge.
@@ -339,12 +541,4 @@ func (UnimplementedHandler) SubmitFlowStep(ctx context.Context, req *FlowSubmitR
 // POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
 func (UnimplementedHandler) VerifyChallengeProof(ctx context.Context, req *VerifyChallengeRequest, params VerifyChallengeProofParams) (r VerifyChallengeProofRes, _ error) {
 	return r, ht.ErrNotImplemented
-}
-
-// NewError creates *ErrorDetailsStatusCode from error returned by handler.
-//
-// Used for common default response.
-func (UnimplementedHandler) NewError(ctx context.Context, err error) (r *ErrorDetailsStatusCode) {
-	r = new(ErrorDetailsStatusCode)
-	return r
 }

@@ -12,7 +12,7 @@ properties:
       - assertion
     properties:
       assertion:
-        type: string
-        description: The base64-encoded WebAuthn AssertionResponse JSON
-        example: 'eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiLi4uIn0='
+        type: object
+        description: The WebAuthn AssertionResponse object
+        additionalProperties: true
 

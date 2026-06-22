@@ -42,8 +42,80 @@ func encodeCreateFlowRequest(
 	return nil
 }
 
+func encodeCreateFlowDefinitionRequest(
+	req *CreateFlowDefinitionRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeCreateProjectRequest(
+	req *CreateProjectRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeCreateSchemaRequest(
+	req CreateSchemaReq,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeCreateSessionRequest(
 	req *CreateSessionRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeCreateTeamRequest(
+	req *CreateTeamRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		if req != nil {
+			req.Encode(e)
+		}
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeCreateUserRequest(
+	req *User,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -312,6 +384,20 @@ func encodeRevokeTokenRequest(
 	return nil
 }
 
+func encodeSetUserPasswordRequest(
+	req *SetUserPasswordRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeSubmitFlowEventRequest(
 	req *FlowEventRequest,
 	r *http.Request,
@@ -328,6 +414,20 @@ func encodeSubmitFlowEventRequest(
 
 func encodeSubmitFlowStepRequest(
 	req *FlowSubmitRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeUpdateFlowDefinitionRequest(
+	req *FlowDefinitionUpdateRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

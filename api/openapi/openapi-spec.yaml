@@ -11,10 +11,35 @@ info:
     name: MIT
     identifier: MIT
 
-servers: 
-  # TODO: put correct server here.
-  - url: https://acc.nextgen.zitadel.com 
-    
+servers:
+  - url: /
+    description: Current API origin. Use http://localhost:8080 for local development.
+  # Add the public production API once that endpoint is available.
+  # - url: https://api.zitadel.com
+  #   description: Production API
+
+tags:
+  - name: Authorization
+    description: OIDC and OAuth discovery, authorization, token, keys, revoke, introspection, and user info endpoints.
+  - name: System
+    description: Health, liveness, and readiness endpoints.
+  - name: Flows
+    description: Runtime flow orchestration endpoints for login, registration, and recovery screens.
+  - name: Flow Definitions
+    description: Flow definition templates that describe user journeys.
+  - name: Authentication Attempts
+    description: Authentication attempt state machine, challenges, verification, and handoff endpoints.
+  - name: Sessions
+    description: Session creation, lookup, exchange, and teardown endpoints.
+  - name: Projects
+    description: Project creation and lookup endpoints.
+  - name: Teams
+    description: Team creation and lookup endpoints.
+  - name: Users
+    description: User creation, lookup, current-user, and password endpoints.
+  - name: Schemas
+    description: User schema creation and lookup endpoints.
+
 paths:
   /.well-known/openid-configuration:
     $ref: endpoints/.well-known/openid-configuration/methods.yaml
@@ -40,8 +65,14 @@ paths:
     $ref: endpoints/livez/methods.yaml
   /readyz:
     $ref: endpoints/readyz/methods.yaml
-  /user:
+  /users:
     $ref: endpoints/users/methods.yaml
+  /users/{user_id}:
+    $ref: endpoints/users/by_id/methods.yaml
+  /users/{user_id}/password:
+    $ref: endpoints/users/by_id/password/methods.yaml
+  /users/me:
+    $ref: endpoints/users/me/methods.yaml
   /flow:
     $ref: endpoints/flow/methods.yaml
   /flow/{id}:
@@ -60,12 +91,34 @@ paths:
     $ref: endpoints/auth_attempts/by_id/challenges/by_id/methods.yaml
   /auth_attempts/{attempt_id}/handoff:
     $ref: endpoints/auth_attempts/by_id/handoff/methods.yaml
+  /projects:
+    $ref: endpoints/projects/methods.yaml
+  /projects/{project_id}:
+    $ref: endpoints/projects/by_id/methods.yaml
   /sessions:
     $ref: endpoints/sessions/methods.yaml
   /sessions/exchange:
     $ref: endpoints/sessions/exchange/methods.yaml
   /sessions/{session_id}:
     $ref: endpoints/sessions/by_id/methods.yaml
+  /sessions/me:
+    $ref: endpoints/sessions/me/methods.yaml
+  /schemas:
+    $ref: endpoints/schemas/methods.yaml
+  /schemas/{id}:
+    $ref: endpoints/schemas/by_id/methods.yaml
+  /flow_definitions:
+    $ref: endpoints/flow_definitions/methods.yaml
+  /flow_definitions/{id}:
+    $ref: endpoints/flow_definitions/by_id/methods.yaml
+  /flow_definitions/{id}/activate:
+    $ref: endpoints/flow_definitions/lifecycle/activate/method.yaml
+  /flow_definitions/{id}/deactivate:
+    $ref: endpoints/flow_definitions/lifecycle/deactivate/method.yaml
+  /teams:
+    $ref: endpoints/teams/methods.yaml
+  /teams/{team_id}:
+    $ref: endpoints/teams/by_id/methods.yaml
 
 components:
   securitySchemes:
@@ -73,4 +126,3 @@ components:
       $ref: security/oauth2.yaml
     usernamePassword:
       $ref: security/username-password.yaml
-

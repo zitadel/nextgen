@@ -1,81 +1,72 @@
 /**
- * `@zitadel-nextgen/components` — Lit-based atomic web components for the
+ * `@zitadel/components` — Lit-based atomic web components for the
  * Zitadel auth UI.
  *
  * Importing this module side-effect-registers every shipped `<zl-*>` atom and
  * the `<zitadel-login>` orchestrator. Tree-shake by importing the leaf
- * subpaths instead (e.g. `@zitadel-nextgen/components/atoms`).
+ * subpaths instead (e.g. `@zitadel/components/atoms`).
  */
 
 import "./atoms/index.js";
 import "./orchestrator/index.js";
 
 export {
-  ZlAction,
-  ZlError,
+  ZlAlert,
+  ZlButton,
+  ZlCard,
   ZlField,
-  ZlSubmit,
+  ZlIcon,
+  ZlPageShell,
+  ZlPill,
+  type IconName,
   type ZlFieldType,
-  zlActionManifest,
-  zlErrorManifest,
+  zlAlertManifest,
+  zlButtonManifest,
+  zlCardManifest,
   zlFieldManifest,
-  zlSubmitManifest,
+  zlIconManifest,
+  zlPageShellManifest,
+  zlPillManifest,
 } from "./atoms/index.js";
 
 export { manifestRegistry, findManifest, listKnownTags, type AtomManifest } from "./manifests.js";
 
-export { tokens, flattenTokens, type TokenCatalogue } from "./tokens/catalogue.js";
-export { cssVar, cssVarRef, type DesignToken } from "./tokens/css-var.js";
-
-export { baseHostStyles } from "./styles/base.js";
-export { focusVisibleStyles } from "./styles/focus-ring.js";
+export { tokens, cssVars, type Tokens, type CssVars } from "./tokens/index.js";
+export { baseHostStyles, focusVisibleStyles, t } from "./styles/index.js";
 
 export {
   ZitadelLogin,
-  FetchTransport,
-  FixtureTransport,
-  FlowTransportError,
-  WalkingFixtureTransport,
+  ZitadelLogout,
   applyBrandingTokens,
   buildBrandingStylesheet,
   resolveTheme,
   ThemeController,
   applyFontUrl,
-  createLiquidEngine,
   createSanitiser,
   validateBranding,
   patchMandatoryGates,
   defaultTemplate,
   layoutChromeCss,
-  authFormTemplate,
   TEMPLATE_NAMES,
   en,
+  de,
+  builtinLocales,
+  startFlow,
+  submitStep,
+  getCurrentStep,
   type Branding,
+  type BrandingAssets,
+  type BrandingAttribution,
   type BrandingPalette,
   type BrandingShape,
   type BrandingTheme,
   type BrandingTypography,
   type BrandingValidationResult,
-  type FlowAction,
   type FlowError,
-  type FlowField,
-  type FlowFieldType,
-  type FlowGate,
   type FlowIdentity,
   type FlowLayout,
   type FlowMessage,
-  type FlowResponse,
-  type FlowStep,
-  type FlowSsoProvider,
-  type FlowSubmitInput,
-  type FlowTransport,
-  type FixtureScript,
-  type FetchTransportOptions,
-  type FlowDefinition,
-  type FlowDefinitionStep,
-  type FlowTransitionTarget,
+  type LiquidContext,
   type Locale,
   type ResolvedTheme,
-  type StartInput,
-  type WalkingFixtureOptions,
 } from "./orchestrator/index.js";

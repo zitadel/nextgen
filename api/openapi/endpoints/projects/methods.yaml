@@ -1,0 +1,33 @@
+post:
+  operationId: createProject
+  summary: Create project
+  tags:
+    - Projects
+  security: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: create-project-request.yaml
+  responses:
+    '201':
+      description: The project was created successfully
+      content:
+        application/json:
+          schema:
+            $ref: create-project-response.yaml
+    '429':
+      description: |
+        Too many requests, the client has sent too many requests in a given
+        amount of time.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml

@@ -1,0 +1,11 @@
+{
+  "name": "@zitadel/demo-nuxt-e2e",
+  "version": "0.0.1",
+  "private": true,
+  "devDependencies": {
+    "@zitadel/sdk-nuxt": "workspace:*",
+    "@playwright/test": "catalog:",
+    "@zitadel/api-mock": "workspace:*",
+    "eslint-plugin-playwright": "catalog:"
+  }
+}

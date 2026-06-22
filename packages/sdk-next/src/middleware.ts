@@ -1,90 +1,16 @@
-import type { NextRequest } from 'next/server';
+import type { ZitadelProject } from "@zitadel/api/config";
+import type { NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
+import type { NextRequest } from "next/server";
 
-import { NextResponse } from 'next/server';
+import {
+  HOP_BY_HOP,
+  INTERNAL_HEADERS,
+  filterResponseHeaders,
+  matchesRoutes,
+} from "@zitadel/sdk-core/middleware";
+import { NextResponse } from "next/server";
 
-import type { NextgenMiddlewareOptions } from './types';
-
-import { verifyJwt } from './lib/jwt';
-
-/**
- * Headers that must never be forwarded to an upstream service.
- * These are connection-level headers that are meaningful only between
- * two directly connected peers and become invalid when proxied.
- */
-const HOP_BY_HOP: ReadonlySet<string> = new Set([
-  'connection',
-  // host is not a hop-by-hop header per RFC 7230, but it must be stripped so
-  // the fetch implementation derives the correct Host from the upstream URL
-  // rather than forwarding the client's Host and causing SNI/vhost mismatches.
-  'host',
-  'keep-alive',
-  'proxy-authenticate',
-  'proxy-authorization',
-  'te',
-  'trailer',
-  'transfer-encoding',
-  'upgrade',
-]);
-
-/**
- * SDK-internal headers that must never be forwarded to the upstream backend.
- * These headers carry session data between the middleware and server components;
- * forwarding them upstream would expose internal state and allow header injection.
- */
-const INTERNAL_HEADERS: ReadonlySet<string> = new Set(['x-nextgen-auth-token']);
-
-/**
- * Conditionally adds the `Secure` flag to any cookie whose name starts with
- * `__nextgen`, but only when the client-facing connection is HTTPS.
- *
- * The edge proxy may terminate TLS — the upstream auth server cannot know
- * whether the browser-facing connection is HTTPS. When `secure` is `true`
- * (i.e. the original request arrived over HTTPS), `Secure` is added so that
- * `__nextgen*` session cookies are never sent over plain HTTP on subsequent
- * requests. When `secure` is `false` (plain HTTP), the flag is intentionally
- * omitted: browsers refuse to store cookies with `Secure` on non-TLS
- * connections, which would break the auth flow entirely.
- *
- * Non-`__nextgen*` cookies are returned unchanged. We trust the upstream for
- * `HttpOnly` and `SameSite`, which are set correctly by the auth server and
- * do not depend on whether TLS is terminated at the edge.
- *
- * @param cookie - The raw `Set-Cookie` header value.
- * @param secure - `true` when the client-facing connection is HTTPS.
- */
-function upgradeSessionCookie(cookie: string, secure: boolean): string {
-  const name = cookie.split('=')[0]?.trim() ?? '';
-  if (!name.startsWith('__nextgen') || !secure) {
-    return cookie;
-  }
-  // Case-insensitive check to avoid doubling an existing Secure flag.
-  if (/;\s*Secure\b/i.test(cookie)) {
-    return cookie;
-  }
-  return `${cookie}; Secure`;
-}
-
-/**
- * Returns `true` when `pathname` matches at least one entry in `routes`.
- *
- * An entry ending with `*` matches any path that starts with the prefix
- * before the `*`. All other entries require an exact match.
- *
- * @param pathname - The URL pathname to test.
- * @param routes   - The list of route patterns to match against.
- * @returns `true` if at least one pattern matches.
- */
-function matchesRoutes(pathname: string, routes: readonly string[]): boolean {
-  if (routes.length === 0) {
-    return false;
-  }
-  return routes.some((pattern) => {
-    if (pattern.endsWith('*')) {
-      return pathname.startsWith(pattern.slice(0, -1));
-    }
-    return pathname === pattern;
-  });
-}
+import { verifyJwt, base64UrlDecode } from "./lib/jwt";
 
 /**
  * Clones the incoming request headers, injects `extra` key/value pairs,
@@ -95,10 +21,7 @@ function matchesRoutes(pathname: string, routes: readonly string[]): boolean {
  * @param extra - Additional headers to inject (e.g. `x-nextgen-auth-token`).
  * @returns A new `Headers` instance with the injected values registered.
  */
-function tunnelHeaders(
-  req: NextRequest,
-  extra: Readonly<Record<string, string>>,
-): Headers {
+function tunnelHeaders(req: NextRequest, extra: Readonly<Record<string, string>>): Headers {
   const headers = new Headers(req.headers);
 
   // Security: strip any x-middleware-override-headers the client may have sent.
@@ -106,7 +29,7 @@ function tunnelHeaders(
   // header names into the Next.js override list, potentially bypassing the
   // internal header-tunnelling safety checks. We always build this header from
   // scratch using only the names we inject ourselves.
-  headers.delete('x-middleware-override-headers');
+  headers.delete("x-middleware-override-headers");
 
   const injectedNames = [];
 
@@ -116,7 +39,7 @@ function tunnelHeaders(
     injectedNames.push(name);
   }
 
-  headers.set('x-middleware-override-headers', injectedNames.join(','));
+  headers.set("x-middleware-override-headers", injectedNames.join(","));
   return headers;
 }
 
@@ -132,14 +55,14 @@ function tunnelHeaders(
  *
  * export function middleware(req: NextRequest) {
  *   return nextgenMiddleware(req, {
- *     issuerUrl: process.env.NEXTGEN_ISSUER_URL,
- *     protectedRoutes: ["/admin*", "/dashboard*"],
+ *     url: process.env.ZITADEL_URL,
+ *     protectedRoutes: ["/profile"],
  *     loginPath: "/login",
  *   });
  * }
  *
  * export const config = {
- *   matcher: ["/__nextgen/:path*", "/admin/:path*", "/login"],
+ *   matcher: ["/__nextgen/:path*", "/profile/:path*"],
  * };
  * ```
  *
@@ -152,15 +75,15 @@ export async function nextgenMiddleware(
   options: NextgenMiddlewareOptions = {},
 ): Promise<NextResponse | Response> {
   const {
-    issuerUrl = process.env.NEXTGEN_ISSUER_URL ?? 'http://localhost:4000',
-    proxyPath = '/__nextgen',
+    url = process.env.ZITADEL_URL ?? "http://localhost:8080",
+    proxyPath = "/__nextgen",
     protectedRoutes = [],
     ignoredRoutes = [],
-    loginPath = '/login',
-    allowedAlgorithms = ['RS256', 'ES256'] as const,
+    loginPath = "/login",
+    allowedAlgorithms = ["RS256", "ES256"] as const,
     clockSkewMs = 5000,
     audience,
-    allowedTokenTypes = ['JWT', 'at+JWT'],
+    allowedTokenTypes = ["JWT", "at+JWT"],
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
   } = options;
@@ -168,7 +91,7 @@ export async function nextgenMiddleware(
   // Guard against open-redirect: loginPath must be a relative path. An absolute
   // URL (e.g. "https://evil.com/phish") or a protocol-relative URL
   // (e.g. "//evil.com") would redirect the browser to an external host.
-  if (!loginPath.startsWith('/') || loginPath.startsWith('//')) {
+  if (!loginPath.startsWith("/") || loginPath.startsWith("//")) {
     throw new Error(
       `[nextgen] loginPath must be a relative path starting with a single "/". ` +
         `Received: "${loginPath}". Using an absolute or protocol-relative URL ` +
@@ -182,16 +105,16 @@ export async function nextgenMiddleware(
     // Neutralise any client-supplied x-nextgen-auth-token on ignored routes.
     // handleAuth is skipped for ignored routes, so we must strip the header
     // here to prevent a forged value from reaching server components.
-    const headers = tunnelHeaders(req, { 'x-nextgen-auth-token': '' });
+    const headers = tunnelHeaders(req, { "x-nextgen-auth-token": "" });
     return NextResponse.next({ request: { headers } });
   }
 
   if (pathname === proxyPath || pathname.startsWith(`${proxyPath}/`)) {
-    return proxyRequest(req, issuerUrl, proxyPath, proxyTimeoutMs);
+    return proxyRequest(req, url, proxyPath, proxyTimeoutMs);
   }
 
   return handleAuth(req, {
-    issuerUrl,
+    url,
     protectedRoutes,
     loginPath,
     allowedAlgorithms,
@@ -201,6 +124,59 @@ export async function nextgenMiddleware(
     jwksTimeoutMs,
     pathname,
   });
+}
+
+const DECODER = new TextDecoder();
+
+/**
+ * Returns `true` when `token` looks structurally like a signed JWT (JWS) —
+ * NOT an encrypted token (JWE).
+ *
+ * JWS compact: 3 dot-separated segments; header has `alg` but NOT `enc`.
+ * JWE compact: 5 dot-separated segments; header has BOTH `alg` and `enc`.
+ *
+ * Our backend issues JWE tokens (AES-256-GCM via go-jose `A256GCMKW/A256GCM`),
+ * whose compact form is `header.encrypted_key.iv.ciphertext.tag`. The header
+ * decodes to JSON with `"alg":"A256GCMKW","enc":"A256GCM"`. Checking for the
+ * absence of `enc` correctly identifies signed JWTs without false-positives on
+ * JWE tokens.
+ *
+ * This is a structural check only — not a security check.
+ */
+function isJwtShaped(token: string): boolean {
+  const parts = token.split(".");
+  if (parts.length < 3 || !parts[0]) return false;
+  try {
+    const header = JSON.parse(DECODER.decode(base64UrlDecode(parts[0]))) as Record<string, unknown>;
+    return typeof header?.alg === "string" && !("enc" in header);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validates an opaque (non-JWT) session token by calling the backend's
+ * `/sessions/me` endpoint. Returns `true` when the backend confirms the
+ * session is live (HTTP 200), `false` otherwise.
+ *
+ * This is the fallback path for backends that issue encrypted opaque tokens
+ * rather than self-contained JWTs.
+ */
+async function validateOpaqueSessionToken(
+  token: string,
+  issuerUrl: string,
+  timeoutMs: number,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${issuerUrl}/sessions/me`, {
+      method: "GET",
+      headers: { cookie: `__nextgen_session=${token}` },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -215,38 +191,24 @@ export async function nextgenMiddleware(
  * are set only when absent, preserving values injected by an upstream CDN.
  *
  * @param req        - The incoming edge request.
- * @param issuerUrl  - Base URL of the auth backend.
+ * @param authUrl    - Base URL of the auth backend.
  * @param proxyPath  - The path prefix being proxied (e.g. `"/__nextgen"`).
  * @returns The proxied upstream `Response`.
  */
 async function proxyRequest(
   req: NextRequest,
-  issuerUrl: string,
+  authUrl: string,
   proxyPath: string,
   proxyTimeoutMs: number,
 ): Promise<Response> {
   const url = new URL(req.url);
   const suffix = url.pathname.slice(proxyPath.length);
-  const target = `${issuerUrl}${suffix}${url.search}`;
-
-  // RFC 7230 §6.1: the Connection header may name additional headers that are
-  // hop-by-hop for this specific connection and must also be stripped.
-  const connectionValue = req.headers.get('connection') ?? '';
-  const dynamicHopByHop = new Set(
-    connectionValue
-      .split(',')
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean),
-  );
+  const target = `${authUrl}${suffix}${url.search}`;
 
   const upstreamHeaders = new Headers();
   for (const [key, value] of req.headers.entries()) {
     const lower = key.toLowerCase();
-    if (
-      !HOP_BY_HOP.has(lower) &&
-      !INTERNAL_HEADERS.has(lower) &&
-      !dynamicHopByHop.has(lower)
-    ) {
+    if (!HOP_BY_HOP.has(lower) && !INTERNAL_HEADERS.has(lower)) {
       upstreamHeaders.set(key, value);
     }
   }
@@ -255,57 +217,53 @@ async function proxyRequest(
   // upstream auth server sees the full proxy path. We never skip this even when
   // a chain is already present — a CDN or load balancer may have set XFF before
   // the request reached this edge node, and our hop must still be recorded.
-  const directIp =
-    (req as unknown as { ip?: string }).ip ?? req.headers.get('x-real-ip');
+  const directIp = (req as unknown as { ip?: string }).ip ?? req.headers.get("x-real-ip");
   if (directIp) {
-    const existingXff = upstreamHeaders.get('x-forwarded-for');
-    upstreamHeaders.set(
-      'x-forwarded-for',
-      existingXff ? `${existingXff}, ${directIp}` : directIp,
-    );
+    const existingXff = upstreamHeaders.get("x-forwarded-for");
+    upstreamHeaders.set("x-forwarded-for", existingXff ? `${existingXff}, ${directIp}` : directIp);
   }
 
-  if (!upstreamHeaders.has('x-forwarded-host')) {
-    upstreamHeaders.set('x-forwarded-host', url.host);
+  if (!upstreamHeaders.has("x-forwarded-host")) {
+    upstreamHeaders.set("x-forwarded-host", url.host);
   }
 
-  if (!upstreamHeaders.has('x-forwarded-proto')) {
-    upstreamHeaders.set('x-forwarded-proto', url.protocol.replace(':', ''));
+  if (!upstreamHeaders.has("x-forwarded-proto")) {
+    upstreamHeaders.set("x-forwarded-proto", url.protocol.replace(":", ""));
   }
 
-  const hasBody = !['GET', 'HEAD'].includes(req.method);
+  const hasBody = !["GET", "HEAD"].includes(req.method);
+
+  // Attach the project service-key secret as the bearer on every proxied
+  // request. The server's security handler verifies it cryptographically; the
+  // browser never sees the secret because this middleware runs in Next.js's
+  // Edge runtime and reads `process.env.ZITADEL_PROJECT_SECRET`. Next auto-
+  // loads `.env.local` at dev time (which is gitignored) and inlines env vars
+  // referenced here into the Edge bundle at build time for production.
+  if (!upstreamHeaders.has("authorization")) {
+    const secret = process.env.ZITADEL_PROJECT_SECRET;
+    if (secret) {
+      upstreamHeaders.set("authorization", `Bearer ${secret}`);
+    }
+  }
+
+  // Read body eagerly so undici receives a concrete buffer rather than a
+  // WinterCG ReadableStream, which is incompatible with Node.js fetch body
+  // extraction.
+  const bodyBuffer = hasBody ? await req.arrayBuffer() : undefined;
 
   const upstream = await fetch(target, {
     method: req.method,
     headers: upstreamHeaders,
-    body: hasBody ? req.body : undefined,
-    redirect: 'manual',
+    body: bodyBuffer,
+    redirect: "manual",
     signal: AbortSignal.timeout(proxyTimeoutMs),
-    ...(hasBody ? { duplex: 'half' } : {}),
-  } as RequestInit);
+  });
 
-  const responseHeaders = new Headers();
-  for (const [key, value] of upstream.headers.entries()) {
-    if (
-      !HOP_BY_HOP.has(key.toLowerCase()) &&
-      key.toLowerCase() !== 'set-cookie' &&
-      // location is stripped to prevent leaking internal upstream URLs to the
-      // browser — this proxy is a pure API proxy and never issues redirects.
-      key.toLowerCase() !== 'location'
-    ) {
-      responseHeaders.set(key, value);
-    }
-  }
+  const responseHeaders = filterResponseHeaders(upstream.headers);
 
-  const isSecure =
-    url.protocol === 'https:' ||
-    req.headers.get('x-forwarded-proto') === 'https';
   const setCookies = upstream.headers.getSetCookie?.() ?? [];
   for (const cookie of setCookies) {
-    responseHeaders.append(
-      'set-cookie',
-      upgradeSessionCookie(cookie, isSecure),
-    );
+    responseHeaders.append("set-cookie", cookie);
   }
 
   return new Response(upstream.body, {
@@ -319,7 +277,7 @@ async function proxyRequest(
  * public-facing {@link NextgenMiddlewareOptions}.
  */
 interface AuthHandlerOptions {
-  readonly issuerUrl: string;
+  readonly url: string;
   readonly protectedRoutes: readonly string[];
   readonly loginPath: string;
   /**
@@ -356,12 +314,9 @@ interface AuthHandlerOptions {
  * @param opts - Auth handler options.
  * @returns A `NextResponse` to continue or redirect.
  */
-async function handleAuth(
-  req: NextRequest,
-  opts: AuthHandlerOptions,
-): Promise<NextResponse> {
+async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<NextResponse> {
   const {
-    issuerUrl,
+    url,
     protectedRoutes,
     loginPath,
     allowedAlgorithms,
@@ -372,11 +327,9 @@ async function handleAuth(
     pathname,
   } = opts;
 
-  const authHeader = req.headers.get('authorization');
-  const bearerToken = authHeader?.startsWith('Bearer ')
-    ? authHeader.slice(7)
-    : null;
-  const cookieToken = req.cookies.get('__nextgen_session')?.value ?? null;
+  const authHeader = req.headers.get("authorization");
+  const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const cookieToken = req.cookies.get("__nextgen_session")?.value ?? null;
   // Bearer token takes explicit precedence over the session cookie. API clients
   // (e.g. mobile apps, CLIs) use Authorization headers while browsers use
   // cookies; when both are present the caller clearly intended the Bearer token.
@@ -384,7 +337,7 @@ async function handleAuth(
 
   const payload = token
     ? await verifyJwt(token, {
-        issuerUrl,
+        issuerUrl: url,
         allowedAlgorithms,
         clockSkewMs,
         audience,
@@ -394,18 +347,33 @@ async function handleAuth(
     : null;
 
   if (payload && token && payload.sub) {
-    const tunnelled = tunnelHeaders(req, { 'x-nextgen-auth-token': token });
+    const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": token });
     return NextResponse.next({ request: { headers: tunnelled } });
   }
 
-  const tunnelled = tunnelHeaders(req, { 'x-nextgen-auth-token': '' });
+  // The backend issues opaque encrypted session tokens rather than JWTs.
+  // Only fall back to /sessions/me validation when the token is definitively
+  // not a JWT (non-JSON segments). A token with a valid JWT structure that
+  // failed verification (bad sig, wrong typ/alg) must be rejected — never
+  // accepted by a backend call that doesn't re-check the JWT claims.
+  if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
+    const isValid = await validateOpaqueSessionToken(cookieToken, url, jwksTimeoutMs ?? 5000);
+    if (isValid) {
+      const tunnelled = tunnelHeaders(req, {
+        "x-nextgen-auth-token": cookieToken,
+      });
+      return NextResponse.next({ request: { headers: tunnelled } });
+    }
+  }
+
+  const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": "" });
   const staleNextgenCookies = req.cookies
     .getAll()
-    .filter((c) => c.name.startsWith('__nextgen'));
+    .filter((c: { name: string }) => c.name.startsWith("__nextgen"));
 
   if (matchesRoutes(pathname, protectedRoutes)) {
     const loginUrl = new URL(loginPath, req.url);
-    loginUrl.searchParams.set('next', pathname);
+    loginUrl.searchParams.set("next", pathname);
     const redirect = NextResponse.redirect(loginUrl, { status: 302 });
     for (const cookie of staleNextgenCookies) {
       redirect.cookies.delete(cookie.name);
@@ -418,4 +386,60 @@ async function handleAuth(
     response.cookies.delete(cookie.name);
   }
   return response;
+}
+
+/**
+ * Options for {@link createProxy} that are separate from the shared
+ * {@link ZitadelConfig}. These configure route protection, login
+ * redirects, and JWT verification behaviour.
+ *
+ * `proxyPath` and `url` are omitted because they come from the
+ * {@link ZitadelConfig} passed as the first argument.
+ */
+export type ProxyOptions = Omit<NextgenMiddlewareOptions, "proxyPath" | "url">;
+
+/**
+ * A pre-configured middleware handler returned by {@link createProxy}.
+ */
+export type ProxyHandler = (req: NextRequest) => Promise<NextResponse | Response>;
+
+/**
+ * Creates a pre-configured middleware handler from the SDK config
+ * returned by `configureZitadel()`. This is the derived-service
+ * derived service pattern:
+ *
+ * ```ts
+ * // src/zitadel.ts
+ * import { configureZitadel } from "@zitadel/api/config";
+ * import { createProxy } from "@zitadel/sdk-next/middleware";
+ *
+ * const zitadel = configureZitadel({
+ *   projectId: "demo",
+ *   url: process.env.ZITADEL_URL,
+ * });
+ *
+ * export const proxy = createProxy(zitadel, {
+ *   protectedRoutes: ["/admin*"],
+ *   loginPath: "/login",
+ * });
+ * ```
+ *
+ * Then in middleware.ts:
+ *
+ * ```ts
+ * import { proxy } from "./zitadel";
+ * export const middleware = proxy;
+ * ```
+ *
+ * @param config  - The SDK handle from `configureZitadel()`.
+ * @param options - Route protection and JWT options.
+ * @returns A middleware handler function.
+ */
+export function createProxy(config: ZitadelProject, options: ProxyOptions = {}): ProxyHandler {
+  const mergedOptions: NextgenMiddlewareOptions = {
+    ...options,
+    proxyPath: config.proxyPath,
+    url: config.url,
+  };
+  return (req: NextRequest) => nextgenMiddleware(req, mergedOptions);
 }

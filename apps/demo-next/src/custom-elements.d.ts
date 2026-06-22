@@ -1,14 +1,20 @@
 import type React from "react";
+import type { ZitadelProject } from "@zitadel/api/config";
+import type { Locale } from "@zitadel/components";
 
 declare module "react" {
   namespace JSX {
     interface IntrinsicElements {
-      "nextgen-login": React.HTMLAttributes<HTMLElement> & {
-        "proxy-base"?: string;
+      "zitadel-login": React.HTMLAttributes<HTMLElement> & {
+        project?: ZitadelProject;
+        "session-exchange-path"?: string;
         "post-sign-in-url"?: string;
+        purpose?: string;
+        lang?: string;
+        locales?: Record<string, Locale>;
       };
-      "nextgen-logout": React.HTMLAttributes<HTMLElement> & {
-        "proxy-base"?: string;
+      "zitadel-logout": React.HTMLAttributes<HTMLElement> & {
+        project?: ZitadelProject;
         "post-sign-out-url"?: string;
       };
     }

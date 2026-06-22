@@ -1,7 +1,7 @@
 {
-  "name": "@zitadel-nextgen/sdk-core",
-  "version": "0.0.0",
-  "description": "Core types and mock runtime helpers for Zitadel",
+  "name": "@zitadel/sdk-core",
+  "version": "0.1.0-alpha.11",
+  "description": "Core types and shared utilities for Zitadel SDKs",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-core#readme",
   "bugs": {
     "url": "https://github.com/zitadel/nextgen/issues"
@@ -16,13 +16,54 @@
     "dist"
   ],
   "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
   "exports": {
     ".": {
+      "@zitadel/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./types": {
+      "@zitadel/source": "./src/types.ts",
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js"
+    },
+    "./jwt": {
+      "@zitadel/source": "./src/jwt.ts",
+      "types": "./dist/jwt.d.ts",
+      "import": "./dist/jwt.js"
+    },
+    "./middleware": {
+      "@zitadel/source": "./src/middleware.ts",
+      "types": "./dist/middleware.d.ts",
+      "import": "./dist/middleware.js"
     }
   },
   "publishConfig": {
     "access": "public"
+  },
+  "dependencies": {
+    "@zitadel/api": "workspace:*"
+  },
+  "devDependencies": {
+    "@eslint/js": "catalog:",
+    "@eslint/json": "catalog:",
+    "@eslint/markdown": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-import-resolver-typescript": "catalog:",
+    "eslint-plugin-import": "catalog:",
+    "eslint-plugin-perfectionist": "catalog:",
+    "eslint-plugin-prettier": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:",
+    "vite": "catalog:sdk",
+    "vitest": "catalog:sdk"
   }
 }

@@ -23,16 +23,5 @@ get:
         application/json:
           schema:
             $ref: ../auth-attempt-response.yaml
-    '404':
-      description: Authentication attempt not found or expired
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
     default:
-      description: Unexpected error
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
-
+      $ref: getAuthAttempt-error-response.yaml

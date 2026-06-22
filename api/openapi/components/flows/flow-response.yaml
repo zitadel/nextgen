@@ -1,5 +1,5 @@
 type: object
-required: [id, session_id, session_token, step]
+required: [id, session_id, step]
 properties:
   id:
     type: string
@@ -13,7 +13,7 @@ properties:
     description: Underlying session ID. Stable across all stacked flows.
   session_token:
     type: string
-    description: Rotated on every response. Required for the next request.
+    description: Reserved for future rotation. The sealed `_zflow` cookie carries the flow state today.
   step:
     $ref: flow-step.yaml
   branding:
@@ -24,13 +24,13 @@ properties:
   redirect_uri:
     type: string
     format: uri
-    description: Present on the `complete` step when a redirect is needed.
+    description: Present when `step.complete` is `redirect`.
   handoff_token:
     type: string
     description: |
       Short-lived, audience-bound token produced on flow completion.
       Exchange it for a session via `POST /sessions/exchange`.
-      Only present when `step.type` is `complete`.
+      Only present when `step.complete` is set.
   handoff_token_expires_at:
     type: string
     format: date-time

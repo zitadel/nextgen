@@ -1,14 +1,40 @@
 type: object
-required: [text_key]
+required: [name, kind]
 description: |
-  An action the user can take. Keyed by action name in the parent dictionary.
-  The action name is sent back in the submit request as `action`.
+  Configuration for a user-invokable action on a step. The `name` is sent
+  back in the submit request as `action`; the engine resolves the action's
+  declared `kind` to decide how to handle the submission.
 properties:
-  text_key:
+  name:
     type: string
-    description: Localization key for the action label.
-    example: identifier.action.submit
+    description: Action identifier. Sent back in the submit request as `action`.
+    example: submit
+  kind:
+    type: string
+    enum: [submit, passkey, passkey_register, navigate]
+    example: submit
+    description: |
+      Classifies how the engine handles this action:
+      - `submit`: collect the step's fields and run validate/dispatch/on_success.
+      - `passkey`: issue a WebAuthn assertion challenge; the matching transition
+        fires once the returned assertion verifies.
+      - `passkey_register`: issue a WebAuthn registration challenge; the matching
+        transition fires once the returned attestation verifies.
+      - `navigate`: route through the transition without running the input
+        pipeline. Used for back-navigation and similar pure-routing actions.
   primary:
     type: boolean
     default: false
-    description: Whether this is the primary/default action.
+    example: true
+    description: |
+      Marks this as the default/primary action. The runtime template uses
+      this hint to choose visual emphasis. At most one action per step
+      should be primary; this is not enforced here.
+  text_key:
+    type: string
+    description: |
+      Optional localization key override for the action's label. When
+      omitted, the engine derives a key from the step and action names.
+      Display text is resolved client-side from a locale dictionary, never
+      by the engine.
+    example: actions.signin.submit

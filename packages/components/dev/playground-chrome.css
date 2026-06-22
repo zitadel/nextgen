@@ -1,0 +1,607 @@
+/**
+ * Shared playground chrome for Lit (`dev/index.html` + `atoms.ts`) and the
+ * React console parity surface. One stylesheet so layout stays in sync.
+ */
+
+:root {
+  color-scheme: light dark;
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --border: #2a2d3a;
+  --text: #e1e4ed;
+  --muted: #8b8fa3;
+  --accent: #6c8cff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Top bar only — React <Card> uses <header class="zr-card__header"> in light DOM. */
+body > header,
+#app > header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+body > header h1,
+#app > header h1 {
+  font-size: 14px;
+  margin: 0;
+  font-weight: 600;
+}
+
+body > header nav,
+#app > header nav {
+  display: flex;
+  gap: 4px;
+}
+
+body > header nav a,
+#app > header nav a {
+  padding: 6px 12px;
+  font-size: 13px;
+  text-decoration: none;
+  color: var(--muted);
+  border-radius: 6px;
+  transition: background 120ms;
+}
+
+body > header nav a:hover,
+#app > header nav a:hover {
+  background: rgba(108, 140, 255, 0.1);
+  color: var(--text);
+}
+
+body > header nav a[aria-current="page"],
+#app > header nav a[aria-current="page"] {
+  background: rgba(108, 140, 255, 0.18);
+  color: var(--accent);
+}
+
+main {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+}
+
+/* Lit: body > header + main > #app */
+main > #app {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+  width: 100%;
+}
+
+/* React console: body > #app > header + main */
+body > #app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.playground-host {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+  width: 100%;
+}
+
+.grid {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 24px;
+  padding: 24px;
+  align-content: start;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.card h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Lit dev has no Tailwind preflight; the console imports tailwindcss (body
+   line-height: 1.5). These selectors beat inherited lh on chrome containers. */
+main .grid .card h3 {
+  line-height: 15px;
+}
+
+.scope {
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--zl-color-surface-default-black, #0f0f11);
+  color: var(--zl-color-text-primary-white, #f4f4f6);
+}
+
+/* React Card renders <header> in light DOM; undo any stray top-bar header rules. */
+.zr-card__header {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  align-items: stretch;
+}
+
+/* React PageShell uses <header>/<footer> in light DOM — not the playground top bar. */
+.zr-page-shell__header,
+.zr-page-shell__footer {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+/* Card header typography — Figma Desktop/Headings/Small (orchestrator templates). */
+.scope .zl-card-title,
+.page-shell-frame .zl-card-title {
+  margin: 0;
+  font-family: var(--zl-font-family-heading, var(--zl-font-family-sans, system-ui, sans-serif));
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 2.5rem;
+  letter-spacing: -0.02em;
+  color: var(--zl-color-text-primary-white, #f4f4f6);
+}
+.scope .zl-card-subtitle {
+  margin: 0;
+  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 400;
+  color: var(--zl-color-text-primary-white, #f4f4f6);
+}
+
+.card-surface-matrix {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr));
+  gap: 1.5rem;
+  align-items: start;
+}
+.card-surface-matrix__label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+.card-surface-matrix__note {
+  grid-column: 1 / -1;
+  margin: 0.5rem 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.card-surface-matrix__note a {
+  color: var(--zl-color-text-subtitle-purple, #bba5e4);
+}
+.card-demo-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-03, 1rem);
+}
+.card-demo-field {
+  height: 4.5rem;
+  border-radius: var(--zl-radius-xs, 4px);
+  border: 1px dashed var(--zl-color-border-default-gray-300, #686883);
+  background: rgb(15 15 17 / 0.35);
+}
+.card-demo-link {
+  height: 1.5rem;
+  width: 8rem;
+  border-radius: 2px;
+  background: var(--zl-color-text-subtitle-purple, #bba5e4);
+  opacity: 0.35;
+}
+.card-demo-help {
+  height: 1rem;
+  width: 75%;
+  border-radius: 2px;
+  background: var(--zl-color-text-primary-white, #f4f4f6);
+  opacity: 0.25;
+}
+.card-demo-btn {
+  height: 3rem;
+  border-radius: var(--zl-radius-s, 8px);
+  background: var(--zl-color-surface-default-white, #f4f4f6);
+  opacity: 0.2;
+}
+
+.page-shell-frame {
+  min-height: 28rem;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.page-shell-frame zl-page-shell {
+  display: block;
+  min-height: 28rem;
+}
+.page-shell-frame .zr-page-shell {
+  min-height: 100%;
+}
+
+main .grid .scope,
+main .grid .btn-matrix,
+main .grid .btn-variants {
+  line-height: 1;
+}
+
+.scope[data-theme="light"] {
+  background: var(--zl-color-surface-default-white, #fff);
+  color: var(--zl-color-text-button-default, #0a0a0a);
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.btn-matrix {
+  display: grid;
+  grid-template-columns: 110px repeat(5, max-content);
+  align-items: center;
+  /* Avoid stretching buttons to the widest track in the column (e.g. the
+     "Icon-only" header vs a 58px square icon button). Lit hosts stay
+     content-sized; light-DOM .zr-btn must match. */
+  justify-items: start;
+  gap: 16px 20px;
+}
+
+.btn-matrix .col-header,
+.btn-matrix .row-header,
+.btn-matrix .group-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+main .grid .btn-matrix .col-header,
+main .grid .btn-matrix .row-header,
+main .grid .btn-matrix .group-header {
+  line-height: 13px;
+}
+
+.btn-matrix .col-header {
+  text-align: center;
+}
+
+.btn-matrix .group-header {
+  grid-column: 1 / -1;
+  color: var(--text);
+  font-weight: 700;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+
+.btn-matrix .group-header:first-child {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.btn-matrix .row-header {
+  text-align: right;
+  padding-right: 4px;
+}
+
+.btn-variants {
+  display: grid;
+  grid-template-columns: 110px repeat(5, max-content);
+  align-items: center;
+  justify-items: start;
+  gap: 16px 20px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.btn-variants .col-header,
+.btn-variants .row-header,
+.btn-variants .group-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+main .grid .btn-variants .col-header,
+main .grid .btn-variants .row-header,
+main .grid .btn-variants .group-header {
+  line-height: 13px;
+}
+
+.btn-variants .col-header {
+  text-align: center;
+}
+
+.btn-variants .group-header {
+  grid-column: 1 / -1;
+  color: var(--text);
+  font-weight: 700;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+
+.btn-variants .group-header:first-child {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.btn-variants .row-header {
+  text-align: right;
+  padding-right: 4px;
+}
+
+.field-matrix {
+  display: grid;
+  grid-template-columns: 88px repeat(7, minmax(200px, 220px));
+  align-items: start;
+  justify-items: start;
+  gap: 16px 20px;
+  width: 100%;
+}
+
+.field-matrix zl-field,
+.field-matrix .zr-field,
+.field-matrix .field-matrix__cell {
+  width: min(220px, 100%);
+  max-width: 220px;
+}
+
+.scope:has(.field-matrix) {
+  overflow-x: auto;
+}
+
+.field-matrix .col-header,
+.field-matrix .row-header,
+.field-matrix .group-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+main .grid .field-matrix .col-header,
+main .grid .field-matrix .row-header,
+main .grid .field-matrix .group-header {
+  line-height: 13px;
+}
+
+.field-matrix .col-header {
+  text-align: center;
+}
+
+.field-matrix .row-header {
+  text-align: right;
+  padding-right: 4px;
+  padding-top: 10px;
+}
+
+.field-matrix .group-header {
+  grid-column: 1 / -1;
+  color: var(--text);
+  font-weight: 700;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+
+/* Figma matrix preview columns — not part of the field component API. */
+.field-matrix__cell[data-state="hovered"] .zr-field:not(.zr-field--disabled):not(.zr-field--invalid):not(.zr-field--success)
+  .zr-field__wrap:not(:focus-within) {
+  border-color: var(--zl-color-gray-500, #9e9eb2);
+  background-color: color-mix(in srgb, var(--zl-color-text-primary-white, #f4f4f6) 10%, transparent);
+}
+.field-matrix__cell[data-state="focused"] .zr-field:not(.zr-field--disabled):not(.zr-field--invalid):not(.zr-field--success)
+  .zr-field__wrap {
+  border-color: var(--zl-color-border-default-white, #f4f4f6);
+}
+.field-matrix__cell[data-state="focused"] .zr-field--invalid .zr-field__wrap {
+  border-color: var(--zl-color-border-error, #ea4f70);
+}
+.field-matrix__cell[data-state="focused"] .zr-field--success .zr-field__wrap {
+  border-color: var(--zl-color-border-success, #33a779);
+}
+
+.alert-matrix {
+  display: grid;
+  grid-template-columns: 72px repeat(3, minmax(280px, 376px));
+  align-items: start;
+  justify-items: stretch;
+  gap: 12px 16px;
+  width: 100%;
+}
+
+.scope:has(.alert-matrix) {
+  overflow-x: auto;
+}
+
+.alert-matrix .col-header,
+.alert-matrix .row-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.alert-matrix .col-header {
+  text-align: center;
+}
+
+.alert-matrix .row-header {
+  text-align: right;
+  padding-right: 4px;
+  padding-top: 10px;
+}
+
+.alert-matrix zl-alert,
+.alert-matrix .zr-alert {
+  width: 100%;
+  max-width: 376px;
+}
+
+.icon-matrix {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  color: var(--zl-color-text-primary-white, #f4f4f6);
+}
+
+.icon-matrix__head,
+.icon-matrix__row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  width: 100%;
+}
+
+.icon-matrix__head {
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.icon-matrix__head .row-header,
+.icon-matrix__row .row-header {
+  flex: 0 0 4.5rem;
+  min-width: 4.5rem;
+}
+
+.icon-matrix__head .col-header {
+  flex: 0 0 4.5rem;
+  min-width: 4.5rem;
+  text-align: center;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.icon-matrix__row .icon-matrix__cell {
+  flex: 0 0 4.5rem;
+  min-width: 4.5rem;
+}
+
+.icon-matrix .col-header,
+.icon-matrix .row-header,
+.icon-matrix .group-header,
+.icon-matrix .tone-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.icon-matrix__head .col-header {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.icon-matrix .row-header,
+.icon-matrix .tone-label {
+  text-align: right;
+  padding-right: 4px;
+  white-space: nowrap;
+}
+
+.icon-matrix__cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--zl-color-text-primary-white, #f4f4f6) 6%, transparent);
+}
+
+/* :host { display: contents } defers sizing; flex rows need a box on the CE. */
+.icon-matrix__cell zl-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-matrix__tones-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.icon-matrix .group-header {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--text);
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.icon-matrix__tones {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.icon-matrix__tone {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 1rem;
+  flex: 0 1 auto;
+}
+
+.icon-matrix__tone .tone-label {
+  flex: 0 0 auto;
+  min-width: 4.5rem;
+}
+
+.icon-matrix__tone .icon-matrix__cell {
+  flex: 0 0 auto;
+  min-width: 4.5rem;
+  max-width: none;
+}

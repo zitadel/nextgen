@@ -5,8 +5,8 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.lib.tsbuildinfo",
     "emitDeclarationOnly": false,
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "types": ["node"],
     "experimentalDecorators": true,
     "jsx": "react-jsx",
@@ -17,6 +17,12 @@
   "references": [
     {
       "path": "../sdk-core/tsconfig.lib.json"
+    },
+    {
+      "path": "../components/tsconfig.lib.json"
+    },
+    {
+      "path": "../api/tsconfig.lib.json"
     }
   ]
 }

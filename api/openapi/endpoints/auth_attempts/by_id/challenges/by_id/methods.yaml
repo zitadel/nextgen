@@ -39,33 +39,5 @@ post:
         application/json:
           schema:
             $ref: ../../../auth-attempt-response.yaml
-    '400':
-      description: Invalid proof or request
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../../components/error-details.yaml
-    '401':
-      description: Proof rejected (invalid credential, wrong code, etc.)
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../../components/error-details.yaml
-    '404':
-      description: Attempt or challenge not found
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../../components/error-details.yaml
-    '429':
-      description: Too many failed attempts (rate limited)
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../../components/error-details.yaml
     default:
-      description: Unexpected error
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../../components/error-details.yaml
+      $ref: verifyChallengeProof-error-response.yaml

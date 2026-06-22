@@ -1,5 +1,5 @@
 import { TanStackDevtools } from "@tanstack/react-devtools";
-import { Outlet, createRootRoute } from "@tanstack/react-router";
+import { Link, Outlet, createRootRoute } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 
 import "../styles.css";
@@ -11,7 +11,19 @@ export const Route = createRootRoute({
 function RootComponent() {
   return (
     <>
-      <Outlet />
+      <header>
+        <h1>@zitadel/ui-react</h1>
+        <nav aria-label="Playground">
+          <Link to="/" activeOptions={{ exact: true }}>
+            Atoms
+          </Link>
+        </nav>
+      </header>
+      <main>
+        <div className="playground-host">
+          <Outlet />
+        </div>
+      </main>
       <TanStackDevtools
         config={{
           position: "bottom-right",

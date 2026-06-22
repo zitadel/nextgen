@@ -15,14 +15,13 @@
  */
 import { Liquid } from "liquidjs";
 
+import type { FlowError } from "./template-context.js";
 import type { Locale } from "./locales/en.js";
 import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
-import { authFormTemplate } from "./templates/auth-form.liquid.js";
-import { defaultTemplate } from "./templates/default.liquid.js";
+import defaultTemplate from "./templates/default.liquid";
 
 export const TEMPLATE_NAMES = {
   default: "default",
-  authForm: "auth_form",
 } as const;
 
 export type CreateLiquidOptions = {
@@ -38,7 +37,6 @@ export type CreateLiquidOptions = {
 export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
   const templates: Record<string, string> = {
     [TEMPLATE_NAMES.default]: defaultTemplate,
-    [TEMPLATE_NAMES.authForm]: authFormTemplate,
     ...(options.templates ?? {}),
   };
 
@@ -71,6 +69,60 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
       return interpolate(template, args.map(stringify));
     },
   );
+
+  /** Resolves `{text_key}.placeholder` — empty when undefined (not the raw key). */
+  engine.registerFilter("fieldPlaceholder", (textKey: unknown) => {
+    const lookupKey = `${stringify(textKey)}.placeholder`;
+    return options.locale[lookupKey] ?? "";
+  });
+
+  /** Resolves `{text_key}.help` — empty when undefined. */
+  engine.registerFilter("fieldHelp", (textKey: unknown) => {
+    const lookupKey = `${stringify(textKey)}.help`;
+    return options.locale[lookupKey] ?? "";
+  });
+
+  /** Maps `error.*` text keys to a field name (Figma inline-error annotations). */
+  const fieldErrorKeys: Record<string, string> = {
+    "error.email_required": "email",
+    "error.email_invalid": "email",
+    "error.email_exists": "email",
+    "error.password_required": "password",
+    "error.password_incorrect": "password",
+    "error.invalid_credentials": "password",
+  };
+
+  /** Resolves `{text_key}.title` for form-level `<zl-alert heading>`. */
+  engine.registerFilter("alertHeading", (textKey: unknown) => {
+    const lookupKey = `${stringify(textKey)}.title`;
+    return options.locale[lookupKey] ?? "";
+  });
+
+  /** Resolves `{text_key}.body` for form-level `<zl-alert>` message slot. */
+  engine.registerFilter("alertBody", (textKey: unknown) => {
+    const lookupKey = `${stringify(textKey)}.body`;
+    return options.locale[lookupKey] ?? "";
+  });
+
+  /** Localized inline error for `fieldName`, or empty when none applies. */
+  engine.registerFilter("fieldError", (fieldName: unknown, errors: unknown) => {
+    const name = stringify(fieldName);
+    if (!Array.isArray(errors)) return "";
+    for (const item of errors) {
+      const err = item as FlowError;
+      const key = err.text_key ?? "";
+      if (fieldErrorKeys[key] === name) {
+        return options.locale[key] ?? key;
+      }
+    }
+    return "";
+  });
+
+  /** True when the error should render as `<zl-alert>`, not on a field. */
+  engine.registerFilter("formLevelError", (err: unknown) => {
+    const key = (err as FlowError)?.text_key ?? "";
+    return key === "" || !(key in fieldErrorKeys);
+  });
 
   // `{% mandatory_gates %}` — emits a unique marker comment that the
   // orchestrator post-processes via `patchMandatoryGates`.

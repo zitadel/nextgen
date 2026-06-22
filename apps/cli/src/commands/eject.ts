@@ -1,89 +1,63 @@
 import { readFile, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { CliIO, GlobalOptions } from "../io/output";
-import { ok, skipped } from "../io/output";
+import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { ZitadelError } from "../lib/errors";
+import { createOrca } from "../lib/orca";
+import type { EjectActions } from "../lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../lib/paths";
+import { readRendererId, readZitadelConfig } from "../lib/project";
 
-export type EjectOptions = GlobalOptions & {
-  force?: boolean;
-};
-
-export async function runEject(io: CliIO, opts: EjectOptions): Promise<void> {
-  if (!opts.force && opts.nonInteractive) {
-    throw new ZitadelError("E_VALIDATION", "Eject requires --force in non-interactive mode", {
-      hint: "Re-run with --force to confirm deletion of managed files.",
+/**
+ * Asks the framework patcher which artifacts it owns. Falls back to the
+ * framework-agnostic set (`zitadel.json`, `.zitadel/`, `.env.local`) when the
+ * framework or its patcher cannot be resolved, so an orphaned/partial project
+ * can still be cleaned up.
+ */
+async function resolveEjectActions(cwd: string): Promise<EjectActions> {
+  const fallback: EjectActions = {
+    markedFiles: [],
+    rootConfigFiles: ["zitadel.json"],
+    directories: [".zitadel"],
+    envBackups: [".env.local"],
+    dependencies: [],
+    configEdits: [],
+  };
+  const orca = createOrca();
+  const framework = await orca.tryDetect(cwd);
+  if (!framework) {
+    return fallback;
+  }
+  try {
+    const config = await readZitadelConfig(cwd).catch(() => ({}) as Record<string, unknown>);
+    return orca.patcherFor(framework.id).artifacts({
+      framework,
+      rendererId: readRendererId(config),
     });
+  } catch {
+    return fallback;
   }
+}
 
-  const removed: string[] = [];
-  const preserved: string[] = [];
-  const backedUp: string[] = [];
-
-  const candidates = [
-    "zitadel.json",
-    ".zitadel/schemas/user.json",
-    ".zitadel/flows/default.json",
-    ".zitadel/locales/en.json",
-    ".zitadel/state.json",
-    ".zitadel/secret",
-    "app/login/page.tsx",
-    "app/register/page.tsx",
-    "app/zitadel-provider.tsx",
-    "src/app/login/page.tsx",
-    "src/app/register/page.tsx",
-    "src/app/zitadel-provider.tsx",
-  ];
-
-  for (const rel of candidates) {
-    const abs = join(opts.cwd, rel);
-    const exists = await pathExists(abs);
-    if (!exists) continue;
-    if (rel.endsWith(".tsx")) {
-      const contents = await readFile(abs, "utf8").catch(() => "");
-      if (!contents.includes(MANAGED_MARKER)) {
-        preserved.push(rel);
-        continue;
-      }
-    }
-    if (opts.dryRun) {
-      removed.push(rel);
-      continue;
-    }
-    await rm(abs, { recursive: true, force: true });
-    removed.push(rel);
+/**
+ * Builds the `next_commands` envelope field — manual follow-ups `eject` can't
+ * safely run itself: deleting the `.env.local.ejected-*` backups it created
+ * (only when some were made), and uninstalling the SDK packages the patcher
+ * added (the CLI never modifies the user's `package.json` + lockfile +
+ * `node_modules` directly; it just suggests the command).
+ */
+function assembleNextCommands(
+  backedUp: ReadonlyArray<unknown>,
+  dependencies: ReadonlyArray<string>,
+): ReadonlyArray<string> {
+  const commands: string[] = [];
+  if (backedUp.length > 0) {
+    commands.push("rm -f .env.local.ejected-*");
   }
-
-  const envLocal = join(opts.cwd, ".env.local");
-  if ((await pathExists(envLocal)) && !opts.dryRun) {
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const backup = join(opts.cwd, `.env.local.ejected-${stamp}`);
-    await rename(envLocal, backup);
-    backedUp.push(`.env.local -> ${backup.slice(opts.cwd.length + 1)}`);
+  for (const dep of dependencies) {
+    commands.push(`npm uninstall ${dep}`);
   }
-
-  const zitadelDir = join(opts.cwd, ".zitadel");
-  if ((await pathExists(zitadelDir)) && !opts.dryRun) {
-    await rm(zitadelDir, { recursive: true, force: true });
-  }
-
-  if (removed.length === 0 && backedUp.length === 0) {
-    skipped(io, "nothing-to-eject", opts, { cwd: opts.cwd });
-    return;
-  }
-
-  ok(
-    io,
-    {
-      title: "Zitadel ejected. Remote project is untouched.",
-      files_removed: removed,
-      files_preserved: preserved,
-      backed_up: backedUp,
-      next_commands: ["rm -rf .zitadel.* (optional cleanup of backups)"],
-    },
-    opts,
-  );
+  return commands;
 }
 
 async function pathExists(path: string): Promise<boolean> {
@@ -92,5 +66,126 @@ async function pathExists(path: string): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * `zitadel eject` — remove managed files and local Zitadel state.
+ *
+ * Removes Zitadel-managed files from the project, leaving the remote project
+ * untouched. The set of files comes from the framework patcher's
+ * {@link import("../lib/orca/patchers/types").Patcher.artifacts}, so the patcher
+ * is the single source of truth for what its integration owns.
+ *
+ * Marked code files are removed only when they still carry the managed marker
+ * (user-replaced files are preserved); `zitadel.json` is removed; `.env.local`
+ * is renamed to a timestamped backup; and `.zitadel/` is removed wholesale.
+ * `--dry-run` reports without touching the filesystem; non-interactive runs
+ * require `--force`.
+ */
+export default class Eject extends BaseCommand {
+  static override description = "Remove managed files and local Zitadel state.";
+  static override aliases = ["uninstall"];
+
+  async run(): Promise<JsonEnvelope> {
+    const { flags } = await this.parse(Eject);
+    await this.toMeta(flags);
+    const { cwd, force, nonInteractive, dryRun } = this.meta;
+
+    if (!force && nonInteractive) {
+      throw new ZitadelError("E_VALIDATION", "Eject requires --force in non-interactive mode", {
+        hint: "Re-run with --force to confirm deletion of managed files.",
+      });
+    }
+
+    const actions = await resolveEjectActions(cwd);
+    const removed: string[] = [];
+    const preserved: string[] = [];
+    const backedUp: string[] = [];
+
+    for (const rel of actions.markedFiles) {
+      const abs = join(cwd, rel);
+      if (!(await pathExists(abs))) {
+        continue;
+      }
+      const contents = await readFile(abs, "utf8").catch(() => "");
+      if (!contents.includes(MANAGED_MARKER)) {
+        preserved.push(rel);
+        continue;
+      }
+      if (!dryRun) {
+        await rm(abs, { force: true });
+      }
+      removed.push(rel);
+    }
+
+    for (const rel of actions.rootConfigFiles) {
+      const abs = join(cwd, rel);
+      if (!(await pathExists(abs))) {
+        continue;
+      }
+      if (!dryRun) {
+        await rm(abs, { force: true });
+      }
+      removed.push(rel);
+    }
+
+    for (const rel of actions.envBackups) {
+      const abs = join(cwd, rel);
+      if (!(await pathExists(abs))) {
+        continue;
+      }
+      if (dryRun) {
+        backedUp.push(`${rel} -> ${rel}.ejected-<timestamp>`);
+        continue;
+      }
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const backup = `${abs}.ejected-${stamp}`;
+      await rename(abs, backup);
+      backedUp.push(`${rel} -> ${backup.slice(cwd.length + 1)}`);
+    }
+
+    for (const rel of actions.directories) {
+      const abs = join(cwd, rel);
+      if (!(await pathExists(abs))) {
+        continue;
+      }
+      if (!dryRun) {
+        await rm(abs, { recursive: true, force: true });
+      }
+      removed.push(rel);
+    }
+
+    // In-place config merges (vite.config.ts / angular.json / nuxt.config.ts)
+    // can't be auto-reverted, so surface them as manual cleanup steps. The
+    // Angular patcher also edits package.json (a `dev` script, not a config
+    // block), so word that one accurately.
+    const manualSteps = actions.configEdits.map((rel) => {
+      if (rel === "package.json" || rel.endsWith("/package.json")) {
+        return `Remove the "dev" script setup added to ${rel}`;
+      }
+      if (rel === "angular.json" || rel.endsWith("/angular.json")) {
+        return `Remove the Zitadel proxyConfig (and dev-server port) from the serve target in ${rel}`;
+      }
+      return `Remove the Zitadel configuration block from ${rel}`;
+    });
+
+    if (removed.length === 0 && backedUp.length === 0 && manualSteps.length === 0) {
+      return this.emit({ status: "skipped", reason: "nothing-to-eject", data: { cwd } });
+    }
+
+    const nextCommands = assembleNextCommands(backedUp, actions.dependencies);
+
+    return this.emit({
+      status: "ok",
+      data: {
+        title: "Zitadel ejected. Remote project is untouched.",
+        files_removed: removed,
+        files_preserved: preserved,
+        backed_up: backedUp,
+        next_commands: nextCommands,
+        manual_steps: manualSteps,
+      },
+    });
   }
 }

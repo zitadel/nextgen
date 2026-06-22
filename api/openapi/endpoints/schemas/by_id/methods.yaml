@@ -1,0 +1,47 @@
+get:
+  operationId: getSchemaById
+  summary: Get schema by ID
+  description: Get a schema by its ID. This will return the default revision of the schema.
+  tags:
+    - Schemas
+  security:
+    - oauth2:
+        - schema.read
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    - $ref: ../../../components/parameters/project-id.yaml
+    - $ref: ../../../components/parameters/team-id.yaml
+  responses:
+    '200':
+      description: The schema was retrieved successfully
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: ../user-schema.yaml
+            discriminator:
+              propertyName: kind
+              mapping:
+                user-schema: ../user-schema.yaml
+    '400':
+      description: The provided input was not valid
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: No schema was found with the given id
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml

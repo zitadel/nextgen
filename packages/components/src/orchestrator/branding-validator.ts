@@ -10,12 +10,14 @@
  *    lands).
  *
  * Failures are non-fatal: we collect issues, log a dev-build warning, and
- * return a sanitised payload with the offending fields stripped so the
- * orchestrator falls back to the bundled defaults.
+ * return a sanitised payload with the offending fields stripped (set to
+ * `undefined`) so the orchestrator falls back to the bundled defaults.
  */
-import type { Branding, FlowLayout } from "./types.js";
+import { CreateFlow201BrandingLayout } from "@zitadel/api/generated/model";
 
-const VALID_LAYOUTS: readonly FlowLayout[] = ["centered", "split"];
+import type { Branding } from "./branding.js";
+
+const VALID_LAYOUTS = new Set<string>(Object.values(CreateFlow201BrandingLayout));
 
 export type BrandingValidationResult = {
   branding: Branding | undefined;
@@ -30,9 +32,9 @@ export function validateBranding(input: Branding | undefined): BrandingValidatio
   const issues: string[] = [];
   const out: Branding = { ...input };
 
-  if (out.layout && !VALID_LAYOUTS.includes(out.layout)) {
+  if (out.layout && !VALID_LAYOUTS.has(out.layout)) {
     issues.push(`Unknown layout "${out.layout}" — falling back to "centered".`);
-    out.layout = "centered";
+    out.layout = CreateFlow201BrandingLayout.centered;
   }
 
   out.logo_url = sanitiseUrl(out.logo_url, "logo_url", issues);
@@ -42,7 +44,11 @@ export function validateBranding(input: Branding | undefined): BrandingValidatio
     out.assets = {
       logo_dark: sanitiseUrl(out.assets.logo_dark, "assets.logo_dark", issues),
       favicon: sanitiseUrl(out.assets.favicon, "assets.favicon", issues),
-      background_image: sanitiseUrl(out.assets.background_image, "assets.background_image", issues),
+      background_image: sanitiseUrl(
+        out.assets.background_image,
+        "assets.background_image",
+        issues,
+      ),
     };
   }
 
@@ -50,22 +56,22 @@ export function validateBranding(input: Branding | undefined): BrandingValidatio
 }
 
 function sanitiseUrl(
-  value: string | null | undefined,
+  value: string | undefined,
   field: string,
   issues: string[],
-): string | null | undefined {
+): string | undefined {
   if (value == null || value === "") {
-    return value ?? undefined;
+    return undefined;
   }
   try {
     const parsed = new URL(value);
     if (parsed.protocol !== "https:") {
       issues.push(`${field} must use https (got "${parsed.protocol}") — dropped.`);
-      return null;
+      return undefined;
     }
     return parsed.toString();
   } catch {
     issues.push(`${field} is not a valid URL — dropped.`);
-    return null;
+    return undefined;
   }
 }

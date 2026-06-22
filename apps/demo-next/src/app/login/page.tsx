@@ -1,4 +1,4 @@
-import { auth } from "@zitadel-nextgen/sdk-next/server";
+import { auth } from "@zitadel/sdk-next/server";
 import { redirect } from "next/navigation";
 import { LoginWidget } from "./widget";
 
@@ -12,7 +12,6 @@ export default async function LoginPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "24px",
         background: "#f3f4f6",
       }}
     >

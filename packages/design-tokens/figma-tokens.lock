@@ -1,0 +1,10 @@
+{
+  "_comment": "Pinned snapshot of the Zitadel Design System library used to populate src/generated/figma.tokens.json. Bumping the version here is the explicit, gated trigger for re-syncing. CI workflow .github/workflows/sync-design-tokens.yml opens a PR; never auto-merges. See packages/design-tokens/README.md.",
+  "fileKey": "8UjCXw8yemgljmbkWGrSfE",
+  "libraryName": "Zitadel - Design System - External",
+  "libraryKey": "lk-84b7904d6ccc53258b50d58da5294801cd708731ffbcdf041ff0ea95aa4ed5111d9f6fe84adbe9830fe296ca679957da20957e93073524ca6cd1f4635088ce11",
+  "version": "unpinned-seed",
+  "pulledAt": null,
+  "pulledBy": null,
+  "note": "The initial src/generated/figma.tokens.json was authored from MCP-enumerated variables. Running `moon run design-tokens:sync` with a FIGMA_TOKEN set will pin a real version here and overwrite the JSON with the canonical REST API response."
+}

@@ -11,6 +11,14 @@ func (s *Branding) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *CreateFlowRequest) setDefaults() {
+	{
+		val := bool(false)
+		s.DryRun.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *Field) setDefaults() {
 	{
 		val := bool(false)
@@ -19,14 +27,26 @@ func (s *Field) setDefaults() {
 }
 
 // setDefaults set default value of fields.
-func (s *Gate) setDefaults() {
+func (s *FlowDefinition) setDefaults() {
 	{
-		val := bool(true)
-		s.Required.SetTo(val)
+		val := FlowDefinitionStatus("active")
+		s.Status.SetTo(val)
 	}
+}
+
+// setDefaults set default value of fields.
+func (s *FlowDefinitionDetailResponse) setDefaults() {
 	{
-		val := bool(false)
-		s.Satisfied.SetTo(val)
+		val := FlowDefinitionStatus("active")
+		s.Status = val
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *FlowDefinitionResponse) setDefaults() {
+	{
+		val := FlowDefinitionStatus("active")
+		s.Status = val
 	}
 }
 
@@ -55,5 +75,21 @@ func (s *StepAction) setDefaults() {
 	{
 		val := bool(false)
 		s.Primary.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *UserProperty) setDefaults() {
+	{
+		val := bool(true)
+		s.XMinusEditable.SetTo(val)
+	}
+	{
+		val := bool(false)
+		s.XMinusSensitive.SetTo(val)
+	}
+	{
+		val := bool(false)
+		s.XMinusMfa.SetTo(val)
 	}
 }

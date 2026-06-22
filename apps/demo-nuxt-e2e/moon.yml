@@ -1,0 +1,19 @@
+id: "demo-nuxt-e2e"
+language: "typescript"
+layer: "automation"
+stack: "frontend"
+dependsOn:
+  - "api-mock"
+  - "demo-nuxt"
+
+tasks:
+  lint:
+    command: "corepack pnpm exec oxlint ."
+
+  e2e:
+    command: "corepack pnpm exec playwright test"
+    deps:
+      - "api-mock:build"
+      - "demo-nuxt:build"
+    options:
+      runInCI: false
