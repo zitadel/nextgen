@@ -19,7 +19,7 @@ type execution struct {
 func (e *execution) Execute(ctx context.Context) error {
 	res, err := e.client.Exec(ctx, e.stmt, e.args...)
 	if err != nil {
-		return err
+		return wrapError(err)
 	}
 	e.affectedRows = res.RowsAffected()
 	return nil
@@ -36,14 +36,14 @@ type query[R any] struct {
 func (q *query[R]) Query(ctx context.Context) (*R, error) {
 	rows, err := q.client.Query(ctx, q.stmt, q.args...)
 	if err != nil {
-		return nil, err
+		return nil, wrapError(err)
 	}
 	if q.result == nil {
 		q.result = new(R)
 	}
 	err = q.scan(rows, q.result)
 	rows.Close()
-	return q.result, errors.Join(err, rows.Err())
+	return q.result, errors.Join(wrapError(err), wrapError(rows.Err()))
 }
 
 var _ database.Query[any] = (*query[any])(nil)
