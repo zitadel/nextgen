@@ -23,6 +23,10 @@ export const publicPackages = [
   { name: "@zitadel/sdk-react", root: "packages/sdk-react/" },
   { name: "@zitadel/sdk-vue", root: "packages/sdk-vue/" },
   { name: "@zitadel/sdk-angular", root: "packages/sdk-angular/" },
+  { name: "@zitadel/sdk-sveltekit", root: "packages/sdk-sveltekit/" },
+  { name: "@zitadel/sdk-tanstack-start", root: "packages/sdk-tanstack-start/" },
+  { name: "@zitadel/sdk-solid-start", root: "packages/sdk-solid-start/" },
+  { name: "@zitadel/sdk-qwik-city", root: "packages/sdk-qwik-city/" },
 ];
 
 const publicPackageNames = publicPackages.map((pkg) => pkg.name);

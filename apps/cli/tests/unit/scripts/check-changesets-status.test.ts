@@ -543,6 +543,10 @@ function validConfig(): { fixed: string[][] } {
         "@zitadel/sdk-react",
         "@zitadel/sdk-vue",
         "@zitadel/sdk-angular",
+        "@zitadel/sdk-sveltekit",
+        "@zitadel/sdk-tanstack-start",
+        "@zitadel/sdk-solid-start",
+        "@zitadel/sdk-qwik-city",
       ],
     ],
   };

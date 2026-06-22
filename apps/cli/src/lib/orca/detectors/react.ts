@@ -8,8 +8,9 @@ import type { Detector, FrameworkFacts } from "./types";
  * file, else the framework default), and the derived local issuer URL.
  *
  * Recognises a project that depends on both `react` and `vite` but NOT `next`
- * — Next.js ships React too, so the {@link import("./next").NextDetector} must
- * run first (and does, by registry order) and this detector excludes it.
+ * or `@tanstack/react-start` — Next.js and TanStack Start both ship React too,
+ * so their detectors must run first (and do, by registry order) and this
+ * detector excludes them so a meta-framework app is never seen as a bare SPA.
  */
 export class ReactDetector implements Detector {
   readonly framework = "react";
@@ -19,6 +20,7 @@ export class ReactDetector implements Detector {
     if (
       !pkg ||
       hasDependency(pkg, "next") ||
+      hasDependency(pkg, "@tanstack/react-start") ||
       !hasDependency(pkg, "react") ||
       !hasDependency(pkg, "vite")
     ) {

@@ -57,6 +57,10 @@ export const PUBLIC_PACKAGE_DIRS = [
   "packages/sdk-solid",
   "packages/sdk-svelte",
   "packages/sdk-qwik",
+  "packages/sdk-sveltekit",
+  "packages/sdk-tanstack-start",
+  "packages/sdk-solid-start",
+  "packages/sdk-qwik-city",
 ];
 export const SERVER_PLATFORMS = [
   { goos: "linux", goarch: "amd64" },
