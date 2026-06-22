@@ -83,6 +83,7 @@ func (h *FlowCreateUserHandler) Handle(ctx context.Context, in domain.FlowOnSucc
 	}
 
 	return domain.FlowOnSuccessResult{
-		UserID: createUserAction.User[domain.UserIDFieldName].(string),
+		UserID:         createUserAction.User[domain.UserIDFieldName].(string),
+		ClearBackStack: true,
 	}, nil
 }
