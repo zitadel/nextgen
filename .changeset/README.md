@@ -34,7 +34,7 @@ The [`fixed` array in `.changeset/config.json`](config.json) is the source of
 truth for exact group membership; if this prose and the config drift, the config
 wins. `AGENTS.md` files under those roots do not require a changeset on their own.
 Private workspaces — demos, `api-mock`, `design-tokens`,
-`shared-component-styles`, `ui-react`, `lint`, and `console` — are marked
+`shared-component-styles`, `ui-react`, and `console` — are marked
 `"private": true` and never publish.
 
 ## When a change needs a changeset
@@ -65,10 +65,7 @@ the server ship or version, it is what gives the change a release-note line. Pic
 | --- | --- | --- |
 | Changes shipped product behavior — any path, including Go under `internal/`, `cmd/`, `api/openapi/`, or migrations | **Yes** — real changeset | Name the file and summarize the release note; list `@zitadel/server` for server changes |
 | Is *exclusively* tests, generated output, docs, CI, or a no-op refactor (see [When a change needs a changeset](#when-a-change-needs-a-changeset)) | **No** | `No changeset required — no shipped behavior changed.` |
-
-**Rare:** a publishable path changed but nothing should ship (e.g. a
-package-internal test) → empty changeset; explain why the path changed but
-nothing ships.
+| Changes a publishable path but nothing should ship (rare — e.g. a package-internal test) | **Empty changeset** | Explain why the path changed but nothing ships |
 
 ## How to add a changeset
 
