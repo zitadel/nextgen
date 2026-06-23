@@ -76,7 +76,10 @@ func (c membershipTeamMatch) Write(b *database.StatementBuilder) {
 	b.WriteString(" AND m.status = 'active')")
 }
 
-func (membershipTeamMatch) Matches(any) bool { return true }
+func (c membershipTeamMatch) Matches(x any) bool {
+	other, ok := x.(membershipTeamMatch)
+	return ok && c.teamID == other.teamID
+}
 
 func (membershipTeamMatch) String() string { return "membershipTeamMatch" }
 
@@ -149,6 +152,9 @@ func WithUserScalarList(project string, filters []UserListScalarFilter, teamScop
 }
 
 func (r *UserRepository) Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error {
+	if err := checkPKOrUniqueKeyCondition(r, condition); err != nil {
+		return err
+	}
 	builder := database.NewStatementBuilder(
 		"DELETE FROM zitadel_nextgen.team_memberships WHERE (project_id, user_id) IN (SELECT project_id, id FROM ",
 	)
