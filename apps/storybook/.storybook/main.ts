@@ -66,13 +66,31 @@ const config: StorybookConfig = {
       exclude: [...(viteConfig.optimizeDeps?.exclude ?? []), ...optimizeDepsExclude],
       include: [...(viteConfig.optimizeDeps?.include ?? []), ...optimizeDepsInclude],
     };
-    // Resolve the workspace `@zitadel/*` packages to their TS/CSS source via the
-    // `@zitadel/source` export condition (e.g. `@zitadel/components` and
-    // `@zitadel/ui-react`), so the Lit atoms and React pairs run from source in
-    // the dev server instead of their built `dist`. Without this, the Lit shadow
-    // CSS (`?inline` imports) and atom logic are frozen at the last build.
+    // Resolve workspace `@zitadel/*` packages that publish a `@zitadel/source`
+    // export condition (e.g. `@zitadel/ui-react`) to their TS source, so they run
+    // from source in the dev server instead of their built `dist`.
     viteConfig.resolve ??= {};
     viteConfig.resolve.conditions = ["@zitadel/source", ...(viteConfig.resolve.conditions ?? [])];
+    // `@zitadel/components` intentionally does NOT publish a `@zitadel/source`
+    // condition: its source imports raw `*.css?inline` and `*.liquid` assets, and
+    // exposing it repo-wide would force every TS consumer (the SDKs, `login-ui`)
+    // to typecheck those un-declared modules and conflict with their composite
+    // `dist` project references. Alias it to source here instead — a Storybook-
+    // bundler-only override that keeps the Lit shadow CSS (`?inline`) and atom
+    // logic hot, without changing how the rest of the workspace resolves it.
+    const componentsSrc = resolve(packagesDir, "components/src");
+    const componentsAlias = [
+      { find: /^@zitadel\/components\/atoms$/, replacement: resolve(componentsSrc, "atoms/index.ts") },
+      { find: /^@zitadel\/components\/manifests$/, replacement: resolve(componentsSrc, "manifests.ts") },
+      { find: /^@zitadel\/components\/tokens$/, replacement: resolve(componentsSrc, "tokens/index.ts") },
+      { find: /^@zitadel\/components\/orchestrator$/, replacement: resolve(componentsSrc, "orchestrator/index.ts") },
+      { find: /^@zitadel\/components$/, replacement: resolve(componentsSrc, "index.ts") },
+    ];
+    const existingAlias = viteConfig.resolve.alias;
+    const normalizedAlias = Array.isArray(existingAlias)
+      ? existingAlias
+      : Object.entries(existingAlias ?? {}).map(([find, replacement]) => ({ find, replacement }));
+    viteConfig.resolve.alias = [...componentsAlias, ...normalizedAlias];
     viteConfig.plugins ??= [];
     // The orchestrator imports its `.liquid` templates as raw strings. Running
     // `@zitadel/components` from source means Vite (not the prebuilt dist) has to

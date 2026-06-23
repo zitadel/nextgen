@@ -29,7 +29,6 @@
       "default": "./vite-liquid-plugin.ts"
     },
     ".": {
-      "@zitadel/source": "./src/index.ts",
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
@@ -39,22 +38,18 @@
       "import": "./dist/standalone.mjs"
     },
     "./atoms": {
-      "@zitadel/source": "./src/atoms/index.ts",
       "types": "./dist/atoms/index.d.mts",
       "import": "./dist/atoms/index.mjs"
     },
     "./manifests": {
-      "@zitadel/source": "./src/manifests.ts",
       "types": "./dist/manifests.d.mts",
       "import": "./dist/manifests.mjs"
     },
     "./tokens": {
-      "@zitadel/source": "./src/tokens/index.ts",
       "types": "./dist/tokens/index.d.mts",
       "import": "./dist/tokens/index.mjs"
     },
     "./orchestrator": {
-      "@zitadel/source": "./src/orchestrator/index.ts",
       "types": "./dist/orchestrator/index.d.mts",
       "import": "./dist/orchestrator/index.mjs"
     }
