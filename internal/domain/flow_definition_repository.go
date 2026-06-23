@@ -22,6 +22,9 @@ type FlowDefinitionRepository interface {
 	// belonging to the given instance. Child records are not populated.
 	ListFlowDefinitions(ctx context.Context, client database.QueryExecutor, projectID string, opts ...FlowDefinitionListOption) ([]*FlowDefinition, error)
 
+	// UpdateFlowDefinition updates a definition and all its child records.
+	UpdateFlowDefinition(ctx context.Context, client database.QueryExecutor, def *FlowDefinition) error
+
 	// UpdateFlowDefinitionStatus transitions a definition to the given status.
 	UpdateFlowDefinitionStatus(ctx context.Context, client database.QueryExecutor, projectID, id string, status FlowDefinitionStatus) error
 
