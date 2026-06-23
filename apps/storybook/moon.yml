@@ -18,9 +18,15 @@ tasks:
       - "ui-react:build"
 
   typecheck:
+    # Runs `tsc --build`: it compiles the referenced `api`/`api-mock` composite
+    # projects (their `dist/*.d.ts` are not produced by their tsdown/no-op
+    # `build` tasks) before type-checking the Storybook program. `api-mock:build`
+    # is a no-op, but the dep edge makes Moon re-run this when api-mock source
+    # changes, since `tsc --build` reads that source directly.
     command: "corepack pnpm run typecheck"
     deps:
       - "api:build"
+      - "api-mock:build"
       - "components:build"
       - "design-tokens:build"
       - "ui-react:build"
