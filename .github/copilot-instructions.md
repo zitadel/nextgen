@@ -26,9 +26,8 @@ more than polish.
 - Changes that ship in the product release need a changeset — including Go server
   changes from implementation paths like `internal/` (list `@zitadel/server`).
   Follow the
-  [decision table in `.changeset/README.md`](.changeset/README.md#decision-table);
-  author `.changeset/<slug>.md` directly, not via the interactive prompt. npm
-  package manifests stay `"license": "MIT"`.
+  [decision table in `.changeset/README.md`](../.changeset/README.md#decision-table);
+  author `.changeset/<slug>.md` directly, not via the interactive prompt.
 - PR metadata must follow `AGENTS.md`: verify the title against
   `.github/semantic.yml`, prefer a scope-free title when unsure, and keep the
   PR description current with summary, validation, changeset, and notes.
