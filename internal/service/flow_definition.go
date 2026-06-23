@@ -169,6 +169,11 @@ func (fd *flowDefinitionService) isUpdateAllowed(
 	projectID string,
 	currentStatus, reqStatus domain.FlowDefinitionStatus,
 	currentPurposes, reqPurposes map[domain.FlowDefinitionPurpose]string) error {
+	// if the flow definition being updated is not active, then the update is allowed implicitly
+	if currentStatus != domain.FlowDefinitionStatusActive {
+		return nil
+	}
+
 	// no status change and no purpose change -> the update is allowed implicitly
 	if currentStatus == reqStatus && maps.Equal(currentPurposes, reqPurposes) {
 		return nil

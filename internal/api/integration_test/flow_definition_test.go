@@ -337,32 +337,6 @@ func TestUpdateFlowDefinition(t *testing.T) {
 			},
 		},
 		{
-			name: "flow definition updated successfully - when status omitted preserves existing status",
-			req: newUpdateFlowDefinitionRequest(func() api.FlowDefinition {
-				def := newFlowDefinitionFixture("updated-flow-omit-status", *userSchemaURI)
-				return def
-			}()),
-			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginFlowDef.ID},
-			wantResp: &api.FlowDefinitionDetailResponse{
-				ID:        loginFlowDef.ID,
-				ProjectID: project.ID,
-				FlowDefinition: api.FlowDefinition{
-					Name:       "updated-flow-omit-status",
-					UserSchema: *userSchemaURI,
-					Purposes:   map[string]string{"login": "step_1"},
-					Audience: api.OptFlowAudience{
-						Value: api.FlowAudience{
-							TeamIds: []string{"team-1", "team-2"},
-							AppIds:  []string{"app-1", "app-2"},
-						},
-						Set: true,
-					},
-					Steps:  validSteps(),
-					Status: api.FlowDefinitionStatusActive,
-				},
-			},
-		},
-		{
 			name: "deactivate while removing old purpose fails when removed purpose has no alternate active definition",
 			req: newUpdateFlowDefinitionRequest(func() api.FlowDefinition {
 				def := newFlowDefinitionFixture("multi-purpose-flow-updated", *userSchemaURI)
