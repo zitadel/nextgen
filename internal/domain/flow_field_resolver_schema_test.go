@@ -73,11 +73,10 @@ func defaultSchemaBytes() []byte {
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
 		"x-auth-methods": { "password": { "enabled": true } },
-		"required": ["email", "username", "password", "given_name", "family_name"],
+		"required": ["email", "username", "given_name", "family_name"],
 		"properties": {
 			"email":       { "type": "string", "format": "email", "maxLength": 320, "x-unique": "team" },
 			"username":    { "type": "string", "minLength": 3, "maxLength": 64, "x-unique": "team" },
-			"password":    { "type": "string", "minLength": 8, "x-password": true },
 			"given_name":  { "type": "string", "minLength": 1, "maxLength": 200 },
 			"family_name": { "type": "string", "minLength": 1, "maxLength": 200 }
 		}
@@ -95,7 +94,7 @@ func TestSchemaFieldResolver_Resolve_DefaultFields(t *testing.T) {
 	resolver := newDefaultResolver(t)
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "identifier",
-		[]string{"email", "username", "password", "given_name", "family_name"})
+		[]string{"email", "username", "x-auth-methods#password", "given_name", "family_name"})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
@@ -107,7 +106,7 @@ func TestSchemaFieldResolver_Resolve_DefaultFields(t *testing.T) {
 	}{
 		{"email", domain.FlowFieldTypeEmail, "identifier.field.email"},
 		{"username", domain.FlowFieldTypeText, "identifier.field.username"},
-		{"password", domain.FlowFieldTypePassword, "identifier.field.password"},
+		{"x-auth-methods#password", domain.FlowFieldTypePassword, "identifier.field.password"},
 		{"given_name", domain.FlowFieldTypeText, "identifier.field.given_name"},
 		{"family_name", domain.FlowFieldTypeText, "identifier.field.family_name"},
 	}
@@ -132,7 +131,7 @@ func TestSchemaFieldResolver_Resolve_DefaultFields(t *testing.T) {
 func TestSchemaFieldResolver_Resolve_IdentifierImpliesUserNotFound(t *testing.T) {
 	resolver := newDefaultResolver(t)
 
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step", []string{"email", "password"})
+	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step", []string{"email", "x-auth-methods#password"})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}

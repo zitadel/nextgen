@@ -1297,7 +1297,7 @@ func TestValidator_PositiveWorkedExampleC(t *testing.T) {
 			},
 			{
 				Name:      "register",
-				Fields:    []string{"email", "password"},
+				Fields:    []string{"email", "x-auth-methods#password"},
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
 					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},

@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/ianlancetaylor/jsonschema/types"
@@ -10,9 +11,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// SchemaResolver is the read seam [SchemaFieldResolver] depends on.
-// Narrowed to a single method so tests can swap in a fake without
-// constructing a real LRU cache + repository + HTTP client.
+// SchemaResolver is the read interface [SchemaFieldResolver] depends on.
 // [JSONSchemaResolver] satisfies it in production.
 type SchemaResolver interface {
 	Resolve(ctx context.Context, client database.QueryExecutor, projectID, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error)
@@ -24,16 +23,12 @@ type SchemaResolver interface {
 //
 // Translation map (user meta-schema → [FlowField]):
 //
-//   - `type` + `format` → [FlowFieldType]; `x-password: true` forces
-//     [FlowFieldTypePassword].
+//   - `type` + `format` → [FlowFieldType];
 //   - top-level `required` membership → [FlowField.Required]
 //   - `minLength`, `maxLength`, `format` → [FlowFieldValidation]
 //   - `x-unique` (non-empty) → [FlowFieldChallengeIdentifier] +
 //     [FlowImplicitOutcomeUserNotFound] + [FlowField.Unique]
-//   - `x-password: true` combined with schema-level
-//     `x-auth-methods.password.enabled = true` →
-//     [FlowFieldChallengePassword]. Other auth methods do not have
-//     user-property-shaped credentials and are not surfaced here.
+//   - `x-auth-methods#` prefixed fields XX
 type SchemaFieldResolver struct {
 	schemas SchemaResolver
 }
@@ -64,18 +59,24 @@ func (r *SchemaFieldResolver) Resolve(
 	fields := make([]FlowField, 0, len(fieldNames))
 	implicit := make(map[string][]string)
 
-	for _, name := range fieldNames {
-		propSchema, ok := properties[name]
-		if !ok {
-			return FlowResolvedFields{}, fmt.Errorf("%w: %q", ErrFlowFieldUnknown, name)
+	for _, fieldName := range fieldNames {
+		if strings.HasPrefix(fieldName, "x-auth-methods#") {
+			field, err := buildFlowFieldForAuthMethod(fieldName, stepName)
+			if err != nil {
+				return FlowResolvedFields{}, fmt.Errorf("flow field resolver: %w", err)
+			}
+			fields = append(fields, field)
+			continue
 		}
-		field, err := buildFlowField(stepName, name, propSchema, required, passwordEnabled)
+
+		field, outcomes, err := buildFlowFieldForUserProperty(properties, fieldName, stepName, required, passwordEnabled)
 		if err != nil {
-			return FlowResolvedFields{}, fmt.Errorf("flow field %q: %w", name, err)
+			return FlowResolvedFields{}, fmt.Errorf("flow field resolver: %w", err)
 		}
+
 		fields = append(fields, field)
-		if outcomes := ImplicitOutcomesForChallenge(field.Challenge); len(outcomes) > 0 {
-			implicit[name] = append(implicit[name], outcomes...)
+		if len(outcomes) > 0 {
+			implicit[fieldName] = append(implicit[fieldName], outcomes...)
 		}
 	}
 
@@ -85,29 +86,65 @@ func (r *SchemaFieldResolver) Resolve(
 	}, nil
 }
 
-// buildFlowField translates a user-schema property into a [FlowField].
-// Returns [ErrFlowFieldUnsupportedType] when the property's JSON `type`
-// keyword cannot be reduced to a single input kind.
-func buildFlowField(stepName, name string, propSchema *jsonschema.Schema, required map[string]struct{}, passwordEnabled bool) (FlowField, error) {
-	unique := deriveUnique(propSchema)
-	fieldType, err := deriveFieldType(propSchema)
+func buildFlowFieldForAuthMethod(fieldName string, stepName string) (FlowField, error) {
+	fieldType, err := deriveFieldTypeForAuthMethod(fieldName)
 	if err != nil {
 		return FlowField{}, err
 	}
+
 	field := FlowField{
-		Name:      name,
-		TextKey:   stepName + ".field." + name,
+		Name:      fieldName,
+		TextKey:   stepName + ".field." + strings.TrimPrefix(fieldName, "x-auth-methods#"),
 		Type:      fieldType,
-		Challenge: deriveChallenge(propSchema, unique, passwordEnabled),
+		Challenge: deriveChallengeForAuthMethod(nil),
+		Required:  true,
+		Validation: &FlowFieldValidation{
+			// TODO: retrieve from password policy OR user-schema x-auth-methods properties
+			MinLength: 8,
+		},
+	}
+
+	return field, nil
+}
+
+func deriveFieldTypeForAuthMethod(fieldName string) (FlowFieldType, error) {
+	switch fieldName {
+	case "x-auth-methods#password":
+		return FlowFieldTypePassword, nil
+	}
+
+	// TODO: create unknown field type
+	return FlowFieldTypeText, fmt.Errorf(`unknown field type for "%s"`, fieldName)
+}
+
+func buildFlowFieldForUserProperty(properties map[string]*jsonschema.Schema, fieldName string, stepName string, required map[string]struct{}, passwordEnabled bool) (FlowField, []string, error) {
+	propSchema, ok := properties[fieldName]
+	if !ok {
+		return FlowField{}, nil, fmt.Errorf("%w: %q", ErrFlowFieldUnknown, fieldName)
+	}
+
+	fieldType, err := deriveFieldType(propSchema)
+	if err != nil {
+		return FlowField{}, nil, err
+	}
+
+	unique := deriveUnique(propSchema)
+
+	field := FlowField{
+		Name:      fieldName,
+		TextKey:   stepName + ".field." + fieldName,
+		Type:      fieldType,
+		Challenge: deriveChallenge(propSchema, unique, false),
 		Unique:    unique,
 	}
-	if _, ok := required[name]; ok {
+	if _, ok := required[fieldName]; ok {
 		field.Required = true
 	}
 	if v := buildValidation(propSchema); v != nil {
 		field.Validation = v
 	}
-	return field, nil
+
+	return field, ImplicitOutcomesForChallenge(field.Challenge), nil
 }
 
 // deriveFieldType maps the property's `enum`, `format`, and JSON
@@ -141,6 +178,11 @@ func deriveFieldType(propSchema *jsonschema.Schema) (FlowFieldType, error) {
 	return FlowFieldTypeText, nil
 }
 
+// temp fix
+func isPassword(propSchema *jsonschema.Schema) bool {
+	return false
+}
+
 // deriveChallenge resolves the unified [FlowFieldChallenge]. A
 // non-empty `x-unique` scope marks the field as Identifier (any
 // uniquely-keyed property can identify a user). `x-password: true`
@@ -155,6 +197,11 @@ func deriveChallenge(propSchema *jsonschema.Schema, unique AttributeUniqueness, 
 		return FlowFieldChallengePassword
 	}
 	return FlowFieldChallengeNone
+}
+
+// TODO
+func deriveChallengeForAuthMethod(propSchema *jsonschema.Schema) FlowFieldChallenge {
+	return FlowFieldChallengePassword
 }
 
 func deriveUnique(propSchema *jsonschema.Schema) AttributeUniqueness {
