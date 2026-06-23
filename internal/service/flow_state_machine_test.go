@@ -1913,6 +1913,12 @@ func TestFlowStateMachine_Process_PasskeyRegisterIssueThenVerify(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, verified.State.PendingChallenge)
 	require.NotNil(t, verified.Step.Complete)
+	// Passkey registration writes a credential (and creates the user when
+	// provisional) — irreversible, so the back stack must be cleared.
+	// History is left intact so the visited-step audit still answers
+	// "did the user pass through register".
+	assert.Empty(t, verified.State.BackStack, "passkey-register verify must clear the back stack")
+	assert.Equal(t, []string{"register"}, verified.State.History, "audit history records the visit even after an irreversible advance")
 }
 
 func TestFlowStateMachine_Process_PasskeyRegisterRejectedKeepsStep(t *testing.T) {
