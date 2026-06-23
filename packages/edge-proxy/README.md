@@ -28,7 +28,7 @@ This secret injection is why a worker / edge function is required: a static rewr
 
 ## Setup
 
-Cloudflare and Netlify intercept `/__nextgen/*` directly (so the default `pathPrefix` matches); Vercel routes it to an edge function via a `vercel.json` rewrite, and the function is configured with the matching prefix.
+Each platform intercepts `/__nextgen/*` with its native edge primitive — a Cloudflare Worker, a Netlify Edge Function, or Vercel Edge Middleware — so the handler's default `pathPrefix` matches directly, no rewrite needed.
 
 ### Cloudflare Workers
 
@@ -59,7 +59,7 @@ The worker serves all non-`/__nextgen` requests via the `ASSETS` binding, so you
 
 ### Vercel
 
-1. Copy `etc/vercel/nextgen.ts` to `api/__nextgen/[...path].ts` and `etc/vercel/vercel.json` to your project root (merge the `rewrites` if you already have one). The rewrite forwards `/__nextgen/*` to the edge function, which is configured with `pathPrefix: "/api/__nextgen"` so it matches the rewritten path.
+1. Copy `etc/vercel/middleware.ts` to your project root. As Vercel Edge Middleware it runs before routing and its `matcher` intercepts `/__nextgen/*` directly — no `vercel.json` rewrite or `api/` function. (Vercel does not build an `api/` function for a static Vite SPA, so middleware is the approach that works.)
 
 2. Set the backend URL and secret (read from `.env.local` under `vercel dev`):
 

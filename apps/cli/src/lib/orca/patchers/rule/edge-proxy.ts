@@ -1,4 +1,3 @@
-import { ZitadelError } from "../../../errors";
 import { MANAGED_MARKER } from "../../../paths";
 import { npmDistTagForCliVersion } from "../../../public-cli";
 import type { DeployTarget } from "../../detectors/deploy-target";
@@ -15,13 +14,14 @@ import { PROXY_PATH } from "./proxy";
  * this covers production by writing the platform's edge entry, wiring the
  * `@zitadel/edge-proxy` handler, and recording the backend URL.
  *
- * Cloudflare (`run_worker_first`) and Netlify (edge-function `path`) intercept
- * `/__nextgen/*` directly, so the handler's default `pathPrefix` matches. Vercel
- * routes it through a `vercel.json` rewrite to an Edge Function at
- * `api/__nextgen/[...path].ts`, which is configured with
- * `pathPrefix: "/api/__nextgen"` to match the rewritten path. The secret is read
- * from a server-side env var inside the edge runtime and never reaches the
- * browser.
+ * Each platform intercepts `/__nextgen/*` with its native edge primitive, so
+ * the handler's default `pathPrefix` matches: Cloudflare a Worker
+ * (`run_worker_first`), Netlify an Edge Function (`config.path`), and Vercel
+ * Edge Middleware (`middleware.ts` matcher). The Vercel middleware approach is
+ * the one that actually deploys for a static Vite SPA — an `api/` function plus
+ * a `vercel.json` rewrite is not built by Vercel for a static framework preset.
+ * The secret is read from a server-side env var inside the edge runtime and
+ * never reaches the browser.
  */
 
 /** The npm package the scaffolded edge entry imports. */
@@ -33,17 +33,17 @@ export const EDGE_PROXY_DEP = "@zitadel/edge-proxy";
  * middleware and are intentionally excluded.
  */
 const EDGE_PROXY_FRAMEWORKS: ReadonlySet<string> = new Set([
-  "react",
-  "vue",
-  "solid",
-  "svelte",
-  "qwik",
-  "angular",
+	"react",
+	"vue",
+	"solid",
+	"svelte",
+	"qwik",
+	"angular",
 ]);
 
 /** Whether `framework` is an SPA that needs a production edge proxy. */
 export function isEdgeProxyFramework(framework: string): boolean {
-  return EDGE_PROXY_FRAMEWORKS.has(framework);
+	return EDGE_PROXY_FRAMEWORKS.has(framework);
 }
 
 /**
@@ -52,24 +52,22 @@ export function isEdgeProxyFramework(framework: string): boolean {
  * Used by patchers' `routeDeps` so `eject` suggests uninstalling all of them.
  */
 export function edgeProxyDeps(target: DeployTarget): string[] {
-  switch (target) {
-    case "cloudflare":
-      return [EDGE_PROXY_DEP, "@cloudflare/workers-types"];
-    case "netlify":
-      return [EDGE_PROXY_DEP, "@netlify/edge-functions"];
-    case "vercel":
-      return [EDGE_PROXY_DEP];
-  }
+	switch (target) {
+		case "cloudflare":
+			return [EDGE_PROXY_DEP, "@cloudflare/workers-types"];
+		case "netlify":
+			return [EDGE_PROXY_DEP, "@netlify/edge-functions"];
+		case "vercel":
+			return [EDGE_PROXY_DEP];
+	}
 }
 
 const CLOUDFLARE_WORKER_PATH = "zitadel-edge-proxy.ts";
-const VERCEL_FUNCTION_PATH = "api/__nextgen/[...path].ts";
-/** Prefix the Vercel edge function sees after the vercel.json rewrite. */
-const VERCEL_PROXY_PREFIX = "/api/__nextgen";
+const VERCEL_MIDDLEWARE_PATH = "middleware.ts";
 const NETLIFY_FUNCTION_PATH = "netlify/edge-functions/zitadel-nextgen.ts";
 
 function cloudflareWorker(): string {
-  return `${MANAGED_MARKER}
+	return `${MANAGED_MARKER}
 import { handleProxy, resolveConfig } from "${EDGE_PROXY_DEP}";
 
 interface Env {
@@ -90,70 +88,28 @@ export default {
 `;
 }
 
-function vercelFunction(): string {
-  return `${MANAGED_MARKER}
+function vercelMiddleware(): string {
+	return `${MANAGED_MARKER}
 import { handleProxy, resolveConfig } from "${EDGE_PROXY_DEP}";
 
-export const config = { runtime: "edge" };
+// Vercel Edge Middleware runs before routing and intercepts ${PROXY_PATH}/*
+// directly — no vercel.json rewrite or api/ function (which Vercel does not
+// build for a static Vite SPA).
+export const config = { matcher: ["${PROXY_PATH}", "${PROXY_PATH}/:path*"] };
 
-// vercel.json rewrites ${PROXY_PATH}/* to this function, which Vercel invokes at
-// ${VERCEL_PROXY_PREFIX}/* — so the proxy uses that prefix to match.
 const proxyConfig = resolveConfig({
   apiUrl: process.env.NEXTGEN_API_URL ?? "",
   projectSecret: process.env.ZITADEL_PROJECT_SECRET ?? "",
-  pathPrefix: "${VERCEL_PROXY_PREFIX}",
 });
 
-export default (req: Request): Promise<Response | null> => handleProxy(req, proxyConfig);
+export default async function middleware(req: Request): Promise<Response | undefined> {
+  return (await handleProxy(req, proxyConfig)) ?? undefined;
+}
 `;
 }
 
-/** The vercel.json rewrite that routes /__nextgen/* to the edge function. */
-const VERCEL_REWRITE = { source: `${PROXY_PATH}/(.*)`, destination: `${VERCEL_PROXY_PREFIX}/$1` };
-
-/**
- * Adds the `/__nextgen` rewrite to `vercel.json`, creating the file when absent
- * and merging into an existing `rewrites` array otherwise. Idempotent: a rewrite
- * with the same source is left in place.
- */
-function vercelJsonEdit(): (source: string | undefined) => string {
-  return (source) => {
-    let parsed: { rewrites?: Array<{ source?: string; destination?: string }> };
-    if (source === undefined) {
-      parsed = {};
-    } else {
-      let raw: unknown;
-      try {
-        raw = JSON.parse(source);
-      } catch (error) {
-        // A malformed vercel.json (comments, trailing commas, …) would otherwise
-        // crash setup with a context-free SyntaxError.
-        throw new ZitadelError("E_VALIDATION", "vercel.json is not valid JSON", {
-          hint: "Fix vercel.json (no comments or trailing commas) and re-run setup, or add the /__nextgen rewrite by hand.",
-          details: { cause: error instanceof Error ? error.message : String(error) },
-        });
-      }
-      // Valid JSON that isn't an object (an array, null, string, …) can't carry
-      // a `rewrites` key — bail clearly rather than throwing later or silently
-      // dropping the rewrite when stringified back.
-      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-        throw new ZitadelError("E_VALIDATION", "vercel.json must be a JSON object", {
-          hint: "Expected an object with a `rewrites` array; add the /__nextgen rewrite by hand if your vercel.json has a different shape.",
-        });
-      }
-      parsed = raw as { rewrites?: Array<{ source?: string; destination?: string }> };
-    }
-    const rewrites = Array.isArray(parsed.rewrites) ? parsed.rewrites : [];
-    if (rewrites.some((r) => r.source === VERCEL_REWRITE.source)) {
-      return source ?? `${JSON.stringify({ rewrites }, null, 2)}\n`;
-    }
-    parsed.rewrites = [...rewrites, VERCEL_REWRITE];
-    return `${JSON.stringify(parsed, null, 2)}\n`;
-  };
-}
-
 function netlifyFunction(): string {
-  return `${MANAGED_MARKER}
+	return `${MANAGED_MARKER}
 import { handleProxy, resolveConfig } from "${EDGE_PROXY_DEP}";
 import type { Config } from "@netlify/edge-functions";
 
@@ -174,10 +130,10 @@ export const config: Config = { path: "${PROXY_PATH}/*" };
 const WRANGLER_CONFIG_PATHS = ["wrangler.jsonc", "wrangler.toml", "wrangler.json"];
 
 function wranglerConfig(server: string): string {
-  // A JSONC template (not JSON.stringify) so the placeholder values carry
-  // inline guidance — the project name and asset directory are framework- and
-  // user-specific and must be reviewed.
-  return `{
+	// A JSONC template (not JSON.stringify) so the placeholder values carry
+	// inline guidance — the project name and asset directory are framework- and
+	// user-specific and must be reviewed.
+	return `{
   "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
   // Replace "my-app" with your project name.
   "name": "my-app",
@@ -209,7 +165,7 @@ function wranglerConfig(server: string): string {
  * does the executor fall back to creating the first candidate (`wrangler.jsonc`).
  */
 function wranglerEdit(server: string): (source: string | undefined) => string {
-  return (source) => (source === undefined ? wranglerConfig(server) : source);
+	return (source) => (source === undefined ? wranglerConfig(server) : source);
 }
 
 /**
@@ -217,104 +173,105 @@ function wranglerEdit(server: string): (source: string | undefined) => string {
  * Spread into an SPA patcher's `routeOps` when a deploy target was detected.
  */
 export function edgeProxyOps(target: DeployTarget, ctx: PatchContext): FileOp[] {
-  const dep: FileOp = {
-    kind: "add-dep",
-    name: EDGE_PROXY_DEP,
-    version: npmDistTagForCliVersion(ctx.cliVersion),
-  };
-  const apiUrlExample: FileOp = {
-    kind: "merge-env",
-    path: ".env.example",
-    entries: { NEXTGEN_API_URL: "" },
-  };
+	const dep: FileOp = {
+		kind: "add-dep",
+		name: EDGE_PROXY_DEP,
+		version: npmDistTagForCliVersion(ctx.cliVersion),
+	};
+	const apiUrlExample: FileOp = {
+		kind: "merge-env",
+		path: ".env.example",
+		entries: { NEXTGEN_API_URL: "" },
+	};
 
-  switch (target) {
-    case "cloudflare":
-      return [
-        dep,
-        // The worker's `Fetcher`/`ExportedHandler` types come from this package;
-        // `wrangler deploy` typechecks the worker, so it must be installed.
-        { kind: "add-dep", name: "@cloudflare/workers-types", version: "^4.0.0", dev: true },
-        { kind: "write", path: CLOUDFLARE_WORKER_PATH, contents: cloudflareWorker() },
-        // Given every wrangler config candidate so an existing .toml/.json is
-        // edited (and left untouched) rather than shadowed by a new .jsonc.
-        { kind: "edit", path: [...WRANGLER_CONFIG_PATHS], edit: wranglerEdit(ctx.server) },
-        // wrangler dev reads .dev.vars (not .env.local); it carries the secret
-        // locally and must stay out of git.
-        {
-          kind: "merge-env",
-          path: ".dev.vars",
-          entries: {
-            NEXTGEN_API_URL: ctx.server,
-            ZITADEL_PROJECT_SECRET: ctx.project.projectSecret,
-          },
-        },
-        { kind: "append-gitignore", entries: [".dev.vars"] },
-        apiUrlExample,
-      ];
-    case "vercel":
-      return [
-        dep,
-        // An Edge Function plus a vercel.json rewrite — the pattern the repo's
-        // SPA SDK guidance uses. (Root middleware.ts does not run for non-Next
-        // Vite SPAs.) The function's pathPrefix matches the rewritten path.
-        { kind: "write", path: VERCEL_FUNCTION_PATH, contents: vercelFunction() },
-        { kind: "edit", path: "vercel.json", edit: vercelJsonEdit() },
-        // vercel dev reads .env.local; the secret is already written there by
-        // the base patcher, so only the backend URL needs adding.
-        { kind: "merge-env", path: ".env.local", entries: { NEXTGEN_API_URL: ctx.server } },
-        apiUrlExample,
-      ];
-    case "netlify":
-      return [
-        dep,
-        // The edge function imports the `Config` type and `Netlify` global from
-        // this package; install it so the scaffolded function typechecks.
-        { kind: "add-dep", name: "@netlify/edge-functions", version: "^2.0.0", dev: true },
-        // Functions in netlify/edge-functions/ are auto-discovered and routed by
-        // the inline `config.path`, so no netlify.toml entry is needed (which
-        // also avoids hardcoding a wrong publish dir for Angular et al.).
-        { kind: "write", path: NETLIFY_FUNCTION_PATH, contents: netlifyFunction() },
-        // `netlify dev` loads .env (not .env.local), and edge functions only see
-        // env injected by the platform — so write both vars where dev picks them
-        // up. .env is gitignored, so the secret stays out of git.
-        {
-          kind: "merge-env",
-          path: ".env",
-          entries: {
-            NEXTGEN_API_URL: ctx.server,
-            ZITADEL_PROJECT_SECRET: ctx.project.projectSecret,
-          },
-        },
-        apiUrlExample,
-      ];
-  }
+	switch (target) {
+		case "cloudflare":
+			return [
+				dep,
+				// The worker's `Fetcher`/`ExportedHandler` types come from this package;
+				// `wrangler deploy` typechecks the worker, so it must be installed.
+				{ kind: "add-dep", name: "@cloudflare/workers-types", version: "^4.0.0", dev: true },
+				{ kind: "write", path: CLOUDFLARE_WORKER_PATH, contents: cloudflareWorker() },
+				// Given every wrangler config candidate so an existing .toml/.json is
+				// edited (and left untouched) rather than shadowed by a new .jsonc.
+				{ kind: "edit", path: [...WRANGLER_CONFIG_PATHS], edit: wranglerEdit(ctx.server) },
+				// wrangler dev reads .dev.vars (not .env.local); it carries the secret
+				// locally and must stay out of git.
+				{
+					kind: "merge-env",
+					path: ".dev.vars",
+					entries: {
+						NEXTGEN_API_URL: ctx.server,
+						ZITADEL_PROJECT_SECRET: ctx.project.projectSecret,
+					},
+				},
+				{ kind: "append-gitignore", entries: [".dev.vars"] },
+				apiUrlExample,
+			];
+		case "vercel":
+			return [
+				dep,
+				// Vercel Edge Middleware (root middleware.ts) intercepts /__nextgen/*
+				// directly. This is what actually deploys for a static Vite SPA — an
+				// api/ function + vercel.json rewrite is not built by Vercel under a
+				// static framework preset (verified against a live deploy).
+				{ kind: "write", path: VERCEL_MIDDLEWARE_PATH, contents: vercelMiddleware() },
+				// vercel dev reads .env.local; the secret is already written there by
+				// the base patcher, so only the backend URL needs adding.
+				{ kind: "merge-env", path: ".env.local", entries: { NEXTGEN_API_URL: ctx.server } },
+				apiUrlExample,
+			];
+		case "netlify":
+			return [
+				dep,
+				// The edge function imports the `Config` type and `Netlify` global from
+				// this package; install it so the scaffolded function typechecks.
+				{ kind: "add-dep", name: "@netlify/edge-functions", version: "^2.0.0", dev: true },
+				// Functions in netlify/edge-functions/ are auto-discovered and routed by
+				// the inline `config.path`, so no netlify.toml entry is needed (which
+				// also avoids hardcoding a wrong publish dir for Angular et al.).
+				{ kind: "write", path: NETLIFY_FUNCTION_PATH, contents: netlifyFunction() },
+				// `netlify dev` loads .env (not .env.local), and edge functions only see
+				// env injected by the platform — so write both vars where dev picks them
+				// up. .env is gitignored, so the secret stays out of git.
+				{
+					kind: "merge-env",
+					path: ".env",
+					entries: {
+						NEXTGEN_API_URL: ctx.server,
+						ZITADEL_PROJECT_SECRET: ctx.project.projectSecret,
+					},
+				},
+				apiUrlExample,
+			];
+	}
 }
 
 /** Managed (marker-bearing) edge-proxy files for `target`, for ejection. */
 export function edgeProxyFiles(target: DeployTarget): string[] {
-  switch (target) {
-    case "cloudflare":
-      return [CLOUDFLARE_WORKER_PATH];
-    case "vercel":
-      return [VERCEL_FUNCTION_PATH];
-    case "netlify":
-      return [NETLIFY_FUNCTION_PATH];
-  }
+	switch (target) {
+		case "cloudflare":
+			return [CLOUDFLARE_WORKER_PATH];
+		case "vercel":
+			return [VERCEL_MIDDLEWARE_PATH];
+		case "netlify":
+			return [NETLIFY_FUNCTION_PATH];
+	}
 }
 
 /** Config files the edge-proxy scaffolding edits in place, for ejection. */
 export function edgeProxyConfigEdits(target: DeployTarget): string[] {
-  // Cloudflare may create wrangler.jsonc; Vercel merges a rewrite into
-  // vercel.json; Netlify auto-discovers the edge function with no config to edit.
-  switch (target) {
-    case "cloudflare":
-      return ["wrangler.jsonc"];
-    case "vercel":
-      return ["vercel.json"];
-    case "netlify":
-      return [];
-  }
+	// Cloudflare may create wrangler.jsonc; Vercel uses a managed middleware.ts
+	// file (a marked file, not a config edit); Netlify auto-discovers the edge
+	// function — neither edits a config file.
+	switch (target) {
+		case "cloudflare":
+			return ["wrangler.jsonc"];
+		case "vercel":
+			return [];
+		case "netlify":
+			return [];
+	}
 }
 
 /**
@@ -324,14 +281,14 @@ export function edgeProxyConfigEdits(target: DeployTarget): string[] {
  * already backs up, so it contributes nothing here.
  */
 export function edgeProxyEnvBackups(target: DeployTarget): string[] {
-  switch (target) {
-    case "cloudflare":
-      return [".dev.vars"];
-    case "netlify":
-      return [".env"];
-    case "vercel":
-      return [];
-  }
+	switch (target) {
+		case "cloudflare":
+			return [".dev.vars"];
+		case "netlify":
+			return [".env"];
+		case "vercel":
+			return [];
+	}
 }
 
 /**
@@ -341,14 +298,14 @@ export function edgeProxyEnvBackups(target: DeployTarget): string[] {
  * the keys themselves.
  */
 export function edgeProxyDeployNotes(target: DeployTarget): string[] {
-  if (target === "cloudflare") {
-    return [
-      `If you already have a wrangler config, wire the worker into it: ` +
-        `main "./${CLOUDFLARE_WORKER_PATH}", assets.binding "ASSETS", and ` +
-        `run_worker_first ["${PROXY_PATH}/*"].`,
-    ];
-  }
-  return [];
+	if (target === "cloudflare") {
+		return [
+			`If you already have a wrangler config, wire the worker into it: ` +
+				`main "./${CLOUDFLARE_WORKER_PATH}", assets.binding "ASSETS", and ` +
+				`run_worker_first ["${PROXY_PATH}/*"].`,
+		];
+	}
+	return [];
 }
 
 /**
@@ -357,17 +314,17 @@ export function edgeProxyDeployNotes(target: DeployTarget): string[] {
  * in the setup summary.
  */
 export function edgeProxySecretCommands(target: DeployTarget): string[] {
-  switch (target) {
-    case "cloudflare":
-      // NEXTGEN_API_URL is a plaintext `var` in wrangler.jsonc; only the secret
-      // goes to the encrypted secret store.
-      return ["wrangler secret put ZITADEL_PROJECT_SECRET"];
-    case "vercel":
-      return ["vercel env add ZITADEL_PROJECT_SECRET", "vercel env add NEXTGEN_API_URL"];
-    case "netlify":
-      return [
-        "netlify env:set ZITADEL_PROJECT_SECRET <secret>",
-        "netlify env:set NEXTGEN_API_URL <backend-url>",
-      ];
-  }
+	switch (target) {
+		case "cloudflare":
+			// NEXTGEN_API_URL is a plaintext `var` in wrangler.jsonc; only the secret
+			// goes to the encrypted secret store.
+			return ["wrangler secret put ZITADEL_PROJECT_SECRET"];
+		case "vercel":
+			return ["vercel env add ZITADEL_PROJECT_SECRET", "vercel env add NEXTGEN_API_URL"];
+		case "netlify":
+			return [
+				"netlify env:set ZITADEL_PROJECT_SECRET <secret>",
+				"netlify env:set NEXTGEN_API_URL <backend-url>",
+			];
+	}
 }
