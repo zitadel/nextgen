@@ -102,17 +102,8 @@ in `alpha` prerelease mode (`.changeset/pre.json`), so versions cut as one
 ## Empty changeset
 
 Use an empty changeset only when a publishable path changed but nothing should
-ship: `corepack pnpm changeset --empty`. It is not a substitute for release
-intent — for Go implementation paths choose **no changeset** (no shipped
-behavior) or a **real `@zitadel/server` changeset** (shipped behavior) instead.
-
-## Anti-patterns
-
-- Do **not** add an empty changeset on PRs that only touch non-publishable paths
-  with no shipped behavior change (for example `docs/`, `.github/`, tests).
-- Do **not** skip a changeset when changing shipped CLI, server, SDK, API, or
-  component behavior — including server changes implemented under `internal/`,
-  `cmd/`, `api/openapi/`, or migrations.
+ship: `corepack pnpm changeset --empty`. Don't reach for it to dodge a real
+changeset when behavior actually ships.
 
 ## Verify locally
 
@@ -123,10 +114,9 @@ corepack pnpm exec changeset status --since origin/main
 ```
 
 Confirm Changesets sees the intended bumps, then state the
-[decision-table](#decision-table) outcome in the PR. This command reads npm
-package paths only — it cannot infer server impact from Go paths, so decide that
-manually and add an `@zitadel/server` changeset when a server change belongs in
-the release notes.
+[decision-table](#decision-table) outcome in the PR. Note the command reads npm
+package paths only — it cannot infer server impact from Go paths, so decide those
+from the table yourself.
 
 ## Alpha prerelease mode
 
