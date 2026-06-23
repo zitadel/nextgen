@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/web-components-vite";
+import type { ZlCheckbox } from "@zitadel/components";
 import { Checkbox } from "@zitadel/ui-react";
 import { html, nothing } from "lit";
 import { expect, userEvent, within } from "storybook/test";
 
+import { assertParity } from "./parity.js";
 import { renderReact } from "./react-render.js";
 
 import "@zitadel/components/atoms";
@@ -46,37 +48,42 @@ const meta: Meta<CheckboxArgs> = {
 export default meta;
 type Story = StoryObj<CheckboxArgs>;
 
+// Shared render builders so the Lit, React, and Parity stories all drive the
+// same surface (see apps/storybook/AGENTS.md "Mirror pairs in one file").
+const litCheckbox = ({ label, checked, disabled, required, previewState }: CheckboxArgs) => html`
+  <zl-checkbox
+    label=${label || nothing}
+    aria-label=${label ? nothing : "Accept terms"}
+    ?checked=${checked}
+    ?disabled=${disabled}
+    ?required=${required}
+    data-state=${previewState || nothing}
+  ></zl-checkbox>
+`;
+
+const reactCheckbox = ({ label, checked, disabled, required, previewState }: CheckboxArgs) => (
+  <Checkbox
+    label={label || undefined}
+    defaultChecked={checked}
+    disabled={disabled}
+    required={required}
+    previewState={previewState || undefined}
+    aria-label={label ? undefined : "Accept terms"}
+  />
+);
+
 // No `play` here on purpose: `<zl-checkbox>`'s toggle/form/focus behaviour is
 // owned by the lower component layer (zl-checkbox.spec.ts +
 // zl-checkbox.browser.spec.ts), so re-clicking it here would duplicate upward.
 // The story still gets addon-vitest's automatic render smoke + a11y pass.
 export const Lit: Story = {
-  render: ({ label, checked, disabled, required, previewState }) => html`
-    <zl-checkbox
-      label=${label || nothing}
-      aria-label=${label ? nothing : "Accept terms"}
-      ?checked=${checked}
-      ?disabled=${disabled}
-      ?required=${required}
-      data-state=${previewState || nothing}
-    ></zl-checkbox>
-  `,
+  render: (args) => litCheckbox(args),
 };
 
 // The React pair has no component-level spec, so this `play` is its sole
 // behavioural test (toggle via the label). Render smoke + a11y come for free.
 export const React: Story = {
-  render: ({ label, checked, disabled, required, previewState }) =>
-    renderReact(
-      <Checkbox
-        label={label || undefined}
-        defaultChecked={checked}
-        disabled={disabled}
-        required={required}
-        previewState={previewState || undefined}
-        aria-label={label ? undefined : "Accept terms"}
-      />,
-    ),
+  render: (args) => renderReact(reactCheckbox(args)),
   play: async ({ canvasElement }) => {
     // `findByRole` waits for React to commit (mount is async, unlike Lit's
     // synchronous shadow render).
@@ -86,5 +93,45 @@ export const React: Story = {
     await expect(input.checked).toBe(false);
     await userEvent.click(label);
     await expect(input.checked).toBe(true);
+  },
+};
+
+/**
+ * Cross-renderer parity gate: mounts both renderers (checked, with a label) and
+ * asserts they compute identical styles for every shared `.zr-checkbox*`
+ * selector. This is the automated version of the side-by-side eyeball — it fails
+ * the run on box-model / colour / type drift (the `box-sizing` and inherited
+ * text/colour gotchas in packages/shared-component-styles/AGENTS.md) instead of
+ * leaving it to be spotted in a screenshot. a11y is off here because two live
+ * checkboxes on one page is a test rig (the Lit/React stories carry the a11y gate).
+ */
+export const Parity: Story = {
+  args: { checked: true },
+  parameters: { a11y: { test: "off" }, chromatic: { disableSnapshot: true } },
+  decorators: [(story) => html`<div style="display: flex; gap: 2rem;">${story()}</div>`],
+  render: (args) => html`
+    <div>${litCheckbox(args)}</div>
+    <div data-renderer="react">${renderReact(reactCheckbox(args))}</div>
+  `,
+  play: async ({ canvasElement }) => {
+    const litEl = canvasElement.querySelector<ZlCheckbox>("zl-checkbox");
+    if (!litEl?.shadowRoot) throw new Error("Lit <zl-checkbox> did not render");
+    await litEl.updateComplete;
+
+    const reactRoot = canvasElement.querySelector<HTMLElement>('[data-renderer="react"]');
+    if (!reactRoot) throw new Error("React container missing");
+    // React mounts asynchronously; wait for its checkbox before measuring.
+    await within(reactRoot).findByRole("checkbox");
+
+    // Compare the inner shared `.zr-checkbox__*` surfaces, not the `.zr-checkbox`
+    // root: Lit's `:host { display: inline-flex }` makes the root a flex item,
+    // which blockifies its `display` to `flex`, while React's root (child of a
+    // plain div) stays `inline-flex`. That divergence is the host model, not a
+    // surface-CSS drift — the inner box/face/label are flex items in both.
+    assertParity(litEl.shadowRoot, reactRoot, [
+      ".zr-checkbox__box",
+      ".zr-checkbox__face",
+      ".zr-checkbox__label",
+    ]);
   },
 };

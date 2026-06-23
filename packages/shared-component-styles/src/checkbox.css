@@ -14,10 +14,32 @@
   align-items: center;
   gap: var(--zl-spacing-02, 0.5rem);
   font-family: var(--zl-font-family-sans, system-ui, sans-serif);
+  /*
+   * Mirror the Lit atom's `baseHostStyles` inherited text properties. The Lit
+   * `:host` sets these and every shadow descendant inherits them; the flat React
+   * DOM has no host, so descendants that don't set their own would fall back to
+   * UA defaults (`line-height: normal`) and drift.
+   */
+  color: var(--zl-color-text-primary-white, #f4f4f6);
+  line-height: 1.5;
   cursor: pointer;
   -webkit-user-select: none;
   user-select: none;
 }
+
+/*
+ * React mirror of the Lit atom's `baseHostStyles` box model: every shadow
+ * descendant of a `<zl-*>` atom inherits `box-sizing: border-box`, but the flat
+ * React DOM has no host to anchor that, so each `.zr-checkbox__*` element would
+ * default to `content-box` and drift. Pin it for the whole subtree once.
+ */
+.zr-checkbox,
+.zr-checkbox *,
+.zr-checkbox *::before,
+.zr-checkbox *::after {
+  box-sizing: border-box;
+}
+
 .zr-checkbox--disabled {
   cursor: not-allowed;
 }
@@ -68,7 +90,6 @@
   justify-content: center;
   width: 1rem;
   height: 1rem;
-  box-sizing: border-box;
   border: 1px solid var(--zl-color-icon-default-white, #f4f4f6);
   border-radius: 2px;
   background: transparent;

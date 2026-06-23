@@ -23,11 +23,6 @@
   "jsdelivr": "./dist/standalone.mjs",
   "exports": {
     "./package.json": "./package.json",
-    "./vite-liquid-plugin": {
-      "@zitadel/source": "./vite-liquid-plugin.ts",
-      "types": "./vite-liquid-plugin.ts",
-      "default": "./vite-liquid-plugin.ts"
-    },
     ".": {
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs",

@@ -2,8 +2,14 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { apiMockPublicDir } from "@zitadel/api-mock/public-dir";
-import { liquidRaw } from "@zitadel/components/vite-liquid-plugin";
 import type { StorybookConfig } from "@storybook/web-components-vite";
+
+// Dev-only Vite plugin that loads the orchestrator's `.liquid` templates as raw
+// strings. It is build tooling, not part of `@zitadel/components`' published API
+// (the package ships only `dist/`), so it is imported by source path here —
+// mirroring how the package's own `vitest.config.ts` imports it — rather than
+// through a package export that would resolve to an unpublished `.ts` file.
+import { liquidRaw } from "../../../packages/components/vite-liquid-plugin.js";
 
 import { optimizeDepsExclude, optimizeDepsInclude } from "./optimize-deps.js";
 

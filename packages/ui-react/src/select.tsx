@@ -226,7 +226,9 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
           )}
         </label>
       )}
-      {name !== undefined && <input type="hidden" name={name} value={currentValue} />}
+      {name !== undefined && currentValue !== "" && (
+        <input type="hidden" name={name} value={currentValue} />
+      )}
       <div className="zr-select__field">
         <button
           ref={setTriggerRef}
