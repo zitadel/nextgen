@@ -8,32 +8,53 @@ on:
     types:
       - opened
 
+permissions:
+  contents: read
+
 jobs:
   add-to-project:
     name: Add issue and community pr to project
     runs-on: ubuntu-latest
     steps:
+      - name: Generate project app token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.PROJECT_APP_ID }}
+          private-key: ${{ secrets.PROJECT_APP_PRIVATE_KEY }}
+          owner: zitadel
+
       - name: add issue
-        uses: actions/add-to-project@v1.0.2
         if: ${{ github.event_name == 'issues' }}
-        with:
-          project-url: https://github.com/orgs/zitadel/projects/2
-          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
-      - uses: tspascoal/get-user-teams-membership@v3
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: gh project item-add 2 --owner zitadel --url "${{ github.event.issue.html_url }}"
+
+      - name: check user team membership
         id: checkUserMember
-        if: github.event_name == 'pull_request_target' && github.actor != 'dependabot[bot]'
-        with:
-          username: ${{ github.actor }}
-          GITHUB_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
+        if: ${{ github.event_name == 'pull_request_target' && github.actor != 'dependabot[bot]' }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          if gh api "orgs/zitadel/teams/engineers/memberships/${{ github.actor }}" >/dev/null 2>&1; then
+            echo "is_engineer=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_engineer=false" >> "$GITHUB_OUTPUT"
+          fi
+          if gh api "orgs/zitadel/teams/staff/memberships/${{ github.actor }}" >/dev/null 2>&1; then
+            echo "is_staff=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_staff=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: add pr
-        uses: actions/add-to-project@v1.0.2
-        if: ${{ github.event_name == 'pull_request_target' && github.actor != 'dependabot[bot]' && !contains(steps.checkUserMember.outputs.teams, 'engineers') }}
-        with:
-          project-url: https://github.com/orgs/zitadel/projects/2
-          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
-      - uses: actions-ecosystem/action-add-labels@v1.1.3
-        if: ${{ github.event_name == 'pull_request_target' && github.actor != 'dependabot[bot]' && !contains(steps.checkUserMember.outputs.teams, 'staff') }}
-        with:
-          github_token: ${{ secrets.ADD_TO_PROJECT_PAT }}
-          labels: |
-            os-contribution
+        if: ${{ github.event_name == 'pull_request_target' && github.actor != 'dependabot[bot]' && steps.checkUserMember.outputs.is_engineer != 'true' }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: gh project item-add 2 --owner zitadel --url "${{ github.event.pull_request.html_url }}"
+
+      - name: add community label
+        if: ${{ github.event_name == 'pull_request_target' && github.actor != 'dependabot[bot]' && steps.checkUserMember.outputs.is_staff != 'true' }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: gh pr edit "${{ github.event.pull_request.html_url }}" --add-label os-contribution

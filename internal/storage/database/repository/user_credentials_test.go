@@ -50,7 +50,7 @@ func TestUserPasswordRepository_CRUD(t *testing.T) {
 	insertProjectTeamSchemaUser(t, tx, pid, tid, schemaURL, userID)
 
 	vid := "verif-1"
-	require.NoError(t, repo.Create(ctx, tx, &domain.CreateUserPassword{
+	require.NoError(t, repo.Set(ctx, tx, &domain.SetUserPassword{
 		ProjectID:      pid,
 		UserID:         userID,
 		EncodedHash:    "argon2id$v=19$m=65536,t=3,p=4$fake",
@@ -80,7 +80,7 @@ func TestUserPasswordRepository_CRUD(t *testing.T) {
 	_, err = repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID)))
 	require.ErrorIs(t, err, new(database.NoRowFoundError))
 
-	require.NoError(t, repo.Create(ctx, tx, &domain.CreateUserPassword{
+	require.NoError(t, repo.Set(ctx, tx, &domain.SetUserPassword{
 		ProjectID:      pid,
 		UserID:         userID,
 		EncodedHash:    "argon2id$v=19$m=65536,t=3,p=4$fake2",
@@ -93,6 +93,61 @@ func TestUserPasswordRepository_CRUD(t *testing.T) {
 	require.NoError(t, repo.Delete(ctx, tx, repo.UniqueCondition(pid, userID)))
 	_, err = repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID)))
 	require.ErrorIs(t, err, new(database.NoRowFoundError))
+}
+
+func TestUserPasswordRepository_SetUpsert(t *testing.T) {
+	skipIfSpanner(t)
+	repo := repository.NewUserPasswordRepository()
+	tx, rollback := transactionForRollback(t)
+	defer rollback()
+	ctx := t.Context()
+
+	const (
+		pid       = "proj-cred-pw-upsert"
+		tid       = "team-cred-pw-upsert"
+		schemaURL = "https://schemas.test/cred-pw-upsert.json"
+		userID    = "usr_pw_upsert"
+	)
+
+	insertProjectTeamSchemaUser(t, tx, pid, tid, schemaURL, userID)
+
+	require.NoError(t, repo.Set(ctx, tx, &domain.SetUserPassword{
+		ProjectID:      pid,
+		UserID:         userID,
+		EncodedHash:    "argon2id$v=19$m=65536,t=3,p=4$initial",
+		ChangeRequired: true,
+	}))
+
+	got, err := repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID)))
+	require.NoError(t, err)
+	initialID := got.ID
+	require.Equal(t, "argon2id$v=19$m=65536,t=3,p=4$initial", got.EncodedHash)
+	require.True(t, got.ChangeRequired)
+
+	_, err = tx.Exec(ctx,
+		fmt.Sprintf(`UPDATE %s SET failed_attempts = 3, last_successful_check = NOW() WHERE project_id = $1 AND user_id = $2`, dbTable("user_passwords")),
+		pid, userID,
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, repo.Set(ctx, tx, &domain.SetUserPassword{
+		ProjectID:      pid,
+		UserID:         userID,
+		EncodedHash:    "argon2id$v=19$m=65536,t=3,p=4$updated",
+		ChangeRequired: false,
+	}))
+
+	got2, err := repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID)))
+	require.NoError(t, err)
+	require.Equal(t, initialID, got2.ID)
+	require.Equal(t, "argon2id$v=19$m=65536,t=3,p=4$updated", got2.EncodedHash)
+	require.False(t, got2.ChangeRequired)
+	require.Zero(t, got2.FailedAttempts)
+	require.Nil(t, got2.LastSuccessfulCheck)
+
+	list, err := repo.List(ctx, tx, database.WithCondition(repo.ProjectIDCondition(pid)))
+	require.NoError(t, err)
+	require.Len(t, list, 1)
 }
 
 func TestUserTOTPRepository_CRUD(t *testing.T) {
