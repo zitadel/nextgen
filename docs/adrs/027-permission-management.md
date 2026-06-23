@@ -30,7 +30,7 @@ The current design docs already lock several adjacent invariants:
   scope-bound repositories.
 - [`docs/design/api/authz.md`](../design/api/authz.md) frames authorization as
   `credential x resolved scope x required permission -> decision`.
-- `internal/storage/AGENTS.md` requires SQL-first storage that works on both
+- [internal/storage/AGENTS.md](../../internal/storage/AGENTS.md) requires SQL-first storage that works on both
   PostgreSQL and Spanner.
 
 Three related issue areas constrain the decision:
@@ -96,7 +96,7 @@ app-group policies, but it must not run an external OpenFGA service or store the
 canonical policy as opaque OpenFGA tuples.
 
 Use the maintained OpenFGA language package for parsing and syntax support:
-`github.com/openfga/language/pkg/go`. Do not build a custom OpenFGA DSL parser.
+[`github.com/openfga/language/pkg/go`](https://pkg.go.dev/github.com/openfga/language/pkg/go). Do not build a custom OpenFGA DSL parser.
 
 The compiler pipeline is:
 
