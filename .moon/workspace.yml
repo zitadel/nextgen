@@ -27,6 +27,7 @@ projects:
     sdk-svelte: "packages/sdk-svelte"
     sdk-vue: "packages/sdk-vue"
     shared-component-styles: "packages/shared-component-styles"
+    storybook: "apps/storybook"
     ui-react: "packages/ui-react"
 
 vcs:

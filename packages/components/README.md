@@ -115,38 +115,29 @@ fixtures:
 - **Tests (`msw/node`)** — pass `setupMockHandlers()` from
   `@zitadel/api-mock` into `setupServer(...)`.
   `getCapturedRequests()` exposes captured request bodies for assertions.
-- **Dev playgrounds / browser (`msw/browser`)** — `setupMock(worker)`; see
-  [`dev/main.ts`](dev/main.ts) for a working setup. `applyBranding(...)`
-  injects a tenant branding overlay merged into every response (presets
-  include `font_url` for Inter).
+- **Browser (`msw/browser`)** — `setupMock(worker)` wires the handlers into a
+  `msw/browser` worker. The Storybook orchestrator stories take the equivalent
+  path through `msw-storybook-addon` (see
+  [`apps/storybook/src/orchestrator.stories.ts`](../../apps/storybook/src/orchestrator.stories.ts)).
+  `applyBranding(...)` injects a tenant branding overlay merged into every
+  response (presets include `font_url` for Inter).
 - **Framework demos (TCP server)** — `moon run api-mock:start`
   serves the same handlers on port 4000 with `defaultDevBranding` (Arimo
   `font_url`) applied at boot. See [`apps/demo-next`](../../apps/demo-next/README.md)
   and [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md).
 
-### Two preview surfaces
+### Preview surfaces
 
-Two places run the components against `@zitadel/api-mock`. They
-have different jobs — keep both:
+| Surface | Moon command | What it gives you |
+| --- | --- | --- |
+| **Storybook** | `moon run storybook:dev` ([:6006](http://localhost:6006)) | The workbench for both the Lit atoms and the paired React components, plus the `<zitadel-login>` orchestrator (MSW via `msw-storybook-addon`, flow/branding as controls). |
+| **demo-next** | `moon run api-mock:start` + `ZITADEL_URL=http://localhost:4000 moon run demo-next:dev` | Next.js SDK, middleware, cookies, built `dist/` ([:3002/login](http://localhost:3002/login)). See [`apps/demo-next`](../../apps/demo-next/README.md). |
+| **demo-nuxt** | mock on `:4000`, then `ZITADEL_URL=http://localhost:4000 moon run demo-nuxt:dev` | Nuxt SDK, middleware, cookies, built `dist/` ([:3001/login](http://localhost:3001/login)). See [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md). |
 
-| Surface | Moon command | URLs | What it gives you |
-| --- | --- | --- | --- |
-| **Lit playground** | `moon run components:dev` | [login](http://localhost:5173/?route=login) · [atoms](http://localhost:5173/?route=atoms) | Component author surface: branding presets, event log, source TS from `src/`. MSW runs in the browser — no TCP mock server. |
-| **React console playground** | `moon run console:dev` | [http://localhost:5174](http://localhost:5174) | `@zitadel/ui-react` atom matrices in the pre-release console shell. MSW in `import.meta.env.DEV`. Compare against Lit `:5173/?route=atoms` in a second tab. |
-| **demo-next** | `moon run api-mock:start` + `ZITADEL_URL=http://localhost:4000 moon run demo-next:dev` | [http://localhost:3002/login](http://localhost:3002/login) (mock on `:4000`) | Next.js SDK, middleware, cookies, built `dist/`. See [`apps/demo-next`](../../apps/demo-next/README.md). |
-| **demo-nuxt** | mock on `:4000`, then `ZITADEL_URL=http://localhost:4000 moon run demo-nuxt:dev` | [http://localhost:3001/login](http://localhost:3001/login) | Nuxt SDK, middleware, cookies, built `dist/`. See [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md). |
-
-The Lit dev playground iterates on `<zl-*>` source; the React console
-playground exercises `@zitadel/ui-react` in the internal shell.
-When tweaking Lit visuals or shadow-DOM behaviour, use `:5173` first —
-it round-trips faster. For React pair tweaks, use `:5174`.
-
-**Stale Lit styles on `:5173`?** Atom `.ts` changes use
-`vite-plugin-web-components-hmr` (Lit HMR). Edits to `shared-component-styles`
-CSS alone trigger a full reload. If it still looks old, run
-`corepack pnpm --filter @zitadel/components run dev:clean` and hard-refresh.
-Console (`:5174`) will not pick up Lit-only edits until you rebuild or
-change the paired React/CSS path.
+Storybook consumes the built `@zitadel/components` / `@zitadel/ui-react`
+artifacts, so rebuild after source changes (`moon run components:build`) or
+keep the Storybook dev server running — its tasks depend on the relevant
+build tasks.
 
 ### Atoms-only (bypass the orchestrator)
 
@@ -280,11 +271,6 @@ See [`src/atoms/`](src/atoms) for full TypeScript types and JSDoc.
 
 ```
 packages/components/
-├── dev/                   Vite playground (atoms + login routes)
-│   ├── index.html
-│   ├── main.ts            bootstraps @zitadel/api-mock + MSW worker
-│   ├── branding-presets.ts tenant-style branding payloads
-│   └── pages/             atom playground + <zitadel-login> demo
 ├── src/
 │   ├── atoms/             zl-field, zl-button, zl-alert, zl-icon, zl-pill,
 │   │                       zl-card, zl-page-shell + tests
@@ -296,9 +282,11 @@ packages/components/
 │   ├── manifests.ts       per-atom attribute / part / event manifests
 │   └── index.ts           barrel
 ├── tsdown.config.ts       library build (externalises lit/liquidjs/dompurify)
-├── vite.config.mts        dev server
 └── vitest.config.ts       jsdom (unit) + chromium (browser) projects
 ```
+
+The interactive workbench (atoms, paired React, and the `<zitadel-login>`
+orchestrator) lives in [`apps/storybook`](../../apps/storybook/README.md).
 
 ## Develop
 
@@ -311,16 +299,11 @@ documented path.
 # install once at the repo root
 corepack pnpm install
 
-# --- Playgrounds (two terminals) ---
+# --- Workbench ---
 
-# Lit: atoms + login, in-browser MSW
-moon run components:dev
-# → http://localhost:5173/?route=login
-# → http://localhost:5173/?route=atoms
-
-# React console: ui-react atom playground (compare to Lit ?route=atoms in another tab)
-moon run console:dev
-# → http://localhost:5174
+# Storybook: atoms, paired React, and the <zitadel-login> orchestrator
+moon run storybook:dev
+# → http://localhost:6006
 
 # Framework demos (TCP mock + SDK) — see apps/demo-*/README.md
 # moon run api-mock:start   # → http://localhost:4000
@@ -335,8 +318,8 @@ moon run components:typecheck
 moon run components:build
 ```
 
-The components dev server imports source TS from `src/` and hot-reloads on edits.
-Run `build` when testing the published `dist/` shape (demos and npm consumers).
+Storybook loads the built `dist/`, so run `moon run components:build` after
+source changes (its Storybook tasks already depend on the build).
 
 **Framework demos** need the TCP mock plus a rebuild after orchestrator changes —
 see [`apps/demo-next/README.md`](../../apps/demo-next/README.md) and

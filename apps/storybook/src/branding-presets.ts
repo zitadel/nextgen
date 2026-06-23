@@ -1,10 +1,11 @@
 /**
- * Branding presets for the dev playground. Mirrors the canonical branding
- * shape in `docs/design/branding/branding.example.json`. Used by
- * `dev/pages/login.ts` to push a tenant-style branding payload through the
- * MSW worker so the orchestrator's CSS-token bridge has something to render.
+ * Tenant-style branding presets for the `<zitadel-login>` orchestrator stories.
+ * Mirrors the canonical branding shape in
+ * `docs/design/branding/branding.example.json`. The orchestrator stories push
+ * one of these through the MSW worker so the orchestrator's CSS-token bridge
+ * has a tenant payload to render.
  */
-import type { Branding } from "../src/orchestrator/index.js";
+import type { Branding } from "@zitadel/components";
 
 const INTER_FONT_URL =
   "https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700&display=swap";

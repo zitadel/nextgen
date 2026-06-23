@@ -84,7 +84,7 @@ function validFlowDefinitionBody(): Record<string, unknown> {
       {
         name: "identifier",
         fields: ["email"],
-        actions: [{ name: "submit", text_key: "submit", primary: true }],
+        actions: [{ name: "submit", kind: "submit", text_key: "submit", primary: true }],
       },
     ],
   };
@@ -290,7 +290,9 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const res = await fetch(`${BASE}/flow_definitions/${id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(validFlowDefinitionBody()),
+      // The update request envelope requires a `flow_definition` wrapper
+      // (flow-definition-update-request.yaml), unlike the create envelope.
+      body: JSON.stringify({ flow_definition: validFlowDefinitionBody() }),
     });
     expect(res.status).toBe(200);
     const body = await res.json();
