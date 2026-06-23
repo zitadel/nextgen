@@ -327,10 +327,6 @@ func lookupInt(schema *jsonschema.Schema, keyword string) int {
 	return 0
 }
 
-func isPassword(schema *jsonschema.Schema) bool {
-	return lookupBool(schema, "x-password")
-}
-
 func lookupBool(schema *jsonschema.Schema, keyword string) bool {
 	v, ok := schema.LookupKeyword(keyword)
 	if !ok {

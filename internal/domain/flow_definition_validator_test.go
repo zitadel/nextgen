@@ -34,6 +34,31 @@ func mustSchema(t *testing.T, raw []byte) *jsonschema.Schema {
 	return &s
 }
 
+var tenantUserSchemaNoAuthMethod = []byte(`{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant.com/schemas/no-auth-user.json",
+  "type": "object",
+  "required": ["email"],
+  "x-auth-methods": {
+  },
+  "properties": {
+    "email":    { "type": "string", "format": "email", "x-unique": "team" }
+  }
+}`)
+
+var tenantUserSchemaDisabledAuthMethod = []byte(`{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant.com/schemas/disabled-auth-user.json",
+  "type": "object",
+  "required": ["email"],
+  "x-auth-methods": {
+    "password": { "enabled": false, "position": 0 }
+  },
+  "properties": {
+    "email":    { "type": "string", "format": "email", "x-unique": "team" }
+  }
+}`)
+
 var userSchemaIDAndPassword = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tenant.com/schemas/idpw-user.json",
@@ -97,6 +122,14 @@ func TestValidateFlowDefinition(t *testing.T) {
 
 	var userSchemaNoProps jsonschema.Schema
 	marshalErr = json.Unmarshal(tenantUserSchemaNoProps, &userSchemaNoProps)
+	require.NoError(t, marshalErr, "failed to unmarshal tenant user schema")
+
+	var userSchemaNoAuthMethod jsonschema.Schema
+	marshalErr = json.Unmarshal(tenantUserSchemaNoAuthMethod, &userSchemaNoAuthMethod)
+	require.NoError(t, marshalErr, "failed to unmarshal tenant user schema")
+
+	var userSchemaDisabledAuthMethod jsonschema.Schema
+	marshalErr = json.Unmarshal(tenantUserSchemaDisabledAuthMethod, &userSchemaDisabledAuthMethod)
 	require.NoError(t, marshalErr, "failed to unmarshal tenant user schema")
 
 	type args struct {
@@ -698,6 +731,74 @@ func TestValidateFlowDefinition(t *testing.T) {
 			wantErr: domain.ErrFlowDefinitionInvalid(`user schema has no properties`, nil),
 		},
 		{
+			name: "auth method not existing",
+			args: args{
+				userSchema: &userSchemaNoAuthMethod,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/no-auth-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []string{"email", "x-auth-methods#password"},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "step_2"},
+							},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+							},
+						},
+						{
+							Name:     "step_2",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "step_1": "password" is not an enabled authentication method`, nil),
+		},
+		{
+			name: "auth method disabled",
+			args: args{
+				userSchema: &userSchemaNoAuthMethod,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/disabled-auth-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []string{"email", "x-auth-methods#password"},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "step_2"},
+							},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+							},
+						},
+						{
+							Name:     "step_2",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "step_1": "password" is not an enabled authentication method`, nil),
+		},
+		{
 			name: "fields not in user schema",
 			args: args{
 				userSchema: &userSchema,
@@ -1011,7 +1112,7 @@ func TestValidator_FlipTable_CombinedLoginRegisterRequiresCounterOutcome(t *test
 			},
 			{
 				Name:      "signin",
-				Fields:    []string{"email", "password"},
+				Fields:    []string{"email", "x-auth-methods#password"},
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
 					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
@@ -1047,7 +1148,7 @@ func TestValidator_FlipTable_SoloLoginNoFlipRequired(t *testing.T) {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "credentials",
-				Fields: []string{"email", "password"},
+				Fields: []string{"email", "x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
 					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
@@ -1132,7 +1233,7 @@ func TestValidator_PositiveWorkedExampleA(t *testing.T) {
 			},
 			{
 				Name:   "set-password",
-				Fields: []string{"password"},
+				Fields: []string{"x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
 					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
@@ -1186,7 +1287,7 @@ func TestValidator_PositiveWorkedExampleC(t *testing.T) {
 			},
 			{
 				Name:   "signin",
-				Fields: []string{"password"},
+				Fields: []string{"x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
 					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 				},

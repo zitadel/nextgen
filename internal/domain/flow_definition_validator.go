@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/ianlancetaylor/jsonschema/types"
@@ -351,17 +352,16 @@ func userSchemaProperties(userSchema *jsonschema.Schema) (types.PartMapSchema, b
 func stepFieldsInUserSchema(stepName string, stepFields []string, userProperties types.PartMapSchema, userSchema *jsonschema.Schema) error {
 	for _, field := range stepFields {
 		// first case - x-auth-methods-prefixed fields
-		//
-		// check against x-auth
-		if field == "x-auth-methods#password" {
-			if !authMethodEnabled(userSchema, "password") {
+		if strings.HasPrefix(field, "x-auth-methods#") {
+			authMethod := strings.TrimPrefix(field, "x-auth-methods#")
+			if !authMethodEnabled(userSchema, authMethod) {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
-					"step %q: field %q is not a property in the user schema", stepName, field), nil)
+					"step %q: %q is not an enabled authentication method", stepName, authMethod), nil)
 			}
 			continue
 		}
 
-		// second case - normal user propertie
+		// second case - normal user properties
 		if _, ok := userProperties[field]; !ok {
 			return ErrFlowDefinitionInvalid(fmt.Sprintf(
 				"step %q: field %q is not a property in the user schema", stepName, field), nil)
@@ -478,6 +478,9 @@ func someStepEstablishesKind(candidates map[string]struct{}, byName map[string]*
 			if challengeForField(userSchema, fieldName) == kind {
 				return true
 			}
+			if challengeForAuthMethod(userSchema, fieldName) == kind {
+				return true
+			}
 		}
 	}
 	return false
@@ -496,9 +499,21 @@ func challengeForField(userSchema *jsonschema.Schema, fieldName string) FlowFiel
 	if deriveUnique(prop) != AttributeUniquenessUnspecified {
 		return FlowFieldChallengeIdentifier
 	}
-	if isPassword(prop) && authMethodEnabled(userSchema, "password") {
-		return FlowFieldChallengePassword
+	return FlowFieldChallengeNone
+}
+
+func challengeForAuthMethod(userSchema *jsonschema.Schema, fieldName string) FlowFieldChallenge {
+	if userSchema == nil {
+		return FlowFieldChallengeNone
 	}
+
+	switch fieldName {
+	case "x-auth-methods#password":
+		if authMethodEnabled(userSchema, "password") {
+			return FlowFieldChallengePassword
+		}
+	}
+
 	return FlowFieldChallengeNone
 }
 
