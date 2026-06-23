@@ -90,7 +90,7 @@ func validateSteps(steps []FlowDefinitionStep, userSchema *jsonschema.Schema) er
 		return ErrFlowDefinitionInvalid("user schema has no properties", nil)
 	}
 	for _, step := range steps {
-		err := stepFieldsInUserSchema(step.Name, step.Fields, userProperties)
+		err := stepFieldsInUserSchema(step.Name, step.Fields, userProperties, userSchema)
 		if err != nil {
 			return err
 		}
@@ -348,8 +348,20 @@ func userSchemaProperties(userSchema *jsonschema.Schema) (types.PartMapSchema, b
 }
 
 // stepFieldsInUserSchema checks that all fields in a step are defined in the user schema properties
-func stepFieldsInUserSchema(stepName string, stepFields []string, userProperties types.PartMapSchema) error {
+func stepFieldsInUserSchema(stepName string, stepFields []string, userProperties types.PartMapSchema, userSchema *jsonschema.Schema) error {
 	for _, field := range stepFields {
+		// first case - x-auth-methods-prefixed fields
+		//
+		// check against x-auth
+		if field == "x-auth-methods#password" {
+			if !authMethodEnabled(userSchema, "password") {
+				return ErrFlowDefinitionInvalid(fmt.Sprintf(
+					"step %q: field %q is not a property in the user schema", stepName, field), nil)
+			}
+			continue
+		}
+
+		// second case - normal user propertie
 		if _, ok := userProperties[field]; !ok {
 			return ErrFlowDefinitionInvalid(fmt.Sprintf(
 				"step %q: field %q is not a property in the user schema", stepName, field), nil)

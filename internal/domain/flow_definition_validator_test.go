@@ -11,6 +11,7 @@ import (
 	"github.com/muhlemmer/gu"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
@@ -42,8 +43,7 @@ var userSchemaIDAndPassword = []byte(`{
     "password": { "enabled": true, "position": 0 }
   },
   "properties": {
-    "email":    { "type": "string", "format": "email", "x-unique": "team" },
-    "password": { "type": "string", "minLength": 8, "x-password": true }
+    "email":    { "type": "string", "format": "email", "x-unique": "team" }
   }
 }`)
 
@@ -127,6 +127,39 @@ func TestValidateFlowDefinition(t *testing.T) {
 						{
 							Name:   "step_1",
 							Fields: []string{"email"},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "step_2"},
+							},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+							},
+						},
+						{
+							Name:     "step_2",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "valid flow definition with password",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/idpw-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []string{"email", "x-auth-methods#password"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
@@ -681,7 +714,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"username", "password"},
+							Fields: []string{"username", "firstName"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
@@ -930,6 +963,8 @@ func TestValidateFlowDefinition(t *testing.T) {
 				assertErrorDetails(t, err, tt.wantErr)
 				return
 			}
+
+			assert.NoError(t, err)
 			assert.Equal(t, tt.wantPivotingTargets, got)
 		})
 	}
