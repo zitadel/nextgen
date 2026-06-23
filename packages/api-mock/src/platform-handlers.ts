@@ -50,6 +50,7 @@ import {
   ListFlowDefinitionsResponse,
   UpdateFlowDefinitionBody,
   UpdateFlowDefinitionParams,
+  UpdateFlowDefinitionQueryParams,
   UpdateFlowDefinitionResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { http, HttpResponse } from "msw";
@@ -391,14 +392,21 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data);
     }),
 
-    http.patch("*/flow_definitions/:id", async ({ params, request }) => {
+    http.put("*/flow_definitions/:id", async ({ params, request }) => {
       const path = parse(UpdateFlowDefinitionParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
       }
+      const query = parse(UpdateFlowDefinitionQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
 
       const record = store.flowDefinitions.get(path.data.id);
       if (!record) {
+        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+      }
+      if (record.projectId !== query.data.project_id) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
       const raw = await readJson(request);
@@ -410,7 +418,11 @@ export function setupPlatformHandlers() {
         return body.response;
       }
 
-      record.body = { ...record.body, ...(body.data as unknown as Record<string, unknown>) };
+      const flowDef = body.data.flow_definition as unknown as Record<string, unknown>;
+      record.name = flowDef.name as string;
+      record.schemaUri = body.data.schema_uri ?? record.schemaUri;
+      record.status = typeof flowDef.status === "string" ? flowDef.status : record.status;
+      record.body = flowDef;
       record.updatedAt = nowIso();
       const responseBody: UpdateFlowDefinition200 = flowDetailResponse(record);
       const out = parse(UpdateFlowDefinitionResponse, responseBody, "mock_response_invalid");

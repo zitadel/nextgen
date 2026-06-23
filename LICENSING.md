@@ -10,9 +10,9 @@ We use SPDX license identifiers for standard license naming.
 
 ## AGPL-3.0-only default
 
-Unless a path-specific MIT override below applies, the contents of this
-repository are licensed under AGPL-3.0-only. The full license text is in
-[LICENSE](LICENSE).
+Unless a path-specific MIT override or third-party community-document note below
+applies, the contents of this repository are licensed under AGPL-3.0-only. The
+full license text is in [LICENSE](LICENSE).
 
 This default includes, without limitation:
 
@@ -47,7 +47,6 @@ licensed under the MIT License:
 ```text
 README.md
 CONTRIBUTING.md
-CODE_OF_CONDUCT.md
 AGENTS.md
 LICENSING.md
 SUPPORT.md
@@ -88,6 +87,13 @@ MIT `LICENSE` files before publishing any of them as npm packages.
 
 For non-package MIT paths such as `api/` and `docs/`, SPDX headers, generated
 metadata, or local README notes are sufficient when the format supports them.
+
+## Third-party community documents
+
+`CODE_OF_CONDUCT.md` is adapted from the Contributor Covenant version 2.0 and is
+included as a community governance document, not as product source code or a
+downstream integration surface. It is intentionally not listed under the MIT
+exceptions above; its attribution and upstream terms are stated in that file.
 
 ## External contributions
 

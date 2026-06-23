@@ -17,7 +17,7 @@
  *   - GET  /projects/:id                → GetProjectResponse
  *   - GET  /flow_definitions            → ListFlowDefinitionsResponse
  *   - GET  /flow_definitions/:id        → GetFlowDefinitionResponse
- *   - PATCH /flow_definitions/:id       → UpdateFlowDefinitionResponse
+ *   - PUT  /flow_definitions/:id        → UpdateFlowDefinitionResponse
  *
  * Endpoints covered structurally (orval emits no `*Response` zod for these
  * because they have no static response schema — POSTs that return only an
@@ -277,7 +277,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(() => GetFlowDefinitionResponse.parse(body)).not.toThrow();
   });
 
-  test("PATCH /flow_definitions/:id matches UpdateFlowDefinitionResponse", async () => {
+  test("PUT /flow_definitions/:id matches UpdateFlowDefinitionResponse", async () => {
     const create = await fetch(`${BASE}/flow_definitions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -287,8 +287,8 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       }),
     });
     const { id } = (await create.json()) as { id: string };
-    const res = await fetch(`${BASE}/flow_definitions/${id}`, {
-      method: "PATCH",
+    const res = await fetch(`${BASE}/flow_definitions/${id}?project_id=proj_conformance_patch`, {
+      method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ flow_definition: validFlowDefinitionBody() }),
     });
