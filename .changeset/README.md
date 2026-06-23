@@ -12,29 +12,27 @@ The public `@zitadel/*` packages are the `fixed` group in
 
 ## When a change needs a changeset
 
-Release intent is **product-level, not path-level**. A change needs a changeset
-if it changes what the shipped product does. Skip it **only** when the change is
-*exclusively* one of:
+A change needs a changeset if it changes what the shipped product does —
+**release intent is product-level, not path-level.** The Go server, its API
+surface (`api/openapi/**`), and the SDKs all ship as one versioned bundle, so a
+server or API change needs one (list `@zitadel/server`) — even from `internal/`
+or `api/generated/**` — because it ships new server and SDK versions that belong
+in the release notes.
 
-- test files (`*_test.go`, `*.spec.ts`, `*.browser.spec.ts`)
-- generated output (`dist/**`, test mocks) — but regenerating `api/generated/**`
-  from an `api/openapi/**` contract change is a shipped change, not a skip
-- comments or contributor docs (`docs/`, `AGENTS.md`, READMEs)
-- CI / build wiring (`.github/`, `moon.yml`, `.changeset/` itself)
+Skip a changeset **only** when the change is *exclusively*:
+
+- tests (`*_test.go`, `*.spec.ts`, …)
+- generated mocks or fixtures
+- docs or comments (`docs/`, `AGENTS.md`, READMEs)
+- CI / build wiring (`.github/`, `moon.yml`, `.changeset/`)
 - a refactor with no behavior change
-
-So a shipped Go server change counts even from an implementation path like
-`internal/` or `cmd/` — list `@zitadel/server`. The public packages are one
-**fixed** group, so any changeset bumps every version together: the
-`@zitadel/server` entry isn't what ships or versions the server, it's what gives
-the change a release-note line.
 
 ## Decision table
 
 | If the PR… | Add `.changeset/*.md`? | **Release notes / changeset** |
 | --- | --- | --- |
 | Changes shipped product behavior (any path) | **Yes** — real changeset | Name the file; summarize the note. List `@zitadel/server` for server changes |
-| Is *exclusively* tests, generated output, docs, CI, or a no-op refactor | **No** | `No changeset required — no shipped behavior changed.` |
+| Is *exclusively* tests, generated mocks, docs, CI, or a no-op refactor | **No** | `No changeset required — no shipped behavior changed.` |
 | Touches a publishable path but ships nothing (rare) | **Empty changeset** | Say why the path changed but nothing ships |
 
 ## How to add a changeset
@@ -99,8 +97,5 @@ Trusted Publishing): provider GitHub Actions, repo `zitadel/nextgen`, workflow
 hand if needed). Provenance stays off (`NPM_CONFIG_PROVENANCE=false`) while the
 repo is private; re-enable when public.
 
-## Licensing
-
-Public packages under `apps/cli/` and `packages/*` are MIT; `apps/server*` ship
-the AGPL server binary (`AGPL-3.0-only`). Set `"license"` and ship a `LICENSE`
-file before publishing. Details: [LICENSING.md](../LICENSING.md).
+Each public package must declare its license and ship a `LICENSE` file before its
+first publish — see [LICENSING.md](../LICENSING.md).

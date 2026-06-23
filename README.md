@@ -127,73 +127,19 @@ diagnostics such as Playwright traces, doctor/start/setup JSON, package lock
 metadata, local runtime logs, and service logs. These artifacts expire after 7
 days and are not release artifacts.
 
-## Build & release
+## Releases
 
-This monorepo uses Moon for task execution, non-npm artifact builds, and the
-draft GitHub Release shell for `v<version>`. Changesets owns per-PR release
-intent, package versions, changelogs, and npm publishing. While the repo is in
-alpha the public packages release as one fixed version train; the rationale lives
-in [ADR 002](docs/adrs/002-multi-package-release-strategy.md) and
-[ADR 023](docs/adrs/023-lockstep-alpha-release-train.md), and the "do I need a
-changeset?" rules live in [`.changeset/README.md`](.changeset/README.md). Product
-release prose is written manually by maintainers when a GitHub Release is
-published.
+Moon builds the artifacts (Go binaries, containers, archives) and the draft
+GitHub Release; Changesets owns versions, npm publishing, and release notes, with
+the public packages on one fixed alpha train. Build a local snapshot with
+`moon run release:snapshot` (more in [CONTRIBUTING.md](CONTRIBUTING.md)). To cut
+or recover a release, follow the
+[release runbook](docs/runbooks/manual-release.md); for when to add a changeset,
+see [`.changeset/README.md`](.changeset/README.md); for the rationale, see
+[ADR 002](docs/adrs/002-multi-package-release-strategy.md) and
+[ADR 023](docs/adrs/023-lockstep-alpha-release-train.md).
 
-### Moon release artifacts
-
-Moon runs repo-owned scripts that build the console and login-ui SPAs directly
-into `internal/staticui/*/dist`, cross-compile the Go server, stage npm
-platform packages, create archives and checksums, build Docker images, and
-assemble release metadata.
-
-```sh
-# Local snapshot without publishing
-moon run release:snapshot
-
-# Dry-run the publish graph
-moon run release:publish -- --dry-run
-```
-
-Release output lands in `dist/release/<version>`. The workflow publishes
-immutable container version tags from the fixed `@zitadel/server` version and
-creates or updates the matching draft GitHub Release with generated artifact and
-package facts; stable releases may also move `ghcr.io/zitadel/nextgen:latest`.
-
-### Release intent & publishing (`changesets`)
-
-Add a changeset for any change that ships in the product release; the
-[decision table](.changeset/README.md#decision-table) covers when and which
-package to list:
-
-```sh
-corepack pnpm changeset
-```
-
-When pending changesets land on `main`, `release-publish.yml` opens or updates a
-version PR; merging it publishes the npm packages, pushes the matching container
-image, and creates or updates the draft GitHub Release. Maintainers add product
-prose and publish the draft when an announcement is needed. Full mechanics are in
-[`.changeset/README.md`](.changeset/README.md); follow the
-[release runbook](docs/runbooks/manual-release.md) when cutting or recovering a
-release.
-
-Preview local Changesets status with:
-
-```sh
-corepack pnpm exec changeset status --since origin/main
-```
-
-Tester commands use either the latest alpha stream or an exact train:
-
-```sh
-npx @zitadel/cli@alpha doctor
-npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --server local
-
-npx @zitadel/cli@0.1.0-alpha.N start
-```
-
-### Local development
+## Local development
 
 The devcontainer at [.devcontainer/](.devcontainer/) pins Go 1.26 and a PostgreSQL sidecar.
 
