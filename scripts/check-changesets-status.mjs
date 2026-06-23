@@ -143,8 +143,19 @@ export function isChangesetMarkdown(file) {
   return file.startsWith(".changeset/") && file.endsWith(".md") && file !== ".changeset/README.md";
 }
 
+export function isTestFile(file) {
+  // Test files never ship, so mirror the "tests skip" rule in
+  // `.changeset/README.md`: a test-only change under a publishable root does not
+  // require a changeset.
+  return (
+    /\.(test|spec)\.[cm]?[jt]sx?$/.test(file) ||
+    file.endsWith("_test.go") ||
+    /(^|\/)(tests?|__tests__)\//.test(file)
+  );
+}
+
 export function packageForFile(file) {
-  if (file.endsWith("/AGENTS.md")) {
+  if (file.endsWith("/AGENTS.md") || isTestFile(file)) {
     return undefined;
   }
   return publicPackages.find((pkg) => file.startsWith(pkg.root));

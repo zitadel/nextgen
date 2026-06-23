@@ -169,7 +169,7 @@ Improve local start behavior.
     const { checkChangesetsStatus } = await loadModule();
     const report = await checkChangesetsStatus({
       entries: [
-        { status: "M", file: "apps/cli/tests/unit/scripts/check-changesets-status.test.ts" },
+        { status: "M", file: "apps/cli/src/lib/diagnostics.ts" },
         { status: "A", file: ".changeset/release-tests.md" },
       ],
       config: validConfig(),
@@ -177,13 +177,27 @@ Improve local start behavior.
         ".changeset/release-tests.md": `---
 ---
 
-Exercise release workflow scripts without changing published package behavior.
+Internal-only change with no published package behavior.
 `,
       },
     });
 
     expect(report.ok).toBe(true);
     expect(report.nextAction).toContain("Empty changeset");
+  });
+
+  it("treats test-only changes under a publishable root as needing no changeset", async () => {
+    const { checkChangesetsStatus } = await loadModule();
+    const report = await checkChangesetsStatus({
+      entries: [
+        { status: "M", file: "apps/cli/tests/unit/scripts/check-changesets-status.test.ts" },
+      ],
+      config: validConfig(),
+    });
+
+    expect(report.ok).toBe(true);
+    expect(report.errors).toEqual([]);
+    expect(report.nextAction).toContain("No changeset required");
   });
 
   it("passes pending mode when public changesets are valid", async () => {
