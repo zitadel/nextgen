@@ -6348,7 +6348,6 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 		return errors.New("invalid: unable to decode FlowDefinition to nil")
 	}
 	var requiredBitSet [1]uint8
-	s.setDefaults()
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
@@ -6889,7 +6888,6 @@ func (s *FlowDefinitionResponse) Decode(d *jx.Decoder) error {
 		return errors.New("invalid: unable to decode FlowDefinitionResponse to nil")
 	}
 	var requiredBitSet [1]uint8
-	s.setDefaults()
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {

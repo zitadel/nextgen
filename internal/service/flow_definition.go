@@ -93,7 +93,7 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 	}
 	status, err := domain.FlowDefinitionStatusString(req.Status)
 	if err != nil {
-		return nil, domain.ErrFlowDefinitionInvalid("invalid status", err)
+		return nil, domain.ErrFlowDefinitionInvalid(fmt.Sprintf("invalid status: %q", req.Status), err)
 	}
 	flowDefinition, err := domain.NewFlowDefinition(
 		"", // the flow definition ID is auto-generated
