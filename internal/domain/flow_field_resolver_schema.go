@@ -158,9 +158,6 @@ func deriveFieldType(propSchema *jsonschema.Schema) (FlowFieldType, error) {
 	if err != nil {
 		return "", err
 	}
-	if isPassword(propSchema) {
-		return FlowFieldTypePassword, nil
-	}
 	if len(lookupStringEnum(propSchema)) > 0 {
 		return FlowFieldTypeSelect, nil
 	}
@@ -192,9 +189,6 @@ func isPassword(propSchema *jsonschema.Schema) bool {
 func deriveChallenge(propSchema *jsonschema.Schema, unique AttributeUniqueness, passwordEnabled bool) FlowFieldChallenge {
 	if unique != AttributeUniquenessUnspecified {
 		return FlowFieldChallengeIdentifier
-	}
-	if isPassword(propSchema) && passwordEnabled {
-		return FlowFieldChallengePassword
 	}
 	return FlowFieldChallengeNone
 }

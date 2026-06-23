@@ -212,7 +212,7 @@ func loginDefinition() *domain.FlowDefinition {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "credentials",
-				Fields: []string{"email", "password"},
+				Fields: []string{"email", "x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
@@ -249,7 +249,7 @@ func signupDefinition() *domain.FlowDefinition {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:      "credentials",
-				Fields:    []string{"email", "password"},
+				Fields:    []string{"email", "x-auth-methods#password"},
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
@@ -307,8 +307,8 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{
-			"email":    "alice@example.com",
-			"password": "correct-horse-battery-staple",
+			"email":                   "alice@example.com",
+			"x-auth-methods#password": "correct-horse-battery-staple",
 		},
 	})
 	require.NoError(t, err)
@@ -362,8 +362,8 @@ func TestFlowStateMachine_Process_LoginHappyPath(t *testing.T) {
 	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{
-			"email":    "alice@example.com",
-			"password": "correct-horse-battery-staple",
+			"email":                   "alice@example.com",
+			"x-auth-methods#password": "correct-horse-battery-staple",
 		},
 	})
 	require.NoError(t, err)
@@ -401,8 +401,8 @@ func TestFlowStateMachine_Process_LoginUserNotFound(t *testing.T) {
 	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{
-			"email":    "ghost@example.com",
-			"password": "irrelevant",
+			"email":                   "ghost@example.com",
+			"x-auth-methods#password": "irrelevant",
 		},
 	})
 	require.NoError(t, err)
@@ -491,8 +491,8 @@ func TestFlowStateMachine_Process_IntegrityOnMissingTargetStep(t *testing.T) {
 	_, err = w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{
-			"email":    "alice@example.com",
-			"password": "correct-horse-battery-staple",
+			"email":                   "alice@example.com",
+			"x-auth-methods#password": "correct-horse-battery-staple",
 		},
 	})
 	require.ErrorIs(t, err, domain.ErrIntegrity)
@@ -513,8 +513,8 @@ func TestFlowStateMachine_Process_InvalidActionRejected(t *testing.T) {
 	_, err = w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
 		Action: "not_declared",
 		Fields: map[string]any{
-			"email":    "alice@example.com",
-			"password": "correct-horse-battery-staple",
+			"email":                   "alice@example.com",
+			"x-auth-methods#password": "correct-horse-battery-staple",
 		},
 	})
 	require.ErrorIs(t, err, domain.ErrInvalidAction)
@@ -900,7 +900,7 @@ func TestFlowStateMachine_FlipTable_LoginUserNotFoundFlipsToRegister(t *testing.
 
 	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
-		Fields: map[string]any{"email": "ghost@example.com", "password": "irrelevant"},
+		Fields: map[string]any{"email": "ghost@example.com", "x-auth-methods#password": "irrelevant"},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, domain.FlowDefinitionPurposeLogin, result.State.Purpose, "Purpose stays pinned")
@@ -1033,7 +1033,7 @@ func loginNoUserNotFoundDefinition() *domain.FlowDefinition {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "credentials",
-				Fields: []string{"email", "password"},
+				Fields: []string{"email", "x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Primary: true},
 				},
@@ -1066,7 +1066,7 @@ func TestFlowStateMachine_FlipTable_OutcomeWithoutTransition_DoesNotFlip(t *test
 
 	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
-		Fields: map[string]any{"email": "ghost@example.com", "password": "irrelevant"},
+		Fields: map[string]any{"email": "ghost@example.com", "x-auth-methods#password": "irrelevant"},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "credentials", result.State.CurrentStep, "no transition for user_not_found keeps the user on the current step")
@@ -1103,7 +1103,7 @@ func TestFlowStateMachine_FlipTable_LoginTypoThenCorrectEmail_StillSignsIn(t *te
 	// engine surfaces a step error and the user stays on credentials.
 	typo, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
-		Fields: map[string]any{"email": "alic@example.com", "password": "irrelevant"},
+		Fields: map[string]any{"email": "alic@example.com", "x-auth-methods#password": "irrelevant"},
 	})
 	require.NoError(t, err)
 	require.Equal(t, "credentials", typo.State.CurrentStep)
@@ -1115,7 +1115,7 @@ func TestFlowStateMachine_FlipTable_LoginTypoThenCorrectEmail_StillSignsIn(t *te
 	// identifier resolves, password verifies, and the user signs in.
 	result, err := w.sm.Process(t.Context(), nil, def, typo.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
-		Fields: map[string]any{"email": "alice@example.com", "password": "correct-horse-battery-staple"},
+		Fields: map[string]any{"email": "alice@example.com", "x-auth-methods#password": "correct-horse-battery-staple"},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "done", result.State.CurrentStep)
@@ -1202,7 +1202,7 @@ func multiStepSignupDefinition() *domain.FlowDefinition {
 			},
 			{
 				Name:   "set-password",
-				Fields: []string{"password"},
+				Fields: []string{"x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
@@ -1252,7 +1252,7 @@ func combinedSigninSignupDefinition() *domain.FlowDefinition {
 			},
 			{
 				Name:   "signin-password",
-				Fields: []string{"password"},
+				Fields: []string{"x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
@@ -1262,7 +1262,7 @@ func combinedSigninSignupDefinition() *domain.FlowDefinition {
 			},
 			{
 				Name:      "register-password",
-				Fields:    []string{"password"},
+				Fields:    []string{"x-auth-methods#password"},
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
@@ -1300,7 +1300,7 @@ func recoveryDefinition() *domain.FlowDefinition {
 			},
 			{
 				Name:   "new-password",
-				Fields: []string{"password"},
+				Fields: []string{"x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
@@ -1339,7 +1339,7 @@ func TestFlowDispatch_RegisterMultiStep_HappyPath(t *testing.T) {
 
 	afterPassword, err := w.sm.Process(t.Context(), nil, def, afterProfile.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
-		Fields: map[string]any{"password": "correct-horse-battery-staple"},
+		Fields: map[string]any{"x-auth-methods#password": "correct-horse-battery-staple"},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "create", afterPassword.State.CurrentStep)
@@ -1404,7 +1404,7 @@ func TestFlowDispatch_CombinedFlow_LoginUnknownEmail_FlipsAndCreates(t *testing.
 
 	done, err := w.sm.Process(t.Context(), nil, def, afterIdentify.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
-		Fields: map[string]any{"password": "correct-horse-battery-staple"},
+		Fields: map[string]any{"x-auth-methods#password": "correct-horse-battery-staple"},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "done", done.State.CurrentStep)
@@ -1441,7 +1441,7 @@ func TestFlowDispatch_CombinedFlow_RegisterKnownEmail_FlipsToSignin(t *testing.T
 
 	done, err := w.sm.Process(t.Context(), nil, def, afterIdentify.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
-		Fields: map[string]any{"password": "correct-horse-battery-staple"},
+		Fields: map[string]any{"x-auth-methods#password": "correct-horse-battery-staple"},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "done", done.State.CurrentStep)
@@ -1473,7 +1473,7 @@ func TestFlowDispatch_Recovery_IdentifierResolvedPasswordNotDispatched(t *testin
 
 	_, err = w.sm.Process(t.Context(), nil, def, afterIdentify.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
-		Fields: map[string]any{"password": "fresh-secret"},
+		Fields: map[string]any{"x-auth-methods#password": "fresh-secret"},
 	})
 	require.NoError(t, err)
 	assert.Empty(t, w.attempts.passwordCalls)
@@ -1684,7 +1684,7 @@ func TestFlowStateMachine_Process_NavigateSkipsValidation(t *testing.T) {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "enter",
-				Fields: []string{"email", "password"},
+				Fields: []string{"email", "x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 					{Name: "back", Kind: domain.FlowActionKindNavigate},

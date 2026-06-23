@@ -145,7 +145,7 @@ func TestSchemaFieldResolver_Resolve_IdentifierImpliesUserNotFound(t *testing.T)
 	if len(got.ImplicitOutcomes["password"]) != 0 {
 		t.Errorf("Resolve password ImplicitOutcomes = %v, want empty", got.ImplicitOutcomes["password"])
 	}
-	if mustField(t, got, "password").Challenge == domain.FlowFieldChallengeIdentifier {
+	if mustField(t, got, "x-auth-methods#password").Challenge == domain.FlowFieldChallengeIdentifier {
 		t.Error("Resolve password Challenge = identifier, want non-identifier")
 	}
 }
@@ -153,7 +153,7 @@ func TestSchemaFieldResolver_Resolve_IdentifierImpliesUserNotFound(t *testing.T)
 func TestSchemaFieldResolver_Resolve_ChallengeSurfaces(t *testing.T) {
 	resolver := newDefaultResolver(t)
 
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step", []string{"email", "password", "given_name"})
+	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step", []string{"email", "x-auth-methods#password", "given_name"})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestSchemaFieldResolver_Resolve_ChallengeSurfaces(t *testing.T) {
 	if mustField(t, got, "email").Challenge != domain.FlowFieldChallengeIdentifier {
 		t.Errorf("Resolve email Challenge = %q, want %q", mustField(t, got, "email").Challenge, domain.FlowFieldChallengeIdentifier)
 	}
-	if mustField(t, got, "password").Challenge != domain.FlowFieldChallengePassword {
+	if mustField(t, got, "x-auth-methods#password").Challenge != domain.FlowFieldChallengePassword {
 		t.Errorf("Resolve password Challenge = %q, want %q", mustField(t, got, "password").Challenge, domain.FlowFieldChallengePassword)
 	}
 	if mustField(t, got, "given_name").Challenge != domain.FlowFieldChallengeNone {
@@ -189,58 +189,10 @@ func TestSchemaFieldResolver_Resolve_PasswordChallengeRequiresAuthMethodEnabled(
 	}
 }
 
-func TestSchemaFieldResolver_Resolve_PasswordChallengeRequiresXPassword(t *testing.T) {
-	const url = "https://example.test/no-x-password.json"
-	bytes := []byte(`{
-		"$schema": "https://json-schema.org/draft/2020-12/schema",
-		"type": "object",
-		"x-auth-methods": { "password": { "enabled": true } },
-		"properties": {
-			"password": { "type": "string", "minLength": 8 }
-		}
-	}`)
-	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
-
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step", []string{"password"})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-	if mustField(t, got, "password").Challenge != domain.FlowFieldChallengeNone {
-		t.Errorf("Resolve password Challenge = %q, want None (x-password absent on property)", mustField(t, got, "password").Challenge)
-	}
-	if mustField(t, got, "password").Type != domain.FlowFieldTypeText {
-		t.Errorf("Resolve password Type = %q, want text (no x-password annotation)", mustField(t, got, "password").Type)
-	}
-}
-
-func TestSchemaFieldResolver_Resolve_RenamedPasswordField(t *testing.T) {
-	const url = "https://example.test/renamed-password.json"
-	bytes := []byte(`{
-		"$schema": "https://json-schema.org/draft/2020-12/schema",
-		"type": "object",
-		"x-auth-methods": { "password": { "enabled": true } },
-		"properties": {
-			"secret": { "type": "string", "minLength": 8, "x-password": true }
-		}
-	}`)
-	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
-
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step", []string{"secret"})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-	if mustField(t, got, "secret").Challenge != domain.FlowFieldChallengePassword {
-		t.Errorf("Resolve secret Challenge = %q, want %q", mustField(t, got, "secret").Challenge, domain.FlowFieldChallengePassword)
-	}
-	if mustField(t, got, "secret").Type != domain.FlowFieldTypePassword {
-		t.Errorf("Resolve secret Type = %q, want %q", mustField(t, got, "secret").Type, domain.FlowFieldTypePassword)
-	}
-}
-
 func TestSchemaFieldResolver_Resolve_UniqueScopeSurfaces(t *testing.T) {
 	resolver := newDefaultResolver(t)
 
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step", []string{"email", "password"})
+	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step", []string{"email", "x-auth-methods#password"})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
@@ -248,7 +200,7 @@ func TestSchemaFieldResolver_Resolve_UniqueScopeSurfaces(t *testing.T) {
 	if mustField(t, got, "email").Unique != domain.AttributeUniquenessTeam {
 		t.Errorf("Resolve email Unique = %v, want %v", mustField(t, got, "email").Unique, domain.AttributeUniquenessTeam)
 	}
-	if mustField(t, got, "password").Unique != domain.AttributeUniquenessUnspecified {
+	if mustField(t, got, "x-auth-methods#password").Unique != domain.AttributeUniquenessUnspecified {
 		t.Errorf("Resolve password Unique = %v, want %v", mustField(t, got, "password").Unique, domain.AttributeUniquenessUnspecified)
 	}
 }

@@ -14,7 +14,7 @@ func resolveDefaultFields(t *testing.T) domain.FlowResolvedFields {
 	t.Helper()
 	resolver := newDefaultResolver(t)
 	fields, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step",
-		[]string{"email", "username", "password", "given_name", "family_name"})
+		[]string{"email", "username", "x-auth-methods#password", "given_name", "family_name"})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
@@ -45,8 +45,8 @@ func TestSchemaFieldResolver_Validate_MinLength(t *testing.T) {
 	resolver := newDefaultResolver(t)
 	fields := resolveDefaultFields(t)
 
-	err := resolver.Validate(fields, map[string]any{"password": "short"})
-	if !hasValidationRule(t, err, "password", domain.FlowFieldValidationRuleMinLength) {
+	err := resolver.Validate(fields, map[string]any{"username": "a"})
+	if !hasValidationRule(t, err, "username", domain.FlowFieldValidationRuleMinLength) {
 		t.Fatalf("Validate err = %v, want min_length violation for password", err)
 	}
 }
@@ -71,7 +71,6 @@ func TestSchemaFieldResolver_Validate_HappyPath(t *testing.T) {
 
 	err := resolver.Validate(fields, map[string]any{
 		"email":       "alice@example.com",
-		"password":    "correct-horse-battery-staple",
 		"given_name":  "Alice",
 		"family_name": "Doe",
 		"username":    "alice",
