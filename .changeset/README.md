@@ -23,19 +23,9 @@ visibility only; they are not a blocking release-policy gate.
 
 ## Publishable npm packages
 
-The public `@zitadel/*` packages that ship to npm live under:
-
-- `apps/cli/` — `@zitadel/cli`
-- `apps/server*/` — `@zitadel/server` and the `@zitadel/server-*` platform binaries
-- `packages/api/`, `packages/components/`, and `packages/sdk-*/` — the API client,
-  web components, and framework SDKs
-
-The [`fixed` array in `.changeset/config.json`](config.json) is the source of
-truth for exact group membership; if this prose and the config drift, the config
-wins. `AGENTS.md` files under those roots do not require a changeset on their own.
-Private workspaces — demos, `api-mock`, `design-tokens`,
-`shared-component-styles`, `ui-react`, and `console` — are marked
-`"private": true` and never publish.
+The public `@zitadel/*` packages are the `fixed` group in
+[`.changeset/config.json`](config.json). Other workspaces do not publish, and
+`AGENTS.md` files under publishable roots do not need a changeset on their own.
 
 ## When a change needs a changeset
 
@@ -52,9 +42,9 @@ change is *exclusively* one of:
 - a refactor with no behavior change
 
 This is why a shipped Go server change still needs a changeset even when it lives
-in an implementation path rather than a published package directory: list
-`@zitadel/server` so the change gets a line in the generated changelog and the
-`v<version>` release notes. (The decision table below lists the concrete paths.)
+under an implementation path like `internal/` or `cmd/` rather than a published
+package directory: list `@zitadel/server` so the change gets a line in the
+generated changelog and the `v<version>` release notes.
 
 The public packages are one Changesets **fixed** group, so every package version
 bumps together from any changeset — the `@zitadel/server` entry is not what makes
@@ -65,7 +55,7 @@ the server ship or version, it is what gives the change a release-note line. Pic
 
 | If the PR… | Add `.changeset/*.md`? | **Release notes / changeset** section |
 | --- | --- | --- |
-| Changes shipped product behavior — any path, including Go under `internal/`, `cmd/`, `api/openapi/`, or migrations | **Yes** — real changeset | Name the file and summarize the release note; list `@zitadel/server` for server changes |
+| Changes shipped product behavior (any path) | **Yes** — real changeset | Name the file and summarize the release note; list `@zitadel/server` for server changes |
 | Is *exclusively* tests, generated output, docs, CI, or a no-op refactor (see [When a change needs a changeset](#when-a-change-needs-a-changeset)) | **No** | `No changeset required — no shipped behavior changed.` |
 | Changes a publishable path but nothing should ship (rare — e.g. a package-internal test) | **Empty changeset** | Explain why the path changed but nothing ships |
 
