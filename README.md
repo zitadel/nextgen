@@ -159,7 +159,7 @@ immutable container version tags from the fixed `@zitadel/server` version and
 creates or updates the matching draft GitHub Release with generated artifact and
 package facts; stable releases may also move `ghcr.io/zitadel/nextgen:latest`.
 
-### Release notes & npm packages (`changesets`)
+### Release intent & publishing (`changesets`)
 
 Add a changeset for any change that ships in the product release; the
 [decision table](.changeset/README.md#decision-table) covers when and which
