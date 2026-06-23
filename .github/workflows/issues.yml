@@ -57,4 +57,4 @@ jobs:
         if: ${{ github.event_name == 'pull_request_target' && github.actor != 'dependabot[bot]' && steps.checkUserMember.outputs.is_staff != 'true' }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: gh pr edit "${{ github.event.pull_request.number }}" --add-label os-contribution
+        run: gh pr edit "${{ github.event.pull_request.html_url }}" --add-label os-contribution
