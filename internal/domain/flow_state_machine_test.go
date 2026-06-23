@@ -59,11 +59,11 @@ func (f *fakeUserRepo) Create(_ context.Context, _ database.QueryExecutor, user 
 
 // fakeUserPasswordRepo records the password rows create_user persists.
 type fakeUserPasswordRepo struct {
-	created []*domain.CreateUserPassword
+	set []*domain.SetUserPassword
 }
 
-func (f *fakeUserPasswordRepo) Create(_ context.Context, _ database.QueryExecutor, pw *domain.CreateUserPassword) error {
-	f.created = append(f.created, pw)
+func (f *fakeUserPasswordRepo) Set(_ context.Context, _ database.QueryExecutor, pw *domain.SetUserPassword) error {
+	f.set = append(f.set, pw)
 	return nil
 }
 
@@ -322,8 +322,8 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 	wantUserID := "user_01TEST"
 	assert.Equal(t, wantUserID, w.users.created[0].ID)
 
-	require.Len(t, w.pws.created, 1)
-	assert.Equal(t, "hashed:correct-horse-battery-staple", w.pws.created[0].EncodedHash)
+	require.Len(t, w.pws.set, 1)
+	assert.Equal(t, "hashed:correct-horse-battery-staple", w.pws.set[0].EncodedHash)
 
 	// create_user pins the user ID and registers them on the attempt so the
 	// terminal step can issue a handoff token and auto-sign-in the new user.

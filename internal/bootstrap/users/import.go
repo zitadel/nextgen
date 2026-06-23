@@ -90,13 +90,13 @@ func importFile(
 		return fmt.Errorf("create user: %w", err)
 	}
 
-	if err := passwordRepo.Create(ctx, pool, &domain.CreateUserPassword{
+	if err := passwordRepo.Set(ctx, pool, &domain.SetUserPassword{
 		ProjectID:      doc.Header.ProjectID,
 		UserID:         doc.Header.ID,
 		EncodedHash:    pw.EncodedHash,
 		ChangeRequired: pw.ChangeRequired,
 	}); err != nil {
-		return fmt.Errorf("create password: %w", err)
+		return fmt.Errorf("set password: %w", err)
 	}
 
 	slog.Info("bootstrap user: loaded user", slog.String("path", path), slog.String("id", doc.Header.ID))
