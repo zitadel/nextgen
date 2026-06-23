@@ -10,7 +10,7 @@ ALTER TABLE zitadel_nextgen.users
 
 UPDATE zitadel_nextgen.users
 SET lifecycle_owner_team_id = team_id
-WHERE team_id IS NOT NULL;
+WHERE team_id IS NOT NULL AND team_id <> '';
 
 CREATE TABLE zitadel_nextgen.team_memberships (
     project_id  TEXT COLLATE "C" NOT NULL,
@@ -33,7 +33,7 @@ CREATE TABLE zitadel_nextgen.team_memberships (
 INSERT INTO zitadel_nextgen.team_memberships (project_id, team_id, user_id, status)
 SELECT project_id, team_id, id, 'active'
 FROM zitadel_nextgen.users
-WHERE team_id IS NOT NULL;
+WHERE team_id IS NOT NULL AND team_id <> '';
 
 ALTER TABLE zitadel_nextgen.users
     DROP CONSTRAINT IF EXISTS users_project_id_team_id_fkey;
