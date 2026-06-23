@@ -132,6 +132,7 @@ func combinedPasswordFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 	createUser := api.FlowDefinitionStepOnSuccessCreateUser
 	return api.FlowDefinition{
 		Name:       "combined-password",
+		Status:     "active",
 		UserSchema: userSchemaURL,
 		Purposes: api.FlowDefinitionPurposes{
 			"login":    "identifier",

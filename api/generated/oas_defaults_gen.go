@@ -30,14 +30,6 @@ func (s *Field) setDefaults() {
 func (s *FlowDefinition) setDefaults() {
 	{
 		val := FlowDefinitionStatus("active")
-		s.Status.SetTo(val)
-	}
-}
-
-// setDefaults set default value of fields.
-func (s *FlowDefinitionDetailResponse) setDefaults() {
-	{
-		val := FlowDefinitionStatus("active")
 		s.Status = val
 	}
 }

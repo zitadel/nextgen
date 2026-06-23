@@ -46,6 +46,11 @@ func DefaultLoginFlowDefinitions(serverURL string, projectID string, userSchemaU
 			return nil, err
 		}
 
+		status, err := domain.FlowDefinitionStatusString(string(req.FlowDefinition.GetStatus()))
+		if err != nil {
+			return nil, domain.ErrFlowDefinitionInvalid("invalid status", err)
+		}
+
 		defs[i], err = domain.NewFlowDefinition(
 			"",
 			projectID,
@@ -58,7 +63,7 @@ func DefaultLoginFlowDefinitions(serverURL string, projectID string, userSchemaU
 				TeamIDs: req.FlowDefinition.GetAudience().Value.TeamIds,
 			},
 			steps,
-			domain.FlowDefinitionStatusActive,
+			status,
 		)
 	}
 

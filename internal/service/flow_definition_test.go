@@ -121,6 +121,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				req: service.FlowDefinitionRequest{
 					ProjectID:     "project1",
 					Name:          "login",
+					Status:        "Active",
 					SchemaVersion: "1.0.0",
 					FlowSchemaURI: "",
 					UserSchema:    "https://tenant.com/schemas/my-user.json",
@@ -228,6 +229,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				req: service.FlowDefinitionRequest{
 					ProjectID:     "project1",
 					Name:          "some-flow",
+					Status:        "active",
 					SchemaVersion: "1.0.0",
 					FlowSchemaURI: "",
 					UserSchema:    "https://tenant.com/schemas/my-user.json",
@@ -330,6 +332,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				req: service.FlowDefinitionRequest{
 					ProjectID:     "project1",
 					Name:          "login",
+					Status:        "active",
 					SchemaVersion: "1.0.0",
 					FlowSchemaURI: "",
 					UserSchema:    "https://tenant.com/schemas/my-user.json",
@@ -431,6 +434,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				req: service.FlowDefinitionRequest{
 					ProjectID:     "project1",
 					Name:          "some-flow",
+					Status:        "active",
 					SchemaVersion: "1.0.0",
 					FlowSchemaURI: "",
 					UserSchema:    "https://tenant.com/schemas/my-user.json",
@@ -497,6 +501,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				req: service.FlowDefinitionRequest{
 					ProjectID:     "project1",
 					Name:          "some-flow",
+					Status:        "active",
 					SchemaVersion: "1.0.0",
 					FlowSchemaURI: "",
 					UserSchema:    "https://tenant.com/schemas/my-user.json",
@@ -566,6 +571,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				req: service.FlowDefinitionRequest{
 					ProjectID:     "project1",
 					Name:          "login",
+					Status:        "active",
 					SchemaVersion: "1.0.0",
 					FlowSchemaURI: "",
 					UserSchema:    "https://tenant.com/schemas/my-user.json",
@@ -750,6 +756,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				req: service.FlowDefinitionRequest{
 					ProjectID:     "project1",
 					Name:          "login",
+					Status:        "active",
 					SchemaVersion: "1.0.0",
 					FlowSchemaURI: "",
 					UserSchema:    "https://tenant.com/schemas/my-user.json",
@@ -1012,6 +1019,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 				FlowDefinitionID: "flowdef_123",
 				ProjectID:        "project1",
 				Name:             "login",
+				Status:           "active",
 				SchemaVersion:    "1.0.0",
 				UserSchema:       "https://tenant.com/schemas/my-user.json",
 				Purposes:         map[string]string{"not-a-purpose": "step_1"},
@@ -1052,7 +1060,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 			wantErr: domain.ErrFlowDefinitionInvalid("validation failed", assert.AnError),
 		},
 		{
-			name: "missing status in update request retains the current status",
+			name: "missing status in update request returns an error",
 			fields: fields{
 				db: stubPool(),
 				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
@@ -1068,10 +1076,6 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 						GetFlowDefinition(gomock.Any(), gomock.Any(), "project1", "flowdef_123").
 						Times(1).
 						Return(&domain.FlowDefinition{ID: "flowdef_123", ProjectID: "project1"}, nil)
-					repo.EXPECT().
-						UpdateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any()).
-						Times(1).
-						Return(nil)
 					return repo
 				},
 			},
@@ -1079,23 +1083,12 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 				FlowDefinitionID: "flowdef_123",
 				ProjectID:        "project1",
 				Name:             "login",
-				// Status missing
-				SchemaVersion: "1.0.0",
-				UserSchema:    "https://tenant.com/schemas/my-user.json",
-				Purposes:      map[string]string{"login": "step_1"},
-				Steps:         []domain.FlowDefinitionStep{{Name: "step_1"}},
+				SchemaVersion:    "1.0.0",
+				UserSchema:       "https://tenant.com/schemas/my-user.json",
+				Purposes:         map[string]string{"login": "step_1"},
+				Steps:            []domain.FlowDefinitionStep{{Name: "step_1"}},
 			}},
-			want: &domain.FlowDefinition{
-				ID:            "flowdef_123",
-				ProjectID:     "project1",
-				Name:          "login",
-				SchemaVersion: "1.0.0",
-				Status:        domain.FlowDefinitionStatusDraft, // retain old status
-				UserSchema:    "https://tenant.com/schemas/my-user.json",
-				Purposes: map[domain.FlowDefinitionPurpose]string{
-					domain.FlowDefinitionPurposeLogin: "step_1",
-				},
-			},
+			wantErr: domain.ErrFlowDefinitionInvalid("invalid status: \"\"", nil),
 		},
 		{
 			name: "deactivate fails - only self is active for purpose",
