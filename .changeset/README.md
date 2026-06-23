@@ -1,8 +1,13 @@
 # Changesets
 
 This directory holds [changesets](https://github.com/changesets/changesets) for
-the npm-published packages in this monorepo. For "do I need a changeset on this
-PR?", see [Publishable npm packages](#publishable-npm-packages) and the
+this monorepo. A changeset records the **per-PR release intent** that feeds the
+generated changelog and the `v<version>` GitHub Release notes; it also drives npm
+package versions and publishing.
+
+This file is the single source of truth for "do I need a changeset on this PR?" —
+other docs link here instead of restating the rules. Start with
+[When a change needs a changeset](#when-a-change-needs-a-changeset) and the
 [Decision table](#decision-table).
 
 ## PR workflow and visibility
@@ -18,50 +23,52 @@ visibility only; they are not a blocking release-policy gate.
 
 ## Publishable npm packages
 
-**Publishable npm packages** are the public `@zitadel/*` packages that ship
-to npm:
+The public `@zitadel/*` packages that ship to npm live under:
 
 - `apps/cli/` — `@zitadel/cli`
-- `apps/server/` — `@zitadel/server`
-- `apps/server-linux-x64/` — `@zitadel/server-linux-x64`
-- `apps/server-linux-arm64/` — `@zitadel/server-linux-arm64`
-- `apps/server-darwin-x64/` — `@zitadel/server-darwin-x64`
-- `apps/server-darwin-arm64/` — `@zitadel/server-darwin-arm64`
-- `apps/server-win32-x64/` — `@zitadel/server-win32-x64`
-- `packages/api/` — `@zitadel/api`
-- `packages/components/` — `@zitadel/components`
-- `packages/sdk-core/` — `@zitadel/sdk-core`
-- `packages/sdk-next/` — `@zitadel/sdk-next`
-- `packages/sdk-nuxt/` — `@zitadel/sdk-nuxt`
-- `packages/sdk-react/` — `@zitadel/sdk-react`
-- `packages/sdk-vue/` — `@zitadel/sdk-vue`
-- `packages/sdk-angular/` — `@zitadel/sdk-angular`
+- `apps/server*/` — `@zitadel/server` and the `@zitadel/server-*` platform binaries
+- `packages/api/`, `packages/components/`, and `packages/sdk-*/` — the API client,
+  web components, and framework SDKs
 
-`AGENTS.md` files under those roots do not require a changeset on their own.
+The [`fixed` array in `.changeset/config.json`](config.json) is the source of
+truth for exact group membership; if this prose and the config drift, the config
+wins. `AGENTS.md` files under those roots do not require a changeset on their own.
+Private workspaces — demos, `api-mock`, `design-tokens`,
+`shared-component-styles`, `ui-react`, `lint`, and `console` — are marked
+`"private": true` and never publish.
 
-Everything else — `internal/`, `docs/`, `.github/`, `apps/console/`,
-`packages/api-mock/`, demos, and other private workspaces — does **not** require
-any changeset file. Other workspaces such as
-`@zitadel/api-mock`, `@zitadel/design-tokens`, `@zitadel/shared-component-styles`,
-`@zitadel/ui-react`, and `@zitadel/lint` are marked `"private": true` and are
-never published.
+## When a change needs a changeset
 
-## User-visible changes
+Release intent is **product-level, not path-level**. Assume a change needs a
+changeset if it changes what the shipped product does. Skip it **only** when the
+change is *exclusively* one of:
 
-**User-visible** means npm consumers would notice: exported APIs/types, CLI
-command surface or JSON contract, published component behavior, or install/setup
-docs shipped in the package. Internal refactors, tests-only edits, and
-contributor-only files are not user-visible unless they change what publishes.
+- test files (`*_test.go`, `*.spec.ts`, `*.browser.spec.ts`)
+- generated output (`api/generated/**`, `dist/**`, mocks)
+- comments or contributor docs (`docs/`, `AGENTS.md`, READMEs)
+- CI / build wiring (`.github/`, `moon.yml`, `.changeset/` itself)
+- a refactor with no behavior change
+
+This is why a Go change under `internal/`, `cmd/`, `api/openapi/`, or a migration
+still needs a changeset when it changes shipped server behavior: list
+`@zitadel/server` so the change gets a line in the generated changelog and the
+`v<version>` release notes.
+
+The public packages are one Changesets **fixed** group, so every package version
+bumps together from any changeset — the `@zitadel/server` entry is not what makes
+the server ship or version, it is what gives the change a release-note line. Pick
+`patch` (fixes), `minor` (features), or `major` (breaking).
 
 ## Decision table
 
-Follow in order before opening a PR:
-
 | If the PR… | Add `.changeset/*.md`? | **Release notes / changeset** section |
 | --- | --- | --- |
-| Does **not** modify any publishable path above | **No** | `No changeset required — no public npm package files changed.` |
-| Modifies publishable paths **and** has user-visible npm impact | **Yes** — real changeset | Name the file and summarize the consumer-facing note |
-| Modifies publishable paths only for non-shipping reasons (e.g. package-internal test) | **Rare:** empty changeset | Explain why the path changed but nothing ships |
+| Changes shipped product behavior — any path, including Go under `internal/`, `cmd/`, `api/openapi/`, or migrations | **Yes** — real changeset | Name the file and summarize the release note; list `@zitadel/server` for server changes |
+| Is *exclusively* tests, generated output, docs, CI, or a no-op refactor (see [When a change needs a changeset](#when-a-change-needs-a-changeset)) | **No** | `No changeset required — no shipped behavior changed.` |
+
+**Rare:** a publishable path changed but nothing should ship (e.g. a
+package-internal test) → empty changeset; explain why the path changed but
+nothing ships.
 
 ## How to add a changeset
 
@@ -86,28 +93,27 @@ interactive prompt. Create `.changeset/<short-slug>.md`:
 One-line, user-facing summary of the change.
 ```
 
-List only public package names (`@zitadel/cli`, `@zitadel/server`,
-`@zitadel/server-*`, `@zitadel/api`, `@zitadel/components`,
-`@zitadel/sdk-core`, `@zitadel/sdk-next`, `@zitadel/sdk-nuxt`,
-`@zitadel/sdk-react`, `@zitadel/sdk-vue`, `@zitadel/sdk-angular`). Pick `patch`
-(fixes), `minor` (features), or `major` (breaking). The repo is in `alpha`
-prerelease mode (`.changeset/pre.json`) and public packages are in one fixed
-group, so versions cut as one `X.Y.Z-alpha.N` train automatically — see
+List only [public package names](#publishable-npm-packages); bump-type and
+when-to-add are covered in
+[When a change needs a changeset](#when-a-change-needs-a-changeset). The repo is
+in `alpha` prerelease mode (`.changeset/pre.json`), so versions cut as one
+`X.Y.Z-alpha.N` train automatically — see
 [Alpha prerelease mode](#alpha-prerelease-mode).
 
 ## Empty changeset
 
-**Empty changeset** (rare) — only when publishable paths changed but nothing
-should ship: `corepack pnpm changeset --empty`. Do **not** use this for Go
-implementation-only paths (`internal/`, `cmd/`, `api/openapi/`), root `docs/`,
-CI-only, or other PRs that never touch the publishable paths above.
+Use an empty changeset only when a publishable path changed but nothing should
+ship: `corepack pnpm changeset --empty`. It is not a substitute for release
+intent — for Go implementation paths choose **no changeset** (no shipped
+behavior) or a **real `@zitadel/server` changeset** (shipped behavior) instead.
 
 ## Anti-patterns
 
-- Do **not** add an empty changeset on PRs that only touch non-publishable
-  paths (for example `internal/`, `docs/`, `.github/`, storage migrations).
-- Do **not** skip a changeset when changing published CLI, server runtime, SDK,
-  or components behavior under the publishable paths above.
+- Do **not** add an empty changeset on PRs that only touch non-publishable paths
+  with no shipped behavior change (for example `docs/`, `.github/`, tests).
+- Do **not** skip a changeset when changing shipped CLI, server, SDK, API, or
+  component behavior — including server changes implemented under `internal/`,
+  `cmd/`, `api/openapi/`, or migrations.
 
 ## Verify locally
 
@@ -117,12 +123,11 @@ Before handoff:
 corepack pnpm exec changeset status --since origin/main
 ```
 
-Use the output to confirm that Changesets sees the intended package bumps, then
-state the correct PR outcome from the decision table above.
-
-The public packages above are in one Changesets fixed group while the repo is
-in alpha, so a version PR moves the CLI, SDKs, API packages, and server npm
-runtime together.
+Confirm Changesets sees the intended bumps, then state the
+[decision-table](#decision-table) outcome in the PR. This command reads npm
+package paths only — it cannot infer server impact from Go paths, so decide that
+manually and add an `@zitadel/server` changeset when a server change belongs in
+the release notes.
 
 ## Alpha prerelease mode
 

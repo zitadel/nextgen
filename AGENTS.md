@@ -242,27 +242,21 @@ For customer-local runtime workflows, agents should prefer
   handoff. Use sections for `Summary`, `Validation`,
   `Release notes / changeset`, and `Notes`. List the exact validation commands
   run; if validation was not run, say so explicitly. In **Release notes /
-  changeset**, state one of the three outcomes from the
+  changeset**, state the outcome from the
   [decision table](.changeset/README.md#decision-table) — do not add a
   `.changeset/*.md` file unless that table says you should.
 
 ### Changesets
 
-When a PR touches [publishable npm packages](.changeset/README.md#publishable-npm-packages)
-(the public `@zitadel/*` packages under `apps/cli/`, `apps/server*`, and
-selected `packages/*` paths), follow the
-[decision table](.changeset/README.md#decision-table) and workflow in
-[`.changeset/README.md`](.changeset/README.md). Verify locally with
-`corepack pnpm exec changeset status --since origin/main` when you need to
-inspect planned package bumps.
-
-The public packages are `@zitadel/cli`, `@zitadel/server`, the
-`@zitadel/server-*` platform packages, `@zitadel/api`, `@zitadel/components`,
-`@zitadel/sdk-core`, `@zitadel/sdk-next`, `@zitadel/sdk-nuxt`,
-`@zitadel/sdk-react`, `@zitadel/sdk-vue`, and `@zitadel/sdk-angular`. These
-packages are in one Changesets fixed group for alpha product releases. Moon
-still creates or updates the draft GitHub Release shell for `v<version>` from
-the fixed package version; maintainers publish product notes manually.
+Whether a PR needs a changeset is decided by shipped behavior, not by path — Go
+changes under `internal/`, `cmd/`, `api/openapi/`, or migrations can need a real
+`@zitadel/server` changeset. The
+[decision table](.changeset/README.md#decision-table),
+[publishable packages](.changeset/README.md#publishable-npm-packages), and the
+negative cases all live in [`.changeset/README.md`](.changeset/README.md); follow
+that and do not restate the package list here. Agents and automation write the
+`.changeset/*.md` file directly rather than using the interactive prompt. Verify
+locally with `corepack pnpm exec changeset status --since origin/main`.
 
 - npm packages under `apps/cli/` and `packages/*` must stay MIT-licensed.
 - Server npm packages under `apps/server*` and console application paths are
