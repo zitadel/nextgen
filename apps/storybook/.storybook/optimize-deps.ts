@@ -9,6 +9,14 @@
  * third-party deps are pre-bundled instead — otherwise the Vitest browser run
  * discovers them behind the excluded packages mid-test and reloads, which
  * loses the current suite and fails the import.
+ *
+ * Every `optimizeDepsInclude` entry must be resolvable from this app, so the
+ * transitive deps of the excluded workspace packages (`dompurify`, `liquidjs`,
+ * `lucide`, `lucide-react`, `xstate`, `@faker-js/faker`) are declared as
+ * devDependencies in `apps/storybook/package.json`. Under pnpm's strict
+ * node_modules they are otherwise unresolvable from here on a clean install, so
+ * Vite cannot pre-bundle them and falls back to the mid-test reload above —
+ * which passes on a warm local cache but fails every cold CI run.
  */
 export const optimizeDepsExclude = [
   "@zitadel/components",

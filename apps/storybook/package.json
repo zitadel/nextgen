@@ -23,6 +23,7 @@
     "react-dom": "catalog:"
   },
   "devDependencies": {
+    "@faker-js/faker": "catalog:",
     "@storybook/addon-a11y": "catalog:",
     "@storybook/addon-vitest": "catalog:",
     "@storybook/web-components-vite": "catalog:",
@@ -30,11 +31,16 @@
     "@types/react-dom": "catalog:",
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
+    "dompurify": "catalog:",
+    "liquidjs": "catalog:",
+    "lucide": "catalog:",
+    "lucide-react": "catalog:",
     "msw-storybook-addon": "catalog:",
     "playwright": "catalog:",
     "storybook": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "xstate": "catalog:"
   }
 }
