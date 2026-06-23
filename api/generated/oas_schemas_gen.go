@@ -3419,9 +3419,8 @@ func (s *FlowDefinitionStepTransitionsItemAction) UnmarshalText(data []byte) err
 	}
 }
 
-// Completely replaces the existing flow definition.
-// The status of the flow definition can also be updated by setting the `status` attribute in the
-// flow definition.
+// Replaces the existing flow definition.
+// If `flow_definition.status` is omitted, the current status is preserved.
 // Ref: #
 type FlowDefinitionUpdateRequest struct {
 	SchemaURI      OptSchemaURI   `json:"schema_uri"`
@@ -10652,11 +10651,23 @@ func (s *SetUserPasswordRequest) SetIsChangeRequired(val OptBool) {
 }
 
 // Configuration for a user-invokable action on a step. The `name` is sent
-// back in the submit request as `action`.
+// back in the submit request as `action`; the engine resolves the action's
+// declared `kind` to decide how to handle the submission.
 // Ref: #
 type StepAction struct {
 	// Action identifier. Sent back in the submit request as `action`.
 	Name string `json:"name"`
+	// Classifies how the engine handles this action:
+	// - `submit`: collect the step's fields and run validate/dispatch/on_success.
+	// - `passkey`: issue a WebAuthn assertion challenge; the matching transition
+	// fires once the returned assertion verifies.
+	// - `passkey_register`: issue a WebAuthn registration challenge; the matching
+	// transition fires once the returned attestation verifies.
+	// - `navigate`: route through the transition without running the input
+	// pipeline. Used for pure-routing actions declared in the flow definition.
+	// - `back`: return the user to the previous step. Surfaced by the engine
+	// when going back is available.
+	Kind StepActionKind `json:"kind"`
 	// Marks this as the default/primary action. The runtime template uses
 	// this hint to choose visual emphasis. At most one action per step
 	// should be primary; this is not enforced here.
@@ -10671,6 +10682,11 @@ type StepAction struct {
 // GetName returns the value of Name.
 func (s *StepAction) GetName() string {
 	return s.Name
+}
+
+// GetKind returns the value of Kind.
+func (s *StepAction) GetKind() StepActionKind {
+	return s.Kind
 }
 
 // GetPrimary returns the value of Primary.
@@ -10688,6 +10704,11 @@ func (s *StepAction) SetName(val string) {
 	s.Name = val
 }
 
+// SetKind sets the value of Kind.
+func (s *StepAction) SetKind(val StepActionKind) {
+	s.Kind = val
+}
+
 // SetPrimary sets the value of Primary.
 func (s *StepAction) SetPrimary(val OptBool) {
 	s.Primary = val
@@ -10696,6 +10717,78 @@ func (s *StepAction) SetPrimary(val OptBool) {
 // SetTextKey sets the value of TextKey.
 func (s *StepAction) SetTextKey(val OptString) {
 	s.TextKey = val
+}
+
+// Classifies how the engine handles this action:
+// - `submit`: collect the step's fields and run validate/dispatch/on_success.
+// - `passkey`: issue a WebAuthn assertion challenge; the matching transition
+// fires once the returned assertion verifies.
+// - `passkey_register`: issue a WebAuthn registration challenge; the matching
+// transition fires once the returned attestation verifies.
+// - `navigate`: route through the transition without running the input
+// pipeline. Used for pure-routing actions declared in the flow definition.
+// - `back`: return the user to the previous step. Surfaced by the engine
+// when going back is available.
+type StepActionKind string
+
+const (
+	StepActionKindSubmit          StepActionKind = "submit"
+	StepActionKindPasskey         StepActionKind = "passkey"
+	StepActionKindPasskeyRegister StepActionKind = "passkey_register"
+	StepActionKindNavigate        StepActionKind = "navigate"
+	StepActionKindBack            StepActionKind = "back"
+)
+
+// AllValues returns all StepActionKind values.
+func (StepActionKind) AllValues() []StepActionKind {
+	return []StepActionKind{
+		StepActionKindSubmit,
+		StepActionKindPasskey,
+		StepActionKindPasskeyRegister,
+		StepActionKindNavigate,
+		StepActionKindBack,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s StepActionKind) MarshalText() ([]byte, error) {
+	switch s {
+	case StepActionKindSubmit:
+		return []byte(s), nil
+	case StepActionKindPasskey:
+		return []byte(s), nil
+	case StepActionKindPasskeyRegister:
+		return []byte(s), nil
+	case StepActionKindNavigate:
+		return []byte(s), nil
+	case StepActionKindBack:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *StepActionKind) UnmarshalText(data []byte) error {
+	switch StepActionKind(data) {
+	case StepActionKindSubmit:
+		*s = StepActionKindSubmit
+		return nil
+	case StepActionKindPasskey:
+		*s = StepActionKindPasskey
+		return nil
+	case StepActionKindPasskeyRegister:
+		*s = StepActionKindPasskeyRegister
+		return nil
+	case StepActionKindNavigate:
+		*s = StepActionKindNavigate
+		return nil
+	case StepActionKindBack:
+		*s = StepActionKindBack
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Step-level localization keys. Resolved client-side via the `| t` LiquidJS filter.
