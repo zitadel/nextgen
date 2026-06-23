@@ -17,8 +17,7 @@
     }
   },
   "required": [
-    "email",
-    "password"
+    "email"
   ],
   "properties": {
     "email": {
@@ -26,12 +25,6 @@
       "format": "email",
       "x-unique": "project",
       "description": "The user's email address."
-    },
-    "password": {
-      "type": "string",
-      "minLength": 8,
-      "description": "The user's password.",
-      "x-password": true
     },
     "givenName": {
       "type": "string",

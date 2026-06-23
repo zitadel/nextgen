@@ -327,9 +327,7 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 
 	// create_user pins the user ID and registers them on the attempt so the
 	// terminal step can issue a handoff token and auto-sign-in the new user.
-	gotUserID, pinned := result.State.CollectedData[domain.FlowCollectedUserIDKey]
-	assert.True(t, pinned, "create_user must pin _user_id")
-	assert.Equal(t, wantUserID, gotUserID)
+	assert.Equal(t, wantUserID, result.State.CollectedData.UserID)
 	require.Len(t, w.attempts.registerCreatedCalls, 1)
 	assert.Equal(t, wantUserID, w.attempts.registerCreatedCalls[0].UserID)
 	require.Len(t, w.attempts.handoffCalls, 1)
@@ -378,7 +376,7 @@ func TestFlowStateMachine_Process_LoginHappyPath(t *testing.T) {
 	require.Len(t, w.attempts.passwordCalls, 1)
 	assert.Equal(t, "att_01TEST", w.attempts.passwordCalls[0].AttemptID)
 
-	assert.Equal(t, "user_alice", result.State.CollectedData[domain.FlowCollectedUserIDKey])
+	assert.Equal(t, "user_alice", result.State.CollectedData.UserID)
 
 	require.Len(t, w.attempts.handoffCalls, 1)
 	assert.Equal(t, "att_01TEST", w.attempts.handoffCalls[0].AttemptID)
@@ -608,7 +606,7 @@ func TestFlowStateMachine_Process_PasskeyIssueThenVerify(t *testing.T) {
 	assert.Equal(t, []byte(`{"id":"x"}`), w.attempts.passkeyCalls[0].Assertion)
 	require.NotNil(t, verified.Step.Complete)
 	assert.Equal(t, "handoff_01TEST", verified.HandoffToken)
-	assert.Equal(t, "user_alice", verified.State.CollectedData[domain.FlowCollectedUserIDKey])
+	assert.Equal(t, "user_alice", verified.State.CollectedData.UserID)
 }
 
 func TestFlowStateMachine_Process_PasskeyProofRejectedKeepsStep(t *testing.T) {
@@ -774,7 +772,7 @@ func TestFlowStateMachine_Process_PasskeyAfterRejectionRebindsIdentifier(t *test
 	require.NotNil(t, issued1.State.PendingChallenge)
 	require.Len(t, w.attempts.identifyCalls, 1, "attempt 1 must identify user1")
 	assert.Equal(t, "user1@example.com", w.attempts.identifyCalls[0].Value)
-	assert.Equal(t, "user_one", issued1.State.CollectedData[domain.FlowCollectedUserIDKey])
+	assert.Equal(t, "user_one", issued1.State.CollectedData.UserID)
 
 	// Attempt 1, verify leg: the assertion that comes back doesn't match any
 	// credential the attempt is constrained to → server rejects.
@@ -809,7 +807,7 @@ func TestFlowStateMachine_Process_PasskeyAfterRejectionRebindsIdentifier(t *test
 		"attempt 2 must re-run SubmitIdentifier for the new email; the stored _user_id from attempt 1 must not short-circuit it")
 	assert.Equal(t, "user2@example.com", w.attempts.identifyCalls[1].Value,
 		"attempt 2 must dispatch the user2 identifier")
-	assert.Equal(t, "user_two", issued2.State.CollectedData[domain.FlowCollectedUserIDKey],
+	assert.Equal(t, "user_two", issued2.State.CollectedData.UserID,
 		"_user_id must be rebound to user_two so the new passkey challenge is scoped to their credentials")
 }
 
@@ -849,7 +847,7 @@ func TestFlowStateMachine_Process_PasskeyResubmitSameIdentifierKeepsPendingChall
 	require.NoError(t, err)
 	assert.Len(t, w.attempts.identifyCalls, 2, "every dispatch calls SubmitIdentifier")
 	require.NotNil(t, second.State.PendingChallenge, "same user resolved — ceremony survives")
-	assert.Equal(t, "user_one", second.State.CollectedData[domain.FlowCollectedUserIDKey])
+	assert.Equal(t, "user_one", second.State.CollectedData.UserID)
 }
 
 // ---- CurrentPurpose + outcome flip ----
@@ -1119,7 +1117,7 @@ func TestFlowStateMachine_FlipTable_LoginTypoThenCorrectEmail_StillSignsIn(t *te
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "done", result.State.CurrentStep)
-	assert.Equal(t, "user_alice", result.State.CollectedData[domain.FlowCollectedUserIDKey])
+	assert.Equal(t, "user_alice", result.State.CollectedData.UserID)
 	assert.NotEmpty(t, result.HandoffToken, "handoff issued for completed sign-in")
 }
 
@@ -1132,7 +1130,6 @@ func TestFlowState_JSONRoundTrip_PreservesCurrentPurpose(t *testing.T) {
 			Purpose:        domain.FlowDefinitionPurposeLogin,
 			CurrentPurpose: domain.FlowDefinitionPurposeRegister,
 			CurrentStep:    "credentials",
-			CollectedData:  map[string]any{},
 		},
 	}
 	payload, err := json.Marshal(state)
@@ -1150,7 +1147,6 @@ func TestFlowState_JSONRoundTrip_PivotPushPopPreservesCurrentPurpose(t *testing.
 		Purpose:        domain.FlowDefinitionPurposeLogin,
 		CurrentPurpose: domain.FlowDefinitionPurposeRegister,
 		CurrentStep:    "parent-step",
-		CollectedData:  map[string]any{},
 	}
 	state := domain.FlowState{
 		ID:        "flow-1",
@@ -1160,7 +1156,6 @@ func TestFlowState_JSONRoundTrip_PivotPushPopPreservesCurrentPurpose(t *testing.
 			Purpose:        domain.FlowDefinitionPurposeLogin,
 			CurrentPurpose: domain.FlowDefinitionPurposeLogin,
 			CurrentStep:    "child-step",
-			CollectedData:  map[string]any{},
 		},
 		PivotStack: []domain.FlowProgress{parent},
 	}
@@ -1522,7 +1517,7 @@ func TestFlowStateMachine_Process_PasskeyRegisterIssueThenVerify(t *testing.T) {
 	})
 	require.NoError(t, err)
 	// Pre-seed a resolved user so passkey_register can proceed.
-	start.State.CollectedData[domain.FlowCollectedUserIDKey] = "user_alice"
+	start.State.CollectedData.UserID = "user_alice"
 
 	// Issue leg: passkey_register action mints a creation challenge.
 	issued, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
@@ -1567,7 +1562,7 @@ func TestFlowStateMachine_Process_PasskeyRegisterRejectedKeepsStep(t *testing.T)
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
-	start.State.CollectedData[domain.FlowCollectedUserIDKey] = "user_alice"
+	start.State.CollectedData.UserID = "user_alice"
 
 	issued, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
 		Action:    domain.FlowActionPasskeyRegister,
@@ -1621,7 +1616,7 @@ func TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID(t *testing.T) {
 	require.Len(t, w.passkeyReg.issueCalls, 1)
 	assert.NotEmpty(t, w.passkeyReg.issueCalls[0].UserID)
 	// The generated ID should be stored in CollectedData for use in the verify phase.
-	assert.Equal(t, w.passkeyReg.issueCalls[0].UserID, issued.State.CollectedData[domain.FlowCollectedUserIDKey])
+	assert.Equal(t, w.passkeyReg.issueCalls[0].UserID, issued.State.CollectedData.UserID)
 }
 
 // TestFlowStateMachine_Start_PreservesActionOrder pins ADR 021: the rendered
