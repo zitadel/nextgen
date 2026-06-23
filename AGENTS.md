@@ -248,15 +248,11 @@ For customer-local runtime workflows, agents should prefer
 
 ### Changesets
 
-Whether a PR needs a changeset is decided by shipped behavior, not by path — Go
-changes under `internal/`, `cmd/`, `api/openapi/`, or migrations can need a real
-`@zitadel/server` changeset. The
-[decision table](.changeset/README.md#decision-table),
-[publishable packages](.changeset/README.md#publishable-npm-packages), and the
-negative cases all live in [`.changeset/README.md`](.changeset/README.md); follow
-that and do not restate the package list here. Agents and automation write the
-`.changeset/*.md` file directly rather than using the interactive prompt. Verify
-locally with `corepack pnpm exec changeset status --since origin/main`.
+The changeset decision — including when a Go-only change needs one — lives in
+[`.changeset/README.md`](.changeset/README.md); follow its
+[decision table](.changeset/README.md#decision-table). Agents write the
+`.changeset/*.md` file directly rather than using the interactive prompt, then
+verify with `corepack pnpm exec changeset status --since origin/main`.
 
 - npm packages under `apps/cli/` and `packages/*` must stay MIT-licensed.
 - Server npm packages under `apps/server*` and console application paths are

@@ -44,15 +44,17 @@ changeset if it changes what the shipped product does. Skip it **only** when the
 change is *exclusively* one of:
 
 - test files (`*_test.go`, `*.spec.ts`, `*.browser.spec.ts`)
-- generated output (`api/generated/**`, `dist/**`, mocks)
+- generated build output and test mocks (`dist/**`, generated mocks) — but
+  regenerating `api/generated/**` from an `api/openapi/**` contract change is a
+  shipped change, not a skip
 - comments or contributor docs (`docs/`, `AGENTS.md`, READMEs)
 - CI / build wiring (`.github/`, `moon.yml`, `.changeset/` itself)
 - a refactor with no behavior change
 
-This is why a Go change under `internal/`, `cmd/`, `api/openapi/`, or a migration
-still needs a changeset when it changes shipped server behavior: list
+This is why a shipped Go server change still needs a changeset even when it lives
+in an implementation path rather than a published package directory: list
 `@zitadel/server` so the change gets a line in the generated changelog and the
-`v<version>` release notes.
+`v<version>` release notes. (The decision table below lists the concrete paths.)
 
 The public packages are one Changesets **fixed** group, so every package version
 bumps together from any changeset — the `@zitadel/server` entry is not what makes
