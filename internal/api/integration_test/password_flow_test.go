@@ -343,7 +343,7 @@ func passwordLoginFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 				Name:   "identifier",
 				Fields: []string{"email"},
 				Actions: []api.StepAction{
-					{Name: "submit", Primary: api.NewOptBool(true)},
+					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 					"submit": api.FlowDefinitionStepTransitionsItem{Target: "password"},
@@ -353,7 +353,7 @@ func passwordLoginFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 				Name:   "password",
 				Fields: []string{"password"},
 				Actions: []api.StepAction{
-					{Name: "submit", Primary: api.NewOptBool(true)},
+					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 					"submit": api.FlowDefinitionStepTransitionsItem{Target: "done"},
@@ -380,7 +380,7 @@ func passwordRegisterFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 				Fields:    []string{"email", "password"},
 				OnSuccess: api.NewOptFlowDefinitionStepOnSuccess(createUser),
 				Actions: []api.StepAction{
-					{Name: "submit", Primary: api.NewOptBool(true)},
+					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 					"submit": api.FlowDefinitionStepTransitionsItem{Target: "done"},
@@ -406,7 +406,7 @@ func passwordLoginFlowWithNotFoundFlowDefinition(userSchemaURL url.URL) api.Flow
 				Name:   "identifier",
 				Fields: []string{"email"},
 				Actions: []api.StepAction{
-					{Name: "submit", Primary: api.NewOptBool(true)},
+					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 					"submit":         api.FlowDefinitionStepTransitionsItem{Target: "password"},
@@ -417,7 +417,7 @@ func passwordLoginFlowWithNotFoundFlowDefinition(userSchemaURL url.URL) api.Flow
 				Name:   "password",
 				Fields: []string{"password"},
 				Actions: []api.StepAction{
-					{Name: "submit", Primary: api.NewOptBool(true)},
+					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 					"submit": api.FlowDefinitionStepTransitionsItem{Target: "done"},

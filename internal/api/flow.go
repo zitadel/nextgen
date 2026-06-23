@@ -419,6 +419,7 @@ func toFlowStepActions(actions []domain.FlowAction) []api.StepAction {
 	for i, a := range actions {
 		out[i] = api.StepAction{
 			Name:    a.Name,
+			Kind:    api.StepActionKind(a.Kind.String()),
 			TextKey: api.NewOptString(a.TextKey),
 			Primary: api.NewOptBool(a.Primary),
 		}
@@ -527,6 +528,7 @@ var (
 	codeMissingFlowDefinitionID       = domain.ErrMissingFlowDefinitionID().Code
 	codeMissingProjectID              = domain.ErrMissingProjectID().Code
 	codeFlowDefinitionAlreadyExists   = domain.ErrFlowDefinitionAlreadyExists().Code
+	codeFlowDefinitionUpdateConflict  = domain.ErrFlowDefinitionUpdateConflict(nil).Code
 )
 
 func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
@@ -538,26 +540,31 @@ func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		codeMissingProjectID:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case codeFlowDefinitionInvalid:
-		errResp := errorResponseWithStatusCode(http.StatusBadRequest, err)
-		if err.Details != nil {
-			if details, ok := err.Details.(string); ok {
-				b, marshalErr := json.Marshal(details)
-				if marshalErr == nil {
-					errResp.Response.Details = api.OptErrorDetailsDetails{
-						Value: api.ErrorDetailsDetails{
-							"details": b,
-						},
-						Set: true,
-					}
-				}
-			}
-		}
-		return errResp
-	case codeFlowDefinitionAlreadyExists:
-		return errorResponseWithStatusCode(http.StatusConflict, err)
+		return errorResponseWithDetails(err, http.StatusBadRequest)
+	case codeFlowDefinitionAlreadyExists, codeFlowDefinitionUpdateConflict:
+		return errorResponseWithDetails(err, http.StatusConflict)
 	default:
 		return internalErrorResponse(err)
 	}
+}
+
+func errorResponseWithDetails(err domain.Error, statusCode int) *api.ErrorDetailsStatusCode {
+	errResp := errorResponseWithStatusCode(statusCode, err)
+	if err.Details == nil {
+		return errResp
+	}
+	if details, ok := err.Details.(string); ok {
+		b, marshalErr := json.Marshal(details)
+		if marshalErr == nil {
+			errResp.Response.Details = api.OptErrorDetailsDetails{
+				Value: api.ErrorDetailsDetails{
+					"details": b,
+				},
+				Set: true,
+			}
+		}
+	}
+	return errResp
 }
 
 func parseURI(s string) (url.URL, error) {
