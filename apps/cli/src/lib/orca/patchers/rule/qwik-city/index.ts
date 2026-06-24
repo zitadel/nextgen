@@ -13,16 +13,23 @@ import {
 } from "./templates";
 
 const SDK_DEPENDENCY = "@zitadel/sdk-qwik-city";
+/**
+ * The idiomatic Qwik component library that ships the `<ZitadelLogin>` /
+ * `<ZitadelLogout>` Qwik components the routes render. The server SDK above is
+ * plumbing only; the widget comes from here, so a Qwik City app gets the native
+ * Qwik component (typed props, callback events) rather than the bare element.
+ */
+const COMPONENT_DEPENDENCY = "@zitadel/sdk-qwik";
 
 /**
  * Rule-based patcher for a Qwik City app. Like Next.js and SvelteKit, Qwik City
  * proxies the backend and verifies the session through a server entrypoint —
  * here the `@zitadel/sdk-qwik-city` `onRequest` plugin in
  * `src/routes/plugin@nextgen.ts`. Contributes the landing/login/register/profile
- * file-based routes (the raw `<zitadel-login>`/`<zitadel-logout>` elements
- * registered client-side), the public project-id env var, and the SDK dep. No
- * config edit is needed — the plugin is a plain route file, so (like Next)
- * every managed file carries the marker.
+ * file-based routes (the idiomatic `<ZitadelLogin>`/`<ZitadelLogout>` Qwik
+ * components from `@zitadel/sdk-qwik`), the public project-id env var, and both
+ * deps. No config edit is needed — the plugin is a plain route file, so (like
+ * Next) every managed file carries the marker.
  */
 export class QwikCityPatcher extends AbstractRulePatcher {
   canPatch(framework: string): boolean {
@@ -54,6 +61,15 @@ export class QwikCityPatcher extends AbstractRulePatcher {
         version: npmDistTagForCliVersion(ctx.cliVersion),
         dev: true,
       },
+      {
+        // The component library is also a Qwik-ecosystem package whose name
+        // matches `/qwik/i`, so `errorOnDuplicatesPkgDeps` likewise forces it
+        // into `devDependencies` where Qwik bundles it into the build.
+        kind: "add-dep",
+        name: COMPONENT_DEPENDENCY,
+        version: npmDistTagForCliVersion(ctx.cliVersion),
+        dev: true,
+      },
     ];
   }
 
@@ -69,14 +85,14 @@ export class QwikCityPatcher extends AbstractRulePatcher {
   }
 
   protected routeDeps(_view: PatchView): ReadonlyArray<string> {
-    return [SDK_DEPENDENCY];
+    return [SDK_DEPENDENCY, COMPONENT_DEPENDENCY];
   }
 
   protected summary(_ctx: PatchContext): { title: string; detail: string } {
     return {
       title: "Qwik City integration",
       detail:
-        "Wrote src/routes/plugin@nextgen.ts (@zitadel/sdk-qwik-city onRequest) plus landing/login/register/profile routes.",
+        "Wrote src/routes/plugin@nextgen.ts (@zitadel/sdk-qwik-city onRequest) plus landing/login/register/profile routes using @zitadel/sdk-qwik.",
     };
   }
 }

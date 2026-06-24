@@ -44,8 +44,10 @@ describe("SolidStartPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/index.tsx")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "src/routes/login.tsx")).toContain('purpose="login"');
     expect(writeContents(plan, "src/routes/register.tsx")).toContain('purpose="register"');
-    expect(writeContents(plan, "src/routes/profile.tsx")).toContain("zitadel-logout");
+    expect(writeContents(plan, "src/routes/profile.tsx")).toContain("ZitadelLogout");
     expect(writeContents(plan, "src/routes/login.tsx")).toContain("background:#0f0f11");
+    expect(writeContents(plan, "src/routes/login.tsx")).toContain("@zitadel/sdk-solid");
+    expect(writeContents(plan, "src/routes/login.tsx")).toContain("ZitadelLogin");
   });
 
   it("seeds the public project id and edits vite.config", () => {
@@ -62,11 +64,16 @@ describe("SolidStartPatcher.plan", () => {
     expect(edit?.path).toContain("vite.config.ts");
   });
 
-  it("adds the SDK dependency at the CLI's prerelease tag", () => {
-    const dep = new SolidStartPatcher()
+  it("adds the SDK + component dependencies at the CLI's prerelease tag", () => {
+    const deps = new SolidStartPatcher()
       .plan(ctx())
-      .ops.find((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
-    expect(dep).toMatchObject({ name: "@zitadel/sdk-solid-start", version: "alpha" });
+      .ops.filter((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
+    expect(deps).toContainEqual(
+      expect.objectContaining({ name: "@zitadel/sdk-solid-start", version: "alpha" }),
+    );
+    expect(deps).toContainEqual(
+      expect.objectContaining({ name: "@zitadel/sdk-solid", version: "alpha" }),
+    );
   });
 });
 
@@ -78,7 +85,7 @@ describe("SolidStartPatcher.artifacts", () => {
     });
     expect(artifacts.markedFiles).toContain("src/middleware.ts");
     expect(artifacts.markedFiles).toContain("src/routes/login.tsx");
-    expect(artifacts.dependencies).toEqual(["@zitadel/sdk-solid-start"]);
+    expect(artifacts.dependencies).toEqual(["@zitadel/sdk-solid-start", "@zitadel/sdk-solid"]);
     expect(artifacts.configEdits).toEqual(["vite.config.*"]);
   });
 });

@@ -1233,9 +1233,6 @@ importers:
       '@zitadel/api':
         specifier: workspace:*
         version: link:../api
-      '@zitadel/components':
-        specifier: workspace:*
-        version: link:../components
       '@zitadel/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
@@ -1455,9 +1452,6 @@ importers:
       '@zitadel/api':
         specifier: workspace:*
         version: link:../api
-      '@zitadel/components':
-        specifier: workspace:*
-        version: link:../components
       '@zitadel/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core
@@ -1589,9 +1583,6 @@ importers:
       '@zitadel/api':
         specifier: workspace:*
         version: link:../api
-      '@zitadel/components':
-        specifier: workspace:*
-        version: link:../components
       '@zitadel/sdk-core':
         specifier: workspace:*
         version: link:../sdk-core

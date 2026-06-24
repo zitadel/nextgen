@@ -15,6 +15,13 @@ import {
 } from "./templates";
 
 const SDK_DEPENDENCY = "@zitadel/sdk-solid-start";
+/**
+ * The idiomatic Solid component library that ships the `<ZitadelLogin>` /
+ * `<ZitadelLogout>` Solid components the routes render. The server SDK above is
+ * plumbing only; the widget comes from here, so a SolidStart app gets the native
+ * Solid component (typed props, callback events) rather than the bare element.
+ */
+const COMPONENT_DEPENDENCY = "@zitadel/sdk-solid";
 
 const VITE_CONFIG_PATHS = configCandidates("vite.config");
 
@@ -25,9 +32,9 @@ const VITE_CONFIG_PATHS = configCandidates("vite.config");
  * registered via the `solidStart({ middleware })` plugin option in a
  * non-destructive `vite.config.*` edit (SolidStart 2 reads middleware from the
  * Vite plugin, not a top-level `app.config.ts` field). Contributes the
- * landing/login/register/profile file-based routes (the raw
- * `<zitadel-login>`/`<zitadel-logout>` elements registered client-side), the
- * public project-id env var, and the SDK dep.
+ * landing/login/register/profile file-based routes (the idiomatic
+ * `<ZitadelLogin>`/`<ZitadelLogout>` Solid components from `@zitadel/sdk-solid`),
+ * the public project-id env var, and both deps.
  */
 export class SolidStartPatcher extends AbstractRulePatcher {
   canPatch(framework: string): boolean {
@@ -58,6 +65,11 @@ export class SolidStartPatcher extends AbstractRulePatcher {
         name: SDK_DEPENDENCY,
         version: npmDistTagForCliVersion(ctx.cliVersion),
       },
+      {
+        kind: "add-dep",
+        name: COMPONENT_DEPENDENCY,
+        version: npmDistTagForCliVersion(ctx.cliVersion),
+      },
     ];
   }
 
@@ -73,7 +85,7 @@ export class SolidStartPatcher extends AbstractRulePatcher {
   }
 
   protected routeDeps(_view: PatchView): ReadonlyArray<string> {
-    return [SDK_DEPENDENCY];
+    return [SDK_DEPENDENCY, COMPONENT_DEPENDENCY];
   }
 
   protected override routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
@@ -84,7 +96,7 @@ export class SolidStartPatcher extends AbstractRulePatcher {
     return {
       title: "SolidStart integration",
       detail:
-        "Wrote src/middleware.ts (@zitadel/sdk-solid-start) plus landing/login/register/profile routes and wired it via solidStart({ middleware }) in vite.config.*.",
+        "Wrote src/middleware.ts (@zitadel/sdk-solid-start) plus landing/login/register/profile routes using @zitadel/sdk-solid components and wired the middleware via solidStart({ middleware }) in vite.config.*.",
     };
   }
 }

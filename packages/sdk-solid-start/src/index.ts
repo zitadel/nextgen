@@ -1,4 +1,3 @@
-export { ZitadelLogin, ZitadelLogout } from "@zitadel/components";
 export { createNextgenMiddleware, getAuth } from "./server.js";
 export type { SolidFetchEvent, SolidMiddlewareConfig } from "./server.js";
 export { configureZitadel, getApi, getZitadelConfig } from "@zitadel/api/config";

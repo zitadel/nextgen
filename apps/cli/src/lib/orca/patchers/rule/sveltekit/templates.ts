@@ -67,35 +67,28 @@ export function indexPageTemplate(): string {
 }
 
 /**
- * A login/register page. Registers the Lit elements + configures the SDK in
- * `onMount` (client only), then renders `<zitadel-login>` behind a `browser`
- * guard so it never runs during SSR. The public project id comes from
- * `PUBLIC_ZITADEL_PROJECT_ID` via SvelteKit's `$env/dynamic/public`.
+ * A login/register page. Renders the idiomatic `<ZitadelLogin>` Svelte component
+ * from `@zitadel/sdk-svelte` (typed props, callback events) behind a `browser`
+ * guard so the widget only mounts on the client. `configureZitadel` returns the
+ * project handle; the public project id comes from `PUBLIC_ZITADEL_PROJECT_ID`
+ * via SvelteKit's `$env/dynamic/public`.
  */
 function authPage(purpose: "login" | "register"): string {
   return `<script lang="ts">
   ${MANAGED_MARKER}
   import { browser } from "$app/environment";
-  import { onMount } from "svelte";
+  import { ZitadelLogin, configureZitadel } from "@zitadel/sdk-svelte";
   import { env } from "$env/dynamic/public";
 
-  const projectId = env.PUBLIC_ZITADEL_PROJECT_ID ?? "";
-
-  onMount(async () => {
-    const { configureZitadel } = await import("@zitadel/sdk-sveltekit/client");
-    configureZitadel({ projectId, proxyPath: "${PROXY_PATH}" });
-    await import("@zitadel/sdk-sveltekit/client");
+  const project = configureZitadel({
+    projectId: env.PUBLIC_ZITADEL_PROJECT_ID ?? "",
+    proxyPath: "${PROXY_PATH}",
   });
 </script>
 
 <main style="${WIDGET_WRAP}">
   {#if browser}
-    <zitadel-login
-      project-id={projectId}
-      proxy-path="${PROXY_PATH}"
-      purpose="${purpose}"
-      post-sign-in-url="/profile"
-    ></zitadel-login>
+    <ZitadelLogin {project} purpose="${purpose}" postSignInUrl="/profile" />
   {/if}
 </main>
 `;
@@ -114,25 +107,18 @@ export function profilePageTemplate(): string {
   return `<script lang="ts">
   ${MANAGED_MARKER}
   import { browser } from "$app/environment";
-  import { onMount } from "svelte";
+  import { ZitadelLogout, configureZitadel } from "@zitadel/sdk-svelte";
   import { env } from "$env/dynamic/public";
 
-  const projectId = env.PUBLIC_ZITADEL_PROJECT_ID ?? "";
-
-  onMount(async () => {
-    const { configureZitadel } = await import("@zitadel/sdk-sveltekit/client");
-    configureZitadel({ projectId, proxyPath: "${PROXY_PATH}" });
-    await import("@zitadel/sdk-sveltekit/client");
+  const project = configureZitadel({
+    projectId: env.PUBLIC_ZITADEL_PROJECT_ID ?? "",
+    proxyPath: "${PROXY_PATH}",
   });
 </script>
 
 <main style="${WIDGET_WRAP}">
   {#if browser}
-    <zitadel-logout
-      project-id={projectId}
-      proxy-path="${PROXY_PATH}"
-      post-sign-out-url="/login"
-    ></zitadel-logout>
+    <ZitadelLogout {project} postSignOutUrl="/login" />
   {/if}
 </main>
 `;

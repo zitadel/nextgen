@@ -1,4 +1,3 @@
-export { ZitadelLogin, ZitadelLogout } from "@zitadel/components";
 export { createNextgenOnRequest, getAuth } from "./server.js";
 export type { QwikRequestEvent, QwikCookieValue } from "./server.js";
 export { configureZitadel, getApi, getZitadelConfig } from "@zitadel/api/config";

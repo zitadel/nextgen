@@ -14,15 +14,23 @@ import {
 } from "./templates";
 
 const SDK_DEPENDENCY = "@zitadel/sdk-sveltekit";
+/**
+ * The idiomatic Svelte component library that ships the `<ZitadelLogin>` /
+ * `<ZitadelLogout>` Svelte components the routes render. The server SDK above is
+ * plumbing only; the widget comes from here, so a SvelteKit app gets the native
+ * Svelte component (typed props, callback events) rather than the bare element.
+ */
+const COMPONENT_DEPENDENCY = "@zitadel/sdk-svelte";
 
 /**
  * Rule-based patcher for a SvelteKit app. Like Next.js and Nuxt, SvelteKit
  * proxies the backend and verifies the session through a server entrypoint —
  * here the `@zitadel/sdk-sveltekit` `handle` hook in `src/hooks.server.ts`.
  * Contributes the layout + landing/login/register/profile file-based routes (the
- * raw `<zitadel-login>`/`<zitadel-logout>` elements registered client-side), the
- * public project-id env var, and the SDK dep. No config edit is needed — the
- * hook is a plain file, so (like Next) every managed file carries the marker.
+ * idiomatic `<ZitadelLogin>`/`<ZitadelLogout>` Svelte components from
+ * `@zitadel/sdk-svelte`), the public project-id env var, and both deps. No config
+ * edit is needed — the hook is a plain file, so (like Next) every managed file
+ * carries the marker.
  */
 export class SvelteKitPatcher extends AbstractRulePatcher {
   canPatch(framework: string): boolean {
@@ -53,6 +61,11 @@ export class SvelteKitPatcher extends AbstractRulePatcher {
         name: SDK_DEPENDENCY,
         version: npmDistTagForCliVersion(ctx.cliVersion),
       },
+      {
+        kind: "add-dep",
+        name: COMPONENT_DEPENDENCY,
+        version: npmDistTagForCliVersion(ctx.cliVersion),
+      },
     ];
   }
 
@@ -69,14 +82,14 @@ export class SvelteKitPatcher extends AbstractRulePatcher {
   }
 
   protected routeDeps(_view: PatchView): ReadonlyArray<string> {
-    return [SDK_DEPENDENCY];
+    return [SDK_DEPENDENCY, COMPONENT_DEPENDENCY];
   }
 
   protected summary(_ctx: PatchContext): { title: string; detail: string } {
     return {
       title: "SvelteKit integration",
       detail:
-        "Wrote src/hooks.server.ts (@zitadel/sdk-sveltekit handle) plus layout and landing/login/register/profile routes.",
+        "Wrote src/hooks.server.ts (@zitadel/sdk-sveltekit handle) plus layout and landing/login/register/profile routes using @zitadel/sdk-svelte.",
     };
   }
 }

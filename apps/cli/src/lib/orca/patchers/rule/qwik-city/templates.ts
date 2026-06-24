@@ -49,34 +49,26 @@ export default component$(() => (
 }
 
 /**
- * A login/register page. Registers the Lit elements + configures the SDK in
- * `useVisibleTask$` (client only), then renders the raw `<zitadel-login>`
- * custom element. The public project id comes from `PUBLIC_ZITADEL_PROJECT_ID`
- * via Qwik's `import.meta.env`.
+ * A login/register page. Renders the idiomatic `<ZitadelLogin>` Qwik component
+ * from `@zitadel/sdk-qwik` (typed props, callback events). `configureZitadel`
+ * returns the project handle at module scope; the public project id comes from
+ * `PUBLIC_ZITADEL_PROJECT_ID` via Qwik's `import.meta.env`.
  */
 function authPage(purpose: "login" | "register"): string {
   return `${MANAGED_MARKER}
-import { component$, useVisibleTask$ } from "@builder.io/qwik";
+import { component$ } from "@builder.io/qwik";
+import { ZitadelLogin, configureZitadel } from "@zitadel/sdk-qwik";
+
+const project = configureZitadel({
+  projectId: import.meta.env.PUBLIC_ZITADEL_PROJECT_ID ?? "",
+  proxyPath: "${PROXY_PATH}",
+});
 
 export default component$(() => {
-  const projectId = import.meta.env.PUBLIC_ZITADEL_PROJECT_ID ?? "";
-
-  // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(async () => {
-    const { configureZitadel } = await import("@zitadel/sdk-qwik-city/client");
-    configureZitadel({ projectId, proxyPath: "${PROXY_PATH}" });
-    await import("@zitadel/sdk-qwik-city/client");
-  });
-
   return (
-    <main style="${WIDGET_WRAP}">
-      <zitadel-login
-        project-id={projectId}
-        proxy-path="${PROXY_PATH}"
-        purpose="${purpose}"
-        post-sign-in-url="/profile"
-      ></zitadel-login>
-    </main>
+    <div style="${WIDGET_WRAP}">
+      <ZitadelLogin project={project} purpose="${purpose}" postSignInUrl="/profile" />
+    </div>
   );
 });
 `;
@@ -93,26 +85,19 @@ export function registerPageTemplate(): string {
 /** `src/routes/profile/index.tsx` — the signed-in view with the logout widget. */
 export function profilePageTemplate(): string {
   return `${MANAGED_MARKER}
-import { component$, useVisibleTask$ } from "@builder.io/qwik";
+import { component$ } from "@builder.io/qwik";
+import { ZitadelLogout, configureZitadel } from "@zitadel/sdk-qwik";
+
+const project = configureZitadel({
+  projectId: import.meta.env.PUBLIC_ZITADEL_PROJECT_ID ?? "",
+  proxyPath: "${PROXY_PATH}",
+});
 
 export default component$(() => {
-  const projectId = import.meta.env.PUBLIC_ZITADEL_PROJECT_ID ?? "";
-
-  // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(async () => {
-    const { configureZitadel } = await import("@zitadel/sdk-qwik-city/client");
-    configureZitadel({ projectId, proxyPath: "${PROXY_PATH}" });
-    await import("@zitadel/sdk-qwik-city/client");
-  });
-
   return (
-    <main style="${WIDGET_WRAP}">
-      <zitadel-logout
-        project-id={projectId}
-        proxy-path="${PROXY_PATH}"
-        post-sign-out-url="/login"
-      ></zitadel-logout>
-    </main>
+    <div style="${WIDGET_WRAP}">
+      <ZitadelLogout project={project} postSignOutUrl="/login" />
+    </div>
   );
 });
 `;

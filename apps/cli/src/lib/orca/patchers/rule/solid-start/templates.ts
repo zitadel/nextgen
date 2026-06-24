@@ -48,35 +48,25 @@ export default function Index() {
 }
 
 /**
- * A login/register page. Registers the Lit elements + configures the SDK in
- * `onMount` (client only, guarded by `isServer`), then renders the raw
- * `<zitadel-login>` custom element. The public project id comes from
+ * A login/register page. Renders the idiomatic `<ZitadelLogin>` Solid component
+ * from `@zitadel/sdk-solid` (typed props, callback events). `configureZitadel`
+ * returns the project handle at module scope; the public project id comes from
  * `VITE_ZITADEL_PROJECT_ID` (Vite only exposes `VITE_`-prefixed env to the
  * client).
  */
 function authPage(purpose: "login" | "register"): string {
   return `${MANAGED_MARKER}
-import { onMount } from "solid-js";
-import { isServer } from "solid-js/web";
+import { ZitadelLogin, configureZitadel } from "@zitadel/sdk-solid";
 
-const projectId = import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "";
+const project = configureZitadel({
+  projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "",
+  proxyPath: "${PROXY_PATH}",
+});
 
 export default function ${purpose === "login" ? "Login" : "Register"}() {
-  onMount(async () => {
-    if (isServer) return;
-    const { configureZitadel } = await import("@zitadel/sdk-solid-start/client");
-    configureZitadel({ projectId, proxyPath: "${PROXY_PATH}" });
-    await import("@zitadel/sdk-solid-start/client");
-  });
-
   return (
     <main style="${WIDGET_WRAP}">
-      <zitadel-login
-        project-id={projectId}
-        proxy-path="${PROXY_PATH}"
-        purpose="${purpose}"
-        post-sign-in-url="/profile"
-      ></zitadel-login>
+      <ZitadelLogin project={project} purpose="${purpose}" postSignInUrl="/profile" />
     </main>
   );
 }
@@ -94,26 +84,17 @@ export function registerPageTemplate(): string {
 /** `src/routes/profile.tsx` — the signed-in view with the logout widget. */
 export function profilePageTemplate(): string {
   return `${MANAGED_MARKER}
-import { onMount } from "solid-js";
-import { isServer } from "solid-js/web";
+import { ZitadelLogout, configureZitadel } from "@zitadel/sdk-solid";
 
-const projectId = import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "";
+const project = configureZitadel({
+  projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "",
+  proxyPath: "${PROXY_PATH}",
+});
 
 export default function Profile() {
-  onMount(async () => {
-    if (isServer) return;
-    const { configureZitadel } = await import("@zitadel/sdk-solid-start/client");
-    configureZitadel({ projectId, proxyPath: "${PROXY_PATH}" });
-    await import("@zitadel/sdk-solid-start/client");
-  });
-
   return (
     <main style="${WIDGET_WRAP}">
-      <zitadel-logout
-        project-id={projectId}
-        proxy-path="${PROXY_PATH}"
-        post-sign-out-url="/login"
-      ></zitadel-logout>
+      <ZitadelLogout project={project} postSignOutUrl="/login" />
     </main>
   );
 }

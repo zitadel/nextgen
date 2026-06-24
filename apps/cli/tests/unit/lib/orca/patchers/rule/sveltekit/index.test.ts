@@ -49,8 +49,10 @@ describe("SvelteKitPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/register/+page.svelte")).toContain(
       'purpose="register"',
     );
-    expect(writeContents(plan, "src/routes/profile/+page.svelte")).toContain("zitadel-logout");
+    expect(writeContents(plan, "src/routes/profile/+page.svelte")).toContain("ZitadelLogout");
     expect(writeContents(plan, "src/routes/login/+page.svelte")).toContain("background:#0f0f11");
+    expect(writeContents(plan, "src/routes/login/+page.svelte")).toContain("@zitadel/sdk-svelte");
+    expect(writeContents(plan, "src/routes/login/+page.svelte")).toContain("ZitadelLogin");
   });
 
   it("seeds the public project id and no other config edit", () => {
@@ -65,11 +67,16 @@ describe("SvelteKitPatcher.plan", () => {
     expect(plan.ops.some((op) => op.kind === "edit")).toBe(false);
   });
 
-  it("adds the SDK dependency at the CLI's prerelease tag", () => {
-    const dep = new SvelteKitPatcher()
+  it("adds the server SDK + the Svelte component lib at the CLI's prerelease tag", () => {
+    const deps = new SvelteKitPatcher()
       .plan(ctx())
-      .ops.find((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
-    expect(dep).toMatchObject({ name: "@zitadel/sdk-sveltekit", version: "alpha" });
+      .ops.filter((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
+    expect(deps).toContainEqual(
+      expect.objectContaining({ name: "@zitadel/sdk-sveltekit", version: "alpha" }),
+    );
+    expect(deps).toContainEqual(
+      expect.objectContaining({ name: "@zitadel/sdk-svelte", version: "alpha" }),
+    );
   });
 });
 
@@ -81,7 +88,7 @@ describe("SvelteKitPatcher.artifacts", () => {
     });
     expect(artifacts.markedFiles).toContain("src/hooks.server.ts");
     expect(artifacts.markedFiles).toContain("src/routes/login/+page.svelte");
-    expect(artifacts.dependencies).toEqual(["@zitadel/sdk-sveltekit"]);
+    expect(artifacts.dependencies).toEqual(["@zitadel/sdk-sveltekit", "@zitadel/sdk-svelte"]);
     expect(artifacts.configEdits).toEqual([]);
   });
 });

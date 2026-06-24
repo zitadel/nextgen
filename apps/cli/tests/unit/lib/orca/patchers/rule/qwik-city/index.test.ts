@@ -46,8 +46,10 @@ describe("QwikCityPatcher.plan", () => {
     expect(writeContents(plan, "src/routes/index.tsx")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "src/routes/login/index.tsx")).toContain('purpose="login"');
     expect(writeContents(plan, "src/routes/register/index.tsx")).toContain('purpose="register"');
-    expect(writeContents(plan, "src/routes/profile/index.tsx")).toContain("zitadel-logout");
+    expect(writeContents(plan, "src/routes/profile/index.tsx")).toContain("ZitadelLogout");
     expect(writeContents(plan, "src/routes/login/index.tsx")).toContain("background:#0f0f11");
+    expect(writeContents(plan, "src/routes/login/index.tsx")).toContain("@zitadel/sdk-qwik");
+    expect(writeContents(plan, "src/routes/login/index.tsx")).toContain("ZitadelLogin");
   });
 
   it("seeds the public project id and no other config edit", () => {
@@ -62,12 +64,17 @@ describe("QwikCityPatcher.plan", () => {
     expect(plan.ops.some((op) => op.kind === "edit")).toBe(false);
   });
 
-  it("adds the SDK as a devDependency at the CLI's prerelease tag", () => {
-    const dep = new QwikCityPatcher()
+  it("adds both SDKs as devDependencies at the CLI's prerelease tag", () => {
+    const deps = new QwikCityPatcher()
       .plan(ctx())
-      .ops.find((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
+      .ops.filter((op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep");
     // Qwik City's vite config forces /qwik/i-named packages into devDependencies.
-    expect(dep).toMatchObject({ name: "@zitadel/sdk-qwik-city", version: "alpha", dev: true });
+    expect(deps).toContainEqual(
+      expect.objectContaining({ name: "@zitadel/sdk-qwik-city", version: "alpha", dev: true }),
+    );
+    expect(deps).toContainEqual(
+      expect.objectContaining({ name: "@zitadel/sdk-qwik", version: "alpha", dev: true }),
+    );
   });
 });
 
@@ -79,7 +86,7 @@ describe("QwikCityPatcher.artifacts", () => {
     });
     expect(artifacts.markedFiles).toContain("src/routes/plugin@nextgen.ts");
     expect(artifacts.markedFiles).toContain("src/routes/login/index.tsx");
-    expect(artifacts.dependencies).toEqual(["@zitadel/sdk-qwik-city"]);
+    expect(artifacts.dependencies).toEqual(["@zitadel/sdk-qwik-city", "@zitadel/sdk-qwik"]);
     expect(artifacts.configEdits).toEqual([]);
   });
 });
