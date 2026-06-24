@@ -40,13 +40,13 @@ event.
 
 The ingestion token is **write-only** (cannot read data back), so embedding it
 in the published CLI is safe and intentional — this is how dev-tool telemetry
-works. Dev and prod are separate Mixpanel projects. The channel is **auto-detected
-by install location**: the published package runs from inside `node_modules`, so
-the **published CLI routes real user traffic to the prod project** with no
-per-user env var, while running from source/tests (or a locally-built
-`node dist/...`) stays on dev. Precedence: explicit `ZITADEL_TELEMETRY_ENV` /
-`NODE_ENV`, then a `ZITADEL_TELEMETRY_BUILD_CHANNEL` stamp (CI/release override),
-then the install-location auto-detection.
+works. Dev and prod are separate Mixpanel projects. The channel is **stamped into
+the bundle at build time**: `tsdown`'s `define` replaces `__ZITADEL_TELEMETRY_CHANNEL__`
+with `production` in the shipped bundle, so the **published CLI routes real user
+traffic to the prod project** with no per-user env var, while running from
+source/tests (where the identifier is undefined) stays on dev. Precedence:
+explicit `ZITADEL_TELEMETRY_ENV` / `NODE_ENV`, then a `ZITADEL_TELEMETRY_BUILD_CHANNEL`
+env override (CI/release), then the build-time stamp.
 
 ---
 

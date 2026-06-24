@@ -36,25 +36,27 @@ const HOSTS = {
 
 export type TelemetryRegion = keyof typeof HOSTS;
 
+declare const __ZITADEL_TELEMETRY_CHANNEL__: string | undefined;
+
 /**
- * Whether the CLI is running from an installed package rather than a source
- * checkout: the published npm tarball (and its bundled `dist`) always lives
- * under a `node_modules` tree — via `npm i`, a global install, or `npx`/`dlx`
- * caches — while a source/dev build runs from the repo working tree. This is the
- * discriminator that routes real published-CLI traffic to the prod project
- * without any per-user env var, while source and test runs stay on dev (it also
- * keeps a locally-built `node dist/...` run on dev, so manual testing can't
- * accidentally hit prod).
+ * Channel stamped into the bundle at build time: tsdown's `define` replaces the
+ * bare `__ZITADEL_TELEMETRY_CHANNEL__` identifier with `"production"` for the
+ * shipped CLI, so published runs route to the prod project with no per-user env
+ * var, while source and test runs (where the identifier is undefined) stay on
+ * dev. The `typeof` guard keeps an unbundled source run from throwing a
+ * ReferenceError on the never-defined global.
  */
-function isInstalledBuild(): boolean {
-  return import.meta.url.includes("/node_modules/");
+function buildStampedChannel(): string {
+  return typeof __ZITADEL_TELEMETRY_CHANNEL__ === "string"
+    ? __ZITADEL_TELEMETRY_CHANNEL__.toLowerCase()
+    : "";
 }
 
 /**
  * Decide which project the events belong to. Precedence: an explicit runtime
  * `ZITADEL_TELEMETRY_ENV`/`NODE_ENV`, then a `ZITADEL_TELEMETRY_BUILD_CHANNEL`
- * stamp (handy for CI/release overrides), then auto-detection by install
- * location.
+ * env override (handy for CI/release), then the build-time channel stamp. The
+ * default — source/dev/test — is the dev project.
  */
 function resolveChannel(env: NodeJS.ProcessEnv): "development" | "production" {
   const explicit = (env.ZITADEL_TELEMETRY_ENV ?? env.NODE_ENV ?? "").toLowerCase();
@@ -64,11 +66,8 @@ function resolveChannel(env: NodeJS.ProcessEnv): "development" | "production" {
   if (explicit === "development") {
     return "development";
   }
-  const stamp = (env.ZITADEL_TELEMETRY_BUILD_CHANNEL ?? "").toLowerCase();
-  if (stamp === "production" || stamp === "development") {
-    return stamp;
-  }
-  return isInstalledBuild() ? "production" : "development";
+  const stamp = (env.ZITADEL_TELEMETRY_BUILD_CHANNEL ?? buildStampedChannel()).toLowerCase();
+  return stamp === "production" ? "production" : "development";
 }
 
 /**

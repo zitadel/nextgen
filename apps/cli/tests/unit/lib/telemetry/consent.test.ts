@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import { resolveConsent } from "../../../../src/lib/telemetry/consent";
 
 describe("resolveConsent", () => {
-  it("is enabled by default with a token configured", () => {
-    expect(resolveConsent({ env: {} })).toEqual({ enabled: true, reason: "enabled" });
+  it("is enabled by default and returns the resolved token", () => {
+    const consent = resolveConsent({ env: {} });
+    expect(consent).toMatchObject({ enabled: true, reason: "enabled" });
+    expect(consent.token).toBeTruthy();
   });
 
   it("honors --no-telemetry above everything else", () => {
@@ -35,7 +37,7 @@ describe("resolveConsent", () => {
   });
 
   it("is enabled on the production channel (production token is configured)", () => {
-    expect(resolveConsent({ env: { ZITADEL_TELEMETRY_ENV: "production" } })).toEqual({
+    expect(resolveConsent({ env: { ZITADEL_TELEMETRY_ENV: "production" } })).toMatchObject({
       enabled: true,
       reason: "enabled",
     });

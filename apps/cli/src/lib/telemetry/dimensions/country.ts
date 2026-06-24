@@ -1,35 +1,12 @@
-import type { Property } from "./property";
-
-/** Maps `process.platform` to Mixpanel's canonical `$os` label. */
-class OperatingSystem implements Property<NodeJS.Platform, string> {
-  public value(platform: NodeJS.Platform): string {
-    switch (platform) {
-      case "darwin":
-        return "Mac OS X";
-      case "win32":
-        return "Windows";
-      case "linux":
-        return "Linux";
-      case "freebsd":
-      case "openbsd":
-      case "netbsd":
-        return "BSD";
-      case "aix":
-        return "AIX";
-      case "sunos":
-        return "Solaris";
-      default:
-        return platform;
-    }
-  }
-}
+import type { Property } from "../property";
 
 /**
  * ISO 3166-1 alpha-2 country for an IANA timezone, defaulting to the machine's
  * own zone. A curated subset of common zones — any zone not listed (or an
  * unknown/unavailable one) yields `undefined`, since we report no country
  * rather than guess. Derived from the timezone, never the IP, so no city or
- * region is ever inferred.
+ * region is ever inferred. The machine's own zone is resolved once and cached:
+ * `Intl.DateTimeFormat` construction loads ICU data and is process-stable.
  */
 class Country implements Property<string | undefined, string | undefined> {
   private readonly byTimezone: Record<string, string> = {
@@ -107,19 +84,25 @@ class Country implements Property<string | undefined, string | undefined> {
     "Pacific/Honolulu": "US",
   };
 
+  private machineZone: string | undefined;
+  private machineZoneResolved = false;
+
   public value(timezone: string | undefined): string | undefined {
-    const zone = timezone ?? this.resolveZone();
+    const zone = timezone ?? this.resolveMachineZone();
     return zone ? this.byTimezone[zone] : undefined;
   }
 
-  private resolveZone(): string | undefined {
-    try {
-      return new Intl.DateTimeFormat().resolvedOptions().timeZone;
-    } catch {
-      return undefined;
+  private resolveMachineZone(): string | undefined {
+    if (!this.machineZoneResolved) {
+      this.machineZoneResolved = true;
+      try {
+        this.machineZone = new Intl.DateTimeFormat().resolvedOptions().timeZone;
+      } catch {
+        this.machineZone = undefined;
+      }
     }
+    return this.machineZone;
   }
 }
 
-export const operatingSystem = new OperatingSystem();
 export const country = new Country();

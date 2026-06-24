@@ -6,7 +6,7 @@ import mixpanelLib, {
   type Properties,
 } from "mixpanel";
 
-import { resolveTelemetryHost, resolveTelemetryToken } from "./config";
+import { resolveTelemetryHost } from "./config";
 import { resolveConsent } from "./consent";
 import { type Identity, loadOrCreateIdentity } from "./identity";
 import { compact } from "./util";
@@ -81,12 +81,7 @@ export class Telemetry {
     if (debug) {
       process.stderr.write(`[telemetry] consent: ${consent.reason}\n`);
     }
-    if (!consent.enabled) {
-      return inert(false);
-    }
-
-    const token = resolveTelemetryToken(deps.env);
-    if (!token) {
+    if (!consent.enabled || !consent.token) {
       return inert(false);
     }
 
@@ -94,7 +89,7 @@ export class Telemetry {
 
     let client: MixpanelClient | undefined;
     try {
-      client = (deps.initClient ?? defaultInit)(token, resolveTelemetryHost(deps.env));
+      client = (deps.initClient ?? defaultInit)(consent.token, resolveTelemetryHost(deps.env));
     } catch {
       return inert(identity.isFirstRun);
     }

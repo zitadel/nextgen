@@ -1,7 +1,11 @@
 import type { Properties } from "../telemetry";
-import { ciFlag, ciProvider, hostAgent, invocationChannel } from "../telemetry/env";
-import { country, operatingSystem } from "../telemetry/geo";
-import type { Property } from "../telemetry/property";
+import { ciFlag } from "../telemetry/dimensions/ci-flag";
+import { ciProvider } from "../telemetry/dimensions/ci-provider";
+import { country } from "../telemetry/dimensions/country";
+import { hostAgent } from "../telemetry/dimensions/host-agent";
+import { invocationChannel } from "../telemetry/dimensions/invocation-channel";
+import { operatingSystem } from "../telemetry/dimensions/operating-system";
+import { serverKind } from "./server-kind";
 import type { GlobalOptions } from "./types";
 
 /**
@@ -21,31 +25,19 @@ export const FIRST_RUN_NOTICE =
   "the --no-telemetry flag.";
 
 /**
- * Buckets the resolved backend `source` into a coarse kind. The raw URL is never
- * emitted — it can carry an internal/self-hosted hostname — only which kind of
- * backend the command targeted.
+ * Process-stable device facts shared by both the event bag and the user
+ * profile, so the two never disagree on the same install's OS/arch/version.
  */
-class ServerKind implements Property<string, "cloud" | "local" | "self_hosted" | "unknown"> {
-  public value(source: string): "cloud" | "local" | "self_hosted" | "unknown" {
-    if (source === "mock") {
-      return "local";
-    }
-    try {
-      const { hostname } = new URL(source);
-      if (hostname.endsWith("zitadel.cloud")) {
-        return "cloud";
-      }
-      if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") {
-        return "local";
-      }
-      return "self_hosted";
-    } catch {
-      return "unknown";
-    }
-  }
+function deviceProperties(meta: GlobalOptions): Properties {
+  return {
+    $os: operatingSystem.value(process.platform),
+    $country_code: country.value(undefined),
+    os: process.platform,
+    arch: process.arch,
+    node_version: process.versions.node,
+    cli_version: meta.cliVersion,
+  };
 }
-
-export const serverKind = new ServerKind();
 
 /**
  * Build the dimensions shared by every lifecycle event, merged with any
@@ -63,15 +55,10 @@ export function commandEventProperties(
   const { env } = meta;
   return {
     ...extra,
+    ...deviceProperties(meta),
     ip: 0,
     session_id: sessionId,
     command: meta.command,
-    cli_version: meta.cliVersion,
-    $os: operatingSystem.value(process.platform),
-    $country_code: country.value(undefined),
-    os: process.platform,
-    arch: process.arch,
-    node_version: process.versions.node,
     non_interactive: meta.nonInteractive,
     is_tty: meta.isTTY,
     is_ci: ciFlag.value(env),
@@ -94,13 +81,8 @@ export function deviceProfileProperties(meta: GlobalOptions, distinctId: string)
   const agent = hostAgent.value(meta.env);
   const label = agent === "unknown" ? process.platform : agent;
   return {
+    ...deviceProperties(meta),
     $name: `${label} · ${distinctId.slice(0, 8)}`,
-    $os: operatingSystem.value(process.platform),
-    $country_code: country.value(undefined),
-    os: process.platform,
-    arch: process.arch,
-    node_version: process.versions.node,
-    cli_version: meta.cliVersion,
     host_agent: agent,
   };
 }

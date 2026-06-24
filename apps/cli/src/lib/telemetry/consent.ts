@@ -14,6 +14,8 @@ export type Consent = {
     | "env-opt-out"
     | "flag-opt-out"
     | "test-runner";
+  /** The resolved ingestion token, present only when `enabled` — so the caller never re-resolves it. */
+  readonly token?: string;
 };
 
 /** Inputs that can disable telemetry, kept explicit so the matrix is testable. */
@@ -60,9 +62,10 @@ export function resolveConsent(input: ConsentInput): Consent {
     return { enabled: false, reason: "env-opt-out" };
   }
 
-  if (!resolveTelemetryToken(input.env)) {
+  const token = resolveTelemetryToken(input.env);
+  if (!token) {
     return { enabled: false, reason: "no-token" };
   }
 
-  return { enabled: true, reason: "enabled" };
+  return { enabled: true, reason: "enabled", token };
 }

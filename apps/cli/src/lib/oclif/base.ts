@@ -141,30 +141,35 @@ export abstract class BaseCommand extends Command {
       env: process.env,
       isTTY,
     };
-    // Create telemetry once per invocation and open the lifecycle. Guarded so a
-    // command that resolves meta more than once does not double-count.
-    if (!this.telemetry) {
-      this.telemetry = Telemetry.create({
-        env: process.env,
-        flag: typeof flags.telemetry === "boolean" ? flags.telemetry : undefined,
-        debug,
-      });
-      this.telemetrySessionId = randomUUID();
-      this.telemetryStartedAt = Date.now();
-      this.telemetry.track(
-        CLI_COMMAND_STARTED,
-        commandEventProperties(this.meta, this.telemetrySessionId, this.telemetryProps),
-      );
-      // Register the install as an anonymous user profile so each device shows
-      // up under Mixpanel "Users"; `$ip: 0` keeps geolocation off.
-      this.telemetry.profile(deviceProfileProperties(this.meta, this.telemetry.distinctId), {
-        $ip: 0,
-      });
-      if (this.telemetry.isFirstRun && !this.meta.nonInteractive) {
-        process.stderr.write(`${FIRST_RUN_NOTICE}\n`);
-      }
-    }
+    this.openTelemetry(typeof flags.telemetry === "boolean" ? flags.telemetry : undefined);
     return this.meta;
+  }
+
+  /**
+   * Create telemetry once per invocation and open the lifecycle (started event +
+   * anonymous profile + first-run notice), reading every dimension from the
+   * current {@link meta}. Guarded so a command that resolves meta more than once
+   * does not double-count. Also called from {@link catch} so a failure thrown
+   * before {@link toMeta} finished (e.g. server resolution, flag parsing) still
+   * records the run.
+   */
+  private openTelemetry(flag: boolean | undefined): void {
+    if (this.telemetry) {
+      return;
+    }
+    this.telemetry = Telemetry.create({ env: process.env, flag, debug: this.meta.debug });
+    this.telemetrySessionId = randomUUID();
+    this.telemetryStartedAt = Date.now();
+    this.telemetry.track(
+      CLI_COMMAND_STARTED,
+      commandEventProperties(this.meta, this.telemetrySessionId, this.telemetryProps),
+    );
+    this.telemetry.profile(deviceProfileProperties(this.meta, this.telemetry.distinctId), {
+      $ip: 0,
+    });
+    if (this.telemetry.isFirstRun && !this.meta.nonInteractive) {
+      process.stderr.write(`${FIRST_RUN_NOTICE}\n`);
+    }
   }
 
   /**
@@ -195,6 +200,11 @@ export abstract class BaseCommand extends Command {
   protected override async catch(error: unknown): Promise<never> {
     const meta: GlobalOptions = { ...this.meta, command: this.id ?? this.meta.command };
     const zitadelError = toZitadelError(error);
+    // An error thrown before toMeta finished (server resolution, flag parsing)
+    // leaves telemetry unopened — open it now so the failure is still recorded.
+    // The flag isn't parsed yet on that path, so honour --no-telemetry from argv.
+    this.meta = meta;
+    this.openTelemetry(process.argv.includes("--no-telemetry") ? false : undefined);
     this.telemetry?.track(
       CLI_COMMAND_FAILED,
       commandEventProperties(meta, this.telemetrySessionId, {
@@ -216,12 +226,12 @@ export abstract class BaseCommand extends Command {
   /**
    * oclif runs this after `run`/`catch` on every path. We use it to flush
    * pending telemetry so a short-lived CLI process does not exit before the
-   * lifecycle event is sent. This await can delay command completion, but only
-   * up to the client's flush timeout (default 2000ms), so a hung network adds a
-   * bounded delay rather than blocking indefinitely.
+   * lifecycle event is sent. The await can delay command completion, but only up
+   * to this short flush budget, so a hung or firewalled network adds at most ~1s
+   * rather than blocking — telemetry must never noticeably slow the CLI.
    */
   protected override async finally(error: Error | undefined): Promise<void> {
-    await this.telemetry?.shutdown();
+    await this.telemetry?.shutdown(1000);
     await super.finally(error);
   }
 
