@@ -244,12 +244,7 @@ func (o *SetPasswordUserAction) Prepare(_ context.Context, _ database.QueryExecu
 }
 
 func (o *SetPasswordUserAction) Apply(ctx context.Context, db database.QueryExecutor) error {
-	err := o.passwordRepo.DeleteByUserID(ctx, db, o.ProjectID, o.UserID)
-	if err != nil {
-		return domain.ErrInternal(err).WithMessage("failed to remove old password from database")
-	}
-
-	err = o.passwordRepo.Create(ctx, db, &domain.CreateUserPassword{
+	err := o.passwordRepo.Set(ctx, db, &domain.SetUserPassword{
 		ProjectID:      o.ProjectID,
 		UserID:         o.UserID,
 		EncodedHash:    o.hash,
@@ -259,7 +254,7 @@ func (o *SetPasswordUserAction) Apply(ctx context.Context, db database.QueryExec
 		if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
 			return domain.ErrUserNotFound()
 		}
-		return domain.ErrInternal(err).WithMessage("failed to set initial password")
+		return domain.ErrInternal(err).WithMessage("failed to set password")
 	}
 	return nil
 }
