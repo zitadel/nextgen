@@ -24,6 +24,13 @@ describe("solidStartConfigEdit", () => {
     const out = edit(source);
     expect(out).toContain('middleware: "./src/middleware.ts"');
     expect(out).toContain("ssr: true");
+    // Must not double the opening paren (solidStart(( ... ) — invalid config),
+    // and parens must stay balanced.
+    expect(out).not.toContain("solidStart((");
+    expect(out).toContain('solidStart({ middleware: "./src/middleware.ts", ssr: true })');
+    const open = (out.match(/\(/g) ?? []).length;
+    const close = (out.match(/\)/g) ?? []).length;
+    expect(open).toBe(close);
   });
 
   it("is idempotent — re-running over its own output changes nothing", () => {

@@ -73,21 +73,22 @@ export function requireUser() {
 }
 ```
 
-### 3. Register components and render the login widget
+### 3. Render the login widget
+
+Install the Solid component library and render its `ZitadelLogin` component.
+`@zitadel/sdk-solid-start` is server-only; the widget comes from `@zitadel/sdk-solid`:
+
+```bash
+pnpm add @zitadel/sdk-solid
+```
 
 ```tsx
-import { onMount } from 'solid-js';
-import { isServer } from 'solid-js/web';
+import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-solid';
+
+const project = configureZitadel({ projectId: 'demo', proxyPath: '/__nextgen' });
 
 export default function Login() {
-  onMount(async () => {
-    if (isServer) return;
-    const { configureZitadel } = await import('@zitadel/sdk-solid-start/client');
-    configureZitadel({ projectId: 'demo', proxyPath: '/__nextgen' });
-    await import('@zitadel/sdk-solid-start/client');
-  });
-
-  return <zitadel-login project-id="demo" proxy-path="/__nextgen" post-sign-in-url="/admin" />;
+  return <ZitadelLogin project={project} purpose="login" postSignInUrl="/admin" />;
 }
 ```
 

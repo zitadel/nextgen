@@ -58,20 +58,24 @@ export const useUser = routeLoader$((ev) => {
 });
 ```
 
-### 3. Register components and render the login widget
+### 3. Render the login widget
+
+Install the Qwik component library and render its `ZitadelLogin` component.
+`@zitadel/sdk-qwik-city` is server-only; the widget comes from `@zitadel/sdk-qwik`.
+Qwik bundles ecosystem packages, so install it as a dev dependency:
+
+```bash
+pnpm add -D @zitadel/sdk-qwik
+```
 
 ```tsx
-import { component$, useVisibleTask$ } from '@builder.io/qwik';
+import { component$ } from '@builder.io/qwik';
+import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-qwik';
+
+const project = configureZitadel({ projectId: 'demo', proxyPath: '/__nextgen' });
 
 export default component$(() => {
-  // eslint-disable-next-line qwik/no-use-visible-task
-  useVisibleTask$(async () => {
-    const { configureZitadel } = await import('@zitadel/sdk-qwik-city/client');
-    configureZitadel({ projectId: 'demo', proxyPath: '/__nextgen' });
-    await import('@zitadel/sdk-qwik-city/client');
-  });
-
-  return <zitadel-login project-id="demo" proxy-path="/__nextgen" post-sign-in-url="/admin" />;
+  return <ZitadelLogin project={project} purpose="login" postSignInUrl="/admin" />;
 });
 ```
 

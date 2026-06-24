@@ -51,11 +51,13 @@ export function solidStartConfigEdit(): (source: string | undefined) => string {
       // solidStart()  ->  solidStart({ middleware: "./src/middleware.ts" })
       replacement = `solidStart({ ${option} })`;
     } else if (inner.startsWith("{")) {
-      // solidStart({ ...existing })  ->  inject the option after the opening brace
-      const objStart = args.text.indexOf("{") + 1;
-      const before = args.text.slice(0, objStart);
-      const rest = args.text.slice(objStart);
-      replacement = `solidStart(${before} ${option},${rest}`;
+      // solidStart({ ...existing })  ->  inject the option after the opening
+      // brace. `args.text` is the whole argument list INCLUDING the parens
+      // (e.g. "({ ssr: true })"), so reuse it verbatim prefixed by `solidStart`
+      // — building from `solidStart(` + args.text would double the opening paren
+      // and produce an invalid config.
+      const braceIdx = args.text.indexOf("{");
+      replacement = `solidStart${args.text.slice(0, braceIdx + 1)} ${option},${args.text.slice(braceIdx + 1)}`;
     } else {
       // Unusual: a non-object argument (e.g. a variable). Don't guess — fail loud.
       throw new ZitadelError(

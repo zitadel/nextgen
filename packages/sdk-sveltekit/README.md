@@ -73,25 +73,26 @@ export const load = (event) => {
 };
 ```
 
-### 4. Register components and render the login widget
+### 4. Render the login widget
 
-In your login route, register the web components in a browser-only boundary and
-configure the SDK, then render `<zitadel-login>`:
+Install the Svelte component library and render its `ZitadelLogin` component.
+`@zitadel/sdk-sveltekit` is server-only; the widget comes from `@zitadel/sdk-svelte`:
+
+```bash
+pnpm add @zitadel/sdk-svelte
+```
 
 ```svelte
 <script lang="ts">
   import { browser } from '$app/environment';
-  import { onMount } from 'svelte';
+  import { ZitadelLogin, configureZitadel } from '@zitadel/sdk-svelte';
 
-  onMount(async () => {
-    if (!browser) return;
-    const { configureZitadel } = await import('@zitadel/sdk-sveltekit/client');
-    configureZitadel({ projectId: 'demo', proxyPath: '/__nextgen' });
-    await import('@zitadel/sdk-sveltekit/client');
-  });
+  const project = configureZitadel({ projectId: 'demo', proxyPath: '/__nextgen' });
 </script>
 
-<zitadel-login project-id="demo" proxy-path="/__nextgen" post-sign-in-url="/admin"></zitadel-login>
+{#if browser}
+  <ZitadelLogin {project} purpose="login" postSignInUrl="/admin" />
+{/if}
 ```
 
 ## Middleware options
