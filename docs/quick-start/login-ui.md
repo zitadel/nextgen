@@ -24,7 +24,7 @@ http://localhost:8080/ui/login/?project_id=river-8421
 ## How it works
 
 1. The browser loads JS/CSS embedded in the `nextgen` binary.
-2. `<zitadel-login>` calls the Flow API on the same origin in production.
+2. The hosted-login shell sets `proxy-path="/"`, so `<zitadel-login>` calls the Flow API at `/flow` on the same origin in production.
 3. Each step response may include `branding.liquid_template`; the component renders it with LiquidJS in the browser.
 
 The server does **not** render Liquid to HTML. Templates are data returned with flow steps.

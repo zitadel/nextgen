@@ -147,10 +147,11 @@ This skips the embedded UI dist checks, so it works before you have built
 ```sh
 curl -s -X POST http://localhost:8080/projects \
   -H "Content-Type: application/json" \
-  -d '{}' | jq .
+  -d '{}'
 ```
 
-The response contains an `id` field — that is your project ID.
+The response contains an `id` field — that is your project ID. If you have
+`jq` installed, append `| jq .` to pretty-print the response.
 
 **3. Configure the dev server:**
 

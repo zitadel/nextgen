@@ -7,11 +7,11 @@ const loginOutDir = "../../internal/staticui/login/dist";
 const defaultDevProxyPath = "/__nextgen";
 const defaultBackendUrl = "http://localhost:8080";
 
-export default defineConfig(({ command, mode }) => {
+export default defineConfig(({ command, mode, isPreview }) => {
   return {
     root: import.meta.dirname,
-    base: command === "build" ? uiBase : "/",
-    server: command === "serve" ? devServerConfig(mode) : baseServerConfig(),
+    base: command === "build" || isPreview ? uiBase : "/",
+    server: command === "serve" && !isPreview ? devServerConfig(mode) : baseServerConfig(),
     cacheDir: "../../node_modules/.vite/apps/login-ui",
     resolve: { conditions: ["@zitadel/source"] },
     plugins: [keepGoEmbedPlaceholder(loginOutDir)],
@@ -31,7 +31,7 @@ function baseServerConfig() {
 }
 
 function devServerConfig(mode: string) {
-  const env = loadEnv(mode, import.meta.dirname, "");
+  const env = loadEnv(mode, import.meta.dirname, "VITE_");
   const proxyPath = env.VITE_PROXY_PATH || defaultDevProxyPath;
   return {
     ...baseServerConfig(),
