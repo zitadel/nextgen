@@ -408,7 +408,10 @@ func toFlowFieldValidation(v *domain.FlowFieldValidation) *api.FieldValidation {
 	if v.MaxLength > 0 {
 		out.MaxLength = api.NewOptInt(v.MaxLength)
 	}
-	if !out.Format.Set && !out.MinLength.Set && !out.MaxLength.Set {
+	if len(v.Enum) > 0 {
+		out.Enum = v.Enum
+	}
+	if !out.Format.Set && !out.MinLength.Set && !out.MaxLength.Set && len(out.Enum) == 0 {
 		return nil
 	}
 	return &out

@@ -31,7 +31,6 @@ var exampleUserSchema = []byte(`{
   },
   "properties": {
     "email":       { "type": "string", "format": "email", "x-unique": "project" },
-    "password":    { "type": "string", "minLength": 8, "x-password": true },
     "name":        { "type": "string" },
     "givenName":   { "type": "string" },
     "familyName":  { "type": "string" },
