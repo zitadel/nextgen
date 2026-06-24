@@ -2,8 +2,7 @@ package spanner
 
 import "github.com/zitadel/nextgen/internal/service"
 
-type queryExecutor interface {
-}
+type queryExecutor interface {}
 
 type statements struct {
 	projectStatements

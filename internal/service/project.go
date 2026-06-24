@@ -66,7 +66,7 @@ func (s *projectService) Create(ctx context.Context, previewOrigins []string) (_
 	}
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := tx.Statements().CreateProject(project).Execute(ctx); err != nil {
+		if err := tx.Statements().CreateProject(ctx, project); err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to create project in the database")
 		}
 
@@ -129,5 +129,5 @@ func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, 
 func (s *projectService) Get(ctx context.Context, id string) (*domain.Project, error) {
 	logger := getLoggingContext(ctx, "project")
 	logger.Info("getting project", slog.String("project_id", id))
-	return s.v2Pool.Statements().GetProjectByID(id).Query(ctx)
+	return s.v2Pool.Statements().GetProjectByID(ctx, id)
 }

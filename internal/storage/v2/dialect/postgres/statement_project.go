@@ -1,10 +1,13 @@
 package postgres
 
 import (
+	"context"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 )
 
 const createProjectStmt = `INSERT INTO zitadel_nextgen.projects (id, project_secret, preview_secret, preview_origins) VALUES ($1, $2, $3, $4) RETURNING id, created_at, updated_at`
@@ -20,115 +23,86 @@ func newProjectStatements(client queryExecutor) projectStatements {
 }
 
 // CreateProject implements [service.ProjectStatements].
-func (ps projectStatements) CreateProject(project *domain.Project) database.Execution {
-	return &query[domain.Project]{
-		execution: execution{
-			client: ps.client,
-			stmt:   createProjectStmt,
-			args: []any{
-				project.ID,
-				project.ProjectSecret,
-				project.PreviewSecret,
-				project.PreviewOrigins,
-			},
-		},
-		scan: func(rows pgx.Rows, result *domain.Project) error {
-			_, err := pgx.CollectOneRow(rows, func(row pgx.CollectableRow) (*domain.Project, error) {
-				return project, row.Scan(&project.ID, &project.CreatedAt, &project.UpdatedAt)
-			})
-			return err
-		},
-	}
+func (ps projectStatements) CreateProject(ctx context.Context, project *domain.Project) error {
+	return ps.client.QueryRow(ctx, createProjectStmt, project.ID, project.ProjectSecret, project.PreviewSecret, project.PreviewOrigins).
+		Scan(&project.ID, &project.CreatedAt, &project.UpdatedAt)
 }
 
 const deleteByIDProjectStmt = `DELETE FROM zitadel_nextgen.projects WHERE id = $1`
 
 // DeleteProjectByID implements [service.ProjectStatements].
-func (ps projectStatements) DeleteProjectByID(id string) database.Execution {
-	return &execution{
-		client: ps.client,
-		stmt:   deleteByIDProjectStmt,
-		args:   []any{id},
-	}
+func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) error {
+	_, err := ps.client.Exec(ctx, deleteByIDProjectStmt, id)
+	return err
 }
 
 const projectQuery = "SELECT id, created_at, updated_at, project_secret, preview_secret, preview_origins FROM zitadel_nextgen.projects"
 
 // GetProjectByID implements [service.ProjectStatements].
-func (ps projectStatements) GetProjectByID(id string) database.Query[domain.Project] {
+func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*domain.Project, error) {
 	var compiler statementCompiler
 	compiler.compileRead(projectQuery, &database.ListOptions{
 		Filter: database.Equal(database.Column(domain.ProjectFieldID), id),
 	})
 
-	return &query[domain.Project]{
-		execution: execution{
-			client: ps.client,
-			stmt:   compiler.String(),
-			args:   compiler.args,
-		},
-		scan: ps.scanProject,
+	rows, err := ps.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, wrapError(err)
 	}
+	return pgx.CollectExactlyOneRow(rows, ps.scanProject)
 }
 
 // ListProjects implements [service.ProjectStatements].
-func (ps projectStatements) ListProjects(filter *database.ListOptions) database.Query[database.ListResult[*domain.Project]] {
+func (ps projectStatements) ListProjects(ctx context.Context, filter *database.ListOptions) (*database.ListResult[*domain.Project], error) {
 	var compiler statementCompiler
 	compiler.compileRead(projectQuery, filter)
 
-	return &query[database.ListResult[*domain.Project]]{
-		execution: execution{
-			client: ps.client,
-			stmt:   compiler.String(),
-			args:   compiler.args,
-		},
-		scan: ps.scanProjects,
-		result: &database.ListResult[*domain.Project]{
-			NextCursor: &database.CursorToken{
-				Limit:   filter.Pagination.Limit,
-				OrderBy: filter.Pagination.OrderBy,
-			},
-		},
-	}
-}
-
-func (ps projectStatements) scanProjects(rows pgx.Rows, result *database.ListResult[*domain.Project]) error {
-	projects, err := pgx.CollectRows(rows, ps.scan)
+	rows, err := ps.client.Query(ctx, compiler.String(), compiler.args...)
 	if err != nil {
-		return err
+		return nil, wrapError(err)
 	}
-	result.Items = projects
 
-	for _, column := range result.NextCursor.OrderBy.Columns {
-		switch column {
-		case database.Column(domain.ProjectFieldID):
-			result.NextCursor.Values = append(result.NextCursor.Values, projects[len(projects)-1].ID)
-		case database.Column(domain.ProjectFieldCreatedAt):
-			result.NextCursor.Values = append(result.NextCursor.Values, projects[len(projects)-1].CreatedAt)
-		case database.Column(domain.ProjectFieldUpdatedAt):
-			result.NextCursor.Values = append(result.NextCursor.Values, projects[len(projects)-1].UpdatedAt)
-		case database.Column(domain.ProjectFieldProjectSecret):
-			result.NextCursor.Values = append(result.NextCursor.Values, projects[len(projects)-1].ProjectSecret)
-		case database.Column(domain.ProjectFieldPreviewSecret):
-			result.NextCursor.Values = append(result.NextCursor.Values, projects[len(projects)-1].PreviewSecret)
-		case database.Column(domain.ProjectFieldPreviewOrigins):
-			result.NextCursor.Values = append(result.NextCursor.Values, projects[len(projects)-1].PreviewOrigins)
+	projects, err := pgx.CollectRows(rows, ps.scanProject)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+
+	var curser *pagination.Cursor
+	if filter.Pagination.Limit > 0 && len(projects) == int(filter.Pagination.Limit) {
+		curser = &pagination.Cursor{
+			Columns: filter.Pagination.OrderBy.Columns,
+			Values:  ps.valuesFromColumns(projects[len(projects)-1], filter.Pagination.OrderBy.Columns),
 		}
 	}
 
-	return nil
+	return &database.ListResult[*domain.Project]{
+		Items:      projects,
+		NextCursor: curser.Marshal(),
+	}, nil
 }
 
-func (ps projectStatements) scanProject(rows pgx.Rows, result *domain.Project) error {
-	res, err := pgx.CollectExactlyOneRow(rows, ps.scan)
-	if err != nil {
-		return err
+func (ps projectStatements) valuesFromColumns(project *domain.Project, columns []database.Column) []any {
+	values := make([]any, len(columns))
+	for i, column := range columns {
+		switch column {
+		case database.Column(domain.ProjectFieldID):
+			values[i] = project.ID
+		case database.Column(domain.ProjectFieldCreatedAt):
+			values[i] = project.CreatedAt
+		case database.Column(domain.ProjectFieldUpdatedAt):
+			values[i] = project.UpdatedAt
+		case database.Column(domain.ProjectFieldProjectSecret):
+			values[i] = project.ProjectSecret
+		case database.Column(domain.ProjectFieldPreviewSecret):
+			values[i] = project.PreviewSecret
+		case database.Column(domain.ProjectFieldPreviewOrigins):
+			values[i] = project.PreviewOrigins
+		}
 	}
-	*result = *res
-	return nil
+	return values
 }
 
-func (ps projectStatements) scan(row pgx.CollectableRow) (*domain.Project, error) {
+func (ps projectStatements) scanProject(row pgx.CollectableRow) (*domain.Project, error) {
 	project := new(domain.Project)
 	if err := row.Scan(&project.ID, &project.CreatedAt, &project.UpdatedAt, &project.ProjectSecret, &project.PreviewSecret, &project.PreviewOrigins); err != nil {
 		return nil, err

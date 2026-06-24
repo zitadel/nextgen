@@ -22,3 +22,7 @@ func newError(code string, message string, details any, parent error) domain.Err
 func ErrInvalidCursor() domain.Error {
 	return newError("db.invalid_cursor", "The provided cursor is invalid.", nil, nil)
 }
+
+func ErrCursorOrderMismatch() domain.Error {
+	return newError("db.cursor_order_mismatch", "The provided cursor does not match the order by clause.", nil, nil)
+}

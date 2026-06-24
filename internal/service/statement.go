@@ -1,6 +1,8 @@
 package service
 
 import (
+	"context"
+
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
@@ -28,10 +30,10 @@ type AllStatements interface {
 
 type ProjectStatements interface {
 	Statements
-	CreateProject(entity *domain.Project) database.Execution
-	GetProjectByID(id string) database.Query[domain.Project]
-	ListProjects(filter *database.ListOptions) database.Query[database.ListResult[*domain.Project]]
-	DeleteProjectByID(id string) database.Execution
+	CreateProject(ctx context.Context, entity *domain.Project) error
+	GetProjectByID(ctx context.Context, id string) (*domain.Project, error)
+	ListProjects(ctx context.Context, filter *database.ListOptions) (*database.ListResult[*domain.Project], error)
+	DeleteProjectByID(ctx context.Context, id string) error
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -42,8 +44,8 @@ type ProjectStatements interface {
 
 type FlowDefinitionStatements interface {
 	Statements
-	CreateFlowDefinition(entity *domain.FlowDefinition) database.Execution
-	GetFlowDefinitionByID(id string) database.Query[domain.FlowDefinition]
-	ListFlowDefinitions(filter *database.ListOptions) database.Query[database.ListResult[*domain.FlowDefinition]]
-	DeleteFlowDefinitionByID(id string) database.Execution
+	CreateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error
+	GetFlowDefinitionByID(ctx context.Context, id string) (*domain.FlowDefinition, error)
+	ListFlowDefinitions(ctx context.Context, filter *database.ListOptions) (*database.ListResult[*domain.FlowDefinition], error)
+	DeleteFlowDefinitionByID(ctx context.Context, id string) error
 }

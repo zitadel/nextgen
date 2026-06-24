@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 )
 
 type statementCompiler struct {
@@ -12,14 +13,21 @@ type statementCompiler struct {
 	args []any
 }
 
-func (c *statementCompiler) compileRead(stmt string, opt *database.ListOptions) {
+func (c *statementCompiler) compileRead(stmt string, opt *database.ListOptions) error {
 	c.WriteString(stmt)
 
-	if opt.Pagination.After != nil {
-		if opt.Pagination.After.OrderBy.Direction == database.OrderAsc {
-			opt.Filter = database.And(opt.Filter, database.GreaterThans(opt.Pagination.After.OrderBy.Columns, opt.Pagination.After.Values))
+	if len(opt.Pagination.Cursor) != 0 {
+		cursor, err := pagination.CursorFromToken(opt.Pagination.Cursor)
+		if err != nil {
+			return database.ErrInvalidCursor()
+		}
+		if !cursor.MatchesOrderBy(opt.Pagination.Columns) {
+			return database.ErrCursorOrderMismatch()
+		}
+		if opt.Pagination.Direction == database.OrderAsc {
+			opt.Filter = database.And(opt.Filter, database.GreaterThans(cursor.Columns, cursor.Values))
 		} else {
-			opt.Filter = database.And(opt.Filter, database.LessThans(opt.Pagination.After.OrderBy.Columns, opt.Pagination.After.Values))
+			opt.Filter = database.And(opt.Filter, database.LessThans(cursor.Columns, cursor.Values))
 		}
 	}
 	if opt.Filter != nil {
@@ -27,11 +35,10 @@ func (c *statementCompiler) compileRead(stmt string, opt *database.ListOptions) 
 		c.compileFilter(opt.Filter)
 	}
 
-	if opt.Pagination.After != nil {
-		c.compilePagination(opt.Pagination.After.OrderBy, opt.Pagination.After.Limit)
-	} else {
-		c.compilePagination(opt.Pagination.OrderBy, opt.Pagination.Limit)
-	}
+	c.compileOrderBy(opt.Pagination.OrderBy)
+	c.compileLimit(opt.Pagination.Limit)
+
+	return nil
 }
 
 func (c *statementCompiler) compileFilter(filter database.Filter) {
@@ -121,7 +128,7 @@ func (c *statementCompiler) compileFilterClause(columns []database.Column, value
 	}
 }
 
-func (c *statementCompiler) compilePagination(orderBy database.OrderBy, limit uint32) {
+func (c *statementCompiler) compileOrderBy(orderBy database.OrderBy) {
 	if len(orderBy.Columns) > 0 {
 		c.WriteString(" ORDER BY ")
 		for i, column := range orderBy.Columns {
@@ -129,12 +136,14 @@ func (c *statementCompiler) compilePagination(orderBy database.OrderBy, limit ui
 				c.WriteString(", ")
 			}
 			c.WriteString(compileColumnName(column))
-		}
-		if orderBy.Direction != database.OrderAsc {
-			c.WriteString(" DESC")
+			if orderBy.Direction == database.OrderDesc {
+				c.WriteString(" DESC")
+			}
 		}
 	}
+}
 
+func (c *statementCompiler) compileLimit(limit uint32) {
 	if limit > 0 {
 		c.WriteString(" LIMIT ")
 		c.writeArg(limit)

@@ -1,7 +1,8 @@
 package spanner
 
 import (
-	"cloud.google.com/go/spanner"
+	"context"
+
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
@@ -9,56 +10,38 @@ import (
 
 type projectStatements struct{ statement }
 
+// CreateProject implements [service.ProjectStatements].
+func (p projectStatements) CreateProject(ctx context.Context, entity *domain.Project) error {
+	panic("unimplemented")
+}
+
+// DeleteProjectByID implements [service.ProjectStatements].
+func (p projectStatements) DeleteProjectByID(ctx context.Context, id string) error {
+	panic("unimplemented")
+}
+
+// GetProjectByID implements [service.ProjectStatements].
+func (p projectStatements) GetProjectByID(ctx context.Context, id string) (*domain.Project, error) {
+	panic("unimplemented")
+}
+
+// IsStatements implements [service.ProjectStatements].
+// Subtle: this method shadows the method (statement).IsStatements of projectStatements.statement.
+func (p projectStatements) IsStatements() {
+	panic("unimplemented")
+}
+
+// ListProjects implements [service.ProjectStatements].
+func (p projectStatements) ListProjects(ctx context.Context, filter *database.ListOptions) (*database.ListResult[*domain.Project], error) {
+	panic("unimplemented")
+}
+
 func newProjectStatements(client queryExecutor) projectStatements {
 	return projectStatements{
 		statement: statement{
 			client: client,
 		},
 	}
-}
-
-// CreateProject implements [service.ProjectStatements].
-func (s projectStatements) CreateProject(project *domain.Project) database.Execution {
-	return &execution{
-		client: s.client,
-		stmt: spanner.Statement{
-			SQL: `INSERT INTO projects (id, project_secret, preview_secret, preview_origins) VALUES (@id, @project_secret, @preview_secret, @preview_origins) THEN RETURN created_at, updated_at`,
-			Params: map[string]any{
-				"id":              project.ID,
-				"project_secret":  project.ProjectSecret,
-				"preview_secret":  project.PreviewSecret,
-				"preview_origins": project.PreviewOrigins,
-			},
-		},
-		scan: func(iter *spanner.RowIterator) error {
-			return iter.Do(func(row *spanner.Row) error {
-				return row.Columns(&project.CreatedAt, &project.UpdatedAt)
-			})
-		},
-	}
-}
-
-// DeleteProjectByID implements [service.ProjectStatements].
-func (s projectStatements) DeleteProjectByID(id string) database.Execution {
-	return &execution{
-		client: s.client,
-		stmt: spanner.Statement{
-			SQL: `DELETE FROM projects WHERE id = @id`,
-			Params: map[string]any{
-				"id": id,
-			},
-		},
-	}
-}
-
-// GetProjectByID implements [service.ProjectStatements].
-func (s projectStatements) GetProjectByID(id string) database.Query[domain.Project] {
-	panic("unimplemented")
-}
-
-// ListProjects implements [service.ProjectStatements].
-func (s projectStatements) ListProjects(filter *database.ListOptions) database.Query[database.ListResult[*domain.Project]] {
-	panic("unimplemented")
 }
 
 var _ service.ProjectStatements = (*projectStatements)(nil)

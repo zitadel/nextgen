@@ -7,7 +7,7 @@ type ListOptions struct {
 
 type ListResult[T any] struct {
 	Items      []T
-	NextCursor *CursorToken
+	NextCursor []byte
 }
 
 type OrderDirection uint8
@@ -23,14 +23,10 @@ type OrderBy struct {
 }
 
 type Page struct {
-	After *CursorToken
+	// Limit is the maximum number of items to return. If Limit is 0, no limit is applied.
 	Limit uint32
+	//OrderBy is the order in which to return the items.
 	OrderBy
-}
-
-// CursorToken holds keyset pagination values matching the list ORDER BY columns.
-type CursorToken struct {
-	Limit   uint32
-	OrderBy OrderBy
-	Values  []any
+	// Cursor is the cursor to start the page from. If Cursor is nil, the page starts from the beginning.
+	Cursor []byte
 }
