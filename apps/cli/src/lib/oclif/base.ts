@@ -163,6 +163,12 @@ export abstract class BaseCommand extends Command {
       return;
     }
     this.telemetry = Telemetry.create({ env: process.env, flag, debug: this.meta.debug });
+    // Inert (opted-out / no-token / test-runner) instance: skip building the
+    // property bags entirely so a disabled run stays a true no-op — no timezone
+    // → country resolution or URL parsing for users who opted out.
+    if (!this.telemetry.enabled) {
+      return;
+    }
     this.telemetry.track(
       CLI_COMMAND_STARTED,
       commandEventProperties(this.meta, this.telemetrySessionId, this.telemetryProps),
@@ -170,9 +176,31 @@ export abstract class BaseCommand extends Command {
     this.telemetry.profile(deviceProfileProperties(this.meta, this.telemetry.distinctId), {
       $ip: 0,
     });
-    if (this.telemetry.isFirstRun && !this.meta.nonInteractive) {
+    if (this.telemetry.isFirstRun && this.isInteractive()) {
       process.stderr.write(`${FIRST_RUN_NOTICE}\n`);
     }
+  }
+
+  /**
+   * Whether this invocation is an interactive human session, used to gate the
+   * one-time first-run notice. Derived from argv + `jsonEnabled()` + TTY rather
+   * than `meta.nonInteractive`, so it is correct even on the early-failure path
+   * where {@link catch} opens telemetry against a fallback meta that has not yet
+   * computed `nonInteractive` from the flags.
+   */
+  private isInteractive(): boolean {
+    if (this.meta.nonInteractive || this.jsonEnabled()) {
+      return false;
+    }
+    const argv = process.argv;
+    if (
+      argv.includes("--json") ||
+      argv.includes("--non-interactive") ||
+      argv.includes("-n")
+    ) {
+      return false;
+    }
+    return Boolean(process.stdout.isTTY && process.stdin.isTTY);
   }
 
   /**
