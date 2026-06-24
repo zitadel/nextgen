@@ -160,7 +160,9 @@ export abstract class BaseCommand extends Command {
    * before {@link toMeta} finished (e.g. server resolution, flag parsing) still
    * records the run. Returns early for an inert (opted-out / no-token /
    * test-runner) instance so a disabled run never builds the property bags —
-   * no timezone→country resolution or URL parsing for users who opted out.
+   * no timezone→country resolution or URL parsing for users who opted out. The
+   * anonymous device profile is install-level and stable, so it is written only
+   * on first run rather than paying a `people.set` request on every command.
    */
   private openTelemetry(flag: boolean | undefined): void {
     if (this.telemetry) {
@@ -174,11 +176,13 @@ export abstract class BaseCommand extends Command {
       CLI_COMMAND_STARTED,
       commandEventProperties(this.meta, this.telemetrySessionId, this.telemetryProps),
     );
-    this.telemetry.profile(deviceProfileProperties(this.meta, this.telemetry.distinctId), {
-      $ip: 0,
-    });
-    if (this.telemetry.isFirstRun && this.isInteractive()) {
-      process.stderr.write(`${FIRST_RUN_NOTICE}\n`);
+    if (this.telemetry.isFirstRun) {
+      this.telemetry.profile(deviceProfileProperties(this.meta, this.telemetry.distinctId), {
+        $ip: 0,
+      });
+      if (this.isInteractive()) {
+        process.stderr.write(`${FIRST_RUN_NOTICE}\n`);
+      }
     }
   }
 
