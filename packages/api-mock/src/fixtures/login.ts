@@ -95,10 +95,10 @@ export function identifierStep(input: StepFixtureInput): CreateFlow201 {
       },
     ],
     actions: [
-      { name: "submit", text_key: "submit.signin", primary: true },
-      { name: "passkey", text_key: "identifier.action.passkey" },
-      { name: "register", text_key: "identifier.action.register.link" },
-      { name: "recover", text_key: "action.forgot_password" },
+      { name: "submit", kind: "submit", text_key: "submit.signin", primary: true },
+      { name: "passkey", kind: "passkey", text_key: "identifier.action.passkey" },
+      { name: "register", kind: "navigate", text_key: "identifier.action.register.link" },
+      { name: "recover", kind: "navigate", text_key: "action.forgot_password" },
     ],
     gates: {},
   });
@@ -133,11 +133,25 @@ export function registerStep(input: StepFixtureInput): CreateFlow201 {
         type: "date",
         text_key: "register.field.dateOfBirth",
       },
+      {
+        // Optional on purpose: the registration e2e/journey flows submit without
+        // touching it, so a `required` select/checkbox would block the form. Its
+        // enum values double as labels (the wire carries no per-option text).
+        name: "country",
+        type: "select",
+        text_key: "register.field.country",
+        validation: { enum: ["United States", "Germany", "Switzerland", "Austria"] },
+      },
+      {
+        name: "terms",
+        type: "checkbox",
+        text_key: "register.field.terms",
+      },
     ],
     actions: [
-      { name: "submit", text_key: "register.action.password", primary: true },
-      { name: "passkey_register", text_key: "register.action.passkey" },
-      { name: "sign_in", text_key: "register.action.sign_in.link" },
+      { name: "submit", kind: "submit", text_key: "register.action.password", primary: true },
+      { name: "passkey_register", kind: "passkey_register", text_key: "register.action.passkey" },
+      { name: "sign_in", kind: "navigate", text_key: "register.action.sign_in.link" },
     ],
     gates: {},
   });
@@ -164,7 +178,7 @@ export function registerPasswordStep(input: StepFixtureInput): CreateFlow201 {
       },
     ],
     actions: [
-      { name: "submit", text_key: "register-password.action.submit", primary: true },
+      { name: "submit", kind: "submit", text_key: "register-password.action.submit", primary: true },
     ],
     gates: {},
   });
@@ -188,9 +202,9 @@ export function passwordStep(input: StepFixtureInput): CreateFlow201 {
       },
     ],
     actions: [
-      { name: "submit", text_key: "submit.signin", primary: true },
-      { name: "passkey", text_key: "password.action.passkey" },
-      { name: "register", text_key: "password.action.register.link" },
+      { name: "submit", kind: "submit", text_key: "submit.signin", primary: true },
+      { name: "passkey", kind: "passkey", text_key: "password.action.passkey" },
+      { name: "register", kind: "navigate", text_key: "password.action.register.link" },
     ],
     gates: {},
   });
@@ -210,7 +224,7 @@ export function recoverStep(input: StepFixtureInput): CreateFlow201 {
     },
     fields: [],
     actions: [
-      { name: "submit", text_key: "recover.action.back", primary: true },
+      { name: "submit", kind: "navigate", text_key: "recover.action.back", primary: true },
     ],
     gates: {},
   });
@@ -226,8 +240,8 @@ export function passkeyUpsellStep(input: StepFixtureInput): CreateFlow201 {
     texts: { title_key: "passkey-upsell.title" },
     fields: [],
     actions: [
-      { name: "setup", text_key: "passkey-upsell.action.setup", primary: true },
-      { name: "skip", text_key: "passkey-upsell.action.skip" },
+      { name: "setup", kind: "passkey_register", text_key: "passkey-upsell.action.setup", primary: true },
+      { name: "skip", kind: "navigate", text_key: "passkey-upsell.action.skip" },
     ],
     gates: {},
   });
@@ -246,7 +260,7 @@ export function passkeySetupStep(input: StepFixtureInput): CreateFlow201 {
     texts: { title_key: "passkey-upsell.title" },
     fields: [],
     actions: [
-      { name: "submit", text_key: "submit.continue", primary: true },
+      { name: "submit", kind: "submit", text_key: "submit.continue", primary: true },
     ],
     gates: {},
     challenge: {
@@ -300,8 +314,8 @@ export function passkeyLoginStep(input: StepFixtureInput): CreateFlow201 {
     texts: { title_key: "passkey-login.title" },
     fields: [],
     actions: [
-      { name: "submit", text_key: "submit.continue", primary: true },
-      { name: "cancel", text_key: "action.cancel" },
+      { name: "submit", kind: "submit", text_key: "submit.continue", primary: true },
+      { name: "cancel", kind: "navigate", text_key: "action.cancel" },
     ],
     gates: {},
     challenge: {
@@ -366,8 +380,8 @@ export async function doneStep(input: StepFixtureInput): Promise<CreateFlow201> 
       complete: "show",
       fields: [],
       actions: [
-        { name: "continue", text_key: "signed-in.continue", primary: true },
-        { name: "logout", text_key: "signed-in.logout" },
+        { name: "continue", kind: "navigate", text_key: "signed-in.continue", primary: true },
+        { name: "logout", kind: "navigate", text_key: "signed-in.logout" },
       ],
       gates: {},
     },

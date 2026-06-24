@@ -124,6 +124,9 @@ export const en: Record<string, string> = {
   // Native <input type="date"> localizes its own display format to the user's
   // locale and submits ISO YYYY-MM-DD — no placeholder/help format hint needed.
   "register.field.dateOfBirth": "Date of birth",
+  "register.field.country": "Country",
+  "register.field.country.placeholder": "Select your country",
+  "register.field.terms": "I agree to the terms of service",
   "register.action.password": "Continue with password",
   "register.action.passkey": "Continue with a passkey",
   "register.action.submit": "Sign up",

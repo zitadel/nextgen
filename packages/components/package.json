@@ -53,8 +53,6 @@
     "access": "public"
   },
   "scripts": {
-    "dev": "vite",
-    "dev:clean": "rm -rf ../../node_modules/.vite/packages/components && vite",
     "build": "tsdown",
     "test": "vitest run --project unit",
     "test:browser": "vitest run --project browser",
@@ -75,7 +73,6 @@
     "msw": "catalog:",
     "playwright": "catalog:",
     "ts-lit-plugin": "catalog:",
-    "vite-plugin-web-components-hmr": "catalog:",
     "lightningcss": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",

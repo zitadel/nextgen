@@ -147,5 +147,16 @@ type FlowProgress struct {
 	// CollectedData accumulates submitted field values for this
 	// progress entry, keyed by schema property name. A child flow's
 	// CollectedData is discarded when its progress is popped.
-	CollectedData map[string]any
+	CollectedData CollectedFlowData
+}
+
+type CollectedFlowData struct {
+	UserData    map[string]any
+	UserID      string
+	AuthMethods CollectedAuthMethodData
+}
+
+type CollectedAuthMethodData struct {
+	Password                       string
+	HasProvisionedUserIDForPasskey bool
 }
