@@ -112,9 +112,7 @@ func TestSchemaFieldResolver_Resolve_DefaultFields(t *testing.T) {
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "identifier",
 		[]string{"email", "username", "password", "given_name", "family_name"})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
+	require.NoError(t, err)
 
 	tests := []struct {
 		name        string
@@ -128,14 +126,13 @@ func TestSchemaFieldResolver_Resolve_DefaultFields(t *testing.T) {
 		{"family_name", domain.FlowFieldTypeText, "identifier.field.family_name"},
 	}
 	for _, tc := range tests {
-		f, ok := findField(got, tc.name)
-		if !ok {
-			t.Errorf("Resolve missing field %q", tc.name)
-			continue
-		}
-		assert.Equal(t, tc.wantType, f.Type)
-		assert.Equal(t, tc.wantTextKey, f.TextKey)
-		assert.True(t, f.Required)
+		t.Run(tc.name, func(t *testing.T) {
+			f, ok := findField(got, tc.name)
+			require.True(t, ok, "Resolve missing field %q", tc.name)
+			assert.Equal(t, tc.wantType, f.Type)
+			assert.Equal(t, tc.wantTextKey, f.TextKey)
+			assert.True(t, f.Required)
+		})
 	}
 }
 
@@ -150,9 +147,7 @@ func TestSchemaFieldResolver_Resolve_IdentifierImpliesUserNotFound(t *testing.T)
 	resolver := domain.NewSchemaFieldResolver(schemaResolver)
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step", []string{"email", "password"})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
+	require.NoError(t, err)
 
 	if !slices.Contains(got.ImplicitOutcomes["email"], domain.FlowImplicitOutcomeUserNotFound) {
 		t.Errorf("Resolve email ImplicitOutcomes = %v, want user_not_found", got.ImplicitOutcomes["email"])
@@ -179,9 +174,7 @@ func TestSchemaFieldResolver_Resolve_ChallengeSurfaces(t *testing.T) {
 	resolver := domain.NewSchemaFieldResolver(schemaResolver)
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step", []string{"email", "password", "given_name"})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
+	require.NoError(t, err)
 
 	if mustField(t, got, "email").Challenge != domain.FlowFieldChallengeIdentifier {
 		t.Errorf("Resolve email Challenge = %q, want %q", mustField(t, got, "email").Challenge, domain.FlowFieldChallengeIdentifier)
@@ -213,9 +206,7 @@ func TestSchemaFieldResolver_Resolve_PasswordChallengeRequiresAuthMethodEnabled(
 	resolver := domain.NewSchemaFieldResolver(schemaResolver)
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step", []string{"password"})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
+	require.NoError(t, err)
 	if mustField(t, got, "password").Challenge != domain.FlowFieldChallengeNone {
 		t.Errorf("Resolve password Challenge = %q, want None (auth-methods absent)", mustField(t, got, "password").Challenge)
 	}
@@ -234,9 +225,8 @@ func TestSchemaFieldResolver_Resolve_PasswordChallengeRequiresXPassword(t *testi
 	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step", []string{"password"})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
+	require.NoError(t, err)
+
 	if mustField(t, got, "password").Challenge != domain.FlowFieldChallengeNone {
 		t.Errorf("Resolve password Challenge = %q, want None (x-password absent on property)", mustField(t, got, "password").Challenge)
 	}
@@ -265,7 +255,8 @@ func TestSchemaFieldResolver_Resolve_RenamedPasswordField(t *testing.T) {
 	resolver := domain.NewSchemaFieldResolver(schemaResolver)
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step", []string{"secret"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
+
 	if mustField(t, got, "secret").Challenge != domain.FlowFieldChallengePassword {
 		t.Errorf("Resolve secret Challenge = %q, want %q", mustField(t, got, "secret").Challenge, domain.FlowFieldChallengePassword)
 	}
@@ -285,9 +276,7 @@ func TestSchemaFieldResolver_Resolve_UniqueScopeSurfaces(t *testing.T) {
 	resolver := domain.NewSchemaFieldResolver(schemaResolver)
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step", []string{"email", "password"})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
+	require.NoError(t, err)
 
 	if mustField(t, got, "email").Unique != domain.AttributeUniquenessTeam {
 		t.Errorf("Resolve email Unique = %v, want %v", mustField(t, got, "email").Unique, domain.AttributeUniquenessTeam)
@@ -316,9 +305,8 @@ func TestSchemaFieldResolver_Resolve_UniqueScopeProject(t *testing.T) {
 	resolver := domain.NewSchemaFieldResolver(schemaResolver)
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step", []string{"handle"})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
+	require.NoError(t, err)
+
 	if mustField(t, got, "handle").Unique != domain.AttributeUniquenessProject {
 		t.Errorf("Resolve handle Unique = %v, want %v", mustField(t, got, "handle").Unique, domain.AttributeUniquenessProject)
 	}
@@ -382,9 +370,7 @@ func TestSchemaFieldResolver_Resolve_FormatAndTypeVariants(t *testing.T) {
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step",
 		[]string{"website", "birthday", "created", "nickname", "gender", "newsletter", "opt_in", "opt_in_rev"})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
+	require.NoError(t, err)
 
 	wantTypes := map[string]domain.FlowFieldType{
 		"website":    domain.FlowFieldTypeURL,
