@@ -169,5 +169,5 @@ export class Telemetry {
 
 /** Real Mixpanel client construction, isolated so {@link Telemetry.create} can swap it in tests. */
 function defaultInit(token: string, host: string): MixpanelClient {
-  return mixpanelLib.init(token, { host });
+  return mixpanelLib.init(token, { host, geolocate: false });
 }
