@@ -264,14 +264,24 @@ export abstract class BaseCommand extends Command {
   }
 
   /**
-   * oclif runs this after `run`/`catch` on every path. We use it to flush
-   * pending telemetry so a short-lived CLI process does not exit before the
-   * lifecycle event is sent. The await can delay command completion, but only up
-   * to this short flush budget, so a hung or firewalled network adds at most ~1s
-   * rather than blocking — telemetry must never noticeably slow the CLI.
+   * oclif runs this after `run`/`catch` on every path. We flush pending
+   * telemetry so a short-lived CLI process does not exit before the lifecycle
+   * event is sent. The await is bounded by the flush budget, so a hung or
+   * firewalled network adds at most ~1s.
+   *
+   * `mixpanel@0.18` always uses keep-alive agents (hardcoded; not configurable)
+   * and exposes no request timeout or handle, so a completed *or* hung request
+   * leaves a socket that keeps Node's event loop open past the await. The
+   * failure path force-exits via oclif's `exit()`, but the success path would
+   * otherwise hang, so we arm an unref'd watchdog: it cannot keep the loop alive
+   * on a clean exit, but if a telemetry socket is still holding it open after
+   * the grace, it force-exits with the resolved code.
    */
   protected override async finally(error: Error | undefined): Promise<void> {
     await this.telemetry?.shutdown(1000);
+    if (this.telemetry?.enabled) {
+      setTimeout(() => process.exit(process.exitCode ?? 0), 250).unref();
+    }
     await super.finally(error);
   }
 
