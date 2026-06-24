@@ -9,9 +9,13 @@ import { defineConfig } from "vite";
 const consoleBase = "/ui/console/";
 const consoleOutDir = "../../internal/staticui/console/dist";
 
-export default defineConfig(({ command }) => ({
+export default defineConfig(({ command, isPreview }) => ({
   root: import.meta.dirname,
-  base: command === "build" ? consoleBase : "/",
+  // The build emits absolute `/ui/console/` asset URLs (the console embeds in
+  // the Go server under that path). `vite preview` runs with command "serve",
+  // so it must opt into the same base or the built index.html's asset links
+  // 404 and the SPA never mounts. The dev server (plain "serve") stays at "/".
+  base: command === "build" || isPreview ? consoleBase : "/",
   server: {
     port: 5174,
     strictPort: true,

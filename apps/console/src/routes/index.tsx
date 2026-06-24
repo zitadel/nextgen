@@ -1,5 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { AtomPlayground } from "../components/atom-playground.js";
+export const Route = createFileRoute("/")({ component: Home });
 
-export const Route = createFileRoute("/")({ component: AtomPlayground });
+function Home() {
+  return (
+    <section className="console-welcome">
+      <h2>Console</h2>
+      <p>
+        The Zitadel console is where users manage their account and settings. This shell is the
+        starting point for that app.
+      </p>
+      <p className="console-welcome__hint">
+        Component development and review now live in Storybook (<code>moon run storybook:dev</code>
+        ).
+      </p>
+    </section>
+  );
+}
