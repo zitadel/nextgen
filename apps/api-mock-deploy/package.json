@@ -19,7 +19,7 @@
     "build": "tsdown",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsdown && tsc --noEmit",
     "lint": "eslint ."
   },
   "dependencies": {

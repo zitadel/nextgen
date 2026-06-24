@@ -7,8 +7,11 @@ import { app } from "../src/app.js";
  * to `http://localhost:<port>` when `VERCEL_URL` is unset — see
  * `src/app.ts`.
  */
-const rawPort = process.env.PORT;
-const port = rawPort !== undefined ? parseInt(rawPort, 10) : 8080;
+// Treat empty/whitespace PORT as unset and fall back to 8080, matching
+// `resolveIssuer` in src/issuer.ts so the bind port and the issuer agree
+// (e.g. `PORT="" node ...` binds 8080 rather than erroring out).
+const rawPort = process.env.PORT?.trim();
+const port = rawPort ? parseInt(rawPort, 10) : 8080;
 
 if (!Number.isFinite(port) || port < 1 || port > 65535) {
   console.error(

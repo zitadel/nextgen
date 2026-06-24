@@ -21,10 +21,13 @@ tasks:
     deps:
       - "api-mock:build"
 
+  # The `typecheck` script bundles (tsdown) before `tsc` so it is
+  # self-contained on a clean checkout; it only needs @zitadel/api built
+  # first (for the workspace import that gets inlined).
   typecheck:
     command: "corepack pnpm run typecheck"
     deps:
-      - "build"
+      - "api-mock:build"
 
   test:
     command: "corepack pnpm run test"
