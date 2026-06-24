@@ -31,7 +31,7 @@ describe("commandEventProperties", () => {
     expect(serialized).not.toContain("/work/app");
     expect(props.server_kind).toBe("self_hosted");
     expect(props.command).toBe("setup");
-    expect(props.session_id).toBe("sess-1");
+    expect(props.invocation_id).toBe("sess-1");
     expect(props.ip).toBe(0);
     expect(props.$os).toBeDefined();
     expect("$country_code" in props).toBe(true);

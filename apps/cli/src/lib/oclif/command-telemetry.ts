@@ -49,7 +49,7 @@ function deviceProperties(meta: GlobalOptions): Properties {
  */
 export function commandEventProperties(
   meta: GlobalOptions,
-  sessionId: string,
+  invocationId: string,
   extra: Properties = {},
 ): Properties {
   const { env } = meta;
@@ -57,7 +57,7 @@ export function commandEventProperties(
     ...extra,
     ...deviceProperties(meta),
     ip: 0,
-    session_id: sessionId,
+    invocation_id: invocationId,
     command: meta.command,
     non_interactive: meta.nonInteractive,
     is_tty: meta.isTTY,

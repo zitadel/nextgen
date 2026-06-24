@@ -98,7 +98,7 @@ wired into the user's app.
 
 ### Base dimensions (every event)
 
-`command`, `cli_version`, `os`, `arch`, `node_version`, `session_id`,
+`command`, `cli_version`, `os`, `arch`, `node_version`, `invocation_id`,
 `non_interactive`, `is_tty`, `is_ci`, `ci_provider`, `host_agent`,
 `invocation_channel`, `dry_run`, `force`, `server_kind` (bucketed
 `cloud`/`local`/`self_hosted` — **never the URL**), plus the reserved
@@ -119,7 +119,7 @@ Mixpanel injects the transport fields (`time`, `$lib_version`,
     "distinct_id": "09233195-cd34-468c-bb7b-151554e19fbc",
     "$insert_id": "2398bc39-3cb6-4b05-835f-bb03908794b8",
     "ip": 0,
-    "session_id": "6d919718-6168-42b4-9482-e656776445f0",
+    "invocation_id": "6d919718-6168-42b4-9482-e656776445f0",
     "command": "status",
     "cli_version": "0.1.0-alpha.11",
     "$os": "Mac OS X",

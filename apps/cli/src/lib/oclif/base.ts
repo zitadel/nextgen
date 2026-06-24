@@ -79,7 +79,7 @@ export abstract class BaseCommand extends Command {
   protected telemetryProps: Readonly<Properties> = Object.freeze({});
 
   /** Correlates the started/completed pair; minted at instance construction. */
-  private readonly telemetrySessionId = randomUUID();
+  private readonly telemetryInvocationId = randomUUID();
 
   /**
    * Wall-clock start used to derive `duration_ms`. Captured at instance
@@ -174,7 +174,7 @@ export abstract class BaseCommand extends Command {
     }
     this.telemetry.track(
       CLI_COMMAND_STARTED,
-      commandEventProperties(this.meta, this.telemetrySessionId, this.telemetryProps),
+      commandEventProperties(this.meta, this.telemetryInvocationId, this.telemetryProps),
     );
     if (this.telemetry.isFirstRun) {
       this.telemetry.profile(deviceProfileProperties(this.meta, this.telemetry.distinctId), {
@@ -218,7 +218,7 @@ export abstract class BaseCommand extends Command {
     if (this.telemetry?.enabled) {
       this.telemetry.track(
         CLI_COMMAND_COMPLETED,
-        commandEventProperties(this.meta, this.telemetrySessionId, {
+        commandEventProperties(this.meta, this.telemetryInvocationId, {
           ...this.telemetryProps,
           status: result.status,
           duration_ms: Date.now() - this.telemetryStartedAt,
@@ -246,7 +246,7 @@ export abstract class BaseCommand extends Command {
     if (this.telemetry?.enabled) {
       this.telemetry.track(
         CLI_COMMAND_FAILED,
-        commandEventProperties(meta, this.telemetrySessionId, {
+        commandEventProperties(meta, this.telemetryInvocationId, {
           ...this.telemetryProps,
           status: "error",
           reason: zitadelError.code,
