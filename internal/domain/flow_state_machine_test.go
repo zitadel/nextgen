@@ -190,8 +190,9 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 	passkeyReg := &fakePasskeyRegistration{}
 	createUser := domain.NewFlowCreateUserHandler(ids, users, pws, hasher)
 	resolver := newDefaultResolver(t)
+	schemas := newDefaultSchemaLoader(t)
 	now := func() time.Time { return time.Unix(1700000000, 0).UTC() }
-	sm := domain.NewFlowStateMachine(resolver, createUser, attempts, passkeyReg, now)
+	sm := domain.NewFlowStateMachine(schemas, resolver, createUser, attempts, passkeyReg, now)
 
 	return &flowTestWorld{users: users, pws: pws, ids: ids, hasher: hasher, attempts: attempts, passkeyReg: passkeyReg, sm: sm}
 }
@@ -212,7 +213,7 @@ func loginDefinition() *domain.FlowDefinition {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "credentials",
-				Fields: []string{"email", "x-auth-methods#password"},
+				Fields: []domain.Field{"email", "x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
@@ -249,7 +250,7 @@ func signupDefinition() *domain.FlowDefinition {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:      "credentials",
-				Fields:    []string{"email", "x-auth-methods#password"},
+				Fields:    []domain.Field{"email", "x-auth-methods#password"},
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
@@ -722,7 +723,7 @@ func passkeyIdentifierLoginDefinition() *domain.FlowDefinition {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "authenticate",
-				Fields: []string{"email"},
+				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionPasskey, Kind: domain.FlowActionKindPasskey, Primary: true},
 				},
@@ -945,7 +946,7 @@ func passkeyIdentifierDefinition() *domain.FlowDefinition {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "identifier",
-				Fields: []string{"email"},
+				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Primary: true},
 					{Name: domain.FlowActionPasskey},
@@ -958,7 +959,7 @@ func passkeyIdentifierDefinition() *domain.FlowDefinition {
 			},
 			{
 				Name:   "password",
-				Fields: []string{"password"},
+				Fields: []domain.Field{"x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Primary: true},
 				},
@@ -968,7 +969,7 @@ func passkeyIdentifierDefinition() *domain.FlowDefinition {
 			},
 			{
 				Name:   "register",
-				Fields: []string{"email"},
+				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Primary: true},
 				},
@@ -1031,7 +1032,7 @@ func loginNoUserNotFoundDefinition() *domain.FlowDefinition {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "credentials",
-				Fields: []string{"email", "x-auth-methods#password"},
+				Fields: []domain.Field{"email", "x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Primary: true},
 				},
@@ -1186,7 +1187,7 @@ func multiStepSignupDefinition() *domain.FlowDefinition {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "profile",
-				Fields: []string{"email"},
+				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
@@ -1197,7 +1198,7 @@ func multiStepSignupDefinition() *domain.FlowDefinition {
 			},
 			{
 				Name:   "set-password",
-				Fields: []string{"x-auth-methods#password"},
+				Fields: []domain.Field{"x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
@@ -1235,7 +1236,7 @@ func combinedSigninSignupDefinition() *domain.FlowDefinition {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "identify",
-				Fields: []string{"email"},
+				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
@@ -1247,7 +1248,7 @@ func combinedSigninSignupDefinition() *domain.FlowDefinition {
 			},
 			{
 				Name:   "signin-password",
-				Fields: []string{"x-auth-methods#password"},
+				Fields: []domain.Field{"x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
@@ -1257,7 +1258,7 @@ func combinedSigninSignupDefinition() *domain.FlowDefinition {
 			},
 			{
 				Name:      "register-password",
-				Fields:    []string{"x-auth-methods#password"},
+				Fields:    []domain.Field{"x-auth-methods#password"},
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
@@ -1284,7 +1285,7 @@ func recoveryDefinition() *domain.FlowDefinition {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "identify",
-				Fields: []string{"email"},
+				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
@@ -1295,7 +1296,7 @@ func recoveryDefinition() *domain.FlowDefinition {
 			},
 			{
 				Name:   "new-password",
-				Fields: []string{"x-auth-methods#password"},
+				Fields: []domain.Field{"x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
@@ -1632,7 +1633,7 @@ func TestFlowStateMachine_Start_PreservesActionOrder(t *testing.T) {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "step",
-				Fields: []string{"email"},
+				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionPasskey, Kind: domain.FlowActionKindPasskey},
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
@@ -1679,7 +1680,7 @@ func TestFlowStateMachine_Process_NavigateSkipsValidation(t *testing.T) {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "enter",
-				Fields: []string{"email", "x-auth-methods#password"},
+				Fields: []domain.Field{"email", "x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 					{Name: "back", Kind: domain.FlowActionKindNavigate},

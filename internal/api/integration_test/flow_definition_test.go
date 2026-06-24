@@ -142,7 +142,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 					Steps: []api.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Transitions: api.NewOptFlowDefinitionStepTransitions(map[string]api.FlowDefinitionStepTransitionsItem{
 								"submit": {
 									Target: "step_2",
@@ -188,7 +188,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 					Steps: []api.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"username"},
+							Fields: []domain.Field{"username"},
 							Transitions: api.NewOptFlowDefinitionStepTransitions(map[string]api.FlowDefinitionStepTransitionsItem{
 								"submit": {
 									Target: "step_2",
@@ -588,7 +588,7 @@ func validSteps() []api.FlowDefinitionStep {
 	return []api.FlowDefinitionStep{
 		{
 			Name:   "step_1",
-			Fields: []string{"email"},
+			Fields: []domain.Field{"email"},
 			Transitions: api.NewOptFlowDefinitionStepTransitions(map[string]api.FlowDefinitionStepTransitionsItem{
 				"submit": {
 					Target: "step_2",

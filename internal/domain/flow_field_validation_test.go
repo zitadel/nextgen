@@ -13,8 +13,12 @@ import (
 func resolveDefaultFields(t *testing.T) domain.FlowResolvedFields {
 	t.Helper()
 	resolver := newDefaultResolver(t)
-	fields, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step",
-		[]string{"email", "username", "x-auth-methods#password", "given_name", "family_name"})
+	schema, err := newDefaultSchemaLoader(t).Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, nil)
+	if err != nil {
+		t.Fatalf("load schema: %v", err)
+	}
+	fields, err := resolver.Resolve(schema, "step",
+		[]domain.Field{"email", "username", "x-auth-methods#password", "given_name", "family_name"})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}

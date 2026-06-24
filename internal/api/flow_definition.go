@@ -129,7 +129,7 @@ func mapFlowDefinitionRequestToService(projectID string, schemaURI api.OptSchema
 	for _, step := range definition.GetSteps() {
 		s := domain.FlowDefinitionStep{
 			Name:   step.GetName(),
-			Fields: step.GetFields(),
+			Fields: domain.FieldsFromStrings(step.GetFields()),
 		}
 		// actions — preserve the nil-vs-empty distinction so an explicit `[]`
 		// (deliberately no actions, e.g. terminal-step shape) survives the
@@ -314,7 +314,7 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 		}
 		apiStep := api.FlowDefinitionStep{
 			Name:    step.Name,
-			Fields:  step.Fields,
+			Fields:  domain.FieldsToStrings(step.Fields),
 			Actions: actions,
 			Gates: api.OptFlowDefinitionStepGates{
 				Value: gates,

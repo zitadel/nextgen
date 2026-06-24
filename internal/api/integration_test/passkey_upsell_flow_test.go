@@ -258,7 +258,7 @@ func passkeyUpsellFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 		Steps: []api.FlowDefinitionStep{
 			{
 				Name:   "register",
-				Fields: []string{"email", "givenName"},
+				Fields: []domain.Field{"email", "givenName"},
 				Actions: []api.StepAction{
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
@@ -268,7 +268,7 @@ func passkeyUpsellFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 			},
 			{
 				Name:      "register-password",
-				Fields:    []string{"x-auth-methods#password"},
+				Fields:    []domain.Field{"x-auth-methods#password"},
 				OnSuccess: api.NewOptFlowDefinitionStepOnSuccess(createUser),
 				Actions: []api.StepAction{
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},

@@ -341,7 +341,7 @@ func passwordLoginFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 		Steps: []api.FlowDefinitionStep{
 			{
 				Name:   "identifier",
-				Fields: []string{"email"},
+				Fields: []domain.Field{"email"},
 				Actions: []api.StepAction{
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
@@ -351,7 +351,7 @@ func passwordLoginFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 			},
 			{
 				Name:   "password",
-				Fields: []string{"x-auth-methods#password"},
+				Fields: []domain.Field{"x-auth-methods#password"},
 				Actions: []api.StepAction{
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
@@ -377,7 +377,7 @@ func passwordRegisterFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 		Steps: []api.FlowDefinitionStep{
 			{
 				Name:      "signup",
-				Fields:    []string{"email", "x-auth-methods#password"},
+				Fields:    []domain.Field{"email", "x-auth-methods#password"},
 				OnSuccess: api.NewOptFlowDefinitionStepOnSuccess(createUser),
 				Actions: []api.StepAction{
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
@@ -404,7 +404,7 @@ func passwordLoginFlowWithNotFoundFlowDefinition(userSchemaURL url.URL) api.Flow
 		Steps: []api.FlowDefinitionStep{
 			{
 				Name:   "identifier",
-				Fields: []string{"email"},
+				Fields: []domain.Field{"email"},
 				Actions: []api.StepAction{
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
@@ -415,7 +415,7 @@ func passwordLoginFlowWithNotFoundFlowDefinition(userSchemaURL url.URL) api.Flow
 			},
 			{
 				Name:   "password",
-				Fields: []string{"x-auth-methods#password"},
+				Fields: []domain.Field{"x-auth-methods#password"},
 				Actions: []api.StepAction{
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
