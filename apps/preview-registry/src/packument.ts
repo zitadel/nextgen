@@ -80,7 +80,14 @@ const extractManifestFromTarball = async (tarballBytes: Buffer): Promise<Tarball
         const chunks: Buffer[] = [];
         stream.on("data", (chunk: Buffer) => chunks.push(chunk));
         stream.on("end", () => {
-          captured = JSON.parse(Buffer.concat(chunks).toString("utf8")) as PackageManifest;
+          // A malformed package.json must reject the promise, not throw
+          // synchronously inside the stream callback (which would escape
+          // as an uncaught exception and crash the function).
+          try {
+            captured = JSON.parse(Buffer.concat(chunks).toString("utf8")) as PackageManifest;
+          } catch (error) {
+            reject(error instanceof Error ? error : new Error(String(error)));
+          }
         });
         stream.on("error", reject);
       },

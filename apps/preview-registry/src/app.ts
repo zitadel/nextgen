@@ -105,7 +105,15 @@ export const createApp = (store: BlobStore) => {
   });
 
   app.get("/-/blob/*", async (context) => {
-    const key = decodeURIComponent(context.req.path.replace(/^\/-\/blob\//, ""));
+    // decodeURIComponent throws on malformed percent-encoding (eg
+    // `%E0%A4%A`); treat that as a miss rather than letting it bubble to
+    // the 500 handler.
+    let key: string;
+    try {
+      key = decodeURIComponent(context.req.path.replace(/^\/-\/blob\//, ""));
+    } catch {
+      return context.json({ error: "not found" }, 404);
+    }
     if (!isSafeBlobKey(key)) {
       return context.json({ error: "not found" }, 404);
     }
@@ -132,7 +140,14 @@ export const createApp = (store: BlobStore) => {
   });
 
   app.get("/:full{@[^/]+%2[Ff][^/]+}", async (context) => {
-    const decoded = decodeURIComponent(context.req.param("full"));
+    // Malformed percent-encoding makes decodeURIComponent throw; surface
+    // it as a 400 bad path instead of a 500.
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(context.req.param("full"));
+    } catch {
+      return context.json({ error: "bad path" }, 400);
+    }
     const [scope, name] = decoded.split("/");
     if (!scope || !name) return context.json({ error: "bad path" }, 400);
     const packument = await buildPackument(store, scope, name);

@@ -157,4 +157,18 @@ describe("buildPackument", () => {
     const packument = await buildPackument(store, "@foodbar", "alpha");
     expect(Object.keys(packument?.versions ?? {})).toEqual(["0.0.0-sha-good"]);
   });
+
+  test("rejects (does not crash) when a tarball has a malformed package.json", async () => {
+    const body = buildTarball(Buffer.from("{ this is not valid json"));
+    const store = fakeStore([
+      {
+        key: "@foodbar/alpha/-/broken.tgz",
+        url: "https://example.test/-/blob/broken",
+        size: body.length,
+        uploadedAt: new Date(),
+        body,
+      },
+    ]);
+    await expect(buildPackument(store, "@foodbar", "alpha")).rejects.toThrow();
+  });
 });

@@ -49,6 +49,14 @@ describe("createApp blob route", () => {
     expect(reads).toEqual([]);
   });
 
+  test("returns 404 for malformed percent-encoding instead of 500", async () => {
+    const { store, reads } = recordingStore();
+    const app = createApp(store);
+    const response = await app.request("/-/blob/%E0%A4%A");
+    expect(response.status).toBe(404);
+    expect(reads).toEqual([]);
+  });
+
   test("answers /-/ping for health checks", async () => {
     const { store } = recordingStore();
     const app = createApp(store);
