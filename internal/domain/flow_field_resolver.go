@@ -1,11 +1,10 @@
 package domain
 
 import (
-	"context"
 	"errors"
 	"strings"
 
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/ianlancetaylor/jsonschema"
 )
 
 //go:generate go tool mockgen -typed -package domainmock -destination ./mock/flow_field_resolver.mock.go . FlowFieldResolver
@@ -19,11 +18,12 @@ import (
 // The contract is shaped to the user meta-schema at
 // api/openapi/endpoints/schemas/user-schema.yaml.
 type FlowFieldResolver interface {
-	// Resolve returns the per-field metadata for fieldNames sourced
-	// from the user schema at userSchemaURL. stepName is the flow
-	// step the fields are being resolved for; it prefixes each
-	// field's text_key (`<stepName>.field.<name>`).
-	Resolve(ctx context.Context, client database.QueryExecutor, projectID, userSchemaURL, stepName string, fieldNames []string) (FlowResolvedFields, error)
+	// Resolve returns the per-field metadata for fields against the
+	// provided user schema. stepName is the flow step the fields are
+	// being resolved for; it prefixes each field's text_key
+	// (`<stepName>.field.<name>`). Schema loading is the caller's
+	// responsibility — see [SchemaResolver].
+	Resolve(schema *jsonschema.Schema, stepName string, fields []Field) (FlowResolvedFields, error)
 
 	// Validate checks submitted values against the rules carried by a
 	// previously resolved field set.
@@ -136,6 +136,8 @@ type FlowFieldValidation struct {
 type FlowFieldType string
 
 const (
+	// FlowFieldTypeUnknown is a reserved field type that is only used in case of errors
+	FlowFieldTypeUnknown  FlowFieldType = "unknown"
 	FlowFieldTypeText     FlowFieldType = "text"
 	FlowFieldTypeEmail    FlowFieldType = "email"
 	FlowFieldTypePassword FlowFieldType = "password"
@@ -207,8 +209,9 @@ func ImplicitOutcomesForChallenge(c FlowFieldChallenge) []string {
 }
 
 // ErrFlowFieldUnknown is returned by [FlowFieldResolver.Resolve] when a
-// requested field name is not part of the resolver's schema or catalog.
-var ErrFlowFieldUnknown = errors.New("flow field: not in resolver catalog")
+// requested field name is not a property in the user schema. The
+// offending field name is appended via `fmt.Errorf("%w: %q", ...)`.
+var ErrFlowFieldUnknown = errors.New("flow field: not a property in the user schema")
 
 // ErrFlowFieldUnsupportedType is returned by [FlowFieldResolver.Resolve]
 // when a property declares a JSON `type` set the resolver cannot
