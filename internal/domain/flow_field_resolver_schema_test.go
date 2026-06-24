@@ -8,6 +8,10 @@ import (
 	"testing"
 
 	"github.com/ianlancetaylor/jsonschema"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
+	"go.uber.org/mock/gomock"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -36,6 +40,13 @@ func mustField(t *testing.T, r domain.FlowResolvedFields, name string) domain.Fl
 		t.Fatalf("resolved fields missing %q", name)
 	}
 	return f
+}
+
+func mustUnmarshal[T any](t *testing.T, content string) *T {
+	value := new(T)
+	err := json.Unmarshal([]byte(content), value)
+	require.NoError(t, err)
+	return value
 }
 
 // fakeSchemaResolver feeds inline JSON bytes through a real
@@ -68,8 +79,7 @@ func newFakeResolver(t *testing.T, schemas map[string][]byte) domain.SchemaResol
 // setup self-contained.
 const defaultSchemaURL = "https://example.test/user/v1/default.user.schema.json"
 
-func defaultSchemaBytes() []byte {
-	return []byte(`{
+const defaultSchemaContent string = `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
 		"x-auth-methods": { "password": { "enabled": true } },
@@ -81,18 +91,24 @@ func defaultSchemaBytes() []byte {
 			"given_name":  { "type": "string", "minLength": 1, "maxLength": 200 },
 			"family_name": { "type": "string", "minLength": 1, "maxLength": 200 }
 		}
-	}`)
-}
+	}`
 
 func newDefaultResolver(t *testing.T) *domain.SchemaFieldResolver {
 	t.Helper()
 	return domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{
-		defaultSchemaURL: defaultSchemaBytes(),
+		defaultSchemaURL: []byte(defaultSchemaContent),
 	}))
 }
 
 func TestSchemaFieldResolver_Resolve_DefaultFields(t *testing.T) {
-	resolver := newDefaultResolver(t)
+	t.Parallel()
+	mock := gomock.NewController(t)
+	schemaResolver := domainmock.NewMockSchemaResolver(mock)
+	schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil)
+
+	resolver := domain.NewSchemaFieldResolver(schemaResolver)
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "identifier",
 		[]string{"email", "username", "password", "given_name", "family_name"})
@@ -117,20 +133,21 @@ func TestSchemaFieldResolver_Resolve_DefaultFields(t *testing.T) {
 			t.Errorf("Resolve missing field %q", tc.name)
 			continue
 		}
-		if f.Type != tc.wantType {
-			t.Errorf("Resolve field %q type = %v, want %v", tc.name, f.Type, tc.wantType)
-		}
-		if f.TextKey != tc.wantTextKey {
-			t.Errorf("Resolve field %q text_key = %q, want %q", tc.name, f.TextKey, tc.wantTextKey)
-		}
-		if !f.Required {
-			t.Errorf("Resolve field %q required = false, want true", tc.name)
-		}
+		assert.Equal(t, tc.wantType, f.Type)
+		assert.Equal(t, tc.wantTextKey, f.TextKey)
+		assert.True(t, f.Required)
 	}
 }
 
 func TestSchemaFieldResolver_Resolve_IdentifierImpliesUserNotFound(t *testing.T) {
-	resolver := newDefaultResolver(t)
+	t.Parallel()
+	mock := gomock.NewController(t)
+	schemaResolver := domainmock.NewMockSchemaResolver(mock)
+	schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil)
+
+	resolver := domain.NewSchemaFieldResolver(schemaResolver)
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step", []string{"email", "password"})
 	if err != nil {
@@ -152,7 +169,14 @@ func TestSchemaFieldResolver_Resolve_IdentifierImpliesUserNotFound(t *testing.T)
 }
 
 func TestSchemaFieldResolver_Resolve_ChallengeSurfaces(t *testing.T) {
-	resolver := newDefaultResolver(t)
+	t.Parallel()
+	mock := gomock.NewController(t)
+	schemaResolver := domainmock.NewMockSchemaResolver(mock)
+	schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil)
+
+	resolver := domain.NewSchemaFieldResolver(schemaResolver)
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step", []string{"email", "password", "given_name"})
 	if err != nil {
@@ -171,15 +195,22 @@ func TestSchemaFieldResolver_Resolve_ChallengeSurfaces(t *testing.T) {
 }
 
 func TestSchemaFieldResolver_Resolve_PasswordChallengeRequiresAuthMethodEnabled(t *testing.T) {
+	t.Parallel()
 	const url = "https://example.test/no-auth-methods.json"
-	bytes := []byte(`{
+	schemaContent := `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
 		"properties": {
 			"password": { "type": "string", "minLength": 8, "x-password": true }
 		}
-	}`)
-	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
+	}`
+	mock := gomock.NewController(t)
+	schemaResolver := domainmock.NewMockSchemaResolver(mock)
+	schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), url, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, schemaContent), nil)
+
+	resolver := domain.NewSchemaFieldResolver(schemaResolver)
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step", []string{"password"})
 	if err != nil {
@@ -215,21 +246,26 @@ func TestSchemaFieldResolver_Resolve_PasswordChallengeRequiresXPassword(t *testi
 }
 
 func TestSchemaFieldResolver_Resolve_RenamedPasswordField(t *testing.T) {
+	t.Parallel()
 	const url = "https://example.test/renamed-password.json"
-	bytes := []byte(`{
+	schemaContent := `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
 		"x-auth-methods": { "password": { "enabled": true } },
 		"properties": {
 			"secret": { "type": "string", "minLength": 8, "x-password": true }
 		}
-	}`)
-	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
+	}`
+	mock := gomock.NewController(t)
+	schemaResolver := domainmock.NewMockSchemaResolver(mock)
+	schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), url, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, schemaContent), nil)
+
+	resolver := domain.NewSchemaFieldResolver(schemaResolver)
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step", []string{"secret"})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
+	assert.NoError(t, err)
 	if mustField(t, got, "secret").Challenge != domain.FlowFieldChallengePassword {
 		t.Errorf("Resolve secret Challenge = %q, want %q", mustField(t, got, "secret").Challenge, domain.FlowFieldChallengePassword)
 	}
@@ -239,7 +275,14 @@ func TestSchemaFieldResolver_Resolve_RenamedPasswordField(t *testing.T) {
 }
 
 func TestSchemaFieldResolver_Resolve_UniqueScopeSurfaces(t *testing.T) {
-	resolver := newDefaultResolver(t)
+	t.Parallel()
+	mock := gomock.NewController(t)
+	schemaResolver := domainmock.NewMockSchemaResolver(mock)
+	schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil)
+
+	resolver := domain.NewSchemaFieldResolver(schemaResolver)
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step", []string{"email", "password"})
 	if err != nil {
@@ -255,15 +298,22 @@ func TestSchemaFieldResolver_Resolve_UniqueScopeSurfaces(t *testing.T) {
 }
 
 func TestSchemaFieldResolver_Resolve_UniqueScopeProject(t *testing.T) {
+	t.Parallel()
 	const url = "https://example.test/project-unique.json"
-	bytes := []byte(`{
+	schemaContent := `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
 		"properties": {
 			"handle": { "type": "string", "x-unique": "project" }
 		}
-	}`)
-	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
+	}`
+	mock := gomock.NewController(t)
+	schemaResolver := domainmock.NewMockSchemaResolver(mock)
+	schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), url, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, schemaContent), nil)
+
+	resolver := domain.NewSchemaFieldResolver(schemaResolver)
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step", []string{"handle"})
 	if err != nil {
@@ -275,7 +325,14 @@ func TestSchemaFieldResolver_Resolve_UniqueScopeProject(t *testing.T) {
 }
 
 func TestSchemaFieldResolver_Resolve_UnknownField(t *testing.T) {
-	resolver := newDefaultResolver(t)
+	t.Parallel()
+	mock := gomock.NewController(t)
+	schemaResolver := domainmock.NewMockSchemaResolver(mock)
+	schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil)
+
+	resolver := domain.NewSchemaFieldResolver(schemaResolver)
 
 	_, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step", []string{"not_in_schema"})
 	if !errors.Is(err, domain.ErrFlowFieldUnknown) {
@@ -284,17 +341,24 @@ func TestSchemaFieldResolver_Resolve_UnknownField(t *testing.T) {
 }
 
 func TestSchemaFieldResolver_Resolve_SchemaLoadFailurePropagates(t *testing.T) {
-	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, nil))
+	t.Parallel()
+	const url = "https://example.test/missing.json"
+	mock := gomock.NewController(t)
+	schemaResolver := domainmock.NewMockSchemaResolver(mock)
+	schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), url, gomock.Any()).
+		Return(nil, errors.New("FAILURE"))
 
-	_, err := resolver.Resolve(t.Context(), nil, testProjectID, "https://example.test/missing.json", "step", []string{"email"})
-	if err == nil {
-		t.Fatal("Resolve err = nil, want load failure")
-	}
+	resolver := domain.NewSchemaFieldResolver(schemaResolver)
+
+	_, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step", []string{"email"})
+	assert.Error(t, err)
 }
 
 func TestSchemaFieldResolver_Resolve_FormatAndTypeVariants(t *testing.T) {
+	t.Parallel()
 	const url = "https://example.test/variants.json"
-	bytes := []byte(`{
+	schemaContent := `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
 		"properties": {
@@ -307,8 +371,14 @@ func TestSchemaFieldResolver_Resolve_FormatAndTypeVariants(t *testing.T) {
 			"opt_in":     { "type": ["null", "boolean"] },
 			"opt_in_rev": { "type": ["boolean", "null"] }
 		}
-	}`)
-	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
+	}`
+	mock := gomock.NewController(t)
+	schemaResolver := domainmock.NewMockSchemaResolver(mock)
+	schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), url, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, schemaContent), nil)
+
+	resolver := domain.NewSchemaFieldResolver(schemaResolver)
 
 	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step",
 		[]string{"website", "birthday", "created", "nickname", "gender", "newsletter", "opt_in", "opt_in_rev"})
@@ -345,15 +415,22 @@ func TestSchemaFieldResolver_Resolve_FormatAndTypeVariants(t *testing.T) {
 }
 
 func TestSchemaFieldResolver_Resolve_AmbiguousJSONTypeRejected(t *testing.T) {
+	t.Parallel()
 	const url = "https://example.test/ambiguous-type.json"
-	bytes := []byte(`{
+	schemaContent := `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
 		"properties": {
 			"either": { "type": ["string", "boolean"] }
 		}
-	}`)
-	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
+	}`
+	mock := gomock.NewController(t)
+	schemaResolver := domainmock.NewMockSchemaResolver(mock)
+	schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), url, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, schemaContent), nil)
+
+	resolver := domain.NewSchemaFieldResolver(schemaResolver)
 
 	_, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step", []string{"either"})
 	if !errors.Is(err, domain.ErrFlowFieldUnsupportedType) {

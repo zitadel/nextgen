@@ -4,7 +4,10 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/ianlancetaylor/jsonschema"
 	"github.com/zitadel/nextgen/internal/domain"
+	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
+	"go.uber.org/mock/gomock"
 )
 
 // resolveDefaultFields resolves every property in defaultSchemaBytes()
@@ -12,7 +15,14 @@ import (
 // (Required, Validation rules, etc. all populated as in production).
 func resolveDefaultFields(t *testing.T) domain.FlowResolvedFields {
 	t.Helper()
-	resolver := newDefaultResolver(t)
+	mock := gomock.NewController(t)
+	schemaResolver := domainmock.NewMockSchemaResolver(mock)
+	schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil)
+
+	resolver := domain.NewSchemaFieldResolver(schemaResolver)
+
 	fields, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step",
 		[]string{"email", "username", "password", "given_name", "family_name"})
 	if err != nil {
@@ -22,7 +32,11 @@ func resolveDefaultFields(t *testing.T) domain.FlowResolvedFields {
 }
 
 func TestSchemaFieldResolver_Validate_RequiredEmptyValue(t *testing.T) {
-	resolver := newDefaultResolver(t)
+	t.Parallel()
+	mock := gomock.NewController(t)
+	schemaResolver := domainmock.NewMockSchemaResolver(mock)
+	resolver := domain.NewSchemaFieldResolver(schemaResolver)
+
 	fields := resolveDefaultFields(t)
 
 	err := resolver.Validate(fields, map[string]any{"email": ""})
@@ -32,7 +46,11 @@ func TestSchemaFieldResolver_Validate_RequiredEmptyValue(t *testing.T) {
 }
 
 func TestSchemaFieldResolver_Validate_EmailFormat(t *testing.T) {
-	resolver := newDefaultResolver(t)
+	t.Parallel()
+	mock := gomock.NewController(t)
+	schemaResolver := domainmock.NewMockSchemaResolver(mock)
+
+	resolver := domain.NewSchemaFieldResolver(schemaResolver)
 	fields := resolveDefaultFields(t)
 
 	err := resolver.Validate(fields, map[string]any{"email": "not-an-email"})
@@ -42,7 +60,11 @@ func TestSchemaFieldResolver_Validate_EmailFormat(t *testing.T) {
 }
 
 func TestSchemaFieldResolver_Validate_MinLength(t *testing.T) {
-	resolver := newDefaultResolver(t)
+	t.Parallel()
+	mock := gomock.NewController(t)
+	schemaResolver := domainmock.NewMockSchemaResolver(mock)
+
+	resolver := domain.NewSchemaFieldResolver(schemaResolver)
 	fields := resolveDefaultFields(t)
 
 	err := resolver.Validate(fields, map[string]any{"password": "short"})
@@ -52,7 +74,11 @@ func TestSchemaFieldResolver_Validate_MinLength(t *testing.T) {
 }
 
 func TestSchemaFieldResolver_Validate_MaxLength(t *testing.T) {
-	resolver := newDefaultResolver(t)
+	t.Parallel()
+	mock := gomock.NewController(t)
+	schemaResolver := domainmock.NewMockSchemaResolver(mock)
+
+	resolver := domain.NewSchemaFieldResolver(schemaResolver)
 	fields := resolveDefaultFields(t)
 	long := make([]byte, 65)
 	for i := range long {
@@ -66,7 +92,11 @@ func TestSchemaFieldResolver_Validate_MaxLength(t *testing.T) {
 }
 
 func TestSchemaFieldResolver_Validate_HappyPath(t *testing.T) {
-	resolver := newDefaultResolver(t)
+	t.Parallel()
+	mock := gomock.NewController(t)
+	schemaResolver := domainmock.NewMockSchemaResolver(mock)
+
+	resolver := domain.NewSchemaFieldResolver(schemaResolver)
 	fields := resolveDefaultFields(t)
 
 	err := resolver.Validate(fields, map[string]any{
@@ -82,7 +112,11 @@ func TestSchemaFieldResolver_Validate_HappyPath(t *testing.T) {
 }
 
 func TestSchemaFieldResolver_Validate_UnknownField(t *testing.T) {
-	resolver := newDefaultResolver(t)
+	t.Parallel()
+	mock := gomock.NewController(t)
+	schemaResolver := domainmock.NewMockSchemaResolver(mock)
+
+	resolver := domain.NewSchemaFieldResolver(schemaResolver)
 	fields := resolveDefaultFields(t)
 
 	err := resolver.Validate(fields, map[string]any{"not_in_schema": "x"})
@@ -92,7 +126,11 @@ func TestSchemaFieldResolver_Validate_UnknownField(t *testing.T) {
 }
 
 func TestSchemaFieldResolver_Validate_NonStringValueReportsFormat(t *testing.T) {
-	resolver := newDefaultResolver(t)
+	t.Parallel()
+	mock := gomock.NewController(t)
+	schemaResolver := domainmock.NewMockSchemaResolver(mock)
+
+	resolver := domain.NewSchemaFieldResolver(schemaResolver)
 	fields := resolveDefaultFields(t)
 
 	err := resolver.Validate(fields, map[string]any{"email": 123})
