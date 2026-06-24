@@ -19,5 +19,13 @@
  * @param env - Environment to read from; injectable for tests.
  */
 export function resolveIssuer(env: NodeJS.ProcessEnv = process.env): string {
-  return env.VERCEL_URL ? `https://${env.VERCEL_URL}` : `http://localhost:${env.PORT ?? "8080"}`;
+  // Treat empty/whitespace as unset: `??` would let `VERCEL_URL=""` or
+  // `PORT=""` through and produce a malformed issuer like `https://` or
+  // `http://localhost:`. `trim() || fallback` collapses both cases.
+  const vercelUrl = env.VERCEL_URL?.trim();
+  if (vercelUrl) {
+    return `https://${vercelUrl}`;
+  }
+  const port = env.PORT?.trim() || "8080";
+  return `http://localhost:${port}`;
 }

@@ -9,6 +9,10 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts"
     },
+    "./openid-configuration": {
+      "types": "./src/openid-configuration.ts",
+      "import": "./src/openid-configuration.ts"
+    },
     "./platform": {
       "types": "./src/platform-handlers.ts",
       "import": "./src/platform-handlers.ts"

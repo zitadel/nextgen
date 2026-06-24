@@ -40,12 +40,19 @@ JWKS the function serves, but on a path the rewrite *can* reach (unlike
 `/.well-known/jwks.json`). Locally the Express app serves the discovery
 document dynamically, so this only matters on Vercel.
 
-There is no bundling step for this app's own code — Vercel builds
-`api/**` straight from TypeScript. The `buildCommand` only builds
-`@zitadel/api`, whose generated MSW/zod endpoints are imported at runtime
-through `@zitadel/api-mock` and therefore need their compiled `dist/`
-output (the workspace resolves to TypeScript source only under the
-`@zitadel/source` condition, which Vercel's runtime does not use).
+### The function is pre-bundled
+
+`@zitadel/api-mock` is consumed as raw TypeScript source (its `exports`
+point at `./src/*.ts`), and a Vercel Node function is not guaranteed to
+transpile a workspace TypeScript dependency at runtime — nor to resolve
+pnpm's symlinked `node_modules` layout from the function's location. So
+the `buildCommand` bundles the app with [`tsdown`](tsdown.config.ts)
+(`noExternal`) into a single self-contained `dist/app.mjs`, and
+[`api/index.ts`](api/index.ts) imports that bundle rather than the
+workspace source. The bundle also inlines `@zitadel/api`'s compiled
+output, so the deployed entry has nothing left to resolve at runtime but
+Node built-ins. `src/app.ts` stays the source of truth — it is what
+`scripts/local-server.ts` and the tests import directly.
 
 ## One-time Vercel setup
 

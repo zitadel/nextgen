@@ -1,7 +1,7 @@
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 
-import { buildOpenIdConfiguration } from "@zitadel/api-mock/server";
+import { buildOpenIdConfiguration } from "@zitadel/api-mock/openid-configuration";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { app, createApp } from "./app.js";
@@ -18,6 +18,15 @@ describe("resolveIssuer", () => {
 
   it("defaults the localhost port to 8080 when PORT is unset", () => {
     expect(resolveIssuer({})).toBe("http://localhost:8080");
+  });
+
+  it("treats an empty PORT as unset rather than producing http://localhost:", () => {
+    expect(resolveIssuer({ PORT: "" })).toBe("http://localhost:8080");
+    expect(resolveIssuer({ PORT: "   " })).toBe("http://localhost:8080");
+  });
+
+  it("treats an empty VERCEL_URL as unset rather than producing https://", () => {
+    expect(resolveIssuer({ VERCEL_URL: "" })).toBe("http://localhost:8080");
   });
 });
 

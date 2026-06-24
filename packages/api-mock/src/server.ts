@@ -38,6 +38,7 @@ import { applyBranding } from "./branding.js";
 import { HandoffError, JWK, verifyHandoffToken } from "./crypto.js";
 import { defaultDevBranding } from "./default-dev-branding.js";
 import { setupMockHandlers } from "./handlers.js";
+import { buildOpenIdConfiguration } from "./openid-configuration.js";
 import { errorBody, setupPlatformHandlers } from "./platform-handlers.js";
 
 const SESSION_TTL_SECONDS = 3600;
@@ -82,38 +83,6 @@ type IdempotencyCacheEntry = {
 };
 const IDEMPOTENCY_TTL_MS = 60_000;
 const idempotencyCache = new Map<string, IdempotencyCacheEntry>();
-
-/**
- * Build the minimal OIDC discovery document this mock advertises.
- *
- * Every real Zitadel server publishes one at
- * `/.well-known/openid-configuration`; the CLI's setup prompt uses it to
- * auto-discover OIDC servers (see `lib/prober`). Factored out of the
- * Express route so a build step can emit the same document as a static
- * asset — needed on Vercel, where `/.well-known/*` is reserved and cannot
- * be served through a rewrite.
- *
- * @param issuer - Absolute issuer base URL.
- * @param options.jwksUri - Absolute URL clients should fetch the JWKS
- *   from. Defaults to `${issuer}/.well-known/jwks.json`; a host that
- *   reserves `/.well-known/*` (Vercel) overrides it to `${issuer}/auth/keys`,
- *   which the mock serves identically.
- */
-export function buildOpenIdConfiguration(
-  issuer: string,
-  options: { jwksUri?: string } = {},
-): Record<string, unknown> {
-  return {
-    issuer,
-    jwks_uri: options.jwksUri ?? `${issuer}/.well-known/jwks.json`,
-    authorization_endpoint: `${issuer}/auth`,
-    token_endpoint: `${issuer}/auth/token`,
-    end_session_endpoint: `${issuer}/auth/end-session`,
-    response_types_supported: ["code"],
-    subject_types_supported: ["public"],
-    id_token_signing_alg_values_supported: ["RS256"],
-  };
-}
 
 /**
  * Build the configured Express app without binding it to a port.
