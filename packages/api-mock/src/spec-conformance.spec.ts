@@ -84,7 +84,10 @@ function validFlowDefinitionBody(): Record<string, unknown> {
       {
         name: "identifier",
         fields: ["email"],
-        actions: [{ name: "submit", text_key: "submit", primary: true }],
+        // `step-action.yaml` requires `kind` (enum submit|passkey|
+        // passkey_register|navigate|back); omitting it makes the
+        // CreateFlowDefinitionBody validation reject the body.
+        actions: [{ name: "submit", kind: "submit", text_key: "submit", primary: true }],
       },
     ],
   };
@@ -290,7 +293,9 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const res = await fetch(`${BASE}/flow_definitions/${id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(validFlowDefinitionBody()),
+      // `flow-definition-update-request.yaml` requires the `{ flow_definition }`
+      // envelope; a bare flow definition is rejected with 400.
+      body: JSON.stringify({ flow_definition: validFlowDefinitionBody() }),
     });
     expect(res.status).toBe(200);
     const body = await res.json();
