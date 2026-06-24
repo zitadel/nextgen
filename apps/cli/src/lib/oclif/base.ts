@@ -65,7 +65,7 @@ export abstract class BaseCommand extends Command {
   /**
    * Anonymous usage analytics for this invocation, created once in
    * {@link toMeta}. Subclasses add command-specific dimensions (framework,
-   * counts, `step_reached`, …) via {@link recordTelemetry}; the base class
+   * counts, `step`, …) via {@link recordTelemetry}; the base class
    * fires the lifecycle events and flushes in {@link finally}.
    */
   protected telemetry?: Telemetry;
@@ -92,7 +92,7 @@ export abstract class BaseCommand extends Command {
   /**
    * Merge command-specific dimensions into {@link telemetryProps} immutably: a
    * new frozen bag replaces the previous one, so no shared object is ever
-   * mutated. `step_reached` advances by re-recording it at each milestone.
+   * mutated. `step` advances by re-recording it at each milestone.
    */
   protected recordTelemetry(patch: Properties): void {
     this.telemetryProps = Object.freeze({ ...this.telemetryProps, ...patch });
@@ -245,7 +245,7 @@ export abstract class BaseCommand extends Command {
         commandEventProperties(meta, this.telemetrySessionId, {
           ...this.telemetryProps,
           status: "error",
-          error_code: zitadelError.code,
+          reason: zitadelError.code,
           exit_code: zitadelError.exitCode,
           duration_ms: Date.now() - this.telemetryStartedAt,
         }),

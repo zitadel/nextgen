@@ -130,7 +130,7 @@ export default class Setup extends BaseCommand {
       scaffolded_skeleton: scaffoldedFramework,
       skip_install: Boolean(flags["skip-install"]),
       dev_port_explicit: flags["dev-port"] !== undefined,
-      step_reached: "framework_resolved",
+      step: "framework_resolved",
     });
 
     // An explicit --dev-port overrides the detected port for the whole run, so
@@ -196,7 +196,7 @@ export default class Setup extends BaseCommand {
           framework.id,
         );
     consola.success(`Created project ${project.id}`);
-    this.recordTelemetry({ step_reached: "project_created" });
+    this.recordTelemetry({ step: "project_created" });
 
     const ctx: PatchContext = {
       framework,
@@ -221,7 +221,7 @@ export default class Setup extends BaseCommand {
         (result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""),
     );
     this.recordTelemetry({
-      step_reached: "files_patched",
+      step: "files_patched",
       files_written_count: result.filesWritten.length,
     });
 
@@ -237,7 +237,7 @@ export default class Setup extends BaseCommand {
     });
 
     this.recordTelemetry({
-      step_reached: "dependencies_installed",
+      step: "dependencies_installed",
       package_manager: installOutcome.install.package_manager,
     });
 

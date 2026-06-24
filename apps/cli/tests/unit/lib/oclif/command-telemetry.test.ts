@@ -38,9 +38,9 @@ describe("commandEventProperties", () => {
   });
 
   it("merges per-command extras", () => {
-    const props = commandEventProperties(meta(), "sess-1", { framework: "react", step_reached: "x" });
+    const props = commandEventProperties(meta(), "sess-1", { framework: "react", step: "x" });
     expect(props.framework).toBe("react");
-    expect(props.step_reached).toBe("x");
+    expect(props.step).toBe("x");
   });
 });
 
