@@ -43,8 +43,6 @@ export default class Plan extends BaseCommand {
     consola.start("Building plan");
     const plan = await buildSyncPlan(cwd, syncers, true);
     const summary = summarizePlan(plan);
-    // Diff *shape* only (counts, never resource contents) — how much config
-    // people manage is a key product signal.
     this.recordTelemetry({
       creates: summary.creates,
       updates: summary.updates,

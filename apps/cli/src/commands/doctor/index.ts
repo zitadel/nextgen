@@ -104,9 +104,6 @@ export default class Doctor extends BaseCommand {
     const failed = checks.filter((check) => check.status === "fail");
     const warnings = checks.filter((check) => check.status === "warn");
     const warningAdvice = advisoryForWarnings(warnings, this.meta.cliVersion);
-    // Health signal: counts plus the *names* of failing checks (stable enums,
-    // never their messages) so the top friction points surface. Set before the
-    // failure throw so the failed-event carries them too.
     this.recordTelemetry({
       runtime: runtimeBackend,
       checks_total: checks.length,

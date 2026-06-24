@@ -33,18 +33,18 @@ export function telemetryConfigDir(env: NodeJS.ProcessEnv): string {
 /**
  * Load the persisted anonymous id, minting and storing a new one on first run.
  *
- * Fail-open: if the config dir cannot be read or written (read-only home, CI
- * sandbox, permissions), fall back to an ephemeral per-process id and report
- * `isFirstRun: false` so we neither crash nor nag the user with the notice on
- * every run. Telemetry is best-effort, never load-bearing.
+ * Fail-open: if the config dir cannot be resolved, read, or written — including
+ * an `os.homedir()` throw in a restricted/containerized environment, a
+ * read-only home, a CI sandbox, or a permissions error — fall back to an
+ * ephemeral per-process id and report `isFirstRun: false` so we neither crash
+ * nor nag the user with the notice on every run. Telemetry is best-effort,
+ * never load-bearing.
  */
 export function loadOrCreateIdentity(env: NodeJS.ProcessEnv): Identity {
   let dir: string;
   try {
     dir = telemetryConfigDir(env);
   } catch {
-    // `os.homedir()` can throw in restricted/containerized environments. Fail
-    // open to an ephemeral id rather than crash the host CLI.
     return { distinctId: randomUUID(), isFirstRun: false };
   }
   const file = join(dir, "telemetry.json");

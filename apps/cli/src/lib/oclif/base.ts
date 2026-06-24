@@ -156,16 +156,15 @@ export abstract class BaseCommand extends Command {
    * current {@link meta}. Guarded so a command that resolves meta more than once
    * does not double-count. Also called from {@link catch} so a failure thrown
    * before {@link toMeta} finished (e.g. server resolution, flag parsing) still
-   * records the run.
+   * records the run. Returns early for an inert (opted-out / no-token /
+   * test-runner) instance so a disabled run never builds the property bags —
+   * no timezone→country resolution or URL parsing for users who opted out.
    */
   private openTelemetry(flag: boolean | undefined): void {
     if (this.telemetry) {
       return;
     }
     this.telemetry = Telemetry.create({ env: process.env, flag, debug: this.meta.debug });
-    // Inert (opted-out / no-token / test-runner) instance: skip building the
-    // property bags entirely so a disabled run stays a true no-op — no timezone
-    // → country resolution or URL parsing for users who opted out.
     if (!this.telemetry.enabled) {
       return;
     }
@@ -226,14 +225,14 @@ export abstract class BaseCommand extends Command {
    * Renders any thrown error as the failure envelope and exits with its code.
    * A flag-parse error fires before {@link toMeta} runs, so the local `meta`
    * here refreshes `command` from the now-resolved command id to keep the
-   * envelope's `command` field accurate.
+   * envelope's `command` field accurate. If that early failure left telemetry
+   * unopened, {@link openTelemetry} runs here so the failure is still recorded;
+   * the flag isn't parsed yet on that path, so `--no-telemetry` is honoured from
+   * argv.
    */
   protected override async catch(error: unknown): Promise<never> {
     const meta: GlobalOptions = { ...this.meta, command: this.id ?? this.meta.command };
     const zitadelError = toZitadelError(error);
-    // An error thrown before toMeta finished (server resolution, flag parsing)
-    // leaves telemetry unopened — open it now so the failure is still recorded.
-    // The flag isn't parsed yet on that path, so honour --no-telemetry from argv.
     this.meta = meta;
     this.openTelemetry(process.argv.includes("--no-telemetry") ? false : undefined);
     this.telemetry?.track(

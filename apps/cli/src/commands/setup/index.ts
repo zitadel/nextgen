@@ -124,10 +124,6 @@ export default class Setup extends BaseCommand {
       }
     }
 
-    // Tag the telemetry context now that the framework is known. `step_reached`
-    // advances at each milestone below so a failure event pinpoints exactly
-    // where setup broke (the funnel's most actionable signal); it is PII-free
-    // (framework id and a fixed step enum only).
     this.recordTelemetry({
       framework: framework.id,
       renderer: flags.renderer ?? "react",
@@ -224,8 +220,6 @@ export default class Setup extends BaseCommand {
       `Patched ${result.filesWritten.length} file${result.filesWritten.length === 1 ? "" : "s"}` +
         (result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""),
     );
-    // Record the patch milestone immediately, before install runs — so an
-    // install failure is attributed to the install step, not project/patch.
     this.recordTelemetry({
       step_reached: "files_patched",
       files_written_count: result.filesWritten.length,

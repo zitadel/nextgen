@@ -1,6 +1,16 @@
 import { defineConfig } from "tsdown";
 
 /**
+ * Telemetry channel stamped into the bundle (replaces `__ZITADEL_TELEMETRY_CHANNEL__`).
+ * Defaults to `development` so every contributor/CI build routes to the dev
+ * Mixpanel project; only the release pipeline sets
+ * `ZITADEL_TELEMETRY_BUILD_CHANNEL=production` (see `scripts/release.mjs`) so the
+ * published CLI routes to production. Releases bump the version, so this build's
+ * input hash changes and moon rebuilds rather than serving a dev-stamped cache.
+ */
+const telemetryChannel = (process.env.ZITADEL_TELEMETRY_BUILD_CHANNEL || "development").toLowerCase();
+
+/**
  * Unbundled, multi-entry build for oclif: each command compiles to its own
  * `dist/commands/<name>.mjs` so oclif can discover and lazy-load them at
  * runtime. `@oclif/*` (core + plugins) stays external — resolved from
@@ -28,15 +38,7 @@ export default defineConfig({
   shims: true,
   external: [/^@oclif\//],
   target: false,
-  // Stamp the telemetry channel into the bundle. Defaults to "development" so
-  // every contributor/CI build routes to the dev project; only the release
-  // pipeline sets ZITADEL_TELEMETRY_BUILD_CHANNEL=production (see
-  // scripts/release.mjs) so the published CLI routes to production. Releases
-  // bump the version, so this build's input hash changes and moon rebuilds
-  // rather than serving a dev-stamped cache.
   define: {
-    __ZITADEL_TELEMETRY_CHANNEL__: JSON.stringify(
-      (process.env.ZITADEL_TELEMETRY_BUILD_CHANNEL || "development").toLowerCase(),
-    ),
+    __ZITADEL_TELEMETRY_CHANNEL__: JSON.stringify(telemetryChannel),
   },
 });

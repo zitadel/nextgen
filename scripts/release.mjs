@@ -114,10 +114,14 @@ async function buildEmbeddedUI() {
   await run("moon", ["run", "console:build", "login-ui:build"], { cwd: repoRoot });
 }
 
+/**
+ * Build the public npm package artifacts for a release. Sets
+ * `ZITADEL_TELEMETRY_BUILD_CHANNEL=production` so the published CLI bundle is
+ * stamped for the production Mixpanel project; only the release pipeline sets
+ * this, so contributor/CI builds default to the dev project (see
+ * `apps/cli/tsdown.config.ts`).
+ */
 async function buildPublicPackageArtifacts() {
-  // Stamp the published CLI bundle for the production Mixpanel project. Only the
-  // release pipeline sets this; contributor/CI builds default to the dev project
-  // (see apps/cli/tsdown.config.ts).
   await run("moon", ["run", ...PUBLIC_PACKAGE_BUILD_TARGETS], {
     cwd: repoRoot,
     env: { ...process.env, ZITADEL_TELEMETRY_BUILD_CHANNEL: "production" },
