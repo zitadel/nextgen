@@ -16,6 +16,7 @@
   },
   "scripts": {
     "dev": "tsx scripts/local-server.ts",
+    "build": "tsdown",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
@@ -38,6 +39,7 @@
     "eslint-plugin-prettier": "catalog:",
     "express": "catalog:",
     "prettier": "catalog:",
+    "tsdown": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",
     "typescript-eslint": "catalog:",

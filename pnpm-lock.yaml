@@ -391,6 +391,9 @@ importers:
       prettier:
         specifier: 'catalog:'
         version: 3.8.3
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.21.10(@tsdown/css@0.21.10)(@typescript/native-preview@7.0.0-dev.20260421.2)(oxc-resolver@11.20.0)(synckit@0.11.12)(typescript@6.0.3)(vue-tsc@3.2.8(typescript@6.0.3))
       tsx:
         specifier: 'catalog:'
         version: 4.21.0
