@@ -96,13 +96,50 @@ wired into the user's app.
 `command`, `cli_version`, `os`, `arch`, `node_version`, `session_id`,
 `non_interactive`, `is_tty`, `is_ci`, `ci_provider`, `host_agent`,
 `invocation_channel`, `dry_run`, `force`, `server_kind` (bucketed
-`cloud`/`local`/`self_hosted` — **never the URL**). Built in
-`src/lib/oclif/command-telemetry.ts` (using the generic env/geo helpers in
-`src/lib/telemetry/`).
+`cloud`/`local`/`self_hosted` — **never the URL**), plus the reserved
+`$os`/`$country_code` (country derived from the timezone, not the IP — `ip: 0`
+keeps geolocation off). Built in `src/lib/oclif/command-telemetry.ts` (using the
+generic env/geo helpers in `src/lib/telemetry/`).
+
+### Event shape
+
+Each event is one Mixpanel `track` call. We set the properties below;
+Mixpanel injects the transport fields (`time`, `$lib_version`,
+`$mp_api_endpoint`, `$user_id`, `mp_lib`, …) on ingestion — we do not send those.
+
+```json
+{
+  "event": "cli_command_completed",
+  "properties": {
+    "distinct_id": "09233195-cd34-468c-bb7b-151554e19fbc",
+    "$insert_id": "2398bc39-3cb6-4b05-835f-bb03908794b8",
+    "ip": 0,
+    "session_id": "6d919718-6168-42b4-9482-e656776445f0",
+    "command": "status",
+    "cli_version": "0.1.0-alpha.11",
+    "$os": "Mac OS X",
+    "$country_code": "AU",
+    "os": "darwin",
+    "arch": "arm64",
+    "node_version": "24.12.0",
+    "non_interactive": true,
+    "is_tty": false,
+    "is_ci": false,
+    "host_agent": "unknown",
+    "invocation_channel": "unknown",
+    "dry_run": false,
+    "force": false,
+    "server_kind": "cloud",
+    "status": "ok",
+    "duration_ms": 25
+  }
+}
+```
 
 ### Command-specific dimensions
 
-Commands enrich `this.telemetryProps` (merged onto every lifecycle event):
+Commands add dimensions via `this.recordTelemetry({ … })` (merged immutably onto
+every lifecycle event for the run):
 
 - **setup** — `framework`, `renderer`, `package_manager`, `scaffolded_skeleton`, `skip_install`, `dev_port_explicit`, `files_written_count`, `step_reached` (`framework_resolved` → `project_created` → `files_patched`).
 - **plan / apply** — `creates`, `updates`, `deletes`, `total` (diff *counts* only).
