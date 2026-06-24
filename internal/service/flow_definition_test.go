@@ -830,7 +830,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 		{
 			name: "flow definition updated successfully (draft to active)",
 			fields: fields{
-				db: stubPool(),
+				db: nil,
 				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
 					return userSchema, nil
 				}},
@@ -895,7 +895,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 		{
 			name: "flow definition updated successfully - draft status unchanged",
 			fields: fields{
-				db: stubPool(),
+				db: nil,
 				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
 					return userSchema, nil
 				}},
@@ -960,7 +960,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 		{
 			name: "flow definition not found",
 			fields: fields{
-				db: stubPool(),
+				db: nil,
 				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
 					return userSchema, nil
 				}},
@@ -991,7 +991,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 		{
 			name: "invalid purpose",
 			fields: fields{
-				db: stubPool(),
+				db: nil,
 				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
 					return userSchema, nil
 				}},
@@ -1022,7 +1022,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 		{
 			name: "validation fails",
 			fields: fields{
-				db: stubPool(),
+				db: nil,
 				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
 					return userSchema, nil
 				}},
@@ -1054,7 +1054,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 		{
 			name: "missing status in update request retains the current status",
 			fields: fields{
-				db: stubPool(),
+				db: nil,
 				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
 					return userSchema, nil
 				}},
@@ -1100,7 +1100,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 		{
 			name: "deactivate fails - only self is active for purpose",
 			fields: fields{
-				db: stubPool(),
+				db: nil,
 				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
 					return userSchema, nil
 				}},
@@ -1145,7 +1145,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 		{
 			name: "deactivate blocked - multi-purpose missing active alternative for one purpose",
 			fields: fields{
-				db: stubPool(),
+				db: nil,
 				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
 					return userSchema, nil
 				}},
@@ -1205,7 +1205,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 		},
 		{
 			name: "deactivate allowed - all purposes have another active definition", fields: fields{
-				db: stubPool(),
+				db: nil,
 				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
 					return userSchema, nil
 				}},
@@ -1294,7 +1294,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 		{
 			name: "active update removing purpose fails - removed purpose has no alternate active definition",
 			fields: fields{
-				db: stubPool(),
+				db: nil,
 				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
 					return userSchema, nil
 				}},
@@ -1343,7 +1343,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 		{
 			name: "active update removing purpose succeeds - alternate active definition exists for removed purpose",
 			fields: fields{
-				db: stubPool(),
+				db: nil,
 				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
 					return userSchema, nil
 				}},
@@ -1406,7 +1406,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 		{
 			name: "repo update error",
 			fields: fields{
-				db: stubPool(),
+				db: nil,
 				schemaResolver: &mockSchemaGetter{getSchema: func(ctx context.Context, projectID, teamID, schemaID string) (*domain.JSONSchema, error) {
 					return userSchema, nil
 				}},

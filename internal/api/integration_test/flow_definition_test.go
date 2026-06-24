@@ -246,7 +246,7 @@ func TestUpdateFlowDefinitionUnauthenticated(t *testing.T) {
 		ProjectID: "proj_1234",
 	})
 	require.NoError(t, err)
-	assert.Equal(t, &api.ErrorDetailsStatusCode{
+	assertFlowDefinitionResponse(t, &api.ErrorDetailsStatusCode{
 		StatusCode: http.StatusUnauthorized,
 		Response: api.ErrorDetails{
 			Code:    "auth.unauthorized",

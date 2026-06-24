@@ -345,12 +345,7 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 		}).
 		Times(1)
 	w.passwordRepo.EXPECT().
-		DeleteByUserID(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Cond(func(in string) bool {
-			return in == userID
-		})).
-		Times(1)
-	w.passwordRepo.EXPECT().
-		Create(gomock.Any(), gomock.Any(), gomock.Cond(func(u *domain.CreateUserPassword) bool {
+		Set(gomock.Any(), gomock.Any(), gomock.Cond(func(u *domain.SetUserPassword) bool {
 			return u.EncodedHash == "hashed:correct-horse-battery-staple"
 		})).
 		Times(1)
@@ -592,10 +587,7 @@ func TestFlowStateMachine_Process_IntegrityOnMissingTargetStep(t *testing.T) {
 		Create(gomock.Any(), gomock.Any(), gomock.Any()).
 		Times(1)
 	w.passwordRepo.EXPECT().
-		DeleteByUserID(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		Times(1)
-	w.passwordRepo.EXPECT().
-		Create(gomock.Any(), gomock.Any(), gomock.Any()).
+		Set(gomock.Any(), gomock.Any(), gomock.Any()).
 		Times(1)
 	w.transaction.EXPECT().Commit(gomock.Any())
 	w.authAttemptService.EXPECT().RegisterCreatedUser(gomock.Any(), gomock.Any())
@@ -639,10 +631,7 @@ func TestFlowStateMachine_Process_InvalidActionRejected(t *testing.T) {
 		Create(gomock.Any(), gomock.Any(), gomock.Any()).
 		Times(1)
 	w.passwordRepo.EXPECT().
-		DeleteByUserID(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		Times(1)
-	w.passwordRepo.EXPECT().
-		Create(gomock.Any(), gomock.Any(), gomock.Any()).
+		Set(gomock.Any(), gomock.Any(), gomock.Any()).
 		Times(1)
 	w.transaction.EXPECT().Commit(gomock.Any())
 	w.authAttemptService.EXPECT().RegisterCreatedUser(gomock.Any(), gomock.Any())
@@ -1603,10 +1592,7 @@ func TestFlowDispatch_RegisterMultiStep_HappyPath(t *testing.T) {
 		Create(gomock.Any(), gomock.Any(), gomock.Any()).
 		Times(1)
 	w.passwordRepo.EXPECT().
-		DeleteByUserID(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		Times(1)
-	w.passwordRepo.EXPECT().
-		Create(gomock.Any(), gomock.Any(), gomock.Any()).
+		Set(gomock.Any(), gomock.Any(), gomock.Any()).
 		Times(1)
 	w.transaction.EXPECT().Commit(gomock.Any())
 	w.authAttemptService.EXPECT().RegisterCreatedUser(gomock.Any(), gomock.Any())
@@ -1700,10 +1686,7 @@ func TestFlowDispatch_CombinedFlow_LoginUnknownEmail_FlipsAndCreates(t *testing.
 		Create(gomock.Any(), gomock.Any(), gomock.Any()).
 		Times(1)
 	w.passwordRepo.EXPECT().
-		DeleteByUserID(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		Times(1)
-	w.passwordRepo.EXPECT().
-		Create(gomock.Any(), gomock.Any(), gomock.Any()).
+		Set(gomock.Any(), gomock.Any(), gomock.Any()).
 		Times(1)
 	w.transaction.EXPECT().Commit(gomock.Any())
 	w.authAttemptService.EXPECT().RegisterCreatedUser(gomock.Any(), gomock.Any())

@@ -43,44 +43,6 @@ func (m *MockUserPasswordRepository) EXPECT() *MockUserPasswordRepositoryMockRec
 	return m.recorder
 }
 
-// Create mocks base method.
-func (m *MockUserPasswordRepository) Create(ctx context.Context, client database.QueryExecutor, user *domain.CreateUserPassword) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Create", ctx, client, user)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Create indicates an expected call of Create.
-func (mr *MockUserPasswordRepositoryMockRecorder) Create(ctx, client, user any) *MockUserPasswordRepositoryCreateCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockUserPasswordRepository)(nil).Create), ctx, client, user)
-	return &MockUserPasswordRepositoryCreateCall{Call: call}
-}
-
-// MockUserPasswordRepositoryCreateCall wrap *gomock.Call
-type MockUserPasswordRepositoryCreateCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockUserPasswordRepositoryCreateCall) Return(arg0 error) *MockUserPasswordRepositoryCreateCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockUserPasswordRepositoryCreateCall) Do(f func(context.Context, database.QueryExecutor, *domain.CreateUserPassword) error) *MockUserPasswordRepositoryCreateCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserPasswordRepositoryCreateCall) DoAndReturn(f func(context.Context, database.QueryExecutor, *domain.CreateUserPassword) error) *MockUserPasswordRepositoryCreateCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // Delete mocks base method.
 func (m *MockUserPasswordRepository) Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error {
 	m.ctrl.T.Helper()
@@ -470,6 +432,44 @@ func (c *MockUserPasswordRepositoryResetFailedAttemptsCall) Do(f func() database
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockUserPasswordRepositoryResetFailedAttemptsCall) DoAndReturn(f func() database.Change) *MockUserPasswordRepositoryResetFailedAttemptsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// Set mocks base method.
+func (m *MockUserPasswordRepository) Set(ctx context.Context, client database.QueryExecutor, user *domain.SetUserPassword) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Set", ctx, client, user)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Set indicates an expected call of Set.
+func (mr *MockUserPasswordRepositoryMockRecorder) Set(ctx, client, user any) *MockUserPasswordRepositorySetCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Set", reflect.TypeOf((*MockUserPasswordRepository)(nil).Set), ctx, client, user)
+	return &MockUserPasswordRepositorySetCall{Call: call}
+}
+
+// MockUserPasswordRepositorySetCall wrap *gomock.Call
+type MockUserPasswordRepositorySetCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockUserPasswordRepositorySetCall) Return(arg0 error) *MockUserPasswordRepositorySetCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockUserPasswordRepositorySetCall) Do(f func(context.Context, database.QueryExecutor, *domain.SetUserPassword) error) *MockUserPasswordRepositorySetCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockUserPasswordRepositorySetCall) DoAndReturn(f func(context.Context, database.QueryExecutor, *domain.SetUserPassword) error) *MockUserPasswordRepositorySetCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

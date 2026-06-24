@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/zitadel/nextgen/internal/crypto"
@@ -75,7 +76,7 @@ func (h *FlowCreateUserHandler) Handle(ctx context.Context, in domain.FlowOnSucc
 
 	err := h.userService.ApplyActions(ctx, createUserAction, setPasswordAction)
 	if err != nil {
-		if derr, ok := err.(domain.Error); ok && derr.Code == domain.ErrUserAlreadyExists().Code {
+		if derr, ok := errors.AsType[domain.Error](err); ok && derr.Code == domain.ErrUserAlreadyExists().Code {
 			msg := "user_already_exists"
 			return domain.FlowOnSuccessResult{StepError: &msg}, nil
 		}
