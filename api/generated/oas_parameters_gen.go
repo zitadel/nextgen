@@ -141,133 +141,6 @@ func decodeActivateFlowDefinitionParams(args [1]string, argsEscaped bool, r *htt
 	return params, nil
 }
 
-// ArchiveFlowDefinitionParams is parameters of archiveFlowDefinition operation.
-type ArchiveFlowDefinitionParams struct {
-	// The id returned by the POST /flow_definitions endpoint.
-	ID string
-	// The unique identifier of the project.
-	ProjectID ProjectID
-}
-
-func unpackArchiveFlowDefinitionParams(packed middleware.Parameters) (params ArchiveFlowDefinitionParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "id",
-			In:   "path",
-		}
-		params.ID = packed[key].(string)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "project_id",
-			In:   "query",
-		}
-		params.ProjectID = packed[key].(ProjectID)
-	}
-	return params
-}
-
-func decodeArchiveFlowDefinitionParams(args [1]string, argsEscaped bool, r *http.Request) (params ArchiveFlowDefinitionParams, _ error) {
-	q := uri.NewQueryDecoder(r.URL.Query())
-	// Decode path: id.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "id",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				val, err := d.DecodeValue()
-				if err != nil {
-					return err
-				}
-
-				c, err := conv.ToString(val)
-				if err != nil {
-					return err
-				}
-
-				params.ID = c
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "id",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	// Decode query: project_id.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotProjectIDVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotProjectIDVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.ProjectID = ProjectID(paramsDotProjectIDVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := params.ProjectID.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "project_id",
-			In:   "query",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
 // AuthorizeDeviceParams is parameters of authorizeDevice operation.
 type AuthorizeDeviceParams struct {
 	// The client ID of the application that is requesting authorization.
@@ -1761,15 +1634,15 @@ func decodeCreateUserParams(args [0]string, argsEscaped bool, r *http.Request) (
 	return params, nil
 }
 
-// DeleteFlowDefinitionParams is parameters of deleteFlowDefinition operation.
-type DeleteFlowDefinitionParams struct {
+// DeactivateFlowDefinitionParams is parameters of deactivateFlowDefinition operation.
+type DeactivateFlowDefinitionParams struct {
 	// The id returned by the POST /flow_definitions endpoint.
 	ID string
-	// The project id to filter by.
+	// The unique identifier of the project.
 	ProjectID ProjectID
 }
 
-func unpackDeleteFlowDefinitionParams(packed middleware.Parameters) (params DeleteFlowDefinitionParams) {
+func unpackDeactivateFlowDefinitionParams(packed middleware.Parameters) (params DeactivateFlowDefinitionParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "id",
@@ -1787,7 +1660,7 @@ func unpackDeleteFlowDefinitionParams(packed middleware.Parameters) (params Dele
 	return params
 }
 
-func decodeDeleteFlowDefinitionParams(args [1]string, argsEscaped bool, r *http.Request) (params DeleteFlowDefinitionParams, _ error) {
+func decodeDeactivateFlowDefinitionParams(args [1]string, argsEscaped bool, r *http.Request) (params DeactivateFlowDefinitionParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Decode path: id.
 	if err := func() error {
@@ -1888,15 +1761,15 @@ func decodeDeleteFlowDefinitionParams(args [1]string, argsEscaped bool, r *http.
 	return params, nil
 }
 
-// DeprecateFlowDefinitionParams is parameters of deprecateFlowDefinition operation.
-type DeprecateFlowDefinitionParams struct {
+// DeleteFlowDefinitionParams is parameters of deleteFlowDefinition operation.
+type DeleteFlowDefinitionParams struct {
 	// The id returned by the POST /flow_definitions endpoint.
 	ID string
-	// The unique identifier of the project.
+	// The project id to filter by.
 	ProjectID ProjectID
 }
 
-func unpackDeprecateFlowDefinitionParams(packed middleware.Parameters) (params DeprecateFlowDefinitionParams) {
+func unpackDeleteFlowDefinitionParams(packed middleware.Parameters) (params DeleteFlowDefinitionParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "id",
@@ -1914,7 +1787,7 @@ func unpackDeprecateFlowDefinitionParams(packed middleware.Parameters) (params D
 	return params
 }
 
-func decodeDeprecateFlowDefinitionParams(args [1]string, argsEscaped bool, r *http.Request) (params DeprecateFlowDefinitionParams, _ error) {
+func decodeDeleteFlowDefinitionParams(args [1]string, argsEscaped bool, r *http.Request) (params DeleteFlowDefinitionParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Decode path: id.
 	if err := func() error {

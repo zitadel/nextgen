@@ -201,6 +201,44 @@ func (c *MockFlowDefinitionRepositoryListFlowDefinitionsCall) DoAndReturn(f func
 	return c
 }
 
+// UpdateFlowDefinition mocks base method.
+func (m *MockFlowDefinitionRepository) UpdateFlowDefinition(ctx context.Context, client database.QueryExecutor, def *domain.FlowDefinition) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateFlowDefinition", ctx, client, def)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateFlowDefinition indicates an expected call of UpdateFlowDefinition.
+func (mr *MockFlowDefinitionRepositoryMockRecorder) UpdateFlowDefinition(ctx, client, def any) *MockFlowDefinitionRepositoryUpdateFlowDefinitionCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateFlowDefinition", reflect.TypeOf((*MockFlowDefinitionRepository)(nil).UpdateFlowDefinition), ctx, client, def)
+	return &MockFlowDefinitionRepositoryUpdateFlowDefinitionCall{Call: call}
+}
+
+// MockFlowDefinitionRepositoryUpdateFlowDefinitionCall wrap *gomock.Call
+type MockFlowDefinitionRepositoryUpdateFlowDefinitionCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockFlowDefinitionRepositoryUpdateFlowDefinitionCall) Return(arg0 error) *MockFlowDefinitionRepositoryUpdateFlowDefinitionCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockFlowDefinitionRepositoryUpdateFlowDefinitionCall) Do(f func(context.Context, database.QueryExecutor, *domain.FlowDefinition) error) *MockFlowDefinitionRepositoryUpdateFlowDefinitionCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockFlowDefinitionRepositoryUpdateFlowDefinitionCall) DoAndReturn(f func(context.Context, database.QueryExecutor, *domain.FlowDefinition) error) *MockFlowDefinitionRepositoryUpdateFlowDefinitionCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // UpdateFlowDefinitionStatus mocks base method.
 func (m *MockFlowDefinitionRepository) UpdateFlowDefinitionStatus(ctx context.Context, client database.QueryExecutor, projectID, id string, status domain.FlowDefinitionStatus) error {
 	m.ctrl.T.Helper()

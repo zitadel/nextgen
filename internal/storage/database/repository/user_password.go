@@ -158,7 +158,7 @@ func (r *UserPasswordRepository) List(ctx context.Context, client database.Query
 	return out, nil
 }
 
-func (r *UserPasswordRepository) Create(ctx context.Context, client database.QueryExecutor, pw *domain.CreateUserPassword) error {
+func (r *UserPasswordRepository) Set(ctx context.Context, client database.QueryExecutor, pw *domain.SetUserPassword) error {
 	builder := database.NewStatementBuilder("INSERT INTO ")
 	builder.WriteString(r.qualifiedTableName())
 	builder.WriteString(" (")
@@ -171,7 +171,14 @@ func (r *UserPasswordRepository) Create(ctx context.Context, client database.Que
 	}.WriteUnqualified(builder)
 	builder.WriteString(") VALUES (")
 	builder.WriteArgs(pw.ProjectID, pw.UserID, pw.EncodedHash, pw.ChangeRequired, pw.VerificationID)
-	builder.WriteString(")")
+	builder.WriteString(") ON CONFLICT (project_id, user_id) DO UPDATE SET")
+	builder.WriteString(" encoded_hash = EXCLUDED.encoded_hash,")
+	builder.WriteString(" change_required = EXCLUDED.change_required,")
+	builder.WriteString(" verification_id = EXCLUDED.verification_id,")
+	builder.WriteString(" changed_at = NOW(),")
+	builder.WriteString(" failed_attempts = 0,")
+	builder.WriteString(" last_successful_check = NULL,")
+	builder.WriteString(" updated_at = NOW()")
 	_, err := client.Exec(ctx, builder.String(), builder.Args()...)
 	return err
 }

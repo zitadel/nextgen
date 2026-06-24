@@ -29,6 +29,12 @@ tasks:
       - "api:build"
       - "config:build"
       - "sdk-next:build"
+    inputs:
+      # Default project files plus the telemetry build-channel env var, so a
+      # production-stamped (release) build is never served from — or reused as —
+      # a dev-stamped cache. See apps/cli/tsdown.config.ts.
+      - "**/*"
+      - "$ZITADEL_TELEMETRY_BUILD_CHANNEL"
     outputs:
       - "dist/**/*"
 

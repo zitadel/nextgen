@@ -84,7 +84,7 @@ function validFlowDefinitionBody(): Record<string, unknown> {
       {
         name: "identifier",
         fields: ["email"],
-        actions: [{ name: "submit", text_key: "submit", primary: true }],
+        actions: [{ name: "submit", kind: "submit", text_key: "submit", primary: true }],
       },
     ],
   };
@@ -282,17 +282,20 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        project_id: "proj_conformance_put",
+        project_id: "proj_conformance_update",
         flow_definition: validFlowDefinitionBody(),
       }),
     });
     const { id } = (await create.json()) as { id: string };
-    const res = await fetch(`${BASE}/flow_definitions/${id}?project_id=proj_conformance_put`, {
+    // Spec: `updateFlowDefinition` is `PUT /flow_definitions/{id}` with a
+    // required `project_id` query param (the generated client and CLI
+    // syncer both call it that way). The body wraps the definition under
+    // `flow_definition` (flow-definition-update-request.yaml), unlike the
+    // create envelope.
+    const res = await fetch(`${BASE}/flow_definitions/${id}?project_id=proj_conformance_update`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        flow_definition: validFlowDefinitionBody(),
-      }),
+      body: JSON.stringify({ flow_definition: validFlowDefinitionBody() }),
     });
     expect(res.status).toBe(200);
     const body = await res.json();

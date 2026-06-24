@@ -17,13 +17,16 @@
         "actions": [
           {
             "name": "submit",
+            "kind": "submit",
             "primary": true
           },
           {
-            "name": "passkey"
+            "name": "passkey",
+            "kind": "passkey"
           },
           {
-            "name": "register"
+            "name": "register",
+            "kind": "submit"
           }
         ],
         "transitions": {
@@ -44,15 +47,17 @@
       {
         "name": "password",
         "fields": [
-          "password"
+          "x-auth-methods#password"
         ],
         "actions": [
           {
             "name": "submit",
+            "kind": "submit",
             "primary": true
           },
           {
-            "name": "passkey"
+            "name": "passkey",
+            "kind": "passkey"
           }
         ],
         "transitions": {
@@ -73,13 +78,16 @@
         "actions": [
           {
             "name": "submit",
+            "kind": "submit",
             "primary": true
           },
           {
-            "name": "passkey_register"
+            "name": "passkey_register",
+            "kind": "passkey_register"
           },
           {
-            "name": "login"
+            "name": "login",
+            "kind": "submit"
           }
         ],
         "transitions": {
@@ -100,12 +108,13 @@
       {
         "name": "register-password",
         "fields": [
-          "password",
+          "x-auth-methods#password",
           "phoneNumber"
         ],
         "actions": [
           {
             "name": "submit",
+            "kind": "submit",
             "primary": true
           }
         ],
@@ -121,10 +130,12 @@
         "actions": [
           {
             "name": "passkey_register",
+            "kind": "passkey_register",
             "primary": true
           },
           {
-            "name": "skip"
+            "name": "skip",
+            "kind": "submit"
           }
         ],
         "transitions": {

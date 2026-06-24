@@ -49,6 +49,7 @@ import {
   ListFlowDefinitionsResponse,
   UpdateFlowDefinitionBody,
   UpdateFlowDefinitionParams,
+  UpdateFlowDefinitionQueryParams,
   UpdateFlowDefinitionResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import {
@@ -199,7 +200,7 @@ function flowListItemResponse(r: FlowDefinitionRecord): ListFlowDefinitions200Fl
     name: r.name,
     project_id: r.projectId,
     schema_uri: r.schemaUri,
-    status: r.status,
+    status: r.status as ListFlowDefinitions200FlowDefinitionsItem["status"],
     created_at: r.createdAt,
     updated_at: r.updatedAt,
   };
@@ -473,13 +474,17 @@ export function setupPlatformHandlers() {
       if (!path.ok) {
         return path.response;
       }
-      const query = requiredProjectID(request);
+      const query = parse(
+        UpdateFlowDefinitionQueryParams,
+        queryRecord(request),
+        "invalid_query",
+      );
       if (!query.ok) {
         return query.response;
       }
 
       const record = store.flowDefinitions.get(path.data.id);
-      if (!record || record.projectId !== query.data) {
+      if (!record || record.projectId !== query.data.project_id) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
       const raw = await readJson(request);

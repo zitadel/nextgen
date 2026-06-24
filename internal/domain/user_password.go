@@ -42,13 +42,15 @@ func (u *UserPassword) Verify(password string, verifier crypto.HashVerifier) err
 	return nil
 }
 
-type CreateUserPassword struct {
+type SetUserPassword struct {
 	ProjectID      string
 	UserID         string
 	EncodedHash    string
 	ChangeRequired bool
 	VerificationID *string
 }
+
+//go:generate go tool mockgen -typed -package domainmock -destination ./mock/user_password.mock.go . UserPasswordRepository
 
 type UserPasswordRepository interface {
 	Repository
@@ -59,7 +61,7 @@ type UserPasswordRepository interface {
 	GetByUserID(ctx context.Context, client database.QueryExecutor, projectID string, userID string) (*UserPassword, error)
 	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*UserPassword, error)
 	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*UserPassword, error)
-	Create(ctx context.Context, client database.QueryExecutor, user *CreateUserPassword) error
+	Set(ctx context.Context, client database.QueryExecutor, user *SetUserPassword) error
 	Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error
 	DeleteByUserID(ctx context.Context, client database.QueryExecutor, projectID string, userID string) error
 }

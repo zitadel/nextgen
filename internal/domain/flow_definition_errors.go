@@ -33,3 +33,7 @@ func ErrMissingFlowDefinitionID() Error {
 func ErrMissingProjectID() Error {
 	return newError(PrefixFlowDefinition.ErrorCodePrefix("missing_project_id"), "flow definition: missing project id", nil, nil)
 }
+
+func ErrFlowDefinitionUpdateConflict(details any) Error {
+	return newError(PrefixFlowDefinition.ErrorCodePrefix("update_conflict"), "flow definition: update conflict", details, nil)
+}

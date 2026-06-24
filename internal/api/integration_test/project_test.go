@@ -159,19 +159,19 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 
 	passwordStep, ok := flowDef.FindStep("password")
 	require.True(t, ok)
-	assert.Equal(t, []string{"password"}, passwordStep.Fields)
+	assert.Equal(t, []domain.Field{"x-auth-methods#password"}, passwordStep.Fields)
 	assert.Contains(t, actionNames(passwordStep.Actions), domain.FlowActionPasskey)
 	assert.Equal(t, "done", passwordStep.Transitions[domain.FlowActionPasskey].Target)
 
 	registerStep, ok := flowDef.FindStep("register")
 	require.True(t, ok)
-	assert.Equal(t, []string{"email", "givenName", "familyName", "dateOfBirth"}, registerStep.Fields)
+	assert.Equal(t, []domain.Field{"email", "givenName", "familyName", "dateOfBirth"}, registerStep.Fields)
 	assert.Contains(t, actionNames(registerStep.Actions), domain.FlowActionPasskeyRegister)
 	assert.Equal(t, "done", registerStep.Transitions[domain.FlowActionPasskeyRegister].Target)
 
 	registerPasswordStep, ok := flowDef.FindStep("register-password")
 	require.True(t, ok)
-	assert.Equal(t, []string{"password"}, registerPasswordStep.Fields)
+	assert.Equal(t, []domain.Field{"x-auth-methods#password"}, registerPasswordStep.Fields)
 	require.NotNil(t, registerPasswordStep.OnSuccess)
 	assert.Equal(t, domain.FlowOnSuccessCreateUser, *registerPasswordStep.OnSuccess)
 	// Registration completes directly — no passkey upsell step; passkey

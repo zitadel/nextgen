@@ -114,8 +114,8 @@ Validate and upload repo config to the platform.
 
 ```
 USAGE
-  $ zitadel apply [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [-e
-    development|preview|production]
+  $ zitadel apply [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
+    [--telemetry] [-e development|preview|production]
 
 FLAGS
   -c, --cwd=<value>           Project directory to operate on.
@@ -126,6 +126,7 @@ FLAGS
   -s, --server=<value>        Override the resolved server URL.
       --debug                 Debug logging.
       --dry-run               Preview without mutating files or the platform.
+      --[no-]telemetry        Send anonymous usage analytics. Disable with --no-telemetry.
       --verbose               Verbose logging.
 
 GLOBAL FLAGS
@@ -201,22 +202,23 @@ Verify local runtime and project state.
 
 ```
 USAGE
-  $ zitadel doctor [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [--fix]
-    [--image <value>] [--port <value>] [--runtime binary|docker]
+  $ zitadel doctor [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
+    [--telemetry] [--fix] [--image <value>] [--port <value>] [--runtime binary|docker]
 
 FLAGS
-  -c, --cwd=<value>      Project directory to operate on.
-  -f, --force            Overwrite protected files on conflict.
-  -n, --non-interactive  Disable prompts. Required when scripting or running as an agent.
-  -s, --server=<value>   Override the resolved server URL.
-      --debug            Debug logging.
-      --dry-run          Preview without mutating files or the platform.
-      --fix              Re-apply missing managed files.
-      --image=<value>    Container image to check.
-      --port=<value>     [default: 8080] Local HTTP port.
-      --runtime=<option> Local runtime backend.
-                         <options: binary|docker>
-      --verbose          Verbose logging.
+  -c, --cwd=<value>       Project directory to operate on.
+  -f, --force             Overwrite protected files on conflict.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>    Override the resolved server URL.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --fix               Re-apply missing managed files.
+      --image=<value>     Container image to check.
+      --port=<value>      [default: 8080] Local HTTP port.
+      --runtime=<option>  Local runtime backend.
+                          <options: binary|docker>
+      --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
+      --verbose           Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -232,6 +234,7 @@ Remove managed files and local Zitadel state.
 ```
 USAGE
   $ zitadel eject [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
+    [--telemetry]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -240,6 +243,7 @@ FLAGS
   -s, --server=<value>   Override the resolved server URL.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
       --verbose          Verbose logging.
 
 GLOBAL FLAGS
@@ -278,8 +282,8 @@ Show local Zitadel server logs.
 
 ```
 USAGE
-  $ zitadel logs [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [--follow]
-    [--tail <value>]
+  $ zitadel logs [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
+    [--telemetry] [--follow] [--tail <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -290,6 +294,7 @@ FLAGS
       --dry-run          Preview without mutating files or the platform.
       --follow           Follow logs.
       --tail=<value>     [default: 200] Number of lines to show.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
       --verbose          Verbose logging.
 
 GLOBAL FLAGS
@@ -305,8 +310,8 @@ Validate config without mutation and preview the sync diff.
 
 ```
 USAGE
-  $ zitadel plan [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [-e
-    development|preview|production]
+  $ zitadel plan [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
+    [--telemetry] [-e development|preview|production]
 
 FLAGS
   -c, --cwd=<value>           Project directory to operate on.
@@ -317,6 +322,7 @@ FLAGS
   -s, --server=<value>        Override the resolved server URL.
       --debug                 Debug logging.
       --dry-run               Preview without mutating files or the platform.
+      --[no-]telemetry        Send anonymous usage analytics. Disable with --no-telemetry.
       --verbose               Verbose logging.
 
 GLOBAL FLAGS
@@ -333,6 +339,7 @@ Delete the local Zitadel server runtime and data.
 ```
 USAGE
   $ zitadel reset [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
+    [--telemetry]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -341,6 +348,7 @@ FLAGS
   -s, --server=<value>   Override the resolved server URL.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
       --verbose          Verbose logging.
 
 GLOBAL FLAGS
@@ -373,7 +381,8 @@ Create a Zitadel project and scaffold local auth.
 ```
 USAGE
   $ zitadel setup [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
-    [--framework next|nuxt|react|vue|angular] [--renderer react|web-component] [--dev-port <value>] [--skip-install]
+    [--telemetry] [--framework next|nuxt|react|vue|solid|svelte|qwik|angular] [--renderer react|web-component]
+    [--dev-port <value>] [--skip-install]
 
 FLAGS
   -c, --cwd=<value>         Project directory to operate on.
@@ -385,10 +394,11 @@ FLAGS
                             port. Use distinct ports to run several scaffolded apps side by side.
       --dry-run             Preview without mutating files or the platform.
       --framework=<option>  Framework to target.
-                            <options: next|nuxt|react|vue|angular>
+                            <options: next|nuxt|react|vue|solid|svelte|qwik|angular>
       --renderer=<option>   Renderer (default: react).
                             <options: react|web-component>
       --skip-install        Do not install dependencies after setup updates package.json.
+      --[no-]telemetry      Send anonymous usage analytics. Disable with --no-telemetry.
       --verbose             Verbose logging.
 
 GLOBAL FLAGS
@@ -409,21 +419,22 @@ Start a local Zitadel server.
 
 ```
 USAGE
-  $ zitadel start [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug] [--image
-    <value>] [--port <value>] [--runtime binary|docker]
+  $ zitadel start [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
+    [--telemetry] [--image <value>] [--port <value>] [--runtime binary|docker]
 
 FLAGS
-  -c, --cwd=<value>      Project directory to operate on.
-  -f, --force            Overwrite protected files on conflict.
-  -n, --non-interactive  Disable prompts. Required when scripting or running as an agent.
-  -s, --server=<value>   Override the resolved server URL.
-      --debug            Debug logging.
-      --dry-run          Preview without mutating files or the platform.
-      --image=<value>    Container image to run.
-      --port=<value>     [default: 8080] Local HTTP port.
-      --runtime=<option> Local runtime backend.
-                         <options: binary|docker>
-      --verbose          Verbose logging.
+  -c, --cwd=<value>       Project directory to operate on.
+  -f, --force             Overwrite protected files on conflict.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>    Override the resolved server URL.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --image=<value>     Container image to run.
+      --port=<value>      [default: 8080] Local HTTP port.
+      --runtime=<option>  Local runtime backend.
+                          <options: binary|docker>
+      --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
+      --verbose           Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -439,6 +450,7 @@ Summarize the local Zitadel server and project state.
 ```
 USAGE
   $ zitadel status [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
+    [--telemetry]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -447,6 +459,7 @@ FLAGS
   -s, --server=<value>   Override the resolved server URL.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
       --verbose          Verbose logging.
 
 GLOBAL FLAGS
@@ -463,14 +476,17 @@ Stop the local Zitadel server.
 ```
 USAGE
   $ zitadel stop [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
+    [--telemetry] [--all]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
   -f, --force            Overwrite protected files on conflict.
   -n, --non-interactive  Disable prompts. Required when scripting or running as an agent.
   -s, --server=<value>   Override the resolved server URL.
+      --all              Stop all discovered CLI-managed local Zitadel runtime processes.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
       --verbose          Verbose logging.
 
 GLOBAL FLAGS
@@ -487,6 +503,7 @@ Remove managed files and local Zitadel state.
 ```
 USAGE
   $ zitadel uninstall [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
+    [--telemetry]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -495,6 +512,7 @@ FLAGS
   -s, --server=<value>   Override the resolved server URL.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
       --verbose          Verbose logging.
 
 GLOBAL FLAGS

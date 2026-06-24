@@ -49,6 +49,7 @@ func DefaultLoginFlowDefinitions(serverURL string, projectID string, userSchemaU
 		}
 
 		defs[i], err = domain.NewFlowDefinition(
+			"",
 			projectID,
 			req.FlowDefinition.GetName(),
 			new(url.URL(req.GetSchemaURI().Value)).String(),
@@ -59,6 +60,7 @@ func DefaultLoginFlowDefinitions(serverURL string, projectID string, userSchemaU
 				TeamIDs: req.FlowDefinition.GetAudience().Value.TeamIds,
 			},
 			steps,
+			domain.FlowDefinitionStatusActive,
 		)
 	}
 
@@ -100,10 +102,15 @@ func convertSteps(steps []api.FlowDefinitionStep) ([]domain.FlowDefinitionStep, 
 			return nil, err
 		}
 
+		actions, err := convertStepActions(step.GetActions())
+		if err != nil {
+			return nil, fmt.Errorf("step %q: %w", step.GetName(), err)
+		}
+
 		ret[i] = domain.FlowDefinitionStep{
 			Name:         step.GetName(),
-			Fields:       step.GetFields(),
-			Actions:      convertStepActions(step.GetActions()),
+			Fields:       domain.FieldsFromStrings(step.GetFields()),
+			Actions:      actions,
 			Gates:        gates,
 			SSOProviders: convertStepSSOProviders(step.GetSSOProviders()),
 			OnSuccess:    onSuccess,
@@ -226,19 +233,24 @@ func convertStepGateConfig(config api.OptGateConfig) (map[string]any, error) {
 // convertStepActions preserves the nil-vs-empty distinction so an explicit
 // `actions: []` survives the embed-loader path without collapsing into a
 // nil that would re-read as "omitted, apply default" downstream.
-func convertStepActions(actions []api.StepAction) []domain.FlowStepAction {
+func convertStepActions(actions []api.StepAction) ([]domain.FlowStepAction, error) {
 	if actions == nil {
-		return nil
+		return nil, nil
 	}
 
 	ret := make([]domain.FlowStepAction, 0, len(actions))
 	for _, action := range actions {
+		kind, err := domain.FlowActionKindString(string(action.GetKind()))
+		if err != nil {
+			return nil, fmt.Errorf("action %q: invalid kind %q: %w", action.GetName(), action.GetKind(), err)
+		}
 		ret = append(ret, domain.FlowStepAction{
 			Name:    action.GetName(),
+			Kind:    kind,
 			TextKey: action.TextKey.Value,
 			Primary: action.Primary.Value,
 		})
 	}
 
-	return ret
+	return ret, nil
 }
