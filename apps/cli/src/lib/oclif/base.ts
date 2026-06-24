@@ -76,11 +76,16 @@ export abstract class BaseCommand extends Command {
    */
   protected telemetryProps: Readonly<Properties> = Object.freeze({});
 
-  /** Correlates the started/completed pair; set once when telemetry opens. */
-  private telemetrySessionId = "";
+  /** Correlates the started/completed pair; minted at instance construction. */
+  private readonly telemetrySessionId = randomUUID();
 
-  /** Wall-clock start used to derive `duration_ms`; set when telemetry opens. */
-  private telemetryStartedAt = 0;
+  /**
+   * Wall-clock start used to derive `duration_ms`. Captured at instance
+   * construction (before flag parsing and server resolution) so the duration
+   * covers the full invocation, even when telemetry is opened late from
+   * {@link catch} after an early failure.
+   */
+  private readonly telemetryStartedAt = Date.now();
 
   /**
    * Merge command-specific dimensions into {@link telemetryProps} immutably: a
@@ -158,8 +163,6 @@ export abstract class BaseCommand extends Command {
       return;
     }
     this.telemetry = Telemetry.create({ env: process.env, flag, debug: this.meta.debug });
-    this.telemetrySessionId = randomUUID();
-    this.telemetryStartedAt = Date.now();
     this.telemetry.track(
       CLI_COMMAND_STARTED,
       commandEventProperties(this.meta, this.telemetrySessionId, this.telemetryProps),
