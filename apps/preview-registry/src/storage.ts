@@ -100,7 +100,16 @@ export const createFsStore = (storageRoot: string, publicBase: string): BlobStor
     },
 
     list: async (prefix) => {
-      const allFiles = await walkDirectory(storageRoot);
+      // Only traverse the subtree the prefix points at instead of the
+      // whole store: a packument request scopes to `@scope/name/-/`, so
+      // walking just that directory keeps each lookup proportional to the
+      // package's own files rather than the entire snapshot bundle. The
+      // directory portion of the prefix is everything up to the last `/`;
+      // an empty/path-less prefix walks the whole root.
+      const lastSlash = prefix.lastIndexOf("/");
+      const prefixDir = lastSlash === -1 ? "" : prefix.slice(0, lastSlash);
+      const walkRoot = prefixDir ? join(storageRoot, prefixDir) : storageRoot;
+      const allFiles = await walkDirectory(walkRoot);
       const matched = await Promise.all(
         allFiles.map(async (fullPath): Promise<BlobEntry | null> => {
           // Blob keys are always POSIX-style (`@scope/name/-/file.tgz`),

@@ -131,8 +131,15 @@ export const createApp = (store: BlobStore) => {
       const tarball = await store.read(key);
       // Return the Buffer directly as the Response body — it's already a
       // valid BodyInit, so there's no extra O(n) copy per download.
+      // Snapshot tarballs are immutable (each is bundled into one deploy
+      // under a commit-stamped name), so cache them aggressively at both
+      // the client and the CDN to avoid re-downloads across install
+      // retries.
       return new Response(tarball, {
-        headers: { "Content-Type": "application/octet-stream" },
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "Cache-Control": "public, max-age=31536000, s-maxage=31536000, immutable",
+        },
       });
     } catch {
       return context.json({ error: "not found" }, 404);
