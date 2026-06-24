@@ -35,14 +35,18 @@ event.
 | **Tracking method** | server-side, fire-and-forget |
 | **CDP (if any)** | none |
 | **Consent required** | yes — opt-out model (`DO_NOT_TRACK`, `ZITADEL_TELEMETRY=0`, `--no-telemetry`) |
-| **Project token location** | `src/lib/telemetry/config.ts` (write-only ingestion token; dev baked in, prod via `ZITADEL_TELEMETRY_TOKEN` / release pipeline) |
+| **Project token location** | `src/lib/telemetry/config.ts` (write-only dev + prod tokens baked in) |
 | **Data region** | `ZITADEL_TELEMETRY_REGION` = `us` (default) \| `eu` |
 
 The ingestion token is **write-only** (cannot read data back), so embedding it
 in the published CLI is safe and intentional — this is how dev-tool telemetry
-works. Dev and prod are separate Mixpanel projects; production is selected only
-when `ZITADEL_TELEMETRY_ENV=production` (or `NODE_ENV=production`), so running
-from source always lands in the dev project.
+works. Dev and prod are separate Mixpanel projects. The channel is **auto-detected
+by install location**: the published package runs from inside `node_modules`, so
+the **published CLI routes real user traffic to the prod project** with no
+per-user env var, while running from source/tests (or a locally-built
+`node dist/...`) stays on dev. Precedence: explicit `ZITADEL_TELEMETRY_ENV` /
+`NODE_ENV`, then a `ZITADEL_TELEMETRY_BUILD_CHANNEL` stamp (CI/release override),
+then the install-location auto-detection.
 
 ---
 

@@ -224,6 +224,12 @@ export default class Setup extends BaseCommand {
       `Patched ${result.filesWritten.length} file${result.filesWritten.length === 1 ? "" : "s"}` +
         (result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""),
     );
+    // Record the patch milestone immediately, before install runs — so an
+    // install failure is attributed to the install step, not project/patch.
+    this.recordTelemetry({
+      step_reached: "files_patched",
+      files_written_count: result.filesWritten.length,
+    });
 
     const installOutcome = await installDependenciesForSetup({
       cwd,
@@ -237,8 +243,7 @@ export default class Setup extends BaseCommand {
     });
 
     this.recordTelemetry({
-      step_reached: "files_patched",
-      files_written_count: result.filesWritten.length,
+      step_reached: "dependencies_installed",
       package_manager: installOutcome.install.package_manager,
     });
 
