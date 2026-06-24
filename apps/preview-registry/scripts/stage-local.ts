@@ -50,8 +50,9 @@ const listPublishablePackageDirectories = (): readonly string[] =>
  *
  * Mirrors the shape of what
  * {@link ../api/registry.ts | the Vercel function bundle} ships in
- * production, just without version stamping — packages keep their
- * checked-in `0.0.0` so iterating on schema or routing is fast.
+ * production, but skips the snapshot version-stamping step — each
+ * package keeps whatever version is currently in its package.json,
+ * so iterating on schema or routing locally is fast.
  */
 const stageLocal = async (): Promise<void> => {
   rmSync(SNAPSHOT_ROOT, { recursive: true, force: true });

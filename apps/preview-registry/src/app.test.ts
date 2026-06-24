@@ -64,4 +64,25 @@ describe("createApp blob route", () => {
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("OK");
   });
+
+  test("scoped packument route returns 404 when the package has no snapshots", async () => {
+    const { store } = recordingStore();
+    const app = createApp(store);
+    const response = await app.request("/@scope/name");
+    expect(response.status).toBe(404);
+  });
+
+  test("URL-encoded scoped packument route returns 404 when the package has no snapshots", async () => {
+    const { store } = recordingStore();
+    const app = createApp(store);
+    const response = await app.request("/@scope%2Fname");
+    expect(response.status).toBe(404);
+  });
+
+  test("URL-encoded packument route returns 400 on malformed percent-encoding", async () => {
+    const { store } = recordingStore();
+    const app = createApp(store);
+    const response = await app.request("/@scope%2F%E0%A4%A");
+    expect(response.status).toBe(400);
+  });
 });
