@@ -1,7 +1,6 @@
 # Layer Hierarchy
 
-> Three layers. Data hierarchy, not URL hierarchy. For how these map to URLs, see [
-`url-architecture.md`](url-architecture.md). For vocabulary, [`../glossary.md`](../glossary.md).
+> Three layers. Data hierarchy, not URL hierarchy. For how these map to URLs, see [`url-architecture.md`](url-architecture.md). For vocabulary, [`../glossary.md`](../glossary.md).
 
 ## The three layers
 
@@ -14,8 +13,7 @@
 ## Platform is a reserved project
 
 There is no separate "platform" resource kind. Zitadel's own control plane is just a **reserved project** inside the
-same model — the platform project. Its `project_id` is discoverable via the authenticated [
-`/capabilities`](conventions.md#capabilities) response under `defaults.project_id`. The SDK does not hardcode the value;
+same model — the platform project. Its `project_id` is discoverable via the authenticated [`/capabilities`](conventions.md#capabilities) response under `defaults.project_id`. The SDK does not hardcode the value;
 it reads it on initialization.
 
 This means:
@@ -26,8 +24,7 @@ This means:
 - **Claim** attaches a customer project to a team in the platform project via `team_id`.
 
 Same resources, different project context. The SDK talks to `/users`, `/teams`, `/team_memberships` at both scales — the
-scope comes from the `project_id` resolved by the resource-scope index (see [
-`url-architecture.md`](url-architecture.md)).
+scope comes from the `project_id` resolved by the resource-scope index (see [`url-architecture.md`](url-architecture.md)).
 
 ## Self-hosted exposes the same API shape as cloud
 

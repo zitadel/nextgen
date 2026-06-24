@@ -3,14 +3,13 @@
 > See [Hierarchy](hierarchy.md)
 > and [ADR 024: User, Team, and Lifecycle Ownership](../../adrs/024-user-team-lifecycle-ownership.md).
 
-This document defines the decision heuristics and worked examples indicated in [Next-Generation Platform Architecture
-](https://github.com/zitadel/nextgen/issues/249) for choosing between a **Project** and a **Team** in the Zitadel next-generation architecture.
+This document defines the decision heuristics and worked examples indicated in [Next-Generation Platform Architecture](https://github.com/zitadel/nextgen/issues/249) for choosing between a **Project** and a **Team** in the Zitadel next-generation architecture.
 
 ## 1. Core Distinctions at a Glance
 
 * **Project:** The top-level tenant and identity namespace. It owns configuration (branding, IdPs, custom domains, feature flags) and contains teams, users, apps, flows, and sessions.
 * **Team:** A tenant-grouping inside a Project. It serves as a collaboration and data boundary. Depending on the context, a team might represent a B2B customer, a department, or a billing account.
-* **User:** An identity scoped to a single Project. Users are attached to teams via Memberships. Removing a team always removes access derived from that membership; user deprovisioning then follows lifecycle-owner policy.
+* **User:** An identity scoped to a single Project. Users are attached to teams via memberships. Removing a team always removes access derived from that membership; user deprovisioning then follows lifecycle-owner policy.
 
 Zitadel's own infrastructure runs in a reserved **Zitadel Platform Project**. Claim attaches a **Customer Project** to a **Team in the Zitadel Platform Project.**
 
@@ -18,7 +17,7 @@ Zitadel's own infrastructure runs in a reserved **Zitadel Platform Project**. Cl
 
 - Choose a **Project** when you need a **hard identity boundary** (separate users, issuer/domain/IdP, sessions, or
   autonomous lifecycle).
-- Choose a **Team** when you need a **collaboration and access boundary within one project** (shared users, membership roles, scoped policy overrides), or as an ownership principal (via **claim**) for customer projects under the reserved Zitadel platform project.
+- Choose a **Team** when you need a **collaboration and access boundary within one project** (shared users, membership roles, scoped policy overrides), or as an ownership principal (via **Claim**) for customer projects under the reserved Zitadel platform project.
 
 ### What Each Entity Owns
 
@@ -175,15 +174,15 @@ Project: Zitadel Platform
 
 ### Case 5: Agency managing customer environments (e.g., BuildStuff)
 
-* **Scenario**: BuildStuff is a dev agency administering identity for Acme, Contoso, and Fabrikam. Agency staff Chris
+- **Scenario**: BuildStuff is a dev agency administering identity for Acme, Contoso, and Fabrikam. Agency staff Chris
   and Jane need admin access across customer setups. Customer setups must remain isolated.
-* **Modeling**:
-    * **Ownership context**: BuildStuff is a paying developer account, represented as a **Team** in the platform
+- **Modeling**:
+    - **Ownership context**: BuildStuff is a paying developer account, represented as a **Team** in the platform
       project (`Team: BuildStuff`). Chris and Jane are **Users** in the platform project with memberships in
       `Team: BuildStuff`.
-    * **Customers**: Acme, Contoso, and Fabrikam are modeled as completely separate customer **Projects** (e.g.,
+    - **Customers**: Acme, Contoso, and Fabrikam are modeled as completely separate customer **Projects** (e.g.,
       `Project: Acme Prod`, `Project: Acme Staging`, `Project: Contoso Prod`).
-    * **Access and ownership**: Membership changes in `Team: BuildStuff` affect operator access only (e.g., when an Agency staff leaves, their access to this team and all resources under it are revoked). The ownership of the customer projects remains under `Team: BuildStuff`.
+    - **Access and ownership**: Membership changes in `Team: BuildStuff` affect operator access only (e.g., when an Agency staff leaves, their access to this team and all resources under it are revoked). The ownership of the customer projects remains under `Team: BuildStuff`.
 
 ```text
 Project: Zitadel Platform
