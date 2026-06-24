@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { buildOpenIdConfiguration } from "@zitadel/api-mock/server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { app } from "./app.js";
+import { app, createApp } from "./app.js";
 import { resolveIssuer } from "./issuer.js";
 
 describe("resolveIssuer", () => {
@@ -36,11 +36,16 @@ describe("static discovery document", () => {
 });
 
 describe("app", () => {
+  // The issuer is decoupled from the bind address (on Vercel it is the
+  // deployment URL, not the listen port), so inject a known issuer via the
+  // factory and assert the discovery document reflects exactly that —
+  // rather than spinning up the ambient-env singleton and loosely matching.
+  const issuer = "https://test-issuer.example";
   let server: Server;
   let baseUrl: string;
 
   beforeAll(async () => {
-    server = app.listen(0);
+    server = createApp({ issuer }).listen(0);
     await new Promise<void>((resolve, reject) => {
       server.once("listening", () => resolve());
       server.once("error", reject);
@@ -55,12 +60,16 @@ describe("app", () => {
     });
   });
 
-  it("serves the OIDC discovery document", async () => {
+  it("exposes a default app built from the ambient environment", () => {
+    expect(typeof app).toBe("function");
+  });
+
+  it("serves the OIDC discovery document with the injected issuer", async () => {
     const response = await fetch(`${baseUrl}/.well-known/openid-configuration`);
     expect(response.status).toBe(200);
     const body = (await response.json()) as { issuer: string; jwks_uri: string };
-    expect(body.issuer).toMatch(/^https?:\/\//);
-    expect(body.jwks_uri).toBe(`${body.issuer}/.well-known/jwks.json`);
+    expect(body.issuer).toBe(issuer);
+    expect(body.jwks_uri).toBe(`${issuer}/.well-known/jwks.json`);
   });
 
   it("serves a JWKS with one signing key", async () => {
