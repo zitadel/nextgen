@@ -69,11 +69,13 @@ function Home() {
 }
 
 /**
- * A login/register route. Renders the typed `<ZitadelLogin>` React wrapper from
- * `@zitadel/sdk-tanstack-start/react` and configures the SDK at module scope via
- * `configureZitadel` from the `/client` entry. The public project id comes from
- * Vite's `import.meta.env.VITE_ZITADEL_PROJECT_ID`; the backend URL never reaches
- * the browser (the widget talks to the same-origin `${PROXY_PATH}` proxy).
+ * A login/register route. Configures the SDK once at module scope with
+ * `configureZitadel` from the `/client` entry and passes the returned project
+ * handle straight to the typed `<ZitadelLogin>` React wrapper from
+ * `@zitadel/sdk-tanstack-start/react` as its `project` prop. The public project
+ * id comes from Vite's `import.meta.env.VITE_ZITADEL_PROJECT_ID`; the backend URL
+ * never reaches the browser (the widget talks to the same-origin `${PROXY_PATH}`
+ * proxy).
  */
 function authRoute(purpose: "login" | "register"): string {
   const path = purpose === "login" ? "/login" : "/register";
@@ -85,7 +87,7 @@ import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";
 
 const projectId = import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "";
 
-configureZitadel({ projectId, proxyPath: "${PROXY_PATH}" });
+const project = configureZitadel({ projectId, proxyPath: "${PROXY_PATH}" });
 
 export const Route = createFileRoute("${path}")({
   component: ${componentName},
@@ -94,12 +96,7 @@ export const Route = createFileRoute("${path}")({
 function ${componentName}() {
   return (
     <div style={{ position: "fixed", inset: 0, overflow: "auto", background: "#0f0f11", colorScheme: "dark" }}>
-      <ZitadelLogin
-        projectId={projectId}
-        proxyPath="${PROXY_PATH}"
-        purpose="${purpose}"
-        postSignInUrl="/profile"
-      />
+      <ZitadelLogin project={project} purpose="${purpose}" postSignInUrl="/profile" />
     </div>
   );
 }
@@ -123,7 +120,7 @@ import { configureZitadel } from "@zitadel/sdk-tanstack-start/client";
 
 const projectId = import.meta.env.VITE_ZITADEL_PROJECT_ID ?? "";
 
-configureZitadel({ projectId, proxyPath: "${PROXY_PATH}" });
+const project = configureZitadel({ projectId, proxyPath: "${PROXY_PATH}" });
 
 export const Route = createFileRoute("/profile")({
   component: ProfilePage,
@@ -132,7 +129,7 @@ export const Route = createFileRoute("/profile")({
 function ProfilePage() {
   return (
     <div style={{ position: "fixed", inset: 0, overflow: "auto", background: "#0f0f11", colorScheme: "dark" }}>
-      <ZitadelLogout projectId={projectId} proxyPath="${PROXY_PATH}" postSignOutUrl="/login" />
+      <ZitadelLogout project={project} postSignOutUrl="/login" />
     </div>
   );
 }

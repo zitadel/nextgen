@@ -68,10 +68,10 @@ Use the typed React wrappers from the `/react` entry:
 import { ZitadelLogin } from '@zitadel/sdk-tanstack-start/react';
 import { configureZitadel } from '@zitadel/sdk-tanstack-start/client';
 
-configureZitadel({ projectId: 'demo', proxyPath: '/__nextgen' });
+const project = configureZitadel({ projectId: 'demo', proxyPath: '/__nextgen' });
 
 export function LoginPage() {
-  return <ZitadelLogin projectId="demo" proxyPath="/__nextgen" postSignInUrl="/admin" />;
+  return <ZitadelLogin project={project} purpose="login" postSignInUrl="/admin" />;
 }
 ```
 
