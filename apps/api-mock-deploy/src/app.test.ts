@@ -28,6 +28,12 @@ describe("resolveIssuer", () => {
   it("treats an empty VERCEL_URL as unset rather than producing https://", () => {
     expect(resolveIssuer({ VERCEL_URL: "" })).toBe("http://localhost:8080");
   });
+
+  it("falls back to 8080 for non-numeric, zero, or out-of-range PORT", () => {
+    expect(resolveIssuer({ PORT: "8080abc" })).toBe("http://localhost:8080");
+    expect(resolveIssuer({ PORT: "0" })).toBe("http://localhost:8080");
+    expect(resolveIssuer({ PORT: "99999" })).toBe("http://localhost:8080");
+  });
 });
 
 describe("static discovery document", () => {

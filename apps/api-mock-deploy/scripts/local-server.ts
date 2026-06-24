@@ -1,4 +1,5 @@
 import { app } from "../src/app.js";
+import { DEFAULT_PORT, parsePort } from "../src/issuer.js";
 
 /**
  * Start a local Node HTTP server that exposes the same Express app the
@@ -7,19 +8,20 @@ import { app } from "../src/app.js";
  * to `http://localhost:<port>` when `VERCEL_URL` is unset — see
  * `src/app.ts`.
  */
-// Treat empty/whitespace PORT as unset and fall back to 8080, matching
-// `resolveIssuer` in src/issuer.ts so the bind port and the issuer agree
-// (e.g. `PORT="" node ...` binds 8080 rather than erroring out).
+// Use the shared `parsePort` so the bind port matches the issuer exactly.
+// Unset/empty PORT falls back to DEFAULT_PORT; a *set but invalid* value
+// (non-numeric or out of range) is a mistake worth failing loudly on,
+// rather than silently binding 8080.
 const rawPort = process.env.PORT?.trim();
-const port = rawPort ? parseInt(rawPort, 10) : 8080;
+const port = parsePort(rawPort);
 
-if (!Number.isFinite(port) || port < 1 || port > 65535) {
+if (rawPort && port === null) {
   console.error(
     `[api-mock-deploy] invalid PORT="${rawPort}" — must be an integer between 1 and 65535`,
   );
   process.exit(1);
 }
 
-app.listen(port, () => {
-  console.log(`api-mock-deploy on http://localhost:${port}`);
+app.listen(port ?? DEFAULT_PORT, () => {
+  console.log(`api-mock-deploy on http://localhost:${port ?? DEFAULT_PORT}`);
 });
