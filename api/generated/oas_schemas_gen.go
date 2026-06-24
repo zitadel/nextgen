@@ -3409,7 +3409,6 @@ func (s *FlowDefinitionStepTransitionsItemAction) UnmarshalText(data []byte) err
 }
 
 // Replaces the existing flow definition.
-// If `flow_definition.status` is omitted, the current status is preserved.
 // Ref: #
 type FlowDefinitionUpdateRequest struct {
 	SchemaURI      OptSchemaURI   `json:"schema_uri"`
