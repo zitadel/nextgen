@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
+  ChevronDown,
   CircleAlert,
   Eye,
   EyeOff,
@@ -41,6 +42,7 @@ export type IconName =
   | "arrow-left"
   | "spinner"
   | "check"
+  | "chevron-down"
   | "cross"
   | "warning"
   | "alert-circle"
@@ -69,6 +71,7 @@ const REGISTRY: Record<IconName, LucideIcon> = {
   "arrow-left": ArrowLeft,
   spinner: LoaderCircle,
   check: Check,
+  "chevron-down": ChevronDown,
   cross: X,
   warning: TriangleAlert,
   "alert-circle": CircleAlert,
