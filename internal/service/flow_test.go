@@ -23,65 +23,48 @@ func stubPool() database.Pool { return nil }
 
 func stubV2Pool() *service.DB { return nil }
 
-type stubV2Execution struct {
-	err error
-}
-
-func (e stubV2Execution) Execute(context.Context) error {
-	return e.err
-}
-
-type stubV2Query[T any] struct {
-	result *T
-	err    error
-}
-
-func (q stubV2Query[T]) Query(context.Context) (*T, error) {
-	return q.result, q.err
-}
-
 type testAllStatements struct {
-	createProject  func(*domain.Project) v2database.Execution
-	getProjectByID func(string) v2database.Query[domain.Project]
+	createProject  func(context.Context, *domain.Project) error
+	getProjectByID func(context.Context, string) (*domain.Project, error)
 }
 
 func (testAllStatements) IsStatements() {}
 
-func (s testAllStatements) CreateProject(project *domain.Project) v2database.Execution {
+func (s testAllStatements) CreateProject(ctx context.Context, project *domain.Project) error {
 	if s.createProject != nil {
-		return s.createProject(project)
+		return s.createProject(ctx, project)
 	}
-	return stubV2Execution{}
+	return nil
 }
 
-func (s testAllStatements) GetProjectByID(id string) v2database.Query[domain.Project] {
+func (s testAllStatements) GetProjectByID(ctx context.Context, id string) (*domain.Project, error) {
 	if s.getProjectByID != nil {
-		return s.getProjectByID(id)
+		return s.getProjectByID(ctx, id)
 	}
-	return stubV2Query[domain.Project]{}
+	return nil, nil
 }
 
-func (testAllStatements) ListProjects(*v2database.ListOptions) v2database.Query[v2database.ListResult[*domain.Project]] {
+func (testAllStatements) ListProjects(context.Context, *v2database.ListOptions) (*v2database.ListResult[*domain.Project], error) {
 	panic("unexpected call to ListProjects")
 }
 
-func (testAllStatements) DeleteProjectByID(string) v2database.Execution {
+func (testAllStatements) DeleteProjectByID(context.Context, string) error {
 	panic("unexpected call to DeleteProjectByID")
 }
 
-func (testAllStatements) CreateFlowDefinition(*domain.FlowDefinition) v2database.Execution {
+func (testAllStatements) CreateFlowDefinition(context.Context, *domain.FlowDefinition) error {
 	panic("unexpected call to CreateFlowDefinition")
 }
 
-func (testAllStatements) GetFlowDefinitionByID(string) v2database.Query[domain.FlowDefinition] {
+func (testAllStatements) GetFlowDefinitionByID(context.Context, string) (*domain.FlowDefinition, error) {
 	panic("unexpected call to GetFlowDefinitionByID")
 }
 
-func (testAllStatements) ListFlowDefinitions(*v2database.ListOptions) v2database.Query[v2database.ListResult[*domain.FlowDefinition]] {
+func (testAllStatements) ListFlowDefinitions(context.Context, *v2database.ListOptions) (*v2database.ListResult[*domain.FlowDefinition], error) {
 	panic("unexpected call to ListFlowDefinitions")
 }
 
-func (testAllStatements) DeleteFlowDefinitionByID(string) v2database.Execution {
+func (testAllStatements) DeleteFlowDefinitionByID(context.Context, string) error {
 	panic("unexpected call to DeleteFlowDefinitionByID")
 }
 

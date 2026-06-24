@@ -27,15 +27,17 @@ See also:
 
 ## Decision
 
-### 1. Statement objects over repository CRUD helpers
+### 1. Statement methods over repository CRUD helpers
 
-Dialect code returns deferred execution objects instead of calling the database
-immediately:
+Dialect `statement_<entity>.go` files implement [`service.*Statements`](../../internal/service/statement.go)
+methods directly. Each method takes `context.Context` and returns `(result, error)` or
+`error` immediately — there are no intermediate deferred execution objects.
 
-- [`Execution`](../../internal/storage/v2/database/database.go) — writes; callers
-  invoke `.Execute(ctx)`
-- [`Query[R]`](../../internal/storage/v2/database/database.go) — reads; callers
-  invoke `.Query(ctx)`
+Example signatures:
+
+- `CreateProject(ctx, *domain.Project) error`
+- `GetProjectByID(ctx, id) (*domain.Project, error)`
+- `ListProjects(ctx, *ListOptions) (*ListResult[*domain.Project], error)`
 
 Entity SQL lives in per-dialect `statement_<entity>.go` files rather than generic
 repository helpers.
@@ -76,9 +78,9 @@ responsibility.
 ### 5. Keyset pagination at the storage layer
 
 [`ListOptions`](../../internal/storage/v2/database/list.go) and
-[`CursorToken`](../../internal/storage/v2/database/list.go) implement the
+[`pagination.Cursor`](../../internal/storage/v2/dialect/pagination/cursor.go) implement the
 storage side of [ADR 009](009-cursor-based-pagination.md). The postgres compiler
-turns `Page.After` into a keyset predicate plus `ORDER BY` and `LIMIT`. API
+turns `Page.Cursor` into a keyset predicate plus `ORDER BY` and `LIMIT`. API
 token signing and opaqueness stay upstream of storage.
 
 ### 6. Unified dialect target (end state on `new-repo`)
@@ -108,9 +110,7 @@ flowchart TB
         serviceDB["service.DB"]
     end
     subgraph v2core [internal/storage/v2/database]
-        Filter["Filter + Column tokens"]
-        ListOpts["ListOptions + CursorToken"]
-        Contracts["Execution / Query R / Pool"]
+        CoreTypes["Filter + ListOptions + dialect registry"]
         DialectReg["Dialect registry + Config.Build"]
     end
     subgraph dialects [internal/storage/v2/dialect]
@@ -128,9 +128,7 @@ flowchart TB
     serviceDB --> StatementIfaces
     StatementIfaces --> pg
     StatementIfaces --> sp
-    pg --> Filter
-    pg --> ListOpts
-    pg --> Contracts
+    pg --> CoreTypes
     DialectReg --> pg
     pg --> v1Repos
     pg -.-> endState
@@ -211,9 +209,10 @@ everywhere until generics land.
 
 ```
 internal/storage/v2/
-  database/           # Dialect registry, Filter, ListOptions, Execution/Query contracts
+  database/           # Dialect registry, Filter, ListOptions, ListResult
   dialect/
     all/              # Blank-import registration (postgres + spanner)
+    pagination/       # Cursor marshal/unmarshal for keyset pagination
     postgres/         # Working reference: pool, tx, compiler, statement_*.go
     spanner/          # Early stub: native @param SQL, partial execution
 ```
@@ -242,9 +241,12 @@ Service call path:
 
 ```go
 err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-    return tx.Statements().CreateProject(project).Execute(ctx)
+    if err := tx.Statements().CreateProject(ctx, project); err != nil {
+        return err
+    }
+    return nil
 })
-project, err := s.v2Pool.Statements().GetProjectByID(id).Query(ctx)
+project, err := s.v2Pool.Statements().GetProjectByID(ctx, id)
 ```
 
 Dialect read compilation:
@@ -297,7 +299,7 @@ entries when no longer useful.
 
 | ADR | Relationship |
 |---|---|
-| [009 Cursor-Based Pagination](009-cursor-based-pagination.md) | v2 `ListOptions`/`CursorToken` is the storage implementation |
+| [009 Cursor-Based Pagination](009-cursor-based-pagination.md) | v2 `ListOptions`/`Page.Cursor` + `pagination.Cursor` is the storage implementation |
 | [011 Resource Identifiers](011-resource-identifiers.md) | ADR 027 refines § Package roles: `Identity` + ID generation move to v2 dialects |
 | [008 Users EAV Store](008-users-eav-store.md) | EAV SQL may remain specialized; port to v2 statements |
 | [010 Session/Auth Attempt](010-session-auth-attempt-check-model.md) | Future v2 port target |
