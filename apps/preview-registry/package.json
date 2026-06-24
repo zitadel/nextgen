@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "description": "Per-PR snapshot npm registry deployed to Vercel (no external storage).",
+  "engines": {
+    "node": ">=24"
+  },
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/preview-registry#readme",
   "bugs": {
     "url": "https://github.com/zitadel/nextgen/issues"

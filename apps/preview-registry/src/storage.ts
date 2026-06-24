@@ -108,7 +108,16 @@ export const createFsStore = (storageRoot: string, publicBase: string): BlobStor
       // an empty/path-less prefix walks the whole root.
       const lastSlash = prefix.lastIndexOf("/");
       const prefixDir = lastSlash === -1 ? "" : prefix.slice(0, lastSlash);
-      const walkRoot = prefixDir ? join(storageRoot, prefixDir) : storageRoot;
+      // The prefix derives from request params, so validate the resolved
+      // walk root stays inside the store — a crafted `..` scope/name must
+      // not let the traversal escape `storageRoot`. An escaping prefix
+      // simply matches nothing.
+      let walkRoot: string;
+      try {
+        walkRoot = prefixDir ? resolveWithinRoot(prefixDir) : storageRoot;
+      } catch {
+        return [];
+      }
       const allFiles = await walkDirectory(walkRoot);
       const matched = await Promise.all(
         allFiles.map(async (fullPath): Promise<BlobEntry | null> => {

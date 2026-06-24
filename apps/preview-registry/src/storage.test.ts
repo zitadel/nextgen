@@ -61,6 +61,12 @@ describe("createFsStore", () => {
     expect(await store.list("")).toEqual([]);
   });
 
+  test("list returns an empty array for a prefix that escapes the storage root", async () => {
+    const store = createFsStore(storeRoot, publicBase);
+    await store.put("@scope/x/-/a.tgz", Buffer.from("1"), "application/octet-stream");
+    expect(await store.list("../../../etc/-/")).toEqual([]);
+  });
+
   test("read throws when the requested key does not exist", async () => {
     const store = createFsStore(storeRoot, publicBase);
     await expect(store.read("missing/file.tgz")).rejects.toThrow();
