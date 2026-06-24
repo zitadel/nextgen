@@ -3,21 +3,19 @@ import { envEnabled } from "./env-flag";
 
 /** Coarse CI provider name, or `undefined` when not running in CI. */
 class CiProvider implements Property<NodeJS.ProcessEnv, string | undefined> {
+  /** Provider-marker env var → reported name, in match order. */
+  private static readonly providers = [
+    ["GITHUB_ACTIONS", "github_actions"],
+    ["GITLAB_CI", "gitlab_ci"],
+    ["CIRCLECI", "circleci"],
+    ["BUILDKITE", "buildkite"],
+    ["JENKINS_URL", "jenkins"],
+  ] as const satisfies ReadonlyArray<readonly [string, string]>;
+
   public value(env: NodeJS.ProcessEnv): string | undefined {
-    if (envEnabled(env.GITHUB_ACTIONS)) {
-      return "github_actions";
-    }
-    if (envEnabled(env.GITLAB_CI)) {
-      return "gitlab_ci";
-    }
-    if (envEnabled(env.CIRCLECI)) {
-      return "circleci";
-    }
-    if (envEnabled(env.BUILDKITE)) {
-      return "buildkite";
-    }
-    if (env.JENKINS_URL) {
-      return "jenkins";
+    const named = CiProvider.providers.find(([marker]) => envEnabled(env[marker]));
+    if (named) {
+      return named[1];
     }
     return envEnabled(env.CI) ? "unknown" : undefined;
   }

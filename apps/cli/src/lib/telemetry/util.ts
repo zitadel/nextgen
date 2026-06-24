@@ -5,12 +5,9 @@ import type { Properties } from "mixpanel";
  * null/''" rule. Pure — the input is never mutated.
  */
 export function compact(properties: Properties): Properties {
-  const out: Properties = {};
-  for (const [key, value] of Object.entries(properties)) {
-    if (value === undefined || value === null || value === "") {
-      continue;
-    }
-    out[key] = value;
-  }
-  return out;
+  return Object.fromEntries(
+    Object.entries(properties).filter(
+      ([, value]) => value !== undefined && value !== null && value !== "",
+    ),
+  );
 }

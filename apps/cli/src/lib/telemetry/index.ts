@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 
 import mixpanelLib, {
   type Mixpanel as MixpanelClient,
@@ -128,23 +129,18 @@ export class Telemetry {
 
   /**
    * Await in-flight sends so a short-lived process does not exit before the
-   * requests complete, bounded by `timeoutMs`. Safe to call on an inert instance.
+   * requests complete, bounded by `timeoutMs`. The timeout is unref'd so the
+   * losing race branch never holds the event loop open or needs a manual clear.
+   * Safe to call on an inert instance.
    */
   async shutdown(timeoutMs = 2000): Promise<void> {
     if (this.pending.length === 0) {
       return;
     }
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<void>((resolve) => {
-      timer = setTimeout(resolve, timeoutMs);
-    });
-    try {
-      await Promise.race([Promise.allSettled(this.pending), timeout]);
-    } finally {
-      if (timer) {
-        clearTimeout(timer);
-      }
-    }
+    await Promise.race([
+      Promise.allSettled(this.pending),
+      delay(timeoutMs, undefined, { ref: false }),
+    ]);
   }
 
   /**

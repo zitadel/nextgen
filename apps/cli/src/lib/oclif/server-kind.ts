@@ -10,18 +10,17 @@ class ServerKind implements Property<string, "cloud" | "local" | "self_hosted" |
     if (source === "mock") {
       return "local";
     }
-    try {
-      const { hostname } = new URL(source);
-      if (hostname === "zitadel.cloud" || hostname.endsWith(".zitadel.cloud")) {
-        return "cloud";
-      }
-      if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") {
-        return "local";
-      }
-      return "self_hosted";
-    } catch {
+    if (!URL.canParse(source)) {
       return "unknown";
     }
+    const { hostname } = new URL(source);
+    if (hostname === "zitadel.cloud" || hostname.endsWith(".zitadel.cloud")) {
+      return "cloud";
+    }
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") {
+      return "local";
+    }
+    return "self_hosted";
   }
 }
 
