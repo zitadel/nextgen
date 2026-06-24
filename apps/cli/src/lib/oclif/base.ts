@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { Command, Flags } from "@oclif/core";
 import consola from "consola";
 
@@ -6,6 +8,15 @@ import { isObject } from "../json";
 import { resolveCwd } from "../paths";
 import { normalizePublicCliCommand, normalizePublicCliCommands } from "../public-cli";
 import { resolveServer } from "../server";
+import { type Properties, Telemetry } from "../telemetry";
+import {
+  CLI_COMMAND_COMPLETED,
+  CLI_COMMAND_FAILED,
+  CLI_COMMAND_STARTED,
+  commandEventProperties,
+  deviceProfileProperties,
+  FIRST_RUN_NOTICE,
+} from "./command-telemetry";
 import type {
   CommandResult,
   ErrorEnvelope,
@@ -41,10 +52,44 @@ export abstract class BaseCommand extends Command {
     "dry-run": Flags.boolean({ description: "Preview without mutating files or the platform." }),
     verbose: Flags.boolean({ description: "Verbose logging." }),
     debug: Flags.boolean({ description: "Debug logging." }),
+    telemetry: Flags.boolean({
+      default: true,
+      allowNo: true,
+      description: "Send anonymous usage analytics. Disable with --no-telemetry.",
+    }),
   };
 
   /** Resolved context for the current invocation; set by {@link toMeta}. */
   protected meta: GlobalOptions = this.fallbackMeta();
+
+  /**
+   * Anonymous usage analytics for this invocation, created once in
+   * {@link toMeta}. Subclasses add command-specific dimensions (framework,
+   * counts, `step_reached`, …) via {@link recordTelemetry}; the base class
+   * fires the lifecycle events and flushes in {@link finally}.
+   */
+  protected telemetry?: Telemetry;
+
+  /**
+   * Per-command dimensions merged onto every lifecycle event for this run.
+   * Updated immutably via {@link recordTelemetry} — never mutated in place.
+   */
+  protected telemetryProps: Readonly<Properties> = Object.freeze({});
+
+  /** Correlates the started/completed pair; set once when telemetry opens. */
+  private telemetrySessionId = "";
+
+  /** Wall-clock start used to derive `duration_ms`; set when telemetry opens. */
+  private telemetryStartedAt = 0;
+
+  /**
+   * Merge command-specific dimensions into {@link telemetryProps} immutably: a
+   * new frozen bag replaces the previous one, so no shared object is ever
+   * mutated. `step_reached` advances by re-recording it at each milestone.
+   */
+  protected recordTelemetry(patch: Properties): void {
+    this.telemetryProps = Object.freeze({ ...this.telemetryProps, ...patch });
+  }
 
   /**
    * Builds {@link GlobalOptions} from parsed flags, resolving the server
@@ -96,6 +141,29 @@ export abstract class BaseCommand extends Command {
       env: process.env,
       isTTY,
     };
+    // Create telemetry once per invocation and open the lifecycle. Guarded so a
+    // command that resolves meta more than once does not double-count.
+    if (!this.telemetry) {
+      this.telemetry = Telemetry.create({
+        env: process.env,
+        flag: typeof flags.telemetry === "boolean" ? flags.telemetry : undefined,
+        debug,
+      });
+      this.telemetrySessionId = randomUUID();
+      this.telemetryStartedAt = Date.now();
+      this.telemetry.track(
+        CLI_COMMAND_STARTED,
+        commandEventProperties(this.meta, this.telemetrySessionId, this.telemetryProps),
+      );
+      // Register the install as an anonymous user profile so each device shows
+      // up under Mixpanel "Users"; `$ip: 0` keeps geolocation off.
+      this.telemetry.profile(deviceProfileProperties(this.meta, this.telemetry.distinctId), {
+        $ip: 0,
+      });
+      if (this.telemetry.isFirstRun && !this.meta.nonInteractive) {
+        process.stderr.write(`${FIRST_RUN_NOTICE}\n`);
+      }
+    }
     return this.meta;
   }
 
@@ -106,6 +174,14 @@ export abstract class BaseCommand extends Command {
    */
   protected emit(result: CommandResult): JsonEnvelope {
     const normalized = normalizeCommandResult(result, this.meta);
+    this.telemetry?.track(
+      CLI_COMMAND_COMPLETED,
+      commandEventProperties(this.meta, this.telemetrySessionId, {
+        status: result.status,
+        duration_ms: Date.now() - this.telemetryStartedAt,
+        ...this.telemetryProps,
+      }),
+    );
     this.log(renderPretty(normalized, this.meta));
     return toEnvelope(normalized, this.meta);
   }
@@ -119,12 +195,33 @@ export abstract class BaseCommand extends Command {
   protected override async catch(error: unknown): Promise<never> {
     const meta: GlobalOptions = { ...this.meta, command: this.id ?? this.meta.command };
     const zitadelError = toZitadelError(error);
+    this.telemetry?.track(
+      CLI_COMMAND_FAILED,
+      commandEventProperties(meta, this.telemetrySessionId, {
+        status: "error",
+        error_code: zitadelError.code,
+        exit_code: zitadelError.exitCode,
+        duration_ms: Date.now() - this.telemetryStartedAt,
+        ...this.telemetryProps,
+      }),
+    );
     if (this.jsonEnabled()) {
       this.logJson(toErrorEnvelope(zitadelError, meta));
     } else {
       this.logToStderr(renderError(zitadelError, meta));
     }
     return this.exit(zitadelError.exitCode);
+  }
+
+  /**
+   * oclif runs this after `run`/`catch` on every path. We use it to flush
+   * pending telemetry so a short-lived CLI process does not exit before the
+   * lifecycle event is sent — bounded by the client's own timeout so a hung
+   * network never delays the user.
+   */
+  protected override async finally(error: Error | undefined): Promise<void> {
+    await this.telemetry?.shutdown();
+    await super.finally(error);
   }
 
   /**

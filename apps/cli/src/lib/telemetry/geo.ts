@@ -1,0 +1,131 @@
+/**
+ * Privacy-preserving geo + platform helpers for telemetry.
+ *
+ * Mixpanel's native "Operating System" and "Country" columns read the reserved
+ * `$os` and `$country_code` properties. A server-side SDK never auto-fills
+ * these, so we set them explicitly:
+ *
+ * - `$os` maps `process.platform` to Mixpanel's canonical OS label.
+ * - `$country_code` is derived from the machine's IANA timezone — NOT from the
+ *   IP address. We keep `ip: 0` so Mixpanel performs no IP geolocation, which
+ *   means no city/region is ever stored; only the coarse country is reported.
+ */
+
+/** Map `process.platform` to Mixpanel's canonical `$os` label. */
+export function osName(platform: NodeJS.Platform): string {
+  switch (platform) {
+    case "darwin":
+      return "Mac OS X";
+    case "win32":
+      return "Windows";
+    case "linux":
+      return "Linux";
+    case "freebsd":
+    case "openbsd":
+    case "netbsd":
+      return "BSD";
+    case "aix":
+      return "AIX";
+    case "sunos":
+      return "Solaris";
+    default:
+      return platform;
+  }
+}
+
+/**
+ * ISO 3166-1 alpha-2 country for an IANA timezone. Covers the populated zones;
+ * an unknown or missing zone yields `undefined` (we report no country rather
+ * than guess). Derived from tzdata's zone→country table.
+ */
+const TIMEZONE_COUNTRY: Record<string, string> = {
+  "Africa/Abidjan": "CI",
+  "Africa/Accra": "GH",
+  "Africa/Addis_Ababa": "ET",
+  "Africa/Algiers": "DZ",
+  "Africa/Cairo": "EG",
+  "Africa/Casablanca": "MA",
+  "Africa/Johannesburg": "ZA",
+  "Africa/Lagos": "NG",
+  "Africa/Nairobi": "KE",
+  "Africa/Tunis": "TN",
+  "America/Anchorage": "US",
+  "America/Argentina/Buenos_Aires": "AR",
+  "America/Bogota": "CO",
+  "America/Chicago": "US",
+  "America/Denver": "US",
+  "America/Halifax": "CA",
+  "America/Lima": "PE",
+  "America/Los_Angeles": "US",
+  "America/Mexico_City": "MX",
+  "America/New_York": "US",
+  "America/Phoenix": "US",
+  "America/Santiago": "CL",
+  "America/Sao_Paulo": "BR",
+  "America/Toronto": "CA",
+  "America/Vancouver": "CA",
+  "Asia/Bangkok": "TH",
+  "Asia/Dhaka": "BD",
+  "Asia/Dubai": "AE",
+  "Asia/Hong_Kong": "HK",
+  "Asia/Jakarta": "ID",
+  "Asia/Jerusalem": "IL",
+  "Asia/Karachi": "PK",
+  "Asia/Kolkata": "IN",
+  "Asia/Kuala_Lumpur": "MY",
+  "Asia/Manila": "PH",
+  "Asia/Riyadh": "SA",
+  "Asia/Seoul": "KR",
+  "Asia/Shanghai": "CN",
+  "Asia/Singapore": "SG",
+  "Asia/Taipei": "TW",
+  "Asia/Tehran": "IR",
+  "Asia/Tokyo": "JP",
+  "Australia/Adelaide": "AU",
+  "Australia/Brisbane": "AU",
+  "Australia/Melbourne": "AU",
+  "Australia/Perth": "AU",
+  "Australia/Sydney": "AU",
+  "Europe/Amsterdam": "NL",
+  "Europe/Athens": "GR",
+  "Europe/Berlin": "DE",
+  "Europe/Brussels": "BE",
+  "Europe/Bucharest": "RO",
+  "Europe/Budapest": "HU",
+  "Europe/Copenhagen": "DK",
+  "Europe/Dublin": "IE",
+  "Europe/Helsinki": "FI",
+  "Europe/Istanbul": "TR",
+  "Europe/Kyiv": "UA",
+  "Europe/Lisbon": "PT",
+  "Europe/London": "GB",
+  "Europe/Madrid": "ES",
+  "Europe/Moscow": "RU",
+  "Europe/Oslo": "NO",
+  "Europe/Paris": "FR",
+  "Europe/Prague": "CZ",
+  "Europe/Rome": "IT",
+  "Europe/Stockholm": "SE",
+  "Europe/Vienna": "AT",
+  "Europe/Warsaw": "PL",
+  "Europe/Zurich": "CH",
+  "Pacific/Auckland": "NZ",
+  "Pacific/Honolulu": "US",
+};
+
+/**
+ * Resolve the coarse country from the runtime timezone. Defaults to the
+ * machine's IANA zone but accepts an explicit one for testing. Returns
+ * `undefined` when the zone is unknown or unavailable.
+ */
+export function countryFromTimezone(timezone?: string): string | undefined {
+  let zone = timezone;
+  if (zone === undefined) {
+    try {
+      zone = new Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch {
+      return undefined;
+    }
+  }
+  return zone ? TIMEZONE_COUNTRY[zone] : undefined;
+}

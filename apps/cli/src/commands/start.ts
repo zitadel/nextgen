@@ -66,6 +66,9 @@ export default class Start extends BaseCommand {
       envImage: this.meta.env.ZITADEL_LOCAL_IMAGE,
     });
     assertRuntimeFlags(runtimeBackend, flags.image);
+    // Which local backend people run (npm binary vs Docker) is a core adoption
+    // question for the default-binary runtime.
+    this.recordTelemetry({ runtime: runtimeBackend });
     const image =
       flags.image ??
       this.meta.env.ZITADEL_LOCAL_IMAGE ??
