@@ -38,6 +38,7 @@
     "eslint-plugin-import": "catalog:",
     "eslint-plugin-perfectionist": "catalog:",
     "eslint-plugin-prettier": "catalog:",
+    "prettier": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",
     "typescript-eslint": "catalog:",
