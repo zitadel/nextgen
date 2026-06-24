@@ -8,7 +8,7 @@ import { isObject } from "../json";
 import { resolveCwd } from "../paths";
 import { normalizePublicCliCommand, normalizePublicCliCommands } from "../public-cli";
 import { resolveServer } from "../server";
-import { type Properties, Telemetry } from "../telemetry";
+import { type Properties, Telemetry, type TelemetryDeps } from "../telemetry";
 import {
   CLI_COMMAND_COMPLETED,
   CLI_COMMAND_FAILED,
@@ -164,11 +164,21 @@ export abstract class BaseCommand extends Command {
    * anonymous device profile is install-level and stable, so it is written only
    * on first run rather than paying a `people.set` request on every command.
    */
+  /**
+   * Telemetry factory seam. Production returns the real {@link Telemetry.create};
+   * tests override it to inject a recording client and assert the lifecycle
+   * ordering and opt-out behaviour that the central Vitest consent guard would
+   * otherwise make untestable.
+   */
+  protected createTelemetry(deps: TelemetryDeps): Telemetry {
+    return Telemetry.create(deps);
+  }
+
   private openTelemetry(flag: boolean | undefined): void {
     if (this.telemetry) {
       return;
     }
-    this.telemetry = Telemetry.create({ env: process.env, flag, debug: this.meta.debug });
+    this.telemetry = this.createTelemetry({ env: process.env, flag, debug: this.meta.debug });
     if (!this.telemetry.enabled) {
       return;
     }
