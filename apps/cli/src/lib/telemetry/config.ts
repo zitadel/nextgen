@@ -11,8 +11,8 @@
  * track dev traffic into the production project). By default the channel comes
  * from a build-time stamp (see {@link resolveChannel}), so the published CLI
  * routes real user traffic to production without any per-user env var while
- * source/test runs stay on dev — but a runtime `ZITADEL_TELEMETRY_ENV`/`NODE_ENV`
- * or `ZITADEL_TELEMETRY_BUILD_CHANNEL` overrides the stamp, and
+ * source/test runs stay on dev — but a runtime `ZITADEL_TELEMETRY_ENV` or
+ * `ZITADEL_TELEMETRY_BUILD_CHANNEL` overrides the stamp, and
  * `ZITADEL_TELEMETRY_TOKEN` overrides the token outright.
  */
 
@@ -55,13 +55,15 @@ function buildStampedChannel(): string {
 }
 
 /**
- * Decide which project the events belong to. Precedence: an explicit runtime
- * `ZITADEL_TELEMETRY_ENV`/`NODE_ENV`, then a `ZITADEL_TELEMETRY_BUILD_CHANNEL`
- * env override (handy for CI/release), then the build-time channel stamp. The
- * default — source/dev/test — is the dev project.
+ * Decide which project the events belong to. Precedence: an explicit
+ * `ZITADEL_TELEMETRY_ENV`, then a `ZITADEL_TELEMETRY_BUILD_CHANNEL` env override
+ * (handy for CI/release), then the build-time channel stamp. The default —
+ * source/dev/test — is the dev project. Ambient `NODE_ENV` is deliberately NOT
+ * consulted: a source build with `NODE_ENV=production` must not route dev
+ * traffic to prod, nor a published run with `NODE_ENV=development` to dev.
  */
 function resolveChannel(env: NodeJS.ProcessEnv): "development" | "production" {
-  const explicit = (env.ZITADEL_TELEMETRY_ENV ?? env.NODE_ENV ?? "").trim().toLowerCase();
+  const explicit = (env.ZITADEL_TELEMETRY_ENV ?? "").trim().toLowerCase();
   if (explicit === "production") {
     return "production";
   }

@@ -46,8 +46,8 @@ sets `__ZITADEL_TELEMETRY_CHANNEL__` from `ZITADEL_TELEMETRY_BUILD_CHANNEL` (els
 `development`), so every contributor/CI build routes to the dev project. **Only
 the release pipeline** (`scripts/release.mjs`) sets that env to `production`, so
 the **published CLI routes real user traffic to prod**. Runtime precedence:
-explicit `ZITADEL_TELEMETRY_ENV` / `NODE_ENV`, then a runtime
-`ZITADEL_TELEMETRY_BUILD_CHANNEL`, then the build-time stamp.
+explicit `ZITADEL_TELEMETRY_ENV`, then a runtime `ZITADEL_TELEMETRY_BUILD_CHANNEL`,
+then the build-time stamp. Ambient `NODE_ENV` is intentionally not consulted.
 
 ---
 
