@@ -107,7 +107,7 @@ func convertSteps(steps []api.FlowDefinitionStep) ([]domain.FlowDefinitionStep, 
 
 		ret[i] = domain.FlowDefinitionStep{
 			Name:         step.GetName(),
-			Fields:       step.GetFields(),
+			Fields:       domain.FieldsFromStrings(step.GetFields()),
 			Actions:      actions,
 			Gates:        gates,
 			SSOProviders: convertStepSSOProviders(step.GetSSOProviders()),
