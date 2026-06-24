@@ -76,8 +76,7 @@ export const it: Locale = {
   // Step: collect-passkey-email (solo e-mail — registrazione solo passkey)
   // ═══════════════════════════════════════════════════════════════════════════
   "collect-passkey-email.title": "Crea il tuo account",
-  "collect-passkey-email.description":
-    "Inserisci la tua e-mail per configurare una passkey",
+  "collect-passkey-email.description": "Inserisci la tua e-mail per configurare una passkey",
   "collect-passkey-email.field.email": "E-mail aziendale",
   "collect-passkey-email.field.email.placeholder": "tu@azienda.com",
   "collect-passkey-email.action.submit": "Continua",
@@ -151,10 +150,8 @@ export const it: Locale = {
 
   // --- Errori passkey ---
   "error.passkey_cancelled": "La configurazione della passkey è stata annullata",
-  "error.passkey_not_registered":
-    "Questa passkey non è registrata. Accedi con e-mail e password.",
-  "error.passkey_setup_failed":
-    "La registrazione della passkey non è stata completata. Riprova.",
+  "error.passkey_not_registered": "Questa passkey non è registrata. Accedi con e-mail e password.",
+  "error.passkey_setup_failed": "La registrazione della passkey non è stata completata. Riprova.",
   "error.passkey_unsupported": "Questo dispositivo non supporta le passkey",
   "error.passkey_failed": "Qualcosa è andato storto. Riprova.",
 

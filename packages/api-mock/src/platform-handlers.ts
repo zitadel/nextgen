@@ -50,6 +50,7 @@ import {
   ListFlowDefinitionsResponse,
   UpdateFlowDefinitionBody,
   UpdateFlowDefinitionParams,
+  UpdateFlowDefinitionQueryParams,
   UpdateFlowDefinitionResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { http, HttpResponse } from "msw";
@@ -391,10 +392,18 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data);
     }),
 
-    http.patch("*/flow_definitions/:id", async ({ params, request }) => {
+    http.put("*/flow_definitions/:id", async ({ params, request }) => {
       const path = parse(UpdateFlowDefinitionParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
+      }
+      const query = parse(
+        UpdateFlowDefinitionQueryParams,
+        queryRecord(request),
+        "invalid_query",
+      );
+      if (!query.ok) {
+        return query.response;
       }
 
       const record = store.flowDefinitions.get(path.data.id);
