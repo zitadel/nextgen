@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "corepack enable && cd ../.. && pnpm install --frozen-lockfile --prod=false",
-  "buildCommand": "cd ../.. && pnpm -r --filter='./packages/*' run build && cd apps/preview-registry && corepack pnpm tsx scripts/publish-on-deploy.ts",
+  "buildCommand": "cd ../.. && pnpm -r --filter='./packages/*' --if-present run build && cd apps/preview-registry && corepack pnpm tsx scripts/publish-on-deploy.ts",
   "functions": {
     "api/registry.ts": {
       "includeFiles": ".snapshots/**"

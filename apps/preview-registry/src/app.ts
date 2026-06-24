@@ -142,16 +142,20 @@ export const createApp = (store: BlobStore) => {
   });
 
   app.notFound((context) => context.json({ error: "not found", path: context.req.path }, 404));
-  app.onError((error, context) =>
-    context.json(
+  app.onError((error, context) => {
+    // Stack traces can expose internal file paths and source snippets,
+    // so only attach them outside production. Production responses carry
+    // just the message and the requested path.
+    const includeStack = process.env.VERCEL_ENV !== "production";
+    return context.json(
       {
         error: error.message,
         path: context.req.path,
-        stack: error.stack,
+        ...(includeStack ? { stack: error.stack } : {}),
       },
       500,
-    ),
-  );
+    );
+  });
 
   return app;
 };

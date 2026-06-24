@@ -49,7 +49,7 @@ const listPublishablePackageDirectories = (): readonly string[] =>
  * dev server has something to serve.
  *
  * Mirrors the shape of what
- * {@link ../api/index.ts | the Vercel function bundle} ships in
+ * {@link ../api/registry.ts | the Vercel function bundle} ships in
  * production, just without version stamping — packages keep their
  * checked-in `0.0.0` so iterating on schema or routing is fast.
  */
@@ -115,7 +115,7 @@ const stageLocal = async (): Promise<void> => {
     writeFileSync(manifestPath, manifestSource);
 
     console.log(`\nstaged into ${SNAPSHOT_ROOT}`);
-    console.log("now run:  corepack pnpm dev:registry");
+    console.log("now run:  corepack pnpm dev");
   } finally {
     rmSync(stagingDirectory, { recursive: true, force: true });
   }
