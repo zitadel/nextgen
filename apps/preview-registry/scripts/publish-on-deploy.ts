@@ -140,17 +140,20 @@ const publishOnDeploy = async (): Promise<void> => {
   rmSync(SNAPSHOT_ROOT, { recursive: true, force: true });
 
   const stagingDirectory = mkdtempSync(join(tmpdir(), "publish-on-deploy-"));
-  let stamped: readonly StampedPackage[] = [];
+  // Collect stamped packages incrementally so a failure mid-pack still
+  // lets `finally` restore every package.json that was already stamped,
+  // rather than leaving them modified on disk.
+  const stamped: StampedPackage[] = [];
   try {
-    stamped = listPackageDirectories().map((packageDirectory) => {
+    for (const packageDirectory of listPackageDirectories()) {
       const entry = stampPackage(packageDirectory);
+      stamped.push(entry);
       console.log(`packing ${packageDirectory} → ${entry.name}@${SNAPSHOT_VERSION}`);
       execFileSync("corepack", ["pnpm", "pack", "--pack-destination", stagingDirectory], {
         cwd: join(REPO_ROOT, packageDirectory),
         stdio: "inherit",
       });
-      return entry;
-    });
+    }
 
     const bundled = readdirSync(stagingDirectory)
       .filter((file) => file.endsWith(".tgz"))

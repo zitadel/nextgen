@@ -119,10 +119,11 @@ export const createApp = (store: BlobStore) => {
     }
     try {
       const tarball = await store.read(key);
-      const copy = new Uint8Array(tarball.byteLength);
-      copy.set(tarball);
-      context.header("Content-Type", "application/octet-stream");
-      return context.body(copy);
+      // Return the Buffer directly as the Response body — it's already a
+      // valid BodyInit, so there's no extra O(n) copy per download.
+      return new Response(tarball, {
+        headers: { "Content-Type": "application/octet-stream" },
+      });
     } catch {
       return context.json({ error: "not found" }, 404);
     }
