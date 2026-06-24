@@ -39,7 +39,14 @@ export function telemetryConfigDir(env: NodeJS.ProcessEnv): string {
  * every run. Telemetry is best-effort, never load-bearing.
  */
 export function loadOrCreateIdentity(env: NodeJS.ProcessEnv): Identity {
-  const dir = telemetryConfigDir(env);
+  let dir: string;
+  try {
+    dir = telemetryConfigDir(env);
+  } catch {
+    // `os.homedir()` can throw in restricted/containerized environments. Fail
+    // open to an ephemeral id rather than crash the host CLI.
+    return { distinctId: randomUUID(), isFirstRun: false };
+  }
   const file = join(dir, "telemetry.json");
 
   try {

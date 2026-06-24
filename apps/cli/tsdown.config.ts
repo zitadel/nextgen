@@ -28,10 +28,15 @@ export default defineConfig({
   shims: true,
   external: [/^@oclif\//],
   target: false,
-  // Stamp the telemetry channel into the shipped bundle so the published CLI
-  // routes real user traffic to the production Mixpanel project. Source/test
-  // runs leave this identifier undefined and stay on the dev project.
+  // Stamp the telemetry channel into the bundle. Defaults to "development" so
+  // every contributor/CI build routes to the dev project; only the release
+  // pipeline sets ZITADEL_TELEMETRY_BUILD_CHANNEL=production (see
+  // scripts/release.mjs) so the published CLI routes to production. Releases
+  // bump the version, so this build's input hash changes and moon rebuilds
+  // rather than serving a dev-stamped cache.
   define: {
-    __ZITADEL_TELEMETRY_CHANNEL__: JSON.stringify("production"),
+    __ZITADEL_TELEMETRY_CHANNEL__: JSON.stringify(
+      (process.env.ZITADEL_TELEMETRY_BUILD_CHANNEL || "development").toLowerCase(),
+    ),
   },
 });
