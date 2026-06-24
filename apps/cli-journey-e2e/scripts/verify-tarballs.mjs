@@ -29,6 +29,10 @@ const requiredPackageDirs = [
   "packages/sdk-solid",
   "packages/sdk-svelte",
   "packages/sdk-qwik",
+  "packages/sdk-sveltekit",
+  "packages/sdk-tanstack-start",
+  "packages/sdk-solid-start",
+  "packages/sdk-qwik-city",
 ];
 const requiredPackageNames = new Set(
   await Promise.all(requiredPackageDirs.map(packageName)),
