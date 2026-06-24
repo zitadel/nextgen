@@ -71,8 +71,10 @@ export abstract class BaseCommand extends Command {
   protected telemetry?: Telemetry;
 
   /**
-   * Per-command dimensions merged onto every lifecycle event for this run.
-   * Updated immutably via {@link recordTelemetry} — never mutated in place.
+   * Per-command dimensions merged onto each lifecycle event emitted *after* they
+   * are recorded — typically `completed`/`failed`, since `started` fires from
+   * {@link openTelemetry} before a command body runs. Updated immutably via
+   * {@link recordTelemetry} — never mutated in place.
    */
   protected telemetryProps: Readonly<Properties> = Object.freeze({});
 
