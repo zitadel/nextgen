@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
-import { x as untar } from "tar";
+import { t as listTarball } from "tar";
 
 import type { BlobEntry, BlobStore } from "./storage.js";
 
@@ -57,9 +57,9 @@ interface TarballSummary {
  * Read `package/package.json` out of a packed npm tarball and compute
  * the integrity hashes the npm CLI expects.
  *
- * Streams the tarball through `tar.x` with a filter so only the
- * manifest entry is buffered. Anything else inside the tarball is
- * skipped without allocating memory for it.
+ * Lists (does not extract) the tarball with `tar.t` and a filter, so
+ * only the manifest entry is buffered and nothing is ever written to
+ * disk — important on Vercel's read-only serverless filesystem.
  */
 const extractManifestFromTarball = async (tarballBytes: Buffer): Promise<TarballSummary> => {
   const shasum = createHash("sha1").update(tarballBytes).digest("hex");
@@ -67,7 +67,7 @@ const extractManifestFromTarball = async (tarballBytes: Buffer): Promise<Tarball
 
   const manifest = await new Promise<PackageManifest>((resolve, reject) => {
     let captured: PackageManifest | undefined;
-    const parser = untar({
+    const parser = listTarball({
       filter: (path) => path === "package/package.json",
       onentry: (entry) => {
         // tar's ReadEntry is a Readable stream at runtime but its TS

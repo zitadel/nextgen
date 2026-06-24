@@ -88,11 +88,14 @@ export const createFsStore = (storageRoot: string, publicBase: string): BlobStor
       const destination = resolveWithinRoot(key);
       await mkdir(dirname(destination), { recursive: true });
       await writeFile(destination, body);
+      // Report the file's actual on-disk stats so `put()` is consistent
+      // with what `list()` returns (mtime, not wall-clock).
+      const info = await stat(destination);
       return {
         key,
         url: toUrl(key),
-        size: body.length,
-        uploadedAt: new Date(),
+        size: info.size,
+        uploadedAt: info.mtime,
       };
     },
 
