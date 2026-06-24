@@ -145,7 +145,7 @@ Mixpanel injects the transport fields (`time`, `$lib_version`,
 Commands add dimensions via `this.recordTelemetry({ … })` (merged immutably onto
 every lifecycle event for the run):
 
-- **setup** — `framework`, `renderer`, `package_manager`, `scaffolded_skeleton`, `skip_install`, `dev_port_explicit`, `files_written_count`, `step_reached` (`framework_resolved` → `project_created` → `files_patched`).
+- **setup** — `framework`, `renderer`, `package_manager`, `scaffolded_skeleton`, `skip_install`, `dev_port_explicit`, `files_written_count`, `step_reached` (`framework_resolved` → `project_created` → `files_patched` → `dependencies_installed`).
 - **plan / apply** — `creates`, `updates`, `deletes`, `total` (diff *counts* only).
 - **doctor** — `runtime`, `checks_total`, `checks_failed`, `checks_warn`, `failed_checks` (failing check **names**, never messages).
 - **start** — `runtime` (`binary` / `docker`).

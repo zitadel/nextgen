@@ -216,8 +216,9 @@ export abstract class BaseCommand extends Command {
   /**
    * oclif runs this after `run`/`catch` on every path. We use it to flush
    * pending telemetry so a short-lived CLI process does not exit before the
-   * lifecycle event is sent — bounded by the client's own timeout so a hung
-   * network never delays the user.
+   * lifecycle event is sent. This await can delay command completion, but only
+   * up to the client's flush timeout (default 2000ms), so a hung network adds a
+   * bounded delay rather than blocking indefinitely.
    */
   protected override async finally(error: Error | undefined): Promise<void> {
     await this.telemetry?.shutdown();

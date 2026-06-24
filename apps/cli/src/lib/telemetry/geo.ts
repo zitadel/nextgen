@@ -34,9 +34,10 @@ export function osName(platform: NodeJS.Platform): string {
 }
 
 /**
- * ISO 3166-1 alpha-2 country for an IANA timezone. Covers the populated zones;
- * an unknown or missing zone yields `undefined` (we report no country rather
- * than guess). Derived from tzdata's zone→country table.
+ * ISO 3166-1 alpha-2 country for an IANA timezone. This is a curated subset of
+ * common zones, not the full tzdata table — any zone not listed (and any
+ * unknown or missing zone) yields `undefined`, since we report no country
+ * rather than guess. Extend the map as coverage gaps surface.
  */
 const TIMEZONE_COUNTRY: Record<string, string> = {
   "Africa/Abidjan": "CI",
