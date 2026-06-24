@@ -118,6 +118,8 @@ export const de: Locale = {
   // Natives <input type="date"> lokalisiert sein Anzeigeformat anhand der Sprache
   // des Nutzers und übermittelt ISO YYYY-MM-DD – kein Platzhalter-/Format-Hinweis nötig.
   "register.field.dateOfBirth": "Geburtsdatum",
+  "register.field.gender": "Geschlecht",
+  "register.field.gender.placeholder": "Geschlecht auswählen",
   "register.field.country": "Land",
   "register.field.country.placeholder": "Land auswählen",
   "register.field.terms": "Ich stimme den Nutzungsbedingungen zu",

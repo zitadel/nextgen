@@ -51,7 +51,7 @@ export {
   applyFontUrl,
   createSanitiser,
   validateBranding,
-  patchMandatoryGates,
+  patchFields,
   defaultTemplate,
   layoutChromeCss,
   TEMPLATE_NAMES,

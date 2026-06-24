@@ -47,6 +47,11 @@
       "type": "string",
       "format": "date",
       "description": "The user's date of birth (ISO 8601, YYYY-MM-DD)."
+    },
+    "gender": {
+      "type": "string",
+      "enum": ["male", "female", "diverse", "other"],
+      "description": "The user's gender."
     }
   }
 }

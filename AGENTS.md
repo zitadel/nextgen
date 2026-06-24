@@ -330,11 +330,40 @@ Standard commands are documented in root `AGENTS.md` → **Local Checks** and
 
 ### Running demo apps manually
 
-To test the sign-in flow interactively (two terminals):
+To test the sign-in flow interactively against the **mock auth server** (two
+terminals):
 
 1. Start the mock auth server: `moon run api-mock:start`
-2. Start demo-next: `ZITADEL_URL=http://localhost:4000 moon run demo-next:dev` (port 3002)
-3. Or demo-nuxt: `ZITADEL_URL=http://localhost:4000 moon run demo-nuxt:dev` (port 3001)
+2. Start demo-next: `moon run demo-next:dev` (port 3002)
+3. Or demo-nuxt: `moon run demo-nuxt:dev` (port 3001)
+
+The mock server defaults to port 8080 (matching the real server). No
+`ZITADEL_URL` override is needed when `.env.local` already points to
+`http://localhost:8080`.
+
+To test against the **real Go server** (three terminals):
+
+1. Start the server: `moon run workspace:server`
+2. Create a project (once the server is listening on `:8080`):
+   ```sh
+   curl -s -X POST http://localhost:8080/projects \
+     -H 'Content-Type: application/json' \
+     -d '{"previewOrigins": ["http://localhost:3002"]}'
+   ```
+3. Copy the `id` and `projectSecret` from the JSON response into
+   `apps/demo-next/.env.local`:
+   ```
+   ZITADEL_URL=http://localhost:8080
+   NEXTGEN_ISSUER_URL=http://localhost:8080
+   NEXT_PUBLIC_ZITADEL_PROJECT_ID=<id from step 2>
+   ZITADEL_PROJECT_SECRET=<projectSecret from step 2>
+   ```
+4. Start demo-next: `moon run demo-next:dev` (port 3002)
+
+`ZITADEL_PROJECT_SECRET` is required for the session exchange endpoint
+(`/sessions/exchange`). The Next.js proxy attaches it as a `Bearer` token on
+proxied requests. It is a server-side env var — restart demo-next after
+changing it (hot-reload only picks up `NEXT_PUBLIC_*` vars).
 
 ### Stale Nuxt lock files
 

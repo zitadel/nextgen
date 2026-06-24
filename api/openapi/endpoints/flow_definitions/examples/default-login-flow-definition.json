@@ -74,7 +74,8 @@
           "email",
           "givenName",
           "familyName",
-          "dateOfBirth"
+          "dateOfBirth",
+          "gender"
         ],
         "actions": [
           {
