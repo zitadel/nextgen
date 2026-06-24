@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "customConditions": ["@zitadel/source"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "useDefineForClassFields": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noEmit": true,
+    "types": []
+  },
+  "include": [".storybook/**/*.ts", "src/**/*.ts", "src/**/*.tsx"],
+  // api + api-mock ship generated/source-only code that is type-checked in
+  // their own packages; referencing them keeps their internals (and the
+  // orval-typed fixtures) out of this program while still resolving their
+  // public types. The atom/React packages resolve to source/dist via the
+  // `@zitadel/source` condition and stay first-class here.
+  "references": [
+    { "path": "../../packages/api/tsconfig.lib.json" },
+    { "path": "../../packages/api-mock/tsconfig.lib.json" }
+  ]
+}

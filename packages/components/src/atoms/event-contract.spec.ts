@@ -13,11 +13,13 @@ describe("atom event contract", () => {
     "zl-alert": ["zl-dismiss"],
     "zl-button": ["zl-submit"],
     "zl-card": [],
+    "zl-checkbox": ["zl-change"],
     "zl-field": ["zl-input"],
     "zl-icon": [],
     "zl-page-shell": [],
     "zl-passkey": ["zl-passkey-result", "zl-passkey-error"],
     "zl-pill": [],
+    "zl-select": ["zl-change"],
   };
 
   for (const manifest of manifestRegistry) {

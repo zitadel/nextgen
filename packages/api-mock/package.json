@@ -33,6 +33,7 @@
     "@zitadel/api": "workspace:*",
     "cookie-parser": "catalog:",
     "express": "catalog:",
+    "tslib": "catalog:",
     "xstate": "catalog:"
   },
   "peerDependencies": {
