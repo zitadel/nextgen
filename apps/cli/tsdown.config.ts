@@ -8,7 +8,9 @@ import { defineConfig } from "tsdown";
  * published CLI routes to production. Releases bump the version, so this build's
  * input hash changes and moon rebuilds rather than serving a dev-stamped cache.
  */
-const telemetryChannel = (process.env.ZITADEL_TELEMETRY_BUILD_CHANNEL || "development").toLowerCase();
+const telemetryChannel = (process.env.ZITADEL_TELEMETRY_BUILD_CHANNEL || "development")
+  .trim()
+  .toLowerCase();
 
 /**
  * Unbundled, multi-entry build for oclif: each command compiles to its own

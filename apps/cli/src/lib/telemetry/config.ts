@@ -50,7 +50,7 @@ declare const __ZITADEL_TELEMETRY_CHANNEL__: string | undefined;
  */
 function buildStampedChannel(): string {
   return typeof __ZITADEL_TELEMETRY_CHANNEL__ === "string"
-    ? __ZITADEL_TELEMETRY_CHANNEL__.toLowerCase()
+    ? __ZITADEL_TELEMETRY_CHANNEL__.trim().toLowerCase()
     : "";
 }
 
@@ -61,14 +61,14 @@ function buildStampedChannel(): string {
  * default — source/dev/test — is the dev project.
  */
 function resolveChannel(env: NodeJS.ProcessEnv): "development" | "production" {
-  const explicit = (env.ZITADEL_TELEMETRY_ENV ?? env.NODE_ENV ?? "").toLowerCase();
+  const explicit = (env.ZITADEL_TELEMETRY_ENV ?? env.NODE_ENV ?? "").trim().toLowerCase();
   if (explicit === "production") {
     return "production";
   }
   if (explicit === "development") {
     return "development";
   }
-  const stamp = (env.ZITADEL_TELEMETRY_BUILD_CHANNEL ?? buildStampedChannel()).toLowerCase();
+  const stamp = (env.ZITADEL_TELEMETRY_BUILD_CHANNEL ?? buildStampedChannel()).trim().toLowerCase();
   return stamp === "production" ? "production" : "development";
 }
 
@@ -96,6 +96,6 @@ export function resolveTelemetryToken(env: NodeJS.ProcessEnv): string | undefine
  * in Live View.
  */
 export function resolveTelemetryHost(env: NodeJS.ProcessEnv): string {
-  const region = (env.ZITADEL_TELEMETRY_REGION ?? "eu").toLowerCase();
+  const region = (env.ZITADEL_TELEMETRY_REGION ?? "eu").trim().toLowerCase();
   return region === "us" ? HOSTS.us : HOSTS.eu;
 }

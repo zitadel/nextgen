@@ -37,6 +37,10 @@ describe("resolveTelemetryToken", () => {
   it("lets ZITADEL_TELEMETRY_TOKEN override the channel outright", () => {
     expect(resolveTelemetryToken({ ZITADEL_TELEMETRY_TOKEN: "custom" })).toBe("custom");
   });
+
+  it("trims surrounding whitespace on the channel env", () => {
+    expect(resolveTelemetryToken({ ZITADEL_TELEMETRY_ENV: " production " })).toBe(PROD_TOKEN);
+  });
 });
 
 describe("resolveTelemetryHost", () => {
@@ -44,5 +48,9 @@ describe("resolveTelemetryHost", () => {
     expect(resolveTelemetryHost({})).toBe("api-eu.mixpanel.com");
     expect(resolveTelemetryHost({ ZITADEL_TELEMETRY_REGION: "us" })).toBe("api.mixpanel.com");
     expect(resolveTelemetryHost({ ZITADEL_TELEMETRY_REGION: "EU" })).toBe("api-eu.mixpanel.com");
+  });
+
+  it("trims surrounding whitespace on the region env", () => {
+    expect(resolveTelemetryHost({ ZITADEL_TELEMETRY_REGION: " us " })).toBe("api.mixpanel.com");
   });
 });
