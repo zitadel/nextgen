@@ -69,3 +69,18 @@ func TestToFlowField_UUIDFormatSurfacesAsText(t *testing.T) {
 	require.True(t, got.Validation.Set)
 	require.Equal(t, apigen.FieldValidationFormatUUID, got.Validation.Value.Format.Value)
 }
+
+func TestToFlowField_EnumSurfaces(t *testing.T) {
+	t.Parallel()
+
+	got := toFlowField(domain.FlowField{
+		Type:    domain.FlowFieldTypeSelect,
+		TextKey: "step.field.maritalStatus",
+		Validation: &domain.FlowFieldValidation{
+			Enum: []string{"Single", "Married", "Divorced", "Widowed"},
+		},
+	})
+
+	require.True(t, got.Validation.Set, "validation block emitted when only enum is set")
+	require.Equal(t, []string{"Single", "Married", "Divorced", "Widowed"}, got.Validation.Value.Enum)
+}
