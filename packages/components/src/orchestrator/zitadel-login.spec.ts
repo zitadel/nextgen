@@ -815,4 +815,80 @@ describe("<zitadel-login> against the typed Flow API", () => {
       );
     expect(submits[0]?.body.fields).toEqual({ email: "", password: "" });
   });
+
+  it("captures <zl-select> and <zl-checkbox> values on submit", async () => {
+    // A step whose only inputs are the non-text atoms. Regression: the
+    // orchestrator used to read `.value` from `<zl-field>` only, so a chosen
+    // select option and a ticked checkbox were submitted as empty strings.
+    server.use(
+      http.post("*/flow", () =>
+        HttpResponse.json(
+          {
+            id: "flow_test",
+            session_token: "st_test",
+            step: {
+              name: "register",
+              texts: { title_key: "register.title" },
+              fields: [
+                {
+                  name: "maritalStatus",
+                  type: "select",
+                  text_key: "register.field.maritalStatus",
+                  required: false,
+                  validation: { enum: ["Single", "Married", "Divorced", "Widowed"] },
+                },
+                {
+                  name: "newsletterOptIn",
+                  type: "checkbox",
+                  text_key: "register.field.newsletterOptIn",
+                  required: false,
+                },
+              ],
+              actions: [{ name: "submit", text_key: "submit.register", primary: true }],
+              gates: {},
+            },
+            branding: {},
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+
+    let submittedFields: Record<string, string> | undefined;
+    server.use(
+      http.post("*/flow/*/submit", async ({ request }) => {
+        const body = (await request.json()) as { fields: Record<string, string> };
+        submittedFields = body.fields;
+        return HttpResponse.json({
+          id: "flow_test",
+          session_token: "st_test",
+          step: { name: "done", texts: { title_key: "done.title" }, fields: [], actions: [], gates: {} },
+          branding: {},
+        });
+      }),
+    );
+
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.project = testProject;
+    host.appendChild(element);
+
+    const select = await waitFor(() =>
+      element.shadowRoot?.querySelector<HTMLElement & { value?: string }>('zl-select[name="maritalStatus"]'),
+    );
+    const checkbox = await waitFor(() =>
+      element.shadowRoot?.querySelector<HTMLElement & { checked?: boolean }>(
+        'zl-checkbox[name="newsletterOptIn"]',
+      ),
+    );
+
+    select.value = "Married";
+    checkbox.checked = true;
+
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+    );
+
+    await waitFor(() => submittedFields ?? null);
+    expect(submittedFields).toEqual({ maritalStatus: "Married", newsletterOptIn: "true" });
+  });
 });

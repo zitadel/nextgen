@@ -117,6 +117,21 @@ export class ZlCheckbox extends LitElement {
     this.inputEl?.focus(options);
   }
 
+  /**
+   * The string this control contributes to form submission — the uniform
+   * read/write contract `<zitadel-login>` uses to capture and restore field
+   * values without knowing each atom's internal shape. Like a native checkbox
+   * this is the value token only when checked, empty otherwise; assigning it
+   * back restores the checked state.
+   */
+  get formValue(): string {
+    return this.checked ? this.value : "";
+  }
+
+  set formValue(value: string) {
+    this.checked = value !== "";
+  }
+
   override render() {
     const rootClass = classMap({
       "zr-checkbox": true,

@@ -70,4 +70,21 @@ describe("<zl-checkbox> markup", () => {
     const root = checkbox.shadowRoot?.querySelector(".zr-checkbox");
     expect(root?.getAttribute("data-state")).toBe("hovered");
   });
+
+  it("exposes formValue as the value token only when checked", async () => {
+    const checkbox = mount(`<zl-checkbox name="opt" value="true"></zl-checkbox>`);
+    await checkbox.updateComplete;
+    expect(checkbox.formValue).toBe("");
+    checkbox.checked = true;
+    expect(checkbox.formValue).toBe("true");
+  });
+
+  it("restores the checked state when formValue is assigned", async () => {
+    const checkbox = mount(`<zl-checkbox name="opt" value="true"></zl-checkbox>`);
+    await checkbox.updateComplete;
+    checkbox.formValue = "true";
+    expect(checkbox.checked).toBe(true);
+    checkbox.formValue = "";
+    expect(checkbox.checked).toBe(false);
+  });
 });

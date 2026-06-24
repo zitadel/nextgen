@@ -78,20 +78,40 @@ describe("<zl-select> form participation (chromium)", () => {
     });
 
     trigger(select).focus();
-    press(select, "ArrowDown");
+    press(select, "ArrowDown"); // open, active = empty prompt (value "")
     await select.updateComplete;
     expect(select.open).toBe(true);
 
-    press(select, "ArrowDown"); // us -> de
+    press(select, "ArrowDown"); // empty -> us
     await select.updateComplete;
     press(select, "Enter");
     await select.updateComplete;
 
-    expect(select.value).toBe("de");
+    expect(select.value).toBe("us");
     expect(select.open).toBe(false);
-    expect(new FormData(form).get("country")).toBe("de");
-    expect(detail).toEqual({ name: "country", value: "de" });
+    expect(new FormData(form).get("country")).toBe("us");
+    expect(detail).toEqual({ name: "country", value: "us" });
     expect(nativeChanges).toBe(1);
+  });
+
+  it("lets the user clear back to the empty option, contributing nothing to FormData", async () => {
+    const { form, select } = await mount("", "us");
+    let detail: ZlSelectChangeDetail | undefined;
+    select.addEventListener("zl-change", (event) => {
+      detail = (event as CustomEvent<ZlSelectChangeDetail>).detail;
+    });
+
+    trigger(select).focus();
+    press(select, "ArrowDown"); // open, active = us (selected)
+    await select.updateComplete;
+    press(select, "ArrowUp"); // us -> empty prompt
+    await select.updateComplete;
+    press(select, "Enter");
+    await select.updateComplete;
+
+    expect(select.value).toBe("");
+    expect(new FormData(form).get("country")).toBeNull();
+    expect(detail).toEqual({ name: "country", value: "" });
   });
 
   it("skips disabled options during keyboard navigation", async () => {

@@ -145,10 +145,36 @@ export class ZlSelect extends LitElement {
     this.triggerEl?.focus(options);
   }
 
+  /**
+   * The string this control contributes to form submission — the uniform
+   * read/write contract `<zitadel-login>` uses to capture and restore field
+   * values without knowing each atom's internal shape. For a select that is
+   * simply the chosen option's value (empty = nothing chosen).
+   */
+  get formValue(): string {
+    return this.value;
+  }
+
+  set formValue(value: string) {
+    this.value = value;
+  }
+
+  /**
+   * Options as painted in the listbox: a leading empty row (labelled with the
+   * placeholder) so the user can return to "no selection". For a `required`
+   * field this empty row is the prompt — choosing it leaves the value empty,
+   * so `required` validation still blocks submit (native `<select>`
+   * semantics). The public `options` property stays the caller's list.
+   */
+  private get listOptions(): ZlSelectOption[] {
+    return [{ value: "", label: this.placeholder }, ...this.options];
+  }
+
   override render() {
     const labelId = `${this.baseId}-label`;
     const listboxId = `${this.baseId}-listbox`;
-    const selected = this.options.find((option) => option.value === this.value);
+    const selected =
+      this.value === "" ? undefined : this.options.find((option) => option.value === this.value);
     const rootClass = classMap({
       "zr-select": true,
       "zr-select--open": this.open,
@@ -197,7 +223,7 @@ export class ZlSelect extends LitElement {
             aria-labelledby=${this.label ? labelId : nothing}
             ?hidden=${!this.open}
           >
-            ${this.options.map((option, index) => this.renderOption(option, index))}
+            ${this.listOptions.map((option, index) => this.renderOption(option, index))}
           </ul>
         </div>
       </div>
@@ -312,7 +338,7 @@ export class ZlSelect extends LitElement {
   };
 
   private handleOptionClick(index: number): void {
-    if (this.options[index]?.disabled) {
+    if (this.listOptions[index]?.disabled) {
       return;
     }
     this.setActive(index);
@@ -320,7 +346,7 @@ export class ZlSelect extends LitElement {
   }
 
   private handleOptionPointerMove(index: number): void {
-    if (!this.options[index]?.disabled && index !== this.activeIndex) {
+    if (!this.listOptions[index]?.disabled && index !== this.activeIndex) {
       this.activeIndex = index;
     }
   }
@@ -332,11 +358,8 @@ export class ZlSelect extends LitElement {
   };
 
   private openMenu(): void {
-    if (this.options.length === 0) {
-      return;
-    }
     this.open = true;
-    const selectedIndex = this.options.findIndex((option) => option.value === this.value);
+    const selectedIndex = this.listOptions.findIndex((option) => option.value === this.value);
     this.activeIndex = selectedIndex >= 0 ? selectedIndex : this.firstEnabledIndex();
   }
 
@@ -350,7 +373,7 @@ export class ZlSelect extends LitElement {
   }
 
   private commitActive(): void {
-    const option = this.options[this.activeIndex];
+    const option = this.listOptions[this.activeIndex];
     if (!option || option.disabled) {
       return;
     }
@@ -367,14 +390,15 @@ export class ZlSelect extends LitElement {
   }
 
   private moveActive(delta: number): void {
-    const count = this.options.length;
+    const list = this.listOptions;
+    const count = list.length;
     if (count === 0) {
       return;
     }
     let next = this.activeIndex;
     for (let step = 0; step < count; step += 1) {
       next = (next + delta + count) % count;
-      if (!this.options[next]?.disabled) {
+      if (!list[next]?.disabled) {
         this.setActive(next);
         return;
       }
@@ -382,18 +406,19 @@ export class ZlSelect extends LitElement {
   }
 
   private setActive(index: number): void {
-    if (index >= 0 && index < this.options.length) {
+    if (index >= 0 && index < this.listOptions.length) {
       this.activeIndex = index;
     }
   }
 
   private firstEnabledIndex(): number {
-    return this.options.findIndex((option) => !option.disabled);
+    return this.listOptions.findIndex((option) => !option.disabled);
   }
 
   private lastEnabledIndex(): number {
-    for (let index = this.options.length - 1; index >= 0; index -= 1) {
-      if (!this.options[index]?.disabled) {
+    const list = this.listOptions;
+    for (let index = list.length - 1; index >= 0; index -= 1) {
+      if (!list[index]?.disabled) {
         return index;
       }
     }

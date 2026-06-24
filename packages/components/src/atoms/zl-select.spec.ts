@@ -75,18 +75,42 @@ describe("<zl-select> markup", () => {
     expect(value?.classList.contains("zr-select__value--placeholder")).toBe(false);
   });
 
-  it("renders one option per item with selection and disabled state", async () => {
-    const el = await mount({ name: "country", value: "us" });
+  it("renders a leading empty option plus one row per item with selection and disabled state", async () => {
+    const el = await mount({ name: "country", value: "us", placeholder: "Pick one" });
     const options = el.shadowRoot?.querySelectorAll('[role="option"]');
-    expect(options?.length).toBe(3);
+    // Leading empty "no selection" row + the three caller options.
+    expect(options?.length).toBe(4);
+    expect(options?.[0]?.getAttribute("data-value")).toBe("");
+    expect(options?.[0]?.textContent?.trim()).toBe("Pick one");
+    expect(options?.[0]?.getAttribute("aria-selected")).toBe("false");
+    expect(options?.[1]?.getAttribute("aria-selected")).toBe("true");
+    expect(options?.[2]?.getAttribute("aria-selected")).toBe("false");
+    expect(options?.[3]?.getAttribute("aria-disabled")).toBe("true");
+  });
+
+  it("marks the empty option selected and lets the user clear back to it", async () => {
+    const el = await mount({ name: "country", value: "us" });
+    el.value = "";
+    await el.updateComplete;
+    const options = el.shadowRoot?.querySelectorAll('[role="option"]');
+    expect(options?.[0]?.getAttribute("data-value")).toBe("");
     expect(options?.[0]?.getAttribute("aria-selected")).toBe("true");
-    expect(options?.[1]?.getAttribute("aria-selected")).toBe("false");
-    expect(options?.[2]?.getAttribute("aria-disabled")).toBe("true");
+    const value = el.shadowRoot?.querySelector(".zr-select__value");
+    expect(value?.classList.contains("zr-select__value--placeholder")).toBe(true);
   });
 
   it("derives a stable trigger test id from the name", async () => {
     const el = await mount({ name: "country" });
     expect(trigger(el).getAttribute("data-testid")).toBe("zitadel-select-country");
+  });
+
+  it("exposes and restores the chosen value through formValue", async () => {
+    const el = await mount({ name: "country", value: "de" });
+    expect(el.formValue).toBe("de");
+    el.formValue = "us";
+    expect(el.value).toBe("us");
+    el.formValue = "";
+    expect(el.value).toBe("");
   });
 
   it("reflects disabled and open to host attributes", async () => {

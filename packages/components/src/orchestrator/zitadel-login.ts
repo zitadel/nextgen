@@ -37,6 +37,20 @@ import layoutChromeCss from "./templates/layout-chrome.css?inline";
 import { ThemeController } from "./theme-controller.js";
 
 /**
+ * The uniform value contract every input atom exposes (`<zl-field>`,
+ * `<zl-select>`, `<zl-checkbox>`, and any future field atom). The orchestrator
+ * reads and restores field values exclusively through `formValue`, so it never
+ * has to know an atom's tag or internal shape — a new field type works with no
+ * change here.
+ */
+type FieldAtom = HTMLElement & { formValue: string };
+
+/** Narrow a rendered named element to the `formValue` field-atom contract. */
+function isFieldAtom(el: Element): el is FieldAtom {
+  return typeof (el as Partial<FieldAtom>).formValue === "string";
+}
+
+/**
  * `<zitadel-login>` — the auth-UI orchestrator.
  *
  * Drives the typed `@zitadel/api` Flow API directly: `POST /flow`
@@ -198,6 +212,9 @@ export class ZitadelLogin extends LitElement {
       sheet.replaceSync(layoutChromeCss);
       root.adoptedStyleSheets = [...existing, sheet];
       root.addEventListener("zl-input", this.handleAtomInput as EventListener);
+      // <zl-select> and <zl-checkbox> commit their value through `zl-change`
+      // rather than `zl-input`, so capture it on the same `formValues` path.
+      root.addEventListener("zl-change", this.handleAtomChange as EventListener);
       // <zl-button> dispatches `zl-submit` for both primary submits and
       // secondary actions; the orchestrator picks the right path based on
       // the button's `type` and `action`.
@@ -566,52 +583,47 @@ export class ZitadelLogin extends LitElement {
     };
   }
 
+  /** All rendered input atoms exposing the `formValue` contract. */
+  private fieldAtoms(): FieldAtom[] {
+    const root = this.shadowRoot;
+    if (!root) return [];
+    return Array.from(root.querySelectorAll<HTMLElement>("[name]")).filter(isFieldAtom);
+  }
+
   private applyValuesToFields(): void {
-    const root = this.shadowRoot;
-    if (!root) return;
-    const fields = root.querySelectorAll<HTMLElement & { value?: string }>("zl-field");
-    if (fields.length === 0) return;
-    for (const field of fields) {
-      const name = field.getAttribute("name");
-      if (!name || !(name in this.formValues)) continue;
+    for (const atom of this.fieldAtoms()) {
+      const name = atom.getAttribute("name");
+      if (!name) continue;
       const next = this.formValues[name];
-      if (field.value !== next) {
-        field.value = next;
+      if (next !== undefined && atom.formValue !== next) {
+        atom.formValue = next;
       }
     }
   }
 
-  private captureValuesFromFields(): Record<string, string> {
-    const root = this.shadowRoot;
-    if (!root) return this.formValues;
-    const fields = root.querySelectorAll<HTMLElement & { value?: string }>("zl-field");
-    if (fields.length === 0) return this.formValues;
-    const next = { ...this.formValues };
-    let changed = false;
-    for (const field of fields) {
-      const name = field.getAttribute("name");
-      const value = this.currentFieldValue(field);
-      if (!name || value === undefined) continue;
-      if (field.value !== value) {
-        field.value = value;
-      }
-      if (next[name] !== value) {
-        next[name] = value;
-        changed = true;
-      }
+  /**
+   * Snapshot the current step's field values straight from the rendered input
+   * atoms through their uniform `formValue` contract. Tag-agnostic: every
+   * form-participating atom is read the same way, so a new field type needs no
+   * change here. Declared fields default to "" so the backend still runs its
+   * required-checks and challenge dispatch instead of silently advancing on a
+   * field-less payload. Captured values are folded into `formValues` for
+   * cross-step identity (the signed-in greeting) and post-error restoration.
+   */
+  private collectSubmitFields(): Record<string, string> {
+    const current = new Map<string, string>();
+    for (const atom of this.fieldAtoms()) {
+      const name = atom.getAttribute("name");
+      if (name) current.set(name, atom.formValue);
     }
-    if (changed) {
-      this.formValues = next;
+    if (current.size > 0) {
+      this.formValues = { ...this.formValues, ...Object.fromEntries(current) };
     }
-    return next;
-  }
-
-  private currentFieldValue(field: HTMLElement & { value?: string }): string | undefined {
-    const native = field.shadowRoot?.querySelector<HTMLInputElement>("input");
-    if (native && native.value !== field.value) {
-      return native.value;
+    const fields: Record<string, string> = {};
+    for (const f of this.response?.step.fields ?? []) {
+      fields[f.name] = current.get(f.name) ?? "";
     }
-    return typeof field.value === "string" ? field.value : undefined;
+    return fields;
   }
 
   private handleAtomInput = (event: CustomEvent<{ name: string; value: string }>): void => {
@@ -623,18 +635,25 @@ export class ZitadelLogin extends LitElement {
     emit(this, "zitadel-flow-input", { name, value });
   };
 
+  private handleAtomChange = (
+    event: CustomEvent<{ name: string; value: string; checked?: boolean }>,
+  ): void => {
+    const detail = event.detail;
+    if (!detail?.name) return;
+    const { name } = detail;
+    // <zl-checkbox> reports `checked`; its submitted value is the value token
+    // only when checked (matching a native checkbox), empty otherwise.
+    const value = detail.checked === undefined ? detail.value : detail.checked ? detail.value : "";
+    this.formValues = { ...this.formValues, [name]: value };
+    this.syncFieldElementValue(name, value);
+    emit(this, "zitadel-flow-input", { name, value });
+  };
+
+  /** Mirror a value onto the matching rendered atom (used after atom events). */
   private syncFieldElementValue(name: string, value: string): void {
-    const root = this.shadowRoot;
-    if (!root) return;
-    const fields = root.querySelectorAll<HTMLElement & { value?: string }>("zl-field");
-    for (const field of fields) {
-      if (field.getAttribute("name") !== name) continue;
-      if (field.value !== value) {
-        field.value = value;
-      }
-      const native = field.shadowRoot?.querySelector<HTMLInputElement>("input");
-      if (native && native.value !== value) {
-        native.value = value;
+    for (const atom of this.fieldAtoms()) {
+      if (atom.getAttribute("name") === name && atom.formValue !== value) {
+        atom.formValue = value;
       }
     }
   }
@@ -741,18 +760,11 @@ export class ZitadelLogin extends LitElement {
     const { id, session_token } = this.response;
     this.loading = true;
     try {
-      // Only send field values that the current step defines. `formValues`
-      // carries state across steps (e.g. email for the signed-in greeting)
-      // but steps without fields should not leak prior values onto the wire.
-      const formValues = this.captureValuesFromFields();
-      const stepFields = this.response.step.fields ?? [];
-      const fields: Record<string, string> = {};
-      for (const f of stepFields) {
-        const value = formValues[f.name];
-        if (value !== undefined) {
-          fields[f.name] = value;
-        }
-      }
+      // Only send field values the current step defines. `formValues` carries
+      // state across steps (e.g. email for the signed-in greeting), but
+      // collectSubmitFields keys off the step's declared fields, so a step
+      // without fields yields an empty map and never leaks prior values.
+      const fields = this.collectSubmitFields();
       const body: SubmitFlowStepBody = {
         session_token,
         action: action ?? "submit",
