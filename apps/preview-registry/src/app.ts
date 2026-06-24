@@ -182,18 +182,17 @@ export const createApp = (store: BlobStore) => {
 
   app.notFound((context) => context.json({ error: "not found", path: context.req.path }, 404));
   app.onError((error, context) => {
-    // Stack traces can expose internal file paths and source snippets.
-    // Preview deploys are public (Deployment Protection is disabled so
-    // the npm CLI can reach them), so only attach a stack in genuine
-    // local dev — i.e. when not running on Vercel at all. Vercel sets
-    // the `VERCEL` env var on every build and deployment.
-    const includeStack = !process.env.VERCEL;
+    // Both the stack AND the raw message can leak internals (eg an fs
+    // ENOENT message embeds an absolute path). Preview deploys are public
+    // (Deployment Protection is disabled so the npm CLI can reach them),
+    // so anywhere on Vercel we return only a generic message. The real
+    // message and stack are surfaced solely in local dev — i.e. when not
+    // running on Vercel at all (Vercel sets `VERCEL` on every deploy).
+    const isLocalDev = !process.env.VERCEL;
     return context.json(
-      {
-        error: error.message,
-        path: context.req.path,
-        ...(includeStack ? { stack: error.stack } : {}),
-      },
+      isLocalDev
+        ? { error: error.message, path: context.req.path, stack: error.stack }
+        : { error: "internal server error", path: context.req.path },
       500,
     );
   });
