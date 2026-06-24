@@ -10,11 +10,10 @@
 package domainmock
 
 import (
-	context "context"
 	reflect "reflect"
 
+	jsonschema "github.com/ianlancetaylor/jsonschema"
 	domain "github.com/zitadel/nextgen/internal/domain"
-	database "github.com/zitadel/nextgen/internal/storage/database"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -43,18 +42,18 @@ func (m *MockFlowFieldResolver) EXPECT() *MockFlowFieldResolverMockRecorder {
 }
 
 // Resolve mocks base method.
-func (m *MockFlowFieldResolver) Resolve(ctx context.Context, client database.QueryExecutor, projectID, userSchemaURL, stepName string, fieldNames []string) (domain.FlowResolvedFields, error) {
+func (m *MockFlowFieldResolver) Resolve(schema *jsonschema.Schema, stepName string, fields []domain.Field) (domain.FlowResolvedFields, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Resolve", ctx, client, projectID, userSchemaURL, stepName, fieldNames)
+	ret := m.ctrl.Call(m, "Resolve", schema, stepName, fields)
 	ret0, _ := ret[0].(domain.FlowResolvedFields)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Resolve indicates an expected call of Resolve.
-func (mr *MockFlowFieldResolverMockRecorder) Resolve(ctx, client, projectID, userSchemaURL, stepName, fieldNames any) *MockFlowFieldResolverResolveCall {
+func (mr *MockFlowFieldResolverMockRecorder) Resolve(schema, stepName, fields any) *MockFlowFieldResolverResolveCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Resolve", reflect.TypeOf((*MockFlowFieldResolver)(nil).Resolve), ctx, client, projectID, userSchemaURL, stepName, fieldNames)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Resolve", reflect.TypeOf((*MockFlowFieldResolver)(nil).Resolve), schema, stepName, fields)
 	return &MockFlowFieldResolverResolveCall{Call: call}
 }
 
@@ -70,13 +69,13 @@ func (c *MockFlowFieldResolverResolveCall) Return(arg0 domain.FlowResolvedFields
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockFlowFieldResolverResolveCall) Do(f func(context.Context, database.QueryExecutor, string, string, string, []string) (domain.FlowResolvedFields, error)) *MockFlowFieldResolverResolveCall {
+func (c *MockFlowFieldResolverResolveCall) Do(f func(*jsonschema.Schema, string, []domain.Field) (domain.FlowResolvedFields, error)) *MockFlowFieldResolverResolveCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockFlowFieldResolverResolveCall) DoAndReturn(f func(context.Context, database.QueryExecutor, string, string, string, []string) (domain.FlowResolvedFields, error)) *MockFlowFieldResolverResolveCall {
+func (c *MockFlowFieldResolverResolveCall) DoAndReturn(f func(*jsonschema.Schema, string, []domain.Field) (domain.FlowResolvedFields, error)) *MockFlowFieldResolverResolveCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

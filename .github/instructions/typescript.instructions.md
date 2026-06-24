@@ -12,10 +12,9 @@ Vitest.
 - Keep public SDK exports stable and deliberate. Changes to exported types,
   renderer props, or package entry points should include tests and README or
   contract updates when user-facing.
-- The public npm packages (`apps/cli`, `packages/api`, `packages/components`,
-  `packages/sdk-core`, `packages/sdk-next`, `packages/sdk-nuxt`,
-  `packages/sdk-react`, `packages/sdk-vue`, `packages/sdk-angular`) must keep
-  `"license": "MIT"`.
+- Published packages under `apps/cli` and `packages/*` must keep
+  `"license": "MIT"` (the `apps/server*` packages are `AGPL-3.0-only`); see
+  [LICENSING.md](../../LICENSING.md).
 - Follow the [decision table in `.changeset/README.md`](../../.changeset/README.md#decision-table)
   for publishable package paths; add a real changeset for user-visible changes,
   skip the file when the PR does not touch those paths. Write
