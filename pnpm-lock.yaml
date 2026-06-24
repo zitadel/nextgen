@@ -388,6 +388,9 @@ importers:
       express:
         specifier: 'catalog:'
         version: 4.22.1
+      prettier:
+        specifier: 'catalog:'
+        version: 3.8.3
       tsx:
         specifier: 'catalog:'
         version: 4.21.0
