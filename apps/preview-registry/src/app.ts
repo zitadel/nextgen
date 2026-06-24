@@ -42,6 +42,22 @@ const originForHost = (hostHeader: string | undefined): string => {
 const branchForDeploy = (): string => process.env.VERCEL_GIT_COMMIT_REF ?? FALLBACK_BRANCH;
 
 /**
+ * Reject blob keys that could escape the snapshot storage root.
+ *
+ * A legitimate tarball key is always a relative `@scope/name/-/file.tgz`
+ * path. An empty key, an absolute path, a Windows drive prefix, or any
+ * `..` traversal segment indicates an attempt to read outside
+ * `.snapshots` (eg the function bundle itself) and is refused before
+ * the key ever reaches the filesystem store.
+ */
+const isSafeBlobKey = (key: string): boolean => {
+  if (key.length === 0) return false;
+  if (key.startsWith("/") || key.startsWith("\\")) return false;
+  if (/^[a-zA-Z]:/.test(key)) return false;
+  return !key.split(/[/\\]/).includes("..");
+};
+
+/**
  * Construct the Hono app that implements the npm registry protocol on
  * top of an arbitrary {@link BlobStore}.
  *
@@ -90,6 +106,9 @@ export const createApp = (store: BlobStore) => {
 
   app.get("/-/blob/*", async (context) => {
     const key = decodeURIComponent(context.req.path.replace(/^\/-\/blob\//, ""));
+    if (!isSafeBlobKey(key)) {
+      return context.json({ error: "not found" }, 404);
+    }
     try {
       const tarball = await store.read(key);
       const copy = new Uint8Array(tarball.byteLength);

@@ -1,5 +1,5 @@
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 
 /**
  * One entry returned by {@link BlobStore.list} or {@link BlobStore.put}.
@@ -64,9 +64,22 @@ const walkDirectory = async (rootDirectory: string): Promise<readonly string[]> 
 export const createFsStore = (storageRoot: string, publicBase: string): BlobStore => {
   const toUrl = (key: string): string => `${publicBase}/-/blob/${encodeURI(key)}`;
 
+  // Defense-in-depth against path traversal: resolve every key against
+  // the storage root and refuse anything that lands outside it. The
+  // HTTP layer already rejects `..` keys, but the store is the last
+  // line so a future caller cannot accidentally read arbitrary files.
+  const resolvedRoot = resolve(storageRoot);
+  const resolveWithinRoot = (key: string): string => {
+    const resolved = resolve(storageRoot, key);
+    if (resolved !== resolvedRoot && !resolved.startsWith(resolvedRoot + sep)) {
+      throw new Error(`key escapes storage root: ${key}`);
+    }
+    return resolved;
+  };
+
   return {
     put: async (key, body, _contentType) => {
-      const destination = join(storageRoot, key);
+      const destination = resolveWithinRoot(key);
       await mkdir(dirname(destination), { recursive: true });
       await writeFile(destination, body);
       return {
@@ -95,6 +108,6 @@ export const createFsStore = (storageRoot: string, publicBase: string): BlobStor
       return matched.filter((entry): entry is BlobEntry => entry !== null);
     },
 
-    read: async (key) => readFile(join(storageRoot, key)),
+    read: async (key) => readFile(resolveWithinRoot(key)),
   };
 };

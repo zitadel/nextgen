@@ -3,37 +3,6 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-/**
- * Workspace package directories the local stage script will pack.
- *
- * Kept in sync with `packages/*` by convention; if you add a package
- * to the workspace, extend this list.
- */
-/**
- * Workspace package directories the local stage script will pack.
- *
- * Aligned with nextgen's publishable (non-private) packages so the
- * local dev round-trip exercises the same set the production build
- * will publish.
- */
-const WORKSPACE_PACKAGES = [
-  "packages/api",
-  "packages/components",
-  "packages/sdk-angular",
-  "packages/sdk-core",
-  "packages/sdk-next",
-  "packages/sdk-nuxt",
-  "packages/sdk-qwik",
-  "packages/sdk-qwik-city",
-  "packages/sdk-react",
-  "packages/sdk-solid",
-  "packages/sdk-solid-start",
-  "packages/sdk-svelte",
-  "packages/sdk-sveltekit",
-  "packages/sdk-tanstack-start",
-  "packages/sdk-vue",
-] as const;
-
 /** Absolute path to `apps/preview-registry/`. */
 const APP_ROOT = resolve(import.meta.dirname, "..");
 
@@ -46,7 +15,34 @@ const SNAPSHOT_ROOT = join(APP_ROOT, ".snapshots");
 interface WorkspaceManifest {
   readonly name: string;
   readonly version: string;
+  readonly private?: boolean;
 }
+
+/**
+ * Discover every publishable workspace package directory under
+ * `packages/`.
+ *
+ * Mirrors `scripts/publish-on-deploy.ts` exactly — directories without
+ * a `package.json` or flagged `private: true` are skipped — so the
+ * local round-trip stages precisely the set the production build
+ * publishes, and the list can never drift from what actually exists in
+ * the repo.
+ */
+const listPublishablePackageDirectories = (): readonly string[] =>
+  readdirSync(join(REPO_ROOT, "packages"))
+    .map((entry) => `packages/${entry}`)
+    .filter((packageDirectory) => {
+      try {
+        const packageJsonPath = join(REPO_ROOT, packageDirectory, "package.json");
+        if (!readdirSync(join(REPO_ROOT, packageDirectory)).includes("package.json")) {
+          return false;
+        }
+        const manifest = JSON.parse(readFileSync(packageJsonPath, "utf8")) as WorkspaceManifest;
+        return manifest.private !== true;
+      } catch {
+        return false;
+      }
+    });
 
 /**
  * Pack every workspace package into the local FS snapshot store so the
@@ -60,9 +56,11 @@ interface WorkspaceManifest {
 const stageLocal = async (): Promise<void> => {
   rmSync(SNAPSHOT_ROOT, { recursive: true, force: true });
 
+  const packageDirectories = listPublishablePackageDirectories();
+
   const stagingDirectory = mkdtempSync(join(tmpdir(), "stage-local-"));
   try {
-    for (const packageDirectory of WORKSPACE_PACKAGES) {
+    for (const packageDirectory of packageDirectories) {
       console.log(`packing ${packageDirectory}`);
       execFileSync("corepack", ["pnpm", "pack", "--pack-destination", stagingDirectory], {
         cwd: join(REPO_ROOT, packageDirectory),
@@ -71,7 +69,7 @@ const stageLocal = async (): Promise<void> => {
     }
 
     const manifests: readonly { path: string; manifest: WorkspaceManifest }[] =
-      WORKSPACE_PACKAGES.map((packageDirectory) => {
+      packageDirectories.map((packageDirectory) => {
         const packageJsonPath = join(REPO_ROOT, packageDirectory, "package.json");
         return {
           path: packageJsonPath,

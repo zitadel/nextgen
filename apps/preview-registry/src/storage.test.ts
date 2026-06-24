@@ -65,4 +65,14 @@ describe("createFsStore", () => {
     const store = createFsStore(storeRoot, publicBase);
     await expect(store.read("missing/file.tgz")).rejects.toThrow();
   });
+
+  test("read refuses keys that traverse outside the storage root", async () => {
+    const store = createFsStore(storeRoot, publicBase);
+    await expect(store.read("../escape.txt")).rejects.toThrow(/escapes storage root/);
+    // `@scope/name/-/` is three segments deep, so five `..` segments
+    // climb past the storage root and land in its parent directory.
+    await expect(store.read("@scope/name/-/../../../../../etc/passwd")).rejects.toThrow(
+      /escapes storage root/,
+    );
+  });
 });
