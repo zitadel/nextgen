@@ -202,8 +202,9 @@ Moon task targets use the `<project>:<task>` form, for example `moon run cli:tes
 
 Use `corepack pnpm exec changeset status --since origin/main` when you want to
 preview the package bumps Changesets will plan from your PR. Pull requests also
-get an informational Changesets comment; maintainers use that and
-`.changeset/README.md` to review release intent.
+get an informational Changesets comment; maintainers use that and the
+[changeset decision table](.changeset/README.md#decision-table) to review release
+intent.
 
 To run the full CI-parity suite locally — including integration tests, demo
 end-to-end tests, and the fresh-app journey — run
