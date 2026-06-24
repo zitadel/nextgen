@@ -45,15 +45,13 @@ moon run demo-nuxt:dev
 
 Open [http://localhost:3001/login](http://localhost:3001/login). Any email/password combination is accepted by the mock server.
 
-**UI-only iteration** (no Nuxt, no TCP mock):
+**UI-only iteration** (no Nuxt, no TCP mock): the Storybook workbench runs the
+Lit atoms, the paired React components, and the `<zitadel-login>` orchestrator
+(MSW in the browser via `msw-storybook-addon`):
 
 ```bash
-moon run components:dev
-# → http://localhost:5173/?route=login
-# → http://localhost:5173/?route=atoms
-
-moon run console:dev
-# → http://localhost:5174
+moon run storybook:dev
+# → http://localhost:6006
 ```
 
 After changing `@zitadel/components`, rebuild before refreshing:

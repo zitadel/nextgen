@@ -111,6 +111,7 @@ the two SPAs bundled directly into the server binary.
 | -------------------------------------------- | ------------------------------------------ |
 | Install dependencies                         | `corepack pnpm install --frozen-lockfile`  |
 | Verify my toolchain                          | `moon run workspace:doctor`                |
+| Open the component workbench (Storybook)     | `moon run storybook:dev` → http://localhost:6006 |
 | Start the console dev server                 | `moon run console:dev` → http://localhost:5174 |
 | Start the login-UI dev server                | `moon run login-ui:dev` → http://localhost:5175 |
 | Build both apps and test with the Go server  | `moon run console:build login-ui:build` then `go run . server` |

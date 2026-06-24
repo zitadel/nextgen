@@ -12,7 +12,7 @@
         "name": "signup",
         "fields": [
           "email",
-          "password"
+          "x-auth-methods#password"
         ],
         "actions": [
           {
