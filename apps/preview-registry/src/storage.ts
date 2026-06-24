@@ -1,5 +1,5 @@
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
-import { dirname, join, resolve, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
 /**
  * One entry returned by {@link BlobStore.list} or {@link BlobStore.put}.
@@ -106,9 +106,10 @@ export const createFsStore = (storageRoot: string, publicBase: string): BlobStor
           // Blob keys are always POSIX-style (`@scope/name/-/file.tgz`),
           // but the filesystem path uses the platform separator — on
           // Windows that would be `\`, which downstream prefix matching
-          // and URL generation do not expect. Normalize to forward slashes.
-          const relativePath = fullPath.slice(storageRoot.length + 1);
-          const key = relativePath.split(sep).join("/");
+          // and URL generation do not expect. `path.relative` derives the
+          // key independent of any trailing separator on `storageRoot`;
+          // normalize the result to forward slashes.
+          const key = relative(storageRoot, fullPath).split(sep).join("/");
           if (!key.startsWith(prefix)) return null;
           const info = await stat(fullPath);
           return {
