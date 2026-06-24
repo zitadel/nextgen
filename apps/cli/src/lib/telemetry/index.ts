@@ -18,8 +18,10 @@ export type { TelemetryRegion } from "./config";
 export type TelemetryProperties = Properties;
 
 /**
- * Seams for tests and for keeping the production wiring honest. Everything is
- * optional; production code passes nothing and gets the real implementations.
+ * Inputs to {@link Telemetry.create}. `env` is required; the rest are optional —
+ * `flag`/`debug` are set by the production wiring, while `initClient`,
+ * `loadIdentity`, and `newId` are test seams that default to the real
+ * implementations when omitted.
  */
 export type TelemetryDeps = {
   readonly env: NodeJS.ProcessEnv;

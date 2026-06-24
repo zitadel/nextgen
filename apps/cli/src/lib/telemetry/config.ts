@@ -8,11 +8,12 @@
  * (we cannot ask end users to supply one). It is intentionally not a secret.
  *
  * Dev and prod are separate Mixpanel projects (the skill's Phase 2 rule: never
- * track dev traffic into the production project). The channel is stamped into
- * the bundle at build time (see {@link resolveChannel}) so the published CLI
- * routes real user traffic to production without any per-user env var, while
- * source/test runs stay on dev. `ZITADEL_TELEMETRY_TOKEN` overrides everything
- * for ad-hoc routing.
+ * track dev traffic into the production project). By default the channel comes
+ * from a build-time stamp (see {@link resolveChannel}), so the published CLI
+ * routes real user traffic to production without any per-user env var while
+ * source/test runs stay on dev — but a runtime `ZITADEL_TELEMETRY_ENV`/`NODE_ENV`
+ * or `ZITADEL_TELEMETRY_BUILD_CHANNEL` overrides the stamp, and
+ * `ZITADEL_TELEMETRY_TOKEN` overrides the token outright.
  */
 
 /**

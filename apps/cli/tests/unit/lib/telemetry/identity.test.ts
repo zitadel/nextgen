@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -18,7 +18,9 @@ function freshConfigHome(): string {
 }
 
 afterEach(() => {
-  // Temp dirs live under the OS tmp dir and are cheap to leave; nothing to undo.
+  for (const dir of dirs) {
+    rmSync(dir, { recursive: true, force: true });
+  }
   dirs.length = 0;
 });
 
