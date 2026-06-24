@@ -27,10 +27,10 @@ export { applyFontUrl } from "./font-loader.js";
 export { TEMPLATE_NAMES } from "./template-names.js";
 export { en, de, it, builtinLocales, type Locale } from "./locales/index.js";
 export {
-  patchMandatoryGates,
-  mandatoryGatesMarkerComment,
-  MANDATORY_GATES_MARKER,
-} from "./mandatory-gates.js";
+  patchFields,
+  fieldPatcherMarkerComment,
+  FIELD_PATCHER_MARKER,
+} from "./field-patcher.js";
 export { createSanitiser } from "./sanitiser.js";
 export { default as defaultTemplate } from "./templates/default.liquid";
 export { default as layoutChromeCss } from "./templates/layout-chrome.css?inline";

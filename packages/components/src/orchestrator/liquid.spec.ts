@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createLiquidEngine } from "./liquid.js";
 import { TEMPLATE_NAMES } from "./template-names.js";
 import { en as fullLocale } from "./locales/en.js";
-import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
+import { fieldPatcherMarkerComment } from "./field-patcher.js";
 
 /**
  * Convert author-friendly `{ name: {...}, ... }` dicts into the wire-shape
@@ -74,10 +74,10 @@ describe("LiquidJS engine", () => {
     expect(result).toContain("&lt;script&gt;");
   });
 
-  it("emits the mandatory_gates marker comment", () => {
+  it("emits the field_patcher marker comment", () => {
     const engine = createLiquidEngine({ locale });
-    const result = engine.parseAndRenderSync("{% mandatory_gates %}", {});
-    expect(result).toBe(mandatoryGatesMarkerComment);
+    const result = engine.parseAndRenderSync("{% field_patcher %}", {});
+    expect(result).toBe(fieldPatcherMarkerComment);
   });
 
   it("renders the bundled default template through the auth-form partial", () => {
@@ -106,7 +106,7 @@ describe("LiquidJS engine", () => {
     expect(result).toContain('<zl-button');
     expect(result).toContain('data-testid="zitadel-action-submit"');
     expect(result).toContain('hierarchy="primary"');
-    expect(result).toContain(mandatoryGatesMarkerComment);
+    expect(result).toContain(fieldPatcherMarkerComment);
   });
 
   it("renders step title from locale via default template", () => {
@@ -349,5 +349,119 @@ describe("LiquidJS engine", () => {
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
     expect(result).toContain("zl-card-title");
+  });
+
+
+  describe("{% fields %} tag", () => {
+    it("renders all fields in the context array", () => {
+      const engine = createLiquidEngine({
+        locale: { ...locale, "identifier.field.password": "Password" },
+      });
+      const result = engine.parseAndRenderSync("{% fields %}", {
+        step: { name: "identifier" },
+        fields: [
+          { name: "email", type: "email", text_key: "identifier.field.email", required: true },
+          { name: "password", type: "password", text_key: "identifier.field.password", required: true },
+        ],
+        errors: [],
+      });
+      expect(result).toContain('<zl-field');
+      expect(result).toContain('name="email"');
+      expect(result).toContain('autocomplete="email"');
+      expect(result).toContain('label="Work email"');
+      expect(result).toContain('data-testid="zitadel-field-email"');
+      expect(result).toContain('name="password"');
+      expect(result).toContain('autocomplete="current-password"');
+    });
+
+    it("renders mixed field types (text, checkbox, select)", () => {
+      const engine = createLiquidEngine({
+        locale: {
+          ...locale,
+          "register.field.email": "Email",
+          "register.field.terms": "I accept the terms",
+          "register.field.lang": "Language",
+        },
+      });
+      const result = engine.parseAndRenderSync("{% fields %}", {
+        step: { name: "register" },
+        fields: [
+          { name: "email", type: "email", text_key: "register.field.email", required: true },
+          { name: "terms", type: "checkbox", text_key: "register.field.terms", required: true, value: true },
+          { name: "language", type: "select", text_key: "register.field.lang", value: "en", validation: { enum: ["en", "de"] } },
+        ],
+        errors: [],
+      });
+      expect(result).toContain("<zl-field");
+      expect(result).toContain("<zl-checkbox");
+      expect(result).toContain('label="I accept the terms"');
+      expect(result).toContain("checked");
+      expect(result).toContain("<zl-select");
+      expect(result).toContain('"value":"en"');
+    });
+
+    it("renders checkbox without checked when value is falsy", () => {
+      const engine = createLiquidEngine({
+        locale: { ...locale, "register.field.terms": "I accept" },
+      });
+      const result = engine.parseAndRenderSync("{% fields %}", {
+        step: { name: "register" },
+        fields: [{ name: "terms", type: "checkbox", text_key: "register.field.terms", value: false }],
+        errors: [],
+      });
+      expect(result).toContain("<zl-checkbox");
+      expect(result).not.toContain("checked");
+    });
+
+    it("resolves new-password autocomplete on register step", () => {
+      const engine = createLiquidEngine({
+        locale: { ...locale, "register.field.password": "Password" },
+      });
+      const result = engine.parseAndRenderSync("{% fields %}", {
+        step: { name: "register" },
+        fields: [{ name: "password", type: "password", text_key: "register.field.password", required: true }],
+        errors: [],
+      });
+      expect(result).toContain('autocomplete="new-password"');
+    });
+
+    it("attaches inline error to the matching field", () => {
+      const engine = createLiquidEngine({ locale: fullLocale });
+      const result = engine.parseAndRenderSync("{% fields %}", {
+        step: { name: "identifier" },
+        fields: [
+          { name: "email", type: "email", text_key: "identifier.field.email", required: true },
+          { name: "password", type: "password", text_key: "identifier.field.password", required: true },
+        ],
+        errors: [{ text_key: "error.invalid_credentials" }],
+      });
+      expect(result).toContain("invalid");
+      expect(result).toContain("Wrong email or password.");
+    });
+
+    it("escapes HTML in field name and label to prevent injection", () => {
+      const engine = createLiquidEngine({
+        locale: { ...locale, 'bad"><script>': 'bad"><script>' },
+      });
+      const result = engine.parseAndRenderSync("{% fields %}", {
+        step: { name: "test" },
+        fields: [{ name: '<img onerror=alert(1)>', type: "text", text_key: 'bad"><script>' }],
+        errors: [],
+      });
+      expect(result).not.toContain("<img onerror");
+      expect(result).not.toContain("<script>");
+      expect(result).toContain("&lt;img");
+      expect(result).toContain("&lt;script&gt;");
+    });
+
+    it("emits field_patcher marker even when fields is empty", () => {
+      const engine = createLiquidEngine({ locale });
+      const result = engine.parseAndRenderSync("{% fields %}", {
+        step: { name: "test" },
+        fields: [],
+        errors: [],
+      });
+      expect(result).toContain("ZL_FIELD_PATCHER");
+    });
   });
 });

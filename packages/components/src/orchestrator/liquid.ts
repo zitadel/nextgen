@@ -3,7 +3,7 @@
  *
  * Configures the engine per the security pipeline in
  * `docs/design/flowengine/template-security.md` and registers the
- * `| t` filter and `{% mandatory_gates %}` tag from
+ * `| t` filter and `{% field_patcher %}` tag from
  * `docs/design/branding/templates.md`.
  *
  * Hard rules:
@@ -15,9 +15,9 @@
  */
 import { Liquid } from "liquidjs";
 
-import type { FlowError } from "./template-context.js";
 import type { Locale } from "./locales/en.js";
-import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
+import { fieldsPartial, registerFieldSupport } from "./liquid-fields.js";
+import { fieldPatcherMarkerComment } from "./field-patcher.js";
 import defaultTemplate from "./templates/default.liquid";
 
 export const TEMPLATE_NAMES = {
@@ -37,6 +37,7 @@ export type CreateLiquidOptions = {
 export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
   const templates: Record<string, string> = {
     [TEMPLATE_NAMES.default]: defaultTemplate,
+    _fields: fieldsPartial,
     ...(options.templates ?? {}),
   };
 
@@ -70,42 +71,6 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
     },
   );
 
-  /** Resolves `{text_key}.placeholder` — empty when undefined (not the raw key). */
-  engine.registerFilter("fieldPlaceholder", (textKey: unknown) => {
-    const lookupKey = `${stringify(textKey)}.placeholder`;
-    return options.locale[lookupKey] ?? "";
-  });
-
-  /** Resolves `{text_key}.help` — empty when undefined. */
-  engine.registerFilter("fieldHelp", (textKey: unknown) => {
-    const lookupKey = `${stringify(textKey)}.help`;
-    return options.locale[lookupKey] ?? "";
-  });
-
-  /**
-   * Builds `<zl-select>` options from a field's closed `validation.enum`. The
-   * wire only carries the allowed values (strings), so the label defaults to the
-   * value — author the enum with display-ready text. Piped through `| json` into
-   * the element's `options` attribute.
-   */
-  engine.registerFilter("selectOptions", (values: unknown) => {
-    if (!Array.isArray(values)) return [];
-    return values.map((value) => {
-      const v = stringify(value);
-      return { value: v, label: v };
-    });
-  });
-
-  /** Maps `error.*` text keys to a field name (Figma inline-error annotations). */
-  const fieldErrorKeys: Record<string, string> = {
-    "error.email_required": "email",
-    "error.email_invalid": "email",
-    "error.email_exists": "email",
-    "error.password_required": "password",
-    "error.password_incorrect": "password",
-    "error.invalid_credentials": "password",
-  };
-
   /** Resolves `{text_key}.title` for form-level `<zl-alert heading>`. */
   engine.registerFilter("alertHeading", (textKey: unknown) => {
     const lookupKey = `${stringify(textKey)}.title`;
@@ -118,39 +83,27 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
     return options.locale[lookupKey] ?? "";
   });
 
-  /** Localized inline error for `fieldName`, or empty when none applies. */
-  engine.registerFilter("fieldError", (fieldName: unknown, errors: unknown) => {
-    const name = stringify(fieldName);
-    if (!Array.isArray(errors)) return "";
-    for (const item of errors) {
-      const err = item as FlowError;
-      const key = err.text_key ?? "";
-      if (fieldErrorKeys[key] === name) {
-        return options.locale[key] ?? key;
-      }
-    }
-    return "";
-  });
-
-  /** True when the error should render as `<zl-alert>`, not on a field. */
-  engine.registerFilter("formLevelError", (err: unknown) => {
-    const key = (err as FlowError)?.text_key ?? "";
-    return key === "" || !(key in fieldErrorKeys);
-  });
-
-  // `{% mandatory_gates %}` — emits a unique marker comment that the
-  // orchestrator post-processes via `patchMandatoryGates`.
-  engine.registerTag("mandatory_gates", {
+  // `{% field_patcher %}` — emits a unique marker comment that the
+  // orchestrator post-processes via `patchFields`.
+  engine.registerTag("field_patcher", {
     parse() {
       // No body, no args — nothing to consume.
     },
     render() {
-      return mandatoryGatesMarkerComment;
+      return fieldPatcherMarkerComment;
     },
   });
 
+  // Field rendering: filters (fieldPlaceholder, fieldHelp, fieldError,
+  // selectOptions, formLevelError) and the `{% fields %}` tag.
+  registerFieldSupport(engine, options);
+
   return engine;
 }
+
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
 
 function stringify(value: unknown): string {
   if (value == null) return "";

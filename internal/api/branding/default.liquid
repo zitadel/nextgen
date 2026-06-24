@@ -20,33 +20,8 @@
       {% endfor %}
     {% endif %}
 
-    {% for f in fields %}
-      {% assign field_placeholder = f.text_key | fieldPlaceholder %}
-      {% assign field_help = f.text_key | fieldHelp %}
-      {% assign field_err = f.name | fieldError: errors %}
-      {% assign autocomplete_val = '' %}
-      {% if f.name == 'email' %}
-        {% assign autocomplete_val = 'email' %}
-      {% elsif f.type == 'password' and step.name contains 'register' %}
-        {% assign autocomplete_val = 'new-password' %}
-      {% elsif f.type == 'password' %}
-        {% assign autocomplete_val = 'current-password' %}
-      {% endif %}
-      <zl-field
-        name="{{ f.name }}"
-        label="{{ f.text_key | t }}"
-        type="{{ f.type }}"
-        value="{{ f.value }}"
-        {% if autocomplete_val != '' %}autocomplete="{{ autocomplete_val }}"{% endif %}
-        {% if f.required %}required{% endif %}
-        {% if field_placeholder != "" %}placeholder="{{ field_placeholder }}"{% endif %}
-        {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
-      >
-        {% if field_help != "" %}
-          <span slot="help">{{ field_help }}</span>
-        {% endif %}
-      </zl-field>
-    {% endfor %}
+    {% fields %}
+
 
     {% assign has_email = fields | where: "name", "email" | first %}
     {% assign has_password = fields | where: "name", "password" | first %}
@@ -125,7 +100,5 @@
         ></zl-passkey>
       {% endif %}
     {% endif %}
-
-    {% mandatory_gates %}
   </zl-card>
 </zl-page-shell>

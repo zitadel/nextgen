@@ -1,5 +1,5 @@
 /**
- * `{% mandatory_gates %}` runtime patcher.
+ * `{% field_patcher %}` runtime patcher.
  *
  * Per `docs/design/branding/validator.md` §Runtime safety net:
  *
@@ -9,7 +9,7 @@
  *      - Any required `gates[*]` without a matching consumer.
  *      - A primary `<zl-button type="submit">` if none was reached."
  *
- * Implementation: the LiquidJS `{% mandatory_gates %}` tag emits a unique
+ * Implementation: the LiquidJS `{% field_patcher %}` tag emits a unique
  * marker comment. After Liquid renders, this patcher parses the produced
  * HTML into a `<template>`, builds any missing atoms as real DOM elements,
  * replaces the marker with them, and serialises back to a string.
@@ -22,11 +22,11 @@ import type { CreateFlow201Step } from "@zitadel/api/generated/model";
 
 import type { Locale } from "./locales/en.js";
 
-export const MANDATORY_GATES_MARKER = "ZL_MANDATORY_GATES";
+export const FIELD_PATCHER_MARKER = "ZL_FIELD_PATCHER";
 
-export const mandatoryGatesMarkerComment = `<!--${MANDATORY_GATES_MARKER}-->`;
+export const fieldPatcherMarkerComment = `<!--${FIELD_PATCHER_MARKER}-->`;
 
-export function patchMandatoryGates(
+export function patchFields(
   html: string,
   step: CreateFlow201Step,
   locale: Locale,
@@ -86,8 +86,8 @@ function hasPrimaryButton(fragment: DocumentFragment): boolean {
 function hasFieldFor(fragment: DocumentFragment, name: string): boolean {
   // We avoid a CSS attribute selector here so we don't have to worry about
   // escaping arbitrary characters in `name` (which comes from the step JSON).
-  // Walking the small set of <zl-field> nodes is fine.
-  for (const field of fragment.querySelectorAll("zl-field")) {
+  // Walking the small set of field-like nodes is fine.
+  for (const field of fragment.querySelectorAll("zl-field, zl-checkbox, zl-select")) {
     if (field.getAttribute("name") === name) return true;
   }
   return false;
@@ -100,7 +100,7 @@ function findMarkerComment(fragment: DocumentFragment): Comment | null {
   );
   let node: Node | null = walker.nextNode();
   while (node) {
-    if (node.nodeValue?.trim() === MANDATORY_GATES_MARKER) {
+    if (node.nodeValue?.trim() === FIELD_PATCHER_MARKER) {
       return node as Comment;
     }
     node = walker.nextNode();
