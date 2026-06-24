@@ -10,7 +10,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["dist/**", ".vercel/**", "node_modules/**"],
+    ignores: ["dist/**", ".vercel/**", "public/**", "node_modules/**"],
   },
   {
     ...eslint.configs.recommended,

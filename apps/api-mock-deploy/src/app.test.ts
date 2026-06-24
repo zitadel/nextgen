@@ -1,9 +1,11 @@
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 
+import { buildOpenIdConfiguration } from "@zitadel/api-mock/server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { app, resolveIssuer } from "./app.js";
+import { app } from "./app.js";
+import { resolveIssuer } from "./issuer.js";
 
 describe("resolveIssuer", () => {
   it("uses the per-deployment VERCEL_URL over HTTPS when present", () => {
@@ -16,6 +18,20 @@ describe("resolveIssuer", () => {
 
   it("defaults the localhost port to 8080 when PORT is unset", () => {
     expect(resolveIssuer({})).toBe("http://localhost:8080");
+  });
+});
+
+describe("static discovery document", () => {
+  // Vercel reserves `/.well-known/*` from rewrites, so the discovery doc
+  // is emitted as a static asset at build time. It must point `jwks_uri`
+  // at a non-reserved path the rewrite still reaches, or JWKS lookups
+  // 404 on the preview.
+  it("points jwks_uri at /auth/keys, off the reserved /.well-known path", () => {
+    const issuer = "https://pr-123.vercel.app";
+    const doc = buildOpenIdConfiguration(issuer, { jwksUri: `${issuer}/auth/keys` });
+    expect(doc.issuer).toBe(issuer);
+    expect(doc.jwks_uri).toBe("https://pr-123.vercel.app/auth/keys");
+    expect(doc.jwks_uri).not.toContain("/.well-known/");
   });
 });
 
@@ -33,8 +49,10 @@ describe("app", () => {
     baseUrl = `http://localhost:${port}`;
   });
 
-  afterAll(() => {
-    server.close();
+  afterAll(async () => {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
   });
 
   it("serves the OIDC discovery document", async () => {

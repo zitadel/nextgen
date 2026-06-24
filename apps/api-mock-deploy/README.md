@@ -27,6 +27,19 @@ The OIDC issuer is taken from `VERCEL_URL` (the immutable per-deploy
 domain) so each preview advertises and verifies tokens against its own
 URL. Locally it falls back to `http://localhost:8080`.
 
+### `/.well-known/` is special
+
+Vercel [reserves the `/.well-known/*` path](https://vercel.com/docs/routing/rewrites)
+and will **not** route it through the catch-all rewrite, so the function
+never sees `/.well-known/openid-configuration`. The only way to serve it
+on a preview is a static file, so the `buildCommand` runs
+[`scripts/generate-wellknown.ts`](scripts/generate-wellknown.ts), which
+writes `public/.well-known/openid-configuration` using this deployment's
+`VERCEL_URL`. That document points `jwks_uri` at `/auth/keys` — the same
+JWKS the function serves, but on a path the rewrite *can* reach (unlike
+`/.well-known/jwks.json`). Locally the Express app serves the discovery
+document dynamically, so this only matters on Vercel.
+
 There is no bundling step for this app's own code — Vercel builds
 `api/**` straight from TypeScript. The `buildCommand` only builds
 `@zitadel/api`, whose generated MSW/zod endpoints are imported at runtime

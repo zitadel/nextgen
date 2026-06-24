@@ -7,7 +7,15 @@ import { app } from "../src/app.js";
  * to `http://localhost:<port>` when `VERCEL_URL` is unset — see
  * `src/app.ts`.
  */
-const port = Number(process.env.PORT ?? 8080);
+const rawPort = process.env.PORT;
+const port = rawPort !== undefined ? parseInt(rawPort, 10) : 8080;
+
+if (!Number.isFinite(port) || port < 1 || port > 65535) {
+  console.error(
+    `[api-mock-deploy] invalid PORT="${rawPort}" — must be an integer between 1 and 65535`,
+  );
+  process.exit(1);
+}
 
 app.listen(port, () => {
   console.log(`api-mock-deploy on http://localhost:${port}`);
