@@ -20,6 +20,10 @@ parse the result rather than scraping human output.
 - Always pass `--non-interactive --json`. The envelope is the contract.
 - Add `--cwd <path>` when operating outside the current working directory.
 - Never run interactive prompts; `--non-interactive` (and `--json`) disable them.
+- The CLI sends anonymous usage telemetry by default. For automated/agent runs
+  that should stay silent, disable it with `--no-telemetry` (per invocation) or
+  `ZITADEL_TELEMETRY=0` / `DO_NOT_TRACK=1` (per environment); this also skips the
+  small end-of-command network flush.
 - See `README.md` (its commands section is generated from the CLI's own
   metadata) or run `zitadel <command> --help` for the full per-command flag list.
 

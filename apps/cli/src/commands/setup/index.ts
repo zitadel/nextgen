@@ -124,6 +124,15 @@ export default class Setup extends BaseCommand {
       }
     }
 
+    this.recordTelemetry({
+      framework: framework.id,
+      renderer: flags.renderer ?? "react",
+      scaffolded_skeleton: scaffoldedFramework,
+      skip_install: Boolean(flags["skip-install"]),
+      dev_port_explicit: flags["dev-port"] !== undefined,
+      step: "framework_resolved",
+    });
+
     // An explicit --dev-port overrides the detected port for the whole run, so
     // the issuer and the registered origin track the requested port (and several
     // apps can be scaffolded on distinct ports). The config edits set the
@@ -187,6 +196,7 @@ export default class Setup extends BaseCommand {
           framework.id,
         );
     consola.success(`Created project ${project.id}`);
+    this.recordTelemetry({ step: "project_created" });
 
     const ctx: PatchContext = {
       framework,
@@ -210,6 +220,10 @@ export default class Setup extends BaseCommand {
       `Patched ${result.filesWritten.length} file${result.filesWritten.length === 1 ? "" : "s"}` +
         (result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""),
     );
+    this.recordTelemetry({
+      step: "files_patched",
+      files_written_count: result.filesWritten.length,
+    });
 
     const installOutcome = await installDependenciesForSetup({
       cwd,
@@ -220,6 +234,11 @@ export default class Setup extends BaseCommand {
       json: this.jsonEnabled(),
       scaffoldedFramework,
       skipInstall: Boolean(flags["skip-install"]),
+    });
+
+    this.recordTelemetry({
+      step: "dependencies_installed",
+      package_manager: installOutcome.install.package_manager,
     });
 
     const writtenRel = result.filesWritten.map((file) => relativeDisplay(cwd, file));
