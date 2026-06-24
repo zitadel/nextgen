@@ -25,7 +25,7 @@ export type ConsentInput = {
   readonly flag?: boolean;
 };
 
-const DISABLED_VALUES = new Set(["0", "false", "off", "no"]);
+const DISABLED_VALUES = new Set(["", "0", "false", "off", "no"]);
 
 /**
  * Resolve telemetry consent under an opt-out model: on by default, but any of

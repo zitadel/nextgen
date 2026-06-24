@@ -25,8 +25,8 @@ describe("resolveConsent", () => {
     expect(resolveConsent({ env: { DO_NOT_TRACK: "0" } }).enabled).toBe(true);
   });
 
-  it("honors ZITADEL_TELEMETRY falsey tokens", () => {
-    for (const value of ["0", "false", "off", "no", "OFF"]) {
+  it("honors ZITADEL_TELEMETRY falsey tokens, including an explicit empty value", () => {
+    for (const value of ["", "0", "false", "off", "no", "OFF"]) {
       expect(resolveConsent({ env: { ZITADEL_TELEMETRY: value } }).reason).toBe("env-opt-out");
     }
   });
