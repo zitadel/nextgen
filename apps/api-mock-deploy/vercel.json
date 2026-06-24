@@ -7,7 +7,10 @@
   "headers": [
     {
       "source": "/.well-known/openid-configuration",
-      "headers": [{ "key": "Content-Type", "value": "application/json" }]
+      "headers": [
+        { "key": "Content-Type", "value": "application/json" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" }
+      ]
     }
   ]
 }

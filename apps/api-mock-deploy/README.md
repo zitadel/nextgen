@@ -20,8 +20,9 @@ Vercel's serverless runtime:
 - [`vercel.json`](vercel.json) disables framework detection
   (`framework: null`) and rewrites **every** path to the single function.
   Vercel preserves the original request URL across the rewrite, so the
-  app sees `/sessions/exchange`, `/.well-known/jwks.json`, etc. exactly
-  as it would locally.
+  app sees `/sessions/exchange`, `/auth/keys`, etc. exactly as it would
+  locally. The exception is `/.well-known/*`, which Vercel reserves and
+  does not route through rewrites (see below).
 
 The OIDC issuer is taken from `VERCEL_URL` (the immutable per-deploy
 domain) so each preview advertises and verifies tokens against its own

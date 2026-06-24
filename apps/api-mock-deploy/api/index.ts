@@ -4,9 +4,12 @@
  * Vercel treats every file under `api/` as a serverless function. The
  * sibling `vercel.json` rewrites every incoming path to this one
  * function, so the Express app below sees the original request URL
- * (`/sessions/exchange`, `/.well-known/jwks.json`, …) exactly as it
- * would when run locally — Vercel preserves the request URL across the
- * rewrite rather than rewriting it to `/api`.
+ * (`/sessions/exchange`, `/auth/keys`, …) exactly as it would when run
+ * locally — Vercel preserves the request URL across the rewrite rather
+ * than rewriting it to `/api`. The one exception is `/.well-known/*`,
+ * which Vercel reserves and will not route through a rewrite; the
+ * discovery document is therefore served as a static asset instead (see
+ * `scripts/generate-wellknown.ts` and the README).
  *
  * Exporting the bare Express `app` as the default export is the
  * documented `@vercel/node` pattern: an Express instance is itself a
