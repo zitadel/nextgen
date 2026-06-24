@@ -88,6 +88,21 @@ describe("app", () => {
     expect(body.keys).toHaveLength(1);
   });
 
+  it("serves the same JWKS at /auth/keys (the deployment-critical path)", async () => {
+    // On Vercel `/.well-known/*` is reserved, so the discovery document
+    // points `jwks_uri` at `/auth/keys`; this is the path the SDK and
+    // preview clients actually fetch. Assert it stays in lockstep with
+    // the well-known route.
+    const wellKnown = (await (await fetch(`${baseUrl}/.well-known/jwks.json`)).json()) as {
+      keys: unknown[];
+    };
+    const response = await fetch(`${baseUrl}/auth/keys`);
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { keys: unknown[] };
+    expect(body.keys).toHaveLength(1);
+    expect(body).toEqual(wellKnown);
+  });
+
   it("handles a platform route end to end (create project)", async () => {
     const response = await fetch(`${baseUrl}/projects`, {
       method: "POST",
