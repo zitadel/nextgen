@@ -824,6 +824,8 @@ func passkeyIdentifierLoginDefinition() *domain.FlowDefinition {
 // attempt 2. Otherwise the new challenge is still scoped to user1 and the
 // second user can never log in.
 func TestFlowStateMachine_Process_PasskeyAfterRejectionRebindsIdentifier(t *testing.T) {
+	t.Parallel()
+
 	const attemptID = "attempt-1"
 	const publicKey = `{"publicKey":{}}`
 
@@ -926,6 +928,8 @@ func TestFlowStateMachine_Process_PasskeyAfterRejectionRebindsIdentifier(t *test
 // the source of truth for whether the binding should change); the resolved
 // user id is the same, so PendingChallenge is preserved.
 func TestFlowStateMachine_Process_PasskeyResubmitSameIdentifierKeepsPendingChallenge(t *testing.T) {
+	t.Parallel()
+
 	const attemptID = "attempt-1"
 	const publicKey = `{"publicKey":{}}`
 	const email = "user1@example.com"
@@ -1144,6 +1148,8 @@ func passkeyIdentifierDefinition() *domain.FlowDefinition {
 // verification in login mode and rejected the same email as user_not_found
 // again. Mirrors the flip the non-passkey dispatch path already applies.
 func TestFlowStateMachine_FlipTable_PasskeyIssue_UnknownEmail_FlipsToRegister(t *testing.T) {
+	t.Parallel()
+
 	const attemptID = "attempt-1"
 	const email = "ghost@example.com"
 
@@ -1220,6 +1226,7 @@ func loginNoUserNotFoundDefinition() *domain.FlowDefinition {
 // must stay at login so the next submit doesn't silently dispatch as
 // register.
 func TestFlowStateMachine_FlipTable_OutcomeWithoutTransition_DoesNotFlip(t *testing.T) {
+	t.Parallel()
 	const attemptID = "attempt-1"
 
 	w := newFlowTestWorld(t)
@@ -1263,6 +1270,8 @@ func TestFlowStateMachine_FlipTable_OutcomeWithoutTransition_DoesNotFlip(t *test
 // have flipped to register on the typo and the second attempt would see
 // the known email as user_already_exists, wedging the sign-in.
 func TestFlowStateMachine_FlipTable_LoginTypoThenCorrectEmail_StillSignsIn(t *testing.T) {
+	t.Parallel()
+
 	const attemptID = "attempt-1"
 	const email = "ghost@example.com"
 	const userID = "user_alice"
@@ -2015,6 +2024,8 @@ func TestFlowStateMachine_Start_PreservesActionOrder(t *testing.T) {
 // half of ADR 026 — a back-navigation action can be invoked with empty
 // fields and the engine must not block on missing email/password.
 func TestFlowStateMachine_Process_NavigateSkipsValidation(t *testing.T) {
+	t.Parallel()
+
 	const attemptID = "attempt-1"
 
 	w := newFlowTestWorld(t)
@@ -2073,6 +2084,8 @@ func TestFlowStateMachine_Process_NavigateSkipsValidation(t *testing.T) {
 // malformed email under a submit action surfaces a field-validation error
 // rather than routing through, exactly as before.
 func TestFlowStateMachine_Process_SubmitKindRegression(t *testing.T) {
+	t.Parallel()
+
 	const attemptID = "attempt-1"
 
 	w := newFlowTestWorld(t)
