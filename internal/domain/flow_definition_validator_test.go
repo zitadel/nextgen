@@ -159,7 +159,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
@@ -192,7 +192,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email", "x-auth-methods#password"},
+							Fields: []domain.Field{"email", "x-auth-methods#password"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
@@ -225,7 +225,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "identify",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Actions: []domain.FlowStepAction{
 								{Name: "submit", Kind: domain.FlowActionKindSubmit},
 
@@ -270,7 +270,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "start",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Actions: []domain.FlowStepAction{
 								{Name: "loop", Kind: domain.FlowActionKindSubmit},
 
@@ -447,7 +447,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 						},
 						{
 							Name:   "broken_step",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 						},
 					},
 				},
@@ -480,7 +480,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 						},
 						{
 							Name:   "catch_me_if_you_can",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Actions: []domain.FlowStepAction{
 								{Name: "next", Kind: domain.FlowActionKindSubmit},
 							},
@@ -544,7 +544,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
@@ -578,7 +578,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
@@ -611,7 +611,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
@@ -645,7 +645,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
@@ -679,7 +679,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
@@ -713,7 +713,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
@@ -747,7 +747,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email", "x-auth-methods#password"},
+							Fields: []domain.Field{"email", "x-auth-methods#password"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
@@ -781,7 +781,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email", "x-auth-methods#password"},
+							Fields: []domain.Field{"email", "x-auth-methods#password"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
@@ -815,7 +815,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"username", "firstName"},
+							Fields: []domain.Field{"username", "firstName"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
@@ -830,7 +830,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					},
 				},
 			},
-			wantErr: domain.ErrFlowDefinitionInvalid(`step "step_1": field "username" is not a property in the user schema`, nil),
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "step_1": flow field: not a property in the user schema: "username"`, nil),
 		},
 		{
 			name: "invalid flow - a terminal step with fields",
@@ -849,7 +849,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
@@ -860,7 +860,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 						{
 							Name:     "step_2",
 							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
-							Fields:   []string{"email"},
+							Fields:   []domain.Field{"email"},
 						},
 					},
 				},
@@ -884,7 +884,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Actions: []domain.FlowStepAction{
 								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 							},
@@ -918,7 +918,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "start",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Actions: []domain.FlowStepAction{
 								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 							},
@@ -953,7 +953,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Actions: []domain.FlowStepAction{
 								{Name: "submit", Kind: domain.FlowActionKindSubmit},
 							},
@@ -963,7 +963,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 						},
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Actions: []domain.FlowStepAction{
 								{Name: "next", Kind: domain.FlowActionKindSubmit},
 							},
@@ -997,7 +997,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Actions: []domain.FlowStepAction{
 								{Name: "submit", Kind: domain.FlowActionKindSubmit},
 
@@ -1034,7 +1034,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Actions: []domain.FlowStepAction{
 								{Name: "submit", Kind: domain.FlowActionKindSubmit},
 
@@ -1102,7 +1102,7 @@ func TestValidator_FlipTable_CombinedLoginRegisterRequiresCounterOutcome(t *test
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "identify",
-				Fields: []string{"email"},
+				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
 					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
@@ -1112,7 +1112,7 @@ func TestValidator_FlipTable_CombinedLoginRegisterRequiresCounterOutcome(t *test
 			},
 			{
 				Name:      "signin",
-				Fields:    []string{"email", "x-auth-methods#password"},
+				Fields:    []domain.Field{"email", "x-auth-methods#password"},
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
 					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
@@ -1148,7 +1148,7 @@ func TestValidator_FlipTable_SoloLoginNoFlipRequired(t *testing.T) {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "credentials",
-				Fields: []string{"email", "x-auth-methods#password"},
+				Fields: []domain.Field{"email", "x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
 					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
@@ -1180,7 +1180,7 @@ func TestValidator_Manifest_CreateUserRequiresPasswordUpstream(t *testing.T) {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "identify",
-				Fields: []string{"email"},
+				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
 					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
@@ -1190,7 +1190,7 @@ func TestValidator_Manifest_CreateUserRequiresPasswordUpstream(t *testing.T) {
 			},
 			{
 				Name:      "create",
-				Fields:    []string{"email"},
+				Fields:    []domain.Field{"email"},
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
 					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
@@ -1223,7 +1223,7 @@ func TestValidator_PositiveWorkedExampleA(t *testing.T) {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "profile",
-				Fields: []string{"email"},
+				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
 					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
@@ -1233,7 +1233,7 @@ func TestValidator_PositiveWorkedExampleA(t *testing.T) {
 			},
 			{
 				Name:   "set-password",
-				Fields: []string{"x-auth-methods#password"},
+				Fields: []domain.Field{"x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
 					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
@@ -1243,7 +1243,7 @@ func TestValidator_PositiveWorkedExampleA(t *testing.T) {
 			},
 			{
 				Name:      "confirm",
-				Fields:    []string{"email"},
+				Fields:    []domain.Field{"email"},
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
 					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
@@ -1275,7 +1275,7 @@ func TestValidator_PositiveWorkedExampleC(t *testing.T) {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "identify",
-				Fields: []string{"email"},
+				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
 					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
@@ -1287,7 +1287,7 @@ func TestValidator_PositiveWorkedExampleC(t *testing.T) {
 			},
 			{
 				Name:   "signin",
-				Fields: []string{"x-auth-methods#password"},
+				Fields: []domain.Field{"x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
 					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
@@ -1297,7 +1297,7 @@ func TestValidator_PositiveWorkedExampleC(t *testing.T) {
 			},
 			{
 				Name:      "register",
-				Fields:    []string{"email", "x-auth-methods#password"},
+				Fields:    []domain.Field{"email", "x-auth-methods#password"},
 				OnSuccess: &createUser,
 				Actions: []domain.FlowStepAction{
 					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
@@ -1324,7 +1324,7 @@ func TestValidator_DuplicateActionRejected(t *testing.T) {
 		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step"},
 		Steps: []domain.FlowDefinitionStep{
 			{
-				Name: "step", Fields: []string{"email"},
+				Name: "step", Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
 					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 					{Name: "submit", Kind: domain.FlowActionKindSubmit},
@@ -1349,7 +1349,7 @@ func TestValidator_EmptyActionNameRejected(t *testing.T) {
 		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step"},
 		Steps: []domain.FlowDefinitionStep{
 			{
-				Name: "step", Fields: []string{"email"},
+				Name: "step", Fields: []domain.Field{"email"},
 				Actions:     []domain.FlowStepAction{{Primary: true}},
 				Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
 			},
@@ -1372,7 +1372,7 @@ func TestValidator_MissingActionKindRejected(t *testing.T) {
 		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step"},
 		Steps: []domain.FlowDefinitionStep{
 			{
-				Name: "step", Fields: []string{"email"},
+				Name: "step", Fields: []domain.Field{"email"},
 				Actions:     []domain.FlowStepAction{{Name: "submit"}},
 				Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
 			},
@@ -1396,7 +1396,7 @@ func TestValidator_DeclaredBackKindRejected(t *testing.T) {
 		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step"},
 		Steps: []domain.FlowDefinitionStep{
 			{
-				Name: "step", Fields: []string{"email"},
+				Name: "step", Fields: []domain.Field{"email"},
 				Actions:     []domain.FlowStepAction{{Name: "back", Kind: domain.FlowActionKindBack}},
 				Transitions: map[string]domain.FlowStepTransition{"back": {Target: "done"}},
 			},

@@ -140,7 +140,7 @@ func combinedPasswordFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 		Steps: []api.FlowDefinitionStep{
 			{
 				Name:   "identifier",
-				Fields: []string{"email"},
+				Fields: []domain.Field{"email"},
 				Actions: []api.StepAction{
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 					{Name: "register", Kind: api.StepActionKindSubmit},
@@ -153,7 +153,7 @@ func combinedPasswordFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 			},
 			{
 				Name:   "password",
-				Fields: []string{"x-auth-methods#password"},
+				Fields: []domain.Field{"x-auth-methods#password"},
 				Actions: []api.StepAction{
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
@@ -163,7 +163,7 @@ func combinedPasswordFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 			},
 			{
 				Name:   "register-identifier",
-				Fields: []string{"email", "givenName", "familyName"},
+				Fields: []domain.Field{"email", "givenName", "familyName"},
 				Actions: []api.StepAction{
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 					{Name: "login", Kind: api.StepActionKindSubmit},
@@ -176,7 +176,7 @@ func combinedPasswordFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 			},
 			{
 				Name:      "register-password",
-				Fields:    []string{"x-auth-methods#password"},
+				Fields:    []domain.Field{"x-auth-methods#password"},
 				OnSuccess: api.NewOptFlowDefinitionStepOnSuccess(createUser),
 				Actions: []api.StepAction{
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},

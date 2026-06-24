@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"slices"
+	"reflect"
 	"testing"
 
 	"github.com/ianlancetaylor/jsonschema"
@@ -14,29 +14,6 @@ import (
 )
 
 const testProjectID = "proj-1"
-
-// findField returns the resolved field with the given name. ok is false
-// when no field matches.
-func findField(r domain.FlowResolvedFields, name string) (domain.FlowField, bool) {
-	for _, f := range r.Fields {
-		if f.Name == name {
-			return f, true
-		}
-	}
-	return domain.FlowField{}, false
-}
-
-// mustField returns the resolved field with the given name. Fails the
-// test loudly when the field is absent so a missing entry can't silently
-// pass single-property assertions on a zero FlowField.
-func mustField(t *testing.T, r domain.FlowResolvedFields, name string) domain.FlowField {
-	t.Helper()
-	f, ok := findField(r, name)
-	if !ok {
-		t.Fatalf("resolved fields missing %q", name)
-	}
-	return f
-}
 
 // fakeSchemaResolver feeds inline JSON bytes through a real
 // [jsonschema.SchemaFromJSON] parser so tests exercise the same
@@ -63,9 +40,9 @@ func newFakeResolver(t *testing.T, schemas map[string][]byte) domain.SchemaResol
 	return &fakeSchemaResolver{bytesByURL: schemas}
 }
 
-// defaultSchema covers email/username/password/given_name/family_name
-// with the same shape as the embedded built-in. Inlining it keeps test
-// setup self-contained.
+// defaultSchema covers email/username/given_name/family_name with the
+// same shape as the embedded built-in. Inlining it keeps test setup
+// self-contained.
 const defaultSchemaURL = "https://example.test/user/v1/default.user.schema.json"
 
 func defaultSchemaBytes() []byte {
@@ -85,229 +62,356 @@ func defaultSchemaBytes() []byte {
 
 func newDefaultResolver(t *testing.T) *domain.SchemaFieldResolver {
 	t.Helper()
-	return domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{
-		defaultSchemaURL: defaultSchemaBytes(),
-	}))
+	return domain.NewSchemaFieldResolver()
 }
 
-func TestSchemaFieldResolver_Resolve_DefaultFields(t *testing.T) {
-	resolver := newDefaultResolver(t)
+// newDefaultSchemaLoader returns a [domain.SchemaResolver] backed by
+// the default user schema. Used by the state machine tests that need
+// to load the schema on demand.
+func newDefaultSchemaLoader(t *testing.T) domain.SchemaResolver {
+	t.Helper()
+	return newFakeResolver(t, map[string][]byte{
+		defaultSchemaURL: defaultSchemaBytes(),
+	})
+}
 
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "identifier",
-		[]string{"email", "username", "x-auth-methods#password", "given_name", "family_name"})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
+// identifierOutcomes is what an x-unique field contributes to
+// ImplicitOutcomes — pinned here so cases stay readable.
+var identifierOutcomes = []string{
+	domain.FlowImplicitOutcomeUserNotFound,
+	domain.FlowImplicitOutcomeUserAlreadyExists,
+}
+
+func TestSchemaFieldResolver_Resolve(t *testing.T) {
+	const schemaURL = "https://example.test/case.json"
 
 	tests := []struct {
-		name        string
-		wantType    domain.FlowFieldType
-		wantTextKey string
+		name    string
+		schema  string
+		step    string
+		fields  []domain.Field
+		want    domain.FlowResolvedFields
+		wantErr error
 	}{
-		{"email", domain.FlowFieldTypeEmail, "identifier.field.email"},
-		{"username", domain.FlowFieldTypeText, "identifier.field.username"},
-		{"x-auth-methods#password", domain.FlowFieldTypePassword, "identifier.field.password"},
-		{"given_name", domain.FlowFieldTypeText, "identifier.field.given_name"},
-		{"family_name", domain.FlowFieldTypeText, "identifier.field.family_name"},
+		{
+			name: "user-property text field with required and validation rules",
+			schema: `{
+				"type": "object",
+				"required": ["given_name"],
+				"properties": {
+					"given_name": { "type": "string", "minLength": 1, "maxLength": 200 }
+				}
+			}`,
+			step:   "register",
+			fields: []domain.Field{"given_name"},
+			want: domain.FlowResolvedFields{
+				Fields: []domain.FlowField{
+					{
+						Name:       "given_name",
+						TextKey:    "register.field.given_name",
+						Type:       domain.FlowFieldTypeText,
+						Required:   true,
+						Validation: &domain.FlowFieldValidation{MinLength: 1, MaxLength: 200},
+					},
+				},
+				ImplicitOutcomes: map[string][]string{},
+			},
+		},
+		{
+			name: "user-property without any rules has nil Validation and Required=false",
+			schema: `{
+				"type": "object",
+				"properties": {
+					"nickname": { "type": "string" }
+				}
+			}`,
+			step:   "step",
+			fields: []domain.Field{"nickname"},
+			want: domain.FlowResolvedFields{
+				Fields: []domain.FlowField{
+					{Name: "nickname", TextKey: "step.field.nickname", Type: domain.FlowFieldTypeText},
+				},
+				ImplicitOutcomes: map[string][]string{},
+			},
+		},
+		{
+			name: "x-unique=team surfaces identifier challenge plus implicit outcomes",
+			schema: `{
+				"type": "object",
+				"properties": {
+					"email": { "type": "string", "format": "email", "x-unique": "team" }
+				}
+			}`,
+			step:   "identifier",
+			fields: []domain.Field{"email"},
+			want: domain.FlowResolvedFields{
+				Fields: []domain.FlowField{
+					{
+						Name:       "email",
+						TextKey:    "identifier.field.email",
+						Type:       domain.FlowFieldTypeEmail,
+						Challenge:  domain.FlowFieldChallengeIdentifier,
+						Unique:     domain.AttributeUniquenessTeam,
+						Validation: &domain.FlowFieldValidation{Format: "email"},
+					},
+				},
+				ImplicitOutcomes: map[string][]string{"email": identifierOutcomes},
+			},
+		},
+		{
+			name: "x-unique=project surfaces project-scoped uniqueness",
+			schema: `{
+				"type": "object",
+				"properties": {
+					"handle": { "type": "string", "x-unique": "project" }
+				}
+			}`,
+			step:   "step",
+			fields: []domain.Field{"handle"},
+			want: domain.FlowResolvedFields{
+				Fields: []domain.FlowField{
+					{
+						Name:      "handle",
+						TextKey:   "step.field.handle",
+						Type:      domain.FlowFieldTypeText,
+						Challenge: domain.FlowFieldChallengeIdentifier,
+						Unique:    domain.AttributeUniquenessProject,
+					},
+				},
+				ImplicitOutcomes: map[string][]string{"handle": identifierOutcomes},
+			},
+		},
+		{
+			name: "x-auth-methods#password with password.enabled=true surfaces password challenge",
+			schema: `{
+				"type": "object",
+				"x-auth-methods": { "password": { "enabled": true } }
+			}`,
+			step:   "password",
+			fields: []domain.Field{"x-auth-methods#password"},
+			want: domain.FlowResolvedFields{
+				Fields: []domain.FlowField{
+					{
+						Name:       "x-auth-methods#password",
+						TextKey:    "password.field.password",
+						Type:       domain.FlowFieldTypePassword,
+						Challenge:  domain.FlowFieldChallengePassword,
+						Required:   true,
+						Validation: &domain.FlowFieldValidation{MinLength: 8},
+					},
+				},
+				ImplicitOutcomes: map[string][]string{},
+			},
+		},
+		// The next two cases describe runtime behavior on flow definitions
+		// the validator would have rejected at save time ("X is not an
+		// enabled authentication method"). The resolver stays permissive
+		// — Challenge=None instead of an error — so it won't crash at
+		// runtime if such a definition ever reaches it.
+		{
+			name: "x-auth-methods#password without x-auth-methods declaration → Challenge=None",
+			schema: `{
+				"type": "object"
+			}`,
+			step:   "step",
+			fields: []domain.Field{"x-auth-methods#password"},
+			want: domain.FlowResolvedFields{
+				Fields: []domain.FlowField{
+					{
+						Name:       "x-auth-methods#password",
+						TextKey:    "step.field.password",
+						Type:       domain.FlowFieldTypePassword,
+						Challenge:  domain.FlowFieldChallengeNone,
+						Required:   true,
+						Validation: &domain.FlowFieldValidation{MinLength: 8},
+					},
+				},
+				ImplicitOutcomes: map[string][]string{},
+			},
+		},
+		{
+			name: "x-auth-methods#password with password.enabled=false → Challenge=None",
+			schema: `{
+				"type": "object",
+				"x-auth-methods": { "password": { "enabled": false } }
+			}`,
+			step:   "step",
+			fields: []domain.Field{"x-auth-methods#password"},
+			want: domain.FlowResolvedFields{
+				Fields: []domain.FlowField{
+					{
+						Name:       "x-auth-methods#password",
+						TextKey:    "step.field.password",
+						Type:       domain.FlowFieldTypePassword,
+						Challenge:  domain.FlowFieldChallengeNone,
+						Required:   true,
+						Validation: &domain.FlowFieldValidation{MinLength: 8},
+					},
+				},
+				ImplicitOutcomes: map[string][]string{},
+			},
+		},
+		{
+			name: "mixed user-property and auth-method fields preserve input order",
+			schema: `{
+				"type": "object",
+				"x-auth-methods": { "password": { "enabled": true } },
+				"properties": {
+					"email": { "type": "string", "format": "email", "x-unique": "team" }
+				}
+			}`,
+			step:   "login",
+			fields: []domain.Field{"email", "x-auth-methods#password"},
+			want: domain.FlowResolvedFields{
+				Fields: []domain.FlowField{
+					{
+						Name:       "email",
+						TextKey:    "login.field.email",
+						Type:       domain.FlowFieldTypeEmail,
+						Challenge:  domain.FlowFieldChallengeIdentifier,
+						Unique:     domain.AttributeUniquenessTeam,
+						Validation: &domain.FlowFieldValidation{Format: "email"},
+					},
+					{
+						Name:       "x-auth-methods#password",
+						TextKey:    "login.field.password",
+						Type:       domain.FlowFieldTypePassword,
+						Challenge:  domain.FlowFieldChallengePassword,
+						Required:   true,
+						Validation: &domain.FlowFieldValidation{MinLength: 8},
+					},
+				},
+				ImplicitOutcomes: map[string][]string{"email": identifierOutcomes},
+			},
+		},
+		{
+			name: "format/type variants resolve to matching FlowFieldType",
+			schema: `{
+				"type": "object",
+				"properties": {
+					"website":    { "type": "string", "format": "uri" },
+					"birthday":   { "type": "string", "format": "date" },
+					"created":    { "type": "string", "format": "date-time" },
+					"gender":     { "type": "string", "enum": ["female", "male", "non_binary"] },
+					"newsletter": { "type": "boolean" }
+				}
+			}`,
+			step:   "step",
+			fields: []domain.Field{"website", "birthday", "created", "gender", "newsletter"},
+			want: domain.FlowResolvedFields{
+				Fields: []domain.FlowField{
+					{Name: "website", TextKey: "step.field.website", Type: domain.FlowFieldTypeURL, Validation: &domain.FlowFieldValidation{Format: "uri"}},
+					{Name: "birthday", TextKey: "step.field.birthday", Type: domain.FlowFieldTypeDate, Validation: &domain.FlowFieldValidation{Format: "date"}},
+					{Name: "created", TextKey: "step.field.created", Type: domain.FlowFieldTypeDate, Validation: &domain.FlowFieldValidation{Format: "date-time"}},
+					{Name: "gender", TextKey: "step.field.gender", Type: domain.FlowFieldTypeSelect, Validation: &domain.FlowFieldValidation{Enum: []string{"female", "male", "non_binary"}}},
+					{Name: "newsletter", TextKey: "step.field.newsletter", Type: domain.FlowFieldTypeCheckbox},
+				},
+				ImplicitOutcomes: map[string][]string{},
+			},
+		},
+		{
+			name: "nullable boolean union [null, boolean] reduces to checkbox",
+			schema: `{
+				"type": "object",
+				"properties": {
+					"opt_in": { "type": ["null", "boolean"] }
+				}
+			}`,
+			step:   "step",
+			fields: []domain.Field{"opt_in"},
+			want: domain.FlowResolvedFields{
+				Fields: []domain.FlowField{
+					{Name: "opt_in", TextKey: "step.field.opt_in", Type: domain.FlowFieldTypeCheckbox},
+				},
+				ImplicitOutcomes: map[string][]string{},
+			},
+		},
+		{
+			name: "nullable boolean union [boolean, null] reduces to checkbox",
+			schema: `{
+				"type": "object",
+				"properties": {
+					"opt_in": { "type": ["boolean", "null"] }
+				}
+			}`,
+			step:   "step",
+			fields: []domain.Field{"opt_in"},
+			want: domain.FlowResolvedFields{
+				Fields: []domain.FlowField{
+					{Name: "opt_in", TextKey: "step.field.opt_in", Type: domain.FlowFieldTypeCheckbox},
+				},
+				ImplicitOutcomes: map[string][]string{},
+			},
+		},
+		{
+			name: "empty fields list returns empty resolved set",
+			schema: `{
+				"type": "object",
+				"properties": { "email": { "type": "string", "format": "email" } }
+			}`,
+			step:   "step",
+			fields: []domain.Field{},
+			want: domain.FlowResolvedFields{
+				Fields:           []domain.FlowField{},
+				ImplicitOutcomes: map[string][]string{},
+			},
+		},
+		{
+			name: "unknown user-property field returns ErrFlowFieldUnknown",
+			schema: `{
+				"type": "object",
+				"properties": { "email": { "type": "string", "format": "email" } }
+			}`,
+			step:    "step",
+			fields:  []domain.Field{"not_in_schema"},
+			wantErr: domain.ErrFlowFieldUnknown,
+		},
+		{
+			name: "ambiguous JSON type union returns ErrFlowFieldUnsupportedType",
+			schema: `{
+				"type": "object",
+				"properties": { "either": { "type": ["string", "boolean"] } }
+			}`,
+			step:    "step",
+			fields:  []domain.Field{"either"},
+			wantErr: domain.ErrFlowFieldUnsupportedType,
+		},
 	}
+
 	for _, tc := range tests {
-		f, ok := findField(got, tc.name)
-		if !ok {
-			t.Errorf("Resolve missing field %q", tc.name)
-			continue
-		}
-		if f.Type != tc.wantType {
-			t.Errorf("Resolve field %q type = %v, want %v", tc.name, f.Type, tc.wantType)
-		}
-		if f.TextKey != tc.wantTextKey {
-			t.Errorf("Resolve field %q text_key = %q, want %q", tc.name, f.TextKey, tc.wantTextKey)
-		}
-		if !f.Required {
-			t.Errorf("Resolve field %q required = false, want true", tc.name)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			schema := mustParseSchema(t, tc.schema)
+			resolver := domain.NewSchemaFieldResolver()
+
+			got, err := resolver.Resolve(schema, tc.step, tc.fields)
+
+			if tc.wantErr != nil {
+				if !errors.Is(err, tc.wantErr) {
+					t.Fatalf("err = %v, want errors.Is(%v)", err, tc.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("err = %v, want nil", err)
+			}
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("Resolve mismatch:\n got: %+v\nwant: %+v", got, tc.want)
+			}
+		})
 	}
 }
 
-func TestSchemaFieldResolver_Resolve_IdentifierImpliesUserNotFound(t *testing.T) {
-	resolver := newDefaultResolver(t)
-
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step", []string{"email", "x-auth-methods#password"})
+// mustParseSchema parses inline JSON into a [*jsonschema.Schema], so
+// table cases can stay self-contained.
+func mustParseSchema(t *testing.T, raw string) *jsonschema.Schema {
+	t.Helper()
+	var v any
+	if err := json.Unmarshal([]byte(raw), &v); err != nil {
+		t.Fatalf("mustParseSchema: %v", err)
+	}
+	s, err := jsonschema.SchemaFromJSON("https://json-schema.org/draft/2020-12/schema", nil, v)
 	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
+		t.Fatalf("mustParseSchema: %v", err)
 	}
-
-	if !slices.Contains(got.ImplicitOutcomes["email"], domain.FlowImplicitOutcomeUserNotFound) {
-		t.Errorf("Resolve email ImplicitOutcomes = %v, want user_not_found", got.ImplicitOutcomes["email"])
-	}
-	if mustField(t, got, "email").Challenge != domain.FlowFieldChallengeIdentifier {
-		t.Errorf("Resolve email Challenge = %q, want %q", mustField(t, got, "email").Challenge, domain.FlowFieldChallengeIdentifier)
-	}
-	if len(got.ImplicitOutcomes["password"]) != 0 {
-		t.Errorf("Resolve password ImplicitOutcomes = %v, want empty", got.ImplicitOutcomes["password"])
-	}
-	if mustField(t, got, "x-auth-methods#password").Challenge == domain.FlowFieldChallengeIdentifier {
-		t.Error("Resolve password Challenge = identifier, want non-identifier")
-	}
-}
-
-func TestSchemaFieldResolver_Resolve_ChallengeSurfaces(t *testing.T) {
-	resolver := newDefaultResolver(t)
-
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step", []string{"email", "x-auth-methods#password", "given_name"})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-
-	if mustField(t, got, "email").Challenge != domain.FlowFieldChallengeIdentifier {
-		t.Errorf("Resolve email Challenge = %q, want %q", mustField(t, got, "email").Challenge, domain.FlowFieldChallengeIdentifier)
-	}
-	if mustField(t, got, "x-auth-methods#password").Challenge != domain.FlowFieldChallengePassword {
-		t.Errorf("Resolve password Challenge = %q, want %q", mustField(t, got, "password").Challenge, domain.FlowFieldChallengePassword)
-	}
-	if mustField(t, got, "given_name").Challenge != domain.FlowFieldChallengeNone {
-		t.Errorf("Resolve given_name Challenge = %q, want %q", mustField(t, got, "given_name").Challenge, domain.FlowFieldChallengeNone)
-	}
-}
-
-func TestSchemaFieldResolver_Resolve_PasswordChallengeRequiresAuthMethodEnabled(t *testing.T) {
-	const url = "https://example.test/no-auth-methods.json"
-	bytes := []byte(`{
-		"$schema": "https://json-schema.org/draft/2020-12/schema",
-		"type": "object",
-		"properties": {
-			"password": { "type": "string", "minLength": 8, "x-password": true }
-		}
-	}`)
-	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
-
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step", []string{"password"})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-	if mustField(t, got, "password").Challenge != domain.FlowFieldChallengeNone {
-		t.Errorf("Resolve password Challenge = %q, want None (auth-methods absent)", mustField(t, got, "password").Challenge)
-	}
-}
-
-func TestSchemaFieldResolver_Resolve_UniqueScopeSurfaces(t *testing.T) {
-	resolver := newDefaultResolver(t)
-
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step", []string{"email", "x-auth-methods#password"})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-
-	if mustField(t, got, "email").Unique != domain.AttributeUniquenessTeam {
-		t.Errorf("Resolve email Unique = %v, want %v", mustField(t, got, "email").Unique, domain.AttributeUniquenessTeam)
-	}
-	if mustField(t, got, "x-auth-methods#password").Unique != domain.AttributeUniquenessUnspecified {
-		t.Errorf("Resolve password Unique = %v, want %v", mustField(t, got, "password").Unique, domain.AttributeUniquenessUnspecified)
-	}
-}
-
-func TestSchemaFieldResolver_Resolve_UniqueScopeProject(t *testing.T) {
-	const url = "https://example.test/project-unique.json"
-	bytes := []byte(`{
-		"$schema": "https://json-schema.org/draft/2020-12/schema",
-		"type": "object",
-		"properties": {
-			"handle": { "type": "string", "x-unique": "project" }
-		}
-	}`)
-	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
-
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step", []string{"handle"})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-	if mustField(t, got, "handle").Unique != domain.AttributeUniquenessProject {
-		t.Errorf("Resolve handle Unique = %v, want %v", mustField(t, got, "handle").Unique, domain.AttributeUniquenessProject)
-	}
-}
-
-func TestSchemaFieldResolver_Resolve_UnknownField(t *testing.T) {
-	resolver := newDefaultResolver(t)
-
-	_, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step", []string{"not_in_schema"})
-	if !errors.Is(err, domain.ErrFlowFieldUnknown) {
-		t.Fatalf("Resolve err = %v, want ErrFlowFieldUnknown", err)
-	}
-}
-
-func TestSchemaFieldResolver_Resolve_SchemaLoadFailurePropagates(t *testing.T) {
-	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, nil))
-
-	_, err := resolver.Resolve(t.Context(), nil, testProjectID, "https://example.test/missing.json", "step", []string{"email"})
-	if err == nil {
-		t.Fatal("Resolve err = nil, want load failure")
-	}
-}
-
-func TestSchemaFieldResolver_Resolve_FormatAndTypeVariants(t *testing.T) {
-	const url = "https://example.test/variants.json"
-	bytes := []byte(`{
-		"$schema": "https://json-schema.org/draft/2020-12/schema",
-		"type": "object",
-		"properties": {
-			"website":    { "type": "string", "format": "uri" },
-			"birthday":   { "type": "string", "format": "date" },
-			"created":    { "type": "string", "format": "date-time" },
-			"nickname":   { "type": "string" },
-			"gender":     { "type": "string", "enum": ["female", "male", "non_binary"] },
-			"newsletter": { "type": "boolean" },
-			"opt_in":     { "type": ["null", "boolean"] },
-			"opt_in_rev": { "type": ["boolean", "null"] }
-		}
-	}`)
-	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
-
-	got, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step",
-		[]string{"website", "birthday", "created", "nickname", "gender", "newsletter", "opt_in", "opt_in_rev"})
-	if err != nil {
-		t.Fatalf("Resolve returned error: %v", err)
-	}
-
-	wantTypes := map[string]domain.FlowFieldType{
-		"website":    domain.FlowFieldTypeURL,
-		"birthday":   domain.FlowFieldTypeDate,
-		"created":    domain.FlowFieldTypeDate,
-		"nickname":   domain.FlowFieldTypeText,
-		"gender":     domain.FlowFieldTypeSelect,
-		"newsletter": domain.FlowFieldTypeCheckbox,
-		"opt_in":     domain.FlowFieldTypeCheckbox,
-		"opt_in_rev": domain.FlowFieldTypeCheckbox,
-	}
-	for name, want := range wantTypes {
-		if mustField(t, got, name).Type != want {
-			t.Errorf("Resolve field %q Type = %q, want %q", name, mustField(t, got, name).Type, want)
-		}
-	}
-	if mustField(t, got, "nickname").Validation != nil {
-		t.Errorf("Resolve nickname Validation = %+v, want nil (no rules)", mustField(t, got, "nickname").Validation)
-	}
-	if v := mustField(t, got, "gender").Validation; v == nil {
-		t.Errorf("Resolve gender Validation = nil, want enum rule")
-	} else if !slices.Equal(v.Enum, []string{"female", "male", "non_binary"}) {
-		t.Errorf("Resolve gender Validation.Enum = %v, want [female male non_binary]", v.Enum)
-	}
-	if mustField(t, got, "newsletter").Validation != nil {
-		t.Errorf("Resolve newsletter Validation = %+v, want nil (no rules)", mustField(t, got, "newsletter").Validation)
-	}
-}
-
-func TestSchemaFieldResolver_Resolve_AmbiguousJSONTypeRejected(t *testing.T) {
-	const url = "https://example.test/ambiguous-type.json"
-	bytes := []byte(`{
-		"$schema": "https://json-schema.org/draft/2020-12/schema",
-		"type": "object",
-		"properties": {
-			"either": { "type": ["string", "boolean"] }
-		}
-	}`)
-	resolver := domain.NewSchemaFieldResolver(newFakeResolver(t, map[string][]byte{url: bytes}))
-
-	_, err := resolver.Resolve(t.Context(), nil, testProjectID, url, "step", []string{"either"})
-	if !errors.Is(err, domain.ErrFlowFieldUnsupportedType) {
-		t.Fatalf("Resolve err = %v, want %v", err, domain.ErrFlowFieldUnsupportedType)
-	}
+	return s
 }
