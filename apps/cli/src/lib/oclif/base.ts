@@ -211,14 +211,16 @@ export abstract class BaseCommand extends Command {
    */
   protected emit(result: CommandResult): JsonEnvelope {
     const normalized = normalizeCommandResult(result, this.meta);
-    this.telemetry?.track(
-      CLI_COMMAND_COMPLETED,
-      commandEventProperties(this.meta, this.telemetrySessionId, {
-        ...this.telemetryProps,
-        status: result.status,
-        duration_ms: Date.now() - this.telemetryStartedAt,
-      }),
-    );
+    if (this.telemetry?.enabled) {
+      this.telemetry.track(
+        CLI_COMMAND_COMPLETED,
+        commandEventProperties(this.meta, this.telemetrySessionId, {
+          ...this.telemetryProps,
+          status: result.status,
+          duration_ms: Date.now() - this.telemetryStartedAt,
+        }),
+      );
+    }
     this.log(renderPretty(normalized, this.meta));
     return toEnvelope(normalized, this.meta);
   }
@@ -237,16 +239,18 @@ export abstract class BaseCommand extends Command {
     const zitadelError = toZitadelError(error);
     this.meta = meta;
     this.openTelemetry(process.argv.includes("--no-telemetry") ? false : undefined);
-    this.telemetry?.track(
-      CLI_COMMAND_FAILED,
-      commandEventProperties(meta, this.telemetrySessionId, {
-        ...this.telemetryProps,
-        status: "error",
-        error_code: zitadelError.code,
-        exit_code: zitadelError.exitCode,
-        duration_ms: Date.now() - this.telemetryStartedAt,
-      }),
-    );
+    if (this.telemetry?.enabled) {
+      this.telemetry.track(
+        CLI_COMMAND_FAILED,
+        commandEventProperties(meta, this.telemetrySessionId, {
+          ...this.telemetryProps,
+          status: "error",
+          error_code: zitadelError.code,
+          exit_code: zitadelError.exitCode,
+          duration_ms: Date.now() - this.telemetryStartedAt,
+        }),
+      );
+    }
     if (this.jsonEnabled()) {
       this.logJson(toErrorEnvelope(zitadelError, meta));
     } else {
