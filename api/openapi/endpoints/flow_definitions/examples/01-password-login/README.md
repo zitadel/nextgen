@@ -7,8 +7,8 @@ The minimal login flow. Collect an identifier, then a password, then complete.
 - Single-purpose definition (`login` only — no flip-table coverage required).
 - Identifier-shaped field (`email` is `x-unique` in the user schema) drives
   implicit identifier dispatch on submit.
-- Password-shaped field (`password` is `x-password`) drives implicit password
-  verification on submit.
+- Password-shaped field (the reserved `x-auth-methods#password` token) drives
+  implicit password verification on submit.
 - Terminal `complete: show` — the frontend renders a success screen and the
   flow handoff token is returned alongside the terminal step.
 
@@ -18,7 +18,7 @@ The minimal login flow. Collect an identifier, then a password, then complete.
 flowchart TD
     start([Start: purpose=login]) --> identifier
     identifier["identifier<br/>field: email<br/>action: submit"]
-    password["password<br/>field: password<br/>action: submit"]
+    password["password<br/>field: x-auth-methods#password<br/>action: submit"]
     done([done<br/>complete: show])
 
     identifier -- submit --> password
