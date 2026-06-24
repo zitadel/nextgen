@@ -30,7 +30,7 @@
       {
         "name": "password",
         "fields": [
-          "password"
+          "x-auth-methods#password"
         ],
         "actions": [
           {

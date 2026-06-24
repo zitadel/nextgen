@@ -33,16 +33,12 @@ func NewFlowCreateUserHandler(ids idgen.Generator, users flowUserWriter, passwor
 var _ FlowOnSuccessHandler = (*FlowCreateUserHandler)(nil)
 
 func (h *FlowCreateUserHandler) Handle(ctx context.Context, client database.QueryExecutor, in FlowOnSuccessInput) (FlowOnSuccessResult, error) {
-	collected := map[string]any{}
-	if in.State != nil {
-		collected = in.State.CollectedData
-	}
-	identifierName, _, _, ok := findCollectedFieldByChallenge(in.Resolved.Fields, collected, FlowFieldChallengeIdentifier)
+	identifierName, _, _, ok := findCollectedFieldByChallenge(in.Resolved.Fields, in.State.CollectedData.UserData, FlowFieldChallengeIdentifier)
 	if !ok {
 		return FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no identifier in collected data", ErrIntegrity)
 	}
-	_, _, passwordValue, hasPassword := findCollectedFieldByChallenge(in.Resolved.Fields, collected, FlowFieldChallengePassword)
-	if !hasPassword {
+	passwordValue := in.State.CollectedData.AuthMethods.Password
+	if passwordValue == "" {
 		return FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", ErrIntegrity)
 	}
 
@@ -55,8 +51,8 @@ func (h *FlowCreateUserHandler) Handle(ctx context.Context, client database.Quer
 	for _, f := range in.Resolved.Fields {
 		byName[f.Name] = f
 	}
-	attrs := make([]*CreateAttribute, 0, len(collected))
-	for name, value := range collected {
+	attrs := make([]*CreateAttribute, 0, len(in.State.CollectedData.UserData))
+	for name, value := range in.State.CollectedData.UserData {
 		field, known := byName[name]
 		if !known || field.Challenge == FlowFieldChallengePassword {
 			continue
@@ -80,10 +76,8 @@ func (h *FlowCreateUserHandler) Handle(ctx context.Context, client database.Quer
 		ID:         userID,
 		Attributes: attrs,
 	}); err != nil {
-		var uniqueErr *database.UniqueError
-		if errors.As(err, &uniqueErr) {
-			msg := "user_already_exists"
-			return FlowOnSuccessResult{StepError: &msg}, nil
+		if _, ok2 := errors.AsType[*database.UniqueError](err); ok2 {
+			return FlowOnSuccessResult{StepError: new("user_already_exists")}, nil
 		}
 		return FlowOnSuccessResult{}, fmt.Errorf("flow on_success create_user: insert user: %w", err)
 	}
@@ -112,7 +106,7 @@ func (h *FlowCreateUserHandler) GenerateUserID() (string, error) {
 // the passkey save for atomicity.
 func (h *FlowCreateUserHandler) HandleProvisional(ctx context.Context, client database.QueryExecutor, userID string, state *FlowState, resolved FlowResolvedFields) error {
 	var attrs []*CreateAttribute
-	if name, field, value, ok := findCollectedFieldByChallenge(resolved.Fields, state.CollectedData, FlowFieldChallengeIdentifier); ok {
+	if name, field, value, ok := findCollectedFieldByChallenge(resolved.Fields, state.CollectedData.UserData, FlowFieldChallengeIdentifier); ok {
 		uniqueScope := attributeUniquenessFor(name, name, field.Unique)
 		attr, err := NewCreateAttribute(name, value, uniqueScope)
 		if err != nil {
@@ -126,8 +120,7 @@ func (h *FlowCreateUserHandler) HandleProvisional(ctx context.Context, client da
 		ID:         userID,
 		Attributes: attrs,
 	})
-	var uniqueErr *database.UniqueError
-	if errors.As(err, &uniqueErr) {
+	if _, ok := errors.AsType[*database.UniqueError](err); ok {
 		return nil
 	}
 	return err

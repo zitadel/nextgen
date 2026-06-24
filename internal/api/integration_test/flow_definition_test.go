@@ -212,7 +212,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 				Message: "flow definition: invalid",
 				Details: api.OptErrorDetailsDetails{
 					Value: api.ErrorDetailsDetails{
-						"details": jx.Raw(`"step \"step_1\": field \"username\" is not a property in the user schema"`),
+						"details": jx.Raw(`"step \"step_1\": flow field: not a property in the user schema: \"username\""`),
 					},
 					Set: true,
 				},

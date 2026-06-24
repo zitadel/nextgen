@@ -133,7 +133,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
@@ -241,7 +241,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Actions: []domain.FlowStepAction{
 								{Name: "submit", Kind: domain.FlowActionKindSubmit},
 
@@ -276,7 +276,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				Steps: []domain.FlowDefinitionStep{
 					{
 						Name:   "step_1",
-						Fields: []string{"email"},
+						Fields: []domain.Field{"email"},
 						Actions: []domain.FlowStepAction{
 							{Name: "submit", Kind: domain.FlowActionKindSubmit},
 
@@ -344,7 +344,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
@@ -376,7 +376,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				Steps: []domain.FlowDefinitionStep{
 					{
 						Name:   "step_1",
-						Fields: []string{"email"},
+						Fields: []domain.Field{"email"},
 						Actions: []domain.FlowStepAction{
 							{Name: "submit", Kind: domain.FlowActionKindSubmit},
 
@@ -446,7 +446,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Actions: []domain.FlowStepAction{
 								{Name: "submit", Kind: domain.FlowActionKindSubmit},
 
@@ -513,7 +513,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Actions: []domain.FlowStepAction{
 								{Name: "submit", Kind: domain.FlowActionKindSubmit},
 
@@ -583,7 +583,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
@@ -645,7 +645,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
@@ -708,7 +708,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
@@ -768,7 +768,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
@@ -877,7 +877,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Actions: []domain.FlowStepAction{
 								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 							},
@@ -942,7 +942,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"email"},
+							Fields: []domain.Field{"email"},
 							Actions: []domain.FlowStepAction{
 								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 							},
@@ -1542,7 +1542,7 @@ func Test_flowDefinitionService_Get(t *testing.T) {
 						Steps: []domain.FlowDefinitionStep{
 							{
 								Name:   "step_1",
-								Fields: []string{"email"},
+								Fields: []domain.Field{"email"},
 								Transitions: map[string]domain.FlowStepTransition{
 									"submit": {Target: "step_2"},
 								},
@@ -1575,7 +1575,7 @@ func Test_flowDefinitionService_Get(t *testing.T) {
 				Steps: []domain.FlowDefinitionStep{
 					{
 						Name:   "step_1",
-						Fields: []string{"email"},
+						Fields: []domain.Field{"email"},
 						Transitions: map[string]domain.FlowStepTransition{
 							"submit": {Target: "step_2"},
 						},

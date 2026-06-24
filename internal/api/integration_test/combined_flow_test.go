@@ -98,7 +98,7 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	pwResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
-			"password": jx.Raw(`"` + newPass + `"`),
+			"x-auth-methods#password": jx.Raw(`"` + newPass + `"`),
 		}),
 	}, api.SubmitFlowStepParams{
 		ID:    flowID,
@@ -154,7 +154,7 @@ func combinedPasswordFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 			},
 			{
 				Name:   "password",
-				Fields: []string{"password"},
+				Fields: []string{"x-auth-methods#password"},
 				Actions: []api.StepAction{
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
@@ -177,7 +177,7 @@ func combinedPasswordFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 			},
 			{
 				Name:      "register-password",
-				Fields:    []string{"password"},
+				Fields:    []string{"x-auth-methods#password"},
 				OnSuccess: api.NewOptFlowDefinitionStepOnSuccess(createUser),
 				Actions: []api.StepAction{
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},

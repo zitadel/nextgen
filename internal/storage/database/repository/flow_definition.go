@@ -311,7 +311,7 @@ func marshalFlowDefinitionContent(def *domain.FlowDefinition) ([]byte, error) {
 		}
 		stepJSON := flowDefinitionStepJSON{
 			Name:        s.Name,
-			Fields:      s.Fields,
+			Fields:      domain.FieldsToStrings(s.Fields),
 			Transitions: transitions,
 		}
 		if len(s.Actions) > 0 {
@@ -400,7 +400,7 @@ func rowToFlowDefinition(row flowDefinitionRow) (*domain.FlowDefinition, error) 
 		}
 		step := domain.FlowDefinitionStep{
 			Name:        s.Name,
-			Fields:      s.Fields,
+			Fields:      domain.FieldsFromStrings(s.Fields),
 			Transitions: transitions,
 		}
 		if len(s.Actions) > 0 {
