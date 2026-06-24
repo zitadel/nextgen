@@ -90,7 +90,10 @@ const extractManifestFromTarball = async (tarballBytes: Buffer): Promise<Tarball
         stream.on("error", reject);
       },
     });
-    Readable.from(tarballBytes)
+    // Wrap the buffer in an array so the stream emits it as a single
+    // chunk. `Readable.from(buffer)` happens to do the same on current
+    // Node, but the array form is explicit and not version-dependent.
+    Readable.from([tarballBytes])
       .pipe(parser)
       .on("finish", () => {
         if (captured) resolve(captured);
