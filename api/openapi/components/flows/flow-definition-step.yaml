@@ -42,8 +42,10 @@ properties:
     default: []
     example:
       - name: submit
+        kind: submit
         primary: true
       - name: forgot_password
+        kind: navigate
 
   gates:
     type: object
