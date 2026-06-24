@@ -83,9 +83,27 @@ type IdempotencyCacheEntry = {
 const IDEMPOTENCY_TTL_MS = 60_000;
 const idempotencyCache = new Map<string, IdempotencyCacheEntry>();
 
-export function startMockServer(port: number): Server {
+/**
+ * Build the configured Express app without binding it to a port.
+ *
+ * Returning the bare app (rather than a listening {@link Server}) lets a
+ * serverless host — e.g. a Vercel function — use it directly as a
+ * request handler, while {@link startMockServer} wraps it for the
+ * standalone dev server.
+ *
+ * The issuer is fixed at construction on purpose: the handoff tokens the
+ * mock signs (inside the MSW handlers) and the `expectedIss` it later
+ * enforces in `/sessions/exchange` must agree, so both read the same
+ * value regardless of which host a given request happens to arrive on.
+ *
+ * @param options.issuer - Absolute base URL this mock advertises as its
+ *   OIDC issuer (`http://localhost:8080` locally, the preview domain on
+ *   Vercel). Embedded in the discovery/JWKS documents and used as the
+ *   expected issuer when verifying handoff tokens.
+ */
+export function createMockApp(options: { issuer: string }): express.Express {
   applyBranding(defaultDevBranding);
-  const iss = `http://localhost:${port}`;
+  const iss = options.issuer;
   const app = express();
   app.use(cookieParser());
 
@@ -316,6 +334,15 @@ export function startMockServer(port: number): Server {
 
   app.use(createMiddleware(...setupMockHandlers({ iss }).handlers, ...setupPlatformHandlers()));
 
+  return app;
+}
+
+/**
+ * Start the standalone dev server: build the app via {@link createMockApp}
+ * with a localhost issuer derived from `port`, then bind it.
+ */
+export function startMockServer(port: number): Server {
+  const app = createMockApp({ issuer: `http://localhost:${port}` });
   return app.listen(port, () => {
     console.log(`\napi-mock server listening on http://localhost:${port}`);
     console.log(`  JWKS: http://localhost:${port}/.well-known/jwks.json`);

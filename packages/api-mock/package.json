@@ -16,6 +16,10 @@
     "./public-dir": {
       "types": "./src/public-dir.ts",
       "import": "./src/public-dir.ts"
+    },
+    "./server": {
+      "types": "./src/server.ts",
+      "import": "./src/server.ts"
     }
   },
   "bin": {

@@ -83,11 +83,16 @@ this package depend on the components type surface. The orchestrator's
 branding-validator strips anything the OpenAPI doesn't model. Tests
 should clear the overlay between cases via `clearBranding()`.
 
-The standalone TCP server (`startMockServer` in `src/server.ts`) calls
-`applyBranding(defaultDevBranding)` on boot so demo apps receive a
-baseline `font_url` (Google Fonts Arimo) without extra setup. The payload
-lives in `src/default-dev-branding.ts` and mirrors
-`docs/design/branding/branding.example.json`. MSW-only consumers
+`src/server.ts` exposes two functions. `createMockApp({ issuer })` builds
+the configured Express app and returns it without binding a port; it
+calls `applyBranding(defaultDevBranding)` on boot so demo apps receive a
+baseline `font_url` (Google Fonts Arimo) without extra setup.
+`startMockServer(port)` wraps it for the standalone TCP server (deriving a
+localhost issuer from `port`). The bare app is published via the
+`./server` export so a serverless host can use it directly as a request
+handler — see `apps/api-mock-deploy`, which serves it as per-PR Vercel
+previews. The branding payload lives in `src/default-dev-branding.ts` and
+mirrors `docs/design/branding/branding.example.json`. MSW-only consumers
 (`setupMockHandlers` / `setupMock`) do **not** get this overlay unless
 they call `applyBranding` themselves — same as before.
 
