@@ -132,7 +132,7 @@ Project: Zitadel Platform
         - **Approach B: Isolated Merchant Identity (White-Label Model)**:
             - If Nike and Adidas require complete isolation, custom domains, and private IdPs, model them as separate **Projects** (`Project: Nike`, `Project: Adidas`).
             - `Team: Shopify Platform` claims both merchant projects for centralized ownership.
-            - Emma becomes two separate **Users** (one per project), with separate credentials and profiles (todo: depends on the outcome of cross-project identity management ADR).
+            - Emma becomes two separate **Users** (one per project), with separate credentials and profiles (todo: depends on the outcome of [cross-project identity management ADR](https://github.com/zitadel/nextgen/issues/333)).
 
 ```text
 Approach A: Shared Consumer Identity
