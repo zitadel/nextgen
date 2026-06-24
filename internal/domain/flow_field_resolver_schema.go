@@ -10,6 +10,8 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
+//go:generate go tool mockgen -typed -package domainmock -destination ./mock/flow_field_resolver.schema.mock.go . SchemaResolver
+
 // SchemaResolver is the read seam [SchemaFieldResolver] depends on.
 // Narrowed to a single method so tests can swap in a fake without
 // constructing a real LRU cache + repository + HTTP client.

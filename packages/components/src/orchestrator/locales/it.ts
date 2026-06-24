@@ -116,6 +116,9 @@ export const it: Locale = {
   // L'<input type="date"> nativo localizza il proprio formato di visualizzazione in base
   // alla lingua dell'utente e invia ISO YYYY-MM-DD — nessun segnaposto/suggerimento di formato necessario.
   "register.field.dateOfBirth": "Data di nascita",
+  "register.field.country": "Paese",
+  "register.field.country.placeholder": "Seleziona il tuo paese",
+  "register.field.terms": "Accetto i termini di servizio",
   "register.action.password": "Continua con password",
   "register.action.passkey": "Continua con passkey",
   "register.action.submit": "Registrati",
