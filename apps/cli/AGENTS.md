@@ -36,7 +36,7 @@ event.
 | **CDP (if any)** | none |
 | **Consent required** | yes — opt-out model (`DO_NOT_TRACK`, `ZITADEL_TELEMETRY=0`, `--no-telemetry`) |
 | **Project token location** | `src/lib/telemetry/config.ts` (write-only dev + prod tokens baked in) |
-| **Data region** | `ZITADEL_TELEMETRY_REGION` = `us` (default) \| `eu` |
+| **Data region** | `ZITADEL_TELEMETRY_REGION` = `eu` (default, Zitadel projects' region) \| `us` |
 
 The ingestion token is **write-only** (cannot read data back), so embedding it
 in the published CLI is safe and intentional — this is how dev-tool telemetry

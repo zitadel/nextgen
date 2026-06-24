@@ -23,7 +23,11 @@ export type TelemetryProperties = Properties;
  */
 export type TelemetryDeps = {
   readonly env: NodeJS.ProcessEnv;
-  /** Resolved opt-out flag (e.g. `--no-telemetry`); default opt-out is on. */
+  /**
+   * Resolved telemetry flag (the `--telemetry/--no-telemetry` value). Defaults
+   * to `true` (telemetry enabled); `false` opts out. Undefined leaves the
+   * decision to the other consent signals.
+   */
   readonly flag?: boolean;
   /** Emit each payload to stderr before sending — for `--debug`. */
   readonly debug?: boolean;

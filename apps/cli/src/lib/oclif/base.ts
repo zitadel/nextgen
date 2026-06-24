@@ -177,9 +177,9 @@ export abstract class BaseCommand extends Command {
     this.telemetry?.track(
       CLI_COMMAND_COMPLETED,
       commandEventProperties(this.meta, this.telemetrySessionId, {
+        ...this.telemetryProps,
         status: result.status,
         duration_ms: Date.now() - this.telemetryStartedAt,
-        ...this.telemetryProps,
       }),
     );
     this.log(renderPretty(normalized, this.meta));
@@ -198,11 +198,11 @@ export abstract class BaseCommand extends Command {
     this.telemetry?.track(
       CLI_COMMAND_FAILED,
       commandEventProperties(meta, this.telemetrySessionId, {
+        ...this.telemetryProps,
         status: "error",
         error_code: zitadelError.code,
         exit_code: zitadelError.exitCode,
         duration_ms: Date.now() - this.telemetryStartedAt,
-        ...this.telemetryProps,
       }),
     );
     if (this.jsonEnabled()) {

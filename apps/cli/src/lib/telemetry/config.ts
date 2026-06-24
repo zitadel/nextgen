@@ -64,7 +64,7 @@ function resolveChannel(env: NodeJS.ProcessEnv): "development" | "production" {
   if (explicit === "development") {
     return "development";
   }
-  const stamp = (process.env.ZITADEL_TELEMETRY_BUILD_CHANNEL ?? "").toLowerCase();
+  const stamp = (env.ZITADEL_TELEMETRY_BUILD_CHANNEL ?? "").toLowerCase();
   if (stamp === "production" || stamp === "development") {
     return stamp;
   }
@@ -88,11 +88,11 @@ export function resolveTelemetryToken(env: NodeJS.ProcessEnv): string | undefine
 }
 
 /**
- * Resolve the Mixpanel API host from `ZITADEL_TELEMETRY_REGION`. Defaults to
- * the US host (the SDK default). If the dev/prod Mixpanel project lives in the
- * EU data-residency region, set `ZITADEL_TELEMETRY_REGION=eu` — events sent to
- * the wrong host are silently dropped, so verify the first event lands in Live
- * View.
+ * Resolve the Mixpanel API host from `ZITADEL_TELEMETRY_REGION`. Defaults to the
+ * EU host, because the Zitadel Mixpanel projects live in the EU data-residency
+ * region. Set `ZITADEL_TELEMETRY_REGION=us` for a US-hosted project — events
+ * sent to the wrong host are silently dropped, so verify the first event lands
+ * in Live View.
  */
 export function resolveTelemetryHost(env: NodeJS.ProcessEnv): string {
   // Default to EU: the Zitadel Mixpanel projects live in the EU data-residency

@@ -58,7 +58,12 @@ export function commandEventProperties(
   extra: Properties = {},
 ): Properties {
   const { env } = meta;
+  // `extra` is spread first so the canonical base dimensions below always win:
+  // a command's per-event extras can never overwrite `command`, `cli_version`,
+  // `session_id`, `server_kind`, etc. Callers order their own extras so reserved
+  // lifecycle fields (status/duration_ms/…) win over free-form command props.
   return {
+    ...extra,
     ip: 0,
     session_id: sessionId,
     command: meta.command,
@@ -77,7 +82,6 @@ export function commandEventProperties(
     dry_run: meta.dryRun,
     force: meta.force,
     server_kind: serverKind(meta.source),
-    ...extra,
   };
 }
 
