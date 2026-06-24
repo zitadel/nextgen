@@ -166,8 +166,14 @@ export const createApp = (store: BlobStore) => {
     } catch {
       return context.json({ error: "bad path" }, 400);
     }
-    const [scope, name] = decoded.split("/");
-    if (!scope || !name) return context.json({ error: "bad path" }, 400);
+    // Require exactly `<scope>/<name>` — a decoded value with extra
+    // segments (eg `@scope/name/extra`) would otherwise silently resolve
+    // to a different package than the URL implies.
+    const segments = decoded.split("/");
+    const [scope, name] = segments;
+    if (segments.length !== 2 || !scope || !name) {
+      return context.json({ error: "bad path" }, 400);
+    }
     const packument = await buildPackument(store, scope, name);
     if (!packument) return context.json({ error: "not found" }, 404);
     context.header("Cache-Control", "s-maxage=60, stale-while-revalidate=86400");

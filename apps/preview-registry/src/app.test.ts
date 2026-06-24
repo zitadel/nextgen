@@ -85,4 +85,11 @@ describe("createApp blob route", () => {
     const response = await app.request("/@scope%2F%E0%A4%A");
     expect(response.status).toBe(400);
   });
+
+  test("URL-encoded packument route returns 400 when it decodes to extra path segments", async () => {
+    const { store } = recordingStore();
+    const app = createApp(store);
+    const response = await app.request("/@scope%2Fname%2Fextra");
+    expect(response.status).toBe(400);
+  });
 });
