@@ -35,7 +35,6 @@ export interface Packument {
           readonly tarball: string;
           readonly shasum: string;
           readonly integrity: string;
-          readonly unpackedSize: number;
         };
       }
     >
@@ -52,7 +51,6 @@ interface TarballSummary {
   readonly manifest: PackageManifest;
   readonly shasum: string;
   readonly integrity: string;
-  readonly size: number;
 }
 
 /**
@@ -101,7 +99,7 @@ const extractManifestFromTarball = async (tarballBytes: Buffer): Promise<Tarball
       .on("error", reject);
   });
 
-  return { manifest, shasum, integrity, size: tarballBytes.length };
+  return { manifest, shasum, integrity };
 };
 
 /**
@@ -139,7 +137,6 @@ export const buildPackument = async (
           tarball: blob.url,
           shasum: summary.shasum,
           integrity: summary.integrity,
-          unpackedSize: summary.size,
         },
       },
     ]),

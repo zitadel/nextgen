@@ -98,15 +98,21 @@ describe("renderLanding", () => {
     expect(html).toContain("0.0.0-sha-abc");
   });
 
-  test("shows install command for a single example package, not all of them", () => {
+  test("shows a one-off bare install (no version needed, --registry points here)", () => {
+    const html = renderLanding(samplePackages, "https://x.test", "main");
+    expect(html).toContain("npm install @foodbar/alpha --registry=https://x.test");
+  });
+
+  test("shows the scoped .npmrc plus a bare install for the everyday flow", () => {
+    const html = renderLanding(samplePackages, "https://x.test", "main");
+    expect(html).toContain("@foodbar:registry=https://x.test");
+    expect(html).toContain("npm install @foodbar/alpha");
+  });
+
+  test("shows an optional pinned-by-commit install for reproducibility", () => {
     const html = renderLanding(samplePackages, "https://x.test", "main");
     expect(html).toContain("npm install @foodbar/alpha@0.0.0-sha-abc --registry=https://x.test");
     expect(html).not.toContain("npm install @foodbar/alpha@0.0.0-sha-abc @foodbar/bravo");
-  });
-
-  test("derives the scope for the .npmrc snippet from the first package", () => {
-    const html = renderLanding(samplePackages, "https://x.test", "main");
-    expect(html).toContain("@foodbar:registry=https://x.test");
   });
 
   test("omits the install section entirely when no packages are bundled", () => {

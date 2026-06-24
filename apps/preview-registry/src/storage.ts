@@ -94,7 +94,12 @@ export const createFsStore = (storageRoot: string, publicBase: string): BlobStor
       const allFiles = await walkDirectory(storageRoot);
       const matched = await Promise.all(
         allFiles.map(async (fullPath): Promise<BlobEntry | null> => {
-          const key = fullPath.slice(storageRoot.length + 1);
+          // Blob keys are always POSIX-style (`@scope/name/-/file.tgz`),
+          // but the filesystem path uses the platform separator — on
+          // Windows that would be `\`, which downstream prefix matching
+          // and URL generation do not expect. Normalize to forward slashes.
+          const relativePath = fullPath.slice(storageRoot.length + 1);
+          const key = relativePath.split(sep).join("/");
           if (!key.startsWith(prefix)) return null;
           const info = await stat(fullPath);
           return {

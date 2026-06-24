@@ -110,7 +110,7 @@ describe("buildPackument", () => {
     ]);
   });
 
-  test("attaches dist.tarball, shasum, integrity, and unpackedSize to every version", async () => {
+  test("attaches dist.tarball, shasum, and integrity to every version", async () => {
     const body = manifestTarball({
       name: "@foodbar/alpha",
       version: "0.0.0-sha-onlyone",
@@ -130,7 +130,6 @@ describe("buildPackument", () => {
     expect(version?.dist.tarball).toBe("https://example.test/-/blob/only");
     expect(version?.dist.shasum).toMatch(/^[0-9a-f]{40}$/);
     expect(version?.dist.integrity).toMatch(/^sha512-/);
-    expect(version?.dist.unpackedSize).toBe(body.length);
   });
 
   test("skips non-tarball blobs that share the package prefix", async () => {
