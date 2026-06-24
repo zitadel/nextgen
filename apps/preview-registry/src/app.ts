@@ -25,12 +25,19 @@ const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"
  * Compute the canonical origin (`scheme://host`) the registry should
  * advertise in install commands for the current request.
  *
- * Localhost connections are served over `http`; any other host is
- * assumed to be a Vercel deploy reachable over `https`.
+ * The scheme comes from the `x-forwarded-proto` header when present —
+ * Vercel and most reverse proxies set it, so production deploys
+ * correctly advertise `https`. Without that header the request reached
+ * the Node server directly (local dev, including via a LAN IP or dev
+ * proxy hostname), so we default to `http` rather than guessing `https`
+ * from the host and printing an unreachable registry URL.
  */
-const originForHost = (hostHeader: string | undefined): string => {
+const originForHost = (
+  hostHeader: string | undefined,
+  forwardedProto: string | undefined,
+): string => {
   const host = hostHeader ?? "localhost";
-  const scheme = host.startsWith("localhost") || host.startsWith("127.0.0.1") ? "http" : "https";
+  const scheme = forwardedProto?.split(",")[0]?.trim() || "http";
   return `${scheme}://${host}`;
 };
 
@@ -100,7 +107,10 @@ export const createApp = (store: BlobStore) => {
   // (written by scripts/publish-on-deploy.ts), so this Hono route is only
   // reached during local dev where there is no static serving layer.
   app.get("/", (context) => {
-    const origin = originForHost(context.req.header("host"));
+    const origin = originForHost(
+      context.req.header("host"),
+      context.req.header("x-forwarded-proto"),
+    );
     return context.html(renderLanding(SNAPSHOT_PACKAGES, origin, branchForDeploy()));
   });
 
