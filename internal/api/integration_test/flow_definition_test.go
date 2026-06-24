@@ -142,7 +142,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 					Steps: []api.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []domain.Field{"email"},
+							Fields: []string{"email"},
 							Transitions: api.NewOptFlowDefinitionStepTransitions(map[string]api.FlowDefinitionStepTransitionsItem{
 								"submit": {
 									Target: "step_2",
@@ -188,7 +188,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 					Steps: []api.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []domain.Field{"username"},
+							Fields: []string{"username"},
 							Transitions: api.NewOptFlowDefinitionStepTransitions(map[string]api.FlowDefinitionStepTransitionsItem{
 								"submit": {
 									Target: "step_2",
@@ -210,7 +210,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 				Message: "flow definition: invalid",
 				Details: api.OptErrorDetailsDetails{
 					Value: api.ErrorDetailsDetails{
-						"details": jx.Raw(`"step \"step_1\": field \"username\" is not a property in the user schema"`),
+						"details": jx.Raw(`"step \"step_1\": flow field: not a property in the user schema: \"username\""`),
 					},
 					Set: true,
 				},
@@ -588,7 +588,7 @@ func validSteps() []api.FlowDefinitionStep {
 	return []api.FlowDefinitionStep{
 		{
 			Name:   "step_1",
-			Fields: []domain.Field{"email"},
+			Fields: []string{"email"},
 			Transitions: api.NewOptFlowDefinitionStepTransitions(map[string]api.FlowDefinitionStepTransitionsItem{
 				"submit": {
 					Target: "step_2",

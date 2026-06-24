@@ -59,7 +59,8 @@ func (h Handler) UpdateFlowDefinition(ctx context.Context, req *api.FlowDefiniti
 		return nil, err
 	}
 
-	return flowDefinitionDetailResponse(flowDefinition), nil
+	resp := flowDefinitionDetailResponse(flowDefinition)
+	return resp, nil
 }
 
 func (h Handler) DeleteFlowDefinition(ctx context.Context, params api.DeleteFlowDefinitionParams) (api.DeleteFlowDefinitionRes, error) {

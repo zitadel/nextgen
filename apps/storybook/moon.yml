@@ -1,0 +1,69 @@
+id: "storybook"
+language: "typescript"
+layer: "application"
+stack: "frontend"
+dependsOn:
+  - "api"
+  - "api-mock"
+  - "components"
+  - "design-tokens"
+  - "ui-react"
+
+tasks:
+  lint:
+    command: "corepack pnpm exec oxlint ."
+    deps:
+      - "components:build"
+      - "design-tokens:build"
+      - "ui-react:build"
+
+  typecheck:
+    # Runs `tsc --build`: it compiles the referenced `api`/`api-mock` composite
+    # projects (their `dist/*.d.ts` are not produced by their tsdown/no-op
+    # `build` tasks) before type-checking the Storybook program. `api-mock:build`
+    # is a no-op, but the dep edge makes Moon re-run this when api-mock source
+    # changes, since `tsc --build` reads that source directly.
+    command: "corepack pnpm run typecheck"
+    deps:
+      - "api:build"
+      - "api-mock:build"
+      - "components:build"
+      - "design-tokens:build"
+      - "ui-react:build"
+
+  build:
+    command: "corepack pnpm run build"
+    deps:
+      - "api:build"
+      - "components:build"
+      - "design-tokens:build"
+      - "ui-react:build"
+    outputs:
+      - "storybook-static/**/*"
+    options:
+      runInCI: false
+
+  # Installs the Chromium that @storybook/addon-vitest drives. Mirrors the
+  # journey e2e pattern (browsers aren't preinstalled on CI runners).
+  install-browsers:
+    command: "corepack pnpm exec playwright install chromium"
+    options:
+      cache: false
+
+  # The component gate: addon-vitest runs every story as a real-browser test
+  # (render smoke + play interactions + a11y). Replaces the old console-e2e
+  # visual-parity sweep and runs in CI via `moon ci :test`.
+  test:
+    command: "corepack pnpm run test"
+    deps:
+      - "install-browsers"
+      - "api:build"
+      - "components:build"
+      - "design-tokens:build"
+      - "ui-react:build"
+
+  dev:
+    command: "corepack pnpm run dev"
+    options:
+      persistent: true
+      runInCI: false

@@ -32,6 +32,7 @@ import "@zitadel/design-tokens/css/tailwind.css";
 | React           | Lit atom              | Notes                                                                |
 | ---             | ---                   | ---                                                                  |
 | `<Button>`      | `<zl-button>`         | Hierarchies: `primary`, `secondary`, `text`                          |
+| `<Checkbox>`    | `<zl-checkbox>`       | Optional `label`; form-associated; mirrors the shared `.zr-checkbox` surface |
 | `<TextField>`   | `<zl-field>`          | Native React inputs; mirrors the design-token border / focus styles  |
 | `<Alert>`       | `<zl-alert>`          | Severities: `error`, `success`, `warning`, `info`                    |
 | `<Pill>`        | `<zl-pill>`           | Tones: `neutral`, `pink`, `purple`, `orange`, `success`              |
@@ -39,8 +40,11 @@ import "@zitadel/design-tokens/css/tailwind.css";
 | `<Card>`        | `<zl-card>`           | Auth-card surface; `header` / `footer` props                         |
 | `<PageShell>`   | `<zl-page-shell>`     | Full-bleed dark chrome with centred body                             |
 
-A Playwright spec in `apps/console-e2e/` renders each pair side-by-side and
-captures a visual diff so the two surfaces stay locked together.
+Each React component and its Lit counterpart appear as `React` / `Lit` stories
+under `Atoms/<Name>` in [`apps/storybook`](../../apps/storybook/README.md);
+`@storybook/addon-vitest` runs them as real-browser tests (render + a11y, plus a
+`play` interaction on the React story — the only behavioural coverage for these
+React pairs) so the two surfaces stay locked together.
 
 ## Status
 

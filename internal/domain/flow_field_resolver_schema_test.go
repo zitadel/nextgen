@@ -8,12 +8,20 @@ import (
 	"testing"
 
 	"github.com/ianlancetaylor/jsonschema"
+	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 const testProjectID = "proj-1"
+
+func mustUnmarshal[T any](t *testing.T, content string) *T {
+	value := new(T)
+	err := json.Unmarshal([]byte(content), value)
+	require.NoError(t, err)
+	return value
+}
 
 // fakeSchemaResolver feeds inline JSON bytes through a real
 // [jsonschema.SchemaFromJSON] parser so tests exercise the same
@@ -45,8 +53,7 @@ func newFakeResolver(t *testing.T, schemas map[string][]byte) domain.SchemaResol
 // self-contained.
 const defaultSchemaURL = "https://example.test/user/v1/default.user.schema.json"
 
-func defaultSchemaBytes() []byte {
-	return []byte(`{
+const defaultSchemaContent string = `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
 		"x-auth-methods": { "password": { "enabled": true } },
@@ -57,23 +64,7 @@ func defaultSchemaBytes() []byte {
 			"given_name":  { "type": "string", "minLength": 1, "maxLength": 200 },
 			"family_name": { "type": "string", "minLength": 1, "maxLength": 200 }
 		}
-	}`)
-}
-
-func newDefaultResolver(t *testing.T) *domain.SchemaFieldResolver {
-	t.Helper()
-	return domain.NewSchemaFieldResolver()
-}
-
-// newDefaultSchemaLoader returns a [domain.SchemaResolver] backed by
-// the default user schema. Used by the state machine tests that need
-// to load the schema on demand.
-func newDefaultSchemaLoader(t *testing.T) domain.SchemaResolver {
-	t.Helper()
-	return newFakeResolver(t, map[string][]byte{
-		defaultSchemaURL: defaultSchemaBytes(),
-	})
-}
+	}`
 
 // identifierOutcomes is what an x-unique field contributes to
 // ImplicitOutcomes — pinned here so cases stay readable.
@@ -380,7 +371,7 @@ func TestSchemaFieldResolver_Resolve(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			schema := mustParseSchema(t, tc.schema)
+			schema := mustUnmarshal[jsonschema.Schema](t, tc.schema)
 			resolver := domain.NewSchemaFieldResolver()
 
 			got, err := resolver.Resolve(schema, tc.step, tc.fields)
@@ -399,19 +390,4 @@ func TestSchemaFieldResolver_Resolve(t *testing.T) {
 			}
 		})
 	}
-}
-
-// mustParseSchema parses inline JSON into a [*jsonschema.Schema], so
-// table cases can stay self-contained.
-func mustParseSchema(t *testing.T, raw string) *jsonschema.Schema {
-	t.Helper()
-	var v any
-	if err := json.Unmarshal([]byte(raw), &v); err != nil {
-		t.Fatalf("mustParseSchema: %v", err)
-	}
-	s, err := jsonschema.SchemaFromJSON("https://json-schema.org/draft/2020-12/schema", nil, v)
-	if err != nil {
-		t.Fatalf("mustParseSchema: %v", err)
-	}
-	return s
 }

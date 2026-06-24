@@ -214,6 +214,9 @@ func (f Field) AuthMethod() string {
 // FieldsFromStrings lifts wire-format string field names into typed
 // [Field] values at the API/repository boundary.
 func FieldsFromStrings(s []string) []Field {
+	if s == nil {
+		return nil
+	}
 	out := make([]Field, len(s))
 	for i, v := range s {
 		out[i] = Field(v)
@@ -224,6 +227,9 @@ func FieldsFromStrings(s []string) []Field {
 // FieldsToStrings lowers typed [Field] values back to wire-format
 // strings at the API/repository boundary.
 func FieldsToStrings(f []Field) []string {
+	if f == nil {
+		return nil
+	}
 	out := make([]string, len(f))
 	for i, v := range f {
 		out[i] = string(v)
