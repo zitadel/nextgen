@@ -169,10 +169,12 @@ export const createApp = (store: BlobStore) => {
 
   app.notFound((context) => context.json({ error: "not found", path: context.req.path }, 404));
   app.onError((error, context) => {
-    // Stack traces can expose internal file paths and source snippets,
-    // so only attach them outside production. Production responses carry
-    // just the message and the requested path.
-    const includeStack = process.env.VERCEL_ENV !== "production";
+    // Stack traces can expose internal file paths and source snippets.
+    // Preview deploys are public (Deployment Protection is disabled so
+    // the npm CLI can reach them), so only attach a stack in genuine
+    // local dev — i.e. when not running on Vercel at all. Vercel sets
+    // the `VERCEL` env var on every build and deployment.
+    const includeStack = !process.env.VERCEL;
     return context.json(
       {
         error: error.message,
