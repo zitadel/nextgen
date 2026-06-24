@@ -1,6 +1,6 @@
 # Project vs. Team Modeling Guide
 
-> See [Hierarchy](hierarchy.md)
+> See [Hierarchy](../api/hierarchy.md)
 > and [ADR 024: User, Team, and Lifecycle Ownership](../../adrs/024-user-team-lifecycle-ownership.md).
 
 This document defines the decision heuristics and worked examples indicated in [Next-Generation Platform Architecture](https://github.com/zitadel/nextgen/issues/249) for choosing between a **Project** and a **Team** in the Zitadel next-generation architecture.
