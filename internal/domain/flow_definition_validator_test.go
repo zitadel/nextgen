@@ -36,11 +36,20 @@ func mustSchema(t *testing.T, raw []byte) *jsonschema.Schema {
 
 var tenantUserSchemaNoAuthMethod = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://tenant.com/schemas/no-auth-user.json",
+  "$id": "https://tenant.com/schemas/no-auth-methods.json",
   "type": "object",
   "required": ["email"],
-  "x-auth-methods": {
-  },
+  "properties": {
+    "email": { "type": "string", "format": "email", "x-unique": "team" }
+  }
+}`)
+
+var tenantUserSchemaEmptyAuthMethod = []byte(`{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant.com/schemas/empty-auth-methods.json",
+  "type": "object",
+  "required": ["email"],
+  "x-auth-methods": {},
   "properties": {
     "email":    { "type": "string", "format": "email", "x-unique": "team" }
   }
@@ -126,6 +135,10 @@ func TestValidateFlowDefinition(t *testing.T) {
 
 	var userSchemaNoAuthMethod jsonschema.Schema
 	marshalErr = json.Unmarshal(tenantUserSchemaNoAuthMethod, &userSchemaNoAuthMethod)
+	require.NoError(t, marshalErr, "failed to unmarshal tenant user schema")
+
+	var userSchemaEmptyAuthMethod jsonschema.Schema
+	marshalErr = json.Unmarshal(tenantUserSchemaEmptyAuthMethod, &userSchemaEmptyAuthMethod)
 	require.NoError(t, marshalErr, "failed to unmarshal tenant user schema")
 
 	var userSchemaDisabledAuthMethod jsonschema.Schema
@@ -731,14 +744,48 @@ func TestValidateFlowDefinition(t *testing.T) {
 			wantErr: domain.ErrFlowDefinitionInvalid(`user schema has no properties`, nil),
 		},
 		{
-			name: "auth method not existing",
+			name: "schema with without auth methods",
 			args: args{
 				userSchema: &userSchemaNoAuthMethod,
 				flowDefinition: domain.FlowDefinition{
 					ProjectID:     "project1",
 					Name:          "login",
 					SchemaVersion: "1.0.0",
-					UserSchema:    "https://tenant.com/schemas/no-auth-user.json",
+					UserSchema:    "https://tenant.com/schemas/no-auth-methods.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []domain.Field{"email", "x-auth-methods#password"},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "step_2"},
+							},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+							},
+						},
+						{
+							Name:     "step_2",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "step_1": "password" is not an enabled authentication method`, nil),
+		},
+		{
+			name: "schema with empty auth methods",
+			args: args{
+				userSchema: &userSchemaEmptyAuthMethod,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/empty-auth-methods.json",
 					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
 					Audience: domain.FlowDefinitionAudience{
 						AppIDs:  []string{"app1"},
@@ -797,6 +844,40 @@ func TestValidateFlowDefinition(t *testing.T) {
 				},
 			},
 			wantErr: domain.ErrFlowDefinitionInvalid(`step "step_1": "password" is not an enabled authentication method`, nil),
+		},
+		{
+			name: "invalid auth method name",
+			args: args{
+				userSchema: &userSchema,
+				flowDefinition: domain.FlowDefinition{
+					ProjectID:     "project1",
+					Name:          "login",
+					SchemaVersion: "1.0.0",
+					UserSchema:    "https://tenant.com/schemas/idpw-user.json",
+					Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
+					Audience: domain.FlowDefinitionAudience{
+						AppIDs:  []string{"app1"},
+						TeamIDs: []string{"team1"},
+					},
+					Steps: []domain.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []domain.Field{"email", "x-auth-methods#INVALID"},
+							Transitions: map[string]domain.FlowStepTransition{
+								"submit": {Target: "step_2"},
+							},
+							Actions: []domain.FlowStepAction{
+								{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+							},
+						},
+						{
+							Name:     "step_2",
+							Complete: gu.Ptr(domain.FlowStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantErr: domain.ErrFlowDefinitionInvalid(`step "step_1": unknown field type for "x-auth-methods#INVALID"`, nil),
 		},
 		{
 			name: "fields not in user schema",

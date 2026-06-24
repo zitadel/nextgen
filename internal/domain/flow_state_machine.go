@@ -1036,9 +1036,9 @@ func mergeCollected(state *FlowState, fields map[string]any) error {
 		return nil
 	}
 	for k, v := range fields {
-		if strings.HasPrefix(k, "x-auth-methods#") {
+		if strings.HasPrefix(k, authMethodPrefix) {
 			switch k {
-			case "x-auth-methods#password":
+			case authMethodPrefix + "password":
 				pwd, ok := v.(string)
 				if !ok {
 					return errors.New("password is not a string")
