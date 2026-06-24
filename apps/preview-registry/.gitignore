@@ -1,3 +1,4 @@
 .env.local
 .vercel/
-.local-pack/
+.snapshots/
+public/

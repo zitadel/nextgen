@@ -1,81 +1,126 @@
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+
 /**
- * Local end-to-end driver:
- *   1. pnpm publish --dry-run --pack-destination → tarball for a workspace pkg
- *   2. put() the tarball into the blob emulator under the same key shape the
- *      production reader will list (branch-<ref>/@scope/name/-/<file>.tgz)
+ * Workspace package directories the local stage script will pack.
  *
- * Run with the emulator already up on http://localhost:3100. The .env.local
- * picked up here matches what `vercel dev` will use, so the function reads
- * exactly what this script wrote.
+ * Kept in sync with `packages/*` by convention; if you add a package
+ * to the workspace, extend this list.
  */
-import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
-import { Readable } from 'node:stream'
-import { x as untar } from 'tar'
-import { put } from '@vercel/blob'
+/**
+ * Workspace package directories the local stage script will pack.
+ *
+ * Aligned with nextgen's publishable (non-private) packages so the
+ * local dev round-trip exercises the same set the production build
+ * will publish.
+ */
+const WORKSPACE_PACKAGES = [
+  "packages/api",
+  "packages/components",
+  "packages/sdk-angular",
+  "packages/sdk-core",
+  "packages/sdk-next",
+  "packages/sdk-nuxt",
+  "packages/sdk-qwik",
+  "packages/sdk-qwik-city",
+  "packages/sdk-react",
+  "packages/sdk-solid",
+  "packages/sdk-solid-start",
+  "packages/sdk-svelte",
+  "packages/sdk-sveltekit",
+  "packages/sdk-tanstack-start",
+  "packages/sdk-vue",
+] as const;
 
-// Point the SDK at the local emulator. The token value is arbitrary; the
-// emulator does no auth, it just needs the env var to be set.
-process.env.BLOB_READ_WRITE_TOKEN ||= 'vercel_blob_rw_emulator_local'
-process.env.VERCEL_BLOB_API_URL ||= 'http://localhost:3100/api/blob'
+/** Absolute path to `apps/preview-registry/`. */
+const APP_ROOT = resolve(import.meta.dirname, "..");
 
-// Smallest packages to keep the loop fast. We're testing the registry shape,
-// not the SDK content.
-const REPO = resolve(import.meta.dirname, '../../..')
-const PACKAGES = [
-  'packages/sdk-core',
-  'packages/sdk-react',
-]
-const BRANCH = process.env.LOCAL_BRANCH ?? 'local'
+/** Absolute path to the workspace root that owns `packages/*`. */
+const REPO_ROOT = resolve(APP_ROOT, "..", "..");
 
-const readManifestFromTgz = async (path: string) => {
-  const buf = readFileSync(path)
-  let manifest: any
-  await new Promise<void>((resolve, reject) => {
-    const parser = untar({
-      filter: (p) => p === 'package/package.json',
-      onentry: (entry) => {
-        const chunks: Buffer[] = []
-        entry.on('data', (d: Buffer) => chunks.push(d))
-        entry.on('end', () => {
-          manifest = JSON.parse(Buffer.concat(chunks).toString('utf8'))
-        })
-      },
-    })
-    Readable.from(buf).pipe(parser).on('finish', () => resolve()).on('error', reject)
-  })
-  return manifest
+/** Directory the local server reads tarballs out of — same layout as the prod build. */
+const SNAPSHOT_ROOT = join(APP_ROOT, ".snapshots");
+
+interface WorkspaceManifest {
+  readonly name: string;
+  readonly version: string;
 }
 
-const out = mkdtempSync(join(tmpdir(), 'preview-stage-'))
-try {
-  for (const dir of PACKAGES) {
-    console.log(`packing ${dir}...`)
-    execFileSync(
-      'pnpm',
-      ['pack', `--pack-destination=${out}`],
-      { cwd: join(REPO, dir), stdio: 'inherit' }
-    )
-  }
+/**
+ * Pack every workspace package into the local FS snapshot store so the
+ * dev server has something to serve.
+ *
+ * Mirrors the shape of what
+ * {@link ../api/index.ts | the Vercel function bundle} ships in
+ * production, just without version stamping — packages keep their
+ * checked-in `0.0.0` so iterating on schema or routing is fast.
+ */
+const stageLocal = async (): Promise<void> => {
+  rmSync(SNAPSHOT_ROOT, { recursive: true, force: true });
 
-  const tgzs = readdirSync(out).filter((f) => f.endsWith('.tgz'))
-  console.log(`uploading ${tgzs.length} tarballs to blob emulator...`)
-  for (const f of tgzs) {
-    const path = join(out, f)
-    const manifest = await readManifestFromTgz(path)
-    const key = `branch-${BRANCH}/${manifest.name}/-/${f}`
-    const blob = await put(key, readFileSync(path), {
-      access: 'public',
-      addRandomSuffix: false,
-      contentType: 'application/octet-stream',
-      allowOverwrite: true,
-    })
-    console.log(`  ${manifest.name}@${manifest.version} → ${blob.url}`)
+  const stagingDirectory = mkdtempSync(join(tmpdir(), "stage-local-"));
+  try {
+    for (const packageDirectory of WORKSPACE_PACKAGES) {
+      console.log(`packing ${packageDirectory}`);
+      execFileSync("corepack", ["pnpm", "pack", "--pack-destination", stagingDirectory], {
+        cwd: join(REPO_ROOT, packageDirectory),
+        stdio: "inherit",
+      });
+    }
+
+    const manifests: readonly { path: string; manifest: WorkspaceManifest }[] =
+      WORKSPACE_PACKAGES.map((packageDirectory) => {
+        const packageJsonPath = join(REPO_ROOT, packageDirectory, "package.json");
+        return {
+          path: packageJsonPath,
+          manifest: JSON.parse(readFileSync(packageJsonPath, "utf8")) as WorkspaceManifest,
+        };
+      });
+
+    const bundled = readdirSync(stagingDirectory)
+      .filter((file) => file.endsWith(".tgz"))
+      .reduce<readonly { name: string; version: string; sizeBytes: number }[]>(
+        (accumulator, tarballFile) => {
+          const tarballBody = readFileSync(join(stagingDirectory, tarballFile));
+          const matchedManifest = manifests.find(({ manifest }) =>
+            tarballFile.startsWith(manifest.name.replace("@", "").replace("/", "-") + "-"),
+          )?.manifest;
+          if (!matchedManifest) {
+            console.warn(`skip ${tarballFile} — no matching workspace package`);
+            return accumulator;
+          }
+          const destination = join(SNAPSHOT_ROOT, matchedManifest.name, "-", tarballFile);
+          mkdirSync(resolve(destination, ".."), { recursive: true });
+          writeFileSync(destination, tarballBody);
+          console.log(`  bundled ${matchedManifest.name} → ${destination}`);
+          return [
+            ...accumulator,
+            {
+              name: matchedManifest.name,
+              version: matchedManifest.version,
+              sizeBytes: tarballBody.length,
+            },
+          ];
+        },
+        [],
+      );
+
+    const manifestPath = join(APP_ROOT, "src", "snapshot-manifest.ts");
+    const manifestSource =
+      "// AUTO-GENERATED by scripts/stage-local.ts. Do not edit.\n" +
+      "import type { PackageRow } from './landing.js'\n\n" +
+      "export const SNAPSHOT_PACKAGES: readonly PackageRow[] = " +
+      JSON.stringify(bundled, null, 2) +
+      " as const\n";
+    writeFileSync(manifestPath, manifestSource);
+
+    console.log(`\nstaged into ${SNAPSHOT_ROOT}`);
+    console.log("now run:  corepack pnpm dev:registry");
+  } finally {
+    rmSync(stagingDirectory, { recursive: true, force: true });
   }
-  console.log('\nstaged. now run: pnpm dev')
-  console.log(`then: curl http://localhost:3000/@zitadel/sdk-core`)
-} finally {
-  rmSync(out, { recursive: true, force: true })
-}
+};
+
+await stageLocal();

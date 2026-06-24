@@ -1,13 +1,10 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "composite": false,
-    "declarationMap": false,
-    "emitDeclarationOnly": false,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "noEmit": true,
-    "types": ["node"],
-    "moduleResolution": "bundler",
-    "module": "esnext"
+    "types": ["node"]
   },
-  "include": ["api/**/*.ts", "scripts/**/*.ts"]
+  "include": ["api/**/*", "scripts/**/*", "src/**/*"]
 }

@@ -1,0 +1,14 @@
+id: "preview-registry"
+language: "typescript"
+layer: "application"
+stack: "backend"
+
+tasks:
+  lint:
+    command: "corepack pnpm run lint"
+
+  typecheck:
+    command: "corepack pnpm run typecheck"
+
+  test:
+    command: "corepack pnpm run test"

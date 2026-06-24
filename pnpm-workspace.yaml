@@ -60,6 +60,8 @@ catalog:
   fumadocs-ui: ^16.10.3
   fumapress: ^0.6.2
   hono: ^4.12.25
+  "@hono/node-server": ^1.13.7
+  tar: ^7.4.3
   jsdom: ^29.0.2
   json-schema-typed: ^8.0.2
   lightningcss: ^1.30.1

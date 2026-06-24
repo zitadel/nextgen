@@ -24,6 +24,9 @@ catalogs:
     '@fumapress/ai':
       specifier: ^0.6.2
       version: 0.6.2
+    '@hono/node-server':
+      specifier: ^1.13.7
+      version: 1.19.14
     '@moonrepo/cli':
       specifier: ^2.3.3
       version: 2.3.3
@@ -252,6 +255,9 @@ catalogs:
     tailwindcss:
       specifier: ^4.2.4
       version: 4.2.4
+    tar:
+      specifier: ^7.4.3
+      version: 7.5.15
     ts-lit-plugin:
       specifier: ^2.0.2
       version: 2.0.2
@@ -702,28 +708,58 @@ importers:
 
   apps/preview-registry:
     dependencies:
-      '@vercel/blob':
-        specifier: ^1.0.0
-        version: 1.1.1
       hono:
-        specifier: ^4.6.14
+        specifier: 'catalog:'
         version: 4.12.25
       tar:
-        specifier: ^7.4.3
+        specifier: 'catalog:'
         version: 7.5.15
     devDependencies:
+      '@eslint/js':
+        specifier: 'catalog:'
+        version: 9.39.4
+      '@eslint/json':
+        specifier: 'catalog:'
+        version: 0.11.0
+      '@eslint/markdown':
+        specifier: 'catalog:'
+        version: 6.6.0
       '@hono/node-server':
-        specifier: ^1.13.7
+        specifier: 'catalog:'
         version: 1.19.14(hono@4.12.25)
       '@types/node':
         specifier: 'catalog:'
         version: 25.6.0
+      eslint:
+        specifier: 'catalog:'
+        version: 9.39.4(jiti@2.7.0)
+      eslint-config-prettier:
+        specifier: 'catalog:'
+        version: 10.1.8(eslint@9.39.4(jiti@2.7.0))
+      eslint-import-resolver-typescript:
+        specifier: 'catalog:'
+        version: 3.10.1(eslint-plugin-import@2.32.0)(eslint@9.39.4(jiti@2.7.0))
+      eslint-plugin-import:
+        specifier: 'catalog:'
+        version: 2.32.0(@typescript-eslint/parser@8.59.3(eslint@9.39.4(jiti@2.7.0))(typescript@6.0.3))(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.4(jiti@2.7.0))
+      eslint-plugin-perfectionist:
+        specifier: 'catalog:'
+        version: 4.15.1(eslint@9.39.4(jiti@2.7.0))(typescript@6.0.3)
+      eslint-plugin-prettier:
+        specifier: 'catalog:'
+        version: 5.5.5(@types/eslint@9.6.1)(eslint-config-prettier@10.1.8(eslint@9.39.4(jiti@2.7.0)))(eslint@9.39.4(jiti@2.7.0))(prettier@3.8.3)
       tsx:
         specifier: 'catalog:'
         version: 4.21.0
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      typescript-eslint:
+        specifier: 'catalog:'
+        version: 8.59.3(eslint@9.39.4(jiti@2.7.0))(typescript@6.0.3)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.7(@opentelemetry/api@1.9.1)(@types/node@25.6.0)(@vitest/browser-playwright@4.1.7)(jsdom@29.0.2)(msw@2.14.6(@types/node@25.6.0)(typescript@6.0.3))(vite@8.0.16(@types/node@25.6.0)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(sass@1.100.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.9.0))
 
   apps/server:
     optionalDependencies:
@@ -17629,7 +17665,8 @@ snapshots:
 
   '@faker-js/faker@10.4.0': {}
 
-  '@fastify/busboy@2.1.1': {}
+  '@fastify/busboy@2.1.1':
+    optional: true
 
   '@floating-ui/core@1.7.5':
     dependencies:
@@ -22507,6 +22544,7 @@ snapshots:
       is-node-process: 1.2.0
       throttleit: 2.1.0
       undici: 5.29.0
+    optional: true
 
   '@vercel/nft@1.10.2(encoding@0.1.13)(rollup@4.60.4)':
     dependencies:
@@ -26535,7 +26573,8 @@ snapshots:
       call-bound: 1.0.4
       has-tostringtag: 1.0.2
 
-  is-buffer@2.0.5: {}
+  is-buffer@2.0.5:
+    optional: true
 
   is-bun-module@2.0.0:
     dependencies:
@@ -31584,6 +31623,7 @@ snapshots:
   undici@5.29.0:
     dependencies:
       '@fastify/busboy': 2.1.1
+    optional: true
 
   undici@7.24.7: {}
 
