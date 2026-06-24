@@ -45,17 +45,13 @@ moon run demo-next:dev
 
 Open [http://localhost:3002/login](http://localhost:3002/login). Any email/password combination is accepted by the mock server.
 
-**UI-only iteration** (no Next.js, no TCP mock): MSW runs in the browser on these dev servers:
+**UI-only iteration** (no Next.js, no TCP mock): the Storybook workbench runs
+the Lit atoms, the paired React components, and the `<zitadel-login>`
+orchestrator (MSW in the browser via `msw-storybook-addon`):
 
 ```bash
-# Lit atoms + <zitadel-login> (source from packages/components/src)
-moon run components:dev
-# → http://localhost:5173/?route=login
-# → http://localhost:5173/?route=atoms
-
-# React paired atoms (@zitadel/ui-react) — compare Lit matrices in another tab
-moon run console:dev
-# → http://localhost:5174
+moon run storybook:dev
+# → http://localhost:6006
 ```
 
 After changing `@zitadel/components`, rebuild before refreshing:

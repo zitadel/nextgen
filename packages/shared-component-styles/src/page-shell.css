@@ -4,6 +4,9 @@
   background: var(--zl-color-surface-default-black, #0f0f11);
   color: var(--zl-color-text-primary-white, #f4f4f6);
   font-family: var(--zl-font-family-sans, system-ui, sans-serif);
+  /* Match the Lit atom's `baseHostStyles` :host line-height so slotted/child
+     content renders at the same height in both renderers. */
+  line-height: 1.5;
   display: flex;
   flex-direction: column;
   align-items: center;

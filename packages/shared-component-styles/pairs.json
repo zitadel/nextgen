@@ -7,6 +7,8 @@
     { "id": "pill", "lit": "zl-pill", "react": "Pill", "surface": "./pill.css", "litHost": "./lit/pill-host.css" },
     { "id": "icon", "lit": "zl-icon", "react": "Icon", "surface": "./icon.css", "litHost": "./lit/icon-host.css" },
     { "id": "card", "lit": "zl-card", "react": "Card", "surface": "./card.css", "litHost": "./lit/card-host.css" },
-    { "id": "page-shell", "lit": "zl-page-shell", "react": "PageShell", "surface": "./page-shell.css", "litHost": "./lit/page-shell-host.css" }
+    { "id": "page-shell", "lit": "zl-page-shell", "react": "PageShell", "surface": "./page-shell.css", "litHost": "./lit/page-shell-host.css" },
+    { "id": "checkbox", "lit": "zl-checkbox", "react": "Checkbox", "surface": "./checkbox.css", "litHost": "./lit/checkbox-host.css" },
+    { "id": "select", "lit": "zl-select", "react": "Select", "surface": "./select.css", "litHost": "./lit/select-host.css" }
   ]
 }

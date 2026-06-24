@@ -197,7 +197,7 @@ function flowListItemResponse(r: FlowDefinitionRecord): ListFlowDefinitions200Fl
     name: r.name,
     project_id: r.projectId,
     schema_uri: r.schemaUri,
-    status: r.status,
+    status: r.status as ListFlowDefinitions200FlowDefinitionsItem["status"],
     created_at: r.createdAt,
     updated_at: r.updatedAt,
   };
