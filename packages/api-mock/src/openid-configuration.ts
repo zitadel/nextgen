@@ -8,8 +8,8 @@
  * This module is intentionally **side-effect free** — it imports nothing
  * and initializes nothing — so a build step can import it to emit the
  * document as a static asset without pulling in `server.ts` (and, through
- * it, `crypto.ts`'s top-level WebCrypto keypair generation). The Express
- * server re-exports it from `./server` for the live route.
+ * it, `crypto.ts`'s top-level WebCrypto keypair generation). `server.ts`
+ * imports it for the live `/.well-known/openid-configuration` route.
  *
  * @param issuer - Absolute issuer base URL.
  * @param options.jwksUri - Absolute URL clients should fetch the JWKS
