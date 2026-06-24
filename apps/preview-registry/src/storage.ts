@@ -6,13 +6,19 @@ import { dirname, join, resolve, sep } from "node:path";
  *
  * Mirrors the subset of fields the npm registry protocol consumes:
  * a stable lookup key, a public URL the npm client can fetch, the byte
- * size of the underlying file, and the time the file was created so the
- * packument can resolve the `latest` dist-tag.
+ * size of the underlying file, and the {@link BlobEntry.uploadedAt}
+ * timestamp the packument uses to resolve the `latest` dist-tag.
  */
 export interface BlobEntry {
   readonly key: string;
   readonly url: string;
   readonly size: number;
+  /**
+   * When this blob last changed. The filesystem store reports the file's
+   * last-modified time (`stat().mtime`); the newest entry wins the
+   * `latest` dist-tag. Since each snapshot is written once and never
+   * rewritten, modified time and creation time coincide in practice.
+   */
   readonly uploadedAt: Date;
 }
 
