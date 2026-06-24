@@ -295,11 +295,11 @@ const CONTEXT_KEY = "nextgenAuth";
 
 /**
  * Creates a TanStack Start request-middleware server handler that proxies,
- * verifies the session JWT, and protects routes. Wire it into a global request
- * middleware:
+ * verifies the session JWT, and protects routes. Register it as a global
+ * request middleware from the framework server entry, `src/start.ts`:
  *
  * ```ts
- * import { createMiddleware, registerGlobalMiddleware } from "@tanstack/react-start";
+ * import { createMiddleware, createStart } from "@tanstack/react-start";
  * import { createNextgenRequestMiddleware } from "@zitadel/sdk-tanstack-start/server";
  *
  * const authMiddleware = createMiddleware({ type: "request" }).server(
@@ -311,7 +311,9 @@ const CONTEXT_KEY = "nextgenAuth";
  *   }),
  * );
  *
- * registerGlobalMiddleware({ middleware: [authMiddleware] });
+ * export const startInstance = createStart(() => ({
+ *   requestMiddleware: [authMiddleware],
+ * }));
  * ```
  *
  * On an authenticated request it calls `next({ context: { nextgenAuth } })` so
