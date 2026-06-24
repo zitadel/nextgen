@@ -95,8 +95,6 @@ export function resolveTelemetryToken(env: NodeJS.ProcessEnv): string | undefine
  * in Live View.
  */
 export function resolveTelemetryHost(env: NodeJS.ProcessEnv): string {
-  // Default to EU: the Zitadel Mixpanel projects live in the EU data-residency
-  // region. Set `ZITADEL_TELEMETRY_REGION=us` for a US-hosted project.
   const region = (env.ZITADEL_TELEMETRY_REGION ?? "eu").toLowerCase();
   return region === "us" ? HOSTS.us : HOSTS.eu;
 }

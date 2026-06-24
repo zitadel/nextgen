@@ -48,7 +48,7 @@ export function loadOrCreateIdentity(env: NodeJS.ProcessEnv): Identity {
       return { distinctId: parsed.distinctId, isFirstRun: false };
     }
   } catch {
-    // Missing or corrupt file — fall through to mint a fresh id below.
+    /* fall through to mint a fresh id */
   }
 
   const distinctId = randomUUID();
@@ -59,7 +59,6 @@ export function loadOrCreateIdentity(env: NodeJS.ProcessEnv): Identity {
     });
     return { distinctId, isFirstRun: true };
   } catch {
-    // Could not persist; use the id only for this process and skip the notice.
     return { distinctId, isFirstRun: false };
   }
 }

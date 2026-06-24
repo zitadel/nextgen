@@ -1,71 +1,71 @@
-/**
- * Generic environment detection for telemetry — derives coarse, non-PII facts
- * about the runtime (CI, agent harness, package manager) from environment
- * variables. Pure functions with no application or CLI coupling.
- */
+import type { Property } from "./property";
 
-/** Whether this looks like an automated CI environment. */
-export function isCi(env: NodeJS.ProcessEnv): boolean {
-  return Boolean(env.CI) || Boolean(env.GITHUB_ACTIONS) || Boolean(env.GITLAB_CI);
+/** Whether the process is running inside an automated CI environment. */
+class CiFlag implements Property<NodeJS.ProcessEnv, boolean> {
+  public value(env: NodeJS.ProcessEnv): boolean {
+    return Boolean(env.CI) || Boolean(env.GITHUB_ACTIONS) || Boolean(env.GITLAB_CI);
+  }
 }
 
-/** Best-effort, coarse CI provider name. Returns `undefined` outside CI. */
-export function ciProvider(env: NodeJS.ProcessEnv): string | undefined {
-  if (env.GITHUB_ACTIONS) {
-    return "github_actions";
+/** Coarse CI provider name, or `undefined` when not running in CI. */
+class CiProvider implements Property<NodeJS.ProcessEnv, string | undefined> {
+  public value(env: NodeJS.ProcessEnv): string | undefined {
+    if (env.GITHUB_ACTIONS) {
+      return "github_actions";
+    }
+    if (env.GITLAB_CI) {
+      return "gitlab_ci";
+    }
+    if (env.CIRCLECI) {
+      return "circleci";
+    }
+    if (env.BUILDKITE) {
+      return "buildkite";
+    }
+    if (env.JENKINS_URL) {
+      return "jenkins";
+    }
+    return env.CI ? "unknown" : undefined;
   }
-  if (env.GITLAB_CI) {
-    return "gitlab_ci";
-  }
-  if (env.CIRCLECI) {
-    return "circleci";
-  }
-  if (env.BUILDKITE) {
-    return "buildkite";
-  }
-  if (env.JENKINS_URL) {
-    return "jenkins";
-  }
-  return env.CI ? "unknown" : undefined;
 }
 
-/**
- * Coarse identity of the agent/host driving the process, as a fixed enum (never
- * a free-form value). Useful for telling automated harnesses apart from humans.
- */
-export function hostAgent(env: NodeJS.ProcessEnv): string {
-  if (env.CLAUDECODE || env.CLAUDE_CODE_ENTRYPOINT) {
-    return "claude_code";
+/** Fixed-enum identity of the agent or host driving the process. */
+class HostAgent implements Property<NodeJS.ProcessEnv, string> {
+  public value(env: NodeJS.ProcessEnv): string {
+    if (env.CLAUDECODE || env.CLAUDE_CODE_ENTRYPOINT) {
+      return "claude_code";
+    }
+    if (env.CURSOR_TRACE_ID || env.CURSOR_AGENT) {
+      return "cursor";
+    }
+    if (env.TERM_PROGRAM === "vscode") {
+      return "vscode";
+    }
+    return "unknown";
   }
-  if (env.CURSOR_TRACE_ID || env.CURSOR_AGENT) {
-    return "cursor";
-  }
-  if (env.TERM_PROGRAM === "vscode") {
-    return "vscode";
-  }
-  return "unknown";
 }
 
-/**
- * How the process was invoked, derived from the package manager's user-agent.
- * Tells `npx`/`pnpm dlx` one-shot runs apart from a resolved install, leaking no
- * path. The UA leads with the package-manager token, e.g.
- * "pnpm/10 npm/? node/v24" — check the more specific names first since "pnpm"
- * contains the substring "npm".
- */
-export function invocationChannel(env: NodeJS.ProcessEnv): string {
-  const ua = env.npm_config_user_agent ?? "";
-  if (ua.startsWith("pnpm")) {
-    return "pnpm";
+/** Package manager that launched the process, read from its user-agent. */
+class InvocationChannel implements Property<NodeJS.ProcessEnv, string> {
+  public value(env: NodeJS.ProcessEnv): string {
+    const userAgent = env.npm_config_user_agent ?? "";
+    if (userAgent.startsWith("pnpm")) {
+      return "pnpm";
+    }
+    if (userAgent.startsWith("yarn")) {
+      return "yarn";
+    }
+    if (userAgent.startsWith("bun")) {
+      return "bun";
+    }
+    if (userAgent.startsWith("npm")) {
+      return "npm";
+    }
+    return "unknown";
   }
-  if (ua.startsWith("yarn")) {
-    return "yarn";
-  }
-  if (ua.startsWith("bun")) {
-    return "bun";
-  }
-  if (ua.startsWith("npm")) {
-    return "npm";
-  }
-  return "unknown";
 }
+
+export const ciFlag = new CiFlag();
+export const ciProvider = new CiProvider();
+export const hostAgent = new HostAgent();
+export const invocationChannel = new InvocationChannel();

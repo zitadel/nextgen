@@ -30,10 +30,12 @@ const DISABLED_VALUES = new Set(["0", "false", "off", "no"]);
  * several explicit signals turns it off, in precedence order.
  *
  * 1. `--no-telemetry` on the command line — the most explicit, per-invocation.
- * 2. `DO_NOT_TRACK` — the cross-tool standard (https://consoledonottrack.com);
+ * 2. An automated test run (`VITEST`/`NODE_ENV=test`) — never emit synthetic
+ *    traffic or pay the shutdown flush; spawned CLI subprocesses inherit it.
+ * 3. `DO_NOT_TRACK` — the cross-tool standard (https://consoledonottrack.com);
  *    any value other than `0`/empty disables.
- * 3. `ZITADEL_TELEMETRY` set to a falsey token (`0`/`false`/`off`/`no`).
- * 4. No ingestion token configured for the active channel — nothing to send to,
+ * 4. `ZITADEL_TELEMETRY` set to a falsey token (`0`/`false`/`off`/`no`).
+ * 5. No ingestion token configured for the active channel — nothing to send to,
  *    so telemetry is inert regardless of consent.
  *
  * Consent being enabled does not by itself send anything; the caller still
@@ -44,9 +46,6 @@ export function resolveConsent(input: ConsentInput): Consent {
     return { enabled: false, reason: "flag-opt-out" };
   }
 
-  // Never emit from an automated test run — it would both slow the suite (the
-  // shutdown flush) and pollute the project with synthetic traffic. Vitest sets
-  // VITEST in every worker, and spawned CLI subprocesses inherit it.
   if (input.env.VITEST || input.env.NODE_ENV === "test") {
     return { enabled: false, reason: "test-runner" };
   }

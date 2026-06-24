@@ -1,30 +1,41 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ciFlag,
   ciProvider,
   hostAgent,
   invocationChannel,
-  isCi,
 } from "../../../../src/lib/telemetry/env";
 
-describe("environment detectors", () => {
-  it("detects CI and its provider", () => {
-    expect(isCi({ GITHUB_ACTIONS: "true" })).toBe(true);
-    expect(isCi({})).toBe(false);
-    expect(ciProvider({ GITHUB_ACTIONS: "true" })).toBe("github_actions");
-    expect(ciProvider({ CI: "1" })).toBe("unknown");
-    expect(ciProvider({})).toBeUndefined();
+describe("ciFlag", () => {
+  it("detects an automated CI environment", () => {
+    expect(ciFlag.value({ GITHUB_ACTIONS: "true" })).toBe(true);
+    expect(ciFlag.value({})).toBe(false);
   });
+});
 
-  it("detects the host agent from a fixed enum", () => {
-    expect(hostAgent({ CLAUDECODE: "1" })).toBe("claude_code");
-    expect(hostAgent({ TERM_PROGRAM: "vscode" })).toBe("vscode");
-    expect(hostAgent({})).toBe("unknown");
+describe("ciProvider", () => {
+  it("names the provider, falling back to unknown inside an unrecognized CI", () => {
+    expect(ciProvider.value({ GITHUB_ACTIONS: "true" })).toBe("github_actions");
+    expect(ciProvider.value({ CI: "1" })).toBe("unknown");
+    expect(ciProvider.value({})).toBeUndefined();
   });
+});
 
-  it("derives the invocation channel from the package-manager user agent", () => {
-    expect(invocationChannel({ npm_config_user_agent: "pnpm/10.0.0 npm/? node/v24" })).toBe("pnpm");
-    expect(invocationChannel({ npm_config_user_agent: "npm/10 node/v24" })).toBe("npm");
-    expect(invocationChannel({})).toBe("unknown");
+describe("hostAgent", () => {
+  it("identifies the driving agent from a fixed enum", () => {
+    expect(hostAgent.value({ CLAUDECODE: "1" })).toBe("claude_code");
+    expect(hostAgent.value({ TERM_PROGRAM: "vscode" })).toBe("vscode");
+    expect(hostAgent.value({})).toBe("unknown");
+  });
+});
+
+describe("invocationChannel", () => {
+  it("derives the package manager from its user-agent (pnpm wins over the npm substring)", () => {
+    expect(invocationChannel.value({ npm_config_user_agent: "pnpm/10.0.0 npm/? node/v24" })).toBe(
+      "pnpm",
+    );
+    expect(invocationChannel.value({ npm_config_user_agent: "npm/10 node/v24" })).toBe("npm");
+    expect(invocationChannel.value({})).toBe("unknown");
   });
 });

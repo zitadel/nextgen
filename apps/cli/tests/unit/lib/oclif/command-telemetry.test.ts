@@ -26,13 +26,13 @@ function meta(overrides: Partial<GlobalOptions> = {}): GlobalOptions {
 
 describe("serverKind", () => {
   it("buckets sources without leaking the URL", () => {
-    expect(serverKind("https://api.zitadel.cloud")).toBe("cloud");
-    expect(serverKind("https://acme.zitadel.cloud")).toBe("cloud");
-    expect(serverKind("http://localhost:8080")).toBe("local");
-    expect(serverKind("http://127.0.0.1:8080")).toBe("local");
-    expect(serverKind("mock")).toBe("local");
-    expect(serverKind("https://auth.internal.acme.com")).toBe("self_hosted");
-    expect(serverKind("not a url")).toBe("unknown");
+    expect(serverKind.value("https://api.zitadel.cloud")).toBe("cloud");
+    expect(serverKind.value("https://acme.zitadel.cloud")).toBe("cloud");
+    expect(serverKind.value("http://localhost:8080")).toBe("local");
+    expect(serverKind.value("http://127.0.0.1:8080")).toBe("local");
+    expect(serverKind.value("mock")).toBe("local");
+    expect(serverKind.value("https://auth.internal.acme.com")).toBe("self_hosted");
+    expect(serverKind.value("not a url")).toBe("unknown");
   });
 });
 
