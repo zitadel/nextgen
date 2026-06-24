@@ -1,0 +1,33 @@
+{
+  "name": "@zitadel/preview-registry",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Per-PR snapshot npm registry deployed to Vercel.",
+  "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/preview-registry#readme",
+  "bugs": {
+    "url": "https://github.com/zitadel/nextgen/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zitadel/nextgen.git",
+    "directory": "apps/preview-registry"
+  },
+  "scripts": {
+    "dev": "tsx scripts/local-server.ts",
+    "stage:local": "tsx scripts/stage-local.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vercel/blob": "^1.0.0",
+    "hono": "^4.6.14",
+    "tar": "^7.4.3"
+  },
+  "devDependencies": {
+    "@hono/node-server": "^1.13.7",
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
+  }
+}

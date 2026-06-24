@@ -5,5 +5,10 @@
     "GOTOOLCHAIN": "local",
     "GOROOT":      null
   },
-  "packages": ["go@1.26", "nodejs@24", "nodePackages.pnpm@latest"]
+  "packages": [
+    "go@1.26",
+    "nodejs@24",
+    "nodePackages.pnpm@latest",
+    "nodePackages.vercel@latest"
+  ]
 }

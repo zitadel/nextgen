@@ -97,6 +97,54 @@
         }
       }
     },
+    "nodePackages.vercel@latest": {
+      "last_modified": "2026-02-03T17:56:14Z",
+      "resolved": "github:NixOS/nixpkgs/41965737c1797c1d83cfb0b644ed0840a6220bd1#nodePackages.vercel",
+      "source": "devbox-search",
+      "version": "41.4.1",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/64wx50dw8ln60js9gb79586cn59ag1v2-vercel-41.4.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/64wx50dw8ln60js9gb79586cn59ag1v2-vercel-41.4.1"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/z8yx11y1x4grsa9phxkwyhzkd60kximp-vercel-41.4.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/z8yx11y1x4grsa9phxkwyhzkd60kximp-vercel-41.4.1"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/vpflp1qzaqx0c090xj6253nzd0413sg8-vercel-41.4.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/vpflp1qzaqx0c090xj6253nzd0413sg8-vercel-41.4.1"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/5izn7nkmzd20fyj7iapbks2npix2l7ki-vercel-41.4.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/5izn7nkmzd20fyj7iapbks2npix2l7ki-vercel-41.4.1"
+        }
+      }
+    },
     "nodejs@24": {
       "last_modified": "2025-12-27T12:56:01Z",
       "plugin_version": "0.0.2",
