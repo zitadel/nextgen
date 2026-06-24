@@ -6,5 +6,5 @@
     "GOROOT":      null,
     "DEVBOX_COREPACK_ENABLED": "true"
   },
-  "packages": ["go@1.26", "nodejs@24", "nodePackages.vercel@latest"]
+  "packages": ["go@1.26", "nodejs@24", "nodePackages.vercel@41.4.1"]
 }
