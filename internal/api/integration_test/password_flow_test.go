@@ -61,7 +61,7 @@ func TestPasswordLoginFlow(t *testing.T) {
 	require.NoError(t, err)
 
 	passwordRepo := harness.EnsureUserPasswordRepo(t)
-	require.NoError(t, passwordRepo.Create(t.Context(), db, &domain.CreateUserPassword{
+	require.NoError(t, passwordRepo.Set(t.Context(), db, &domain.SetUserPassword{
 		ProjectID:   project.ID,
 		UserID:      userID,
 		EncodedHash: encodedHash,
