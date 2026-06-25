@@ -2,7 +2,7 @@ import { frameworkForId, frameworkIds } from "./frameworks.mjs";
 
 export function parseLocalJourneyArgs(args) {
   const parsed = {
-    concurrency: 5,
+    concurrency: 1,
     frameworkIds: [...frameworkIds],
     image: "",
     keep: false,

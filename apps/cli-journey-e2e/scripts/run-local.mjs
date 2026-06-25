@@ -122,7 +122,7 @@ function printUsage() {
 
 Options:
   --framework <id>         Run one framework: next, nuxt, react, vue, or angular
-  --concurrency <n>        Number of framework journeys to run in parallel (default: 5)
+  --concurrency <n>        Number of framework journeys to run in parallel (default: 1)
   --runtime <binary|docker> Local runtime backend (default: binary)
   --image <docker-tag>     Use an existing local runtime image instead of building one
   --keep                   Keep the temp work directory after success
