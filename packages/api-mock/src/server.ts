@@ -97,6 +97,13 @@ const idempotencyCache = new Map<string, IdempotencyCacheEntry>();
  * enforces in `/sessions/exchange` must agree, so both read the same
  * value regardless of which host a given request happens to arrive on.
  *
+ * **State is not per-app.** The session store, consumed-handoff set, and
+ * idempotency cache are module-scoped (see the top of this file), so two
+ * apps built in the same process **share** that state — there is no
+ * per-instance isolation. This is intentional for the single-app dev/
+ * serverless use cases; tests that need isolation should run in separate
+ * workers (as Vitest does) rather than creating multiple apps in one.
+ *
  * @param options.issuer - Absolute base URL this mock advertises as its
  *   OIDC issuer (`http://localhost:8080` locally, the preview domain on
  *   Vercel). Embedded in the discovery/JWKS documents and used as the
