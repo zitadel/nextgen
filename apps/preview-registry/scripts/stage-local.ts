@@ -45,6 +45,19 @@ const listPublishablePackageDirectories = (): readonly string[] =>
     });
 
 /**
+ * Exact tarball filename pnpm writes for a workspace package:
+ * `@scope/name` at version `v` → `scope-name-<v>.tgz`.
+ *
+ * Local staging keeps each package's own version (no snapshot stamping),
+ * so the version comes straight off the manifest. Matching the full
+ * filename rather than the `scope-name-` prefix prevents mis-associating
+ * packages whose names share a prefix — eg an `@scope/api` tarball would
+ * otherwise also match `@scope/api-mock`.
+ */
+const expectedTarballFilename = (manifest: WorkspaceManifest): string =>
+  `${manifest.name.replace("@", "").replace("/", "-")}-${manifest.version}.tgz`;
+
+/**
  * Pack every workspace package into the local FS snapshot store so the
  * dev server has something to serve.
  *
@@ -83,8 +96,8 @@ const stageLocal = async (): Promise<void> => {
       .reduce<readonly { name: string; version: string; sizeBytes: number }[]>(
         (accumulator, tarballFile) => {
           const tarballBody = readFileSync(join(stagingDirectory, tarballFile));
-          const matchedManifest = manifests.find(({ manifest }) =>
-            tarballFile.startsWith(manifest.name.replace("@", "").replace("/", "-") + "-"),
+          const matchedManifest = manifests.find(
+            ({ manifest }) => tarballFile === expectedTarballFilename(manifest),
           )?.manifest;
           if (!matchedManifest) {
             console.warn(`skip ${tarballFile} — no matching workspace package`);

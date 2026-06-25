@@ -123,11 +123,18 @@ const restoreOriginals = (stamped: readonly StampedPackage[]): void => {
 };
 
 /**
- * Filename prefix pnpm uses for a packed tarball of `packageName`.
- * `@scope/name` → `scope-name-`, so `scope-name-1.0.0.tgz` matches it.
+ * Exact tarball filename pnpm writes for `packageName` at this deploy's
+ * snapshot version: `@scope/name` → `scope-name-<version>.tgz`.
+ *
+ * Every package is stamped to the same {@link SNAPSHOT_VERSION} before
+ * packing, so the version is known up front and the full filename can be
+ * matched exactly. A prefix match (`scope-name-`) would mis-associate
+ * packages whose names share a prefix — eg a `scope-api-…` tarball would
+ * also match `@scope/api-mock` — bundling tarballs under the wrong
+ * package and producing a landing manifest that lies.
  */
-const tarballPrefixFor = (packageName: string): string =>
-  packageName.replace("@", "").replace("/", "-") + "-";
+const expectedTarballFilename = (packageName: string): string =>
+  `${packageName.replace("@", "").replace("/", "-")}-${SNAPSHOT_VERSION}.tgz`;
 
 /**
  * Pack every workspace package and copy each resulting tarball into
@@ -161,8 +168,8 @@ const publishOnDeploy = async (): Promise<void> => {
       .filter((file) => file.endsWith(".tgz"))
       .reduce<readonly { name: string; version: string; sizeBytes: number }[]>(
         (accumulator, tarballFile) => {
-          const matched = stamped.find((entry) =>
-            tarballFile.startsWith(tarballPrefixFor(entry.name)),
+          const matched = stamped.find(
+            (entry) => tarballFile === expectedTarballFilename(entry.name),
           );
           if (!matched) {
             console.warn(`skip ${tarballFile} — no matching workspace package`);
