@@ -1,0 +1,35 @@
+id: "mock-zitadel"
+language: "typescript"
+layer: "application"
+stack: "backend"
+dependsOn:
+  - "api-mock"
+
+tasks:
+  # Bundle the function into a single self-contained JS file (see
+  # tsdown.config.ts). The deployed entry imports this, not the workspace
+  # TypeScript source.
+  build:
+    command: "corepack pnpm run build"
+    deps:
+      - "api-mock:build"
+    outputs:
+      - "dist/**"
+
+  lint:
+    command: "corepack pnpm run lint"
+    deps:
+      - "api-mock:build"
+
+  # The `typecheck` script bundles (tsdown) before `tsc` so it is
+  # self-contained on a clean checkout; it only needs @zitadel/api built
+  # first (for the workspace import that gets inlined).
+  typecheck:
+    command: "corepack pnpm run typecheck"
+    deps:
+      - "api-mock:build"
+
+  test:
+    command: "corepack pnpm run test"
+    deps:
+      - "api-mock:build"
