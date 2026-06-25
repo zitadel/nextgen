@@ -5,29 +5,29 @@ import { createApp } from "../src/app.js";
 import { createFsStore } from "../src/storage.js";
 
 /**
- * Resolve the directory the snapshot bundle lives in, regardless of
- * whether the function was shipped as ESM or transpiled to CJS by the
- * Vercel builder. Tries `__dirname` first (CJS), then
- * `import.meta.url` (native ESM), and finally `process.cwd()` so the
- * registry still serves the right files if either of those become
- * undefined in a future runtime.
+ * Resolve the absolute path to the snapshot bundle the Vercel build
+ * shipped with this function, regardless of whether it was shipped as
+ * ESM or transpiled to CJS.
+ *
+ * `__dirname` (CJS) and `import.meta.url` (native ESM) both point at the
+ * compiled function file's directory (`<bundle>/api`), so `.snapshots`
+ * — which the build's `includeFiles` rule places at the bundle root —
+ * is one level up. The `process.cwd()` fallback is different: the
+ * function's working directory is already the bundle root, so the
+ * snapshot directory sits directly under it, not one level up.
  */
-const resolveFunctionDirectory = (): string => {
+const resolveSnapshotRoot = (): string => {
   const cjsDirectory = typeof __dirname === "string" ? __dirname : undefined;
-  if (cjsDirectory) return cjsDirectory;
+  if (cjsDirectory) return resolve(cjsDirectory, "..", ".snapshots");
   try {
-    return dirname(fileURLToPath(import.meta.url));
+    return resolve(dirname(fileURLToPath(import.meta.url)), "..", ".snapshots");
   } catch {
-    return process.cwd();
+    return resolve(process.cwd(), ".snapshots");
   }
 };
 
-/**
- * Absolute path to the snapshot bundle the Vercel build shipped with
- * this function. The build's `includeFiles` rule places `.snapshots/`
- * next to the function file, so it resolves one directory above.
- */
-const SNAPSHOT_ROOT = resolve(resolveFunctionDirectory(), "..", ".snapshots");
+/** Absolute path to the bundled snapshot tarballs. */
+const SNAPSHOT_ROOT = resolveSnapshotRoot();
 
 /**
  * URL prefix the registry advertises in tarball download URLs at
