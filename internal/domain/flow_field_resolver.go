@@ -49,8 +49,9 @@ type FlowField struct {
 
 	// Type is the UI input kind the client should render. It is
 	// derived from the property's JSON `type` and `format` in the user
-	// meta-schema. The property's `x-password: true` annotation forces
-	// a password input regardless of `format`.
+	// meta-schema. The reserved `x-auth-methods#<method>` field name
+	// forces the input kind matching that credential method
+	// (e.g. `x-auth-methods#password` → password).
 	Type FlowFieldType
 
 	// TextKey is a localization key for the field label (e.g.
@@ -79,15 +80,15 @@ type FlowField struct {
 	// identifier nor a credential proof. Derivation paths: a non-empty
 	// `x-unique` annotation on the property surfaces as
 	// [FlowFieldChallengeIdentifier] (any uniquely-keyed property can
-	// identify a user); `x-password: true` combined with schema-level
-	// `x-auth-methods.password.enabled = true` surfaces as
-	// [FlowFieldChallengePassword]. Other credential kinds (passkey,
-	// magic_link, sso, otp) do not have user-property-shaped proofs and
-	// are produced by the state machine as challenge steps, not by the
-	// resolver. The state machine consults Challenge on submit to route
-	// the value — identifier fields drive identifier resolution (and
-	// the `user_not_found` implicit outcome), password fields drive the
-	// password challenge.
+	// identify a user); the reserved `x-auth-methods#password` field
+	// name combined with `x-auth-methods.password.enabled = true` at
+	// the schema root surfaces as [FlowFieldChallengePassword]. Other
+	// credential kinds (passkey, magic_link, sso, otp) do not have
+	// field-shaped proofs and are produced by the state machine as
+	// challenge steps, not by the resolver. The state machine consults
+	// Challenge on submit to route the value — identifier fields drive
+	// identifier resolution (and the `user_not_found` implicit outcome),
+	// password fields drive the password challenge.
 	Challenge FlowFieldChallenge
 }
 
@@ -95,12 +96,13 @@ type FlowField struct {
 // to. Values mirror the keys of `x-auth-methods` in the user
 // meta-schema (api/openapi/endpoints/schemas/user-schema.yaml).
 // `identifier` is sourced from a non-empty `x-unique` scope on the
-// property; `password` is sourced from `x-password` on the property
-// combined with `x-auth-methods.password.enabled` at the schema root.
-// The remaining credential values (passkey, magic_link, sso, otp) have
-// no user-property-shaped proof and are produced by the state machine
-// as challenge steps rather than by the resolver. Empty means the
-// field maps to no challenge.
+// property; `password` is sourced from the reserved
+// `x-auth-methods#password` field name combined with
+// `x-auth-methods.password.enabled` at the schema root. The remaining
+// credential values (passkey, magic_link, sso, otp) have no
+// field-shaped proof and are produced by the state machine as
+// challenge steps rather than by the resolver. Empty means the field
+// maps to no challenge.
 type FlowFieldChallenge string
 
 const (

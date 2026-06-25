@@ -7,6 +7,10 @@ import { fileURLToPath } from "node:url";
 
 import { forwardedArgs, isDirectRun, runCapture } from "./dev-process.mjs";
 
+// Public product packages, mirroring the fixed alpha group in
+// `.changeset/config.json` (the source of truth) plus each package's root path.
+// `validateFixedGroup()` fails the release check if the two drift, so update both
+// when adding a public package.
 export const publicPackages = [
   { name: "@zitadel/cli", root: "apps/cli/" },
   { name: "@zitadel/server", root: "apps/server/" },
@@ -23,6 +27,9 @@ export const publicPackages = [
   { name: "@zitadel/sdk-react", root: "packages/sdk-react/" },
   { name: "@zitadel/sdk-vue", root: "packages/sdk-vue/" },
   { name: "@zitadel/sdk-angular", root: "packages/sdk-angular/" },
+  { name: "@zitadel/sdk-solid", root: "packages/sdk-solid/" },
+  { name: "@zitadel/sdk-svelte", root: "packages/sdk-svelte/" },
+  { name: "@zitadel/sdk-qwik", root: "packages/sdk-qwik/" },
 ];
 
 const publicPackageNames = publicPackages.map((pkg) => pkg.name);
@@ -136,8 +143,19 @@ export function isChangesetMarkdown(file) {
   return file.startsWith(".changeset/") && file.endsWith(".md") && file !== ".changeset/README.md";
 }
 
+export function isTestFile(file) {
+  // Test files never ship, so mirror the "tests skip" rule in
+  // `.changeset/README.md`: a test-only change under a publishable root does not
+  // require a changeset.
+  return (
+    /\.(test|spec)\.[cm]?[jt]sx?$/.test(file) ||
+    file.endsWith("_test.go") ||
+    /(^|\/)(tests?|__tests__)\//.test(file)
+  );
+}
+
 export function packageForFile(file) {
-  if (file.endsWith("/AGENTS.md")) {
+  if (file.endsWith("/AGENTS.md") || isTestFile(file)) {
     return undefined;
   }
   return publicPackages.find((pkg) => file.startsWith(pkg.root));
