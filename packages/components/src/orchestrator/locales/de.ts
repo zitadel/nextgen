@@ -153,7 +153,7 @@ export const de: Locale = {
   "sso.redirect.title": "Weiterleitung zum Anbieter…",
 
   // --- Passkey-Fehler ---
-  "error.passkey_cancelled": "Passkey-Einrichtung wurde abgebrochen",
+  "error.passkey_cancelled": "Passkey wurde abgebrochen. Bitte versuche es erneut.",
   "error.passkey_not_registered":
     "Dieser Passkey ist nicht registriert. Bitte melde dich mit E-Mail und Passwort an.",
   "error.passkey_setup_failed":

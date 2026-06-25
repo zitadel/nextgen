@@ -154,7 +154,7 @@ export const en: Record<string, string> = {
   "sso.redirect.title": "Redirecting to your provider…",
 
   // --- Passkey errors ---
-  "error.passkey_cancelled": "Passkey setup was cancelled",
+  "error.passkey_cancelled": "Passkey was cancelled. Please try again.",
   "error.passkey_not_registered":
     "This passkey is not registered. Please sign in with your email and password.",
   "error.passkey_setup_failed": "Passkey registration did not complete. Please try again.",

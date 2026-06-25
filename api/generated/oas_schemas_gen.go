@@ -3866,13 +3866,15 @@ func (s *FlowStepChallenge) SetOptions(val OptFlowStepChallengeOptions) {
 type FlowStepChallengeMethod string
 
 const (
-	FlowStepChallengeMethodPasskey FlowStepChallengeMethod = "passkey"
+	FlowStepChallengeMethodPasskey         FlowStepChallengeMethod = "passkey"
+	FlowStepChallengeMethodPasskeyRegister FlowStepChallengeMethod = "passkey_register"
 )
 
 // AllValues returns all FlowStepChallengeMethod values.
 func (FlowStepChallengeMethod) AllValues() []FlowStepChallengeMethod {
 	return []FlowStepChallengeMethod{
 		FlowStepChallengeMethodPasskey,
+		FlowStepChallengeMethodPasskeyRegister,
 	}
 }
 
@@ -3880,6 +3882,8 @@ func (FlowStepChallengeMethod) AllValues() []FlowStepChallengeMethod {
 func (s FlowStepChallengeMethod) MarshalText() ([]byte, error) {
 	switch s {
 	case FlowStepChallengeMethodPasskey:
+		return []byte(s), nil
+	case FlowStepChallengeMethodPasskeyRegister:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -3891,6 +3895,9 @@ func (s *FlowStepChallengeMethod) UnmarshalText(data []byte) error {
 	switch FlowStepChallengeMethod(data) {
 	case FlowStepChallengeMethodPasskey:
 		*s = FlowStepChallengeMethodPasskey
+		return nil
+	case FlowStepChallengeMethodPasskeyRegister:
+		*s = FlowStepChallengeMethodPasskeyRegister
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)

@@ -151,7 +151,7 @@ export const it: Locale = {
   "sso.redirect.title": "Reindirizzamento al provider…",
 
   // --- Errori passkey ---
-  "error.passkey_cancelled": "La configurazione della passkey è stata annullata",
+  "error.passkey_cancelled": "Passkey è stata annullata. Riprova.",
   "error.passkey_not_registered":
     "Questa passkey non è registrata. Accedi con e-mail e password.",
   "error.passkey_setup_failed":

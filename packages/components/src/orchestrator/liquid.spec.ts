@@ -175,7 +175,7 @@ describe("LiquidJS engine", () => {
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
     expect(result).toContain('<zl-alert severity="error"');
-    expect(result).toContain("Passkey setup was cancelled");
+    expect(result).toContain("Passkey was cancelled. Please try again.");
     expect(result).toContain('action="setup"');
     expect(result).not.toContain("invalid");
   });
