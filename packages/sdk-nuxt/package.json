@@ -33,7 +33,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts src/server.ts src/runtime/types.ts src/runtime/server/middleware.ts src/runtime/server/handler.ts --format esm --dts --clean --external '#imports' && tsup src/runtime/plugin.ts src/runtime/composables/useAuth.ts src/module.ts --format esm --no-clean --external @nuxt/kit --external '#imports'",
+    "build": "tsup src/index.ts src/server.ts src/runtime/types.ts src/runtime/server/middleware.ts src/runtime/server/handler.ts --format esm --dts --clean --external '#imports' && tsup src/runtime/plugin.ts src/runtime/composables/useAuth.ts src/runtime/components/ZitadelLogin.ts src/runtime/components/ZitadelLogout.ts src/module.ts --format esm --no-clean --external @nuxt/kit --external '#imports' --external vue",
     "dev": "tsup src/index.ts src/server.ts --format esm --dts --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
@@ -46,12 +46,14 @@
   },
   "peerDependencies": {
     "h3": ">=1",
-    "nuxt": ">=4"
+    "nuxt": ">=4",
+    "vue": ">=3"
   },
   "devDependencies": {
     "@eslint/js": "catalog:",
     "@eslint/json": "catalog:",
     "@eslint/markdown": "catalog:",
+    "vue": "^3.5.0",
     "@nuxt/eslint-plugin": "^0.7.0",
     "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
