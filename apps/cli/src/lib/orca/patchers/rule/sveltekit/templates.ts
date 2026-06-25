@@ -12,14 +12,20 @@ const WIDGET_WRAP =
  * proxies `/__nextgen/*` to the auth backend (attaching the project service-key
  * from `ZITADEL_PROJECT_SECRET`), verifies the session JWT, and redirects
  * unauthenticated requests away from protected routes. `url` and `projectSecret`
- * default from `process.env` (seeded in `.env.local`), so only the route policy
- * is spelled out here. The managed marker sits in a JS comment.
+ * are read from `$env/dynamic/private` and passed explicitly: SvelteKit does NOT
+ * expose `.env` values on `process.env` (it sandboxes private env behind the
+ * `$env` modules), so the SDK's `process.env` fallback would never see them and
+ * would silently default `url` to `http://localhost:8080`. The managed marker
+ * sits in a JS comment.
  */
 export function hooksServerTemplate(): string {
   return `${MANAGED_MARKER}
 import { createNextgenHandle } from "@zitadel/sdk-sveltekit/server";
+import { env } from "$env/dynamic/private";
 
 export const handle = createNextgenHandle({
+  url: env.ZITADEL_URL,
+  projectSecret: env.ZITADEL_PROJECT_SECRET,
   protectedRoutes: ["/profile"],
   loginPath: "/login",
 });
