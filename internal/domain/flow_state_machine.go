@@ -724,7 +724,7 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 		// fields (e.g. a passkey-upsell step), while the identifier/ email
 		// was collected on an earlier step.
 		var username string
-		if _, _, idValue, ok := findCollectedFieldByChallenge(resolved.Fields, state.CollectedData, FlowFieldChallengeIdentifier); ok {
+		if _, _, idValue, ok := findCollectedFieldByChallenge(resolved.Fields, state.CollectedData.UserData, FlowFieldChallengeIdentifier); ok {
 			username, _ = idValue.(string)
 		}
 		out, err := r.passkeyRegistration.IssuePasskeyRegistrationChallenge(ctx, FlowIssuePasskeyRegistrationChallengeInput{
