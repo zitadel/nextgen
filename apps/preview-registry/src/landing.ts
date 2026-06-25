@@ -50,21 +50,22 @@ const TARBALL_KEY_PATTERN = /^(@[^/]+\/[^/]+)\/-\/(.+)\.tgz$/;
  * anything else dropped into its storage root.
  */
 export const collectPackages = (blobs: readonly BlobEntry[]): readonly PackageRow[] => {
-  const rowsByName = blobs.reduce<ReadonlyMap<string, PackageRow>>((accumulator, blob) => {
+  // One mutable Map filled in a single linear pass — the first blob for a
+  // given package name wins. (Rebuilding a fresh Map per blob would be
+  // O(n²).) The Map is local; the returned array is a fresh value.
+  const rowsByName = new Map<string, PackageRow>();
+  for (const blob of blobs) {
     const match = blob.key.match(TARBALL_KEY_PATTERN);
-    if (!match) return accumulator;
+    if (!match) continue;
     const [, packageName, filename] = match;
-    if (!packageName || !filename) return accumulator;
-    if (accumulator.has(packageName)) return accumulator;
+    if (!packageName || !filename) continue;
+    if (rowsByName.has(packageName)) continue;
     const filenamePrefix = packageName.replace("@", "").replace("/", "-") + "-";
     const version = filename.startsWith(filenamePrefix)
       ? filename.slice(filenamePrefix.length)
       : "unknown";
-    return new Map([
-      ...accumulator,
-      [packageName, { name: packageName, version, sizeBytes: blob.size }],
-    ]);
-  }, new Map());
+    rowsByName.set(packageName, { name: packageName, version, sizeBytes: blob.size });
+  }
 
   return [...rowsByName.values()].sort((left, right) => left.name.localeCompare(right.name));
 };
