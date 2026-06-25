@@ -2,8 +2,8 @@
 
 A per-PR snapshot npm registry deployed to Vercel. On every push, the
 Vercel build packs each non-private package under `packages/`, stamps
-the version to `0.0.0-sha-<commit>`, rewrites `workspace:*` deps to that
-snapshot version, and bundles the tarballs into the serverless function
+the version to `0.0.0-sha-<commit>`, rewrites `workspace:` protocol deps
+to that snapshot version, and bundles the tarballs into the serverless function
 — no external storage and no GitHub secrets.
 
 The Hono app serves the npm registry protocol (packument, tarball,

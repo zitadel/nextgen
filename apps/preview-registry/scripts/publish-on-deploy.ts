@@ -7,7 +7,8 @@ import { renderLanding } from "../src/landing.js";
 
 /**
  * Dependency field names a workspace package may declare a sibling
- * package under. All of these get rewritten from `workspace:*` to the
+ * package under. Any `workspace:` protocol value in these fields (eg
+ * `workspace:*`, `workspace:^`, `workspace:~`) is rewritten to the
  * concrete snapshot version during the publish pass.
  */
 const DEPENDENCY_FIELDS = [
@@ -80,8 +81,9 @@ const listPackageDirectories = (): readonly string[] =>
 
 /**
  * Rewrite a single `package.json` in place: bump its version to the
- * deploy's snapshot version and replace every `workspace:*` style
- * dependency value with the same snapshot version.
+ * deploy's snapshot version and replace every `workspace:` protocol
+ * dependency value (`workspace:*`, `workspace:^`, `workspace:~`, …)
+ * with the same snapshot version.
  *
  * Returns a {@link StampedPackage} containing the file's original
  * content so {@link restoreOriginals} can put it back afterwards.
