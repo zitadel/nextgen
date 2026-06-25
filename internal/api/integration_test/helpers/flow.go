@@ -10,7 +10,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
-func (h *Harness) EnsureCreateUserHandler(t *testing.T) *service.FlowCreateUserHandler {
+func (h *Harness) EnsureCreateUserHandler(t *testing.T) *service.FlowCreateUserWithPasswordHandler {
 	t.Helper()
 	return service.NewFlowCreateUserHandler(
 		h.EnsureUserRepo(t),
@@ -18,6 +18,13 @@ func (h *Harness) EnsureCreateUserHandler(t *testing.T) *service.FlowCreateUserH
 		h.EnsureHasher(t),
 		h.EnsureUserService(t),
 		h.EnsureSchemaRepo(t),
+	)
+}
+
+func (h *Harness) EnsureFlowCreateUserForPasskeyHandler(t *testing.T) *service.FlowCreateUserForPasskeyHandler {
+	t.Helper()
+	return service.NewFlowCreateUserForPasskeyHandler(
+		h.EnsureUserRepo(t),
 	)
 }
 
@@ -46,7 +53,16 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 			idgen.NewULID(),
 		)
 		passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
-		h.FlowStateMachine = domain.NewFlowStateMachine(h.EnsureSchemaResolver(t), fields, h.EnsureCreateUserHandler(t), authAdapter, passkeyRegAdapter, time.Now)
+		h.FlowStateMachine = domain.NewFlowStateMachine(
+			h.EnsureSchemaResolver(t),
+			fields,
+			h.EnsureCreateUserHandler(t),
+			h.EnsureFlowCreateUserForPasskeyHandler(t),
+			authAdapter,
+			passkeyRegAdapter,
+			idgen.NewULID(),
+			time.Now,
+		)
 	}
 	return h.FlowStateMachine
 }

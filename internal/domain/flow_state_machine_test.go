@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/idgen/idgenmock"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"go.uber.org/mock/gomock"
 )
@@ -46,13 +47,15 @@ func findAction(actions []domain.FlowAction, name string) (domain.FlowAction, bo
 // registry + handlers + state machine, sharing the fakes the test
 // inspects after a run.
 type flowTestWorld struct {
-	mock               *gomock.Controller
-	hasher             *cryptomock.MockHasher
-	authAttemptService *domainmock.MockFlowAuthAttemptService
-	passkeyRegService  *domainmock.MockFlowPasskeyRegistrationService
-	schemaResolver     *domainmock.MockSchemaResolver
-	createUser         *domainmock.MockFlowOnSuccessHandler
-	sm                 *domain.FlowStateMachineRuntime
+	mock                 *gomock.Controller
+	hasher               *cryptomock.MockHasher
+	authAttemptService   *domainmock.MockFlowAuthAttemptService
+	passkeyRegService    *domainmock.MockFlowPasskeyRegistrationService
+	schemaResolver       *domainmock.MockSchemaResolver
+	createUser           *domainmock.MockFlowOnSuccessHandler
+	createUserForPasskey *domainmock.MockFlowPasskeyUserCreater
+	ids                  *idgenmock.MockGenerator
+	sm                   *domain.FlowStateMachineRuntime
 }
 
 func newFlowTestWorld(t *testing.T) *flowTestWorld {
@@ -69,6 +72,9 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 	authAttemptService := domainmock.NewMockFlowAuthAttemptService(mock)
 	passkeyRegService := domainmock.NewMockFlowPasskeyRegistrationService(mock)
 	createUser := domainmock.NewMockFlowOnSuccessHandler(mock)
+	createUserForPasskey := domainmock.NewMockFlowPasskeyUserCreater(mock)
+	ids := idgenmock.NewMockGenerator(mock)
+
 	resolver := domain.NewSchemaFieldResolver()
 
 	now := func() time.Time { return time.Unix(1700000000, 0).UTC() }
@@ -77,19 +83,23 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		schemaResolver,
 		resolver,
 		createUser,
+		createUserForPasskey,
 		authAttemptService,
 		passkeyRegService,
+		ids,
 		now,
 	)
 
 	return &flowTestWorld{
-		mock:               mock,
-		hasher:             hasher,
-		schemaResolver:     schemaResolver,
-		authAttemptService: authAttemptService,
-		passkeyRegService:  passkeyRegService,
-		createUser:         createUser,
-		sm:                 sm,
+		mock:                 mock,
+		hasher:               hasher,
+		schemaResolver:       schemaResolver,
+		authAttemptService:   authAttemptService,
+		passkeyRegService:    passkeyRegService,
+		createUser:           createUser,
+		createUserForPasskey: createUserForPasskey,
+		ids:                  ids,
+		sm:                   sm,
 	}
 }
 
@@ -1794,6 +1804,10 @@ func TestFlowStateMachine_Process_PasskeyRegisterIssueThenVerify(t *testing.T) {
 	def := passkeyRegisterDefinition()
 
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	w.ids.EXPECT().New(gomock.Any()).Return(userID, nil)
+	w.createUserForPasskey.EXPECT().
+		CreateProvisionalUser(gomock.Any(), gomock.Any(), userID, gomock.Any(), gomock.Any()).
+		Times(1)
 	w.passkeyRegService.EXPECT().
 		IssuePasskeyRegistrationChallenge(gomock.Any(), gomock.Cond(func(in domain.FlowIssuePasskeyRegistrationChallengeInput) bool {
 			return assert.Equal(t, userID, in.UserID)
@@ -1917,6 +1931,7 @@ func TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID(t *testing.T) {
 	def := passkeyRegisterDefinition()
 
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	w.ids.EXPECT().New(gomock.Any()).Return(userID, nil)
 	// The provisional user ID should have been generated and passed to the service.
 	w.passkeyRegService.EXPECT().
 		IssuePasskeyRegistrationChallenge(gomock.Any(), gomock.Cond(func(in domain.FlowIssuePasskeyRegistrationChallengeInput) bool {

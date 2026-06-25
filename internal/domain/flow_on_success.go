@@ -2,9 +2,11 @@ package domain
 
 import (
 	"context"
+
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/flow_on_success.mock.go . FlowOnSuccessHandler
+//go:generate go tool mockgen -typed -package domainmock -destination ./mock/flow_on_success.mock.go . FlowOnSuccessHandler,FlowPasskeyUserCreater
 
 // FlowOnSuccessHandler is the contract every on_success mutation
 // satisfies. The state machine calls Handle after a step's fields
@@ -14,6 +16,10 @@ import (
 // in their own file (e.g. flow_on_success_create_user.go).
 type FlowOnSuccessHandler interface {
 	Handle(ctx context.Context, in FlowOnSuccessInput) (FlowOnSuccessResult, error)
+}
+
+type FlowPasskeyUserCreater interface {
+	CreateProvisionalUser(ctx context.Context, client database.QueryExecutor, userID string, state *FlowState, resolved FlowResolvedFields) error
 }
 
 // ManifestForOnSuccess returns the credential kinds a mutation establishes.

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -176,12 +177,14 @@ var (
 
 // FlowStateMachineRuntime is the production [FlowStateMachine].
 type FlowStateMachineRuntime struct {
-	schemas             SchemaResolver
-	fields              FlowFieldResolver
-	userCreater         FlowOnSuccessHandler
-	authAttempts        FlowAuthAttemptService
-	passkeyRegistration FlowPasskeyRegistrationService
-	now                 func() time.Time
+	schemas               SchemaResolver
+	fields                FlowFieldResolver
+	userCreater           FlowOnSuccessHandler
+	userForPasskeyCreater FlowPasskeyUserCreater
+	authAttempts          FlowAuthAttemptService
+	passkeyRegistration   FlowPasskeyRegistrationService
+	ids                   idgen.Generator
+	now                   func() time.Time
 }
 
 // NewFlowStateMachine wires the runtime. The now hook is injectable so
@@ -190,20 +193,24 @@ func NewFlowStateMachine(
 	schemas SchemaResolver,
 	fields FlowFieldResolver,
 	createUser FlowOnSuccessHandler,
+	userForPasskeyCreater FlowPasskeyUserCreater,
 	authAttempts FlowAuthAttemptService,
 	passkeyRegistration FlowPasskeyRegistrationService,
+	ids idgen.Generator,
 	now func() time.Time,
 ) *FlowStateMachineRuntime {
 	if now == nil {
 		now = time.Now
 	}
 	return &FlowStateMachineRuntime{
-		schemas:             schemas,
-		fields:              fields,
-		userCreater:         createUser,
-		authAttempts:        authAttempts,
-		passkeyRegistration: passkeyRegistration,
-		now:                 now,
+		schemas:               schemas,
+		fields:                fields,
+		userCreater:           createUser,
+		userForPasskeyCreater: userForPasskeyCreater,
+		authAttempts:          authAttempts,
+		passkeyRegistration:   passkeyRegistration,
+		ids:                   ids,
+		now:                   now,
 	}
 }
 
@@ -307,10 +314,8 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	prefillFromCollected(&resolved, state.CollectedData.UserData)
 
 	if validationErr := r.fields.Validate(resolved, in.Fields); validationErr != nil {
-		var errs FlowFieldValidationErrors
-		if asValidationErrors(validationErr, &errs) {
-			msg := errs.Error()
-			step := r.buildStep(currentStep, resolved, &msg, nil, nil)
+		if errs, ok := errors.AsType[FlowFieldValidationErrors](validationErr); ok {
+			step := r.buildStep(currentStep, resolved, new(errs.Error()), nil, nil)
 			state.IssuedAt = r.now()
 			return FlowStepResult{State: state, Step: step}, nil
 		}
@@ -622,10 +627,9 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 			provisional := state.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey
 			if provisional {
 				state.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey = false
-				// TODO HANDLE PROVISIONAL
-				//if err := r.createUser.HandleProvisional(ctx, client, userID, state, resolved); err != nil {
-				//	return passkeyPhaseResult{}, fmt.Errorf("flow state machine: ensure user exists: %w", err)
-				//}
+				if err := r.userForPasskeyCreater.CreateProvisionalUser(ctx, client, userID, state, resolved); err != nil {
+					return passkeyPhaseResult{}, fmt.Errorf("flow state machine: ensure user exists: %w", err)
+				}
 			}
 			err := r.passkeyRegistration.SubmitPasskeyRegistration(ctx, client, FlowSubmitPasskeyRegistrationInput{
 				ProjectID:   state.ProjectID,
@@ -720,12 +724,12 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 		}
 		userID := state.CollectedData.UserID
 		if userID == "" {
-			// TODO HANDLE PROVISIONAL
-			//newID, err := r.createUser.GenerateUserID()
-			//if err != nil {
-			//	return passkeyPhaseResult{}, fmt.Errorf("flow state machine: generate user id: %w", err)
-			//}
-			//userID = newID
+			// TODO: only domain should generate user ids
+			newID, err := r.ids.New("user")
+			if err != nil {
+				return passkeyPhaseResult{}, fmt.Errorf("flow state machine: generate user id: %w", err)
+			}
+			userID = newID
 			state.CollectedData.UserID = userID
 			// Mark as provisional: user doesn't exist in the DB yet.
 			// The verify leg will call HandleProvisional + RegisterCreatedUser.
@@ -1065,12 +1069,4 @@ func mergeCollected(state *FlowState, fields map[string]any) error {
 		state.CollectedData.UserData[k] = v
 	}
 	return nil
-}
-
-func asValidationErrors(err error, out *FlowFieldValidationErrors) bool {
-	if errs, ok := err.(FlowFieldValidationErrors); ok {
-		*out = errs
-		return true
-	}
-	return false
 }

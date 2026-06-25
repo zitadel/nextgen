@@ -10,9 +10,9 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// FlowCreateUserHandler implements the `create_user` on_success:
+// FlowCreateUserWithPasswordHandler implements the `create_user` on_success:
 // persist a new user from validated identifier + password fields.
-type FlowCreateUserHandler struct {
+type FlowCreateUserWithPasswordHandler struct {
 	userRepo     domain.UserRepository
 	passwordRepo domain.UserPasswordRepository
 	hasher       crypto.Hasher
@@ -26,8 +26,8 @@ func NewFlowCreateUserHandler(
 	hasher crypto.Hasher,
 	userService *UserService,
 	schemaRepo domain.JSONSchemaRepository,
-) *FlowCreateUserHandler {
-	return &FlowCreateUserHandler{
+) *FlowCreateUserWithPasswordHandler {
+	return &FlowCreateUserWithPasswordHandler{
 		userService:  userService,
 		userRepo:     userRepo,
 		schemaRepo:   schemaRepo,
@@ -36,9 +36,9 @@ func NewFlowCreateUserHandler(
 	}
 }
 
-var _ domain.FlowOnSuccessHandler = (*FlowCreateUserHandler)(nil)
+var _ domain.FlowOnSuccessHandler = (*FlowCreateUserWithPasswordHandler)(nil)
 
-func (h *FlowCreateUserHandler) Handle(ctx context.Context, in domain.FlowOnSuccessInput) (domain.FlowOnSuccessResult, error) {
+func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domain.FlowOnSuccessInput) (domain.FlowOnSuccessResult, error) {
 	in.State.CollectedData.UserData["$schema"] = in.UserSchemaURL
 	createUserAction := NewCreateUserAction(
 		CreateUserInput{
