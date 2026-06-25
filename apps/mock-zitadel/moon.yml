@@ -21,13 +21,12 @@ tasks:
     deps:
       - "api-mock:build"
 
-  # The `typecheck` script bundles (tsdown) before `tsc` so it is
-  # self-contained on a clean checkout; it only needs @zitadel/api built
-  # first (for the workspace import that gets inlined).
+  # The `typecheck` script generates @zitadel/api first (its source is
+  # gitignored and produced by orval), so it is self-contained — it passes
+  # whether run via Moon or standalone (e.g. the Vercel "TypeCheck"
+  # deployment check, which runs the npm script in a sandbox without Moon).
   typecheck:
     command: "corepack pnpm run typecheck"
-    deps:
-      - "api-mock:build"
 
   test:
     command: "corepack pnpm run test"
