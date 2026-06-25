@@ -43,7 +43,6 @@ if (process.env.JOURNEY_ENABLE_PASSKEY !== "0") {
     await expectSessionCookie(page);
 
     await logout(page);
-    await enableVirtualAuthenticator(page);
     await loginWithPasskey(page, email);
     await expectSignedIn(page);
     await expectSessionCookie(page);
@@ -120,7 +119,39 @@ async function registerWithPasskey(page: Page, email: string): Promise<void> {
 async function loginWithPasskey(page: Page, email: string): Promise<void> {
   await gotoLogin(page);
   await fillEmail(page, email);
-  await clickAction(page, /sign in with.*passkey|passkey/i, ["passkey"]);
+
+  // On CI Linux Chromium, the virtual authenticator's credential lookup can
+  // fail after page navigations (logout → login), causing the WebAuthn
+  // ceremony to be cancelled. Retry the passkey button click if we see the
+  // "cancelled" error alert on the page.
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    await clickAction(page, /sign in with.*passkey|passkey/i, ["passkey"]);
+
+    // Wait briefly for either the profile redirect (success) or a cancelled
+    // error alert (failure). On success, break immediately.
+    const cancelledAlert = page.getByText(/passkey was cancelled/i);
+    const succeeded = await Promise.race([
+      page
+        .waitForURL(profileUrl, { timeout: 10_000 })
+        .then(() => true)
+        .catch(() => false),
+      cancelledAlert
+        .waitFor({ state: "visible", timeout: 10_000 })
+        .then(() => false)
+        .catch(() => false),
+    ]);
+
+    if (succeeded) return;
+
+    if (attempt < maxAttempts) {
+      console.warn(
+        `[journey] passkey login attempt ${attempt}/${maxAttempts} was cancelled, retrying…`,
+      );
+      // Small delay before retry to let the authenticator stabilize.
+      await page.waitForTimeout(1000);
+    }
+  }
 }
 
 async function skipPasskeyUpsellIfVisible(page: Page): Promise<void> {
@@ -166,18 +197,9 @@ async function expectSessionCookie(page: Page): Promise<void> {
   expect(sessionCookie?.httpOnly).toBe(true);
 }
 
-let virtualAuthenticatorAdded = false;
-
 async function enableVirtualAuthenticator(page: Page): Promise<void> {
   const client = await page.context().newCDPSession(page);
   await client.send("WebAuthn.enable");
-
-  if (virtualAuthenticatorAdded) {
-    // Authenticator already created — just refreshing the CDP session
-    // binding so credentials remain accessible after navigation.
-    return;
-  }
-
   await client.send("WebAuthn.addVirtualAuthenticator", {
     options: {
       protocol: "ctap2",
@@ -188,7 +210,6 @@ async function enableVirtualAuthenticator(page: Page): Promise<void> {
       automaticPresenceSimulation: true,
     },
   });
-  virtualAuthenticatorAdded = true;
 }
 
 async function logout(page: Page): Promise<void> {
