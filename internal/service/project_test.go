@@ -14,7 +14,6 @@ import (
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/dbmock"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 	"go.uber.org/mock/gomock"
 )
 
@@ -35,8 +34,8 @@ func TestProjectService_Create(t *testing.T) {
 			previewOrigins: nil,
 			setupStatements: func(_ *domain.Project) testAllStatements {
 				return testAllStatements{
-					createProject: func(_ *domain.Project) v2database.Execution {
-						return stubV2Execution{}
+					createProject: func(_ context.Context, _ *domain.Project) error {
+						return nil
 					},
 				}
 			},
@@ -70,9 +69,9 @@ func TestProjectService_Create(t *testing.T) {
 			previewOrigins: []string{"*.vercel.app", "*.netlify.app"},
 			setupStatements: func(_ *domain.Project) testAllStatements {
 				return testAllStatements{
-					createProject: func(project *domain.Project) v2database.Execution {
+					createProject: func(_ context.Context, project *domain.Project) error {
 						assert.Equal(t, []string{"*.vercel.app", "*.netlify.app"}, project.PreviewOrigins)
-						return stubV2Execution{}
+						return nil
 					},
 				}
 			},
@@ -106,8 +105,8 @@ func TestProjectService_Create(t *testing.T) {
 			previewOrigins: nil,
 			setupStatements: func(_ *domain.Project) testAllStatements {
 				return testAllStatements{
-					createProject: func(_ *domain.Project) v2database.Execution {
-						return stubV2Execution{err: errors.New("db error")}
+					createProject: func(_ context.Context, _ *domain.Project) error {
+						return errors.New("db error")
 					},
 				}
 			},
@@ -199,15 +198,13 @@ func TestProjectService_Get(t *testing.T) {
 			id:   "proj_aaa",
 			setupStatements: func(id string) testAllStatements {
 				return testAllStatements{
-					getProjectByID: func(gotID string) v2database.Query[domain.Project] {
+					getProjectByID: func(_ context.Context, gotID string) (*domain.Project, error) {
 						assert.Equal(t, id, gotID)
-						return stubV2Query[domain.Project]{
-							result: &domain.Project{
-								ID:        "proj_aaa",
-								CreatedAt: now,
-								UpdatedAt: now,
-							},
-						}
+						return &domain.Project{
+							ID:        "proj_aaa",
+							CreatedAt: now,
+							UpdatedAt: now,
+						}, nil
 					},
 				}
 			},
@@ -224,11 +221,9 @@ func TestProjectService_Get(t *testing.T) {
 			id:   "proj_missing",
 			setupStatements: func(id string) testAllStatements {
 				return testAllStatements{
-					getProjectByID: func(gotID string) v2database.Query[domain.Project] {
+					getProjectByID: func(_ context.Context, gotID string) (*domain.Project, error) {
 						assert.Equal(t, id, gotID)
-						return stubV2Query[domain.Project]{
-							err: database.NewNoRowFoundError(nil),
-						}
+						return nil, database.NewNoRowFoundError(nil)
 					},
 				}
 			},
