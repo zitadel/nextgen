@@ -18,5 +18,8 @@ export default defineConfig({
   format: ["esm"],
   platform: "node",
   dts: true,
-  noExternal: [/.*/],
+  // Bundle every dependency into the single self-contained output.
+  // `onlyBundle: false` silences tsdown's "consider deps.onlyBundle" hint —
+  // bundling everything is exactly the intent here.
+  deps: { alwaysBundle: [/.*/], onlyBundle: false },
 });
