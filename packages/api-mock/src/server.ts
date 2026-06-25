@@ -98,16 +98,19 @@ const idempotencyCache = new Map<string, IdempotencyCacheEntry>();
  * value regardless of which host a given request happens to arrive on.
  *
  * **State is not per-app.** The session store, consumed-handoff set, and
- * idempotency cache are module-scoped (see the top of this file), so two
- * apps built in the same process **share** that state — there is no
- * per-instance isolation. This is intentional for the single-app dev/
- * serverless use cases; tests that need isolation should run in separate
- * workers (as Vitest does) rather than creating multiple apps in one.
+ * idempotency cache are module-scoped (see the top of this file), and the
+ * branding overlay is likewise module-scoped — `applyBranding` mutates it
+ * during construction. So two apps built in the same process **share** all
+ * of that state; there is no per-instance isolation. This is intentional
+ * for the single-app dev/serverless use cases; tests that need isolation
+ * should run in separate workers (as Vitest does) rather than creating
+ * multiple apps in one.
  *
  * @param options.issuer - Absolute base URL this mock advertises as its
  *   OIDC issuer (`http://localhost:8080` locally, the preview domain on
- *   Vercel). Embedded in the discovery/JWKS documents and used as the
- *   expected issuer when verifying handoff tokens.
+ *   Vercel). Embedded in the discovery document and used as the expected
+ *   issuer when verifying handoff tokens (the JWKS responses carry only
+ *   the key, not the issuer).
  */
 export function createMockApp(options: { issuer: string }): express.Express {
   applyBranding(defaultDevBranding);
