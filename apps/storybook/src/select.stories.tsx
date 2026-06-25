@@ -62,8 +62,10 @@ const reactSelect = ({ label, placeholder, value, disabled, required, open }: Se
  * implementation (`<Select>`) shown side by side. Both consume the same shared
  * `.zr-select` surface CSS, so the two stories are the parity check.
  *
- * It's a select-only combobox: a trigger button opens a `role="listbox"` popup.
- * Each renderer is ONE controls-driven story; every state (selected value /
+ * The operable control is a real native `<select>` (the accessibility +
+ * automation surface); the styled trigger + popup are a pointer-only,
+ * `aria-hidden` visual layer over it. Each renderer is ONE controls-driven
+ * story; every state (selected value /
  * disabled / required / forced-open) is a knob — there are no per-state stories.
  * Clearing `label` falls back to an `aria-label` so the trigger stays accessible.
  */
@@ -140,12 +142,12 @@ export const Parity: Story = {
       ".zr-select__value",
       ".zr-select__listbox",
       ".zr-select__option",
-      '[role="option"][aria-selected="true"]',
+      ".zr-select__option[data-selected]",
     ]);
 
     // Guard the box-model divergence this gate was added to catch (40px rows).
     const optionHeight = (root: ParentNode) => {
-      const option = root.querySelector('[role="option"]');
+      const option = root.querySelector(".zr-select__option");
       if (!option) throw new Error("no option to measure");
       return option.getBoundingClientRect().height;
     };

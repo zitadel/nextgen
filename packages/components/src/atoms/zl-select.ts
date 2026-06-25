@@ -2,6 +2,7 @@ import { LitElement, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { ifDefined } from "lit/directives/if-defined.js";
+import { live } from "lit/directives/live.js";
 
 import selectHost from "@zitadel/shared-component-styles/lit/select-host.css?inline";
 import selectSurface from "@zitadel/shared-component-styles/select.css?inline";
@@ -24,20 +25,26 @@ export interface ZlSelectOption {
 export type ZlSelectChangeDetail = { name: string; value: string };
 
 /**
- * Atom: `<zl-select>` — a select-only combobox bound to a single choice.
+ * Atom: `<zl-select>` — a select bound to a single choice.
  *
  * Spec lineage (file `8UjCXw8yemgljmbkWGrSfE`, "Zitadel - Design System - External"):
  *   - trigger + open/selected matrix:  node `4397:4816` (Dropdown)
  *   - option (Items) state matrix:      node `4397:4098` (Input text)
  *
- * The trigger mirrors `<zl-field>`'s box; the popup is a `role="listbox"` whose
- * options paint the Figma hover / keyboard-active wash and the chosen row's
- * solid fill + check glyph. Follows the WAI-ARIA select-only combobox pattern:
- * focus stays on the trigger and `aria-activedescendant` tracks the active
- * option, so arrow keys move a virtual cursor without moving DOM focus.
+ * Agent-first contract (see `packages/components/AGENTS.md` → "Input atoms expose
+ * a real native control"): the operable, accessible, form-associated, and
+ * automatable control is a real native `<select>`. Screen readers, keyboard
+ * users, password managers, native form submission/validation, and automation
+ * drivers (Playwright `selectOption`, the chrome-devtools accessibility
+ * snapshot, the Codex in-app browser) all interact with that native element via
+ * the stable `data-testid="zitadel-select-${name}"`.
  *
- * Form participation: `<zl-select>` is a form-associated custom element; its
- * `value` is the selected option's value (empty string = nothing chosen).
+ * The Figma-styled trigger + popup (`.zr-select__trigger` / `.zr-select__listbox`)
+ * are a pointer-only **visual** layer: they are `aria-hidden` and never in the
+ * tab order, so they don't duplicate the native control in the accessibility
+ * tree. A mouse user sees the styled popup; everyone else (keyboard, AT, agents)
+ * uses the native `<select>` and its native popup. Both paths converge on
+ * `value`, emit `zl-change`, and mirror `internals.setFormValue()`.
  */
 @customElement("zl-select")
 export class ZlSelect extends LitElement {
@@ -96,9 +103,9 @@ export class ZlSelect extends LitElement {
   @property({ attribute: "aria-label" }) accessor ariaLabelText: string | undefined = undefined;
   @property({ attribute: "data-testid" }) accessor testId: string | undefined = undefined;
 
-  @state() private accessor activeIndex = -1;
+  @state() private accessor activeValue: string | null = null;
 
-  @query(".zr-select__trigger") private accessor triggerEl: HTMLButtonElement | null = null;
+  @query(".zr-select__native") private accessor nativeEl: HTMLSelectElement | null = null;
 
   private readonly baseId = nextUid("zl-select");
   private readonly internals: ElementInternals;
@@ -142,7 +149,7 @@ export class ZlSelect extends LitElement {
   }
 
   override focus(options?: FocusOptions): void {
-    this.triggerEl?.focus(options);
+    this.nativeEl?.focus(options);
   }
 
   /**
@@ -172,7 +179,6 @@ export class ZlSelect extends LitElement {
 
   override render() {
     const labelId = `${this.baseId}-label`;
-    const listboxId = `${this.baseId}-listbox`;
     const selected =
       this.value === "" ? undefined : this.options.find((option) => option.value === this.value);
     const rootClass = classMap({
@@ -185,24 +191,31 @@ export class ZlSelect extends LitElement {
       <div class=${rootClass} part="root">
         ${this.renderLabel(labelId)}
         <div class="zr-select__field" part="field">
-          <button
-            type="button"
-            class="zr-select__trigger"
-            part="trigger"
-            id=${`${this.baseId}-trigger`}
-            role="combobox"
-            aria-haspopup="listbox"
-            aria-expanded=${this.open ? "true" : "false"}
-            aria-controls=${listboxId}
+          <select
+            class="zr-select__native"
+            part="native"
+            id=${`${this.baseId}-native`}
+            data-testid=${ifDefined(this.nativeTestId())}
             aria-labelledby=${this.label ? labelId : nothing}
             aria-label=${ifDefined(this.label ? undefined : this.ariaLabelText)}
-            aria-activedescendant=${this.open && this.activeIndex >= 0
-              ? this.optionId(this.activeIndex)
-              : nothing}
-            data-testid=${ifDefined(this.triggerTestId())}
             ?disabled=${this.disabled}
+            ?required=${this.required}
+            @change=${this.handleNativeChange}
+          >
+            ${this.listOptions.map(
+              (option) =>
+                html`<option
+                  value=${option.value}
+                  ?disabled=${option.disabled ?? false}
+                  .selected=${live(option.value === this.value)}
+                >${option.label}</option>`,
+            )}
+          </select>
+          <div
+            class="zr-select__trigger"
+            part="trigger"
+            aria-hidden="true"
             @click=${this.handleTriggerClick}
-            @keydown=${this.handleTriggerKeyDown}
           >
             <span
               class=${classMap({
@@ -213,17 +226,9 @@ export class ZlSelect extends LitElement {
               ${selected ? selected.label : this.placeholder}
             </span>
             <zl-icon class="zr-select__icon" name="chevron-down" size="16" decorative></zl-icon>
-          </button>
-          <ul
-            class="zr-select__listbox"
-            part="listbox"
-            id=${listboxId}
-            role="listbox"
-            tabindex="-1"
-            aria-labelledby=${this.label ? labelId : nothing}
-            ?hidden=${!this.open}
-          >
-            ${this.listOptions.map((option, index) => this.renderOption(option, index))}
+          </div>
+          <ul class="zr-select__listbox" part="listbox" aria-hidden="true" ?hidden=${!this.open}>
+            ${this.listOptions.map((option) => this.renderOption(option))}
           </ul>
         </div>
       </div>
@@ -244,20 +249,18 @@ export class ZlSelect extends LitElement {
     `;
   }
 
-  private renderOption(option: ZlSelectOption, index: number) {
+  private renderOption(option: ZlSelectOption) {
     const isSelected = option.value === this.value;
     return html`
       <li
         class="zr-select__option"
         part="option"
-        id=${this.optionId(index)}
-        role="option"
-        aria-selected=${isSelected ? "true" : "false"}
-        aria-disabled=${option.disabled ? "true" : nothing}
-        data-active=${this.open && index === this.activeIndex ? "true" : nothing}
         data-value=${option.value}
-        @click=${() => this.handleOptionClick(index)}
-        @pointermove=${() => this.handleOptionPointerMove(index)}
+        data-selected=${isSelected ? "" : nothing}
+        data-active=${this.open && option.value === this.activeValue ? "" : nothing}
+        data-disabled=${option.disabled ? "" : nothing}
+        @click=${() => this.handleOptionClick(option)}
+        @pointermove=${() => this.handleOptionPointerMove(option)}
       >
         <span class="zr-select__option-label">${option.label}</span>
         <zl-icon class="zr-select__option-check" name="check" size="16" decorative></zl-icon>
@@ -265,13 +268,9 @@ export class ZlSelect extends LitElement {
     `;
   }
 
-  private optionId(index: number): string {
-    return `${this.baseId}-option-${index}`;
-  }
-
   private handleLabelClick = (): void => {
     if (!this.disabled) {
-      this.triggerEl?.focus();
+      this.nativeEl?.focus();
     }
   };
 
@@ -279,150 +278,54 @@ export class ZlSelect extends LitElement {
     if (this.disabled) {
       return;
     }
-    if (this.open) {
-      this.close();
-    } else {
-      this.openMenu();
-    }
+    this.open = !this.open;
   };
 
-  private handleTriggerKeyDown = (event: KeyboardEvent): void => {
-    if (this.disabled) {
-      return;
-    }
-    switch (event.key) {
-      case "ArrowDown":
-      case "ArrowUp":
-        event.preventDefault();
-        if (!this.open) {
-          this.openMenu();
-        } else {
-          this.moveActive(event.key === "ArrowDown" ? 1 : -1);
-        }
-        break;
-      case "Home":
-        if (this.open) {
-          event.preventDefault();
-          this.setActive(this.firstEnabledIndex());
-        }
-        break;
-      case "End":
-        if (this.open) {
-          event.preventDefault();
-          this.setActive(this.lastEnabledIndex());
-        }
-        break;
-      case "Enter":
-      case " ":
-        event.preventDefault();
-        if (this.open) {
-          this.commitActive();
-        } else {
-          this.openMenu();
-        }
-        break;
-      case "Escape":
-        if (this.open) {
-          event.preventDefault();
-          this.close();
-        }
-        break;
-      case "Tab":
-        if (this.open) {
-          this.close();
-        }
-        break;
-      default:
-        break;
-    }
+  /**
+   * The native `<select>` is the source of truth for keyboard, AT, and
+   * automation. Its `change` event covers native-popup selection as well as
+   * programmatic value-setting by automation drivers.
+   */
+  private handleNativeChange = (event: Event): void => {
+    const next = (event.target as HTMLSelectElement).value;
+    this.open = false;
+    this.commitValue(next);
   };
 
-  private handleOptionClick(index: number): void {
-    if (this.listOptions[index]?.disabled) {
+  private handleOptionClick(option: ZlSelectOption): void {
+    if (option.disabled) {
       return;
     }
-    this.setActive(index);
-    this.commitActive();
+    this.open = false;
+    this.nativeEl?.focus();
+    this.commitValue(option.value);
   }
 
-  private handleOptionPointerMove(index: number): void {
-    if (!this.listOptions[index]?.disabled && index !== this.activeIndex) {
-      this.activeIndex = index;
+  private handleOptionPointerMove(option: ZlSelectOption): void {
+    if (!option.disabled && option.value !== this.activeValue) {
+      this.activeValue = option.value;
     }
   }
 
   private handleDocumentPointerDown = (event: Event): void => {
     if (this.open && !event.composedPath().includes(this)) {
-      this.close();
+      this.open = false;
     }
   };
 
-  private openMenu(): void {
-    this.open = true;
-    const selectedIndex = this.listOptions.findIndex((option) => option.value === this.value);
-    this.activeIndex = selectedIndex >= 0 ? selectedIndex : this.firstEnabledIndex();
-  }
-
-  private close(): void {
-    if (!this.open) {
+  /**
+   * Apply a new value from any input path (native select, styled popup), keeping
+   * `value`, form state, and listeners in sync and emitting the `zl-change`
+   * contract plus a composed native `change` for host forms.
+   */
+  private commitValue(next: string): void {
+    if (next === this.value) {
       return;
     }
-    this.open = false;
-    this.activeIndex = -1;
-    this.triggerEl?.focus();
-  }
-
-  private commitActive(): void {
-    const option = this.listOptions[this.activeIndex];
-    if (!option || option.disabled) {
-      return;
-    }
-    const changed = option.value !== this.value;
-    this.value = option.value;
-    this.open = false;
-    this.activeIndex = -1;
-    this.triggerEl?.focus();
+    this.value = next;
     this.syncFormState();
-    if (changed) {
-      emit<ZlSelectChangeDetail>(this, "zl-change", { name: this.name, value: this.value });
-      this.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
-    }
-  }
-
-  private moveActive(delta: number): void {
-    const list = this.listOptions;
-    const count = list.length;
-    if (count === 0) {
-      return;
-    }
-    let next = this.activeIndex;
-    for (let step = 0; step < count; step += 1) {
-      next = (next + delta + count) % count;
-      if (!list[next]?.disabled) {
-        this.setActive(next);
-        return;
-      }
-    }
-  }
-
-  private setActive(index: number): void {
-    if (index >= 0 && index < this.listOptions.length) {
-      this.activeIndex = index;
-    }
-  }
-
-  private firstEnabledIndex(): number {
-    return this.listOptions.findIndex((option) => !option.disabled);
-  }
-
-  private lastEnabledIndex(): number {
-    const list = this.listOptions;
-    for (let index = list.length - 1; index >= 0; index -= 1) {
-      if (!list[index]?.disabled) {
-        return index;
-      }
-    }
-    return -1;
+    emit<ZlSelectChangeDetail>(this, "zl-change", { name: this.name, value: this.value });
+    this.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
   }
 
   private syncFormState(): void {
@@ -431,19 +334,19 @@ export class ZlSelect extends LitElement {
       this.internals.setValidity?.(
         { valueMissing: true },
         "Please select an item in the list.",
-        this.triggerEl ?? undefined,
+        this.nativeEl ?? undefined,
       );
     } else {
       this.internals.setValidity?.({});
     }
   }
 
-  private triggerTestId(): string | undefined {
+  private nativeTestId(): string | undefined {
     if (this.name) {
       return `zitadel-select-${this.name}`;
     }
     if (this.testId) {
-      return `${this.testId}-trigger`;
+      return `${this.testId}-native`;
     }
     return undefined;
   }
@@ -463,7 +366,7 @@ export const zlSelectManifest: AtomManifest = {
     "aria-label",
     "data-testid",
   ],
-  parts: ["root", "label", "field", "trigger", "listbox", "option"],
+  parts: ["root", "label", "field", "native", "trigger", "listbox", "option"],
   slots: [],
   events: ["zl-change"],
 } as const;
