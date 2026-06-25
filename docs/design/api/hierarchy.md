@@ -160,4 +160,3 @@ describing its scope.
 - [`resource-map.md`](resource-map.md) — the full endpoint surface
 - [`../platform/overview.md`](../platform/overview.md) — orthogonal axes (lifecycle / tier / environment / integration
   level)
-- [`../platform/project-team-modeling.md`](../platform/project-team-modeling.md) - how to model your project and teams for your use case
