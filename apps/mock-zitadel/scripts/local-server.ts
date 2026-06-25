@@ -1,4 +1,3 @@
-import { app } from "../src/app.js";
 import { DEFAULT_PORT, parsePort } from "../src/issuer.js";
 
 /**
@@ -8,10 +7,10 @@ import { DEFAULT_PORT, parsePort } from "../src/issuer.js";
  * to `http://localhost:<port>` when `VERCEL_URL` is unset — see
  * `src/app.ts`.
  */
-// Use the shared `parsePort` so the bind port matches the issuer exactly.
-// Unset/empty PORT falls back to DEFAULT_PORT; a *set but invalid* value
-// (non-numeric or out of range) is a mistake worth failing loudly on,
-// rather than silently binding 8080.
+// Validate PORT *before* importing the app. `parsePort` is shared with
+// resolveIssuer so the bind port matches the issuer exactly. Unset/empty
+// PORT falls back to DEFAULT_PORT; a *set but invalid* value (non-numeric
+// or out of range) fails loudly rather than silently binding 8080.
 const rawPort = process.env.PORT?.trim();
 const port = parsePort(rawPort);
 
@@ -21,6 +20,11 @@ if (rawPort && port === null) {
   );
   process.exit(1);
 }
+
+// Import the app only after PORT is known good, so an invalid config exits
+// before the app's module-level construction (keypair generation, handler
+// setup, branding) runs.
+const { app } = await import("../src/app.js");
 
 app.listen(port ?? DEFAULT_PORT, () => {
   console.log(`mock-zitadel on http://localhost:${port ?? DEFAULT_PORT}`);
