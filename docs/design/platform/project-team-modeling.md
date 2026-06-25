@@ -1,178 +1,349 @@
 # Project vs. Team Modeling Guide
 
-> See [Hierarchy](../api/hierarchy.md), [Glossary](../glossary.md),
-> and [ADR 024: User, Team, and Lifecycle Ownership](../../adrs/024-user-team-lifecycle-ownership.md).
+> **Status:** Draft guidance
+> **See also:** [Hierarchy](../api/hierarchy.md), [Glossary](../glossary.md),
+> [Claim Flow](claim-flow.md), and
+> [ADR 024: User, Team, and Lifecycle Ownership](../../adrs/024-user-team-lifecycle-ownership.md).
+>
+> **Scope:** This guide explains when to model something as a **Project** or
+> a **Team**. It does not define cross-project operator access, global human
+> identity, project grants, or consultant/staff collaboration across Projects.
+> Those topics are tracked in
+> [#333](https://github.com/zitadel/nextgen/issues/333).
 
-This document defines the decision heuristics and worked examples indicated in [Next-Generation Platform Architecture](https://github.com/zitadel/nextgen/issues/249) for choosing between a **Project** and a **Team** in the Zitadel next-generation architecture.
+Use this document when a real-world concept could be either a Project or a
+Team: a product, workspace, merchant, department, agency customer, or paying
+account.
 
-## 1. Core Distinctions at a Glance
+## The Short Rule
 
-| Entity | Primary Role                                                                                                                                                                               |
-| :--- |:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Project** | The identity/auth boundary.                                                                                                                                                                |
-| **Team** | A collaboration, data, and access boundary. Exists inside a project. Acts as a roster for user memberships.                                                                                |
-| **User** | An identity scoped to a single Project.                                                                                                                                                    |
-| **Environment** | A deployment/config variant of the same Project. Represents stages (`development`, `preview`, `production`) with different issuer/origin, runtime mode, preview URLs, and config overrides |
+Use a **Project** when you need a separate identity, authentication, or
+authorization boundary.
 
-Zitadel infrastructure runs in a reserved **Zitadel Platform Project**.
-In target architecture, claim attaches a **Customer Project** to a
-**Team in the Zitadel Platform Project**.
+Use a **Team** when you need a collaboration group, roster, or access boundary
+inside one Project.
 
-Refer to [Hierarchy](../api/hierarchy.md) and [Glossary](../glossary.md) for a more detailed explanation of the entities and their relationships.
+Use an **Environment** when the same Project runs in development, preview, or
+production with different config.
 
-### Quick Decision Rule
+In one sentence:
 
-- Use the **same Project** when dealing with the same identity/authorization universe running in another environment or under a different origin/issuer configuration.
-- Use a **separate Project** when a separate issuer/session/IdP/identity boundary (e.g., isolated lifecycle and policy accountability boundaries) is needed.
-- Use a **Team** when a collaboration/access boundary within one Project, allowing shared users to hold membership roles and team-scoped policy contexts is desired.
+> Project = identity/auth boundary. Team = collaboration/group boundary inside
+> that boundary. Environment = config/deployment variant of the same boundary.
 
----
+## Decision Table
 
-## 2. Decision Heuristics
+| Question | Model |
+|---|---|
+| Is this the same users, sessions, IdPs, apps, policies, and auth boundary running in dev, preview, or production? | Same **Project**, different **Environment**. |
+| Is this the same identity universe served from another issuer, origin, or custom domain? | Same **Project**, different Environment issuer/origin config. |
+| Do users need one credential and one profile across workspaces, merchants, departments, or other groups? | Same **Project**, multiple **Teams**. |
+| Does each entity need isolated users, sessions, IdPs, apps, grants, policies, or lifecycle/accountability state? | Separate **Projects**. |
+| Is this the account or workspace that owns Projects in this Zitadel deployment? | A **Team in the platform Project**. |
+| Is this a customer workspace, merchant, department, or collaboration group inside an application? | A **Team in the customer Project**. |
 
-To determine whether an entity should be modeled as a Project or a Team, consider the following heuristics:
+## Mental Model
 
-### Heuristic 1: Identity Sharing
+Every Zitadel deployment has a reserved **platform Project**. This is true for
+cloud and self-hosted deployments. The platform Project is what lets Zitadel
+create and attach ownership to customer Projects without introducing a separate
+organization resource.
 
-- **Rule**: If a human user must access multiple entities (e.g., workspaces, clients, merchants) using a single, unified
-  credential without registering multiple times, those entities **must live within the same Project**.
-- **Rationale**: User identities are scoped to a Project. An active session, credential, or profile cannot be shared
-  across Project boundaries without federation (Cross-project identity behavior is yet to be resolved in [#333](https://github.com/zitadel/nextgen/issues/333)).
+In this guide, "customer Project" means a non-platform Project owned by an
+account or workspace in the platform Project. It does not mean "cloud-only".
 
-### Heuristic 2: Boundary Isolation
+There is no separate "organization" resource in the next-generation model. The
+same Team resource appears in two common contexts:
 
-- **Rule**: Model a separate **Project** only when a separate issuer, session, IdP, identity, policy, or accountability boundary is required.
-- **Rationale**: A dedicated custom domain does *not* automatically mean a new Project is needed. Domain/origin values are simply Project configuration (see [environments config](./configuration-surface.md#environments)).
+- A **Team in the platform Project** represents an owning account or workspace
+  in this Zitadel deployment. In cloud that may be a customer account. In
+  self-hosted deployments it may be the operator's default team or another
+  account-like grouping. It can own customer Projects.
+- A **Team in a customer Project** represents a workspace, merchant, department,
+  or other customer-defined group inside that Project.
 
-### Heuristic 3: Environment vs. Project
+The context matters more than the word "Team".
 
-- **Rule**: If the entity is the same identity boundary deployed to different stages, keep one **Project** and configure environments (`development`, `preview`, `production`).
-- **Rationale**: Environments are deployment/config slots for one Project (see [environments config](./configuration-surface.md#environments)).
-  Split into multiple Projects only when the identity or accountability state must be isolated.
+Assigning ownership attaches a customer Project to a Team in the platform
+Project for accountability, recovery, governance, and, in cloud, billing. The
+CLI's `zitadel claim` flow is one way a newly created Project gets that owner.
+Ownership does **not** by itself define how every human in the platform Team can
+administer every owned Project. Cross-project operator access is still out of
+scope for this guide and belongs to [#333](https://github.com/zitadel/nextgen/issues/333).
 
-### Heuristic 4: Lifecycle and Autonomy
+## Definitions
 
-- **Rule**: Use a **Team** when the entity is a collaboration boundary where deletion should revoke access while preserving `self`-owned users. Use a **Project** when the entity is a fully autonomous boundary that should be retired end-to-end without impacting other projects.
-- **Rationale**: Teams are roster/collaboration boundaries where membership removals revoke team-scoped access;
-  Projects are top-level deployment boundaries.
+### Project
 
----
+A Project is the top-level identity/auth boundary. It contains users, teams,
+memberships, apps, IdPs, sessions, flows, policies, roles/grants, branding, and
+declared issuers for one identity space.
 
-## 3. Worked Examples
+Choose a separate Project when the boundary should be independently owned,
+isolated, configured, retired, audited, or recovered.
 
-> **Note on project-specific roles**:
-Specifics related to user access across Customer Projects are still not finalized and are not in scope for this document.
+### Team
 
+A Team groups users and resources inside a Project. It gives the Project a
+roster, membership roles, team-scoped policy context, and a boundary for
+collaboration or customer data.
 
-### Case 1: Acme Inc.
+Choose a Team when the users should remain in the same identity universe but
+need scoped access to a workspace, department, merchant, customer group, or
+account.
 
-- **Scenario**: Acme manages three distinct products: Acme CRM, Acme Analytics, and Acme AI. The Head of Engineering (Alice) manages all three; Bob manages only Acme AI. Products have separate staging/production setups.
-- **Ownership Context**: Acme exists as a **Team** inside the platform project (`Team: Acme Account`), holding billing and subscription state. Alice and Bob are **Users** in the platform project with memberships in this team.
-- **Acme's Products**: Acme CRM, Acme Analytics, and Acme AI each map to a distinct **Project**. Each Project uses fixed environments (`development`, `preview`, `production`) for deployment variants.
-- **Claim Relationship**: In the target architecture, these Projects are attached to `Team: Acme Account` via claim.
-- **Access Control**: Alice has owner roles across all Acme Projects. Bob is granted membership and roles solely on `Project: Acme AI`.
+### Environment
+
+An Environment is a config/deployment slot for the same Project. The fixed
+environment names are `development`, `preview`, and `production`.
+
+Environments can have different issuer/origin declarations, runtime mode,
+preview URLs, and config overrides. They do not create a separate identity
+boundary by themselves.
+
+### User
+
+A User is scoped to exactly one Project. A User may have zero, one, or many Team
+memberships inside that Project. A Team membership is not the same thing as
+identity lifecycle ownership; [ADR 024](../../adrs/024-user-team-lifecycle-ownership.md) defines that split.
+
+## Decision Rules
+
+### 1. Start with identity sharing
+
+If a human should access multiple entities with one credential, one session, and
+one profile, those entities need to live inside the same Project.
+
+Use Teams to separate their access inside that Project.
+
+If the same human should have separate credentials, sessions, policy state, or
+accountability in each entity, separate Projects may be correct. Cross-project
+identity linking is not decided yet; see [#333](https://github.com/zitadel/nextgen/issues/333).
+
+### 2. Do not split Projects for environments unless isolation is intentional
+
+Staging and production are usually Environments of the same Project.
+
+Split into separate Projects only when staging and production intentionally need
+isolation: separate users, credentials, sessions, IdPs, apps, roles, grants,
+policies, lifecycle, or accountability.
+
+Some customers may want completely separated environments. That is valid, but
+the reason is the desired isolation, not the fact that the environment is named
+staging or production.
+
+### 3. Treat domains as Environment config
+
+A custom domain, issuer, preview URL, or origin is config on an Environment.
+It is not a reason to create a new Project.
+
+If a customer wants a separate Project, the reason should be isolated users,
+credentials, sessions, IdPs, apps, roles, grants, policies, lifecycle, or
+accountability. The domain just points at that chosen boundary.
+
+### 4. Use Teams to group access inside one Project
+
+Teams are the right model when users need scoped access to a group inside one
+identity universe:
+
+- Slack workspaces
+- Shopify-style merchants in a shared consumer network
+- enterprise departments
+- customer workspaces in a B2B SaaS product
+- owning account/workspace groups in the platform Project
+
+### 5. Keep ownership separate from access control
+
+Ownership answers: "Which platform Team is accountable for this Project?"
+
+Access control answers: "Which principal can do which action in this Project?"
+
+Do not assume that a Team owning a Project automatically decides every human
+operator's admin rights. That is a separate authorization model.
+
+## Common Mistakes
+
+| Mistake | Better model |
+|---|---|
+| `Project: Acme AI Staging` and `Project: Acme AI Production` by default | `Project: Acme AI` with `development`, `preview`, and `production` Environments. |
+| `Project: acme.com` only because Acme has a custom domain | Same Project with Acme's issuer/origin configured. |
+| Treating a Team in the platform Project and a Team in a customer Project as different resource kinds | Same resource kind, different Project context. |
+| Assuming ownership defines all admin permissions across owned Projects | Ownership defines accountability. Cross-project access is separate and still tracked in [#333](https://github.com/zitadel/nextgen/issues/333). |
+| Treating Team membership as user lifecycle ownership | Membership controls participation/access. Lifecycle ownership is explicit policy from [ADR 024](../../adrs/024-user-team-lifecycle-ownership.md). |
+
+## Examples
+
+These examples show how to choose the model. They intentionally do not finalize
+cross-project operator access.
+
+### Case 1: Acme has multiple product streams
+
+Acme is one company with several product streams: CRM, Analytics, and AI.
+
+Decision question: are those product streams separate identity/auth boundaries,
+or are they product areas inside one shared identity universe?
+
+If each stream has independent users, apps, IdPs, policies, lifecycle, or
+accountability, use separate Projects owned by the same platform Team:
 
 ```text
 Project: Zitadel Platform
-  -> Users: Alice | Bob
   -> Team: Acme Account
-    -> Memberships: Alice (account_owner) | Bob (member)
-    -> claims -> Project: Acme CRM
+    -> owns -> Project: Acme CRM
                   -> Environments: development | preview | production
-    -> claims -> Project: Acme Analytics
+    -> owns -> Project: Acme Analytics
                   -> Environments: development | preview | production
-    -> claims -> Project: Acme AI
+    -> owns -> Project: Acme AI
                   -> Environments: development | preview | production
 ```
 
-### Case 2: B2B SaaS (e.g., Slack)
-
-- **Scenario**: Slack hosts Acme, Contoso, and Fabrikam workspaces. Consultant Sarah works for both Acme and Contoso with a single identity. Slack admins need global visibility.
-- **Ownership Context**: Slack is represented in the platform project as `Team: Slack Account` for centralized billing and lifecycle control.
-- **Customer Identity Boundary**: Slack runs its customer ecosystem as a single **Project** (`Project: Slack Workspaces`).
-- **Tenants and Apps**: Slack customer workspaces are modeled as **Teams** inside Slack's Project (`Team: Acme`, `Team: Contoso`). Slack's surfaces (Web, Mobile, Admin) are modeled as **Applications** inside the Project.
-- **Users and Roles**: Users in Slack's Project can hold memberships in multiple Teams (Sarah has memberships in both Acme and Contoso). Workspace admins have elevated roles in their respective Teams, while Slack operators have project-level admin roles in `Project: Slack Workspaces`.
+If Acme wants one shared customer or workforce identity across all streams,
+model the streams as Apps, app groups, or product areas inside one Project
+instead:
 
 ```text
 Project: Zitadel Platform
-  -> Users: Slack Staff
+  -> Team: Acme Account
+    -> owns -> Project: Acme Product Suite
+                  -> Apps: CRM | Analytics | AI
+                  -> Teams: Sales | Engineering | Finance
+                  -> Environments: development | preview | production
+```
+
+Alice managing all products and Bob managing only Acme AI is an access-control
+requirement. If the products are separate Projects, the cross-project admin
+mechanism is intentionally left to [#333](https://github.com/zitadel/nextgen/issues/333).
+
+### Case 2: B2B SaaS workspaces
+
+Decision question: should a consultant use one identity across multiple
+customer workspaces?
+
+For a Slack-style product, yes. Sarah should access Acme and Contoso with one
+identity, so the product's customer ecosystem is one Project. Customer
+workspaces are Teams inside that Project.
+
+```text
+Project: Zitadel Platform
   -> Team: Slack Account
-    -> Memberships: Slack Staff (account_owner)
-    -> claims -> Project: Slack Workspaces
-                  -> Users: Sarah
-                  -> Applications: Slack Web | Slack Mobile | Slack Admin
+    -> owns -> Project: Slack Workspaces
+                  -> Users: Sarah | Slack Staff
+                  -> Apps: Slack Web | Slack Mobile | Slack Admin
                   -> Teams: Acme | Contoso | Fabrikam
-                     -> Memberships: Sarah (member in Team: Acme)
-                     -> Memberships: Sarah (member in Team: Contoso)
+                     -> Memberships: Sarah in Acme
+                     -> Memberships: Sarah in Contoso
 ```
 
-### Case 3: B2B2C Platform (e.g., Shopify)
+Workspace admins are Team-scoped roles. Slack-wide admins are project-level
+roles inside `Project: Slack Workspaces`.
 
-- **Scenario**: Shopify hosts independent merchants Nike and Adidas. Emma shops from both. Tom manages the Nike store.
-- **Ownership Context**: Shopify is represented in the platform project as `Team: Shopify Account`.
+### Case 3: B2B2C merchant platform
 
-**Approach A: Shared Consumer Identity**
-The Shopify consumer ecosystem is one **Project** (`Project: Shopify Merchant Network`), claimed by `Team: Shopify Account`. Nike and Adidas are **Teams** inside that Project. Emma is a single **User** interacting with both Teams; Tom is a **User** with elevated roles in `Team: Nike`.
+Decision question: should consumers have one identity across merchants?
 
-**Approach B: Isolated Merchant Identity**
-If total identity isolation is required, Nike and Adidas are modeled as entirely separate **Projects** (`Project: Nike`, `Project: Adidas`), both claimed by `Team: Shopify Account` in the target architecture. Emma becomes two separate **Users** (Cross-project identity behavior is still under discussion in [#333](https://github.com/zitadel/nextgen/issues/333)).
+For a Shopify-style product, usually yes. If consumers should have one identity
+across merchants, use one Project and model merchants as Teams:
 
 ```text
-Approach A
 Project: Zitadel Platform
-  -> Users: Shopify Staff
   -> Team: Shopify Account
-    -> Memberships: Shopify Staff (account_owner)
-    -> claims -> Project: Shopify Merchant Network
-                  -> Users: Emma | Tom
+    -> owns -> Project: Shopify Merchant Network
+                  -> Users: Emma | Tom | Shopify Staff
+                  -> Apps: Storefront | Merchant Portal | Admin Console
                   -> Teams: Nike | Adidas
-                     -> Memberships: Tom (admin in Team: Nike)
+                     -> Memberships: Tom as admin in Nike
 ```
+
+Emma is one User in the Project and can interact with both merchants.
+
+If Nike and Adidas require total identity isolation, use separate Projects:
+
 ```text
-Approach B
 Project: Zitadel Platform
-  -> Users: Shopify Staff
   -> Team: Shopify Account
-    -> Memberships: Shopify Staff (account_owner)
-    -> claims -> Project: Nike
-                  -> Users: Tom | Emma
-    -> claims -> Project: Adidas
+    -> owns -> Project: Nike
+                  -> Users: Emma | Tom
+    -> owns -> Project: Adidas
                   -> Users: Emma
 ```
 
-### Case 4: Enterprise Workforce (e.g., Microsoft)
+In that isolated model, Emma is represented as two project-scoped Users.
+Whether those users can be linked into one global human identity is unresolved
+and belongs to [#333](https://github.com/zitadel/nextgen/issues/333).
 
-- **Scenario**: Microsoft manages access to M365, Azure, GitHub, and finance systems. John (Engineering) needs Azure/GitHub. Lisa (Finance) needs finance systems. Policies apply globally by default but can be overridden.
-- **Ownership Context**: Microsoft is represented in the platform project as `Team: Microsoft Account`.
-- **The Enterprise Boundary**: Microsoft workforce identity runs in one customer **Project** (`Project: Microsoft Workforce`), claimed by `Team: Microsoft Account` in target architecture.
-- **Departments and Integrations**: Departments are **Teams** (`Team: Engineering`, `Team: Finance`). The various services (M365, Azure, GitHub) are distinct **Applications** because they are integration boundaries with unique client configurations.
-- **Policies**: Central admins define global authentication policies on the Project. Teams override defaults with stricter team-level requirements if needed (for example, `Team: Finance` may configure stricter MFA).
+### Case 4: Enterprise workforce
+
+Decision question: is this one workforce identity system?
+
+For a Microsoft-style workforce setup, usually yes. The enterprise workforce
+belongs in one Project. Departments are Teams, and services are Apps.
 
 ```text
 Project: Zitadel Platform
-  -> Users: Microsoft IT
   -> Team: Microsoft Account
-    -> Memberships: Microsoft IT (account_owner)
-    -> claims -> Project: Microsoft Workforce
-                  -> Users: John | Lisa
-                  -> Applications: M365 | Azure | GitHub | Finance Systems
+    -> owns -> Project: Microsoft Workforce
+                  -> Users: John | Lisa | Microsoft IT
+                  -> Apps: M365 | Azure | GitHub | Finance Systems
                   -> Teams: Engineering | Finance
-                     -> Memberships: John (member in Team: Engineering)
-                     -> Memberships: Lisa (member in Team: Finance)
+                     -> Memberships: John in Engineering
+                     -> Memberships: Lisa in Finance
 ```
 
-### Case 5: Agency managing isolated customer projects (e.g., BuildStuff)
+Central IT administrators should be modeled as principals with project-level
+roles inside `Project: Microsoft Workforce`, unless a future cross-project
+operator model decides otherwise.
 
-- **Scenario**: BuildStuff is a dev agency administering identity for independent customers Acme, Contoso, and Fabrikam. Agency staff Chris and Jane need admin access across setups. Customer setups must remain isolated.
-- **Ownership Context**: BuildStuff is represented as `Team: BuildStuff Account` in the platform project. Agency staff are **Users** in the platform project with memberships in that Team.
-- **Customers**: Acme, Contoso, and Fabrikam are modeled as entirely separate **Projects** (`Project: Acme`, `Project: Contoso`), claimed by `Team: BuildStuff Account` in the target architecture.
+### Case 5: Agency managing isolated customer projects
+
+Decision question: do agency customers need hard isolation from each other?
+
+For an agency such as BuildStuff, yes. Acme, Contoso, and Fabrikam are
+independent customers with their own apps, users, policies, domains, and
+lifecycle. They should be separate Projects.
 
 ```text
 Project: Zitadel Platform
-  -> Users: Chris | Jane
   -> Team: BuildStuff Account
-    -> Memberships: Chris (account_owner) | Jane (member)
-    -> claims -> Project: Acme
-    -> claims -> Project: Contoso
-    -> claims -> Project: Fabrikam
+    -> owns -> Project: Acme
+    -> owns -> Project: Contoso
+    -> owns -> Project: Fabrikam
 ```
+
+This models ownership/accountability: BuildStuff's platform Team owns the
+customer Projects.
+
+It does not finalize how Chris and Jane administer all three Projects. Until the
+cross-project identity and collaboration ADR lands, that access must be modeled
+explicitly per Project or called out as TBD.
+
+## Out of Scope
+
+This guide does not define:
+
+- how one human identity is linked across multiple Projects
+- how platform Team members receive admin access across owned Projects
+- staff/support access to customer Projects
+- agency/consultant access delegation across isolated Projects
+- project transfer or Team merge semantics beyond Project ownership
+
+Those decisions belong to the cross-project identity and collaboration work in
+[#333](https://github.com/zitadel/nextgen/issues/333).
+
+## Summary
+
+When the model feels ambiguous, ask these questions in order:
+
+1. Do these entities share one identity/auth boundary?
+2. Do users need one credential and profile across them?
+3. Is the difference only environment, issuer, origin, or domain config?
+4. Is this a group that needs scoped access inside one Project?
+5. Is this a hard isolation/accountability boundary between Projects?
+
+The answers usually choose the resource:
+
+- Same identity boundary: one Project.
+- Scoped collaboration inside that boundary: Teams.
+- Dev/preview/prod variants: Environments.
+- Separate identity/accountability boundary: separate Projects.
+- Ownership of customer Projects by an account/workspace: attach them to a Team
+  in the platform Project.
