@@ -16,7 +16,15 @@ test("setup completed and installed local registry packages", async () => {
   const metadata = JSON.parse(await readFile(join(outputDir, "metadata.json"), "utf8"));
   expect(setup.data.framework).toBe(metadata.framework);
   const packageJson = JSON.parse(await readFile(join(appDir, "package.json"), "utf8"));
-  expect(packageJson.dependencies?.[metadata.sdkPackage]).toBeTruthy();
+  // The framework SDK must be declared, but the section depends on the
+  // framework's bundling model: most apps externalise runtime deps and list it
+  // under `dependencies`, whereas Qwik City's Vite config bundles its
+  // ecosystem packages and so requires them in `devDependencies`. Accept
+  // either — the contract is "declared as a dependency", not which section.
+  const sdkVersion =
+    packageJson.dependencies?.[metadata.sdkPackage] ??
+    packageJson.devDependencies?.[metadata.sdkPackage];
+  expect(sdkVersion).toBeTruthy();
 
   await expectLocalLockfileResolution({
     appDir,

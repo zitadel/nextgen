@@ -36,6 +36,14 @@ export interface QwikRequestEvent {
   send(response: Response): void;
   /** Returns a redirect marker to be thrown. */
   redirect(statusCode: number, url: string): unknown;
+  /**
+   * Qwik City's platform env getter. This is how server env reaches the
+   * handler: Vite/Qwik load `.env`/`.env.local` into `ev.env`, NOT into
+   * `process.env`, so `ZITADEL_URL` / `ZITADEL_PROJECT_SECRET` are read here
+   * (mirroring SvelteKit's `$env/dynamic/private`). Optional so unit-test mocks
+   * that exercise only the auth path need not stub it.
+   */
+  readonly env?: { get(key: string): string | undefined };
 }
 
 /** Parses a `Cookie` request header into a name→value map. */
@@ -296,7 +304,7 @@ export function createNextgenOnRequest(
   options: NextgenMiddlewareOptions & { projectSecret?: string } = {},
 ): (ev: QwikRequestEvent) => Promise<void> {
   const {
-    url = process.env.ZITADEL_URL ?? "http://localhost:8080",
+    url: urlOption,
     proxyPath = "/__nextgen",
     protectedRoutes = [],
     ignoredRoutes = [],
@@ -308,7 +316,7 @@ export function createNextgenOnRequest(
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
     opaqueTokenTimeoutMs = 5000,
-    projectSecret = process.env.ZITADEL_PROJECT_SECRET,
+    projectSecret: projectSecretOption,
   } = options;
 
   // Guard against open-redirect: loginPath must be a relative path.
@@ -322,6 +330,18 @@ export function createNextgenOnRequest(
 
   return async (ev: QwikRequestEvent): Promise<void> => {
     const { pathname } = ev.url;
+
+    // Resolve the backend URL and project secret per request. Precedence:
+    // explicit option > Qwik City's `ev.env` (which carries `.env.local`) >
+    // `process.env` (set in production adapters) > localhost default. Qwik does
+    // not surface `.env` files on `process.env`, so a factory-time read would
+    // miss them and the proxy would fall back to :8080 ("fetch failed").
+    const url =
+      urlOption ?? ev.env?.get("ZITADEL_URL") ?? process.env.ZITADEL_URL ?? "http://localhost:8080";
+    const projectSecret =
+      projectSecretOption ??
+      ev.env?.get("ZITADEL_PROJECT_SECRET") ??
+      process.env.ZITADEL_PROJECT_SECRET;
 
     if (matchesRoutes(pathname, ignoredRoutes)) {
       return;

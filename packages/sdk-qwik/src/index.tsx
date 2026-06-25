@@ -11,6 +11,7 @@ import type {
 
 import "@zitadel/components";
 import { component$, useSignal, useVisibleTask$, type QRL, type Signal } from "@builder.io/qwik";
+import { isBrowser } from "@builder.io/qwik/build";
 import {
   configureZitadel,
   getApi,
@@ -24,17 +25,36 @@ export type { ZitadelConfig, ZitadelProject };
 export * from "./types";
 
 /**
- * Passes the project config as a spread because `@zitadel/components`' Qwik JSX
- * types omit these property-only members. Qwik binds object and string values to
- * custom elements as DOM properties, so the handle (or the discrete project id /
- * proxy path) reaches the element intact. The widget uses whichever is present.
+ * Derives the widget's declarative `project-id` / `proxy-path` / `url`
+ * *attributes* from the SDK handle (or the discrete props), spread because
+ * `@zitadel/components`' Qwik JSX types omit these members.
+ *
+ * Attributes — not the `project` object property — are what make the widget
+ * survive Qwik's resumability. Qwik serialises attributes into the SSR'd HTML,
+ * so they are present the instant the custom element upgrades on the client and
+ * Lit reflects each one onto its `projectId` / `proxyPath` / `url` property. An
+ * object bound only as the `project` property, by contrast, is dropped on
+ * resume — Qwik does not re-apply object DOM properties to a plain custom
+ * element after hydration — which left the element unconfigured and the flow
+ * erroring with "requires a configured project". A `ZitadelProject` is just
+ * `{ projectId, proxyPath, url? }`, so the three attributes express it fully.
+ *
+ * The SDK handle is *additionally* bound as the `project` property (see the
+ * `ref` below); when present it wins by `resolveApi()` precedence, so the
+ * in-memory handle (and its shared API-client cache) is still used once the ref
+ * runs. The attributes are the resume-safe fallback that closes the timing gap.
+ * Undefined values are omitted so the widget keeps its own `proxy-path` default.
  */
-function projectProp(
+function projectAttrs(
   project: ZitadelProject | undefined,
   projectId: string | undefined,
   proxyPath: string | undefined,
-): Record<string, unknown> {
-  return { project, projectId, proxyPath };
+): Record<string, string | undefined> {
+  return {
+    "project-id": project?.projectId ?? projectId,
+    "proxy-path": project?.proxyPath ?? proxyPath,
+    url: project?.url,
+  };
 }
 
 function eventDetail<T>(event: Event): T {
@@ -108,11 +128,19 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
     <zitadel-login
       ref={(el) => {
         host.value = el;
+        // Bind the SDK handle as the `project` property too: when the ref runs
+        // before the deferred `startFlow()`, the in-memory handle wins by
+        // precedence; the `project-id` attribute below is the resume-safe path.
+        // Guard to the browser — Qwik also runs `ref` during SSR, where `el` is
+        // a non-extensible virtual node and assigning to it throws.
+        if (isBrowser && props.project) {
+          el.project = props.project;
+        }
         if (props.ref) {
           props.ref.value = el;
         }
       }}
-      {...projectProp(props.project, props.projectId, props.proxyPath)}
+      {...projectAttrs(props.project, props.projectId, props.proxyPath)}
       purpose={props.purpose ?? "login"}
       post-sign-in-url={props.postSignInUrl}
     />
@@ -163,11 +191,17 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
     <zitadel-logout
       ref={(el) => {
         host.value = el;
+        // See ZitadelLogin: bind the handle as `project` for precedence, while
+        // the `project-id` attribute below survives Qwik's resume. Browser-only
+        // — `ref` also runs during SSR, where `el` is non-extensible.
+        if (isBrowser && props.project) {
+          el.project = props.project;
+        }
         if (props.ref) {
           props.ref.value = el;
         }
       }}
-      {...projectProp(props.project, props.projectId, props.proxyPath)}
+      {...projectAttrs(props.project, props.projectId, props.proxyPath)}
       post-sign-out-url={props.postSignOutUrl}
     />
   );

@@ -12,9 +12,9 @@ const WIDGET_WRAP =
  * `createNextgenOnRequest` proxies `/__nextgen/*` to the auth backend (attaching
  * the project service-key from `ZITADEL_PROJECT_SECRET`), verifies the session
  * JWT, and redirects unauthenticated requests away from protected routes. `url`
- * and `projectSecret` default from `process.env` (seeded in `.env.local`), so
- * only the route policy is spelled out here. The managed marker sits in a JS
- * comment.
+ * and `projectSecret` are read per request from Qwik City's `ev.env` (which
+ * carries `.env.local`), so only the route policy is spelled out here. The
+ * managed marker sits in a JS comment.
  */
 export function pluginTemplate(): string {
   return `${MANAGED_MARKER}
