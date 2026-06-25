@@ -66,6 +66,7 @@ export default class Start extends BaseCommand {
       envImage: this.meta.env.ZITADEL_LOCAL_IMAGE,
     });
     assertRuntimeFlags(runtimeBackend, flags.image);
+    this.recordTelemetry({ runtime: runtimeBackend });
     const image =
       flags.image ??
       this.meta.env.ZITADEL_LOCAL_IMAGE ??

@@ -104,6 +104,13 @@ export default class Doctor extends BaseCommand {
     const failed = checks.filter((check) => check.status === "fail");
     const warnings = checks.filter((check) => check.status === "warn");
     const warningAdvice = advisoryForWarnings(warnings, this.meta.cliVersion);
+    this.recordTelemetry({
+      runtime: runtimeBackend,
+      checks_total: checks.length,
+      checks_failed: failed.length,
+      checks_warn: warnings.length,
+      failed_checks: failed.length > 0 ? failed.map((check) => check.name).join(",") : undefined,
+    });
     const data = {
       title:
         failed.length > 0
