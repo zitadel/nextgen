@@ -726,9 +726,9 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 		var username string
 		visited, err := r.resolveVisitedFields(ctx, client, state.ProjectID, userSchemaURL, def, state, step)
 		if err == nil && len(visited.Fields) > 0 {
-			username = findCollectedEmailField(visited.Fields, state.CollectedData)
+			username = findCollectedEmailField(visited.Fields, state.CollectedData.UserData)
 			if username == "" {
-				if _, _, idValue, ok := findCollectedFieldByChallenge(visited.Fields, state.CollectedData, FlowFieldChallengeIdentifier); ok {
+				if _, _, idValue, ok := findCollectedFieldByChallenge(visited.Fields, state.CollectedData.UserData, FlowFieldChallengeIdentifier); ok {
 					username, _ = idValue.(string)
 				}
 			}
