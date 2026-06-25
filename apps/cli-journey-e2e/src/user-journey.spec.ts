@@ -1,5 +1,5 @@
 /* oxlint-disable playwright/expect-expect, playwright/no-conditional-in-test */
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type CDPSession, type Locator, type Page } from "@playwright/test";
 
 test.describe.configure({ mode: "serial" });
 test.setTimeout(60_000);
@@ -42,7 +42,12 @@ if (process.env.JOURNEY_ENABLE_PASSKEY !== "0") {
     await expectSignedIn(page);
     await expectSessionCookie(page);
 
+    // On CI Linux Chromium, the virtual authenticator's resident credentials
+    // are permanently lost after page navigation. Backup the credentials now
+    // (while the CDP session is valid) and restore them after logout.
+    await backupVirtualCredentials();
     await logout(page);
+    await restoreVirtualAuthenticator(page);
     await loginWithPasskey(page, email);
     await expectSignedIn(page);
     await expectSessionCookie(page);
@@ -119,39 +124,7 @@ async function registerWithPasskey(page: Page, email: string): Promise<void> {
 async function loginWithPasskey(page: Page, email: string): Promise<void> {
   await gotoLogin(page);
   await fillEmail(page, email);
-
-  // On CI Linux Chromium, the virtual authenticator's credential lookup can
-  // fail after page navigations (logout → login), causing the WebAuthn
-  // ceremony to be cancelled. Retry the passkey button click if we see the
-  // "cancelled" error alert on the page.
-  const maxAttempts = 3;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    await clickAction(page, /sign in with.*passkey|passkey/i, ["passkey"]);
-
-    // Wait briefly for either the profile redirect (success) or a cancelled
-    // error alert (failure). On success, break immediately.
-    const cancelledAlert = page.getByText(/passkey was cancelled/i);
-    const succeeded = await Promise.race([
-      page
-        .waitForURL(profileUrl, { timeout: 10_000 })
-        .then(() => true)
-        .catch(() => false),
-      cancelledAlert
-        .waitFor({ state: "visible", timeout: 10_000 })
-        .then(() => false)
-        .catch(() => false),
-    ]);
-
-    if (succeeded) return;
-
-    if (attempt < maxAttempts) {
-      console.warn(
-        `[journey] passkey login attempt ${attempt}/${maxAttempts} was cancelled, retrying…`,
-      );
-      // Small delay before retry to let the authenticator stabilize.
-      await page.waitForTimeout(1000);
-    }
-  }
+  await clickAction(page, /sign in with.*passkey|passkey/i, ["passkey"]);
 }
 
 async function skipPasskeyUpsellIfVisible(page: Page): Promise<void> {
@@ -197,19 +170,84 @@ async function expectSessionCookie(page: Page): Promise<void> {
   expect(sessionCookie?.httpOnly).toBe(true);
 }
 
+// ---------- Virtual Authenticator with Credential Backup/Restore ----------
+//
+// On CI Linux Chromium, the virtual authenticator's resident credentials are
+// permanently lost after page navigation. We work around this by:
+// 1. Creating the authenticator and storing its ID + CDP session
+// 2. After registration, backing up all credentials via WebAuthn.getCredentials
+// 3. After navigation (logout), creating a fresh authenticator and restoring
+//    the backed-up credentials via WebAuthn.addCredential
+
+let webauthnClient: CDPSession | null = null;
+let webauthnAuthenticatorId = "";
+let savedCredentials: Array<Record<string, unknown>> = [];
+
+const AUTHENTICATOR_OPTIONS = {
+  protocol: "ctap2" as const,
+  transport: "internal" as const,
+  hasResidentKey: true,
+  hasUserVerification: true,
+  isUserVerified: true,
+  automaticPresenceSimulation: true,
+};
+
 async function enableVirtualAuthenticator(page: Page): Promise<void> {
-  const client = await page.context().newCDPSession(page);
-  await client.send("WebAuthn.enable");
-  await client.send("WebAuthn.addVirtualAuthenticator", {
-    options: {
-      protocol: "ctap2",
-      transport: "internal",
-      hasResidentKey: true,
-      hasUserVerification: true,
-      isUserVerified: true,
-      automaticPresenceSimulation: true,
-    },
-  });
+  webauthnClient = await page.context().newCDPSession(page);
+  await webauthnClient.send("WebAuthn.enable");
+  const { authenticatorId } = (await webauthnClient.send(
+    "WebAuthn.addVirtualAuthenticator",
+    { options: AUTHENTICATOR_OPTIONS },
+  )) as { authenticatorId: string };
+  webauthnAuthenticatorId = authenticatorId;
+  savedCredentials = [];
+}
+
+/**
+ * Backup all credentials from the current virtual authenticator.
+ * Must be called BEFORE navigation that may lose them.
+ */
+async function backupVirtualCredentials(): Promise<void> {
+  if (!webauthnClient || !webauthnAuthenticatorId) return;
+  const { credentials } = (await webauthnClient.send(
+    "WebAuthn.getCredentials" as never,
+    { authenticatorId: webauthnAuthenticatorId },
+  )) as { credentials: Array<Record<string, unknown>> };
+  savedCredentials = credentials;
+}
+
+/**
+ * Create a fresh virtual authenticator on a new CDP session and restore
+ * previously backed-up credentials.
+ */
+async function restoreVirtualAuthenticator(page: Page): Promise<void> {
+  // Remove the old authenticator first — Chrome only allows one internal
+  // authenticator per environment.
+  if (webauthnClient && webauthnAuthenticatorId) {
+    try {
+      await webauthnClient.send("WebAuthn.removeVirtualAuthenticator" as never, {
+        authenticatorId: webauthnAuthenticatorId,
+      });
+    } catch {
+      // CDP session may be stale after navigation — that's fine, the
+      // authenticator may already be gone.
+    }
+  }
+
+  webauthnClient = await page.context().newCDPSession(page);
+  await webauthnClient.send("WebAuthn.enable");
+  const { authenticatorId } = (await webauthnClient.send(
+    "WebAuthn.addVirtualAuthenticator",
+    { options: AUTHENTICATOR_OPTIONS },
+  )) as { authenticatorId: string };
+  webauthnAuthenticatorId = authenticatorId;
+
+  for (const credential of savedCredentials) {
+    await webauthnClient.send("WebAuthn.addCredential" as never, {
+      authenticatorId: webauthnAuthenticatorId,
+      credential,
+    });
+  }
 }
 
 async function logout(page: Page): Promise<void> {
