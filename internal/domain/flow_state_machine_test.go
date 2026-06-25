@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/idgen/idgenmock"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"go.uber.org/mock/gomock"
 )
@@ -48,13 +47,11 @@ func findAction(actions []domain.FlowAction, name string) (domain.FlowAction, bo
 // inspects after a run.
 type flowTestWorld struct {
 	mock               *gomock.Controller
-	userRepo           *domainmock.MockUserRepository
-	passwordRepo       *domainmock.MockUserPasswordRepository
-	ids                *idgenmock.MockGenerator
 	hasher             *cryptomock.MockHasher
 	authAttemptService *domainmock.MockFlowAuthAttemptService
 	passkeyRegService  *domainmock.MockFlowPasskeyRegistrationService
 	schemaResolver     *domainmock.MockSchemaResolver
+	createUser         *domainmock.MockFlowOnSuccessHandler
 	sm                 *domain.FlowStateMachineRuntime
 }
 
@@ -62,39 +59,36 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 	t.Helper()
 	mock := gomock.NewController(t)
 
-	userRepo := domainmock.NewMockUserRepository(mock)
-	passwordRepo := domainmock.NewMockUserPasswordRepository(mock)
-	authAttemptService := domainmock.NewMockFlowAuthAttemptService(mock)
-	passkeyRegService := domainmock.NewMockFlowPasskeyRegistrationService(mock)
-	schemaResolver := domainmock.NewMockSchemaResolver(mock)
-
-	ids := idgenmock.NewMockGenerator(gomock.NewController(t))
-	ids.EXPECT().
-		New(gomock.Any()).
-		DoAndReturn(func(prefix string) (string, error) { return prefix + "_01TEST", nil }).
-		AnyTimes()
-
 	hasher := cryptomock.NewMockHasher(mock)
 	hasher.EXPECT().
 		Hash(gomock.Any()).
 		DoAndReturn(func(s string) (string, error) { return "hashed:" + s, nil }).
 		AnyTimes()
 
-	createUser := domain.NewFlowCreateUserHandler(ids, userRepo, passwordRepo, hasher)
+	schemaResolver := domainmock.NewMockSchemaResolver(mock)
+	authAttemptService := domainmock.NewMockFlowAuthAttemptService(mock)
+	passkeyRegService := domainmock.NewMockFlowPasskeyRegistrationService(mock)
+	createUser := domainmock.NewMockFlowOnSuccessHandler(mock)
 	resolver := domain.NewSchemaFieldResolver()
 
 	now := func() time.Time { return time.Unix(1700000000, 0).UTC() }
-	sm := domain.NewFlowStateMachine(schemaResolver, resolver, createUser, authAttemptService, passkeyRegService, now)
+
+	sm := domain.NewFlowStateMachine(
+		schemaResolver,
+		resolver,
+		createUser,
+		authAttemptService,
+		passkeyRegService,
+		now,
+	)
 
 	return &flowTestWorld{
 		mock:               mock,
-		userRepo:           userRepo,
-		passwordRepo:       passwordRepo,
-		ids:                ids,
 		hasher:             hasher,
+		schemaResolver:     schemaResolver,
 		authAttemptService: authAttemptService,
 		passkeyRegService:  passkeyRegService,
-		schemaResolver:     schemaResolver,
+		createUser:         createUser,
 		sm:                 sm,
 	}
 }
@@ -210,29 +204,25 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 	w := newFlowTestWorld(t)
 	def := signupDefinition()
 
-	const wantUserID = "user_01TEST"
+	const userID = "user_01TEST"
 	const handoffToken = "handoff_01TEST"
 	const email = "alice@example.com"
 	const password = "correct-horse-battery-staple"
 
-	w.userRepo.EXPECT().
-		Create(gomock.Any(), gomock.Any(), gomock.Cond(func(u *domain.CreateUser) bool {
-			return u.ID == wantUserID
-		})).
-		Times(1)
-	w.passwordRepo.EXPECT().
-		Set(gomock.Any(), gomock.Any(), gomock.Cond(func(u *domain.SetUserPassword) bool {
-			return u.EncodedHash == "hashed:correct-horse-battery-staple"
-		})).
-		Times(1)
 	w.schemaResolver.EXPECT().
 		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
+	w.createUser.EXPECT().
+		Handle(gomock.Any(), gomock.Cond(func(in domain.FlowOnSuccessInput) bool {
+			return in.State.CollectedData.UserData["email"] == email &&
+				in.State.CollectedData.AuthMethods.Password == password
+		})).
+		Return(domain.FlowOnSuccessResult{UserID: userID}, nil)
 	w.authAttemptService.EXPECT().
 		RegisterCreatedUser(gomock.Any(), gomock.Cond(func(in domain.FlowRegisterCreatedUserInput) bool {
-			return in.UserID == wantUserID
+			return in.UserID == userID
 		})).
 		Times(1)
 	w.authAttemptService.EXPECT().
@@ -278,7 +268,7 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 
 	// create_user pins the user ID and registers them on the attempt so the
 	// terminal step can issue a handoff token and auto-sign-in the new user.
-	assert.Equal(t, wantUserID, result.State.CollectedData.UserID)
+	assert.Equal(t, userID, result.State.CollectedData.UserID)
 	assert.Equal(t, handoffToken, result.HandoffToken)
 }
 
@@ -439,9 +429,6 @@ func TestFlowStateMachine_Process_FieldValidationErrorKeepsStep(t *testing.T) {
 		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
 		AnyTimes()
-	w.userRepo.EXPECT().
-		Create(gomock.Any(), gomock.Any(), gomock.Any()).
-		Times(0)
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 
 	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
@@ -475,12 +462,13 @@ func TestFlowStateMachine_Process_IntegrityOnMissingTargetStep(t *testing.T) {
 		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
 		AnyTimes()
-	w.userRepo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any())
-	w.passwordRepo.EXPECT().Set(gomock.Any(), gomock.Any(), gomock.Any())
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), gomock.Any()).
 		Return("", domain.ErrAuthAttemptProofRejected(nil))
+	w.createUser.EXPECT().
+		Handle(gomock.Any(), gomock.Any()).
+		Return(domain.FlowOnSuccessResult{UserID: "user-id1"}, nil)
 	w.authAttemptService.EXPECT().RegisterCreatedUser(gomock.Any(), gomock.Any())
 
 	def := signupDefinition()
@@ -513,12 +501,13 @@ func TestFlowStateMachine_Process_InvalidActionRejected(t *testing.T) {
 		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
 		AnyTimes()
-	w.userRepo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any())
-	w.passwordRepo.EXPECT().Set(gomock.Any(), gomock.Any(), gomock.Any())
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), gomock.Any()).
 		Return("", domain.ErrAuthAttemptProofRejected(nil))
+	w.createUser.EXPECT().
+		Handle(gomock.Any(), gomock.Any()).
+		Return(domain.FlowOnSuccessResult{UserID: "user-id1"}, nil)
 	w.authAttemptService.EXPECT().RegisterCreatedUser(gomock.Any(), gomock.Any())
 
 	def := signupDefinition()
@@ -1542,18 +1531,16 @@ func TestFlowDispatch_RegisterMultiStep_HappyPath(t *testing.T) {
 		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
 		AnyTimes()
-	w.userRepo.EXPECT().
-		Create(gomock.Any(), gomock.Any(), gomock.Cond(func(u *domain.CreateUser) bool {
-			attr := findAttribute(u.Attributes, "email")
-			return attr != nil && attr.Value == email
-		})).
-		Times(1)
-	w.passwordRepo.EXPECT().Set(gomock.Any(), gomock.Any(), gomock.Any())
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), gomock.Any()).
 		Return("", domain.ErrAuthAttemptProofRejected(nil)).
 		Times(1)
+	w.createUser.EXPECT().
+		Handle(gomock.Any(), gomock.Cond(func(in domain.FlowOnSuccessInput) bool {
+			return in.State.CollectedData.UserData["email"] == email
+		})).
+		Return(domain.FlowOnSuccessResult{UserID: "user-id1"}, nil)
 	w.authAttemptService.EXPECT().RegisterCreatedUser(gomock.Any(), gomock.Any())
 	w.authAttemptService.EXPECT().
 		Handoff(gomock.Any(), gomock.Any()).
@@ -1639,17 +1626,15 @@ func TestFlowDispatch_CombinedFlow_LoginUnknownEmail_FlipsAndCreates(t *testing.
 		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
 		AnyTimes()
-	w.userRepo.EXPECT().
-		Create(gomock.Any(), gomock.Any(), gomock.Cond(func(u *domain.CreateUser) bool {
-			attr := findAttribute(u.Attributes, "email")
-			return attr != nil && attr.Value == email
-		})).
-		Times(1)
-	w.passwordRepo.EXPECT().Set(gomock.Any(), gomock.Any(), gomock.Any())
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), gomock.Any()).
 		Return("", domain.ErrAuthAttemptProofRejected(nil))
+	w.createUser.EXPECT().
+		Handle(gomock.Any(), gomock.Cond(func(in domain.FlowOnSuccessInput) bool {
+			return in.State.CollectedData.UserData["email"] == email
+		})).
+		Return(domain.FlowOnSuccessResult{UserID: "user-id1"}, nil)
 	w.authAttemptService.EXPECT().RegisterCreatedUser(gomock.Any(), gomock.Any())
 	w.authAttemptService.EXPECT().
 		Handoff(gomock.Any(), gomock.Any()).
@@ -1817,7 +1802,6 @@ func TestFlowStateMachine_Process_PasskeyRegisterIssueThenVerify(t *testing.T) {
 			ChallengeID: challengeID,
 			Options:     []byte(registrationOpts),
 		}, nil)
-	w.userRepo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any())
 	w.passkeyRegService.EXPECT().
 		SubmitPasskeyRegistration(gomock.Any(), gomock.Any(), gomock.Cond(func(in domain.FlowSubmitPasskeyRegistrationInput) bool {
 			return assert.Equal(t, challengeID, in.ChallengeID) &&

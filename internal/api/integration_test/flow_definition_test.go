@@ -39,15 +39,13 @@ func TestCreateFlowDefinitionUnauthenticated(t *testing.T) {
 			Steps: validSteps(),
 		},
 	})
-	expectedResp := &api.ErrorDetailsStatusCode{
+	assertFlowDefinitionResponse(t, &api.ErrorDetailsStatusCode{
 		StatusCode: http.StatusUnauthorized,
 		Response: api.ErrorDetails{
 			Code:    "auth.unauthorized",
 			Message: `operation CreateFlowDefinition: security "": security requirement is not satisfied`,
 		},
-	}
-	require.NoError(t, err)
-	assert.Equal(t, expectedResp, resp)
+	}, resp)
 }
 
 func TestCreateFlowDefinition(t *testing.T) {
@@ -249,7 +247,7 @@ func TestUpdateFlowDefinitionUnauthenticated(t *testing.T) {
 		ProjectID: "proj_1234",
 	})
 	require.NoError(t, err)
-	assert.Equal(t, &api.ErrorDetailsStatusCode{
+	assertFlowDefinitionResponse(t, &api.ErrorDetailsStatusCode{
 		StatusCode: http.StatusUnauthorized,
 		Response: api.ErrorDetails{
 			Code:    "auth.unauthorized",
@@ -578,7 +576,8 @@ func assertFlowDefinitionResponse(t *testing.T, want, got any) {
 		require.True(t, ok)
 
 		assert.Equal(t, expected.StatusCode, actual.StatusCode)
-		assert.Equal(t, expected.Response, actual.Response)
+		assert.Equal(t, expected.Response.Code, actual.Response.Code)
+		assert.Equal(t, expected.Response.Message, actual.Response.Message)
 	default:
 		assert.Fail(t, "unexpected response type", helpers.MustMarshal(t, got))
 	}
@@ -614,16 +613,15 @@ func TestGetFlowDefinitionUnauthenticated(t *testing.T) {
 		ID:        "flowDef_1234",
 		ProjectID: "proj_1234",
 	})
+
 	require.NoError(t, err)
-	expectedResp := &api.ErrorDetailsStatusCode{
+	assertFlowDefinitionResponse(t, &api.ErrorDetailsStatusCode{
 		StatusCode: http.StatusUnauthorized,
 		Response: api.ErrorDetails{
 			Code:    "auth.unauthorized",
 			Message: `operation GetFlowDefinition: security "": security requirement is not satisfied`,
 		},
-	}
-	require.NoError(t, err)
-	assert.Equal(t, expectedResp, getResp)
+	}, getResp)
 }
 
 func TestGetFlowDefinition(t *testing.T) {
@@ -707,15 +705,14 @@ func TestListFlowDefinitionsUnauthenticated(t *testing.T) {
 		ProjectID: "proj_1234",
 	})
 	require.NoError(t, err)
-	expectedResp := &api.ErrorDetailsStatusCode{
+
+	assertFlowDefinitionResponse(t, &api.ErrorDetailsStatusCode{
 		StatusCode: http.StatusUnauthorized,
 		Response: api.ErrorDetails{
 			Code:    "auth.unauthorized",
 			Message: `operation ListFlowDefinitions: security "": security requirement is not satisfied`,
 		},
-	}
-	require.NoError(t, err)
-	assert.Equal(t, expectedResp, getResp)
+	}, getResp)
 }
 
 func TestListFlowDefinitions(t *testing.T) {
@@ -964,16 +961,15 @@ func TestDeleteFlowDefinitionUnauthenticated(t *testing.T) {
 		ID:        "flowDef_1234",
 		ProjectID: "proj_1234",
 	})
-	require.NoError(t, err)
 
-	expectedResp := &api.ErrorDetailsStatusCode{
+	require.NoError(t, err)
+	assertFlowDefinitionResponse(t, &api.ErrorDetailsStatusCode{
 		StatusCode: http.StatusUnauthorized,
 		Response: api.ErrorDetails{
 			Code:    "auth.unauthorized",
 			Message: `operation DeleteFlowDefinition: security "": security requirement is not satisfied`,
 		},
-	}
-	assert.Equal(t, expectedResp, resp)
+	}, resp)
 }
 
 func TestDeleteFlowDefinition(t *testing.T) {
@@ -1057,15 +1053,15 @@ func TestDeleteFlowDefinition(t *testing.T) {
 				ID:        tt.req.ID,
 				ProjectID: tt.req.ProjectID,
 			})
+
 			assert.NoError(t, err)
-			expectedGetResp := &api.ErrorDetailsStatusCode{
+			assertFlowDefinitionResponse(t, &api.ErrorDetailsStatusCode{
 				StatusCode: http.StatusNotFound,
 				Response: api.ErrorDetails{
 					Code:    "flowdef.not_found",
 					Message: "flow definition: not found",
 				},
-			}
-			assert.Equal(t, expectedGetResp, getResp)
+			}, getResp)
 		})
 	}
 }

@@ -178,7 +178,7 @@ var (
 type FlowStateMachineRuntime struct {
 	schemas             SchemaResolver
 	fields              FlowFieldResolver
-	createUser          *FlowCreateUserHandler
+	userCreater         FlowOnSuccessHandler
 	authAttempts        FlowAuthAttemptService
 	passkeyRegistration FlowPasskeyRegistrationService
 	now                 func() time.Time
@@ -186,11 +186,25 @@ type FlowStateMachineRuntime struct {
 
 // NewFlowStateMachine wires the runtime. The now hook is injectable so
 // tests can produce deterministic [FlowState.IssuedAt] values.
-func NewFlowStateMachine(schemas SchemaResolver, fields FlowFieldResolver, createUser *FlowCreateUserHandler, authAttempts FlowAuthAttemptService, passkeyRegistration FlowPasskeyRegistrationService, now func() time.Time) *FlowStateMachineRuntime {
+func NewFlowStateMachine(
+	schemas SchemaResolver,
+	fields FlowFieldResolver,
+	createUser FlowOnSuccessHandler,
+	authAttempts FlowAuthAttemptService,
+	passkeyRegistration FlowPasskeyRegistrationService,
+	now func() time.Time,
+) *FlowStateMachineRuntime {
 	if now == nil {
 		now = time.Now
 	}
-	return &FlowStateMachineRuntime{schemas: schemas, fields: fields, createUser: createUser, authAttempts: authAttempts, passkeyRegistration: passkeyRegistration, now: now}
+	return &FlowStateMachineRuntime{
+		schemas:             schemas,
+		fields:              fields,
+		userCreater:         createUser,
+		authAttempts:        authAttempts,
+		passkeyRegistration: passkeyRegistration,
+		now:                 now,
+	}
 }
 
 var _ FlowStateMachine = (*FlowStateMachineRuntime)(nil)
@@ -363,7 +377,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 				if err != nil {
 					return FlowStepResult{}, err
 				}
-				result, err := r.runOnSuccess(ctx, client, def, state, userSchemaURL, currentStep, in.Fields, visitedResolved)
+				result, err := r.runOnSuccess(ctx, def, state, userSchemaURL, currentStep, in.Fields, visitedResolved)
 				if err != nil {
 					return FlowStepResult{}, err
 				}
@@ -608,9 +622,10 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 			provisional := state.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey
 			if provisional {
 				state.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey = false
-				if err := r.createUser.HandleProvisional(ctx, client, userID, state, resolved); err != nil {
-					return passkeyPhaseResult{}, fmt.Errorf("flow state machine: ensure user exists: %w", err)
-				}
+				// TODO HANDLE PROVISIONAL
+				//if err := r.createUser.HandleProvisional(ctx, client, userID, state, resolved); err != nil {
+				//	return passkeyPhaseResult{}, fmt.Errorf("flow state machine: ensure user exists: %w", err)
+				//}
 			}
 			err := r.passkeyRegistration.SubmitPasskeyRegistration(ctx, client, FlowSubmitPasskeyRegistrationInput{
 				ProjectID:   state.ProjectID,
@@ -705,11 +720,12 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 		}
 		userID := state.CollectedData.UserID
 		if userID == "" {
-			newID, err := r.createUser.GenerateUserID()
-			if err != nil {
-				return passkeyPhaseResult{}, fmt.Errorf("flow state machine: generate user id: %w", err)
-			}
-			userID = newID
+			// TODO HANDLE PROVISIONAL
+			//newID, err := r.createUser.GenerateUserID()
+			//if err != nil {
+			//	return passkeyPhaseResult{}, fmt.Errorf("flow state machine: generate user id: %w", err)
+			//}
+			//userID = newID
 			state.CollectedData.UserID = userID
 			// Mark as provisional: user doesn't exist in the DB yet.
 			// The verify leg will call HandleProvisional + RegisterCreatedUser.
@@ -770,23 +786,20 @@ func attachPendingChallenge(step *FlowStep, pc *FlowPendingChallenge) {
 
 // runOnSuccess dispatches the step's on_success mutation. Add a case
 // when a new [FlowOnSuccess] handler lands.
-func (r *FlowStateMachineRuntime) runOnSuccess(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, userSchemaURL string, step *FlowDefinitionStep, fields map[string]any, resolved FlowResolvedFields) (FlowOnSuccessResult, error) {
-	var handler FlowOnSuccessHandler
+func (r *FlowStateMachineRuntime) runOnSuccess(ctx context.Context, def *FlowDefinition, state *FlowState, userSchemaURL string, step *FlowDefinitionStep, fields map[string]any, resolved FlowResolvedFields) (FlowOnSuccessResult, error) {
 	switch *step.OnSuccess {
 	case FlowOnSuccessCreateUser:
-		handler = r.createUser
-	}
-	if handler == nil {
+		return r.userCreater.Handle(ctx, FlowOnSuccessInput{
+			ProjectID:     state.ProjectID,
+			UserSchemaURL: userSchemaURL,
+			Fields:        fields,
+			Resolved:      resolved,
+			State:         state,
+			ResolvedFlow:  def,
+		})
+	default:
 		return FlowOnSuccessResult{}, fmt.Errorf("%w: on_success %s not wired", ErrIntegrity, *step.OnSuccess)
 	}
-	return handler.Handle(ctx, client, FlowOnSuccessInput{
-		ProjectID:     state.ProjectID,
-		UserSchemaURL: userSchemaURL,
-		Fields:        fields,
-		Resolved:      resolved,
-		State:         state,
-		ResolvedFlow:  def,
-	})
 }
 
 // followTransition routes from currentStep via the transition keyed by

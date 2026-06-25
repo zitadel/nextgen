@@ -10,13 +10,14 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
-func (h *Harness) EnsureCreateUserHandler(t *testing.T) *domain.FlowCreateUserHandler {
+func (h *Harness) EnsureCreateUserHandler(t *testing.T) *service.FlowCreateUserHandler {
 	t.Helper()
-	return domain.NewFlowCreateUserHandler(
-		idgen.NewULID(),
+	return service.NewFlowCreateUserHandler(
 		h.EnsureUserRepo(t),
 		h.EnsureUserPasswordRepo(t),
 		h.EnsureHasher(t),
+		h.EnsureUserService(t),
+		h.EnsureSchemaRepo(t),
 	)
 }
 
