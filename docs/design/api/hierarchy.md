@@ -4,17 +4,15 @@
 
 ## The three layers
 
-| Layer       | What it is                                                                                                                                                                                   |
-|-------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Project** | A tenant / deployment. Owns branding, IdPs, custom domain, feature flags, teams, users, apps, flows, sessions.                                                                               |
-| **Team**    | A tenant-grouping inside any project. Carries billing (in the platform project), acts as a B2B end-customer boundary (in a customer project), and owns team-scoped collaboration/data state. |
-| **User**    | An identity inside any project. Memberships attach users to teams; lifecycle ownership is explicit policy, not implied by containment.                                                       |
+| Layer | What it is |
+|---|---|
+| **Project** | A tenant / deployment. Owns branding, IdPs, custom domain, feature flags, teams, users, apps, flows, sessions. |
+| **Team** | A tenant-grouping inside any project. Carries billing (in the platform project), acts as a B2B end-customer boundary (in a customer project), and owns team-scoped collaboration/data state. |
+| **User** | An identity inside any project. Memberships attach users to teams; lifecycle ownership is explicit policy, not implied by containment. |
 
 ## Platform is a reserved project
 
-There is no separate "platform" resource kind. Zitadel's own control plane is just a **reserved project** inside the
-same model — the platform project. Its `project_id` is discoverable via the authenticated [`/capabilities`](conventions.md#capabilities) response under `defaults.project_id`. The SDK does not hardcode the value;
-it reads it on initialization.
+There is no separate "platform" resource kind. Zitadel's own control plane is just a **reserved project** inside the same model — the platform project. Its `project_id` is discoverable via the authenticated [`/capabilities`](conventions.md#capabilities) response under `defaults.project_id`. The SDK does not hardcode the value; it reads it on initialisation.
 
 This means:
 
@@ -23,25 +21,19 @@ This means:
 - A **B2B end-customer tenant** (what used to be called an "organization") is a team *in a customer project*.
 - **Claim** attaches a customer project to a team in the platform project via `team_id`.
 
-Same resources, different project context. The SDK talks to `/users`, `/teams`, `/team_memberships` at both scales — the
-scope comes from the `project_id` resolved by the resource-scope index (see [`url-architecture.md`](url-architecture.md)).
+Same resources, different project context. The SDK talks to `/users`, `/teams`, `/team_memberships` at both scales — the scope comes from the `project_id` resolved by the resource-scope index (see [`url-architecture.md`](url-architecture.md)).
 
 ## Self-hosted exposes the same API shape as cloud
 
-**LOCKED.** Self-hosted returns a singleton platform project and a singleton default team with the identical JSON schema
-the cloud version returns. The SDK does not branch on deployment mode — it blindly works against both.
+**LOCKED.** Self-hosted returns a singleton platform project and a singleton default team with the identical JSON schema the cloud version returns. The SDK does not branch on deployment mode — it blindly works against both.
 
-The self-hosted project ID is **discoverable via `/capabilities`**, never hardcoded. When self-hosted grows to multiple
-projects, restores from backup with a different `project_id`, or runs clustered, the SDK keeps working because it
-discovered its defaults from the server.
+The self-hosted project ID is **discoverable via `/capabilities`**, never hardcoded. When self-hosted grows to multiple projects, restores from backup with a different `project_id`, or runs clustered, the SDK keeps working because it discovered its defaults from the server.
 
 ## Concrete shapes
 
-**Degenerate case (solo developer, self-hosted):** one user + one team inside the singleton platform project. One
-customer project, maybe empty of teams.
+**Degenerate case (solo developer, self-hosted):** one user + one team inside the singleton platform project. One customer project, maybe empty of teams.
 
-**B2B SaaS case (cloud):** many users in the platform project, many teams (paying developer accounts), each owning many
-customer projects; each customer project contains many teams (their B2B tenants) with many users having N:N memberships.
+**B2B SaaS case (cloud):** many users in the platform project, many teams (paying developer accounts), each owning many customer projects; each customer project contains many teams (their B2B tenants) with many users having N:N memberships.
 
 ```mermaid
 graph TD
@@ -89,10 +81,10 @@ These are separate ideas:
 
 Every user has exactly one lifecycle owner:
 
-| Owner  | Default meaning                                                                                                                                                        |
-|--------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Owner | Default meaning |
+|---|---|
 | `self` | Self-serve/default signup. The user survives team deletion unless explicitly deleted. The product may still auto-create a personal team/workspace for team-context UX. |
-| `team` | Managed account. Team deletion or lifecycle-owner membership removal can deactivate the user according to policy.                                                      |
+| `team` | Managed account. Team deletion or lifecycle-owner membership removal can deactivate the user according to policy. |
 
 An auto-created personal team is a normal team resource. It gives a self-owned
 user a default workspace, but it does not own the user's lifecycle.
@@ -110,18 +102,18 @@ state.
 
 DB-facing lifecycle summary:
 
-| Operation         | Canonical effect                                                                                                                                                                                    |
-|-------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Delete team       | Deactivate/tombstone team, revoke team-scoped API keys, deactivate/remove memberships, preserve self-owned users, and deactivate users lifecycle-owned by that team according to policy.            |
-| Delete user       | Deactivate/tombstone user, revoke sessions/tokens/credentials, deactivate memberships, preserve teams/resources the user created or administered unless a resource-specific cleanup policy applies. |
-| Delete membership | Remove access to that team; only deprovision the user if that membership is the configured lifecycle-owner relationship and policy requires it.                                                     |
+| Operation | Canonical effect |
+|---|---|
+| Delete team | Deactivate/tombstone team, revoke team-scoped API keys, deactivate/remove memberships, preserve self-owned users, and deactivate users lifecycle-owned by that team according to policy. |
+| Delete user | Deactivate/tombstone user, revoke sessions/tokens/credentials, deactivate memberships, preserve teams/resources the user created or administered unless a resource-specific cleanup policy applies. |
+| Delete membership | Remove access to that team; only deprovision the user if that membership is the configured lifecycle-owner relationship and policy requires it. |
 
 Status is also separate:
 
-| Resource        | Example statuses                                      |
-|-----------------|-------------------------------------------------------|
-| User            | `active`, `suspended`, `deactivated`, `pending_purge` |
-| Team membership | `pending`, `active`, `inactive`, `removed`            |
+| Resource | Example statuses |
+|---|---|
+| User | `active`, `suspended`, `deactivated`, `pending_purge` |
+| Team membership | `pending`, `active`, `inactive`, `removed` |
 
 Transitional storage artifacts such as `users.team_id` or team-to-user
 `ON DELETE CASCADE` must not be read as canonical product semantics. Database
@@ -150,13 +142,11 @@ GET /me                    # the calling principal
 GET /me/memberships        # every team_membership the caller holds, across projects
 ```
 
-`/me` dispatches on credential type: a user token returns the user object; an `sk_*` token returns a synthetic principal
-describing its scope.
+`/me` dispatches on credential type: a user token returns the user object; an `sk_*` token returns a synthetic principal describing its scope.
 
 ## See also
 
 - [`../glossary.md`](../glossary.md) — canonical terms
 - [`url-architecture.md`](url-architecture.md) — flat-by-ID, resource-scope index, scope-bound DAL
 - [`resource-map.md`](resource-map.md) — the full endpoint surface
-- [`../platform/overview.md`](../platform/overview.md) — orthogonal axes (lifecycle / tier / environment / integration
-  level)
+- [`../platform/overview.md`](../platform/overview.md) — orthogonal axes (lifecycle / tier / environment / integration level)
