@@ -371,7 +371,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       window,
       "PublicKeyCredential",
     );
-    const create = vi.fn(() => new Promise<PublicKeyCredential>(() => {}));
+    const create = vi.fn(() => Promise.race<PublicKeyCredential>([]));
     let releaseSubmit: (() => void) | undefined;
 
     Object.defineProperty(window, "PublicKeyCredential", {
