@@ -6,7 +6,7 @@ import { parseLocalJourneyArgs } from "./run-options.mjs";
 
 test("local journey defaults to the full framework matrix", () => {
   assert.deepEqual(parseLocalJourneyArgs([]), {
-    concurrency: 5,
+    concurrency: 1,
     frameworkIds: ["next", "nuxt", "react", "vue", "angular", "solid", "svelte", "qwik"],
     image: "",
     keep: false,
@@ -41,7 +41,7 @@ test("local journey can select one framework and tune concurrency", () => {
 
 test("local journey can request the binary runtime explicitly", () => {
   assert.deepEqual(parseLocalJourneyArgs(["--runtime", "binary", "--framework", "next"]), {
-    concurrency: 5,
+    concurrency: 1,
     frameworkIds: ["next"],
     image: "",
     keep: false,
