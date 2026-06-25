@@ -14,11 +14,6 @@
       "const": "https://json-schema.org/draft/2020-12/schema",
       "description": "The JSON Schema version used for this schema."
     },
-    "x-password": {
-      "type": "boolean",
-      "default": false,
-      "description": "Whether this property carries the user's password proof."
-    },
     "x-verify": {
       "oneOf": [
         {
