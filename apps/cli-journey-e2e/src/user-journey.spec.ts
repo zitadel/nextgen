@@ -43,6 +43,7 @@ if (process.env.JOURNEY_ENABLE_PASSKEY !== "0") {
     await expectSessionCookie(page);
 
     await logout(page);
+    await enableVirtualAuthenticator(page);
     await loginWithPasskey(page, email);
     await expectSignedIn(page);
     await expectSessionCookie(page);
@@ -165,9 +166,18 @@ async function expectSessionCookie(page: Page): Promise<void> {
   expect(sessionCookie?.httpOnly).toBe(true);
 }
 
+let virtualAuthenticatorAdded = false;
+
 async function enableVirtualAuthenticator(page: Page): Promise<void> {
   const client = await page.context().newCDPSession(page);
   await client.send("WebAuthn.enable");
+
+  if (virtualAuthenticatorAdded) {
+    // Authenticator already created — just refreshing the CDP session
+    // binding so credentials remain accessible after navigation.
+    return;
+  }
+
   await client.send("WebAuthn.addVirtualAuthenticator", {
     options: {
       protocol: "ctap2",
@@ -178,6 +188,7 @@ async function enableVirtualAuthenticator(page: Page): Promise<void> {
       automaticPresenceSimulation: true,
     },
   });
+  virtualAuthenticatorAdded = true;
 }
 
 async function logout(page: Page): Promise<void> {
