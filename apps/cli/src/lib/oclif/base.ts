@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { Command, Flags } from "@oclif/core";
 import consola from "consola";
 
@@ -6,6 +8,15 @@ import { isObject } from "../json";
 import { resolveCwd } from "../paths";
 import { normalizePublicCliCommand, normalizePublicCliCommands } from "../public-cli";
 import { resolveServer } from "../server";
+import { type Properties, Telemetry, type TelemetryDeps } from "../telemetry";
+import {
+  CLI_COMMAND_COMPLETED,
+  CLI_COMMAND_FAILED,
+  CLI_COMMAND_STARTED,
+  commandEventProperties,
+  deviceProfileProperties,
+  FIRST_RUN_NOTICE,
+} from "./command-telemetry";
 import type {
   CommandResult,
   ErrorEnvelope,
@@ -41,10 +52,51 @@ export abstract class BaseCommand extends Command {
     "dry-run": Flags.boolean({ description: "Preview without mutating files or the platform." }),
     verbose: Flags.boolean({ description: "Verbose logging." }),
     debug: Flags.boolean({ description: "Debug logging." }),
+    telemetry: Flags.boolean({
+      default: true,
+      allowNo: true,
+      description: "Send anonymous usage analytics. Disable with --no-telemetry.",
+    }),
   };
 
   /** Resolved context for the current invocation; set by {@link toMeta}. */
   protected meta: GlobalOptions = this.fallbackMeta();
+
+  /**
+   * Anonymous usage analytics for this invocation, created once in
+   * {@link toMeta}. Subclasses add command-specific dimensions (framework,
+   * counts, `step`, …) via {@link recordTelemetry}; the base class
+   * fires the lifecycle events and flushes in {@link finally}.
+   */
+  protected telemetry?: Telemetry;
+
+  /**
+   * Per-command dimensions merged onto each lifecycle event emitted *after* they
+   * are recorded — typically `completed`/`failed`, since `started` fires from
+   * {@link openTelemetry} before a command body runs. Updated immutably via
+   * {@link recordTelemetry} — never mutated in place.
+   */
+  protected telemetryProps: Readonly<Properties> = Object.freeze({});
+
+  /** Correlates the started/completed pair; minted at instance construction. */
+  private readonly telemetryInvocationId = randomUUID();
+
+  /**
+   * Wall-clock start used to derive `duration_ms`. Captured at instance
+   * construction (before flag parsing and server resolution) so the duration
+   * covers the full invocation, even when telemetry is opened late from
+   * {@link catch} after an early failure.
+   */
+  private readonly telemetryStartedAt = Date.now();
+
+  /**
+   * Merge command-specific dimensions into {@link telemetryProps} immutably: a
+   * new frozen bag replaces the previous one, so no shared object is ever
+   * mutated. `step` advances by re-recording it at each milestone.
+   */
+  protected recordTelemetry(patch: Properties): void {
+    this.telemetryProps = Object.freeze({ ...this.telemetryProps, ...patch });
+  }
 
   /**
    * Builds {@link GlobalOptions} from parsed flags, resolving the server
@@ -96,7 +148,74 @@ export abstract class BaseCommand extends Command {
       env: process.env,
       isTTY,
     };
+    this.openTelemetry(typeof flags.telemetry === "boolean" ? flags.telemetry : undefined);
     return this.meta;
+  }
+
+  /**
+   * Create telemetry once per invocation and open the lifecycle (started event +
+   * anonymous profile + first-run notice), reading every dimension from the
+   * current {@link meta}. Guarded so a command that resolves meta more than once
+   * does not double-count. Also called from {@link catch} so a failure thrown
+   * before {@link toMeta} finished (e.g. server resolution, flag parsing) still
+   * records the run. Returns early for an inert (opted-out / no-token /
+   * test-runner) instance so a disabled run never builds the property bags —
+   * no timezone→country resolution or URL parsing for users who opted out. The
+   * anonymous device profile is install-level and stable, so it is written only
+   * on first run rather than paying a `people.set` request on every command.
+   */
+  /**
+   * Telemetry factory seam. Production returns the real {@link Telemetry.create};
+   * tests override it to inject a recording client and assert the lifecycle
+   * ordering and opt-out behaviour that the central Vitest consent guard would
+   * otherwise make untestable.
+   */
+  protected createTelemetry(deps: TelemetryDeps): Telemetry {
+    return Telemetry.create(deps);
+  }
+
+  private openTelemetry(flag: boolean | undefined): void {
+    if (this.telemetry) {
+      return;
+    }
+    this.telemetry = this.createTelemetry({ env: process.env, flag, debug: this.meta.debug });
+    if (!this.telemetry.enabled) {
+      return;
+    }
+    this.telemetry.track(
+      CLI_COMMAND_STARTED,
+      commandEventProperties(this.meta, this.telemetryInvocationId, this.telemetryProps),
+    );
+    if (this.telemetry.isFirstRun) {
+      this.telemetry.profile(deviceProfileProperties(this.meta, this.telemetry.distinctId), {
+        $ip: 0,
+      });
+      if (this.isInteractive()) {
+        process.stderr.write(`${FIRST_RUN_NOTICE}\n`);
+      }
+    }
+  }
+
+  /**
+   * Whether this invocation is an interactive human session, used to gate the
+   * one-time first-run notice. Derived from argv + `jsonEnabled()` + TTY rather
+   * than `meta.nonInteractive`, so it is correct even on the early-failure path
+   * where {@link catch} opens telemetry against a fallback meta that has not yet
+   * computed `nonInteractive` from the flags.
+   */
+  private isInteractive(): boolean {
+    if (this.meta.nonInteractive || this.jsonEnabled()) {
+      return false;
+    }
+    const argv = process.argv;
+    if (
+      argv.includes("--json") ||
+      argv.includes("--non-interactive") ||
+      argv.includes("-n")
+    ) {
+      return false;
+    }
+    return Boolean(process.stdout.isTTY && process.stdin.isTTY);
   }
 
   /**
@@ -106,6 +225,16 @@ export abstract class BaseCommand extends Command {
    */
   protected emit(result: CommandResult): JsonEnvelope {
     const normalized = normalizeCommandResult(result, this.meta);
+    if (this.telemetry?.enabled) {
+      this.telemetry.track(
+        CLI_COMMAND_COMPLETED,
+        commandEventProperties(this.meta, this.telemetryInvocationId, {
+          ...this.telemetryProps,
+          status: result.status,
+          duration_ms: Date.now() - this.telemetryStartedAt,
+        }),
+      );
+    }
     this.log(renderPretty(normalized, this.meta));
     return toEnvelope(normalized, this.meta);
   }
@@ -114,17 +243,56 @@ export abstract class BaseCommand extends Command {
    * Renders any thrown error as the failure envelope and exits with its code.
    * A flag-parse error fires before {@link toMeta} runs, so the local `meta`
    * here refreshes `command` from the now-resolved command id to keep the
-   * envelope's `command` field accurate.
+   * envelope's `command` field accurate. If that early failure left telemetry
+   * unopened, {@link openTelemetry} runs here so the failure is still recorded;
+   * the flag isn't parsed yet on that path, so `--no-telemetry` is honoured from
+   * argv.
    */
   protected override async catch(error: unknown): Promise<never> {
     const meta: GlobalOptions = { ...this.meta, command: this.id ?? this.meta.command };
     const zitadelError = toZitadelError(error);
+    this.meta = meta;
+    this.openTelemetry(process.argv.includes("--no-telemetry") ? false : undefined);
+    if (this.telemetry?.enabled) {
+      this.telemetry.track(
+        CLI_COMMAND_FAILED,
+        commandEventProperties(meta, this.telemetryInvocationId, {
+          ...this.telemetryProps,
+          status: "error",
+          reason: zitadelError.code,
+          exit_code: zitadelError.exitCode,
+          duration_ms: Date.now() - this.telemetryStartedAt,
+        }),
+      );
+    }
     if (this.jsonEnabled()) {
       this.logJson(toErrorEnvelope(zitadelError, meta));
     } else {
       this.logToStderr(renderError(zitadelError, meta));
     }
     return this.exit(zitadelError.exitCode);
+  }
+
+  /**
+   * oclif runs this after `run`/`catch` on every path. We flush pending
+   * telemetry so a short-lived CLI process does not exit before the lifecycle
+   * event is sent. The await is bounded by the flush budget, so a hung or
+   * firewalled network adds at most ~1s.
+   *
+   * `mixpanel@0.18` always uses keep-alive agents (hardcoded; not configurable)
+   * and exposes no request timeout or handle, so a completed *or* hung request
+   * leaves a socket that keeps Node's event loop open past the await. The
+   * failure path force-exits via oclif's `exit()`, but the success path would
+   * otherwise hang, so we arm an unref'd watchdog: it cannot keep the loop alive
+   * on a clean exit, but if a telemetry socket is still holding it open after
+   * the grace, it force-exits with the resolved code.
+   */
+  protected override async finally(error: Error | undefined): Promise<void> {
+    await this.telemetry?.shutdown(1000);
+    if (this.telemetry?.enabled) {
+      setTimeout(() => process.exit(process.exitCode ?? 0), 250).unref();
+    }
+    await super.finally(error);
   }
 
   /**
