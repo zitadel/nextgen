@@ -14,7 +14,7 @@ Vercel's serverless runtime:
 
 - [`src/app.ts`](src/app.ts) builds the Express app, pinning the OIDC
   issuer for the current environment (`resolveIssuer`).
-- [`api/index.ts`](api/index.ts) re-exports that app as the default
+- [`api/index.mjs`](api/index.mjs) re-exports that app as the default
   export. `@vercel/node` treats an Express instance as a `(req, res)`
   handler and invokes it directly — no adapter.
 - [`vercel.json`](vercel.json) disables framework detection
@@ -49,7 +49,7 @@ transpile a workspace TypeScript dependency at runtime — nor to resolve
 pnpm's symlinked `node_modules` layout from the function's location. So
 the `buildCommand` bundles the app with [`tsdown`](tsdown.config.ts)
 (`noExternal`) into a single self-contained `dist/app.mjs`, and
-[`api/index.ts`](api/index.ts) imports that bundle rather than the
+[`api/index.mjs`](api/index.mjs) imports that bundle rather than the
 workspace source. The bundle also inlines `@zitadel/api`'s compiled
 output, so the deployed entry has nothing left to resolve at runtime but
 Node built-ins. `src/app.ts` stays the source of truth — it is what
