@@ -6,7 +6,10 @@
     "rootDir": "src",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "preserve",
-    "jsxImportSource": "solid-js"
+    "jsxImportSource": "solid-js",
+    // tsup-preset-solid's d.ts step injects the (now-deprecated) `baseUrl`
+    // option; TS 6 errors on it unless deprecations are explicitly tolerated.
+    "ignoreDeprecations": "6.0"
   },
   "include": ["src"]
 }
