@@ -81,6 +81,22 @@ var userSchemaIDAndPassword = []byte(`{
   }
 }`)
 
+var userSchemaRequiredProps = []byte(`{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant.com/schemas/idpw-user.json",
+  "type": "object",
+  "required": ["email", "first_name", "last_name"],
+  "x-auth-methods": {
+    "password": { "enabled": true, "position": 0 }
+  },
+  "properties": {
+    "email":    { "type": "string", "format": "email", "x-unique": "team" },
+	"first_name": { "type": "string" },
+	"last_name": { "type": "string" },
+	"age": { "type": "integer" }
+  }
+}`)
+
 var tenantUserSchema = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "metaSchema": "https://nextgen.com/schemas/user-meta-schema.json",
@@ -1487,4 +1503,33 @@ func TestValidator_DeclaredBackKindRejected(t *testing.T) {
 	_, err := domain.ValidateFlowDefinition(schema, def)
 	require.Error(t, err)
 	assert.Contains(t, errorDetails(t, err), `action "back" has kind=back, which is engine-injected and cannot be declared`)
+}
+
+func TestValidator_MissingRequiredUserSchemaFields(t *testing.T) {
+	schema := mustSchema(t, userSchemaRequiredProps)
+	def := domain.FlowDefinition{
+		ProjectID: "p", Name: "f", SchemaVersion: "1",
+		UserSchema: "https://tenant.com/schemas/idpw-user.json",
+		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identifier"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "identifier", Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "profile"}},
+			},
+			{
+				Name: "profile", Fields: []domain.Field{"given_name", "family_name", "date_of_birth"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
+			},
+			{Name: "done", Complete: new(domain.FlowStepCompleteShow)},
+		},
+	}
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, domain.ErrFlowDefinitionInvalid(`required fields [first_name last_name] in user schema are missing in the flow definition steps`, nil))
 }
