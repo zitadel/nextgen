@@ -33,8 +33,9 @@ A flow definition is a directed graph. The engine derives step behavior from
 the properties present on the step — there is no step `type`:
 
 - A step with `fields` collects user input validated against the
-  `user_schema`. Schema annotations (`x-unique`, `x-password`,
-  `x-auth-methods`) drive implicit dispatch behavior at runtime.
+  `user_schema`. Schema annotations (`x-unique`, `x-auth-methods`)
+  and reserved credential field names (`x-auth-methods#<method>`)
+  drive implicit dispatch behavior at runtime.
 - A step with `actions` exposes user-selectable buttons. Two action names are
   engine-handled — `passkey` (login) and `passkey_register` (signup) — and
   trigger the two-phase WebAuthn ceremony.

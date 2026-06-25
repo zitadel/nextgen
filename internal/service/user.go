@@ -44,12 +44,12 @@ type GetMyUserInput struct {
 // ---- Implementation -------------------------------------------------------------
 
 type UserService struct {
-	pool         database.Pool
-	userRepo     domain.UserRepository
-	passwordRepo domain.UserPasswordRepository
-	schemaRepo   domain.JSONSchemaRepository
-	decrypter    crypto.Decrypter
-	hasher       crypto.Hasher
+	pool          database.Pool
+	userRepo      domain.UserRepository
+	passwordRepo  domain.UserPasswordRepository
+	schemaRepo    domain.JSONSchemaRepository
+	hasher        crypto.Hasher
+	tokenVerifier domain.TokenVerifier
 }
 
 func NewUserService(
@@ -57,16 +57,16 @@ func NewUserService(
 	userRepo domain.UserRepository,
 	passwordRepo domain.UserPasswordRepository,
 	schemaRepo domain.JSONSchemaRepository,
-	decrypter crypto.Decrypter,
 	hasher crypto.Hasher,
+	tokenVerifier domain.TokenVerifier,
 ) *UserService {
 	return &UserService{
-		pool:         pool,
-		userRepo:     userRepo,
-		passwordRepo: passwordRepo,
-		schemaRepo:   schemaRepo,
-		hasher:       hasher,
-		decrypter:    decrypter,
+		pool:          pool,
+		userRepo:      userRepo,
+		passwordRepo:  passwordRepo,
+		schemaRepo:    schemaRepo,
+		hasher:        hasher,
+		tokenVerifier: tokenVerifier,
 	}
 }
 
@@ -143,18 +143,15 @@ func (s *UserService) SetPassword(ctx context.Context, input SetPasswordInput) (
 }
 
 func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]byte, error) {
-	sessionToken, err := domain.DecryptSessionTokenString(input.SessionToken, s.decrypter)
+	sessionToken, err := domain.DecryptSessionTokenString(input.SessionToken, s.tokenVerifier)
 	if err != nil {
 		return nil, domain.ErrSessionTokenInvalid()
 	}
-	if time.Now().After(sessionToken.ExpiresAt) {
+	if sessionToken.ExpiresAt != nil && time.Now().After(*sessionToken.ExpiresAt) {
 		return nil, domain.ErrSessionTokenInvalid()
 	}
-	if sessionToken.UserID == nil {
-		return nil, domain.ErrUserNotFound()
-	}
 
-	user, err := s.userRepo.GetByID(ctx, s.pool, sessionToken.ProjectID, nil, *sessionToken.UserID)
+	user, err := s.userRepo.GetByID(ctx, s.pool, sessionToken.ProjectID, nil, sessionToken.UserID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrUserNotFound()
@@ -245,12 +242,7 @@ func (o *SetPasswordUserAction) Prepare(_ context.Context, _ database.QueryExecu
 }
 
 func (o *SetPasswordUserAction) Apply(ctx context.Context, db database.QueryExecutor) error {
-	err := o.passwordRepo.DeleteByUserID(ctx, db, o.ProjectID, o.UserID)
-	if err != nil {
-		return domain.ErrInternal(err).WithMessage("failed to remove old password from database")
-	}
-
-	err = o.passwordRepo.Create(ctx, db, &domain.CreateUserPassword{
+	err := o.passwordRepo.Set(ctx, db, &domain.SetUserPassword{
 		ProjectID:      o.ProjectID,
 		UserID:         o.UserID,
 		EncodedHash:    o.hash,
@@ -260,7 +252,7 @@ func (o *SetPasswordUserAction) Apply(ctx context.Context, db database.QueryExec
 		if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
 			return domain.ErrUserNotFound()
 		}
-		return domain.ErrInternal(err).WithMessage("failed to set initial password")
+		return domain.ErrInternal(err).WithMessage("failed to set password")
 	}
 	return nil
 }

@@ -10,6 +10,7 @@ import {
   appVueTemplate,
   authPluginTemplate,
   componentsPluginTemplate,
+  indexPageTemplate,
   loginPageTemplate,
   profilePageTemplate,
   registerPageTemplate,
@@ -37,6 +38,7 @@ export class NuxtPatcher extends AbstractRulePatcher {
       // app.vue/pages/plugins live under the Nuxt srcDir (`app/` on Nuxt 4, the
       // root on Nuxt 3); nuxt.config, env, and the dep stay at the project root.
       { kind: "write", path: src("app.vue"), contents: appVueTemplate() },
+      { kind: "write", path: src("pages/index.vue"), contents: indexPageTemplate() },
       { kind: "write", path: src("pages/login.vue"), contents: loginPageTemplate() },
       { kind: "write", path: src("pages/register.vue"), contents: registerPageTemplate() },
       { kind: "write", path: src("pages/profile.vue"), contents: profilePageTemplate() },
@@ -69,6 +71,7 @@ export class NuxtPatcher extends AbstractRulePatcher {
     const src = (rel: string) => join(view.framework.appDir, rel);
     return [
       src("app.vue"),
+      src("pages/index.vue"),
       src("pages/login.vue"),
       src("pages/register.vue"),
       src("pages/profile.vue"),
@@ -89,7 +92,7 @@ export class NuxtPatcher extends AbstractRulePatcher {
     return {
       title: "Nuxt integration",
       detail:
-        "Wrote login/register/profile pages + plugins and registered @zitadel/sdk-nuxt in nuxt.config.*.",
+        "Wrote landing/login/register/profile pages + plugins and registered @zitadel/sdk-nuxt in nuxt.config.*.",
     };
   }
 }

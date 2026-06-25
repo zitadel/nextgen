@@ -27,7 +27,7 @@ func (h *Harness) EnsureProjectService(t *testing.T) service.ProjectService {
 			h.EnsureProjectRepo(t),
 			h.EnsureSchemaRepo(t),
 			h.EnsureFlowDefinitionRepo(t),
-			h.EnsureSecretGenerator(t),
+			h.EnsureOpaqueTokenGenerator(t),
 			BuiltinSchemaBaseURL,
 			h.EnsureSchemaValidator(t),
 		)

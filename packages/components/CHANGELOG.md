@@ -1,5 +1,50 @@
 # @zitadel/components
 
+## 0.1.0-alpha.12
+
+### Minor Changes
+
+- [#390](https://github.com/zitadel/nextgen/pull/390) [`2c32a90`](https://github.com/zitadel/nextgen/commit/2c32a90b41bdc7da736a2c3be0e8e851dbe59333) Thanks [@bastionstack](https://github.com/bastionstack)! - Add the `Checkbox` and `Select` atoms in both renderers, and render the
+  `checkbox` and `select` field types in the orchestrator.
+  - `@zitadel/components`:
+    - New form-associated `<zl-checkbox>` Lit atom (Figma `Checkbox` `4387:460`,
+      `Checkbox / With Label` `6634:1868`): optional `label` (or default slot),
+      `checked` / `disabled` / `required` / `value` / `name`, a `zl-change` event,
+      and full form participation (`setFormValue` / `setValidity` / reset / focus
+      delegation).
+    - New form-associated `<zl-select>` Lit atom (Figma `Dropdown` `4397:4816`,
+      `Input text` `4397:4098`): a select-only combobox following the WAI-ARIA
+      pattern with keyboard navigation. Options accept either a JS array
+      (`.options`) or a JSON `options` attribute; `value` / `placeholder` /
+      `disabled` / `required` and a `zl-change` event.
+    - New `chevron-down` icon.
+    - Both atoms registered in the manifest registry.
+    - Orchestrator: the default Liquid template now renders `select` and
+      `checkbox` field types as `<zl-select>` / `<zl-checkbox>`; select options
+      are built from the field's `validation.enum` via a new `selectOptions`
+      filter.
+  - `@zitadel/ui-react`: new paired `<Checkbox>` and `<Select>` React components
+    that mirror the Lit atoms' DOM and share their surface CSS.
+
+  Shared `checkbox.css` and `select.css` (+ their `lit/*-host.css`) were added to
+  `@zitadel/shared-component-styles`. No new design tokens were required.
+
+### Patch Changes
+
+- [#337](https://github.com/zitadel/nextgen/pull/337) [`237c3c7`](https://github.com/zitadel/nextgen/commit/237c3c73a319e74c1411e3b04a1bb1a0e9d91051) Thanks [@bastionstack](https://github.com/bastionstack)! - Scaffolded app pages now enforce the dark surface the Zitadel widgets are designed for (`color-scheme: dark`, `#0f0f11`), instead of following the OS light/dark setting — across every framework template (`next`, `react`, `vue`, `angular`, `nuxt`, `solid`, `svelte`, `qwik`). This fixes the inconsistency where the `<zitadel-logout>` avatar (and other non-widget chrome, e.g. the `/profile` view) rendered on a white background while `<zitadel-login>` enforced its own dark surface.
+
+  Removed misleading field hints from the login component locales (`en`, `de`, `it`): the password "include a symbol and number" hint (only `minLength` is enforced server-side) and the `YYYY-MM-DD` date-of-birth hint (native `<input type="date">` localizes its own format and submits ISO). A dynamic, validation-rule-driven hint is tracked in [#251](https://github.com/zitadel/nextgen/issues/251).
+
+## 0.1.0-alpha.11
+
+### Minor Changes
+
+- [#309](https://github.com/zitadel/nextgen/pull/309) [`0b81768`](https://github.com/zitadel/nextgen/commit/0b8176857395d25c95343b5b320d074e0ba2c102) Thanks [@bastionstack](https://github.com/bastionstack)! - Load the design-system brand font (Arimo) by default in `<zitadel-login>` so the
+  auth UI paints the brand face even when the server returns no branding; headings
+  render in bold Arimo. Tenant `branding.font_url` still overrides it. Exposes
+  `applyDefaultFont` and `DEFAULT_BRAND_FONT_HREF` so deployments can self-host the
+  default face.
+
 ## 0.1.0-alpha.10
 
 ### Patch Changes

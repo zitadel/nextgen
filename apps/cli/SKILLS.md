@@ -4,7 +4,7 @@ description: >-
   Set up and manage Zitadel authentication in a local project with the
   agent-friendly `zitadel` CLI. Use when the user wants to add login,
   registration, or session handling, create a Zitadel project, scaffold auth
-  for a Next.js, React, Vue, Angular, or Nuxt app, or plan and apply Zitadel
+  for a Next.js, React, Vue, Angular, Nuxt, Solid, Svelte, or Qwik app, or plan and apply Zitadel
   config changes from repo state.
 ---
 
@@ -20,6 +20,10 @@ parse the result rather than scraping human output.
 - Always pass `--non-interactive --json`. The envelope is the contract.
 - Add `--cwd <path>` when operating outside the current working directory.
 - Never run interactive prompts; `--non-interactive` (and `--json`) disable them.
+- The CLI sends anonymous usage telemetry by default. For automated/agent runs
+  that should stay silent, disable it with `--no-telemetry` (per invocation) or
+  `ZITADEL_TELEMETRY=0` / `DO_NOT_TRACK=1` (per environment); this also skips the
+  small end-of-command network flush.
 - See `README.md` (its commands section is generated from the CLI's own
   metadata) or run `zitadel <command> --help` for the full per-command flag list.
 
@@ -64,7 +68,7 @@ layer, not the envelope.
   and login flow are provisioned server-side at creation, so setup neither
   scaffolds nor uploads them. Agents must pass `--framework` when scaffolding
   into a fresh directory; interactive humans can omit it and choose from the
-  prompt. Flags: `--framework next|react|vue|angular|nuxt`, `--renderer
+  prompt. Flags: `--framework next|react|vue|angular|nuxt|solid|svelte|qwik`, `--renderer
   react|web-component` (selects the Next.js auth-page renderer; accepted for any
   framework and recorded in `zitadel.json` branding, but only Next varies its
   generated templates by it), `--dev-port` (dev-server port, also the issuer

@@ -1,0 +1,12 @@
+---
+title: Flows and schemas
+description: The relationship between login flows, user schemas, and generated UI.
+---
+
+The flow engine drives login, registration, passkey, and related auth journeys.
+
+A flow definition decides which step renders when. User schemas describe the user properties collected by the default forms.
+
+The current CLI creates a project against the target server and relies on server-side defaults for the initial user schema and login flow. The CLI does not scaffold or upload those defaults during setup.
+
+Future configuration work should keep flow and schema files reviewable under `.zitadel/**`, then use `plan` and `apply` for sync.

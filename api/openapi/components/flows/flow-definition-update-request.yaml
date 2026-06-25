@@ -1,44 +1,11 @@
 type: object
+required:
+    - flow_definition
 description: |
-  Partial update for a flow definition. Only provided fields are replaced;
-  omitted fields retain their current server-side values.
-
-  Collection fields (`steps`, `purposes`) are treated atomically: if
-  provided, the entire array/object is replaced. If omitted, the current
-  value is preserved unchanged.
-
-  `name` is a stable identifier and cannot be changed after creation.
+    Replaces the existing flow definition.
+    If `flow_definition.status` is omitted, the current status is preserved
 properties:
-  user_schema:
-    type: string
-    format: uri
-    description: |
-      User schema this flow operates on. Replaces the current value if provided.
-    example: https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml
-
-  purposes:
-    type: object
-    description: |
-      Replaces the full purpose-to-entry-step map if provided. Keys are
-      purpose names; values must match a `name` in `steps`.
-    minProperties: 1
-    propertyNames:
-      type: string
-      enum: [login, register, recovery, profiling, reauth, link_account]
-    additionalProperties:
-      type: string
-    example:
-      login: identifier
-      register: profile
-
-  audience:
-    $ref: flow-audience.yaml
-
-  steps:
-    type: array
-    items:
-      $ref: flow-definition-step.yaml
-    minItems: 1
-    description: |
-      Replaces the full steps array if provided. Partial step lists are not
-      supported — supply all steps when updating this field.
+    schema_uri:
+        $ref: ../../components/schemas/schema-uri.yaml
+    flow_definition:
+        $ref: flow-definition.yaml

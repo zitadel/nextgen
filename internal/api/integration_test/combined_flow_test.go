@@ -32,7 +32,10 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	userSchemaURL, err := url.Parse(schemaURL)
 	require.NoError(t, err)
 
-	client := harness.EnsureAPIClient(t, project.ID)
+	server := harness.EnsureTestServer(t)
+	client, err := helpers.NewApiClient(server.URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
@@ -95,7 +98,7 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	pwResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
-			"password": jx.Raw(`"` + newPass + `"`),
+			"x-auth-methods#password": jx.Raw(`"` + newPass + `"`),
 		}),
 	}, api.SubmitFlowStepParams{
 		ID:    flowID,
@@ -139,8 +142,8 @@ func combinedPasswordFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 				Name:   "identifier",
 				Fields: []string{"email"},
 				Actions: []api.StepAction{
-					{Name: "submit", Primary: api.NewOptBool(true)},
-					{Name: "register"},
+					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
+					{Name: "register", Kind: api.StepActionKindSubmit},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 					"submit":         api.FlowDefinitionStepTransitionsItem{Target: "password"},
@@ -150,9 +153,9 @@ func combinedPasswordFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 			},
 			{
 				Name:   "password",
-				Fields: []string{"password"},
+				Fields: []string{"x-auth-methods#password"},
 				Actions: []api.StepAction{
-					{Name: "submit", Primary: api.NewOptBool(true)},
+					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 					"submit": api.FlowDefinitionStepTransitionsItem{Target: "done"},
@@ -162,8 +165,8 @@ func combinedPasswordFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 				Name:   "register-identifier",
 				Fields: []string{"email", "givenName", "familyName"},
 				Actions: []api.StepAction{
-					{Name: "submit", Primary: api.NewOptBool(true)},
-					{Name: "login"},
+					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
+					{Name: "login", Kind: api.StepActionKindSubmit},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 					"submit":              api.FlowDefinitionStepTransitionsItem{Target: "register-password"},
@@ -173,10 +176,10 @@ func combinedPasswordFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 			},
 			{
 				Name:      "register-password",
-				Fields:    []string{"password"},
+				Fields:    []string{"x-auth-methods#password"},
 				OnSuccess: api.NewOptFlowDefinitionStepOnSuccess(createUser),
 				Actions: []api.StepAction{
-					{Name: "submit", Primary: api.NewOptBool(true)},
+					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 					"submit": api.FlowDefinitionStepTransitionsItem{Target: "done"},

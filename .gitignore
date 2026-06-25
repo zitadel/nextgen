@@ -45,19 +45,9 @@ __debug_bin*
 .opencode/
 opencode.json
 .agents/
-.cursor/agents/
+.cursor/
 
 # OSX
-.DS_Store
-
-# OSX
-.DS_Store
-
-# Editor/IDE
-.idea/
-.vscode/
-
-# System Files
 .DS_Store
 
 #Frontend
@@ -70,6 +60,8 @@ out-tsc
 coverage/
 **/.vitest-attachments/
 **/__screenshots__/
+test-results/
+playwright-report/
 
 ## dependencies
 node_modules
@@ -81,17 +73,24 @@ pnpm-debug.log*
 vite.config.*.timestamp*
 vitest.config.*.timestamp*
 test-output
-coverage
 
 ## moon
 .moon/cache
 .moon/docker
 
-## Next.js / Nuxt build outputs
+## Framework build outputs (Next.js / Nuxt / SvelteKit)
 .next/
 .nuxt/
 .nuxt-typecheck/
 .output/
+.svelte-kit/
+
+## Docs generated artifacts
+apps/docs/.source/
+apps/docs/.generated/
+
+## Storybook static build
+storybook-static/
 
 ## Go build cache
 .go/
@@ -114,7 +113,6 @@ nextgen-data/
 apps/demo-next/tsconfig.tsbuildinfo
 packages/api-mock/tsconfig.tsbuildinfo
 
-.nx/polygraph
-.cursor/debug-*
+.nx/
 # Root TS incremental build info (generated)
 tsconfig.tsbuildinfo

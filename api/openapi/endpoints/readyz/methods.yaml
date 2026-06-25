@@ -1,5 +1,7 @@
 get:
   operationId: getReady
+  tags:
+    - System
   summary: Check server readiness
   description: Check whether the server is ready to accept requests
   security: []

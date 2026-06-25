@@ -17,10 +17,12 @@
         "actions": [
           {
             "name": "submit",
+            "kind": "submit",
             "primary": true
           },
           {
-            "name": "register"
+            "name": "register",
+            "kind": "submit"
           }
         ],
         "transitions": {
@@ -38,11 +40,12 @@
       {
         "name": "password",
         "fields": [
-          "password"
+          "x-auth-methods#password"
         ],
         "actions": [
           {
             "name": "submit",
+            "kind": "submit",
             "primary": true
           }
         ],
@@ -62,10 +65,12 @@
         "actions": [
           {
             "name": "submit",
+            "kind": "submit",
             "primary": true
           },
           {
-            "name": "login"
+            "name": "login",
+            "kind": "submit"
           }
         ],
         "transitions": {
@@ -83,11 +88,12 @@
       {
         "name": "register-password",
         "fields": [
-          "password"
+          "x-auth-methods#password"
         ],
         "actions": [
           {
             "name": "submit",
+            "kind": "submit",
             "primary": true
           }
         ],

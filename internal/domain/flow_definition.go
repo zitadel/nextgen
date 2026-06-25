@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"strings"
 	"time"
 )
 
@@ -76,6 +77,36 @@ const (
 	FlowGateKindCaptcha FlowGateKind = iota
 )
 
+// FlowActionKind classifies what the engine should do when a user invokes
+// an action. Submit-style kinds run the input pipeline (field validation,
+// challenge dispatch, on_success); Navigate skips the pipeline and just
+// follows the matching transition.
+//
+//go:generate go tool enumer -type FlowActionKind -transform snake -trimprefix FlowActionKind -sql
+type FlowActionKind uint8
+
+const (
+	// FlowActionKindSubmit advances by collecting the step's fields and
+	// running the standard validate/dispatch/on_success pipeline.
+	FlowActionKindSubmit FlowActionKind = iota + 1
+	// FlowActionKindPasskey issues a WebAuthn assertion challenge and
+	// resolves the matching transition once the assertion verifies.
+	FlowActionKindPasskey
+	// FlowActionKindPasskeyRegister issues a WebAuthn registration
+	// challenge and resolves the matching transition once the attestation
+	// verifies.
+	FlowActionKindPasskeyRegister
+	// FlowActionKindNavigate routes through the transition without running
+	// the input pipeline. Used for pure-routing actions declared in the flow
+	// definition where the submitted fields are irrelevant.
+	FlowActionKindNavigate
+	// FlowActionKindBack pops the previous step from runtime history and
+	// re-renders it. Injected by the engine on rendered step responses when
+	// history is non-empty and the current step is non-terminal; rejected by
+	// the validator on inbound flow definitions — flow authors never declare it.
+	FlowActionKindBack
+)
+
 // FlowDefinition is a customer-configured directed graph of authentication steps.
 // It is immutable: modifications produce a new revision with a new SchemaVersion.
 type FlowDefinition struct {
@@ -96,6 +127,7 @@ type FlowDefinition struct {
 }
 
 func NewFlowDefinition(
+	flowDefID string,
 	projectID string,
 	name string,
 	schemaVersion string,
@@ -103,19 +135,21 @@ func NewFlowDefinition(
 	purposes map[FlowDefinitionPurpose]string,
 	audience FlowDefinitionAudience,
 	steps []FlowDefinitionStep,
-) (*FlowDefinition, error) {
-	id, err := newID(FlowDefinitionPrefix)
-	if err != nil {
-		return nil, ErrInternal(err).WithMessage("failed to generate flow-definition id")
+	status FlowDefinitionStatus,
+) (_ *FlowDefinition, err error) {
+
+	if flowDefID == "" {
+		flowDefID, err = newID(FlowDefinitionPrefix)
+		if err != nil {
+			return nil, ErrInternal(err).WithMessage("failed to generate flow-definition id")
+		}
 	}
 	return &FlowDefinition{
 		ProjectID:     projectID,
-		ID:            id,
+		ID:            flowDefID,
 		Name:          name,
 		SchemaVersion: schemaVersion,
-		Status:        FlowDefinitionStatusActive,
-		CreatedAt:     time.Now().UTC(),
-		UpdatedAt:     time.Now().UTC(),
+		Status:        status,
 		UserSchema:    userSchema,
 		Purposes:      purposes,
 		Audience:      audience,
@@ -149,13 +183,67 @@ type FlowDefinitionAudience struct {
 	TeamIDs []string
 }
 
+// authMethodPrefix marks a step.fields entry as referring to an entry
+// under the user schema's `x-auth-methods` keyword (e.g.
+// "x-auth-methods#password") rather than to a top-level user property.
+const authMethodPrefix = "x-auth-methods#"
+
+// Field carries the raw field name from a flow-definition step.
+type Field string
+
+// String returns the raw wire-format name.
+func (f Field) String() string {
+	return string(f)
+}
+
+// IsUserProperty reports whether the field names a top-level user-schema property.
+func (f Field) IsUserProperty() bool {
+	return !f.IsAuthMethod()
+}
+
+// IsAuthMethod reports whether the field references an `x-auth-methods` entry.
+func (f Field) IsAuthMethod() bool {
+	return strings.HasPrefix(f.String(), authMethodPrefix)
+}
+
+// AuthMethod returns the method name after the `x-auth-methods#` prefix (e.g. "password").
+func (f Field) AuthMethod() string {
+	return strings.TrimPrefix(f.String(), authMethodPrefix)
+}
+
+// FieldsFromStrings lifts wire-format string field names into typed
+// [Field] values at the API/repository boundary.
+func FieldsFromStrings(s []string) []Field {
+	if s == nil {
+		return nil
+	}
+	out := make([]Field, len(s))
+	for i, v := range s {
+		out[i] = Field(v)
+	}
+	return out
+}
+
+// FieldsToStrings lowers typed [Field] values back to wire-format
+// strings at the API/repository boundary.
+func FieldsToStrings(f []Field) []string {
+	if f == nil {
+		return nil
+	}
+	out := make([]string, len(f))
+	for i, v := range f {
+		out[i] = string(v)
+	}
+	return out
+}
+
 // FlowDefinitionStep is a single node in the step graph.
 type FlowDefinitionStep struct {
 	Name string
 	// Fields lists the user-schema property names this step collects.
 	// Resolved against [FlowDefinition.UserSchema] at runtime to derive
 	// per-field type, validation, and implicit outcomes.
-	Fields []string
+	Fields []Field
 	// Actions are the user-selectable actions on this step, in display
 	// order. Each action's Name is what the frontend echoes back in the
 	// submit request.
@@ -182,7 +270,10 @@ type FlowDefinitionStep struct {
 
 // FlowStepAction is a user-selectable action declared on a step.
 type FlowStepAction struct {
-	Name    string
+	Name string
+	// Kind classifies how the engine handles this action. See
+	// [FlowActionKind] for the available kinds.
+	Kind    FlowActionKind
 	TextKey string
 	Primary bool
 }
