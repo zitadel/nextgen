@@ -98,9 +98,11 @@ describe("renderLanding", () => {
     expect(html).toContain("0.0.0-sha-abc");
   });
 
-  test("shows a one-off bare install (no version needed, --registry points here)", () => {
+  test("one-off install overrides only the scope registry, not the global one", () => {
     const html = renderLanding(samplePackages, "https://x.test", "main");
-    expect(html).toContain("npm install @foodbar/alpha --registry=https://x.test");
+    expect(html).toContain("npm install @foodbar/alpha --@foodbar:registry=https://x.test");
+    // A bare `--registry=` would override resolution for third-party deps too.
+    expect(html).not.toContain("npm install @foodbar/alpha --registry=https://x.test");
   });
 
   test("shows the scoped .npmrc plus a bare install for the everyday flow", () => {
@@ -109,9 +111,11 @@ describe("renderLanding", () => {
     expect(html).toContain("npm install @foodbar/alpha");
   });
 
-  test("shows an optional pinned-by-commit install for reproducibility", () => {
+  test("pinned-by-commit install also uses the scope-only registry override", () => {
     const html = renderLanding(samplePackages, "https://x.test", "main");
-    expect(html).toContain("npm install @foodbar/alpha@0.0.0-sha-abc --registry=https://x.test");
+    expect(html).toContain(
+      "npm install @foodbar/alpha@0.0.0-sha-abc --@foodbar:registry=https://x.test",
+    );
     expect(html).not.toContain("npm install @foodbar/alpha@0.0.0-sha-abc @foodbar/bravo");
   });
 

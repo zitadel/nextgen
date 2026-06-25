@@ -14,10 +14,11 @@ isolated registry scoped to that branch's commit.
 ## Install from a deploy
 
 No version needed — the registry resolves `latest` to the deploy's
-snapshot:
+snapshot. Override only the `@zitadel` scope so third-party
+dependencies still resolve from the default registry:
 
 ```sh
-npm install @zitadel/sdk-react --registry=https://<preview-deploy>.vercel.app
+npm install @zitadel/sdk-react --@zitadel:registry=https://<preview-deploy>.vercel.app
 ```
 
 Or pin the scope in `.npmrc` and install normally:
@@ -30,7 +31,7 @@ Or pin the scope in `.npmrc` and install normally:
 Pin an exact build for reproducibility:
 
 ```sh
-npm install @zitadel/sdk-react@0.0.0-sha-<sha> --registry=https://<preview-deploy>.vercel.app
+npm install @zitadel/sdk-react@0.0.0-sha-<sha> --@zitadel:registry=https://<preview-deploy>.vercel.app
 ```
 
 ## Local development

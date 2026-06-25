@@ -96,10 +96,12 @@ export const renderLanding = (
     <section class="mb-10">
       <h2 class="mb-2 text-sm font-medium">Option 1 — one-off install</h2>
       <p class="mb-2 text-sm text-slate-500 dark:text-slate-400">
-        Point a single install at this registry. No version needed — the
-        registry resolves <code>latest</code> to this deploy's snapshot.
+        Point only the <code>${escapeHtml(scope ?? "")}</code> scope at this
+        registry so third-party dependencies still resolve from the default
+        registry. No version needed — <code>latest</code> resolves to this
+        deploy's snapshot.
       </p>
-      <pre class="overflow-x-auto rounded border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-800 dark:bg-slate-900">npm install ${escapeHtml(firstPackage.name)} --registry=${escapeHtml(origin)}</pre>
+      <pre class="overflow-x-auto rounded border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-800 dark:bg-slate-900">npm install ${escapeHtml(firstPackage.name)} --${escapeHtml(scope ?? "")}:registry=${escapeHtml(origin)}</pre>
     </section>
 
     <section class="mb-10">
@@ -116,7 +118,7 @@ export const renderLanding = (
       <p class="mb-2 text-sm text-slate-500 dark:text-slate-400">
         Each snapshot is tagged with its commit, so you can pin a reproducible version:
       </p>
-      <pre class="overflow-x-auto rounded border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-800 dark:bg-slate-900">npm install ${escapeHtml(firstPackage.name)}@${escapeHtml(firstPackage.version)} --registry=${escapeHtml(origin)}</pre>
+      <pre class="overflow-x-auto rounded border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-800 dark:bg-slate-900">npm install ${escapeHtml(firstPackage.name)}@${escapeHtml(firstPackage.version)} --${escapeHtml(scope ?? "")}:registry=${escapeHtml(origin)}</pre>
     </section>
     `
     : "";
