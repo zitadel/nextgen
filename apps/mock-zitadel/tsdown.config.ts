@@ -8,7 +8,7 @@ import { defineConfig } from "tsdown";
  * guaranteed to transpile a workspace TypeScript dependency at runtime,
  * nor to be able to resolve pnpm's symlinked `node_modules` layout from
  * the function's location. Inlining every dependency (`noExternal`)
- * sidesteps both: the deployed entry (`api/index.ts`) imports only the
+ * sidesteps both: the deployed entry (`api/index.mjs`) imports only the
  * plain JS this emits, with nothing left to resolve at runtime but Node
  * built-ins.
  */
