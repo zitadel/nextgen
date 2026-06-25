@@ -112,10 +112,6 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 					Actions: []api.StepAction{
 						{Name: "passkey", Kind: api.StepActionKindPasskey, Primary: api.NewOptBool(true)},
 					},
-					Gates:        api.OptFlowDefinitionStepGates{},
-					SSOProviders: nil,
-					OnSuccess:    api.OptFlowDefinitionStepOnSuccess{},
-					Complete:     api.OptFlowDefinitionStepComplete{},
 					Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 						"passkey": api.FlowDefinitionStepTransitionsItem{Target: "register-step"},
 					}),
