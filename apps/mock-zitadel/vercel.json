@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "cd ../.. && corepack pnpm install --frozen-lockfile --prod=false",
-  "buildCommand": "cd ../.. && corepack pnpm --filter @zitadel/api run generate && corepack pnpm --filter @zitadel/api run build && cd apps/api-mock-deploy && corepack pnpm run build && corepack pnpm exec tsx scripts/generate-wellknown.ts",
+  "buildCommand": "cd ../.. && corepack pnpm --filter @zitadel/api run generate && corepack pnpm --filter @zitadel/api run build && cd apps/mock-zitadel && corepack pnpm run build && corepack pnpm exec tsx scripts/generate-wellknown.ts",
   "rewrites": [{ "source": "/(.*)", "destination": "/api" }],
   "headers": [
     {

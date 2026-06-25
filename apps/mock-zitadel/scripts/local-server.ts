@@ -17,11 +17,11 @@ const port = parsePort(rawPort);
 
 if (rawPort && port === null) {
   console.error(
-    `[api-mock-deploy] invalid PORT="${rawPort}" — must be an integer between 1 and 65535`,
+    `[mock-zitadel] invalid PORT="${rawPort}" — must be an integer between 1 and 65535`,
   );
   process.exit(1);
 }
 
 app.listen(port ?? DEFAULT_PORT, () => {
-  console.log(`api-mock-deploy on http://localhost:${port ?? DEFAULT_PORT}`);
+  console.log(`mock-zitadel on http://localhost:${port ?? DEFAULT_PORT}`);
 });

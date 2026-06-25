@@ -90,7 +90,7 @@ baseline `font_url` (Google Fonts Arimo) without extra setup.
 `startMockServer(port)` wraps it for the standalone TCP server (deriving a
 localhost issuer from `port`). The bare app is published via the
 `./server` export so a serverless host can use it directly as a request
-handler — see `apps/api-mock-deploy`, which serves it as per-PR Vercel
+handler — see `apps/mock-zitadel`, which serves it as per-PR Vercel
 previews. The branding payload lives in `src/default-dev-branding.ts` and
 mirrors `docs/design/branding/branding.example.json`. MSW-only consumers
 (`setupMockHandlers` / `setupMock`) do **not** get this overlay unless

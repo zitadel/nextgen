@@ -24,7 +24,7 @@ import { resolveIssuer } from "../src/issuer.js";
 // breaks every preview client in a hard-to-debug way — fail loudly instead.
 if (!process.env.VERCEL_URL?.trim()) {
   console.error(
-    "[api-mock-deploy] VERCEL_URL is not set — refusing to write a static " +
+    "[mock-zitadel] VERCEL_URL is not set — refusing to write a static " +
       "discovery document with a localhost issuer (this script is meant to run " +
       "in the Vercel build, where VERCEL_URL is defined).",
   );
@@ -46,4 +46,4 @@ await writeFile(
   JSON.stringify(document, null, 2) + "\n",
 );
 
-console.log(`[api-mock-deploy] wrote public/.well-known/openid-configuration (issuer ${issuer})`);
+console.log(`[mock-zitadel] wrote public/.well-known/openid-configuration (issuer ${issuer})`);

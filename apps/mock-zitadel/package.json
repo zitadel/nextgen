@@ -1,10 +1,10 @@
 {
-  "name": "@zitadel/api-mock-deploy",
+  "name": "@zitadel/mock-zitadel",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "description": "Per-PR mock Zitadel API deployed to Vercel (wraps @zitadel/api-mock).",
-  "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/api-mock-deploy#readme",
+  "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/mock-zitadel#readme",
   "bugs": {
     "url": "https://github.com/zitadel/nextgen/issues"
   },
@@ -12,7 +12,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/zitadel/nextgen.git",
-    "directory": "apps/api-mock-deploy"
+    "directory": "apps/mock-zitadel"
   },
   "scripts": {
     "dev": "tsx scripts/local-server.ts",

@@ -13,7 +13,7 @@ projects:
     demo-nuxt: "apps/demo-nuxt"
     demo-nuxt-e2e: "apps/demo-nuxt-e2e"
     login-ui: "apps/login-ui"
-    api-mock-deploy: "apps/api-mock-deploy"
+    mock-zitadel: "apps/mock-zitadel"
     api: "packages/api"
     api-mock: "packages/api-mock"
     components: "packages/components"

@@ -1,4 +1,4 @@
-# @zitadel/api-mock-deploy
+# @zitadel/mock-zitadel
 
 A paper-thin Vercel wrapper that serves [`@zitadel/api-mock`](../../packages/api-mock)
 as a live HTTP endpoint, so **every pull request gets its own throwaway
@@ -59,7 +59,7 @@ Node built-ins. `src/app.ts` stays the source of truth — it is what
 
 1. Create a new Vercel project and connect it to the `zitadel/nextgen`
    GitHub repo (install the Vercel GitHub app if it isn't already).
-2. Set the project's **Root Directory** to `apps/api-mock-deploy`. The
+2. Set the project's **Root Directory** to `apps/mock-zitadel`. The
    `installCommand`/`buildCommand` in `vercel.json` `cd` to the repo root
    so the pnpm workspace (and the `catalog:` protocol) resolve with the
    repo's pinned pnpm.
@@ -88,8 +88,8 @@ overkill for a mock.
 
 ```sh
 # from the repo root, inside devbox
-devbox run -- corepack pnpm --filter @zitadel/api-mock-deploy dev    # node on :8080
-devbox run -- corepack pnpm --filter @zitadel/api-mock-deploy test   # vitest
+devbox run -- corepack pnpm --filter @zitadel/mock-zitadel dev    # node on :8080
+devbox run -- corepack pnpm --filter @zitadel/mock-zitadel test   # vitest
 ```
 
 `dev` runs [`scripts/local-server.ts`](scripts/local-server.ts), which

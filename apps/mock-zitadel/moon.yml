@@ -1,4 +1,4 @@
-id: "api-mock-deploy"
+id: "mock-zitadel"
 language: "typescript"
 layer: "application"
 stack: "backend"
