@@ -23,11 +23,11 @@ more than polish.
   server contract lands first.
 - Watch for secret leakage. Project, preview, token, and `.zitadel/secret` style
   values must not enter source control or browser-safe env metadata.
-- User-visible changes to a public npm package need a changeset; follow the
-  [decision table in `.changeset/README.md`](.changeset/README.md#decision-table)
-  (paths, when to skip, when to add a real vs empty file). Author
-  `.changeset/<slug>.md` directly rather than via the interactive prompt. npm
-  package manifests must keep `"license": "MIT"`.
+- Changes that ship in the product release need a changeset — including Go server
+  changes from implementation paths like `internal/` (list `@zitadel/server`).
+  Follow the
+  [decision table in `.changeset/README.md`](../.changeset/README.md#decision-table);
+  author `.changeset/<slug>.md` directly, not via the interactive prompt.
 - PR metadata must follow `AGENTS.md`: verify the title against
   `.github/semantic.yml`, prefer a scope-free title when unsure, and keep the
   PR description current with summary, validation, changeset, and notes.

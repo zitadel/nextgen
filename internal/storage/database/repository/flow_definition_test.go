@@ -229,7 +229,7 @@ func TestFlowDefinitionRepository_UpdateFlowDefinition(t *testing.T) {
 	updated.Steps = []domain.FlowDefinitionStep{
 		{
 			Name:   "start",
-			Fields: []string{"email"},
+			Fields: []domain.Field{"email"},
 			Actions: []domain.FlowStepAction{
 				{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
 			},
@@ -312,7 +312,7 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "identifier",
-				Fields: []string{"email"},
+				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
 					{Name: "submit", Kind: domain.FlowActionKindSubmit, TextKey: "identifier.submit", Primary: true},
 				},
@@ -339,7 +339,7 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 			},
 			{
 				Name:        "password",
-				Fields:      []string{"password"},
+				Fields:      []domain.Field{"password"},
 				OnSuccess:   &createUser,
 				Complete:    &completeShow,
 				Transitions: map[string]domain.FlowStepTransition{},

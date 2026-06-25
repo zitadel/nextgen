@@ -275,9 +275,17 @@ export async function packPublicPackages(options = {}) {
   for (const dir of PUBLIC_PACKAGE_DIRS) {
     const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
     await assertPublishDirectoryReady({ repoRoot, dir, manifest });
+    // `pnpm pack` runs the package's `prepack`, which for @zitadel/cli rebuilds
+    // the bundle via tsdown. Stamp the production telemetry channel here so the
+    // published tarball routes to the prod Mixpanel project — setting it only on
+    // the earlier `moon run cli:build` is not enough, since prepack rebuilds.
+    const env =
+      dir === "apps/cli"
+        ? { ...process.env, ZITADEL_TELEMETRY_BUILD_CHANNEL: "production" }
+        : process.env;
     await runFn("corepack", ["pnpm", "--dir", dir, "pack", "--pack-destination", tarballsDir], {
       cwd: repoRoot,
-      env: process.env,
+      env,
     });
   }
 

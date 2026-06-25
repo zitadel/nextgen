@@ -111,6 +111,7 @@ the two SPAs bundled directly into the server binary.
 | -------------------------------------------- | ------------------------------------------ |
 | Install dependencies                         | `corepack pnpm install --frozen-lockfile`  |
 | Verify my toolchain                          | `moon run workspace:doctor`                |
+| Open the component workbench (Storybook)     | `moon run storybook:dev` → http://localhost:6006 |
 | Start the console dev server                 | `moon run console:dev` → http://localhost:5174 |
 | Start the login-UI dev server                | `moon run login-ui:dev` → http://localhost:5175 |
 | Build both apps and test with the Go server  | `moon run console:build login-ui:build` then `go run . server` |
@@ -125,6 +126,51 @@ authentication flows.
 
 Dev servers serve at `/`; the embedded production builds are served at
 `/ui/console/` and `/ui/login/`.
+
+### First-run setup for the login-UI dev server
+
+The Go backend does **not** create a project on startup. Create one before the
+login UI can boot a flow. Project creation provisions the default human user
+schema and default login/register flow definition.
+
+**1. Start the API-only backend:**
+
+```sh
+NEXTGEN_SERVER_CONSOLE_ENABLED=false NEXTGEN_SERVER_LOGIN_ENABLED=false go run . server
+```
+
+This skips the embedded UI dist checks, so it works before you have built
+`apps/console` or `apps/login-ui`.
+
+**2. Create a project:**
+
+```sh
+curl -s -X POST http://localhost:8080/projects \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+The response contains an `id` field — that is your project ID. If you have
+`jq` installed, append `| jq .` to pretty-print the response.
+
+**3. Configure the dev server:**
+
+Copy the example env file and fill in your project ID:
+
+```sh
+cp apps/login-ui/.env.example apps/login-ui/.env.development.local
+# edit .env.development.local and uncomment VITE_PROJECT_ID=<id-from-step-2>
+```
+
+These Vite env vars are only for the local dev server. `VITE_PROXY_PATH` tells
+the login UI to prefix all API requests with
+`/__nextgen`, which the Vite dev server proxies to the Go backend on port 8080.
+Set `VITE_BACKEND_URL` in `.env.development.local` to override the target
+(default: `http://localhost:8080`). Production hosted-login builds ignore these
+development env vars and use request/URL-derived context instead.
+
+As a one-off alternative, pass `?project_id=<id>` in the browser URL instead
+of setting `VITE_PROJECT_ID`.
 
 ---
 
@@ -156,8 +202,9 @@ Moon task targets use the `<project>:<task>` form, for example `moon run cli:tes
 
 Use `corepack pnpm exec changeset status --since origin/main` when you want to
 preview the package bumps Changesets will plan from your PR. Pull requests also
-get an informational Changesets comment; maintainers use that and
-`.changeset/README.md` to review release intent.
+get an informational Changesets comment; maintainers use that and the
+[changeset decision table](.changeset/README.md#decision-table) to review release
+intent.
 
 To run the full CI-parity suite locally — including integration tests, demo
 end-to-end tests, and the fresh-app journey — run

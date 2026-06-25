@@ -69,11 +69,22 @@ Two thin layers:
   var(--zl-color-surface-default-white); }`).
 
 We did not use `@lit/react` for the React side — the goal is a console
-that ships zero Lit runtime. The Playwright spec in
-`apps/console-e2e/visual-parity.spec.ts` keeps the surfaces locked
-visually.
+that ships zero Lit runtime.
+
+> **Update (2026-06):** Lit ↔ React parity and the orchestrator showcase
+> moved to the unified Storybook (`apps/storybook`), where stories run as
+> real-browser tests via `@storybook/addon-vitest` (in CI). The original
+> `apps/console-e2e/visual-parity.spec.ts` matrix sweep was retired with the
+> playgrounds.
 
 ### 3. Console embeds the Lit orchestrator via a tiny `createElement` wrapper
+
+> **Update (2026-06):** Superseded. The console no longer hosts the
+> orchestrator — it is being built into the real settings app. The
+> `<zitadel-login>` end-to-end showcase now lives in the `Orchestrator/Login`
+> Storybook stories (MSW via `msw-storybook-addon`), and the framework demos
+> (`apps/demo-next`, `apps/demo-nuxt`) remain the real-SDK integrations. The
+> original decision is kept below for context.
 
 The console is the only React surface that hosts the actual
 `<zitadel-login>` orchestrator (so reviewers can see the end-to-end
