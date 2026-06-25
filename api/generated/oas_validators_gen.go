@@ -1702,6 +1702,8 @@ func (s FlowStepChallengeMethod) Validate() error {
 	switch s {
 	case "passkey":
 		return nil
+	case "passkey_register":
+		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}

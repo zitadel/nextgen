@@ -365,6 +365,124 @@ describe("<zitadel-login> against the typed Flow API", () => {
     });
   });
 
+  it("does not restart a passkey registration challenge while submitting the proof", async () => {
+    const originalCredentials = Object.getOwnPropertyDescriptor(navigator, "credentials");
+    const originalPublicKeyCredential = Object.getOwnPropertyDescriptor(
+      window,
+      "PublicKeyCredential",
+    );
+    const create = vi.fn(() => new Promise<PublicKeyCredential>(() => {}));
+    let releaseSubmit: (() => void) | undefined;
+
+    Object.defineProperty(window, "PublicKeyCredential", {
+      configurable: true,
+      value: class PublicKeyCredentialStub {},
+    });
+    Object.defineProperty(navigator, "credentials", {
+      configurable: true,
+      value: { create: create as unknown as CredentialsContainer["create"], get: vi.fn() },
+    });
+
+    try {
+      server.use(
+        http.post(
+          "*/flow/*/submit",
+          () =>
+            new Promise((resolve) => {
+              releaseSubmit = () =>
+                resolve(
+                  HttpResponse.json({
+                    id: "flow-1",
+                    session_token: "token-1",
+                    step: {
+                      name: "done",
+                      texts: {},
+                      fields: [],
+                      actions: [],
+                      gates: {},
+                      complete: { behavior: "show" },
+                    },
+                    branding: {},
+                  }),
+                );
+            }),
+        ),
+      );
+
+      const element = await mount(host);
+      Reflect.set(element, "response", {
+        id: "flow-1",
+        session_id: "sess-1",
+        session_token: "token-1",
+        step: {
+          name: "passkey-enroll",
+          texts: { title_key: "passkey-enroll.title" },
+          fields: [],
+          actions: [],
+          gates: {},
+          challenge: {
+            method: "passkey_register",
+            challenge_id: "reg-1",
+            options: {
+              challenge: "AAAA",
+              rp: { id: "localhost", name: "localhost" },
+              user: {
+                id: "dXNlcl8x",
+                name: "alice@example.com",
+                displayName: "alice@example.com",
+              },
+              pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+            },
+          },
+        },
+        branding: {},
+      });
+      Reflect.set(element, "loading", false);
+      await element.updateComplete;
+
+      await waitFor(() => (create.mock.calls.length === 1 ? true : null));
+      expect(element.shadowRoot?.querySelector("zl-passkey")).toBeTruthy();
+
+      element.shadowRoot?.dispatchEvent(
+        new CustomEvent("zl-passkey-result", {
+          bubbles: true,
+          composed: true,
+          detail: {
+            challenge_id: "reg-1",
+            method: "passkey_register",
+            proof: {
+              id: "cred_mock_123",
+              rawId: "Y3JlZF9tb2NrXzEyMw",
+              type: "public-key",
+              response: {
+                attestationObject: "AAAA",
+                clientDataJSON: "BBBB",
+              },
+            },
+          },
+        }),
+      );
+
+      await waitFor(() => (Reflect.get(element, "loading") === true ? true : null));
+      await element.updateComplete;
+
+      expect(element.shadowRoot?.querySelector("zl-passkey")).toBeNull();
+      expect(create).toHaveBeenCalledTimes(1);
+    } finally {
+      releaseSubmit?.();
+      if (originalCredentials) {
+        Object.defineProperty(navigator, "credentials", originalCredentials);
+      } else {
+        delete (navigator as unknown as Record<string, unknown>).credentials;
+      }
+      if (originalPublicKeyCredential) {
+        Object.defineProperty(window, "PublicKeyCredential", originalPublicKeyCredential);
+      } else {
+        delete (window as unknown as Record<string, unknown>).PublicKeyCredential;
+      }
+    }
+  });
+
   it("re-renders with error and strips challenge on zl-passkey-error", async () => {
     const element = await mount(host);
 

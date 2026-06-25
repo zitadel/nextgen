@@ -1798,6 +1798,74 @@ func passkeyRegisterDefinition() *domain.FlowDefinition {
 	}
 }
 
+func passkeyRegisterAfterIdentifierDefinition() *domain.FlowDefinition {
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-passkey-reg-with-identifier",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeRegister: "identify",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "identify",
+				Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "register"},
+				},
+			},
+			{
+				Name: "register",
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionPasskeyRegister, Kind: domain.FlowActionKindPasskeyRegister, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionPasskeyRegister: {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+}
+
+func passkeyRegisterAfterUsernameAndEmailDefinition() *domain.FlowDefinition {
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-passkey-reg-with-username-and-email",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeRegister: "identify",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "identify",
+				Fields: []domain.Field{"username", "email"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "register"},
+				},
+			},
+			{
+				Name: "register",
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionPasskeyRegister, Kind: domain.FlowActionKindPasskeyRegister, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionPasskeyRegister: {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+}
+
 func TestFlowStateMachine_Process_PasskeyRegisterIssueThenVerify(t *testing.T) {
 	t.Parallel()
 	const userID = "user_01TEST"
@@ -1936,7 +2004,9 @@ func TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID(t *testing.T) {
 	// The provisional user ID should have been generated and passed to the service.
 	w.passkeyRegService.EXPECT().
 		IssuePasskeyRegistrationChallenge(gomock.Any(), gomock.Cond(func(in domain.FlowIssuePasskeyRegistrationChallengeInput) bool {
-			return assert.Equal(t, userID, in.UserID)
+			return assert.Equal(t, userID, in.UserID) &&
+				assert.Empty(t, in.Username) &&
+				assert.Empty(t, in.DisplayName)
 		})).
 		Return(domain.FlowPasskeyRegistrationChallengeOutput{
 			ChallengeID: challengeID,
@@ -1960,6 +2030,120 @@ func TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID(t *testing.T) {
 	require.NotNil(t, issued.Step.Challenge)
 	// The generated ID should be stored in CollectedData for use in the verify phase.
 	assert.Equal(t, userID, issued.State.CollectedData.UserID)
+}
+
+func TestFlowStateMachine_Process_PasskeyRegisterUsesCollectedIdentifierForDisplay(t *testing.T) {
+	t.Parallel()
+	const email = "alice@example.com"
+	const challengeID = "reg-1"
+	const registrationOpts = `{"rp":{"id":"example.com"}}`
+	const userID = "user_01TEST"
+	w := newFlowTestWorld(t)
+	def := passkeyRegisterAfterIdentifierDefinition()
+
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+			return assert.Equal(t, "email", in.AttributeName) &&
+				assert.Equal(t, email, in.Value)
+		})).
+		Return("", domain.ErrAuthAttemptProofRejected(nil))
+	w.passkeyRegService.EXPECT().
+		IssuePasskeyRegistrationChallenge(gomock.Any(), gomock.Cond(func(in domain.FlowIssuePasskeyRegistrationChallengeInput) bool {
+			return assert.Equal(t, userID, in.UserID) &&
+				assert.Equal(t, email, in.Username) &&
+				assert.Equal(t, email, in.DisplayName)
+		})).
+		Return(domain.FlowPasskeyRegistrationChallengeOutput{
+			ChallengeID: challengeID,
+			Options:     []byte(registrationOpts),
+		}, nil)
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	registerStep, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": email},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "register", registerStep.Step.Name)
+
+	issued, err := w.sm.Process(t.Context(), nil, def, registerStep.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskeyRegister,
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, issued.Step.Challenge)
+	assert.Equal(t, challengeID, issued.Step.Challenge.ChallengeID)
+}
+
+func TestFlowStateMachine_Process_PasskeyRegisterPrefersEmailForDisplay(t *testing.T) {
+	t.Parallel()
+	const username = "alice"
+	const email = "alice@example.com"
+	const challengeID = "reg-1"
+	const registrationOpts = `{"rp":{"id":"example.com"}}`
+	const userID = "user_01TEST"
+	w := newFlowTestWorld(t)
+	def := passkeyRegisterAfterUsernameAndEmailDefinition()
+
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+			return assert.Equal(t, "username", in.AttributeName) &&
+				assert.Equal(t, username, in.Value)
+		})).
+		Return("", domain.ErrAuthAttemptProofRejected(nil))
+	w.passkeyRegService.EXPECT().
+		IssuePasskeyRegistrationChallenge(gomock.Any(), gomock.Cond(func(in domain.FlowIssuePasskeyRegistrationChallengeInput) bool {
+			return assert.Equal(t, userID, in.UserID) &&
+				assert.Equal(t, email, in.Username) &&
+				assert.Equal(t, email, in.DisplayName)
+		})).
+		Return(domain.FlowPasskeyRegistrationChallengeOutput{
+			ChallengeID: challengeID,
+			Options:     []byte(registrationOpts),
+		}, nil)
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	registerStep, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{
+			"username": username,
+			"email":    email,
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "register", registerStep.Step.Name)
+
+	issued, err := w.sm.Process(t.Context(), nil, def, registerStep.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskeyRegister,
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, issued.Step.Challenge)
+	assert.Equal(t, challengeID, issued.Step.Challenge.ChallengeID)
 }
 
 // TestFlowStateMachine_Start_PreservesActionOrder pins ADR 021: the rendered
