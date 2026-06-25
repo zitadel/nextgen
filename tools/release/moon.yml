@@ -11,6 +11,35 @@ tasks:
       runFromWorkspaceRoot: true
       runInCI: true
 
+  clean-public-package-dist:
+    command: "node scripts/release-clean.mjs public-package-dist"
+    options:
+      cache: false
+      runFromWorkspaceRoot: true
+      runInCI: true
+
+  build-public-packages:
+    command: "node -e 0"
+    deps:
+      - "release:clean-public-package-dist"
+      - "cli:build-release"
+      - "api:build-release"
+      - "components:build-release"
+      - "sdk-core:build-release"
+      - "sdk-next:build-release"
+      - "sdk-nuxt:build-release"
+      - "sdk-react:build-release"
+      - "sdk-vue:build-release"
+      - "sdk-angular:build-release"
+      - "sdk-solid:build-release"
+      - "sdk-svelte:build-release"
+      - "sdk-qwik:build-release"
+    options:
+      cache: false
+      runDepsInParallel: false
+      runFromWorkspaceRoot: true
+      runInCI: true
+
   version:
     command: "node scripts/release.mjs version"
     options:
@@ -19,9 +48,15 @@ tasks:
 
   pack:
     command: "node scripts/release.mjs pack"
+    deps:
+      - "release:build-public-packages"
+      - "console:build"
+      - "login-ui:build-release"
     outputs:
       - "/dist/release/**/*"
     options:
+      cache: false
+      runDepsInParallel: false
       runFromWorkspaceRoot: true
       runInCI: false
 
@@ -29,14 +64,25 @@ tasks:
     command: "node scripts/release.mjs snapshot"
     deps:
       - "server:test"
+      - "release:build-public-packages"
+      - "console:build"
+      - "login-ui:build-release"
     outputs:
       - "/dist/release/**/*"
     options:
+      cache: false
+      runDepsInParallel: false
       runFromWorkspaceRoot: true
       runInCI: false
 
   publish:
     command: "node scripts/release.mjs publish"
+    deps:
+      - "release:build-public-packages"
+      - "console:build"
+      - "login-ui:build-release"
     options:
+      cache: false
+      runDepsInParallel: false
       runFromWorkspaceRoot: true
       runInCI: true

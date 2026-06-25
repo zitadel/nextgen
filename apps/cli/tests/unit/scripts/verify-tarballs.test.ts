@@ -10,26 +10,6 @@ import { afterEach, describe, expect, it } from "vitest";
 const execFile = promisify(execFileCallback);
 const repoRoot = fileURLToPath(new URL("../../../../../", import.meta.url));
 const verifyScript = join(repoRoot, "apps/cli-journey-e2e/scripts/verify-tarballs.mjs");
-const packageDirs = [
-  "apps/cli",
-  "apps/server",
-  "apps/server-linux-x64",
-  "apps/server-linux-arm64",
-  "apps/server-darwin-x64",
-  "apps/server-darwin-arm64",
-  "apps/server-win32-x64",
-  "packages/api",
-  "packages/components",
-  "packages/sdk-core",
-  "packages/sdk-next",
-  "packages/sdk-nuxt",
-  "packages/sdk-react",
-  "packages/sdk-vue",
-  "packages/sdk-angular",
-  "packages/sdk-solid",
-  "packages/sdk-svelte",
-  "packages/sdk-qwik",
-];
 const tempDirs: string[] = [];
 
 afterEach(async () => {
@@ -83,6 +63,7 @@ async function fixtureTarballs(
   tempDirs.push(root);
   const tarballsDir = join(root, "tarballs");
   await mkdir(tarballsDir);
+  const packageDirs = await publicPackageDirs();
 
   for (const dir of packageDirs) {
     const manifest = JSON.parse(await readFile(join(repoRoot, dir, "package.json"), "utf8")) as {
@@ -95,6 +76,13 @@ async function fixtureTarballs(
   }
 
   return tarballsDir;
+}
+
+async function publicPackageDirs(): Promise<string[]> {
+  const manifest = (await import(
+    new URL("../../../../../scripts/release-manifest.mjs", import.meta.url).href
+  )) as { PUBLIC_PACKAGE_DIRS: string[] };
+  return manifest.PUBLIC_PACKAGE_DIRS;
 }
 
 async function createTarball(
