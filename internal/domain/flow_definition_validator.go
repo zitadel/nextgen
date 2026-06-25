@@ -135,6 +135,9 @@ func resolveAllStepFields(schema *jsonschema.Schema, steps []FlowDefinitionStep)
 // validateRequiredUserSchemaFields checks that all required fields in the
 // user schema are present in the flow definition.
 func validateRequiredUserSchemaFields(required map[string]struct{}, steps []FlowDefinitionStep) error {
+	if len(required) == 0 {
+		return nil
+	}
 	// gather all the fields set in the flow definition steps
 	fields := make(map[string]struct{})
 	for _, step := range steps {
