@@ -1,5 +1,26 @@
 # @zitadel/cli
 
+## 0.1.0-alpha.12
+
+### Minor Changes
+
+- [#392](https://github.com/zitadel/nextgen/pull/392) [`292bfc9`](https://github.com/zitadel/nextgen/commit/292bfc97006c85bc3926e345cae0e9021e715062) Thanks [@mridang](https://github.com/mridang)! - Add opt-out anonymous usage telemetry. Disable with `--no-telemetry`,
+  `DO_NOT_TRACK=1`, or `ZITADEL_TELEMETRY=0`.
+
+### Patch Changes
+
+- [#337](https://github.com/zitadel/nextgen/pull/337) [`237c3c7`](https://github.com/zitadel/nextgen/commit/237c3c73a319e74c1411e3b04a1bb1a0e9d91051) Thanks [@bastionstack](https://github.com/bastionstack)! - Scaffolded app pages now enforce the dark surface the Zitadel widgets are designed for (`color-scheme: dark`, `#0f0f11`), instead of following the OS light/dark setting — across every framework template (`next`, `react`, `vue`, `angular`, `nuxt`, `solid`, `svelte`, `qwik`). This fixes the inconsistency where the `<zitadel-logout>` avatar (and other non-widget chrome, e.g. the `/profile` view) rendered on a white background while `<zitadel-login>` enforced its own dark surface.
+
+  Removed misleading field hints from the login component locales (`en`, `de`, `it`): the password "include a symbol and number" hint (only `minLength` is enforced server-side) and the `YYYY-MM-DD` date-of-birth hint (native `<input type="date">` localizes its own format and submits ISO). A dynamic, validation-rule-driven hint is tracked in [#251](https://github.com/zitadel/nextgen/issues/251).
+
+- [#372](https://github.com/zitadel/nextgen/pull/372) [`fb07553`](https://github.com/zitadel/nextgen/commit/fb075538cad22d9b9a67729e1fa02f394964e9e1) Thanks [@mridang](https://github.com/mridang)! - Set the now-required `kind` on the default flow's step actions: submit actions use `submit`, the register/login routing actions use `navigate`. Without it, the generated flow fails validation against the updated flow-definition schema.
+
+- [#354](https://github.com/zitadel/nextgen/pull/354) [`4060d9d`](https://github.com/zitadel/nextgen/commit/4060d9da0a214b58913000173657ef75e8be0843) Thanks [@mridang](https://github.com/mridang)! - Align the CLI flow-definition sync update with the PUT contract: send the `{ flow_definition }` body envelope and the required `project_id` query parameter so updates to existing flow definitions are accepted by the generated server.
+
+- Updated dependencies [[`a2f6526`](https://github.com/zitadel/nextgen/commit/a2f65266e00ee461e8e7fb1dee35e5add30b7199), [`f6279a0`](https://github.com/zitadel/nextgen/commit/f6279a0bac51447533a4a33eb33479b792558783), [`9b05b82`](https://github.com/zitadel/nextgen/commit/9b05b82c3e7546ad3c4ebd4a025a991da499abf8), [`2b2cfd5`](https://github.com/zitadel/nextgen/commit/2b2cfd58f63d564c96fdc582c07e874297a5229c), [`e5150f3`](https://github.com/zitadel/nextgen/commit/e5150f30dfc2b24230fa698bb99baeceb2841d00), [`5d18103`](https://github.com/zitadel/nextgen/commit/5d18103e677d31a5b9b7c93ea164bef53b3e6e96)]:
+  - @zitadel/api@0.1.0-alpha.12
+  - @zitadel/server@0.1.0-alpha.12
+
 ## 0.1.0-alpha.11
 
 ### Patch Changes

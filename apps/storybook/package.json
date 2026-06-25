@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/storybook",
-  "version": "0.0.0",
+  "version": "0.0.1-alpha.0",
   "private": true,
   "description": "Unified component workbench. One @storybook/web-components-vite instance hosts both the Lit atoms (@zitadel/components) and their paired React implementations (@zitadel/ui-react), so Lit ↔ React parity is visible side by side in a single tool.",
   "type": "module",
