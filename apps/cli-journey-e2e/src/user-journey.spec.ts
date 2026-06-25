@@ -5,7 +5,19 @@ test.describe.configure({ mode: "serial" });
 test.setTimeout(60_000);
 
 const framework = process.env.JOURNEY_FRAMEWORK ?? "next";
-const expectsProtectedRouteRedirect = framework === "next" || framework === "nuxt";
+// Server-rendered frameworks enforce protected routes on the server, so an
+// unauthenticated hit on /profile redirects to /login. SPA frameworks guard on
+// the client, so the route renders without a redirect. Keep this in step with
+// `expectsProtectedRouteRedirect` in scripts/frameworks.mjs.
+const serverRedirectFrameworks = new Set([
+  "next",
+  "nuxt",
+  "sveltekit",
+  "tanstack-start",
+  "solid-start",
+  "qwik-city",
+]);
+const expectsProtectedRouteRedirect = serverRedirectFrameworks.has(framework);
 const loginUrl = /\/login(?:[/?#]|$)/;
 const profileUrl = /\/profile(?:[/?#]|$)/;
 

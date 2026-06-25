@@ -28,9 +28,16 @@ export function parseLocalJourneyArgs(args) {
         break;
       }
       case "--framework": {
-        const frameworkId = readValue(args, ++index, arg);
-        frameworkForId(frameworkId);
-        parsed.frameworkIds = [frameworkId];
+        const value = readValue(args, ++index, arg);
+        const ids = value
+          .split(",")
+          .map((id) => id.trim())
+          .filter(Boolean);
+        if (ids.length === 0) {
+          throw new Error(`${arg} requires at least one framework id`);
+        }
+        ids.forEach((id) => frameworkForId(id));
+        parsed.frameworkIds = ids;
         break;
       }
       case "--image": {
