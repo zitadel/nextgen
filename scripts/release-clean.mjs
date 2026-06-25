@@ -40,6 +40,6 @@ if (isDirectRun(import.meta.url)) {
     await main();
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
-    process.exit(error?.code ?? 1);
+    process.exit(typeof error?.code === "number" && error.code !== 0 ? error.code : 1);
   }
 }
