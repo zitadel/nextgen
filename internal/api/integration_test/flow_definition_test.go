@@ -188,7 +188,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 					Steps: []api.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"username"},
+							Fields: []string{"email", "username"},
 							Transitions: api.NewOptFlowDefinitionStepTransitions(map[string]api.FlowDefinitionStepTransitionsItem{
 								"submit": {
 									Target: "step_2",

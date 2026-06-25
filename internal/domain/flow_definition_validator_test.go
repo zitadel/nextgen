@@ -347,6 +347,9 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name: "identify",
+							Fields: []domain.Field{
+								"email",
+							},
 							SSOProviders: []domain.FlowSSOProvider{
 								{
 									ID:       "google",
@@ -420,6 +423,9 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name: "enter",
+							Fields: []domain.Field{
+								"email",
+							},
 							Actions: []domain.FlowStepAction{
 								{Name: "next", Kind: domain.FlowActionKindSubmit},
 							},
@@ -912,7 +918,7 @@ func TestValidateFlowDefinition(t *testing.T) {
 					Steps: []domain.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []domain.Field{"username", "firstName"},
+							Fields: []domain.Field{"email", "username", "firstName"},
 							Transitions: map[string]domain.FlowStepTransition{
 								"submit": {Target: "step_2"},
 							},
