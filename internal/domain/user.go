@@ -108,6 +108,8 @@ func SchemaFromUserMap(user map[string]any) (string, error) {
 	return schemaURL, nil
 }
 
+//go:generate go tool mockgen -typed -package domainmock -destination ./mock/user.mock.go . UserRepository
+
 type UserRepository interface {
 	Repository
 

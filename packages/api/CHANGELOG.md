@@ -1,5 +1,11 @@
 # @zitadel/api
 
+## 0.1.0-alpha.12
+
+### Patch Changes
+
+- [#386](https://github.com/zitadel/nextgen/pull/386) [`a2f6526`](https://github.com/zitadel/nextgen/commit/a2f65266e00ee461e8e7fb1dee35e5add30b7199) Thanks [@wim07101993](https://github.com/wim07101993)! - Fixed some examples which represent flow-definition-step in the openapi examples.
+
 ## 0.1.0-alpha.11
 
 ## 0.1.0-alpha.10

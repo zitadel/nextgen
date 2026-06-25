@@ -3,7 +3,6 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: inherit;
   width: var(--zl-icon-size, 1.5rem);
   height: var(--zl-icon-size, 1.5rem);
 }

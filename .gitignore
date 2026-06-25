@@ -45,7 +45,7 @@ __debug_bin*
 .opencode/
 opencode.json
 .agents/
-.cursor/agents/
+.cursor/
 
 # OSX
 .DS_Store
@@ -60,6 +60,8 @@ out-tsc
 coverage/
 **/.vitest-attachments/
 **/__screenshots__/
+test-results/
+playwright-report/
 
 ## dependencies
 node_modules
@@ -87,6 +89,9 @@ test-output
 apps/docs/.source/
 apps/docs/.generated/
 
+## Storybook static build
+storybook-static/
+
 ## Go build cache
 .go/
 
@@ -108,7 +113,6 @@ nextgen-data/
 apps/demo-next/tsconfig.tsbuildinfo
 packages/api-mock/tsconfig.tsbuildinfo
 
-.nx/polygraph
-.cursor/debug-*
+.nx/
 # Root TS incremental build info (generated)
 tsconfig.tsbuildinfo

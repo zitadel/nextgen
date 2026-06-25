@@ -10,72 +10,68 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// SchemaResolver is the read seam [SchemaFieldResolver] depends on.
-// Narrowed to a single method so tests can swap in a fake without
-// constructing a real LRU cache + repository + HTTP client.
-// [JSONSchemaResolver] satisfies it in production.
+//go:generate go tool mockgen -typed -package domainmock -destination ./mock/flow_field_resolver.schema.mock.go . SchemaResolver
+
+// SchemaResolver loads a compiled JSON schema by URL. It is the
+// loader [FlowStateMachineRuntime] depends on for runtime schema
+// access; [SchemaFieldResolver] is the translator that runs on top of
+// the loaded schema.
 type SchemaResolver interface {
 	Resolve(ctx context.Context, client database.QueryExecutor, projectID, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error)
 }
 
-// SchemaFieldResolver is the production [FlowFieldResolver]. It reads a
-// customer's user schema through [SchemaResolver] and translates its
-// keywords into [FlowField] payloads.
+// SchemaFieldResolver is the production [FlowFieldResolver]. It is a
+// stateless translator from a loaded user schema to [FlowField]
+// payloads — schema loading is the caller's responsibility (see
+// [SchemaResolver]).
 //
 // Translation map (user meta-schema → [FlowField]):
 //
-//   - `type` + `format` → [FlowFieldType]; `x-password: true` forces
-//     [FlowFieldTypePassword].
+//   - `type` + `format` → [FlowFieldType]
 //   - top-level `required` membership → [FlowField.Required]
 //   - `minLength`, `maxLength`, `format` → [FlowFieldValidation]
 //   - `x-unique` (non-empty) → [FlowFieldChallengeIdentifier] +
 //     [FlowImplicitOutcomeUserNotFound] + [FlowField.Unique]
-//   - `x-password: true` combined with schema-level
-//     `x-auth-methods.password.enabled = true` →
-//     [FlowFieldChallengePassword]. Other auth methods do not have
-//     user-property-shaped credentials and are not surfaced here.
-type SchemaFieldResolver struct {
-	schemas SchemaResolver
-}
+//   - `x-auth-methods#<method>` field name → credential challenge for
+//     that method (e.g. `x-auth-methods#password` → password)
+type SchemaFieldResolver struct{}
 
-// NewSchemaFieldResolver returns a [FlowFieldResolver] backed by the
-// given [SchemaResolver].
-func NewSchemaFieldResolver(schemas SchemaResolver) *SchemaFieldResolver {
-	return &SchemaFieldResolver{schemas: schemas}
+// NewSchemaFieldResolver returns a stateless [FlowFieldResolver].
+func NewSchemaFieldResolver() *SchemaFieldResolver {
+	return &SchemaFieldResolver{}
 }
 
 var _ FlowFieldResolver = (*SchemaFieldResolver)(nil)
 
-func (r *SchemaFieldResolver) Resolve(
-	ctx context.Context,
-	client database.QueryExecutor,
-	projectID, userSchemaURL, stepName string,
-	fieldNames []string,
-) (FlowResolvedFields, error) {
-	schema, err := r.schemas.Resolve(ctx, client, projectID, userSchemaURL, nil)
+func (r *SchemaFieldResolver) Resolve(schema *jsonschema.Schema, stepName string, fieldNames []Field) (FlowResolvedFields, error) {
+	root := newSchemaReader(schema)
+	properties := root.Properties()
+	required := root.RequiredSet()
+	authMethods, err := root.AuthMethods()
 	if err != nil {
-		return FlowResolvedFields{}, fmt.Errorf("flow field resolver: load user schema: %w", err)
+		return FlowResolvedFields{}, fmt.Errorf("flow field resolver: read x-auth-methods: %w", err)
 	}
-
-	passwordEnabled := passwordAuthEnabled(schema)
-	required := readRequiredSet(schema)
-	properties := lookupProperties(schema)
 
 	fields := make([]FlowField, 0, len(fieldNames))
 	implicit := make(map[string][]string)
 
-	for _, name := range fieldNames {
-		propSchema, ok := properties[name]
-		if !ok {
-			return FlowResolvedFields{}, fmt.Errorf("%w: %q", ErrFlowFieldUnknown, name)
+	for _, field := range fieldNames {
+		var (
+			ff  FlowField
+			err error
+		)
+		switch {
+		case field.IsAuthMethod():
+			ff, err = resolveAuthMethodField(authMethods, field, stepName)
+		default:
+			ff, err = resolveUserPropertyField(properties, required, field, stepName)
 		}
-		field, err := buildFlowField(stepName, name, propSchema, required, passwordEnabled)
 		if err != nil {
-			return FlowResolvedFields{}, fmt.Errorf("flow field %q: %w", name, err)
+			return FlowResolvedFields{}, err
 		}
-		fields = append(fields, field)
-		if outcomes := ImplicitOutcomesForChallenge(field.Challenge); len(outcomes) > 0 {
-			implicit[name] = append(implicit[name], outcomes...)
+		fields = append(fields, ff)
+		if outcomes := ImplicitOutcomesForChallenge(ff.Challenge); len(outcomes) > 0 {
+			implicit[field.String()] = outcomes
 		}
 	}
 
@@ -85,49 +81,81 @@ func (r *SchemaFieldResolver) Resolve(
 	}, nil
 }
 
-// buildFlowField translates a user-schema property into a [FlowField].
-// Returns [ErrFlowFieldUnsupportedType] when the property's JSON `type`
-// keyword cannot be reduced to a single input kind.
-func buildFlowField(stepName, name string, propSchema *jsonschema.Schema, required map[string]struct{}, passwordEnabled bool) (FlowField, error) {
-	unique := deriveUnique(propSchema)
-	fieldType, err := deriveFieldType(propSchema)
+// resolveUserPropertyField builds a [FlowField] from a top-level
+// property of the user schema. Returns [ErrFlowFieldUnknown] when the
+// property is absent, [ErrFlowFieldUnsupportedType] when the JSON
+// `type` keyword is an ambiguous union.
+func resolveUserPropertyField(properties map[string]schemaReader, required map[string]struct{}, field Field, stepName string) (FlowField, error) {
+	prop, ok := properties[field.String()]
+	if !ok {
+		return FlowField{}, fmt.Errorf("%w: %q", ErrFlowFieldUnknown, field.String())
+	}
+
+	fieldType, err := deriveUserPropertyType(prop)
 	if err != nil {
 		return FlowField{}, err
 	}
-	field := FlowField{
-		Name:      name,
-		TextKey:   stepName + ".field." + name,
+
+	unique := deriveUnique(prop)
+
+	ff := FlowField{
+		Name:      field.String(),
+		TextKey:   stepName + ".field." + field.String(),
 		Type:      fieldType,
-		Challenge: deriveChallenge(propSchema, unique, passwordEnabled),
+		Challenge: deriveIdentifierChallenge(unique),
 		Unique:    unique,
 	}
-	if _, ok := required[name]; ok {
-		field.Required = true
+	if _, ok := required[field.String()]; ok {
+		ff.Required = true
 	}
-	if v := buildValidation(propSchema); v != nil {
-		field.Validation = v
+	if v := buildValidation(prop); v != nil {
+		ff.Validation = v
 	}
-	return field, nil
+	return ff, nil
 }
 
-// deriveFieldType maps the property's `enum`, `format`, and JSON
-// `type` keywords to a [FlowFieldType]. `x-password: true` forces a
-// password input regardless of the other keywords. A closed `enum`
-// surfaces as `select`; JSON `type: boolean` surfaces as `checkbox`.
-// Returns [ErrFlowFieldUnsupportedType] when the JSON `type` is an
-// ambiguous union the resolver cannot reduce to a single kind.
-func deriveFieldType(propSchema *jsonschema.Schema) (FlowFieldType, error) {
-	jsonType, err := lookupJSONType(propSchema)
+// resolveAuthMethodField builds a [FlowField] from an
+// `x-auth-methods#<method>` field name. The field carries the
+// credential challenge only when the method is enabled on the schema;
+// otherwise [FlowFieldChallengeNone] is returned (the validator
+// rejects this at definition time).
+func resolveAuthMethodField(authMethods xAuthMethodsReader, field Field, stepName string) (FlowField, error) {
+	fieldType, err := deriveAuthMethodType(field)
+	if err != nil {
+		return FlowField{}, err
+	}
+
+	var challenge FlowFieldChallenge
+	if field.AuthMethod() == "password" && authMethods.IsEnabled(field.AuthMethod()) {
+		challenge = FlowFieldChallengePassword
+	}
+
+	return FlowField{
+		Name:      field.String(),
+		TextKey:   stepName + ".field." + field.AuthMethod(),
+		Type:      fieldType,
+		Challenge: challenge,
+		Required:  true,
+		Validation: &FlowFieldValidation{
+			MinLength: 8, // TODO: should come from policy or user-schema
+		},
+	}, nil
+}
+
+// deriveUserPropertyType maps a user-property's `enum`, `format`, and
+// JSON `type` keywords to a [FlowFieldType]. A closed `enum` surfaces
+// as `select`; JSON `type: boolean` surfaces as `checkbox`. Returns
+// [ErrFlowFieldUnsupportedType] when the JSON `type` is an ambiguous
+// union the resolver cannot reduce to a single kind.
+func deriveUserPropertyType(prop schemaReader) (FlowFieldType, error) {
+	jsonType, err := prop.JSONType()
 	if err != nil {
 		return "", err
 	}
-	if isPassword(propSchema) {
-		return FlowFieldTypePassword, nil
-	}
-	if len(lookupStringEnum(propSchema)) > 0 {
+	if len(prop.StringEnum()) > 0 {
 		return FlowFieldTypeSelect, nil
 	}
-	switch lookupString(propSchema, "format") {
+	switch prop.String("format") {
 	case "email":
 		return FlowFieldTypeEmail, nil
 	case "uri":
@@ -141,24 +169,30 @@ func deriveFieldType(propSchema *jsonschema.Schema) (FlowFieldType, error) {
 	return FlowFieldTypeText, nil
 }
 
-// deriveChallenge resolves the unified [FlowFieldChallenge]. A
-// non-empty `x-unique` scope marks the field as Identifier (any
-// uniquely-keyed property can identify a user). `x-password: true`
-// surfaces as Password when the schema-level `x-auth-methods.password`
-// is enabled. Other credential kinds (passkey, magic_link, sso, otp)
-// have no user-property-shaped proof and are never surfaced here.
-func deriveChallenge(propSchema *jsonschema.Schema, unique AttributeUniqueness, passwordEnabled bool) FlowFieldChallenge {
+// deriveAuthMethodType returns the input kind for an
+// `x-auth-methods#<method>` field. Today only `password` is
+// recognized; other methods return [FlowFieldTypeUnknown] with an
+// error.
+func deriveAuthMethodType(field Field) (FlowFieldType, error) {
+	switch field.AuthMethod() {
+	case "password":
+		return FlowFieldTypePassword, nil
+	}
+	return FlowFieldTypeUnknown, fmt.Errorf(`unknown field type for "%s"`, field.String())
+}
+
+// deriveIdentifierChallenge surfaces [FlowFieldChallengeIdentifier]
+// when the property has any non-empty `x-unique` scope. Any uniquely-
+// keyed property can identify a user.
+func deriveIdentifierChallenge(unique AttributeUniqueness) FlowFieldChallenge {
 	if unique != AttributeUniquenessUnspecified {
 		return FlowFieldChallengeIdentifier
-	}
-	if isPassword(propSchema) && passwordEnabled {
-		return FlowFieldChallengePassword
 	}
 	return FlowFieldChallengeNone
 }
 
-func deriveUnique(propSchema *jsonschema.Schema) AttributeUniqueness {
-	switch lookupString(propSchema, "x-unique") {
+func deriveUnique(prop schemaReader) AttributeUniqueness {
+	switch prop.String("x-unique") {
 	case "project":
 		return AttributeUniquenessProject
 	case "team":
@@ -167,12 +201,12 @@ func deriveUnique(propSchema *jsonschema.Schema) AttributeUniqueness {
 	return AttributeUniquenessUnspecified
 }
 
-func buildValidation(propSchema *jsonschema.Schema) *FlowFieldValidation {
+func buildValidation(prop schemaReader) *FlowFieldValidation {
 	v := FlowFieldValidation{
-		Format:    lookupString(propSchema, "format"),
-		MinLength: lookupInt(propSchema, "minLength"),
-		MaxLength: lookupInt(propSchema, "maxLength"),
-		Enum:      lookupStringEnum(propSchema),
+		Format:    prop.String("format"),
+		MinLength: prop.Int("minLength"),
+		MaxLength: prop.Int("maxLength"),
+		Enum:      prop.StringEnum(),
 	}
 	if v.Format == "" && v.MinLength == 0 && v.MaxLength == 0 && len(v.Enum) == 0 {
 		return nil
@@ -180,14 +214,28 @@ func buildValidation(propSchema *jsonschema.Schema) *FlowFieldValidation {
 	return &v
 }
 
-// lookupJSONType returns the property's single JSON `type` keyword.
-// JSON Schema allows `type` to be either a string or an array of
-// strings; the nullable idiom `["null", X]` (in either order) is
-// reduced to X. Any other multi-entry union yields
-// [ErrFlowFieldUnsupportedType], since the resolver has no rule for
-// picking one input kind over the other.
-func lookupJSONType(schema *jsonschema.Schema) (string, error) {
-	v, ok := schema.LookupKeyword("type")
+// schemaReader is a thin reader over a [*jsonschema.Schema] that
+// centralizes the keyword-shape quirks (PartString vs PartAny,
+// nullable type unions, x-* extensions) so callers stay focused on
+// translation. Used both at root level (Properties, RequiredSet,
+// AuthMethods) and at property level (JSONType, String, Int,
+// StringEnum).
+type schemaReader struct {
+	s *jsonschema.Schema
+}
+
+func newSchemaReader(s *jsonschema.Schema) schemaReader {
+	return schemaReader{s: s}
+}
+
+// JSONType returns the property's single JSON `type` keyword. JSON
+// Schema allows `type` to be either a string or an array of strings;
+// the nullable idiom `["null", X]` (in either order) is reduced to X.
+// Any other multi-entry union yields [ErrFlowFieldUnsupportedType],
+// since the resolver has no rule for picking one input kind over the
+// other.
+func (r schemaReader) JSONType() (string, error) {
+	v, ok := r.s.LookupKeyword("type")
 	if !ok {
 		return "", nil
 	}
@@ -214,12 +262,12 @@ func lookupJSONType(schema *jsonschema.Schema) (string, error) {
 	}
 }
 
-// lookupStringEnum returns the property's `enum` keyword, restricted to
+// StringEnum returns the property's `enum` keyword, restricted to
 // string entries. Non-string entries are skipped: the user meta-schema
 // surfaces enums only for closed text choices today; numeric/boolean
 // enums (if ever added) would need a richer wire type.
-func lookupStringEnum(schema *jsonschema.Schema) []string {
-	v, ok := schema.LookupKeyword("enum")
+func (r schemaReader) StringEnum() []string {
+	v, ok := r.s.LookupKeyword("enum")
 	if !ok {
 		return nil
 	}
@@ -243,35 +291,60 @@ func lookupStringEnum(schema *jsonschema.Schema) []string {
 	return out
 }
 
-// passwordAuthEnabled reports whether the root schema declares
-// `x-auth-methods.password.enabled = true`. Password is the only
-// credential the resolver surfaces, so the broader set isn't needed.
-func passwordAuthEnabled(schema *jsonschema.Schema) bool {
-	v, ok := schema.LookupKeyword("x-auth-methods")
+// String returns the string value of the given keyword, or "" when
+// absent or shaped differently.
+func (r schemaReader) String(keyword string) string {
+	v, ok := r.s.LookupKeyword(keyword)
 	if !ok {
-		return false
+		return ""
 	}
-	raw, ok := v.(types.PartAny)
-	if !ok {
-		return false
+	if s, ok := v.(types.PartString); ok {
+		return string(s)
 	}
-	methods, ok := raw.V.(map[string]any)
-	if !ok {
-		return false
+	if part, ok := v.(types.PartAny); ok {
+		if s, ok := part.V.(string); ok {
+			return s
+		}
 	}
-	entry, ok := methods["password"].(map[string]any)
-	if !ok {
-		return false
-	}
-	enabled, _ := entry["enabled"].(bool)
-	return enabled
+	return ""
 }
 
-// readRequiredSet returns the names listed in the root schema's
-// top-level `required` keyword.
-func readRequiredSet(schema *jsonschema.Schema) map[string]struct{} {
+// Int returns the int value of the given keyword, or 0 when absent.
+func (r schemaReader) Int(keyword string) int {
+	v, ok := r.s.LookupKeyword(keyword)
+	if !ok {
+		return 0
+	}
+	if n, ok := v.(types.PartInt); ok {
+		return int(n)
+	}
+	return 0
+}
+
+// Properties returns each top-level property of an object schema as
+// its own [schemaReader], or nil when `properties` is absent or
+// malformed.
+func (r schemaReader) Properties() map[string]schemaReader {
+	v, ok := r.s.LookupKeyword("properties")
+	if !ok {
+		return nil
+	}
+	m, ok := v.(types.PartMapSchema)
+	if !ok {
+		return nil
+	}
+	out := make(map[string]schemaReader, len(m))
+	for name, prop := range m {
+		out[name] = newSchemaReader(prop)
+	}
+	return out
+}
+
+// RequiredSet returns the names listed in the top-level `required`
+// keyword as a set.
+func (r schemaReader) RequiredSet() map[string]struct{} {
 	out := map[string]struct{}{}
-	v, ok := schema.LookupKeyword("required")
+	v, ok := r.s.LookupKeyword("required")
 	if !ok {
 		return out
 	}
@@ -285,64 +358,35 @@ func readRequiredSet(schema *jsonschema.Schema) map[string]struct{} {
 	return out
 }
 
-// lookupProperties returns the root schema's `properties` map, or nil
-// when the keyword is absent or malformed. A nil map yields the
-// "every field is unknown" behavior at lookup sites.
-func lookupProperties(schema *jsonschema.Schema) map[string]*jsonschema.Schema {
-	v, ok := schema.LookupKeyword("properties")
+// AuthMethods returns a reader over the root schema's `x-auth-methods`
+// keyword. An empty (no-op) reader is returned when the keyword is
+// absent. An error is returned only when the keyword is present but
+// shaped differently than expected.
+func (r schemaReader) AuthMethods() (xAuthMethodsReader, error) {
+	v, ok := r.s.LookupKeyword("x-auth-methods")
 	if !ok {
-		return nil
+		return xAuthMethodsReader{}, nil
 	}
-	m, ok := v.(types.PartMapSchema)
+	raw, ok := v.(types.PartAny)
 	if !ok {
-		return nil
+		return xAuthMethodsReader{}, fmt.Errorf("%w: %v", ErrFlowFieldUnsupportedType, v)
 	}
-	return map[string]*jsonschema.Schema(m)
+	return xAuthMethodsReader{raw: raw}, nil
 }
 
-func lookupString(schema *jsonschema.Schema, keyword string) string {
-	v, ok := schema.LookupKeyword(keyword)
-	if !ok {
-		return ""
-	}
-	if s, ok := v.(types.PartString); ok {
-		return string(s)
-	}
-	if any, ok := v.(types.PartAny); ok {
-		if s, ok := any.V.(string); ok {
-			return s
-		}
-	}
-	return ""
+type xAuthMethodsReader struct {
+	raw types.PartAny
 }
 
-func lookupInt(schema *jsonschema.Schema, keyword string) int {
-	v, ok := schema.LookupKeyword(keyword)
-	if !ok {
-		return 0
-	}
-	if n, ok := v.(types.PartInt); ok {
-		return int(n)
-	}
-	return 0
-}
-
-func isPassword(schema *jsonschema.Schema) bool {
-	return lookupBool(schema, "x-password")
-}
-
-func lookupBool(schema *jsonschema.Schema, keyword string) bool {
-	v, ok := schema.LookupKeyword(keyword)
+func (x xAuthMethodsReader) IsEnabled(method string) bool {
+	methods, ok := x.raw.V.(map[string]any)
 	if !ok {
 		return false
 	}
-	if b, ok := v.(types.PartBool); ok {
-		return bool(b)
+	entry, ok := methods[method].(map[string]any)
+	if !ok {
+		return false
 	}
-	if any, ok := v.(types.PartAny); ok {
-		if b, ok := any.V.(bool); ok {
-			return b
-		}
-	}
-	return false
+	enabled, _ := entry["enabled"].(bool)
+	return enabled
 }

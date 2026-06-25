@@ -1,5 +1,12 @@
 # @zitadel/sdk-core
 
+## 0.1.0-alpha.12
+
+### Patch Changes
+
+- Updated dependencies [[`a2f6526`](https://github.com/zitadel/nextgen/commit/a2f65266e00ee461e8e7fb1dee35e5add30b7199)]:
+  - @zitadel/api@0.1.0-alpha.12
+
 ## 0.1.0-alpha.11
 
 ### Minor Changes

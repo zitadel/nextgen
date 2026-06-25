@@ -1,7 +1,7 @@
 # ADR 002: Multi-package Release Strategy
 
 > **Status:** Accepted
-> **Date:** 2026-04-25 (revised 2026-06-16)
+> **Date:** 2026-04-25 (revised 2026-06-23)
 > **Context:** nextgen monorepo release pipelines
 
 ## Decision
@@ -22,6 +22,13 @@ Release orchestration is split by responsibility:
    GitHub Release shell for `v<version>` with generated artifact and package
    facts. Product GitHub Release prose is a manual maintainer artifact when an
    announcement is needed.
+
+Because the product ships one GitHub Release for a shared `v<version>`, release
+intent is product-level, not path-level: a PR that changes shipped Go server
+behavior records an `@zitadel/server` changeset even when the source lives in
+implementation paths such as `internal/`, `cmd/`, `api/openapi/`, or migrations,
+so the change appears in the generated changelog and release notes. The
+[changeset rules](../../.changeset/README.md) own the per-PR decision.
 
 Nx and GoReleaser are retired dependencies. They are not part of the target CI
 or release path.

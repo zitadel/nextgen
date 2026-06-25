@@ -1209,13 +1209,9 @@ func (s *FlowDefinitionResponse) Validate() error {
 
 func (s FlowDefinitionStatus) Validate() error {
 	switch s {
-	case "draft":
-		return nil
 	case "active":
 		return nil
-	case "deprecated":
-		return nil
-	case "archived":
+	case "draft":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
@@ -1228,6 +1224,31 @@ func (s *FlowDefinitionStep) Validate() error {
 	}
 
 	var failures []validate.FieldError
+	if err := func() error {
+		var failures []validate.FieldError
+		for i, elem := range s.Actions {
+			if err := func() error {
+				if err := elem.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				failures = append(failures, validate.FieldError{
+					Name:  fmt.Sprintf("[%d]", i),
+					Error: err,
+				})
+			}
+		}
+		if len(failures) > 0 {
+			return &validate.Error{Fields: failures}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "actions",
+			Error: err,
+		})
+	}
 	if err := func() error {
 		if value, ok := s.Gates.Get(); ok {
 			if err := func() error {
@@ -1587,6 +1608,23 @@ func (s *FlowStep) Validate() error {
 	if err := func() error {
 		if s.Actions == nil {
 			return errors.New("nil is invalid value")
+		}
+		var failures []validate.FieldError
+		for i, elem := range s.Actions {
+			if err := func() error {
+				if err := elem.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				failures = append(failures, validate.FieldError{
+					Name:  fmt.Sprintf("[%d]", i),
+					Error: err,
+				})
+			}
+		}
+		if len(failures) > 0 {
+			return &validate.Error{Fields: failures}
 		}
 		return nil
 	}(); err != nil {
@@ -2567,6 +2605,46 @@ func (s *SessionWithTokenResponseHeaders) Validate() error {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
+}
+
+func (s *StepAction) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Kind.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "kind",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s StepActionKind) Validate() error {
+	switch s {
+	case "submit":
+		return nil
+	case "passkey":
+		return nil
+	case "passkey_register":
+		return nil
+	case "navigate":
+		return nil
+	case "back":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
 }
 
 func (s *SubmitFlowStepBadRequest) Validate() error {
