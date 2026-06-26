@@ -68,8 +68,9 @@ Without this, implementations drift: flow handlers construct inline `domain.Erro
 - **Context:** `ExtractErrCause` logs `context.Cause(ctx)` when present.
 - **Masking:** `MaskConfig` redacts configured attribute keys/groups in log output.
 - **Config:** `ErrorConfig.ReportLocation` and `ErrorConfig.StackTrace` exist but are **not read anywhere** yet.
+- **Request logging:** `middleware.WithLogging` (wired in `cmd/server/server.go`) logs every request on entry (`method`, `url`, `uri`) and on exit. Responses with status ≥ 400 are logged at **`Error`** with the **full serialized response body** and `operation_id`; otherwise at `Info`.
 - **Gap:** `domain.Error.Location` is not attached to structured log records.
-- **Gap:** no policy for when to log at `Error` vs `Warn` for expected client errors (4xx).
+- **Gap:** the generic request-logging path above is separate from per-error structured logging (Decision 5), logs **all** 4xx at `Error`, and logs the raw response body — so any API leak (Decision 6) also reaches logs, and there is no `Error`-vs-`Warn` policy for expected client errors.
 
 ## Decision
 
@@ -168,6 +169,8 @@ Follow-up tracked by [#48](https://github.com/zitadel/nextgen/issues/48): introd
 
 ### 4. Domain → API mapping
 
+Every error response is the ogen-generated `api.ErrorDetails` (`api/openapi/components/error-details.yaml`): a required `code` (stable machine key) and `message` (human-facing string), plus an optional `details`. These wire types are generated from `api/openapi` by ogen (`api/generate.go`; see `api/openapi/readme.md`) — change the OpenAPI source, never `api/generated`.
+
 #### Response body
 
 - Always return `code` and `message` from the `domain.Error`.
@@ -226,6 +229,7 @@ Capture is centralized in `internal/errreport` and configured by **global atomic
 #### Expected client errors (4xx)
 
 - Log at `Info` or `Warn` with `error.code` and request correlation attributes.
+- `middleware.WithLogging` (Inventory) currently logs **all** status ≥ 400 at `Error` with the full response body. Align it: log expected 4xx at `Info`/`Warn`, reserve `Error` for `internal`/5xx, and stop logging the raw response body — log the structured `code` plus safe attributes instead (Decision 6).
 - Expected storage signals (for example `NoRowFoundError` → `*.not_found`) should not trigger stack capture in normal operation; capturing stacks for frequently-expected errors is acceptable only while the debug toggle is on.
 - Do **not** send 4xx domain errors to GCP Error Reporting as service incidents unless rate anomalies trigger alerting separately.
 
@@ -281,6 +285,20 @@ logger.LogAttrs(ctx, slog.LevelDebug, "unique attribute conflict",
 
 This keeps both the value and its hash out of logs without losing debuggability: the structured cause says a uniqueness rule fired on `user_unique_attributes`, the caller adds the safe discriminator (`attribute_key=email`), and correlation identifiers (`request_id` / `trace_id`) let an operator pivot from the log line back to the originating request — including a captured HAR or trace that already carries the entered value — under the access controls that protect request data, rather than baking the value or its hash into every error log permanently.
 
+#### Masking limits for schema-driven data
+
+`MaskConfig` (Inventory → Logging) is a **static deny-list of attribute key names** (`password`, `token`, …) applied per slog attribute. It is a backstop, not the mechanism for user/schema-driven data, for two structural reasons:
+
+- **Keys are open-ended.** User attributes are EAV, defined per tenant by JSON Schemas (`api/openapi/endpoints/schemas`). The sensitive key set (`ssn`, `date_of_birth`, custom fields) cannot be enumerated in a global list ahead of time.
+- **Values land in opaque blobs.** Key masking matches attribute *keys*; it cannot reach inside a serialized JSON body. The request-logging middleware logging the full `response` body string is exactly this case.
+
+Policy:
+
+1. **Default-sensitive: do not log user/schema attribute payloads or raw request/response bodies.** Log the structured domain error (`code` + safe `message` + a few named, safe attributes), never the serialized body. This removes the blob problem at the source.
+2. **Declare sensitivity in the schema, enforce at the boundary.** Sensitivity is a property of the JSON Schema (`writeOnly`, `format: password`, or an `x-zitadel-sensitive` extension), consulted by the attribute-handling code — not guessed by the generic slog layer.
+3. **Keep static key masking as defense-in-depth** for fixed-name credential attributes that appear in structured args.
+4. **URLs are safe-to-log by construction, not by redaction.** Path and query params are already logged everywhere downstream (proxies, load balancers, access logs, browser history, `Referer`), so the rule is the inverse of redaction: **no secret or PII may be carried in a path or query parameter** — those belong in headers or the request body. Logging keeps the URL and omits only the body.
+
 #### Known current leaks to remediate
 
 The canonical mapper (`domainErrorDetails` → only `Code` + `Message`) is clean. With `Error()` trimmed (Decision 4 → Messages), `domain.Error` chains rendered via `Error()` become safe too. These remaining side paths still need call-site fixes because they render **non-domain** errors or rely on raw text:
@@ -331,7 +349,8 @@ The canonical mapper (`domainErrorDetails` → only `Code` + `Message`) is clean
 | Flow error sentinels + OpenAPI schemas | API / domain | #367 |
 | Shared storage error detection helpers | Storage / service | #48 |
 | Selective API `details` population | API | #367 |
-| Audit 4xx log levels | API / service | #367 |
+| Align `WithLogging`: 4xx at `Info`/`Warn`, stop logging raw response bodies | API / instrumentation | #367 |
+| Schema-declared attribute sensitivity; audit no secret/PII in path/query params | API / domain | #367 |
 
 ## References
 
