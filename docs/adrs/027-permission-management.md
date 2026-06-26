@@ -43,6 +43,12 @@ Three related issue areas constrain the decision:
 - Agent identity needs first-class principals and scoped delegations, not broad
   inherited user authority.
 
+Prior oxidel design work provides useful reference patterns for this ADR:
+
+- [ADR-036 (Staff Access and Support Grants)](https://github.com/zitadel/oxidel/blob/main/docs/adr/036-staff-access-support-grants.md) defines scoped, time-limited staff grants with four privilege tiers and an explicit audit-trail contract.
+- [ADR-041 (Cloud Platform Collaboration Model)](https://github.com/zitadel/oxidel/blob/main/docs/adr/041-cloud-customer-portal-collaboration.md) establishes org membership as the share primitive for cross-project access.
+- [ADR-042 (Projects and Apps Use Owner-Org AuthZ)](https://github.com/zitadel/oxidel/blob/main/docs/adr/042-projects-apps-owner-org-authz.md) defines resource-oriented permission names and 403/404 denial semantics.
+
 Fine-grained authorization products are useful references, but external
 sidecars are not the implementation target. They need their own tuple store and
 must learn about resource existence and attributes through synchronization,
@@ -168,6 +174,24 @@ delegation id, expiry/revocation state, and scope. An agent never receives
 permissions by copying all permissions from its owner. The resolver must be able
 to explain which delegation authorized or denied an agent action for audit.
 
+Staff and support grants use the same storage shape: each record carries a
+`grant_id`, issuer principal, human-readable `reason`, role tier, expiry
+timestamp, and revocation state alongside the standard assignment tuple. The
+authoritative grant record drives both access decisions and audit export — there
+is no separate access path that bypasses the grant check. Cross-project
+privileged access is modeled through four tiers in the system catalog:
+
+| Tier | Permitted scope |
+|---|---|
+| `support.read` | Read resources, sessions, event streams, and settings |
+| `support.write` | Above plus reset credentials, revoke sessions, suspend/unsuspend principals |
+| `support.config` | Above plus modify resource configuration and policy |
+| `support.admin` | Full delegated access including impersonation grants |
+
+Each tier is a named permission set in the system catalog, not a runtime bypass.
+Tier escalation requires a new grant at the higher tier; chaining lower-tier
+grants cannot yield higher-tier access.
+
 ### 4. Resolver and list filtering
 
 Every protected endpoint declares:
@@ -193,6 +217,21 @@ into the resource query. Repositories tell the predicate builder which resource
 columns carry `project_id`, `team_id`, and any owner/resource identifiers. The
 database filters rows in one query; the API never performs O(n) per-row
 permission checks after fetching a result page.
+
+For list endpoints that span authorization scopes, the resolver first derives
+the set of project/team scopes the caller is authorized to read, then constrains
+the query to rows owned by those scopes. This avoids returning all rows and
+filtering post-fetch.
+
+**Denial semantics.** The resolver enforces a strict two-code contract:
+
+- Principal is authorized to the project/resource scope but lacks the required
+  permission → `403 Forbidden`.
+- Resource does not exist within the resolved scope, or principal lacks any
+  access to the scope boundary → `404 Not Found`.
+
+This distinction prevents information leakage about resource existence across
+project scopes while still giving authorized callers an actionable error.
 
 PostgreSQL may later use generated SQL functions, views, or RLS as an
 accelerator behind the same resolver interface. The portable behavior remains
@@ -220,6 +259,29 @@ ADR requires authorization rows to be stored with the same residency/partition
 metadata as the resources they protect, and it requires all cross-project staff,
 operator, agency, and support access to be represented as explicit grants with
 scope, expiry, grantor, and audit provenance.
+
+### 6. Audit trail and grant provenance
+
+Every action performed under a scoped grant or agent delegation records the
+grant context in the event actor metadata:
+
+```
+actor:     staff:alice
+grant_id:  grant-123
+reason:    "SUPPORT-456: customer reports login failures"
+role:      support.write
+action:    session.revoke
+target:    user:bob
+```
+
+This makes support actions and delegated agent actions visible in the resource
+owner's audit log. There is no hidden access path: the grant check and the audit
+record are the same code path.
+
+A break-glass escape hatch (equivalent to oxidel's `operator_admin`) must be
+defined for platform operators when normal grant issuance is unavailable. Unlike
+regular grants, break-glass access skips the grant-issuance flow but still
+produces audit events. Break-glass design is deferred to a follow-up.
 
 ## Consequences
 
@@ -294,7 +356,7 @@ policies without reintroducing hard-coded levels and special cases.
 
 ## Follow-ups
 
-1. Define the exact system permission catalog and optional default bundles.
+1. Define the exact system permission catalog and optional default bundles. Use resource-oriented naming consistent with the ADR-042 pattern — e.g. `project.create`, `project.read`, `project.write`, `project.delete`, `project.app.read`, `project.app.write`, `project.app.delete` — and extend to all nextgen resource types.
 2. Design relational migrations for catalogs, permissions/relations, grants,
    assignments, app grants, and `resource_scope_index`.
 3. Add the upstream OpenFGA language package and implement the IR/profile
@@ -307,3 +369,6 @@ policies without reintroducing hard-coded levels and special cases.
    external permissions.
 8. Define agent delegation schema, audit record shape, and denial explanation
    fields.
+9. Define the break-glass access mechanism for platform operators when normal
+   grant issuance is unavailable, specifying which checks it bypasses and what
+   audit events it must emit.
