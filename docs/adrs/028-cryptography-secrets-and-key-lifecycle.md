@@ -24,7 +24,7 @@ package. It provides all functionality to hash and migrate hashes of passwords.
 A project admin should be able to configure which hashing method should be used.
 This so that a tenant can have specific requirements like FIPS.
 
-By default, we should use `bcrypt` for password/secret hashing.
+By default, we should use `argon2id` for password/secret hashing.
 
 ### Project/preview secret
 
