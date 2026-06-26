@@ -223,6 +223,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 				FlowDefinition: api.FlowDefinition{
 					Name:       "invalid-flow",
 					UserSchema: *userSchemaURI,
+					Status:     "active",
 					Purposes:   map[string]string{"login": "step_1"},
 					Audience: api.OptFlowAudience{
 						Value: api.FlowAudience{
