@@ -24,10 +24,14 @@ func compileRead[F ~uint8, T any](c *statementCompiler, stmt string, opt *databa
 		if !cursor.MatchesOrderBy(opt.Pagination.OrderBy.Columns) {
 			return database.ErrCursorOrderMismatch()
 		}
+		values, err := schema.CoerceCursorValues(cursor.Columns, cursor.Values)
+		if err != nil {
+			return database.ErrInvalidCursor()
+		}
 		if opt.Pagination.OrderBy.Direction == database.OrderAsc {
-			opt.Filter = database.And(opt.Filter, database.GreaterThans(cursor.Columns, cursor.Values))
+			opt.Filter = database.And(opt.Filter, database.GreaterThans(cursor.Columns, values))
 		} else {
-			opt.Filter = database.And(opt.Filter, database.LessThans(cursor.Columns, cursor.Values))
+			opt.Filter = database.And(opt.Filter, database.LessThans(cursor.Columns, values))
 		}
 	}
 	if opt.Filter != nil {

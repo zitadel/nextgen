@@ -65,7 +65,7 @@ func TestCompileReadKeysetCursorAsc(t *testing.T) {
 
 	assert.Contains(t, sql, "(created_at, id) > ($1, $2)")
 	require.Len(t, args, 3)
-	assert.Equal(t, createdAt.UTC().Format(time.RFC3339), args[0])
+	assert.Equal(t, createdAt, args[0])
 	assert.Equal(t, "proj_1", args[1])
 	assert.Equal(t, uint32(5), args[2])
 }

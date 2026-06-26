@@ -22,10 +22,12 @@ func TestSchemaSQLNameAndValuesFrom(t *testing.T) {
 		domain.ProjectFieldID: {
 			SQLName:  "id",
 			Accessor: func(p *domain.Project) any { return p.ID },
+			Coerce:   database.CoerceString,
 		},
 		domain.ProjectFieldCreatedAt: {
 			SQLName:  "created_at",
 			Accessor: func(p *domain.Project) any { return p.CreatedAt },
+			Coerce:   database.CoerceTime,
 		},
 	})
 
@@ -41,11 +43,56 @@ func TestSchemaSQLNameAndValuesFrom(t *testing.T) {
 	assert.Equal(t, createdAt, values[1])
 }
 
+func TestSchemaCoerceCursorValues(t *testing.T) {
+	createdAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	schema := database.NewSchema(map[domain.ProjectField]database.FieldBinding[domain.Project]{
+		domain.ProjectFieldCreatedAt: {
+			SQLName:  "created_at",
+			Accessor: func(p *domain.Project) any { return p.CreatedAt },
+			Coerce:   database.CoerceTime,
+		},
+		domain.ProjectFieldID: {
+			SQLName:  "id",
+			Accessor: func(p *domain.Project) any { return p.ID },
+			Coerce:   database.CoerceString,
+		},
+	})
+
+	values, err := schema.CoerceCursorValues(
+		[]database.Column[domain.ProjectField]{
+			database.Col(domain.ProjectFieldCreatedAt),
+			database.Col(domain.ProjectFieldID),
+		},
+		[]any{"2026-01-02T03:04:05Z", "proj_1"},
+	)
+	require.NoError(t, err)
+	require.Len(t, values, 2)
+	assert.Equal(t, createdAt, values[0])
+	assert.Equal(t, "proj_1", values[1])
+}
+
+func TestSchemaCoerceCursorValues_invalidTime(t *testing.T) {
+	schema := database.NewSchema(map[domain.ProjectField]database.FieldBinding[domain.Project]{
+		domain.ProjectFieldCreatedAt: {
+			SQLName:  "created_at",
+			Accessor: func(p *domain.Project) any { return p.CreatedAt },
+			Coerce:   database.CoerceTime,
+		},
+	})
+
+	_, err := schema.CoerceCursorValues(
+		[]database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldCreatedAt)},
+		[]any{"not-a-time"},
+	)
+	assert.Error(t, err)
+}
+
 func TestSchemaUnknownFieldPanics(t *testing.T) {
 	schema := database.NewSchema(map[domain.ProjectField]database.FieldBinding[domain.Project]{
 		domain.ProjectFieldID: {
 			SQLName:  "id",
 			Accessor: func(p *domain.Project) any { return p.ID },
+			Coerce:   database.CoerceString,
 		},
 	})
 
