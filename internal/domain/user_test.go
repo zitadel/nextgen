@@ -20,26 +20,45 @@ const minimalUserSchema = `{
 	}
 }`
 
-func TestNewCreateUser_HonorsCallerSuppliedID(t *testing.T) {
-	user := map[string]any{
-		"$schema":   "https://example.test/schema.json",
-		"email":     "alice@example.com",
-		"givenName": "Alice",
+func TestNewCreateUser(t *testing.T) {
+	tests := []struct {
+		name  string
+		id    string
+		user  map[string]any
+		check func(t *testing.T, got *domain.CreateUser)
+	}{
+		{
+			name: "caller-supplied id passes through",
+			id:   "user_provisional",
+			user: map[string]any{
+				"$schema":   "https://example.test/schema.json",
+				"email":     "alice@example.com",
+				"givenName": "Alice",
+			},
+			check: func(t *testing.T, got *domain.CreateUser) {
+				assert.Equal(t, "user_provisional", got.ID)
+			},
+		},
+		{
+			name: "empty id mints a fresh one with the user prefix",
+			id:   "",
+			user: map[string]any{
+				"$schema": "https://example.test/schema.json",
+				"email":   "alice@example.com",
+			},
+			check: func(t *testing.T, got *domain.CreateUser) {
+				prefix := string(domain.PrefixUser) + "_"
+				assert.True(t, strings.HasPrefix(got.ID, prefix), "want prefix %q, got id %q", prefix, got.ID)
+				assert.Greater(t, len(got.ID), len(prefix), "minted id must not be just the prefix")
+			},
+		},
 	}
 
-	got, err := domain.NewCreateUser("proj_1", nil, "user_provisional", []byte(minimalUserSchema), user)
-	require.NoError(t, err)
-	assert.Equal(t, "user_provisional", got.ID, "caller-supplied id must pass through unchanged")
-}
-
-func TestNewCreateUser_MintsIDWhenCallerLeavesItEmpty(t *testing.T) {
-	user := map[string]any{
-		"$schema": "https://example.test/schema.json",
-		"email":   "alice@example.com",
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := domain.NewCreateUser("proj_1", nil, tt.id, []byte(minimalUserSchema), tt.user)
+			require.NoError(t, err)
+			tt.check(t, got)
+		})
 	}
-
-	got, err := domain.NewCreateUser("proj_1", nil, "", []byte(minimalUserSchema), user)
-	require.NoError(t, err)
-	assert.True(t, strings.HasPrefix(got.ID, string(domain.PrefixUser)+"_"), "minted id must carry the user prefix, got %q", got.ID)
-	assert.Greater(t, len(got.ID), len(string(domain.PrefixUser))+1, "minted id must not be just the prefix")
 }
