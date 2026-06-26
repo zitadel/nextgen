@@ -171,12 +171,9 @@ Follow-up tracked by [#48](https://github.com/zitadel/nextgen/issues/48): introd
 #### Response body
 
 - Always return `code` and `message` from the `domain.Error`.
-- Populate OpenAPI `details` **only** when all of the following hold:
-  1. The error is a **public stable** code.
-  2. `Details` contains **client-actionable, non-sensitive** structured data (field paths, schema validation issues, conflict keys).
-  3. The resource `*ErrorResponse` function explicitly allows details for that code.
-
-Until details are selectively enabled per code, the conservative default remains: **omit `details` from HTTP responses** (current behavior).
+- **`Details` is marshalled to the client whenever a producer sets it** (standard JSON marshalling). Setting `Details` *is* the act of exposing it — there is no separate per-code allow-list.
+- `Details` must contain only **client-actionable, non-sensitive** data (field paths, schema validation issues, conflict keys). Keeping secrets/PII out is the **producer's** responsibility (Decision 6), because the value is client-facing by intent.
+- A details **container type is not a client-redaction mechanism**: a `map`/struct marshals whatever it holds, and no generic type can distinguish intended PII (for example the subject's own email on a self-scoped endpoint) from a leak. Redaction is enforced by producer discipline and review, not by the type.
 
 #### HTTP status
 
@@ -256,8 +253,33 @@ Forbidden: credential material, full storage error strings, rows/records contain
 
 #### Logging
 
+- **`Details` is not logged by default.** `domain.Error`'s `LogValue` (Decision 5) emits `code`, `message`, and `parent` but not `Details`, because `Details` is the client face — its contents are governed by producer discipline, not log-safety. A specific details type may opt into logging by implementing `slog.LogValuer` (emitting only named, non-sensitive attributes); otherwise it stays out of logs.
+- **Wrapped causes must be log-safe at the source.** A `Parent` is logged by default (it is the diagnostic payload), but key-masking cannot reach inside a free-form `Error()` string. Error types that may wrap value-bearing driver errors — notably `database.*Error` — must implement `slog.LogValuer` emitting typed fields (`integrity_type`, `table`, `constraint`) and must **not** surface the raw driver cause (for example `pgconn.PgError.Detail`, which embeds the offending row — for the unique-attribute schema that is the `value_hash`, a salt-less SHA-256 that stays sensitive because it is reversible for low-entropy identifiers). The offending value never enters a log through an error; if a discriminator is needed it is logged deliberately at the call site (see worked example).
 - Apply `instrumentation.log.mask.keys` to attribute names such as `password`, `token`, `secret`, `authorization`, `cookie`, `session`, and nested groups that carry credentials.
 - When logging `ErrInternal`, log the unwrapped `Parent` chain server-side; mask attribute keys that appear in structured args.
+
+#### Worked example: debugging a unique-attribute conflict
+
+Scenario: a user cannot register because a unique attribute (for example their email) is already taken. The data model matters here. User attributes are stored EAV in `zitadel_nextgen.user_attributes`; uniqueness is enforced indirectly by hashing the value with SHA-256 and writing it to `zitadel_nextgen.user_unique_attributes`, whose primary key `(project_id, team_id, key, value_hash)` is the unique constraint. A duplicate raises a `23505` on that table's partition. The two facts involved have different owners:
+
+1. **Which rule failed** is the error's job — but only partially. The pg dialect captures `table` + `constraint`, here `user_unique_attributes` and a partition PK such as `user_unique_attributes_part_0_pkey`. The storage error's `LogValue` emits those typed fields and drops the driver `Detail`. Two reasons the `Detail` must be dropped: the row it names contains the `value_hash` (a salt-less SHA-256 of, for example, an email — reversible for low-entropy identifiers, so still sensitive), and the PK constraint name is shared by *all* unique attributes, so it does not even reveal which attribute collided:
+
+```
+level=WARN msg="registration failed" code=user.email_taken
+  parent.db_error=integrity_violation parent.integrity_type=unique
+  parent.table=user_unique_attributes parent.constraint=user_unique_attributes_part_0_pkey
+  request_id=... trace_id=... org_id=...
+```
+
+2. **Which attribute collided** is the caller's knowledge, not the error's. The discriminating signal is the attribute `key` (`email`), and the registration service already has it because writing that attribute is the operation it is performing. It logs that deliberately, as a **named, non-sensitive** attribute — the field name, never the value or its hash:
+
+```go
+logger.LogAttrs(ctx, slog.LevelDebug, "unique attribute conflict",
+	slog.String("attribute_key", "email"), // the field name, not the value
+)
+```
+
+This keeps both the value and its hash out of logs without losing debuggability: the structured cause says a uniqueness rule fired on `user_unique_attributes`, the caller adds the safe discriminator (`attribute_key=email`), and correlation identifiers (`request_id` / `trace_id`) let an operator pivot from the log line back to the originating request — including a captured HAR or trace that already carries the entered value — under the access controls that protect request data, rather than baking the value or its hash into every error log permanently.
 
 #### Known current leaks to remediate
 
@@ -267,6 +289,7 @@ The canonical mapper (`domainErrorDetails` → only `Code` + `Message`) is clean
 - `internal/api/error_handler.go:80,86` — `OgenErrorHandler` sets `d.Message = err.Error()` for ogen security/decode errors (raw framework text). **Must fix / normalize.**
 - `internal/api/flow.go:109,154` — `ErrRequestInvalid().WithMessage(err.Error())` surfaces raw decode/parse error text (non-domain `err`). **Must fix / normalize.**
 - `internal/api/flow.go:486,489,492` — `Message: err.Error()` for `invalid_action` / `session_conflict` / `unsupported`. Mitigated by the trimmed `Error()` when `err` is a `domain.Error`, but still migrate to `flow.*` sentinels with fixed messages (Decision 2) rather than relying on `Error()`.
+- `internal/storage/database/errors.go` — `IntegrityViolationError.Error()` (and `NoRowFoundError` / `ScanError` / `UnknownError`) render the wrapped `original` driver error with `%v`. For a `23505` the pg dialect stores `*pgconn.PgError` as `original` (`error.go:51`), whose `Detail` embeds the offending row — for the unique-attribute schema, `Key (project_id, team_id, key, value_hash)=(…, …, email, \x9f86d0…) already exists.`, exposing the sensitive `value_hash`. This is **log-safe-at-source** work: add a `LogValue` that emits typed fields only and stops carrying the driver `Detail` into logged output. **Log leak — must fix.**
 
 ### 7. Backwards compatibility and migration
 
@@ -303,7 +326,7 @@ The canonical mapper (`domainErrorDetails` → only `Code` + `Message`) is clean
 | `internal/errreport` leaf (global toggles + `Capture`/`Origin`) | Instrumentation / shared | #367 |
 | `domain.Error`: add `Unwrap`, trim `Error()` to `Message`, drop `Parent`→`Details` fallback, embed `Origin`, `LogValuer` | Domain | #367 |
 | Remediate API leak sites (`project.go:31`, `error_handler.go:80/86`, `flow.go:109/154/486/489/492`) | API | #367 |
-| `database.*Error`: embed `Origin`, capture in `wrapError` | Storage | #48 / #367 |
+| `database.*Error`: embed `Origin`, capture in `wrapError`, add log-safe `LogValue` (typed fields; drop driver `Detail`/value) | Storage | #48 / #367 |
 | Wire `errreport` toggles + `GCPReporting` from `log.errors.*` / format | Instrumentation | #367 |
 | Flow error sentinels + OpenAPI schemas | API / domain | #367 |
 | Shared storage error detection helpers | Storage / service | #48 |
