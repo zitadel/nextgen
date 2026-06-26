@@ -31,6 +31,19 @@ function fakeAssertion(): PublicKeyCredential {
   } as unknown as PublicKeyCredential;
 }
 
+function fakeAttestation(): PublicKeyCredential {
+  return {
+    id: "cred-id",
+    rawId: bytes("rawid"),
+    type: "public-key",
+    authenticatorAttachment: "platform",
+    response: {
+      clientDataJSON: bytes("{}"),
+      attestationObject: bytes("attestation"),
+    },
+  } as unknown as PublicKeyCredential;
+}
+
 describe("<zl-passkey>", () => {
   let host: HTMLDivElement;
   let credentials: CredentialsStub;
@@ -170,6 +183,41 @@ describe("<zl-passkey>", () => {
     const descriptor = arg.publicKey.allowCredentials[0];
     expect(descriptor?.id).toBeInstanceOf(ArrayBuffer);
     expect(descriptor?.type).toBe("public-key");
+  });
+
+  it("auto-starts registration once and passes user labels to create()", async () => {
+    credentials.create.mockResolvedValue(fakeAttestation());
+    const el = create({
+      ceremony: "register",
+      method: "passkey_register",
+      options: {
+        challenge: "AAAA",
+        rp: { id: "example.com", name: "example.com" },
+        user: { id: "dXNlci0x", name: "alice@example.com", displayName: "Alice" },
+        pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+      },
+    });
+    const detail = nextEvent<{
+      method: string;
+      proof: { response: { attestationObject?: string } };
+    }>(el, "zl-passkey-result");
+    host.appendChild(el);
+    const result = await detail;
+
+    expect(credentials.create).toHaveBeenCalledTimes(1);
+    expect(credentials.get).not.toHaveBeenCalled();
+    const arg = credentials.create.mock.calls[0]?.[0] as {
+      publicKey: {
+        user: { id: unknown; name: string; displayName: string };
+        pubKeyCredParams: Array<{ type: string; alg: number }>;
+      };
+    };
+    expect(arg.publicKey.user.id).toBeInstanceOf(ArrayBuffer);
+    expect(arg.publicKey.user.name).toBe("alice@example.com");
+    expect(arg.publicKey.user.displayName).toBe("Alice");
+    expect(arg.publicKey.pubKeyCredParams).toEqual([{ type: "public-key", alg: -7 }]);
+    expect(result.method).toBe("passkey_register");
+    expect(result.proof.response.attestationObject).toBeTypeOf("string");
   });
 
   it("aborts the in-flight ceremony when disconnected", async () => {

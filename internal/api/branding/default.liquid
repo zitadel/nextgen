@@ -110,10 +110,10 @@
     {% endif %}
 
     {% if challenge %}
-      {% if challenge.method == "passkey" %}
+      {% if challenge.method == "passkey" or challenge.method == "passkey_register" %}
         {% assign ceremony = "authenticate" %}
         {% assign submit_method = "passkey" %}
-        {% if challenge.options.user %}
+        {% if challenge.method == "passkey_register" or challenge.options.user %}
           {% assign ceremony = "register" %}
           {% assign submit_method = "passkey_register" %}
         {% endif %}

@@ -8734,6 +8734,8 @@ func (s *FlowStepChallengeMethod) Decode(d *jx.Decoder) error {
 	switch FlowStepChallengeMethod(v) {
 	case FlowStepChallengeMethodPasskey:
 		*s = FlowStepChallengeMethodPasskey
+	case FlowStepChallengeMethodPasskeyRegister:
+		*s = FlowStepChallengeMethodPasskeyRegister
 	default:
 		*s = FlowStepChallengeMethod(v)
 	}
