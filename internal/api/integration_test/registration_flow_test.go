@@ -108,7 +108,8 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 			Purposes:   api.FlowDefinitionPurposes{"login": "auth-step"},
 			Steps: []api.FlowDefinitionStep{
 				{
-					Name: "auth-step",
+					Name:   "auth-step",
+					Fields: []string{"email"},
 					Actions: []api.StepAction{
 						{Name: "passkey", Kind: api.StepActionKindPasskey, Primary: api.NewOptBool(true)},
 					},

@@ -190,7 +190,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 					Steps: []api.FlowDefinitionStep{
 						{
 							Name:   "step_1",
-							Fields: []string{"username"},
+							Fields: []string{"email", "username"},
 							Transitions: api.NewOptFlowDefinitionStepTransitions(map[string]api.FlowDefinitionStepTransitionsItem{
 								"submit": {
 									Target: "step_2",
@@ -213,6 +213,52 @@ func TestCreateFlowDefinition(t *testing.T) {
 				Details: api.OptErrorDetailsDetails{
 					Value: api.ErrorDetailsDetails{
 						"details": jx.Raw(`"step \"step_1\": flow field: not a property in the user schema: \"username\""`),
+					},
+					Set: true,
+				},
+			},
+		},
+		{
+			name: "invalid flow definition - missing required fields per user schema",
+			req: &api.CreateFlowDefinitionRequest{
+				ProjectID: api.ProjectID(project.ID),
+				FlowDefinition: api.FlowDefinition{
+					Name:       "invalid-flow",
+					UserSchema: *userSchemaURI,
+					Purposes:   map[string]string{"login": "step_1"},
+					Audience: api.OptFlowAudience{
+						Value: api.FlowAudience{
+							TeamIds: []string{"team-1", "team-2"},
+							AppIds:  []string{"app-1", "app-2"},
+						},
+						Set: true,
+					},
+					Steps: []api.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []string{"username"},
+							Transitions: api.NewOptFlowDefinitionStepTransitions(map[string]api.FlowDefinitionStepTransitionsItem{
+								"submit": {
+									Target: "step_2",
+								},
+							}),
+							Actions: []api.StepAction{
+								{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
+							},
+						},
+						{
+							Name:     "step_2",
+							Complete: api.NewOptFlowDefinitionStepComplete(api.FlowDefinitionStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantResp: &api.CreateFlowDefinitionBadRequest{
+				Code:    "flowdef.invalid",
+				Message: "flow definition: invalid",
+				Details: api.OptErrorDetailsDetails{
+					Value: api.ErrorDetailsDetails{
+						"details": jx.Raw(`"required fields [email] in user schema are missing in the flow definition steps"`),
 					},
 					Set: true,
 				},
