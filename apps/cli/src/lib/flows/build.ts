@@ -42,6 +42,7 @@ export function buildFlow(
 ): CreateFlowDefinitionBodyFlowDefinition {
   return {
     name: "default",
+    status: "active",
     user_schema: USER_SCHEMA_URI,
     purposes: {
       login: "identifier",
