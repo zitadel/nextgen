@@ -276,63 +276,51 @@ describe("setupMockHandlers", () => {
     expect(next.branding).toBeUndefined();
   });
 
-  describe("back-navigation (ADR 016)", () => {
-    test("passkey-upsell → back → identifier", async () => {
-      const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
-      expect(start.step.name).toBe("identifier");
+  describe("back-navigation (ADR 022)", () => {
+    test("register-password → back → register", async () => {
+      const start = await createFlow({ purpose: "register", project_id: PROJECT_ID });
+      expect(start.step.name).toBe("register");
 
-      const upsell = await submitFlowStep(start.id, {
+      const regPw = await submitFlowStep(start.id, {
         session_token: start.session_token,
         action: "submit",
-        fields: { email: "alice@acme.com", password: "hunter2" },
+        fields: { email: "alice@acme.com", given_name: "Alice", family_name: "Acme" },
       });
-      expect(upsell.step.name).toBe("passkey-upsell");
-      expect(upsell.step.actions?.back).toBeTruthy();
+      expect(regPw.step.name).toBe("register-password");
+      expect(regPw.step.actions?.find((a) => a.kind === "back")).toBeTruthy();
 
-      const back = await submitFlowStep(upsell.id, {
-        session_token: upsell.session_token,
+      const back = await submitFlowStep(regPw.id, {
+        session_token: regPw.session_token,
         action: "back",
         fields: {},
       });
-      expect(back.step.name).toBe("identifier");
-    });
-
-    test("register → back → identifier", async () => {
-      const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
-      const reg = await submitFlowStep(start.id, {
-        session_token: start.session_token,
-        action: "register",
-        fields: {},
-      });
-      expect(reg.step.name).toBe("register");
-      expect(reg.step.actions?.back).toBeTruthy();
-
-      const back = await submitFlowStep(reg.id, {
-        session_token: reg.session_token,
-        action: "back",
-        fields: {},
-      });
-      expect(back.step.name).toBe("identifier");
+      expect(back.step.name).toBe("register");
     });
 
     test("back rotates the session token", async () => {
-      const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
-      const upsell = await submitFlowStep(start.id, {
+      const start = await createFlow({ purpose: "register", project_id: PROJECT_ID });
+      const regPw = await submitFlowStep(start.id, {
         session_token: start.session_token,
         action: "submit",
-        fields: { email: "alice@acme.com", password: "hunter2" },
+        fields: { email: "alice@acme.com", given_name: "Alice", family_name: "Acme" },
       });
-      const back = await submitFlowStep(upsell.id, {
-        session_token: upsell.session_token,
+      const back = await submitFlowStep(regPw.id, {
+        session_token: regPw.session_token,
         action: "back",
         fields: {},
       });
-      expect(back.session_token).not.toBe(upsell.session_token);
+      expect(back.session_token).not.toBe(regPw.session_token);
     });
 
     test("identifier step has no back action", async () => {
       const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
-      expect(start.step.actions?.back).toBeUndefined();
+      expect(start.step.actions?.find((a) => a.kind === "back")).toBeUndefined();
+    });
+
+    test("register step has no back action (initial step for register purpose)", async () => {
+      const start = await createFlow({ purpose: "register", project_id: PROJECT_ID });
+      expect(start.step.name).toBe("register");
+      expect(start.step.actions?.find((a) => a.kind === "back")).toBeUndefined();
     });
   });
 });

@@ -143,6 +143,7 @@ export const it: Locale = {
   "submit.signin": "Accedi",
   "action.forgot_password": "Password dimenticata?",
   "action.cancel": "Annulla",
+  "action.back": "Indietro",
 
   // --- SSO ---
   "sso.redirect.title": "Reindirizzamento al provider…",

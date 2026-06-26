@@ -646,11 +646,10 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(submits[0]?.body.fields).toEqual({ email: "", password: "" });
   });
 
-  describe("back-navigation (ADR 016)", () => {
-    it("renders a back link when the step has a back action", async () => {
-      const element = await mount(host);
-
-      // Navigate to register (which has a back action)
+  describe("back-navigation (ADR 022)", () => {
+    /** Navigate from identifier → register → register-password (has back action). */
+    async function navigateToRegisterPassword(element: ZitadelLogin): Promise<void> {
+      // identifier → register
       element.shadowRoot?.dispatchEvent(
         new CustomEvent("zl-submit", {
           bubbles: true,
@@ -658,10 +657,44 @@ describe("<zitadel-login> against the typed Flow API", () => {
           detail: { action: "register" },
         }),
       );
+      await waitFor(() => {
+        const title = element.shadowRoot?.querySelector(".zl-card-title");
+        return title?.textContent?.includes("Create") ? title : null;
+      });
 
-      const backLink = await waitFor(() =>
-        element.shadowRoot?.querySelector<HTMLElement>('[data-action="back"]'),
+      // Fill required register fields
+      for (const [name, value] of Object.entries({
+        email: "alice@acme.com",
+        given_name: "Alice",
+        family_name: "Acme",
+      })) {
+        element.shadowRoot?.dispatchEvent(
+          new CustomEvent("zl-input", {
+            bubbles: true,
+            composed: true,
+            detail: { name, value },
+          }),
+        );
+      }
+
+      // register → register-password
+      element.shadowRoot?.dispatchEvent(
+        new CustomEvent("zl-submit", {
+          bubbles: true,
+          composed: true,
+          detail: { action: "submit" },
+        }),
       );
+      await waitFor(() =>
+        element.shadowRoot?.querySelector('[data-action="back"]'),
+      );
+    }
+
+    it("renders a back link when the step has a kind: back action", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+
+      const backLink = element.shadowRoot?.querySelector<HTMLElement>('[data-action="back"]');
       expect(backLink).toBeTruthy();
       expect(backLink?.classList.contains("zl-card-nav__link")).toBe(true);
     });
@@ -674,29 +707,18 @@ describe("<zitadel-login> against the typed Flow API", () => {
       expect(backLink).toBeNull();
     });
 
-    it("clicking the back link submits action: back", async () => {
+    it("clicking the back link submits the back action", async () => {
       const element = await mount(host);
-
-      // Navigate to register
-      element.shadowRoot?.dispatchEvent(
-        new CustomEvent("zl-submit", {
-          bubbles: true,
-          composed: true,
-          detail: { action: "register" },
-        }),
-      );
-      await waitFor(() =>
-        element.shadowRoot?.querySelector('[data-action="back"]'),
-      );
+      await navigateToRegisterPassword(element);
 
       // Click the back link
       const backLink = element.shadowRoot?.querySelector<HTMLElement>('[data-action="back"]');
       backLink?.click();
 
-      // Wait for the submit to go through and step to change back to identifier
+      // Wait for the step to change back to register (which has no back action)
       await waitFor(() => {
-        const title = element.shadowRoot?.querySelector(".zl-card-title");
-        return title?.textContent?.includes("Sign in") ? title : null;
+        const link = element.shadowRoot?.querySelector('[data-action="back"]');
+        return link === null ? true : null;
       });
 
       // Verify the back action was submitted
@@ -708,41 +730,36 @@ describe("<zitadel-login> against the typed Flow API", () => {
       expect(backSubmit).toBeDefined();
     });
 
-    it("calls history.pushState when step has back action", async () => {
+    it("calls history.pushState when step has kind: back action", async () => {
       const pushState = vi.spyOn(history, "pushState");
       try {
         const element = await mount(host);
+        await navigateToRegisterPassword(element);
 
-        // Navigate to register (has back action)
-        element.shadowRoot?.dispatchEvent(
-          new CustomEvent("zl-submit", {
-            bubbles: true,
-            composed: true,
-            detail: { action: "register" },
-          }),
+        // pushState should have been called for register-password (has back)
+        const zlCalls = pushState.mock.calls.filter(
+          ([state]) => (state as { zl?: boolean } | null)?.zl === true,
         );
-        await waitFor(() =>
-          element.shadowRoot?.querySelector('[data-action="back"]'),
-        );
-
-        // pushState should have been called for the register step (has back)
-        expect(pushState).toHaveBeenCalled();
-        const lastCall = pushState.mock.calls.at(-1);
+        expect(zlCalls.length).toBeGreaterThanOrEqual(1);
+        const lastCall = zlCalls.at(-1);
         expect(lastCall?.[2]).toMatch(/^#s\d+$/);
       } finally {
         pushState.mockRestore();
       }
     });
 
-    it("calls history.replaceState when step has no back action", async () => {
-      const replaceState = vi.spyOn(history, "replaceState");
+    it("does not call history.pushState when step has no back action", async () => {
+      const pushState = vi.spyOn(history, "pushState");
       try {
         await mount(host);
 
-        // Identifier step has no back action — replaceState should have been called
-        expect(replaceState).toHaveBeenCalled();
+        // Identifier step has no back action — no zl-tagged pushState calls
+        const zlCalls = pushState.mock.calls.filter(
+          ([state]) => (state as { zl?: boolean } | null)?.zl === true,
+        );
+        expect(zlCalls).toHaveLength(0);
       } finally {
-        replaceState.mockRestore();
+        pushState.mockRestore();
       }
     });
 

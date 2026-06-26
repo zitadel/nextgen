@@ -423,15 +423,13 @@ export class ZitadelLogin extends LitElement {
     this.formValues = { ...collectInitialValues(wire.step), ...this.formValues };
 
     // History API: push a new entry when the step supports back-navigation
-    // so the browser's back gesture fires `popstate`. Steps without a `back`
-    // action replace the current entry — the browser's back button then
-    // navigates the host page (leaves the flow), which is correct.
+    // so the browser's back gesture fires `popstate`. Steps without a
+    // `kind: "back"` action get no new entry — the browser's back button
+    // then navigates the host page (leaves the flow), which is correct.
     if (typeof window !== "undefined") {
-      const hasBack = Boolean(wire.step.actions && "back" in wire.step.actions);
+      const hasBack = Boolean(wire.step.actions?.some((a) => a.kind === "back"));
       if (hasBack) {
-        history.pushState({ zl: true }, "", `#s${this.stepSeq++}`);
-      } else {
-        history.replaceState({ zl: true }, "");
+        history.pushState({ zl: true, seq: this.stepSeq }, "", `#s${this.stepSeq++}`);
       }
     }
 
@@ -770,15 +768,34 @@ export class ZitadelLogin extends LitElement {
   }
 
   /**
-   * Handle the browser's back gesture. When `popstate` fires and the current
-   * step declares a `back` action, submit it to the flow API. Forward
-   * navigation and steps without `back` are silently ignored (no-op) —
-   * the displayed step does not change (ADR 016 §Edge cases).
+   * Handle the browser's back/forward gesture. When `popstate` fires:
+   *
+   * - **Backward** with a `kind: "back"` action → submit it to the API.
+   * - **Backward** without a back action → `history.forward()` to restore
+   *   the consumed entry (the flow's entries are eventually exhausted and
+   *   the host page becomes reachable again).
+   * - **Forward** after going back → `history.back()` to undo the
+   *   traversal; the flow state is server-authoritative, the browser
+   *   cannot skip ahead (ADR 022 §Edge cases).
    */
-  private onPopState(_event: PopStateEvent): void {
+  private onPopState(event: PopStateEvent): void {
     if (!this.response?.step?.actions) return;
-    if ("back" in this.response.step.actions) {
-      void this.submit("back");
+
+    // Detect forward navigation: the state's seq is at or ahead of our
+    // current stepSeq counter → the user pressed forward.
+    const stateSeq = (event.state as { seq?: number } | null)?.seq;
+    if (stateSeq !== undefined && stateSeq >= this.stepSeq) {
+      history.back();
+      return;
+    }
+
+    const backAction = this.response.step.actions.find((a) => a.kind === "back");
+    if (backAction) {
+      void this.submit(backAction.name);
+    } else {
+      // No back action — restore the consumed history entry so the
+      // browser's back button eventually reaches the host page.
+      history.forward();
     }
   }
 
