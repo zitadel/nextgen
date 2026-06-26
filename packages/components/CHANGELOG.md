@@ -1,5 +1,11 @@
 # @zitadel/components
 
+## 0.1.0-alpha.13
+
+### Patch Changes
+
+- [#417](https://github.com/zitadel/nextgen/pull/417) [`b574f3a`](https://github.com/zitadel/nextgen/commit/b574f3a6e6122439fadd6f971b73a61b8554f293) Thanks [@fforootd](https://github.com/fforootd)! - Label passkey registrations with collected identifiers and request discoverable credentials while keeping WebAuthn user handles opaque.
+
 ## 0.1.0-alpha.12
 
 ### Minor Changes
