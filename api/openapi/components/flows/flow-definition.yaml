@@ -1,5 +1,5 @@
 type: object
-required: [ name, user_schema, purposes, steps ]
+required: [ name, status, user_schema, purposes, steps ]
 description: |
   A flow definition is the server-side configuration that describes a complete
   authentication or identity flow. It is NOT sent to the frontend — the flow

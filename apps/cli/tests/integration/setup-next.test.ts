@@ -159,9 +159,10 @@ describe("Next setup integration", () => {
 
     const flowWithEnvRef = {
       // Spec: `name` is the slug-pattern stable identifier; required fields
-      // are [name, user_schema, purposes, steps]. `purposes` is a map
+      // are [name, status, user_schema, purposes, steps]. `purposes` is a map
       // from purpose name to entry-point step name.
       name: "default",
+      status: "active",
       user_schema:
         "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml",
       purposes: { login: "identifier" },
