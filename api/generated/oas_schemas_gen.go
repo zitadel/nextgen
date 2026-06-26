@@ -2770,8 +2770,8 @@ type FlowDefinition struct {
 	// `switch` and `pivot` transitions. Renaming is not supported — the
 	// `name` is part of the public contract another definition may
 	// reference. Acts as the human display label as well; no separate slug.
-	Name   string                  `json:"name"`
-	Status OptFlowDefinitionStatus `json:"status"`
+	Name   string               `json:"name"`
+	Status FlowDefinitionStatus `json:"status"`
 	// User schema this flow operates on. Step `fields` reference properties
 	// defined in this schema. The engine resolves field types, validation,
 	// and implicit outcomes from schema annotations at runtime.
@@ -2793,7 +2793,7 @@ func (s *FlowDefinition) GetName() string {
 }
 
 // GetStatus returns the value of Status.
-func (s *FlowDefinition) GetStatus() OptFlowDefinitionStatus {
+func (s *FlowDefinition) GetStatus() FlowDefinitionStatus {
 	return s.Status
 }
 
@@ -2823,7 +2823,7 @@ func (s *FlowDefinition) SetName(val string) {
 }
 
 // SetStatus sets the value of Status.
-func (s *FlowDefinition) SetStatus(val OptFlowDefinitionStatus) {
+func (s *FlowDefinition) SetStatus(val FlowDefinitionStatus) {
 	s.Status = val
 }
 
@@ -2852,11 +2852,10 @@ type FlowDefinitionDetailResponse struct {
 	// Unique identifier for the flow definition.
 	ID string `json:"id"`
 	// Identifier of the project this flow definition belongs to.
-	ProjectID      string               `json:"project_id"`
-	Status         FlowDefinitionStatus `json:"status"`
-	FlowDefinition FlowDefinition       `json:"flow_definition"`
-	CreatedAt      time.Time            `json:"created_at"`
-	UpdatedAt      time.Time            `json:"updated_at"`
+	ProjectID      string         `json:"project_id"`
+	FlowDefinition FlowDefinition `json:"flow_definition"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
 }
 
 // GetID returns the value of ID.
@@ -2867,11 +2866,6 @@ func (s *FlowDefinitionDetailResponse) GetID() string {
 // GetProjectID returns the value of ProjectID.
 func (s *FlowDefinitionDetailResponse) GetProjectID() string {
 	return s.ProjectID
-}
-
-// GetStatus returns the value of Status.
-func (s *FlowDefinitionDetailResponse) GetStatus() FlowDefinitionStatus {
-	return s.Status
 }
 
 // GetFlowDefinition returns the value of FlowDefinition.
@@ -2897,11 +2891,6 @@ func (s *FlowDefinitionDetailResponse) SetID(val string) {
 // SetProjectID sets the value of ProjectID.
 func (s *FlowDefinitionDetailResponse) SetProjectID(val string) {
 	s.ProjectID = val
-}
-
-// SetStatus sets the value of Status.
-func (s *FlowDefinitionDetailResponse) SetStatus(val FlowDefinitionStatus) {
-	s.Status = val
 }
 
 // SetFlowDefinition sets the value of FlowDefinition.
@@ -3420,7 +3409,6 @@ func (s *FlowDefinitionStepTransitionsItemAction) UnmarshalText(data []byte) err
 }
 
 // Replaces the existing flow definition.
-// If `flow_definition.status` is omitted, the current status is preserved.
 // Ref: #
 type FlowDefinitionUpdateRequest struct {
 	SchemaURI      OptSchemaURI   `json:"schema_uri"`
@@ -3919,13 +3907,15 @@ func (s *FlowStepChallenge) SetOptions(val OptFlowStepChallengeOptions) {
 type FlowStepChallengeMethod string
 
 const (
-	FlowStepChallengeMethodPasskey FlowStepChallengeMethod = "passkey"
+	FlowStepChallengeMethodPasskey         FlowStepChallengeMethod = "passkey"
+	FlowStepChallengeMethodPasskeyRegister FlowStepChallengeMethod = "passkey_register"
 )
 
 // AllValues returns all FlowStepChallengeMethod values.
 func (FlowStepChallengeMethod) AllValues() []FlowStepChallengeMethod {
 	return []FlowStepChallengeMethod{
 		FlowStepChallengeMethodPasskey,
+		FlowStepChallengeMethodPasskeyRegister,
 	}
 }
 
@@ -3933,6 +3923,8 @@ func (FlowStepChallengeMethod) AllValues() []FlowStepChallengeMethod {
 func (s FlowStepChallengeMethod) MarshalText() ([]byte, error) {
 	switch s {
 	case FlowStepChallengeMethodPasskey:
+		return []byte(s), nil
+	case FlowStepChallengeMethodPasskeyRegister:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -3944,6 +3936,9 @@ func (s *FlowStepChallengeMethod) UnmarshalText(data []byte) error {
 	switch FlowStepChallengeMethod(data) {
 	case FlowStepChallengeMethodPasskey:
 		*s = FlowStepChallengeMethodPasskey
+		return nil
+	case FlowStepChallengeMethodPasskeyRegister:
+		*s = FlowStepChallengeMethodPasskeyRegister
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -7376,52 +7371,6 @@ func (o OptFlowAudience) Get() (v FlowAudience, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowAudience) Or(d FlowAudience) FlowAudience {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptFlowDefinitionStatus returns new OptFlowDefinitionStatus with value set to v.
-func NewOptFlowDefinitionStatus(v FlowDefinitionStatus) OptFlowDefinitionStatus {
-	return OptFlowDefinitionStatus{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptFlowDefinitionStatus is optional FlowDefinitionStatus.
-type OptFlowDefinitionStatus struct {
-	Value FlowDefinitionStatus
-	Set   bool
-}
-
-// IsSet returns true if OptFlowDefinitionStatus was set.
-func (o OptFlowDefinitionStatus) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptFlowDefinitionStatus) Reset() {
-	var v FlowDefinitionStatus
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptFlowDefinitionStatus) SetTo(v FlowDefinitionStatus) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptFlowDefinitionStatus) Get() (v FlowDefinitionStatus, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptFlowDefinitionStatus) Or(d FlowDefinitionStatus) FlowDefinitionStatus {
 	if v, ok := o.Get(); ok {
 		return v
 	}

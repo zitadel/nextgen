@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
@@ -17,22 +16,12 @@ type FlowService interface {
 	// when Name is set; audience match otherwise.
 	Resolve(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error)
 	// Start mints a fresh flow on the resolved definition.
-	Start(ctx context.Context, req StartFlowRequest) (FlowStepResult, error)
+	Start(ctx context.Context, req StartFlowRequest) (domain.FlowStepResult, error)
 	// Submit advances the state machine. Re-fetches the definition
 	// from FlowState.DefinitionID.
-	Submit(ctx context.Context, req SubmitFlowRequest) (FlowStepResult, error)
+	Submit(ctx context.Context, req SubmitFlowRequest) (domain.FlowStepResult, error)
 	// GetStep re-emits the current step without advancing.
-	GetStep(ctx context.Context, req GetFlowStepRequest) (FlowStepResult, error)
-}
-
-// FlowStepResult is what Start/Submit/GetStep return. HandoffToken and
-// HandoffTokenExpiresAt are populated only on the submit that terminates
-// the flow; zero values on every other call.
-type FlowStepResult struct {
-	State                 *domain.FlowState
-	Step                  *domain.FlowStep
-	HandoffToken          string
-	HandoffTokenExpiresAt time.Time
+	GetStep(ctx context.Context, req GetFlowStepRequest) (domain.FlowStepResult, error)
 }
 
 type StartFlowRequest struct {
@@ -152,18 +141,19 @@ func (s *flowService) resolveByAudience(ctx context.Context, req ResolveFlowRequ
 	return defs[0], nil
 }
 
-func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (FlowStepResult, error) {
+func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.FlowStepResult, error) {
 	if req.Definition == nil {
-		return FlowStepResult{}, fmt.Errorf("flow service: start without definition")
+		return domain.FlowStepResult{}, fmt.Errorf("flow service: start without definition")
 	}
 
+	// TODO(wim): use SessionService to create sessions (#412)
 	sessionID := ""
 	if req.SessionID != nil {
 		sessionID = *req.SessionID
 	} else {
 		id, err := s.ids.New("sess")
 		if err != nil {
-			return FlowStepResult{}, fmt.Errorf("flow service: mint session id: %w", err)
+			return domain.FlowStepResult{}, fmt.Errorf("flow service: mint session id: %w", err)
 		}
 		sessionID = id
 	}
@@ -181,26 +171,26 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (FlowStep
 
 	result, err := s.stateMachine.Start(ctx, s.pool, in)
 	if err != nil {
-		return FlowStepResult{}, err
+		return domain.FlowStepResult{}, err
 	}
 
 	flowID, err := s.ids.New("flow")
 	if err != nil {
-		return FlowStepResult{}, fmt.Errorf("flow service: mint flow id: %w", err)
+		return domain.FlowStepResult{}, fmt.Errorf("flow service: mint flow id: %w", err)
 	}
 	result.State.ID = flowID
 
-	return FlowStepResult{State: result.State, Step: result.Step}, nil
+	return domain.FlowStepResult{State: result.State, Step: result.Step}, nil
 }
 
-func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (FlowStepResult, error) {
+func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (domain.FlowStepResult, error) {
 	if req.State == nil {
-		return FlowStepResult{}, fmt.Errorf("flow service: submit without state")
+		return domain.FlowStepResult{}, fmt.Errorf("flow service: submit without state")
 	}
 	// todo: gracefully handle when the definition was updated (status, steps, etc.,) since the flow started
 	def, err := s.flowDefs.GetFlowDefinition(ctx, s.pool, req.State.ProjectID, req.State.DefinitionID)
 	if err != nil {
-		return FlowStepResult{}, err
+		return domain.FlowStepResult{}, err
 	}
 	in := domain.FlowSubmitInput{
 		Action:            req.Action,
@@ -214,9 +204,9 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (FlowSt
 	}
 	result, err := s.stateMachine.Process(ctx, s.pool, def, req.State, in)
 	if err != nil {
-		return FlowStepResult{}, err
+		return domain.FlowStepResult{}, err
 	}
-	return FlowStepResult{
+	return domain.FlowStepResult{
 		State:                 result.State,
 		Step:                  result.Step,
 		HandoffToken:          result.HandoffToken,
@@ -224,19 +214,19 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (FlowSt
 	}, nil
 }
 
-func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (FlowStepResult, error) {
+func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (domain.FlowStepResult, error) {
 	if req.State == nil {
-		return FlowStepResult{}, fmt.Errorf("flow service: get step without state")
+		return domain.FlowStepResult{}, fmt.Errorf("flow service: get step without state")
 	}
 	def, err := s.flowDefs.GetFlowDefinition(ctx, s.pool, req.State.ProjectID, req.State.DefinitionID)
 	if err != nil {
-		return FlowStepResult{}, err
+		return domain.FlowStepResult{}, err
 	}
 	result, err := s.stateMachine.Render(ctx, s.pool, def, req.State)
 	if err != nil {
-		return FlowStepResult{}, err
+		return domain.FlowStepResult{}, err
 	}
-	return FlowStepResult{State: result.State, Step: result.Step}, nil
+	return domain.FlowStepResult{State: result.State, Step: result.Step}, nil
 }
 
 func flowServesPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {
