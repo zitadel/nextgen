@@ -351,11 +351,20 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 		}
 	}
 
+	passkeyResolved := resolved
+	if needsPasskeyRegistrationVisitedFields(state, in, actionKind) {
+		visitedResolved, err := r.resolveVisitedFields(ctx, client, state.ProjectID, userSchemaURL, def, state, currentStep)
+		if err != nil {
+			return FlowStepResult{}, err
+		}
+		passkeyResolved = visitedResolved
+	}
+
 	// Two-phase passkey ceremony (issue → client signs → verify) runs before the
 	// field-shaped dispatch and short-circuits it when engaged. Only proceed into
 	// processPasskey when no dispatch outcome already overrode the route.
 	if routeOutcome == in.Action {
-		pk, err := r.processPasskey(ctx, client, state, currentStep, resolved, in, actionKind)
+		pk, err := r.processPasskey(ctx, client, state, currentStep, resolved, passkeyResolved, in, actionKind)
 		if err != nil {
 			return FlowStepResult{}, err
 		}
@@ -593,8 +602,9 @@ type passkeyPhaseResult struct {
 //     mint an assertion challenge; discoverable login allowed when no user is
 //     yet identified.
 //   - issue leg (register): step offers a `passkey_register` action and it
-//     was selected → user must already be identified; mint a creation challenge.
-func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client database.QueryExecutor, state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, in FlowSubmitInput, actionKind FlowActionKind) (passkeyPhaseResult, error) {
+//     was selected → use the resolved user id or mint a provisional one, then
+//     issue a creation challenge.
+func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client database.QueryExecutor, state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, passkeyResolved FlowResolvedFields, in FlowSubmitInput, actionKind FlowActionKind) (passkeyPhaseResult, error) {
 	switch {
 	// A ceremony is in flight but no proof arrived: resume or abandon.
 	case state.PendingChallenge != nil && in.ChallengeResponse == nil:
@@ -627,7 +637,7 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 			provisional := state.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey
 			if provisional {
 				state.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey = false
-				if err := r.userForPasskeyCreater.CreateProvisionalUser(ctx, client, userID, state, resolved); err != nil {
+				if err := r.userForPasskeyCreater.CreateProvisionalUser(ctx, client, userID, state, passkeyResolved); err != nil {
 					return passkeyPhaseResult{}, fmt.Errorf("flow state machine: ensure user exists: %w", err)
 				}
 			}
@@ -735,11 +745,14 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 			// The verify leg will call HandleProvisional + RegisterCreatedUser.
 			state.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey = true
 		}
+		username, displayName := passkeyRegistrationDisplay(passkeyResolved, state.CollectedData.UserData)
 		out, err := r.passkeyRegistration.IssuePasskeyRegistrationChallenge(ctx, FlowIssuePasskeyRegistrationChallengeInput{
-			ProjectID: state.ProjectID,
-			UserID:    userID,
-			RPID:      in.PasskeyRP.RPID,
-			RPOrigins: in.PasskeyRP.Origins,
+			ProjectID:   state.ProjectID,
+			UserID:      userID,
+			Username:    username,
+			DisplayName: displayName,
+			RPID:        in.PasskeyRP.RPID,
+			RPOrigins:   in.PasskeyRP.Origins,
 		})
 		if err != nil {
 			return passkeyPhaseResult{}, fmt.Errorf("flow state machine: issue passkey registration: %w", err)
@@ -756,6 +769,31 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 		return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
 	}
 	return passkeyPhaseResult{}, nil
+}
+
+func needsPasskeyRegistrationVisitedFields(state *FlowState, in FlowSubmitInput, actionKind FlowActionKind) bool {
+	if actionKind == FlowActionKindPasskeyRegister && in.ChallengeResponse == nil {
+		return true
+	}
+	if in.ChallengeResponse == nil {
+		return false
+	}
+	if state != nil && state.PendingChallenge != nil {
+		return state.PendingChallenge.Method == FlowChallengeMethodPasskeyRegister
+	}
+	return in.ChallengeResponse.Method == FlowChallengeMethodPasskeyRegister
+}
+
+func passkeyRegistrationDisplay(resolved FlowResolvedFields, collected map[string]any) (string, string) {
+	_, _, value, ok := findCollectedFieldByChallenge(resolved.Fields, collected, FlowFieldChallengeIdentifier)
+	if !ok {
+		return "", ""
+	}
+	label := strings.TrimSpace(asString(value))
+	if label == "" {
+		return "", ""
+	}
+	return label, label
 }
 
 // pendingMatchesKind reports whether a no-proof POST should resume the

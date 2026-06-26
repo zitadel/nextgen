@@ -155,27 +155,20 @@ class FlowDefinitionSyncer implements ResourceSyncer {
   }
 
   async delete(id: string): Promise<void> {
-    await this.client.deleteFlowDefinition(id);
+    await this.client.deleteFlowDefinition(id, { project_id: this.projectId });
   }
 
   /**
-   * `GET /flow_definitions/:id` wraps the bare flow body in a detail envelope
-   * (`id`, `project_id`, `schema_uri`, `status`, `created_at`, `updated_at`).
-   * Strip those envelope fields here so the diff renderer compares
-   * apples-to-apples against the on-disk file, which stores only the bare
-   * body.
+   * `GET /flow_definitions/:id` returns a detail envelope with metadata
+   * (`id`, `project_id`, `created_at`, `updated_at`) plus `flow_definition`.
+   * Return only `flow_definition` so diffs compare with the on-disk bare body.
    */
   async fetch(id: string): Promise<object> {
-    const envelope = (await this.client.getFlowDefinition(id)) as GetFlowDefinition200;
-    const {
-      id: _id,
-      project_id: _projectId,
-      schema_uri: _schemaUri,
-      status: _status,
-      created_at: _createdAt,
-      updated_at: _updatedAt,
-      ...body
-    } = envelope;
-    return body;
+    const envelope = (await this.client.getFlowDefinition(
+      id,
+      { project_id: this.projectId },
+    )) as GetFlowDefinition200;
+
+    return envelope.flow_definition as object;
   }
 }

@@ -436,7 +436,11 @@ func BuildPasskeyCreationOptions(c *AuthChallengePasskeyRegistration) ([]byte, e
 		Parameters:            c.CredParams,
 		CredentialExcludeList: excluded,
 		Attestation:           protocol.PreferNoAttestation,
-		Extensions:            c.Extensions,
+		AuthenticatorSelection: protocol.AuthenticatorSelection{
+			ResidentKey:      protocol.ResidentKeyRequirementRequired,
+			UserVerification: protocol.VerificationPreferred,
+		},
+		Extensions: c.Extensions,
 	}
 	return json.Marshal(opts)
 }

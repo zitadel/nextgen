@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -12,6 +13,7 @@ import {
 } from "./release-automation.mjs";
 import {
   CONTAINER_PLATFORMS,
+  PUBLIC_PACKAGE_DIRS,
   buildContainerImage,
   buildServerBinaries,
   createArchives,
@@ -122,10 +124,19 @@ async function buildEmbeddedUI() {
  * `apps/cli/tsdown.config.ts`).
  */
 async function buildPublicPackageArtifacts() {
-  await run("moon", ["run", ...PUBLIC_PACKAGE_BUILD_TARGETS], {
+  await cleanPublicPackageDistArtifacts();
+  await run("moon", ["run", "--force", ...PUBLIC_PACKAGE_BUILD_TARGETS], {
     cwd: repoRoot,
     env: { ...process.env, ZITADEL_TELEMETRY_BUILD_CHANNEL: "production" },
   });
+}
+
+async function cleanPublicPackageDistArtifacts() {
+  await Promise.all(
+    PUBLIC_PACKAGE_DIRS.map((dir) =>
+      rm(join(repoRoot, dir, "dist"), { recursive: true, force: true }),
+    ),
+  );
 }
 
 async function commandPublish(options) {

@@ -1,5 +1,5 @@
 /* oxlint-disable playwright/expect-expect, playwright/no-conditional-in-test */
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type CDPSession, type Locator, type Page } from "@playwright/test";
 
 test.describe.configure({ mode: "serial" });
 test.setTimeout(60_000);
@@ -33,7 +33,7 @@ if (process.env.JOURNEY_ENABLE_PASSKEY !== "0") {
   test(`passkey-only registration, logout, and passkey login work in a fresh ${framework} app`, async ({
     page,
   }) => {
-    await enableVirtualAuthenticator(page);
+    const authenticator = await enableVirtualAuthenticator(page);
 
     const email = uniqueEmail("passkey");
 
@@ -41,13 +41,14 @@ if (process.env.JOURNEY_ENABLE_PASSKEY !== "0") {
     await registerWithPasskey(page, email);
     await expectSignedIn(page);
     await expectSessionCookie(page);
+    await expectVirtualCredentialCount(authenticator, 1);
 
     await logout(page);
     await loginWithPasskey(page, email);
     await expectSignedIn(page);
     await expectSessionCookie(page);
+    await expectVirtualCredentialCount(authenticator, 1);
   });
-
 }
 
 async function expectProtectedRouteToRedirect(page: Page): Promise<void> {
@@ -165,10 +166,15 @@ async function expectSessionCookie(page: Page): Promise<void> {
   expect(sessionCookie?.httpOnly).toBe(true);
 }
 
-async function enableVirtualAuthenticator(page: Page): Promise<void> {
+type VirtualAuthenticator = {
+  client: CDPSession;
+  authenticatorId: string;
+};
+
+async function enableVirtualAuthenticator(page: Page): Promise<VirtualAuthenticator> {
   const client = await page.context().newCDPSession(page);
   await client.send("WebAuthn.enable");
-  await client.send("WebAuthn.addVirtualAuthenticator", {
+  const { authenticatorId } = await client.send("WebAuthn.addVirtualAuthenticator", {
     options: {
       protocol: "ctap2",
       transport: "internal",
@@ -178,6 +184,21 @@ async function enableVirtualAuthenticator(page: Page): Promise<void> {
       automaticPresenceSimulation: true,
     },
   });
+  return { client, authenticatorId };
+}
+
+async function expectVirtualCredentialCount(
+  authenticator: VirtualAuthenticator,
+  expected: number,
+): Promise<void> {
+  await expect
+    .poll(async () => {
+      const { credentials } = await authenticator.client.send("WebAuthn.getCredentials", {
+        authenticatorId: authenticator.authenticatorId,
+      });
+      return credentials.length;
+    })
+    .toBe(expected);
 }
 
 async function logout(page: Page): Promise<void> {

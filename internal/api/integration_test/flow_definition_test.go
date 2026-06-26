@@ -28,6 +28,7 @@ func TestCreateFlowDefinitionUnauthenticated(t *testing.T) {
 		ProjectID: "proj_1234",
 		FlowDefinition: api.FlowDefinition{
 			Name:       "login-flow",
+			Status:     "active",
 			UserSchema: *userSchemaURI,
 			Purposes:   map[string]string{"login": "step_1"},
 			Audience: api.OptFlowAudience{
@@ -83,7 +84,6 @@ func TestCreateFlowDefinition(t *testing.T) {
 			req:  newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("login-flow", *userSchemaURI)),
 			wantResp: &api.FlowDefinitionDetailResponse{
 				ProjectID: project.ID,
-				Status:    "active",
 				FlowDefinition: api.FlowDefinition{
 					Name:       "login-flow",
 					UserSchema: *userSchemaURI,
@@ -96,7 +96,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 						Set: true,
 					},
 					Steps:  validSteps(),
-					Status: api.NewOptFlowDefinitionStatus(api.FlowDefinitionStatusActive),
+					Status: api.FlowDefinitionStatusActive,
 				},
 			},
 		},
@@ -128,6 +128,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 				ProjectID: api.ProjectID(project.ID),
 				FlowDefinition: api.FlowDefinition{
 					Name:       "invalid-flow",
+					Status:     "active",
 					UserSchema: *userSchemaURI,
 					Purposes:   map[string]string{"login": "collect_identifier"},
 					Audience: api.OptFlowAudience{
@@ -175,6 +176,53 @@ func TestCreateFlowDefinition(t *testing.T) {
 				FlowDefinition: api.FlowDefinition{
 					Name:       "invalid-flow",
 					UserSchema: *userSchemaURI,
+					Status:     "active",
+					Purposes:   map[string]string{"login": "step_1"},
+					Audience: api.OptFlowAudience{
+						Value: api.FlowAudience{
+							TeamIds: []string{"team-1", "team-2"},
+							AppIds:  []string{"app-1", "app-2"},
+						},
+						Set: true,
+					},
+					Steps: []api.FlowDefinitionStep{
+						{
+							Name:   "step_1",
+							Fields: []string{"email", "username"},
+							Transitions: api.NewOptFlowDefinitionStepTransitions(map[string]api.FlowDefinitionStepTransitionsItem{
+								"submit": {
+									Target: "step_2",
+								},
+							}),
+							Actions: []api.StepAction{
+								{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
+							},
+						},
+						{
+							Name:     "step_2",
+							Complete: api.NewOptFlowDefinitionStepComplete(api.FlowDefinitionStepCompleteRedirect),
+						},
+					},
+				},
+			},
+			wantResp: &api.CreateFlowDefinitionBadRequest{
+				Code:    "flowdef.invalid",
+				Message: "flow definition: invalid",
+				Details: api.OptErrorDetailsDetails{
+					Value: api.ErrorDetailsDetails{
+						"details": jx.Raw(`"step \"step_1\": flow field: not a property in the user schema: \"username\""`),
+					},
+					Set: true,
+				},
+			},
+		},
+		{
+			name: "invalid flow definition - missing required fields per user schema",
+			req: &api.CreateFlowDefinitionRequest{
+				ProjectID: api.ProjectID(project.ID),
+				FlowDefinition: api.FlowDefinition{
+					Name:       "invalid-flow",
+					UserSchema: *userSchemaURI,
 					Purposes:   map[string]string{"login": "step_1"},
 					Audience: api.OptFlowAudience{
 						Value: api.FlowAudience{
@@ -208,7 +256,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 				Message: "flow definition: invalid",
 				Details: api.OptErrorDetailsDetails{
 					Value: api.ErrorDetailsDetails{
-						"details": jx.Raw(`"step \"step_1\": flow field: not a property in the user schema: \"username\""`),
+						"details": jx.Raw(`"required fields [email] in user schema are missing in the flow definition steps"`),
 					},
 					Set: true,
 				},
@@ -238,6 +286,7 @@ func TestUpdateFlowDefinitionUnauthenticated(t *testing.T) {
 	resp, err := client.UpdateFlowDefinition(t.Context(), &api.FlowDefinitionUpdateRequest{
 		FlowDefinition: api.FlowDefinition{
 			Name:       "login-flow",
+			Status:     "active",
 			UserSchema: *userSchemaURI,
 			Purposes:   map[string]string{"login": "step_1"},
 			Steps:      validSteps(),
@@ -318,7 +367,6 @@ func TestUpdateFlowDefinition(t *testing.T) {
 			wantResp: &api.FlowDefinitionDetailResponse{
 				ID:        loginFlowDef.ID,
 				ProjectID: project.ID,
-				Status:    api.FlowDefinitionStatusActive,
 				FlowDefinition: api.FlowDefinition{
 					Name:       "updated-flow",
 					UserSchema: *userSchemaURI,
@@ -328,34 +376,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 						Set:   true,
 					},
 					Steps:  validSteps(),
-					Status: api.NewOptFlowDefinitionStatus(api.FlowDefinitionStatusActive),
-				},
-			},
-		},
-		{
-			name: "flow definition updated successfully - when status omitted preserves existing status",
-			req: newUpdateFlowDefinitionRequest(func() api.FlowDefinition {
-				def := newFlowDefinitionFixture("updated-flow-omit-status", *userSchemaURI)
-				return def
-			}()),
-			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginFlowDef.ID},
-			wantResp: &api.FlowDefinitionDetailResponse{
-				ID:        loginFlowDef.ID,
-				ProjectID: project.ID,
-				Status:    api.FlowDefinitionStatusActive,
-				FlowDefinition: api.FlowDefinition{
-					Name:       "updated-flow-omit-status",
-					UserSchema: *userSchemaURI,
-					Purposes:   map[string]string{"login": "step_1"},
-					Audience: api.OptFlowAudience{
-						Value: api.FlowAudience{
-							TeamIds: []string{"team-1", "team-2"},
-							AppIds:  []string{"app-1", "app-2"},
-						},
-						Set: true,
-					},
-					Steps:  validSteps(),
-					Status: api.NewOptFlowDefinitionStatus(api.FlowDefinitionStatusActive),
+					Status: api.FlowDefinitionStatusActive,
 				},
 			},
 		},
@@ -366,7 +387,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 				def.Purposes = map[string]string{
 					"login": "step_1", // remove recovery
 				}
-				def.Status = api.NewOptFlowDefinitionStatus(api.FlowDefinitionStatusDraft) // deactivate while removing recovery
+				def.Status = api.FlowDefinitionStatusDraft // deactivate while removing recovery
 				return def
 			}()),
 			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginRegisterFlowDef.ID},
@@ -391,7 +412,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 				def.Purposes = map[string]string{
 					"login": "step_1", // remove recovery while staying active
 				}
-				def.Status = api.NewOptFlowDefinitionStatus(api.FlowDefinitionStatusActive)
+				def.Status = api.FlowDefinitionStatusActive
 				return def
 			}()),
 			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginRegisterFlowDef.ID},
@@ -416,14 +437,13 @@ func TestUpdateFlowDefinition(t *testing.T) {
 				def.Purposes = map[string]string{
 					"recovery": "step_1", // remove login
 				}
-				def.Status = api.NewOptFlowDefinitionStatus(api.FlowDefinitionStatusActive)
+				def.Status = api.FlowDefinitionStatusActive
 				return def
 			}()),
 			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginRegisterFlowDef.ID},
 			wantResp: &api.FlowDefinitionDetailResponse{
 				ID:        loginRegisterFlowDef.ID,
 				ProjectID: project.ID,
-				Status:    api.FlowDefinitionStatusActive,
 				FlowDefinition: api.FlowDefinition{
 					Name:       "multi-purpose-flow-remove-login",
 					UserSchema: *userSchemaURI,
@@ -436,7 +456,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 						Set: true,
 					},
 					Steps:  validSteps(),
-					Status: api.NewOptFlowDefinitionStatus(api.FlowDefinitionStatusActive),
+					Status: api.FlowDefinitionStatusActive,
 				},
 			},
 		},
@@ -509,6 +529,7 @@ func newUpdateFlowDefinitionRequest(definition api.FlowDefinition) *api.FlowDefi
 func newFlowDefinitionFixture(name string, userSchemaURI url.URL) api.FlowDefinition {
 	return api.FlowDefinition{
 		Name:       name,
+		Status:     "active",
 		UserSchema: userSchemaURI,
 		Purposes:   map[string]string{"login": "step_1"},
 		Audience: api.OptFlowAudience{
@@ -533,7 +554,6 @@ func assertFlowDefinitionResponse(t *testing.T, want, got any) {
 
 		assert.NotEmpty(t, actual.ID)
 		assert.Equal(t, expected.ProjectID, actual.ProjectID)
-		assert.Equal(t, expected.Status, actual.Status)
 		assert.Equal(t, expected.FlowDefinition, actual.FlowDefinition)
 	case *api.CreateFlowDefinitionBadRequest:
 		expected, ok := want.(*api.CreateFlowDefinitionBadRequest)
@@ -642,6 +662,7 @@ func TestGetFlowDefinition(t *testing.T) {
 		ProjectID: api.ProjectID(project.ID),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "existing-flow",
+			Status:     "active",
 			UserSchema: *userSchemaURI,
 			Purposes:   map[string]string{"login": "step_1"},
 			Audience: api.OptFlowAudience{
@@ -740,6 +761,7 @@ func TestListFlowDefinitions(t *testing.T) {
 		ProjectID: api.ProjectID(project1.ID),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "flow-1",
+			Status:     "active",
 			UserSchema: *userSchemaURI,
 			Purposes:   map[string]string{"login": "step_1"},
 			Audience: api.OptFlowAudience{
@@ -761,6 +783,7 @@ func TestListFlowDefinitions(t *testing.T) {
 		FlowDefinition: api.FlowDefinition{
 			Name:       "flow-2",
 			UserSchema: *userSchemaURI,
+			Status:     "active",
 			Purposes:   map[string]string{"profiling": "step_1"},
 			Audience: api.OptFlowAudience{
 				Value: api.FlowAudience{
@@ -781,6 +804,7 @@ func TestListFlowDefinitions(t *testing.T) {
 		FlowDefinition: api.FlowDefinition{
 			Name:       "flow-3",
 			UserSchema: *userSchemaURI,
+			Status:     "active",
 			Purposes:   map[string]string{"login": "step_1"},
 			Audience: api.OptFlowAudience{
 				Value: api.FlowAudience{
@@ -814,16 +838,16 @@ func TestListFlowDefinitions(t *testing.T) {
 					{
 						ID:        flowDef1.ID,
 						Name:      flowDef1.FlowDefinition.GetName(),
+						Status:    flowDef1.FlowDefinition.GetStatus(),
 						ProjectID: flowDef1.ProjectID,
-						Status:    flowDef1.Status,
 						CreatedAt: flowDef1.CreatedAt,
 						UpdatedAt: flowDef1.UpdatedAt,
 					},
 					{
 						ID:        flowDef2.ID,
 						Name:      flowDef2.FlowDefinition.GetName(),
+						Status:    flowDef2.FlowDefinition.GetStatus(),
 						ProjectID: flowDef2.ProjectID,
-						Status:    flowDef2.Status,
 						CreatedAt: flowDef2.CreatedAt,
 						UpdatedAt: flowDef2.UpdatedAt,
 					},
@@ -845,7 +869,7 @@ func TestListFlowDefinitions(t *testing.T) {
 						ID:        flowDef3.ID,
 						Name:      flowDef3.FlowDefinition.GetName(),
 						ProjectID: flowDef3.ProjectID,
-						Status:    flowDef3.Status,
+						Status:    flowDef3.FlowDefinition.GetStatus(),
 						CreatedAt: flowDef3.CreatedAt,
 						UpdatedAt: flowDef3.UpdatedAt,
 					},
@@ -867,7 +891,7 @@ func TestListFlowDefinitions(t *testing.T) {
 						ID:        flowDef2.ID,
 						Name:      flowDef2.FlowDefinition.GetName(),
 						ProjectID: flowDef2.ProjectID,
-						Status:    flowDef2.Status,
+						Status:    flowDef2.FlowDefinition.GetStatus(),
 						CreatedAt: flowDef2.CreatedAt,
 						UpdatedAt: flowDef2.UpdatedAt,
 					},
@@ -893,7 +917,7 @@ func TestListFlowDefinitions(t *testing.T) {
 						ID:        flowDef1.ID,
 						Name:      flowDef1.FlowDefinition.GetName(),
 						ProjectID: flowDef1.ProjectID,
-						Status:    flowDef1.Status,
+						Status:    flowDef1.FlowDefinition.GetStatus(),
 						CreatedAt: flowDef1.CreatedAt,
 						UpdatedAt: flowDef1.UpdatedAt,
 					},
@@ -993,6 +1017,7 @@ func TestDeleteFlowDefinition(t *testing.T) {
 		ProjectID: api.ProjectID(project.ID),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "existing-flow",
+			Status:     "active",
 			UserSchema: *userSchemaURI,
 			Purposes:   map[string]string{"login": "step_1"},
 			Audience: api.OptFlowAudience{
