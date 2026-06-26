@@ -64,7 +64,7 @@ Without this, implementations drift: flow handlers construct inline `domain.Erro
 
 ### Logging and reporting
 
-- **Handlers:** `LogFormatGCPErrorReporting` uses `sloggcp.NewErrorReportingHandler`; `ReplaceErrKeys` maps `err` → `@type` error key.
+- **Handlers:** `LogFormatGCPErrorReporting` uses `sloggcp.NewErrorReportingHandler`; `ReplaceErrKeys` renames the `err` attribute key to `sloggcp.ErrorKey` (`"error"`).
 - **Context:** `ExtractErrCause` logs `context.Cause(ctx)` when present.
 - **Masking:** `MaskConfig` redacts configured attribute keys/groups in log output.
 - **Config:** `ErrorConfig.ReportLocation` and `ErrorConfig.StackTrace` exist but are **not read anywhere** yet.
@@ -88,7 +88,7 @@ Refinements (behavioral, not a new type):
 - **Implement `Unwrap() error`** returning `Parent`, so standard `errors.Is` / `errors.As` traverse into the cause chain (for example reach a `database.NoRowFoundError` wrapped by `ErrInternal`). The existing code-based `Is` stays for sentinel matching.
 - **`Error()` returns only `Message`** (no parent chain), so the Go-default `err.Error()` render is safe by construction; the cause is reached via `Unwrap()` and structured logging instead (see Decision 4 → Messages and Decision 5).
 - **Stop copying `Parent` into `Details`.** `newError` no longer falls back to `details = parent`; `Details` is only what a caller explicitly attaches via `WithDetails`. This removes the leak path the redaction policy (Decision 6) would otherwise have to defend against.
-  - *Provenance:* the `details = parent` fallback was introduced in [#207](https://github.com/zitadel/nextgen/pull/207) (branch `fix/token-handling`) with an empty PR description, no review discussion on `error.go`, and no code or test in that PR consuming it. Its only observable effect is that a wrapped cause (often a raw storage/driver error) becomes visible in the JSON-serialized `details` because `Parent` itself has no JSON tag — i.e. a debugging convenience that doubles as the leak risk above. Dropping it appears safe (current `Details` consumers in `session.go`, `flow.go`, and `session_ttl_test.go` all set details explicitly); confirm with a grep at implementation time since the behavior has been live since 2026-06-18.
+  - *Provenance:* the `details = parent` fallback was introduced in [#207](https://github.com/zitadel/nextgen/pull/207) (branch `fix/token-handling`) with an empty PR description, no review discussion on `error.go`, and no code or test in that PR consuming it. Its effect is to populate the in-memory `Details` field with the wrapped cause (often a raw storage/driver error). It does **not** reach clients today — `domainErrorDetails` serializes only `code` and `message` (see Inventory → API), so `details` is never emitted — but it is a **latent** leak: the cause surfaces to anything that logs `Details` or serializes a `domain.Error` directly, and it would reach clients the moment `details` population is enabled (Decision 4). In short, it is a debugging convenience that doubles as the leak risk above. Dropping it appears safe (current `Details` consumers in `session.go`, `flow.go`, and `session_ttl_test.go` all set details explicitly); confirm with a grep at implementation time since the behavior has been live since 2026-06-18.
 - **Replace the `Location string` field with embedded capture** (see Decision 5): `domain.Error` embeds a shared `errreport.Origin` carrying a structured `*sloggcp.ReportLocation` and an optional stack, instead of a basename `file:line` string.
 
 `domain.Error` stays a **value type**. The refinements above (value-receiver `Unwrap`, embedded `Origin`, `slog.LogValuer`) do not require a pointer type, so the existing sentinel-factory and value-return patterns are unchanged.
@@ -285,11 +285,11 @@ This keeps both the value and its hash out of logs without losing debuggability:
 
 The canonical mapper (`domainErrorDetails` → only `Code` + `Message`) is clean. With `Error()` trimmed (Decision 4 → Messages), `domain.Error` chains rendered via `Error()` become safe too. These remaining side paths still need call-site fixes because they render **non-domain** errors or rely on raw text:
 
-- `internal/api/project.go:31` — concatenates a `*database.NoRowFoundError` into the response: `"project not found: " + notFound.Error()`. A storage error's `Error()` still carries the driver cause. **Hard leak — must fix.**
-- `internal/api/error_handler.go:80,86` — `OgenErrorHandler` sets `d.Message = err.Error()` for ogen security/decode errors (raw framework text). **Must fix / normalize.**
-- `internal/api/flow.go:109,154` — `ErrRequestInvalid().WithMessage(err.Error())` surfaces raw decode/parse error text (non-domain `err`). **Must fix / normalize.**
-- `internal/api/flow.go:486,489,492` — `Message: err.Error()` for `invalid_action` / `session_conflict` / `unsupported`. Mitigated by the trimmed `Error()` when `err` is a `domain.Error`, but still migrate to `flow.*` sentinels with fixed messages (Decision 2) rather than relying on `Error()`.
-- `internal/storage/database/errors.go` — `IntegrityViolationError.Error()` (and `NoRowFoundError` / `ScanError` / `UnknownError`) render the wrapped `original` driver error with `%v`. For a `23505` the pg dialect stores `*pgconn.PgError` as `original` (`error.go:51`), whose `Detail` embeds the offending row — for the unique-attribute schema, `Key (project_id, team_id, key, value_hash)=(…, …, email, \x9f86d0…) already exists.`, exposing the sensitive `value_hash`. This is **log-safe-at-source** work: add a `LogValue` that emits typed fields only and stops carrying the driver `Detail` into logged output. **Log leak — must fix.**
+- `internal/api/project.go`, `Handler.GetProject` — concatenates a `*database.NoRowFoundError` into the `GetProjectNotFound` message: `"project not found: " + notFound.Error()`. A storage error's `Error()` still carries the driver cause. **Hard leak — must fix.**
+- `internal/api/error_handler.go`, `OgenErrorHandler` — sets `d.Message = err.Error()` for ogen security and decode errors (raw framework text). **Must fix / normalize.**
+- `internal/api/flow.go`, `Handler.SubmitFlowStep` — `domain.ErrRequestInvalid().WithMessage(err.Error())` surfaces raw decode/parse error text (non-domain `err`) in the field-decode and origin-validation branches. **Must fix / normalize.**
+- `internal/api/flow.go`, `mapFlowErrorStatus` — `Message: err.Error()` for `invalid_action` / `session_conflict` / `unsupported`. Mitigated by the trimmed `Error()` when `err` is a `domain.Error`, but still migrate to `flow.*` sentinels with fixed messages (Decision 2) rather than relying on `Error()`.
+- `internal/storage/database/errors.go` — `IntegrityViolationError.Error()` (and `NoRowFoundError` / `ScanError` / `UnknownError`) render the wrapped `original` driver error with `%v`. For a `23505` the pg dialect stores `*pgconn.PgError` as `original` (the `23505` case in `wrapPgError`), whose `Detail` embeds the offending row — for the unique-attribute schema, `Key (project_id, team_id, key, value_hash)=(…, …, email, \x9f86d0…) already exists.`, exposing the sensitive `value_hash`. This is **log-safe-at-source** work: add a `LogValue` that emits typed fields only and stops carrying the driver `Detail` into logged output. **Log leak — must fix.**
 
 ### 7. Backwards compatibility and migration
 
@@ -325,7 +325,7 @@ The canonical mapper (`domainErrorDetails` → only `Code` + `Message`) is clean
 |---|---|---|
 | `internal/errreport` leaf (global toggles + `Capture`/`Origin`) | Instrumentation / shared | #367 |
 | `domain.Error`: add `Unwrap`, trim `Error()` to `Message`, drop `Parent`→`Details` fallback, embed `Origin`, `LogValuer` | Domain | #367 |
-| Remediate API leak sites (`project.go:31`, `error_handler.go:80/86`, `flow.go:109/154/486/489/492`) | API | #367 |
+| Remediate API leak sites (`Handler.GetProject`, `OgenErrorHandler`, `Handler.SubmitFlowStep`, `mapFlowErrorStatus`) | API | #367 |
 | `database.*Error`: embed `Origin`, capture in `wrapError`, add log-safe `LogValue` (typed fields; drop driver `Detail`/value) | Storage | #48 / #367 |
 | Wire `errreport` toggles + `GCPReporting` from `log.errors.*` / format | Instrumentation | #367 |
 | Flow error sentinels + OpenAPI schemas | API / domain | #367 |
