@@ -29,6 +29,10 @@
       "types": "./dist/client.d.ts",
       "import": "./dist/client.js"
     },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js"
+    },
     "./middleware": {
       "types": "./dist/middleware.d.ts",
       "import": "./dist/middleware.js"
@@ -38,12 +42,13 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/middleware.ts src/auth.ts src/context.tsx src/useAuth.ts src/types.ts src/index.ts src/server.ts src/client.ts --format esm --dts --clean --tsconfig tsconfig.build.json",
+    "build": "tsup src/middleware.ts src/auth.ts src/context.tsx src/useAuth.ts src/types.ts src/index.ts src/server.ts src/client.ts src/react.tsx --format esm --dts --clean --tsconfig tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "lint": "eslint ."
   },
   "dependencies": {
+    "@lit/react": "^1.0.8",
     "@zitadel/api": "workspace:*",
     "@zitadel/components": "workspace:*",
     "@zitadel/sdk-core": "workspace:*",

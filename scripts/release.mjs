@@ -41,6 +41,10 @@ const PUBLIC_PACKAGE_BUILD_TARGETS = [
   "sdk-solid:build",
   "sdk-svelte:build",
   "sdk-qwik:build",
+  "sdk-sveltekit:build",
+  "sdk-tanstack-start:build",
+  "sdk-solid-start:build",
+  "sdk-qwik-city:build",
 ];
 
 export async function main(args = forwardedArgs()) {

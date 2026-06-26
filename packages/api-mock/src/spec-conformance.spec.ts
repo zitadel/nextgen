@@ -17,7 +17,7 @@
  *   - GET  /projects/:id                → GetProjectResponse
  *   - GET  /flow_definitions            → ListFlowDefinitionsResponse
  *   - GET  /flow_definitions/:id        → GetFlowDefinitionResponse
- *   - PUT  /flow_definitions/:id        → UpdateFlowDefinitionResponse
+ *   - PATCH /flow_definitions/:id       → UpdateFlowDefinitionResponse
  *
  * Endpoints covered structurally (orval emits no `*Response` zod for these
  * because they have no static response schema — POSTs that return only an
@@ -84,6 +84,9 @@ function validFlowDefinitionBody(): Record<string, unknown> {
       {
         name: "identifier",
         fields: ["email"],
+        // `step-action.yaml` requires `kind` (enum submit|passkey|
+        // passkey_register|navigate|back); omitting it makes the
+        // CreateFlowDefinitionBody validation reject the body.
         actions: [{ name: "submit", kind: "submit", text_key: "submit", primary: true }],
       },
     ],
@@ -277,24 +280,21 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(() => GetFlowDefinitionResponse.parse(body)).not.toThrow();
   });
 
-  test("PUT /flow_definitions/:id matches UpdateFlowDefinitionResponse", async () => {
+  test("PATCH /flow_definitions/:id matches UpdateFlowDefinitionResponse", async () => {
     const create = await fetch(`${BASE}/flow_definitions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        project_id: "proj_conformance_update",
+        project_id: "proj_conformance_patch",
         flow_definition: validFlowDefinitionBody(),
       }),
     });
     const { id } = (await create.json()) as { id: string };
-    // Spec: `updateFlowDefinition` is `PUT /flow_definitions/{id}` with a
-    // required `project_id` query param (the generated client and CLI
-    // syncer both call it that way). The body wraps the definition under
-    // `flow_definition` (flow-definition-update-request.yaml), unlike the
-    // create envelope.
-    const res = await fetch(`${BASE}/flow_definitions/${id}?project_id=proj_conformance_update`, {
-      method: "PUT",
+    const res = await fetch(`${BASE}/flow_definitions/${id}`, {
+      method: "PATCH",
       headers: { "content-type": "application/json" },
+      // `flow-definition-update-request.yaml` requires the `{ flow_definition }`
+      // envelope; a bare flow definition is rejected with 400.
       body: JSON.stringify({ flow_definition: validFlowDefinitionBody() }),
     });
     expect(res.status).toBe(200);

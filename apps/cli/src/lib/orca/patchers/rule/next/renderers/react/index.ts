@@ -3,26 +3,27 @@ import type { RendererSpec } from "../types";
 
 /**
  * The Next.js App Router renderer scaffolds `/login`, `/register`, and
- * `/profile` pages that drive the `<zitadel-login>` and `<zitadel-logout>`
- * Lit web components.
+ * `/profile` pages that render the `<ZitadelLogin>` / `<ZitadelLogout>` React
+ * components from `@zitadel/sdk-next/react`.
  *
- * Each page is a single client component (`"use client"`) that, inside a
- * `next/dynamic({ ssr: false })` loader, builds the SDK project handle with
- * `configureZitadel({ projectId, proxyPath: "/__nextgen" })` and passes it to
- * the widget via `project={...}`. It also imports
- * `@zitadel/sdk-next/client` for its `customElements.define`
- * side-effect — importing `@zitadel/components` directly would fail on
- * strict-resolution package managers (pnpm, yarn PnP) because the app only
- * declares `sdk-next` as a direct dep. SSR is disabled because Lit's element
- * registration needs a browser.
+ * Those components wrap the Lit web components (via `@lit/react`): the server
+ * renders the inert tag and the client upgrades it, and the SDK `project`
+ * handle is bound as a DOM property. The React components are fully typed, so
+ * there is no `next/dynamic({ ssr: false })` and no `custom-elements.d.ts`.
  *
- * The handle is passed as the `project` DOM property, which relies on React
- * 19's custom-element property binding (the scaffold targets the latest Next /
- * React). The backend URL never reaches the browser: the client talks to the
- * same-origin `/__nextgen` proxy path, and the scaffolded Next request boundary
- * forwards it to `ZITADEL_URL` server-side. `NEXT_PUBLIC_ZITADEL_PROJECT_ID` is
- * public — the project id is not sensitive and the widget needs it to start a
- * flow.
+ * The pages are marked `"use client"`. `configureZitadel()` stores the SDK
+ * handle on a `globalThis` singleton that the web component reads at startup
+ * (`getZitadelConfig()`). That call must run in the browser to populate the
+ * client-side global — in a plain Server Component it would run only on the
+ * server, leaving the browser global empty and the widget unable to start its
+ * flow. `"use client"` keeps SSR (the inert tag is still server-rendered) while
+ * ensuring `configureZitadel()` also runs on the client.
+ *
+ * `configureZitadel({ projectId, proxyPath: "/__nextgen" })` builds the handle;
+ * the backend URL never reaches the browser (the client talks to the
+ * same-origin `/__nextgen` proxy, which the scaffolded request boundary forwards
+ * to `ZITADEL_URL` server-side). `NEXT_PUBLIC_ZITADEL_PROJECT_ID` is public —
+ * the project id is not sensitive and the widget needs it to start a flow.
  */
 export const reactRenderer: RendererSpec = {
   id: "react",
@@ -33,39 +34,18 @@ export const reactRenderer: RendererSpec = {
   templates: {
     authPage(mode) {
       const componentName = mode === "login" ? "LoginPage" : "RegisterPage";
-      const elementName = mode === "login" ? "ZitadelLogin" : "ZitadelRegister";
       return {
         mode,
         contents: `${MANAGED_MARKER}
 "use client";
-
-import dynamic from "next/dynamic";
+import { ZitadelLogin } from "@zitadel/sdk-next/react";
+import { configureZitadel } from "@zitadel/sdk-next/client";
 import Link from "next/link";
 
-const ${elementName} = dynamic(
-  async () => {
-    const { configureZitadel } = await import("@zitadel/sdk-next/client");
-    // Build the SDK project handle and pass it to the component via the
-    // \`project\` prop. The component reads config from this prop directly, so
-    // it works regardless of how the SDK packages are bundled. The backend URL
-    // stays server-side: requests go through the proxy path "/__nextgen",
-    // which the scaffolded request boundary forwards to the Zitadel server.
-    const project = configureZitadel({
-      projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "",
-      proxyPath: "/__nextgen",
-    });
-    return function ${elementName}Element() {
-      return (
-        <zitadel-login
-          project={project}
-          purpose="${mode}"
-          post-sign-in-url="/profile"
-        />
-      );
-    };
-  },
-  { ssr: false },
-);
+const project = configureZitadel({
+  projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "",
+  proxyPath: "/__nextgen",
+});
 
 export default function ${componentName}() {
   return (
@@ -75,7 +55,7 @@ export default function ${componentName}() {
           ${mode === "login" ? "Create account" : "Sign in"}
         </Link>
       </nav>
-      <${elementName} />
+      <ZitadelLogin project={project} purpose="${mode}" postSignInUrl="/profile" />
     </main>
   );
 }
@@ -86,8 +66,8 @@ export default function ${componentName}() {
       return {
         contents: `${MANAGED_MARKER}
 "use client";
-
-import dynamic from "next/dynamic";
+import { ZitadelLogout } from "@zitadel/sdk-next/react";
+import { configureZitadel } from "@zitadel/sdk-next/client";
 import { useEffect, useState } from "react";
 
 type SessionProof = {
@@ -96,24 +76,10 @@ type SessionProof = {
   user_id?: string;
 };
 
-const ZitadelLogout = dynamic(
-  async () => {
-    const { configureZitadel } = await import("@zitadel/sdk-next/client");
-    const project = configureZitadel({
-      projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "",
-      proxyPath: "/__nextgen",
-    });
-    return function ZitadelLogoutElement() {
-      return (
-        <zitadel-logout
-          project={project}
-          post-sign-out-url="/login"
-        />
-      );
-    };
-  },
-  { ssr: false },
-);
+const project = configureZitadel({
+  projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "",
+  proxyPath: "/__nextgen",
+});
 
 export default function ProfilePage() {
   const [session, setSession] = useState<SessionProof | null>(null);
@@ -150,7 +116,7 @@ export default function ProfilePage() {
       <div style={{ maxWidth: "680px", margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>
           <h1 style={{ fontSize: "24px", fontWeight: 700, margin: 0, color: "#f4f4f6" }}>Signed in</h1>
-          <ZitadelLogout />
+          <ZitadelLogout project={project} postSignOutUrl="/login" />
         </div>
         <p style={{ color: "#33a779", fontWeight: 600 }}>Signed in profile loaded.</p>
         {session ? (
@@ -172,31 +138,6 @@ export default function ProfilePage() {
       </div>
     </main>
   );
-}
-`,
-      };
-    },
-    customElementsDts() {
-      return {
-        contents: `${MANAGED_MARKER}
-import type React from "react";
-import type { ZitadelProject } from "@zitadel/sdk-next/client";
-
-declare module "react" {
-  namespace JSX {
-    interface IntrinsicElements {
-      "zitadel-login": React.HTMLAttributes<HTMLElement> & {
-        project?: ZitadelProject;
-        "session-exchange-path"?: string;
-        "post-sign-in-url"?: string;
-        purpose?: string;
-      };
-      "zitadel-logout": React.HTMLAttributes<HTMLElement> & {
-        project?: ZitadelProject;
-        "post-sign-out-url"?: string;
-      };
-    }
-  }
 }
 `,
       };

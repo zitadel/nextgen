@@ -86,10 +86,14 @@ describe("Orca selection", () => {
     expect(orca.availableFrameworks().map((choice) => choice.id)).toEqual([
       "next",
       "nuxt",
+      "tanstack-start",
       "react",
       "vue",
+      "solid-start",
       "solid",
+      "sveltekit",
       "svelte",
+      "qwik-city",
       "qwik",
       "angular",
     ]);

@@ -29,6 +29,10 @@ const packageDirs = [
   "packages/sdk-solid",
   "packages/sdk-svelte",
   "packages/sdk-qwik",
+  "packages/sdk-sveltekit",
+  "packages/sdk-tanstack-start",
+  "packages/sdk-solid-start",
+  "packages/sdk-qwik-city",
 ];
 const tempDirs: string[] = [];
 
@@ -49,7 +53,7 @@ describe("verify-tarballs script", () => {
     });
 
     await expect(runVerify(tarballsDir)).resolves.toMatchObject({
-      stdout: expect.stringContaining("verified 18 installable tarballs"),
+      stdout: expect.stringContaining("verified 22 installable tarballs"),
     });
   });
 

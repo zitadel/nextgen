@@ -18,15 +18,18 @@
   ],
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "solid": "./dist/index.jsx",
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
     }
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "vite build",
+    "build": "tsup",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "lint": "eslint ."
@@ -55,6 +58,8 @@
     "jsdom": "catalog:",
     "prettier": "catalog:",
     "solid-js": "^1.9.12",
+    "tsup": "catalog:",
+    "tsup-preset-solid": "^2.2.0",
     "typescript": "catalog:",
     "typescript-eslint": "catalog:",
     "vite": "catalog:sdk",

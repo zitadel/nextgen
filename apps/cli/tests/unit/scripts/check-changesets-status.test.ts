@@ -560,6 +560,10 @@ function validConfig(): { fixed: string[][] } {
         "@zitadel/sdk-solid",
         "@zitadel/sdk-svelte",
         "@zitadel/sdk-qwik",
+        "@zitadel/sdk-sveltekit",
+        "@zitadel/sdk-tanstack-start",
+        "@zitadel/sdk-solid-start",
+        "@zitadel/sdk-qwik-city",
       ],
     ],
   };

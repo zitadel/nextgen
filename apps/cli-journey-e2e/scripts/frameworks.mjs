@@ -1,4 +1,17 @@
-export const frameworkIds = ["next", "nuxt", "react", "vue", "angular", "solid", "svelte", "qwik"];
+export const frameworkIds = [
+  "next",
+  "nuxt",
+  "react",
+  "vue",
+  "angular",
+  "solid",
+  "svelte",
+  "qwik",
+  "sveltekit",
+  "tanstack-start",
+  "solid-start",
+  "qwik-city",
+];
 
 const viteDevArgs = (port) => [
   "run",
@@ -81,6 +94,38 @@ export const frameworks = [
     sdkPackageDir: "packages/sdk-qwik",
     readyPath: "/login",
     expectsProtectedRouteRedirect: false,
+    devServerArgs: viteDevArgs,
+  },
+  {
+    id: "sveltekit",
+    displayName: "SvelteKit",
+    sdkPackageDir: "packages/sdk-sveltekit",
+    readyPath: "/login",
+    expectsProtectedRouteRedirect: true,
+    devServerArgs: viteDevArgs,
+  },
+  {
+    id: "tanstack-start",
+    displayName: "TanStack Start",
+    sdkPackageDir: "packages/sdk-tanstack-start",
+    readyPath: "/login",
+    expectsProtectedRouteRedirect: true,
+    devServerArgs: viteDevArgs,
+  },
+  {
+    id: "solid-start",
+    displayName: "SolidStart",
+    sdkPackageDir: "packages/sdk-solid-start",
+    readyPath: "/login",
+    expectsProtectedRouteRedirect: true,
+    devServerArgs: viteDevArgs,
+  },
+  {
+    id: "qwik-city",
+    displayName: "Qwik City",
+    sdkPackageDir: "packages/sdk-qwik-city",
+    readyPath: "/login",
+    expectsProtectedRouteRedirect: true,
     devServerArgs: viteDevArgs,
   },
 ];
