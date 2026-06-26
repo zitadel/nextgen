@@ -1,8 +1,6 @@
 package database
 
-import (
-	"fmt"
-)
+import "fmt"
 
 // FieldBinding maps a domain field to its SQL column name and entity accessor.
 type FieldBinding[T any] struct {
@@ -52,14 +50,14 @@ func (s Schema[F, T]) ValuesFrom(entity *T, cols []Column[F]) []any {
 // CoerceCursorValues restores JSON-decoded cursor values to SQL bind types.
 func (s Schema[F, T]) CoerceCursorValues(cols []Column[F], raw []any) ([]any, error) {
 	if len(cols) != len(raw) {
-		return nil, fmt.Errorf("database: cursor columns and values length mismatch")
+		return nil, ErrCursorLengthMismatch()
 	}
 
 	values := make([]any, len(cols))
 	for i, col := range cols {
 		binding := s.binding(col.Field())
 		if binding.Coerce == nil {
-			return nil, fmt.Errorf("database: missing coerce for field %v", col.Field())
+			return nil, ErrMissingFieldCoerce(col.Field())
 		}
 		coerced, err := binding.Coerce(raw[i])
 		if err != nil {

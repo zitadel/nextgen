@@ -2,7 +2,6 @@ package database
 
 import (
 	"encoding/json"
-	"fmt"
 	"strconv"
 	"time"
 )
@@ -13,7 +12,7 @@ func CoerceStringValue(v any) (string, error) {
 	case string:
 		return s, nil
 	default:
-		return "", fmt.Errorf("expected string, got %T", v)
+		return "", ErrCoerceExpectedType("string", v)
 	}
 }
 
@@ -33,11 +32,11 @@ func CoerceTimeValue(v any) (time.Time, error) {
 			parsed, err = time.Parse(time.RFC3339, t)
 		}
 		if err != nil {
-			return time.Time{}, fmt.Errorf("parse time: %w", err)
+			return time.Time{}, ErrCoerceParse("The cursor time value could not be parsed.", err)
 		}
 		return parsed, nil
 	default:
-		return time.Time{}, fmt.Errorf("expected time, got %T", v)
+		return time.Time{}, ErrCoerceExpectedType("time", v)
 	}
 }
 
@@ -57,12 +56,12 @@ func CoerceUint8Value[E ~uint8](v any) (E, error) {
 		parsed, err := strconv.ParseUint(n, 10, 8)
 		if err != nil {
 			var zero E
-			return zero, fmt.Errorf("parse uint8: %w", err)
+			return zero, ErrCoerceParse("The cursor enum value could not be parsed.", err)
 		}
 		return E(parsed), nil
 	default:
 		var zero E
-		return zero, fmt.Errorf("expected %T, got %T", zero, v)
+		return zero, ErrCoerceExpectedType("uint8 enum", v)
 	}
 }
 
@@ -80,13 +79,13 @@ func CoerceJSONValue[T any](v any) (T, error) {
 	data, err := json.Marshal(v)
 	if err != nil {
 		var zero T
-		return zero, fmt.Errorf("marshal json value: %w", err)
+		return zero, ErrCoerceParse("The cursor JSON value could not be marshaled.", err)
 	}
 
 	var out T
 	if err := json.Unmarshal(data, &out); err != nil {
 		var zero T
-		return zero, fmt.Errorf("unmarshal json value: %w", err)
+		return zero, ErrCoerceParse("The cursor JSON value could not be unmarshaled.", err)
 	}
 	return out, nil
 }
@@ -104,19 +103,19 @@ func CoerceEnumKeyMap[K ~uint8, V any](v any, parseKey func(string) (K, error)) 
 
 	data, err := json.Marshal(v)
 	if err != nil {
-		return nil, fmt.Errorf("marshal enum key map: %w", err)
+		return nil, ErrCoerceParse("The cursor enum key map could not be marshaled.", err)
 	}
 
 	var stringMap map[string]V
 	if err := json.Unmarshal(data, &stringMap); err != nil {
-		return nil, fmt.Errorf("unmarshal enum key map: %w", err)
+		return nil, ErrCoerceParse("The cursor enum key map could not be unmarshaled.", err)
 	}
 
 	out := make(map[K]V, len(stringMap))
 	for key, value := range stringMap {
 		parsed, err := parseKey(key)
 		if err != nil {
-			return nil, fmt.Errorf("parse map key %q: %w", key, err)
+			return nil, ErrCoerceEnumMapKey(key, err)
 		}
 		out[parsed] = value
 	}
@@ -141,13 +140,13 @@ func CoerceSlice[T any](v any, coerceElem func(any) (T, error)) ([]T, error) {
 		for i, item := range s {
 			coerced, err := coerceElem(item)
 			if err != nil {
-				return nil, fmt.Errorf("coerce slice element %d: %w", i, err)
+				return nil, ErrCoerceSliceElement(i, err)
 			}
 			out[i] = coerced
 		}
 		return out, nil
 	default:
-		return nil, fmt.Errorf("expected slice, got %T", v)
+		return nil, ErrCoerceExpectedSlice(v)
 	}
 }
 

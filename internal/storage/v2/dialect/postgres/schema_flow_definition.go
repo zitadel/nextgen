@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"fmt"
 	"strconv"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -14,7 +13,7 @@ func parseFlowDefinitionPurposeKey(s string) (domain.FlowDefinitionPurpose, erro
 	}
 	n, err := strconv.ParseUint(s, 10, 8)
 	if err != nil {
-		return 0, fmt.Errorf("unknown flow definition purpose key %q", s)
+		return 0, database.ErrInvalidEnumKey(s)
 	}
 	return domain.FlowDefinitionPurpose(n), nil
 }

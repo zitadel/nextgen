@@ -26,7 +26,7 @@ func compileRead[F ~uint8, T any](c *statementCompiler, stmt string, opt *databa
 		}
 		values, err := schema.CoerceCursorValues(cursor.Columns, cursor.Values)
 		if err != nil {
-			return database.ErrInvalidCursor()
+			return database.ErrInvalidCursor().WithParent(err)
 		}
 		if opt.Pagination.OrderBy.Direction == database.OrderAsc {
 			opt.Filter = database.And(opt.Filter, database.GreaterThans(cursor.Columns, values))

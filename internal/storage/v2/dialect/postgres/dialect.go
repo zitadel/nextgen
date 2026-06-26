@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"errors"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -73,5 +72,5 @@ func DecodeConfig(input any) (database.Dialect, error) {
 		}
 		return connector, nil
 	}
-	return nil, errors.New("invalid configuration")
+	return nil, database.ErrInvalidDialectConfig(input)
 }
