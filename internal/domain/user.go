@@ -58,9 +58,7 @@ type CreateUser struct {
 }
 
 // NewCreateUser builds a [CreateUser] from a schema-validated user map.
-// When id is empty a fresh ID is minted; callers with a pre-bound ID
-// (e.g. the passkey-register ceremony, which keys its WebAuthn challenge
-// to a provisional user id at issue time) pass it through here.
+// id passes through when non-empty; otherwise a fresh one is minted.
 func NewCreateUser(projectID string, teamID *string, id string, schemabs []byte, muser map[string]any) (*CreateUser, error) {
 	schemaURL, err := SchemaFromUserMap(muser)
 	if err != nil {
