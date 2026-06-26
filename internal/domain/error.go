@@ -11,8 +11,8 @@ type Error struct {
 	Code     string `json:"code"`
 	Message  string `json:"message"`
 	Details  any    `json:"details,omitempty"`
-	Parent   error  `json:"parent"`
-	Location string `json:"location"`
+	Parent   error  `json:"parent,omitempty"`
+	Location string `json:"location,omitempty"`
 }
 
 func (e Error) Error() string {
