@@ -34,7 +34,8 @@
     "@zitadel/server-darwin-arm64": "0.0.0",
     "@zitadel/server-win32-x64": "0.0.0",
     "@zitadel/docs": "0.0.1",
-    "@zitadel/storybook": "0.0.0"
+    "@zitadel/storybook": "0.0.0",
+    "@zitadel/mock-zitadel": "0.0.0"
   },
   "changesets": [
     "add-solid-svelte-qwik-sdks",
@@ -44,6 +45,7 @@
     "api-config-global-slot",
     "automate-release-workflows",
     "checkbox-select-atoms",
+    "cleanup-x-password",
     "cli-drop-unused-flows",
     "cli-local-runtime-truthful",
     "cli-remove-claim-logic",
@@ -86,6 +88,7 @@
     "optimize-fresh-app-agent-flow",
     "ordered-step-arrays",
     "passkey-end-to-end-flow",
+    "passkey-registration-labels",
     "pr-metadata-guidance",
     "prerelease-release-automation",
     "proxy-send-project-secret",
@@ -95,6 +98,7 @@
     "recover-alpha-seven",
     "recover-alpha-train-manual",
     "register-profile-field-labels",
+    "release-dag-artifact-freshness",
     "release-main-ci-wait",
     "server-npm-runtime",
     "server-wrapper-signals",
