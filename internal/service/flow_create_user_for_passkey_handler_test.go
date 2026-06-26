@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -183,8 +184,8 @@ func TestFlowCreateUserForPasskey_SkipsPasswordChallengeFieldDefensively(t *test
 	h := service.NewFlowCreateUserForPasskeyHandler(writer)
 
 	collected := map[string]any{
-		"email":               "alice@example.com",
-		"x-auth-methods#pwd":  "leaked plaintext",
+		"email":              "alice@example.com",
+		"x-auth-methods#pwd": "leaked plaintext",
 	}
 	state := provisionalState(t, collected)
 	resolved := domain.FlowResolvedFields{
