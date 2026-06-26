@@ -26,7 +26,7 @@ func (f flowDefinitionStatements) GetFlowDefinitionByID(ctx context.Context, id 
 }
 
 // ListFlowDefinitions implements [service.FlowDefinitionStatements].
-func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filter *database.ListOptions) (*database.ListResult[*domain.FlowDefinition], error) {
+func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
 	panic("unimplemented")
 }
 

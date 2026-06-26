@@ -32,7 +32,7 @@ type ProjectStatements interface {
 	Statements
 	CreateProject(ctx context.Context, entity *domain.Project) error
 	GetProjectByID(ctx context.Context, id string) (*domain.Project, error)
-	ListProjects(ctx context.Context, filter *database.ListOptions) (*database.ListResult[*domain.Project], error)
+	ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
 	DeleteProjectByID(ctx context.Context, id string) error
 }
 
@@ -46,6 +46,6 @@ type FlowDefinitionStatements interface {
 	Statements
 	CreateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error
 	GetFlowDefinitionByID(ctx context.Context, id string) (*domain.FlowDefinition, error)
-	ListFlowDefinitions(ctx context.Context, filter *database.ListOptions) (*database.ListResult[*domain.FlowDefinition], error)
+	ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error)
 	DeleteFlowDefinitionByID(ctx context.Context, id string) error
 }

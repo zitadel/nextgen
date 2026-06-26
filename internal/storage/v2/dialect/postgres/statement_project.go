@@ -41,9 +41,11 @@ const projectQuery = "SELECT id, created_at, updated_at, project_secret, preview
 // GetProjectByID implements [service.ProjectStatements].
 func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*domain.Project, error) {
 	var compiler statementCompiler
-	compiler.compileRead(projectQuery, &database.ListOptions{
-		Filter: database.Equal(database.Column(domain.ProjectFieldID), id),
-	})
+	if err := compileRead(&compiler, projectQuery, &database.ListOptions[domain.ProjectField]{
+		Filter: database.Equal(database.Col(domain.ProjectFieldID), id),
+	}, projectSchema); err != nil {
+		return nil, err
+	}
 
 	rows, err := ps.client.Query(ctx, compiler.String(), compiler.args...)
 	if err != nil {
@@ -53,9 +55,11 @@ func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*dom
 }
 
 // ListProjects implements [service.ProjectStatements].
-func (ps projectStatements) ListProjects(ctx context.Context, filter *database.ListOptions) (*database.ListResult[*domain.Project], error) {
+func (ps projectStatements) ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
 	var compiler statementCompiler
-	compiler.compileRead(projectQuery, filter)
+	if err := compileRead(&compiler, projectQuery, filter, projectSchema); err != nil {
+		return nil, err
+	}
 
 	rows, err := ps.client.Query(ctx, compiler.String(), compiler.args...)
 	if err != nil {
@@ -67,39 +71,19 @@ func (ps projectStatements) ListProjects(ctx context.Context, filter *database.L
 		return nil, wrapError(err)
 	}
 
-	var curser *pagination.Cursor
+	var nextCursor []byte
 	if filter.Pagination.Limit > 0 && len(projects) == int(filter.Pagination.Limit) {
-		curser = &pagination.Cursor{
+		curser := &pagination.Cursor[domain.ProjectField]{
 			Columns: filter.Pagination.OrderBy.Columns,
-			Values:  ps.valuesFromColumns(projects[len(projects)-1], filter.Pagination.OrderBy.Columns),
+			Values:  projectSchema.ValuesFrom(projects[len(projects)-1], filter.Pagination.OrderBy.Columns),
 		}
+		nextCursor = curser.Marshal()
 	}
 
 	return &database.ListResult[*domain.Project]{
 		Items:      projects,
-		NextCursor: curser.Marshal(),
+		NextCursor: nextCursor,
 	}, nil
-}
-
-func (ps projectStatements) valuesFromColumns(project *domain.Project, columns []database.Column) []any {
-	values := make([]any, len(columns))
-	for i, column := range columns {
-		switch column {
-		case database.Column(domain.ProjectFieldID):
-			values[i] = project.ID
-		case database.Column(domain.ProjectFieldCreatedAt):
-			values[i] = project.CreatedAt
-		case database.Column(domain.ProjectFieldUpdatedAt):
-			values[i] = project.UpdatedAt
-		case database.Column(domain.ProjectFieldProjectSecret):
-			values[i] = project.ProjectSecret
-		case database.Column(domain.ProjectFieldPreviewSecret):
-			values[i] = project.PreviewSecret
-		case database.Column(domain.ProjectFieldPreviewOrigins):
-			values[i] = project.PreviewOrigins
-		}
-	}
-	return values
 }
 
 func (ps projectStatements) scanProject(row pgx.CollectableRow) (*domain.Project, error) {

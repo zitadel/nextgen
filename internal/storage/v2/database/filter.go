@@ -2,164 +2,136 @@ package database
 
 import "slices"
 
-type Filter interface {
+type Filter[F ~uint8] interface {
 	isFilter()
-	// TODO replace below with Restricts(column Column) bool
-	Restricts(column Column) bool
+	Restricts(column Column[F]) bool
 }
 
-type Column uint8
-
-type AndFilter struct {
-	Filters []Filter
+type AndFilter[F ~uint8] struct {
+	Filters []Filter[F]
 }
 
-func And(filters ...Filter) AndFilter {
-	return AndFilter{Filters: filters}
+func And[F ~uint8](filters ...Filter[F]) AndFilter[F] {
+	combined := make([]Filter[F], 0, len(filters))
+	for _, filter := range filters {
+		if filter != nil {
+			combined = append(combined, filter)
+		}
+	}
+	return AndFilter[F]{Filters: combined}
 }
 
 // Restricts implements [Filter].
-func (f AndFilter) Restricts(column Column) bool {
-	return slices.ContainsFunc(f.Filters, func(f Filter) bool { return f.Restricts(column) })
+func (f AndFilter[F]) Restricts(column Column[F]) bool {
+	return slices.ContainsFunc(f.Filters, func(filter Filter[F]) bool { return filter.Restricts(column) })
 }
 
-func (f AndFilter) isFilter() {}
+func (f AndFilter[F]) isFilter() {}
 
-var _ Filter = (*AndFilter)(nil)
+var _ Filter[uint8] = AndFilter[uint8]{}
 
-type OrFilter struct {
-	Filters []Filter
+type OrFilter[F ~uint8] struct {
+	Filters []Filter[F]
 }
 
-func Or(filters ...Filter) OrFilter {
-	return OrFilter{Filters: filters}
+func Or[F ~uint8](filters ...Filter[F]) OrFilter[F] {
+	return OrFilter[F]{Filters: filters}
 }
 
-func (f OrFilter) Restricts(column Column) bool {
-	if len(f.Filters) == 0 {
-		return false
-	}
-	for _, child := range f.Filters {
-		if !child.Restricts(column) {
-			return false
-		}
-	}
-	return true
+func (f OrFilter[F]) Restricts(column Column[F]) bool {
+	return slices.ContainsFunc(f.Filters, func(filter Filter[F]) bool { return filter.Restricts(column) })
 }
 
-func (f OrFilter) isFilter() {}
+func (f OrFilter[F]) isFilter() {}
 
-var _ Filter = (*OrFilter)(nil)
+var _ Filter[uint8] = OrFilter[uint8]{}
 
-type EqualsFilter struct {
-	Columns []Column
+type EqualsFilter[F ~uint8] struct {
+	Columns []Column[F]
 	Values  []any
 }
 
 // Equal creates a new EqualsFilter for a single column and value.
 // The condition will look like "column = value".
-func Equal(column Column, value any) *EqualsFilter {
-	return Equals([]Column{column}, []any{value})
+func Equal[F ~uint8](column Column[F], value any) *EqualsFilter[F] {
+	return Equals([]Column[F]{column}, []any{value})
 }
 
 // Equals creates a new EqualsFilter for multiple columns and values.
 // The condition will look like "(column1, column2, ...) = (value1, value2, ...)".
-func Equals(columns []Column, values []any) *EqualsFilter {
-	return &EqualsFilter{
+func Equals[F ~uint8](columns []Column[F], values []any) *EqualsFilter[F] {
+	return &EqualsFilter[F]{
 		Columns: columns,
 		Values:  values,
 	}
 }
 
 // Restricts implements [Filter].
-func (e *EqualsFilter) Restricts(column Column) bool {
+func (e *EqualsFilter[F]) Restricts(column Column[F]) bool {
 	return slices.Contains(e.Columns, column)
 }
 
 // isFilter implements [Filter].
-func (e *EqualsFilter) isFilter() {}
+func (e *EqualsFilter[F]) isFilter() {}
 
-var _ Filter = (*EqualsFilter)(nil)
+var _ Filter[uint8] = (*EqualsFilter[uint8])(nil)
 
-type GreaterThanFilter struct {
-	Columns []Column
+type GreaterThanFilter[F ~uint8] struct {
+	Columns []Column[F]
 	Values  []any
 }
 
 // GreaterThan creates a new GreaterThanFilter for a single column and value.
 // The condition will look like "column > value".
-func GreaterThan(column Column, value any) *GreaterThanFilter {
-	return GreaterThans([]Column{column}, []any{value})
+func GreaterThan[F ~uint8](column Column[F], value any) *GreaterThanFilter[F] {
+	return GreaterThans([]Column[F]{column}, []any{value})
 }
 
 // GreaterThans creates a new GreaterThanFilter for multiple columns and values.
 // The condition will look like "(column1, column2, ...) > (value1, value2, ...)".
-func GreaterThans(columns []Column, values []any) *GreaterThanFilter {
-	return &GreaterThanFilter{
+func GreaterThans[F ~uint8](columns []Column[F], values []any) *GreaterThanFilter[F] {
+	return &GreaterThanFilter[F]{
 		Columns: columns,
 		Values:  values,
 	}
 }
 
 // Restricts implements [Filter].
-func (g *GreaterThanFilter) Restricts(column Column) bool {
+func (g *GreaterThanFilter[F]) Restricts(column Column[F]) bool {
 	return slices.Contains(g.Columns, column)
 }
 
 // isFilter implements [Filter].
-func (g *GreaterThanFilter) isFilter() {}
+func (g *GreaterThanFilter[F]) isFilter() {}
 
-var _ Filter = (*GreaterThanFilter)(nil)
+var _ Filter[uint8] = (*GreaterThanFilter[uint8])(nil)
 
-type LessThanFilter struct {
-	Columns []Column
+type LessThanFilter[F ~uint8] struct {
+	Columns []Column[F]
 	Values  []any
 }
 
 // LessThan creates a new LessThanFilter for a single column and value.
 // The condition will look like "column < value".
-func LessThan(column Column, value any) *LessThanFilter {
-	return LessThans([]Column{column}, []any{value})
+func LessThan[F ~uint8](column Column[F], value any) *LessThanFilter[F] {
+	return LessThans([]Column[F]{column}, []any{value})
 }
 
 // LessThans creates a new LessThanFilter for multiple columns and values.
 // The condition will look like "(column1, column2, ...) < (value1, value2, ...)".
-func LessThans(columns []Column, values []any) *LessThanFilter {
-	return &LessThanFilter{
+func LessThans[F ~uint8](columns []Column[F], values []any) *LessThanFilter[F] {
+	return &LessThanFilter[F]{
 		Columns: columns,
 		Values:  values,
 	}
 }
 
 // Restricts implements [Filter].
-func (l *LessThanFilter) Restricts(column Column) bool {
+func (l *LessThanFilter[F]) Restricts(column Column[F]) bool {
 	return slices.Contains(l.Columns, column)
 }
 
 // isFilter implements [Filter].
-func (l *LessThanFilter) isFilter() {}
+func (l *LessThanFilter[F]) isFilter() {}
 
-var _ Filter = (*LessThanFilter)(nil)
-
-// type textCondition[C Column, T ~string] struct {
-// 	column   C
-// 	operator textOperator
-// 	value    T
-// }
-
-// type textOperator uint8
-
-// const (
-// 	textEqual textOperator = iota
-// 	textIgnoreCaseEqual
-// )
-
-// func TextEquals[C Column, T ~string](column C, value T) textCondition[C, T] {
-// 	return textCondition[C, T]{column: column, operator: textEqual, value: value}
-// }
-
-// func TextIgnoreCaseEquals[C Column, T ~string](column C, value T) textCondition[C, T] {
-// 	return textCondition[C, T]{column: column, operator: textIgnoreCaseEqual, value: value}
-// }
-
-// func (c textCondition[C, T]) isFilter() {}
+var _ Filter[uint8] = (*LessThanFilter[uint8])(nil)

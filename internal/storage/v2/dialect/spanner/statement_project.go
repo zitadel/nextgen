@@ -32,7 +32,7 @@ func (p projectStatements) IsStatements() {
 }
 
 // ListProjects implements [service.ProjectStatements].
-func (p projectStatements) ListProjects(ctx context.Context, filter *database.ListOptions) (*database.ListResult[*domain.Project], error) {
+func (p projectStatements) ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
 	panic("unimplemented")
 }
 
