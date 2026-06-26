@@ -13,6 +13,8 @@ import (
 
 const testProjectQuery = "SELECT id, created_at, updated_at, project_secret, preview_secret, preview_origins FROM zitadel_nextgen.projects"
 
+const testFlowDefinitionQuery = "SELECT project_id, id, name FROM zitadel_nextgen.flow_definitions"
+
 func TestCompileReadFilterAndOrderBy(t *testing.T) {
 	t.Parallel()
 
@@ -35,6 +37,23 @@ func TestCompileReadFilterAndOrderBy(t *testing.T) {
 	require.Len(t, args, 2)
 	assert.Equal(t, "proj_1", args[0])
 	assert.Equal(t, uint32(10), args[1])
+}
+
+func TestCompileReadCompareGreater(t *testing.T) {
+	t.Parallel()
+
+	createdAt := time.Date(2026, 6, 26, 10, 0, 0, 0, time.UTC)
+	sql, args := compileProjectRead(t, &database.ListOptions[domain.ProjectField]{
+		Filter: database.CompareGreater(
+			database.Term(database.Col(domain.ProjectFieldCreatedAt), createdAt),
+			database.Term(database.Col(domain.ProjectFieldID), "proj_1"),
+		),
+	})
+
+	assert.Contains(t, sql, "(created_at, id) > ($1, $2)")
+	require.Len(t, args, 2)
+	assert.Equal(t, createdAt, args[0])
+	assert.Equal(t, "proj_1", args[1])
 }
 
 func TestCompileReadKeysetCursorAsc(t *testing.T) {
@@ -70,11 +89,44 @@ func TestCompileReadKeysetCursorAsc(t *testing.T) {
 	assert.Equal(t, uint32(5), args[2])
 }
 
+func TestCompileReadStringContains(t *testing.T) {
+	t.Parallel()
+
+	sql, args := compileFlowDefinitionRead(t, &database.ListOptions[domain.FlowDefinitionField]{
+		Filter: database.StringContains(database.Col(domain.FlowDefinitionFieldName), "login"),
+	})
+
+	assert.Contains(t, sql, "WHERE name LIKE $1")
+	require.Len(t, args, 1)
+	assert.Equal(t, "%login%", args[0])
+}
+
+func TestCompileReadStringEqualFold(t *testing.T) {
+	t.Parallel()
+
+	sql, args := compileFlowDefinitionRead(t, &database.ListOptions[domain.FlowDefinitionField]{
+		Filter: database.StringEqualFold(database.Col(domain.FlowDefinitionFieldName), "Login"),
+	})
+
+	assert.Contains(t, sql, "WHERE LOWER(name) = LOWER($1)")
+	require.Len(t, args, 1)
+	assert.Equal(t, "Login", args[0])
+}
+
 func compileProjectRead(t *testing.T, opts *database.ListOptions[domain.ProjectField]) (string, []any) {
 	t.Helper()
 
 	var compiler statementCompiler
 	err := compileRead(&compiler, testProjectQuery, opts, projectSchema)
+	require.NoError(t, err)
+	return compiler.String(), compiler.args
+}
+
+func compileFlowDefinitionRead(t *testing.T, opts *database.ListOptions[domain.FlowDefinitionField]) (string, []any) {
+	t.Helper()
+
+	var compiler statementCompiler
+	err := compileRead(&compiler, testFlowDefinitionQuery, opts, flowDefinitionSchema)
 	require.NoError(t, err)
 	return compiler.String(), compiler.args
 }

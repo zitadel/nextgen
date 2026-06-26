@@ -70,10 +70,25 @@ from a static `SELECT` base.
 ### 4. Portable filter AST
 
 [`Filter[F]`](../../internal/storage/v2/database/filter.go) is a sealed generic
-interface tree (`And`, `Or`, `Equal`, `GreaterThan`, `LessThan`, …) parameterized
-by a domain field enum (`F ~uint8`). [`Column[F]`](../../internal/storage/v2/database/column.go)
+interface tree (`And`, `Or`, `Equal`, `GreaterThan`, `LessThan`, `CompareGreater`,
+`CompareLess`, `StringEqual`, `StringContains`, …) parameterized by a domain
+field enum (`F ~uint8`). [`Column[F]`](../../internal/storage/v2/database/column.go)
 wraps that enum via `database.Col(domain.ProjectFieldID)` so filters, order-by,
 and cursors cannot mix fields across entities at compile time.
+
+Single-column equality uses `Equal(col, value)`. Tuple comparisons for keyset
+pagination use explicit `CompareTerm` pairs:
+
+```go
+database.CompareGreater(
+    database.Term(database.Col(domain.ProjectFieldCreatedAt), createdAt),
+    database.Term(database.Col(domain.ProjectFieldID), id),
+)
+```
+
+String matching (`StringEqual`, `StringStartsWith`, `StringContains`,
+`StringEndsWith`, and `*Fold` ignore-case variants) lives in
+[`filter_string.go`](../../internal/storage/v2/database/filter_string.go).
 
 [`Schema[F, T]`](../../internal/storage/v2/database/schema.go) maps each field to
 a SQL column name and entity accessor. Dialect `schema_<entity>.go` files define
@@ -258,7 +273,7 @@ Dialect read compilation:
 
 ```go
 compiler.compileRead(projectQuery, &database.ListOptions{
-    Filter: database.Equal(database.Column(domain.ProjectFieldID), id),
+    Filter: database.Equal(database.Col(domain.ProjectFieldID), id),
 })
 ```
 
@@ -291,7 +306,6 @@ entries when no longer useful.
 
 - [ ] Implement `compileColumnName()` mapping from domain field enums to SQL column names
 - [ ] Fix `AndFilter`/`OrFilter` value vs pointer mismatch in postgres compiler
-- [ ] Enable `LessThanFilter` in compiler for DESC keyset pagination
 - [ ] Complete Spanner execution and dialect registration
 - [ ] Move migrations from v1 to v2 dialect packages (postgres + spanner)
 - [ ] Move embedded postgres startup to v2 postgres dialect

@@ -46,92 +46,72 @@ func (f OrFilter[F]) isFilter() {}
 
 var _ Filter[uint8] = OrFilter[uint8]{}
 
-type EqualsFilter[F ~uint8] struct {
-	Columns []Column[F]
-	Values  []any
+type CompareOp uint8
+
+const (
+	OpEqual CompareOp = iota
+	OpGreater
+	OpLess
+)
+
+type CompareTerm[F ~uint8] struct {
+	Column Column[F]
+	Value  any
 }
 
-// Equal creates a new EqualsFilter for a single column and value.
-// The condition will look like "column = value".
-func Equal[F ~uint8](column Column[F], value any) *EqualsFilter[F] {
-	return Equals([]Column[F]{column}, []any{value})
+// Term pairs a column with a comparison value.
+func Term[F ~uint8](column Column[F], value any) CompareTerm[F] {
+	return CompareTerm[F]{Column: column, Value: value}
 }
 
-// Equals creates a new EqualsFilter for multiple columns and values.
-// The condition will look like "(column1, column2, ...) = (value1, value2, ...)".
-func Equals[F ~uint8](columns []Column[F], values []any) *EqualsFilter[F] {
-	return &EqualsFilter[F]{
-		Columns: columns,
-		Values:  values,
+type CompareFilter[F ~uint8] struct {
+	Op    CompareOp
+	Terms []CompareTerm[F]
+}
+
+// Compare builds a single lexicographic comparison across one or more column/value terms.
+func Compare[F ~uint8](op CompareOp, terms ...CompareTerm[F]) *CompareFilter[F] {
+	return &CompareFilter[F]{
+		Op:    op,
+		Terms: terms,
 	}
 }
 
-// Restricts implements [Filter].
-func (e *EqualsFilter[F]) Restricts(column Column[F]) bool {
-	return slices.Contains(e.Columns, column)
+// Equal creates a single-column equality filter: "column = value".
+func Equal[F ~uint8](column Column[F], value any) *CompareFilter[F] {
+	return Compare(OpEqual, Term(column, value))
 }
 
-// isFilter implements [Filter].
-func (e *EqualsFilter[F]) isFilter() {}
-
-var _ Filter[uint8] = (*EqualsFilter[uint8])(nil)
-
-type GreaterThanFilter[F ~uint8] struct {
-	Columns []Column[F]
-	Values  []any
+// GreaterThan creates a single-column greater-than filter: "column > value".
+func GreaterThan[F ~uint8](column Column[F], value any) *CompareFilter[F] {
+	return Compare(OpGreater, Term(column, value))
 }
 
-// GreaterThan creates a new GreaterThanFilter for a single column and value.
-// The condition will look like "column > value".
-func GreaterThan[F ~uint8](column Column[F], value any) *GreaterThanFilter[F] {
-	return GreaterThans([]Column[F]{column}, []any{value})
+// LessThan creates a single-column less-than filter: "column < value".
+func LessThan[F ~uint8](column Column[F], value any) *CompareFilter[F] {
+	return Compare(OpLess, Term(column, value))
 }
 
-// GreaterThans creates a new GreaterThanFilter for multiple columns and values.
-// The condition will look like "(column1, column2, ...) > (value1, value2, ...)".
-func GreaterThans[F ~uint8](columns []Column[F], values []any) *GreaterThanFilter[F] {
-	return &GreaterThanFilter[F]{
-		Columns: columns,
-		Values:  values,
-	}
+// CompareEqual creates a tuple equality filter: "(col1, col2, ...) = (val1, val2, ...)".
+func CompareEqual[F ~uint8](terms ...CompareTerm[F]) *CompareFilter[F] {
+	return Compare(OpEqual, terms...)
 }
 
-// Restricts implements [Filter].
-func (g *GreaterThanFilter[F]) Restricts(column Column[F]) bool {
-	return slices.Contains(g.Columns, column)
+// CompareGreater creates a tuple greater-than filter for keyset pagination.
+func CompareGreater[F ~uint8](terms ...CompareTerm[F]) *CompareFilter[F] {
+	return Compare(OpGreater, terms...)
 }
 
-// isFilter implements [Filter].
-func (g *GreaterThanFilter[F]) isFilter() {}
-
-var _ Filter[uint8] = (*GreaterThanFilter[uint8])(nil)
-
-type LessThanFilter[F ~uint8] struct {
-	Columns []Column[F]
-	Values  []any
-}
-
-// LessThan creates a new LessThanFilter for a single column and value.
-// The condition will look like "column < value".
-func LessThan[F ~uint8](column Column[F], value any) *LessThanFilter[F] {
-	return LessThans([]Column[F]{column}, []any{value})
-}
-
-// LessThans creates a new LessThanFilter for multiple columns and values.
-// The condition will look like "(column1, column2, ...) < (value1, value2, ...)".
-func LessThans[F ~uint8](columns []Column[F], values []any) *LessThanFilter[F] {
-	return &LessThanFilter[F]{
-		Columns: columns,
-		Values:  values,
-	}
+// CompareLess creates a tuple less-than filter for keyset pagination.
+func CompareLess[F ~uint8](terms ...CompareTerm[F]) *CompareFilter[F] {
+	return Compare(OpLess, terms...)
 }
 
 // Restricts implements [Filter].
-func (l *LessThanFilter[F]) Restricts(column Column[F]) bool {
-	return slices.Contains(l.Columns, column)
+func (f *CompareFilter[F]) Restricts(column Column[F]) bool {
+	return slices.ContainsFunc(f.Terms, func(term CompareTerm[F]) bool { return term.Column == column })
 }
 
-// isFilter implements [Filter].
-func (l *LessThanFilter[F]) isFilter() {}
+func (f *CompareFilter[F]) isFilter() {}
 
-var _ Filter[uint8] = (*LessThanFilter[uint8])(nil)
+var _ Filter[uint8] = (*CompareFilter[uint8])(nil)

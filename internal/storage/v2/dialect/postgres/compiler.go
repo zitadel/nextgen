@@ -28,10 +28,11 @@ func compileRead[F ~uint8, T any](c *statementCompiler, stmt string, opt *databa
 		if err != nil {
 			return database.ErrInvalidCursor().WithParent(err)
 		}
+		terms := compareTerms(cursor.Columns, values)
 		if opt.Pagination.OrderBy.Direction == database.OrderAsc {
-			opt.Filter = database.And(opt.Filter, database.GreaterThans(cursor.Columns, values))
+			opt.Filter = database.And(opt.Filter, database.CompareGreater(terms...))
 		} else {
-			opt.Filter = database.And(opt.Filter, database.LessThans(cursor.Columns, values))
+			opt.Filter = database.And(opt.Filter, database.CompareLess(terms...))
 		}
 	}
 	if opt.Filter != nil {
@@ -45,6 +46,14 @@ func compileRead[F ~uint8, T any](c *statementCompiler, stmt string, opt *databa
 	return nil
 }
 
+func compareTerms[F ~uint8](columns []database.Column[F], values []any) []database.CompareTerm[F] {
+	terms := make([]database.CompareTerm[F], len(columns))
+	for i, column := range columns {
+		terms[i] = database.Term(column, values[i])
+	}
+	return terms
+}
+
 func compileFilter[F ~uint8, T any](c *statementCompiler, filter database.Filter[F], schema database.Schema[F, T]) {
 	if filter == nil {
 		return
@@ -55,12 +64,10 @@ func compileFilter[F ~uint8, T any](c *statementCompiler, filter database.Filter
 		compileAndFilter(c, f, schema)
 	case database.OrFilter[F]:
 		compileOrFilter(c, f, schema)
-	case *database.EqualsFilter[F]:
-		compileFilterClause(c, f.Columns, f.Values, " = ", schema)
-	case *database.GreaterThanFilter[F]:
-		compileFilterClause(c, f.Columns, f.Values, " > ", schema)
-	case *database.LessThanFilter[F]:
-		compileFilterClause(c, f.Columns, f.Values, " < ", schema)
+	case *database.CompareFilter[F]:
+		compileCompareFilter(c, f, schema)
+	case *database.StringFilter[F]:
+		compileStringFilter(c, f, schema)
 	default:
 		panic("unknown filter type")
 	}
@@ -104,33 +111,74 @@ func compileOrFilter[F ~uint8, T any](c *statementCompiler, filter database.OrFi
 	c.WriteString(")")
 }
 
-func compileFilterClause[F ~uint8, T any](c *statementCompiler, columns []database.Column[F], values []any, operator string, schema database.Schema[F, T]) {
-	if columns == nil || len(columns) != len(values) {
-		// TODO: error handling
+func compileCompareFilter[F ~uint8, T any](c *statementCompiler, filter *database.CompareFilter[F], schema database.Schema[F, T]) {
+	op := compareOpSQL(filter.Op)
+	if len(filter.Terms) == 1 {
+		c.WriteString(schema.SQLName(filter.Terms[0].Column))
+		c.WriteString(op)
+		writeArg(c, filter.Terms[0].Value)
 		return
 	}
 
-	if len(columns) > 1 {
-		c.WriteString(" (")
-	}
-	for i, column := range columns {
+	c.WriteString("(")
+	for i, term := range filter.Terms {
 		if i > 0 {
 			c.WriteString(", ")
 		}
-		c.WriteString(schema.SQLName(column))
+		c.WriteString(schema.SQLName(term.Column))
 	}
-	if len(columns) > 1 {
-		c.WriteString(")")
+	c.WriteString(")")
+	c.WriteString(op)
+	c.WriteString("(")
+	for i, term := range filter.Terms {
+		if i > 0 {
+			c.WriteString(", ")
+		}
+		writeArg(c, term.Value)
 	}
+	c.WriteString(")")
+}
 
-	c.WriteString(operator)
-
-	if len(values) > 1 {
-		c.WriteString("(")
+func compareOpSQL(op database.CompareOp) string {
+	switch op {
+	case database.OpEqual:
+		return " = "
+	case database.OpGreater:
+		return " > "
+	case database.OpLess:
+		return " < "
+	default:
+		panic("unknown compare op")
 	}
-	writeArgs(c, values...)
-	if len(values) > 1 {
-		c.WriteString(")")
+}
+
+func compileStringFilter[F ~uint8, T any](c *statementCompiler, filter *database.StringFilter[F], schema database.Schema[F, T]) {
+	col := schema.SQLName(filter.Column)
+	switch filter.Match {
+	case database.StringMatchEqual:
+		if filter.IgnoreCase {
+			c.WriteString("LOWER(")
+			c.WriteString(col)
+			c.WriteString(") = LOWER(")
+			writeArg(c, filter.Value)
+			c.WriteString(")")
+		} else {
+			c.WriteString(col)
+			c.WriteString(" = ")
+			writeArg(c, filter.Value)
+		}
+	case database.StringMatchStartsWith, database.StringMatchContains, database.StringMatchEndsWith:
+		pattern := likePattern(filter.Match, filter.Value)
+		if filter.IgnoreCase {
+			c.WriteString(col)
+			c.WriteString(" ILIKE ")
+		} else {
+			c.WriteString(col)
+			c.WriteString(" LIKE ")
+		}
+		writeArg(c, pattern)
+	default:
+		panic("unknown string match")
 	}
 }
 
