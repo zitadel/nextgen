@@ -1,9 +1,29 @@
 type: object
+required: [name, kind]
 description: |
-  Configuration for a user-invokable action on a step. Keyed by action name
-  in the parent dictionary. The action name is sent back in the submit
-  request as `action`.
+  Configuration for a user-invokable action on a step. The `name` is sent
+  back in the submit request as `action`; the engine resolves the action's
+  declared `kind` to decide how to handle the submission.
 properties:
+  name:
+    type: string
+    description: Action identifier. Sent back in the submit request as `action`.
+    example: submit
+  kind:
+    type: string
+    enum: [submit, passkey, passkey_register, navigate, back]
+    example: submit
+    description: |
+      Classifies how the engine handles this action:
+      - `submit`: collect the step's fields and run validate/dispatch/on_success.
+      - `passkey`: issue a WebAuthn assertion challenge; the matching transition
+        fires once the returned assertion verifies.
+      - `passkey_register`: issue a WebAuthn registration challenge; the matching
+        transition fires once the returned attestation verifies.
+      - `navigate`: route through the transition without running the input
+        pipeline. Used for pure-routing actions declared in the flow definition.
+      - `back`: return the user to the previous step. Surfaced by the engine
+        when going back is available.
   primary:
     type: boolean
     default: false

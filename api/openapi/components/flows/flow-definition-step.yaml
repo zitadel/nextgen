@@ -32,18 +32,20 @@ properties:
     example: [email, password]
 
   actions:
-    type: object
+    type: array
     description: |
-      Actions the user can take. Keyed by action name.
-      The action name is what the frontend sends back in the submit request.
-      If omitted, the engine provides a default `submit` action.
-    additionalProperties:
+      Ordered list of actions the user can take. The action name is what the
+      frontend sends back in the submit request. If omitted, the engine
+      provides a default `submit` action.
+    items:
       $ref: step-action.yaml
-    default: {}
+    default: []
     example:
-      submit:
+      - name: submit
+        kind: submit
         primary: true
-      forgot_password: {}
+      - name: forgot_password
+        kind: navigate
 
   gates:
     type: object
@@ -95,7 +97,7 @@ properties:
     description: |
       Maps action/outcome names to their transition descriptor.
 
-      Keys match action names from the `actions` dict. Additional keys
+      Keys match action names from the `actions` array. Additional keys
       come from implicit outcomes based on schema annotations
       (e.g. `user_not_found` from `x-unique` fields) and engine
       events (e.g. `sso`, `callback`).

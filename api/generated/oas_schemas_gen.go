@@ -12,6 +12,11 @@ import (
 	"github.com/zitadel/nextgen/internal/api/ogenx"
 )
 
+// ActivateFlowDefinitionNoContent is response for ActivateFlowDefinition operation.
+type ActivateFlowDefinitionNoContent struct{}
+
+func (*ActivateFlowDefinitionNoContent) activateFlowDefinitionRes() {}
+
 // Merged schema.
 // Ref: #
 type AttAlreadyCompleted struct {
@@ -1333,6 +1338,9 @@ type CreateFlowDefinitionConflict ErrorDetails
 
 func (*CreateFlowDefinitionConflict) createFlowDefinitionRes() {}
 
+// Creates a flow definition.
+// The flow definition is created in an `active` state by default.
+// The status can also be set via the `status` attribute in the flow definition payload.
 // Ref: #
 type CreateFlowDefinitionRequest struct {
 	ProjectID      ProjectID      `json:"project_id"`
@@ -1378,6 +1386,10 @@ type CreateFlowRequest struct {
 	// When omitted, the engine selects the best-matching definition
 	// based on purpose + audience context.
 	FlowDefinitionName OptString `json:"flow_definition_name"`
+	// Set to true to simulate the flow without actually creating any
+	// user or session. Useful for testing and validation of flow definitions.
+	// This requires setting the `flow_definition_name` property as well.
+	DryRun OptBool `json:"dry_run"`
 	// Semver version of the flow definition JSON Schema to use.
 	// When omitted, the latest version is used.
 	SchemaVersion  OptString         `json:"schema_version"`
@@ -1404,6 +1416,11 @@ func (s *CreateFlowRequest) GetPurpose() CreateFlowRequestPurpose {
 // GetFlowDefinitionName returns the value of FlowDefinitionName.
 func (s *CreateFlowRequest) GetFlowDefinitionName() OptString {
 	return s.FlowDefinitionName
+}
+
+// GetDryRun returns the value of DryRun.
+func (s *CreateFlowRequest) GetDryRun() OptBool {
+	return s.DryRun
 }
 
 // GetSchemaVersion returns the value of SchemaVersion.
@@ -1449,6 +1466,11 @@ func (s *CreateFlowRequest) SetPurpose(val CreateFlowRequestPurpose) {
 // SetFlowDefinitionName sets the value of FlowDefinitionName.
 func (s *CreateFlowRequest) SetFlowDefinitionName(val OptString) {
 	s.FlowDefinitionName = val
+}
+
+// SetDryRun sets the value of DryRun.
+func (s *CreateFlowRequest) SetDryRun(val OptBool) {
+	s.DryRun = val
 }
 
 // SetSchemaVersion sets the value of SchemaVersion.
@@ -2055,6 +2077,19 @@ type CreateUserUnauthorized ErrorDetails
 
 func (*CreateUserUnauthorized) createUserRes() {}
 
+type DeactivateFlowDefinitionBadRequest ErrorDetails
+
+func (*DeactivateFlowDefinitionBadRequest) deactivateFlowDefinitionRes() {}
+
+type DeactivateFlowDefinitionConflict ErrorDetails
+
+func (*DeactivateFlowDefinitionConflict) deactivateFlowDefinitionRes() {}
+
+// DeactivateFlowDefinitionNoContent is response for DeactivateFlowDefinition operation.
+type DeactivateFlowDefinitionNoContent struct{}
+
+func (*DeactivateFlowDefinitionNoContent) deactivateFlowDefinitionRes() {}
+
 // DeleteFlowDefinitionNoContent is response for DeleteFlowDefinition operation.
 type DeleteFlowDefinitionNoContent struct{}
 
@@ -2187,16 +2222,18 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 	s.Details = val
 }
 
-func (*ErrorDetails) authorizeDeviceRes()     {}
-func (*ErrorDetails) authorizeGetRes()        {}
-func (*ErrorDetails) createFlowRes()          {}
-func (*ErrorDetails) createProjectRes()       {}
-func (*ErrorDetails) createSessionRes()       {}
-func (*ErrorDetails) endSessionRes()          {}
-func (*ErrorDetails) getMyUserRes()           {}
-func (*ErrorDetails) introspectRes()          {}
-func (*ErrorDetails) listFlowDefinitionsRes() {}
-func (*ErrorDetails) submitFlowStepRes()      {}
+func (*ErrorDetails) activateFlowDefinitionRes() {}
+func (*ErrorDetails) authorizeDeviceRes()        {}
+func (*ErrorDetails) authorizeGetRes()           {}
+func (*ErrorDetails) createFlowRes()             {}
+func (*ErrorDetails) createProjectRes()          {}
+func (*ErrorDetails) createSessionRes()          {}
+func (*ErrorDetails) deleteFlowDefinitionRes()   {}
+func (*ErrorDetails) endSessionRes()             {}
+func (*ErrorDetails) getMyUserRes()              {}
+func (*ErrorDetails) introspectRes()             {}
+func (*ErrorDetails) listFlowDefinitionsRes()    {}
+func (*ErrorDetails) submitFlowStepRes()         {}
 
 // Additional error-specific context.
 type ErrorDetailsDetails map[string]jx.Raw
@@ -2236,45 +2273,47 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 	s.Response = val
 }
 
-func (*ErrorDetailsStatusCode) authorizeDeviceRes()        {}
-func (*ErrorDetailsStatusCode) authorizeGetRes()           {}
-func (*ErrorDetailsStatusCode) createFlowDefinitionRes()   {}
-func (*ErrorDetailsStatusCode) createFlowRes()             {}
-func (*ErrorDetailsStatusCode) createProjectRes()          {}
-func (*ErrorDetailsStatusCode) createSchemaRes()           {}
-func (*ErrorDetailsStatusCode) createSessionRes()          {}
-func (*ErrorDetailsStatusCode) createTeamRes()             {}
-func (*ErrorDetailsStatusCode) createUserRes()             {}
-func (*ErrorDetailsStatusCode) deleteFlowDefinitionRes()   {}
-func (*ErrorDetailsStatusCode) endSessionRes()             {}
-func (*ErrorDetailsStatusCode) exchangeHandoffRes()        {}
-func (*ErrorDetailsStatusCode) getFlowDefinitionRes()      {}
-func (*ErrorDetailsStatusCode) getFlowStepRes()            {}
-func (*ErrorDetailsStatusCode) getHealthRes()              {}
-func (*ErrorDetailsStatusCode) getKeysRes()                {}
-func (*ErrorDetailsStatusCode) getLiveRes()                {}
-func (*ErrorDetailsStatusCode) getMySessionRes()           {}
-func (*ErrorDetailsStatusCode) getMyUserRes()              {}
-func (*ErrorDetailsStatusCode) getOpenIDConfigurationRes() {}
-func (*ErrorDetailsStatusCode) getProjectRes()             {}
-func (*ErrorDetailsStatusCode) getReadyRes()               {}
-func (*ErrorDetailsStatusCode) getSchemaByIdRes()          {}
-func (*ErrorDetailsStatusCode) getSessionRes()             {}
-func (*ErrorDetailsStatusCode) getTeamRes()                {}
-func (*ErrorDetailsStatusCode) getTokenRes()               {}
-func (*ErrorDetailsStatusCode) getUserByIDRes()            {}
-func (*ErrorDetailsStatusCode) getUserInfoRes()            {}
-func (*ErrorDetailsStatusCode) introspectRes()             {}
-func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()    {}
-func (*ErrorDetailsStatusCode) listSessionsRes()           {}
-func (*ErrorDetailsStatusCode) listUsersRes()              {}
-func (*ErrorDetailsStatusCode) revokeMySessionRes()        {}
-func (*ErrorDetailsStatusCode) revokeSessionRes()          {}
-func (*ErrorDetailsStatusCode) revokeTokenRes()            {}
-func (*ErrorDetailsStatusCode) setUserPasswordRes()        {}
-func (*ErrorDetailsStatusCode) submitFlowEventRes()        {}
-func (*ErrorDetailsStatusCode) submitFlowStepRes()         {}
-func (*ErrorDetailsStatusCode) updateFlowDefinitionRes()   {}
+func (*ErrorDetailsStatusCode) activateFlowDefinitionRes()   {}
+func (*ErrorDetailsStatusCode) authorizeDeviceRes()          {}
+func (*ErrorDetailsStatusCode) authorizeGetRes()             {}
+func (*ErrorDetailsStatusCode) createFlowDefinitionRes()     {}
+func (*ErrorDetailsStatusCode) createFlowRes()               {}
+func (*ErrorDetailsStatusCode) createProjectRes()            {}
+func (*ErrorDetailsStatusCode) createSchemaRes()             {}
+func (*ErrorDetailsStatusCode) createSessionRes()            {}
+func (*ErrorDetailsStatusCode) createTeamRes()               {}
+func (*ErrorDetailsStatusCode) createUserRes()               {}
+func (*ErrorDetailsStatusCode) deactivateFlowDefinitionRes() {}
+func (*ErrorDetailsStatusCode) deleteFlowDefinitionRes()     {}
+func (*ErrorDetailsStatusCode) endSessionRes()               {}
+func (*ErrorDetailsStatusCode) exchangeHandoffRes()          {}
+func (*ErrorDetailsStatusCode) getFlowDefinitionRes()        {}
+func (*ErrorDetailsStatusCode) getFlowStepRes()              {}
+func (*ErrorDetailsStatusCode) getHealthRes()                {}
+func (*ErrorDetailsStatusCode) getKeysRes()                  {}
+func (*ErrorDetailsStatusCode) getLiveRes()                  {}
+func (*ErrorDetailsStatusCode) getMySessionRes()             {}
+func (*ErrorDetailsStatusCode) getMyUserRes()                {}
+func (*ErrorDetailsStatusCode) getOpenIDConfigurationRes()   {}
+func (*ErrorDetailsStatusCode) getProjectRes()               {}
+func (*ErrorDetailsStatusCode) getReadyRes()                 {}
+func (*ErrorDetailsStatusCode) getSchemaByIdRes()            {}
+func (*ErrorDetailsStatusCode) getSessionRes()               {}
+func (*ErrorDetailsStatusCode) getTeamRes()                  {}
+func (*ErrorDetailsStatusCode) getTokenRes()                 {}
+func (*ErrorDetailsStatusCode) getUserByIDRes()              {}
+func (*ErrorDetailsStatusCode) getUserInfoRes()              {}
+func (*ErrorDetailsStatusCode) introspectRes()               {}
+func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()      {}
+func (*ErrorDetailsStatusCode) listSessionsRes()             {}
+func (*ErrorDetailsStatusCode) listUsersRes()                {}
+func (*ErrorDetailsStatusCode) revokeMySessionRes()          {}
+func (*ErrorDetailsStatusCode) revokeSessionRes()            {}
+func (*ErrorDetailsStatusCode) revokeTokenRes()              {}
+func (*ErrorDetailsStatusCode) setUserPasswordRes()          {}
+func (*ErrorDetailsStatusCode) submitFlowEventRes()          {}
+func (*ErrorDetailsStatusCode) submitFlowStepRes()           {}
+func (*ErrorDetailsStatusCode) updateFlowDefinitionRes()     {}
 
 type ExchangeHandoffBadRequest ErrorDetails
 
@@ -2373,10 +2412,14 @@ func (s *FactorMethod) UnmarshalText(data []byte) error {
 // Does not contain display text — only a `text_key` resolved client-side.
 // Ref: #
 type Field struct {
-	// The input kind the client should render. Encodes the formats that
-	// have a matching HTML input type (email, url, date). For other
-	// formats (e.g. uuid) the type is `text` and `validation.format`
-	// carries the rule.
+	// Field name, matching a property in the flow's user schema. Carries
+	// the submitted value back to the engine.
+	Name string `json:"name"`
+	// The input kind the client should render. Encodes the formats and
+	// JSON types that map to a familiar HTML input: `email`, `url`,
+	// `date` come from `format`; `checkbox` from JSON `type: boolean`;
+	// `select` from a closed `enum`. For other formats (e.g. uuid) the
+	// type is `text` and `validation.format` carries the rule.
 	Type FieldType `json:"type"`
 	// Localization key for the field label.
 	TextKey string `json:"text_key"`
@@ -2393,6 +2436,11 @@ type Field struct {
 	// Each key mirrors a JSON Schema keyword on the underlying user
 	// property; absent keys mean no rule.
 	Validation OptFieldValidation `json:"validation"`
+}
+
+// GetName returns the value of Name.
+func (s *Field) GetName() string {
+	return s.Name
 }
 
 // GetType returns the value of Type.
@@ -2420,6 +2468,11 @@ func (s *Field) GetValidation() OptFieldValidation {
 	return s.Validation
 }
 
+// SetName sets the value of Name.
+func (s *Field) SetName(val string) {
+	s.Name = val
+}
+
 // SetType sets the value of Type.
 func (s *Field) SetType(val FieldType) {
 	s.Type = val
@@ -2445,10 +2498,11 @@ func (s *Field) SetValidation(val OptFieldValidation) {
 	s.Validation = val
 }
 
-// The input kind the client should render. Encodes the formats that
-// have a matching HTML input type (email, url, date). For other
-// formats (e.g. uuid) the type is `text` and `validation.format`
-// carries the rule.
+// The input kind the client should render. Encodes the formats and
+// JSON types that map to a familiar HTML input: `email`, `url`,
+// `date` come from `format`; `checkbox` from JSON `type: boolean`;
+// `select` from a closed `enum`. For other formats (e.g. uuid) the
+// type is `text` and `validation.format` carries the rule.
 type FieldType string
 
 const (
@@ -2460,6 +2514,8 @@ const (
 	FieldTypeURL      FieldType = "url"
 	FieldTypeDate     FieldType = "date"
 	FieldTypeHidden   FieldType = "hidden"
+	FieldTypeCheckbox FieldType = "checkbox"
+	FieldTypeSelect   FieldType = "select"
 )
 
 // AllValues returns all FieldType values.
@@ -2473,6 +2529,8 @@ func (FieldType) AllValues() []FieldType {
 		FieldTypeURL,
 		FieldTypeDate,
 		FieldTypeHidden,
+		FieldTypeCheckbox,
+		FieldTypeSelect,
 	}
 }
 
@@ -2494,6 +2552,10 @@ func (s FieldType) MarshalText() ([]byte, error) {
 	case FieldTypeDate:
 		return []byte(s), nil
 	case FieldTypeHidden:
+		return []byte(s), nil
+	case FieldTypeCheckbox:
+		return []byte(s), nil
+	case FieldTypeSelect:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -2527,6 +2589,12 @@ func (s *FieldType) UnmarshalText(data []byte) error {
 	case FieldTypeHidden:
 		*s = FieldTypeHidden
 		return nil
+	case FieldTypeCheckbox:
+		*s = FieldTypeCheckbox
+		return nil
+	case FieldTypeSelect:
+		*s = FieldTypeSelect
+		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
@@ -2550,6 +2618,11 @@ type FieldValidation struct {
 	MinLength OptInt `json:"min_length"`
 	// Maximum length in characters (inclusive). Mirrors `maxLength`.
 	MaxLength OptInt `json:"max_length"`
+	// Closed list of allowed values. Mirrors the JSON Schema `enum`
+	// keyword on the underlying user property. When `type` is
+	// `select` the client renders these as options; for other types
+	// the rule still applies as a membership check.
+	Enum []string `json:"enum"`
 }
 
 // GetFormat returns the value of Format.
@@ -2567,6 +2640,11 @@ func (s *FieldValidation) GetMaxLength() OptInt {
 	return s.MaxLength
 }
 
+// GetEnum returns the value of Enum.
+func (s *FieldValidation) GetEnum() []string {
+	return s.Enum
+}
+
 // SetFormat sets the value of Format.
 func (s *FieldValidation) SetFormat(val OptFieldValidationFormat) {
 	s.Format = val
@@ -2580,6 +2658,11 @@ func (s *FieldValidation) SetMinLength(val OptInt) {
 // SetMaxLength sets the value of MaxLength.
 func (s *FieldValidation) SetMaxLength(val OptInt) {
 	s.MaxLength = val
+}
+
+// SetEnum sets the value of Enum.
+func (s *FieldValidation) SetEnum(val []string) {
+	s.Enum = val
 }
 
 // Semantic format the value must match. Values mirror the user
@@ -2687,7 +2770,8 @@ type FlowDefinition struct {
 	// `switch` and `pivot` transitions. Renaming is not supported — the
 	// `name` is part of the public contract another definition may
 	// reference. Acts as the human display label as well; no separate slug.
-	Name string `json:"name"`
+	Name   string               `json:"name"`
+	Status FlowDefinitionStatus `json:"status"`
 	// User schema this flow operates on. Step `fields` reference properties
 	// defined in this schema. The engine resolves field types, validation,
 	// and implicit outcomes from schema annotations at runtime.
@@ -2706,6 +2790,11 @@ type FlowDefinition struct {
 // GetName returns the value of Name.
 func (s *FlowDefinition) GetName() string {
 	return s.Name
+}
+
+// GetStatus returns the value of Status.
+func (s *FlowDefinition) GetStatus() FlowDefinitionStatus {
+	return s.Status
 }
 
 // GetUserSchema returns the value of UserSchema.
@@ -2733,6 +2822,11 @@ func (s *FlowDefinition) SetName(val string) {
 	s.Name = val
 }
 
+// SetStatus sets the value of Status.
+func (s *FlowDefinition) SetStatus(val FlowDefinitionStatus) {
+	s.Status = val
+}
+
 // SetUserSchema sets the value of UserSchema.
 func (s *FlowDefinition) SetUserSchema(val url.URL) {
 	s.UserSchema = val
@@ -2758,9 +2852,7 @@ type FlowDefinitionDetailResponse struct {
 	// Unique identifier for the flow definition.
 	ID string `json:"id"`
 	// Identifier of the project this flow definition belongs to.
-	ProjectID string `json:"project_id"`
-	// Status of the flow definition.
-	Status         string         `json:"status"`
+	ProjectID      string         `json:"project_id"`
 	FlowDefinition FlowDefinition `json:"flow_definition"`
 	CreatedAt      time.Time      `json:"created_at"`
 	UpdatedAt      time.Time      `json:"updated_at"`
@@ -2774,11 +2866,6 @@ func (s *FlowDefinitionDetailResponse) GetID() string {
 // GetProjectID returns the value of ProjectID.
 func (s *FlowDefinitionDetailResponse) GetProjectID() string {
 	return s.ProjectID
-}
-
-// GetStatus returns the value of Status.
-func (s *FlowDefinitionDetailResponse) GetStatus() string {
-	return s.Status
 }
 
 // GetFlowDefinition returns the value of FlowDefinition.
@@ -2804,11 +2891,6 @@ func (s *FlowDefinitionDetailResponse) SetID(val string) {
 // SetProjectID sets the value of ProjectID.
 func (s *FlowDefinitionDetailResponse) SetProjectID(val string) {
 	s.ProjectID = val
-}
-
-// SetStatus sets the value of Status.
-func (s *FlowDefinitionDetailResponse) SetStatus(val string) {
-	s.Status = val
 }
 
 // SetFlowDefinition sets the value of FlowDefinition.
@@ -2886,9 +2968,8 @@ type FlowDefinitionResponse struct {
 	// URI of the flow definition schema this definition was authored against.
 	// If the schema_uri was not provided in the request, the flow definition is validated against the
 	// latest version of the schema, and the response includes the schema_uri of the latest version.
-	SchemaURI OptURI `json:"schema_uri"`
-	// Status of the flow definition.
-	Status string `json:"status"`
+	SchemaURI OptURI               `json:"schema_uri"`
+	Status    FlowDefinitionStatus `json:"status"`
 	// Timestamp when the flow definition was created.
 	CreatedAt time.Time `json:"created_at"`
 	// Timestamp when the flow definition was last updated.
@@ -2916,7 +2997,7 @@ func (s *FlowDefinitionResponse) GetSchemaURI() OptURI {
 }
 
 // GetStatus returns the value of Status.
-func (s *FlowDefinitionResponse) GetStatus() string {
+func (s *FlowDefinitionResponse) GetStatus() FlowDefinitionStatus {
 	return s.Status
 }
 
@@ -2951,7 +3032,7 @@ func (s *FlowDefinitionResponse) SetSchemaURI(val OptURI) {
 }
 
 // SetStatus sets the value of Status.
-func (s *FlowDefinitionResponse) SetStatus(val string) {
+func (s *FlowDefinitionResponse) SetStatus(val FlowDefinitionStatus) {
 	s.Status = val
 }
 
@@ -2963,6 +3044,55 @@ func (s *FlowDefinitionResponse) SetCreatedAt(val time.Time) {
 // SetUpdatedAt sets the value of UpdatedAt.
 func (s *FlowDefinitionResponse) SetUpdatedAt(val time.Time) {
 	s.UpdatedAt = val
+}
+
+// The lifecycle state of this flow definition.
+// active: The flow definition is ready to be used. The flow engine can select it for new flows.
+// draft: The engine will not select it for new flows, and existing flows must handle it gracefully
+// if they reference this definition.
+// Allowed transitions:
+// - draft -> active: To activate the flow definition.
+// - active -> draft: To remove the flow definition from active use immediately.
+// Ref: #
+type FlowDefinitionStatus string
+
+const (
+	FlowDefinitionStatusActive FlowDefinitionStatus = "active"
+	FlowDefinitionStatusDraft  FlowDefinitionStatus = "draft"
+)
+
+// AllValues returns all FlowDefinitionStatus values.
+func (FlowDefinitionStatus) AllValues() []FlowDefinitionStatus {
+	return []FlowDefinitionStatus{
+		FlowDefinitionStatusActive,
+		FlowDefinitionStatusDraft,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowDefinitionStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowDefinitionStatusActive:
+		return []byte(s), nil
+	case FlowDefinitionStatusDraft:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowDefinitionStatus) UnmarshalText(data []byte) error {
+	switch FlowDefinitionStatus(data) {
+	case FlowDefinitionStatusActive:
+		*s = FlowDefinitionStatusActive
+		return nil
+	case FlowDefinitionStatusDraft:
+		*s = FlowDefinitionStatusDraft
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // A step in a flow definition. This is the admin-authored configuration,
@@ -2983,10 +3113,10 @@ type FlowDefinitionStep struct {
 	// (e.g. a property with `x-unique` set implies a `user_not_found`
 	// transition outcome).
 	Fields []string `json:"fields"`
-	// Actions the user can take. Keyed by action name.
-	// The action name is what the frontend sends back in the submit request.
-	// If omitted, the engine provides a default `submit` action.
-	Actions OptFlowDefinitionStepActions `json:"actions"`
+	// Ordered list of actions the user can take. The action name is what the
+	// frontend sends back in the submit request. If omitted, the engine
+	// provides a default `submit` action.
+	Actions []StepAction `json:"actions"`
 	// Security gates that must be satisfied before submission. Keyed by gate
 	// name. Each gate selects a kind (e.g. "captcha") and provider-specific
 	// configuration. The engine may also inject gates dynamically based on
@@ -3003,7 +3133,7 @@ type FlowDefinitionStep struct {
 	// - show: render as a success/info screen.
 	Complete OptFlowDefinitionStepComplete `json:"complete"`
 	// Maps action/outcome names to their transition descriptor.
-	// Keys match action names from the `actions` dict. Additional keys
+	// Keys match action names from the `actions` array. Additional keys
 	// come from implicit outcomes based on schema annotations
 	// (e.g. `user_not_found` from `x-unique` fields) and engine
 	// events (e.g. `sso`, `callback`).
@@ -3021,7 +3151,7 @@ func (s *FlowDefinitionStep) GetFields() []string {
 }
 
 // GetActions returns the value of Actions.
-func (s *FlowDefinitionStep) GetActions() OptFlowDefinitionStepActions {
+func (s *FlowDefinitionStep) GetActions() []StepAction {
 	return s.Actions
 }
 
@@ -3061,7 +3191,7 @@ func (s *FlowDefinitionStep) SetFields(val []string) {
 }
 
 // SetActions sets the value of Actions.
-func (s *FlowDefinitionStep) SetActions(val OptFlowDefinitionStepActions) {
+func (s *FlowDefinitionStep) SetActions(val []StepAction) {
 	s.Actions = val
 }
 
@@ -3088,20 +3218,6 @@ func (s *FlowDefinitionStep) SetComplete(val OptFlowDefinitionStepComplete) {
 // SetTransitions sets the value of Transitions.
 func (s *FlowDefinitionStep) SetTransitions(val OptFlowDefinitionStepTransitions) {
 	s.Transitions = val
-}
-
-// Actions the user can take. Keyed by action name.
-// The action name is what the frontend sends back in the submit request.
-// If omitted, the engine provides a default `submit` action.
-type FlowDefinitionStepActions map[string]StepAction
-
-func (s *FlowDefinitionStepActions) init() FlowDefinitionStepActions {
-	m := *s
-	if m == nil {
-		m = map[string]StepAction{}
-		*s = m
-	}
-	return m
 }
 
 // Marks this as a terminal step. Tells the frontend what to do:
@@ -3201,7 +3317,7 @@ func (s *FlowDefinitionStepOnSuccess) UnmarshalText(data []byte) error {
 }
 
 // Maps action/outcome names to their transition descriptor.
-// Keys match action names from the `actions` dict. Additional keys
+// Keys match action names from the `actions` array. Additional keys
 // come from implicit outcomes based on schema annotations
 // (e.g. `user_not_found` from `x-unique` fields) and engine
 // events (e.g. `sso`, `callback`).
@@ -3292,76 +3408,31 @@ func (s *FlowDefinitionStepTransitionsItemAction) UnmarshalText(data []byte) err
 	}
 }
 
-// Partial update for a flow definition. Only provided fields are replaced;
-// omitted fields retain their current server-side values.
-// Collection fields (`steps`, `purposes`) are treated atomically: if
-// provided, the entire array/object is replaced. If omitted, the current
-// value is preserved unchanged.
-// `name` is a stable identifier and cannot be changed after creation.
+// Replaces the existing flow definition.
 // Ref: #
 type FlowDefinitionUpdateRequest struct {
-	// User schema this flow operates on. Replaces the current value if provided.
-	UserSchema OptURI `json:"user_schema"`
-	// Replaces the full purpose-to-entry-step map if provided. Keys are
-	// purpose names; values must match a `name` in `steps`.
-	Purposes OptFlowDefinitionUpdateRequestPurposes `json:"purposes"`
-	Audience OptFlowAudience                        `json:"audience"`
-	// Replaces the full steps array if provided. Partial step lists are not
-	// supported — supply all steps when updating this field.
-	Steps []FlowDefinitionStep `json:"steps"`
+	SchemaURI      OptSchemaURI   `json:"schema_uri"`
+	FlowDefinition FlowDefinition `json:"flow_definition"`
 }
 
-// GetUserSchema returns the value of UserSchema.
-func (s *FlowDefinitionUpdateRequest) GetUserSchema() OptURI {
-	return s.UserSchema
+// GetSchemaURI returns the value of SchemaURI.
+func (s *FlowDefinitionUpdateRequest) GetSchemaURI() OptSchemaURI {
+	return s.SchemaURI
 }
 
-// GetPurposes returns the value of Purposes.
-func (s *FlowDefinitionUpdateRequest) GetPurposes() OptFlowDefinitionUpdateRequestPurposes {
-	return s.Purposes
+// GetFlowDefinition returns the value of FlowDefinition.
+func (s *FlowDefinitionUpdateRequest) GetFlowDefinition() FlowDefinition {
+	return s.FlowDefinition
 }
 
-// GetAudience returns the value of Audience.
-func (s *FlowDefinitionUpdateRequest) GetAudience() OptFlowAudience {
-	return s.Audience
+// SetSchemaURI sets the value of SchemaURI.
+func (s *FlowDefinitionUpdateRequest) SetSchemaURI(val OptSchemaURI) {
+	s.SchemaURI = val
 }
 
-// GetSteps returns the value of Steps.
-func (s *FlowDefinitionUpdateRequest) GetSteps() []FlowDefinitionStep {
-	return s.Steps
-}
-
-// SetUserSchema sets the value of UserSchema.
-func (s *FlowDefinitionUpdateRequest) SetUserSchema(val OptURI) {
-	s.UserSchema = val
-}
-
-// SetPurposes sets the value of Purposes.
-func (s *FlowDefinitionUpdateRequest) SetPurposes(val OptFlowDefinitionUpdateRequestPurposes) {
-	s.Purposes = val
-}
-
-// SetAudience sets the value of Audience.
-func (s *FlowDefinitionUpdateRequest) SetAudience(val OptFlowAudience) {
-	s.Audience = val
-}
-
-// SetSteps sets the value of Steps.
-func (s *FlowDefinitionUpdateRequest) SetSteps(val []FlowDefinitionStep) {
-	s.Steps = val
-}
-
-// Replaces the full purpose-to-entry-step map if provided. Keys are
-// purpose names; values must match a `name` in `steps`.
-type FlowDefinitionUpdateRequestPurposes map[string]string
-
-func (s *FlowDefinitionUpdateRequestPurposes) init() FlowDefinitionUpdateRequestPurposes {
-	m := *s
-	if m == nil {
-		m = map[string]string{}
-		*s = m
-	}
-	return m
+// SetFlowDefinition sets the value of FlowDefinition.
+func (s *FlowDefinitionUpdateRequest) SetFlowDefinition(val FlowDefinition) {
+	s.FlowDefinition = val
 }
 
 // Ref: #
@@ -3643,9 +3714,10 @@ func (s *FlowResponseHeaders) SetResponse(val FlowResponse) {
 
 func (*FlowResponseHeaders) createFlowRes() {}
 
-// A step contains unordered capability dictionaries: what to collect (fields),
+// A step contains ordered capability arrays: what to collect (fields),
 // what the user can do (actions), and what security gates must be satisfied (gates).
-// Layout and element ordering are controlled by the LiquidJS template in `branding.liquid_template`.
+// The LiquidJS template in `branding.liquid_template` iterates these arrays in order
+// and builds name-keyed indexes locally for lookup.
 // Ref: #
 type FlowStep struct {
 	// Step name from the flow definition.
@@ -3659,14 +3731,14 @@ type FlowStep struct {
 	Complete OptFlowStepComplete `json:"complete"`
 	// URL to navigate to (e.g., SSO provider redirect).
 	RedirectURL OptURI `json:"redirect_url"`
-	// Unordered dictionary of input fields to collect. Keyed by field name.
-	// The LiquidJS template controls which fields appear and in what order.
-	// Field metadata (type, validation) is resolved by the engine from the
-	// flow's user schema.
-	Fields FlowStepFields `json:"fields"`
-	// Unordered dictionary of available user actions. Keyed by action name.
-	// The LiquidJS template controls positioning and presentation.
-	Actions FlowStepActions `json:"actions"`
+	// Ordered list of input fields to collect. Field metadata (type, validation)
+	// is resolved by the engine from the flow's user schema. The LiquidJS
+	// template iterates this array; for keyed lookup it builds a name-indexed
+	// map locally.
+	Fields []Field `json:"fields"`
+	// Ordered list of available user actions. The LiquidJS template iterates
+	// this array and builds a name-indexed map locally for keyed lookup.
+	Actions []StepAction `json:"actions"`
 	// Security gates that must be satisfied before the step can be submitted.
 	// The engine injects gates dynamically based on policy, even if they
 	// are not declared in the flow definition.
@@ -3708,12 +3780,12 @@ func (s *FlowStep) GetRedirectURL() OptURI {
 }
 
 // GetFields returns the value of Fields.
-func (s *FlowStep) GetFields() FlowStepFields {
+func (s *FlowStep) GetFields() []Field {
 	return s.Fields
 }
 
 // GetActions returns the value of Actions.
-func (s *FlowStep) GetActions() FlowStepActions {
+func (s *FlowStep) GetActions() []StepAction {
 	return s.Actions
 }
 
@@ -3758,12 +3830,12 @@ func (s *FlowStep) SetRedirectURL(val OptURI) {
 }
 
 // SetFields sets the value of Fields.
-func (s *FlowStep) SetFields(val FlowStepFields) {
+func (s *FlowStep) SetFields(val []Field) {
 	s.Fields = val
 }
 
 // SetActions sets the value of Actions.
-func (s *FlowStep) SetActions(val FlowStepActions) {
+func (s *FlowStep) SetActions(val []StepAction) {
 	s.Actions = val
 }
 
@@ -3780,19 +3852,6 @@ func (s *FlowStep) SetSSOProviders(val []SSOProvider) {
 // SetChallenge sets the value of Challenge.
 func (s *FlowStep) SetChallenge(val OptFlowStepChallenge) {
 	s.Challenge = val
-}
-
-// Unordered dictionary of available user actions. Keyed by action name.
-// The LiquidJS template controls positioning and presentation.
-type FlowStepActions map[string]StepAction
-
-func (s *FlowStepActions) init() FlowStepActions {
-	m := *s
-	if m == nil {
-		m = map[string]StepAction{}
-		*s = m
-	}
-	return m
 }
 
 // A pending authentication challenge issued by the server. Present when the
@@ -3848,13 +3907,15 @@ func (s *FlowStepChallenge) SetOptions(val OptFlowStepChallengeOptions) {
 type FlowStepChallengeMethod string
 
 const (
-	FlowStepChallengeMethodPasskey FlowStepChallengeMethod = "passkey"
+	FlowStepChallengeMethodPasskey         FlowStepChallengeMethod = "passkey"
+	FlowStepChallengeMethodPasskeyRegister FlowStepChallengeMethod = "passkey_register"
 )
 
 // AllValues returns all FlowStepChallengeMethod values.
 func (FlowStepChallengeMethod) AllValues() []FlowStepChallengeMethod {
 	return []FlowStepChallengeMethod{
 		FlowStepChallengeMethodPasskey,
+		FlowStepChallengeMethodPasskeyRegister,
 	}
 }
 
@@ -3862,6 +3923,8 @@ func (FlowStepChallengeMethod) AllValues() []FlowStepChallengeMethod {
 func (s FlowStepChallengeMethod) MarshalText() ([]byte, error) {
 	switch s {
 	case FlowStepChallengeMethodPasskey:
+		return []byte(s), nil
+	case FlowStepChallengeMethodPasskeyRegister:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -3873,6 +3936,9 @@ func (s *FlowStepChallengeMethod) UnmarshalText(data []byte) error {
 	switch FlowStepChallengeMethod(data) {
 	case FlowStepChallengeMethodPasskey:
 		*s = FlowStepChallengeMethodPasskey
+		return nil
+	case FlowStepChallengeMethodPasskeyRegister:
+		*s = FlowStepChallengeMethodPasskeyRegister
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -3936,21 +4002,6 @@ func (s *FlowStepComplete) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
-}
-
-// Unordered dictionary of input fields to collect. Keyed by field name.
-// The LiquidJS template controls which fields appear and in what order.
-// Field metadata (type, validation) is resolved by the engine from the
-// flow's user schema.
-type FlowStepFields map[string]Field
-
-func (s *FlowStepFields) init() FlowStepFields {
-	m := *s
-	if m == nil {
-		m = map[string]Field{}
-		*s = m
-	}
-	return m
 }
 
 // Security gates that must be satisfied before the step can be submitted.
@@ -7326,52 +7377,6 @@ func (o OptFlowAudience) Or(d FlowAudience) FlowAudience {
 	return d
 }
 
-// NewOptFlowDefinitionStepActions returns new OptFlowDefinitionStepActions with value set to v.
-func NewOptFlowDefinitionStepActions(v FlowDefinitionStepActions) OptFlowDefinitionStepActions {
-	return OptFlowDefinitionStepActions{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptFlowDefinitionStepActions is optional FlowDefinitionStepActions.
-type OptFlowDefinitionStepActions struct {
-	Value FlowDefinitionStepActions
-	Set   bool
-}
-
-// IsSet returns true if OptFlowDefinitionStepActions was set.
-func (o OptFlowDefinitionStepActions) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptFlowDefinitionStepActions) Reset() {
-	var v FlowDefinitionStepActions
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptFlowDefinitionStepActions) SetTo(v FlowDefinitionStepActions) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptFlowDefinitionStepActions) Get() (v FlowDefinitionStepActions, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptFlowDefinitionStepActions) Or(d FlowDefinitionStepActions) FlowDefinitionStepActions {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptFlowDefinitionStepComplete returns new OptFlowDefinitionStepComplete with value set to v.
 func NewOptFlowDefinitionStepComplete(v FlowDefinitionStepComplete) OptFlowDefinitionStepComplete {
 	return OptFlowDefinitionStepComplete{
@@ -7550,52 +7555,6 @@ func (o OptFlowDefinitionStepTransitions) Get() (v FlowDefinitionStepTransitions
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowDefinitionStepTransitions) Or(d FlowDefinitionStepTransitions) FlowDefinitionStepTransitions {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptFlowDefinitionUpdateRequestPurposes returns new OptFlowDefinitionUpdateRequestPurposes with value set to v.
-func NewOptFlowDefinitionUpdateRequestPurposes(v FlowDefinitionUpdateRequestPurposes) OptFlowDefinitionUpdateRequestPurposes {
-	return OptFlowDefinitionUpdateRequestPurposes{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptFlowDefinitionUpdateRequestPurposes is optional FlowDefinitionUpdateRequestPurposes.
-type OptFlowDefinitionUpdateRequestPurposes struct {
-	Value FlowDefinitionUpdateRequestPurposes
-	Set   bool
-}
-
-// IsSet returns true if OptFlowDefinitionUpdateRequestPurposes was set.
-func (o OptFlowDefinitionUpdateRequestPurposes) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptFlowDefinitionUpdateRequestPurposes) Reset() {
-	var v FlowDefinitionUpdateRequestPurposes
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptFlowDefinitionUpdateRequestPurposes) SetTo(v FlowDefinitionUpdateRequestPurposes) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptFlowDefinitionUpdateRequestPurposes) Get() (v FlowDefinitionUpdateRequestPurposes, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptFlowDefinitionUpdateRequestPurposes) Or(d FlowDefinitionUpdateRequestPurposes) FlowDefinitionUpdateRequestPurposes {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -10640,11 +10599,24 @@ func (s *SetUserPasswordRequest) SetIsChangeRequired(val OptBool) {
 	s.IsChangeRequired = val
 }
 
-// Configuration for a user-invokable action on a step. Keyed by action name
-// in the parent dictionary. The action name is sent back in the submit
-// request as `action`.
+// Configuration for a user-invokable action on a step. The `name` is sent
+// back in the submit request as `action`; the engine resolves the action's
+// declared `kind` to decide how to handle the submission.
 // Ref: #
 type StepAction struct {
+	// Action identifier. Sent back in the submit request as `action`.
+	Name string `json:"name"`
+	// Classifies how the engine handles this action:
+	// - `submit`: collect the step's fields and run validate/dispatch/on_success.
+	// - `passkey`: issue a WebAuthn assertion challenge; the matching transition
+	// fires once the returned assertion verifies.
+	// - `passkey_register`: issue a WebAuthn registration challenge; the matching
+	// transition fires once the returned attestation verifies.
+	// - `navigate`: route through the transition without running the input
+	// pipeline. Used for pure-routing actions declared in the flow definition.
+	// - `back`: return the user to the previous step. Surfaced by the engine
+	// when going back is available.
+	Kind StepActionKind `json:"kind"`
 	// Marks this as the default/primary action. The runtime template uses
 	// this hint to choose visual emphasis. At most one action per step
 	// should be primary; this is not enforced here.
@@ -10654,6 +10626,16 @@ type StepAction struct {
 	// Display text is resolved client-side from a locale dictionary, never
 	// by the engine.
 	TextKey OptString `json:"text_key"`
+}
+
+// GetName returns the value of Name.
+func (s *StepAction) GetName() string {
+	return s.Name
+}
+
+// GetKind returns the value of Kind.
+func (s *StepAction) GetKind() StepActionKind {
+	return s.Kind
 }
 
 // GetPrimary returns the value of Primary.
@@ -10666,6 +10648,16 @@ func (s *StepAction) GetTextKey() OptString {
 	return s.TextKey
 }
 
+// SetName sets the value of Name.
+func (s *StepAction) SetName(val string) {
+	s.Name = val
+}
+
+// SetKind sets the value of Kind.
+func (s *StepAction) SetKind(val StepActionKind) {
+	s.Kind = val
+}
+
 // SetPrimary sets the value of Primary.
 func (s *StepAction) SetPrimary(val OptBool) {
 	s.Primary = val
@@ -10674,6 +10666,78 @@ func (s *StepAction) SetPrimary(val OptBool) {
 // SetTextKey sets the value of TextKey.
 func (s *StepAction) SetTextKey(val OptString) {
 	s.TextKey = val
+}
+
+// Classifies how the engine handles this action:
+// - `submit`: collect the step's fields and run validate/dispatch/on_success.
+// - `passkey`: issue a WebAuthn assertion challenge; the matching transition
+// fires once the returned assertion verifies.
+// - `passkey_register`: issue a WebAuthn registration challenge; the matching
+// transition fires once the returned attestation verifies.
+// - `navigate`: route through the transition without running the input
+// pipeline. Used for pure-routing actions declared in the flow definition.
+// - `back`: return the user to the previous step. Surfaced by the engine
+// when going back is available.
+type StepActionKind string
+
+const (
+	StepActionKindSubmit          StepActionKind = "submit"
+	StepActionKindPasskey         StepActionKind = "passkey"
+	StepActionKindPasskeyRegister StepActionKind = "passkey_register"
+	StepActionKindNavigate        StepActionKind = "navigate"
+	StepActionKindBack            StepActionKind = "back"
+)
+
+// AllValues returns all StepActionKind values.
+func (StepActionKind) AllValues() []StepActionKind {
+	return []StepActionKind{
+		StepActionKindSubmit,
+		StepActionKindPasskey,
+		StepActionKindPasskeyRegister,
+		StepActionKindNavigate,
+		StepActionKindBack,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s StepActionKind) MarshalText() ([]byte, error) {
+	switch s {
+	case StepActionKindSubmit:
+		return []byte(s), nil
+	case StepActionKindPasskey:
+		return []byte(s), nil
+	case StepActionKindPasskeyRegister:
+		return []byte(s), nil
+	case StepActionKindNavigate:
+		return []byte(s), nil
+	case StepActionKindBack:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *StepActionKind) UnmarshalText(data []byte) error {
+	switch StepActionKind(data) {
+	case StepActionKindSubmit:
+		*s = StepActionKindSubmit
+		return nil
+	case StepActionKindPasskey:
+		*s = StepActionKindPasskey
+		return nil
+	case StepActionKindPasskeyRegister:
+		*s = StepActionKindPasskeyRegister
+		return nil
+	case StepActionKindNavigate:
+		*s = StepActionKindNavigate
+		return nil
+	case StepActionKindBack:
+		*s = StepActionKindBack
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Step-level localization keys. Resolved client-side via the `| t` LiquidJS filter.

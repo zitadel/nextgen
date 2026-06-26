@@ -1,4 +1,4 @@
-# ADR 016: Flow Back-Navigation
+# ADR 022: Flow Back-Navigation
 
 > **Status:** Proposed
 > **Date:** 2026-05-21
@@ -7,10 +7,11 @@
 ## Decision
 
 Back-navigation in the flow engine uses the **existing action contract**.
-The server declares a `back` action on steps where returning to the previous
-step is allowed. The orchestrator submits `{ action: "back" }` like any other
-action. The server follows the `back` transition in the flow definition and
-returns the target step.
+The engine **injects** a `back` action on steps where returning to the
+previous step is allowed — flow authors do not declare back transitions
+per step. The orchestrator submits `{ action: "back" }` like any other
+action. The engine pops the previous step from the runtime history and
+returns it.
 
 The `<zitadel-login>` orchestrator additionally integrates with the browser's
 **History API** so that the native back gesture (swipe, button, keyboard
@@ -19,17 +20,19 @@ losing widget state.
 
 ### The `back` action
 
-`back` is a plain action — same shape as `submit` or `register`:
+`back` is an action with `kind: "back"`. The name is conventionally
+`"back"` but only the `kind` is load-bearing — clients identify the
+back action by kind, never by name:
 
 ```json
 {
   "step": {
     "name": "passkey-upsell",
-    "actions": {
-      "setup": { "text_key": "passkey-upsell.action.setup", "primary": true },
-      "skip":  { "text_key": "passkey-upsell.action.skip" },
-      "back":  { "text_key": "action.back" }
-    }
+    "actions": [
+      { "name": "setup", "kind": "passkey_register", "text_key": "passkey-upsell.action.setup", "primary": true },
+      { "name": "skip",  "kind": "navigate",         "text_key": "passkey-upsell.action.skip" },
+      { "name": "back",  "kind": "back",             "text_key": "action.back" }
+    ]
   }
 }
 ```
@@ -40,39 +43,28 @@ When submitted:
 POST /flow/{id}/submit { session_token, action: "back" }
 ```
 
-The server resolves this like any other action: it looks up the `back`
-transition in the flow definition, follows it to the target step, and returns
-the new step response. The session token rotates as usual. No special API
-endpoint, no history stack popping — `back` is a regular edge in the
-definition's step graph:
+The engine pops the previous step from the runtime `history` array stored
+in the encrypted flow cookie and returns it as the new step response. The
+session token rotates as usual. No special API endpoint, no per-step
+`back` transition in the flow definition.
 
-```json
-{
-  "name": "passkey-upsell",
-  "transitions": {
-    "setup": { "target": "done" },
-    "skip":  { "target": "done" },
-    "back":  { "target": "identifier" }
-  }
-}
-```
+### When the engine injects `back`
 
-### Server-side contract
+The engine adds a `kind: "back"` action to the step's `actions` iff
+**both** of the following hold:
 
-The server controls **whether** back is allowed. It includes `back` in the
-step's `actions` dict only when the flow definition declares a `back`
-transition for the current step.
+1. The runtime `history` array has at least one prior step.
+2. The current step is not terminal.
 
-Steps where `back` is **not** offered:
+Reversibility is folded into rule 1: the engine pushes onto `history`
+only on reversible transitions, and **clears** `history` on irreversible
+ones (e.g., the action just created the user or rotated a credential).
+The engine classifies reversibility from the semantics of the action it
+executed — flow definitions carry no reversibility metadata.
 
-| Step | Reason |
-|---|---|
-| Initial step (e.g. `identifier`) | No `back` transition defined — nowhere to go back to |
-| Post-mutation steps | User was already created / credential was reset — irreversible |
-| Terminal steps (`complete`) | Flow is done |
-
-The frontend never needs to hardcode which steps support back — the presence
-or absence of the `back` action in the response is the single source of truth.
+The frontend never needs to hardcode which steps support back — the
+presence or absence of a `kind: "back"` action in the response is the
+single source of truth.
 
 ### Browser History API integration
 
@@ -82,23 +74,21 @@ the native back gesture work without page reloads.
 
 #### Lifecycle
 
-1. **On each step transition** (after `applyResponse`):
-   - If the new step's `actions` contains `back` →
-     `history.pushState(null, '', '#s' + this.stepSeq++)` — creates a
-     history entry with an opaque, incrementing fragment (`#s1`, `#s2`, …).
-     The fragment has no semantic meaning; it is never read back.
-   - If the new step has no `back` action → `history.replaceState(...)` (no
-     new entry — browser back navigates the host page, which is correct)
+1. **On each submit response** (after `applyResponse`):
+   - New step has a `kind: "back"` action and the step name changed →
+     `history.pushState(null, '', '#s' + this.stepSeq++)`.
+   - Otherwise → no history call.
 
 2. **On `popstate` event** (browser back button):
-   - If the current step's `actions` contains `back` →
-     submit `{ action: "back" }` to the API, apply the response
-   - If no `back` action → call `history.forward()` to restore the
-     consumed entry without growing the stack, and surface a brief
-     visual indicator that going back is not available. This avoids
-     trapping the user in an ever-growing back loop — the history
-     stack stays fixed and the host page remains reachable once the
-     flow's entries are exhausted
+   - If the current step has a `kind: "back"` action →
+     submit `{ action: <that action's name> }` to the API, apply the
+     response.
+   - Else → call `history.forward()` to restore the consumed entry
+     without growing the stack, and surface a brief visual indicator
+     that going back is not available. This avoids trapping the user
+     in an ever-growing back loop — the history stack stays fixed and
+     the host page remains reachable once the flow's entries are
+     exhausted.
 
 3. **On `disconnectedCallback`** (widget removed):
    - Remove the `popstate` listener — clean up
@@ -122,42 +112,37 @@ identical to clicking an in-UI back button.
 
 | Scenario | Behavior |
 |---|---|
-| User presses back on the initial step | No `back` action → browser navigates the host page (leaves the flow) — correct behavior |
-| User presses forward after going back | `popstate` fires with a forward state — orchestrator ignores it (no-op). The displayed step does not change; the URL fragment may drift but carries no semantic meaning. |
+| User presses back on the initial step | No `kind: "back"` action → browser navigates the host page (leaves the flow) — correct behavior |
+| User presses forward after going back | `popstate` fires with a forward state — orchestrator calls `history.back()` to undo the traversal and keep the URL aligned with the displayed step. The flow state is server-authoritative; the browser cannot skip ahead. |
 | Multiple rapid back presses | Each `popstate` triggers a sequential `submit("back")` — the session token rotation prevents race conditions |
 | Embedded in a SPA with its own router | The host router and the flow's fragment entries coexist — fragments are scoped and don't conflict with path-based routing |
 
 ### Template rendering
 
 The `default.liquid` template already iterates all non-primary actions and
-renders them. A `back` action renders automatically as a secondary button or
-link — no template changes required.
+renders them. A `kind: "back"` action renders automatically as a secondary
+button or link — no template changes required.
 
-For visual consistency, the `back` action can be rendered as a left-arrow
-link above the card (matching common auth UI patterns) by checking the
-action key name in the template:
+For visual consistency, the back action can be rendered as a left-arrow
+link above the card (matching common auth UI patterns) by selecting it
+by kind in the template:
 
 ```liquid
-{% if actions.back %}
-  <a class="zl-card-nav__link" data-action="back">
-    {{ actions.back.text_key | t }}
+{% assign back = actions | where: "kind", "back" | first %}
+{% if back %}
+  <a class="zl-card-nav__link" data-action="{{ back.name }}">
+    {{ back.text_key | t }}
   </a>
 {% endif %}
 ```
 
 ### Mock server changes
 
-The xstate flow machine adds `back` transitions to steps that follow the
-initial step:
-
-```
-passkey-upsell → back → identifier
-register       → back → identifier
-password       → back → identifier
-```
-
-Step fixtures include `back: { text_key: "action.back" }` in their `actions`
-dict where appropriate.
+No per-step `back` transitions in the xstate machine — the mock engine
+derives back from its runtime history, same as production. The mock
+classifies the same action semantics as irreversible (e.g., the action
+that creates the user) so `back` is automatically omitted on the
+following step.
 
 ## Context
 
@@ -206,17 +191,19 @@ increases flow abandonment.
 
 ## Consequences
 
-- **`step-action.yaml`** — unchanged. `back` is a plain action.
+- **`step-action.yaml`** — `kind` enum gains `back`. Clients identify the
+  back action by `kind: "back"`, never by name.
 - **`flow-submit-request.yaml`** — unchanged. `back` is already documented
   as a valid action value.
-- **Flow definitions** — gain `back` transitions on steps where backtracking
-  is allowed. The `history` array in `flow-engine-storage.md` is unrelated
-  internal bookkeeping — `back` is resolved via the transition graph.
+- **Flow definitions** — unchanged. No per-step `back` transitions and no
+  reversibility metadata; the engine derives back from the runtime
+  `history` array (see `flow-engine-storage.md`) and from the semantics
+  of the actions it executes.
 - **`zitadel-login.ts`** — gains `pushState` calls on step transitions and a
   `popstate` listener.
 - **Locale files** — gain `action.back` translation key.
-- **Mock server** — `flow-machine.ts` gains `back` transitions;
-  `fixtures/login.ts` gains `back` actions on applicable steps.
+- **Mock server** — no `back` edges added to `flow-machine.ts`; the mock
+  engine applies the same back-injection rules as production.
 
 [storage]: ../design/flowengine/flow-engine-storage.md
 [submit]: ../../api/openapi/components/flows/flow-submit-request.yaml

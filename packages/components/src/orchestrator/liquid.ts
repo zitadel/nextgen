@@ -82,6 +82,20 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
     return options.locale[lookupKey] ?? "";
   });
 
+  /**
+   * Builds `<zl-select>` options from a field's closed `validation.enum`. The
+   * wire only carries the allowed values (strings), so the label defaults to the
+   * value — author the enum with display-ready text. Piped through `| json` into
+   * the element's `options` attribute.
+   */
+  engine.registerFilter("selectOptions", (values: unknown) => {
+    if (!Array.isArray(values)) return [];
+    return values.map((value) => {
+      const v = stringify(value);
+      return { value: v, label: v };
+    });
+  });
+
   /** Maps `error.*` text keys to a field name (Figma inline-error annotations). */
   const fieldErrorKeys: Record<string, string> = {
     "error.email_required": "email",

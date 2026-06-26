@@ -1,30 +1,34 @@
 type: object
 required: [name, fields, actions, gates]
 description: |
-  A step contains unordered capability dictionaries: what to collect (fields),
+  A step contains ordered capability arrays: what to collect (fields),
   what the user can do (actions), and what security gates must be satisfied (gates).
-  Layout and element ordering are controlled by the LiquidJS template in `branding.liquid_template`.
+  The LiquidJS template in `branding.liquid_template` iterates these arrays in order
+  and builds name-keyed indexes locally for lookup.
 example:
   name: login
   texts:
     title_key: login.title
     description_key: login.description
   fields:
-    email:
+    - name: email
       type: email
       text_key: login.field.email
       required: true
-    password:
+    - name: password
       type: password
       text_key: login.field.password
       required: true
   actions:
-    submit:
+    - name: submit
+      kind: submit
       text_key: login.action.submit
       primary: true
-    register:
+    - name: register
+      kind: navigate
       text_key: login.action.register
-    recover:
+    - name: recover
+      kind: navigate
       text_key: login.action.recover
   gates:
     captcha:
@@ -65,23 +69,23 @@ properties:
     format: uri
     description: URL to navigate to (e.g., SSO provider redirect).
   fields:
-    type: object
+    type: array
     description: |
-      Unordered dictionary of input fields to collect. Keyed by field name.
-      The LiquidJS template controls which fields appear and in what order.
-      Field metadata (type, validation) is resolved by the engine from the
-      flow's user schema.
-    additionalProperties:
+      Ordered list of input fields to collect. Field metadata (type, validation)
+      is resolved by the engine from the flow's user schema. The LiquidJS
+      template iterates this array; for keyed lookup it builds a name-indexed
+      map locally.
+    items:
       $ref: field.yaml
-    default: {}
+    default: []
   actions:
-    type: object
+    type: array
     description: |
-      Unordered dictionary of available user actions. Keyed by action name.
-      The LiquidJS template controls positioning and presentation.
-    additionalProperties:
+      Ordered list of available user actions. The LiquidJS template iterates
+      this array and builds a name-indexed map locally for keyed lookup.
+    items:
       $ref: step-action.yaml
-    default: {}
+    default: []
   gates:
     type: object
     description: |
@@ -110,7 +114,7 @@ properties:
     properties:
       method:
         type: string
-        enum: [passkey]
+        enum: [passkey, passkey_register]
         description: Challenge method. Determines which component handles the ceremony.
       challenge_id:
         type: string

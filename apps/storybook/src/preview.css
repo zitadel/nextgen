@@ -1,0 +1,19 @@
+/* Dark canvas matching the design system's only published mode (ADR 014). */
+body.sb-show-main {
+  background: var(--zl-color-surface-default-black, #0f0f11);
+  color: var(--zl-color-text-primary-white, #f4f4f6);
+  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
+}
+
+/*
+ * Per-story dark surface applied by the global decorator in `preview.ts`.
+ * Unlike `body.sb-show-main` (Storybook UI only), this wraps the rendered
+ * story subtree, so the addon-vitest a11y run also sees the dark background
+ * behind the light atom text and contrast checks pass.
+ */
+.sb-canvas {
+  background: var(--zl-color-surface-default-black, #0f0f11);
+  color: var(--zl-color-text-primary-white, #f4f4f6);
+  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
+  padding: 2rem;
+}

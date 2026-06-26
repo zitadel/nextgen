@@ -1,12 +1,13 @@
 package domain
 
 import (
-	"context"
 	"errors"
 	"strings"
 
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/ianlancetaylor/jsonschema"
 )
+
+//go:generate go tool mockgen -typed -package domainmock -destination ./mock/flow_field_resolver.mock.go . FlowFieldResolver
 
 // FlowFieldResolver maps property names referenced by a flow step to
 // fully-resolved [FlowField] payloads, surfaces the implicit transition
@@ -17,11 +18,12 @@ import (
 // The contract is shaped to the user meta-schema at
 // api/openapi/endpoints/schemas/user-schema.yaml.
 type FlowFieldResolver interface {
-	// Resolve returns the per-field metadata for fieldNames sourced
-	// from the user schema at userSchemaURL. stepName is the flow
-	// step the fields are being resolved for; it prefixes each
-	// field's text_key (`<stepName>.field.<name>`).
-	Resolve(ctx context.Context, client database.QueryExecutor, projectID, userSchemaURL, stepName string, fieldNames []string) (FlowResolvedFields, error)
+	// Resolve returns the per-field metadata for fields against the
+	// provided user schema. stepName is the flow step the fields are
+	// being resolved for; it prefixes each field's text_key
+	// (`<stepName>.field.<name>`). Schema loading is the caller's
+	// responsibility — see [SchemaResolver].
+	Resolve(schema *jsonschema.Schema, stepName string, fields []Field) (FlowResolvedFields, error)
 
 	// Validate checks submitted values against the rules carried by a
 	// previously resolved field set.
@@ -30,22 +32,26 @@ type FlowFieldResolver interface {
 
 // FlowResolvedFields is the output of [FlowFieldResolver.Resolve].
 type FlowResolvedFields struct {
-	// Fields holds the resolved per-field metadata. Keys match the
-	// property names passed to Resolve.
-	Fields map[string]FlowField
+	// Fields holds the resolved per-field metadata in the same order as
+	// the property names passed to Resolve.
+	Fields []FlowField
 
 	// ImplicitOutcomes lists the reserved transition outcomes each
-	// field contributes. The state machine uses it to validate flow
-	// definitions and route schema-derived transitions.
+	// field contributes, keyed by field name. The state machine uses it
+	// to validate flow definitions and route schema-derived transitions.
 	ImplicitOutcomes map[string][]string
 }
 
 // FlowField is the resolved per-field metadata.
 type FlowField struct {
+	// Name is the user-schema property name this field collects.
+	Name string
+
 	// Type is the UI input kind the client should render. It is
 	// derived from the property's JSON `type` and `format` in the user
-	// meta-schema. The property's `x-password: true` annotation forces
-	// a password input regardless of `format`.
+	// meta-schema. The reserved `x-auth-methods#<method>` field name
+	// forces the input kind matching that credential method
+	// (e.g. `x-auth-methods#password` → password).
 	Type FlowFieldType
 
 	// TextKey is a localization key for the field label (e.g.
@@ -74,15 +80,15 @@ type FlowField struct {
 	// identifier nor a credential proof. Derivation paths: a non-empty
 	// `x-unique` annotation on the property surfaces as
 	// [FlowFieldChallengeIdentifier] (any uniquely-keyed property can
-	// identify a user); `x-password: true` combined with schema-level
-	// `x-auth-methods.password.enabled = true` surfaces as
-	// [FlowFieldChallengePassword]. Other credential kinds (passkey,
-	// magic_link, sso, otp) do not have user-property-shaped proofs and
-	// are produced by the state machine as challenge steps, not by the
-	// resolver. The state machine consults Challenge on submit to route
-	// the value — identifier fields drive identifier resolution (and
-	// the `user_not_found` implicit outcome), password fields drive the
-	// password challenge.
+	// identify a user); the reserved `x-auth-methods#password` field
+	// name combined with `x-auth-methods.password.enabled = true` at
+	// the schema root surfaces as [FlowFieldChallengePassword]. Other
+	// credential kinds (passkey, magic_link, sso, otp) do not have
+	// field-shaped proofs and are produced by the state machine as
+	// challenge steps, not by the resolver. The state machine consults
+	// Challenge on submit to route the value — identifier fields drive
+	// identifier resolution (and the `user_not_found` implicit outcome),
+	// password fields drive the password challenge.
 	Challenge FlowFieldChallenge
 }
 
@@ -90,12 +96,13 @@ type FlowField struct {
 // to. Values mirror the keys of `x-auth-methods` in the user
 // meta-schema (api/openapi/endpoints/schemas/user-schema.yaml).
 // `identifier` is sourced from a non-empty `x-unique` scope on the
-// property; `password` is sourced from `x-password` on the property
-// combined with `x-auth-methods.password.enabled` at the schema root.
-// The remaining credential values (passkey, magic_link, sso, otp) have
-// no user-property-shaped proof and are produced by the state machine
-// as challenge steps rather than by the resolver. Empty means the
-// field maps to no challenge.
+// property; `password` is sourced from the reserved
+// `x-auth-methods#password` field name combined with
+// `x-auth-methods.password.enabled` at the schema root. The remaining
+// credential values (passkey, magic_link, sso, otp) have no
+// field-shaped proof and are produced by the state machine as
+// challenge steps rather than by the resolver. Empty means the field
+// maps to no challenge.
 type FlowFieldChallenge string
 
 const (
@@ -115,6 +122,7 @@ const (
 //   - Format    ↔ `format` (enum: email, date-time, uuid, uri)
 //   - MinLength ↔ `minLength`
 //   - MaxLength ↔ `maxLength`
+//   - Enum      ↔ `enum` (closed set of allowed string values)
 //
 // Zero values mean "no rule". JSON Schema's `pattern` keyword is not
 // part of the user meta-schema and is intentionally not surfaced.
@@ -122,6 +130,7 @@ type FlowFieldValidation struct {
 	Format    string
 	MinLength int
 	MaxLength int
+	Enum      []string
 }
 
 // FlowFieldType names the input kind the client should render. Mirrors
@@ -129,6 +138,8 @@ type FlowFieldValidation struct {
 type FlowFieldType string
 
 const (
+	// FlowFieldTypeUnknown is a reserved field type that is only used in case of errors
+	FlowFieldTypeUnknown  FlowFieldType = "unknown"
 	FlowFieldTypeText     FlowFieldType = "text"
 	FlowFieldTypeEmail    FlowFieldType = "email"
 	FlowFieldTypePassword FlowFieldType = "password"
@@ -137,6 +148,8 @@ const (
 	FlowFieldTypeURL      FlowFieldType = "url"
 	FlowFieldTypeDate     FlowFieldType = "date"
 	FlowFieldTypeHidden   FlowFieldType = "hidden"
+	FlowFieldTypeCheckbox FlowFieldType = "checkbox"
+	FlowFieldTypeSelect   FlowFieldType = "select"
 )
 
 // FlowFieldValidationRule names a schema-derived validation rule the
@@ -198,5 +211,13 @@ func ImplicitOutcomesForChallenge(c FlowFieldChallenge) []string {
 }
 
 // ErrFlowFieldUnknown is returned by [FlowFieldResolver.Resolve] when a
-// requested field name is not part of the resolver's schema or catalog.
-var ErrFlowFieldUnknown = errors.New("flow field: not in resolver catalog")
+// requested field name is not a property in the user schema. The
+// offending field name is appended via `fmt.Errorf("%w: %q", ...)`.
+var ErrFlowFieldUnknown = errors.New("flow field: not a property in the user schema")
+
+// ErrFlowFieldUnsupportedType is returned by [FlowFieldResolver.Resolve]
+// when a property declares a JSON `type` set the resolver cannot
+// reduce to a single input kind. The nullable idiom `["null", X]` is
+// reduced to X and does not trigger this error; any other multi-entry
+// union does.
+var ErrFlowFieldUnsupportedType = errors.New("flow field: unsupported JSON type")

@@ -1,0 +1,32 @@
+{
+  "name": "@zitadel/server",
+  "version": "0.1.0-alpha.12",
+  "description": "Zitadel server binary launcher.",
+  "homepage": "https://github.com/zitadel/nextgen#readme",
+  "bugs": {
+    "url": "https://github.com/zitadel/nextgen/issues"
+  },
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zitadel/nextgen.git",
+    "directory": "apps/server"
+  },
+  "bin": {
+    "zitadel-server": "./bin/zitadel-server.js"
+  },
+  "files": [
+    "bin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "optionalDependencies": {
+    "@zitadel/server-darwin-arm64": "workspace:*",
+    "@zitadel/server-darwin-x64": "workspace:*",
+    "@zitadel/server-linux-arm64": "workspace:*",
+    "@zitadel/server-linux-x64": "workspace:*",
+    "@zitadel/server-win32-x64": "workspace:*"
+  }
+}

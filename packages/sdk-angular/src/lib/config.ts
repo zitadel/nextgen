@@ -35,7 +35,7 @@ export interface ZitadelConfig {
  */
 export function configureZitadel(config: ZitadelConfig): ZitadelProject {
   return Object.freeze({
-    proxyPath: config.proxyPath ?? '/__nextgen',
+    proxyPath: config.proxyPath ?? "/__nextgen",
     projectId: config.projectId,
     url: config.url,
   });

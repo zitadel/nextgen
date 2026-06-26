@@ -1,0 +1,34 @@
+id: "cli-journey-e2e"
+language: "typescript"
+layer: "automation"
+stack: "frontend"
+dependsOn:
+  - "cli"
+
+tasks:
+  lint:
+    command: "corepack pnpm exec oxlint ."
+
+  test:
+    command: "corepack pnpm run test"
+
+  e2e:
+    command: "corepack pnpm run e2e"
+    env:
+      # Our own e2e harness drives the real CLI binary (not under Vitest), so
+      # disable telemetry to keep CI traffic out of the Mixpanel project and off
+      # the per-command flush latency.
+      ZITADEL_TELEMETRY: "0"
+    deps:
+      - "cli:build"
+    options:
+      runInCI: false
+
+  e2e-local:
+    command: "corepack pnpm run e2e-local"
+    env:
+      ZITADEL_TELEMETRY: "0"
+    deps:
+      - "cli:build"
+    options:
+      runInCI: false

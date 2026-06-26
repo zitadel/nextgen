@@ -8,8 +8,8 @@ Scoped instructions for `packages/api-mock/`. Read together with the
 `@zitadel/api-mock` is a workspace-internal MSW handler library
 for the typed `@zitadel/api` Flow API. Consumers:
 
-- `packages/components/dev/main.ts` — boots the worker for the dev
-  playground.
+- `apps/storybook` — the `Orchestrator/Login` stories boot the worker
+  through `msw-storybook-addon`.
 - `packages/components/src/orchestrator/zitadel-login.spec.ts` — feeds
   the handlers into `msw/node`'s `setupServer`.
 - `apps/demo-next/` and `apps/demo-nuxt/` — hit the standalone TCP server
@@ -56,20 +56,21 @@ mapping function. To add a step:
 
 ## Dev fixture emails
 
-`src/handlers.ts` recognizes special emails for the components login
-playground (`http://localhost:5173/?route=login`). The sidebar there
-documents the same table.
+`src/handlers.ts` recognizes special emails for the `Orchestrator/Login`
+Storybook stories (`moon run storybook:dev`). The story docs note the same
+table.
 
 | When | Email | Result |
 |------|-------|--------|
 | Sign in submit | `wrong@example.com` | Stays on identifier; `error.invalid_credentials` on password |
 | Sign in submit | `server@example.com` | Stays on identifier; `error.sign_in_server` form alert |
 | Sign up submit | `exists@example.com` | Stays on register; `error.email_exists` on email |
-| Passkey upsell, any action except `skip` | `passkey-cancel@example.com` (captured from sign-in) | Stays on passkey-upsell; `error.passkey_cancelled` |
-| Passkey upsell, any action except `skip` | `passkey-unsupported@example.com` | `error.passkey_unsupported` |
-| Passkey upsell, any action except `skip` | `passkey-fail@example.com` | `error.passkey_failed` |
 
-Happy path: any other email → identifier/register → passkey-upsell → (skip) `done` or (setup) passkey-setup → `done`.
+Happy path: any other email → identifier/register → `done`. The
+`passkey-upsell` / `passkey-setup` states still exist in the machine but are
+no longer routed to by the default paths (passkey registration is offered up
+front instead); their fixture emails (`passkey-cancel@…`, `passkey-unsupported@…`,
+`passkey-fail@…`) only matter for tests that inject those states directly.
 
 ## Branding
 
@@ -82,11 +83,16 @@ this package depend on the components type surface. The orchestrator's
 branding-validator strips anything the OpenAPI doesn't model. Tests
 should clear the overlay between cases via `clearBranding()`.
 
-The standalone TCP server (`startMockServer` in `src/server.ts`) calls
-`applyBranding(defaultDevBranding)` on boot so demo apps receive a
-baseline `font_url` (Google Fonts Arimo) without extra setup. The payload
-lives in `src/default-dev-branding.ts` and mirrors
-`docs/design/branding/branding.example.json`. MSW-only consumers
+`src/server.ts` exposes two functions. `createMockApp({ issuer })` builds
+the configured Express app and returns it without binding a port; it
+calls `applyBranding(defaultDevBranding)` on boot so demo apps receive a
+baseline `font_url` (Google Fonts Arimo) without extra setup.
+`startMockServer(port)` wraps it for the standalone TCP server (deriving a
+localhost issuer from `port`). The bare app is published via the
+`./server` export so a serverless host can use it directly as a request
+handler — see `apps/mock-zitadel`, which serves it as per-PR Vercel
+previews. The branding payload lives in `src/default-dev-branding.ts` and
+mirrors `docs/design/branding/branding.example.json`. MSW-only consumers
 (`setupMockHandlers` / `setupMock`) do **not** get this overlay unless
 they call `applyBranding` themselves — same as before.
 
@@ -100,8 +106,8 @@ Two Vitest projects, mirroring `packages/components`:
   `pnpm test`.
 - `browser` — real Chromium via Playwright against `msw/browser`'s
   `setupWorker`. Picks up `*.browser.spec.ts`. `index.browser.spec.ts`
-  smoke-tests the `setupMock(worker)` entry point that the dev
-  playground uses. Runs locally via `pnpm test:browser` and requires a
+  smoke-tests the `setupMock(worker)` browser entry point. Runs locally
+  via `pnpm test:browser` and requires a
   Playwright browser install (`pnpm exec playwright install`); skipped
   in CI to keep the runner image lean.
 
@@ -115,5 +121,5 @@ routing, add a case to the unit spec first — that is what CI gates on.
 - Don't depend on `msw/browser` from anything other than the
   `setupMock(worker)` entry point — the same handlers must work in
   node.
-- Don't ship a build target. The `nx:noop` build is intentional —
-  consumers import source via the workspace export map.
+- Don't ship a build artifact. Consumers import source via the workspace
+  export map; the Moon build task is intentionally a no-op.

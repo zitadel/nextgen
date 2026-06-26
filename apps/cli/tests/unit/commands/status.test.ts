@@ -1,10 +1,16 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import {
+  localContainerName,
+  localRuntimePaths,
+  writeRuntimeMetadata,
+  type RuntimeMetadata,
+} from "../../../src/lib/local-server/runtime";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 
 const SECRET = {
   project_id: "proj-001",
@@ -65,7 +71,7 @@ describe("status command", () => {
     expect(json.data.project.lifecycle).toBe("configured");
     expect(json.data.project.project_id).toBe("proj-001");
     expect(json.data.project.issuer).toBe("http://localhost:3000");
-    expect(json.data.next_commands).toContain("npx @zitadel/cli@alpha doctor");
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("doctor"));
   });
 
   it("reports orphaned-config when zitadel.json exists but secret is missing", async () => {
@@ -86,7 +92,7 @@ describe("status command", () => {
       };
     };
     expect(json.status).toBe("ok");
-    expect(json.data.next_commands).toContain("npx @zitadel/cli@alpha setup --force");
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("setup --force"));
     expect(json.data.project.project_id).toBe("orphan");
     expect(json.data.project.lifecycle).toBe("orphaned-config");
   });
@@ -110,8 +116,24 @@ describe("status command", () => {
     expect(json.data.server.lifecycle).toBe("missing");
     expect(json.data.project.lifecycle).toBe("not-configured");
     expect(json.data.next_actions.join("\n")).toContain("From your app directory");
-    expect(json.data.next_commands).toContain("npx @zitadel/cli@alpha start");
-    expect(json.data.next_commands).toContain("npx @zitadel/cli@alpha setup --server local");
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("start"));
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("setup --server local"));
+  });
+
+  it("normalizes relative --cwd before reading runtime metadata", async () => {
+    const cwd = await makeProject();
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
+
+    const res = await status(relative(process.cwd(), cwd));
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      status: string;
+      data: { server: { runtime: { configured: boolean; data_dir?: string } } };
+    };
+    expect(json.status).toBe("ok");
+    expect(json.data.server.runtime.configured).toBe(true);
+    expect(json.data.server.runtime.data_dir).toBe(localRuntimePaths(cwd).dataDir);
   });
 
   it("falls back to the secret project_id when config.project is absent", async () => {
@@ -135,3 +157,18 @@ describe("status command", () => {
     expect(json.data.project.issuer).toBeUndefined();
   });
 });
+
+function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
+  return {
+    schema_version: 1,
+    backend: "docker",
+    container_name: localContainerName(cwd),
+    container_id: "container-test-id",
+    image: "ghcr.io/zitadel/nextgen:test",
+    port: Number(new URL(serverUrl).port),
+    server_url: serverUrl,
+    data_dir: localRuntimePaths(cwd).dataDir,
+    created_at: "2026-06-09T00:00:00.000Z",
+    cli_version: "0.0.0-test",
+  };
+}

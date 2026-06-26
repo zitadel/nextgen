@@ -1,9 +1,11 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import { classMap } from "lit/directives/class-map.js";
 
 import buttonHost from "@zitadel/shared-component-styles/lit/button-host.css?inline";
 import buttonSurface from "@zitadel/shared-component-styles/button.css?inline";
 
+import { emit } from "../internal/emit.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
 
@@ -93,6 +95,16 @@ export class ZlButton extends LitElement {
 
   @property() accessor label: string | undefined = undefined;
 
+  @property({ attribute: "data-testid" }) accessor testId: string | undefined = undefined;
+
+  /**
+   * Forces a visual interaction state on the inner button, projected to its
+   * `data-state` attribute. Used by the design playground to capture
+   * hover/pressed/focus states; reactive so toggling the host attribute
+   * re-renders.
+   */
+  @property({ attribute: "data-state" }) accessor forcedState: string | null = null;
+
   private readonly internals: ElementInternals;
 
   constructor() {
@@ -100,79 +112,132 @@ export class ZlButton extends LitElement {
     this.internals = this.attachInternals();
   }
 
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this.addEventListener("click", this.handleHostClick);
+  }
+
+  override disconnectedCallback(): void {
+    this.removeEventListener("click", this.handleHostClick);
+    super.disconnectedCallback();
+  }
+
   override focus(options?: FocusOptions): void {
     this.shadowRoot?.querySelector<HTMLButtonElement>("button")?.focus(options);
   }
 
-  private surfaceClasses(): string {
-    return [
-      "root",
-      "zr-btn",
-      `zr-btn--${this.hierarchy}`,
-      `zr-btn--${this.size}`,
-      this.block ? "zr-btn--block" : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
-  }
-
   override render() {
-    const blocked = this.disabled || this.loading;
-    const forcedState = this.getAttribute("data-state");
+    const hierarchy = this.stringOption("hierarchy", this.hierarchy, "primary");
+    const size = this.stringOption("size", this.size, "medium");
+    const type = this.buttonType();
+    const loading = this.booleanOption("loading", this.loading);
+    const disabled = this.booleanOption("disabled", this.disabled);
+    const block = this.booleanOption("block", this.block);
+    const label = this.stringOption("label", this.label);
+    const blocked = disabled || loading;
     // If `label` is provided, render the text directly and treat the default
     // slot as a fallback (avoids the whitespace-only slot bug where indentation
     // between `<zl-icon slot="leading">` tags marks the default slot as
     // "assigned" with text nodes, suppressing slot fallback content).
-    const body = this.label !== undefined ? html`<span>${this.label}</span>` : html`<slot></slot>`;
+    const body = label !== undefined ? html`<span>${label}</span>` : html`<slot></slot>`;
     return html`
       <button
-        class=${this.surfaceClasses()}
+        class=${classMap({
+          root: true,
+          "zr-btn": true,
+          [`zr-btn--${hierarchy}`]: true,
+          [`zr-btn--${size}`]: true,
+          "zr-btn--block": block,
+        })}
         part="root"
-        type=${this.type}
+        type=${type}
         ?disabled=${blocked}
-        aria-busy=${this.loading ? "true" : "false"}
-        data-state=${forcedState ?? nothing}
+        aria-busy=${loading ? "true" : "false"}
+        data-testid=${this.nativeButtonTestId() ?? nothing}
+        data-state=${this.forcedState ?? nothing}
         @click=${this.handleClick}
       >
         <slot name="leading"></slot>
         ${body}
-        ${this.loading
-          ? html`<span class="spinner" part="spinner"><zl-icon name="spinner" size=${this.size === "small" ? "16" : "24"} spin decorative></zl-icon></span>`
+        ${loading
+          ? html`<span class="spinner" part="spinner"><zl-icon name="spinner" size=${size === "small" ? "16" : "24"} spin decorative></zl-icon></span>`
           : html`<slot name="trailing"></slot>`}
       </button>
     `;
   }
 
   private handleClick = (event: MouseEvent): void => {
-    if (this.disabled || this.loading) {
+    this.activate(event);
+  };
+
+  private handleHostClick = (event: MouseEvent): void => {
+    if (event.composedPath()[0] !== this) return;
+    this.activate(event);
+  };
+
+  private nativeButtonTestId(): string | undefined {
+    const testId = this.stringOption("data-testid", this.testId);
+    if (testId) {
+      return `${testId}-button`;
+    }
+    const action = this.buttonAction();
+    return action ? `zitadel-action-${action}` : undefined;
+  }
+
+  private buttonType(): "button" | "submit" | "reset" {
+    const type = this.stringOption("type", this.type, "button");
+    return type === "submit" || type === "reset" ? type : "button";
+  }
+
+  private buttonAction(): string | undefined {
+    return this.stringOption("action", this.action);
+  }
+
+  private activate(event: MouseEvent): void {
+    const type = this.buttonType();
+    const action = this.buttonAction();
+    if (this.booleanOption("disabled", this.disabled) || this.booleanOption("loading", this.loading)) {
       event.preventDefault();
       event.stopImmediatePropagation();
       return;
     }
     const form = this.internals.form;
-    if (this.type === "submit" && form) {
+    if (type === "submit" && form) {
       // Mirror native <button type="submit"> behaviour through the
       // shadow boundary so the host <form>'s validation runs.
       event.preventDefault();
       form.requestSubmit();
-    } else if (this.type === "reset" && form) {
+    } else if (type === "reset" && form) {
       event.preventDefault();
       form.reset();
     }
-    this.dispatchEvent(
-      new CustomEvent("zl-submit", {
-        bubbles: true,
-        composed: true,
-        detail: { action: this.action ?? null },
-      }),
-    );
-  };
+    emit<{ action: string | null }>(this, "zl-submit", { action: action ?? null });
+  }
+
+  private stringOption(
+    attribute: string,
+    value: string | null | undefined,
+    fallback?: string,
+  ): string | undefined {
+    if (typeof value === "string" && value.length > 0) {
+      return value;
+    }
+    const attr = this.getAttribute(attribute);
+    if (attr !== null && attr.length > 0) {
+      return attr;
+    }
+    return fallback;
+  }
+
+  private booleanOption(attribute: string, value: boolean): boolean {
+    return value === true || this.hasAttribute(attribute);
+  }
 }
 
 export const zlButtonManifest: AtomManifest = {
   tag: "zl-button",
   consumes: { action: { kind: "submit", required: false } },
-  attrs: ["hierarchy", "size", "type", "action", "loading", "disabled", "block", "label"],
+  attrs: ["hierarchy", "size", "type", "action", "loading", "disabled", "block", "label", "data-testid"],
   parts: ["root", "spinner"],
   slots: ["", "leading", "trailing"],
   events: ["zl-submit"],

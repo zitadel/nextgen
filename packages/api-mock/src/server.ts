@@ -9,6 +9,7 @@
  * Custom-only routes added on top:
  *   POST   /sessions/exchange     — exchange handoff_token for session cookie
  *   GET    /sessions/me           — get current session from opaque cookie
+ *   DELETE /sessions/me           — revoke the current session (logout)
  *   GET    /auth/end-session      — OIDC-style end-session, clears cookies
  *   GET    /.well-known/jwks.json — JWKS for JWT verification (dev convenience)
  *   GET    /auth/keys             — JWKS, spec-defined endpoint (operation `getKeys`)
@@ -37,6 +38,7 @@ import { applyBranding } from "./branding.js";
 import { HandoffError, JWK, verifyHandoffToken } from "./crypto.js";
 import { defaultDevBranding } from "./default-dev-branding.js";
 import { setupMockHandlers } from "./handlers.js";
+import { buildOpenIdConfiguration } from "./openid-configuration.js";
 import { errorBody, setupPlatformHandlers } from "./platform-handlers.js";
 
 const SESSION_TTL_SECONDS = 3600;
@@ -82,9 +84,37 @@ type IdempotencyCacheEntry = {
 const IDEMPOTENCY_TTL_MS = 60_000;
 const idempotencyCache = new Map<string, IdempotencyCacheEntry>();
 
-export function startMockServer(port: number): Server {
+/**
+ * Build the configured Express app without binding it to a port.
+ *
+ * Returning the bare app (rather than a listening {@link Server}) lets a
+ * serverless host — e.g. a Vercel function — use it directly as a
+ * request handler, while {@link startMockServer} wraps it for the
+ * standalone dev server.
+ *
+ * The issuer is fixed at construction on purpose: the handoff tokens the
+ * mock signs (inside the MSW handlers) and the `expectedIss` it later
+ * enforces in `/sessions/exchange` must agree, so both read the same
+ * value regardless of which host a given request happens to arrive on.
+ *
+ * **State is not per-app.** The session store, consumed-handoff set, and
+ * idempotency cache are module-scoped (see the top of this file), and the
+ * branding overlay is likewise module-scoped — `applyBranding` mutates it
+ * during construction. So two apps built in the same process **share** all
+ * of that state; there is no per-instance isolation. This is intentional
+ * for the single-app dev/serverless use cases; tests that need isolation
+ * should run in separate workers (as Vitest does) rather than creating
+ * multiple apps in one.
+ *
+ * @param options.issuer - Absolute base URL this mock advertises as its
+ *   OIDC issuer (`http://localhost:8080` locally, the preview domain on
+ *   Vercel). Embedded in the discovery document and used as the expected
+ *   issuer when verifying handoff tokens (the JWKS responses carry only
+ *   the key, not the issuer).
+ */
+export function createMockApp(options: { issuer: string }): express.Express {
   applyBranding(defaultDevBranding);
-  const iss = `http://localhost:${port}`;
+  const iss = options.issuer;
   const app = express();
   app.use(cookieParser());
 
@@ -110,22 +140,10 @@ export function startMockServer(port: number): Server {
   app.get("/auth/keys", (_req: express.Request, res: express.Response) => {
     res.json({ keys: [JWK] });
   });
-  // Minimal OIDC discovery document — every real Zitadel server publishes
-  // one. The CLI's setup prompt uses this to auto-discover localhost OIDC
-  // servers (see lib/prober).
   app.get(
     "/.well-known/openid-configuration",
     (_req: express.Request, res: express.Response) => {
-      res.json({
-        issuer: iss,
-        jwks_uri: `${iss}/.well-known/jwks.json`,
-        authorization_endpoint: `${iss}/auth`,
-        token_endpoint: `${iss}/auth/token`,
-        end_session_endpoint: `${iss}/auth/end-session`,
-        response_types_supported: ["code"],
-        subject_types_supported: ["public"],
-        id_token_signing_alg_values_supported: ["RS256"],
-      });
+      res.json(buildOpenIdConfiguration(iss));
     },
   );
 
@@ -272,6 +290,33 @@ export function startMockServer(port: number): Server {
     res.json(session);
   });
 
+  // DELETE /sessions/me — revoke the current session (logout). Mirrors the
+  // Go server's revokeMySession handler and the SDK proxy's logout call.
+  app.delete("/sessions/me", (req: express.Request, res: express.Response) => {
+    const token = (req.cookies as Record<string, string>).__nextgen_session;
+    if (!token) {
+      res.status(401).json(errorBody("unauthenticated", "no session cookie"));
+      return;
+    }
+    const session = sessionStore.get(token);
+    if (!session) {
+      res.status(404).json(errorBody("session_not_found", "session not found"));
+      return;
+    }
+    if (new Date(session.expires_at) < new Date()) {
+      sessionStore.delete(token);
+      res.status(409).json(errorBody("session_revoked", "session already revoked or expired"));
+      return;
+    }
+    sessionStore.delete(token);
+    res.setHeader("Set-Cookie", [
+      `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
+      `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,
+      `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
+    ]);
+    res.status(204).end();
+  });
+
   app.get("/auth/end-session", (req: express.Request, res: express.Response) => {
     // Clean up session from store when logging out
     const token = (req.cookies as Record<string, string>).__nextgen_session;
@@ -288,6 +333,15 @@ export function startMockServer(port: number): Server {
 
   app.use(createMiddleware(...setupMockHandlers({ iss }).handlers, ...setupPlatformHandlers()));
 
+  return app;
+}
+
+/**
+ * Start the standalone dev server: build the app via {@link createMockApp}
+ * with a localhost issuer derived from `port`, then bind it.
+ */
+export function startMockServer(port: number): Server {
+  const app = createMockApp({ issuer: `http://localhost:${port}` });
   return app.listen(port, () => {
     console.log(`\napi-mock server listening on http://localhost:${port}`);
     console.log(`  JWKS: http://localhost:${port}/.well-known/jwks.json`);

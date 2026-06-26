@@ -42,6 +42,7 @@ export function buildFlow(
 ): CreateFlowDefinitionBodyFlowDefinition {
   return {
     name: "default",
+    status: "active",
     user_schema: USER_SCHEMA_URI,
     purposes: {
       login: "identifier",
@@ -51,10 +52,10 @@ export function buildFlow(
       {
         name: "identifier",
         fields: ["email"],
-        actions: {
-          submit: { primary: true },
-          register: {},
-        },
+        actions: [
+          { name: "submit", kind: "submit", primary: true },
+          { name: "register", kind: "navigate" },
+        ],
         gates: {},
         transitions: {
           submit: { target: "credential" },
@@ -67,7 +68,7 @@ export function buildFlow(
       {
         name: "credential",
         fields: ["password"],
-        actions: { submit: { primary: true } },
+        actions: [{ name: "submit", kind: "submit", primary: true }],
         gates: {},
         transitions: { submit: { target: "complete" } },
       },
@@ -78,10 +79,10 @@ export function buildFlow(
         // `internal/domain/flow_on_success_create_user.go`): it inserts
         // the user row and the password row in one transaction.
         fields: [...fields, "password"],
-        actions: {
-          submit: { primary: true },
-          login: {},
-        },
+        actions: [
+          { name: "submit", kind: "submit", primary: true },
+          { name: "login", kind: "navigate" },
+        ],
         gates: {},
         on_success: "create_user",
         transitions: {
@@ -92,7 +93,7 @@ export function buildFlow(
       {
         name: "complete",
         fields: [],
-        actions: {},
+        actions: [],
         gates: {},
         complete: "redirect",
       },

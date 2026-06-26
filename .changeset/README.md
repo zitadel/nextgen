@@ -1,68 +1,101 @@
 # Changesets
 
-This directory holds [changesets](https://github.com/changesets/changesets) for the npm-published packages in this monorepo. The **public** packages are:
+A changeset records a PR's **release intent** — it feeds the generated changelog
+and the `v<version>` GitHub Release notes, and drives npm versions and publishing.
+This file is the source of truth for "do I need one?"; other docs link here.
 
-- `@zitadel/cli` (`apps/cli`)
-- `@zitadel/api` (`packages/api`)
-- `@zitadel/components` (`packages/components`)
-- `@zitadel/sdk-core` (`packages/sdk-core`)
-- `@zitadel/sdk-next` (`packages/sdk-next`)
-- `@zitadel/sdk-nuxt` (`packages/sdk-nuxt`)
-- `@zitadel/sdk-react` (`packages/sdk-react`)
-- `@zitadel/sdk-vue` (`packages/sdk-vue`)
-- `@zitadel/sdk-angular` (`packages/sdk-angular`)
+## Publishable npm packages
 
-Everything else (`@zitadel/api-mock`, `@zitadel/design-tokens`, `@zitadel/shared-component-styles`, `@zitadel/ui-react`, `@zitadel/lint`, the demos, the console) is marked `"private": true` and is never published.
+The public `@zitadel/*` packages are the `fixed` group in
+[`.changeset/config.json`](config.json). Other workspaces do not publish, and
+`AGENTS.md` files under publishable roots do not need a changeset on their own.
 
-When you make a user-visible change to one of the public packages, run:
+## When a change needs a changeset
 
-```sh
-corepack pnpm changeset
+A change needs a changeset if it changes what the shipped product does —
+**release intent is product-level, not path-level.** The Go server, its API
+surface (`api/openapi/**`), and the SDKs all ship as one versioned bundle, so a
+server or API change needs one (list `@zitadel/server`) — even from `internal/`
+or `api/generated/**` — because it ships new server and SDK versions that belong
+in the release notes.
+
+Skip a changeset **only** when the change is *exclusively*:
+
+- tests (`*_test.go`, `*.spec.ts`, …)
+- generated mocks or fixtures
+- docs or comments (`docs/`, `AGENTS.md`, READMEs)
+- CI / build wiring (`.github/`, `moon.yml`, `.changeset/`)
+- a refactor with no behavior change
+
+## Decision table
+
+| If the PR… | Add `.changeset/*.md`? | **Release notes / changeset** |
+| --- | --- | --- |
+| Changes shipped product behavior (any path) | **Yes** — real changeset | Name the file; summarize the note. List `@zitadel/server` for server changes |
+| Is *exclusively* tests, generated mocks, docs, CI, or a no-op refactor | **No** | `No changeset required — no shipped behavior changed.` |
+| Touches a publishable path but ships nothing (rare) | **Empty changeset** | Say why the path changed but nothing ships |
+
+## How to add a changeset
+
+Humans run `corepack pnpm changeset` and pick the packages, bump type, and a
+one-line summary. Agents write `.changeset/<slug>.md` directly — don't rely on
+the interactive prompt:
+
+```md
+---
+"@zitadel/cli": minor
+---
+
+One-line, user-facing summary.
 ```
 
-Pick the affected packages, the bump type (patch / minor / major), and write a one-line summary. A markdown file appears in this directory and gets committed with your PR.
+Use [public package names](#publishable-npm-packages) and `patch` / `minor` /
+`major`. For the rare empty changeset (publishable path, nothing ships):
+`corepack pnpm changeset --empty`.
+
+## Verify locally
+
+```sh
+corepack pnpm exec changeset status --since origin/main
+```
+
+Confirm the planned bumps, then state the [decision-table](#decision-table)
+outcome in the PR. The command sees npm paths only — it can't infer server impact
+from Go paths, so judge those from the table.
 
 ## Alpha prerelease mode
 
-The repo is currently in changesets **prerelease mode** with the `alpha` tag (see `.changeset/pre.json`). While in this mode:
+The repo is in changesets prerelease mode, tag `alpha` (`.changeset/pre.json`):
 
-- `changeset version` cuts versions like `0.1.0-alpha.0`, `0.1.0-alpha.1`, …
-- `changeset publish` publishes them under the **`alpha`** npm dist-tag, **not** `latest`. So `npm install @zitadel/cli` keeps resolving the last stable release; consumers opt into prereleases with `@zitadel/cli@alpha`.
-- A package that has never had a stable release is published to `latest` on its first publish (changesets behaviour), then to `alpha` thereafter until it has a stable release.
+- `changeset version` cuts `0.1.0-alpha.N`; consumed changesets are recorded in
+  `pre.json`, pending ones stay in the tree.
+- The fixed group versions together; `changeset publish` uses the `alpha` npm
+  dist-tag.
 
-To leave alpha and cut a stable `latest` release:
+Leave alpha for a stable `latest` release:
 
 ```sh
 corepack pnpm changeset pre exit
-corepack pnpm changeset version   # strips the -alpha suffix
+corepack pnpm changeset version   # strips -alpha
 ```
 
-## Publishing (npm trusted publishing / OIDC)
+## Publishing
 
-The [`.github/workflows/release-npm.yml`](../.github/workflows/release-npm.yml) workflow runs the [changesets GitHub Action](https://github.com/changesets/action). Pushing changesets to `main` opens a "Version Packages" PR aggregating all pending changesets; merging that PR bumps versions, updates `CHANGELOG.md` files, and publishes to npm (under the `alpha` dist-tag while in prerelease mode).
+On merge to `main`, `release-publish.yml` opens a "Version Packages" PR — via the
+changesets action, using the release GitHub App token so `full-pr` runs. Merging
+it publishes the npm packages, pushes the server container, and updates the draft
+GitHub Release for `v<version>`. Re-run with `recover_version=<version>` to
+backfill a missing artifact; `changeset publish` skips versions already on npm.
+Full steps: [release runbook](../docs/runbooks/manual-release.md). Ownership and
+rationale: [ADR 002](../docs/adrs/002-multi-package-release-strategy.md) and
+[ADR 023](../docs/adrs/023-lockstep-alpha-release-train.md).
 
-Publishing authenticates with **npm trusted publishing (OIDC)** — there is **no `NPM_TOKEN`** secret. Before the first automated publish, a maintainer must, once per public package:
+Publishing uses **npm trusted publishing (OIDC)** — there is no `NPM_TOKEN`. Once
+per public package, a maintainer adds a trusted publisher on npmjs.com (Settings →
+Trusted Publishing): provider GitHub Actions, repo `zitadel/nextgen`, workflow
+`release-publish.yml`. The package must exist on npm first (publish `0.0.x` by
+hand if needed). Provenance stays off (`NPM_CONFIG_PROVENANCE=false`) while the
+repo is private; re-enable when public.
 
-1. Ensure the package exists on npm (publish `0.0.x` manually the first time if needed, since a trusted publisher can only be attached to an existing package).
-2. On npmjs.com → the package → **Settings → Trusted Publishing**, add a publisher:
-   - Provider: **GitHub Actions**
-   - Organization/owner: `zitadel`
-   - Repository: `nextgen`
-   - Workflow filename: `release-npm.yml` (exact, case-sensitive)
-3. Optionally, under **Publishing access**, require 2FA and disallow tokens so only this workflow can publish.
-
-While this repository is private, the workflow keeps npm provenance disabled
-with `NPM_CONFIG_PROVENANCE=false`. Trusted publishing still authenticates with
-short-lived OIDC credentials, but npm only accepts public provenance
-attestations from public source repositories. Re-enable provenance when
-`zitadel/nextgen` is public.
-
-The Go server binary is **not** managed by changesets — it is released with `goreleaser` through the manual [`release.yml`](../.github/workflows/release.yml) workflow while the repo is pre-release. See [docs/adrs/002-multi-package-release-strategy.md](../docs/adrs/002-multi-package-release-strategy.md).
-
-## Licensing reminder
-
-npm packages published from this repo are **MIT-licensed**, not AGPL like the
-server. Public packages under `apps/cli/` and `packages/*` must set
-`"license": "MIT"` and ship a package-level `LICENSE` file before publishing.
-Private demo, design-system, and integration workspaces are covered by the path
-exceptions in [/LICENSING.md](../LICENSING.md) while they remain private.
+Each public package must declare its license and ship a `LICENSE` file before its
+first publish — see [LICENSING.md](../LICENSING.md).

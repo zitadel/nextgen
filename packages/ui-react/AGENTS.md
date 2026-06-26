@@ -27,6 +27,6 @@ packages/ui-react/src/styles.css                # @import shared barrel
 ## Local checks
 
 ```sh
-corepack pnpm nx run @zitadel/ui-react:build
-corepack pnpm nx run @zitadel/ui-react:typecheck
+moon run ui-react:build
+moon run ui-react:typecheck
 ```

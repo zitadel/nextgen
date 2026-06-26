@@ -6,8 +6,16 @@ export function npmDistTagForCliVersion(cliVersion: string): string {
   return match?.[1] ?? "latest";
 }
 
+export function npmSelectorForCliVersion(cliVersion: string): string {
+  const normalized = cliVersion.trim().replace(/^v/, "");
+  if (/^\d+\.\d+\.\d+-alpha\.\d+$/.test(normalized)) {
+    return normalized;
+  }
+  return npmDistTagForCliVersion(normalized);
+}
+
 export function publicCliCommand(args: string, cliVersion: string): string {
-  const prefix = `npx ${CLI_PACKAGE_NAME}@${npmDistTagForCliVersion(cliVersion)}`;
+  const prefix = `npx ${CLI_PACKAGE_NAME}@${npmSelectorForCliVersion(cliVersion)}`;
   return args.length > 0 ? `${prefix} ${args}` : prefix;
 }
 

@@ -1,0 +1,10 @@
+{
+  "title": "Flow Definitions",
+  "pages": [
+    "listFlowDefinitions",
+    "createFlowDefinition",
+    "getFlowDefinition",
+    "updateFlowDefinition",
+    "deleteFlowDefinition"
+  ]
+}

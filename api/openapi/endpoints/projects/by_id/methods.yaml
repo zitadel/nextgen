@@ -4,7 +4,7 @@ get:
   description: |
     Returns the current state of a project.
   tags:
-    - Project
+    - Projects
   parameters:
     - name: project_id
       in: path

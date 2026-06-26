@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/zitadel/nextgen/internal/domain/idgen"
-	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -31,16 +29,22 @@ type Project struct {
 	PreviewOrigins []string
 }
 
-func NewProject(previewOrigins []string, secretGenerator secrets.Generator) (*Project, error) {
+func NewProject(previewOrigins []string, tokenGenerator TokenGenerator) (*Project, error) {
 	id, err := newID(PrefixProject)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to create project id")
 	}
-	projectSecret, err := idgen.NewULID().New("sk_proj")
+	projectSecret, err := tokenGenerator.Generate(&Token{
+		ProjectID: id,
+		Scope:     []string{"project.write", "project.read"},
+	})
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to generate project secret")
 	}
-	previewSecret, err := idgen.NewULID().New("sk_proj")
+	previewSecret, err := tokenGenerator.Generate(&Token{
+		ProjectID: id,
+		Scope:     []string{"project.read"},
+	})
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to generate preview secret")
 	}

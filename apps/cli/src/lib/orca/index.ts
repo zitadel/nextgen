@@ -1,5 +1,5 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 
 import { ZitadelError } from "../errors";
 import { detectors } from "./detectors";
@@ -14,6 +14,20 @@ export { issuerFromPort } from "./detectors/port";
 
 /** One framework the CLI can scaffold from scratch, surfaced to the picker. */
 export type FrameworkChoice = Readonly<{ id: string; displayName: string }>;
+
+export type ScaffoldTarget = Readonly<{
+  scaffoldable: boolean;
+  hasGitignore: boolean;
+  hasRuntimeOnlyZitadel: boolean;
+  reason?: string;
+  entries: ReadonlyArray<string>;
+}>;
+
+type ScaffoldStash = Readonly<{
+  gitignore?: string;
+  root: string;
+  zitadel?: string;
+}>;
 
 /**
  * Orchestrates the three per-framework strategies — detectors (recognise an
@@ -79,17 +93,9 @@ export class Orca {
     }
   }
 
-  /**
-   * Whether `cwd` has no `package.json`, i.e. it is empty (or non-Node) and
-   * should be scaffolded from scratch rather than detected/patched.
-   */
-  async isEmpty(cwd: string): Promise<boolean> {
-    try {
-      await readFile(join(cwd, "package.json"), "utf8");
-      return false;
-    } catch {
-      return true;
-    }
+  /** Whether `cwd` is safe for an in-place framework scaffold. */
+  async isFreshScaffoldTarget(cwd: string): Promise<boolean> {
+    return (await inspectScaffoldTarget(cwd)).scaffoldable;
   }
 
   /**
@@ -99,12 +105,22 @@ export class Orca {
    * scaffolder supports the framework.
    */
   async scaffold(cwd: string, framework: string): Promise<FrameworkFacts> {
-    if (!(await this.isEmpty(cwd))) {
-      throw new ZitadelError("E_CONFLICT", `Cannot scaffold: ${cwd} already contains a project`, {
-        hint: "Run setup in an empty directory, or integrate the existing project instead.",
+    const target = await inspectScaffoldTarget(cwd);
+    if (!target.scaffoldable) {
+      throw new ZitadelError("E_CONFLICT", `Cannot scaffold: ${cwd} is not empty`, {
+        hint:
+          target.reason ??
+          "Run setup in an empty directory, or run setup from an existing supported app project.",
+        details: { entries: target.entries },
       });
     }
-    await this.scaffolderFor(framework).scaffold(cwd, framework);
+    assertNpmSafeScaffoldDirectoryName(cwd);
+    const stash = await stashFreshScaffoldArtifacts(cwd, target);
+    try {
+      await this.scaffolderFor(framework).scaffold(cwd, framework);
+    } finally {
+      await restoreFreshScaffoldArtifacts(cwd, stash);
+    }
     return this.detect(cwd, framework);
   }
 
@@ -151,7 +167,236 @@ export class Orca {
   }
 }
 
+function assertNpmSafeScaffoldDirectoryName(cwd: string): void {
+  const name = basename(cwd);
+  const errors = npmPackageNameErrors(name);
+  if (errors.length === 0) {
+    return;
+  }
+
+  throw new ZitadelError(
+    "E_VALIDATION",
+    `Fresh app directory name "${name}" is not npm-package-safe`,
+    {
+      hint:
+        "Rename the directory to a lowercase npm-package-safe name, for example `my-zitadel-app`, then rerun setup.",
+      details: { cwd, name, validation_errors: errors },
+    },
+  );
+}
+
+function npmPackageNameErrors(name: string): string[] {
+  // This local preflight catches common package-name failures before the
+  // scaffolder mutates disk; framework generators still own stricter checks.
+  const errors: string[] = [];
+  if (name.length === 0) {
+    errors.push("name is empty");
+  }
+  if (name.length > 214) {
+    errors.push("name is longer than 214 characters");
+  }
+  if (name !== name.trim()) {
+    errors.push("name contains leading or trailing whitespace");
+  }
+  if (/[A-Z]/.test(name)) {
+    errors.push("name can no longer contain capital letters");
+  }
+  if (name.startsWith(".") || name.startsWith("_")) {
+    errors.push("name cannot start with a period or underscore");
+  }
+  if (!/^[a-z0-9][a-z0-9._~-]*$/.test(name)) {
+    errors.push("name may only contain lowercase letters, numbers, dots, underscores, tildes, and hyphens");
+  }
+  if (name === "node_modules" || name === "favicon.ico") {
+    errors.push(`name "${name}" is reserved`);
+  }
+  return [...new Set(errors)];
+}
+
 /** {@link Orca} wired with the default detector, scaffolder, and patcher registries. */
 export function createOrca(): Orca {
   return new Orca(detectors, scaffolders, patchers);
+}
+
+export async function inspectScaffoldTarget(cwd: string): Promise<ScaffoldTarget> {
+  const entries = await readdir(cwd, { withFileTypes: true });
+  const names = entries.map((entry) => entry.name).sort();
+  let hasGitignore = false;
+  let hasRuntimeOnlyZitadel = false;
+
+  for (const entry of entries) {
+    if (entry.name === ".gitignore") {
+      if (!entry.isFile()) {
+        return {
+          scaffoldable: false,
+          hasGitignore: false,
+          hasRuntimeOnlyZitadel: false,
+          reason: ".gitignore exists but is not a file.",
+          entries: names,
+        };
+      }
+      hasGitignore = true;
+      continue;
+    }
+
+    if (entry.name === ".zitadel") {
+      if (!entry.isDirectory() || !(await isRuntimeOnlyZitadelDir(join(cwd, ".zitadel")))) {
+        return {
+          scaffoldable: false,
+          hasGitignore,
+          hasRuntimeOnlyZitadel: false,
+          reason:
+            ".zitadel contains project state. Move it aside or run setup from an empty app directory.",
+          entries: names,
+        };
+      }
+      hasRuntimeOnlyZitadel = true;
+      continue;
+    }
+
+    return {
+      scaffoldable: false,
+      hasGitignore,
+      hasRuntimeOnlyZitadel: false,
+      reason: `Directory contains ${entry.name}. Run setup from an empty directory to scaffold a new app.`,
+      entries: names,
+    };
+  }
+
+  return { scaffoldable: true, hasGitignore, hasRuntimeOnlyZitadel, entries: names };
+}
+
+async function isRuntimeOnlyZitadelDir(path: string): Promise<boolean> {
+  const entries = await readdir(path, { withFileTypes: true });
+  if (entries.length !== 1 || entries[0]?.name !== "local" || !entries[0].isDirectory()) {
+    return false;
+  }
+  return true;
+}
+
+async function stashFreshScaffoldArtifacts(
+  cwd: string,
+  target: ScaffoldTarget,
+): Promise<ScaffoldStash | undefined> {
+  if (!target.hasGitignore && !target.hasRuntimeOnlyZitadel) {
+    return undefined;
+  }
+
+  const parent = dirname(cwd);
+  const root = join(
+    parent,
+    `.${basename(cwd)}.fresh-scaffold-stash-${String(process.pid)}-${String(Date.now())}`,
+  );
+  await mkdir(root, { mode: 0o700 });
+
+  const stash: { gitignore?: string; root: string; zitadel?: string } = { root };
+  if (target.hasRuntimeOnlyZitadel) {
+    stash.zitadel = join(root, ".zitadel");
+    await rename(join(cwd, ".zitadel"), stash.zitadel);
+  }
+  if (target.hasGitignore) {
+    stash.gitignore = join(root, ".gitignore");
+    await rename(join(cwd, ".gitignore"), stash.gitignore);
+  }
+  return stash;
+}
+
+async function restoreFreshScaffoldArtifacts(
+  cwd: string,
+  stash: ScaffoldStash | undefined,
+): Promise<void> {
+  if (!stash) {
+    return;
+  }
+
+  try {
+    await restoreRuntimeOnlyZitadel(cwd, stash.zitadel);
+    await restoreGitignore(cwd, stash.gitignore);
+  } finally {
+    await rm(stash.root, { recursive: true, force: true });
+  }
+}
+
+async function restoreRuntimeOnlyZitadel(cwd: string, stash: string | undefined): Promise<void> {
+  if (!stash) {
+    return;
+  }
+
+  const target = join(cwd, ".zitadel");
+  try {
+    await rename(stash, target);
+    await appendGitignoreEntry(cwd, ".zitadel/local/");
+    return;
+  } catch (error) {
+    if (!isErrno(error, "EEXIST")) {
+      throw error;
+    }
+  }
+
+  await mkdir(target, { recursive: true, mode: 0o700 });
+  await rename(join(stash, "local"), join(target, "local"));
+  await rm(stash, { recursive: true, force: true });
+  await appendGitignoreEntry(cwd, ".zitadel/local/");
+}
+
+async function restoreGitignore(cwd: string, stash: string | undefined): Promise<void> {
+  if (!stash) {
+    return;
+  }
+
+  const path = join(cwd, ".gitignore");
+  const stashed = await readFile(stash, "utf8");
+  let current = "";
+  try {
+    current = await readFile(path, "utf8");
+  } catch (error) {
+    if (!isErrno(error, "ENOENT")) {
+      throw error;
+    }
+  }
+
+  const existingLines = new Set(
+    current
+      .split(/\r?\n/g)
+      .map((line) => line.trim())
+      .filter(Boolean),
+  );
+  const missingLines = stashed
+    .split(/\r?\n/g)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !existingLines.has(line));
+  if (missingLines.length === 0) {
+    return;
+  }
+
+  const prefix = current.length === 0 || current.endsWith("\n") ? "" : "\n";
+  await writeFile(path, `${current}${prefix}${missingLines.join("\n")}\n`);
+}
+
+async function appendGitignoreEntry(cwd: string, entry: string): Promise<void> {
+  const path = join(cwd, ".gitignore");
+  let existing = "";
+  try {
+    existing = await readFile(path, "utf8");
+  } catch (error) {
+    if (!isErrno(error, "ENOENT")) {
+      throw error;
+    }
+  }
+
+  const lines = existing.split(/\r?\n/g).map((line) => line.trim());
+  if (lines.includes(entry)) {
+    return;
+  }
+  const prefix = existing.length === 0 || existing.endsWith("\n") ? "" : "\n";
+  await writeFile(path, `${existing}${prefix}${entry}\n`);
+}
+
+function isErrno(error: unknown, code: string): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === code
+  );
 }

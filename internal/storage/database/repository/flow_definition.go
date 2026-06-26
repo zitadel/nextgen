@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -44,7 +45,7 @@ type flowDefinitionAudienceJSON struct {
 type flowDefinitionStepJSON struct {
 	Name         string                            `json:"name"`
 	Fields       []string                          `json:"fields,omitempty"`
-	Actions      map[string]flowStepActionJSON     `json:"actions,omitempty"`
+	Actions      []flowStepActionJSON              `json:"actions,omitempty"`
 	Gates        map[string]flowStepGateJSON       `json:"gates,omitempty"`
 	SSOProviders []flowSSOProviderJSON             `json:"sso_providers,omitempty"`
 	OnSuccess    *string                           `json:"on_success,omitempty"`
@@ -53,6 +54,8 @@ type flowDefinitionStepJSON struct {
 }
 
 type flowStepActionJSON struct {
+	Name    string `json:"name"`
+	Kind    string `json:"kind"`
 	TextKey string `json:"text_key,omitempty"`
 	Primary bool   `json:"primary,omitempty"`
 }
@@ -235,6 +238,40 @@ func (r *FlowDefinitionRepository) UpdateFlowDefinitionStatus(ctx context.Contex
 	return err
 }
 
+func (r *FlowDefinitionRepository) UpdateFlowDefinition(ctx context.Context, client database.QueryExecutor, def *domain.FlowDefinition) error {
+	content, err := marshalFlowDefinitionContent(def)
+	if err != nil {
+		return err
+	}
+
+	purposeStrs := make([]string, 0, len(def.Purposes))
+	for p := range def.Purposes {
+		purposeStrs = append(purposeStrs, p.String())
+	}
+
+	b := database.NewStatementBuilder("UPDATE ")
+	b.WriteString(r.meta.tableName)
+	b.WriteString(" SET name = ")
+	b.WriteArg(def.Name)
+	b.WriteString(", schema_version = ")
+	b.WriteArg(def.SchemaVersion)
+	b.WriteString(", status = ")
+	b.WriteString(b.AppendArg(def.Status.String()) + r.statusCast)
+	b.WriteString(", purposes = ")
+	b.WriteString(b.AppendArg(r.encodePurposes(purposeStrs)) + r.purposeArrCast)
+	b.WriteString(", definition = ")
+	b.WriteArg(r.encodeDefinition(content))
+	b.WriteString(", updated_at = ")
+	b.WriteArg(r.now)
+	b.WriteString(" WHERE project_id = ")
+	b.WriteArg(def.ProjectID)
+	b.WriteString(" AND id = ")
+	b.WriteArg(def.ID)
+
+	_, err = client.Exec(ctx, b.String(), b.Args()...)
+	return err
+}
+
 func (r *FlowDefinitionRepository) DeleteFlowDefinition(ctx context.Context, client database.QueryExecutor, projectID, id string) error {
 	t := r.meta.tableName
 	condition := database.And(
@@ -274,16 +311,18 @@ func marshalFlowDefinitionContent(def *domain.FlowDefinition) ([]byte, error) {
 		}
 		stepJSON := flowDefinitionStepJSON{
 			Name:        s.Name,
-			Fields:      s.Fields,
+			Fields:      domain.FieldsToStrings(s.Fields),
 			Transitions: transitions,
 		}
 		if len(s.Actions) > 0 {
-			stepJSON.Actions = make(map[string]flowStepActionJSON, len(s.Actions))
-			for name, a := range s.Actions {
-				stepJSON.Actions[name] = flowStepActionJSON{
+			stepJSON.Actions = make([]flowStepActionJSON, 0, len(s.Actions))
+			for _, a := range s.Actions {
+				stepJSON.Actions = append(stepJSON.Actions, flowStepActionJSON{
+					Name:    a.Name,
+					Kind:    a.Kind.String(),
 					TextKey: a.TextKey,
 					Primary: a.Primary,
-				}
+				})
 			}
 		}
 		if len(s.Gates) > 0 {
@@ -361,16 +400,22 @@ func rowToFlowDefinition(row flowDefinitionRow) (*domain.FlowDefinition, error) 
 		}
 		step := domain.FlowDefinitionStep{
 			Name:        s.Name,
-			Fields:      s.Fields,
+			Fields:      domain.FieldsFromStrings(s.Fields),
 			Transitions: transitions,
 		}
 		if len(s.Actions) > 0 {
-			step.Actions = make(map[string]domain.FlowStepAction, len(s.Actions))
-			for name, a := range s.Actions {
-				step.Actions[name] = domain.FlowStepAction{
+			step.Actions = make([]domain.FlowStepAction, 0, len(s.Actions))
+			for _, a := range s.Actions {
+				kind, err := domain.FlowActionKindString(a.Kind)
+				if err != nil {
+					return nil, fmt.Errorf("step %q: action %q has invalid kind %q: %w", s.Name, a.Name, a.Kind, err)
+				}
+				step.Actions = append(step.Actions, domain.FlowStepAction{
+					Name:    a.Name,
+					Kind:    kind,
 					TextKey: a.TextKey,
 					Primary: a.Primary,
-				}
+				})
 			}
 		}
 		if len(s.Gates) > 0 {

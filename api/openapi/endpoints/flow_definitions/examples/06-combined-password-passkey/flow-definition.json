@@ -1,0 +1,157 @@
+{
+  "project_id": "${PROJECT_ID}",
+  "schema_uri": "https://nextgen.com/flow-definition.json",
+  "flow_definition": {
+    "name": "combined-password-passkey",
+    "status": "active",
+    "user_schema": "${USER_SCHEMA_URL}",
+    "purposes": {
+      "login": "identifier",
+      "register": "register"
+    },
+    "steps": [
+      {
+        "name": "identifier",
+        "fields": [
+          "email"
+        ],
+        "actions": [
+          {
+            "name": "submit",
+            "kind": "submit",
+            "primary": true
+          },
+          {
+            "name": "passkey",
+            "kind": "passkey"
+          },
+          {
+            "name": "register",
+            "kind": "submit"
+          }
+        ],
+        "transitions": {
+          "submit": {
+            "target": "password"
+          },
+          "passkey": {
+            "target": "done"
+          },
+          "register": {
+            "target": "register"
+          },
+          "user_not_found": {
+            "target": "register"
+          }
+        }
+      },
+      {
+        "name": "password",
+        "fields": [
+          "x-auth-methods#password"
+        ],
+        "actions": [
+          {
+            "name": "submit",
+            "kind": "submit",
+            "primary": true
+          },
+          {
+            "name": "passkey",
+            "kind": "passkey"
+          }
+        ],
+        "transitions": {
+          "submit": {
+            "target": "done"
+          },
+          "passkey": {
+            "target": "done"
+          }
+        }
+      },
+      {
+        "name": "register",
+        "fields": [
+          "email",
+          "name"
+        ],
+        "actions": [
+          {
+            "name": "submit",
+            "kind": "submit",
+            "primary": true
+          },
+          {
+            "name": "passkey_register",
+            "kind": "passkey_register"
+          },
+          {
+            "name": "login",
+            "kind": "submit"
+          }
+        ],
+        "transitions": {
+          "submit": {
+            "target": "register-password"
+          },
+          "passkey_register": {
+            "target": "done"
+          },
+          "login": {
+            "target": "identifier"
+          },
+          "user_already_exists": {
+            "target": "password"
+          }
+        }
+      },
+      {
+        "name": "register-password",
+        "fields": [
+          "x-auth-methods#password",
+          "phoneNumber"
+        ],
+        "actions": [
+          {
+            "name": "submit",
+            "kind": "submit",
+            "primary": true
+          }
+        ],
+        "on_success": "create_user",
+        "transitions": {
+          "submit": {
+            "target": "passkey-upsell"
+          }
+        }
+      },
+      {
+        "name": "passkey-upsell",
+        "actions": [
+          {
+            "name": "passkey_register",
+            "kind": "passkey_register",
+            "primary": true
+          },
+          {
+            "name": "skip",
+            "kind": "submit"
+          }
+        ],
+        "transitions": {
+          "passkey_register": {
+            "target": "done"
+          },
+          "skip": {
+            "target": "done"
+          }
+        }
+      },
+      {
+        "name": "done",
+        "complete": "redirect"
+      }
+    ]
+  }
+}

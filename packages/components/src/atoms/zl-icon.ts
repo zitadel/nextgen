@@ -1,5 +1,6 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import { classMap } from "lit/directives/class-map.js";
 import { unsafeSVG } from "lit/directives/unsafe-svg.js";
 
 import iconHost from "@zitadel/shared-component-styles/lit/icon-host.css?inline";
@@ -8,6 +9,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
+  ChevronDown,
   CircleAlert,
   Eye,
   EyeOff,
@@ -67,14 +69,12 @@ export class ZlIcon extends LitElement {
   override render() {
     const ariaLabel = this.label ?? DEFAULT_LABELS[this.name];
     const hidden = this.decorative || !ariaLabel;
-    const classes = [
-      "zr-icon",
-      `zr-icon--${this.size}`,
-      this.tone !== "default" ? `zr-icon--tone-${this.tone}` : "",
-      this.spin ? "zr-icon--spin" : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
+    const classes = classMap({
+      "zr-icon": true,
+      [`zr-icon--${this.size}`]: true,
+      [`zr-icon--tone-${this.tone}`]: this.tone !== "default",
+      "zr-icon--spin": this.spin,
+    });
     return html`
       <span class=${classes}>
         <svg
@@ -100,6 +100,7 @@ export type IconName =
   | "arrow-left"
   | "spinner"
   | "check"
+  | "chevron-down"
   | "cross"
   | "warning"
   | "alert-circle"
@@ -116,6 +117,7 @@ export const SHIPPED_ICON_NAMES = [
   "arrow-left",
   "spinner",
   "check",
+  "chevron-down",
   "cross",
   "warning",
   "alert-circle",
@@ -137,6 +139,7 @@ const ICON_NODES: Record<IconName, IconNode> = {
   "arrow-left": ArrowLeft,
   spinner: LoaderCircle,
   check: Check,
+  "chevron-down": ChevronDown,
   cross: X,
   warning: TriangleAlert,
   "alert-circle": CircleAlert,

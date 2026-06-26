@@ -5,6 +5,17 @@ import { TEMPLATE_NAMES } from "./template-names.js";
 import { en as fullLocale } from "./locales/en.js";
 import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
 
+/**
+ * Convert author-friendly `{ name: {...}, ... }` dicts into the wire-shape
+ * `[{ name, ... }, ...]` array. Keeps each test's context authoring concise
+ * while matching the runtime contract.
+ */
+function toArray<T extends object>(
+  entries: Record<string, T>,
+): ({ name: string } & T)[] {
+  return Object.entries(entries).map(([name, body]) => ({ name, ...body }));
+}
+
 const locale: Record<string, string> = {
   "identifier.title": "Sign in",
   "identifier.field.email": "Work email",
@@ -71,12 +82,14 @@ describe("LiquidJS engine", () => {
 
   it("renders the bundled default template through the auth-form partial", () => {
     const engine = createLiquidEngine({ locale });
+    const f = toArray({
+      identifier: { type: "email", text_key: "identifier.title", required: true },
+    });
+    const a = toArray({ submit: { text_key: "submit.continue", primary: true } });
     const context = {
       step: { name: "identifier", type: "identifier", texts: { title_key: "identifier.title" } },
-      fields: {
-        identifier: { type: "email", text_key: "identifier.title", required: true },
-      },
-      actions: { submit: { text_key: "submit.continue", primary: true } },
+      fields: f,
+      actions: a,
       branding: {},
       loading: false,
       errors: [],
@@ -89,17 +102,20 @@ describe("LiquidJS engine", () => {
     expect(result).toContain("<zl-page-shell");
     expect(result).toContain("<zl-card");
     expect(result).toContain("<zl-field");
+    expect(result).toContain('data-testid="zitadel-field-identifier"');
     expect(result).toContain('<zl-button');
+    expect(result).toContain('data-testid="zitadel-action-submit"');
     expect(result).toContain('hierarchy="primary"');
     expect(result).toContain(mandatoryGatesMarkerComment);
   });
 
   it("renders step title from locale via default template", () => {
     const engine = createLiquidEngine({ locale });
+    const a = toArray({ submit: { text_key: "submit.continue", primary: true } });
     const context = {
       step: { name: "password", texts: { title_key: "password.title" } },
-      fields: {},
-      actions: { submit: { text_key: "submit.continue", primary: true } },
+      fields: [],
+      actions: a,
       branding: {},
       loading: false,
       errors: [],
@@ -114,13 +130,14 @@ describe("LiquidJS engine", () => {
 
   it("renders passkey upsell: card, primary + secondary CTAs", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
+    const a = toArray({
+      setup: { text_key: "passkey-upsell.action.setup", primary: true },
+      skip: { text_key: "passkey-upsell.action.skip" },
+    });
     const context = {
       step: { name: "passkey-upsell", texts: { title_key: "passkey-upsell.title" } },
-      fields: {},
-      actions: {
-        setup: { text_key: "passkey-upsell.action.setup", primary: true },
-        skip: { text_key: "passkey-upsell.action.skip" },
-      },
+      fields: [],
+      actions: a,
       branding: {},
       loading: false,
       errors: [],
@@ -140,13 +157,14 @@ describe("LiquidJS engine", () => {
 
   it("renders passkey upsell setup error: form-level alert, retry allowed", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
+    const a = toArray({
+      setup: { text_key: "passkey-upsell.action.setup", primary: true },
+      skip: { text_key: "passkey-upsell.action.skip" },
+    });
     const context = {
       step: { name: "passkey-upsell", texts: { title_key: "passkey-upsell.title" } },
-      fields: {},
-      actions: {
-        setup: { text_key: "passkey-upsell.action.setup", primary: true },
-        skip: { text_key: "passkey-upsell.action.skip" },
-      },
+      fields: [],
+      actions: a,
       branding: {},
       loading: false,
       errors: [{ text_key: "error.passkey_cancelled" }],
@@ -162,12 +180,71 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain("invalid");
   });
 
+  it("renders passkey registration challenges with registration ceremony", () => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    const context = {
+      step: { name: "passkey-enroll", texts: { title_key: "passkey-enroll.title" } },
+      fields: [],
+      actions: [],
+      branding: {},
+      loading: false,
+      errors: [],
+      gates: {},
+      sso_providers: [],
+      messages: [],
+      identity: null,
+      challenge: {
+        method: "passkey_register",
+        challenge_id: "reg-1",
+        options: {
+          challenge: "AAAA",
+          rp: { id: "example.com", name: "example.com" },
+          user: { id: "dXNlci0x", name: "alice@example.com", displayName: "Alice" },
+          pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+        },
+      },
+    };
+
+    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    expect(result).toContain("<zl-passkey");
+    expect(result).toContain('ceremony="register"');
+    expect(result).toContain('method="passkey_register"');
+    expect(result).toContain('challenge-id="reg-1"');
+  });
+
+  it("keeps legacy passkey registration challenges working when options.user is present", () => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    const context = {
+      step: { name: "passkey-enroll", texts: { title_key: "passkey-enroll.title" } },
+      fields: [],
+      actions: [],
+      branding: {},
+      loading: false,
+      errors: [],
+      gates: {},
+      sso_providers: [],
+      messages: [],
+      identity: null,
+      challenge: {
+        method: "passkey",
+        challenge_id: "reg-1",
+        options: {
+          user: { id: "dXNlci0x", name: "alice@example.com", displayName: "Alice" },
+        },
+      },
+    };
+
+    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    expect(result).toContain('ceremony="register"');
+    expect(result).toContain('method="passkey_register"');
+  });
+
   it("renders the signed-in screen when the step is the signed-in confirmation", () => {
     const engine = createLiquidEngine({ locale });
     const context = {
       step: { name: "signed-in", texts: { title_key: "complete.title" } },
-      fields: {},
-      actions: {},
+      fields: [],
+      actions: [],
       branding: {},
       loading: false,
       errors: [],
@@ -182,18 +259,20 @@ describe("LiquidJS engine", () => {
 
   it("renders combined sign-in (6593:141983): email+password, forgot link, sign-in CTA", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
+    const f = toArray({
+      email: { type: "email", text_key: "identifier.field.email", required: true },
+      password: { type: "password", text_key: "identifier.field.password", required: true },
+    });
+    const a = toArray({
+      submit: { text_key: "submit.signin", primary: true },
+      passkey: { text_key: "identifier.action.passkey" },
+      register: { text_key: "identifier.action.register.link" },
+      recover: { text_key: "action.forgot_password" },
+    });
     const context = {
       step: { name: "identifier", texts: { title_key: "identifier.title" } },
-      fields: {
-        email: { type: "email", text_key: "identifier.field.email", required: true },
-        password: { type: "password", text_key: "identifier.field.password", required: true },
-      },
-      actions: {
-        submit: { text_key: "submit.signin", primary: true },
-        passkey: { text_key: "identifier.action.passkey" },
-        register: { text_key: "identifier.action.register.link" },
-        recover: { text_key: "action.forgot_password" },
-      },
+      fields: f,
+      actions: a,
       branding: {},
       loading: false,
       errors: [],
@@ -214,16 +293,18 @@ describe("LiquidJS engine", () => {
 
   it("renders sign-in wrong credentials (6602:180268): inline password error, no form alert", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
+    const f = toArray({
+      email: { type: "email", text_key: "identifier.field.email", required: true },
+      password: { type: "password", text_key: "identifier.field.password", required: true },
+    });
+    const a = toArray({
+      submit: { text_key: "submit.signin", primary: true },
+      recover: { text_key: "action.forgot_password" },
+    });
     const context = {
       step: { name: "identifier", texts: { title_key: "identifier.title" } },
-      fields: {
-        email: { type: "email", text_key: "identifier.field.email", required: true },
-        password: { type: "password", text_key: "identifier.field.password", required: true },
-      },
-      actions: {
-        submit: { text_key: "submit.signin", primary: true },
-        recover: { text_key: "action.forgot_password" },
-      },
+      fields: f,
+      actions: a,
       branding: {},
       loading: false,
       errors: [{ text_key: "error.invalid_credentials" }],
@@ -242,16 +323,18 @@ describe("LiquidJS engine", () => {
 
   it("renders sign-in server error (6594:125237): heading + body alert, fields unchanged", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
+    const f = toArray({
+      email: { type: "email", text_key: "identifier.field.email", required: true },
+      password: { type: "password", text_key: "identifier.field.password", required: true },
+    });
+    const a = toArray({
+      submit: { text_key: "submit.signin", primary: true },
+      recover: { text_key: "action.forgot_password" },
+    });
     const context = {
       step: { name: "identifier", texts: { title_key: "identifier.title" } },
-      fields: {
-        email: { type: "email", text_key: "identifier.field.email", required: true },
-        password: { type: "password", text_key: "identifier.field.password", required: true },
-      },
-      actions: {
-        submit: { text_key: "submit.signin", primary: true },
-        recover: { text_key: "action.forgot_password" },
-      },
+      fields: f,
+      actions: a,
       branding: {},
       loading: false,
       errors: [{ text_key: "error.sign_in_server" }],
@@ -270,15 +353,18 @@ describe("LiquidJS engine", () => {
 
   it("renders sign-up field annotations (6593:141741): autocomplete, help, inline email error", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
+    const f = toArray({
+      email: { type: "email", text_key: "register.field.email", required: true },
+      password: { type: "password", text_key: "register.field.password", required: true },
+      dateOfBirth: { type: "date", text_key: "register.field.dateOfBirth", required: true },
+    });
+    const a = toArray({
+      submit: { text_key: "register.action.submit", primary: true },
+    });
     const context = {
       step: { name: "register", texts: { title_key: "register.title" } },
-      fields: {
-        email: { type: "email", text_key: "register.field.email", required: true },
-        password: { type: "password", text_key: "register.field.password", required: true },
-      },
-      actions: {
-        submit: { text_key: "register.action.submit", primary: true },
-      },
+      fields: f,
+      actions: a,
       branding: {},
       loading: false,
       errors: [{ text_key: "error.email_exists" }],
@@ -290,7 +376,12 @@ describe("LiquidJS engine", () => {
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
     expect(result).toContain('autocomplete="email"');
     expect(result).toContain('autocomplete="new-password"');
-    expect(result).toContain("At least 8 characters");
+    // Password complexity copy and the YYYY-MM-DD date hint were removed: only
+    // minLength is enforced server-side, and native <input type="date"> handles
+    // its own localized format (#251 tracks dynamic, rule-driven hints).
+    expect(result).not.toContain("At least 8 characters");
+    expect(result).not.toContain('placeholder="YYYY-MM-DD"');
+    expect(result).not.toContain("Use YYYY-MM-DD.");
     expect(result).toContain("An account with this email already exists");
     expect(result).not.toContain("forgot-password-href");
     expect(result).not.toContain('<zl-alert severity="error">An account');
@@ -305,8 +396,8 @@ describe("LiquidJS engine", () => {
     const engine = createLiquidEngine({ locale });
     const context = {
       step: { name: "done", complete: "show", texts: { title_key: "complete.title" } },
-      fields: {},
-      actions: {},
+      fields: [],
+      actions: [],
       branding: {},
       loading: false,
       errors: [],

@@ -46,14 +46,15 @@ func TestFlowDefinitionRepository_CreateAndGet(t *testing.T) {
 	}
 
 	identifier := stepsByName["identifier"]
-	assert.Equal(t, []string{"email"}, identifier.Fields)
+	assert.Equal(t, []domain.Field{"email"}, identifier.Fields)
 	assert.Nil(t, identifier.OnSuccess)
 	assert.Nil(t, identifier.Complete)
 	require.Len(t, identifier.Transitions, 2)
 
-	require.Contains(t, identifier.Actions, "submit")
-	assert.Equal(t, "identifier.submit", identifier.Actions["submit"].TextKey)
-	assert.True(t, identifier.Actions["submit"].Primary)
+	require.Len(t, identifier.Actions, 1)
+	assert.Equal(t, "submit", identifier.Actions[0].Name)
+	assert.Equal(t, "identifier.submit", identifier.Actions[0].TextKey)
+	assert.True(t, identifier.Actions[0].Primary)
 
 	require.Contains(t, identifier.Gates, "bot")
 	bot := identifier.Gates["bot"]
@@ -205,6 +206,60 @@ func TestFlowDefinitionRepository_UpdateStatus(t *testing.T) {
 	assert.Equal(t, domain.FlowDefinitionStatusActive, got.Status)
 }
 
+func TestFlowDefinitionRepository_UpdateFlowDefinition(t *testing.T) {
+	tx, rollback := transactionForRollback(t)
+	defer rollback()
+
+	repo := repository.NewFlowDefinitionRepository(tx)
+	def := sampleFlowDefinition("proj-j1", "flow-j1")
+	require.NoError(t, repo.CreateFlowDefinition(t.Context(), tx, def))
+
+	updated := sampleFlowDefinition("proj-j1", "flow-j1")
+	updated.Name = "Updated Login"
+	updated.SchemaVersion = "1.2.0"
+	updated.Status = domain.FlowDefinitionStatusActive
+	updated.UserSchema = "https://example.com/schemas/updated-user.json"
+	updated.Purposes = map[domain.FlowDefinitionPurpose]string{
+		domain.FlowDefinitionPurposeRegister: "start",
+	}
+	updated.Audience = domain.FlowDefinitionAudience{
+		AppIDs:  []string{"app-2"},
+		TeamIDs: []string{"team-1"},
+	}
+	updated.Steps = []domain.FlowDefinitionStep{
+		{
+			Name:   "start",
+			Fields: []domain.Field{"email"},
+			Actions: []domain.FlowStepAction{
+				{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+			},
+			Transitions: map[string]domain.FlowStepTransition{
+				"submit": {Target: "finish"},
+			},
+		},
+		{
+			Name: "finish",
+		},
+	}
+
+	require.NoError(t, repo.UpdateFlowDefinition(t.Context(), tx, updated))
+
+	got, err := repo.GetFlowDefinition(t.Context(), tx, "proj-j1", "flow-j1")
+	require.NoError(t, err)
+
+	assert.Equal(t, updated.Name, got.Name)
+	assert.Equal(t, updated.SchemaVersion, got.SchemaVersion)
+	assert.Equal(t, updated.Status, got.Status)
+	assert.Equal(t, updated.UserSchema, got.UserSchema)
+	assert.Equal(t, updated.Purposes, got.Purposes)
+	assert.Equal(t, updated.Audience, got.Audience)
+	require.Len(t, got.Steps, 2)
+	assert.Equal(t, "start", got.Steps[0].Name)
+	assert.Equal(t, "finish", got.Steps[1].Name)
+	assert.WithinDuration(t, time.Now(), got.CreatedAt, 5*time.Second)
+	assert.WithinDuration(t, time.Now(), got.UpdatedAt, 5*time.Second)
+}
+
 func TestFlowDefinitionRepository_Delete(t *testing.T) {
 	tx, rollback := transactionForRollback(t)
 	defer rollback()
@@ -257,9 +312,9 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "identifier",
-				Fields: []string{"email"},
-				Actions: map[string]domain.FlowStepAction{
-					"submit": {TextKey: "identifier.submit", Primary: true},
+				Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, TextKey: "identifier.submit", Primary: true},
 				},
 				Gates: map[string]domain.FlowStepGate{
 					"bot": {
@@ -284,7 +339,7 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 			},
 			{
 				Name:        "password",
-				Fields:      []string{"password"},
+				Fields:      []domain.Field{"password"},
 				OnSuccess:   &createUser,
 				Complete:    &completeShow,
 				Transitions: map[string]domain.FlowStepTransition{},

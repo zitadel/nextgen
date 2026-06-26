@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -62,7 +62,7 @@ func importFile(
 		database.WithCondition(userRepo.PrimaryKeyCondition(doc.Header.ProjectID, doc.Header.ID)),
 	)
 	if err == nil {
-		log.Printf("bootstrap user: skipped %q (user %s already exists)", path, doc.Header.ID)
+		slog.Info("bootstrap user: skipped user because they already exists)", slog.String("path", path), slog.String("id", doc.Header.ID))
 		return nil
 	}
 	if !errors.Is(err, new(database.NoRowFoundError)) {
@@ -90,16 +90,17 @@ func importFile(
 		return fmt.Errorf("create user: %w", err)
 	}
 
-	if err := passwordRepo.Create(ctx, pool, &domain.CreateUserPassword{
+	if err := passwordRepo.Set(ctx, pool, &domain.SetUserPassword{
 		ProjectID:      doc.Header.ProjectID,
 		UserID:         doc.Header.ID,
 		EncodedHash:    pw.EncodedHash,
 		ChangeRequired: pw.ChangeRequired,
 	}); err != nil {
-		return fmt.Errorf("create password: %w", err)
+		return fmt.Errorf("set password: %w", err)
 	}
 
-	log.Printf("bootstrap user: loaded %q (user %s)", path, doc.Header.ID)
+	slog.Info("bootstrap user: loaded user", slog.String("path", path), slog.String("id", doc.Header.ID))
+
 	return nil
 }
 

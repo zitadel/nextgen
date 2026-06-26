@@ -1,0 +1,42 @@
+---
+title: Troubleshooting
+description: Common CLI errors and first checks.
+---
+
+## Local server is not running
+
+If setup or doctor reports `E_LOCAL_SERVER_NOT_RUNNING`, start the local runtime:
+
+```sh
+npx @zitadel/cli@alpha start
+```
+
+Then retry setup with `--server local`.
+
+## Port is in use
+
+If the runtime port already has a listener, stop that process, run:
+
+```sh
+npx @zitadel/cli@alpha stop --all
+```
+
+or choose another port:
+
+```sh
+npx @zitadel/cli@alpha start --port 8081
+```
+
+## JSON output looks mixed with installer logs
+
+Capture stdout and stderr separately. The JSON envelope is on stdout; package-manager progress belongs on stderr.
+
+## Browser proof stops at the form
+
+A rendered login or registration form is not enough. Complete registration, logout, login, and signed-in profile verification in a real browser.
+
+## Old localhost passkeys still appear
+
+Browser and OS passkeys for `localhost` can outlive `zitadel reset --force`, deleted app folders, and new local projects. If the passkey picker shows stale local accounts, remove the old `localhost` passkeys from your browser or operating system credential manager.
+
+Password managers can also keep their save or update sheet open after the app redirects to the signed-in profile. An `Update Existing` prompt usually means the manager found an old `localhost` item with the same account label. Update it, save a new item, or delete the stale local passkey before retrying.

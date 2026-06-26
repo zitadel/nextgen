@@ -1,0 +1,439 @@
+//go:build postgres_integration
+
+package integration_test
+
+import (
+	"net/url"
+	"testing"
+
+	"github.com/go-faster/jx"
+	"github.com/stretchr/testify/require"
+	api "github.com/zitadel/nextgen/api/generated"
+	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
+	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/database"
+)
+
+// TestPasswordLoginFlow exercises the example 01 (password-login) JSON
+// definition end-to-end over the real /flow REST API: start flow → submit
+// identifier step → submit password step → assert handoff token.
+//
+// The passkey flows have HTTP e2e coverage (passkey_flow_test.go,
+// registration_flow_test.go); this test gives the password path the same
+// shape so neither the dispatch nor the password challenge can regress
+// behind the unit suite.
+func TestPasswordLoginFlow(t *testing.T) {
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	require.NoError(t, err)
+
+	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
+		ProjectID: project.ID,
+	})
+	require.NoError(t, err)
+
+	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
+	userSchemaURL, err := url.Parse(schemaURL)
+	require.NoError(t, err)
+
+	const (
+		userID    = "pwlogin-user-01"
+		userEmail = "pwlogin@example.com"
+		userPass  = "correct-horse-battery-staple"
+	)
+
+	db := harness.EnsureDBPool(t)
+	emailAttr, err := domain.NewCreateAttribute("email", userEmail, domain.AttributeUniquenessProject)
+	require.NoError(t, err)
+
+	userRepo := harness.EnsureUserRepo(t)
+	require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
+		ProjectID:  project.ID,
+		SchemaURL:  schemaURL,
+		ID:         userID,
+		TeamID:     &team.ID,
+		Attributes: []*domain.CreateAttribute{emailAttr},
+	}))
+
+	hasher := harness.EnsureHasher(t)
+	encodedHash, err := hasher.Hash(userPass)
+	require.NoError(t, err)
+
+	passwordRepo := harness.EnsureUserPasswordRepo(t)
+	require.NoError(t, passwordRepo.Set(t.Context(), db, &domain.SetUserPassword{
+		ProjectID:   project.ID,
+		UserID:      userID,
+		EncodedHash: encodedHash,
+	}))
+
+	server := harness.EnsureTestServer(t)
+	client, err := helpers.NewApiClient(server.URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
+
+	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+		ProjectID:      api.ProjectID(project.ID),
+		FlowDefinition: passwordLoginFlowDefinition(*userSchemaURL),
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %+v", defResp)
+
+	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
+		ProjectID: api.ProjectID(project.ID),
+		Purpose:   api.CreateFlowRequestPurposeLogin,
+	})
+	require.NoError(t, err)
+	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
+	require.True(t, ok, "expected FlowResponseHeaders, got %T", createResp)
+
+	flowID := flowHeaders.Response.ID
+	require.Equal(t, "identifier", flowHeaders.Response.Step.Name)
+	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
+
+	// Step 1: submit identifier → password step.
+	idResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
+		Action: "submit",
+		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
+			"email": jx.Raw(`"` + userEmail + `"`),
+		}),
+	}, api.SubmitFlowStepParams{
+		ID:    flowID,
+		Zflow: zflow,
+	})
+	require.NoError(t, err)
+	idOK, ok := idResp.(*api.SubmitFlowStepOK)
+	require.True(t, ok, "expected SubmitFlowStepOK on identifier, got %T: %+v", idResp, idResp)
+	require.Equal(t, "password", idOK.Response.Step.Name)
+	zflow = mustExtractZflow(t, idOK.SetCookie.Value)
+
+	// Step 2: submit password → done + handoff token.
+	pwResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
+		Action: "submit",
+		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
+			"x-auth-methods#password": jx.Raw(`"` + userPass + `"`),
+		}),
+	}, api.SubmitFlowStepParams{
+		ID:    flowID,
+		Zflow: zflow,
+	})
+	require.NoError(t, err)
+	pwOK, ok := pwResp.(*api.SubmitFlowStepOK)
+	require.True(t, ok, "expected SubmitFlowStepOK on password, got %T: %+v", pwResp, pwResp)
+	require.Equal(t, "done", pwOK.Response.Step.Name)
+	require.True(t, pwOK.Response.Step.Complete.Set, "expected terminal step")
+
+	handoffToken, hasToken := pwOK.Response.HandoffToken.Get()
+	require.True(t, hasToken, "expected handoff token after successful password login")
+	require.NotEmpty(t, handoffToken)
+}
+
+// TestPasswordLoginFlow_UnknownEmail confirms an unknown identifier routes to
+// the `user_not_found` outcome without ever attempting password verification.
+func TestPasswordLoginFlow_UnknownEmail(t *testing.T) {
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	require.NoError(t, err)
+
+	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
+	userSchemaURL, err := url.Parse(schemaURL)
+	require.NoError(t, err)
+
+	server := harness.EnsureTestServer(t)
+	client, err := helpers.NewApiClient(server.URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
+
+	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+		ProjectID:      api.ProjectID(project.ID),
+		FlowDefinition: passwordLoginFlowWithNotFoundFlowDefinition(*userSchemaURL),
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %+v", defResp)
+
+	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
+		ProjectID: api.ProjectID(project.ID),
+		Purpose:   api.CreateFlowRequestPurposeLogin,
+	})
+	require.NoError(t, err)
+	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
+	require.True(t, ok, "expected FlowResponseHeaders, got %T", createResp)
+	flowID := flowHeaders.Response.ID
+	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
+
+	idResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
+		Action: "submit",
+		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
+			"email": jx.Raw(`"ghost-pwlogin@example.com"`),
+		}),
+	}, api.SubmitFlowStepParams{
+		ID:    flowID,
+		Zflow: zflow,
+	})
+	require.NoError(t, err)
+	idOK, ok := idResp.(*api.SubmitFlowStepOK)
+	require.True(t, ok, "expected SubmitFlowStepOK on identifier, got %T: %+v", idResp, idResp)
+	require.Equal(t, "not_found", idOK.Response.Step.Name, "user_not_found must route to not_found terminal")
+	require.True(t, idOK.Response.Step.Complete.Set, "expected terminal step")
+
+	_, hasToken := idOK.Response.HandoffToken.Get()
+	require.False(t, hasToken, "informational terminal must not issue a handoff token")
+}
+
+// TestPasswordRegisterFlow exercises example 02 (password-register): a single
+// signup step collecting email+password with on_success: create_user. Verifies
+// the user + password row land in the database and a handoff token is issued
+// so the new user is auto-signed-in.
+func TestPasswordRegisterFlow(t *testing.T) {
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	require.NoError(t, err)
+
+	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
+	userSchemaURL, err := url.Parse(schemaURL)
+	require.NoError(t, err)
+
+	server := harness.EnsureTestServer(t)
+	client, err := helpers.NewApiClient(server.URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
+
+	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+		ProjectID:      api.ProjectID(project.ID),
+		FlowDefinition: passwordRegisterFlowDefinition(*userSchemaURL),
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %+v", defResp)
+
+	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
+		ProjectID: api.ProjectID(project.ID),
+		Purpose:   api.CreateFlowRequestPurposeRegister,
+	})
+	require.NoError(t, err)
+	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
+	require.True(t, ok, "expected FlowResponseHeaders, got %T", createResp)
+	flowID := flowHeaders.Response.ID
+	require.Equal(t, "signup", flowHeaders.Response.Step.Name)
+	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
+
+	const (
+		newEmail = "pwregister@example.com"
+		newPass  = "super-secret-password-1"
+	)
+
+	submitResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
+		Action: "submit",
+		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
+			"email":                   jx.Raw(`"` + newEmail + `"`),
+			"x-auth-methods#password": jx.Raw(`"` + newPass + `"`),
+		}),
+	}, api.SubmitFlowStepParams{
+		ID:    flowID,
+		Zflow: zflow,
+	})
+	require.NoError(t, err)
+	submitOK, ok := submitResp.(*api.SubmitFlowStepOK)
+	require.True(t, ok, "expected SubmitFlowStepOK, got %T: %+v", submitResp, submitResp)
+	require.Equal(t, "done", submitOK.Response.Step.Name)
+	require.True(t, submitOK.Response.Step.Complete.Set, "expected terminal step")
+
+	handoffToken, hasToken := submitOK.Response.HandoffToken.Get()
+	require.True(t, hasToken, "create_user must issue handoff token on terminal")
+	require.NotEmpty(t, handoffToken)
+
+	// User row exists with the submitted email.
+	db := harness.EnsureDBPool(t)
+	userRepo := harness.EnsureUserRepo(t)
+	user, err := userRepo.Get(t.Context(), db,
+		database.WithCondition(database.And(
+			userRepo.ProjectIDCondition(project.ID),
+			userRepo.AttributesCondition([]domain.Attribute{{Key: "email", Value: newEmail}}),
+		)),
+	)
+	require.NoError(t, err, "create_user must persist exactly one user")
+
+	// Password hash exists for that user and verifies the submitted password.
+	passwordRepo := harness.EnsureUserPasswordRepo(t)
+	pw, err := passwordRepo.GetByUserID(t.Context(), db, project.ID, user.ID)
+	require.NoError(t, err)
+	require.NotEmpty(t, pw.EncodedHash)
+	require.NoError(t, pw.Verify(newPass, harness.EnsureHashVerifier(t)))
+}
+
+// TestPasswordRegisterFlow_DuplicateEmail confirms a second registration with
+// the same email surfaces user_already_exists via the create_user writer
+// (UniqueError → StepError handled by the flow engine).
+func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	require.NoError(t, err)
+
+	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
+	userSchemaURL, err := url.Parse(schemaURL)
+	require.NoError(t, err)
+
+	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
+		ProjectID: project.ID,
+	})
+	require.NoError(t, err)
+
+	// Pre-seed a user with the email we'll try to register.
+	const conflictEmail = "pwregister-conflict@example.com"
+	emailAttr, err := domain.NewCreateAttribute("email", conflictEmail, domain.AttributeUniquenessProject)
+	require.NoError(t, err)
+	require.NoError(t, harness.EnsureUserRepo(t).Create(t.Context(), harness.EnsureDBPool(t), &domain.CreateUser{
+		ProjectID:  project.ID,
+		SchemaURL:  schemaURL,
+		ID:         "pwregister-conflict-seed",
+		TeamID:     &team.ID,
+		Attributes: []*domain.CreateAttribute{emailAttr},
+	}))
+
+	server := harness.EnsureTestServer(t)
+	client, err := helpers.NewApiClient(server.URL)
+	require.NoError(t, err)
+	client.SetToken(project.ProjectSecret)
+
+	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
+		ProjectID:      api.ProjectID(project.ID),
+		FlowDefinition: passwordRegisterFlowDefinition(*userSchemaURL),
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp)
+
+	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
+		ProjectID: api.ProjectID(project.ID),
+		Purpose:   api.CreateFlowRequestPurposeRegister,
+	})
+	require.NoError(t, err)
+	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
+	require.True(t, ok)
+	flowID := flowHeaders.Response.ID
+	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
+
+	submitResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
+		Action: "submit",
+		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
+			"email":                   jx.Raw(`"` + conflictEmail + `"`),
+			"x-auth-methods#password": jx.Raw(`"some-strong-password"`),
+		}),
+	}, api.SubmitFlowStepParams{
+		ID:    flowID,
+		Zflow: zflow,
+	})
+	require.NoError(t, err)
+	// Without a user_already_exists transition the engine surfaces the error
+	// on the same step and the HTTP layer maps it to 400.
+	badResp, ok := submitResp.(*api.SubmitFlowStepBadRequest)
+	require.True(t, ok, "expected SubmitFlowStepBadRequest, got %T: %+v", submitResp, submitResp)
+	require.Equal(t, "signup", badResp.Response.Step.Name, "duplicate email must keep flow on signup step")
+	errVal, errSet := badResp.Response.Step.Error.Get()
+	require.True(t, errSet, "expected an error on the step")
+	require.Equal(t, "user_already_exists", errVal)
+	require.False(t, badResp.Response.Step.Complete.Set, "expected non-terminal step")
+	_, hasToken := badResp.Response.HandoffToken.Get()
+	require.False(t, hasToken, "no handoff token on rejected registration")
+}
+
+// passwordLoginFlowDefinition mirrors examples/01-password-login.
+func passwordLoginFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
+	return api.FlowDefinition{
+		Name:       "password-login",
+		Status:     "active",
+		UserSchema: userSchemaURL,
+		Purposes:   api.FlowDefinitionPurposes{"login": "identifier"},
+		Steps: []api.FlowDefinitionStep{
+			{
+				Name:   "identifier",
+				Fields: []string{"email"},
+				Actions: []api.StepAction{
+					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
+				},
+				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
+					"submit": api.FlowDefinitionStepTransitionsItem{Target: "password"},
+				}),
+			},
+			{
+				Name:   "password",
+				Fields: []string{"x-auth-methods#password"},
+				Actions: []api.StepAction{
+					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
+				},
+				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
+					"submit": api.FlowDefinitionStepTransitionsItem{Target: "done"},
+				}),
+			},
+			{
+				Name:     "done",
+				Complete: api.NewOptFlowDefinitionStepComplete(api.FlowDefinitionStepCompleteShow),
+			},
+		},
+	}
+}
+
+// passwordRegisterFlowDefinition mirrors examples/02-password-register.
+func passwordRegisterFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
+	createUser := api.FlowDefinitionStepOnSuccessCreateUser
+	return api.FlowDefinition{
+		Name:       "password-register",
+		UserSchema: userSchemaURL,
+		Status:     "active",
+		Purposes:   api.FlowDefinitionPurposes{"register": "signup"},
+		Steps: []api.FlowDefinitionStep{
+			{
+				Name:      "signup",
+				Fields:    []string{"email", "x-auth-methods#password"},
+				OnSuccess: api.NewOptFlowDefinitionStepOnSuccess(createUser),
+				Actions: []api.StepAction{
+					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
+				},
+				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
+					"submit": api.FlowDefinitionStepTransitionsItem{Target: "done"},
+				}),
+			},
+			{
+				Name:     "done",
+				Complete: api.NewOptFlowDefinitionStepComplete(api.FlowDefinitionStepCompleteShow),
+			},
+		},
+	}
+}
+
+// passwordLoginFlowWithNotFoundFlowDefinition adds a user_not_found outcome
+// pointing to a `not_found` terminal so the unknown-email path is observable.
+func passwordLoginFlowWithNotFoundFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
+	return api.FlowDefinition{
+		Name:       "password-login-with-not-found",
+		UserSchema: userSchemaURL,
+		Status:     "active",
+		Purposes:   api.FlowDefinitionPurposes{"login": "identifier"},
+		Steps: []api.FlowDefinitionStep{
+			{
+				Name:   "identifier",
+				Fields: []string{"email"},
+				Actions: []api.StepAction{
+					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
+				},
+				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
+					"submit":         api.FlowDefinitionStepTransitionsItem{Target: "password"},
+					"user_not_found": api.FlowDefinitionStepTransitionsItem{Target: "not_found"},
+				}),
+			},
+			{
+				Name:   "password",
+				Fields: []string{"x-auth-methods#password"},
+				Actions: []api.StepAction{
+					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
+				},
+				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
+					"submit": api.FlowDefinitionStepTransitionsItem{Target: "done"},
+				}),
+			},
+			{
+				Name:     "done",
+				Complete: api.NewOptFlowDefinitionStepComplete(api.FlowDefinitionStepCompleteShow),
+			},
+			{
+				Name:     "not_found",
+				Complete: api.NewOptFlowDefinitionStepComplete(api.FlowDefinitionStepCompleteShow),
+			},
+		},
+	}
+}

@@ -19,8 +19,9 @@ export const it: Locale = {
   "identifier.description": "Inserisci la tua e-mail per continuare",
   "identifier.field.email": "E-mail aziendale",
   "identifier.field.email.placeholder": "tu@azienda.com",
-  "identifier.action.submit": "Continua",
-  "identifier.action.continue": "Continua",
+  "identifier.field.password": "Password",
+  "identifier.action.submit": "Accedi",
+  "identifier.action.continue": "Accedi",
   "identifier.action.passkey": "Accedi con passkey",
   "identifier.action.register.lead": "Non hai un account? ",
   "identifier.action.register.link": "Registrati",
@@ -49,8 +50,6 @@ export const it: Locale = {
   "collect-credentials.field.email": "E-mail aziendale",
   "collect-credentials.field.email.placeholder": "tu@azienda.com",
   "collect-credentials.field.password": "Password",
-  "collect-credentials.field.password.help":
-    "Almeno 8 caratteri, incluso un simbolo e un numero.",
   "collect-credentials.action.submit": "Registrati",
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -60,8 +59,6 @@ export const it: Locale = {
   "register-password.title": "Crea la tua password",
   "register-password.description": "Scegli una password sicura per il tuo account",
   "register-password.field.password": "Password",
-  "register-password.field.password.help":
-    "Almeno 8 caratteri, incluso un simbolo e un numero.",
   "register-password.action.submit": "Registrati",
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -109,14 +106,21 @@ export const it: Locale = {
   "password.action.register.link": "Registrati",
 
   "register.title": "Crea il tuo account",
-  "register.description": "Inserisci la tua e-mail per iniziare",
+  // Vuoto per design — la scheda di registrazione non ha sottotitolo (Figma 6593:141743).
+  "register.description": "",
   "register.field.email": "E-mail aziendale",
   "register.field.email.placeholder": "tu@azienda.com",
   "register.field.password": "Password",
-  "register.field.password.help":
-    "Almeno 8 caratteri, incluso un simbolo e un numero.",
+  "register.field.givenName": "Nome",
+  "register.field.familyName": "Cognome",
+  // L'<input type="date"> nativo localizza il proprio formato di visualizzazione in base
+  // alla lingua dell'utente e invia ISO YYYY-MM-DD — nessun segnaposto/suggerimento di formato necessario.
+  "register.field.dateOfBirth": "Data di nascita",
+  "register.field.country": "Paese",
+  "register.field.country.placeholder": "Seleziona il tuo paese",
+  "register.field.terms": "Accetto i termini di servizio",
   "register.action.password": "Continua con password",
-  "register.action.passkey": "Registrati con passkey",
+  "register.action.passkey": "Continua con passkey",
   "register.action.submit": "Registrati",
   "register.action.sign_in.lead": "Hai già un account? ",
   "register.action.sign_in.link": "Accedi",

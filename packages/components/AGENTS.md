@@ -16,12 +16,14 @@ no transport abstraction, no wire-vs-internal type split, and no shadow
 types — the orchestrator stores the orval `CreateFlow201` shape directly
 and the Liquid renderer reads it through the `LiquidContext` projection.
 
-Tests intercept at the network layer with MSW. The dev playground and the
-unit tests both source their handlers from `@zitadel/api-mock`
-(`setupMock(worker)` for the browser, `setupMockHandlers()` for
-`msw/node`). Configure the API base URL with `setProxyPath()` from
-`@zitadel/api/runtime/base-url`, or via the `api-base` attribute
-on `<zitadel-login>` for declarative setups.
+Tests intercept at the network layer with MSW. The unit tests and the
+Storybook orchestrator stories both source their handlers from
+`@zitadel/api-mock` (`setupMockHandlers()` for `msw/node`; the same handlers
+via `msw-storybook-addon` in [`apps/storybook`](../../apps/storybook/README.md)).
+Configure the SDK with `configureZitadel({ projectId, proxyPath })`
+from `@zitadel/api/config`; the element reads the global handle via
+`getZitadelConfig()`, or you can assign the returned handle to the element's
+`project` property. There is no `api-base` attribute.
 
 ## Type boundaries
 
@@ -95,10 +97,12 @@ in the allowlist is silently stripped.
 
 ### Tokens, not magic values
 
-Atom styles must consume design tokens through the `cssVar(...)` helper
-(`src/tokens/css-var.ts`). New tokens go in `src/tokens/catalogue.ts`. The
-orchestrator maps `branding` tokens to CSS variables on its own shadow root —
-do not reach for inline styles in atoms.
+Atom styles must consume design tokens through the `t` helper
+(`src/styles/tokens.ts`), which wraps the `@zitadel/design-tokens` `cssVars`
+tree as Lit `CSSResult` values (e.g. `t.color.surface.defaultWhite`). Tokens
+themselves are owned by the `@zitadel/design-tokens` package — add new ones
+there, not here. The orchestrator maps `branding` tokens to CSS variables on
+its own shadow root — do not reach for inline styles in atoms.
 
 ### Comments
 
@@ -118,45 +122,71 @@ Always cover form-associated behaviour, focus delegation, and Enter-to-submit
 in the browser project. Anything markup-only (aria attributes, classes, slot
 projection) belongs in the unit project for speed.
 
+### The `browser` project "hangs" — it doesn't, it's cold-start
+
+The browser project launches real headless Chromium via Playwright **and**
+resolves the whole workspace from source (`resolve.conditions:
+["@zitadel/source"]`). On a cold run Vite pre-bundles a large graph (`lit`, the
+generated `@zitadel/api` client, `dompurify`, `liquidjs`) **before the first
+test**: that warm-up is 60–120s+ and variable, while the tests themselves run in
+~1s. With a warm `node_modules/.vite` cache the same run finishes in seconds. It
+is intentionally `runInCI: false` in `moon.yml` — a heavy, opt-in local check,
+not part of the default loop (`moon ci :lint :typecheck :build :test` runs only
+the jsdom `unit` project).
+
+What actually makes it look stuck, and how to avoid it:
+
+- **Don't pipe through `tail`** (or any buffering filter). It withholds all
+  output until EOF, so the entire warm-up looks frozen. Let it stream.
+- **Don't kill a run mid-flight and immediately retry.** An interrupted run
+  leaves a zombie Chromium + Vite dev server holding the port; the next run logs
+  `Port 63315 is in use, trying another one...` and stalls retrying. If you did
+  interrupt one, clear it first:
+
+  ```sh
+  pkill -f vitest; pkill -f chrome-headless-shell
+  ```
+
+- **Run it directly and patiently**, expecting a slow first run then fast reruns:
+
+  ```sh
+  corepack pnpm --filter @zitadel/components test:browser   # or: moon run components:test-browser
+  ```
+
+- For a single file: `corepack pnpm --filter @zitadel/components exec vitest run --project browser <name>`.
+
+`vitest run` exits non-zero on any failure, so a `0` exit is authoritative even
+when the non-TTY summary line doesn't flush to a redirected log.
+
 When a test needs the Flow API, prefer `setupMockHandlers()` from
 `@zitadel/api-mock` over hand-rolled handlers — it walks the same
-xstate machine the dev playground uses, so step fixtures and step routing
-stay consistent.
+xstate machine the Storybook orchestrator stories use, so step fixtures and
+step routing stay consistent.
 
 The full sign-in handover (terminal step → session exchange → real
 `Set-Cookie` on the demo origin → full-page navigation to a protected
 route) is covered end-to-end in `apps/demo-next-e2e/` and
-`apps/demo-nuxt-e2e/`, not here. The exchange URL is controlled by
-`session-exchange-path` on `<zitadel-login>`: the default
-`/sessions/exchange` is prefixed with `api-base`; any other path is
-resolved from `location.origin` so SPAs can rewrite exchange separately
-from the flow API. Unit coverage lives in `api-client.spec.ts` and
-`zitadel-login.spec.ts`. When a change touches `maybeCompleteFlow`,
-`sessionExchangePath`, or the `postSignInUrl` path, run **both** e2e projects — they exercise
-different SDK middlewares against the same orchestrator code, which is
-how a regression in one framework slips past the other.
+`apps/demo-nuxt-e2e/`, not here. The terminal `handoff_token` is exchanged
+through the generated `exchangeSession` wrapper in `api-client.ts` (which
+hits the SDK proxy path); there is no `session-exchange-path` attribute. Unit
+coverage lives in `api-client.spec.ts` and `zitadel-login.spec.ts`. When a
+change touches `maybeCompleteFlow` or the `postSignInUrl` path, run **both**
+e2e projects — they exercise different SDK middlewares against the same
+orchestrator code, which is how a regression in one framework slips past the
+other.
 
 When iterating against a long-running demo dev server, remember the demo
-loads this package's built `dist/` (not source). The Nx `e2e` target has
-`dependsOn: ["^build"]` so CI is safe; manual loops need a fresh
-`nx build @zitadel/components` after orchestrator changes.
+loads this package's built `dist/` (not source). The Moon e2e tasks depend on
+the relevant build tasks so CI is safe; manual loops need a fresh
+`moon run components:build` after orchestrator changes.
 
-### Lit dev playground (`:5173`) and caching
+### Workbench
 
-Atom `.ts` hot reload uses [`vite-plugin-web-components-hmr`](https://github.com/fi3ework/vite-plugin-web-components-hmr)
-(Open WC–derived Lit preset) on `src/**/*.ts` only. `dev/pages/*.ts` is plain
-`innerHTML` — `dev/main.ts` accepts those modules and calls `mountRoute()` again;
-`dev/playground-chrome.css` and sibling-package CSS trigger a full reload via
-`vite/lit-dev-hmr.ts` (`workspaceStylesFullReload`).
-
-If the playground still looks stale after save:
-
-```sh
-corepack pnpm --filter @zitadel/components dev:clean
-```
-
-Then hard-refresh the browser. `apps/console` (`:5174`) does not pick up Lit-only
-source edits — use `:5173` for atom work.
+The interactive workbench is [`apps/storybook`](../../apps/storybook/README.md)
+(`moon run storybook:dev`, `:6006`): the Lit atoms, the paired React
+components, and the `<zitadel-login>` orchestrator (MSW via
+`msw-storybook-addon`). It loads the built `dist/`, so rebuild after source
+changes (`moon run components:build`) — the Storybook tasks depend on it.
 
 ## Build
 

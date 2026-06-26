@@ -2,8 +2,11 @@ package domain
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
+	"github.com/ianlancetaylor/jsonschema"
+	"github.com/zitadel/nextgen/internal/maputil"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -54,13 +57,35 @@ type CreateUser struct {
 	Attributes []*CreateAttribute
 }
 
-func NewCreateUser(projectID string, teamID *string, schemaURL string, attributes map[string]any, schema map[string]any) (*CreateUser, error) {
+func NewCreateUser(projectID string, teamID *string, schemabs []byte, muser map[string]any) (*CreateUser, error) {
+	schemaURL, err := SchemaFromUserMap(muser)
+	if err != nil {
+		return nil, err
+	}
+
+	var jschema jsonschema.Schema
+	err = json.Unmarshal(schemabs, &jschema)
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to unmarshal json schema")
+	}
+
+	err = jschema.Validate(muser)
+	if err != nil {
+		return nil, ErrUserInvalid().WithParent(err).WithMessage("user is not valid according to schema")
+	}
+
+	var mschema map[string]any
+	err = json.Unmarshal(schemabs, &mschema)
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to unmarshal schema map")
+	}
+
 	id, err := newID(PrefixUser)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to create user id")
 	}
 
-	attrs, err := FlattenMapToCreateAttributes(attributes, schema, "")
+	attrs, err := FlattenMapToCreateAttributes(muser, mschema, "")
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to flatten user attributes")
 	}
@@ -73,6 +98,17 @@ func NewCreateUser(projectID string, teamID *string, schemaURL string, attribute
 		Attributes: attrs,
 	}, nil
 }
+
+func SchemaFromUserMap(user map[string]any) (string, error) {
+	schemaURL, ok := maputil.Get[string](user, "$schema")
+	if !ok {
+		return "", ErrUserInvalid().
+			WithDetails("No $schema provided for the user. A schema must be provided when creating a new user. Against this schema, the user will be validated")
+	}
+	return schemaURL, nil
+}
+
+//go:generate go tool mockgen -typed -package domainmock -destination ./mock/user.mock.go . UserRepository
 
 type UserRepository interface {
 	Repository

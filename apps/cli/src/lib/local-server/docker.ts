@@ -142,18 +142,19 @@ export async function inspectContainer(containerName: string): Promise<{
   exists: boolean;
   running: boolean;
   id?: string;
+  image?: string;
 }> {
   const result = await runDocker([
     "inspect",
     "--format",
-    "{{.Id}} {{.State.Running}}",
+    "{{.Id}} {{.State.Running}} {{.Config.Image}}",
     containerName,
   ]);
   if (result.status !== 0) {
     return { exists: false, running: false };
   }
-  const [id, running] = result.stdout.trim().split(/\s+/);
-  return { exists: true, running: running === "true", id };
+  const [id, running, ...imageParts] = result.stdout.trim().split(/\s+/);
+  return { exists: true, running: running === "true", id, image: imageParts.join(" ") };
 }
 
 export async function startContainer(spec: DockerRunSpec): Promise<string> {
@@ -204,6 +205,7 @@ export function metadataFromStart(input: {
 }): RuntimeMetadata {
   return {
     schema_version: 1,
+    backend: "docker",
     container_name: input.containerName,
     container_id: input.containerId,
     image: input.image,

@@ -10,7 +10,7 @@ post:
     The schema can either be a concrete schema, e.g. a user schema, or a 
     schema-url which will be resolved by the server.
   tags:
-    - Schema
+    - Schemas
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
     - $ref: ../../components/parameters/team-id.yaml
@@ -41,7 +41,7 @@ post:
             externalValue: examples/schema-url-example.yaml
           defaultHumanUserSchema:
             summary: The default human user schema provided by the server.
-            externalValue: examples/default-human-user-schema-example.json
+            externalValue: examples/default-human-user-schema.json
   responses:
     '201':
       description: The schema was created successfully

@@ -1,5 +1,7 @@
 get:
   operationId: getLive
+  tags:
+    - System
   summary: Check server liveness
   description: Check whether the server is started
   security: []

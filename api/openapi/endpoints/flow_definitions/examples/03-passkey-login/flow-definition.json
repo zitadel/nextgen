@@ -1,0 +1,34 @@
+{
+  "project_id": "${PROJECT_ID}",
+  "schema_uri": "https://nextgen.com/flow-definition.json",
+  "flow_definition": {
+    "name": "passkey-login",
+    "status": "active",
+    "user_schema": "${USER_SCHEMA_URL}",
+    "purposes": {
+      "login": "signin"
+    },
+    "steps": [
+      {
+        "name": "signin",
+        "fields": ["email"],
+        "actions": [
+          {
+            "name": "passkey",
+            "kind": "passkey",
+            "primary": true
+          }
+        ],
+        "transitions": {
+          "passkey": {
+            "target": "done"
+          }
+        }
+      },
+      {
+        "name": "done",
+        "complete": "show"
+      }
+    ]
+  }
+}

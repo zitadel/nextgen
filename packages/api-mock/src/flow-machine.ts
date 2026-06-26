@@ -10,15 +10,20 @@
  * State graph:
  *
  *   idle --START(login)----> identifier (email+password, Figma 6593:141985)
- *                                       --SUBMIT(submit)--> passkey-upsell
+ *                                       --SUBMIT(submit)--> done
  *                                       --SUBMIT(recover)--> recover --SUBMIT--> identifier
  *                                       --SUBMIT(register)--> register
  *                                       --SUBMIT(passkey)--> passkey-login
  *                                       --SUBMIT(sso_provider_id)--> sso-redirect
- *      \--START(register)--> register --SUBMIT--> passkey-upsell
+ *      \--START(register)--> register --SUBMIT--> register-password --SUBMIT--> done
+ *                                     --SUBMIT(sign_in)--> identifier
  *
  *   password -- legacy split step; not reachable from any START transition;
  *               kept so tests can target it directly via actor injection
+ *   passkey-upsell / passkey-setup -- legacy upsell pair; the default flow no
+ *               longer routes through them (passkey registration is offered
+ *               up front instead). Kept so tests can target them directly
+ *               via actor injection.
  *   passkey-upsell --SUBMIT(skip)--> done
  *   passkey-upsell --SUBMIT(*)----> passkey-setup --SUBMIT--> done
  *   passkey-login --SUBMIT--> done
@@ -32,6 +37,7 @@ import { createMachine, type Actor, assign, createActor } from "xstate";
 export type FlowStepName =
   | "identifier"
   | "register"
+  | "register-password"
   | "password"
   | "recover"
   | "passkey-upsell"
@@ -138,7 +144,7 @@ export const flowMachine = createMachine({
             actions: [captureFields, rotateToken],
           },
           {
-            target: "passkey-upsell",
+            target: "done",
             actions: [captureFields, rotateToken],
           },
         ],
@@ -148,11 +154,26 @@ export const flowMachine = createMachine({
       on: {
         SUBMIT: [
           {
-            guard: ({ event }) => event.action === "back",
+            guard: ({ event }) => event.action === "sign_in",
             target: "identifier",
+            actions: [captureFields, rotateToken],
+          },
+          {
+            target: "register-password",
+            actions: [captureFields, rotateToken],
+          },
+        ],
+      },
+    },
+    "register-password": {
+      on: {
+        SUBMIT: [
+          {
+            guard: ({ event }) => event.action === "back",
+            target: "register",
             actions: [rotateToken],
           },
-          { target: "passkey-upsell", actions: [captureFields, rotateToken] },
+          { target: "done", actions: [captureFields, rotateToken] },
         ],
       },
     },

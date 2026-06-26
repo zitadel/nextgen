@@ -19,10 +19,6 @@ import { readZitadelSecret } from "../lib/project";
  */
 export default class Apply extends BaseCommand {
   static override description = "Validate and upload repo config to the platform.";
-  // Temporarily hidden while we collapse the dev workflow around `setup`'s
-  // auto-apply. The logic stays wired up so re-exposing this command is a
-  // one-line flip when we settle on the surface area.
-  static override hidden = true;
   static override flags = {
     environment: Flags.string({
       char: "e",
@@ -55,6 +51,12 @@ export default class Apply extends BaseCommand {
     consola.start("Building plan (dry run)");
     const plan = await buildSyncPlan(cwd, syncers, true);
     const summary = summarizePlan(plan);
+    this.recordTelemetry({
+      creates: summary.creates,
+      updates: summary.updates,
+      deletes: summary.deletes,
+      total: summary.total,
+    });
     consola.success(
       `Plan: ${summary.creates} create${summary.creates === 1 ? "" : "s"}, ` +
         `${summary.updates} update${summary.updates === 1 ? "" : "s"}, ` +

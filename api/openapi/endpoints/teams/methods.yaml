@@ -2,7 +2,7 @@ post:
   operationId: createTeam
   summary: Create team
   tags:
-    - Team
+    - Teams
   security: []
   parameters:
     - $ref: ../../components/parameters/project-id.yaml

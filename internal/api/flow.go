@@ -306,7 +306,12 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
 	out := api.FlowStepChallenge{}
 	if c.Method != "" {
-		out.Method = api.NewOptFlowStepChallengeMethod(api.FlowStepChallengeMethodPasskey)
+		switch c.Method {
+		case domain.FlowChallengeMethodPasskeyRegister:
+			out.Method = api.NewOptFlowStepChallengeMethod(api.FlowStepChallengeMethodPasskeyRegister)
+		default:
+			out.Method = api.NewOptFlowStepChallengeMethod(api.FlowStepChallengeMethodPasskey)
+		}
 	}
 	if c.ChallengeID != "" {
 		out.ChallengeID = api.NewOptString(c.ChallengeID)
@@ -359,16 +364,17 @@ func toStepTexts(t domain.FlowStepTexts) api.StepTexts {
 	return out
 }
 
-func toFlowStepFields(fields map[string]domain.FlowField) api.FlowStepFields {
-	out := make(api.FlowStepFields, len(fields))
-	for name, f := range fields {
-		out[name] = toFlowField(f)
+func toFlowStepFields(fields []domain.FlowField) []api.Field {
+	out := make([]api.Field, len(fields))
+	for i, f := range fields {
+		out[i] = toFlowField(f)
 	}
 	return out
 }
 
 func toFlowField(f domain.FlowField) api.Field {
 	out := api.Field{
+		Name:     f.Name,
 		Type:     api.FieldType(f.Type),
 		TextKey:  f.TextKey,
 		Required: api.NewOptBool(f.Required),
@@ -407,16 +413,21 @@ func toFlowFieldValidation(v *domain.FlowFieldValidation) *api.FieldValidation {
 	if v.MaxLength > 0 {
 		out.MaxLength = api.NewOptInt(v.MaxLength)
 	}
-	if !out.Format.Set && !out.MinLength.Set && !out.MaxLength.Set {
+	if len(v.Enum) > 0 {
+		out.Enum = v.Enum
+	}
+	if !out.Format.Set && !out.MinLength.Set && !out.MaxLength.Set && len(out.Enum) == 0 {
 		return nil
 	}
 	return &out
 }
 
-func toFlowStepActions(actions map[string]domain.FlowAction) api.FlowStepActions {
-	out := make(api.FlowStepActions, len(actions))
-	for name, a := range actions {
-		out[name] = api.StepAction{
+func toFlowStepActions(actions []domain.FlowAction) []api.StepAction {
+	out := make([]api.StepAction, len(actions))
+	for i, a := range actions {
+		out[i] = api.StepAction{
+			Name:    a.Name,
+			Kind:    api.StepActionKind(a.Kind.String()),
 			TextKey: api.NewOptString(a.TextKey),
 			Primary: api.NewOptBool(a.Primary),
 		}
@@ -525,6 +536,7 @@ var (
 	codeMissingFlowDefinitionID       = domain.ErrMissingFlowDefinitionID().Code
 	codeMissingProjectID              = domain.ErrMissingProjectID().Code
 	codeFlowDefinitionAlreadyExists   = domain.ErrFlowDefinitionAlreadyExists().Code
+	codeFlowDefinitionUpdateConflict  = domain.ErrFlowDefinitionUpdateConflict(nil).Code
 )
 
 func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
@@ -536,26 +548,31 @@ func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		codeMissingProjectID:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case codeFlowDefinitionInvalid:
-		errResp := errorResponseWithStatusCode(http.StatusBadRequest, err)
-		if err.Details != nil {
-			if details, ok := err.Details.(string); ok {
-				b, marshalErr := json.Marshal(details)
-				if marshalErr == nil {
-					errResp.Response.Details = api.OptErrorDetailsDetails{
-						Value: api.ErrorDetailsDetails{
-							"details": b,
-						},
-						Set: true,
-					}
-				}
-			}
-		}
-		return errResp
-	case codeFlowDefinitionAlreadyExists:
-		return errorResponseWithStatusCode(http.StatusConflict, err)
+		return errorResponseWithDetails(err, http.StatusBadRequest)
+	case codeFlowDefinitionAlreadyExists, codeFlowDefinitionUpdateConflict:
+		return errorResponseWithDetails(err, http.StatusConflict)
 	default:
 		return internalErrorResponse(err)
 	}
+}
+
+func errorResponseWithDetails(err domain.Error, statusCode int) *api.ErrorDetailsStatusCode {
+	errResp := errorResponseWithStatusCode(statusCode, err)
+	if err.Details == nil {
+		return errResp
+	}
+	if details, ok := err.Details.(string); ok {
+		b, marshalErr := json.Marshal(details)
+		if marshalErr == nil {
+			errResp.Response.Details = api.OptErrorDetailsDetails{
+				Value: api.ErrorDetailsDetails{
+					"details": b,
+				},
+				Set: true,
+			}
+		}
+	}
+	return errResp
 }
 
 func parseURI(s string) (url.URL, error) {

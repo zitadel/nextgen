@@ -1,0 +1,42 @@
+id: "login-ui"
+language: "typescript"
+layer: "application"
+stack: "frontend"
+dependsOn:
+  - "components"
+  - "design-tokens"
+
+tasks:
+  lint:
+    command: "corepack pnpm exec oxlint ."
+    deps:
+      - "components:build"
+      - "design-tokens:build"
+
+  typecheck:
+    command: "corepack pnpm run typecheck"
+    deps:
+      - "components:build"
+      - "design-tokens:build"
+
+  build:
+    command: "corepack pnpm run build"
+    deps:
+      - "components:build"
+      - "design-tokens:build"
+    outputs:
+      - "/internal/staticui/login/dist/**/*"
+
+  dev:
+    command: "corepack pnpm run dev"
+    options:
+      persistent: true
+      runInCI: false
+
+  preview:
+    command: "corepack pnpm run preview"
+    deps:
+      - "build"
+    options:
+      persistent: true
+      runInCI: false

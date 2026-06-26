@@ -1,0 +1,40 @@
+id: "design-tokens"
+language: "typescript"
+layer: "library"
+stack: "frontend"
+
+tasks:
+  sync:
+    command: "corepack pnpm run sync"
+    options:
+      runInCI: false
+
+  generate:
+    command: "corepack pnpm run generate"
+    outputs:
+      - "src/generated/tokens.css"
+      - "src/generated/tokens.ts"
+      - "src/generated/tailwind.css"
+
+  lint:
+    command: "corepack pnpm exec oxlint ."
+    deps:
+      - "generate"
+
+  typecheck:
+    command: "corepack pnpm exec tsc --noEmit -p tsconfig.json"
+    deps:
+      - "generate"
+
+  build:
+    command: "corepack pnpm run build"
+    deps:
+      - "generate"
+    outputs:
+      - "dist/**/*"
+
+  test:
+    command: "corepack pnpm run test"
+    deps:
+      - "generate"
+

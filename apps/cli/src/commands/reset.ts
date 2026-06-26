@@ -1,6 +1,7 @@
 import { cancel, confirm, isCancel } from "@clack/prompts";
 
 import { ZitadelError } from "../lib/errors";
+import { stopBinaryRuntime } from "../lib/local-server/binary";
 import { stopAndRemoveContainer } from "../lib/local-server/docker";
 import {
   DEFAULT_LOCAL_SERVER_URL,
@@ -10,6 +11,7 @@ import {
   removeRuntimeMetadata,
 } from "../lib/local-server/runtime";
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { resolveCwd } from "../lib/paths";
 import { publicCliCommand } from "../lib/public-cli";
 
 export default class Reset extends BaseCommand {
@@ -17,20 +19,25 @@ export default class Reset extends BaseCommand {
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Reset);
-    const runtime = await readRuntimeMetadata(flags.cwd ? String(flags.cwd) : process.cwd());
+    const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
+    const runtime = await readRuntimeMetadata(cwd);
     await this.toMeta(flags, {
       resolveServer: false,
       source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
     });
 
-    const containerName = runtime?.container_name ?? localContainerName(this.meta.cwd);
+    const containerName =
+      runtime?.backend === "docker" ? runtime.container_name : localContainerName(this.meta.cwd);
     if (this.meta.dryRun) {
       return this.emit({
         status: "ok",
         data: {
           title: "Local Zitadel server runtime reset plan.",
           runtime: {
-            container_name: containerName,
+            backend: runtime?.backend ?? "missing",
+            ...(runtime?.backend === "binary"
+              ? { pid: runtime.pid, log_path: runtime.log_path }
+              : { container_name: containerName }),
             data_deleted: true,
           },
           next_commands: [publicCliCommand("reset --force", this.meta.cliVersion)],
@@ -46,7 +53,7 @@ export default class Reset extends BaseCommand {
         });
       }
       const answer = await confirm({
-        message: "Delete the local Zitadel container and .zitadel/local/nextgen-data?",
+        message: "Delete the local Zitadel runtime and .zitadel/local/nextgen-data?",
         initialValue: false,
       });
       if (isCancel(answer)) {
@@ -58,7 +65,17 @@ export default class Reset extends BaseCommand {
       }
     }
 
-    await stopAndRemoveContainer(containerName);
+    if (runtime?.backend === "binary") {
+      const stopResult = await stopBinaryRuntime(runtime.pid);
+      if (stopResult.status === "failed") {
+        throw new ZitadelError("E_VALIDATION", "Local Zitadel server did not stop", {
+          hint: "Stop the local runtime manually, then rerun reset.",
+          details: { runtime, stop_result: stopResult },
+        });
+      }
+    } else {
+      await stopAndRemoveContainer(containerName);
+    }
     await removeLocalData(this.meta.cwd);
     await removeRuntimeMetadata(this.meta.cwd);
 
@@ -67,7 +84,10 @@ export default class Reset extends BaseCommand {
       data: {
         title: "Local Zitadel server runtime reset.",
         runtime: {
-          container_name: containerName,
+          backend: runtime?.backend ?? "missing",
+          ...(runtime?.backend === "binary"
+            ? { pid: runtime.pid, log_path: runtime.log_path }
+            : { container_name: containerName }),
           data_deleted: true,
         },
       },

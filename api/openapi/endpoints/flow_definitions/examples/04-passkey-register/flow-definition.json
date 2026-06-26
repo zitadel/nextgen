@@ -1,0 +1,36 @@
+{
+  "project_id": "${PROJECT_ID}",
+  "schema_uri": "https://nextgen.com/flow-definition.json",
+  "flow_definition": {
+    "name": "passkey-register",
+    "status": "active",
+    "user_schema": "${USER_SCHEMA_URL}",
+    "purposes": {
+      "register": "signup"
+    },
+    "steps": [
+      {
+        "name": "signup",
+        "fields": [
+          "email"
+        ],
+        "actions": [
+          {
+            "name": "passkey_register",
+            "kind": "passkey_register",
+            "primary": true
+          }
+        ],
+        "transitions": {
+          "passkey_register": {
+            "target": "done"
+          }
+        }
+      },
+      {
+        "name": "done",
+        "complete": "show"
+      }
+    ]
+  }
+}

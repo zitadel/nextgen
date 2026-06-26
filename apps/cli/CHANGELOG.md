@@ -1,5 +1,130 @@
 # @zitadel/cli
 
+## 0.1.0-alpha.12
+
+### Minor Changes
+
+- [#392](https://github.com/zitadel/nextgen/pull/392) [`292bfc9`](https://github.com/zitadel/nextgen/commit/292bfc97006c85bc3926e345cae0e9021e715062) Thanks [@mridang](https://github.com/mridang)! - Add opt-out anonymous usage telemetry. Disable with `--no-telemetry`,
+  `DO_NOT_TRACK=1`, or `ZITADEL_TELEMETRY=0`.
+
+### Patch Changes
+
+- [#337](https://github.com/zitadel/nextgen/pull/337) [`237c3c7`](https://github.com/zitadel/nextgen/commit/237c3c73a319e74c1411e3b04a1bb1a0e9d91051) Thanks [@bastionstack](https://github.com/bastionstack)! - Scaffolded app pages now enforce the dark surface the Zitadel widgets are designed for (`color-scheme: dark`, `#0f0f11`), instead of following the OS light/dark setting — across every framework template (`next`, `react`, `vue`, `angular`, `nuxt`, `solid`, `svelte`, `qwik`). This fixes the inconsistency where the `<zitadel-logout>` avatar (and other non-widget chrome, e.g. the `/profile` view) rendered on a white background while `<zitadel-login>` enforced its own dark surface.
+
+  Removed misleading field hints from the login component locales (`en`, `de`, `it`): the password "include a symbol and number" hint (only `minLength` is enforced server-side) and the `YYYY-MM-DD` date-of-birth hint (native `<input type="date">` localizes its own format and submits ISO). A dynamic, validation-rule-driven hint is tracked in [#251](https://github.com/zitadel/nextgen/issues/251).
+
+- [#372](https://github.com/zitadel/nextgen/pull/372) [`fb07553`](https://github.com/zitadel/nextgen/commit/fb075538cad22d9b9a67729e1fa02f394964e9e1) Thanks [@mridang](https://github.com/mridang)! - Set the now-required `kind` on the default flow's step actions: submit actions use `submit`, the register/login routing actions use `navigate`. Without it, the generated flow fails validation against the updated flow-definition schema.
+
+- [#354](https://github.com/zitadel/nextgen/pull/354) [`4060d9d`](https://github.com/zitadel/nextgen/commit/4060d9da0a214b58913000173657ef75e8be0843) Thanks [@mridang](https://github.com/mridang)! - Align the CLI flow-definition sync update with the PUT contract: send the `{ flow_definition }` body envelope and the required `project_id` query parameter so updates to existing flow definitions are accepted by the generated server.
+
+- Updated dependencies [[`a2f6526`](https://github.com/zitadel/nextgen/commit/a2f65266e00ee461e8e7fb1dee35e5add30b7199), [`f6279a0`](https://github.com/zitadel/nextgen/commit/f6279a0bac51447533a4a33eb33479b792558783), [`9b05b82`](https://github.com/zitadel/nextgen/commit/9b05b82c3e7546ad3c4ebd4a025a991da499abf8), [`2b2cfd5`](https://github.com/zitadel/nextgen/commit/2b2cfd58f63d564c96fdc582c07e874297a5229c), [`e5150f3`](https://github.com/zitadel/nextgen/commit/e5150f30dfc2b24230fa698bb99baeceb2841d00), [`5d18103`](https://github.com/zitadel/nextgen/commit/5d18103e677d31a5b9b7c93ea164bef53b3e6e96)]:
+  - @zitadel/api@0.1.0-alpha.12
+  - @zitadel/server@0.1.0-alpha.12
+
+## 0.1.0-alpha.11
+
+### Patch Changes
+
+- [#310](https://github.com/zitadel/nextgen/pull/310) [`050f5d7`](https://github.com/zitadel/nextgen/commit/050f5d7a39a2a9160346276203e8da82db137478) Thanks [@mridang](https://github.com/mridang)! - CLI scaffolds now write the project service-key secret to `.env.local` as `ZITADEL_PROJECT_SECRET`, and the React/Vue/Angular dev proxies plus the Next.js and Nuxt server middlewares send it as the bearer on every proxied request instead of synthesising `sk_<project_id>` from the public project id. The secret stays server-side: `.env.local` is gitignored, Vite only exposes `VITE_`-prefixed vars to the client, Next.js auto-loads `.env.local` into `process.env` server-side, and the Nuxt module reads `process.env.ZITADEL_PROJECT_SECRET` in its `setup()` and pushes it into Nuxt's server-only `runtimeConfig.nextgen.projectSecret` (overridable at deploy time via `NUXT_NEXTGEN_PROJECT_SECRET`).
+
+  Also drops the unused `onExchangeResponse` hook from `NextgenMiddlewareOptions` (no callers anywhere; alpha so no external usage to break).
+
+- Updated dependencies []:
+  - @zitadel/server@0.1.0-alpha.11
+  - @zitadel/api@0.1.0-alpha.11
+
+## 0.1.0-alpha.10
+
+### Patch Changes
+
+- [#328](https://github.com/zitadel/nextgen/pull/328) [`acb5b54`](https://github.com/zitadel/nextgen/commit/acb5b549386efcc5ede005871b145c1cd0f9ac5e) Thanks [@fforootd](https://github.com/fforootd)! - Improve fresh-app CLI recovery guidance and align agent automation hook docs with the rendered login controls.
+
+- Updated dependencies []:
+  - @zitadel/server@0.1.0-alpha.10
+  - @zitadel/api@0.1.0-alpha.10
+
+## 0.1.0-alpha.9
+
+### Patch Changes
+
+- [#325](https://github.com/zitadel/nextgen/pull/325) [`ae99992`](https://github.com/zitadel/nextgen/commit/ae999926df674eb7ca777e0273789b8f58f83a19) Thanks [@fforootd](https://github.com/fforootd)! - Report local port conflicts clearly, sweep managed local runtime orphans with `stop --all`, and explain non-empty setup targets.
+
+- Updated dependencies [[`ae99992`](https://github.com/zitadel/nextgen/commit/ae999926df674eb7ca777e0273789b8f58f83a19)]:
+  - @zitadel/server@0.1.0-alpha.9
+  - @zitadel/api@0.1.0-alpha.9
+
+## 0.1.0-alpha.8
+
+### Patch Changes
+
+- Updated dependencies [[`0547b8c`](https://github.com/zitadel/nextgen/commit/0547b8c397b1016e199fa16f0b208a7115720806)]:
+  - @zitadel/server@0.1.0-alpha.8
+  - @zitadel/api@0.1.0-alpha.8
+
+## 0.1.0-alpha.7
+
+### Patch Changes
+
+- Updated dependencies [[`0bacdf2`](https://github.com/zitadel/nextgen/commit/0bacdf23226a1e90c37f09b3cac245e1cf917091)]:
+  - @zitadel/server@0.1.0-alpha.7
+  - @zitadel/api@0.1.0-alpha.7
+
+## 0.1.0-alpha.6
+
+### Patch Changes
+
+- [#270](https://github.com/zitadel/nextgen/pull/270) [`30b4b41`](https://github.com/zitadel/nextgen/commit/30b4b411a9c99fc61d991f739636f93d7bee5b1d) Thanks [@vitorbari](https://github.com/vitorbari)! - Step `fields` and `actions` are now ordered `[{ name, ... }]` arrays on the wire (ADR 021). Templates iterate them in authorial order; the orchestrator builds `fields_by_name` / `actions_by_name` views for keyed lookups. The private `@zitadel/api-mock` workspace follows the same wire shape for tests. `gates` stays a name-keyed object for now.
+
+- [#303](https://github.com/zitadel/nextgen/pull/303) [`69e41b2`](https://github.com/zitadel/nextgen/commit/69e41b24275a5337b04b977dd3582f3f5c5c1461) Thanks [@fforootd](https://github.com/fforootd)! - Improve local bootstrap guidance for Docker prerequisites, generated auth pages, and agent browser proof.
+
+- Updated dependencies [[`2cf813e`](https://github.com/zitadel/nextgen/commit/2cf813e62d2d76346536911e3e4ccfe390fb3583)]:
+  - @zitadel/server@0.1.0-alpha.6
+  - @zitadel/api@0.1.0-alpha.6
+
+## 0.1.0-alpha.5
+
+### Minor Changes
+
+- [#257](https://github.com/zitadel/nextgen/pull/257) [`6f8dd2d`](https://github.com/zitadel/nextgen/commit/6f8dd2d612b06d1ca546a7c16c6fb5c6430de2c1) Thanks [@mridang](https://github.com/mridang)! - Add `setup --framework react|vue|angular|nuxt` support to the CLI. Each framework scaffolds its auth entry/pages and wires `/__nextgen/*` calls to the backend with a `sk_<project_id>` bearer attached: React and Vue get a dev proxy magicast-merged into the Vite config (`vite.config.*`) that reads the project id from `ZITADEL_PROJECT_ID`; Angular gets a `proxy.conf.cjs` wired into `angular.json` that reads it from `zitadel.json`; and Nuxt registers the `@zitadel/sdk-nuxt` module in the Nuxt config (`nuxt.config.*`), which adds the proxy via server middleware. A `--dev-port` flag sets the scaffolded dev-server port.
+
+- [#299](https://github.com/zitadel/nextgen/pull/299) [`f77ca44`](https://github.com/zitadel/nextgen/commit/f77ca44e85565976d26de0b6444b7fc5b1616e8c) Thanks [@fforootd](https://github.com/fforootd)! - Make the generated Next.js auth app easier for agents and developers to prove end-to-end registration, logout, and login in a visible browser.
+
+### Patch Changes
+
+- [#295](https://github.com/zitadel/nextgen/pull/295) [`f02718f`](https://github.com/zitadel/nextgen/commit/f02718f0499042569e13c1c67ae4135b6e943518) Thanks [@fforootd](https://github.com/fforootd)! - Allow fresh app scaffolding after `zitadel start` creates local runtime ignore files, and load Nuxt runtime config through the Nuxt virtual imports module.
+
+- Updated dependencies []:
+  - @zitadel/api@0.1.0-alpha.5
+
+## 0.1.0-alpha.4
+
+### Patch Changes
+
+- [#279](https://github.com/zitadel/nextgen/pull/279) [`ce237ef`](https://github.com/zitadel/nextgen/commit/ce237ef355422c666769eef20df78bdc8ec0e0f9) Thanks [@fforootd](https://github.com/fforootd)! - Harden local setup guidance, Next 16 scaffolding, and login form automation.
+
+- Updated dependencies []:
+  - @zitadel/api@0.1.0-alpha.4
+
+## 0.1.0-alpha.3
+
+### Patch Changes
+
+- [#272](https://github.com/zitadel/nextgen/pull/272) [`08b7ab4`](https://github.com/zitadel/nextgen/commit/08b7ab44f13e104545f17f6f94244eb825a4dcf5) Thanks [@fforootd](https://github.com/fforootd)! - Allow same-directory setup after starting the local Zitadel runtime.
+
+- Updated dependencies []:
+  - @zitadel/api@0.1.0-alpha.3
+
+## 0.1.0-alpha.2
+
+### Patch Changes
+
+- [#265](https://github.com/zitadel/nextgen/pull/265) [`ceb74d5`](https://github.com/zitadel/nextgen/commit/ceb74d54c98fff07deb90c800a5aa08b2f46e30e) Thanks [@fforootd](https://github.com/fforootd)! - Derive alpha local runtime images from the installed CLI version, pin generated SDK dependencies to the same alpha train, and emit exact-version follow-up commands for reproducible tester reports.
+
+- [#255](https://github.com/zitadel/nextgen/pull/255) [`ca53f61`](https://github.com/zitadel/nextgen/commit/ca53f61ae249f81fd301f71f33cd9be416271ad7) Thanks [@fforootd](https://github.com/fforootd)! - Make doctor local-runtime checks advisory for cloud setup, harden fresh Next.js scaffolding, auto-install setup dependencies, normalize public follow-up commands, and avoid assuming Next.js in local-runtime setup guidance.
+
+- Updated dependencies [[`b0094f4`](https://github.com/zitadel/nextgen/commit/b0094f4255854c571664e746f70447c365c52af2)]:
+  - @zitadel/api@0.1.0-alpha.2
+
 ## 0.1.0-alpha.1
 
 ### Minor Changes

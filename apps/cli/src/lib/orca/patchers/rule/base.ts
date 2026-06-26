@@ -47,7 +47,19 @@ export abstract class AbstractRulePatcher implements Patcher {
       directories: [".zitadel"],
       envBackups: [".env.local"],
       dependencies: this.routeDeps(view),
+      configEdits: this.routeConfigEdits(view),
     };
+  }
+
+  /**
+   * User config files this patcher merges into via an `edit` op (e.g.
+   * `vite.config.ts`). `eject` can't reverse an in-place merge, so it lists
+   * these as manual cleanup steps. Defaults to none; patchers that edit a config
+   * (React/Vue/Angular/Nuxt) override it. Next writes whole marker-bearing files
+   * instead, so it has none.
+   */
+  protected routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
+    return [];
   }
 
   /**
@@ -94,10 +106,10 @@ export abstract class AbstractRulePatcher implements Patcher {
         path: ".env.example",
         entries: {
           ZITADEL_PROJECT_ID: "",
+          ZITADEL_PROJECT_SECRET: "",
           ZITADEL_ENVIRONMENT: "",
           ZITADEL_ISSUER: "",
           ZITADEL_URL: "",
-          NEXT_PUBLIC_ZITADEL_PROJECT_ID: "",
         },
       },
       {
@@ -105,10 +117,10 @@ export abstract class AbstractRulePatcher implements Patcher {
         path: ".env.local",
         entries: {
           ZITADEL_PROJECT_ID: ctx.project.id,
+          ZITADEL_PROJECT_SECRET: ctx.project.projectSecret,
           ZITADEL_ENVIRONMENT: "development",
           ZITADEL_ISSUER: ctx.issuer,
           ZITADEL_URL: ctx.server,
-          NEXT_PUBLIC_ZITADEL_PROJECT_ID: ctx.project.id,
         },
       },
       {
@@ -136,8 +148,10 @@ export abstract class AbstractRulePatcher implements Patcher {
 function projectConfig(ctx: PatchContext): Record<string, unknown> {
   const environments: Record<string, unknown> = { development: { issuer: ctx.issuer } };
   if (ctx.project.previewOrigins.length > 0) {
+    // previewOrigins are already full origins (scheme://host[:port]); don't
+    // prepend a scheme or it doubles up (https://http://localhost:3000).
     environments.preview = {
-      issuer_pattern: ctx.project.previewOrigins.map((origin) => `https://${origin}`),
+      issuer_pattern: [...ctx.project.previewOrigins],
     };
   }
   return {

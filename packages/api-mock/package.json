@@ -9,6 +9,10 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts"
     },
+    "./openid-configuration": {
+      "types": "./src/openid-configuration.ts",
+      "import": "./src/openid-configuration.ts"
+    },
     "./platform": {
       "types": "./src/platform-handlers.ts",
       "import": "./src/platform-handlers.ts"
@@ -16,6 +20,10 @@
     "./public-dir": {
       "types": "./src/public-dir.ts",
       "import": "./src/public-dir.ts"
+    },
+    "./server": {
+      "types": "./src/server.ts",
+      "import": "./src/server.ts"
     }
   },
   "bin": {
@@ -33,6 +41,7 @@
     "@zitadel/api": "workspace:*",
     "cookie-parser": "catalog:",
     "express": "catalog:",
+    "tslib": "catalog:",
     "xstate": "catalog:"
   },
   "peerDependencies": {
@@ -47,16 +56,6 @@
     "playwright": "catalog:",
     "tsx": "catalog:",
     "zod": "catalog:"
-  },
-  "nx": {
-    "targets": {
-      "build": {
-        "executor": "nx:noop",
-        "dependsOn": [
-          "^build"
-        ]
-      }
-    }
   },
   "msw": {
     "workerDirectory": [

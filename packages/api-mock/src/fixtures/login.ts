@@ -80,24 +80,26 @@ export function identifierStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "identifier",
     texts: { title_key: "identifier.title" },
-    fields: {
-      email: {
+    fields: [
+      {
+        name: "email",
         type: "email",
         text_key: "identifier.field.email",
         required: true,
       },
-      password: {
+      {
+        name: "password",
         type: "password",
         text_key: "identifier.field.password",
         required: true,
       },
-    },
-    actions: {
-      submit: { text_key: "submit.signin", primary: true },
-      passkey: { text_key: "identifier.action.passkey" },
-      register: { text_key: "identifier.action.register.link" },
-      recover: { text_key: "action.forgot_password" },
-    },
+    ],
+    actions: [
+      { name: "submit", kind: "submit", text_key: "submit.signin", primary: true },
+      { name: "passkey", kind: "passkey", text_key: "identifier.action.passkey" },
+      { name: "register", kind: "navigate", text_key: "identifier.action.register.link" },
+      { name: "recover", kind: "navigate", text_key: "action.forgot_password" },
+    ],
     gates: {},
   });
 }
@@ -107,23 +109,78 @@ export function registerStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "register",
     texts: { title_key: "register.title" },
-    fields: {
-      email: {
+    fields: [
+      {
+        name: "email",
         type: "email",
         text_key: "register.field.email",
         required: true,
       },
-      password: {
+      {
+        name: "given_name",
+        type: "text",
+        text_key: "register.field.givenName",
+        required: true,
+      },
+      {
+        name: "family_name",
+        type: "text",
+        text_key: "register.field.familyName",
+        required: true,
+      },
+      {
+        name: "date_of_birth",
+        type: "date",
+        text_key: "register.field.dateOfBirth",
+      },
+      {
+        // Optional on purpose: the registration e2e/journey flows submit without
+        // touching it, so a `required` select/checkbox would block the form. Its
+        // enum values double as labels (the wire carries no per-option text).
+        name: "country",
+        type: "select",
+        text_key: "register.field.country",
+        validation: { enum: ["United States", "Germany", "Switzerland", "Austria"] },
+      },
+      {
+        name: "terms",
+        type: "checkbox",
+        text_key: "register.field.terms",
+      },
+    ],
+    actions: [
+      { name: "submit", kind: "submit", text_key: "register.action.password", primary: true },
+      { name: "passkey_register", kind: "passkey_register", text_key: "register.action.passkey" },
+      { name: "sign_in", kind: "navigate", text_key: "register.action.sign_in.link" },
+    ],
+    gates: {},
+  });
+}
+
+/**
+ * Register-password step — second step in the two-step registration flow.
+ * Collects the password after the user has entered their profile fields.
+ */
+export function registerPasswordStep(input: StepFixtureInput): CreateFlow201 {
+  return wrap(input, {
+    name: "register-password",
+    texts: {
+      title_key: "register-password.title",
+      description_key: "register-password.description",
+    },
+    fields: [
+      {
+        name: "password",
         type: "password",
-        text_key: "register.field.password",
+        text_key: "register-password.field.password",
         required: true,
         validation: { min_length: 8 },
       },
-    },
-    actions: {
-      submit: { text_key: "register.action.submit", primary: true },
-      back: { text_key: "action.back" },
-    },
+    ],
+    actions: [
+      { name: "submit", kind: "submit", text_key: "register-password.action.submit", primary: true },
+      { name: "back", kind: "back", text_key: "action.back" },
+    ],
     gates: {},
   });
 }
@@ -137,19 +194,20 @@ export function passwordStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "password",
     texts: { title_key: "password.title" },
-    fields: {
-      password: {
+    fields: [
+      {
+        name: "password",
         type: "password",
         text_key: "password.field.password",
         required: true,
       },
-    },
-    actions: {
-      submit: { text_key: "submit.signin", primary: true },
-      passkey: { text_key: "password.action.passkey" },
-      register: { text_key: "password.action.register.link" },
-      back: { text_key: "action.back" },
-    },
+    ],
+    actions: [
+      { name: "submit", kind: "submit", text_key: "submit.signin", primary: true },
+      { name: "passkey", kind: "passkey", text_key: "password.action.passkey" },
+      { name: "register", kind: "navigate", text_key: "password.action.register.link" },
+      { name: "back", kind: "back", text_key: "action.back" },
+    ],
     gates: {},
   });
 }
@@ -166,10 +224,10 @@ export function recoverStep(input: StepFixtureInput): CreateFlow201 {
       title_key: "recover.title",
       description_key: "recover.description",
     },
-    fields: {},
-    actions: {
-      submit: { text_key: "recover.action.back", primary: true },
-    },
+    fields: [],
+    actions: [
+      { name: "submit", kind: "navigate", text_key: "recover.action.back", primary: true },
+    ],
     gates: {},
   });
 }
@@ -182,12 +240,12 @@ export function passkeyUpsellStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "passkey-upsell",
     texts: { title_key: "passkey-upsell.title" },
-    fields: {},
-    actions: {
-      setup: { text_key: "passkey-upsell.action.setup", primary: true },
-      skip: { text_key: "passkey-upsell.action.skip" },
-      back: { text_key: "action.back" },
-    },
+    fields: [],
+    actions: [
+      { name: "setup", kind: "passkey_register", text_key: "passkey-upsell.action.setup", primary: true },
+      { name: "skip", kind: "navigate", text_key: "passkey-upsell.action.skip" },
+      { name: "back", kind: "back", text_key: "action.back" },
+    ],
     gates: {},
   });
 }
@@ -203,10 +261,10 @@ export function passkeySetupStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "passkey-setup",
     texts: { title_key: "passkey-upsell.title" },
-    fields: {},
-    actions: {
-      submit: { text_key: "submit.continue", primary: true },
-    },
+    fields: [],
+    actions: [
+      { name: "submit", kind: "submit", text_key: "submit.continue", primary: true },
+    ],
     gates: {},
     challenge: {
       method: "passkey",
@@ -257,11 +315,11 @@ export function passkeyLoginStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "passkey-login",
     texts: { title_key: "passkey-login.title" },
-    fields: {},
-    actions: {
-      submit: { text_key: "submit.continue", primary: true },
-      cancel: { text_key: "action.cancel" },
-    },
+    fields: [],
+    actions: [
+      { name: "submit", kind: "submit", text_key: "submit.continue", primary: true },
+      { name: "cancel", kind: "navigate", text_key: "action.cancel" },
+    ],
     gates: {},
     challenge: {
       method: "passkey",
@@ -295,8 +353,8 @@ export function ssoRedirectStep(
   return wrap(input, {
     name: "sso-redirect",
     texts: { title_key: "sso.redirect.title" },
-    fields: {},
-    actions: {},
+    fields: [],
+    actions: [],
     gates: {},
     redirect_url: input.redirectUrl ?? "https://idp.mock.invalid/authorize",
   });
@@ -323,11 +381,11 @@ export async function doneStep(input: StepFixtureInput): Promise<CreateFlow201> 
       name: "done",
       texts: { title_key: "complete.title" },
       complete: "show",
-      fields: {},
-      actions: {
-        continue: { text_key: "signed-in.continue", primary: true },
-        logout: { text_key: "signed-in.logout" },
-      },
+      fields: [],
+      actions: [
+        { name: "continue", kind: "navigate", text_key: "signed-in.continue", primary: true },
+        { name: "logout", kind: "navigate", text_key: "signed-in.logout" },
+      ],
       gates: {},
     },
     {

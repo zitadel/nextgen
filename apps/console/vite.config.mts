@@ -1,15 +1,21 @@
-import { nxViteTsPaths } from "@nx/vite/plugins/nx-tsconfig-paths.plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { devtools } from "@tanstack/devtools-vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { defineConfig } from "vite";
 
 const consoleBase = "/ui/console/";
+const consoleOutDir = "../../internal/staticui/console/dist";
 
-export default defineConfig(({ command }) => ({
+export default defineConfig(({ command, isPreview }) => ({
   root: import.meta.dirname,
-  base: command === "build" ? consoleBase : "/",
+  // The build emits absolute `/ui/console/` asset URLs (the console embeds in
+  // the Go server under that path). `vite preview` runs with command "serve",
+  // so it must opt into the same base or the built index.html's asset links
+  // 404 and the SPA never mounts. The dev server (plain "serve") stays at "/".
+  base: command === "build" || isPreview ? consoleBase : "/",
   server: {
     port: 5174,
     strictPort: true,
@@ -31,10 +37,10 @@ export default defineConfig(({ command }) => ({
       autoCodeSplitting: true,
     }),
     react(),
-    nxViteTsPaths(),
+    keepGoEmbedPlaceholder(consoleOutDir),
   ],
   build: {
-    outDir: "./dist",
+    outDir: consoleOutDir,
     emptyOutDir: true,
     reportCompressedSize: true,
     commonjsOptions: {
@@ -57,3 +63,23 @@ export default defineConfig(({ command }) => ({
     },
   },
 }));
+
+function keepGoEmbedPlaceholder(outDir: string) {
+  const writePlaceholder = () => {
+    const dir = resolve(import.meta.dirname, outDir);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(resolve(dir, ".gitkeep"), "");
+  };
+
+  return {
+    name: "zitadel-go-embed-placeholder",
+    buildEnd(error?: Error) {
+      if (error) {
+        writePlaceholder();
+      }
+    },
+    closeBundle() {
+      writePlaceholder();
+    },
+  };
+}

@@ -1,5 +1,5 @@
 type: object
-required: [id, project_id, status, flow_definition, created_at, updated_at]
+required: [id, project_id, flow_definition, created_at, updated_at]
 properties:
   id:
     type: string
@@ -9,10 +9,6 @@ properties:
     type: string
     description: Identifier of the project this flow definition belongs to.
     example: proj_789ghi012jkl
-  status:
-    type: string
-    description: Status of the flow definition.
-    example: active
   flow_definition:
     $ref: flow-definition.yaml
   created_at:

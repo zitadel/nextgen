@@ -23,8 +23,9 @@ export const en: Record<string, string> = {
   "identifier.description": "Enter your email to continue",
   "identifier.field.email": "Work email",
   "identifier.field.email.placeholder": "you@company.com",
-  "identifier.action.submit": "Continue",
-  "identifier.action.continue": "Continue",
+  "identifier.field.password": "Password",
+  "identifier.action.submit": "Sign in",
+  "identifier.action.continue": "Sign in",
   "identifier.action.passkey": "Sign in with a passkey",
   "identifier.action.register.lead": "Don't have an account? ",
   "identifier.action.register.link": "Sign up",
@@ -53,8 +54,9 @@ export const en: Record<string, string> = {
   "collect-credentials.field.email": "Work email",
   "collect-credentials.field.email.placeholder": "you@company.com",
   "collect-credentials.field.password": "Password",
-  "collect-credentials.field.password.help":
-    "At least 8 characters, including a symbol and number.",
+  // No static password rule hint: the only enforced rule is the schema's
+  // minLength, and "symbol + number" was never enforced. The client will build
+  // this hint dynamically from the API's per-field validation rules (#251).
   "collect-credentials.action.submit": "Sign up",
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -64,8 +66,6 @@ export const en: Record<string, string> = {
   "register-password.title": "Create your password",
   "register-password.description": "Choose a secure password for your account",
   "register-password.field.password": "Password",
-  "register-password.field.password.help":
-    "At least 8 characters, including a symbol and number.",
   "register-password.action.submit": "Sign up",
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -114,13 +114,21 @@ export const en: Record<string, string> = {
   "password.action.register.link": "Sign up",
 
   "register.title": "Create your account",
-  "register.description": "Enter your email to get started",
+  // Empty by design — the sign-up card has no subheadline (Figma 6593:141743).
+  "register.description": "",
   "register.field.email": "Work email",
   "register.field.email.placeholder": "you@company.com",
   "register.field.password": "Password",
-  "register.field.password.help": "At least 8 characters, including a symbol and number.",
+  "register.field.givenName": "Given name",
+  "register.field.familyName": "Family name",
+  // Native <input type="date"> localizes its own display format to the user's
+  // locale and submits ISO YYYY-MM-DD — no placeholder/help format hint needed.
+  "register.field.dateOfBirth": "Date of birth",
+  "register.field.country": "Country",
+  "register.field.country.placeholder": "Select your country",
+  "register.field.terms": "I agree to the terms of service",
   "register.action.password": "Continue with password",
-  "register.action.passkey": "Register with a passkey",
+  "register.action.passkey": "Continue with a passkey",
   "register.action.submit": "Sign up",
   "register.action.sign_in.lead": "Already have an account? ",
   "register.action.sign_in.link": "Sign in",

@@ -1,5 +1,5 @@
 type: object
-required: [name, user_schema, purposes, steps]
+required: [ name, status, user_schema, purposes, steps ]
 description: |
   A flow definition is the server-side configuration that describes a complete
   authentication or identity flow. It is NOT sent to the frontend — the flow
@@ -20,6 +20,9 @@ properties:
       `name` is part of the public contract another definition may
       reference. Acts as the human display label as well; no separate slug.
 
+  status:
+    $ref: flow-definition-status.yaml
+
   user_schema:
     type: string
     format: uri
@@ -39,7 +42,7 @@ properties:
     minProperties: 1
     propertyNames:
       type: string
-      enum: [login, register, recovery, profiling, reauth, link_account]
+      enum: [ login, register, recovery, profiling, reauth, link_account ]
     additionalProperties:
       type: string
     example:
@@ -48,7 +51,7 @@ properties:
   audience:
     $ref: flow-audience.yaml
     example:
-      app_ids: [app_saas]
+      app_ids: [ app_saas ]
 
   steps:
     type: array
@@ -60,16 +63,20 @@ properties:
       actual step sequencing is determined by transitions.
     example:
       - name: identify
-        fields: [email]
+        fields: [ email ]
         actions:
-          submit: { primary: true }
+          - name: submit 
+            kind: submit
+            primary: true
         transitions:
           submit: { target: authenticate }
           user_not_found: { target: register, action: switch }
       - name: authenticate
-        fields: [password]
+        fields: [ password ]
         actions:
-          submit: { primary: true }
+          - name: submit 
+            kind: submit
+            primary: true
         transitions:
           submit: { target: done }
       - name: done
