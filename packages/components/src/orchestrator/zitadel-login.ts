@@ -471,7 +471,10 @@ export class ZitadelLogin extends LitElement {
       actions,
       gates: step.gates ?? {},
       sso_providers: step.sso_providers ?? [],
-      challenge: step.challenge ?? null,
+      // While submitting a passkey proof, `loading` re-renders the current
+      // step before the server returns. Re-rendering the same challenge would
+      // reconnect `<zl-passkey>` and start a second WebAuthn ceremony.
+      challenge: this.loading ? null : (step.challenge ?? null),
       messages: [],
       identity: this.deriveIdentity(),
       errors,
