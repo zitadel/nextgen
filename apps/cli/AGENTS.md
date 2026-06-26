@@ -102,9 +102,11 @@ wired into the user's app.
 `non_interactive`, `is_tty`, `is_ci`, `ci_provider`, `host_agent`,
 `invocation_channel`, `dry_run`, `force`, `server_kind` (bucketed
 `cloud`/`local`/`self_hosted` — **never the URL**), plus the reserved
-`$os`/`$country_code` (country derived from the timezone, not the IP — `ip: 0`
-keeps geolocation off). Built in `src/lib/oclif/command-telemetry.ts` (using the
-generic env/geo helpers in `src/lib/telemetry/`).
+event properties `$os`/`mp_country_code` (country derived from the timezone, not
+the IP — `ip: 0` keeps IP geolocation off). First-run user profiles use the
+People API's `$country_code` profile property for the same derived country. Built
+in `src/lib/oclif/command-telemetry.ts` (using the generic env/geo helpers in
+`src/lib/telemetry/`).
 
 ### Event shape
 
@@ -123,7 +125,7 @@ Mixpanel injects the transport fields (`time`, `$lib_version`,
     "command": "status",
     "cli_version": "0.1.0-alpha.11",
     "$os": "Mac OS X",
-    "$country_code": "AU",
+    "mp_country_code": "AU",
     "os": "darwin",
     "arch": "arm64",
     "node_version": "24.12.0",
