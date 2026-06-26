@@ -120,7 +120,23 @@ func TestFlowCreateUserForPasskey_IdentifierUniquenessHonorsSchemaScope(t *testi
 	assert.Equal(t, domain.AttributeUniquenessProject, attrByKey(t, writer.created.Attributes, "email").UniqueScope)
 }
 
-func TestFlowCreateUserForPasskey_MissingIdentifierIsIntegrityError(t *testing.T) {
+func TestFlowCreateUserForPasskey_NoIdentifierFieldIsIntegrityError(t *testing.T) {
+	writer := &fakeFlowUserWriter{}
+	h := service.NewFlowCreateUserForPasskeyHandler(writer)
+
+	state := provisionalState(t, map[string]any{"givenName": "Alice"})
+	resolved := domain.FlowResolvedFields{
+		Fields: []domain.FlowField{
+			{Name: "givenName"},
+		},
+	}
+
+	err := h.CreateProvisionalUser(t.Context(), nil, "user_1", state, resolved)
+	assert.ErrorIs(t, err, domain.ErrIntegrity)
+	assert.Equal(t, 0, writer.calls, "must not call the writer when the step declares no identifier")
+}
+
+func TestFlowCreateUserForPasskey_IdentifierMissingFromCollectedIsIntegrityError(t *testing.T) {
 	writer := &fakeFlowUserWriter{}
 	h := service.NewFlowCreateUserForPasskeyHandler(writer)
 
@@ -134,7 +150,7 @@ func TestFlowCreateUserForPasskey_MissingIdentifierIsIntegrityError(t *testing.T
 
 	err := h.CreateProvisionalUser(t.Context(), nil, "user_1", state, resolved)
 	assert.ErrorIs(t, err, domain.ErrIntegrity)
-	assert.Equal(t, 0, writer.calls, "must not call the writer when the identifier invariant fails")
+	assert.Equal(t, 0, writer.calls, "must not call the writer when the identifier value wasn't collected")
 }
 
 func TestFlowCreateUserForPasskey_SkipsCollectedKeysNotInResolvedFields(t *testing.T) {

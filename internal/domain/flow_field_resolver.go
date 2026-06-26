@@ -42,6 +42,18 @@ type FlowResolvedFields struct {
 	ImplicitOutcomes map[string][]string
 }
 
+// IdentifierField returns the first resolved field whose challenge is
+// [FlowFieldChallengeIdentifier]. Callers that also need the collected
+// value look it up themselves with the returned field's Name.
+func (r FlowResolvedFields) IdentifierField() (FlowField, bool) {
+	for _, f := range r.Fields {
+		if f.Challenge == FlowFieldChallengeIdentifier {
+			return f, true
+		}
+	}
+	return FlowField{}, false
+}
+
 // FlowField is the resolved per-field metadata.
 type FlowField struct {
 	// Name is the user-schema property name this field collects.

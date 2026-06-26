@@ -32,10 +32,14 @@ func NewFlowCreateUserForPasskeyHandler(
 // within the passkey verify phase, sharing the same client transaction as
 // the passkey save for atomicity.
 func (h *FlowCreateUserForPasskeyHandler) CreateProvisionalUser(ctx context.Context, client database.QueryExecutor, userID string, state *domain.FlowState, resolved domain.FlowResolvedFields) error {
-	identifierName, _, _, ok := domain.FindCollectedFieldByChallenge(resolved.Fields, state.CollectedData.UserData, domain.FlowFieldChallengeIdentifier)
+	idField, ok := resolved.IdentifierField()
 	if !ok {
+		return fmt.Errorf("%w: provisional passkey user has no identifier field", domain.ErrIntegrity)
+	}
+	if _, present := state.CollectedData.UserData[idField.Name]; !present {
 		return fmt.Errorf("%w: provisional passkey user has no identifier in collected data", domain.ErrIntegrity)
 	}
+	identifierName := idField.Name
 
 	byName := make(map[string]domain.FlowField, len(resolved.Fields))
 	for _, f := range resolved.Fields {
