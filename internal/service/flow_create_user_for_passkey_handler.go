@@ -3,65 +3,55 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-type flowUserWriter interface {
-	Create(ctx context.Context, client database.QueryExecutor, user *domain.CreateUser) error
-}
-
+// FlowCreateUserForPasskeyHandler creates the user row on the passkey-register
+// verify leg. The user id was bound to the WebAuthn registration challenge at
+// issue time, so the row is created with that pre-assigned id rather than a
+// freshly-minted one. A prior on_success handler having already created the
+// row is treated as success so the racing handler-then-ceremony order stays
+// safe.
 type FlowCreateUserForPasskeyHandler struct {
-	users flowUserWriter
+	userRepo    domain.UserRepository
+	userService *UserService
+	schemaRepo  domain.JSONSchemaRepository
 }
 
 func NewFlowCreateUserForPasskeyHandler(
-	users flowUserWriter,
+	userRepo domain.UserRepository,
+	userService *UserService,
+	schemaRepo domain.JSONSchemaRepository,
 ) *FlowCreateUserForPasskeyHandler {
-	// TODO: streamline the passkey registration process like passwords
-	return &FlowCreateUserForPasskeyHandler{users: users}
+	return &FlowCreateUserForPasskeyHandler{
+		userRepo:    userRepo,
+		userService: userService,
+		schemaRepo:  schemaRepo,
+	}
 }
 
-// CreateProvisionalUser creates a passwordless user with a pre-assigned ID from
-// state.CollectedData. If the user already exists (UniqueError from a prior
-// on_success handler), the call succeeds silently. Intended to be called
-// within the passkey verify phase, sharing the same client transaction as
-// the passkey save for atomicity.
-func (h *FlowCreateUserForPasskeyHandler) CreateProvisionalUser(ctx context.Context, client database.QueryExecutor, userID string, state *domain.FlowState, resolved domain.FlowResolvedFields) error {
-	var attrs []*domain.CreateAttribute
-	if name, field, value, ok := domain.FindCollectedFieldByChallenge(resolved.Fields, state.CollectedData.UserData, domain.FlowFieldChallengeIdentifier); ok {
-		uniqueScope := attributeUniquenessFor(name, name, field.Unique)
-		attr, err := domain.NewCreateAttribute(name, value, uniqueScope)
-		if err != nil {
-			return fmt.Errorf("flow create provisional user: build attribute: %w", err)
-		}
-		attrs = append(attrs, attr)
-	}
-	// TODO: use UserService to create users.
-	err := h.users.Create(ctx, client, &domain.CreateUser{
-		ProjectID:  state.ProjectID,
-		SchemaURL:  state.UserSchemaURL,
-		ID:         userID,
-		Attributes: attrs,
-	})
-	if _, ok := errors.AsType[*database.UniqueError](err); ok {
+// CreateProvisionalUser creates a passwordless user with the caller-supplied
+// userID through [UserService.ApplyActions], the same path the password
+// handler drives. The client and resolved arguments are accepted to satisfy
+// the [domain.FlowPasskeyUserCreater] contract and are intentionally unused:
+// the transaction lifecycle is owned by the user service, and the attribute
+// set is derived from the schema rather than the resolved fields.
+func (h *FlowCreateUserForPasskeyHandler) CreateProvisionalUser(ctx context.Context, _ database.QueryExecutor, userID string, state *domain.FlowState, _ domain.FlowResolvedFields) error {
+	state.CollectedData.UserData["$schema"] = state.UserSchemaURL
+	action := NewCreateUserAction(
+		CreateUserInput{
+			ProjectID: state.ProjectID,
+			User:      state.CollectedData.UserData,
+			ID:        userID,
+		},
+		h.userRepo,
+		h.schemaRepo,
+	)
+	err := h.userService.ApplyActions(ctx, action)
+	if derr, ok := errors.AsType[domain.Error](err); ok && derr.Code == domain.ErrUserAlreadyExists().Code {
 		return nil
 	}
 	return err
-}
-
-// attributeUniquenessFor picks the [AttributeUniqueness] the user
-// repository writes for a given field. The field's own scope passes
-// through; the identifier field falls back to team-level when the
-// schema didn't pin it, so two users can't share the same login.
-func attributeUniquenessFor(name, identifierName string, scope domain.AttributeUniqueness) domain.AttributeUniqueness {
-	if scope != domain.AttributeUniquenessUnspecified {
-		return scope
-	}
-	if name == identifierName {
-		return domain.AttributeUniquenessTeam
-	}
-	return domain.AttributeUniquenessUnspecified
 }

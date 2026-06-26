@@ -17,6 +17,7 @@ type CreateUserInput struct {
 	ProjectID string
 	TeamID    *string
 	User      map[string]any
+	ID        string
 }
 
 type UserAction interface {
@@ -200,7 +201,7 @@ func (o *CreateUserAction) Prepare(ctx context.Context, db database.QueryExecuto
 		return domain.ErrInternal(err).WithMessage("failed to get schema from database")
 	}
 
-	o.CreateUser, err = domain.NewCreateUser(o.ProjectID, o.TeamID, schemaEntity.Schema, o.User)
+	o.CreateUser, err = domain.NewCreateUser(o.ProjectID, o.TeamID, o.ID, schemaEntity.Schema, o.User)
 	if err != nil {
 		return err
 	}

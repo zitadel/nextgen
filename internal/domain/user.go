@@ -57,7 +57,11 @@ type CreateUser struct {
 	Attributes []*CreateAttribute
 }
 
-func NewCreateUser(projectID string, teamID *string, schemabs []byte, muser map[string]any) (*CreateUser, error) {
+// NewCreateUser builds a [CreateUser] from a schema-validated user map.
+// When id is empty a fresh ID is minted; callers with a pre-bound ID
+// (e.g. the passkey-register ceremony, which keys its WebAuthn challenge
+// to a provisional user id at issue time) pass it through here.
+func NewCreateUser(projectID string, teamID *string, id string, schemabs []byte, muser map[string]any) (*CreateUser, error) {
 	schemaURL, err := SchemaFromUserMap(muser)
 	if err != nil {
 		return nil, err
@@ -80,9 +84,11 @@ func NewCreateUser(projectID string, teamID *string, schemabs []byte, muser map[
 		return nil, ErrInternal(err).WithMessage("failed to unmarshal schema map")
 	}
 
-	id, err := newID(PrefixUser)
-	if err != nil {
-		return nil, ErrInternal(err).WithMessage("failed to create user id")
+	if id == "" {
+		id, err = newID(PrefixUser)
+		if err != nil {
+			return nil, ErrInternal(err).WithMessage("failed to create user id")
+		}
 	}
 
 	attrs, err := FlattenMapToCreateAttributes(muser, mschema, "")

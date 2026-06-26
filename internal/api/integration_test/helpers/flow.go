@@ -25,6 +25,8 @@ func (h *Harness) EnsureFlowCreateUserForPasskeyHandler(t *testing.T) *service.F
 	t.Helper()
 	return service.NewFlowCreateUserForPasskeyHandler(
 		h.EnsureUserRepo(t),
+		h.EnsureUserService(t),
+		h.EnsureSchemaRepo(t),
 	)
 }
 
