@@ -9,11 +9,12 @@ import (
 	"github.com/muhlemmer/gu"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
+
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen/idgenmock"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
-	"go.uber.org/mock/gomock"
 )
 
 func findAttribute(attrs []*domain.CreateAttribute, key string) *domain.CreateAttribute {
@@ -2074,65 +2075,6 @@ func TestFlowStateMachine_Process_PasskeyRegisterUsesCollectedIdentifierForDispl
 	registerStep, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{"email": email},
-	})
-	require.NoError(t, err)
-	assert.Equal(t, "register", registerStep.Step.Name)
-
-	issued, err := w.sm.Process(t.Context(), nil, def, registerStep.State, domain.FlowSubmitInput{
-		Action:    domain.FlowActionPasskeyRegister,
-		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
-	})
-	require.NoError(t, err)
-	require.NotNil(t, issued.Step.Challenge)
-	assert.Equal(t, challengeID, issued.Step.Challenge.ChallengeID)
-}
-
-func TestFlowStateMachine_Process_PasskeyRegisterPrefersEmailForDisplay(t *testing.T) {
-	t.Parallel()
-	const username = "alice"
-	const email = "alice@example.com"
-	const challengeID = "reg-1"
-	const registrationOpts = `{"rp":{"id":"example.com"}}`
-	const userID = "user_01TEST"
-	w := newFlowTestWorld(t)
-	def := passkeyRegisterAfterUsernameAndEmailDefinition()
-
-	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
-	w.schemaResolver.EXPECT().
-		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
-		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
-		AnyTimes()
-	w.authAttemptService.EXPECT().
-		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
-			return assert.Equal(t, "username", in.AttributeName) &&
-				assert.Equal(t, username, in.Value)
-		})).
-		Return("", domain.ErrAuthAttemptProofRejected(nil))
-	w.passkeyRegService.EXPECT().
-		IssuePasskeyRegistrationChallenge(gomock.Any(), gomock.Cond(func(in domain.FlowIssuePasskeyRegistrationChallengeInput) bool {
-			return assert.Equal(t, userID, in.UserID) &&
-				assert.Equal(t, email, in.Username) &&
-				assert.Equal(t, email, in.DisplayName)
-		})).
-		Return(domain.FlowPasskeyRegistrationChallengeOutput{
-			ChallengeID: challengeID,
-			Options:     []byte(registrationOpts),
-		}, nil)
-
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
-		Definition:    def,
-		Purpose:       domain.FlowDefinitionPurposeRegister,
-		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
-		UserSchemaURL: defaultSchemaURL,
-	})
-	require.NoError(t, err)
-
-	registerStep, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
-		Action: domain.FlowActionSubmit,
-		Fields: map[string]any{
-			"username": username,
-			"email":    email,
-		},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "register", registerStep.Step.Name)

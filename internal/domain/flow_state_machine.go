@@ -765,16 +765,6 @@ func needsPasskeyRegistrationVisitedFields(state *FlowState, in FlowSubmitInput,
 }
 
 func passkeyRegistrationDisplay(resolved FlowResolvedFields, collected map[string]any) (string, string) {
-	for _, f := range resolved.Fields {
-		if f.Type != FlowFieldTypeEmail {
-			continue
-		}
-		label := strings.TrimSpace(asString(collected[f.Name]))
-		if label != "" {
-			return label, label
-		}
-	}
-
 	_, _, value, ok := findCollectedFieldByChallenge(resolved.Fields, collected, FlowFieldChallengeIdentifier)
 	if !ok {
 		return "", ""
