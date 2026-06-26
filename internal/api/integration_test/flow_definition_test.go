@@ -545,6 +545,10 @@ func newFlowDefinitionFixture(name string, userSchemaURI url.URL) api.FlowDefini
 
 func assertFlowDefinitionResponse(t *testing.T, want, got any) {
 	t.Helper()
+	if !assert.IsType(t, want, got) {
+		return
+	}
+
 	switch want.(type) {
 	case *api.FlowDefinitionDetailResponse:
 		expected, ok := want.(*api.FlowDefinitionDetailResponse)

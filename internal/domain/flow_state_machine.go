@@ -785,11 +785,12 @@ func needsPasskeyRegistrationVisitedFields(state *FlowState, in FlowSubmitInput,
 }
 
 func passkeyRegistrationDisplay(resolved FlowResolvedFields, collected map[string]any) (string, string) {
-	_, _, value, ok := findCollectedFieldByChallenge(resolved.Fields, collected, FlowFieldChallengeIdentifier)
+	_, _, value, ok := FindCollectedFieldByChallenge(resolved.Fields, collected, FlowFieldChallengeIdentifier)
 	if !ok {
 		return "", ""
 	}
-	label := strings.TrimSpace(asString(value))
+	svalue, _ := value.(string)
+	label := strings.TrimSpace(svalue)
 	if label == "" {
 		return "", ""
 	}
@@ -1107,4 +1108,20 @@ func mergeCollected(state *FlowState, fields map[string]any) error {
 		state.CollectedData.UserData[k] = v
 	}
 	return nil
+}
+
+// FindCollectedFieldByChallenge looks up a field whose resolved Challenge
+// matches target and whose name is present in collected. Returns the field
+// name, the matched [FlowField], and its collected value. Callers that don't
+// need the FlowField discard it.
+func FindCollectedFieldByChallenge(resolved []FlowField, collected map[string]any, target FlowFieldChallenge) (name string, field FlowField, value any, ok bool) {
+	for _, f := range resolved {
+		if f.Challenge != target {
+			continue
+		}
+		if v, present := collected[f.Name]; present {
+			return f.Name, f, v, true
+		}
+	}
+	return "", FlowField{}, nil, false
 }

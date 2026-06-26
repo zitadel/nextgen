@@ -31,7 +31,7 @@ func NewFlowCreateUserForPasskeyHandler(
 // the passkey save for atomicity.
 func (h *FlowCreateUserForPasskeyHandler) CreateProvisionalUser(ctx context.Context, client database.QueryExecutor, userID string, state *domain.FlowState, resolved domain.FlowResolvedFields) error {
 	var attrs []*domain.CreateAttribute
-	if name, field, value, ok := findCollectedFieldByChallenge(resolved.Fields, state.CollectedData.UserData, domain.FlowFieldChallengeIdentifier); ok {
+	if name, field, value, ok := domain.FindCollectedFieldByChallenge(resolved.Fields, state.CollectedData.UserData, domain.FlowFieldChallengeIdentifier); ok {
 		uniqueScope := attributeUniquenessFor(name, name, field.Unique)
 		attr, err := domain.NewCreateAttribute(name, value, uniqueScope)
 		if err != nil {
@@ -50,22 +50,6 @@ func (h *FlowCreateUserForPasskeyHandler) CreateProvisionalUser(ctx context.Cont
 		return nil
 	}
 	return err
-}
-
-// findCollectedFieldByChallenge looks up a field whose resolved Challenge
-// matches target and whose name is present in collected. Returns the field
-// name, the matched [FlowField], and its collected value. Callers that don't
-// need the FlowField discard it.
-func findCollectedFieldByChallenge(resolved []domain.FlowField, collected map[string]any, target domain.FlowFieldChallenge) (name string, field domain.FlowField, value any, ok bool) {
-	for _, f := range resolved {
-		if f.Challenge != target {
-			continue
-		}
-		if v, present := collected[f.Name]; present {
-			return f.Name, f, v, true
-		}
-	}
-	return "", domain.FlowField{}, nil, false
 }
 
 // attributeUniquenessFor picks the [AttributeUniqueness] the user
