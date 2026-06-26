@@ -74,7 +74,7 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 	}
 
 	return domain.FlowOnSuccessResult{
-		UserID:         createUserAction.CreateUser.ID,
-		ClearBackStack: true,
+		UserID:       createUserAction.CreateUser.ID,
+		Irreversible: true,
 	}, nil
 }

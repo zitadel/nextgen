@@ -2434,13 +2434,14 @@ func TestFlowStateMachine_Back_StackClearedAfterCreateUser(t *testing.T) {
 		SubmitIdentifier(gomock.Any(), gomock.Any()).
 		Return("", domain.ErrAuthAttemptProofRejected(nil)).
 		Times(1)
-	// The create_user handler returns ClearBackStack: true on success — that
+	// The create_user handler returns Irreversible: true on success — that
 	// signal is what this test pins down. Production handlers
 	// ([FlowCreateUserWithPasswordHandler] and the passkey-register flow)
-	// already set it; the mock here mirrors that contract.
+	// already classify their action as irreversible; the mock mirrors
+	// that contract.
 	w.createUser.EXPECT().
 		Handle(gomock.Any(), gomock.Any()).
-		Return(domain.FlowOnSuccessResult{UserID: userID, ClearBackStack: true}, nil)
+		Return(domain.FlowOnSuccessResult{UserID: userID, Irreversible: true}, nil)
 	w.authAttemptService.EXPECT().RegisterCreatedUser(gomock.Any(), gomock.Any()).Times(1)
 	w.authAttemptService.EXPECT().
 		Handoff(gomock.Any(), gomock.Any()).
@@ -2466,5 +2467,5 @@ func TestFlowStateMachine_Back_StackClearedAfterCreateUser(t *testing.T) {
 	// The audit trail records the visited step; the back stack is dropped
 	// because create_user signalled an irreversible mutation.
 	assert.Equal(t, []string{"credentials"}, result.State.History)
-	assert.Empty(t, result.State.BackStack, "ClearBackStack from on_success must drop the back stack")
+	assert.Empty(t, result.State.BackStack, "an irreversible on_success must drop the back stack")
 }

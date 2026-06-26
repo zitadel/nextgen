@@ -344,10 +344,12 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	}
 
 	routeOutcome := in.Action
-	// clearBackStack is set when the engine executes an irreversible action
-	// (user creation, credential rotation) on this submit. Applied after the
-	// advance below so the next step renders without `back`.
-	var clearBackStack bool
+	// irreversible captures whether the operations run for this submit
+	// (on_success handler, passkey verify) mutated persistent state in a
+	// way the user cannot back out of. Applied after advance to drop the
+	// back stack so subsequent steps don't surface `back` across the
+	// mutation boundary.
+	var irreversible bool
 
 	// For passkey Phase 1 (issue challenge, no proof yet), identify the user first
 	// so that IssuePasskeyChallenge can populate allowCredentials. Without this,
@@ -433,13 +435,13 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 						return FlowStepResult{}, fmt.Errorf("flow state machine: register created user on attempt: %w", err)
 					}
 				}
-				if result.ClearBackStack {
-					clearBackStack = true
+				if result.Irreversible {
+					irreversible = true
 				}
 			}
 		}
-		if pk.clearBackStack {
-			clearBackStack = true
+		if pk.irreversible {
+			irreversible = true
 		}
 	}
 
@@ -469,7 +471,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	applyOutcomeFlip(state, routeOutcome)
 
 	r.advance(state, currentStep, nextStep.Name)
-	if clearBackStack {
+	if irreversible {
 		state.BackStack = nil
 	}
 
@@ -612,13 +614,14 @@ func fieldValueByChallenge(resolved FlowResolvedFields, fields map[string]any, t
 // with a submission. handled is true when a passkey leg ran (so the
 // field-shaped dispatch must be skipped); halt, when non-nil, is the result
 // to return immediately (challenge issued and awaiting proof, or a
-// verification error rendered on the step); clearBackStack signals that an
-// irreversible passkey operation (registration verify) committed and the
-// engine must drop the back stack after advance.
+// verification error rendered on the step); irreversible is true when this
+// phase mutated persistent state the user cannot back out of (registration
+// verify writes a credential), so the engine clears the back stack on the
+// way out.
 type passkeyPhaseResult struct {
-	handled        bool
-	halt           *FlowStepResult
-	clearBackStack bool
+	handled      bool
+	halt         *FlowStepResult
+	irreversible bool
 }
 
 // processPasskey runs all two-phase WebAuthn ceremonies (authentication and
@@ -702,9 +705,10 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 				}
 			}
 			state.PendingChallenge = nil
-			// Registering a passkey writes a credential — irreversible.
-			// Signal the caller to drop the back stack after advance.
-			return passkeyPhaseResult{handled: true, clearBackStack: true}, nil
+			// Registering a passkey writes a credential — the user cannot
+			// back out of it. Signal irreversibility; the engine clears the
+			// back stack on the way out.
+			return passkeyPhaseResult{handled: true, irreversible: true}, nil
 
 		default: // FlowChallengeMethodPasskey
 			userID, err := r.authAttempts.SubmitPasskey(ctx, FlowSubmitPasskeyInput{

@@ -53,9 +53,11 @@ type FlowOnSuccessResult struct {
 	// UserID is set when a handler creates a new user. The state machine
 	// records it and registers the user on the auth attempt.
 	UserID string
-	// ClearBackStack signals the engine to drop the runtime back stack
-	// after this handler runs. Set when the mutation is irreversible
-	// (e.g. created a user) so subsequent steps don't surface `back`
-	// across the mutation boundary.
-	ClearBackStack bool
+	// Irreversible signals that this handler mutated persistent state in
+	// a way the user cannot back out of (e.g. created a user, rotated a
+	// credential). The engine drops the runtime back stack after advance
+	// so subsequent steps don't surface `back` across the mutation
+	// boundary. Defaults to false — handlers that only read or compute
+	// leave the back stack intact.
+	Irreversible bool
 }
