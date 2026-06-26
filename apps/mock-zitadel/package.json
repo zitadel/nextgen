@@ -1,0 +1,48 @@
+{
+  "name": "@zitadel/mock-zitadel",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Per-PR mock Zitadel API deployed to Vercel (wraps @zitadel/api-mock).",
+  "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/mock-zitadel#readme",
+  "bugs": {
+    "url": "https://github.com/zitadel/nextgen/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zitadel/nextgen.git",
+    "directory": "apps/mock-zitadel"
+  },
+  "scripts": {
+    "dev": "tsx scripts/local-server.ts",
+    "build": "tsdown",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "corepack pnpm --filter @zitadel/api run generate && tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@zitadel/api-mock": "workspace:*"
+  },
+  "devDependencies": {
+    "@eslint/js": "catalog:",
+    "@eslint/json": "catalog:",
+    "@eslint/markdown": "catalog:",
+    "@types/express": "catalog:",
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-import-resolver-typescript": "catalog:",
+    "eslint-plugin-import": "catalog:",
+    "eslint-plugin-perfectionist": "catalog:",
+    "eslint-plugin-prettier": "catalog:",
+    "express": "catalog:",
+    "prettier": "catalog:",
+    "tsdown": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:",
+    "vitest": "catalog:"
+  }
+}

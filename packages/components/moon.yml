@@ -47,9 +47,3 @@ tasks:
     options:
       runInCI: false
 
-  dev:
-    command: "corepack pnpm run dev"
-    options:
-      persistent: true
-      runInCI: false
-

@@ -40,7 +40,7 @@
       {
         "name": "password",
         "fields": [
-          "password"
+          "x-auth-methods#password"
         ],
         "actions": [
           {
@@ -88,7 +88,7 @@
       {
         "name": "register-password",
         "fields": [
-          "password"
+          "x-auth-methods#password"
         ],
         "actions": [
           {

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/ianlancetaylor/jsonschema"
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
@@ -12,9 +13,12 @@ import (
 // (Required, Validation rules, etc. all populated as in production).
 func resolveDefaultFields(t *testing.T) domain.FlowResolvedFields {
 	t.Helper()
-	resolver := newDefaultResolver(t)
-	fields, err := resolver.Resolve(t.Context(), nil, testProjectID, defaultSchemaURL, "step",
-		[]string{"email", "username", "password", "given_name", "family_name"})
+
+	resolver := domain.NewSchemaFieldResolver()
+	schema := mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent)
+
+	fields, err := resolver.Resolve(schema, "step",
+		[]domain.Field{"email", "username", "x-auth-methods#password", "given_name", "family_name"})
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
@@ -22,17 +26,19 @@ func resolveDefaultFields(t *testing.T) domain.FlowResolvedFields {
 }
 
 func TestSchemaFieldResolver_Validate_RequiredEmptyValue(t *testing.T) {
-	resolver := newDefaultResolver(t)
+	t.Parallel()
+	resolver := domain.NewSchemaFieldResolver()
 	fields := resolveDefaultFields(t)
 
 	err := resolver.Validate(fields, map[string]any{"email": ""})
 	if !hasValidationRule(t, err, "email", domain.FlowFieldValidationRuleRequired) {
-		t.Fatalf("Validate err = %v, want required violation for email", err)
+		t.Fatalf("Validate err = %v,  newDefaultSchemaLoader(t).Reswant required violation for email", err)
 	}
 }
 
 func TestSchemaFieldResolver_Validate_EmailFormat(t *testing.T) {
-	resolver := newDefaultResolver(t)
+	t.Parallel()
+	resolver := domain.NewSchemaFieldResolver()
 	fields := resolveDefaultFields(t)
 
 	err := resolver.Validate(fields, map[string]any{"email": "not-an-email"})
@@ -42,17 +48,19 @@ func TestSchemaFieldResolver_Validate_EmailFormat(t *testing.T) {
 }
 
 func TestSchemaFieldResolver_Validate_MinLength(t *testing.T) {
-	resolver := newDefaultResolver(t)
+	t.Parallel()
+	resolver := domain.NewSchemaFieldResolver()
 	fields := resolveDefaultFields(t)
 
-	err := resolver.Validate(fields, map[string]any{"password": "short"})
-	if !hasValidationRule(t, err, "password", domain.FlowFieldValidationRuleMinLength) {
+	err := resolver.Validate(fields, map[string]any{"username": "a"})
+	if !hasValidationRule(t, err, "username", domain.FlowFieldValidationRuleMinLength) {
 		t.Fatalf("Validate err = %v, want min_length violation for password", err)
 	}
 }
 
 func TestSchemaFieldResolver_Validate_MaxLength(t *testing.T) {
-	resolver := newDefaultResolver(t)
+	t.Parallel()
+	resolver := domain.NewSchemaFieldResolver()
 	fields := resolveDefaultFields(t)
 	long := make([]byte, 65)
 	for i := range long {
@@ -66,12 +74,12 @@ func TestSchemaFieldResolver_Validate_MaxLength(t *testing.T) {
 }
 
 func TestSchemaFieldResolver_Validate_HappyPath(t *testing.T) {
-	resolver := newDefaultResolver(t)
+	t.Parallel()
+	resolver := domain.NewSchemaFieldResolver()
 	fields := resolveDefaultFields(t)
 
 	err := resolver.Validate(fields, map[string]any{
 		"email":       "alice@example.com",
-		"password":    "correct-horse-battery-staple",
 		"given_name":  "Alice",
 		"family_name": "Doe",
 		"username":    "alice",
@@ -82,7 +90,8 @@ func TestSchemaFieldResolver_Validate_HappyPath(t *testing.T) {
 }
 
 func TestSchemaFieldResolver_Validate_UnknownField(t *testing.T) {
-	resolver := newDefaultResolver(t)
+	t.Parallel()
+	resolver := domain.NewSchemaFieldResolver()
 	fields := resolveDefaultFields(t)
 
 	err := resolver.Validate(fields, map[string]any{"not_in_schema": "x"})
@@ -92,7 +101,8 @@ func TestSchemaFieldResolver_Validate_UnknownField(t *testing.T) {
 }
 
 func TestSchemaFieldResolver_Validate_NonStringValueReportsFormat(t *testing.T) {
-	resolver := newDefaultResolver(t)
+	t.Parallel()
+	resolver := domain.NewSchemaFieldResolver()
 	fields := resolveDefaultFields(t)
 
 	err := resolver.Validate(fields, map[string]any{"email": 123})

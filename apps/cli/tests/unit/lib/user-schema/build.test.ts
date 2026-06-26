@@ -15,11 +15,6 @@ describe("buildUserSchema", () => {
     expect(schema["x-auth-methods"].password).toEqual({ enabled: true, position: 0 });
   });
 
-  it("appends a password property with x-password: true (the engine's password marker)", () => {
-    const schema = buildUserSchema(["email"]);
-    expect(schema.properties?.password?.["x-password"]).toBe(true);
-  });
-
   it("returns a freshly allocated object on every call", () => {
     const a = buildUserSchema(["email"]);
     const b = buildUserSchema(["email"]);

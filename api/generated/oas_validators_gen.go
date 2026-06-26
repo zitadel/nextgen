@@ -2640,6 +2640,8 @@ func (s StepActionKind) Validate() error {
 		return nil
 	case "navigate":
 		return nil
+	case "back":
+		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}

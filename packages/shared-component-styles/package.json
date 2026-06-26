@@ -34,6 +34,8 @@
     "./icon.css": "./src/icon.css",
     "./card.css": "./src/card.css",
     "./page-shell.css": "./src/page-shell.css",
+    "./checkbox.css": "./src/checkbox.css",
+    "./select.css": "./src/select.css",
     "./lit/button-host.css": "./src/lit/button-host.css",
     "./lit/text-field-host.css": "./src/lit/text-field-host.css",
     "./lit/alert-host.css": "./src/lit/alert-host.css",
@@ -41,6 +43,8 @@
     "./lit/icon-host.css": "./src/lit/icon-host.css",
     "./lit/card-host.css": "./src/lit/card-host.css",
     "./lit/page-shell-host.css": "./src/lit/page-shell-host.css",
+    "./lit/checkbox-host.css": "./src/lit/checkbox-host.css",
+    "./lit/select-host.css": "./src/lit/select-host.css",
     "./pairs.json": "./pairs.json"
   },
   "devDependencies": {
