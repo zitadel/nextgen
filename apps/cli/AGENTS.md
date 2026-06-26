@@ -44,8 +44,8 @@ works. Dev and prod are separate Mixpanel projects. The channel is **stamped int
 the bundle at build time** and **defaults to `development`**: `tsdown`'s `define`
 sets `__ZITADEL_TELEMETRY_CHANNEL__` from `ZITADEL_TELEMETRY_BUILD_CHANNEL` (else
 `development`), so every contributor/CI build routes to the dev project. **Only
-the release pipeline** (`scripts/release.mjs`) sets that env to `production`, so
-the **published CLI routes real user traffic to prod**. Runtime precedence:
+the release pipeline** (`cli:build-release` and CLI `prepack`) sets that env to
+`production`, so the **published CLI routes real user traffic to prod**. Runtime precedence:
 explicit `ZITADEL_TELEMETRY_ENV`, then a runtime `ZITADEL_TELEMETRY_BUILD_CHANNEL`,
 then the build-time stamp. Ambient `NODE_ENV` is intentionally not consulted.
 
