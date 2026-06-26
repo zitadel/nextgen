@@ -1,10 +1,11 @@
 package postgres
 
 import (
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
@@ -30,12 +31,10 @@ func TestCompileReadFilterAndOrderBy(t *testing.T) {
 	})
 
 	wantSQL := testProjectQuery + " WHERE id = $1 ORDER BY created_at, id LIMIT $2"
-	if sql != wantSQL {
-		t.Fatalf("sql = %q, want %q", sql, wantSQL)
-	}
-	if len(args) != 2 || args[0] != "proj_1" || args[1] != uint32(10) {
-		t.Fatalf("args = %#v, want [proj_1, 10]", args)
-	}
+	assert.Equal(t, wantSQL, sql)
+	require.Len(t, args, 2)
+	assert.Equal(t, "proj_1", args[0])
+	assert.Equal(t, uint32(10), args[1])
 }
 
 func TestCompileReadKeysetCursorAsc(t *testing.T) {
@@ -64,23 +63,18 @@ func TestCompileReadKeysetCursorAsc(t *testing.T) {
 		},
 	})
 
-	if !strings.Contains(sql, "(created_at, id) > ($1, $2)") {
-		t.Fatalf("sql = %q, want keyset greater-than predicate", sql)
-	}
-	if len(args) != 3 {
-		t.Fatalf("args len = %d, want 3", len(args))
-	}
-	if args[0] != createdAt.UTC().Format(time.RFC3339) || args[1] != "proj_1" || args[2] != uint32(5) {
-		t.Fatalf("args = %#v", args)
-	}
+	assert.Contains(t, sql, "(created_at, id) > ($1, $2)")
+	require.Len(t, args, 3)
+	assert.Equal(t, createdAt.UTC().Format(time.RFC3339), args[0])
+	assert.Equal(t, "proj_1", args[1])
+	assert.Equal(t, uint32(5), args[2])
 }
 
 func compileProjectRead(t *testing.T, opts *database.ListOptions[domain.ProjectField]) (string, []any) {
 	t.Helper()
 
 	var compiler statementCompiler
-	if err := compileRead(&compiler, testProjectQuery, opts, projectSchema); err != nil {
-		t.Fatalf("compileRead() error = %v", err)
-	}
+	err := compileRead(&compiler, testProjectQuery, opts, projectSchema)
+	require.NoError(t, err)
 	return compiler.String(), compiler.args
 }

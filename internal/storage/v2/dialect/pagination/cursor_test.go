@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
@@ -21,15 +23,9 @@ func TestCursorMarshalRoundTrip(t *testing.T) {
 
 	token := original.Marshal()
 	decoded, err := pagination.CursorFromToken[domain.ProjectField](token)
-	if err != nil {
-		t.Fatalf("CursorFromToken() error = %v", err)
-	}
-	if !decoded.MatchesOrderBy(original.Columns) {
-		t.Fatal("decoded cursor columns do not match original order by")
-	}
-	if len(decoded.Values) != 2 {
-		t.Fatalf("decoded values len = %d, want 2", len(decoded.Values))
-	}
+	require.NoError(t, err)
+	assert.True(t, decoded.MatchesOrderBy(original.Columns))
+	require.Len(t, decoded.Values, 2)
 }
 
 func TestCursorMatchesOrderByMismatch(t *testing.T) {
@@ -38,9 +34,7 @@ func TestCursorMatchesOrderByMismatch(t *testing.T) {
 			database.Col(domain.ProjectFieldCreatedAt),
 		},
 	}
-	if cursor.MatchesOrderBy([]database.Column[domain.ProjectField]{
+	assert.False(t, cursor.MatchesOrderBy([]database.Column[domain.ProjectField]{
 		database.Col(domain.ProjectFieldID),
-	}) {
-		t.Fatal("expected order by mismatch")
-	}
+	}))
 }
