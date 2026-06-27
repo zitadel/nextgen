@@ -6,6 +6,8 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
+//go:generate go tool mockgen -typed -package domainmock -destination ./mock/flow_on_success.mock.go . FlowOnSuccessHandler,FlowPasskeyUserCreater
+
 // FlowOnSuccessHandler is the contract every on_success mutation
 // satisfies. The state machine calls Handle after a step's fields
 // validate and before its transition fires.
@@ -13,7 +15,11 @@ import (
 // Each [FlowOnSuccess] value maps to one handler. Implementations live
 // in their own file (e.g. flow_on_success_create_user.go).
 type FlowOnSuccessHandler interface {
-	Handle(ctx context.Context, client database.QueryExecutor, in FlowOnSuccessInput) (FlowOnSuccessResult, error)
+	Handle(ctx context.Context, in FlowOnSuccessInput) (FlowOnSuccessResult, error)
+}
+
+type FlowPasskeyUserCreater interface {
+	CreateProvisionalUser(ctx context.Context, client database.QueryExecutor, userID string, state *FlowState, resolved FlowResolvedFields) error
 }
 
 // ManifestForOnSuccess returns the credential kinds a mutation establishes.
@@ -47,10 +53,4 @@ type FlowOnSuccessResult struct {
 	// UserID is set when a handler creates a new user. The state machine
 	// records it and registers the user on the auth attempt.
 	UserID string
-}
-
-// FlowPasswordHasher hashes plaintext passwords into the PHC string
-// stored on [UserPassword.EncodedHash].
-type FlowPasswordHasher interface {
-	Hash(plain string) (encoded string, err error)
 }
