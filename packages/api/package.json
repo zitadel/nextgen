@@ -1,8 +1,17 @@
 {
   "name": "@zitadel/api",
   "version": "0.1.0-alpha.13",
-  "description": "Generated TypeScript API client for Zitadel NextGen",
+  "description": "Generated TypeScript API client for the pre-release Zitadel preview.",
+  "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/api#readme",
+  "bugs": {
+    "url": "https://github.com/zitadel/nextgen/issues"
+  },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zitadel/nextgen.git",
+    "directory": "packages/api"
+  },
   "type": "module",
   "files": [
     "dist",
