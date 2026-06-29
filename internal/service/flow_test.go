@@ -44,7 +44,7 @@ func (s testAllStatements) GetProjectByID(ctx context.Context, id string) (*doma
 	return nil, nil
 }
 
-func (testAllStatements) ListProjects(context.Context, *v2database.ListOptions) (*v2database.ListResult[*domain.Project], error) {
+func (testAllStatements) ListProjects(context.Context, *v2database.ListOptions[domain.ProjectField]) (*v2database.ListResult[*domain.Project], error) {
 	panic("unexpected call to ListProjects")
 }
 
@@ -60,7 +60,7 @@ func (testAllStatements) GetFlowDefinitionByID(context.Context, string) (*domain
 	panic("unexpected call to GetFlowDefinitionByID")
 }
 
-func (testAllStatements) ListFlowDefinitions(context.Context, *v2database.ListOptions) (*v2database.ListResult[*domain.FlowDefinition], error) {
+func (testAllStatements) ListFlowDefinitions(context.Context, *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
 	panic("unexpected call to ListFlowDefinitions")
 }
 

@@ -8,16 +8,16 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-type Cursor struct {
+type Cursor[F ~uint8] struct {
 	// Columns of the previous order by clause.
 	// They are used to determine if the [database.Page.OrderBy] has changed and if the cursor is still valid.
-	Columns []database.Column
+	Columns []database.Column[F] `json:"columns"`
 	// Values of the last row of the page. They are used to determine the next page of results.
-	Values []any
+	Values []any `json:"values"`
 }
 
-func CursorFromToken(token []byte) (*Cursor, error) {
-	var c Cursor
+func CursorFromToken[F ~uint8](token []byte) (*Cursor[F], error) {
+	var c Cursor[F]
 	decoded, err := base64.RawURLEncoding.DecodeString(string(token))
 	if err != nil {
 		return nil, err
@@ -28,7 +28,7 @@ func CursorFromToken(token []byte) (*Cursor, error) {
 	return &c, nil
 }
 
-func (c *Cursor) Marshal() []byte {
+func (c *Cursor[F]) Marshal() []byte {
 	payload, err := json.Marshal(c)
 	if err != nil {
 		// This should never happen, as the Cursor struct is simple and should always be serializable.
@@ -37,7 +37,7 @@ func (c *Cursor) Marshal() []byte {
 	return []byte(base64.RawURLEncoding.EncodeToString(payload))
 }
 
-func (c *Cursor) MatchesOrderBy(columns []database.Column) bool {
+func (c *Cursor[F]) MatchesOrderBy(columns []database.Column[F]) bool {
 	if len(c.Columns) != len(columns) {
 		return false
 	}

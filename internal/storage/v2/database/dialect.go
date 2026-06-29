@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"maps"
 	"slices"
@@ -38,7 +37,7 @@ func RegisterDialect(name string, decoder DialectDecoder) error {
 	dialectRegistryMu.Lock()
 	defer dialectRegistryMu.Unlock()
 	if _, exists := dialectRegistry[name]; exists {
-		return fmt.Errorf("database: dialect %q already registered", name)
+		return ErrDialectAlreadyRegistered(name)
 	}
 	dialectRegistry[name] = decoder
 	return nil
@@ -73,27 +72,27 @@ func (c Config) build(decoders map[string]DialectDecoder) (Dialect, error) {
 			slog.Info("no database dialect configured, fallback to default dialect")
 			return defaultDialect, nil
 		}
-		return nil, fmt.Errorf("database: no dialect configured")
+		return nil, ErrNoDialectConfigured()
 	}
 	if len(c.Raw) != 1 {
 		keys := slices.Collect(maps.Keys(c.Raw))
 		slices.Sort(keys)
-		return nil, fmt.Errorf("database: expected exactly one dialect, got %d (%v)", len(c.Raw), keys)
+		return nil, ErrMultipleDialectsConfigured(len(c.Raw), keys)
 	}
 
 	for name, raw := range c.Raw {
 		decoder, ok := decoders[name]
 		if !ok {
-			return nil, fmt.Errorf("database: unsupported dialect %q", name)
+			return nil, ErrUnsupportedDialect(name)
 		}
 		connector, err := decoder(raw)
 		if err != nil {
-			return nil, fmt.Errorf("database: decode %q: %w", name, err)
+			return nil, ErrDecodeDialect(name, err)
 		}
 		return connector, nil
 	}
 
-	return nil, fmt.Errorf("database: no dialect configured")
+	return nil, ErrNoDialectConfigured()
 }
 
 func snapshotDialects() map[string]DialectDecoder {

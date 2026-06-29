@@ -69,16 +69,36 @@ from a static `SELECT` base.
 
 ### 4. Portable filter AST
 
-[`Filter`](../../internal/storage/v2/database/filter.go) is a sealed interface
-tree (`And`, `Or`, `Equal`, `GreaterThan`, `LessThan`, …). [`Column`](../../internal/storage/v2/database/filter.go)
-is an opaque `uint8` token sourced from domain field enums (for example
-`domain.ProjectFieldID`). Mapping column tokens to SQL names is a dialect
-responsibility.
+[`Filter[F]`](../../internal/storage/v2/database/filter.go) is a sealed generic
+interface tree (`And`, `Or`, `Equal`, `GreaterThan`, `LessThan`, `CompareGreater`,
+`CompareLess`, `StringEqual`, `StringContains`, …) parameterized by a domain
+field enum (`F ~uint8`). [`Column[F]`](../../internal/storage/v2/database/column.go)
+wraps that enum via `database.Col(domain.ProjectFieldID)` so filters, order-by,
+and cursors cannot mix fields across entities at compile time.
+
+Single-column equality uses `Equal(col, value)`. Tuple comparisons for keyset
+pagination use explicit `CompareTerm` pairs:
+
+```go
+database.CompareGreater(
+    database.Term(database.Col(domain.ProjectFieldCreatedAt), createdAt),
+    database.Term(database.Col(domain.ProjectFieldID), id),
+)
+```
+
+String matching (`StringEqual`, `StringStartsWith`, `StringContains`,
+`StringEndsWith`, and `*Fold` ignore-case variants) lives in
+[`filter_string.go`](../../internal/storage/v2/database/filter_string.go).
+
+[`Schema[F, T]`](../../internal/storage/v2/database/schema.go) maps each field to
+a SQL column name and entity accessor. Dialect `schema_<entity>.go` files define
+per-entity bindings; the postgres compiler resolves `Column[F]` through the schema
+passed into `compileRead`.
 
 ### 5. Keyset pagination at the storage layer
 
-[`ListOptions`](../../internal/storage/v2/database/list.go) and
-[`pagination.Cursor`](../../internal/storage/v2/dialect/pagination/cursor.go) implement the
+[`ListOptions[F]`](../../internal/storage/v2/database/list.go) and
+[`pagination.Cursor[F]`](../../internal/storage/v2/dialect/pagination/cursor.go) implement the
 storage side of [ADR 009](009-cursor-based-pagination.md). The postgres compiler
 turns `Page.Cursor` into a keyset predicate plus `ORDER BY` and `LIMIT`. API
 token signing and opaqueness stay upstream of storage.
@@ -253,7 +273,7 @@ Dialect read compilation:
 
 ```go
 compiler.compileRead(projectQuery, &database.ListOptions{
-    Filter: database.Equal(database.Column(domain.ProjectFieldID), id),
+    Filter: database.Equal(database.Col(domain.ProjectFieldID), id),
 })
 ```
 
@@ -286,7 +306,6 @@ entries when no longer useful.
 
 - [ ] Implement `compileColumnName()` mapping from domain field enums to SQL column names
 - [ ] Fix `AndFilter`/`OrFilter` value vs pointer mismatch in postgres compiler
-- [ ] Enable `LessThanFilter` in compiler for DESC keyset pagination
 - [ ] Complete Spanner execution and dialect registration
 - [ ] Move migrations from v1 to v2 dialect packages (postgres + spanner)
 - [ ] Move embedded postgres startup to v2 postgres dialect

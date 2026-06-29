@@ -1,8 +1,8 @@
 package database
 
-type ListOptions struct {
-	Filter     Filter
-	Pagination Page
+type ListOptions[F ~uint8] struct {
+	Filter     Filter[F]
+	Pagination Page[F]
 }
 
 type ListResult[T any] struct {
@@ -17,16 +17,16 @@ const (
 	OrderDesc
 )
 
-type OrderBy struct {
-	Columns   []Column
+type OrderBy[F ~uint8] struct {
+	Columns   []Column[F]
 	Direction OrderDirection
 }
 
-type Page struct {
+type Page[F ~uint8] struct {
 	// Limit is the maximum number of items to return. If Limit is 0, no limit is applied.
 	Limit uint32
-	//OrderBy is the order in which to return the items.
-	OrderBy
+	// OrderBy is the order in which to return the items.
+	OrderBy OrderBy[F]
 	// Cursor is the cursor to start the page from. If Cursor is nil, the page starts from the beginning.
 	Cursor []byte
 }

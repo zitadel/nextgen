@@ -13,129 +13,183 @@ type statementCompiler struct {
 	args []any
 }
 
-func (c *statementCompiler) compileRead(stmt string, opt *database.ListOptions) error {
+func compileRead[F ~uint8, T any](c *statementCompiler, stmt string, opt *database.ListOptions[F], schema database.Schema[F, T]) error {
 	c.WriteString(stmt)
 
 	if len(opt.Pagination.Cursor) != 0 {
-		cursor, err := pagination.CursorFromToken(opt.Pagination.Cursor)
+		cursor, err := pagination.CursorFromToken[F](opt.Pagination.Cursor)
 		if err != nil {
 			return database.ErrInvalidCursor()
 		}
-		if !cursor.MatchesOrderBy(opt.Pagination.Columns) {
+		if !cursor.MatchesOrderBy(opt.Pagination.OrderBy.Columns) {
 			return database.ErrCursorOrderMismatch()
 		}
-		if opt.Pagination.Direction == database.OrderAsc {
-			opt.Filter = database.And(opt.Filter, database.GreaterThans(cursor.Columns, cursor.Values))
+		values, err := schema.CoerceCursorValues(cursor.Columns, cursor.Values)
+		if err != nil {
+			return database.ErrInvalidCursor().WithParent(err)
+		}
+		terms := compareTerms(cursor.Columns, values)
+		if opt.Pagination.OrderBy.Direction == database.OrderAsc {
+			opt.Filter = database.And(opt.Filter, database.CompareGreater(terms...))
 		} else {
-			opt.Filter = database.And(opt.Filter, database.LessThans(cursor.Columns, cursor.Values))
+			opt.Filter = database.And(opt.Filter, database.CompareLess(terms...))
 		}
 	}
 	if opt.Filter != nil {
 		c.WriteString(" WHERE ")
-		c.compileFilter(opt.Filter)
+		compileFilter(c, opt.Filter, schema)
 	}
 
-	c.compileOrderBy(opt.Pagination.OrderBy)
-	c.compileLimit(opt.Pagination.Limit)
+	compileOrderBy(c, opt.Pagination.OrderBy, schema)
+	compileLimit(c, opt.Pagination.Limit)
 
 	return nil
 }
 
-func (c *statementCompiler) compileFilter(filter database.Filter) {
+func compareTerms[F ~uint8](columns []database.Column[F], values []any) []database.CompareTerm[F] {
+	terms := make([]database.CompareTerm[F], len(columns))
+	for i, column := range columns {
+		terms[i] = database.Term(column, values[i])
+	}
+	return terms
+}
+
+func compileFilter[F ~uint8, T any](c *statementCompiler, filter database.Filter[F], schema database.Schema[F, T]) {
 	if filter == nil {
 		return
 	}
 
 	switch f := filter.(type) {
-	case *database.AndFilter:
-		c.compileAndFilter(f)
-	case *database.OrFilter:
-		c.compileOrFilter(f)
-	case *database.EqualsFilter:
-		c.compileFilterClause(f.Columns, f.Values, " = ")
-	// case *database.NotEqualFilter[C]:
-	// 	c.compileNotEqualFilter(f)
-	// case *database.LessThanFilter[C]:
-	// 	c.compileLessThanFilter(f)
-	// case *database.LessThanOrEqualFilter[C]:
-	// 	c.compileLessThanOrEqualFilter(f)
-	case *database.GreaterThanFilter:
-		c.compileFilterClause(f.Columns, f.Values, " > ")
-	// case *database.GreaterThanOrEqualFilter[C]:
-	// 	c.compileGreaterThanOrEqualFilter(f)
+	case database.AndFilter[F]:
+		compileAndFilter(c, f, schema)
+	case database.OrFilter[F]:
+		compileOrFilter(c, f, schema)
+	case *database.CompareFilter[F]:
+		compileCompareFilter(c, f, schema)
+	case *database.StringFilter[F]:
+		compileStringFilter(c, f, schema)
 	default:
 		panic("unknown filter type")
 	}
 }
 
-func (c *statementCompiler) compileAndFilter(filter *database.AndFilter) {
+func compileAndFilter[F ~uint8, T any](c *statementCompiler, filter database.AndFilter[F], schema database.Schema[F, T]) {
 	if len(filter.Filters) == 0 {
 		return
 	}
+	if len(filter.Filters) == 1 {
+		compileFilter(c, filter.Filters[0], schema)
+		return
+	}
 
-	c.WriteString(" (")
+	c.WriteString("(")
 	for i, child := range filter.Filters {
 		if i > 0 {
 			c.WriteString(" AND ")
 		}
-		c.compileFilter(child)
+		compileFilter(c, child, schema)
 	}
 	c.WriteString(")")
 }
 
-func (c *statementCompiler) compileOrFilter(filter *database.OrFilter) {
+func compileOrFilter[F ~uint8, T any](c *statementCompiler, filter database.OrFilter[F], schema database.Schema[F, T]) {
 	if len(filter.Filters) == 0 {
 		return
 	}
+	if len(filter.Filters) == 1 {
+		compileFilter(c, filter.Filters[0], schema)
+		return
+	}
 
-	c.WriteString(" (")
+	c.WriteString("(")
 	for i, child := range filter.Filters {
 		if i > 0 {
 			c.WriteString(" OR ")
 		}
-		c.compileFilter(child)
+		compileFilter(c, child, schema)
 	}
 	c.WriteString(")")
 }
 
-func (c *statementCompiler) compileFilterClause(columns []database.Column, values []any, operator string) {
-	if columns == nil || len(columns) != len(values) {
-		// TODO: error handling
+func compileCompareFilter[F ~uint8, T any](c *statementCompiler, filter *database.CompareFilter[F], schema database.Schema[F, T]) {
+	op := compareOpSQL(filter.Op)
+	if len(filter.Terms) == 1 {
+		c.WriteString(schema.SQLName(filter.Terms[0].Column))
+		c.WriteString(op)
+		writeArg(c, filter.Terms[0].Value)
 		return
 	}
 
-	if len(columns) > 1 {
-		c.WriteString(" (")
-	}
-	for i, column := range columns {
+	c.WriteString("(")
+	for i, term := range filter.Terms {
 		if i > 0 {
 			c.WriteString(", ")
 		}
-		c.WriteString(compileColumnName(column))
+		c.WriteString(schema.SQLName(term.Column))
 	}
-	if len(columns) > 1 {
-		c.WriteString(") ")
+	c.WriteString(")")
+	c.WriteString(op)
+	c.WriteString("(")
+	for i, term := range filter.Terms {
+		if i > 0 {
+			c.WriteString(", ")
+		}
+		writeArg(c, term.Value)
 	}
+	c.WriteString(")")
+}
 
-	c.WriteString(operator)
-
-	if len(values) > 1 {
-		c.WriteString("(")
-	}
-	c.writeArgs(values...)
-	if len(values) > 1 {
-		c.WriteString(")")
+func compareOpSQL(op database.CompareOp) string {
+	switch op {
+	case database.OpEqual:
+		return " = "
+	case database.OpGreater:
+		return " > "
+	case database.OpLess:
+		return " < "
+	default:
+		panic("unknown compare op")
 	}
 }
 
-func (c *statementCompiler) compileOrderBy(orderBy database.OrderBy) {
+func compileStringFilter[F ~uint8, T any](c *statementCompiler, filter *database.StringFilter[F], schema database.Schema[F, T]) {
+	col := schema.SQLName(filter.Column)
+	switch filter.Match {
+	case database.StringMatchEqual:
+		if filter.IgnoreCase {
+			c.WriteString("LOWER(")
+			c.WriteString(col)
+			c.WriteString(") = LOWER(")
+			writeArg(c, filter.Value)
+			c.WriteString(")")
+		} else {
+			c.WriteString(col)
+			c.WriteString(" = ")
+			writeArg(c, filter.Value)
+		}
+	case database.StringMatchStartsWith, database.StringMatchContains, database.StringMatchEndsWith:
+		pattern := likePattern(filter.Match, filter.Value)
+		if filter.IgnoreCase {
+			c.WriteString(col)
+			c.WriteString(" ILIKE ")
+		} else {
+			c.WriteString(col)
+			c.WriteString(" LIKE ")
+		}
+		writeArg(c, pattern)
+	default:
+		panic("unknown string match")
+	}
+}
+
+func compileOrderBy[F ~uint8, T any](c *statementCompiler, orderBy database.OrderBy[F], schema database.Schema[F, T]) {
 	if len(orderBy.Columns) > 0 {
 		c.WriteString(" ORDER BY ")
 		for i, column := range orderBy.Columns {
 			if i > 0 {
 				c.WriteString(", ")
 			}
-			c.WriteString(compileColumnName(column))
+			c.WriteString(schema.SQLName(column))
 			if orderBy.Direction == database.OrderDesc {
 				c.WriteString(" DESC")
 			}
@@ -143,76 +197,24 @@ func (c *statementCompiler) compileOrderBy(orderBy database.OrderBy) {
 	}
 }
 
-func (c *statementCompiler) compileLimit(limit uint32) {
+func compileLimit(c *statementCompiler, limit uint32) {
 	if limit > 0 {
 		c.WriteString(" LIMIT ")
-		c.writeArg(limit)
+		writeArg(c, limit)
 	}
 }
 
-func (c *statementCompiler) writeArgs(args ...any) {
+func writeArgs(c *statementCompiler, args ...any) {
 	for i, arg := range args {
 		if i > 0 {
 			c.WriteString(", ")
 		}
-		c.writeArg(arg)
+		writeArg(c, arg)
 	}
 }
 
-func (c *statementCompiler) writeArg(arg any) {
+func writeArg(c *statementCompiler, arg any) {
 	c.args = append(c.args, arg)
 	c.WriteString("$")
 	c.WriteString(strconv.Itoa(len(c.args)))
-}
-
-func compileColumnName(column any) string {
-	return "id"
-	// switch col := column.(type) {
-	// case domain.ProjectField:
-	// 	switch col {
-	// 	case domain.ProjectFieldID:
-	// 		return "id"
-	// 	case domain.ProjectFieldCreatedAt:
-	// 		return "created_at"
-	// 	case domain.ProjectFieldUpdatedAt:
-	// 		return "updated_at"
-	// 	case domain.ProjectFieldProjectSecret:
-	// 		return "project_secret"
-	// 	case domain.ProjectFieldPreviewSecret:
-	// 		return "preview_secret"
-	// 	case domain.ProjectFieldPreviewOrigins:
-	// 		return "preview_origins"
-	// 	default:
-	// 		panic("unknown column type")
-	// 	}
-	// case domain.FlowDefinitionField:
-	// 	switch col {
-	// 	case domain.FlowDefinitionFieldProjectID:
-	// 		return "project_id"
-	// 	case domain.FlowDefinitionFieldID:
-	// 		return "id"
-	// 	case domain.FlowDefinitionFieldName:
-	// 		return "name"
-	// 	case domain.FlowDefinitionFieldSchemaVersion:
-	// 		return "schema_version"
-	// 	case domain.FlowDefinitionFieldStatus:
-	// 		return "status"
-	// 	case domain.FlowDefinitionFieldCreatedAt:
-	// 		return "created_at"
-	// 	case domain.FlowDefinitionFieldUpdatedAt:
-	// 		return "updated_at"
-	// 	case domain.FlowDefinitionFieldUserSchema:
-	// 		return "user_schema"
-	// 	case domain.FlowDefinitionFieldPurposes:
-	// 		return "purposes"
-	// 	case domain.FlowDefinitionFieldAudience:
-	// 		return "audience"
-	// 	case domain.FlowDefinitionFieldSteps:
-	// 		return "steps"
-	// 	default:
-	// 		panic("unknown column type")
-	// 	}
-	// default:
-	// 	panic("unknown column type")
-	// }
 }
