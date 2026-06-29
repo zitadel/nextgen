@@ -56,8 +56,30 @@ func CoerceNumberValue[E Number](v any) (E, error) {
 	switch n := v.(type) {
 	case E:
 		return n, nil
-	case float32, float64, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
-		return n.(E), nil
+	case float32:
+		return E(n), nil
+	case float64:
+		return E(n), nil
+	case int:
+		return E(n), nil
+	case int8:
+		return E(n), nil
+	case int16:
+		return E(n), nil
+	case int32:
+		return E(n), nil
+	case int64:
+		return E(n), nil
+	case uint:
+		return E(n), nil
+	case uint8:
+		return E(n), nil
+	case uint16:
+		return E(n), nil
+	case uint32:
+		return E(n), nil
+	case uint64:
+		return E(n), nil
 	case string:
 		return parseNumber[E](n)
 	default:
