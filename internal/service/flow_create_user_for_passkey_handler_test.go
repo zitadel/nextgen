@@ -110,7 +110,7 @@ func TestFlowCreateUserForPasskey_HonorsPreAssignedUserID(t *testing.T) {
 		"givenName": "Alice",
 	})
 
-	err := f.handler.CreateProvisionalUser(t.Context(),"user_provisional", state, domain.FlowResolvedFields{})
+	err := f.handler.CreateProvisionalUser(t.Context(), "user_provisional", state)
 	require.NoError(t, err)
 	require.NotNil(t, captured)
 	assert.Equal(t, "user_provisional", captured.ID, "pre-assigned id must reach the user repository unchanged")
@@ -137,7 +137,7 @@ func TestFlowCreateUserForPasskey_PersistsAllCollectedSchemaFields(t *testing.T)
 		"familyName": "Doe",
 	})
 
-	err := f.handler.CreateProvisionalUser(t.Context(),"user_1", state, domain.FlowResolvedFields{})
+	err := f.handler.CreateProvisionalUser(t.Context(), "user_1", state)
 	require.NoError(t, err)
 	require.NotNil(t, captured)
 
@@ -163,7 +163,7 @@ func TestFlowCreateUserForPasskey_UserAlreadyExistsIsSilent(t *testing.T) {
 
 	state := passkeyFlowState(map[string]any{"email": "alice@example.com"})
 
-	err := f.handler.CreateProvisionalUser(t.Context(),"user_1", state, domain.FlowResolvedFields{})
+	err := f.handler.CreateProvisionalUser(t.Context(), "user_1", state)
 	assert.NoError(t, err, "racing prior on_success must not surface as an error")
 }
 
@@ -179,6 +179,6 @@ func TestFlowCreateUserForPasskey_OtherErrorsPropagate(t *testing.T) {
 
 	state := passkeyFlowState(map[string]any{"email": "alice@example.com"})
 
-	err := f.handler.CreateProvisionalUser(t.Context(),"user_1", state, domain.FlowResolvedFields{})
+	err := f.handler.CreateProvisionalUser(t.Context(), "user_1", state)
 	require.Error(t, err)
 }

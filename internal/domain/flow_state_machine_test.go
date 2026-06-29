@@ -1875,7 +1875,7 @@ func TestFlowStateMachine_Process_PasskeyRegisterIssueThenVerify(t *testing.T) {
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.ids.EXPECT().New(gomock.Any()).Return(userID, nil)
 	w.createUserForPasskey.EXPECT().
-		CreateProvisionalUser(gomock.Any(), userID, gomock.Any(), gomock.Any()).
+		CreateProvisionalUser(gomock.Any(), userID, gomock.Any()).
 		Times(1)
 	w.passkeyRegService.EXPECT().
 		IssuePasskeyRegistrationChallenge(gomock.Any(), gomock.Cond(func(in domain.FlowIssuePasskeyRegistrationChallengeInput) bool {

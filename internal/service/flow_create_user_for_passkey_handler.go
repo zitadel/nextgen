@@ -27,9 +27,7 @@ func NewFlowCreateUserForPasskeyHandler(
 	}
 }
 
-// resolved is accepted for interface symmetry; attributes are derived from
-// the schema, not the resolved fields.
-func (h *FlowCreateUserForPasskeyHandler) CreateProvisionalUser(ctx context.Context, userID string, state *domain.FlowState, _ domain.FlowResolvedFields) error {
+func (h *FlowCreateUserForPasskeyHandler) CreateProvisionalUser(ctx context.Context, userID string, state *domain.FlowState) error {
 	state.CollectedData.UserData["$schema"] = state.UserSchemaURL
 	action := NewCreateUserAction(
 		CreateUserInput{

@@ -637,7 +637,7 @@ func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client dat
 			provisional := state.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey
 			if provisional {
 				state.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey = false
-				if err := r.userForPasskeyCreater.CreateProvisionalUser(ctx, userID, state, passkeyResolved); err != nil {
+				if err := r.userForPasskeyCreater.CreateProvisionalUser(ctx, userID, state); err != nil {
 					return passkeyPhaseResult{}, fmt.Errorf("flow state machine: ensure user exists: %w", err)
 				}
 			}
