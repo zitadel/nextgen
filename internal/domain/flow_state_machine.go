@@ -311,8 +311,13 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	}
 
 	// Every other kind carries inputs through the same field-prep
-	// pipeline (resolve + prefill + validate + merge).
-	prepared, halt, err := r.prepareFields(ctx, client, state, currentStep, userSchemaURL, in.Fields)
+	// pipeline: resolve+prefill the step's schema, then validate the
+	// submitted values and merge them into CollectedData.
+	resolved, err := r.resolveInputs(ctx, client, state, currentStep)
+	if err != nil {
+		return FlowStepResult{}, err
+	}
+	halt, err := r.validateAndMerge(state, currentStep, resolved, in.Fields)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
@@ -331,53 +336,50 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 
 	switch actionKind {
 	case FlowActionKindPasskey:
-		return r.processPasskeyLogin(ctx, client, def, state, currentStep, prepared, in, userSchemaURL)
+		return r.processPasskeyLogin(ctx, client, def, state, currentStep, resolved, in, userSchemaURL)
 	case FlowActionKindPasskeyRegister:
-		return r.processPasskeyRegister(ctx, client, def, state, currentStep, prepared, in, userSchemaURL)
+		return r.processPasskeyRegister(ctx, client, def, state, currentStep, resolved, in, userSchemaURL)
 	default:
 		// FlowActionKindSubmit and the zero value (an action declared
 		// without an explicit kind, common in fixtures) both go through
 		// the submit pipeline. An unknown user-supplied action ends up
 		// here too and fails at the transition lookup inside [routeOutcome].
-		return r.processSubmit(ctx, client, def, state, currentStep, prepared, in, userSchemaURL)
+		return r.processSubmit(ctx, client, def, state, currentStep, resolved, in, userSchemaURL)
 	}
 }
 
-// preparedStep captures the inputs the per-kind processors share: the
-// step's resolved field shape, after prefill and validation. Created
-// once per submit by [FlowStateMachineRuntime.prepareFields].
-type preparedStep struct {
-	resolved FlowResolvedFields
-}
-
-// prepareFields runs the input pipeline shared by every
-// input-carrying kind: resolve the step's fields, prefill from
-// CollectedData, validate the submitted values, and merge the new
-// values back into state. Returns (prepared, nil, nil) on success;
-// (zero, halt, nil) when validation fails — halt is a rendered step
-// with the validation error attached, ready to return to the client;
-// (zero, nil, err) on infrastructure failure.
-func (r *FlowStateMachineRuntime) prepareFields(ctx context.Context, client database.QueryExecutor, state *FlowState, currentStep *FlowDefinitionStep, userSchemaURL string, fields map[string]any) (preparedStep, *FlowStepResult, error) {
-	resolved, err := r.resolveStepFields(ctx, client, state.ProjectID, userSchemaURL, currentStep)
+// resolveInputs prepares the step's input shape: resolves the declared
+// fields against the user schema and prefills values already in
+// CollectedData (so prior-step entries pre-populate the next form).
+func (r *FlowStateMachineRuntime) resolveInputs(ctx context.Context, client database.QueryExecutor, state *FlowState, currentStep *FlowDefinitionStep) (FlowResolvedFields, error) {
+	resolved, err := r.resolveStepFields(ctx, client, state.ProjectID, state.UserSchemaURL, currentStep)
 	if err != nil {
-		return preparedStep{}, nil, err
+		return FlowResolvedFields{}, err
 	}
 	prefillFromCollected(&resolved, state.CollectedData.UserData)
+	return resolved, nil
+}
 
+// validateAndMerge validates the submitted values against the resolved
+// step and, on success, merges them into state.CollectedData. Returns
+// a non-nil halt when validation surfaces a step error (the rendered
+// step is ready to send to the client); returns nil when the submit
+// is clean and the per-kind processor should proceed.
+func (r *FlowStateMachineRuntime) validateAndMerge(state *FlowState, currentStep *FlowDefinitionStep, resolved FlowResolvedFields, fields map[string]any) (*FlowStepResult, error) {
 	if validationErr := r.fields.Validate(resolved, fields); validationErr != nil {
 		if errs, ok := errors.AsType[FlowFieldValidationErrors](validationErr); ok {
 			step := r.buildStep(currentStep, resolved, new(errs.Error()), nil, nil)
 			state.IssuedAt = r.now()
-			return preparedStep{}, &FlowStepResult{State: state, Step: step}, nil
+			return &FlowStepResult{State: state, Step: step}, nil
 		}
-		return preparedStep{}, nil, fmt.Errorf("flow state machine: validate fields: %w", validationErr)
+		return nil, fmt.Errorf("flow state machine: validate fields: %w", validationErr)
 	}
 
 	if err := mergeCollected(state, fields); err != nil {
-		return preparedStep{}, nil, fmt.Errorf("flow state machine: validate fields: %w", err)
+		return nil, fmt.Errorf("flow state machine: validate fields: %w", err)
 	}
 
-	return preparedStep{resolved: resolved}, nil, nil
+	return nil, nil
 }
 
 // renderStepError builds a halt result that keeps the user on the
@@ -447,15 +449,15 @@ func (r *FlowStateMachineRuntime) routeOutcome(ctx context.Context, client datab
 // routeOutcome, or a halt result if dispatch / on_success surfaced a
 // soft failure. Shared by [processSubmit] and the
 // ceremony-abandoned fall-through in the passkey processors.
-func (r *FlowStateMachineRuntime) runDispatchAndOnSuccess(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, currentStep *FlowDefinitionStep, prepared preparedStep, in FlowSubmitInput, userSchemaURL string) (string, *FlowStepResult, error) {
+func (r *FlowStateMachineRuntime) runDispatchAndOnSuccess(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, currentStep *FlowDefinitionStep, resolved FlowResolvedFields, in FlowSubmitInput, userSchemaURL string) (string, *FlowStepResult, error) {
 	routeOutcome := in.Action
 
-	dispatch, err := r.dispatchChallenges(ctx, def, state, currentStep, prepared.resolved, in.Fields)
+	dispatch, err := r.dispatchChallenges(ctx, def, state, currentStep, resolved, in.Fields)
 	if err != nil {
 		return "", nil, err
 	}
 	if dispatch.StepError != nil {
-		halt := r.renderStepError(state, currentStep, prepared.resolved, dispatch.StepError)
+		halt := r.renderStepError(state, currentStep, resolved, dispatch.StepError)
 		return "", &halt, nil
 	}
 	if dispatch.Outcome != "" {
@@ -478,7 +480,7 @@ func (r *FlowStateMachineRuntime) runDispatchAndOnSuccess(ctx context.Context, c
 		return "", nil, err
 	}
 	if result.StepError != nil {
-		halt := r.renderStepError(state, currentStep, prepared.resolved, result.StepError)
+		halt := r.renderStepError(state, currentStep, resolved, result.StepError)
 		return "", &halt, nil
 	}
 	if result.Outcome != "" {
@@ -500,15 +502,15 @@ func (r *FlowStateMachineRuntime) runDispatchAndOnSuccess(ctx context.Context, c
 
 // processSubmit handles kind=submit: dispatch → on_success →
 // routeOutcome.
-func (r *FlowStateMachineRuntime) processSubmit(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, currentStep *FlowDefinitionStep, prepared preparedStep, in FlowSubmitInput, userSchemaURL string) (FlowStepResult, error) {
-	outcome, halt, err := r.runDispatchAndOnSuccess(ctx, client, def, state, currentStep, prepared, in, userSchemaURL)
+func (r *FlowStateMachineRuntime) processSubmit(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, currentStep *FlowDefinitionStep, resolved FlowResolvedFields, in FlowSubmitInput, userSchemaURL string) (FlowStepResult, error) {
+	outcome, halt, err := r.runDispatchAndOnSuccess(ctx, client, def, state, currentStep, resolved, in, userSchemaURL)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
 	if halt != nil {
 		return *halt, nil
 	}
-	return r.routeOutcome(ctx, client, def, state, currentStep, prepared.resolved, outcome, in.Action, userSchemaURL)
+	return r.routeOutcome(ctx, client, def, state, currentStep, resolved, outcome, in.Action, userSchemaURL)
 }
 
 // processPasskeyLogin handles kind=passkey. The issue leg runs
@@ -518,23 +520,23 @@ func (r *FlowStateMachineRuntime) processSubmit(ctx context.Context, client data
 // (a pending challenge mismatches the submitted action), the
 // submission falls back to the standard dispatch + on_success pipeline
 // so it still progresses.
-func (r *FlowStateMachineRuntime) processPasskeyLogin(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, currentStep *FlowDefinitionStep, prepared preparedStep, in FlowSubmitInput, userSchemaURL string) (FlowStepResult, error) {
+func (r *FlowStateMachineRuntime) processPasskeyLogin(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, currentStep *FlowDefinitionStep, resolved FlowResolvedFields, in FlowSubmitInput, userSchemaURL string) (FlowStepResult, error) {
 	if in.ChallengeResponse == nil {
-		dispatch, err := r.dispatchChallenges(ctx, def, state, currentStep, prepared.resolved, in.Fields)
+		dispatch, err := r.dispatchChallenges(ctx, def, state, currentStep, resolved, in.Fields)
 		if err != nil {
 			return FlowStepResult{}, err
 		}
 		if dispatch.StepError != nil {
-			return r.renderStepError(state, currentStep, prepared.resolved, dispatch.StepError), nil
+			return r.renderStepError(state, currentStep, resolved, dispatch.StepError), nil
 		}
 		if dispatch.Outcome != "" {
 			// user_not_found et al — skip the ceremony and route via the
 			// diverted outcome (e.g. straight to choose-register).
-			return r.routeOutcome(ctx, client, def, state, currentStep, prepared.resolved, dispatch.Outcome, in.Action, userSchemaURL)
+			return r.routeOutcome(ctx, client, def, state, currentStep, resolved, dispatch.Outcome, in.Action, userSchemaURL)
 		}
 	}
 
-	pk, err := r.processPasskey(ctx, client, state, currentStep, prepared.resolved, prepared.resolved, in, FlowActionKindPasskey)
+	pk, err := r.processPasskey(ctx, client, state, currentStep, resolved, resolved, in, FlowActionKindPasskey)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
@@ -542,10 +544,10 @@ func (r *FlowStateMachineRuntime) processPasskeyLogin(ctx context.Context, clien
 		return *pk.halt, nil
 	}
 	if !pk.handled {
-		return r.fallBackToStandardPipeline(ctx, client, def, state, currentStep, prepared, in, userSchemaURL)
+		return r.fallBackToStandardPipeline(ctx, client, def, state, currentStep, resolved, in, userSchemaURL)
 	}
 
-	return r.routeOutcome(ctx, client, def, state, currentStep, prepared.resolved, in.Action, in.Action, userSchemaURL)
+	return r.routeOutcome(ctx, client, def, state, currentStep, resolved, in.Action, in.Action, userSchemaURL)
 }
 
 // processPasskeyRegister handles kind=passkey_register. Resolves the
@@ -553,8 +555,8 @@ func (r *FlowStateMachineRuntime) processPasskeyLogin(ctx context.Context, clien
 // incorporate attributes collected on earlier steps, then runs the
 // ceremony. As with [processPasskeyLogin], abandonment falls back to
 // the standard pipeline.
-func (r *FlowStateMachineRuntime) processPasskeyRegister(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, currentStep *FlowDefinitionStep, prepared preparedStep, in FlowSubmitInput, userSchemaURL string) (FlowStepResult, error) {
-	passkeyResolved := prepared.resolved
+func (r *FlowStateMachineRuntime) processPasskeyRegister(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, currentStep *FlowDefinitionStep, resolved FlowResolvedFields, in FlowSubmitInput, userSchemaURL string) (FlowStepResult, error) {
+	passkeyResolved := resolved
 	if needsPasskeyRegistrationVisitedFields(state, in, FlowActionKindPasskeyRegister) {
 		visitedResolved, err := r.resolveVisitedFields(ctx, client, state.ProjectID, userSchemaURL, def, state, currentStep)
 		if err != nil {
@@ -563,7 +565,7 @@ func (r *FlowStateMachineRuntime) processPasskeyRegister(ctx context.Context, cl
 		passkeyResolved = visitedResolved
 	}
 
-	pk, err := r.processPasskey(ctx, client, state, currentStep, prepared.resolved, passkeyResolved, in, FlowActionKindPasskeyRegister)
+	pk, err := r.processPasskey(ctx, client, state, currentStep, resolved, passkeyResolved, in, FlowActionKindPasskeyRegister)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
@@ -571,10 +573,10 @@ func (r *FlowStateMachineRuntime) processPasskeyRegister(ctx context.Context, cl
 		return *pk.halt, nil
 	}
 	if !pk.handled {
-		return r.fallBackToStandardPipeline(ctx, client, def, state, currentStep, prepared, in, userSchemaURL)
+		return r.fallBackToStandardPipeline(ctx, client, def, state, currentStep, resolved, in, userSchemaURL)
 	}
 
-	return r.routeOutcome(ctx, client, def, state, currentStep, prepared.resolved, in.Action, in.Action, userSchemaURL)
+	return r.routeOutcome(ctx, client, def, state, currentStep, resolved, in.Action, in.Action, userSchemaURL)
 }
 
 // fallBackToStandardPipeline is the post-abandonment recovery path
@@ -584,15 +586,15 @@ func (r *FlowStateMachineRuntime) processPasskeyRegister(ctx context.Context, cl
 // !handled; the engine still owes the user a response, so we run the
 // standard dispatch + on_success pipeline as if the submit were a
 // plain submit-kind action on this step.
-func (r *FlowStateMachineRuntime) fallBackToStandardPipeline(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, currentStep *FlowDefinitionStep, prepared preparedStep, in FlowSubmitInput, userSchemaURL string) (FlowStepResult, error) {
-	outcome, halt, err := r.runDispatchAndOnSuccess(ctx, client, def, state, currentStep, prepared, in, userSchemaURL)
+func (r *FlowStateMachineRuntime) fallBackToStandardPipeline(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, currentStep *FlowDefinitionStep, resolved FlowResolvedFields, in FlowSubmitInput, userSchemaURL string) (FlowStepResult, error) {
+	outcome, halt, err := r.runDispatchAndOnSuccess(ctx, client, def, state, currentStep, resolved, in, userSchemaURL)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
 	if halt != nil {
 		return *halt, nil
 	}
-	return r.routeOutcome(ctx, client, def, state, currentStep, prepared.resolved, outcome, in.Action, userSchemaURL)
+	return r.routeOutcome(ctx, client, def, state, currentStep, resolved, outcome, in.Action, userSchemaURL)
 }
 
 // flowDispatchResult summarizes the challenge dispatch loop. Outcome
