@@ -22,6 +22,15 @@ tasks:
     outputs:
       - "/dist/release/**/*"
     options:
+      # Never cache the pack task itself. It stages release tarballs that feed
+      # local installs (`workspace:cli`, `workspace:journey`) and CI freshness
+      # checks, which must reflect the current package sources. The task has no
+      # inputs tied to the packages it bundles, so a cached run silently served
+      # stale tarballs after package edits. The expensive work (embedded UI,
+      # public package, and server builds) is invoked through their own
+      # moon/go-cached steps inside the script, so re-running pack only redoes
+      # the cheap staging/tar step.
+      cache: false
       runFromWorkspaceRoot: true
       runInCI: false
 

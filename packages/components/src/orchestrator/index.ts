@@ -1,14 +1,16 @@
 /**
- * Orchestrator surface: the `<zitadel-login>` and `<zitadel-logout>`
- * elements and their supporting primitives. Importing this barrel
- * side-effect-registers the elements.
+ * Orchestrator surface: the `<zitadel-login>`, `<zitadel-logout>`, and
+ * `<zitadel-session>` elements and their supporting primitives. Importing this
+ * barrel side-effect-registers the elements.
  */
 
 import "./zitadel-login.js";
 import "./zitadel-logout.js";
+import "./zitadel-session.js";
 
 export { ZitadelLogin } from "./zitadel-login.js";
 export { ZitadelLogout } from "./zitadel-logout.js";
+export { ZitadelSession } from "./zitadel-session.js";
 export {
   applyBrandingTokens,
   buildBrandingStylesheet,

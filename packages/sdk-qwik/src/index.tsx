@@ -1,12 +1,15 @@
 import type {
   ZitadelLogin as ZitadelLoginElement,
   ZitadelLogout as ZitadelLogoutElement,
+  ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 import type {
   ZitadelLoginConfig,
   ZitadelLoginHandlers,
   ZitadelLogoutConfig,
   ZitadelLogoutHandlers,
+  ZitadelSessionConfig,
+  ZitadelSessionHandlers,
 } from "@zitadel/sdk-core/types";
 
 import "@zitadel/components";
@@ -169,6 +172,67 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
       }}
       {...projectProp(props.project, props.projectId, props.proxyPath)}
       post-sign-out-url={props.postSignOutUrl}
+    />
+  );
+});
+
+/**
+ * Props for {@link ZitadelSession}. Supply the SDK handle via {@link project},
+ * or the discrete `projectId` / `proxyPath` the widget reads as properties. The
+ * `on…$` QRL callbacks are derived from the shared {@link ZitadelSessionHandlers}
+ * contract. Pass an optional {@link ref} signal to obtain the underlying
+ * `<zitadel-session>` element imperatively.
+ */
+export type ZitadelSessionProps = ZitadelSessionConfig &
+  Qrlify<ZitadelSessionHandlers> & {
+    /**
+     * Optional signal populated with the underlying `<zitadel-session>` element
+     * once it mounts, mirroring React's `forwardRef`.
+     */
+    readonly ref?: Signal<ZitadelSessionElement | undefined>;
+  };
+
+/**
+ * Qwik component wrapping the `<zitadel-session>` web component — the
+ * post-sign-in "signed in as" card. Binds the {@link ZitadelProject} handle as
+ * a DOM property (or the discrete project id / proxy path) and forwards the
+ * widget's `zitadel-continue` and `zitadel-signout` events as optional
+ * callbacks.
+ */
+export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
+  const host = useSignal<ZitadelSessionElement>();
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(
+    ({ track, cleanup }) => {
+      const el = track(() => host.value);
+      if (!el) {
+        return;
+      }
+      const onContinue = (event: Event): void => void props.onContinue$?.(eventDetail(event));
+      const onSignout = (event: Event): void => void props.onSignout$?.(eventDetail(event));
+      el.addEventListener("zitadel-continue", onContinue);
+      el.addEventListener("zitadel-signout", onSignout);
+      cleanup(() => {
+        el.removeEventListener("zitadel-continue", onContinue);
+        el.removeEventListener("zitadel-signout", onSignout);
+      });
+    },
+    { strategy: "document-ready" },
+  );
+  return (
+    <zitadel-session
+      ref={(el) => {
+        host.value = el;
+        if (props.ref) {
+          props.ref.value = el;
+        }
+      }}
+      {...projectProp(props.project, props.projectId, props.proxyPath)}
+      continue-url={props.continueUrl}
+      post-sign-out-url={props.postSignOutUrl}
+      heading={props.heading}
+      continue-label={props.continueLabel}
+      logout-label={props.logoutLabel}
     />
   );
 });

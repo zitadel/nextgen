@@ -5,7 +5,7 @@ import { PROXY_PATH } from "../proxy";
 /**
  * The managed `src/app.tsx`: a minimal path-based router that renders the
  * `@zitadel/sdk-qwik` widgets — a landing chooser at `/`, login at `/login`,
- * register at `/register`, and the logout widget at `/profile`. Exports a named `App`
+ * register at `/register`, and the signed-in session card at `/profile`. Exports a named `App`
  * (`component$`) to match the create-vite Qwik entry (`main.tsx` imports
  * `{ App }`). The project id comes from `VITE_ZITADEL_PROJECT_ID`. No secret
  * reaches the browser: the dev proxy in `vite.config.*` attaches the project
@@ -14,7 +14,7 @@ import { PROXY_PATH } from "../proxy";
 export function appTemplate(): string {
   return `${MANAGED_MARKER}
 import { component$ } from "@builder.io/qwik";
-import { ZitadelLogin, ZitadelLogout, configureZitadel } from "@zitadel/sdk-qwik";
+import { ZitadelLogin, ZitadelSession, configureZitadel } from "@zitadel/sdk-qwik";
 
 const project = configureZitadel({
   projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID,
@@ -42,7 +42,7 @@ export const App = component$(() => {
   if (path.startsWith("/profile")) {
     return (
       <div style={{ position: "fixed", inset: "0", overflow: "auto", background: "#0f0f11", colorScheme: "dark" }}>
-        <ZitadelLogout project={project} postSignOutUrl="/login" />
+        <ZitadelSession project={project} continueUrl="/" postSignOutUrl="/login" />
       </div>
     );
   }

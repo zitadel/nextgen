@@ -5,7 +5,7 @@ import { PROXY_PATH } from "../proxy";
 /**
  * The managed `src/App.svelte`: a minimal path-based router that renders the
  * `@zitadel/sdk-svelte` widgets — a landing chooser at `/`, login at `/login`,
- * register at `/register`, and the logout widget at `/profile`. The managed marker lives in
+ * register at `/register`, and the signed-in session card at `/profile`. The managed marker lives in
  * the `<script lang="ts">` block (a JS comment) so eject/doctor stay
  * marker-aware. The project id comes from `VITE_ZITADEL_PROJECT_ID`. No secret
  * reaches the browser: the dev proxy in `vite.config.*` attaches the project
@@ -14,7 +14,7 @@ import { PROXY_PATH } from "../proxy";
 export function appTemplate(): string {
   return `<script lang="ts">
 ${MANAGED_MARKER}
-import { ZitadelLogin, ZitadelLogout, configureZitadel } from "@zitadel/sdk-svelte";
+import { ZitadelLogin, ZitadelSession, configureZitadel } from "@zitadel/sdk-svelte";
 
 const project = configureZitadel({
   projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID,
@@ -38,7 +38,7 @@ const path = window.location.pathname;
   </main>
 {:else if path.startsWith("/profile")}
   <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
-    <ZitadelLogout {project} postSignOutUrl="/login" />
+    <ZitadelSession {project} continueUrl="/" postSignOutUrl="/login" />
   </div>
 {:else if path.startsWith("/register")}
   <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">

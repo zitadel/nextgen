@@ -47,6 +47,12 @@ export interface ZitadelSignoutDetail {
   readonly email: string;
 }
 
+/** Payload of the `zitadel-continue` event (the signed-in identity). */
+export interface ZitadelContinueDetail {
+  readonly name: string;
+  readonly email: string;
+}
+
 /* ───────────────────────────  SPA widget contract  ───────────────────────
  * Single source of truth shared by every SPA SDK (react, vue, angular, solid,
  * svelte, qwik). The event maps below declare which widget events exist and
@@ -71,6 +77,16 @@ export interface ZitadelLogoutEventMap {
 }
 
 /**
+ * Events emitted by `<zitadel-session>`, keyed to their detail payload.
+ * `zitadel-signout` reuses {@link ZitadelSignoutDetail} so the post-sign-in
+ * card and the avatar menu speak the same sign-out contract.
+ */
+export interface ZitadelSessionEventMap {
+  "zitadel-continue": ZitadelContinueDetail;
+  "zitadel-signout": ZitadelSignoutDetail;
+}
+
+/**
  * Maps each `<zitadel-login>` event to the callback prop the SDKs expose. The
  * `satisfies Record<keyof ZitadelLoginEventMap, …>` is the drift lock: every
  * event needs exactly one handler entry — a missing one, or an extra one left
@@ -88,6 +104,12 @@ export const ZITADEL_LOGOUT_EVENT_HANDLERS = {
   "zitadel-signout": "onSignout",
 } as const satisfies Record<keyof ZitadelLogoutEventMap, `on${string}`>;
 
+/** Maps each `<zitadel-session>` event to the callback prop the SDKs expose. */
+export const ZITADEL_SESSION_EVENT_HANDLERS = {
+  "zitadel-continue": "onContinue",
+  "zitadel-signout": "onSignout",
+} as const satisfies Record<keyof ZitadelSessionEventMap, `on${string}`>;
+
 /** Runtime list of `<zitadel-login>` event names (drives wiring + drift tests). */
 export const ZITADEL_LOGIN_EVENTS = Object.keys(
   ZITADEL_LOGIN_EVENT_HANDLERS,
@@ -97,6 +119,11 @@ export const ZITADEL_LOGIN_EVENTS = Object.keys(
 export const ZITADEL_LOGOUT_EVENTS = Object.keys(
   ZITADEL_LOGOUT_EVENT_HANDLERS,
 ) as (keyof ZitadelLogoutEventMap)[];
+
+/** Runtime list of `<zitadel-session>` event names. */
+export const ZITADEL_SESSION_EVENTS = Object.keys(
+  ZITADEL_SESSION_EVENT_HANDLERS,
+) as (keyof ZitadelSessionEventMap)[];
 
 /** Configuration props shared by every `ZitadelLogin` wrapper. */
 export interface ZitadelLoginConfig {
@@ -124,6 +151,26 @@ export interface ZitadelLogoutConfig {
   readonly postSignOutUrl?: string;
 }
 
+/** Configuration props shared by every `ZitadelSession` wrapper. */
+export interface ZitadelSessionConfig {
+  /** The SDK handle from `configureZitadel(...)`. */
+  readonly project?: ZitadelProject;
+  /** Discrete project id, read when no {@link project} handle is supplied. */
+  readonly projectId?: string;
+  /** Reverse-proxy path prefix the widget calls. */
+  readonly proxyPath?: string;
+  /** Where the Continue action navigates. Provisional contract. */
+  readonly continueUrl?: string;
+  /** Where to navigate after sign-out. */
+  readonly postSignOutUrl?: string;
+  /** Heading text override. */
+  readonly heading?: string;
+  /** Continue (primary) action label override. */
+  readonly continueLabel?: string;
+  /** Logout (secondary) action label override. */
+  readonly logoutLabel?: string;
+}
+
 /**
  * Plain-callback handlers for the `<zitadel-login>` events, derived from
  * {@link ZitadelLoginEventMap} and {@link ZITADEL_LOGIN_EVENT_HANDLERS} so the
@@ -142,8 +189,18 @@ export type ZitadelLogoutHandlers = {
   ) => void;
 };
 
+/** Plain-callback handlers for the `<zitadel-session>` events (derived, as above). */
+export type ZitadelSessionHandlers = {
+  readonly [E in keyof ZitadelSessionEventMap as (typeof ZITADEL_SESSION_EVENT_HANDLERS)[E]]?: (
+    detail: ZitadelSessionEventMap[E],
+  ) => void;
+};
+
 /** Full prop set for a `ZitadelLogin` wrapper (config + plain-callback handlers). */
 export type ZitadelLoginProps = ZitadelLoginConfig & ZitadelLoginHandlers;
 
 /** Full prop set for a `ZitadelLogout` wrapper (config + plain-callback handlers). */
 export type ZitadelLogoutProps = ZitadelLogoutConfig & ZitadelLogoutHandlers;
+
+/** Full prop set for a `ZitadelSession` wrapper (config + plain-callback handlers). */
+export type ZitadelSessionProps = ZitadelSessionConfig & ZitadelSessionHandlers;

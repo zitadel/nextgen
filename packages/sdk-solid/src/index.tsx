@@ -1,6 +1,7 @@
 import type {
   ZitadelLogin as ZitadelLoginElement,
   ZitadelLogout as ZitadelLogoutElement,
+  ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 
 import "@zitadel/components";
@@ -15,12 +16,14 @@ import {
 } from "@zitadel/api/config";
 
 import type {
+  ZitadelContinueDetail,
   ZitadelFlowCompleteDetail,
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,
   ZitadelFlowStepDetail,
   ZitadelLoginProps,
   ZitadelLogoutProps,
+  ZitadelSessionProps,
   ZitadelSignoutDetail,
 } from "./types";
 
@@ -46,6 +49,19 @@ declare module "solid-js" {
         "project-id"?: string;
         "proxy-path"?: string;
         "post-sign-out-url"?: string;
+        "on:zitadel-signout"?: (event: CustomEvent<ZitadelSignoutDetail>) => void;
+      };
+      "zitadel-session": Omit<HTMLAttributes<HTMLElement>, "ref"> & {
+        ref?: ZitadelSessionElement | ((el: ZitadelSessionElement) => void);
+        "prop:project"?: ZitadelProject;
+        "project-id"?: string;
+        "proxy-path"?: string;
+        "continue-url"?: string;
+        "post-sign-out-url"?: string;
+        heading?: string;
+        "continue-label"?: string;
+        "logout-label"?: string;
+        "on:zitadel-continue"?: (event: CustomEvent<ZitadelContinueDetail>) => void;
         "on:zitadel-signout"?: (event: CustomEvent<ZitadelSignoutDetail>) => void;
       };
     }
@@ -107,6 +123,37 @@ export function ZitadelLogout(
       project-id={props.projectId}
       proxy-path={props.proxyPath}
       post-sign-out-url={props.postSignOutUrl}
+      on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
+    />
+  );
+}
+
+/**
+ * Solid component wrapping the `<zitadel-session>` web component — the
+ * post-sign-in "signed in as" card. Binds the {@link ZitadelProject} handle as
+ * a DOM property (or the discrete project id / proxy path as attributes) and
+ * forwards the widget's `zitadel-continue` and `zitadel-signout` events as
+ * optional callbacks.
+ *
+ * A forwarded `ref` resolves to the underlying `<zitadel-session>` DOM element.
+ */
+export function ZitadelSession(
+  props: ZitadelSessionProps & {
+    ref?: ZitadelSessionElement | ((el: ZitadelSessionElement) => void);
+  },
+): JSX.Element {
+  return (
+    <zitadel-session
+      ref={props.ref}
+      prop:project={props.project}
+      project-id={props.projectId}
+      proxy-path={props.proxyPath}
+      continue-url={props.continueUrl}
+      post-sign-out-url={props.postSignOutUrl}
+      heading={props.heading}
+      continue-label={props.continueLabel}
+      logout-label={props.logoutLabel}
+      on:zitadel-continue={(event) => props.onContinue?.(event.detail)}
       on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
     />
   );

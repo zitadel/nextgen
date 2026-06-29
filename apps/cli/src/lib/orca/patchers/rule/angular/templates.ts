@@ -13,14 +13,14 @@ export function appComponentTemplate(projectId: string): string {
 import { Component } from "@angular/core";
 import {
   ZitadelLoginComponent,
-  ZitadelLogoutComponent,
+  ZitadelSessionComponent,
   configureZitadel,
 } from "@zitadel/sdk-angular";
 
 @Component({
   selector: "app-root",
   standalone: true,
-  imports: [ZitadelLoginComponent, ZitadelLogoutComponent],
+  imports: [ZitadelLoginComponent, ZitadelSessionComponent],
   templateUrl: "./app.html",
 })
 export class App {
@@ -53,7 +53,11 @@ export function appTemplateHtml(): string {
   </main>
 } @else if (path.startsWith('/profile')) {
   <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
-    <zitadel-auth-logout [project]="project" [postSignOutUrl]="'/login'"></zitadel-auth-logout>
+    <zitadel-auth-session
+      [project]="project"
+      [continueUrl]="'/'"
+      [postSignOutUrl]="'/login'"
+    ></zitadel-auth-session>
   </div>
 } @else if (path.startsWith('/register')) {
   <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">

@@ -9,16 +9,19 @@ import {
 import {
   ZitadelLogin as ZitadelLoginElement,
   ZitadelLogout as ZitadelLogoutElement,
+  ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 import * as React from "react";
 
 import type {
+  ZitadelContinueDetail,
   ZitadelFlowCompleteDetail,
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,
   ZitadelFlowStepDetail,
   ZitadelLoginProps,
   ZitadelLogoutProps,
+  ZitadelSessionProps,
   ZitadelSignoutDetail,
 } from "./types";
 
@@ -69,6 +72,16 @@ const ZitadelLogoutElementReact = createComponent({
   tagName: "zitadel-logout",
   elementClass: ZitadelLogoutElement,
   events: {
+    onZitadelSignout: "zitadel-signout" as EventName<CustomEvent<ZitadelSignoutDetail>>,
+  },
+});
+
+const ZitadelSessionElementReact = createComponent({
+  react: React,
+  tagName: "zitadel-session",
+  elementClass: ZitadelSessionElement,
+  events: {
+    onZitadelContinue: "zitadel-continue" as EventName<CustomEvent<ZitadelContinueDetail>>,
     onZitadelSignout: "zitadel-signout" as EventName<CustomEvent<ZitadelSignoutDetail>>,
   },
 });
@@ -125,3 +138,27 @@ export const ZitadelLogout = React.forwardRef<ZitadelLogoutElement, ZitadelLogou
 );
 
 ZitadelLogout.displayName = "ZitadelLogout";
+
+/**
+ * React component wrapping the `<zitadel-session>` web component — the
+ * post-sign-in "signed in as" card. Binds the `ZitadelProject` handle as a DOM
+ * property (or the discrete project id / proxy path as attributes) and forwards
+ * the widget's `zitadel-continue` and `zitadel-signout` events as optional
+ * callbacks.
+ *
+ * A forwarded `ref` resolves to the underlying `<zitadel-session>` DOM element.
+ */
+export const ZitadelSession = React.forwardRef<ZitadelSessionElement, ZitadelSessionProps>(
+  function ZitadelSession({ onContinue, onSignout, ...props }, ref) {
+    return (
+      <ZitadelSessionElementReact
+        {...props}
+        ref={ref}
+        onZitadelContinue={onContinue && ((event) => onContinue(event.detail))}
+        onZitadelSignout={onSignout && ((event) => onSignout(event.detail))}
+      />
+    );
+  },
+);
+
+ZitadelSession.displayName = "ZitadelSession";

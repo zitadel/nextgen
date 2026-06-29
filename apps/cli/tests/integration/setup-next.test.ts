@@ -87,12 +87,11 @@ describe("Next setup integration", () => {
     expect(registerPage).not.toContain('href="/profile"');
     const profilePage = await readFile(join(cwd, "app/profile/page.tsx"), "utf8");
     expect(profilePage).toContain("zitadel-cli: managed-file v1");
-    expect(profilePage).toContain("<zitadel-logout");
+    expect(profilePage).toContain("<zitadel-session");
     expect(profilePage).toContain("configureZitadel");
     expect(profilePage).toContain("project={project}");
     expect(profilePage).toContain('post-sign-out-url="/login"');
-    expect(profilePage).toContain('fetch("/__nextgen/sessions/me"');
-    expect(profilePage).toContain("Signed in profile loaded");
+    expect(profilePage).toContain('continue-url="/"');
     const proxy = await readFile(join(cwd, "proxy.ts"), "utf8");
     expect(proxy).toContain("zitadel-cli: managed-file v1");
     expect(proxy).toContain("nextgenMiddleware");
