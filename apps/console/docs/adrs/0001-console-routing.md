@@ -8,42 +8,38 @@
 
 ## Context
 
-The console (`apps/console`) is a Vite + React + TanStack Router SPA, but today
-it is only **scaffold** — wired up just far enough to prove the app builds,
-embeds, and runs. The current files (`__root.tsx` header + `<Outlet />`, an
-`index.tsx` welcome page, and the two minimal router stubs in
-[`src/main.tsx`](../../src/main.tsx) and [`src/router.tsx`](../../src/router.tsx))
-are placeholders, not a design to preserve. The #440 build-out can start the
-routing layer from scratch.
+Issue #440 builds the console (`apps/console`) into a real admin app: an app
+shell (sidebar, header, responsive layout) and file-based routes for the API
+resources (users, teams, sessions, projects, flow definitions, schemas,
+system). This is a greenfield build — the routing layer is designed from
+scratch, and this ADR records that design up front so the first route is
+written against an agreed shape.
 
-Issue #440 asks us to build the app shell (sidebar, header, responsive layout)
-and the file-based routes for the API resources (users, teams, sessions,
-projects, flow definitions, schemas, system). Starting fresh, we still want a
-recorded decision up front so the first real route is written against an agreed
-shape rather than whatever the placeholder happened to do. Three things are
-worth fixing in the design before any route is built:
+The decisions below answer three questions every route in the app depends on:
 
-1. **Where the router is constructed.** There should be one obvious place that
-   builds the router and owns the `declare module "@tanstack/react-router"`
-   register augmentation — not a config inlined in the entry point plus a
-   second factory variant, which is how the scaffold currently looks.
+1. **Where the router is constructed** — one obvious home that builds the
+   router and owns the `declare module "@tanstack/react-router"` register
+   augmentation, so there is a single canonical router for the app.
 
-2. **How the basepath is chosen.** The router basepath has to match the Vite
-   `base` ([`vite.config.mts`](../../vite.config.mts):
-   `command === "build" || isPreview ? "/ui/console/" : "/"`). We want a single
-   source of truth for that prefix rather than a hand-written, per-environment
-   copy — `vite preview` (PROD-built assets served by a "serve" command) is the
-   case a naive `import.meta.env.PROD` check gets wrong.
+2. **How the basepath is chosen** — the router basepath must match the
+   deployment prefix in every environment without being maintained by hand.
 
-3. **Data-loading and boundary convention.** #440 requires every list page to
-   have loading, empty, and error states. Whether that comes from route
-   `loader`s or in-component fetching, and where pending/error/not-found
-   boundaries live, should be decided once.
+3. **The data-loading and boundary convention** — #440 requires every list
+   page to have loading, empty, and error states; where data is fetched and
+   where pending/error/not-found boundaries live is decided once, not per page.
 
-The console is embedded into the Go server under `/ui/console/` and served as
-a static SPA with an `index.html` fallback for unknown client routes (see
-[`internal/staticui/handler.go`](../../../../internal/staticui/handler.go)).
-Routing decisions therefore have to survive a hard refresh on a deep link.
+Two product constraints shape the answers:
+
+- The console is **embedded into the Go server under `/ui/console/`** and
+  served as a static SPA with an `index.html` fallback for unknown client
+  routes (see
+  [`internal/staticui/handler.go`](../../../../internal/staticui/handler.go)).
+  Routing must survive a hard refresh on a deep link, and the client basepath
+  must line up with that embed prefix.
+- That embed prefix is owned by the Vite `base`
+  ([`vite.config.mts`](../../vite.config.mts):
+  `command === "build" || isPreview ? "/ui/console/" : "/"`), so the router
+  should take the prefix from there rather than declaring its own copy.
 
 ## Decision
 
@@ -69,8 +65,7 @@ There is exactly **one** place that constructs the router: a single
 [`src/main.tsx`](../../src/main.tsx) only imports and renders it — the entry
 point does not build its own router. The
 `declare module "@tanstack/react-router"` register block lives next to that
-factory and is the only one in the app. (The placeholder scaffold currently
-has two router stubs; the build-out replaces them with this single factory.)
+factory and is the only one in the app.
 
 Router options are decided once, in that factory:
 
@@ -78,11 +73,10 @@ Router options are decided once, in that factory:
 - `scrollRestoration: true`.
 - `basepath` — derived, not hardcoded (next section).
 
-### 3. Basepath is derived from the Vite base, not branched on `PROD`
+### 3. Basepath is derived from the Vite base
 
-The router `basepath` is derived from `import.meta.env.BASE_URL` (the value
-Vite injects from the `base` option) rather than re-deriving the prefix from
-`import.meta.env.PROD`:
+The router `basepath` is derived from `import.meta.env.BASE_URL` — the value
+Vite injects from its `base` option:
 
 ```ts
 // the single router factory
@@ -91,10 +85,11 @@ const basepath = import.meta.env.BASE_URL.replace(/\/$/, "") || undefined;
 
 This makes the router prefix track [`vite.config.mts`](../../vite.config.mts)
 automatically: `BASE_URL` is `/ui/console/` for `build`/`preview` and `/` for
-the dev server, so the router and the emitted asset base can never disagree —
-including the `vite preview` case that a `PROD` check gets wrong. The
+the dev server, so the router and the emitted asset base always agree —
+including under `vite preview` (PROD-built assets served by a "serve" command),
+which is where an `import.meta.env.PROD` check would get the prefix wrong. The
 `/ui/console/` prefix is owned by exactly one file (`vite.config.mts`); the
-router consumes it.
+router consumes it instead of declaring its own copy.
 
 ### 4. Route tree for the #440 resources
 
@@ -173,8 +168,7 @@ the sidebar.
 ## Consequences
 
 - **One canonical router.** `main.tsx` renders the factory from `router.tsx`;
-  router options and the register augmentation have a single home, instead of
-  the placeholder scaffold's two stubs.
+  router options and the register augmentation have a single home.
 - **Prefix can't drift.** Deriving `basepath` from `BASE_URL` ties it to the
   Vite `base`, so adding/renaming the embed prefix is a one-file change and
   `vite preview` behaves like production.
