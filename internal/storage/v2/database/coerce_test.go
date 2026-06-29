@@ -34,12 +34,12 @@ func TestCoerceTimeValue(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestCoerceUint8Value(t *testing.T) {
-	got, err := database.CoerceUint8Value[domain.FlowDefinitionStatus](float64(domain.FlowDefinitionStatusActive))
+func TestCoerceNumberValue(t *testing.T) {
+	got, err := database.CoerceNumberValue[domain.FlowDefinitionStatus](float64(domain.FlowDefinitionStatusActive))
 	require.NoError(t, err)
 	assert.Equal(t, domain.FlowDefinitionStatusActive, got)
 
-	got, err = database.CoerceUint8Value[domain.FlowDefinitionStatus](domain.FlowDefinitionStatusDraft)
+	got, err = database.CoerceNumberValue[domain.FlowDefinitionStatus](domain.FlowDefinitionStatusDraft)
 	require.NoError(t, err)
 	assert.Equal(t, domain.FlowDefinitionStatusDraft, got)
 }

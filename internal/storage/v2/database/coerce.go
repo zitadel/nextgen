@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strconv"
 	"time"
+
+	"golang.org/x/exp/constraints"
 )
 
 // CoerceStringValue coerces a JSON-decoded value into a string.
@@ -45,29 +47,28 @@ func CoerceTime(v any) (any, error) {
 	return CoerceTimeValue(v)
 }
 
-// CoerceUint8Value coerces a JSON-decoded value into a uint8-based enum.
-func CoerceUint8Value[E ~uint8](v any) (E, error) {
+type Number interface {
+	constraints.Float | constraints.Integer | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64
+}
+
+// CoerceNumberValue coerces a JSON-decoded value into a uint8-based enum.
+func CoerceNumberValue[E Number](v any) (E, error) {
 	switch n := v.(type) {
 	case E:
 		return n, nil
-	case float64:
-		return E(n), nil
+	case float32, float64, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		return n.(E), nil
 	case string:
-		parsed, err := strconv.ParseUint(n, 10, 8)
-		if err != nil {
-			var zero E
-			return zero, ErrCoerceParse("The cursor enum value could not be parsed.", err)
-		}
-		return E(parsed), nil
+		return parseNumber[E](n)
 	default:
 		var zero E
 		return zero, ErrCoerceExpectedType("uint8 enum", v)
 	}
 }
 
-// CoerceUint8 coerces a JSON-decoded value into a uint8-based enum for SQL binding.
-func CoerceUint8[E ~uint8](v any) (any, error) {
-	return CoerceUint8Value[E](v)
+// CoerceNumber coerces a JSON-decoded value into a uint8-based enum for SQL binding.
+func CoerceNumber[E Number](v any) (any, error) {
+	return CoerceNumberValue[E](v)
 }
 
 // CoerceJSONValue coerces a JSON-decoded value into T via marshal/unmarshal when needed.
@@ -154,5 +155,47 @@ func CoerceSlice[T any](v any, coerceElem func(any) (T, error)) ([]T, error) {
 func CoerceSliceAsAny[T any](coerceElem func(any) (T, error)) func(any) (any, error) {
 	return func(v any) (any, error) {
 		return CoerceSlice(v, coerceElem)
+	}
+}
+
+func parseNumber[E Number](v string) (number E, err error) {
+	defer func() {
+		if err != nil {
+			err = ErrCoerceParse("The cursor number value could not be parsed.", err)
+		}
+	}()
+	switch any(number).(type) {
+	case uint8:
+		parsed, err := strconv.ParseUint(v, 10, 8)
+		return E(parsed), err
+	case uint16:
+		parsed, err := strconv.ParseUint(v, 10, 16)
+		return E(parsed), err
+	case uint32:
+		parsed, err := strconv.ParseUint(v, 10, 32)
+		return E(parsed), err
+	case uint, uint64:
+		parsed, err := strconv.ParseUint(v, 10, 64)
+		return E(parsed), err
+	case int8:
+		parsed, err := strconv.ParseInt(v, 10, 8)
+		return E(parsed), err
+	case int16:
+		parsed, err := strconv.ParseInt(v, 10, 16)
+		return E(parsed), err
+	case int32:
+		parsed, err := strconv.ParseInt(v, 10, 32)
+		return E(parsed), err
+	case int, int64:
+		parsed, err := strconv.ParseInt(v, 10, 64)
+		return E(parsed), err
+	case float32:
+		parsed, err := strconv.ParseFloat(v, 32)
+		return E(parsed), err
+	case float64:
+		parsed, err := strconv.ParseFloat(v, 64)
+		return E(parsed), err
+	default:
+		return number, ErrCoerceExpectedType("number", v)
 	}
 }

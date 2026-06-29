@@ -42,7 +42,7 @@ var flowDefinitionSchema = database.NewSchema(map[domain.FlowDefinitionField]dat
 	domain.FlowDefinitionFieldStatus: {
 		SQLName:  "status",
 		Accessor: func(d *domain.FlowDefinition) any { return d.Status },
-		Coerce:   database.CoerceUint8[domain.FlowDefinitionStatus],
+		Coerce:   database.CoerceNumber[domain.FlowDefinitionStatus],
 	},
 	domain.FlowDefinitionFieldCreatedAt: {
 		SQLName:  "created_at",
