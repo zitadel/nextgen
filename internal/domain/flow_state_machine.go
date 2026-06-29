@@ -307,7 +307,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	// on_success) and routes straight to the matching transition. Pure
 	// routing — the submitted fields are irrelevant.
 	if actionKind == FlowActionKindNavigate {
-		return r.commit(ctx, client, def, state, currentStep, FlowResolvedFields{}, in.Action, in.Action, userSchemaURL)
+		return r.routeOutcome(ctx, client, def, state, currentStep, FlowResolvedFields{}, in.Action, in.Action, userSchemaURL)
 	}
 
 	// Every other kind carries inputs through the same field-prep
@@ -338,7 +338,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 		// FlowActionKindSubmit and the zero value (an action declared
 		// without an explicit kind, common in fixtures) both go through
 		// the submit pipeline. An unknown user-supplied action ends up
-		// here too and fails at the transition lookup inside [commit].
+		// here too and fails at the transition lookup inside [routeOutcome].
 		return r.processSubmit(ctx, client, def, state, currentStep, prepared, in, userSchemaURL)
 	}
 }
@@ -389,14 +389,15 @@ func (r *FlowStateMachineRuntime) renderStepError(state *FlowState, currentStep 
 	return FlowStepResult{State: state, Step: step}
 }
 
-// commit completes a submission: looks up the transition for outcome,
-// applies any purpose flip, advances state, and renders the next step
+// routeOutcome resolves a submission's outcome through the transition
+// table and lands the user on the next step: looks up the transition,
+// applies any purpose flip, advances state, then renders the next step
 // (or terminates on a terminal step). When outcome differs from
 // originalAction it came from a handler diversion (e.g.
 // user_not_found from dispatch); a missing transition in that case
 // degrades to a step error since the user-supplied action did resolve
 // cleanly.
-func (r *FlowStateMachineRuntime) commit(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, currentStep *FlowDefinitionStep, resolved FlowResolvedFields, outcome, originalAction, userSchemaURL string) (FlowStepResult, error) {
+func (r *FlowStateMachineRuntime) routeOutcome(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, currentStep *FlowDefinitionStep, resolved FlowResolvedFields, outcome, originalAction, userSchemaURL string) (FlowStepResult, error) {
 	transition, ok := currentStep.Transitions[outcome]
 	if !ok {
 		if outcome != originalAction {
@@ -414,7 +415,7 @@ func (r *FlowStateMachineRuntime) commit(ctx context.Context, client database.Qu
 		return FlowStepResult{}, fmt.Errorf("%w: transition target %q missing from definition", ErrIntegrity, transition.Target)
 	}
 
-	// Flip after the route is committed; an outcome with no wired
+	// Flip after the route is resolved; an outcome with no wired
 	// transition leaves CurrentPurpose untouched.
 	applyOutcomeFlip(state, outcome)
 
@@ -497,7 +498,8 @@ func (r *FlowStateMachineRuntime) runDispatchAndOnSuccess(ctx context.Context, c
 	return routeOutcome, nil, nil
 }
 
-// processSubmit handles kind=submit: dispatch → on_success → commit.
+// processSubmit handles kind=submit: dispatch → on_success →
+// routeOutcome.
 func (r *FlowStateMachineRuntime) processSubmit(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, currentStep *FlowDefinitionStep, prepared preparedStep, in FlowSubmitInput, userSchemaURL string) (FlowStepResult, error) {
 	outcome, halt, err := r.runDispatchAndOnSuccess(ctx, client, def, state, currentStep, prepared, in, userSchemaURL)
 	if err != nil {
@@ -506,7 +508,7 @@ func (r *FlowStateMachineRuntime) processSubmit(ctx context.Context, client data
 	if halt != nil {
 		return *halt, nil
 	}
-	return r.commit(ctx, client, def, state, currentStep, prepared.resolved, outcome, in.Action, userSchemaURL)
+	return r.routeOutcome(ctx, client, def, state, currentStep, prepared.resolved, outcome, in.Action, userSchemaURL)
 }
 
 // processPasskeyLogin handles kind=passkey. The issue leg runs
@@ -528,7 +530,7 @@ func (r *FlowStateMachineRuntime) processPasskeyLogin(ctx context.Context, clien
 		if dispatch.Outcome != "" {
 			// user_not_found et al — skip the ceremony and route via the
 			// diverted outcome (e.g. straight to choose-register).
-			return r.commit(ctx, client, def, state, currentStep, prepared.resolved, dispatch.Outcome, in.Action, userSchemaURL)
+			return r.routeOutcome(ctx, client, def, state, currentStep, prepared.resolved, dispatch.Outcome, in.Action, userSchemaURL)
 		}
 	}
 
@@ -543,7 +545,7 @@ func (r *FlowStateMachineRuntime) processPasskeyLogin(ctx context.Context, clien
 		return r.fallBackToStandardPipeline(ctx, client, def, state, currentStep, prepared, in, userSchemaURL)
 	}
 
-	return r.commit(ctx, client, def, state, currentStep, prepared.resolved, in.Action, in.Action, userSchemaURL)
+	return r.routeOutcome(ctx, client, def, state, currentStep, prepared.resolved, in.Action, in.Action, userSchemaURL)
 }
 
 // processPasskeyRegister handles kind=passkey_register. Resolves the
@@ -572,7 +574,7 @@ func (r *FlowStateMachineRuntime) processPasskeyRegister(ctx context.Context, cl
 		return r.fallBackToStandardPipeline(ctx, client, def, state, currentStep, prepared, in, userSchemaURL)
 	}
 
-	return r.commit(ctx, client, def, state, currentStep, prepared.resolved, in.Action, in.Action, userSchemaURL)
+	return r.routeOutcome(ctx, client, def, state, currentStep, prepared.resolved, in.Action, in.Action, userSchemaURL)
 }
 
 // fallBackToStandardPipeline is the post-abandonment recovery path
@@ -590,7 +592,7 @@ func (r *FlowStateMachineRuntime) fallBackToStandardPipeline(ctx context.Context
 	if halt != nil {
 		return *halt, nil
 	}
-	return r.commit(ctx, client, def, state, currentStep, prepared.resolved, outcome, in.Action, userSchemaURL)
+	return r.routeOutcome(ctx, client, def, state, currentStep, prepared.resolved, outcome, in.Action, userSchemaURL)
 }
 
 // flowDispatchResult summarizes the challenge dispatch loop. Outcome
