@@ -148,8 +148,8 @@ jobs:
           if [ -n "$RECOVER_VERSION" ]; then
             args+=(--recover-version "$RECOVER_VERSION")
           fi
-          # Keep the GitHub Actions environment intact: npm trusted publishing
-          # uses it to exchange the workflow OIDC token during real publishes.
+          # Dry runs do not publish, so provenance stays off here. Real
+          # publishes keep the GitHub Actions environment intact for OIDC.
           moon run "${args[@]}"
         env:
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
@@ -165,10 +165,10 @@ jobs:
             args+=(-- --recover-version "$RECOVER_VERSION")
           fi
           # Keep the GitHub Actions environment intact: npm trusted publishing
-          # uses it to exchange the workflow OIDC token during real publishes.
+          # and provenance use it to exchange the workflow OIDC token.
           moon run "${args[@]}"
         env:
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_CONFIG_PROVENANCE: "false"
+          NPM_CONFIG_PROVENANCE: "true"
           RECOVER_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.recover_version || '' }}

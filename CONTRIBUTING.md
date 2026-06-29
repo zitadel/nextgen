@@ -1,5 +1,11 @@
 # Contributing
 
+This repository contains a pre-release Zitadel preview. It is public for
+visibility, feedback, and security reporting, but we are not yet accepting
+external code contributions here unless a maintainer explicitly asks for one.
+The workflows below are primarily for the Zitadel team and invited
+contributors while the preview stabilizes.
+
 If you want to add Zitadel to your own app rather than contribute here, see the
 [quick-start guide in README.md](README.md).
 
