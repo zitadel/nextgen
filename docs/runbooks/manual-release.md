@@ -7,8 +7,9 @@ prose is written manually by maintainers.
 
 ## Normal release
 
-1. Make sure every user-visible public package or product change has a
-   `.changeset/*.md`.
+1. Make sure every change that ships in the release has a `.changeset/*.md`,
+   including shipped Go server changes (list `@zitadel/server`); see the
+   [changeset decision table](../../.changeset/README.md#decision-table).
 2. Merge those changes to `main`.
 3. `release-publish` runs the Changesets action and opens or updates the
    generated version PR.

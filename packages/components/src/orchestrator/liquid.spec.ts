@@ -180,6 +180,65 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain("invalid");
   });
 
+  it("renders passkey registration challenges with registration ceremony", () => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    const context = {
+      step: { name: "passkey-enroll", texts: { title_key: "passkey-enroll.title" } },
+      fields: [],
+      actions: [],
+      branding: {},
+      loading: false,
+      errors: [],
+      gates: {},
+      sso_providers: [],
+      messages: [],
+      identity: null,
+      challenge: {
+        method: "passkey_register",
+        challenge_id: "reg-1",
+        options: {
+          challenge: "AAAA",
+          rp: { id: "example.com", name: "example.com" },
+          user: { id: "dXNlci0x", name: "alice@example.com", displayName: "Alice" },
+          pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+        },
+      },
+    };
+
+    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    expect(result).toContain("<zl-passkey");
+    expect(result).toContain('ceremony="register"');
+    expect(result).toContain('method="passkey_register"');
+    expect(result).toContain('challenge-id="reg-1"');
+  });
+
+  it("keeps legacy passkey registration challenges working when options.user is present", () => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    const context = {
+      step: { name: "passkey-enroll", texts: { title_key: "passkey-enroll.title" } },
+      fields: [],
+      actions: [],
+      branding: {},
+      loading: false,
+      errors: [],
+      gates: {},
+      sso_providers: [],
+      messages: [],
+      identity: null,
+      challenge: {
+        method: "passkey",
+        challenge_id: "reg-1",
+        options: {
+          user: { id: "dXNlci0x", name: "alice@example.com", displayName: "Alice" },
+        },
+      },
+    };
+
+    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    expect(result).toContain('ceremony="register"');
+    expect(result).toContain('method="passkey_register"');
+  });
+
   it("renders the signed-in screen when the step is the signed-in confirmation", () => {
     const engine = createLiquidEngine({ locale });
     const context = {

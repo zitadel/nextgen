@@ -40,6 +40,7 @@ moon run workspace:journey -- --work-dir /tmp/zitadel-journey
 moon run workspace:journey -- --runtime docker --image nextgen:local
 moon run workspace:journey -- --framework next
 moon run workspace:journey -- --concurrency 2
+moon run workspace:journey -- --tarballs-dir dist/release/<version>/npm
 ```
 
 - `--framework <id>` runs one framework (`next`, `nuxt`, `react`, `vue`, or
@@ -49,6 +50,8 @@ moon run workspace:journey -- --concurrency 2
   `binary`.
 - `--image <docker-tag>` uses an existing local runtime image instead of
   building one and implies `--runtime docker`.
+- `--tarballs-dir <path>` uses prebuilt release npm tarballs instead of running
+  `moon run release:pack`.
 - `--keep` keeps the temporary work directory after success.
 - `--work-dir <path>` uses an explicit work directory.
 
@@ -57,6 +60,7 @@ Useful environment overrides:
 - `JOURNEY_REGISTRY_PORT`
 - `JOURNEY_APP_PORT` for single-framework runs only
 - `JOURNEY_ZITADEL_PORT` for single-framework runs only
+- `JOURNEY_TARBALLS_DIR` to use prebuilt release npm tarballs
 - `JOURNEY_ENABLE_PASSKEY=0` as a local-only escape hatch while debugging
   passkey setup. CI must run passkey coverage.
 

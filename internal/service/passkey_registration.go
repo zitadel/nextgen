@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -12,6 +13,7 @@ import (
 )
 
 const passkeyRegistrationTTL = 5 * time.Minute
+const passkeyRegistrationDefaultUsername = "Passkey account"
 
 // PasskeyRegistrationService is the authoritative service for the passkey registration
 // ceremony. It exposes [Begin] and [Finish] for direct callers and is wrapped by
@@ -39,10 +41,12 @@ func NewPasskeyRegistrationService(
 
 // BeginRegistrationInput carries the parameters needed to start a passkey registration ceremony.
 type BeginRegistrationInput struct {
-	ProjectID string
-	UserID    string
-	RPID      string
-	RPOrigins []string
+	ProjectID   string
+	UserID      string
+	Username    string
+	DisplayName string
+	RPID        string
+	RPOrigins   []string
 }
 
 // BeginRegistrationOutput is returned by [PasskeyRegistrationService.Begin].
@@ -65,8 +69,9 @@ func (s *PasskeyRegistrationService) Begin(ctx context.Context, in BeginRegistra
 		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: list passkeys: %w", err)
 	}
 
+	username, displayName := passkeyRegistrationLabels(in.Username, in.DisplayName)
 	challenge, err := domain.CreatePasskeyRegistrationChallenge(
-		in.UserID, in.UserID, in.UserID, // username and displayName default to userID for MVP
+		in.UserID, username, displayName,
 		existing,
 		in.RPID, origins,
 	)
@@ -98,6 +103,18 @@ func (s *PasskeyRegistrationService) Begin(ctx context.Context, in BeginRegistra
 	}
 
 	return BeginRegistrationOutput{RegistrationID: regID, Options: options}, nil
+}
+
+func passkeyRegistrationLabels(username, displayName string) (string, string) {
+	username = strings.TrimSpace(username)
+	displayName = strings.TrimSpace(displayName)
+	if username == "" {
+		return passkeyRegistrationDefaultUsername, ""
+	}
+	if displayName == "" {
+		displayName = username
+	}
+	return username, displayName
 }
 
 // FinishRegistrationInput carries the parameters needed to complete a passkey registration.

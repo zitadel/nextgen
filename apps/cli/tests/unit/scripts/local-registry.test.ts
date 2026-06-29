@@ -30,6 +30,7 @@ type LocalRegistryModule = {
     log?: (message: string) => void;
     onStarted?: (registry: { exitCode: number | null; logFile: string }) => void;
     paths?: ReturnType<LocalRegistryModule["localRegistryPaths"]>;
+    prebuiltTarballsDir?: string;
     registryPort: number;
     registryUrl: string;
     repoRoot: string;
@@ -182,6 +183,60 @@ describe("local registry helper", () => {
     });
   });
 
+  it("uses prebuilt tarballs without rebuilding release packages", async () => {
+    const repoRoot = await fixtureRepo();
+    const workDir = await mkdtemp(join(tmpdir(), "zitadel-local-registry-"));
+    const prebuiltTarballsDir = await mkdtemp(join(tmpdir(), "zitadel-prebuilt-tarballs-"));
+    tempDirs.push(workDir, prebuiltTarballsDir);
+    const paths = localRegistry.localRegistryPaths(workDir);
+    const calls: Array<
+      | RunCall
+      | { type: "start-registry"; port: number }
+      | { type: "wait"; label: string; url: string }
+    > = [];
+    const logs: string[] = [];
+    const env = { PATH: "/bin" };
+    const registry = { exitCode: null, logFile: paths.registryLogPath };
+    await fixtureTarballs(prebuiltTarballsDir);
+
+    await localRegistry.prepareLocalRegistry({
+      env,
+      log: (message) => logs.push(message),
+      paths,
+      prebuiltTarballsDir,
+      registryPort: 51_234,
+      registryUrl: "http://127.0.0.1:51234",
+      repoRoot,
+      run: async (command, args, options) => {
+        calls.push({ command, args, options });
+      },
+      startLocalRegistry: async (options) => {
+        calls.push({ type: "start-registry", port: options.registryPort });
+        return registry;
+      },
+      waitForHttp: async (url, label) => {
+        calls.push({ type: "wait", label, url });
+      },
+      workDir,
+    });
+
+    expect(logs).toContain(`using prebuilt release npm tarballs from ${prebuiltTarballsDir}`);
+    const runCalls = calls.filter((call): call is RunCall => "command" in call);
+    expect(runCalls).not.toContainEqual({
+      command: "moon",
+      args: ["run", "release:pack"],
+      options: { cwd: repoRoot, env },
+    });
+    expect(runCalls[0]).toEqual({
+      command: "node",
+      args: ["apps/cli-journey-e2e/scripts/verify-tarballs.mjs", paths.tarballsDir],
+      options: { cwd: repoRoot, env },
+    });
+    expect(await readFile(join(paths.tarballsDir, "zitadel-cli-0.1.0-alpha.5.tgz"), "utf8")).toBe(
+      "@zitadel/cli\n",
+    );
+  });
+
   it("validates explicit local registry ports and derives stable defaults", () => {
     expect(
       localRegistry.localRegistryPort("/repo", {
@@ -220,6 +275,10 @@ async function fixtureRepo(): Promise<string> {
 
 async function fixtureReleaseTarballs(repoRoot: string): Promise<void> {
   const outDir = join(repoRoot, "dist", "release", "0.1.0-alpha.5", "npm");
+  await fixtureTarballs(outDir);
+}
+
+async function fixtureTarballs(outDir: string): Promise<void> {
   await mkdir(outDir, { recursive: true });
   for (const dir of localRegistry.packageDirs) {
     const name = packageNameForDir(dir);

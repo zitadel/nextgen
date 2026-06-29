@@ -19,8 +19,9 @@ downstream applications.
 ## Current Reality
 
 This repository is pre-release. The current checked-in CLI supports the local
-Docker-backed setup flow documented in [README.md](README.md); it does not
-currently ship a `zitadel claim` command.
+npm-binary setup flow documented in [README.md](README.md); Docker remains
+available as an explicit fallback runtime. The CLI does not currently ship a
+`zitadel claim` command.
 
 Create-first, claim-later remains the product direction. The previous mock-only
 claim lifecycle was removed until the real server-side claim contract exists;

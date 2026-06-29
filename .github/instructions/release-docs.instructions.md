@@ -19,7 +19,7 @@ state of the repo.
 - npm package changes use changesets; Go server artifacts and containers use
   Moon release tasks.
   Changeset PR workflow (decision table, publishable paths, CI gate) lives in
-  [`.changeset/README.md`](../.changeset/README.md).
+  [`.changeset/README.md`](../../.changeset/README.md).
 - Keep licensing text aligned with `LICENSING.md`: AGPL-3.0-only by default,
   MIT exceptions for CLI, SDKs, API contracts, and docs.
 - Docs that mention repo behavior should point to `AGENTS.md`; docs that mention

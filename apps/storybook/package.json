@@ -1,0 +1,46 @@
+{
+  "name": "@zitadel/storybook",
+  "version": "0.0.1-alpha.0",
+  "private": true,
+  "description": "Unified component workbench. One @storybook/web-components-vite instance hosts both the Lit atoms (@zitadel/components) and their paired React implementations (@zitadel/ui-react), so Lit ↔ React parity is visible side by side in a single tool.",
+  "type": "module",
+  "scripts": {
+    "dev": "storybook dev -p 6006 --no-open",
+    "build": "storybook build",
+    "typecheck": "tsc --build tsconfig.json",
+    "test": "vitest run --project=storybook"
+  },
+  "dependencies": {
+    "@zitadel/api": "workspace:*",
+    "@zitadel/api-mock": "workspace:*",
+    "@zitadel/components": "workspace:*",
+    "@zitadel/design-tokens": "workspace:*",
+    "@zitadel/shared-component-styles": "workspace:*",
+    "@zitadel/ui-react": "workspace:*",
+    "lit": "catalog:",
+    "msw": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "catalog:",
+    "@storybook/addon-a11y": "catalog:",
+    "@storybook/addon-vitest": "catalog:",
+    "@storybook/web-components-vite": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitest/browser": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "dompurify": "catalog:",
+    "liquidjs": "catalog:",
+    "lucide": "catalog:",
+    "lucide-react": "catalog:",
+    "msw-storybook-addon": "catalog:",
+    "playwright": "catalog:",
+    "storybook": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "xstate": "catalog:"
+  }
+}

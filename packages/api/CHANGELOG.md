@@ -1,5 +1,17 @@
 # @zitadel/api
 
+## 0.1.0-alpha.13
+
+### Patch Changes
+
+- [#417](https://github.com/zitadel/nextgen/pull/417) [`b574f3a`](https://github.com/zitadel/nextgen/commit/b574f3a6e6122439fadd6f971b73a61b8554f293) Thanks [@fforootd](https://github.com/fforootd)! - Label passkey registrations with collected identifiers and request discoverable credentials while keeping WebAuthn user handles opaque.
+
+## 0.1.0-alpha.12
+
+### Patch Changes
+
+- [#386](https://github.com/zitadel/nextgen/pull/386) [`a2f6526`](https://github.com/zitadel/nextgen/commit/a2f65266e00ee461e8e7fb1dee35e5add30b7199) Thanks [@wim07101993](https://github.com/wim07101993)! - Fixed some examples which represent flow-definition-step in the openapi examples.
+
 ## 0.1.0-alpha.11
 
 ## 0.1.0-alpha.10

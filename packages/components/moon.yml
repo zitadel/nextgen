@@ -32,6 +32,17 @@ tasks:
     outputs:
       - "dist/**/*"
 
+  build-release:
+    command: "corepack pnpm run build"
+    deps:
+      - "api:build-release"
+      - "design-tokens:build"
+      - "shared-component-styles:build"
+    outputs:
+      - "dist/**/*"
+    options:
+      cache: false
+
   test:
     command: "corepack pnpm run test"
     deps:
@@ -46,10 +57,3 @@ tasks:
       - "build"
     options:
       runInCI: false
-
-  dev:
-    command: "corepack pnpm run dev"
-    options:
-      persistent: true
-      runInCI: false
-

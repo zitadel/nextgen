@@ -20,7 +20,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	slogctx "github.com/veqryn/slog-context"
-
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/middleware"
@@ -213,12 +212,28 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 
 	// ── Flow engine ──────────────────
 	ids := idgen.NewULID()
-	fields := domain.NewSchemaFieldResolver(storageSchemaResolver)
+	fields := domain.NewSchemaFieldResolver()
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
-	createUserHandler := domain.NewFlowCreateUserHandler(ids, userRepo, userPasswordRepo, passwordHasher)
+	createUserHandler := service.NewFlowCreateUserHandler(
+		userRepo,
+		userPasswordRepo,
+		passwordHasher,
+		userService,
+		schemaRepo,
+	)
+	createUserForPasskeyHandler := service.NewFlowCreateUserForPasskeyHandler(userRepo)
 	passkeyRegSvc := service.NewPasskeyRegistrationService(pool, passkeyRegRepo, userPasskeyRepo, ids)
 	passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
-	stateMachine := domain.NewFlowStateMachine(fields, createUserHandler, flowAuth, passkeyRegAdapter, time.Now)
+	stateMachine := domain.NewFlowStateMachine(
+		storageSchemaResolver,
+		fields,
+		createUserHandler,
+		createUserForPasskeyHandler,
+		flowAuth,
+		passkeyRegAdapter,
+		ids,
+		time.Now,
+	)
 
 	flowService := service.NewFlowService(pool, flowDefinitionRepo, stateMachine, ids)
 
