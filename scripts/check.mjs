@@ -122,7 +122,7 @@ async function phasePack() {
 }
 
 async function phaseRelease() {
-  await run("node", ["scripts/release.mjs", "snapshot", "--skip-container"]);
+  await run("moon", ["run", "release:snapshot", "--", "--skip-container"]);
 }
 
 async function phaseJourney() {

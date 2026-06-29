@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/ianlancetaylor/jsonschema"
 )
@@ -96,8 +97,14 @@ func resolveAllStepFields(schema *jsonschema.Schema, steps []FlowDefinitionStep)
 	// Fail fast on schemas with no `properties` keyword at all. Without
 	// it the resolver would emit one ErrFlowFieldUnknown per user-property
 	// field; the structural defect is clearer surfaced once.
-	if newSchemaReader(schema).Properties() == nil {
+	sr := newSchemaReader(schema)
+	if sr.Properties() == nil {
 		return nil, ErrFlowDefinitionInvalid("user schema has no properties", nil)
+	}
+
+	// validate that all required fields in the schema are present in the flow definition
+	if err := validateRequiredUserSchemaFields(sr.RequiredSet(), steps); err != nil {
+		return nil, err
 	}
 
 	// SchemaFieldResolver is stateless; a zero-value instance is the
@@ -123,6 +130,32 @@ func resolveAllStepFields(schema *jsonschema.Schema, steps []FlowDefinitionStep)
 		out[step.Name] = resolved
 	}
 	return out, nil
+}
+
+// validateRequiredUserSchemaFields checks that all required fields in the
+// user schema are present in the flow definition.
+func validateRequiredUserSchemaFields(required map[string]struct{}, steps []FlowDefinitionStep) error {
+	if len(required) == 0 {
+		return nil
+	}
+	// gather all the fields set in the flow definition steps
+	fields := make(map[string]struct{})
+	for _, step := range steps {
+		for _, f := range step.Fields {
+			fields[string(f)] = struct{}{}
+		}
+	}
+	missingFields := make([]string, 0, len(required))
+	for requiredField := range required {
+		if _, ok := fields[requiredField]; !ok {
+			missingFields = append(missingFields, requiredField)
+		}
+	}
+	if len(missingFields) > 0 {
+		slices.Sort(missingFields)
+		return ErrFlowDefinitionInvalid(fmt.Sprintf("required fields %v in user schema are missing in the flow definition steps", missingFields), nil)
+	}
+	return nil
 }
 
 // validateSteps checks the structural shape of each step (terminal vs

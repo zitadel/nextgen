@@ -127,10 +127,12 @@ func TestPasskeyRegistrationService_Begin_StoresSession(t *testing.T) {
 	svc := buildTestRegistrationSvc(regRepo, pkRepo)
 
 	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
-		ProjectID: "proj-1",
-		UserID:    "user-1",
-		RPID:      "example.com",
-		RPOrigins: []string{"https://example.com"},
+		ProjectID:   "proj-1",
+		UserID:      "user-1",
+		Username:    "alice@example.com",
+		DisplayName: "Alice Example",
+		RPID:        "example.com",
+		RPOrigins:   []string{"https://example.com"},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "pkreg_test01", out.RegistrationID)
@@ -141,13 +143,64 @@ func TestPasskeyRegistrationService_Begin_StoresSession(t *testing.T) {
 	require.NoError(t, json.Unmarshal(out.Options, &optMap))
 	assert.Contains(t, optMap, "challenge")
 	assert.Contains(t, optMap, "rp")
+	user, ok := optMap["user"].(map[string]any)
+	require.True(t, ok, "creation options must include a user object")
+	assert.Equal(t, "alice@example.com", user["name"])
+	assert.Equal(t, "Alice Example", user["displayName"])
 
 	// Session must be persisted.
 	require.NotNil(t, regRepo.created)
 	assert.Equal(t, "proj-1", regRepo.created.ProjectID)
 	assert.Equal(t, "user-1", regRepo.created.UserID)
 	assert.Equal(t, "pkreg_test01", regRepo.created.ID)
+	assert.Equal(t, "alice@example.com", regRepo.created.Challenge.Username)
+	assert.Equal(t, "Alice Example", regRepo.created.Challenge.DisplayName)
 	assert.True(t, regRepo.created.ExpiresAt.After(time.Now()))
+}
+
+func TestPasskeyRegistrationService_Begin_UsesNeutralLabelWithoutUsername(t *testing.T) {
+	regRepo := &fakePasskeyRegRepo{}
+	pkRepo := &fakePasskeyRepo{}
+	svc := buildTestRegistrationSvc(regRepo, pkRepo)
+
+	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
+		ProjectID: "proj-1",
+		UserID:    "user-1",
+		RPID:      "example.com",
+		RPOrigins: []string{"https://example.com"},
+	})
+	require.NoError(t, err)
+	assert.NotEmpty(t, out.Options)
+
+	var optMap map[string]any
+	require.NoError(t, json.Unmarshal(out.Options, &optMap))
+	user, ok := optMap["user"].(map[string]any)
+	require.True(t, ok, "creation options must include a user object")
+	assert.Equal(t, "Passkey account", user["name"])
+	assert.Empty(t, user["displayName"])
+	assert.Equal(t, "Passkey account", regRepo.created.Challenge.Username)
+	assert.Empty(t, regRepo.created.Challenge.DisplayName)
+}
+
+func TestPasskeyRegistrationService_Begin_RequestsDiscoverableCredential(t *testing.T) {
+	regRepo := &fakePasskeyRegRepo{}
+	pkRepo := &fakePasskeyRepo{}
+	svc := buildTestRegistrationSvc(regRepo, pkRepo)
+
+	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
+		ProjectID: "proj-1",
+		UserID:    "user-1",
+		RPID:      "example.com",
+		RPOrigins: []string{"https://example.com"},
+	})
+	require.NoError(t, err)
+
+	var optMap map[string]any
+	require.NoError(t, json.Unmarshal(out.Options, &optMap))
+	selection, ok := optMap["authenticatorSelection"].(map[string]any)
+	require.True(t, ok, "creation options must include authenticatorSelection")
+	assert.Equal(t, "required", selection["residentKey"])
+	assert.Equal(t, "preferred", selection["userVerification"])
 }
 
 func TestPasskeyRegistrationService_Finish_NotFoundReturnsError(t *testing.T) {

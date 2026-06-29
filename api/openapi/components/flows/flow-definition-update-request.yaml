@@ -3,7 +3,6 @@ required:
     - flow_definition
 description: |
     Replaces the existing flow definition.
-    If `flow_definition.status` is omitted, the current status is preserved
 properties:
     schema_uri:
         $ref: ../../components/schemas/schema-uri.yaml
