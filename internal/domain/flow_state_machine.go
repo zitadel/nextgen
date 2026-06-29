@@ -1109,4 +1109,3 @@ func mergeCollected(state *FlowState, fields map[string]any) error {
 	}
 	return nil
 }
-
