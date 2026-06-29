@@ -9,6 +9,7 @@ import (
 
 // FlowCreateUserForPasskeyHandler creates the user row on the passkey-register
 // verify leg using the userID bound to the WebAuthn challenge at issue time.
+// NOTE: user creation currently runs in a separate transaction from passkey registration persistence.
 type FlowCreateUserForPasskeyHandler struct {
 	userRepo    domain.UserRepository
 	userService *UserService
