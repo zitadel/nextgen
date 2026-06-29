@@ -14,7 +14,6 @@ import (
 	reflect "reflect"
 
 	domain "github.com/zitadel/nextgen/internal/domain"
-	database "github.com/zitadel/nextgen/internal/storage/database"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -106,17 +105,17 @@ func (m *MockFlowPasskeyUserCreater) EXPECT() *MockFlowPasskeyUserCreaterMockRec
 }
 
 // CreateProvisionalUser mocks base method.
-func (m *MockFlowPasskeyUserCreater) CreateProvisionalUser(ctx context.Context, client database.QueryExecutor, userID string, state *domain.FlowState, resolved domain.FlowResolvedFields) error {
+func (m *MockFlowPasskeyUserCreater) CreateProvisionalUser(ctx context.Context, userID string, state *domain.FlowState) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateProvisionalUser", ctx, client, userID, state, resolved)
+	ret := m.ctrl.Call(m, "CreateProvisionalUser", ctx, userID, state)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CreateProvisionalUser indicates an expected call of CreateProvisionalUser.
-func (mr *MockFlowPasskeyUserCreaterMockRecorder) CreateProvisionalUser(ctx, client, userID, state, resolved any) *MockFlowPasskeyUserCreaterCreateProvisionalUserCall {
+func (mr *MockFlowPasskeyUserCreaterMockRecorder) CreateProvisionalUser(ctx, userID, state any) *MockFlowPasskeyUserCreaterCreateProvisionalUserCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateProvisionalUser", reflect.TypeOf((*MockFlowPasskeyUserCreater)(nil).CreateProvisionalUser), ctx, client, userID, state, resolved)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateProvisionalUser", reflect.TypeOf((*MockFlowPasskeyUserCreater)(nil).CreateProvisionalUser), ctx, userID, state)
 	return &MockFlowPasskeyUserCreaterCreateProvisionalUserCall{Call: call}
 }
 
@@ -132,13 +131,13 @@ func (c *MockFlowPasskeyUserCreaterCreateProvisionalUserCall) Return(arg0 error)
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockFlowPasskeyUserCreaterCreateProvisionalUserCall) Do(f func(context.Context, database.QueryExecutor, string, *domain.FlowState, domain.FlowResolvedFields) error) *MockFlowPasskeyUserCreaterCreateProvisionalUserCall {
+func (c *MockFlowPasskeyUserCreaterCreateProvisionalUserCall) Do(f func(context.Context, string, *domain.FlowState) error) *MockFlowPasskeyUserCreaterCreateProvisionalUserCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockFlowPasskeyUserCreaterCreateProvisionalUserCall) DoAndReturn(f func(context.Context, database.QueryExecutor, string, *domain.FlowState, domain.FlowResolvedFields) error) *MockFlowPasskeyUserCreaterCreateProvisionalUserCall {
+func (c *MockFlowPasskeyUserCreaterCreateProvisionalUserCall) DoAndReturn(f func(context.Context, string, *domain.FlowState) error) *MockFlowPasskeyUserCreaterCreateProvisionalUserCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
