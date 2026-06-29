@@ -1,6 +1,6 @@
 # Console ADR 0001: Routing
 
-> **Status:** Accepted
+> **Status:** Proposed
 > **Date:** 2026-06-29
 > **Scope:** `apps/console` only. See [`apps/console/AGENTS.md`](../../AGENTS.md).
 > **Context:** Console shell layout, navigation, and resource list pages

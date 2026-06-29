@@ -8,9 +8,10 @@ take precedence over, the root [`AGENTS.md`](../../AGENTS.md) for files under
 
 Before changing console routing, navigation, the app shell, or how the console
 talks to the API, read the console-scoped ADRs in
-[`docs/adrs/`](docs/adrs/README.md). They are the recorded decisions that
-upcoming work (issue [#440](https://github.com/zitadel/nextgen/issues/440))
-must follow:
+[`docs/adrs/`](docs/adrs/README.md). They are the proposed direction for
+upcoming work (issue [#440](https://github.com/zitadel/nextgen/issues/440)).
+Both are currently **Proposed** and pending team review, so confirm their
+status before relying on them as settled:
 
 - [ADR 0001: Routing](docs/adrs/0001-console-routing.md) — file-based routing,
   one router factory, `basepath` derived from the Vite `base`, route loaders +

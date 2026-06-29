@@ -1,9 +1,13 @@
 # Console Architecture Decision Records
 
 This directory holds architecture decision records (ADRs) **scoped to the
-`apps/console` app**. They record decisions that are local to the console SPA
+`apps/console` app**. They capture proposals that are local to the console SPA
 (routing, API access, shell composition) and are numbered independently from
 the repository-wide ADRs in [`docs/adrs/`](../../../../docs/adrs/README.md).
+
+Both ADRs below are **Proposed** and pending team review — they are not yet
+ratified. Treat them as the proposed direction for the upcoming console work,
+subject to change during review.
 
 When a decision affects more than the console (the server, the SDK packages,
 the shared component contract), it belongs in the repo-wide
