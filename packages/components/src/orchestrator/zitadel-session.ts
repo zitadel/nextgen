@@ -1,6 +1,7 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { type ZitadelProject } from "@zitadel/api/config";
+import type { GetMySession200 } from "@zitadel/api/generated/model";
 
 import { applyBaseTokens } from "./branding-to-tokens.js";
 import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
@@ -126,10 +127,6 @@ export class ZitadelSession extends LitElement {
     this.maybeLoadIdentity();
   }
 
-  private static asString(value: unknown): string {
-    return typeof value === "string" ? value : "";
-  }
-
   /** Single identity line: human-readable name, then email, then user_id. */
   private get identityLabel(): string {
     return this.displayName || this.displayEmail || this.displayUserId;
@@ -165,14 +162,16 @@ export class ZitadelSession extends LitElement {
 
   private async fetchIdentity(api: ReturnType<typeof resolveApi>["api"]): Promise<void> {
     try {
-      const session = (await api.getMySession({ credentials: "include" })) as {
-        name?: unknown;
-        email?: unknown;
-        user_id?: unknown;
+      // `name`/`email` are not yet in the generated session schema — the server
+      // returns only `user_id` today. Read them speculatively so the card shows
+      // a human-readable identity as soon as the backend starts sending them.
+      const session = (await api.getMySession({ credentials: "include" })) as GetMySession200 & {
+        name?: string;
+        email?: string;
       };
-      this.displayName = ZitadelSession.asString(session.name);
-      this.displayEmail = ZitadelSession.asString(session.email);
-      this.displayUserId = ZitadelSession.asString(session.user_id);
+      this.displayName = session.name ?? "";
+      this.displayEmail = session.email ?? "";
+      this.displayUserId = session.user_id ?? "";
     } catch {
       // No active session, or not configured — render without an identity line.
     }
