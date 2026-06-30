@@ -94,7 +94,7 @@ const ZitadelSession = dynamic(
     const { configureZitadel } = await import("@zitadel/sdk-next/client");
     // Build the SDK project handle and pass it to the session card via the
     // \`project\` prop. The card reads identity from "/__nextgen/sessions/me"
-    // and exposes Continue + Logout actions.
+    // and exposes a Logout action.
     const project = configureZitadel({
       projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "",
       proxyPath: "/__nextgen",
@@ -103,7 +103,6 @@ const ZitadelSession = dynamic(
       return (
         <zitadel-session
           project={project}
-          continue-url="/"
           post-sign-out-url="/login"
         />
       );
@@ -143,10 +142,8 @@ declare module "react" {
       };
       "zitadel-session": React.HTMLAttributes<HTMLElement> & {
         project?: ZitadelProject;
-        "continue-url"?: string;
         "post-sign-out-url"?: string;
         heading?: string;
-        "continue-label"?: string;
         "logout-label"?: string;
       };
     }

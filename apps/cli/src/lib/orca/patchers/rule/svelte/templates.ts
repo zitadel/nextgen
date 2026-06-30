@@ -38,7 +38,7 @@ const path = window.location.pathname;
   </main>
 {:else if path.startsWith("/profile")}
   <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
-    <ZitadelSession {project} continueUrl="/" postSignOutUrl="/login" />
+    <ZitadelSession {project} postSignOutUrl="/login" />
   </div>
 {:else if path.startsWith("/register")}
   <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">

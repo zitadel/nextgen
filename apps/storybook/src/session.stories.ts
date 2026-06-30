@@ -60,13 +60,13 @@ const meta: Meta<SessionArgs> = {
     clearBranding();
     applyBranding(brandingPresets[args.branding]);
   },
-  render: () => html`<zitadel-session continue-url="#"></zitadel-session>`,
+  render: () => html`<zitadel-session></zitadel-session>`,
 };
 
 export default meta;
 type Story = StoryObj<SessionArgs>;
 
-/** Default signed-in card: heading, email, Continue + Logout. */
+/** Default signed-in card: heading, email, and the Logout action. */
 export const SignedIn: Story = {};
 
 /** Same card with split-layout tenant branding tokens. */

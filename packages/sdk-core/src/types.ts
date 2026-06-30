@@ -47,12 +47,6 @@ export interface ZitadelSignoutDetail {
   readonly email: string;
 }
 
-/** Payload of the `zitadel-continue` event (the signed-in identity). */
-export interface ZitadelContinueDetail {
-  readonly name: string;
-  readonly email: string;
-}
-
 /* ───────────────────────────  SPA widget contract  ───────────────────────
  * Single source of truth shared by every SPA SDK (react, vue, angular, solid,
  * svelte, qwik). The event maps below declare which widget events exist and
@@ -82,7 +76,6 @@ export interface ZitadelLogoutEventMap {
  * card and the avatar menu speak the same sign-out contract.
  */
 export interface ZitadelSessionEventMap {
-  "zitadel-continue": ZitadelContinueDetail;
   "zitadel-signout": ZitadelSignoutDetail;
 }
 
@@ -104,9 +97,8 @@ export const ZITADEL_LOGOUT_EVENT_HANDLERS = {
   "zitadel-signout": "onSignout",
 } as const satisfies Record<keyof ZitadelLogoutEventMap, `on${string}`>;
 
-/** Maps each `<zitadel-session>` event to the callback prop the SDKs expose. */
+/** Maps the `<zitadel-session>` event to the callback prop the SDKs expose. */
 export const ZITADEL_SESSION_EVENT_HANDLERS = {
-  "zitadel-continue": "onContinue",
   "zitadel-signout": "onSignout",
 } as const satisfies Record<keyof ZitadelSessionEventMap, `on${string}`>;
 
@@ -159,15 +151,11 @@ export interface ZitadelSessionConfig {
   readonly projectId?: string;
   /** Reverse-proxy path prefix the widget calls. */
   readonly proxyPath?: string;
-  /** Where the Continue action navigates. Provisional contract. */
-  readonly continueUrl?: string;
   /** Where to navigate after sign-out. */
   readonly postSignOutUrl?: string;
   /** Heading text override. */
   readonly heading?: string;
-  /** Continue (primary) action label override. */
-  readonly continueLabel?: string;
-  /** Logout (secondary) action label override. */
+  /** Logout action label override. */
   readonly logoutLabel?: string;
 }
 

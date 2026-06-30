@@ -41,7 +41,7 @@ export default function App() {
   if (path.startsWith("/profile")) {
     return (
       <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
-        <ZitadelSession project={project} continueUrl="/" postSignOutUrl="/login" />
+        <ZitadelSession project={project} postSignOutUrl="/login" />
       </div>
     );
   }

@@ -13,11 +13,10 @@ import "../atoms/index.js";
  * `<zitadel-session>` — the full-screen "signed in" card.
  *
  * Renders the post-sign-in confirmation surface (Figma `7355:8959`): a
- * centred auth card reading "Signed in as {email}" with a primary
- * **Continue** action and a secondary **Logout** action. Composed from the
- * same `<zl-page-shell>` / `<zl-card>` / `<zl-button>` atoms as the
- * `<zitadel-login>` orchestrator, so it inherits tenant branding tokens with
- * no hardcoded colour, radius, or shadow.
+ * centred auth card reading "Signed in as {identity}" with a **Logout**
+ * action. Composed from the same `<zl-page-shell>` / `<zl-card>` /
+ * `<zl-button>` atoms as the `<zitadel-login>` orchestrator, so it inherits
+ * tenant branding tokens with no hardcoded colour, radius, or shadow.
  *
  * This is the companion surface to `<zitadel-login>` for the "go straight to
  * /login" flow: the orchestrator signs the user in and redirects here (or to
@@ -27,16 +26,19 @@ import "../atoms/index.js";
  * - Identity is fetched from the typed `getMySession` operation
  *   (`GET /sessions/me`), sent with credentials so the session cookie
  *   authenticates it. The card shows `name`, then `email`, then the
- *   always-present `user_id` (the current server response includes only the
- *   `user_id`). A failed or unauthenticated request renders the card without an
- *   identity line rather than throwing.
+ *   always-present `user_id`. NOTE: the current server response includes only
+ *   the `user_id`, so the card displays the raw id until the backend returns a
+ *   human-readable `name`/`email` on `/sessions/me`. A failed or
+ *   unauthenticated request renders the card without an identity line rather
+ *   than throwing.
  * - **Logout** calls the typed `revokeMySession` operation
  *   (`DELETE /sessions/me`); the server clears the session cookie. On success
  *   the element fires `zitadel-signout` (detail `{ name, email }`, matching the
  *   shared SPA contract) and optionally navigates to `post-sign-out-url`.
- * - **Continue** fires `zitadel-continue` (detail `{ name, email }`) and, when
- *   `continue-url` is set, navigates there. The post-sign-in destination
- *   contract is provisional and may change.
+ *
+ * A "Continue" action is intentionally omitted for now: the post-sign-in
+ * destination contract is still being decided. Consumers redirect after
+ * sign-in via the `<zitadel-login>` `post-sign-in-url`.
  */
 @customElement("zitadel-session")
 export class ZitadelSession extends LitElement {
@@ -97,20 +99,10 @@ export class ZitadelSession extends LitElement {
   /** URL to navigate to after a successful sign-out. */
   @property({ type: String, attribute: "post-sign-out-url" }) accessor postSignOutUrl = "";
 
-  /**
-   * URL the "Continue" action navigates to. Provisional — the post-sign-in
-   * destination contract is still being decided; consumers can also listen for
-   * the `zitadel-continue` event and handle navigation themselves.
-   */
-  @property({ type: String, attribute: "continue-url" }) accessor continueUrl = "";
-
   /** Heading text. Defaults to the English label. */
   @property({ type: String }) accessor heading = "Signed in as";
 
-  /** Primary action label. */
-  @property({ type: String, attribute: "continue-label" }) accessor continueLabel = "Continue";
-
-  /** Secondary action label. */
+  /** Logout action label. */
   @property({ type: String, attribute: "logout-label" }) accessor logoutLabel = "Logout";
 
   @state() private accessor displayName = "";
@@ -186,14 +178,6 @@ export class ZitadelSession extends LitElement {
     }
   }
 
-  private handleContinue(event: Event): void {
-    event.preventDefault();
-    emit(this, "zitadel-continue", { name: this.displayName, email: this.displayEmail });
-    if (this.continueUrl && typeof window !== "undefined") {
-      window.location.assign(this.continueUrl);
-    }
-  }
-
   /**
    * Calls `DELETE /sessions/me` (`revokeMySession`) with credentials. On
    * success fires `zitadel-signout` and optionally navigates to
@@ -237,14 +221,6 @@ export class ZitadelSession extends LitElement {
 
           <zl-button
             hierarchy="primary"
-            size="medium"
-            block
-            data-testid="zitadel-session-continue"
-            label=${this.continueLabel}
-            @zl-submit=${this.handleContinue}
-          ></zl-button>
-          <zl-button
-            hierarchy="secondary"
             size="medium"
             block
             ?loading=${this.loading}

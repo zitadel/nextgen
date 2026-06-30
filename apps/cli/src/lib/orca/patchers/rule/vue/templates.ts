@@ -42,7 +42,7 @@ const path = window.location.pathname;
     v-else-if="path.startsWith('/profile')"
     style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark"
   >
-    <ZitadelSession :project="project" continueUrl="/" postSignOutUrl="/login" />
+    <ZitadelSession :project="project" postSignOutUrl="/login" />
   </div>
   <div
     v-else-if="path.startsWith('/register')"

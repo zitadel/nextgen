@@ -88,7 +88,7 @@ const project = useZitadelProject();
 <template>
   <main style="${MAIN_STYLE}">
     <ClientOnly>
-      <zitadel-session :project="project" continue-url="/" post-sign-out-url="/login" />
+      <zitadel-session :project="project" post-sign-out-url="/login" />
     </ClientOnly>
   </main>
 </template>

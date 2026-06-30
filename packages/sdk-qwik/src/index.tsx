@@ -196,8 +196,7 @@ export type ZitadelSessionProps = ZitadelSessionConfig &
  * Qwik component wrapping the `<zitadel-session>` web component — the
  * post-sign-in "signed in as" card. Binds the {@link ZitadelProject} handle as
  * a DOM property (or the discrete project id / proxy path) and forwards the
- * widget's `zitadel-continue` and `zitadel-signout` events as optional
- * callbacks.
+ * widget's `zitadel-signout` event as an optional callback.
  */
 export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
   const host = useSignal<ZitadelSessionElement>();
@@ -208,12 +207,9 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
       if (!el) {
         return;
       }
-      const onContinue = (event: Event): void => void props.onContinue$?.(eventDetail(event));
       const onSignout = (event: Event): void => void props.onSignout$?.(eventDetail(event));
-      el.addEventListener("zitadel-continue", onContinue);
       el.addEventListener("zitadel-signout", onSignout);
       cleanup(() => {
-        el.removeEventListener("zitadel-continue", onContinue);
         el.removeEventListener("zitadel-signout", onSignout);
       });
     },
@@ -228,10 +224,8 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
         }
       }}
       {...projectProp(props.project, props.projectId, props.proxyPath)}
-      continue-url={props.continueUrl}
       post-sign-out-url={props.postSignOutUrl}
       heading={props.heading}
-      continue-label={props.continueLabel}
       logout-label={props.logoutLabel}
     />
   );

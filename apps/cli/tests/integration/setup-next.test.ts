@@ -91,7 +91,6 @@ describe("Next setup integration", () => {
     expect(profilePage).toContain("configureZitadel");
     expect(profilePage).toContain("project={project}");
     expect(profilePage).toContain('post-sign-out-url="/login"');
-    expect(profilePage).toContain('continue-url="/"');
     const proxy = await readFile(join(cwd, "proxy.ts"), "utf8");
     expect(proxy).toContain("zitadel-cli: managed-file v1");
     expect(proxy).toContain("nextgenMiddleware");

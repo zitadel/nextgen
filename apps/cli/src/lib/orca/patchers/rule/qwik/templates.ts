@@ -42,7 +42,7 @@ export const App = component$(() => {
   if (path.startsWith("/profile")) {
     return (
       <div style={{ position: "fixed", inset: "0", overflow: "auto", background: "#0f0f11", colorScheme: "dark" }}>
-        <ZitadelSession project={project} continueUrl="/" postSignOutUrl="/login" />
+        <ZitadelSession project={project} postSignOutUrl="/login" />
       </div>
     );
   }

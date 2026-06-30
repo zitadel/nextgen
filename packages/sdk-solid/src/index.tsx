@@ -16,7 +16,6 @@ import {
 } from "@zitadel/api/config";
 
 import type {
-  ZitadelContinueDetail,
   ZitadelFlowCompleteDetail,
   ZitadelFlowErrorDetail,
   ZitadelFlowInputDetail,
@@ -56,12 +55,9 @@ declare module "solid-js" {
         "prop:project"?: ZitadelProject;
         "project-id"?: string;
         "proxy-path"?: string;
-        "continue-url"?: string;
         "post-sign-out-url"?: string;
         heading?: string;
-        "continue-label"?: string;
         "logout-label"?: string;
-        "on:zitadel-continue"?: (event: CustomEvent<ZitadelContinueDetail>) => void;
         "on:zitadel-signout"?: (event: CustomEvent<ZitadelSignoutDetail>) => void;
       };
     }
@@ -132,8 +128,7 @@ export function ZitadelLogout(
  * Solid component wrapping the `<zitadel-session>` web component — the
  * post-sign-in "signed in as" card. Binds the {@link ZitadelProject} handle as
  * a DOM property (or the discrete project id / proxy path as attributes) and
- * forwards the widget's `zitadel-continue` and `zitadel-signout` events as
- * optional callbacks.
+ * forwards the widget's `zitadel-signout` event as an optional callback.
  *
  * A forwarded `ref` resolves to the underlying `<zitadel-session>` DOM element.
  */
@@ -148,12 +143,9 @@ export function ZitadelSession(
       prop:project={props.project}
       project-id={props.projectId}
       proxy-path={props.proxyPath}
-      continue-url={props.continueUrl}
       post-sign-out-url={props.postSignOutUrl}
       heading={props.heading}
-      continue-label={props.continueLabel}
       logout-label={props.logoutLabel}
-      on:zitadel-continue={(event) => props.onContinue?.(event.detail)}
       on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
     />
   );

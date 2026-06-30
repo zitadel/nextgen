@@ -9,8 +9,8 @@ import type { ZitadelSession } from "./zitadel-session.js";
 
 /**
  * jsdom-friendly behaviour for `<zitadel-session>`. Identity is fetched from
- * `GET /sessions/me`; the Continue/Logout wiring, the revoke call, and emitted
- * events are covered here.
+ * `GET /sessions/me`; the Logout wiring, the revoke call, and emitted events
+ * are covered here.
  */
 const API_BASE = "https://session.test.invalid";
 const deleteLog: { url: string; method: string; credentials: string }[] = [];
@@ -139,30 +139,14 @@ describe("<zitadel-session>", () => {
     expect(element.shadowRoot?.querySelector(".identity")).toBeNull();
   });
 
-  it("renders Continue (primary) and Logout (secondary) actions", async () => {
+  it("renders a single primary Logout action", async () => {
     const element = mount();
     await flush(element);
-    const cont = shadowQuery<HTMLElement>(element, 'zl-button[data-testid="zitadel-session-continue"]');
     const out = shadowQuery<HTMLElement>(element, 'zl-button[data-testid="zitadel-session-logout"]');
-    expect(cont.getAttribute("hierarchy")).toBe("primary");
-    expect(out.getAttribute("hierarchy")).toBe("secondary");
-  });
-
-  it("fires zitadel-continue and navigates to continue-url on Continue", async () => {
-    const loc = stubLocation();
-    const element = mount('<zitadel-session continue-url="https://app.test/home"></zitadel-session>');
-    await flush(element);
-
-    const events: CustomEvent[] = [];
-    element.addEventListener("zitadel-continue", (e) => events.push(e as CustomEvent));
-
-    activate(shadowQuery(element, 'zl-button[data-testid="zitadel-session-continue"]'));
-    await element.updateComplete;
-
-    expect(events).toHaveLength(1);
-    expect(events[0]?.detail).toEqual({ name: "", email: "alice@acme.com" });
-    expect(loc.current).toBe("https://app.test/home");
-    expect(deleteLog).toHaveLength(0);
+    expect(out.getAttribute("hierarchy")).toBe("primary");
+    expect(
+      element.shadowRoot?.querySelector('zl-button[data-testid="zitadel-session-continue"]'),
+    ).toBeNull();
   });
 
   it("calls DELETE /sessions/me with credentials and fires zitadel-signout on Logout", async () => {

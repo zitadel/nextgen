@@ -55,7 +55,6 @@ export function appTemplateHtml(): string {
   <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
     <zitadel-auth-session
       [project]="project"
-      [continueUrl]="'/'"
       [postSignOutUrl]="'/login'"
     ></zitadel-auth-session>
   </div>
