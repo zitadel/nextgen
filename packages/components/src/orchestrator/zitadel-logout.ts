@@ -238,10 +238,12 @@ export class ZitadelLogout extends LitElement {
   // light-DOM mutation, which we don't support.
   private templateMode = false;
 
-  // The consumer-supplied `<template>`, projected once identity resolves.
+  // The consumer-supplied `<template>` and its currently projected clone. The
+  // template is re-projected whenever identity changes so a late config /
+  // identity fetch updates the light-DOM markup rather than leaving it blank.
   private pendingTemplate: HTMLTemplateElement | null = null;
 
-  private templateProjected = false;
+  private projectedContainer: HTMLElement | null = null;
 
   // Guards the one-shot identity fetch so it runs once config is resolvable,
   // whether that's at connect time (global config / declarative attributes) or
@@ -256,6 +258,9 @@ export class ZitadelLogout extends LitElement {
     if (tmpl instanceof HTMLTemplateElement) {
       this.templateMode = true;
       this.pendingTemplate = tmpl;
+      // Project immediately so the logout control renders even before (or
+      // without) a resolvable config; it is re-projected once identity loads.
+      this.projectTemplate();
     }
 
     document.addEventListener("click", this.handleDocumentClick);
@@ -288,9 +293,10 @@ export class ZitadelLogout extends LitElement {
   /**
    * Fetches the signed-in identity from `GET /sessions/me` once a project is
    * resolvable. No-ops until then (and on repeat calls) so framework property
-   * timing doesn't matter and we never fire the request twice. When no config
-   * is available yet, any pending `<template>` is still projected so the logout
-   * control renders.
+   * timing doesn't matter and we never fire the request twice. A pending
+   * `<template>` is already projected in `connectedCallback`, so when no config
+   * is available yet the logout control still renders; it is re-projected with
+   * the real identity once a later request succeeds.
    */
   private maybeLoadIdentity(): void {
     if (this.identityRequested) return;
@@ -298,7 +304,6 @@ export class ZitadelLogout extends LitElement {
     try {
       ({ api } = resolveApi(this.project, this.projectAttrs, "<zitadel-logout>"));
     } catch {
-      this.projectTemplateOnce();
       return;
     }
     this.identityRequested = true;
@@ -314,7 +319,8 @@ export class ZitadelLogout extends LitElement {
     } catch {
       // No active session — render the control without identity.
     } finally {
-      this.projectTemplateOnce();
+      // Re-project so template-mode markup reflects the resolved identity.
+      this.projectTemplate();
     }
   }
 
@@ -324,17 +330,25 @@ export class ZitadelLogout extends LitElement {
   }
 
   /**
-   * Clones a consumer-supplied `<template>` into the light DOM, fills the
+   * Clones the consumer-supplied `<template>` into the light DOM, fills the
    * `{{name}}`, `{{email}}`, and `{{initial}}` tokens via a TreeWalker, and
    * wires every element with `data-action="logout"` to trigger sign-out.
    * Light-DOM mounting is deliberate so the consumer's existing CSS applies.
+   *
+   * Re-runnable: each call replaces the previously projected clone, so a late
+   * identity fetch (or a `project` assigned post-mount) updates the rendered
+   * markup instead of leaving the placeholders stuck on their initial values.
    */
-  private renderTemplate(tmpl: HTMLTemplateElement): void {
-    const clone = tmpl.content.cloneNode(true) as DocumentFragment;
+  private projectTemplate(): void {
+    if (!this.templateMode || !this.pendingTemplate) return;
+
+    const clone = this.pendingTemplate.content.cloneNode(true) as DocumentFragment;
     fillTemplateTokens(clone, this.displayName, this.displayEmail, this.initial);
 
     const container = document.createElement("span");
     container.appendChild(clone);
+    this.projectedContainer?.remove();
+    this.projectedContainer = container;
     this.appendChild(container);
 
     const targets = container.querySelectorAll<HTMLElement>('[data-action="logout"]');
@@ -344,13 +358,6 @@ export class ZitadelLogout extends LitElement {
         void this.doLogout();
       });
     });
-  }
-
-  /** Projects the pending `<template>` once — after identity resolves. */
-  private projectTemplateOnce(): void {
-    if (!this.templateMode || this.templateProjected || !this.pendingTemplate) return;
-    this.templateProjected = true;
-    this.renderTemplate(this.pendingTemplate);
   }
 
   private readonly handleDocumentClick = (event: MouseEvent): void => {
@@ -423,7 +430,7 @@ export class ZitadelLogout extends LitElement {
 
   override render() {
     if (this.templateMode) {
-      // Rendering happens once into the light DOM via `renderTemplate`. The
+      // Rendering happens into the light DOM via `projectTemplate`. The
       // shadow root stays empty so the projected markup is the only thing
       // the user sees.
       return nothing;

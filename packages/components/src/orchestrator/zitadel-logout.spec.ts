@@ -178,6 +178,35 @@ describe("<zitadel-logout>", () => {
     expect(element.shadowRoot?.querySelector(".trigger")).toBeNull();
   });
 
+  it("re-projects the template with identity when project is assigned after mount", async () => {
+    // No config resolvable at connect: the control still renders, but with a
+    // blank identity. When a framework assigns `project` post-mount and the
+    // fetch succeeds, the projected markup must update (not stay blank).
+    _resetConfigForTesting();
+    try {
+      currentName = "Carol Danvers";
+      currentEmail = "carol@acme.com";
+      const element = mount(`
+        <zitadel-logout>
+          <template>
+            <button data-action="logout">Bye {{name}} [{{initial}}]</button>
+          </template>
+        </zitadel-logout>
+      `);
+      await element.updateComplete;
+      const before = element.querySelector("button[data-action='logout']") as HTMLButtonElement;
+      expect(before.textContent).toBe("Bye  [?]");
+
+      element.project = configureZitadel({ proxyPath: API_BASE, projectId: "test" });
+      await flush(element);
+
+      const after = element.querySelector("button[data-action='logout']") as HTMLButtonElement;
+      expect(after.textContent).toBe("Bye Carol Danvers [C]");
+    } finally {
+      configureZitadel({ proxyPath: API_BASE, projectId: "test" });
+    }
+  });
+
   it("calls DELETE /sessions/me with credentials, fires zitadel-signout", async () => {
     currentName = "Alice Liddell";
     currentEmail = "alice@acme.com";
