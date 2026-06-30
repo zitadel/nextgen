@@ -152,6 +152,16 @@ func WithUserScalarList(project string, filters []UserListScalarFilter, teamScop
 }
 
 func (r *UserRepository) Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error {
+	if beginner, ok := condition.(database.Beginner); ok {
+		tx, err := beginner.Begin(ctx, nil)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			err = tx.End(ctx, err)
+		}()
+		client = tx
+	}
 	if err := checkPKOrUniqueKeyCondition(r, condition); err != nil {
 		return err
 	}
