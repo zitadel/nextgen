@@ -135,7 +135,7 @@ export const en: Record<string, string> = {
 
   "complete.title": "You're signed in as",
   "signed-in.continue": "Continue",
-  "signed-in.logout": "Logout",
+  "signed-in.logout": "Sign out",
 
   // --- Passkey login ---
   "passkey-login.title": "Sign in with your passkey",
