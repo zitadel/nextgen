@@ -14,7 +14,7 @@ import "../atoms/index.js";
  * `<zitadel-session>` — the full-screen "signed in" card.
  *
  * Renders the post-sign-in confirmation surface (Figma `7355:8959`): a
- * centred auth card reading "Signed in as {identity}" with a **Logout**
+ * centred auth card reading "Signed in as {identity}" with a **Sign out**
  * action. Composed from the same `<zl-page-shell>` / `<zl-card>` /
  * `<zl-button>` atoms as the `<zitadel-login>` orchestrator, so it inherits
  * tenant branding tokens with no hardcoded colour, radius, or shadow.
@@ -32,7 +32,7 @@ import "../atoms/index.js";
  *   human-readable `name`/`email` on `/sessions/me`. A failed or
  *   unauthenticated request renders the card without an identity line rather
  *   than throwing.
- * - **Logout** calls the typed `revokeMySession` operation
+ * - **Sign out** calls the typed `revokeMySession` operation
  *   (`DELETE /sessions/me`); the server clears the session cookie. On success
  *   the element fires `zitadel-signout` (detail `{ name, email }`, matching the
  *   shared SPA contract) and optionally navigates to `post-sign-out-url`.
@@ -103,8 +103,8 @@ export class ZitadelSession extends LitElement {
   /** Heading text. Defaults to the English label. */
   @property({ type: String }) accessor heading = "Signed in as";
 
-  /** Logout action label. */
-  @property({ type: String, attribute: "logout-label" }) accessor logoutLabel = "Logout";
+  /** Sign-out action label. */
+  @property({ type: String, attribute: "logout-label" }) accessor logoutLabel = "Sign out";
 
   @state() private accessor displayName = "";
 

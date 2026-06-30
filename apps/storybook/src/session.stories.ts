@@ -35,7 +35,7 @@ const sessionHandlers = [
  * — the companion to `<zitadel-login>` for the "go straight to /login" flow.
  *
  * It fetches the signed-in email from `GET /sessions/me`; here that endpoint is
- * mocked via `msw-storybook-addon`. The Logout action calls the real
+ * mocked via `msw-storybook-addon`. The Sign out action calls the real
  * `revokeMySession` endpoint, so the story is excluded from the Storybook test
  * run (`no-test`).
  */
@@ -66,7 +66,7 @@ const meta: Meta<SessionArgs> = {
 export default meta;
 type Story = StoryObj<SessionArgs>;
 
-/** Default signed-in card: heading, email, and the Logout action. */
+/** Default signed-in card: heading, email, and the Sign out action. */
 export const SignedIn: Story = {};
 
 /** Same card with split-layout tenant branding tokens. */

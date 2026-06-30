@@ -139,7 +139,7 @@ describe("<zitadel-session>", () => {
     expect(element.shadowRoot?.querySelector(".identity")).toBeNull();
   });
 
-  it("renders a single primary Logout action", async () => {
+  it("renders a single primary Sign out action", async () => {
     const element = mount();
     await flush(element);
     const out = shadowQuery<HTMLElement>(element, 'zl-button[data-testid="zitadel-session-logout"]');
@@ -149,7 +149,7 @@ describe("<zitadel-session>", () => {
     ).toBeNull();
   });
 
-  it("calls DELETE /sessions/me with credentials and fires zitadel-signout on Logout", async () => {
+  it("calls DELETE /sessions/me with credentials and fires zitadel-signout on Sign out", async () => {
     const element = mount();
     await flush(element);
 
