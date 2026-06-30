@@ -1,0 +1,16 @@
+---
+"@zitadel/components": minor
+"@zitadel/sdk-core": minor
+"@zitadel/sdk-react": minor
+"@zitadel/sdk-vue": minor
+"@zitadel/sdk-angular": minor
+"@zitadel/sdk-solid": minor
+"@zitadel/sdk-svelte": minor
+"@zitadel/sdk-qwik": minor
+"@zitadel/sdk-next": minor
+"@zitadel/cli": minor
+---
+
+Add a post-sign-in `<zitadel-session>` "signed in as" card: a dedicated element exposed through every SPA SDK and re-exported from sdk-next. CLI scaffolds now render it as the post-sign-in `/profile` page (with a Logout action) across all frameworks. Identity is read from `GET /sessions/me`, preferring `name` then `email` then `user_id`.
+
+`<zitadel-logout>` now sources its identity from the same `getMySession` operation instead of the `__nextgen_display` cookie, so both signed-in surfaces work against the real backend. Both components route their `getMySession`/`revokeMySession` calls through the shared `api-client` wrappers that enforce `credentials: "include"`.
