@@ -2,32 +2,26 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { type ZitadelProject } from "@zitadel/api/config";
 
+import { getSession, revokeSession } from "./api-client.js";
 import { applyBaseTokens } from "./branding-to-tokens.js";
 import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
 import { emit } from "../internal/emit.js";
 import { baseHostStyles, focusVisibleStyles, t } from "../styles/index.js";
 
 /**
- * Shape of the decoded `__nextgen_display` cookie set by the auth backend on
- * sign-in. The cookie is a base64-encoded JSON object — non-`HttpOnly` so the
- * frontend can render the signed-in user's identity without an extra round
- * trip.
- */
-interface DisplayData {
-  readonly name: string;
-  readonly email: string;
-}
-
-const DISPLAY_COOKIE_NAME = "__nextgen_display";
-
-/**
  * `<zitadel-logout>` — orchestrator-tier element that lets the signed-in user
  * sign out without touching the flow API.
  *
- * Reads the user's display name + email from the `__nextgen_display` cookie
- * (set by the auth backend on sign-in), renders an avatar trigger with a
- * dropdown that exposes a "Sign out" action, and calls the typed
- * `revokeMySession` operation in `@zitadel/api`
+ * Reads the user's identity from the typed `getMySession` operation
+ * (`GET /sessions/me`, credentialed) — the same source as `<zitadel-session>`,
+ * so both signed-in surfaces stay consistent and work against the real backend.
+ * The avatar/preview show `name`, then `email`, then the always-present
+ * `user_id`. NOTE: the current server response includes only the `user_id`, so
+ * the avatar falls back to the id until the backend returns a human-readable
+ * `name`/`email`.
+ *
+ * It renders an avatar trigger with a dropdown that exposes a "Sign out"
+ * action, and calls the typed `revokeMySession` operation in `@zitadel/api`
  * (`DELETE /sessions/me`). The server clears the session cookie via
  * `Set-Cookie: Max-Age=0`; on success the element fires `zitadel-signout`
  * and optionally navigates to `post-sign-out-url`. (`getEndSessionUrl()`
@@ -231,6 +225,8 @@ export class ZitadelLogout extends LitElement {
 
   @state() private accessor displayEmail = "";
 
+  @state() private accessor displayUserId = "";
+
   @state() private accessor open = false;
 
   @state() private accessor loading = false;
@@ -242,19 +238,30 @@ export class ZitadelLogout extends LitElement {
   // light-DOM mutation, which we don't support.
   private templateMode = false;
 
+  // The consumer-supplied `<template>`, projected once identity resolves.
+  private pendingTemplate: HTMLTemplateElement | null = null;
+
+  private templateProjected = false;
+
+  // Guards the one-shot identity fetch so it runs once config is resolvable,
+  // whether that's at connect time (global config / declarative attributes) or
+  // after a framework assigns the `project` property post-mount.
+  private identityRequested = false;
+
   override connectedCallback(): void {
     super.connectedCallback();
     this.dataset.theme = "dark";
-    this.readDisplayCookie();
 
     const tmpl = this.querySelector("template");
     if (tmpl instanceof HTMLTemplateElement) {
       this.templateMode = true;
-      this.renderTemplate(tmpl);
+      this.pendingTemplate = tmpl;
     }
 
     document.addEventListener("click", this.handleDocumentClick);
     document.addEventListener("keydown", this.handleDocumentKeydown);
+
+    this.maybeLoadIdentity();
   }
 
   override disconnectedCallback(): void {
@@ -268,29 +275,51 @@ export class ZitadelLogout extends LitElement {
     if (root && !this.templateMode) {
       applyBaseTokens(root);
     }
+    // Retry once config becomes resolvable (e.g. a framework set `project`
+    // after mount). No-ops after the first successful request.
+    this.maybeLoadIdentity();
+  }
+
+  /** Declarative config read from this element's attributes. */
+  private get projectAttrs(): ProjectAttrs {
+    return { projectId: this.projectId, proxyPath: this.proxyPath, url: this.url };
   }
 
   /**
-   * Decodes the `__nextgen_display` cookie (base64-encoded JSON, set by the
-   * auth backend on sign-in) and populates `displayName` / `displayEmail`.
-   * A missing or malformed cookie is intentionally non-fatal — the dropdown
-   * still renders, just with empty values.
+   * Fetches the signed-in identity from `GET /sessions/me` once a project is
+   * resolvable. No-ops until then (and on repeat calls) so framework property
+   * timing doesn't matter and we never fire the request twice. When no config
+   * is available yet, any pending `<template>` is still projected so the logout
+   * control renders.
    */
-  private readDisplayCookie(): void {
-    if (typeof document === "undefined") return;
-    const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${DISPLAY_COOKIE_NAME}=([^;]+)`));
-    if (!match || !match[1]) return;
+  private maybeLoadIdentity(): void {
+    if (this.identityRequested) return;
+    let api;
     try {
-      const data = JSON.parse(atob(match[1])) as DisplayData;
-      this.displayName = typeof data.name === "string" ? data.name : "";
-      this.displayEmail = typeof data.email === "string" ? data.email : "";
+      ({ api } = resolveApi(this.project, this.projectAttrs, "<zitadel-logout>"));
     } catch {
-      // Cookie present but malformed — render with empty values.
+      this.projectTemplateOnce();
+      return;
+    }
+    this.identityRequested = true;
+    void this.loadIdentity(api);
+  }
+
+  private async loadIdentity(api: ReturnType<typeof resolveApi>["api"]): Promise<void> {
+    try {
+      const session = await getSession(api);
+      this.displayName = session.name ?? "";
+      this.displayEmail = session.email ?? "";
+      this.displayUserId = session.user_id ?? "";
+    } catch {
+      // No active session — render the control without identity.
+    } finally {
+      this.projectTemplateOnce();
     }
   }
 
   private get initial(): string {
-    const source = this.displayName || this.displayEmail;
+    const source = this.displayName || this.displayEmail || this.displayUserId;
     return source ? source.charAt(0).toUpperCase() : "?";
   }
 
@@ -317,6 +346,13 @@ export class ZitadelLogout extends LitElement {
     });
   }
 
+  /** Projects the pending `<template>` once — after identity resolves. */
+  private projectTemplateOnce(): void {
+    if (!this.templateMode || this.templateProjected || !this.pendingTemplate) return;
+    this.templateProjected = true;
+    this.renderTemplate(this.pendingTemplate);
+  }
+
   private readonly handleDocumentClick = (event: MouseEvent): void => {
     if (!this.open) return;
     if (event.composedPath().includes(this)) return;
@@ -341,18 +377,13 @@ export class ZitadelLogout extends LitElement {
    * clears the cookie via `Set-Cookie: Max-Age=0`. On success this element fires
    * `zitadel-signout` and optionally navigates to `postSignOutUrl`.
    */
-  /** Declarative config read from this element's attributes. */
-  private get projectAttrs(): ProjectAttrs {
-    return { projectId: this.projectId, proxyPath: this.proxyPath, url: this.url };
-  }
-
   private async doLogout(): Promise<void> {
     this.loading = true;
     this.errorMessage = "";
 
     try {
       const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-logout>");
-      await api.revokeMySession({ credentials: "include" });
+      await revokeSession(api);
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       this.errorMessage = message || "Sign-out failed. Please try again.";
@@ -416,8 +447,10 @@ export class ZitadelLogout extends LitElement {
               <div class="preview">
                 <div class="preview-avatar" aria-hidden="true">${this.initial}</div>
                 <div class="preview-info">
-                  <div class="preview-name">${this.displayName || this.displayEmail}</div>
-                  ${this.displayName
+                  <div class="preview-name">
+                    ${this.displayName || this.displayEmail || this.displayUserId}
+                  </div>
+                  ${this.displayName && this.displayEmail
                     ? html`<div class="preview-email">${this.displayEmail}</div>`
                     : nothing}
                 </div>

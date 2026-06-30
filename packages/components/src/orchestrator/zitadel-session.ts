@@ -1,8 +1,8 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { type ZitadelProject } from "@zitadel/api/config";
-import type { GetMySession200 } from "@zitadel/api/generated/model";
 
+import { getSession, revokeSession } from "./api-client.js";
 import { applyBaseTokens } from "./branding-to-tokens.js";
 import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
 import { emit } from "../internal/emit.js";
@@ -162,13 +162,7 @@ export class ZitadelSession extends LitElement {
 
   private async fetchIdentity(api: ReturnType<typeof resolveApi>["api"]): Promise<void> {
     try {
-      // `name`/`email` are not yet in the generated session schema — the server
-      // returns only `user_id` today. Read them speculatively so the card shows
-      // a human-readable identity as soon as the backend starts sending them.
-      const session = (await api.getMySession({ credentials: "include" })) as GetMySession200 & {
-        name?: string;
-        email?: string;
-      };
+      const session = await getSession(api);
       this.displayName = session.name ?? "";
       this.displayEmail = session.email ?? "";
       this.displayUserId = session.user_id ?? "";
@@ -188,7 +182,7 @@ export class ZitadelSession extends LitElement {
 
     try {
       const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-session>");
-      await api.revokeMySession({ credentials: "include" });
+      await revokeSession(api);
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       this.errorMessage = message || "Sign-out failed. Please try again.";
