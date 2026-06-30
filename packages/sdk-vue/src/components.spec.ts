@@ -2,25 +2,30 @@
 import type {
   ZitadelLogin as ZitadelLoginElement,
   ZitadelLogout as ZitadelLogoutElement,
+  ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 
 import { render } from "@testing-library/vue";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
+  ZITADEL_SESSION_EVENT_HANDLERS,
 } from "@zitadel/sdk-core/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h, shallowRef, type Ref } from "vue";
 
 import ZitadelLogin from "./components/ZitadelLogin";
 import ZitadelLogout from "./components/ZitadelLogout";
+import ZitadelSession from "./components/ZitadelSession";
 
 // A consumer's `ref` on these components resolves to the component instance,
 // whose `expose({ element })` surfaces the inner DOM node. Vue's exposed proxy
 // auto-unwraps the exposed `Ref`, so the consumer reads the element directly as
 // `r.value.element`. Mount the component under a parent that holds such a ref
 // and forward the captured instance out, mirroring that consumer access.
-function mountWithInstanceRef(child: typeof ZitadelLogin | typeof ZitadelLogout): {
+function mountWithInstanceRef(
+  child: typeof ZitadelLogin | typeof ZitadelLogout | typeof ZitadelSession,
+): {
   captured: Ref<{ element: HTMLElement | null } | null>;
   container: Element;
 } {
@@ -120,5 +125,45 @@ describe("ZitadelLogout", () => {
     expect(element).not.toBeNull();
     expect(element!.tagName.toLowerCase()).toBe("zitadel-logout");
     expect(element).toBe(container.querySelector("zitadel-logout"));
+  });
+});
+
+describe("ZitadelSession", () => {
+  it("binds the project handle as a property", () => {
+    const { container } = render(ZitadelSession, { props: { project } });
+    const el = container.querySelector<ZitadelSessionElement>("zitadel-session");
+    expect(el).not.toBeNull();
+    expect(el!.project).toBe(project);
+  });
+
+  it("binds discrete projectId/proxyPath", () => {
+    const { container } = render(ZitadelSession, {
+      props: { projectId: "proj-test", proxyPath: "/__nextgen" },
+    });
+    const el = container.querySelector<ZitadelSessionElement>("zitadel-session");
+    expect(el!.projectId).toBe("proj-test");
+    expect(el!.proxyPath).toBe("/__nextgen");
+  });
+
+  it.each(Object.entries(ZITADEL_SESSION_EVENT_HANDLERS))(
+    "forwards %s to its callback",
+    (eventName, handlerProp) => {
+      const spy = vi.fn();
+      const { container } = render(ZitadelSession, {
+        props: { project, [handlerProp]: spy },
+      });
+      const el = container.querySelector("zitadel-session");
+      const detail = { probe: eventName };
+      el?.dispatchEvent(new CustomEvent(eventName, { detail }));
+      expect(spy).toHaveBeenCalledWith(detail);
+    },
+  );
+
+  it("exposes the rendered element via the instance ref", () => {
+    const { captured, container } = mountWithInstanceRef(ZitadelSession);
+    const element = captured.value!.element;
+    expect(element).not.toBeNull();
+    expect(element!.tagName.toLowerCase()).toBe("zitadel-session");
+    expect(element).toBe(container.querySelector("zitadel-session"));
   });
 });
