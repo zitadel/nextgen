@@ -12,6 +12,16 @@ type ReleaseArtifactsModule = {
     tag: string;
     prerelease: boolean;
   }>;
+  packPublicPackages: (options: {
+    repoRoot: string;
+    outDir: string;
+    version: string;
+    run?: (
+      command: string,
+      args: string[],
+      options: { cwd: string; env: NodeJS.ProcessEnv },
+    ) => Promise<void>;
+  }) => Promise<string>;
   stageServerNpmBinaries: (options: {
     repoRoot: string;
     outDir: string;
@@ -137,5 +147,31 @@ describe("release artifact helpers", () => {
         },
       }),
     ).rejects.toThrow("missing release artifacts");
+  });
+
+  it("rejects packing public packages before release build output exists", async () => {
+    const { packPublicPackages } = await loadModule();
+    const manifest = (await import(
+      new URL("../../../../../scripts/release-manifest.mjs", import.meta.url).href
+    )) as { PUBLIC_RELEASE_PACKAGES: Array<{ name: string; dir: string }> };
+    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-packages-"));
+    tempDirs.push(repoRoot);
+    const outDir = join(repoRoot, "dist/release/0.1.0-alpha.6");
+    for (const pkg of manifest.PUBLIC_RELEASE_PACKAGES) {
+      await mkdir(join(repoRoot, pkg.dir), { recursive: true });
+      await writeFile(
+        join(repoRoot, pkg.dir, "package.json"),
+        `${JSON.stringify({ license: "MIT", name: pkg.name, version: "0.1.0-alpha.6" }, null, 2)}\n`,
+      );
+    }
+
+    await expect(
+      packPublicPackages({
+        repoRoot,
+        outDir,
+        version: "0.1.0-alpha.6",
+        run: async () => undefined,
+      }),
+    ).rejects.toThrow("requires apps/cli/dist before packing");
   });
 });

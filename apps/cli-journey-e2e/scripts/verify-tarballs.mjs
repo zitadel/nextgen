@@ -3,6 +3,8 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
+import { PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
+
 const tarballsDir = process.argv[2];
 if (!tarballsDir) {
   throw new Error("usage: node scripts/verify-tarballs.mjs <tarballs-dir>");
@@ -10,28 +12,8 @@ if (!tarballsDir) {
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");
-const requiredPackageDirs = [
-  "apps/cli",
-  "apps/server",
-  "apps/server-linux-x64",
-  "apps/server-linux-arm64",
-  "apps/server-darwin-x64",
-  "apps/server-darwin-arm64",
-  "apps/server-win32-x64",
-  "packages/api",
-  "packages/components",
-  "packages/sdk-core",
-  "packages/sdk-next",
-  "packages/sdk-nuxt",
-  "packages/sdk-react",
-  "packages/sdk-vue",
-  "packages/sdk-angular",
-  "packages/sdk-solid",
-  "packages/sdk-svelte",
-  "packages/sdk-qwik",
-];
 const requiredPackageNames = new Set(
-  await Promise.all(requiredPackageDirs.map(packageName)),
+  await Promise.all(PUBLIC_PACKAGE_DIRS.map(packageName)),
 );
 const dependencyFields = [
   "dependencies",

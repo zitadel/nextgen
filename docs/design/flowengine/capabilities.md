@@ -33,7 +33,7 @@ to be a fast answer to "can I build flow X right now?"
 
 ### Steps & state machine
 
-- Schema-driven `fields`: type, validation, `required`, uniqueness scope, challenge mapping from `x-unique` / `x-password` annotations.
+- Schema-driven `fields`: type, validation, `required`, uniqueness scope, challenge mapping from the `x-unique` annotation on user properties, or — for credential fields — the reserved `x-auth-methods#<method>` field name resolved against the schema's `x-auth-methods`.
 - `actions` — user-selectable, surfaced on the capability payload. `passkey` and `passkey_register` are recognized action names that drive the passkey ceremony.
 - `on_success: create_user` — hashes the password (argon2id), writes the user and credential rows, then calls `auth-attempt.RegisterCreatedUser` so the new user counts as verified for the terminal handoff.
 - `complete: redirect` and `complete: show` — terminal step classifiers.

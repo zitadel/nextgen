@@ -93,7 +93,7 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	pwResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
-			"password": jx.Raw(`"` + newPass + `"`),
+			"x-auth-methods#password": jx.Raw(`"` + newPass + `"`),
 		}),
 	}, api.SubmitFlowStepParams{
 		ID:    flowID,
@@ -132,12 +132,24 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 
 	require.True(t, issueOK.Response.Step.Challenge.Set, "expected challenge on passkey_register issue")
 	challenge := issueOK.Response.Step.Challenge.Value
+	method, methodSet := challenge.Method.Get()
+	require.True(t, methodSet)
+	require.Equal(t, api.FlowStepChallengeMethodPasskeyRegister, method)
 	challengeID, challengeIDSet := challenge.ChallengeID.Get()
 	require.True(t, challengeIDSet)
 	require.True(t, challenge.Options.Set, "expected creation options on passkey_register issue")
 
 	creationOptionsJSON, err := json.Marshal(challenge.Options.Value)
 	require.NoError(t, err)
+	var creationOptions struct {
+		User struct {
+			Name        string `json:"name"`
+			DisplayName string `json:"displayName"`
+		} `json:"user"`
+	}
+	require.NoError(t, json.Unmarshal(creationOptionsJSON, &creationOptions))
+	require.Equal(t, newEmail, creationOptions.User.Name)
+	require.Equal(t, newEmail, creationOptions.User.DisplayName)
 	attestOpts, err := virtualwebauthn.ParseAttestationOptions(string(creationOptionsJSON))
 	require.NoError(t, err)
 	attestationJSON := virtualwebauthn.CreateAttestationResponse(rp, auth, cred, *attestOpts)
@@ -227,7 +239,7 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 	pwResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
-			"password": jx.Raw(`"` + newPass + `"`),
+			"x-auth-methods#password": jx.Raw(`"` + newPass + `"`),
 		}),
 	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
 	require.NoError(t, err)
@@ -253,6 +265,7 @@ func passkeyUpsellFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 	createUser := api.FlowDefinitionStepOnSuccessCreateUser
 	return api.FlowDefinition{
 		Name:       "register-with-passkey-upsell",
+		Status:     "active",
 		UserSchema: userSchemaURL,
 		Purposes:   api.FlowDefinitionPurposes{"register": "register"},
 		Steps: []api.FlowDefinitionStep{
@@ -268,7 +281,7 @@ func passkeyUpsellFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 			},
 			{
 				Name:      "register-password",
-				Fields:    []string{"password"},
+				Fields:    []string{"x-auth-methods#password"},
 				OnSuccess: api.NewOptFlowDefinitionStepOnSuccess(createUser),
 				Actions: []api.StepAction{
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},

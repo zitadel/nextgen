@@ -81,6 +81,11 @@ catalog:
   "@scalar/api-client-react": ^2.0.26
   sharp: ^0.34.5
   shiki: ^4.2.0
+  storybook: ^10.3.6
+  "@storybook/web-components-vite": ^10.3.6
+  "@storybook/addon-a11y": ^10.3.6
+  "@storybook/addon-vitest": ^10.3.6
+  msw-storybook-addon: ^2.0.7
   tailwindcss: ^4.2.4
   ts-lit-plugin: ^2.0.2
   tsdown: ^0.21.10

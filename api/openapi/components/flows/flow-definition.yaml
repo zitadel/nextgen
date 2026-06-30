@@ -1,5 +1,5 @@
 type: object
-required: [ name, user_schema, purposes, steps ]
+required: [ name, status, user_schema, purposes, steps ]
 description: |
   A flow definition is the server-side configuration that describes a complete
   authentication or identity flow. It is NOT sent to the frontend — the flow
@@ -65,14 +65,18 @@ properties:
       - name: identify
         fields: [ email ]
         actions:
-          submit: { primary: true }
+          - name: submit 
+            kind: submit
+            primary: true
         transitions:
           submit: { target: authenticate }
           user_not_found: { target: register, action: switch }
       - name: authenticate
         fields: [ password ]
         actions:
-          submit: { primary: true }
+          - name: submit 
+            kind: submit
+            primary: true
         transitions:
           submit: { target: done }
       - name: done

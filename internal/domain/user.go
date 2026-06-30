@@ -105,7 +105,9 @@ func (c *CreateUser) AttributeTeamScope() string {
 	return ""
 }
 
-func NewCreateUser(projectID string, initialMembershipTeamID *string, schemabs []byte, muser map[string]any) (*CreateUser, error) {
+// NewCreateUser builds a [CreateUser] from a schema-validated user map.
+// id passes through when non-empty; otherwise a fresh one is minted.
+func NewCreateUser(projectID string, teamID *string, id string, schemabs []byte, muser map[string]any) (*CreateUser, error) {
 	schemaURL, err := SchemaFromUserMap(muser)
 	if err != nil {
 		return nil, err
@@ -128,9 +130,11 @@ func NewCreateUser(projectID string, initialMembershipTeamID *string, schemabs [
 		return nil, ErrInternal(err).WithMessage("failed to unmarshal schema map")
 	}
 
-	id, err := newID(PrefixUser)
-	if err != nil {
-		return nil, ErrInternal(err).WithMessage("failed to create user id")
+	if id == "" {
+		id, err = newID(PrefixUser)
+		if err != nil {
+			return nil, ErrInternal(err).WithMessage("failed to create user id")
+		}
 	}
 
 	attrs, err := FlattenMapToCreateAttributes(muser, mschema, "")
@@ -140,7 +144,7 @@ func NewCreateUser(projectID string, initialMembershipTeamID *string, schemabs [
 
 	return &CreateUser{
 		ProjectID:               projectID,
-		InitialMembershipTeamID: initialMembershipTeamID,
+		InitialMembershipTeamID: teamID,
 		ID:                      id,
 		SchemaURL:               schemaURL,
 		Attributes:              attrs,
@@ -155,6 +159,8 @@ func SchemaFromUserMap(user map[string]any) (string, error) {
 	}
 	return schemaURL, nil
 }
+
+//go:generate go tool mockgen -typed -package domainmock -destination ./mock/user.mock.go . UserRepository
 
 type UserRepository interface {
 	Repository

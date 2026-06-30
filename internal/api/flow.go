@@ -253,7 +253,7 @@ func flowSetCookie(value string, clear bool) string {
 	return c.String()
 }
 
-func (h *Handler) buildFlowResponse(result service.FlowStepResult, terminal bool) api.FlowResponse {
+func (h *Handler) buildFlowResponse(result domain.FlowStepResult, terminal bool) api.FlowResponse {
 	resp := api.FlowResponse{
 		ID:        result.State.ID,
 		SessionID: result.State.SessionID,
@@ -306,7 +306,12 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
 	out := api.FlowStepChallenge{}
 	if c.Method != "" {
-		out.Method = api.NewOptFlowStepChallengeMethod(api.FlowStepChallengeMethodPasskey)
+		switch c.Method {
+		case domain.FlowChallengeMethodPasskeyRegister:
+			out.Method = api.NewOptFlowStepChallengeMethod(api.FlowStepChallengeMethodPasskeyRegister)
+		default:
+			out.Method = api.NewOptFlowStepChallengeMethod(api.FlowStepChallengeMethodPasskey)
+		}
 	}
 	if c.ChallengeID != "" {
 		out.ChallengeID = api.NewOptString(c.ChallengeID)
@@ -408,7 +413,10 @@ func toFlowFieldValidation(v *domain.FlowFieldValidation) *api.FieldValidation {
 	if v.MaxLength > 0 {
 		out.MaxLength = api.NewOptInt(v.MaxLength)
 	}
-	if !out.Format.Set && !out.MinLength.Set && !out.MaxLength.Set {
+	if len(v.Enum) > 0 {
+		out.Enum = v.Enum
+	}
+	if !out.Format.Set && !out.MinLength.Set && !out.MaxLength.Set && len(out.Enum) == 0 {
 		return nil
 	}
 	return &out

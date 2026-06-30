@@ -2,9 +2,9 @@ package domain
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/ianlancetaylor/jsonschema"
-	"github.com/ianlancetaylor/jsonschema/types"
 )
 
 var reservedOutcomes = map[string]struct{}{
@@ -25,27 +25,33 @@ func ValidateFlowDefinition(userSchema *jsonschema.Schema, flowDefinition FlowDe
 		return nil, err
 	}
 
-	// 2. validate against the fields of the user schema, validate steps, step fields, transitions, actions, etc.
-	if err := validateSteps(flowDefinition.Steps, userSchema); err != nil {
+	// 2. validate steps, step fields, transitions, actions, etc.
+	if err := validateSteps(flowDefinition.Steps); err != nil {
 		return nil, err
 	}
 
-	// 3. validate the graph structure: every step reachable from an initial step, no unreachable steps
+	// 3. resolve each step's fields against the user schema.
+	resolvedByStep, err := resolveAllStepFields(userSchema, flowDefinition.Steps)
+	if err != nil {
+		return nil, err
+	}
+
+	// 4. validate the graph structure: every step reachable from an initial step, no unreachable steps
 	pivotingTargets, err := validateGraph(flowDefinition)
 	if err != nil {
 		return nil, err
 	}
 
-	// 4. validate the cycle of steps: every cycle of steps has at least one exit transition to a terminal step or another flow
+	// 5. validate the cycle of steps: every cycle of steps has at least one exit transition to a terminal step or another flow
 	if err := validateCycles(flowDefinition); err != nil {
 		return nil, err
 	}
 
-	// 5. flip-table coverage + on_success manifest cross-check
+	// 6. flip-table coverage + on_success manifest cross-check
 	if err := validateFlipTableCoverage(flowDefinition); err != nil {
 		return nil, err
 	}
-	if err := validateOnSuccessManifests(flowDefinition, userSchema); err != nil {
+	if err := validateOnSuccessManifests(flowDefinition, resolvedByStep); err != nil {
 		return nil, err
 	}
 
@@ -82,19 +88,82 @@ func validateDefinition(flowDefinition FlowDefinition) error {
 	return nil
 }
 
-// validateSteps checks that the flow definition steps are valid
-func validateSteps(steps []FlowDefinitionStep, userSchema *jsonschema.Schema) error {
-	// extract user schema properties
-	userProperties, hasProperties := userSchemaProperties(userSchema)
-	if !hasProperties {
-		return ErrFlowDefinitionInvalid("user schema has no properties", nil)
+// resolveAllStepFields runs every step's fields through the resolver
+// and returns the per-step results keyed by step name. Resolution
+// errors (unknown property, unsupported type, etc.) are translated to
+// definition-validation errors. An `x-auth-methods#<method>` field
+// whose method is not enabled on the schema is rejected.
+func resolveAllStepFields(schema *jsonschema.Schema, steps []FlowDefinitionStep) (map[string]FlowResolvedFields, error) {
+	// Fail fast on schemas with no `properties` keyword at all. Without
+	// it the resolver would emit one ErrFlowFieldUnknown per user-property
+	// field; the structural defect is clearer surfaced once.
+	sr := newSchemaReader(schema)
+	if sr.Properties() == nil {
+		return nil, ErrFlowDefinitionInvalid("user schema has no properties", nil)
 	}
-	for _, step := range steps {
-		err := stepFieldsInUserSchema(step.Name, step.Fields, userProperties)
-		if err != nil {
-			return err
-		}
 
+	// validate that all required fields in the schema are present in the flow definition
+	if err := validateRequiredUserSchemaFields(sr.RequiredSet(), steps); err != nil {
+		return nil, err
+	}
+
+	// SchemaFieldResolver is stateless; a zero-value instance is the
+	// shared translator used at both runtime (state machine) and
+	// definition-time (this validator).
+	var resolver SchemaFieldResolver
+
+	out := make(map[string]FlowResolvedFields, len(steps))
+	for _, step := range steps {
+		resolved, err := resolver.Resolve(schema, step.Name, step.Fields)
+		if err != nil {
+			return nil, ErrFlowDefinitionInvalid(fmt.Sprintf(
+				"step %q: %v", step.Name, err), nil)
+		}
+		for _, f := range resolved.Fields {
+			raw := Field(f.Name)
+			if raw.IsAuthMethod() && f.Challenge == FlowFieldChallengeNone {
+				return nil, ErrFlowDefinitionInvalid(fmt.Sprintf(
+					"step %q: %q is not an enabled authentication method",
+					step.Name, raw.AuthMethod()), nil)
+			}
+		}
+		out[step.Name] = resolved
+	}
+	return out, nil
+}
+
+// validateRequiredUserSchemaFields checks that all required fields in the
+// user schema are present in the flow definition.
+func validateRequiredUserSchemaFields(required map[string]struct{}, steps []FlowDefinitionStep) error {
+	if len(required) == 0 {
+		return nil
+	}
+	// gather all the fields set in the flow definition steps
+	fields := make(map[string]struct{})
+	for _, step := range steps {
+		for _, f := range step.Fields {
+			fields[string(f)] = struct{}{}
+		}
+	}
+	missingFields := make([]string, 0, len(required))
+	for requiredField := range required {
+		if _, ok := fields[requiredField]; !ok {
+			missingFields = append(missingFields, requiredField)
+		}
+	}
+	if len(missingFields) > 0 {
+		slices.Sort(missingFields)
+		return ErrFlowDefinitionInvalid(fmt.Sprintf("required fields %v in user schema are missing in the flow definition steps", missingFields), nil)
+	}
+	return nil
+}
+
+// validateSteps checks the structural shape of each step (terminal vs
+// non-terminal, unique field/action names, transitions matching
+// actions or reserved outcomes). Field-name validity against the user
+// schema is checked upstream by [resolveAllStepFields].
+func validateSteps(steps []FlowDefinitionStep) error {
+	for _, step := range steps {
 		isTerminalStep := step.Complete != nil
 		// a terminal step must have no fields/actions/transitions/gates/sso_providers
 		if isTerminalStep {
@@ -109,7 +178,7 @@ func validateSteps(steps []FlowDefinitionStep, userSchema *jsonschema.Schema) er
 		// fields/actions/gates have ordered slice shape on the wire; ensure
 		// every entry has a non-empty unique name to keep them addressable by
 		// transitions and submit payloads.
-		if err := uniqueNonEmptyStrings(step.Name, "field", step.Fields); err != nil {
+		if err := uniqueNonEmptyFields(step.Name, step.Fields); err != nil {
 			return err
 		}
 		actionNames := make(map[string]struct{}, len(step.Actions))
@@ -172,19 +241,19 @@ func validateSteps(steps []FlowDefinitionStep, userSchema *jsonschema.Schema) er
 	return nil
 }
 
-// uniqueNonEmptyStrings rejects duplicate or empty entries in an ordered
-// string list (e.g. step.Fields). Returns a flow-definition-invalid error
-// pinned to stepName and a human-readable item label.
-func uniqueNonEmptyStrings(stepName, label string, items []string) error {
-	seen := make(map[string]struct{}, len(items))
+// uniqueNonEmptyFields rejects duplicate or empty entries in a step's
+// Fields list. Returns a flow-definition-invalid error pinned to
+// stepName.
+func uniqueNonEmptyFields(stepName string, items []Field) error {
+	seen := make(map[Field]struct{}, len(items))
 	for _, item := range items {
 		if item == "" {
 			return ErrFlowDefinitionInvalid(fmt.Sprintf(
-				"step %q: %s entry is empty", stepName, label), nil)
+				"step %q: field entry is empty", stepName), nil)
 		}
 		if _, dup := seen[item]; dup {
 			return ErrFlowDefinitionInvalid(fmt.Sprintf(
-				"step %q: duplicate %s %q", stepName, label, item), nil)
+				"step %q: duplicate field %q", stepName, item), nil)
 		}
 		seen[item] = struct{}{}
 	}
@@ -336,28 +405,6 @@ func bfsReachable(start string, adj map[string][]string, reachable map[string]st
 	}
 }
 
-// userSchemaProperties extracts the "properties" map from a compiled user schema.
-// Returns (map, true) when the keyword is present, (nil, false) otherwise.
-func userSchemaProperties(userSchema *jsonschema.Schema) (types.PartMapSchema, bool) {
-	pv, ok := userSchema.LookupKeyword("properties")
-	if !ok {
-		return nil, false
-	}
-	props, ok := pv.(types.PartMapSchema)
-	return props, ok
-}
-
-// stepFieldsInUserSchema checks that all fields in a step are defined in the user schema properties
-func stepFieldsInUserSchema(stepName string, stepFields []string, userProperties types.PartMapSchema) error {
-	for _, field := range stepFields {
-		if _, ok := userProperties[field]; !ok {
-			return ErrFlowDefinitionInvalid(fmt.Sprintf(
-				"step %q: field %q is not a property in the user schema", stepName, field), nil)
-		}
-	}
-	return nil
-}
-
 // validateFlipTableCoverage requires the counter-outcome transition on
 // an entry step iff the partner purpose is also wired (e.g. login entry
 // needs user_not_found only when register is also a purpose).
@@ -399,13 +446,9 @@ var purposeFlipTargets = map[FlowDefinitionPurpose]map[string]FlowDefinitionPurp
 
 // validateOnSuccessManifests verifies that every kind in each step's
 // on_success manifest is collected on the step itself or upstream.
-func validateOnSuccessManifests(def FlowDefinition, userSchema *jsonschema.Schema) error {
+func validateOnSuccessManifests(def FlowDefinition, resolvedByStep map[string]FlowResolvedFields) error {
 	if len(def.Steps) == 0 {
 		return nil
-	}
-	stepsByName := make(map[string]*FlowDefinitionStep, len(def.Steps))
-	for i := range def.Steps {
-		stepsByName[def.Steps[i].Name] = &def.Steps[i]
 	}
 	reverse := make(map[string][]string, len(def.Steps))
 	for _, s := range def.Steps {
@@ -427,7 +470,7 @@ func validateOnSuccessManifests(def FlowDefinition, userSchema *jsonschema.Schem
 		}
 		reachable := reachableSteps(step.Name, reverse)
 		for _, kind := range manifest {
-			if !someStepEstablishesKind(reachable, stepsByName, kind, userSchema) {
+			if !someStepEstablishesKind(reachable, resolvedByStep, kind) {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
 					"step %q: on_success %s requires %q to be collected upstream", step.Name, *step.OnSuccess, kind), nil)
 			}
@@ -455,64 +498,20 @@ func reachableSteps(start string, reverse map[string][]string) map[string]struct
 }
 
 // someStepEstablishesKind reports whether any candidate step collects
-// a field whose schema-derived challenge matches kind.
-func someStepEstablishesKind(candidates map[string]struct{}, byName map[string]*FlowDefinitionStep, kind FlowFieldChallenge, userSchema *jsonschema.Schema) bool {
+// a field whose resolver-derived challenge matches kind.
+func someStepEstablishesKind(candidates map[string]struct{}, resolvedByStep map[string]FlowResolvedFields, kind FlowFieldChallenge) bool {
 	for name := range candidates {
-		s, ok := byName[name]
+		resolved, ok := resolvedByStep[name]
 		if !ok {
 			continue
 		}
-		for _, fieldName := range s.Fields {
-			if challengeForField(userSchema, fieldName) == kind {
+		for _, f := range resolved.Fields {
+			if f.Challenge == kind {
 				return true
 			}
 		}
 	}
 	return false
-}
-
-// challengeForField mirrors [deriveChallenge] in the field resolver.
-func challengeForField(userSchema *jsonschema.Schema, fieldName string) FlowFieldChallenge {
-	if userSchema == nil {
-		return FlowFieldChallengeNone
-	}
-	properties := lookupProperties(userSchema)
-	prop, ok := properties[fieldName]
-	if !ok {
-		return FlowFieldChallengeNone
-	}
-	if deriveUnique(prop) != AttributeUniquenessUnspecified {
-		return FlowFieldChallengeIdentifier
-	}
-	if isPassword(prop) && authMethodEnabled(userSchema, "password") {
-		return FlowFieldChallengePassword
-	}
-	return FlowFieldChallengeNone
-}
-
-// authMethodEnabled reads `x-auth-methods.<method>.enabled` off the root schema.
-func authMethodEnabled(schema *jsonschema.Schema, method string) bool {
-	if schema == nil {
-		return false
-	}
-	v, ok := schema.LookupKeyword("x-auth-methods")
-	if !ok {
-		return false
-	}
-	raw, ok := v.(types.PartAny)
-	if !ok {
-		return false
-	}
-	methods, ok := raw.V.(map[string]any)
-	if !ok {
-		return false
-	}
-	entry, ok := methods[method].(map[string]any)
-	if !ok {
-		return false
-	}
-	enabled, _ := entry["enabled"].(bool)
-	return enabled
 }
 
 // a map of step names for a quick lookup of all the steps in a flow definition

@@ -6,24 +6,15 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { forwardedArgs, isDirectRun, runCapture } from "./dev-process.mjs";
+import { PUBLIC_RELEASE_PACKAGES } from "./release-manifest.mjs";
 
-export const publicPackages = [
-  { name: "@zitadel/cli", root: "apps/cli/" },
-  { name: "@zitadel/server", root: "apps/server/" },
-  { name: "@zitadel/server-linux-x64", root: "apps/server-linux-x64/" },
-  { name: "@zitadel/server-linux-arm64", root: "apps/server-linux-arm64/" },
-  { name: "@zitadel/server-darwin-x64", root: "apps/server-darwin-x64/" },
-  { name: "@zitadel/server-darwin-arm64", root: "apps/server-darwin-arm64/" },
-  { name: "@zitadel/server-win32-x64", root: "apps/server-win32-x64/" },
-  { name: "@zitadel/api", root: "packages/api/" },
-  { name: "@zitadel/components", root: "packages/components/" },
-  { name: "@zitadel/sdk-core", root: "packages/sdk-core/" },
-  { name: "@zitadel/sdk-next", root: "packages/sdk-next/" },
-  { name: "@zitadel/sdk-nuxt", root: "packages/sdk-nuxt/" },
-  { name: "@zitadel/sdk-react", root: "packages/sdk-react/" },
-  { name: "@zitadel/sdk-vue", root: "packages/sdk-vue/" },
-  { name: "@zitadel/sdk-angular", root: "packages/sdk-angular/" },
-];
+// Public product packages, mirrored by the fixed alpha group in
+// `.changeset/config.json`. `validateFixedGroup()` fails the release check if
+// the manifest and Changesets config drift.
+export const publicPackages = PUBLIC_RELEASE_PACKAGES.map((pkg) => ({
+  name: pkg.name,
+  root: `${pkg.dir}/`,
+}));
 
 const publicPackageNames = publicPackages.map((pkg) => pkg.name);
 const publicPackageNameSet = new Set(publicPackageNames);
@@ -136,8 +127,19 @@ export function isChangesetMarkdown(file) {
   return file.startsWith(".changeset/") && file.endsWith(".md") && file !== ".changeset/README.md";
 }
 
+export function isTestFile(file) {
+  // Test files never ship, so mirror the "tests skip" rule in
+  // `.changeset/README.md`: a test-only change under a publishable root does not
+  // require a changeset.
+  return (
+    /\.(test|spec)\.[cm]?[jt]sx?$/.test(file) ||
+    file.endsWith("_test.go") ||
+    /(^|\/)(tests?|__tests__)\//.test(file)
+  );
+}
+
 export function packageForFile(file) {
-  if (file.endsWith("/AGENTS.md")) {
+  if (file.endsWith("/AGENTS.md") || isTestFile(file)) {
     return undefined;
   }
   return publicPackages.find((pkg) => file.startsWith(pkg.root));

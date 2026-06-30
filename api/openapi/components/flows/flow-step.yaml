@@ -21,11 +21,14 @@ example:
       required: true
   actions:
     - name: submit
+      kind: submit
       text_key: login.action.submit
       primary: true
     - name: register
+      kind: navigate
       text_key: login.action.register
     - name: recover
+      kind: navigate
       text_key: login.action.recover
   gates:
     captcha:
@@ -111,7 +114,7 @@ properties:
     properties:
       method:
         type: string
-        enum: [passkey]
+        enum: [passkey, passkey_register]
         description: Challenge method. Determines which component handles the ceremony.
       challenge_id:
         type: string

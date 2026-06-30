@@ -31,7 +31,6 @@ var exampleUserSchema = []byte(`{
   },
   "properties": {
     "email":       { "type": "string", "format": "email", "x-unique": "project" },
-    "password":    { "type": "string", "minLength": 8, "x-password": true },
     "name":        { "type": "string" },
     "givenName":   { "type": "string" },
     "familyName":  { "type": "string" },
@@ -93,6 +92,8 @@ func TestExampleFlowDefinitions(t *testing.T) {
 
 			schemaURI := url.URL(req.GetSchemaURI().Value)
 			userSchemaRef := req.FlowDefinition.GetUserSchema()
+			status, err := domain.FlowDefinitionStatusString(string(req.FlowDefinition.GetStatus()))
+			require.NoError(t, err, "invalid status")
 
 			flowDef, err := domain.NewFlowDefinition(
 				"",
@@ -106,7 +107,7 @@ func TestExampleFlowDefinitions(t *testing.T) {
 					TeamIDs: req.FlowDefinition.GetAudience().Value.TeamIds,
 				},
 				steps,
-				domain.FlowDefinitionStatusActive,
+				status,
 			)
 			require.NoError(t, err, "domain NewFlowDefinition")
 

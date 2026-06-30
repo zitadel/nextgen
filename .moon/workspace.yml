@@ -13,6 +13,7 @@ projects:
     demo-nuxt: "apps/demo-nuxt"
     demo-nuxt-e2e: "apps/demo-nuxt-e2e"
     login-ui: "apps/login-ui"
+    mock-zitadel: "apps/mock-zitadel"
     api: "packages/api"
     api-mock: "packages/api-mock"
     components: "packages/components"
@@ -27,6 +28,7 @@ projects:
     sdk-svelte: "packages/sdk-svelte"
     sdk-vue: "packages/sdk-vue"
     shared-component-styles: "packages/shared-component-styles"
+    storybook: "apps/storybook"
     ui-react: "packages/ui-react"
 
 vcs:

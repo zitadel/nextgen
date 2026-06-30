@@ -27,29 +27,51 @@
       {% assign field_placeholder = f.text_key | fieldPlaceholder %}
       {% assign field_help = f.text_key | fieldHelp %}
       {% assign field_err = f.name | fieldError: errors %}
-      {% assign autocomplete_val = '' %}
-      {% if f.name == 'email' %}
-        {% assign autocomplete_val = 'email' %}
-      {% elsif f.type == 'password' and step.name contains 'register' %}
-        {% assign autocomplete_val = 'new-password' %}
-      {% elsif f.type == 'password' %}
-        {% assign autocomplete_val = 'current-password' %}
-      {% endif %}
-      <zl-field
-        name="{{ f.name }}"
-        data-testid="zitadel-field-{{ f.name }}"
-        label="{{ f.text_key | t }}"
-        type="{{ f.type }}"
-        value="{{ f.value }}"
-        {% if autocomplete_val != '' %}autocomplete="{{ autocomplete_val }}"{% endif %}
-        {% if f.required %}required{% endif %}
-        {% if field_placeholder != "" %}placeholder="{{ field_placeholder }}"{% endif %}
-        {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
-      >
-        {% if field_help != "" %}
-          <span slot="help">{{ field_help }}</span>
+      {% case f.type %}
+      {% when 'checkbox' %}
+        <zl-checkbox
+          name="{{ f.name }}"
+          data-testid="zitadel-field-{{ f.name }}"
+          label="{{ f.text_key | t }}"
+          value="true"
+          {% if f.value %}checked{% endif %}
+          {% if f.required %}required{% endif %}
+        ></zl-checkbox>
+      {% when 'select' %}
+        <zl-select
+          name="{{ f.name }}"
+          data-testid="zitadel-field-{{ f.name }}"
+          label="{{ f.text_key | t }}"
+          value="{{ f.value }}"
+          options='{{ f.validation.enum | selectOptions | json }}'
+          {% if f.required %}required{% endif %}
+          {% if field_placeholder != "" %}placeholder="{{ field_placeholder }}"{% endif %}
+        ></zl-select>
+      {% else %}
+        {% assign autocomplete_val = '' %}
+        {% if f.name == 'email' %}
+          {% assign autocomplete_val = 'email' %}
+        {% elsif f.type == 'password' and step.name contains 'register' %}
+          {% assign autocomplete_val = 'new-password' %}
+        {% elsif f.type == 'password' %}
+          {% assign autocomplete_val = 'current-password' %}
         {% endif %}
-      </zl-field>
+        <zl-field
+          name="{{ f.name }}"
+          data-testid="zitadel-field-{{ f.name }}"
+          label="{{ f.text_key | t }}"
+          type="{{ f.type }}"
+          value="{{ f.value }}"
+          {% if autocomplete_val != '' %}autocomplete="{{ autocomplete_val }}"{% endif %}
+          {% if f.required %}required{% endif %}
+          {% if field_placeholder != "" %}placeholder="{{ field_placeholder }}"{% endif %}
+          {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
+        >
+          {% if field_help != "" %}
+            <span slot="help">{{ field_help }}</span>
+          {% endif %}
+        </zl-field>
+      {% endcase %}
     {% endfor %}
 
     {% assign recover = actions | where: "name", "recover" | first %}
@@ -118,10 +140,14 @@
     {% if challenge %}
       {% if challenge.method == "passkey" or challenge.method == "passkey_register" %}
         {% assign ceremony = "authenticate" %}
-        {% if challenge.method == "passkey_register" %}{% assign ceremony = "register" %}{% endif %}
+        {% assign submit_method = challenge.method %}
+        {% if challenge.method == "passkey_register" or challenge.options.user %}
+          {% assign ceremony = "register" %}
+          {% assign submit_method = "passkey_register" %}
+        {% endif %}
         <zl-passkey
           ceremony="{{ ceremony }}"
-          method="{{ challenge.method }}"
+          method="{{ submit_method }}"
           challenge-id="{{ challenge.challenge_id }}"
           options='{{ challenge.options | json }}'
         ></zl-passkey>

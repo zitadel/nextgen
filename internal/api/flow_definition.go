@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/muhlemmer/gu"
 	api "github.com/zitadel/nextgen/api/generated"
@@ -59,7 +60,8 @@ func (h Handler) UpdateFlowDefinition(ctx context.Context, req *api.FlowDefiniti
 		return nil, err
 	}
 
-	return flowDefinitionDetailResponse(flowDefinition), nil
+	resp := flowDefinitionDetailResponse(flowDefinition)
+	return resp, nil
 }
 
 func (h Handler) DeleteFlowDefinition(ctx context.Context, params api.DeleteFlowDefinitionParams) (api.DeleteFlowDefinitionRes, error) {
@@ -75,19 +77,12 @@ func (h Handler) DeleteFlowDefinition(ctx context.Context, params api.DeleteFlow
 /* API request to service/domain converters */
 func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.FlowDefinitionRequest, error) {
 	definition := req.GetFlowDefinition()
-
-	// set the default status to active if not provided
-	status := api.FlowDefinitionStatusActive
-	if s, ok := definition.GetStatus().Get(); ok && s != "" {
-		status = s
-	}
-	return mapFlowDefinitionRequestToService(string(req.GetProjectID()), req.GetSchemaURI(), req.GetFlowDefinition(), string(status))
+	return mapFlowDefinitionRequestToService(string(req.GetProjectID()), req.GetSchemaURI(), req.GetFlowDefinition(), strings.ToLower(string(definition.GetStatus())))
 }
 
 func mapUpdateRequestToService(params api.UpdateFlowDefinitionParams, req *api.FlowDefinitionUpdateRequest) (service.FlowDefinitionRequest, error) {
 	definition := req.GetFlowDefinition()
-	status := string(definition.GetStatus().Value)
-	svcReq, err := mapFlowDefinitionRequestToService(string(params.ProjectID), req.GetSchemaURI(), definition, status)
+	svcReq, err := mapFlowDefinitionRequestToService(string(params.ProjectID), req.GetSchemaURI(), definition, strings.ToLower(string(definition.GetStatus())))
 	if err != nil {
 		return svcReq, err
 	}
@@ -129,7 +124,7 @@ func mapFlowDefinitionRequestToService(projectID string, schemaURI api.OptSchema
 	for _, step := range definition.GetSteps() {
 		s := domain.FlowDefinitionStep{
 			Name:   step.GetName(),
-			Fields: step.GetFields(),
+			Fields: domain.FieldsFromStrings(step.GetFields()),
 		}
 		// actions — preserve the nil-vs-empty distinction so an explicit `[]`
 		// (deliberately no actions, e.g. terminal-step shape) survives the
@@ -275,9 +270,9 @@ func flowDefinitionDetailResponse(flowDefinition *domain.FlowDefinition) *api.Fl
 	return &api.FlowDefinitionDetailResponse{
 		ID:        flowDefinition.ID,
 		ProjectID: flowDefinition.ProjectID,
-		Status:    api.FlowDefinitionStatus(flowDefinition.Status.String()),
 		FlowDefinition: api.FlowDefinition{
 			Name:       flowDefinition.Name,
+			Status:     api.FlowDefinitionStatus(flowDefinition.Status.String()),
 			Steps:      steps,
 			Purposes:   purposes,
 			Audience:   audience,
@@ -314,7 +309,7 @@ func mapDomainStepsToAPI(domainSteps []domain.FlowDefinitionStep) []api.FlowDefi
 		}
 		apiStep := api.FlowDefinitionStep{
 			Name:    step.Name,
-			Fields:  step.Fields,
+			Fields:  domain.FieldsToStrings(step.Fields),
 			Actions: actions,
 			Gates: api.OptFlowDefinitionStepGates{
 				Value: gates,

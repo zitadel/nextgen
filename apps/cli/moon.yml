@@ -25,8 +25,29 @@ tasks:
     deps:
       - "api:build"
       - "sdk-next:build"
+    inputs:
+      # Default project files plus the telemetry build-channel env var, so a
+      # production-stamped (release) build is never served from — or reused as —
+      # a dev-stamped cache. See apps/cli/tsdown.config.ts.
+      - "**/*"
+      - "$ZITADEL_TELEMETRY_BUILD_CHANNEL"
     outputs:
       - "dist/**/*"
+
+  build-release:
+    command: "corepack pnpm run build"
+    env:
+      ZITADEL_TELEMETRY_BUILD_CHANNEL: "production"
+    deps:
+      - "api:build-release"
+      - "sdk-next:build-release"
+    inputs:
+      - "**/*"
+      - "$ZITADEL_TELEMETRY_BUILD_CHANNEL"
+    outputs:
+      - "dist/**/*"
+    options:
+      cache: false
 
   test:
     command: "corepack pnpm run test"

@@ -3,6 +3,7 @@
   "schema_uri": "https://nextgen.com/flow-definition.json",
   "flow_definition": {
     "name": "default-login",
+    "status": "active",
     "user_schema": "${USER_SCHEMA_URL}",
     "purposes": {
       "login": "identifier",
@@ -43,7 +44,7 @@
       {
         "name": "password",
         "fields": [
-          "password"
+          "x-auth-methods#password"
         ],
         "actions": [
           {
@@ -105,7 +106,7 @@
       {
         "name": "register-password",
         "fields": [
-          "password"
+          "x-auth-methods#password"
         ],
         "actions": [
           {

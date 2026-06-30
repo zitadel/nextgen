@@ -11,6 +11,10 @@
   flex-direction: column;
   gap: var(--zl-spacing-05, 2rem);
   font-family: var(--zl-font-family-sans, system-ui, sans-serif);
+  /* Match the Lit atom's `baseHostStyles` :host line-height so flowing body
+     text (slotted in Lit, a child in React) renders at the same height in both
+     renderers regardless of the host page's default. */
+  line-height: 1.5;
   color: var(--zl-color-text-primary-white, #f4f4f6);
   box-sizing: border-box;
 }

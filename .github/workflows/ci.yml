@@ -58,7 +58,13 @@ jobs:
 
       - name: Run binary fresh-app journey
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- --runtime binary --concurrency 5 --work-dir "${RUNNER_TEMP}/ci-journey"
+        run: |
+          version="$(node -p "require('./apps/server/package.json').version")"
+          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- \
+            --runtime binary \
+            --concurrency 5 \
+            --work-dir "${RUNNER_TEMP}/ci-journey" \
+            --tarballs-dir "dist/release/${version}/npm"
 
       - name: Validate version PR
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}

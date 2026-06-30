@@ -78,6 +78,10 @@ type CheckChangesetStatus = {
   }>;
 };
 
+const releaseManifest = (await import(
+  new URL("../../../../../scripts/release-manifest.mjs", import.meta.url).href
+)) as { PUBLIC_PACKAGE_NAMES: string[] };
+
 async function loadModule(): Promise<CheckChangesetsStatusModule> {
   return (await import(
     new URL("../../../../../scripts/check-changesets-status.mjs", import.meta.url).href
@@ -169,7 +173,7 @@ Improve local start behavior.
     const { checkChangesetsStatus } = await loadModule();
     const report = await checkChangesetsStatus({
       entries: [
-        { status: "M", file: "apps/cli/tests/unit/scripts/check-changesets-status.test.ts" },
+        { status: "M", file: "apps/cli/src/lib/diagnostics.ts" },
         { status: "A", file: ".changeset/release-tests.md" },
       ],
       config: validConfig(),
@@ -177,13 +181,27 @@ Improve local start behavior.
         ".changeset/release-tests.md": `---
 ---
 
-Exercise release workflow scripts without changing published package behavior.
+Internal-only change with no published package behavior.
 `,
       },
     });
 
     expect(report.ok).toBe(true);
     expect(report.nextAction).toContain("Empty changeset");
+  });
+
+  it("treats test-only changes under a publishable root as needing no changeset", async () => {
+    const { checkChangesetsStatus } = await loadModule();
+    const report = await checkChangesetsStatus({
+      entries: [
+        { status: "M", file: "apps/cli/tests/unit/scripts/check-changesets-status.test.ts" },
+      ],
+      config: validConfig(),
+    });
+
+    expect(report.ok).toBe(true);
+    expect(report.errors).toEqual([]);
+    expect(report.nextAction).toContain("No changeset required");
   });
 
   it("passes pending mode when public changesets are valid", async () => {
@@ -526,24 +544,6 @@ describe("release publish guard", () => {
 
 function validConfig(): { fixed: string[][] } {
   return {
-    fixed: [
-      [
-        "@zitadel/cli",
-        "@zitadel/server",
-        "@zitadel/server-linux-x64",
-        "@zitadel/server-linux-arm64",
-        "@zitadel/server-darwin-x64",
-        "@zitadel/server-darwin-arm64",
-        "@zitadel/server-win32-x64",
-        "@zitadel/api",
-        "@zitadel/components",
-        "@zitadel/sdk-core",
-        "@zitadel/sdk-next",
-        "@zitadel/sdk-nuxt",
-        "@zitadel/sdk-react",
-        "@zitadel/sdk-vue",
-        "@zitadel/sdk-angular",
-      ],
-    ],
+    fixed: [[...releaseManifest.PUBLIC_PACKAGE_NAMES]],
   };
 }
