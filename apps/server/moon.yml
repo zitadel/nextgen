@@ -20,6 +20,19 @@ tasks:
       runFromWorkspaceRoot: true
 
   generate:
+    command: "go generate ./..."
+    outputs:
+      - "/api/generated/**"
+      - "/api/openapi/components/schemas/errors/**"
+      - "/api/openapi/endpoints/**"
+      - "/internal/domain/**"
+      - "/internal/instrumentation/**"
+      - "/internal/service/mocks/**"
+      - "/internal/storage/database/**"
+    options:
+      runFromWorkspaceRoot: true
+
+  check-generate:
     command: "node scripts/check-go-generate.mjs"
     options:
       runFromWorkspaceRoot: true
@@ -42,7 +55,7 @@ tasks:
     deps:
       - "openapi"
       - "format"
-      - "generate"
+      - "check-generate"
       - "vet"
     options:
       runFromWorkspaceRoot: true

@@ -208,7 +208,8 @@ changes.
 ## Generated Files
 
 - Do not hand-edit `api/generated/**`; update `api/openapi/**` and run
-  `go generate ./...`.
+  `moon run server:generate` or `go generate ./...`. CI enforces committed
+  generated output through `server:check-generate` (via `server:test`).
 - Do not hand-edit generated package output under `dist/`.
 - Do not hand-edit `apps/console/src/routeTree.gen.ts`; update route files and
   let the TanStack Router plugin regenerate it.
