@@ -26,10 +26,7 @@ func (f flowDefinitionStatements) GetFlowDefinitionByID(ctx context.Context, id 
 }
 
 // IsStatements implements [service.FlowDefinitionStatements].
-// Subtle: this method shadows the method (statement).IsStatements of flowDefinitionStatements.statement.
-func (f flowDefinitionStatements) IsStatements() {
-	panic("unimplemented")
-}
+func (f flowDefinitionStatements) IsStatements() {}
 
 // ListFlowDefinitions implements [service.FlowDefinitionStatements].
 func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {

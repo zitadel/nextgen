@@ -26,10 +26,7 @@ func (p projectStatements) GetProjectByID(ctx context.Context, id string) (*doma
 }
 
 // IsStatements implements [service.ProjectStatements].
-// Subtle: this method shadows the method (statement).IsStatements of projectStatements.statement.
-func (p projectStatements) IsStatements() {
-	panic("unimplemented")
-}
+func (p projectStatements) IsStatements() {}
 
 // ListProjects implements [service.ProjectStatements].
 func (p projectStatements) ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {

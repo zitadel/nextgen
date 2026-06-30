@@ -52,7 +52,7 @@ type beginner interface {
 	Begin(ctx context.Context) (pgx.Tx, error)
 }
 
-func executeTransaction(ctx context.Context, begin beginner, fn func(ctx context.Context, tx service.Statementer[service.AllStatements]) error) error {
+func executeTransaction(ctx context.Context, begin beginner, callback func(ctx context.Context, tx service.Statementer[service.AllStatements]) error) (err error) {
 	tx, err := begin.Begin(ctx)
 	if err != nil {
 		return err
@@ -64,5 +64,5 @@ func executeTransaction(ctx context.Context, begin beginner, fn func(ctx context
 		}
 		err = tx.Commit(ctx)
 	}()
-	return fn(ctx, transaction{tx: tx, statements: newStatements(tx)})
+	return callback(ctx, transaction{tx: tx, statements: newStatements(tx)})
 }

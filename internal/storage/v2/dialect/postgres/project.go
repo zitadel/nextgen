@@ -51,7 +51,11 @@ func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*dom
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	return pgx.CollectExactlyOneRow(rows, ps.scanProject)
+	project, err := pgx.CollectExactlyOneRow(rows, ps.scanProject)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return project, nil
 }
 
 // ListProjects implements [service.ProjectStatements].
