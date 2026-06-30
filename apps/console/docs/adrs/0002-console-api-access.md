@@ -1,7 +1,7 @@
 # Console ADR 0002: API access and auth interceptors
 
-> **Status:** Proposed
-> **Date:** 2026-06-29
+> **Status:** Accepted
+> **Date:** 2026-06-29 (accepted 2026-06-30)
 > **Scope:** `apps/console` only. See [`apps/console/AGENTS.md`](../../AGENTS.md).
 > **Context:** Console shell layout, navigation, and resource list pages
 > (issue [#440](https://github.com/zitadel/nextgen/issues/440)).

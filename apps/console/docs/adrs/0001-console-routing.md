@@ -1,7 +1,7 @@
 # Console ADR 0001: Routing
 
-> **Status:** Proposed
-> **Date:** 2026-06-29
+> **Status:** Accepted
+> **Date:** 2026-06-29 (accepted 2026-06-30)
 > **Scope:** `apps/console` only. See [`apps/console/AGENTS.md`](../../AGENTS.md).
 > **Context:** Console shell layout, navigation, and resource list pages
 > (issue [#440](https://github.com/zitadel/nextgen/issues/440)).
@@ -87,9 +87,14 @@ This makes the router prefix track [`vite.config.mts`](../../vite.config.mts)
 automatically: `BASE_URL` is `/ui/console/` for `build`/`preview` and `/` for
 the dev server, so the router and the emitted asset base always agree —
 including under `vite preview` (PROD-built assets served by a "serve" command),
-which is where an `import.meta.env.PROD` check would get the prefix wrong. The
-`/ui/console/` prefix is owned by exactly one file (`vite.config.mts`); the
-router consumes it instead of declaring its own copy.
+which is where an `import.meta.env.PROD` check would get the prefix wrong.
+
+The literal `/ui/console/` value is inherited from the previous Zitadel console
+and is **not** something routing should bake in. The router stays
+value-agnostic: it reads whatever `BASE_URL` resolves to, so the prefix is
+owned by exactly one file (`vite.config.mts`) and can be changed — or dropped —
+there without touching any routing code. Hardcoding the prefix in the router
+(as legacy code did) is explicitly out.
 
 ### 4. Route tree for the #440 resources
 
