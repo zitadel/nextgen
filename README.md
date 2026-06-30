@@ -110,7 +110,7 @@ GitHub Actions context `full-pr`, shown in the pull request UI as
 without adding a blocking CI gate. `ci / full-pr` runs the Moon-driven PR
 confidence path on a 16-core Depot runner:
 
-- Go vet and tests.
+- Go generated-file drift check, vet, and tests (`server:check-generate`, `server:test`).
 - pnpm install and Moon lint/typecheck/build/test tasks.
 - Built CLI smoke checks.
 - npm package dry-run/pack checks.
