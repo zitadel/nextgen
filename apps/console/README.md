@@ -44,7 +44,7 @@ runtime and the permissions model are defined in a future ADR.
 | `VITE_CONSOLE_PROJECT_ID` | public (browser) | Non-secret project id; scopes list/detail calls that need `project_id`. |
 | `VITE_CONSOLE_API_BASE`   | public (browser) | Same-origin API base path. Defaults to `/api`.                          |
 | `CONSOLE_PROJECT_SECRET`  | **Node only**    | Interim project-secret bearer injected by the dev proxy. Not `VITE_`-prefixed, so it never reaches the browser bundle. |
-| `VITE_CONSOLE_BACKEND_URL`| Node (dev proxy) | Go server URL the dev proxy forwards to. Defaults to `http://localhost:8080`. |
+| `CONSOLE_BACKEND_URL`     | **Node only**    | Go server URL the dev proxy forwards to. Not `VITE_`-prefixed, so it never reaches the browser bundle. Defaults to `http://localhost:8080`. |
 
 ## Run against the Go server
 

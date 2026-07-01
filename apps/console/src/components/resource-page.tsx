@@ -71,7 +71,7 @@ export function DataTable<TRow>({
 }: {
   columns: Column<TRow>[];
   rows: TRow[];
-  getRowKey: (row: TRow) => string;
+  getRowKey: (row: TRow, index: number) => string;
   emptyMessage?: string;
 }) {
   if (rows.length === 0) {
@@ -91,8 +91,8 @@ export function DataTable<TRow>({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={getRowKey(row)}>
+          {rows.map((row, index) => (
+            <tr key={getRowKey(row, index)}>
               {columns.map((column) => (
                 <td key={column.header} className={CELL}>
                   {column.cell(row)}

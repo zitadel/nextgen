@@ -23,7 +23,7 @@ function UsersList() {
       <PageHeader title="Users" action={<CreateButtonStub label="Create user" />} />
       <DataTable
         rows={users}
-        getRowKey={(user) => field(user, "id") ?? crypto.randomUUID()}
+        getRowKey={(user, index) => field(user, "id") ?? `user-${index}`}
         emptyMessage="No users yet."
         columns={[
           {

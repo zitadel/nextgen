@@ -22,6 +22,8 @@ function SessionsList() {
     try {
       await api.revokeSession(sessionId, { project_id: projectId });
       await router.invalidate();
+    } catch (error) {
+      console.error("Failed to revoke session", error);
     } finally {
       setRevoking(null);
     }

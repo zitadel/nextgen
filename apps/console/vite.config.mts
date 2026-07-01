@@ -79,17 +79,21 @@ export default defineConfig(({ command, mode, isPreview }) => ({
 }));
 
 function devApiProxy(mode: string): Record<string, ProxyOptions> {
-  // Public, browser-safe vars (VITE_ prefixed). The API base is the same path
-  // the SDK client targets (`VITE_CONSOLE_API_BASE`, default `/api`).
+  // Public, browser-safe var (VITE_ prefixed): the API base the SDK client
+  // targets (`VITE_CONSOLE_API_BASE`, default `/api`).
   const env = loadEnv(mode, import.meta.dirname, "VITE_");
   const apiBase = env.VITE_CONSOLE_API_BASE || defaultApiBase;
-  const backendUrl = env.VITE_CONSOLE_BACKEND_URL || defaultBackendUrl;
-  // Node-only secret — deliberately NOT VITE_ prefixed, so it is never inlined
+  // Node-only vars — deliberately NOT VITE_ prefixed, so they are never inlined
   // into the client bundle. Read straight from the process environment.
+  const backendUrl = process.env.CONSOLE_BACKEND_URL || defaultBackendUrl;
   const projectSecret = process.env.CONSOLE_PROJECT_SECRET ?? "";
 
+  // Anchor the context to a path segment so a similarly-prefixed path (e.g.
+  // `/api2/...`) is not accidentally proxied and rewritten.
+  const escaped = apiBase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
   return {
-    [apiBase]: {
+    [`^${escaped}(/|$)`]: {
       target: backendUrl,
       changeOrigin: true,
       rewrite: (path: string) => {
