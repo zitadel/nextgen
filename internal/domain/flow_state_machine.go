@@ -524,7 +524,10 @@ func (r *FlowStateMachineRuntime) processPasskeyLogin(ctx context.Context, clien
 		return *pk.halt, nil
 	}
 	if !pk.handled {
-		return r.fallBackToStandardPipeline(ctx, client, def, state, currentStep, resolved, in, userSchemaURL)
+		// Ceremony was abandoned (pending challenge didn't match the
+		// submitted action): treat the submit as a plain kind=submit so
+		// the user still gets a response.
+		return r.processSubmit(ctx, client, def, state, currentStep, resolved, in, userSchemaURL)
 	}
 
 	return r.routeOutcome(ctx, client, def, state, currentStep, resolved, in.Action, in.Action, userSchemaURL)
@@ -552,24 +555,13 @@ func (r *FlowStateMachineRuntime) processPasskeyRegister(ctx context.Context, cl
 		return *pk.halt, nil
 	}
 	if !pk.handled {
-		return r.fallBackToStandardPipeline(ctx, client, def, state, currentStep, resolved, in, userSchemaURL)
+		// Ceremony was abandoned (pending challenge didn't match the
+		// submitted action): treat the submit as a plain kind=submit so
+		// the user still gets a response.
+		return r.processSubmit(ctx, client, def, state, currentStep, resolved, in, userSchemaURL)
 	}
 
 	return r.routeOutcome(ctx, client, def, state, currentStep, resolved, in.Action, in.Action, userSchemaURL)
-}
-
-// fallBackToStandardPipeline runs when a passkey ceremony was
-// abandoned mid-submit: treat the submission as if it were a plain
-// submit-kind action so the user still gets a response.
-func (r *FlowStateMachineRuntime) fallBackToStandardPipeline(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, currentStep *FlowDefinitionStep, resolved FlowResolvedFields, in FlowSubmitInput, userSchemaURL string) (FlowStepResult, error) {
-	outcome, halt, err := r.runDispatchAndOnSuccess(ctx, client, def, state, currentStep, resolved, in, userSchemaURL)
-	if err != nil {
-		return FlowStepResult{}, err
-	}
-	if halt != nil {
-		return *halt, nil
-	}
-	return r.routeOutcome(ctx, client, def, state, currentStep, resolved, outcome, in.Action, userSchemaURL)
 }
 
 // flowDispatchResult summarizes the challenge dispatch loop. Outcome
