@@ -1,0 +1,46 @@
+get:
+  operationId: getSchemaByRevisionNr
+  summary: Get schema revision
+  description: |
+    Get a schema by its ID and revision number. This will return the specified 
+    revision of the schema.
+  tags:
+    - Schemas
+  security:
+    - oauth2:
+        - schema.read
+  parameters:
+    - $ref: ../../../../components/parameters/schema-id.yaml
+    - $ref: ../../../../components/parameters/revision-id.yaml
+    - $ref: ../../../../components/parameters/project-id.yaml
+    - $ref: ../../../../components/parameters/team-id.yaml
+  responses:
+    '200':
+      description: The schema was retrieved successfully
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: ../../user-schema.yaml
+            discriminator:
+              propertyName: kind
+              mapping:
+                user-schema: ../../user-schema.yaml
+    '400':
+      description: The provided input was not valid
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '404':
+      description: No schema was found with the given id or revision number
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml

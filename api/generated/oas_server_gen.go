@@ -93,6 +93,17 @@ type Handler interface {
 	//
 	// POST /schemas
 	CreateSchema(ctx context.Context, req CreateSchemaReq, params CreateSchemaParams) (CreateSchemaRes, error)
+	// CreateSchemaRevision implements createSchemaRevision operation.
+	//
+	// Create a new schema revision. The schema definition must include a unique $id field,
+	// which will be used to identify the schema in future requests. The $id must
+	// be a valid URI and should ideally point to the location where the schema
+	// can be accessed.
+	// The schema can either be a concrete schema, e.g. a user schema, or a
+	// schema-url which will be resolved by the server.
+	//
+	// POST /schemas/{id}
+	CreateSchemaRevision(ctx context.Context, req CreateSchemaRevisionReq, params CreateSchemaRevisionParams) (CreateSchemaRevisionRes, error)
 	// CreateSession implements createSession operation.
 	//
 	// Creates an anonymous session shell with no user and no factors (`state: building`).
@@ -246,6 +257,13 @@ type Handler interface {
 	//
 	// GET /schemas/{id}
 	GetSchemaById(ctx context.Context, params GetSchemaByIdParams) (GetSchemaByIdRes, error)
+	// GetSchemaByRevisionNr implements getSchemaByRevisionNr operation.
+	//
+	// Get a schema by its ID and revision number. This will return the specified
+	// revision of the schema.
+	//
+	// GET /schemas/{id}/{revision_nr}
+	GetSchemaByRevisionNr(ctx context.Context, params GetSchemaByRevisionNrParams) (GetSchemaByRevisionNrRes, error)
 	// GetSession implements getSession operation.
 	//
 	// Returns the current state of a session including its factors and all currently

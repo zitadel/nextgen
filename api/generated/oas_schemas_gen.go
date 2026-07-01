@@ -1894,7 +1894,84 @@ func (s *CreateSchemaResponse) SetID(val string) {
 	s.ID = val
 }
 
-func (*CreateSchemaResponse) createSchemaRes() {}
+func (*CreateSchemaResponse) createSchemaRes()         {}
+func (*CreateSchemaResponse) createSchemaRevisionRes() {}
+
+type CreateSchemaRevisionBadRequest ErrorDetails
+
+func (*CreateSchemaRevisionBadRequest) createSchemaRevisionRes() {}
+
+type CreateSchemaRevisionConflict ErrorDetails
+
+func (*CreateSchemaRevisionConflict) createSchemaRevisionRes() {}
+
+// CreateSchemaRevisionReq represents sum type.
+type CreateSchemaRevisionReq struct {
+	Type       CreateSchemaRevisionReqType // switch on this field
+	UserSchema UserSchema
+	SchemaURL  SchemaURL
+}
+
+// CreateSchemaRevisionReqType is oneOf type of CreateSchemaRevisionReq.
+type CreateSchemaRevisionReqType string
+
+// Possible values for CreateSchemaRevisionReqType.
+const (
+	UserSchemaCreateSchemaRevisionReq CreateSchemaRevisionReqType = "user-schema"
+	SchemaURLCreateSchemaRevisionReq  CreateSchemaRevisionReqType = "schema-url"
+)
+
+// IsUserSchema reports whether CreateSchemaRevisionReq is UserSchema.
+func (s CreateSchemaRevisionReq) IsUserSchema() bool {
+	return s.Type == UserSchemaCreateSchemaRevisionReq
+}
+
+// IsSchemaURL reports whether CreateSchemaRevisionReq is SchemaURL.
+func (s CreateSchemaRevisionReq) IsSchemaURL() bool {
+	return s.Type == SchemaURLCreateSchemaRevisionReq
+}
+
+// SetUserSchema sets CreateSchemaRevisionReq to UserSchema.
+func (s *CreateSchemaRevisionReq) SetUserSchema(v UserSchema) {
+	s.Type = UserSchemaCreateSchemaRevisionReq
+	s.UserSchema = v
+}
+
+// GetUserSchema returns UserSchema and true boolean if CreateSchemaRevisionReq is UserSchema.
+func (s CreateSchemaRevisionReq) GetUserSchema() (v UserSchema, ok bool) {
+	if !s.IsUserSchema() {
+		return v, false
+	}
+	return s.UserSchema, true
+}
+
+// NewUserSchemaCreateSchemaRevisionReq returns new CreateSchemaRevisionReq from UserSchema.
+func NewUserSchemaCreateSchemaRevisionReq(v UserSchema) CreateSchemaRevisionReq {
+	var s CreateSchemaRevisionReq
+	s.SetUserSchema(v)
+	return s
+}
+
+// SetSchemaURL sets CreateSchemaRevisionReq to SchemaURL.
+func (s *CreateSchemaRevisionReq) SetSchemaURL(v SchemaURL) {
+	s.Type = SchemaURLCreateSchemaRevisionReq
+	s.SchemaURL = v
+}
+
+// GetSchemaURL returns SchemaURL and true boolean if CreateSchemaRevisionReq is SchemaURL.
+func (s CreateSchemaRevisionReq) GetSchemaURL() (v SchemaURL, ok bool) {
+	if !s.IsSchemaURL() {
+		return v, false
+	}
+	return s.SchemaURL, true
+}
+
+// NewSchemaURLCreateSchemaRevisionReq returns new CreateSchemaRevisionReq from SchemaURL.
+func NewSchemaURLCreateSchemaRevisionReq(v SchemaURL) CreateSchemaRevisionReq {
+	var s CreateSchemaRevisionReq
+	s.SetSchemaURL(v)
+	return s
+}
 
 // Request to create an anonymous session shell.
 // Ref: #
@@ -2280,6 +2357,7 @@ func (*ErrorDetailsStatusCode) createFlowDefinitionRes()     {}
 func (*ErrorDetailsStatusCode) createFlowRes()               {}
 func (*ErrorDetailsStatusCode) createProjectRes()            {}
 func (*ErrorDetailsStatusCode) createSchemaRes()             {}
+func (*ErrorDetailsStatusCode) createSchemaRevisionRes()     {}
 func (*ErrorDetailsStatusCode) createSessionRes()            {}
 func (*ErrorDetailsStatusCode) createTeamRes()               {}
 func (*ErrorDetailsStatusCode) createUserRes()               {}
@@ -2298,6 +2376,7 @@ func (*ErrorDetailsStatusCode) getOpenIDConfigurationRes()   {}
 func (*ErrorDetailsStatusCode) getProjectRes()               {}
 func (*ErrorDetailsStatusCode) getReadyRes()                 {}
 func (*ErrorDetailsStatusCode) getSchemaByIdRes()            {}
+func (*ErrorDetailsStatusCode) getSchemaByRevisionNrRes()    {}
 func (*ErrorDetailsStatusCode) getSessionRes()               {}
 func (*ErrorDetailsStatusCode) getTeamRes()                  {}
 func (*ErrorDetailsStatusCode) getTokenRes()                 {}
@@ -4551,6 +4630,56 @@ func NewUserSchemaGetSchemaByIdOK(v UserSchema) GetSchemaByIdOK {
 }
 
 func (*GetSchemaByIdOK) getSchemaByIdRes() {}
+
+type GetSchemaByRevisionNrBadRequest ErrorDetails
+
+func (*GetSchemaByRevisionNrBadRequest) getSchemaByRevisionNrRes() {}
+
+type GetSchemaByRevisionNrNotFound ErrorDetails
+
+func (*GetSchemaByRevisionNrNotFound) getSchemaByRevisionNrRes() {}
+
+// GetSchemaByRevisionNrOK represents sum type.
+type GetSchemaByRevisionNrOK struct {
+	Type       GetSchemaByRevisionNrOKType // switch on this field
+	UserSchema UserSchema
+}
+
+// GetSchemaByRevisionNrOKType is oneOf type of GetSchemaByRevisionNrOK.
+type GetSchemaByRevisionNrOKType string
+
+// Possible values for GetSchemaByRevisionNrOKType.
+const (
+	UserSchemaGetSchemaByRevisionNrOK GetSchemaByRevisionNrOKType = "user-schema"
+)
+
+// IsUserSchema reports whether GetSchemaByRevisionNrOK is UserSchema.
+func (s GetSchemaByRevisionNrOK) IsUserSchema() bool {
+	return s.Type == UserSchemaGetSchemaByRevisionNrOK
+}
+
+// SetUserSchema sets GetSchemaByRevisionNrOK to UserSchema.
+func (s *GetSchemaByRevisionNrOK) SetUserSchema(v UserSchema) {
+	s.Type = UserSchemaGetSchemaByRevisionNrOK
+	s.UserSchema = v
+}
+
+// GetUserSchema returns UserSchema and true boolean if GetSchemaByRevisionNrOK is UserSchema.
+func (s GetSchemaByRevisionNrOK) GetUserSchema() (v UserSchema, ok bool) {
+	if !s.IsUserSchema() {
+		return v, false
+	}
+	return s.UserSchema, true
+}
+
+// NewUserSchemaGetSchemaByRevisionNrOK returns new GetSchemaByRevisionNrOK from UserSchema.
+func NewUserSchemaGetSchemaByRevisionNrOK(v UserSchema) GetSchemaByRevisionNrOK {
+	var s GetSchemaByRevisionNrOK
+	s.SetUserSchema(v)
+	return s
+}
+
+func (*GetSchemaByRevisionNrOK) getSchemaByRevisionNrRes() {}
 
 type GetSessionNotFound ErrorDetails
 
@@ -10031,6 +10160,8 @@ func (s *PostTokenRequestGrantType) UnmarshalText(data []byte) error {
 
 type ProjectID string
 
+type RevisionID int
+
 type RevokeMySessionConflict ErrorDetails
 
 func (*RevokeMySessionConflict) revokeMySessionRes() {}
@@ -10162,6 +10293,8 @@ func (s *SSOProvider) SetName(val string) {
 func (s *SSOProvider) SetTemplate(val string) {
 	s.Template = val
 }
+
+type SchemaID string
 
 type SchemaURI url.URL
 

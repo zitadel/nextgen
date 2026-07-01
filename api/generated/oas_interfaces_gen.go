@@ -37,6 +37,10 @@ type CreateSchemaRes interface {
 	createSchemaRes()
 }
 
+type CreateSchemaRevisionRes interface {
+	createSchemaRevisionRes()
+}
+
 type CreateSessionRes interface {
 	createSessionRes()
 }
@@ -111,6 +115,10 @@ type GetReadyRes interface {
 
 type GetSchemaByIdRes interface {
 	getSchemaByIdRes()
+}
+
+type GetSchemaByRevisionNrRes interface {
+	getSchemaByRevisionNrRes()
 }
 
 type GetSessionRes interface {

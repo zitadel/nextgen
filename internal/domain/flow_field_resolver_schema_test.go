@@ -1,7 +1,6 @@
 package domain_test
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"reflect"
@@ -11,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 const testProjectID = "proj-1"
@@ -21,31 +19,6 @@ func mustUnmarshal[T any](t *testing.T, content string) *T {
 	err := json.Unmarshal([]byte(content), value)
 	require.NoError(t, err)
 	return value
-}
-
-// fakeSchemaResolver feeds inline JSON bytes through a real
-// [jsonschema.SchemaFromJSON] parser so tests exercise the same
-// keyword extraction the production path uses, without needing a
-// database or HTTP client.
-type fakeSchemaResolver struct {
-	bytesByURL map[string][]byte
-}
-
-func (f *fakeSchemaResolver) Resolve(_ context.Context, _ database.QueryExecutor, _, schemaURL string, _ []byte) (*jsonschema.Schema, error) {
-	raw, ok := f.bytesByURL[schemaURL]
-	if !ok {
-		return nil, errors.New("fakeSchemaResolver: schema not found: " + schemaURL)
-	}
-	var v any
-	if err := json.Unmarshal(raw, &v); err != nil {
-		return nil, err
-	}
-	return jsonschema.SchemaFromJSON("https://json-schema.org/draft/2020-12/schema", nil, v)
-}
-
-func newFakeResolver(t *testing.T, schemas map[string][]byte) domain.SchemaResolver {
-	t.Helper()
-	return &fakeSchemaResolver{bytesByURL: schemas}
 }
 
 // defaultSchema covers email/username/given_name/family_name with the
@@ -74,8 +47,6 @@ var identifierOutcomes = []string{
 }
 
 func TestSchemaFieldResolver_Resolve(t *testing.T) {
-	const schemaURL = "https://example.test/case.json"
-
 	tests := []struct {
 		name    string
 		schema  string

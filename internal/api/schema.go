@@ -46,7 +46,7 @@ func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq, par
 }
 
 func (h *Handler) GetSchemaById(ctx context.Context, params api.GetSchemaByIdParams) (api.GetSchemaByIdRes, error) {
-	schema, err := h.schemaService.GetSchema(ctx, string(params.ProjectID), string(params.TeamID.Value), params.ID)
+	schema, err := h.schemaService.GetSchema(ctx, string(params.ProjectID), string(params.TeamID.Value), string(params.ID))
 	if err != nil {
 		return nil, err
 	}

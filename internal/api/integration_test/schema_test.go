@@ -151,7 +151,7 @@ func TestGetSchema(t *testing.T) {
 			schemaID := harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
 			resp, err := client.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
-				ID:        schemaID,
+				ID:        api.SchemaID(schemaID),
 				ProjectID: api.ProjectID(project.ID),
 			})
 			assert.NoError(t, err)

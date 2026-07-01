@@ -125,6 +125,20 @@ func (UnimplementedHandler) CreateSchema(ctx context.Context, req CreateSchemaRe
 	return r, ht.ErrNotImplemented
 }
 
+// CreateSchemaRevision implements createSchemaRevision operation.
+//
+// Create a new schema revision. The schema definition must include a unique $id field,
+// which will be used to identify the schema in future requests. The $id must
+// be a valid URI and should ideally point to the location where the schema
+// can be accessed.
+// The schema can either be a concrete schema, e.g. a user schema, or a
+// schema-url which will be resolved by the server.
+//
+// POST /schemas/{id}
+func (UnimplementedHandler) CreateSchemaRevision(ctx context.Context, req CreateSchemaRevisionReq, params CreateSchemaRevisionParams) (r CreateSchemaRevisionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CreateSession implements createSession operation.
 //
 // Creates an anonymous session shell with no user and no factors (`state: building`).
@@ -332,6 +346,16 @@ func (UnimplementedHandler) GetReady(ctx context.Context) (r GetReadyRes, _ erro
 //
 // GET /schemas/{id}
 func (UnimplementedHandler) GetSchemaById(ctx context.Context, params GetSchemaByIdParams) (r GetSchemaByIdRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetSchemaByRevisionNr implements getSchemaByRevisionNr operation.
+//
+// Get a schema by its ID and revision number. This will return the specified
+// revision of the schema.
+//
+// GET /schemas/{id}/{revision_nr}
+func (UnimplementedHandler) GetSchemaByRevisionNr(ctx context.Context, params GetSchemaByRevisionNrParams) (r GetSchemaByRevisionNrRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

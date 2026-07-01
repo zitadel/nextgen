@@ -1,0 +1,5 @@
+name: revision_nr
+in: path
+required: true
+schema:
+  $ref: '../schemas/revision-id.yaml'

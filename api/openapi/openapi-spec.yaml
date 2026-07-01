@@ -107,6 +107,8 @@ paths:
     $ref: endpoints/schemas/methods.yaml
   /schemas/{id}:
     $ref: endpoints/schemas/by_id/methods.yaml
+  /schemas/{id}/{revision_nr}:
+    $ref: endpoints/schemas/by_id/by_revision/methods.yaml
   /flow_definitions:
     $ref: endpoints/flow_definitions/methods.yaml
   /flow_definitions/{id}:

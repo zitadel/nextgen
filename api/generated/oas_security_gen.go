@@ -52,6 +52,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateSchemaOperation: []string{
 		"schema.write",
 	},
+	CreateSchemaRevisionOperation: []string{
+		"schema.write",
+	},
 	CreateSessionOperation: []string{
 		"sessions.write",
 	},
@@ -77,6 +80,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"projects.read",
 	},
 	GetSchemaByIdOperation: []string{
+		"schema.read",
+	},
+	GetSchemaByRevisionNrOperation: []string{
 		"schema.read",
 	},
 	GetSessionOperation: []string{

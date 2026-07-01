@@ -773,6 +773,20 @@ func (s CreateSchemaReq) Validate() error {
 	}
 }
 
+func (s CreateSchemaRevisionReq) Validate() error {
+	switch s.Type {
+	case UserSchemaCreateSchemaRevisionReq:
+		if err := s.UserSchema.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case SchemaURLCreateSchemaRevisionReq:
+		return nil // no validation needed
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
 func (s *CreateSessionRequest) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -1768,6 +1782,18 @@ func (s GetSchemaByIdOK) Validate() error {
 	}
 }
 
+func (s GetSchemaByRevisionNrOK) Validate() error {
+	switch s.Type {
+	case UserSchemaGetSchemaByRevisionNrOK:
+		if err := s.UserSchema.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
 func (s *GetUserInfoOK) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -2375,6 +2401,24 @@ func (s ProjectID) Validate() error {
 		MaxNumericSet: false,
 	}).Validate(string(alias)); err != nil {
 		return errors.Wrap(err, "string")
+	}
+	return nil
+}
+
+func (s RevisionID) Validate() error {
+	alias := (int)(s)
+	if err := (validate.Int{
+		MinSet:        true,
+		Min:           1,
+		MaxSet:        false,
+		Max:           0,
+		MinExclusive:  false,
+		MaxExclusive:  false,
+		MultipleOfSet: false,
+		MultipleOf:    0,
+		Pattern:       nil,
+	}).Validate(int64(alias)); err != nil {
+		return errors.Wrap(err, "int")
 	}
 	return nil
 }
