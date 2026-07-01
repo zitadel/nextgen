@@ -129,10 +129,10 @@ export function validateAdrIndex({ files, readmeRows, headings = new Map() }) {
   }
 
   if (files.length > 0) {
-    const expectedNumbers = files.map((file) => file.number);
-    const maxNumber = expectedNumbers.at(-1);
+    const fileNumbers = new Set(files.map((file) => file.number));
+    const maxNumber = files.at(-1).number;
     for (let number = 1; number <= maxNumber; number += 1) {
-      if (!expectedNumbers.includes(number)) {
+      if (!fileNumbers.has(number)) {
         errors.push({
           code: "skipped-id",
           message: `ADR sequence skips ${String(number).padStart(3, "0")}; expected contiguous numbering from 001 through ${String(maxNumber).padStart(3, "0")}`,
@@ -186,10 +186,10 @@ export function validateAdrIndex({ files, readmeRows, headings = new Map() }) {
   }
 
   if (readmeRows.length > 0) {
-    const readmeNumbers = readmeRows.map((row) => row.number);
-    const maxReadmeNumber = readmeNumbers.at(-1);
+    const readmeNumbers = new Set(readmeRows.map((row) => row.number));
+    const maxReadmeNumber = readmeRows.at(-1).number;
     for (let number = 1; number <= maxReadmeNumber; number += 1) {
-      if (!readmeNumbers.includes(number)) {
+      if (!readmeNumbers.has(number)) {
         errors.push({
           code: "readme-order",
           message: `docs/adrs/README.md index skips ADR ${String(number).padStart(3, "0")}`,

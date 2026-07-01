@@ -48,6 +48,7 @@ tasks:
     inputs:
       - "docs/adrs/**/*.md"
       - "scripts/check-adrs-index.mjs"
+      - "scripts/dev-process.mjs"
     options:
       cache: true
       runInCI: true
