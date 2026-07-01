@@ -42,3 +42,12 @@ tasks:
     options:
       cache: false
       runInCI: false
+
+  check-adrs:
+    command: "node scripts/check-adrs-index.mjs"
+    inputs:
+      - "docs/adrs/**/*.md"
+      - "scripts/check-adrs-index.mjs"
+    options:
+      cache: true
+      runInCI: true
