@@ -1,4 +1,4 @@
-# ADR 009: Cursor-Based Pagination
+# ADR 027: Cursor-Based Pagination
 
 > **Status:** Proposed
 > **Date:** 2026-04-30
@@ -26,5 +26,4 @@ Cursor-based pagination solves these by encoding the position of the last seen i
 - No `total` count is returned. If a total is needed for a specific use case it should be a separate endpoint or query parameter.
 - Existing endpoints that still use `offset`/`limit` (e.g. `GET /users`) are marked with a `TODO` comment and will be migrated. New list endpoints must use `page_token`.
 - See `GET /sessions` as the reference implementation and `components/parameters/page-token.yaml` for the reusable parameter definition.
-
 
