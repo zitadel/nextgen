@@ -11,6 +11,7 @@
     "steps": [
       {
         "name": "signin",
+        "fields": ["email"],
         "actions": [
           {
             "name": "passkey",

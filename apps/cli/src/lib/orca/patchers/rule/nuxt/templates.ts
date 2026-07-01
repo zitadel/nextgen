@@ -76,7 +76,7 @@ export function registerPageTemplate(): string {
   return authPage("register");
 }
 
-/** `pages/profile.vue` — the signed-in view with the logout widget. */
+/** `pages/profile.vue` — the post-sign-in "signed in as" session card. */
 export function profilePageTemplate(): string {
   return `<script setup lang="ts">
 ${MANAGED_MARKER}
@@ -86,10 +86,9 @@ const project = useZitadelProject();
 </script>
 
 <template>
-  <main style="${MAIN_STYLE}; padding: 24px">
-    <h1>Signed in (Nuxt)</h1>
+  <main style="${MAIN_STYLE}">
     <ClientOnly>
-      <zitadel-logout :project="project" post-sign-out-url="/login" />
+      <zitadel-session :project="project" post-sign-out-url="/login" />
     </ClientOnly>
   </main>
 </template>

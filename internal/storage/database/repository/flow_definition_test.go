@@ -46,7 +46,7 @@ func TestFlowDefinitionRepository_CreateAndGet(t *testing.T) {
 	}
 
 	identifier := stepsByName["identifier"]
-	assert.Equal(t, []string{"email"}, identifier.Fields)
+	assert.Equal(t, []domain.Field{"email"}, identifier.Fields)
 	assert.Nil(t, identifier.OnSuccess)
 	assert.Nil(t, identifier.Complete)
 	require.Len(t, identifier.Transitions, 2)

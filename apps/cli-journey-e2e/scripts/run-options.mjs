@@ -7,6 +7,7 @@ export function parseLocalJourneyArgs(args) {
     image: "",
     keep: false,
     runtime: "binary",
+    tarballsDir: "",
     workDir: "",
   };
 
@@ -40,6 +41,10 @@ export function parseLocalJourneyArgs(args) {
       }
       case "--runtime": {
         parsed.runtime = parseRuntime(readValue(args, ++index, arg));
+        break;
+      }
+      case "--tarballs-dir": {
+        parsed.tarballsDir = readValue(args, ++index, arg);
         break;
       }
       case "--keep": {

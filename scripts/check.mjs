@@ -87,6 +87,7 @@ async function phaseOpenApi() {
 }
 
 async function phaseGo() {
+  await run("moon", ["run", "server:check-generate"]);
   await run("moon", ["run", "server:test"]);
 }
 
@@ -122,7 +123,7 @@ async function phasePack() {
 }
 
 async function phaseRelease() {
-  await run("node", ["scripts/release.mjs", "snapshot", "--skip-container"]);
+  await run("moon", ["run", "release:snapshot", "--", "--skip-container"]);
 }
 
 async function phaseJourney() {

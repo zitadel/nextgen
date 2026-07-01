@@ -2,16 +2,18 @@
 import type {
   ZitadelLogin as ZitadelLoginElement,
   ZitadelLogout as ZitadelLogoutElement,
+  ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 
 import { render } from "@solidjs/testing-library";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
+  ZITADEL_SESSION_EVENT_HANDLERS,
 } from "@zitadel/sdk-core/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ZitadelLogin, ZitadelLogout } from "./index";
+import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
@@ -111,5 +113,51 @@ describe("ZitadelLogout", () => {
     ));
     expect(captured).toBe(container.querySelector("zitadel-logout"));
     expect(captured?.tagName.toLowerCase()).toBe("zitadel-logout");
+  });
+});
+
+describe("ZitadelSession", () => {
+  it("binds the project handle as a property", () => {
+    const { container } = render(() => <ZitadelSession project={project} />);
+    const el = container.querySelector<ZitadelSessionElement>("zitadel-session");
+    expect(el).not.toBeNull();
+    expect(el!.project).toBe(project);
+  });
+
+  it("binds discrete projectId/proxyPath", () => {
+    const { container } = render(() => (
+      <ZitadelSession projectId="proj-test" proxyPath="/__nextgen" />
+    ));
+    const el = container.querySelector<ZitadelSessionElement>("zitadel-session");
+    expect(el!.projectId).toBe("proj-test");
+    expect(el!.proxyPath).toBe("/__nextgen");
+  });
+
+  it.each(Object.entries(ZITADEL_SESSION_EVENT_HANDLERS))(
+    "forwards %s to its callback",
+    (eventName, handlerProp) => {
+      const spy = vi.fn();
+      const { container } = render(() => (
+        <ZitadelSession project={project} {...{ [handlerProp]: spy }} />
+      ));
+      const el = container.querySelector("zitadel-session");
+      const detail = { probe: eventName };
+      el?.dispatchEvent(new CustomEvent(eventName, { detail }));
+      expect(spy).toHaveBeenCalledWith(detail);
+    },
+  );
+
+  it("forwards the ref to the underlying element", () => {
+    let captured: ZitadelSessionElement | undefined;
+    const { container } = render(() => (
+      <ZitadelSession
+        ref={(e) => {
+          captured = e;
+        }}
+        project={project}
+      />
+    ));
+    expect(captured).toBe(container.querySelector("zitadel-session"));
+    expect(captured?.tagName.toLowerCase()).toBe("zitadel-session");
   });
 });
