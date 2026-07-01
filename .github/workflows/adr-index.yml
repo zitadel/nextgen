@@ -17,11 +17,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: moonrepo/setup-toolchain@v0
-
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
 
       - name: Validate ADR index
-        run: moon run workspace:check-adrs
+        run: node scripts/check-adrs-index.mjs
