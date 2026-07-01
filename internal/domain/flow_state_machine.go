@@ -257,7 +257,7 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, client database.Que
 	}
 	state.AuthAttemptID = attemptID
 
-	step, err := r.renderStep(ctx, client, in.Definition, state, in.UserSchemaURL, nil)
+	step, err := r.renderStep(ctx, client, in.Definition, state, nil)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
@@ -270,7 +270,7 @@ func (r *FlowStateMachineRuntime) Render(ctx context.Context, client database.Qu
 	if def == nil || state == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: render without definition or state", ErrIntegrity)
 	}
-	step, err := r.renderStep(ctx, client, def, state, state.UserSchemaURL, nil)
+	step, err := r.renderStep(ctx, client, def, state, nil)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
@@ -355,7 +355,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 // resolveInputs resolves the step's fields and prefills any values the
 // user already supplied on earlier steps.
 func (r *FlowStateMachineRuntime) resolveInputs(pc *processCtx) (FlowResolvedFields, error) {
-	resolved, err := r.resolveStepFields(pc.ctx, pc.client, pc.state.ProjectID, pc.state.UserSchemaURL, pc.currentStep)
+	resolved, err := r.resolveStepFields(pc.ctx, pc.client, pc.state, pc.currentStep)
 	if err != nil {
 		return FlowResolvedFields{}, err
 	}
@@ -426,7 +426,7 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 	r.advance(pc.state, pc.currentStep, nextStep.Name)
 
 	if nextStep.Complete != nil {
-		step, handoff, err := r.terminate(pc.ctx, pc.client, pc.def, pc.state, pc.state.UserSchemaURL, nextStep)
+		step, handoff, err := r.terminate(pc.ctx, pc.client, pc.def, pc.state, nextStep)
 		if err != nil {
 			return FlowStepResult{}, err
 		}
@@ -438,7 +438,7 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 		}, nil
 	}
 
-	step, err := r.renderStep(pc.ctx, pc.client, pc.def, pc.state, pc.state.UserSchemaURL, nextStep)
+	step, err := r.renderStep(pc.ctx, pc.client, pc.def, pc.state, nextStep)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
@@ -468,11 +468,11 @@ func (r *FlowStateMachineRuntime) runDispatchAndOnSuccess(pc *processCtx, resolv
 	}
 
 	// on_success reads across every visited step, not just the current one.
-	visitedResolved, err := r.resolveVisitedFields(pc.ctx, pc.client, pc.state.ProjectID, pc.state.UserSchemaURL, pc.def, pc.state, pc.currentStep)
+	visitedResolved, err := r.resolveVisitedFields(pc.ctx, pc.client, pc.def, pc.state, pc.currentStep)
 	if err != nil {
 		return "", nil, err
 	}
-	result, err := r.runOnSuccess(pc.ctx, pc.def, pc.state, pc.state.UserSchemaURL, pc.currentStep, pc.in.Fields, visitedResolved)
+	result, err := r.runOnSuccess(pc.ctx, pc.def, pc.state, pc.currentStep, pc.in.Fields, visitedResolved)
 	if err != nil {
 		return "", nil, err
 	}
@@ -552,7 +552,7 @@ func (r *FlowStateMachineRuntime) processPasskeyLogin(pc *processCtx, resolved F
 func (r *FlowStateMachineRuntime) processPasskeyRegister(pc *processCtx, resolved FlowResolvedFields) (FlowStepResult, error) {
 	passkeyResolved := resolved
 	if needsPasskeyRegistrationVisitedFields(pc.state, pc.in, FlowActionKindPasskeyRegister) {
-		visitedResolved, err := r.resolveVisitedFields(pc.ctx, pc.client, pc.state.ProjectID, pc.state.UserSchemaURL, pc.def, pc.state, pc.currentStep)
+		visitedResolved, err := r.resolveVisitedFields(pc.ctx, pc.client, pc.def, pc.state, pc.currentStep)
 		if err != nil {
 			return FlowStepResult{}, err
 		}
@@ -941,12 +941,12 @@ func attachPendingChallenge(step *FlowStep, pc *FlowPendingChallenge) {
 
 // runOnSuccess dispatches the step's on_success mutation. Add a case
 // when a new [FlowOnSuccess] handler lands.
-func (r *FlowStateMachineRuntime) runOnSuccess(ctx context.Context, def *FlowDefinition, state *FlowState, userSchemaURL string, step *FlowDefinitionStep, fields map[string]any, resolved FlowResolvedFields) (FlowOnSuccessResult, error) {
+func (r *FlowStateMachineRuntime) runOnSuccess(ctx context.Context, def *FlowDefinition, state *FlowState, step *FlowDefinitionStep, fields map[string]any, resolved FlowResolvedFields) (FlowOnSuccessResult, error) {
 	switch *step.OnSuccess {
 	case FlowOnSuccessCreateUser:
 		return r.userCreater.Handle(ctx, FlowOnSuccessInput{
 			ProjectID:     state.ProjectID,
-			UserSchemaURL: userSchemaURL,
+			UserSchemaURL: state.UserSchemaURL,
 			Fields:        fields,
 			Resolved:      resolved,
 			State:         state,
@@ -963,8 +963,8 @@ func (r *FlowStateMachineRuntime) advance(state *FlowState, prev *FlowDefinition
 	state.IssuedAt = r.now()
 }
 
-func (r *FlowStateMachineRuntime) terminate(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, userSchemaURL string, step *FlowDefinitionStep) (*FlowStep, FlowHandoffOutput, error) {
-	rendered, err := r.renderStep(ctx, client, def, state, userSchemaURL, step)
+func (r *FlowStateMachineRuntime) terminate(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, step *FlowDefinitionStep) (*FlowStep, FlowHandoffOutput, error) {
+	rendered, err := r.renderStep(ctx, client, def, state, step)
 	if err != nil {
 		return nil, FlowHandoffOutput{}, err
 	}
@@ -997,7 +997,7 @@ func (r *FlowStateMachineRuntime) terminate(ctx context.Context, client database
 	return rendered, handoff, nil
 }
 
-func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, userSchemaURL string, stepOverride *FlowDefinitionStep) (*FlowStep, error) {
+func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, stepOverride *FlowDefinitionStep) (*FlowStep, error) {
 	step := stepOverride
 	if step == nil {
 		s, ok := def.FindStep(state.CurrentStep)
@@ -1006,7 +1006,7 @@ func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, client databas
 		}
 		step = s
 	}
-	resolved, err := r.resolveStepFields(ctx, client, state.ProjectID, userSchemaURL, step)
+	resolved, err := r.resolveStepFields(ctx, client, state, step)
 	if err != nil {
 		return nil, err
 	}
@@ -1014,11 +1014,11 @@ func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, client databas
 	return r.buildStep(step, resolved, nil, nil, nil), nil
 }
 
-func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, client database.QueryExecutor, projectID, userSchemaURL string, step *FlowDefinitionStep) (FlowResolvedFields, error) {
+func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, client database.QueryExecutor, state *FlowState, step *FlowDefinitionStep) (FlowResolvedFields, error) {
 	if len(step.Fields) == 0 {
 		return FlowResolvedFields{}, nil
 	}
-	schema, err := r.schemas.Resolve(ctx, client, projectID, userSchemaURL, nil)
+	schema, err := r.schemas.Resolve(ctx, client, state.ProjectID, state.UserSchemaURL, nil)
 	if err != nil {
 		return FlowResolvedFields{}, fmt.Errorf("flow state machine: load user schema on step %q: %w", step.Name, err)
 	}
@@ -1033,7 +1033,7 @@ func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, client 
 // step the user has passed through (history plus current). on_success
 // handlers read this to find attributes by challenge across the full
 // progress, not just the current step.
-func (r *FlowStateMachineRuntime) resolveVisitedFields(ctx context.Context, client database.QueryExecutor, projectID, userSchemaURL string, def *FlowDefinition, state *FlowState, current *FlowDefinitionStep) (FlowResolvedFields, error) {
+func (r *FlowStateMachineRuntime) resolveVisitedFields(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, current *FlowDefinitionStep) (FlowResolvedFields, error) {
 	seen := map[Field]struct{}{}
 	collect := func(s *FlowDefinitionStep) {
 		if s == nil {
@@ -1056,7 +1056,7 @@ func (r *FlowStateMachineRuntime) resolveVisitedFields(ctx context.Context, clie
 	for n := range seen {
 		names = append(names, n)
 	}
-	schema, err := r.schemas.Resolve(ctx, client, projectID, userSchemaURL, nil)
+	schema, err := r.schemas.Resolve(ctx, client, state.ProjectID, state.UserSchemaURL, nil)
 	if err != nil {
 		return FlowResolvedFields{}, fmt.Errorf("flow state machine: load user schema for visited fields: %w", err)
 	}
