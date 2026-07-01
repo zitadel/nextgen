@@ -69,7 +69,12 @@ type CompareFilter[F ~uint8] struct {
 	Terms []CompareTerm[F]
 }
 
-// Compare builds a single lexicographic comparison across one or more column/value terms.
+// Compare builds a comparison filter across one or more column/value terms.
+//
+// With a single term, Compare compiles to a simple column comparison
+// (for example, "created_at > $1"). With multiple terms, Compare compiles to
+// lexicographic tuple comparison (for example, "(created_at, id) > ($1, $2)").
+// Term order must match the corresponding OrderBy.Columns when used for keyset pagination.
 func Compare[F ~uint8](op CompareOp, terms ...CompareTerm[F]) *CompareFilter[F] {
 	return &CompareFilter[F]{
 		Op:    op,
@@ -93,16 +98,20 @@ func LessThan[F ~uint8](column Column[F], value any) *CompareFilter[F] {
 }
 
 // CompareEqual creates a tuple equality filter: "(col1, col2, ...) = (val1, val2, ...)".
+// With one term this is equivalent to Equal.
 func CompareEqual[F ~uint8](terms ...CompareTerm[F]) *CompareFilter[F] {
 	return Compare(OpEqual, terms...)
 }
 
-// CompareGreater creates a tuple greater-than filter for keyset pagination.
+// CompareGreater creates a greater-than filter for keyset pagination.
+// Pass one term per OrderBy column; for example, three terms restrict rows after
+// the cursor position in (col1, col2, col3) sort order.
 func CompareGreater[F ~uint8](terms ...CompareTerm[F]) *CompareFilter[F] {
 	return Compare(OpGreater, terms...)
 }
 
-// CompareLess creates a tuple less-than filter for keyset pagination.
+// CompareLess creates a less-than filter for keyset pagination.
+// Pass one term per OrderBy column; term order must match OrderBy.Columns.
 func CompareLess[F ~uint8](terms ...CompareTerm[F]) *CompareFilter[F] {
 	return Compare(OpLess, terms...)
 }

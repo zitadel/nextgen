@@ -101,6 +101,43 @@ func TestCompileReadStringContains(t *testing.T) {
 	assert.Equal(t, "%login%", args[0])
 }
 
+func TestCompileReadCursorDoesNotMutateCallerFilter(t *testing.T) {
+	t.Parallel()
+
+	createdAt := time.Date(2026, 6, 26, 10, 0, 0, 0, time.UTC)
+	baseFilter := database.Equal(database.Col(domain.ProjectFieldID), "proj_1")
+	cursor := (&pagination.Cursor[domain.ProjectField]{
+		Columns: []database.Column[domain.ProjectField]{
+			database.Col(domain.ProjectFieldCreatedAt),
+			database.Col(domain.ProjectFieldID),
+		},
+		Values: []any{createdAt, "proj_1"},
+	}).Marshal()
+
+	opts := &database.ListOptions[domain.ProjectField]{
+		Filter: baseFilter,
+		Pagination: database.Page[domain.ProjectField]{
+			Limit: 5,
+			OrderBy: database.OrderBy[domain.ProjectField]{
+				Columns: []database.Column[domain.ProjectField]{
+					database.Col(domain.ProjectFieldCreatedAt),
+					database.Col(domain.ProjectFieldID),
+				},
+				Direction: database.OrderAsc,
+			},
+			Cursor: cursor,
+		},
+	}
+
+	sql1, args1 := compileProjectRead(t, opts)
+	assert.Equal(t, baseFilter, opts.Filter)
+
+	sql2, args2 := compileProjectRead(t, opts)
+	assert.Equal(t, baseFilter, opts.Filter)
+	assert.Equal(t, sql1, sql2)
+	assert.Equal(t, args1, args2)
+}
+
 func TestCompileReadStringEqualFold(t *testing.T) {
 	t.Parallel()
 

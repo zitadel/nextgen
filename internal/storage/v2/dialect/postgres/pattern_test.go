@@ -22,5 +22,6 @@ func TestLikePattern(t *testing.T) {
 	assert.Equal(t, `acme%`, likePattern(database.StringMatchStartsWith, "acme"))
 	assert.Equal(t, `%login%`, likePattern(database.StringMatchContains, "login"))
 	assert.Equal(t, `%suffix`, likePattern(database.StringMatchEndsWith, "suffix"))
+	assert.Equal(t, `exact`, likePattern(database.StringMatchEqual, "exact"))
 	assert.Equal(t, `%100\%%`, likePattern(database.StringMatchContains, "100%"))
 }

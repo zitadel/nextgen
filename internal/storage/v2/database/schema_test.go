@@ -11,6 +11,7 @@ import (
 )
 
 func TestSchemaSQLNameAndValuesFrom(t *testing.T) {
+	t.Parallel()
 	createdAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	project := &domain.Project{
 		ID:        "proj_1",
@@ -44,6 +45,7 @@ func TestSchemaSQLNameAndValuesFrom(t *testing.T) {
 }
 
 func TestSchemaCoerceCursorValues(t *testing.T) {
+	t.Parallel()
 	createdAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	schema := database.NewSchema(map[domain.ProjectField]database.FieldBinding[domain.Project]{
 		domain.ProjectFieldCreatedAt: {
@@ -72,6 +74,7 @@ func TestSchemaCoerceCursorValues(t *testing.T) {
 }
 
 func TestSchemaCoerceCursorValues_invalidTime(t *testing.T) {
+	t.Parallel()
 	schema := database.NewSchema(map[domain.ProjectField]database.FieldBinding[domain.Project]{
 		domain.ProjectFieldCreatedAt: {
 			SQLName:  "created_at",
@@ -88,6 +91,7 @@ func TestSchemaCoerceCursorValues_invalidTime(t *testing.T) {
 }
 
 func TestSchemaUnknownFieldPanics(t *testing.T) {
+	t.Parallel()
 	schema := database.NewSchema(map[domain.ProjectField]database.FieldBinding[domain.Project]{
 		domain.ProjectFieldID: {
 			SQLName:  "id",

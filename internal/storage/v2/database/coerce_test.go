@@ -11,6 +11,7 @@ import (
 )
 
 func TestCoerceStringValue(t *testing.T) {
+	t.Parallel()
 	got, err := database.CoerceStringValue("proj_1")
 	require.NoError(t, err)
 	assert.Equal(t, "proj_1", got)
@@ -20,6 +21,7 @@ func TestCoerceStringValue(t *testing.T) {
 }
 
 func TestCoerceTimeValue(t *testing.T) {
+	t.Parallel()
 	createdAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 
 	got, err := database.CoerceTimeValue(createdAt)
@@ -35,6 +37,7 @@ func TestCoerceTimeValue(t *testing.T) {
 }
 
 func TestCoerceNumberValue(t *testing.T) {
+	t.Parallel()
 	got, err := database.CoerceNumberValue[domain.FlowDefinitionStatus](float64(domain.FlowDefinitionStatusActive))
 	require.NoError(t, err)
 	assert.Equal(t, domain.FlowDefinitionStatusActive, got)
@@ -45,6 +48,7 @@ func TestCoerceNumberValue(t *testing.T) {
 }
 
 func TestCoerceSliceString(t *testing.T) {
+	t.Parallel()
 	got, err := database.CoerceSlice([]any{"https://a.example", "https://b.example"}, database.CoerceStringValue)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"https://a.example", "https://b.example"}, got)
@@ -56,6 +60,7 @@ func TestCoerceSliceString(t *testing.T) {
 }
 
 func TestCoerceSliceAsAnyJSON(t *testing.T) {
+	t.Parallel()
 	raw := []any{map[string]any{"name": "login"}}
 	coerce := database.CoerceSliceAsAny(database.CoerceJSONValue[domain.FlowDefinitionStep])
 
@@ -68,6 +73,7 @@ func TestCoerceSliceAsAnyJSON(t *testing.T) {
 }
 
 func TestCoerceJSONValueStruct(t *testing.T) {
+	t.Parallel()
 	raw := map[string]any{
 		"AppIDs": []any{"app1"},
 	}
@@ -77,6 +83,7 @@ func TestCoerceJSONValueStruct(t *testing.T) {
 }
 
 func TestCoerceEnumKeyMap(t *testing.T) {
+	t.Parallel()
 	parseKey := func(s string) (domain.FlowDefinitionPurpose, error) {
 		return domain.FlowDefinitionPurposeString(s)
 	}
