@@ -451,7 +451,7 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 func (r *FlowStateMachineRuntime) runDispatchAndOnSuccess(pc *processCtx, resolved FlowResolvedFields) (string, *FlowStepResult, error) {
 	routeOutcome := pc.in.Action
 
-	dispatch, err := r.dispatchChallenges(pc.ctx, pc.def, pc.state, pc.currentStep, resolved, pc.in.Fields)
+	dispatch, err := r.dispatchChallenges(pc, resolved)
 	if err != nil {
 		return "", nil, err
 	}
@@ -468,11 +468,11 @@ func (r *FlowStateMachineRuntime) runDispatchAndOnSuccess(pc *processCtx, resolv
 	}
 
 	// on_success reads across every visited step, not just the current one.
-	visitedResolved, err := r.resolveVisitedFields(pc.ctx, pc.client, pc.def, pc.state, pc.currentStep)
+	visitedResolved, err := r.resolveVisitedFields(pc)
 	if err != nil {
 		return "", nil, err
 	}
-	result, err := r.runOnSuccess(pc.ctx, pc.def, pc.state, pc.currentStep, pc.in.Fields, visitedResolved)
+	result, err := r.runOnSuccess(pc, visitedResolved)
 	if err != nil {
 		return "", nil, err
 	}
@@ -515,7 +515,7 @@ func (r *FlowStateMachineRuntime) processSubmit(pc *processCtx, resolved FlowRes
 // abandonment falls through to the standard pipeline.
 func (r *FlowStateMachineRuntime) processPasskeyLogin(pc *processCtx, resolved FlowResolvedFields) (FlowStepResult, error) {
 	if pc.in.ChallengeResponse == nil {
-		dispatch, err := r.dispatchChallenges(pc.ctx, pc.def, pc.state, pc.currentStep, resolved, pc.in.Fields)
+		dispatch, err := r.dispatchChallenges(pc, resolved)
 		if err != nil {
 			return FlowStepResult{}, err
 		}
@@ -528,7 +528,7 @@ func (r *FlowStateMachineRuntime) processPasskeyLogin(pc *processCtx, resolved F
 		}
 	}
 
-	pk, err := r.processPasskey(pc.ctx, pc.client, pc.state, pc.currentStep, resolved, resolved, pc.in, FlowActionKindPasskey)
+	pk, err := r.processPasskey(pc, resolved, resolved, FlowActionKindPasskey)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
@@ -552,14 +552,14 @@ func (r *FlowStateMachineRuntime) processPasskeyLogin(pc *processCtx, resolved F
 func (r *FlowStateMachineRuntime) processPasskeyRegister(pc *processCtx, resolved FlowResolvedFields) (FlowStepResult, error) {
 	passkeyResolved := resolved
 	if needsPasskeyRegistrationVisitedFields(pc.state, pc.in, FlowActionKindPasskeyRegister) {
-		visitedResolved, err := r.resolveVisitedFields(pc.ctx, pc.client, pc.def, pc.state, pc.currentStep)
+		visitedResolved, err := r.resolveVisitedFields(pc)
 		if err != nil {
 			return FlowStepResult{}, err
 		}
 		passkeyResolved = visitedResolved
 	}
 
-	pk, err := r.processPasskey(pc.ctx, pc.client, pc.state, pc.currentStep, resolved, passkeyResolved, pc.in, FlowActionKindPasskeyRegister)
+	pk, err := r.processPasskey(pc, resolved, passkeyResolved, FlowActionKindPasskeyRegister)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
@@ -607,7 +607,8 @@ func applyOutcomeFlip(state *FlowState, outcome string) {
 // dispatchChallenges submits field-shaped challenges in
 // [challengeDispatchOrder]. CurrentPurpose + visited on_success decide
 // verify-vs-skip.
-func (r *FlowStateMachineRuntime) dispatchChallenges(ctx context.Context, def *FlowDefinition, state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, fields map[string]any) (flowDispatchResult, error) {
+func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved FlowResolvedFields) (flowDispatchResult, error) {
+	ctx, def, state, step, fields := pc.ctx, pc.def, pc.state, pc.currentStep, pc.in.Fields
 	for _, challenge := range challengeDispatchOrder {
 		name, value, ok := fieldValueByChallenge(resolved, fields, challenge)
 		if !ok {
@@ -716,7 +717,8 @@ type passkeyPhaseResult struct {
 //   - issue leg (register): step offers a `passkey_register` action and it
 //     was selected → use the resolved user id or mint a provisional one, then
 //     issue a creation challenge.
-func (r *FlowStateMachineRuntime) processPasskey(ctx context.Context, client database.QueryExecutor, state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, passkeyResolved FlowResolvedFields, in FlowSubmitInput, actionKind FlowActionKind) (passkeyPhaseResult, error) {
+func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowResolvedFields, passkeyResolved FlowResolvedFields, actionKind FlowActionKind) (passkeyPhaseResult, error) {
+	ctx, client, state, step, in := pc.ctx, pc.client, pc.state, pc.currentStep, pc.in
 	switch {
 	// A ceremony is in flight but no proof arrived: resume or abandon.
 	case state.PendingChallenge != nil && in.ChallengeResponse == nil:
@@ -941,19 +943,19 @@ func attachPendingChallenge(step *FlowStep, pc *FlowPendingChallenge) {
 
 // runOnSuccess dispatches the step's on_success mutation. Add a case
 // when a new [FlowOnSuccess] handler lands.
-func (r *FlowStateMachineRuntime) runOnSuccess(ctx context.Context, def *FlowDefinition, state *FlowState, step *FlowDefinitionStep, fields map[string]any, resolved FlowResolvedFields) (FlowOnSuccessResult, error) {
-	switch *step.OnSuccess {
+func (r *FlowStateMachineRuntime) runOnSuccess(pc *processCtx, resolved FlowResolvedFields) (FlowOnSuccessResult, error) {
+	switch *pc.currentStep.OnSuccess {
 	case FlowOnSuccessCreateUser:
-		return r.userCreater.Handle(ctx, FlowOnSuccessInput{
-			ProjectID:     state.ProjectID,
-			UserSchemaURL: state.UserSchemaURL,
-			Fields:        fields,
+		return r.userCreater.Handle(pc.ctx, FlowOnSuccessInput{
+			ProjectID:     pc.state.ProjectID,
+			UserSchemaURL: pc.state.UserSchemaURL,
+			Fields:        pc.in.Fields,
 			Resolved:      resolved,
-			State:         state,
-			ResolvedFlow:  def,
+			State:         pc.state,
+			ResolvedFlow:  pc.def,
 		})
 	default:
-		return FlowOnSuccessResult{}, fmt.Errorf("%w: on_success %s not wired", ErrIntegrity, *step.OnSuccess)
+		return FlowOnSuccessResult{}, fmt.Errorf("%w: on_success %s not wired", ErrIntegrity, *pc.currentStep.OnSuccess)
 	}
 }
 
@@ -1033,7 +1035,8 @@ func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, client 
 // step the user has passed through (history plus current). on_success
 // handlers read this to find attributes by challenge across the full
 // progress, not just the current step.
-func (r *FlowStateMachineRuntime) resolveVisitedFields(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, current *FlowDefinitionStep) (FlowResolvedFields, error) {
+func (r *FlowStateMachineRuntime) resolveVisitedFields(pc *processCtx) (FlowResolvedFields, error) {
+	ctx, client, def, state, current := pc.ctx, pc.client, pc.def, pc.state, pc.currentStep
 	seen := map[Field]struct{}{}
 	collect := func(s *FlowDefinitionStep) {
 		if s == nil {
