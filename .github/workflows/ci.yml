@@ -44,11 +44,15 @@ jobs:
         id: ci-mode
         run: node scripts/ci-mode.mjs "${{ github.event.pull_request.base.sha || 'origin/main' }}"
 
+      - name: Check Go generated files
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: moon run server:check-generate
+
       - name: Run Moon build and test graph
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: moon ci :lint :typecheck :build :test
 
-      - name: Run Go checks
+      - name: Run Go tests
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: moon run server:test
 

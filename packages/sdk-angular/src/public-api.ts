@@ -1,5 +1,6 @@
 export { ZitadelLoginComponent } from "./lib/zitadel-login.component";
 export { ZitadelLogoutComponent } from "./lib/zitadel-logout.component";
+export { ZitadelSessionComponent } from "./lib/zitadel-session.component";
 export { configureZitadel } from "./lib/config";
 export type { ZitadelConfig, ZitadelProject } from "./lib/config";
 // The shared SPA widget types, re-exported wholesale so this surface can never
