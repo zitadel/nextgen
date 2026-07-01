@@ -87,6 +87,7 @@ async function phaseOpenApi() {
 }
 
 async function phaseGo() {
+  await run("moon", ["run", "server:check-generate"]);
   await run("moon", ["run", "server:test"]);
 }
 
