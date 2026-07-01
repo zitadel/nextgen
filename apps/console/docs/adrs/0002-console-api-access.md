@@ -36,8 +36,9 @@ failure mode ADR 005 exists to prevent.
 
 The console is served **same-origin** with the API: the Go mux in
 [`cmd/server/server.go`](../../../../cmd/server/server.go) `buildHTTPMux`
-mounts the static console SPA at `/ui/console/` and the API handler at `/` on
-the same server. That co-location is what makes a server-side solution cheap.
+mounts the static console SPA under its configured deployment prefix and the
+API handler at `/` on the same server. That co-location is what makes a
+server-side solution cheap.
 
 ### Problem 2 — `src/api/client.ts` would re-implement an interceptor we already have
 

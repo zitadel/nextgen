@@ -30,16 +30,16 @@ The decisions below answer three questions every route in the app depends on:
 
 Two product constraints shape the answers:
 
-- The console is **embedded into the Go server under `/ui/console/`** and
-  served as a static SPA with an `index.html` fallback for unknown client
-  routes (see
+- The console is **embedded into the Go server under a configurable deployment
+  prefix** and served as a static SPA with an `index.html` fallback for unknown
+  client routes (see
   [`internal/staticui/handler.go`](../../../../internal/staticui/handler.go)).
   Routing must survive a hard refresh on a deep link, and the client basepath
   must line up with that embed prefix.
 - That embed prefix is owned by the Vite `base`
-  ([`vite.config.mts`](../../vite.config.mts):
-  `command === "build" || isPreview ? "/ui/console/" : "/"`), so the router
-  should take the prefix from there rather than declaring its own copy.
+  ([`vite.config.mts`](../../vite.config.mts): a build/preview prefix, `/` for
+  the dev server), so the router should take the prefix from there rather than
+  declaring its own copy.
 
 ## Decision
 
@@ -84,17 +84,16 @@ const basepath = import.meta.env.BASE_URL.replace(/\/$/, "") || undefined;
 ```
 
 This makes the router prefix track [`vite.config.mts`](../../vite.config.mts)
-automatically: `BASE_URL` is `/ui/console/` for `build`/`preview` and `/` for
-the dev server, so the router and the emitted asset base always agree —
+automatically: `BASE_URL` is the deployment prefix for `build`/`preview` and
+`/` for the dev server, so the router and the emitted asset base always agree —
 including under `vite preview` (PROD-built assets served by a "serve" command),
 which is where an `import.meta.env.PROD` check would get the prefix wrong.
 
-The literal `/ui/console/` value is inherited from the previous Zitadel console
-and is **not** something routing should bake in. The router stays
-value-agnostic: it reads whatever `BASE_URL` resolves to, so the prefix is
-owned by exactly one file (`vite.config.mts`) and can be changed — or dropped —
-there without touching any routing code. Hardcoding the prefix in the router
-(as legacy code did) is explicitly out.
+The concrete prefix value is **not** something routing should bake in. The
+router stays value-agnostic: it reads whatever `BASE_URL` resolves to, so the
+prefix is owned by exactly one file (`vite.config.mts`) and can be changed — or
+dropped — there without touching any routing code. Hardcoding the prefix in the
+router (as legacy code did) is explicitly out.
 
 ### 4. Route tree for the #440 resources
 
@@ -178,7 +177,8 @@ the sidebar.
   Vite `base`, so adding/renaming the embed prefix is a one-file change and
   `vite preview` behaves like production.
 - **Deep-link safe.** File-based routes plus the Go SPA `index.html` fallback
-  mean a hard refresh on `/ui/console/users/123` rehydrates the right route.
+  mean a hard refresh on a deep link (e.g. `<prefix>/users/123`) rehydrates the
+  right route.
 - **States are free.** Loaders + `pendingComponent`/`errorComponent`/
   `notFoundComponent` deliver #440's loading/empty/error requirement without
   per-page boolean flags.
