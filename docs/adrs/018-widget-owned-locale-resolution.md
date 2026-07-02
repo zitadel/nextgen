@@ -1,4 +1,4 @@
-# ADR 017: Widget-owned locale resolution
+# ADR 018: Widget-owned locale resolution
 
 ## Status
 
