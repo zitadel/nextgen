@@ -280,10 +280,8 @@ func (r *FlowStateMachineRuntime) Render(ctx context.Context, client database.Qu
 	return FlowStepResult{State: state, Step: step}, nil
 }
 
-// processCtx bundles the invariants for a single Process invocation
-// so the per-kind methods and their helpers don't have to thread six
-// parameters through every call. It's built once at the top of
-// [Process] and passed by pointer.
+// processCtx carries the per-submission context threaded through the
+// per-kind methods and their helpers.
 type processCtx struct {
 	ctx         context.Context
 	client      database.QueryExecutor
