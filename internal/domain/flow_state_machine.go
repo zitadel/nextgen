@@ -145,9 +145,6 @@ const FlowActionPasskeyRegister = "passkey_register"
 // injected back action. Clients switch on FlowActionKindBack, not name.
 const flowBackActionName = "back"
 
-// flowBackActionTextKey is the localization key for the back label.
-const flowBackActionTextKey = "action.back"
-
 // FlowChallengeMethodPasskey is the [FlowStepChallenge.Method] /
 // [FlowPendingChallenge.Method] value for the WebAuthn passkey ceremony.
 const FlowChallengeMethodPasskey = "passkey"
@@ -1137,12 +1134,13 @@ func (r *FlowStateMachineRuntime) buildStep(state *FlowState, step *FlowDefiniti
 			Primary: a.Primary,
 		})
 	}
-	// Inject `back` when there's somewhere to return to.
+	// Inject `back` when there's somewhere to return to. TextKey
+	// follows the `<step>.action.<name>` convention.
 	if len(state.BackStack) > 0 && step.Complete == nil {
 		actions = append(actions, FlowAction{
 			Name:    flowBackActionName,
 			Kind:    FlowActionKindBack,
-			TextKey: flowBackActionTextKey,
+			TextKey: step.Name + ".action." + flowBackActionName,
 		})
 	}
 	return &FlowStep{

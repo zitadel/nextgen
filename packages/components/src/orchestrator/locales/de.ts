@@ -62,6 +62,7 @@ export const de: Locale = {
   "register-password.description": "Wähle ein sicheres Passwort für dein Konto",
   "register-password.field.password": "Passwort",
   "register-password.action.submit": "Registrieren",
+  "register-password.action.back": "Zurück",
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: passkey-upsell (Passkey-Angebot — nach Registrierung)
@@ -104,6 +105,7 @@ export const de: Locale = {
   "password.field.password": "Passwort",
   "password.action.signin": "Anmelden",
   "password.action.passkey": "Mit Passkey anmelden",
+  "password.action.back": "Zurück",
   "password.action.register.lead": "Noch kein Konto? ",
   "password.action.register.link": "Registrieren",
 
@@ -124,6 +126,7 @@ export const de: Locale = {
   "register.action.password": "Mit Passwort fortfahren",
   "register.action.passkey": "Weiter mit Passkey",
   "register.action.submit": "Registrieren",
+  "register.action.back": "Zurück",
   "register.action.sign_in.lead": "Bereits ein Konto? ",
   "register.action.sign_in.link": "Anmelden",
 
@@ -143,7 +146,6 @@ export const de: Locale = {
   // --- Gemeinsame Aktionen ---
   "submit.continue": "Weiter",
   "submit.signin": "Anmelden",
-  "action.back": "Zurück",
   "action.forgot_password": "Passwort vergessen?",
   "action.cancel": "Abbrechen",
 

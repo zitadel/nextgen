@@ -2350,7 +2350,7 @@ func TestFlowStateMachine_Back_InjectedAfterAdvance(t *testing.T) {
 
 	back := findBackAction(result.Step)
 	if assert.NotNil(t, back, "back action must be injected after the first advance") {
-		assert.Equal(t, "action.back", back.TextKey)
+		assert.Equal(t, "step2.action.back", back.TextKey)
 		assert.False(t, back.Primary, "back must never be primary")
 	}
 }
