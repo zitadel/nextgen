@@ -145,10 +145,6 @@ const FlowActionPasskeyRegister = "passkey_register"
 // injected back action. Clients switch on FlowActionKindBack, not name.
 const flowBackActionName = "back"
 
-// flowActionKindUnset is the zero value of FlowActionKind, returned by
-// stepActionKind when the submitted name isn't declared on the step.
-const flowActionKindUnset FlowActionKind = 0
-
 // FlowChallengeMethodPasskey is the [FlowStepChallenge.Method] /
 // [FlowPendingChallenge.Method] value for the WebAuthn passkey ceremony.
 const FlowChallengeMethodPasskey = "passkey"
@@ -323,7 +319,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	// Back is engine-injected, so it's not in step.Actions and
 	// stepActionKind returns unset. Recover the kind when the
 	// submission names it; processBack rejects the empty-stack case.
-	if actionKind == flowActionKindUnset && in.Action == flowBackActionName {
+	if actionKind == FlowActionKindUnset && in.Action == flowBackActionName {
 		actionKind = FlowActionKindBack
 	}
 
