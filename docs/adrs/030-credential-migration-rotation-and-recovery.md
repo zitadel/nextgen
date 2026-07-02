@@ -1,4 +1,4 @@
-# ADR 030: Credential & Factor Migration and Recovery
+# ADR 030: Credential Migration, Rotation, and Recovery
 
 > **Status:** Proposed
 > **Date:** 2026-07-01
@@ -13,7 +13,7 @@ This document defines the standard operating procedures for credential migration
 ### 1. Password Rehashing and Migration
 The system leverages `passwap.Swapper` combined with the `password_hasher` configuration to handle both parameter upgrades (rehashing) and complete algorithmic switches (migration).
 
-* **The Flow:** When a user logs in, the provided password is verified against the stored hash. `PasswapHasher.Swapper.Verify` returns an updated encoded hash when it detects parameter upgrades (e.g., an Argon2id time-cost increase) or algorithm migrations (e.g., moving from legacy bcrypt to FIPS-compliant PBKDF2). The database is subsequently updated with the new hash.
+* **The Flow:** When a user logs in, the provided password is verified against the stored hash. `(*passwap.Swapper).Verify` returns `(upgradedEncodedHash, error)`; when it returns an upgraded hash for parameter upgrades or algorithm migration, the server MUST persist that upgraded hash to the database.
 
 ### 2. Passkey Migration
 Unlike passwords, passkeys (asymmetric keys) cannot be transparently rehashed or migrated by the server.
@@ -31,7 +31,7 @@ Passkey credentials are cryptographically bound to the WebAuthn Relying Party ID
 ### 3. TOTP Enrollment and Rotation
 Rotating a TOTP secret mandates invalidating the current shared secret and establishing a new one.
 
-* **Device Change:** When registering a new device to replace an old one, the new TOTP secret replaces the old one. Remove the existing TOTP and remove the existing TOTP configuration and register a new one.
+* **Device Change:** When registering a new device to replace an old one, the new TOTP secret replaces the old one. Remove the existing TOTP configuration and register a new one.
 * **Device Loss:** In the event of device loss or compromise, the user authenticates via a recovery method (see [Section 4](#4-account-recovery)). Upon successful recovery, the system immediately prompts the user to re-register their TOTP secret.
 
 ### 4. Account Recovery
@@ -65,14 +65,13 @@ To rotate a key without breaking active user sessions:
 
 #### 5.2 Emergency Compromise Handling
 If an active signing key is compromised:
-1.  Immediately set `active_until = now()` on the compromised key and remove its public key from the JWKS endpoint. This immediately invalidates all active tokens bearing that `kid`.
+1.  Immediately set `active_until = now()` on the compromised key and remove its public key from the JWKS endpoint. This prevents verification of tokens with that `kid` once verifiers refresh JWKS; revoke sessions/refresh tokens as part of the incident response.
 2.  Generate and publish a replacement key pair to resume operations and force clients to re-authenticate.
 
 ### 6. Encryption-at-rest key rotation
 For data encrypted at rest (e.g., TOTP secrets, OAuth client secrets), key rotation is necessary to limit the amount of data protected by a single key and to recover from potential key compromise.
 
-The current implementation relies on a single static symmetric key (AES-256-GCM), fulfilling the `crypto.Crypter` interface. To support robust key rotation without requiring complex, long-running database migrations, the system implements **Global Envelope Encryption via KMS**.
-
+Today, the configured `server.encryption_key` is used for sealing server-managed payloads (e.g., flow cookies and opaque tokens) via AES-256-GCM (`crypto.Crypter`). This ADR proposes an explicit envelope-encryption approach for any database-stored secrets that require encryption at rest.
 Instead of loading a raw 32-byte key directly from a file, the server loads an encrypted **Global Data Encryption Key (DEK)** that is wrapped by a Key Encryption Key (KEK) managed by a Key Management Service (AWS KMS, Google Cloud KMS, or HashiCorp Vault).
 
 **The Lifecycle:**
