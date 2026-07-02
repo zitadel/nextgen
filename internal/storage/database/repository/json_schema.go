@@ -86,6 +86,11 @@ func (r *JSONSchemaRepository) URLCondition(url string) database.Condition {
 	return database.NewTextCondition(r.URL(), database.TextOperationEqual, url)
 }
 
+// PayloadTextCondition creates a text condition against the value at path inside the payload JSON column.
+func (r *JSONSchemaRepository) PayloadTextCondition(op database.TextOperation, value string, path ...string) database.Condition {
+	return database.NewJSONTextCondition(r.Payload(), op, value, path...)
+}
+
 func (r *JSONSchemaRepository) GetByID(ctx context.Context, client database.QueryExecutor, projectID string, schemaID string) (*domain.JSONSchema, error) {
 	return r.Get(ctx, client, database.WithCondition(r.PrimaryKeyCondition(projectID, schemaID)))
 }

@@ -250,59 +250,6 @@ func NewTextIgnoreCaseCondition[T Text](col Column, op TextOperation, value T) C
 	}
 }
 
-type jsonBFieldColumn struct {
-	field string
-}
-
-// Matches implements [Column].
-func (c jsonBFieldColumn) Matches(x any) bool {
-	toMatch, ok := x.(jsonBFieldColumn)
-	if !ok {
-		return false
-	}
-	return c.field == toMatch.field
-}
-
-// String implements [Column].
-func (c jsonBFieldColumn) String() string {
-	return "database.jsonBFieldColumn"
-}
-
-// WriteQualified implements [Column].
-func (c jsonBFieldColumn) WriteQualified(builder *StatementBuilder) {
-	builder.WriteString("payload->>")
-	builder.WriteArg(c.field)
-}
-
-// WriteUnqualified implements [Column].
-func (c jsonBFieldColumn) WriteUnqualified(builder *StatementBuilder) {
-	c.WriteQualified(builder)
-}
-
-// Equals implements [Column].
-func (c jsonBFieldColumn) Equals(col Column) bool {
-	if col == nil {
-		return false
-	}
-	toMatch, ok := col.(jsonBFieldColumn)
-	if !ok {
-		return false
-	}
-	return c.field == toMatch.field
-}
-
-// WriteArg implements [Column].
-func (c jsonBFieldColumn) WriteArg(builder *StatementBuilder) {
-	c.WriteQualified(builder)
-}
-
-var _ Column = (jsonBFieldColumn{})
-
-// NewJsonBFieldCondition creates a text condition against a top-level key in the payload JSONB column.
-func NewJsonBFieldCondition(field string, op TextOperation, value string) Condition {
-	return NewTextCondition(jsonBFieldColumn{field: field}, op, value)
-}
-
 // NewNumberCondition creates a condition that compares a numeric column with a value.
 func NewNumberCondition[V Number](col Column, op NumberOperation, value V) Condition {
 	return valueCondition{
@@ -341,6 +288,19 @@ func NewBytesCondition[V Bytes](col Column, op BytesOperation, value any) Condit
 			writeBytesOperation[V](builder, col, op, value)
 		},
 	}
+}
+
+// NewJSONTextCondition creates a text condition against the value at path inside a JSON column.
+// The extracted value is compared as text, reusing the standard text operator machinery
+// (so ignore-case operations render as LOWER(...) on both sides).
+func NewJSONTextCondition(col Column, op TextOperation, value string, path ...string) Condition {
+	return NewTextCondition(JSONText(col, path...), op, value)
+}
+
+// NewJSONNumberCondition creates a numeric condition against the value at path inside a JSON column.
+// The extracted value is cast to numeric before comparison, e.g. (col->>$1)::numeric > $2.
+func NewJSONNumberCondition[V Number](col Column, op NumberOperation, value V, path ...string) Condition {
+	return NewNumberCondition(jsonNumeric(col, path...), op, value)
 }
 
 // NewColumnCondition creates a condition that compares two columns on equality.

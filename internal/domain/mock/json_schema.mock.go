@@ -321,6 +321,49 @@ func (c *MockJSONSchemaRepositoryPayloadCall) DoAndReturn(f func() database.Colu
 	return c
 }
 
+// PayloadTextCondition mocks base method.
+func (m *MockJSONSchemaRepository) PayloadTextCondition(op database.TextOperation, value string, path ...string) database.Condition {
+	m.ctrl.T.Helper()
+	varargs := []any{op, value}
+	for _, a := range path {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PayloadTextCondition", varargs...)
+	ret0, _ := ret[0].(database.Condition)
+	return ret0
+}
+
+// PayloadTextCondition indicates an expected call of PayloadTextCondition.
+func (mr *MockJSONSchemaRepositoryMockRecorder) PayloadTextCondition(op, value any, path ...any) *MockJSONSchemaRepositoryPayloadTextConditionCall {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{op, value}, path...)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PayloadTextCondition", reflect.TypeOf((*MockJSONSchemaRepository)(nil).PayloadTextCondition), varargs...)
+	return &MockJSONSchemaRepositoryPayloadTextConditionCall{Call: call}
+}
+
+// MockJSONSchemaRepositoryPayloadTextConditionCall wrap *gomock.Call
+type MockJSONSchemaRepositoryPayloadTextConditionCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJSONSchemaRepositoryPayloadTextConditionCall) Return(arg0 database.Condition) *MockJSONSchemaRepositoryPayloadTextConditionCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJSONSchemaRepositoryPayloadTextConditionCall) Do(f func(database.TextOperation, string, ...string) database.Condition) *MockJSONSchemaRepositoryPayloadTextConditionCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJSONSchemaRepositoryPayloadTextConditionCall) DoAndReturn(f func(database.TextOperation, string, ...string) database.Condition) *MockJSONSchemaRepositoryPayloadTextConditionCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // PrimaryKeyColumns mocks base method.
 func (m *MockJSONSchemaRepository) PrimaryKeyColumns() []database.Column {
 	m.ctrl.T.Helper()

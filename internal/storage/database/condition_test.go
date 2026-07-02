@@ -116,19 +116,35 @@ func TestWrite(t *testing.T) {
 			},
 		},
 		{
-			name: "jsonb field text condition",
-			cond: NewJsonBFieldCondition("userType", TextOperationEqual, "worker"),
+			name: "json field text condition",
+			cond: NewJSONTextCondition(NewColumn("t", "payload"), TextOperationEqual, "worker", "userType"),
 			want: want{
-				stmt: "payload->>$1 = $2",
+				stmt: "t.payload->>$1 = $2",
 				args: []any{"userType", "worker"},
 			},
 		},
 		{
-			name: "jsonb field text ignore case condition",
-			cond: NewJsonBFieldCondition("userType", TextOperationEqualIgnoreCase, "Worker"),
+			name: "json field text ignore case condition",
+			cond: NewJSONTextCondition(NewColumn("t", "payload"), TextOperationEqualIgnoreCase, "Worker", "userType"),
 			want: want{
-				stmt: "LOWER(payload->>$1) = LOWER($2)",
+				stmt: "LOWER(t.payload->>$1) = LOWER($2)",
 				args: []any{"userType", "Worker"},
+			},
+		},
+		{
+			name: "json field nested path condition",
+			cond: NewJSONTextCondition(NewColumn("t", "payload"), TextOperationEqual, "worker", "spec", "userType"),
+			want: want{
+				stmt: "t.payload->$1->>$2 = $3",
+				args: []any{"spec", "userType", "worker"},
+			},
+		},
+		{
+			name: "json field number condition",
+			cond: NewJSONNumberCondition(NewColumn("t", "payload"), NumberOperationGreaterThan, 18, "age"),
+			want: want{
+				stmt: "(t.payload->>$1)::numeric > $2",
+				args: []any{"age", 18},
 			},
 		},
 		{

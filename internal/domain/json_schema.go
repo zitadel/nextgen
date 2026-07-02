@@ -99,6 +99,7 @@ type jsonSchemaConditions interface {
 	PrimaryKeyCondition(projectID, url string) database.Condition
 	ProjectIDCondition(projectID string) database.Condition
 	URLCondition(url string) database.Condition
+	PayloadTextCondition(op database.TextOperation, value string, path ...string) database.Condition
 }
 
 const (

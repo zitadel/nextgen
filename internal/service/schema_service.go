@@ -136,7 +136,7 @@ func (s *SchemaService) ListSchemas(ctx context.Context, projectID, userType str
 	}
 	if userType != "" {
 		conditions = append(conditions,
-			database.NewJsonBFieldCondition("userType", database.TextOperationEqual, userType),
+			s.schemaRepo.PayloadTextCondition(database.TextOperationEqual, userType, "userType"),
 		)
 	}
 
