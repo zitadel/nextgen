@@ -141,8 +141,10 @@ const FlowActionPasskey = "passkey"
 // transition fires once the returned attestation verifies.
 const FlowActionPasskeyRegister = "passkey_register"
 
-// flowBackActionName is the name the engine emits and expects for the
-// injected back action. Clients switch on FlowActionKindBack, not name.
+// flowBackActionName is the name attached to the injected back action.
+// The client dispatches on FlowActionKindBack, but the submit wire
+// protocol only carries the action name, so the engine echoes it back
+// to reclassify the submission as back.
 const flowBackActionName = "back"
 
 // FlowChallengeMethodPasskey is the [FlowStepChallenge.Method] /
