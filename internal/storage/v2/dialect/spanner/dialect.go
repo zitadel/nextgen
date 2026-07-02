@@ -7,6 +7,10 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
+func init() {
+	database.MustRegisterDialect("spanner", DecodeConfig)
+}
+
 type Dialect struct {
 	// Database is the Spanner database string, in the format "projects/{project}/instances/{instance}/databases/{database}".
 	Database string
@@ -27,3 +31,13 @@ func (d *Dialect) Name() string {
 }
 
 var _ database.Dialect = (*Dialect)(nil)
+
+// DecodeConfig parses a Spanner database DSN string.
+// Expected format: projects/<project>/instances/<instance>/databases/<database>
+func DecodeConfig(input any) (database.Dialect, error) {
+	dsn, ok := input.(string)
+	if !ok {
+		return nil, database.ErrInvalidDialectConfig(input)
+	}
+	return &Dialect{Database: dsn}, nil
+}

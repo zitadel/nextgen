@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/go-viper/mapstructure/v2"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
@@ -58,19 +60,31 @@ func DecodeConfig(input any) (database.Dialect, error) {
 		}
 		return &Config{Config: config}, nil
 	case map[string]any:
-		connector := new(Config)
+		connMap := c
+		if nested, ok := c["ConnConfig"].(map[string]any); ok {
+			connMap = nested
+		}
+
+		pgconnConfig := &pgconn.Config{}
 		decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 			DecodeHook:       mapstructure.StringToTimeDurationHookFunc(),
 			WeaklyTypedInput: true,
-			Result:           connector,
+			Result:           pgconnConfig,
 		})
 		if err != nil {
 			return nil, err
 		}
-		if err = decoder.Decode(c); err != nil {
+		if err = decoder.Decode(connMap); err != nil {
 			return nil, err
 		}
-		return connector, nil
+
+		return &Config{
+			Config: &pgxpool.Config{
+				ConnConfig: &pgx.ConnConfig{
+					Config: *pgconnConfig,
+				},
+			},
+		}, nil
 	}
 	return nil, database.ErrInvalidDialectConfig(input)
 }

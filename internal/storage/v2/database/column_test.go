@@ -10,11 +10,13 @@ import (
 )
 
 func TestColField(t *testing.T) {
+	t.Parallel()
 	col := database.Col(domain.ProjectFieldID)
 	assert.Equal(t, domain.ProjectFieldID, col.Field())
 }
 
 func TestColumnEquality(t *testing.T) {
+	t.Parallel()
 	a := database.Col(domain.ProjectFieldID)
 	b := database.Col(domain.ProjectFieldID)
 	c := database.Col(domain.ProjectFieldCreatedAt)
@@ -24,6 +26,7 @@ func TestColumnEquality(t *testing.T) {
 }
 
 func TestColumnJSONRoundTrip(t *testing.T) {
+	t.Parallel()
 	col := database.Col(domain.ProjectFieldUpdatedAt)
 	data, err := col.MarshalJSON()
 	require.NoError(t, err)

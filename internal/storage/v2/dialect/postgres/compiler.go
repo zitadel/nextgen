@@ -13,9 +13,15 @@ type statementCompiler struct {
 	args []any
 }
 
+func (c *statementCompiler) Reset() {
+	c.Builder.Reset()
+	c.args = nil
+}
+
 func compileRead[F ~uint8, T any](c *statementCompiler, stmt string, opt *database.ListOptions[F], schema database.Schema[F, T]) error {
 	c.WriteString(stmt)
 
+	filter := opt.Filter
 	if len(opt.Pagination.Cursor) != 0 {
 		cursor, err := pagination.CursorFromToken[F](opt.Pagination.Cursor)
 		if err != nil {
@@ -30,14 +36,14 @@ func compileRead[F ~uint8, T any](c *statementCompiler, stmt string, opt *databa
 		}
 		terms := compareTerms(cursor.Columns, values)
 		if opt.Pagination.OrderBy.Direction == database.OrderAsc {
-			opt.Filter = database.And(opt.Filter, database.CompareGreater(terms...))
+			filter = database.And(filter, database.CompareGreater(terms...))
 		} else {
-			opt.Filter = database.And(opt.Filter, database.CompareLess(terms...))
+			filter = database.And(filter, database.CompareLess(terms...))
 		}
 	}
-	if opt.Filter != nil {
+	if filter != nil {
 		c.WriteString(" WHERE ")
-		compileFilter(c, opt.Filter, schema)
+		compileFilter(c, filter, schema)
 	}
 
 	compileOrderBy(c, opt.Pagination.OrderBy, schema)
@@ -168,15 +174,17 @@ func compileStringFilter[F ~uint8, T any](c *statementCompiler, filter *database
 			writeArg(c, filter.Value)
 		}
 	case database.StringMatchStartsWith, database.StringMatchContains, database.StringMatchEndsWith:
-		pattern := likePattern(filter.Match, filter.Value)
+		value := filter.Value
 		if filter.IgnoreCase {
+			c.WriteString("LOWER(")
 			c.WriteString(col)
-			c.WriteString(" ILIKE ")
+			c.WriteString(")")
+			value = strings.ToLower(filter.Value)
 		} else {
 			c.WriteString(col)
-			c.WriteString(" LIKE ")
 		}
-		writeArg(c, pattern)
+		c.WriteString(" LIKE ")
+		compileLikePattern(c, filter.Match, value)
 	default:
 		panic("unknown string match")
 	}
@@ -201,15 +209,6 @@ func compileLimit(c *statementCompiler, limit uint32) {
 	if limit > 0 {
 		c.WriteString(" LIMIT ")
 		writeArg(c, limit)
-	}
-}
-
-func writeArgs(c *statementCompiler, args ...any) {
-	for i, arg := range args {
-		if i > 0 {
-			c.WriteString(", ")
-		}
-		writeArg(c, arg)
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 )
 
 func TestCursorMarshalRoundTrip(t *testing.T) {
+	t.Parallel()
 	createdAt := time.Date(2026, 6, 26, 12, 0, 0, 0, time.UTC)
 	original := &pagination.Cursor[domain.ProjectField]{
 		Columns: []database.Column[domain.ProjectField]{
@@ -31,6 +32,7 @@ func TestCursorMarshalRoundTrip(t *testing.T) {
 }
 
 func TestCursorMatchesOrderByMismatch(t *testing.T) {
+	t.Parallel()
 	cursor := &pagination.Cursor[domain.ProjectField]{
 		Columns: []database.Column[domain.ProjectField]{
 			database.Col(domain.ProjectFieldCreatedAt),

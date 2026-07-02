@@ -9,6 +9,8 @@ import (
 )
 
 func TestEqualFilterRestricts(t *testing.T) {
+	t.Parallel()
+
 	filter := database.Equal(database.Col(domain.ProjectFieldID), "proj_1")
 	assert.True(t, filter.Restricts(database.Col(domain.ProjectFieldID)))
 	assert.False(t, filter.Restricts(database.Col(domain.ProjectFieldCreatedAt)))
@@ -17,17 +19,23 @@ func TestEqualFilterRestricts(t *testing.T) {
 }
 
 func TestCompareGreaterRestrictsAllTerms(t *testing.T) {
+	t.Parallel()
+
 	filter := database.CompareGreater(
 		database.Term(database.Col(domain.ProjectFieldCreatedAt), "t1"),
 		database.Term(database.Col(domain.ProjectFieldID), "proj_1"),
+		database.Term(database.Col(domain.ProjectFieldUpdatedAt), "t2"),
 	)
 	assert.True(t, filter.Restricts(database.Col(domain.ProjectFieldCreatedAt)))
 	assert.True(t, filter.Restricts(database.Col(domain.ProjectFieldID)))
-	assert.False(t, filter.Restricts(database.Col(domain.ProjectFieldUpdatedAt)))
+	assert.True(t, filter.Restricts(database.Col(domain.ProjectFieldUpdatedAt)))
+	assert.False(t, filter.Restricts(database.Col(domain.ProjectFieldProjectSecret)))
 	assert.Equal(t, database.OpGreater, filter.Op)
 }
 
 func TestAndFilterRestricts(t *testing.T) {
+	t.Parallel()
+
 	filter := database.And(
 		database.Equal(database.Col(domain.ProjectFieldID), "proj_1"),
 		database.Equal(database.Col(domain.ProjectFieldCreatedAt), "now"),
@@ -38,6 +46,8 @@ func TestAndFilterRestricts(t *testing.T) {
 }
 
 func TestOrFilterRestricts(t *testing.T) {
+	t.Parallel()
+
 	filter := database.Or(
 		database.Equal(database.Col(domain.ProjectFieldID), "proj_1"),
 		database.Equal(database.Col(domain.ProjectFieldCreatedAt), "now"),
@@ -48,6 +58,8 @@ func TestOrFilterRestricts(t *testing.T) {
 }
 
 func TestGreaterAndLessThanFilterRestricts(t *testing.T) {
+	t.Parallel()
+
 	gt := database.GreaterThan(database.Col(domain.ProjectFieldCreatedAt), "t1")
 	lt := database.LessThan(database.Col(domain.ProjectFieldID), "proj_1")
 	assert.True(t, gt.Restricts(database.Col(domain.ProjectFieldCreatedAt)))
@@ -55,6 +67,8 @@ func TestGreaterAndLessThanFilterRestricts(t *testing.T) {
 }
 
 func TestStringFilterConstructors(t *testing.T) {
+	t.Parallel()
+
 	col := database.Col(domain.FlowDefinitionFieldName)
 
 	equal := database.StringEqual(col, "login")
@@ -81,6 +95,8 @@ func TestStringFilterConstructors(t *testing.T) {
 }
 
 func TestStringFilterRestricts(t *testing.T) {
+	t.Parallel()
+
 	col := database.Col(domain.FlowDefinitionFieldName)
 	filter := database.StringContains(col, "login")
 	assert.True(t, filter.Restricts(col))
