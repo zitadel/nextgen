@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"cloud.google.com/go/spanner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -26,8 +27,8 @@ func TestWrapError(t *testing.T) {
 			want: nil,
 		},
 		{
-			name: "no rows",
-			err:  errNoRows,
+			name: "row not found",
+			err:  spanner.ErrRowNotFound,
 			want: new(database.NoRowFoundError),
 		},
 		{

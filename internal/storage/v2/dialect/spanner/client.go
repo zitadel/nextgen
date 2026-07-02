@@ -14,10 +14,9 @@ type Client struct {
 }
 
 func newClient(spannerClient *spanner.Client) *Client {
-	executor := newClientExecutor(spannerClient)
 	return &Client{
 		client:     spannerClient,
-		statements: newStatements(executor),
+		statements: newStatements(newClientDB(spannerClient)),
 	}
 }
 
@@ -44,7 +43,7 @@ func (c Client) Transaction(ctx context.Context, fn func(ctx context.Context, tx
 }
 
 func (c Client) Statements() service.AllStatements {
-	return newStatements(newClientExecutor(c.client))
+	return newStatements(newClientDB(c.client))
 }
 
 var (

@@ -11,14 +11,23 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 )
 
-const createProjectStmt = `INSERT INTO projects (id, project_secret, preview_secret, preview_origins) VALUES (@p1, @p2, @p3, @p4) THEN RETURN id, created_at, updated_at`
+const (
+	projectsTable         = "projects"
+	createProjectStmt     = `INSERT INTO projects (id, project_secret, preview_secret, preview_origins) VALUES (@p1, @p2, @p3, @p4) THEN RETURN id, created_at, updated_at`
+	deleteByIDProjectStmt = `DELETE FROM projects WHERE id = @p1`
+	projectQuery          = "SELECT id, created_at, updated_at, project_secret, preview_secret, preview_origins FROM projects"
+)
+
+var projectColumns = []string{
+	"id", "created_at", "updated_at", "project_secret", "preview_secret", "preview_origins",
+}
 
 type projectStatements struct{ statement }
 
-func newProjectStatements(client queryExecutor) projectStatements {
+func newProjectStatements(db spannerDB) projectStatements {
 	return projectStatements{
 		statement: statement{
-			client: client,
+			db: db,
 		},
 	}
 }
@@ -29,34 +38,30 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 	if err != nil {
 		return wrapError(err)
 	}
-	return ps.client.QueryRow(ctx, createProjectStmt, project.ID, project.ProjectSecret, project.PreviewSecret, previewOrigins).
-		Scan(&project.ID, &project.CreatedAt, &project.UpdatedAt)
-}
-
-const deleteByIDProjectStmt = `DELETE FROM projects WHERE id = @p1`
-
-// DeleteProjectByID implements [service.ProjectStatements].
-func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) error {
-	_, err := ps.client.Exec(ctx, deleteByIDProjectStmt, id)
+	stmt := buildStatement(createProjectStmt, project.ID, project.ProjectSecret, project.PreviewSecret, previewOrigins).statement()
+	_, err = collectOneRow(ps.db.Query(ctx, stmt), func(row *spanner.Row) (*domain.Project, error) {
+		if err := row.Columns(&project.ID, &project.CreatedAt, &project.UpdatedAt); err != nil {
+			return nil, err
+		}
+		return project, nil
+	})
 	return err
 }
 
-const projectQuery = "SELECT id, created_at, updated_at, project_secret, preview_secret, preview_origins FROM projects"
+// DeleteProjectByID implements [service.ProjectStatements].
+func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) error {
+	stmt := buildStatement(deleteByIDProjectStmt, id).statement()
+	_, err := ps.db.Update(ctx, stmt)
+	return err
+}
 
 // GetProjectByID implements [service.ProjectStatements].
 func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*domain.Project, error) {
-	var compiler statementCompiler
-	if err := compileRead(&compiler, projectQuery, &database.ListOptions[domain.ProjectField]{
-		Filter: database.Equal(database.Col(domain.ProjectFieldID), id),
-	}, projectSchema); err != nil {
+	row, err := ps.db.ReadRow(ctx, projectsTable, spanner.Key{id}, projectColumns)
+	if err != nil {
 		return nil, err
 	}
-
-	rows, err := ps.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	return collectExactlyOneRow(rows, ps.scanProject)
+	return ps.scanProject(row)
 }
 
 // ListProjects implements [service.ProjectStatements].
@@ -66,12 +71,7 @@ func (ps projectStatements) ListProjects(ctx context.Context, filter *database.L
 		return nil, err
 	}
 
-	rows, err := ps.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
-	projects, err := collectRows(rows, ps.scanProject)
+	projects, err := collectRows(ps.db.Query(ctx, compiler.statement()), ps.scanProject)
 	if err != nil {
 		return nil, err
 	}

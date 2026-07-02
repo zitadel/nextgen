@@ -218,7 +218,7 @@ func writeArg(c *statementCompiler, arg any) {
 	c.WriteString(strconv.Itoa(len(c.args)))
 }
 
-func buildStatement(sql string, args []any) spannerStatement {
+func buildStatement(sql string, args ...any) spannerStatement {
 	params := make(map[string]any, len(args))
 	for i, arg := range args {
 		params[paramName(i+1)] = arg
@@ -226,8 +226,8 @@ func buildStatement(sql string, args []any) spannerStatement {
 	return spannerStatement{SQL: sql, Params: params}
 }
 
-func buildStatementFromPostgresSQL(sql string, args []any) spannerStatement {
-	return buildStatement(convertPlaceholders(sql), args)
+func buildStatementFromPostgresSQL(sql string, args ...any) spannerStatement {
+	return buildStatement(convertPlaceholders(sql), args...)
 }
 
 func paramName(index int) string {

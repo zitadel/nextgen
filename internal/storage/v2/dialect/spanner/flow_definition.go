@@ -34,10 +34,10 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 // IsStatements implements [service.FlowDefinitionStatements].
 func (f flowDefinitionStatements) IsStatements() {}
 
-func newFlowDefinitionStatements(client queryExecutor) flowDefinitionStatements {
+func newFlowDefinitionStatements(db spannerDB) flowDefinitionStatements {
 	return flowDefinitionStatements{
 		statement: statement{
-			client: client,
+			db: db,
 		},
 	}
 }
