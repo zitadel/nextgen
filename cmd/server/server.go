@@ -218,7 +218,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		userService,
 		schemaRepo,
 	)
-	createUserForPasskeyHandler := service.NewFlowCreateUserForPasskeyHandler(userRepo)
+	createUserForPasskeyHandler := service.NewFlowCreateUserForPasskeyHandler(userRepo, userService, schemaRepo)
 	passkeyRegSvc := service.NewPasskeyRegistrationService(pool, passkeyRegRepo, userPasskeyRepo, ids)
 	passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
 	stateMachine := domain.NewFlowStateMachine(

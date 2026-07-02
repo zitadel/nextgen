@@ -1,4 +1,4 @@
-# ADR 009: Cursor-Based Pagination
+# ADR 027: Cursor-Based Pagination
 
 > **Status:** Proposed
 > **Date:** 2026-04-30
@@ -27,4 +27,4 @@ Cursor-based pagination solves these by encoding the position of the last seen i
 - Existing endpoints that still use `offset`/`limit` (e.g. `GET /users`) are marked with a `TODO` comment and will be migrated. New list endpoints must use `page_token`.
 - See `GET /sessions` as the reference implementation and `components/parameters/page-token.yaml` for the reusable parameter definition.
 - Storage-layer keyset pagination is implemented in `internal/storage/v2/` via
-  `ListOptions` and `CursorToken`; see [ADR 027](027-storage-v2-statements-and-dialects.md).
+  `ListOptions` and `CursorToken`; see [ADR 028](028-storage-v2-statements-and-dialects.md).

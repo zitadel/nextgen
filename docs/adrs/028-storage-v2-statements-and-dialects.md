@@ -1,4 +1,4 @@
-# ADR 027: Storage v2 — Typed Statements and Per-Dialect SQL
+# ADR 028: Storage v2 — Typed Statements and Per-Dialect SQL
 
 > **Status:** Proposed (partially implemented; pre-merge checklist tracks remaining work on `new-repo`)
 > **Date:** 2026-06-23
@@ -22,7 +22,7 @@ migration path, and pre-merge checklist for the `new-repo` branch.
 See also:
 
 - [ADR 008](008-users-eav-store.md) — user EAV storage model
-- [ADR 009](009-cursor-based-pagination.md) — cursor pagination contract
+- [ADR 027](027-cursor-based-pagination.md) — cursor pagination contract
 - [ADR 011](011-resource-identifiers.md) — ephemeral vs managed identifiers
 
 ## Decision
@@ -99,7 +99,7 @@ passed into `compileRead`.
 
 [`ListOptions[F]`](../../internal/storage/v2/database/list.go) and
 [`pagination.Cursor[F]`](../../internal/storage/v2/dialect/pagination/cursor.go) implement the
-storage side of [ADR 009](009-cursor-based-pagination.md). The postgres compiler
+storage side of [ADR 027](027-cursor-based-pagination.md). The postgres compiler
 turns `Page.Cursor` into a keyset predicate plus `ORDER BY` and `LIMIT`. API
 token signing and opaqueness stay upstream of storage.
 
@@ -318,7 +318,7 @@ entries when no longer useful.
 
 | ADR | Relationship |
 |---|---|
-| [009 Cursor-Based Pagination](009-cursor-based-pagination.md) | v2 `ListOptions`/`Page.Cursor` + `pagination.Cursor` is the storage implementation |
+| [027 Cursor-Based Pagination](027-cursor-based-pagination.md) | v2 `ListOptions`/`Page.Cursor` + `pagination.Cursor` is the storage implementation |
 | [011 Resource Identifiers](011-resource-identifiers.md) | ADR 027 refines § Package roles: `Identity` + ID generation move to v2 dialects |
 | [008 Users EAV Store](008-users-eav-store.md) | EAV SQL may remain specialized; port to v2 statements |
 | [010 Session/Auth Attempt](010-session-auth-attempt-check-model.md) | Future v2 port target |
@@ -329,7 +329,7 @@ entries when no longer useful.
 
 - Entity SQL is explicit and reviewable per dialect
 - Dialect differences isolated to `dialect/<engine>/` instead of repository switches
-- Keyset pagination is a first-class storage concern (ADR 009)
+- Keyset pagination is a first-class storage concern (ADR 027)
 - ID generation colocated with dialect-specific DDL and insert semantics (ADR 011)
 - Incremental migration without big-bang rewrite
 

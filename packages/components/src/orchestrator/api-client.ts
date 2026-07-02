@@ -2,14 +2,17 @@
  * Thin wrappers around the orval-generated `@zitadel/api` fetch
  * functions for the API operations the orchestrator drives:
  *
- * - `POST /flow`              — `createFlow`
- * - `POST /flow/{id}/submit`  — `submitFlowStep`
- * - `GET  /flow/{id}`         — `getFlowStep`
- * - `POST /sessions/exchange` — `exchangeHandoff`
+ * - `POST   /flow`              — `createFlow`
+ * - `POST   /flow/{id}/submit`  — `submitFlowStep`
+ * - `GET    /flow/{id}`         — `getFlowStep`
+ * - `POST   /sessions/exchange` — `exchangeHandoff`
+ * - `GET    /sessions/me`       — `getMySession`
+ * - `DELETE /sessions/me`       — `revokeMySession`
  *
  * The wrappers exist for one reason: every API call must run with
- * `credentials: "include"` so the stateless `_zflow` HttpOnly cookie
- * round-trips. Centralising that here keeps every call site honest.
+ * `credentials: "include"` so the stateless `_zflow` / `__nextgen_session`
+ * HttpOnly cookies round-trip. Centralising that here keeps every call site
+ * honest.
  *
  * Types come straight from `@zitadel/api/generated/model`. Orval
  * emits per-operation aliases (`CreateFlow201`, `GetFlowStep200`,
@@ -24,11 +27,23 @@ import type {
   ExchangeHandoff200,
   ExchangeHandoffBody,
   ExchangeHandoffParams,
+  GetMySession200,
   SubmitFlowStepBody,
 } from "@zitadel/api/generated/model";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
 const apiRequestInit: RequestInit = { credentials: "include" };
+
+/**
+ * The signed-in session as the orchestrator renders it. `name` and `email` are
+ * not yet in the generated `GetMySession200` schema — the server returns only
+ * `user_id` today — so they are read speculatively and light up automatically
+ * once the backend includes them on `GET /sessions/me`.
+ */
+export type SessionIdentity = GetMySession200 & {
+  readonly name?: string;
+  readonly email?: string;
+};
 
 export async function startFlow(api: ZitadelApi, input: CreateFlowBody): Promise<CreateFlow201> {
   return api.createFlow(input, apiRequestInit);
@@ -73,4 +88,21 @@ export async function exchangeSession(
   params: ExchangeHandoffParams,
 ): Promise<ExchangeHandoff200> {
   return api.exchangeHandoff(body, params, apiRequestInit);
+}
+
+/**
+ * Reads the current session (`GET /sessions/me`) with credentials so the
+ * `__nextgen_session` cookie authenticates the request. Used by the
+ * orchestrator's signed-in surfaces to render the user's identity.
+ */
+export async function getSession(api: ZitadelApi): Promise<SessionIdentity> {
+  return (await api.getMySession(apiRequestInit)) as SessionIdentity;
+}
+
+/**
+ * Revokes the current session (`DELETE /sessions/me`) with credentials. The
+ * server deletes the session and clears the cookie via `Set-Cookie: Max-Age=0`.
+ */
+export async function revokeSession(api: ZitadelApi): Promise<void> {
+  await api.revokeMySession(apiRequestInit);
 }
