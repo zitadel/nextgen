@@ -8,11 +8,6 @@ items:
     id:
       type: string
       description: The unique identifier for this user schema.
-    userType:
-      type: string
-      maxLength: 256
-      description: The userType to which this schema belongs.
-      example: human-user
     createdAt:
       type: string
       format: date

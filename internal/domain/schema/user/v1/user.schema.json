@@ -1,7 +1,4 @@
- metaSchema:
-    type: string
-    format: uri
-    description: The user Schema version used for this schema.{
+{
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "{{ .SchemaURL }}",
     "title": "Non-normative, Example User Schema",
