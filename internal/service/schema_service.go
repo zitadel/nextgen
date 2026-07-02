@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -21,6 +22,12 @@ type CreateSchemaByURLInput struct {
 	ProjectID string
 	TeamID    string
 	URL       url.URL
+}
+
+type ListSchemasOutputItem struct {
+	ID        string
+	UserType  string
+	CreatedAt time.Time
 }
 
 // ---- Secondary ports -------------------------------------------------------------
@@ -122,4 +129,37 @@ func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID 
 		return nil, domain.ErrInternal(err).WithMessage("failed to get schema from database")
 	}
 	return schema, nil
+}
+
+func (s *SchemaService) ListSchemas(ctx context.Context, projectID, userType string, offset int, token string) ([]ListSchemasOutputItem, error) {
+	conditions := []database.Condition{
+		s.schemaRepo.ProjectIDCondition(projectID),
+	}
+	if userType != "" {
+		conditions = append(conditions,
+			database.NewJsonBFieldCondition("userType", database.TextOperationEqual, userType),
+		)
+	}
+
+	// TODO: implement pagination
+
+	opts := []database.QueryOption{
+		database.WithCondition(database.And(conditions...)),
+		database.WithOrderByDescending(s.schemaRepo.CreatedAt()),
+	}
+
+	schemas, err := s.schemaRepo.List(ctx, s.pool, opts...)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to list schemas")
+	}
+
+	output := make([]ListSchemasOutputItem, len(schemas), len(schemas))
+	for i, schema := range schemas {
+		output[i] = ListSchemasOutputItem{
+			ID:        schema.URL,
+			CreatedAt: schema.CreatedAt,
+		}
+	}
+
+	return output, nil
 }

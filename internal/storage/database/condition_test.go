@@ -116,6 +116,22 @@ func TestWrite(t *testing.T) {
 			},
 		},
 		{
+			name: "jsonb field text condition",
+			cond: NewJsonBFieldCondition("userType", TextOperationEqual, "worker"),
+			want: want{
+				stmt: "payload->>$1 = $2",
+				args: []any{"userType", "worker"},
+			},
+		},
+		{
+			name: "jsonb field text ignore case condition",
+			cond: NewJsonBFieldCondition("userType", TextOperationEqualIgnoreCase, "Worker"),
+			want: want{
+				stmt: "LOWER(payload->>$1) = LOWER($2)",
+				args: []any{"userType", "Worker"},
+			},
+		},
+		{
 			name: "number condition",
 			cond: NewNumberCondition(NewColumn("table", "column1"), NumberOperationEqual, 42),
 			want: want{

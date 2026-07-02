@@ -63,6 +63,30 @@ func (h *Handler) GetSchemaById(ctx context.Context, params api.GetSchemaByIdPar
 	}, nil
 }
 
+func (h *Handler) ListSchemas(ctx context.Context, params api.ListSchemasParams) (api.ListSchemasRes, error) {
+	schemas, err := h.schemaService.ListSchemas(ctx,
+		string(params.ProjectID),
+		params.UserType.Value,
+		params.Offset.Value,
+		string(params.PageToken.Value),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := make(api.ListSchemasResponse, len(schemas), len(schemas))
+
+	for i, schema := range schemas {
+		resp[i] = api.ListSchemasResponseItem{
+			ID:        schema.ID,
+			UserType:  api.OptString{Value: schema.UserType, Set: true},
+			CreatedAt: schema.CreatedAt,
+		}
+	}
+
+	return &resp, nil
+}
+
 // ------------------ Errors ---------------
 
 func schemaErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
