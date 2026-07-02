@@ -132,7 +132,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	opaqueTokenGenerator := tokengen.NewOpaqueTokenGenerator(crypter)
 
 	// ── Repositories ─────────────────
-	projectRepo := repository.NewProjectRepository(pool)
 	userRepo := repository.NewUserRepository()
 	userPasswordRepo := repository.NewUserPasswordRepository()
 	userPasskeyRepo := repository.NewUserPasskeyRepository()
@@ -172,7 +171,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		pool,
 		attemptRepo,
 		sessionRepo,
-		projectRepo,
 		userRepo,
 		userPasswordRepo,
 		userPasskeyRepo,
@@ -185,7 +183,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	projectService := service.NewProjectService(
 		pool,
 		serviceDBPool,
-		projectRepo,
 		schemaRepo,
 		flowDefinitionRepo,
 		opaqueTokenGenerator,

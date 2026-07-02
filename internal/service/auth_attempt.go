@@ -210,7 +210,6 @@ type authAttemptService struct {
 	pool             database.Pool
 	attempts         domain.AuthAttemptRepository
 	sessions         SessionResolver
-	projects         ProjectLoader
 	users            UserLookup
 	userPasswords    UserPasswords
 	userPasskeys     UserPasskeys
@@ -221,7 +220,6 @@ func NewAuthAttemptService(
 	pool database.Pool,
 	attempts domain.AuthAttemptRepository,
 	sessions SessionResolver,
-	projects ProjectLoader,
 	users UserLookup,
 	userPasswords UserPasswords,
 	userPasskeys UserPasskeys,
@@ -231,7 +229,6 @@ func NewAuthAttemptService(
 		pool:             pool,
 		attempts:         attempts,
 		sessions:         sessions,
-		projects:         projects,
 		users:            users,
 		userPasswords:    userPasswords,
 		userPasskeys:     userPasskeys,

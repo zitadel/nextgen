@@ -53,7 +53,6 @@ type Harness struct {
 	FlowDefinitionRepo domain.FlowDefinitionRepository
 	AuthAttemptRepo    domain.AuthAttemptRepository
 	SessionRepo        domain.SessionRepository
-	ProjectRepo        domain.ProjectRepository
 	UserRepo           domain.UserRepository
 	UserPasswordRepo   domain.UserPasswordRepository
 	UserPasskeyRepo    domain.UserPasskeyRepository

@@ -161,7 +161,6 @@ func TestProjectService_Create(t *testing.T) {
 			svc := service.NewProjectService(
 				stubPool(),
 				service.NewPool(mockPool),
-				nil,
 				schemaRepo,
 				flowDefinitionRepo,
 				tokenGenerator,
@@ -251,7 +250,6 @@ func TestProjectService_Get(t *testing.T) {
 			svc := service.NewProjectService(
 				stubPool(),
 				service.NewPool(mockPool),
-				nil,
 				schemaRepo,
 				flowDefinitionRepo,
 				tokenGenerator,

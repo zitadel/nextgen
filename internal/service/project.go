@@ -27,7 +27,6 @@ type ProjectService interface {
 func NewProjectService(
 	pool database.Pool,
 	v2Pool *DB,
-	repo domain.ProjectRepository,
 	schemaRepo domain.JSONSchemaRepository,
 	flowDefinitionRepo domain.FlowDefinitionRepository,
 	tokenGenerator domain.TokenGenerator,
@@ -37,7 +36,6 @@ func NewProjectService(
 	return &projectService{
 		pool:               pool,
 		v2Pool:             v2Pool,
-		projectRepo:        repo,
 		schemaRepo:         schemaRepo,
 		flowDefinitionRepo: flowDefinitionRepo,
 		tokenGenerator:     tokenGenerator,
@@ -49,7 +47,6 @@ func NewProjectService(
 type projectService struct {
 	pool               database.Pool
 	v2Pool             *DB
-	projectRepo        domain.ProjectRepository
 	schemaRepo         domain.JSONSchemaRepository
 	flowDefinitionRepo domain.FlowDefinitionRepository
 	tokenGenerator     domain.TokenGenerator

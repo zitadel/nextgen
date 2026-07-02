@@ -846,7 +846,7 @@ func TestFlowStateMachine_Process_PasskeyAfterRejectionRebindsIdentifier(t *test
 
 	w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
-			return attemptID == in.AttemptID && "email" == in.AttributeName && email1 == in.Value
+			return attemptID == in.AttemptID && in.AttributeName == "email" && email1 == in.Value
 		})).
 		Return(userID1, nil).
 		Times(1)
@@ -901,7 +901,7 @@ func TestFlowStateMachine_Process_PasskeyAfterRejectionRebindsIdentifier(t *test
 	// was stored, leaving the attempt bound to user1.
 	w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
-			return attemptID == in.AttemptID && "email" == in.AttributeName && email2 == in.Value
+			return attemptID == in.AttemptID && in.AttributeName == "email" && email2 == in.Value
 		})).
 		Return(userID2, nil).
 		Times(1)
@@ -944,7 +944,7 @@ func TestFlowStateMachine_Process_PasskeyResubmitSameIdentifierKeepsPendingChall
 		AnyTimes()
 	w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
-			return attemptID == in.AttemptID && "email" == in.AttributeName && email == in.Value
+			return attemptID == in.AttemptID && in.AttributeName == "email" && email == in.Value
 		})).
 		Return(userID, nil).
 		Times(2)
@@ -1287,7 +1287,7 @@ func TestFlowStateMachine_FlipTable_LoginTypoThenCorrectEmail_StillSignsIn(t *te
 		AnyTimes()
 	w.authAttemptService.EXPECT().
 		SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
-			return attemptID == in.AttemptID && "email" == in.AttributeName && email == in.Value
+			return attemptID == in.AttemptID && in.AttributeName == "email" && email == in.Value
 		})).
 		Return(userID, nil).
 		AnyTimes()
