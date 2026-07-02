@@ -19,9 +19,30 @@ func TestEscapeLikePattern(t *testing.T) {
 func TestLikePattern(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, `acme%`, likePattern(database.StringMatchStartsWith, "acme"))
-	assert.Equal(t, `%login%`, likePattern(database.StringMatchContains, "login"))
-	assert.Equal(t, `%suffix`, likePattern(database.StringMatchEndsWith, "suffix"))
-	assert.Equal(t, `exact`, likePattern(database.StringMatchEqual, "exact"))
-	assert.Equal(t, `%100\%%`, likePattern(database.StringMatchContains, "100%"))
+	var c statementCompiler
+
+	c.Reset()
+	likePattern(&c, database.StringMatchStartsWith, "acme")
+	assert.Equal(t, `$1 || '%'`, c.String())
+	assert.ElementsMatch(t, c.args, []any{"acme"})
+
+	c.Reset()
+	likePattern(&c, database.StringMatchContains, "login")
+	assert.Equal(t, `'%' || $1 || '%'`, c.String())
+	assert.ElementsMatch(t, c.args, []any{"login"})
+
+	c.Reset()
+	likePattern(&c, database.StringMatchEndsWith, "suffix")
+	assert.Equal(t, `'%' || $1`, c.String())
+	assert.ElementsMatch(t, c.args, []any{"suffix"})
+
+	c.Reset()
+	likePattern(&c, database.StringMatchEqual, "exact")
+	assert.Equal(t, `$1`, c.String())
+	assert.ElementsMatch(t, c.args, []any{"exact"})
+
+	c.Reset()
+	likePattern(&c, database.StringMatchContains, "100%")
+	assert.Equal(t, `'%' || $1 || '%'`, c.String())
+	assert.ElementsMatch(t, c.args, []any{"100\\%"})
 }

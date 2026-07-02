@@ -13,6 +13,11 @@ type statementCompiler struct {
 	args []any
 }
 
+func (c *statementCompiler) Reset() {
+	c.Builder.Reset()
+	c.args = nil
+}
+
 func compileRead[F ~uint8, T any](c *statementCompiler, stmt string, opt *database.ListOptions[F], schema database.Schema[F, T]) error {
 	c.WriteString(stmt)
 
@@ -169,7 +174,7 @@ func compileStringFilter[F ~uint8, T any](c *statementCompiler, filter *database
 			writeArg(c, filter.Value)
 		}
 	case database.StringMatchStartsWith, database.StringMatchContains, database.StringMatchEndsWith:
-		pattern := likePattern(filter.Match, filter.Value)
+		likePattern(c, filter.Match, filter.Value)
 		if filter.IgnoreCase {
 			c.WriteString(col)
 			c.WriteString(" ILIKE ")
@@ -177,7 +182,7 @@ func compileStringFilter[F ~uint8, T any](c *statementCompiler, filter *database
 			c.WriteString(col)
 			c.WriteString(" LIKE ")
 		}
-		writeArg(c, pattern)
+		// writeArg(c, pattern)
 	default:
 		panic("unknown string match")
 	}

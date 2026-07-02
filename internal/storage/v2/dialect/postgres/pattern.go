@@ -20,17 +20,21 @@ func escapeLikePattern(value string) string {
 	return b.String()
 }
 
-func likePattern(match database.StringMatch, value string) string {
+func likePattern(c *statementCompiler, match database.StringMatch, value string) {
 	escaped := escapeLikePattern(value)
 	switch match {
 	case database.StringMatchStartsWith:
-		return escaped + "%"
+		writeArg(c, escaped)
+		c.WriteString(" || '%'")
 	case database.StringMatchContains:
-		return "%" + escaped + "%"
+		c.WriteString("'%' || ")
+		writeArg(c, escaped)
+		c.WriteString(" || '%'")
 	case database.StringMatchEndsWith:
-		return "%" + escaped
+		c.WriteString("'%' || ")
+		writeArg(c, escaped)
 	case database.StringMatchEqual:
-		return escaped
+		writeArg(c, escaped)
 	default:
 		panic("unknown string match")
 	}
