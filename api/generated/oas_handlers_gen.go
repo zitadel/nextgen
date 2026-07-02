@@ -6594,7 +6594,7 @@ func (s *Server) handleListSchemasRequest(args [0]string, argsEscaped bool, w ht
 					In:   "query",
 				}: params.PageToken,
 				{
-					Name: "userType",
+					Name: "user_type",
 					In:   "query",
 				}: params.UserType,
 			},

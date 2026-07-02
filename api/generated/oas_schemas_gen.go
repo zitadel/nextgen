@@ -5648,20 +5648,13 @@ func (*ListSchemasResponse) listSchemasRes() {}
 
 type ListSchemasResponseItem struct {
 	// The unique identifier for this user schema.
-	ID string `json:"id"`
-	// The userType to which this schema belongs.
-	UserType  OptString `json:"userType"`
+	ID        string    `json:"id"`
 	CreatedAt time.Time `json:"createdAt"`
 }
 
 // GetID returns the value of ID.
 func (s *ListSchemasResponseItem) GetID() string {
 	return s.ID
-}
-
-// GetUserType returns the value of UserType.
-func (s *ListSchemasResponseItem) GetUserType() OptString {
-	return s.UserType
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -5672,11 +5665,6 @@ func (s *ListSchemasResponseItem) GetCreatedAt() time.Time {
 // SetID sets the value of ID.
 func (s *ListSchemasResponseItem) SetID(val string) {
 	s.ID = val
-}
-
-// SetUserType sets the value of UserType.
-func (s *ListSchemasResponseItem) SetUserType(val OptString) {
-	s.UserType = val
 }
 
 // SetCreatedAt sets the value of CreatedAt.

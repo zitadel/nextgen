@@ -26,7 +26,6 @@ type CreateSchemaByURLInput struct {
 
 type ListSchemasOutputItem struct {
 	ID        string
-	UserType  string
 	CreatedAt time.Time
 }
 

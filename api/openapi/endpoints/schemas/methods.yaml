@@ -86,7 +86,7 @@ get:
     - $ref: ../../components/parameters/offset.yaml
     - $ref: ../../components/parameters/page-token.yaml
       # TODO: user-type is specific for user schemas. The list schemas endpoint works for all kinds of schemas. This should be made more generic
-    - name: userType
+    - name: user_type
       in: query
       description: The userType of the schema to filter by.
       schema:
@@ -97,7 +97,7 @@ get:
         - schema.read
   responses:
     '200':
-      description: A list of schemas was retrieved successfull.
+      description: A list of schemas was retrieved successful.
       content:
         application/json:
           schema:

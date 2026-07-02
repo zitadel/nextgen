@@ -12631,21 +12631,14 @@ func (s *ListSchemasResponseItem) encodeFields(e *jx.Encoder) {
 		e.Str(s.ID)
 	}
 	{
-		if s.UserType.Set {
-			e.FieldStart("userType")
-			s.UserType.Encode(e)
-		}
-	}
-	{
 		e.FieldStart("createdAt")
 		json.EncodeDate(e, s.CreatedAt)
 	}
 }
 
-var jsonFieldsNameOfListSchemasResponseItem = [3]string{
+var jsonFieldsNameOfListSchemasResponseItem = [2]string{
 	0: "id",
-	1: "userType",
-	2: "createdAt",
+	1: "createdAt",
 }
 
 // Decode decodes ListSchemasResponseItem from json.
@@ -12669,18 +12662,8 @@ func (s *ListSchemasResponseItem) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"id\"")
 			}
-		case "userType":
-			if err := func() error {
-				s.UserType.Reset()
-				if err := s.UserType.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"userType\"")
-			}
 		case "createdAt":
-			requiredBitSet[0] |= 1 << 2
+			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
 				v, err := json.DecodeDate(d)
 				s.CreatedAt = v
@@ -12701,7 +12684,7 @@ func (s *ListSchemasResponseItem) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000101,
+		0b00000011,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.

@@ -79,7 +79,6 @@ func (h *Handler) ListSchemas(ctx context.Context, params api.ListSchemasParams)
 	for i, schema := range schemas {
 		resp[i] = api.ListSchemasResponseItem{
 			ID:        schema.ID,
-			UserType:  api.OptString{Value: schema.UserType, Set: true},
 			CreatedAt: schema.CreatedAt,
 		}
 	}

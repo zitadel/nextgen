@@ -5370,9 +5370,9 @@ func (c *Client) sendListSchemas(ctx context.Context, params ListSchemasParams) 
 		}
 	}
 	{
-		// Encode "userType" parameter.
+		// Encode "user_type" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "userType",
+			Name:    "user_type",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}

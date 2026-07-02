@@ -3981,7 +3981,7 @@ func unpackListSchemasParams(packed middleware.Parameters) (params ListSchemasPa
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "userType",
+			Name: "user_type",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
@@ -4163,10 +4163,10 @@ func decodeListSchemasParams(args [0]string, argsEscaped bool, r *http.Request) 
 			Err:  err,
 		}
 	}
-	// Decode query: userType.
+	// Decode query: user_type.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "userType",
+			Name:    "user_type",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
@@ -4226,7 +4226,7 @@ func decodeListSchemasParams(args [0]string, argsEscaped bool, r *http.Request) 
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "userType",
+			Name: "user_type",
 			In:   "query",
 			Err:  err,
 		}
