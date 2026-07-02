@@ -14,9 +14,10 @@ type Client struct {
 }
 
 func newClient(spannerClient *spanner.Client) *Client {
+	executor := newClientExecutor(spannerClient)
 	return &Client{
 		client:     spannerClient,
-		statements: newStatements(spannerClient),
+		statements: newStatements(executor),
 	}
 }
 
@@ -28,27 +29,25 @@ func (c *Client) Close(ctx context.Context) error {
 
 // Ping implements [database.Pool].
 func (c Client) Ping(ctx context.Context) error {
-	// Spanner does not have a built-in ping method, so we execute a simple query to check the connection.
-	iter := c.client.Single().Query(ctx, spanner.NewStatement("SELECT 1"))
+	iter := c.client.Single().Query(ctx, spanner.Statement{SQL: "SELECT 1"})
 	defer iter.Stop()
-	return iter.Do(func(row *spanner.Row) error {
-		return nil
-	})
+	return wrapError(iter.Do(func(*spanner.Row) error { return nil }))
 }
 
-// Transaction implements [database.Pool].
-func (c Client) Transaction(ctx context.Context, fn func(ctx context.Context, tx service.AllStatements) error) error {
+// Transaction implements [service.Transactioner].
+func (c Client) Transaction(ctx context.Context, fn func(ctx context.Context, tx service.Statementer[service.AllStatements]) error) error {
 	_, err := c.client.ReadWriteTransaction(ctx, func(ctx context.Context, rwt *spanner.ReadWriteTransaction) error {
-		return fn(ctx, newTransaction(rwt))
+		tx := newTransaction(rwt)
+		return fn(ctx, tx)
 	})
-	return err
+	return wrapError(err)
 }
 
 func (c Client) Statements() service.AllStatements {
-	return newStatements(c.client)
+	return newStatements(newClientExecutor(c.client))
 }
 
 var (
-	_ database.Pool         = (*Client)(nil)
-	_ service.AllStatements = (*Client)(nil)
+	_ database.Pool = (*Client)(nil)
+	_ service.Pool  = (*Client)(nil)
 )
