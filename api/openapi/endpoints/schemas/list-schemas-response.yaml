@@ -10,4 +10,4 @@ items:
       description: The unique identifier for this user schema.
     createdAt:
       type: string
-      format: date
+      format: date-time
