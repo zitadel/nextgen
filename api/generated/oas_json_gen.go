@@ -12632,7 +12632,7 @@ func (s *ListSchemasResponseItem) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("createdAt")
-		json.EncodeDate(e, s.CreatedAt)
+		json.EncodeDateTime(e, s.CreatedAt)
 	}
 }
 
@@ -12665,7 +12665,7 @@ func (s *ListSchemasResponseItem) Decode(d *jx.Decoder) error {
 		case "createdAt":
 			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
-				v, err := json.DecodeDate(d)
+				v, err := json.DecodeDateTime(d)
 				s.CreatedAt = v
 				if err != nil {
 					return err
