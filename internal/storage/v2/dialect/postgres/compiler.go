@@ -174,15 +174,17 @@ func compileStringFilter[F ~uint8, T any](c *statementCompiler, filter *database
 			writeArg(c, filter.Value)
 		}
 	case database.StringMatchStartsWith, database.StringMatchContains, database.StringMatchEndsWith:
-		likePattern(c, filter.Match, filter.Value)
+		value := filter.Value
 		if filter.IgnoreCase {
+			c.WriteString("LOWER(")
 			c.WriteString(col)
-			c.WriteString(" ILIKE ")
+			c.WriteString(")")
+			value = strings.ToLower(filter.Value)
 		} else {
 			c.WriteString(col)
-			c.WriteString(" LIKE ")
 		}
-		// writeArg(c, pattern)
+		c.WriteString(" LIKE ")
+		compileLikePattern(c, filter.Match, value)
 	default:
 		panic("unknown string match")
 	}

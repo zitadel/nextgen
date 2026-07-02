@@ -96,9 +96,9 @@ func TestCompileReadStringContains(t *testing.T) {
 		Filter: database.StringContains(database.Col(domain.FlowDefinitionFieldName), "login"),
 	})
 
-	assert.Contains(t, sql, "WHERE name LIKE $1")
+	assert.Contains(t, sql, "WHERE name LIKE '%' || $1 || '%'")
 	require.Len(t, args, 1)
-	assert.Equal(t, "%login%", args[0])
+	assert.Equal(t, "login", args[0])
 }
 
 func TestCompileReadCursorDoesNotMutateCallerFilter(t *testing.T) {

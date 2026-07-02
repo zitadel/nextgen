@@ -20,7 +20,7 @@ func escapeLikePattern(value string) string {
 	return b.String()
 }
 
-func likePattern(c *statementCompiler, match database.StringMatch, value string) {
+func compileLikePattern(c *statementCompiler, match database.StringMatch, value string) {
 	escaped := escapeLikePattern(value)
 	switch match {
 	case database.StringMatchStartsWith:
