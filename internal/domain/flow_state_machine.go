@@ -141,14 +141,11 @@ const FlowActionPasskey = "passkey"
 // transition fires once the returned attestation verifies.
 const FlowActionPasskeyRegister = "passkey_register"
 
-// flowBackActionName is the conventional name for the engine-injected
-// back action. The wire contract is kind-driven — clients switch on
-// FlowActionKindBack, never on the literal name — but the engine still
-// needs the name to identify the action in inbound submissions.
+// flowBackActionName is the name the engine emits and expects for the
+// injected back action. Clients switch on FlowActionKindBack, not name.
 const flowBackActionName = "back"
 
-// flowBackActionTextKey is the localization key clients use to render
-// the back action label.
+// flowBackActionTextKey is the localization key for the back label.
 const flowBackActionTextKey = "action.back"
 
 // FlowChallengeMethodPasskey is the [FlowStepChallenge.Method] /
@@ -322,10 +319,8 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	pc := &processCtx{ctx: ctx, client: client, def: def, state: state, currentStep: currentStep, in: in}
 	actionKind := stepActionKind(currentStep, in.Action)
 
-	// The engine-injected back action isn't declared on the step, so
-	// stepActionKind returns zero. Recover its kind when the submission
-	// targets it by name and there's somewhere to pop to. A future
-	// author-declared `back`-named action with a real kind wins above.
+	// Back is engine-injected, so stepActionKind returns zero. Recover
+	// the kind when the submission names it and the stack is non-empty.
 	if actionKind == 0 && in.Action == flowBackActionName && len(state.BackStack) > 0 {
 		actionKind = FlowActionKindBack
 	}
@@ -420,10 +415,8 @@ func (r *FlowStateMachineRuntime) renderStepError(pc *processCtx, resolved FlowR
 // renders (or terminates on a terminal step). When outcome differs
 // from the user-submitted action it came from a handler diversion
 // (e.g. user_not_found); a missing transition in that case degrades
-// to a step error instead of ErrInvalidAction. When irreversible is
-// true (a mutation the user cannot back out of), the back stack is
-// dropped after advance so subsequent steps don't surface `back`
-// across the boundary.
+// to a step error instead of ErrInvalidAction. If irreversible,
+// BackStack is dropped after advance.
 func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowResolvedFields, outcome string, irreversible bool) (FlowStepResult, error) {
 	transition, ok := pc.currentStep.Transitions[outcome]
 	if !ok {
@@ -987,10 +980,8 @@ func (r *FlowStateMachineRuntime) runOnSuccess(pc *processCtx, resolved FlowReso
 	}
 }
 
-// advance moves the flow to nextStepName. prevPurpose is the
-// CurrentPurpose value from before any outcome flip on this
-// transition — recording it on BackStack lets `back` restore both
-// step and purpose together, undoing the flip.
+// advance records the transition. prevPurpose is captured before the
+// outcome flip so `back` can restore both step and purpose.
 func (r *FlowStateMachineRuntime) advance(state *FlowState, prev *FlowDefinitionStep, prevPurpose FlowDefinitionPurpose, nextStepName string) {
 	state.History = append(state.History, prev.Name)
 	state.BackStack = append(state.BackStack, FlowBackEntry{StepName: prev.Name, Purpose: prevPurpose})
@@ -998,12 +989,10 @@ func (r *FlowStateMachineRuntime) advance(state *FlowState, prev *FlowDefinition
 	state.IssuedAt = r.now()
 }
 
-// processBack pops the previous entry off BackStack and re-renders
-// that step, restoring the CurrentPurpose the flow had at the time.
-// The input pipeline is skipped: CollectedData is preserved so the
-// previous step prefills, and any pending ceremony is dropped since
-// its challenge id was bound to the step the user is leaving. History
-// is left intact — that's the audit trail, not the navigation cursor.
+// processBack pops the previous BackStack entry and re-renders that
+// step, restoring the snapshotted purpose. CollectedData is preserved
+// (previous form prefills); PendingChallenge is dropped; History is
+// left intact.
 func (r *FlowStateMachineRuntime) processBack(pc *processCtx) (FlowStepResult, error) {
 	if len(pc.state.BackStack) == 0 {
 		return FlowStepResult{}, fmt.Errorf("%w: back submitted with empty back stack on step %q", ErrInvalidAction, pc.state.CurrentStep)
@@ -1148,9 +1137,7 @@ func (r *FlowStateMachineRuntime) buildStep(state *FlowState, step *FlowDefiniti
 			Primary: a.Primary,
 		})
 	}
-	// Inject the engine-provided back action when the user has
-	// somewhere reversible to return to and the step is not terminal.
-	// Clients identify it by kind, not by the conventional name.
+	// Inject `back` when there's somewhere to return to.
 	if len(state.BackStack) > 0 && step.Complete == nil {
 		actions = append(actions, FlowAction{
 			Name:    flowBackActionName,

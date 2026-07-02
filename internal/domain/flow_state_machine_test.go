@@ -2298,6 +2298,15 @@ func findBackAction(step *domain.FlowStep) *domain.FlowAction {
 	return nil
 }
 
+func findFieldByName(fields []domain.FlowField, name string) *domain.FlowField {
+	for i, f := range fields {
+		if f.Name == name {
+			return &fields[i]
+		}
+	}
+	return nil
+}
+
 func TestFlowStateMachine_Back_NotInjectedOnInitialStep(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)
@@ -2414,8 +2423,7 @@ func TestFlowStateMachine_Back_EmptyBackStackRejected(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// A client synthesizing action=back on the initial step (stale cookie
-	// or malicious submit) must be rejected — the action was never injected.
+	// Client-synthesized back on the initial step must be rejected.
 	_, err = w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{Action: "back"})
 	require.Error(t, err)
 	assert.ErrorIs(t, err, domain.ErrInvalidAction)
@@ -2472,11 +2480,9 @@ func loginRegisterFlipDefinition() *domain.FlowDefinition {
 	}
 }
 
-// TestFlowStateMachine_Back_RestoresPurposeAfterFlip pins the bug where
-// back-nav landed the user on the previous step but left CurrentPurpose
-// flipped: a subsequent submit of the same unknown identifier would
-// then skip the user_not_found path and route as if the user existed.
-// Back must restore both step and purpose.
+// TestFlowStateMachine_Back_RestoresPurposeAfterFlip regresses a bug
+// where back popped the step but left CurrentPurpose flipped, so a
+// re-submit of the same unknown identifier bypassed user_not_found.
 func TestFlowStateMachine_Back_RestoresPurposeAfterFlip(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)
@@ -2536,9 +2542,7 @@ func TestFlowStateMachine_Back_StackClearedAfterCreateUser(t *testing.T) {
 		SubmitIdentifier(gomock.Any(), gomock.Any()).
 		Return("", domain.ErrAuthAttemptProofRejected(nil)).
 		Times(1)
-	// The create_user handler returns Irreversible: true; that signal is
-	// what this test pins down. Production handlers (password + passkey)
-	// classify their advance as irreversible too.
+	// create_user signals Irreversible on success; test pins the signal.
 	w.createUser.EXPECT().
 		Handle(gomock.Any(), gomock.Any()).
 		Return(domain.FlowOnSuccessResult{UserID: userID, Irreversible: true}, nil)
@@ -2568,4 +2572,131 @@ func TestFlowStateMachine_Back_StackClearedAfterCreateUser(t *testing.T) {
 	// create_user signaled an irreversible mutation.
 	assert.Equal(t, []string{"credentials"}, result.State.History)
 	assert.Empty(t, result.State.BackStack, "an irreversible on_success must drop the back stack")
+}
+
+// navigateThreeStepDefinition chains three navigable steps to a
+// terminal, so a multi-hop back can pop the stack progressively.
+func navigateThreeStepDefinition() *domain.FlowDefinition {
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-back-nav-3",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "step1",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{Name: "step1", Actions: []domain.FlowStepAction{{Name: "go", Kind: domain.FlowActionKindNavigate, Primary: true}}, Transitions: map[string]domain.FlowStepTransition{"go": {Target: "step2"}}},
+			{Name: "step2", Actions: []domain.FlowStepAction{{Name: "go", Kind: domain.FlowActionKindNavigate, Primary: true}}, Transitions: map[string]domain.FlowStepTransition{"go": {Target: "step3"}}},
+			{Name: "step3", Actions: []domain.FlowStepAction{{Name: "go", Kind: domain.FlowActionKindNavigate, Primary: true}}, Transitions: map[string]domain.FlowStepTransition{"go": {Target: "done"}}},
+			{Name: "done", Complete: &show},
+		},
+	}
+}
+
+func TestFlowStateMachine_Back_MultiHopPopsProgressively(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := navigateThreeStepDefinition()
+
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	s2, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{Action: "go"})
+	require.NoError(t, err)
+	s3, err := w.sm.Process(t.Context(), nil, def, s2.State, domain.FlowSubmitInput{Action: "go"})
+	require.NoError(t, err)
+	require.Equal(t, "step3", s3.Step.Name)
+	require.Len(t, s3.State.BackStack, 2)
+
+	back1, err := w.sm.Process(t.Context(), nil, def, s3.State, domain.FlowSubmitInput{Action: "back"})
+	require.NoError(t, err)
+	assert.Equal(t, "step2", back1.Step.Name)
+	require.Len(t, back1.State.BackStack, 1)
+	assert.NotNil(t, findBackAction(back1.Step))
+
+	back2, err := w.sm.Process(t.Context(), nil, def, back1.State, domain.FlowSubmitInput{Action: "back"})
+	require.NoError(t, err)
+	assert.Equal(t, "step1", back2.Step.Name)
+	assert.Empty(t, back2.State.BackStack)
+	assert.Nil(t, findBackAction(back2.Step), "back must be absent on the initial step after popping to it")
+	// History records every forward visit; back does not rewind it.
+	assert.Equal(t, []string{"step1", "step2"}, back2.State.History)
+}
+
+func TestFlowStateMachine_Back_PreservesCollectedData(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := loginRegisterFlipDefinition()
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att-1", nil)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		Return("", domain.ErrAuthAttemptProofRejected(nil)).
+		Times(1)
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	const email = "ghost@example.com"
+	afterSubmit, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": email},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "register", afterSubmit.Step.Name)
+
+	afterBack, err := w.sm.Process(t.Context(), nil, def, afterSubmit.State, domain.FlowSubmitInput{Action: "back"})
+	require.NoError(t, err)
+	require.Equal(t, "identifier", afterBack.Step.Name)
+	// The email survives back so the previous form pre-fills.
+	assert.Equal(t, email, afterBack.State.CollectedData.UserData["email"])
+	require.NotEmpty(t, afterBack.Step.Fields)
+	if emailField := findFieldByName(afterBack.Step.Fields, "email"); assert.NotNil(t, emailField) && emailField.Value != nil {
+		assert.Equal(t, email, *emailField.Value, "identifier step must prefill from CollectedData on back")
+	}
+}
+
+func TestFlowStateMachine_Back_DropsPendingChallenge(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := navigateOnlyDefinition()
+
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	advanced, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{Action: "go"})
+	require.NoError(t, err)
+
+	// Simulate a ceremony pending on step2. The challenge id is bound to
+	// step2; back must drop it so a downstream verify can't resurrect it
+	// against a different step.
+	advanced.State.PendingChallenge = &domain.FlowPendingChallenge{ID: "ch-1", Method: domain.FlowChallengeMethodPasskey}
+
+	afterBack, err := w.sm.Process(t.Context(), nil, def, advanced.State, domain.FlowSubmitInput{Action: "back"})
+	require.NoError(t, err)
+	assert.Equal(t, "step1", afterBack.Step.Name)
+	assert.Nil(t, afterBack.State.PendingChallenge, "back must drop the pending challenge")
 }

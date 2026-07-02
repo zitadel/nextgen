@@ -139,19 +139,13 @@ type FlowProgress struct {
 	// step.
 	CurrentStep string
 
-	// History is the append-only list of step names the user has
-	// visited within this progress entry (excluding any parents on
-	// PivotStack). Preserved across irreversible operations so helpers
-	// that inspect the visitation trail stay correct.
+	// History is the append-only audit trail of visited steps.
+	// Preserved across irreversible operations.
 	History []string
 
-	// BackStack is the stack the user can return through via the
-	// engine-injected `back` action. Each entry captures the step name
-	// and the CurrentPurpose it had at the time of advance, so back can
-	// restore both together (undoing any purpose flip that ran on the
-	// forward transition). Cleared after an irreversible operation
-	// (user creation, credential rotation) so back never crosses a
-	// mutation boundary.
+	// BackStack is the navigation cursor for the engine-injected
+	// `back` action. Cleared after an irreversible operation so back
+	// never crosses a mutation boundary.
 	BackStack []FlowBackEntry
 
 	// CollectedData accumulates submitted field values for this
@@ -160,8 +154,8 @@ type FlowProgress struct {
 	CollectedData CollectedFlowData
 }
 
-// FlowBackEntry pins a step and the purpose the flow had when it was
-// left. When the user clicks back the engine restores both.
+// FlowBackEntry is a BackStack frame. Purpose is snapshotted so back
+// can undo any outcome flip that ran on the forward transition.
 type FlowBackEntry struct {
 	StepName string
 	Purpose  FlowDefinitionPurpose

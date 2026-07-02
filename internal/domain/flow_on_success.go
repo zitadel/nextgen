@@ -51,9 +51,7 @@ type FlowOnSuccessResult struct {
 	// UserID is set when a handler creates a new user. The state machine
 	// records it and registers the user on the auth attempt.
 	UserID string
-	// Irreversible flags mutations the user cannot back out of (created a
-	// user, rotated a credential). The engine drops the runtime back
-	// stack after advance so subsequent steps don't surface `back`
-	// across the mutation boundary.
+	// Irreversible flags mutations the user cannot back out of
+	// (e.g. created a user). The engine drops BackStack after advance.
 	Irreversible bool
 }
