@@ -141,6 +141,7 @@ export const it: Locale = {
   // --- Azioni condivise ---
   "submit.continue": "Continua",
   "submit.signin": "Accedi",
+  "action.back": "Indietro",
   "action.forgot_password": "Password dimenticata?",
   "action.cancel": "Annulla",
 

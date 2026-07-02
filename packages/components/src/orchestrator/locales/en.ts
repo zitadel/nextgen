@@ -148,6 +148,7 @@ export const en: Record<string, string> = {
   // --- Shared actions ---
   "submit.continue": "Continue",
   "submit.signin": "Sign in",
+  "action.back": "Back",
   "action.forgot_password": "Forgot password?",
   "action.cancel": "Cancel",
 

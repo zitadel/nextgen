@@ -143,6 +143,7 @@ export const de: Locale = {
   // --- Gemeinsame Aktionen ---
   "submit.continue": "Weiter",
   "submit.signin": "Anmelden",
+  "action.back": "Zurück",
   "action.forgot_password": "Passwort vergessen?",
   "action.cancel": "Abbrechen",
 
