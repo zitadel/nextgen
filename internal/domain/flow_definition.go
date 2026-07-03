@@ -308,3 +308,21 @@ type FlowStepTransition struct {
 func (fst FlowStepTransition) IsCurrentFlow() bool {
 	return fst.Action == nil
 }
+
+// FlowDefinitionField enumerates the fields of FlowDefinition which can be used for ordering in list operations.
+type FlowDefinitionField uint8
+
+const (
+	FlowDefinitionFieldUnspecified FlowDefinitionField = iota
+	FlowDefinitionFieldProjectID
+	FlowDefinitionFieldID
+	FlowDefinitionFieldName
+	FlowDefinitionFieldSchemaVersion
+	FlowDefinitionFieldStatus
+	FlowDefinitionFieldCreatedAt
+	FlowDefinitionFieldUpdatedAt
+	FlowDefinitionFieldUserSchema
+	FlowDefinitionFieldPurposes
+	FlowDefinitionFieldAudience
+	FlowDefinitionFieldSteps
+)

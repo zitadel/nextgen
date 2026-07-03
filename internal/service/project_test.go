@@ -11,6 +11,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/service"
+	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/dbmock"
 	"go.uber.org/mock/gomock"
@@ -20,10 +21,10 @@ func TestProjectService_Create(t *testing.T) {
 	tests := []struct {
 		name                    string
 		previewOrigins          []string
-		setupProjectRepo        func(*domainmock.MockProjectRepository)
+		setupStatements         func(*domain.Project) testAllStatements
 		setupSchemaRepo         func(*domainmock.MockJSONSchemaRepository)
-		setupFlowDefinitionRepo func(call *domainmock.MockFlowDefinitionRepository)
-		setupPool               func(*dbmock.MockPool, *dbmock.MockTransaction)
+		setupFlowDefinitionRepo func(*domainmock.MockFlowDefinitionRepository)
+		setupPool               func(*servicemocks.MockPool, *dbmock.MockTransaction, testAllStatements)
 		setupTokenGenerator     func(generator *domainmock.MockTokenGenerator)
 		wantErr                 bool
 		check                   func(t *testing.T, got *domain.Project)
@@ -31,12 +32,12 @@ func TestProjectService_Create(t *testing.T) {
 		{
 			name:           "ok — no preview origins",
 			previewOrigins: nil,
-			setupProjectRepo: func(r *domainmock.MockProjectRepository) {
-				r.EXPECT().
-					Create(gomock.Any(), gomock.Any(), gomock.Any()).
-					DoAndReturn(func(_ context.Context, _ database.QueryExecutor, p *domain.Project) error {
+			setupStatements: func(_ *domain.Project) testAllStatements {
+				return testAllStatements{
+					createProject: func(_ context.Context, _ *domain.Project) error {
 						return nil
-					})
+					},
+				}
 			},
 			setupSchemaRepo: func(r *domainmock.MockJSONSchemaRepository) {
 				r.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any())
@@ -44,9 +45,15 @@ func TestProjectService_Create(t *testing.T) {
 			setupFlowDefinitionRepo: func(r *domainmock.MockFlowDefinitionRepository) {
 				r.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any())
 			},
-			setupPool: func(pool *dbmock.MockPool, transaction *dbmock.MockTransaction) {
-				pool.EXPECT().Begin(gomock.Any(), gomock.Any()).Return(transaction, nil)
-				transaction.EXPECT().Commit(gomock.Any())
+			setupPool: func(pool *servicemocks.MockPool, transaction *dbmock.MockTransaction, statements testAllStatements) {
+				pool.EXPECT().
+					Transaction(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+						return fn(ctx, v2TestTx{
+							QueryExecutor: transaction,
+							stmts:         statements,
+						})
+					})
 			},
 			setupTokenGenerator: func(generator *domainmock.MockTokenGenerator) {
 				generator.EXPECT().
@@ -60,13 +67,13 @@ func TestProjectService_Create(t *testing.T) {
 		{
 			name:           "ok — with preview origins",
 			previewOrigins: []string{"*.vercel.app", "*.netlify.app"},
-			setupProjectRepo: func(r *domainmock.MockProjectRepository) {
-				r.EXPECT().
-					Create(gomock.Any(), gomock.Any(), gomock.Any()).
-					DoAndReturn(func(_ context.Context, _ database.QueryExecutor, p *domain.Project) error {
-						assert.Equal(t, []string{"*.vercel.app", "*.netlify.app"}, p.PreviewOrigins)
+			setupStatements: func(_ *domain.Project) testAllStatements {
+				return testAllStatements{
+					createProject: func(_ context.Context, project *domain.Project) error {
+						assert.Equal(t, []string{"*.vercel.app", "*.netlify.app"}, project.PreviewOrigins)
 						return nil
-					})
+					},
+				}
 			},
 			setupSchemaRepo: func(r *domainmock.MockJSONSchemaRepository) {
 				r.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any())
@@ -74,9 +81,15 @@ func TestProjectService_Create(t *testing.T) {
 			setupFlowDefinitionRepo: func(r *domainmock.MockFlowDefinitionRepository) {
 				r.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any())
 			},
-			setupPool: func(pool *dbmock.MockPool, transaction *dbmock.MockTransaction) {
-				pool.EXPECT().Begin(gomock.Any(), gomock.Any()).Return(transaction, nil)
-				transaction.EXPECT().Commit(gomock.Any())
+			setupPool: func(pool *servicemocks.MockPool, transaction *dbmock.MockTransaction, statements testAllStatements) {
+				pool.EXPECT().
+					Transaction(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+						return fn(ctx, v2TestTx{
+							QueryExecutor: transaction,
+							stmts:         statements,
+						})
+					})
 			},
 			setupTokenGenerator: func(generator *domainmock.MockTokenGenerator) {
 				generator.EXPECT().
@@ -88,16 +101,24 @@ func TestProjectService_Create(t *testing.T) {
 			},
 		},
 		{
-			name:           "repo Create error",
+			name:           "CreateProject error",
 			previewOrigins: nil,
-			setupProjectRepo: func(r *domainmock.MockProjectRepository) {
-				r.EXPECT().
-					Create(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(errors.New("db error"))
+			setupStatements: func(_ *domain.Project) testAllStatements {
+				return testAllStatements{
+					createProject: func(_ context.Context, _ *domain.Project) error {
+						return errors.New("db error")
+					},
+				}
 			},
-			setupPool: func(pool *dbmock.MockPool, transaction *dbmock.MockTransaction) {
-				pool.EXPECT().Begin(gomock.Any(), gomock.Any()).Return(transaction, nil)
-				transaction.EXPECT().Rollback(gomock.Any())
+			setupPool: func(pool *servicemocks.MockPool, transaction *dbmock.MockTransaction, statements testAllStatements) {
+				pool.EXPECT().
+					Transaction(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+						return fn(ctx, v2TestTx{
+							QueryExecutor: transaction,
+							stmts:         statements,
+						})
+					})
 			},
 			setupTokenGenerator: func(generator *domainmock.MockTokenGenerator) {
 				generator.EXPECT().
@@ -111,9 +132,8 @@ func TestProjectService_Create(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			pool := dbmock.NewMockPool(ctrl)
+			mockPool := servicemocks.NewMockPool(ctrl)
 			transaction := dbmock.NewMockTransaction(ctrl)
-			projectRepo := domainmock.NewMockProjectRepository(ctrl)
 			schemaRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
 			flowDefinitionRepo := domainmock.NewMockFlowDefinitionRepository(ctrl)
 			const baseURL = "https://example.com/api/schemas"
@@ -121,7 +141,10 @@ func TestProjectService_Create(t *testing.T) {
 			require.NoError(t, err)
 			tokenGenerator := domainmock.NewMockTokenGenerator(ctrl)
 
-			tc.setupProjectRepo(projectRepo)
+			statements := testAllStatements{}
+			if tc.setupStatements != nil {
+				statements = tc.setupStatements(nil)
+			}
 			if tc.setupSchemaRepo != nil {
 				tc.setupSchemaRepo(schemaRepo)
 			}
@@ -129,15 +152,15 @@ func TestProjectService_Create(t *testing.T) {
 				tc.setupFlowDefinitionRepo(flowDefinitionRepo)
 			}
 			if tc.setupPool != nil {
-				tc.setupPool(pool, transaction)
+				tc.setupPool(mockPool, transaction, statements)
 			}
 			if tc.setupTokenGenerator != nil {
 				tc.setupTokenGenerator(tokenGenerator)
 			}
 
 			svc := service.NewProjectService(
-				pool,
-				projectRepo,
+				stubPool(),
+				service.NewPool(mockPool),
 				schemaRepo,
 				flowDefinitionRepo,
 				tokenGenerator,
@@ -162,23 +185,30 @@ func TestProjectService_Get(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	tests := []struct {
-		name      string
-		id        string
-		setupRepo func(*domainmock.MockProjectRepository)
-		wantErr   bool
-		check     func(t *testing.T, got *domain.Project)
+		name            string
+		id              string
+		setupStatements func(string) testAllStatements
+		setupPool       func(*servicemocks.MockPool, testAllStatements)
+		wantErr         bool
+		check           func(t *testing.T, got *domain.Project)
 	}{
 		{
 			name: "ok",
 			id:   "proj_aaa",
-			setupRepo: func(r *domainmock.MockProjectRepository) {
-				r.EXPECT().
-					Get(gomock.Any(), gomock.Any(), "proj_aaa").
-					Return(&domain.Project{
-						ID:        "proj_aaa",
-						CreatedAt: now,
-						UpdatedAt: now,
-					}, nil)
+			setupStatements: func(id string) testAllStatements {
+				return testAllStatements{
+					getProjectByID: func(_ context.Context, gotID string) (*domain.Project, error) {
+						assert.Equal(t, id, gotID)
+						return &domain.Project{
+							ID:        "proj_aaa",
+							CreatedAt: now,
+							UpdatedAt: now,
+						}, nil
+					},
+				}
+			},
+			setupPool: func(pool *servicemocks.MockPool, statements testAllStatements) {
+				pool.EXPECT().Statements().Return(statements)
 			},
 			check: func(t *testing.T, got *domain.Project) {
 				assert.Equal(t, "proj_aaa", got.ID)
@@ -188,10 +218,16 @@ func TestProjectService_Get(t *testing.T) {
 		{
 			name: "not found",
 			id:   "proj_missing",
-			setupRepo: func(r *domainmock.MockProjectRepository) {
-				r.EXPECT().
-					Get(gomock.Any(), gomock.Any(), "proj_missing").
-					Return(nil, database.NewNoRowFoundError(nil))
+			setupStatements: func(id string) testAllStatements {
+				return testAllStatements{
+					getProjectByID: func(_ context.Context, gotID string) (*domain.Project, error) {
+						assert.Equal(t, id, gotID)
+						return nil, database.NewNoRowFoundError(nil)
+					},
+				}
+			},
+			setupPool: func(pool *servicemocks.MockPool, statements testAllStatements) {
+				pool.EXPECT().Statements().Return(statements)
 			},
 			wantErr: true,
 		},
@@ -200,18 +236,20 @@ func TestProjectService_Get(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			projectRepo := domainmock.NewMockProjectRepository(ctrl)
+			mockPool := servicemocks.NewMockPool(ctrl)
 			schemaRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
 			flowDefinitionRepo := domainmock.NewMockFlowDefinitionRepository(ctrl)
 			const baseURL = "https://example.com"
 			schemaValidator, err := domain.NewSchemaValidator(baseURL)
 			require.NoError(t, err)
-			tc.setupRepo(projectRepo)
 			tokenGenerator := domainmock.NewMockTokenGenerator(ctrl)
+
+			statements := tc.setupStatements(tc.id)
+			tc.setupPool(mockPool, statements)
 
 			svc := service.NewProjectService(
 				stubPool(),
-				projectRepo,
+				service.NewPool(mockPool),
 				schemaRepo,
 				flowDefinitionRepo,
 				tokenGenerator,
