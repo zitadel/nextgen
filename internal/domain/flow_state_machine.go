@@ -447,77 +447,51 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 	return FlowStepResult{State: pc.state, Step: step}, nil
 }
 
-// pipelineOutcome bundles the result of runDispatchAndOnSuccess. If
-// Halt is non-nil, the caller returns it immediately; otherwise
-// Outcome names the transition to follow and Irreversible tells the
-// caller whether to drop the back stack on advance.
-type pipelineOutcome struct {
-	Outcome      string
-	Irreversible bool
-	Halt         *FlowStepResult
-}
-
-// runDispatchAndOnSuccess runs the identifier + password dispatch and,
-// if the step declares one, its on_success handler. Shared by
-// processSubmit and the passkey abandonment fallback.
-func (r *FlowStateMachineRuntime) runDispatchAndOnSuccess(pc *processCtx, resolved FlowResolvedFields) (pipelineOutcome, error) {
-	dispatch, err := r.dispatchChallenges(pc, resolved)
-	if err != nil {
-		return pipelineOutcome{}, err
-	}
-	if dispatch.StepError != nil {
-		halt := r.renderStepError(pc, resolved, dispatch.StepError)
-		return pipelineOutcome{Halt: &halt}, nil
-	}
-	if dispatch.Outcome != "" {
-		return pipelineOutcome{Outcome: dispatch.Outcome}, nil
-	}
-
-	if pc.currentStep.OnSuccess == nil {
-		return pipelineOutcome{Outcome: pc.in.Action}, nil
-	}
-
-	// on_success reads across every visited step, not just the current one.
-	visitedResolved, err := r.resolveVisitedFields(pc)
-	if err != nil {
-		return pipelineOutcome{}, err
-	}
-	result, err := r.runOnSuccess(pc, visitedResolved)
-	if err != nil {
-		return pipelineOutcome{}, err
-	}
-	if result.StepError != nil {
-		halt := r.renderStepError(pc, resolved, result.StepError)
-		return pipelineOutcome{Halt: &halt}, nil
-	}
-	outcome := pc.in.Action
-	if result.Outcome != "" {
-		outcome = result.Outcome
-	}
-	if result.UserID != "" {
-		recordResolvedUser(pc.state, result.UserID)
-		if err := r.authAttempts.RegisterCreatedUser(pc.ctx, FlowRegisterCreatedUserInput{
-			ProjectID: pc.state.ProjectID,
-			AttemptID: pc.state.AuthAttemptID,
-			UserID:    result.UserID,
-		}); err != nil {
-			return pipelineOutcome{}, fmt.Errorf("flow state machine: register created user on attempt: %w", err)
-		}
-	}
-
-	return pipelineOutcome{Outcome: outcome, Irreversible: result.Irreversible}, nil
-}
-
-// processSubmit handles kind=submit — dispatch + on_success + route.
+// processSubmit handles kind=submit: dispatch challenges, run
+// on_success (if declared), and route the resulting outcome.
 func (r *FlowStateMachineRuntime) processSubmit(pc *processCtx, resolved FlowResolvedFields) (FlowStepResult, error) {
-	pipe, err := r.runDispatchAndOnSuccess(pc, resolved)
+	outcome := pc.in.Action
+	irreversible := false
+
+	dispatch, err := r.dispatchChallenges(pc, resolved)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
-	if pipe.Halt != nil {
-		return *pipe.Halt, nil
+	if dispatch.StepError != nil {
+		return r.renderStepError(pc, resolved, dispatch.StepError), nil
 	}
-	return r.routeOutcome(pc, resolved, pipe.Outcome, pipe.Irreversible)
+	if dispatch.Outcome != "" {
+		outcome = dispatch.Outcome
+	} else if pc.currentStep.OnSuccess != nil {
+		// on_success reads across every visited step, not just the current one.
+		visitedResolved, err := r.resolveVisitedFields(pc)
+		if err != nil {
+			return FlowStepResult{}, err
+		}
+		result, err := r.runOnSuccess(pc, visitedResolved)
+		if err != nil {
+			return FlowStepResult{}, err
+		}
+		if result.StepError != nil {
+			return r.renderStepError(pc, resolved, result.StepError), nil
+		}
+		if result.Outcome != "" {
+			outcome = result.Outcome
+		}
+		if result.UserID != "" {
+			recordResolvedUser(pc.state, result.UserID)
+			if err := r.authAttempts.RegisterCreatedUser(pc.ctx, FlowRegisterCreatedUserInput{
+				ProjectID: pc.state.ProjectID,
+				AttemptID: pc.state.AuthAttemptID,
+				UserID:    result.UserID,
+			}); err != nil {
+				return FlowStepResult{}, fmt.Errorf("flow state machine: register created user on attempt: %w", err)
+			}
+		}
+		irreversible = result.Irreversible
+	}
+
+	return r.routeOutcome(pc, resolved, outcome, irreversible)
 }
 
 // processPasskeyLogin handles kind=passkey. The issue leg runs
