@@ -34,7 +34,7 @@ By default, provide some standard claims:
 {
   "iss": "https://auth.example.com",
   "sub": "123456789",
-  "aud": "the_audience_",
+  "aud": ["the_audience_"],
   "iat": 1516299022,
   "exp": 1516239022,
   "scope": "openid email"
