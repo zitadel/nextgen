@@ -56,10 +56,10 @@ server can validate whether the session/user is still active.
 
 ### Storage
 
-All tokens should be stored in the server because the need to be able to be 
+All tokens should be stored in the server because the need to be able to be
 revoked. The storage of these tokens is minimal. Only the token-id. All other
 information can be retrieved from the token itself. Since all tokens are signed
-we can trust the information which is encoded in them, we only need to ensure 
+we can trust the information which is encoded in them, we only need to ensure
 the tokens are active.
 
 Once a token is revoked, we can mark the token as inactive in the database which
@@ -74,11 +74,11 @@ returned. This token can be used for the next refresh.
 
 [RFC7009 for token revokation](https://datatracker.ietf.org/doc/html/rfc7009#section-2.1)
 states:
- 
-> The invalidation takes place immediately, and the token cannot be used again 
+
+> The invalidation takes place immediately, and the token cannot be used again
 > after the revocation.
 
-However, experience learns that some clients do not handle this well. Therefore, 
+However, experience learns that some clients do not handle this well. Therefore,
 The revokation endpoint will be idempotent.
 
 ### Revocation propagation & invalidation semantics
@@ -90,6 +90,11 @@ via two distinct operational models.
 1. First-Party Surfaces (Immediate): Session tokens evaluate directly against
    the server on every single call. Administrative lockouts or logouts take
    effect instantly on all first-party UI/UX applications.
-2. Third-Party Edges (Eventually Consistent): Active Access Tokens cannot be
-   revoked once published validated offline. They naturally burn out at the end
-   of their 5-minute lifespan.
+2. Third-Party Edges (Eventually Consistent): 
+   - Active Access Tokens can be revoked but because of their self-contained
+     nature, and not all clients using token introspection via the api, clients
+     will still use them but naturally burn out at the end of their lifespan. 
+     Opaque access tokens do need to be introspected via the api, so they can
+     be revoked and won't be valid anymore immediately.
+   - Refresh tokens and PATs need to be exchanged for access-tokens. So once
+     they are revoked they won't be usable anymore and access has been revoked.
