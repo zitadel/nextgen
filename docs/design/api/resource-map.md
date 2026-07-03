@@ -183,12 +183,29 @@ POST   /flow-definitions/{id}/simulate
 
 ## Events and audit
 
+Unified wide-event audit stream. See [ADR 029](../../adrs/029-wide-events-internal-audit-primitive.md)
+(internal model) and [ADR 030](../../adrs/030-events-api-retention-export.md) (API,
+retention, export).
+
 ```http
-/events/{id}                             # identity events (sign-in, password change)
-/events?project_id=…
-/audit_events/{id}                       # admin/configuration changes
-/audit_events?team_id=…
+GET /events/{id}
+GET /events?project_id=…
+         &category=…          # request | auth | session | admin | entity | signal
+         &event_type=…
+         &actor_id=…
+         &client_id=…
+         &session_id=…
+         &flow_id=…
+         &request_id=…
+         &fingerprint=…
+         &created_after=…
+         &created_before=…
+         &page_token=…
 ```
+
+`category=admin` covers admin and configuration changes (formerly sketched as
+`/audit_events`). `category=auth` and `category=session` cover sign-in, token,
+and session lifecycle events.
 
 ---
 
@@ -282,7 +299,10 @@ Draft request/response sketches for this design PR:
 - [`../flowengine/api/flow-api.yaml`](../flowengine/api/flow-api.yaml) — flow engine runtime.
 - [`../flowengine/api/session-api.yaml`](../flowengine/api/session-api.yaml) — sessions.
 
-auth_attempts, api_keys (flat), events, audit_events, imports, capabilities: **TODO — not yet specified.**
+auth_attempts, api_keys (flat), imports, capabilities: **TODO — not yet specified.**
+
+events: partially specified via [ADR 030](../../adrs/030-events-api-retention-export.md);
+OpenAPI sketch pending.
 
 Implementation OpenAPI source remains under `api/openapi/**`; generated Go code
 continues to come from that source, not from these design sketches.

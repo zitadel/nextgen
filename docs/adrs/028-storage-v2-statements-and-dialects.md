@@ -322,6 +322,7 @@ entries when no longer useful.
 | [011 Resource Identifiers](011-resource-identifiers.md) | ADR 027 refines § Package roles: `Identity` + ID generation move to v2 dialects |
 | [008 Users EAV Store](008-users-eav-store.md) | EAV SQL may remain specialized; port to v2 statements |
 | [010 Session/Auth Attempt](010-session-auth-attempt-check-model.md) | Future v2 port target |
+| [029 Wide Events](029-wide-events-internal-audit-primitive.md) | Event emission on v2 statement mutations; `EventStatements.InsertEvent` |
 
 ## Consequences
 
