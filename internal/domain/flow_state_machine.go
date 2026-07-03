@@ -476,10 +476,6 @@ func (r *FlowStateMachineRuntime) processSubmit(pc *processCtx, resolved FlowRes
 	if result.StepError != nil {
 		return r.renderStepError(pc, resolved, result.StepError), nil
 	}
-	outcome := pc.in.Action
-	if result.Outcome != "" {
-		outcome = result.Outcome
-	}
 	if result.UserID != "" {
 		recordResolvedUser(pc.state, result.UserID)
 		if err := r.authAttempts.RegisterCreatedUser(pc.ctx, FlowRegisterCreatedUserInput{
@@ -490,7 +486,7 @@ func (r *FlowStateMachineRuntime) processSubmit(pc *processCtx, resolved FlowRes
 			return FlowStepResult{}, fmt.Errorf("flow state machine: register created user on attempt: %w", err)
 		}
 	}
-	return r.routeOutcome(pc, resolved, outcome, result.Irreversible)
+	return r.routeOutcome(pc, resolved, pc.in.Action, result.Irreversible)
 }
 
 // processPasskeyLogin handles kind=passkey. The issue leg runs
