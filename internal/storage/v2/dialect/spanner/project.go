@@ -24,7 +24,7 @@ var projectColumns = []string{
 
 type projectStatements struct{ statement }
 
-func newProjectStatements(db spannerDB) projectStatements {
+func newProjectStatements(db queryExecutor) projectStatements {
 	return projectStatements{
 		statement: statement{
 			db: db,

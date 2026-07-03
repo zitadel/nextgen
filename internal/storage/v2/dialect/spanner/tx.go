@@ -16,23 +16,23 @@ type transaction struct {
 }
 
 // Exec implements [database.QueryExecutor].
-func (t transaction) Exec(ctx context.Context, stmt string, args ...any) (int64, error) {
+func (tx transaction) Exec(ctx context.Context, stmt string, args ...any) (int64, error) {
 	s := buildStatementFromPostgresSQL(stmt, args).statement()
-	n, err := t.txn.Update(ctx, s)
+	n, err := tx.txn.Update(ctx, s)
 	return n, wrapError(err)
 }
 
 // Query implements [database.QueryExecutor].
-func (t transaction) Query(ctx context.Context, stmt string, args ...any) (dbold.Rows, error) {
+func (tx transaction) Query(ctx context.Context, stmt string, args ...any) (dbold.Rows, error) {
 	s := buildStatementFromPostgresSQL(stmt, args).statement()
-	iter := t.txn.Query(ctx, s)
+	iter := tx.txn.Query(ctx, s)
 	return &bridgeRows{iter: iter}, nil
 }
 
 // QueryRow implements [database.QueryExecutor].
-func (t transaction) QueryRow(ctx context.Context, stmt string, args ...any) dbold.Row {
+func (tx transaction) QueryRow(ctx context.Context, stmt string, args ...any) dbold.Row {
 	s := buildStatementFromPostgresSQL(stmt, args).statement()
-	iter := t.txn.Query(ctx, s)
+	iter := tx.txn.Query(ctx, s)
 	row, err := iter.Next()
 	iter.Stop()
 	if errors.Is(err, iterator.Done) {

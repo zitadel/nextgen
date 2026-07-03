@@ -7,27 +7,26 @@ import (
 	"cloud.google.com/go/spanner"
 )
 
-type spannerDB interface {
+type queryExecutor interface {
 	Query(ctx context.Context, stmt spanner.Statement) *spanner.RowIterator
 	Update(ctx context.Context, stmt spanner.Statement) (int64, error)
 	ReadRow(ctx context.Context, table string, key spanner.Key, columns []string) (*spanner.Row, error)
 }
 
-type clientDB struct {
+type client struct {
 	client *spanner.Client
 }
 
-func newClientDB(client *spanner.Client) spannerDB {
-	return clientDB{client: client}
+func newClientDB(c *spanner.Client) queryExecutor {
+	return client{client: c}
 }
 
-func (d clientDB) Query(ctx context.Context, stmt spanner.Statement) *spanner.RowIterator {
-	return d.client.Single().Query(ctx, stmt)
+func (c client) Query(ctx context.Context, stmt spanner.Statement) *spanner.RowIterator {
+	return c.client.Single().Query(ctx, stmt)
 }
 
-func (d clientDB) Update(ctx context.Context, stmt spanner.Statement) (int64, error) {
-	var rowCount int64
-	_, err := d.client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+func (c client) Update(ctx context.Context, stmt spanner.Statement) (rowCount int64, _ error) {
+	_, err := c.client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 		n, err := txn.Update(ctx, stmt)
 		rowCount = n
 		return err
@@ -35,30 +34,30 @@ func (d clientDB) Update(ctx context.Context, stmt spanner.Statement) (int64, er
 	return rowCount, wrapError(err)
 }
 
-func (d clientDB) ReadRow(ctx context.Context, table string, key spanner.Key, columns []string) (*spanner.Row, error) {
-	row, err := d.client.Single().ReadRow(ctx, table, key, columns)
+func (c client) ReadRow(ctx context.Context, table string, key spanner.Key, columns []string) (*spanner.Row, error) {
+	row, err := c.client.Single().ReadRow(ctx, table, key, columns)
 	return row, wrapError(err)
 }
 
-type txnDB struct {
+type tx struct {
 	txn *spanner.ReadWriteTransaction
 }
 
-func newTxnDB(txn *spanner.ReadWriteTransaction) spannerDB {
-	return txnDB{txn: txn}
+func newTxnDB(txn *spanner.ReadWriteTransaction) queryExecutor {
+	return tx{txn: txn}
 }
 
-func (d txnDB) Query(ctx context.Context, stmt spanner.Statement) *spanner.RowIterator {
-	return d.txn.Query(ctx, stmt)
+func (t tx) Query(ctx context.Context, stmt spanner.Statement) *spanner.RowIterator {
+	return t.txn.Query(ctx, stmt)
 }
 
-func (d txnDB) Update(ctx context.Context, stmt spanner.Statement) (int64, error) {
-	n, err := d.txn.Update(ctx, stmt)
+func (t tx) Update(ctx context.Context, stmt spanner.Statement) (int64, error) {
+	n, err := t.txn.Update(ctx, stmt)
 	return n, wrapError(err)
 }
 
-func (d txnDB) ReadRow(ctx context.Context, table string, key spanner.Key, columns []string) (*spanner.Row, error) {
-	row, err := d.txn.ReadRow(ctx, table, key, columns)
+func (t tx) ReadRow(ctx context.Context, table string, key spanner.Key, columns []string) (*spanner.Row, error) {
+	row, err := t.txn.ReadRow(ctx, table, key, columns)
 	return row, wrapError(err)
 }
 

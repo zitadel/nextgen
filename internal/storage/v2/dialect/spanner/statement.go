@@ -16,7 +16,7 @@ func (s statements) Statements() service.AllStatements {
 // IsStatements implements [service.Statements].
 func (s statements) IsStatements() {}
 
-func newStatements(db spannerDB) statements {
+func newStatements(db queryExecutor) statements {
 	return statements{
 		projectStatements:        newProjectStatements(db),
 		flowDefinitionStatements: newFlowDefinitionStatements(db),
@@ -26,7 +26,7 @@ func newStatements(db spannerDB) statements {
 var _ service.AllStatements = (*statements)(nil)
 
 type statement struct {
-	db spannerDB
+	db queryExecutor
 }
 
 // IsStatements implements [service.Statements].
