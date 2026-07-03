@@ -450,9 +450,6 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 // processSubmit handles kind=submit: dispatch challenges, run
 // on_success (if declared), and route the resulting outcome.
 func (r *FlowStateMachineRuntime) processSubmit(pc *processCtx, resolved FlowResolvedFields) (FlowStepResult, error) {
-	outcome := pc.in.Action
-	irreversible := false
-
 	dispatch, err := r.dispatchChallenges(pc, resolved)
 	if err != nil {
 		return FlowStepResult{}, err
@@ -461,37 +458,39 @@ func (r *FlowStateMachineRuntime) processSubmit(pc *processCtx, resolved FlowRes
 		return r.renderStepError(pc, resolved, dispatch.StepError), nil
 	}
 	if dispatch.Outcome != "" {
-		outcome = dispatch.Outcome
-	} else if pc.currentStep.OnSuccess != nil {
-		// on_success reads across every visited step, not just the current one.
-		visitedResolved, err := r.resolveVisitedFields(pc)
-		if err != nil {
-			return FlowStepResult{}, err
-		}
-		result, err := r.runOnSuccess(pc, visitedResolved)
-		if err != nil {
-			return FlowStepResult{}, err
-		}
-		if result.StepError != nil {
-			return r.renderStepError(pc, resolved, result.StepError), nil
-		}
-		if result.Outcome != "" {
-			outcome = result.Outcome
-		}
-		if result.UserID != "" {
-			recordResolvedUser(pc.state, result.UserID)
-			if err := r.authAttempts.RegisterCreatedUser(pc.ctx, FlowRegisterCreatedUserInput{
-				ProjectID: pc.state.ProjectID,
-				AttemptID: pc.state.AuthAttemptID,
-				UserID:    result.UserID,
-			}); err != nil {
-				return FlowStepResult{}, fmt.Errorf("flow state machine: register created user on attempt: %w", err)
-			}
-		}
-		irreversible = result.Irreversible
+		return r.routeOutcome(pc, resolved, dispatch.Outcome, false)
+	}
+	if pc.currentStep.OnSuccess == nil {
+		return r.routeOutcome(pc, resolved, pc.in.Action, false)
 	}
 
-	return r.routeOutcome(pc, resolved, outcome, irreversible)
+	// on_success reads across every visited step, not just the current one.
+	visitedResolved, err := r.resolveVisitedFields(pc)
+	if err != nil {
+		return FlowStepResult{}, err
+	}
+	result, err := r.runOnSuccess(pc, visitedResolved)
+	if err != nil {
+		return FlowStepResult{}, err
+	}
+	if result.StepError != nil {
+		return r.renderStepError(pc, resolved, result.StepError), nil
+	}
+	outcome := pc.in.Action
+	if result.Outcome != "" {
+		outcome = result.Outcome
+	}
+	if result.UserID != "" {
+		recordResolvedUser(pc.state, result.UserID)
+		if err := r.authAttempts.RegisterCreatedUser(pc.ctx, FlowRegisterCreatedUserInput{
+			ProjectID: pc.state.ProjectID,
+			AttemptID: pc.state.AuthAttemptID,
+			UserID:    result.UserID,
+		}); err != nil {
+			return FlowStepResult{}, fmt.Errorf("flow state machine: register created user on attempt: %w", err)
+		}
+	}
+	return r.routeOutcome(pc, resolved, outcome, result.Irreversible)
 }
 
 // processPasskeyLogin handles kind=passkey. The issue leg runs
