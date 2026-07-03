@@ -37,7 +37,7 @@ Without this, implementations drift: flow handlers construct inline `domain.Erro
 - **`errors.Is` support:** `Code` is the primary match key; `WithMessage` / `WithDetails` / `WithParent` preserve `Code`.
 - **`Details`:** when callers pass `nil` details, `newError` copies `Parent` into `Details`. This is useful for logging but must not leak to clients.
 - **Gap:** no documented rules for what belongs in `Details`, and no redaction helper at the domain boundary.
-- **Gap:** `newError` overwrites `Location` on every construction (no parent awareness) and records no stack; `Location` is a basename `file:line` string, not the structured `sloggcp.ReportLocation` the GCP handler consumes.
+- **Gap:** `newError` records no structured location/stack and has no parent-aware capture; `Location` is a basename `file:line` string, not the structured `sloggcp.ReportLocation` the GCP handler consumes (Decision 5 changes this).
 
 ### Storage (`database.*Error`)
 
@@ -133,7 +133,7 @@ Rationale for distinct types rather than one universal error type (`zerrors`-sty
 2. **Storage taxonomy.** The service maps on storage specifics (`errors.AsType[*database.UniqueError]`, constraint names — `internal/service/user.go`). Flattening to one type loses the typed mapping built for [#48](https://github.com/zitadel/nextgen/issues/48).
 3. **Layering.** A single code-bearing type would force `storage` to depend on API-facing error codes.
 
-Cross-type behavior (deepest-stack inheritance) works through the shared `sloggcp.StackTraceError` / `sloggcp.ReportLocationError` interfaces — implemented by the embedded `Origin` — not through a shared concrete type.
+Cross-type behavior (deepest-first location and stack inheritance) works through the shared `sloggcp.StackTraceError` / `sloggcp.ReportLocationError` interfaces — implemented by the embedded `Origin` — not through a shared concrete type.
 
 ### 2. Error code taxonomy
 
@@ -205,7 +205,7 @@ Every error response is the ogen-generated `api.ErrorDetails` (`api/openapi/comp
 - For `req.invalid` and ogen decode errors, prefer normalized messages; avoid leaking parser internals when a stable domain message exists.
 - **`domain.Error.Error()` returns only `Message`; it does not include the parent chain.** `err.Error()` is the Go-default way to render an error, so the default must be safe. The parent is only needed for diagnostics, which are served by `Unwrap()` (programmatic traversal / `errors.Is` / `errors.As`) and `LogValue` (structured logs explicitly emit `parent`, Decision 5). Making `Error()` parent-free means the common `err.Error()` call cannot leak a wrapped cause.
 - This does **not** make every `Error()` safe: non-`domain.Error` values (storage `database.*Error`, ogen framework errors) can still include their cause in `Error()`. API code must therefore avoid rendering a **non-domain** error's `Error()` into a client message — translate to a `domain.Error` first, or use the explicit `Message` field via `domainErrorDetails`.
-- Trade-off: plain `%v` / non-structured logging of a `domain.Error` no longer shows the cause inline; logs must use the structured path (`slog.Any` → `LogValue`) to capture `parent`. `errors.Is` / `errors.As` / `Unwrap` are unaffected. Confirm at implementation time that no test asserts a chained string via `EqualError` / `ErrorContains` on a `domain.Error`.
+- **Structured logging is required for error diagnostics.** Plain `%v` / unstructured logging of a `domain.Error` shows only `Message`; the cause is available via `Unwrap()` and via `slog.Any(ErrorAttributeKey, err)` → `LogValue` (Decision 5). There is no verbose `Error()` mode — that would reintroduce the parent-chain leak path this ADR removes. `internal/` uses `slog` exclusively; non-structured error logging is not a supported production path. Confirm at implementation time that no test asserts a chained string via `EqualError` / `ErrorContains` on a `domain.Error`.
 
 ### 5. Location, stack traces, and operational reporting
 
@@ -215,20 +215,20 @@ Capture is centralized in `internal/errreport` and configured by **global atomic
 
 - Every structured error type embeds `errreport.Origin`, which carries a `*sloggcp.ReportLocation` and an optional stack, and implements `sloggcp.ReportLocationError` + `sloggcp.StackTraceError`.
 - `errreport.Capture(parent error, skip int) Origin`:
-  - records a **fresh location** at the creation site when location reporting is enabled;
-  - for the stack, **inherits the deepest existing one**: if the `parent` chain already contains a `sloggcp.StackTraceError`, reuse its stack; otherwise capture a fresh stack when stack reporting is enabled.
+  - for **location**, **inherits the deepest existing one**: if the `parent` chain already contains a `sloggcp.ReportLocationError`, reuse its location; otherwise record a fresh location at the creation site when location reporting is enabled;
+  - for the **stack**, same deepest-first rule: if the `parent` chain already contains a `sloggcp.StackTraceError`, reuse its stack; otherwise capture a fresh stack when stack reporting is enabled.
 
 #### Location
 
 - Captured at **every** error-construction boundary, storage included — `database.*Error` records its origin in `wrapError`, `domain.Error` records its origin in `newError`.
-- **Location is always local to the creation site; it is never inherited from a parent.** Wrapping is a deliberate "represent this failure as this error now" decision, so the wrapping error's own location is the meaningful primary one. Ancestors keep their own locations in the `Parent` chain.
-- Location is cheap (single `runtime.Caller`) and may be enabled by default; it is **internal-only** and never serialized to API responses.
+- **Location follows deepest-first inheritance**, same as stack traces (above). Only one report location is sent to the logger, so the value is the **deepest point in the cause chain** — typically where a driver or third-party package first returned an error — not the site of the last domain wrap. Because location is **log-only** and never serialized to API responses, inheriting the origin does not leak information.
+- Location is cheap (single `runtime.Caller`) and may be enabled by default; stack capture remains gated (expensive).
 
 #### Stack traces
 
 - Stack capture is **gated** (expensive `debug.Stack()`); intended for `internal`/unexpected errors and debug/non-production use, off by default in production.
 - Stacks follow **deepest-first** semantics. Because the storage layer captures at `wrapError` — a frame that has already returned by the time the service translates the error — the storage error holds the deepest reachable stack, and the wrapping `domain.Error` inherits it via `errreport.Capture`. This is why storage must participate: the domain layer physically cannot recover frames that already unwound.
-- `sloggcp` extracts the **outermost** `StackTraceError`; deepest-first inheritance guarantees that outermost error already carries the deepest stack, so no chain-walking is needed at log time.
+- `sloggcp` extracts the **outermost** `StackTraceError` and `ReportLocationError`; deepest-first inheritance guarantees that outermost error already carries the deepest values, so no chain-walking is needed at log time.
 
 #### Structured logging
 
@@ -240,13 +240,13 @@ Capture is centralized in `internal/errreport` and configured by **global atomic
 - Production JSON logging may use `LogFormatGCPErrorReporting`; the format wires `errreport.GCPReporting(true)`, replacing the commented-out `zerrors.GCPErrorReportingEnabled(true)` stub in `internal/instrumentation/config.go`.
 - Log the root error with `slog.Any(ErrorAttributeKey, err)`; the handler resolves location/stack through the shared interfaces and `Parent` via `Unwrap()`.
 - `context.Cause` continues to surface through `ExtractErrCause`.
+- With `sloggcp` as the log handler, log lines that match the Error Reporting format are **collected automatically** by GCP (parsed from structured output — there is no separate "send to Error Reporting" step). Expected client errors logged at `Info` or `Warn` may therefore appear in Error Reporting; that is acceptable for spotting client-facing hotspots (for example a sudden spike of 403s). **Alerting policy** based on severity or error class is out of scope for this ADR.
 
 #### Expected client errors (4xx)
 
 - Log at `Info` or `Warn` with `error.code` and request correlation attributes.
 - `middleware.WithLogging` (Inventory) currently logs **all** status ≥ 400 at `Error` with the full response body. Align it: log expected 4xx at `Info`/`Warn`, reserve `Error` for `internal`/5xx, and stop logging the raw response body — log the structured `code` plus safe attributes instead (Decision 6).
 - Expected storage signals (for example `NoRowFoundError` → `*.not_found`) should not trigger stack capture in normal operation; capturing stacks for frequently-expected errors is acceptable only while the debug toggle is on.
-- Do **not** send 4xx domain errors to GCP Error Reporting as service incidents unless rate anomalies trigger alerting separately.
 
 ### 6. Redaction and PII policy
 
@@ -281,7 +281,9 @@ Forbidden: credential material, full storage error strings, rows/records contain
 
 Scenario: a user cannot register because a unique attribute (for example their email) is already taken. The data model matters here. User attributes are stored EAV in `zitadel_nextgen.user_attributes`; uniqueness is enforced indirectly by hashing the value with SHA-256 and writing it to `zitadel_nextgen.user_unique_attributes`, whose primary key `(project_id, team_id, key, value_hash)` is the unique constraint. A duplicate raises a `23505` on that table's partition. The two facts involved have different owners:
 
-1. **Which rule failed** is the error's job — but only partially. The pg dialect captures `table` + `constraint`, here `user_unique_attributes` and a partition PK such as `user_unique_attributes_part_0_pkey`. The storage error's `LogValue` emits those typed fields and drops the driver `Detail`. Two reasons the `Detail` must be dropped: the row it names contains the `value_hash` (a salt-less SHA-256 of, for example, an email — reversible for low-entropy identifiers, so still sensitive), and the PK constraint name is shared by *all* unique attributes, so it does not even reveal which attribute collided:
+1. **Which rule failed** is the error's job — but only partially. The pg dialect captures `table` + `constraint`, here `user_unique_attributes` and a partition PK such as `user_unique_attributes_part_0_pkey`. The storage error's `LogValue` emits those typed fields and drops the driver `Detail`. Two reasons the `Detail` must be dropped: the row it names contains the `value_hash` (a salt-less SHA-256 of, for example, an email — reversible for low-entropy identifiers, so still sensitive), and the PK constraint name is shared by *all* unique attributes, so it does not even reveal which attribute collided.
+
+The **`level=WARN` line below is emitted by the registration service** when it maps the storage `UniqueError` to a domain error (for example `domain.ErrEmailTaken().WithParent(err)`) — a **client error** (409), not an application failure. The storage error is the `parent` on that log line. Optional `Debug` logs inside `internal/storage` are package-scoped instrumentation only; they are not the primary error-reporting path for request handling.
 
 ```
 level=WARN msg="registration failed" code=user.email_taken
@@ -346,7 +348,7 @@ The canonical mapper (`domainErrorDetails` → only `Code` + `Message`) is clean
 
 - Service-layer mapping remains explicit (intentionally — constraint-to-semantics is resource-specific).
 - `domain.Error` stays a value type; `Unwrap`, embedded `errreport.Origin`, and `slog.LogValuer` do not require a pointer, so existing value-return patterns are unchanged.
-- `domain.Error.Error()` returns only the public `Message`; this makes the Go-default `err.Error()` safe, but inline/non-structured logs lose the cause, which now lives only in `Unwrap()` / `LogValue`. Storage and framework errors still carry their cause in `Error()`, so non-domain `Error()` rendering still needs call-site discipline (Decision 6).
+- `domain.Error.Error()` returns only the public `Message`; diagnostics live in `Unwrap()` / structured `LogValue` logging (Decision 4 → Messages). Storage and framework errors still carry their cause in `Error()`, so non-domain `Error()` rendering still needs call-site discipline (Decision 6).
 - Reporting toggles are **process-global atomics** in `errreport` (matching `zerrors`), not per-request config. This is the accepted trade-off for constructing errors deep in the stack without a config handle.
 - Storage participates in capture (`wrapError` records an `Origin`). Location is cheap; gated stack capture may run for frequently-expected errors (for example `NoRowFoundError`) while the debug toggle is on.
 - A new `internal/errreport` leaf package and embedding `Origin` across `domain` and `storage` error types is upfront churn.
