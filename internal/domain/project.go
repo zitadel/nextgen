@@ -1,10 +1,7 @@
 package domain
 
 import (
-	"context"
 	"time"
-
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 const (
@@ -61,19 +58,15 @@ func NewProject(previewOrigins []string, tokenGenerator TokenGenerator) (*Projec
 	}, nil
 }
 
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/project.mock.go . ProjectRepository
+// ProjectField enumerates the fields of Project which can be used for ordering in list operations.
+type ProjectField uint8
 
-// ProjectRepository provides storage operations for [Project]s.
-type ProjectRepository interface {
-	// Create persists a new project. The repository sets [Project.CreatedAt] and
-	// [Project.UpdatedAt] to the current time; callers should not pre-populate
-	// those fields. Callers MUST pre-populate [Project.ProjectSecret],
-	// [Project.PreviewSecret], and [Project.PreviewOrigins].
-	// Returns a [database.IntegrityViolationError] (specifically [database.UniqueError])
-	// if a project with the same ID already exists.
-	Create(ctx context.Context, client database.QueryExecutor, project *Project) error
-
-	// Get retrieves a project by its ID.
-	// Returns a [database.NoRowFoundError] when no project with the given ID exists.
-	Get(ctx context.Context, client database.QueryExecutor, id string) (*Project, error)
-}
+const (
+	ProjectFieldUnspecified ProjectField = iota
+	ProjectFieldID
+	ProjectFieldCreatedAt
+	ProjectFieldUpdatedAt
+	ProjectFieldProjectSecret
+	ProjectFieldPreviewSecret
+	ProjectFieldPreviewOrigins
+)
