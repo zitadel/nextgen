@@ -341,7 +341,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	// drop it so we don't re-emit the abandoned prompt.
 	if state.PendingChallenge != nil && in.ChallengeResponse == nil &&
 		!pendingMatchesKind(state.PendingChallenge.Method, in.Action, actionKind) {
-		state.PendingChallenge = nil
+		state.ClearPendingChallenge()
 	}
 
 	switch actionKind {
@@ -704,7 +704,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 	// A ceremony is in flight but no proof arrived: resume or abandon.
 	case state.PendingChallenge != nil && in.ChallengeResponse == nil:
 		if !pendingMatchesKind(state.PendingChallenge.Method, in.Action, actionKind) {
-			state.PendingChallenge = nil
+			state.ClearPendingChallenge()
 			return passkeyPhaseResult{}, nil
 		}
 		rendered := r.buildStep(pc, resolved, nil, nil, nil)
@@ -743,7 +743,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 				Attestation: in.ChallengeResponse.Proof,
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
-				state.PendingChallenge = nil
+				state.ClearPendingChallenge()
 				msg := "auth_attempt.passkey_registration_invalid"
 				rendered := r.buildStep(pc, resolved, &msg, nil, nil)
 				state.IssuedAt = r.now()
@@ -764,7 +764,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 					return passkeyPhaseResult{}, fmt.Errorf("flow state machine: register passkey user on attempt: %w", err)
 				}
 			}
-			state.PendingChallenge = nil
+			state.ClearPendingChallenge()
 			// Registration wrote a credential — the user cannot back out.
 			return passkeyPhaseResult{handled: true, irreversible: true}, nil
 
@@ -776,7 +776,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 				Assertion:   in.ChallengeResponse.Proof,
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
-				state.PendingChallenge = nil
+				state.ClearPendingChallenge()
 				msg := "auth_attempt.passkey_invalid"
 				rendered := r.buildStep(pc, resolved, &msg, nil, nil)
 				state.IssuedAt = r.now()
@@ -786,7 +786,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 				return passkeyPhaseResult{}, fmt.Errorf("flow state machine: submit passkey: %w", err)
 			}
 			recordResolvedUser(state, userID)
-			state.PendingChallenge = nil
+			state.ClearPendingChallenge()
 			return passkeyPhaseResult{handled: true}, nil
 		}
 
@@ -955,14 +955,13 @@ func (r *FlowStateMachineRuntime) advance(state *FlowState, prev *FlowDefinition
 // (previous form prefills); PendingChallenge is dropped; History is
 // left intact.
 func (r *FlowStateMachineRuntime) processBack(pc *processCtx) (FlowStepResult, error) {
-	if len(pc.state.BackStack) == 0 {
+	prev, ok := pc.state.PopBackStack()
+	if !ok {
 		return FlowStepResult{}, fmt.Errorf("%w: back submitted with empty back stack on step %q", ErrInvalidAction, pc.state.CurrentStep)
 	}
-	prev := pc.state.BackStack[len(pc.state.BackStack)-1]
-	pc.state.BackStack = pc.state.BackStack[:len(pc.state.BackStack)-1]
 	pc.state.CurrentStep = prev.StepName
 	pc.state.CurrentPurpose = prev.Purpose
-	pc.state.PendingChallenge = nil
+	pc.state.ClearPendingChallenge()
 
 	if _, ok := pc.def.FindStep(prev.StepName); !ok {
 		return FlowStepResult{}, fmt.Errorf("%w: back-stack step %q missing from definition", ErrIntegrity, prev.StepName)
@@ -1179,7 +1178,7 @@ func recordResolvedUser(state *FlowState, userID string) {
 // clearUserBoundState drops the resolved user id, any in-flight
 // ceremony, and the passkey provisional marker.
 func clearUserBoundState(state *FlowState) {
-	state.PendingChallenge = nil
+	state.ClearPendingChallenge()
 	state.CollectedData.UserID = ""
 	state.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey = false
 }

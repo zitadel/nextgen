@@ -167,6 +167,25 @@ func (s *FlowState) ClearBackStack() {
 	s.BackStack = nil
 }
 
+// PopBackStack removes and returns the top BackStack entry. Returns
+// false when the stack is empty, leaving the state untouched.
+func (s *FlowState) PopBackStack() (FlowBackEntry, bool) {
+	n := len(s.BackStack) - 1
+	if n < 0 {
+		return FlowBackEntry{}, false
+	}
+	prev := s.BackStack[n]
+	s.BackStack = s.BackStack[:n]
+	return prev, true
+}
+
+// ClearPendingChallenge drops any outstanding ceremony binding on the
+// state. Called when the challenge is superseded (verify succeeded, or
+// the user navigated away).
+func (s *FlowState) ClearPendingChallenge() {
+	s.PendingChallenge = nil
+}
+
 type CollectedFlowData struct {
 	UserData    map[string]any
 	UserID      string
