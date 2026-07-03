@@ -207,12 +207,12 @@ func TestSchemaRevisions(t *testing.T) {
 
 	testCases := []struct {
 		name            string
-		userType        string
+		objectType      string
 		schemaRevisions []string
 	}{
 		{
-			name:     "client does not provision ID",
-			userType: "client-does-not-provision-id",
+			name:       "client does not provision ID",
+			objectType: "client-does-not-provision-id",
 			schemaRevisions: []string{
 				fmt.Sprintf(
 					`{
@@ -291,7 +291,7 @@ func TestSchemaRevisions(t *testing.T) {
 				t.Context(),
 				api.ListSchemasParams{
 					ProjectID:  api.ProjectID(project.ID),
-					ObjectType: api.OptString{Value: tc.userType, Set: true},
+					ObjectType: api.OptString{Value: tc.objectType, Set: true},
 				},
 			)
 			require.NoError(t, err)
