@@ -54,13 +54,13 @@ never has to be exposed.
 Secret values which might need to be sent to other systems (E.g.: IdP secrets,
 API keys, tokens, etc.) cannot be stored as a simple hash. But we can not store
 them in plain text. For these values we use encryption. More specific, we use
-RSA to encrypt these values.
+AES-GCM to encrypt these values.
 
 ### Third party secrets
 
 We will need to store secrets required for communication with other parties.
 E.g.: IdP secrets, API keys, etc. These keys should be stored encrypted in the
-database.
+database. For that encryption, also AES-GCM will be used.
 
 ### Tokens
 
@@ -76,6 +76,23 @@ info on keys, see [the signing keys decision](#signing-keys).
 
 ### Signing/encryption keys
 
+The application uses different keys for different use-cases:
+
+```mermaid
+graph TD
+%% Nodes
+    MasterKey["Master Key (KEK)"]
+    DEK["Data Encryption Key (DEK)"]
+    TokenSigningKeys["Token Signing Keys"]
+    ThirdPartySecrets["Third-Party Secrets"]
+    ExternalTokenEncryptionKey["Encryption key for<br/>encrypting opaque tokens"]
+%% Hierarchy Relationships
+    MasterKey --> DEK
+    DEK --> TokenSigningKeys
+    DEK --> ThirdPartySecrets
+    DEK --> ExternalTokenEncryptionKey
+ ```
+
 #### Storage
 
 We need to store encryption/signing keys for multiple use-cases in the database.
@@ -86,9 +103,6 @@ Storing these keys falls under the [data at rest decision](#data-at-rest)
 
 To ensure isolation we create a separate set of keys per project. Such a set may 
 contain, but is not limited to:
-
-- Signing/Encryption keys for signing/encrypting tokens
-- Third party secret encryption keys
 
 By creating key sets per project, they can be rotated in case of a leak or
 incident. Since all keys are asymmetric, data encrytped/signed with previous
@@ -127,11 +141,10 @@ could handle rotation.
 
 **Important: public key cannot be public**: In normal cases of a private/public
 key pair, the private key should be treated as a secret and the public key can
-be shared. This is not the case for the encryption keys of the system since it
-would defeat the purpose of the encryption of data at rest. Once the private 
-or the public key is leaked it should immediately be rotated and a data 
-migration should happen. The process for emergency key rotation is out of scope
-for this ADR though.
+be shared. This is not the case for the master-keys of the system since it
+would defeat the purpose of the key. Once the private or the public key is 
+leaked it should immediately be rotated and a data migration should happen. The
+process for emergency key rotation is out of scope for this ADR though.
 
 ## NIST
 
