@@ -101,3 +101,18 @@ To ensure master-key rotation:
 - A master-key needs to be asymmetric like all other encryption keys
 - It is possible to specify multiple master-keys with one marked for encryption.
   The other keys will be used for verification only.
+
+## NIST
+
+A growing number of customers require NIST compliance. We should provide this 
+out of the box. A customer will be able to enable NIST compliance per project. 
+This can be done either in the configuration file/environment variables to 
+set it up right out of the gate or using the console ui or the api when a
+customer wants to set it up later. 
+
+By enabling NIST compliance certain features and policies will be enabled or
+disabled by default. E.g.: only PBKDF2 will be used for password hashing. It is
+as of now the only approved password hashing algorithm. It is also required for 
+NIST to use AES (preferably with GCM) for data encryption. That is the 
+encryption algorithm we use anyway. The exact NIST compliance rules will be 
+checked at implementation time. To ensure the latest standards.
