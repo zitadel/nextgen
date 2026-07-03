@@ -104,6 +104,21 @@ driver/dialect → database.*Error → domain.Error → api.ErrorDetails (+ HTTP
                                structured logs / GCP Error Reporting
 ```
 
+The downward branch is the **diagnostic channel**, not a fourth runtime layer:
+
+- **Horizontal (→):** error *transformation* — each step narrows and re-labels the failure for the next consumer.
+- **Vertical (↓):** error *observability* — what structured logs and GCP Error Reporting consume once something logs the error.
+
+`domain.Error` is the last type that still carries causes (`Parent`), capture metadata (`Origin`: location, stack), and a log-safe shape (`slog.LogValuer`). `api.ErrorDetails` is the client-safe subset (`code`, `message`, optional `details`); it deliberately omits `Parent` and reporting metadata.
+
+**`internal/domain` does not call `slog`.** Layers construct errors; the API/instrumentation boundary emits logs (today: `middleware.WithLogging`; see Inventory → Logging and Decision 5 → Expected client errors). Typical flow:
+
+1. Storage/service/domain **return** a `domain.Error` (or an error wrapped as one).
+2. API **maps** it to `api.ErrorDetails` + HTTP status for the response.
+3. Request middleware (or explicit `slog.Any(ErrorAttributeKey, err)` at the boundary) **logs** the `domain.Error` via `LogValue` / GCP interfaces — not the serialized response body.
+
+Optional call-site logs in the **service** layer may add deliberate, safe context (for example `attribute_key=email` in Decision 6); that is the exception, not the default path.
+
 #### Error package layering
 
 Error *types* stay per-layer; only the capture *mechanism* is shared.
@@ -217,7 +232,7 @@ Capture is centralized in `internal/errreport` and configured by **global atomic
 
 #### Structured logging
 
-- `domain.Error` implements `slog.LogValuer`. It emits `code`, `message`, and `parent`; when GCP error reporting is active it **omits** location/stack from the log value (the GCP handler adds them from the `ReportLocationError` / `StackTraceError` interfaces) to avoid duplication.
+- `domain.Error` implements `slog.LogValuer`. It emits `code`, `message`, and `parent`; when GCP error reporting is active it **omits** location/stack from the log value (the GCP handler adds them from the `ReportLocationError` / `StackTraceError` interfaces) to avoid duplication. Emission stays at the request boundary (Decision 1 → Layer contract); `LogValuer` defines the shape consumed when that boundary logs the error.
 - Outside GCP mode, when logging a `domain.Error` at `Error` level or above, the value additionally includes `reportLocation` and (if present) `stackTrace`.
 
 #### GCP Error Reporting
