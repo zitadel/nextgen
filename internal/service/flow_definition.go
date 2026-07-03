@@ -212,7 +212,7 @@ func (fd *flowDefinitionService) isUpdateAllowed(
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage(fmt.Sprintf("failed to list flow definitions for old purpose %q", purpose))
 		}
-		if !(len(fds) > 1) {
+		if len(fds) <= 1 {
 			return domain.ErrFlowDefinitionUpdateConflict(fmt.Sprintf("cannot update: no other active flow definition found with purpose %q", purpose))
 		}
 	}
