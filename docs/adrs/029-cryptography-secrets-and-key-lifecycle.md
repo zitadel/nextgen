@@ -101,13 +101,11 @@ Storing these keys falls under the [data at rest decision](#data-at-rest)
 
 #### Scope
 
-To ensure isolation we create a separate set of keys per project. Such a set may 
-contain, but is not limited to:
-
-By creating key sets per project, they can be rotated in case of a leak or
-incident. Since all keys are asymmetric, data encrytped/signed with previous
-keys can still be decrypted/verified. The private keys never leave our system.
-The public signing keys can be requested in the form of a [JWK](https://datatracker.ietf.org/doc/html/rfc7517).
+To ensure isolation we create a separate set of keys per project. By creating 
+key sets per project, they can be rotated in case of a leak or incident. Since
+all keys are asymmetric, data encrytped/signed with previous keys can still be
+decrypted/verified. The private keys never leave our system. The public signing
+keys can be requested in the form of a [JWK](https://datatracker.ietf.org/doc/html/rfc7517).
 
 #### Auto-rotation
 
@@ -136,15 +134,6 @@ To ensure master-key rotation:
 For easy integration with systems like k8s, the master key can be provided as an
 x.509 certificate with private and public key inside. That way a cert-manager 
 could handle rotation.
-
-#### Public keys are not "public"
-
-**Important: public key cannot be public**: In normal cases of a private/public
-key pair, the private key should be treated as a secret and the public key can
-be shared. This is not the case for the master-keys of the system since it
-would defeat the purpose of the key. Once the private or the public key is 
-leaked it should immediately be rotated and a data migration should happen. The
-process for emergency key rotation is out of scope for this ADR though.
 
 ## NIST
 
