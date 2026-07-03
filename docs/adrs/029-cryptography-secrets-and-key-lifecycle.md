@@ -39,7 +39,7 @@ for password/secret hashing.
 required for revocation, this can be achieved by storing the token id (E.g.:
 `jti`) or the signature of the token. Since the token id itself is not a secret,
 it does not need to be hashed. Since the signature of a token is already a
-cryptographic output, so additional hashing is not required.
+cryptographic output, additional hashing is not required.
 
 ### Signatures
 
@@ -81,58 +81,62 @@ The application uses different keys for different use-cases:
 ```mermaid
 graph TD
 %% Nodes
-    MasterKey["Master Key (KEK)"]
-    DEK["Data Encryption Key (DEK)"]
-    TokenSigningKeys["Token Signing Keys"]
+    MasterKey["RSA Master Key (KEK)"]
+    DEK["AES Data Encryption Key (DEK)"]
+    TokenSigningKeys["RSA Token Signing Keys"]
     ThirdPartySecrets["Third-Party Secrets"]
-    ExternalTokenEncryptionKey["Encryption key for<br/>encrypting opaque tokens"]
+    OpaqueTokens["Opaque tokens"]
 %% Hierarchy Relationships
     MasterKey --> DEK
     DEK --> TokenSigningKeys
     DEK --> ThirdPartySecrets
-    DEK --> ExternalTokenEncryptionKey
+    DEK --> OpaqueTokens
  ```
 
 #### Storage
 
 We need to store encryption/signing keys for multiple use-cases in the database.
-Storing these keys falls under the [data at rest decision](#data-at-rest) 
-(envelope encryption). 
+Storing these keys falls under the [data at rest decision](#data-at-rest)
+(envelope encryption).
 
 #### Scope
 
-To ensure isolation we create a separate set of keys per project. By creating 
-key sets per project, they can be rotated in case of a leak or incident. Since
-all keys are asymmetric, data encrytped/signed with previous keys can still be
-decrypted/verified. The private keys never leave our system. The public signing
-keys can be requested in the form of a [JWK](https://datatracker.ietf.org/doc/html/rfc7517).
+To ensure isolation we create a separate set of keys per project. By creating
+key sets per project, it is cryptographically not possible for one customer to
+read encrypted data of another customer. Since all signing keys are asymmetric,
+data encrypted/signed with previous keys can still be verified. The private keys
+never leave our system. The public signing keys can be requested in the form of
+a [JWK](https://datatracker.ietf.org/doc/html/rfc7517).
 
-#### Auto-rotation
+#### Rotation
 
-All generated keys will be periodically and automatically rotated. This happens 
-by default each 30 days. But this is also configurable.
+All signing keys will be periodically and automatically rotated. This happens by
+default each 30 days. But this is also configurable. This is done so that it is
+possible to isolate possibly forged tokens within a window of time in case of a
+breach.
 
-Rotating the master key is something which has to be managed by an outside 
-process since the key should also be provided from outside the application.
+Rotating the master key is something which has to be managed by an outside
+process since the key should also be provided from outside the application. The
+rotation process can be managed by a tool like cert-manager in k8s.
 
 #### Master key
 
 Since encryption keys need to be stored in the database and storage needs to be
 according to the [data at rest decision](#data-at-rest), they also need to be
 encrypted. To do this, a master-key has to be provided by config. This can be
-done via a cli argument or a config parameter/environment variable. If
-no master-key is provided, the application will create one and write it to the
+done via a cli argument or a config parameter/environment variable. If no
+master-key is provided, the application will create one and write it to the
 host's file system. This auto-creation is mainly for testing and developing the
 system. A production system should specify its own master-key.
 
 To ensure master-key rotation:
 
-- A master-key needs to be asymmetric like all other encryption keys
+- A master-key needs to be asymmetric
 - It is possible to specify multiple master-keys with one marked for encryption.
   The other keys will be used for decryption only.
 
 For easy integration with systems like k8s, the master key can be provided as an
-x.509 certificate with private and public key inside. That way a cert-manager 
+x.509 certificate with private and public key inside. That way a cert-manager
 could handle rotation.
 
 ## NIST
