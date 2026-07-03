@@ -167,15 +167,24 @@ func (s *FlowState) ClearBackStack() {
 	s.BackStack = nil
 }
 
-// PopBackStack removes and returns the top BackStack entry. Returns
-// false when the stack is empty, leaving the state untouched.
-func (s *FlowState) PopBackStack() (FlowBackEntry, bool) {
+// PeekBackStack returns the top BackStack entry without mutating the
+// state. Returns false when the stack is empty.
+func (s *FlowState) PeekBackStack() (FlowBackEntry, bool) {
 	n := len(s.BackStack) - 1
 	if n < 0 {
 		return FlowBackEntry{}, false
 	}
-	prev := s.BackStack[n]
-	s.BackStack = s.BackStack[:n]
+	return s.BackStack[n], true
+}
+
+// PopBackStack removes and returns the top BackStack entry. Returns
+// false when the stack is empty, leaving the state untouched.
+func (s *FlowState) PopBackStack() (FlowBackEntry, bool) {
+	prev, ok := s.PeekBackStack()
+	if !ok {
+		return FlowBackEntry{}, false
+	}
+	s.BackStack = s.BackStack[:len(s.BackStack)-1]
 	return prev, true
 }
 

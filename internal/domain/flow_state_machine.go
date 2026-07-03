@@ -955,17 +955,18 @@ func (r *FlowStateMachineRuntime) advance(state *FlowState, prev *FlowDefinition
 // (previous form prefills); PendingChallenge is dropped; History is
 // left intact.
 func (r *FlowStateMachineRuntime) processBack(pc *processCtx) (FlowStepResult, error) {
-	prev, ok := pc.state.PopBackStack()
+	prev, ok := pc.state.PeekBackStack()
 	if !ok {
 		return FlowStepResult{}, fmt.Errorf("%w: back submitted with empty back stack on step %q", ErrInvalidAction, pc.state.CurrentStep)
 	}
+	if _, ok := pc.def.FindStep(prev.StepName); !ok {
+		return FlowStepResult{}, fmt.Errorf("%w: back-stack step %q missing from definition", ErrIntegrity, prev.StepName)
+	}
+	pc.state.PopBackStack()
 	pc.state.CurrentStep = prev.StepName
 	pc.state.CurrentPurpose = prev.Purpose
 	pc.state.ClearPendingChallenge()
 
-	if _, ok := pc.def.FindStep(prev.StepName); !ok {
-		return FlowStepResult{}, fmt.Errorf("%w: back-stack step %q missing from definition", ErrIntegrity, prev.StepName)
-	}
 	step, err := r.renderStep(pc.ctx, pc.client, pc.def, pc.state)
 	if err != nil {
 		return FlowStepResult{}, err

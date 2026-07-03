@@ -199,6 +199,10 @@ func validateSteps(steps []FlowDefinitionStep) error {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
 					"step %q: action %q has kind=back, which is engine-injected and cannot be declared", step.Name, a.Name), nil)
 			}
+			if a.Name == flowBackActionName {
+				return ErrFlowDefinitionInvalid(fmt.Sprintf(
+					"step %q: action name %q is reserved for engine-injected back navigation", step.Name, a.Name), nil)
+			}
 			actionNames[a.Name] = struct{}{}
 		}
 

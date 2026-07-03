@@ -2167,11 +2167,11 @@ func TestFlowStateMachine_Process_NavigateSkipsValidation(t *testing.T) {
 				Fields: []domain.Field{"email", "x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
-					{Name: "back", Kind: domain.FlowActionKindNavigate},
+					{Name: "cancel", Kind: domain.FlowActionKindNavigate},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit: {Target: "done"},
-					"back":                  {Target: "landing"},
+					"cancel":                {Target: "landing"},
 				},
 			},
 			{Name: "landing", Complete: &show},
@@ -2196,7 +2196,7 @@ func TestFlowStateMachine_Process_NavigateSkipsValidation(t *testing.T) {
 	// Empty fields would fail validation under a submit action; navigate
 	// must skip validation and follow the transition.
 	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
-		Action: "back",
+		Action: "cancel",
 		Fields: map[string]any{},
 	})
 	require.NoError(t, err)
