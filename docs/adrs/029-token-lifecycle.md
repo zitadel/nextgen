@@ -6,14 +6,14 @@
 
 ## Context
 
-A production IAM must have a clear server-authoritative model for sessions and
-tokens. The platform has session/auth-attempt primitives and token metadata,
-but lacks a consolidated architecture for token classes, refresh token rotation/
-binding/replay detection, revocation semantics, and how logout/password/factor
-changes invalidate credentials. This ADR will define the authoritative session
-model, token families, revocation propagation, and incident/administrative
-invalidation flows. Without this, token misuse, inconsistent invalidation, and
-recovery gaps become likely.
+A production IAM system must have a clear server-authoritative model for 
+sessions and tokens. The platform has session/auth-attempt primitives and token
+metadata, but lacks a consolidated architecture for token classes, refresh token 
+rotation/ binding/replay detection, revocation semantics, and how 
+logout/password/factor changes invalidate credentials. This ADR will define the
+authoritative session model, token families, revocation propagation, and 
+incident/administrative invalidation flows. Without this, token misuse, 
+inconsistent invalidation, and recovery gaps become likely.
 
 ## Decision
 
@@ -61,6 +61,9 @@ revoked. The storage of these tokens is minimal. Only the token-id. All other
 information can be retrieved from the token itself. Since all tokens are signed
 we can trust the information which is encoded in them, we only need to ensure
 the tokens are active.
+
+Keeping the data in the database at a minimum and trusting the data in the tokens
+allows for faster token validation in cases where high throughput is required.
 
 Once a token is revoked, we can mark the token as inactive in the database which
 will make future validations fail.
