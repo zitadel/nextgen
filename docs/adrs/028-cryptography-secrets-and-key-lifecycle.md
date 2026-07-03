@@ -1,4 +1,4 @@
-# ADR 027: Cryptography, secrets and key lifecycle
+# ADR 028: Cryptography, secrets and key lifecycle
 
 > **Status:** Proposed
 > **Date:** 2026-06-24
