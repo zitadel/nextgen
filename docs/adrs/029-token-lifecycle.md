@@ -6,9 +6,14 @@
 
 ## Context
 
-We are building an authorization platform which has to be stateless and
-deployable in multiple regions. This adds some requirements to the different
-types of tokens.
+A production IAM must have a clear server-authoritative model for sessions and 
+tokens. The platform has session/auth-attempt primitives and token metadata, 
+but lacks a consolidated architecture for token classes, refresh token rotation/
+binding/replay detection, revocation semantics, and how logout/password/factor 
+changes invalidate credentials. This ADR will define the authoritative session 
+model, token families, revocation propagation, and incident/administrative 
+invalidation flows. Without this, token misuse, inconsistent invalidation, and 
+recovery gaps become likely.
 
 ## Decision
 
