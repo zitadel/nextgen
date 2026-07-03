@@ -290,19 +290,6 @@ func NewBytesCondition[V Bytes](col Column, op BytesOperation, value any) Condit
 	}
 }
 
-// NewJSONTextCondition creates a text condition against the value at path inside a JSON column.
-// The extracted value is compared as text, reusing the standard text operator machinery
-// (so ignore-case operations render as LOWER(...) on both sides).
-func NewJSONTextCondition(col Column, op TextOperation, value string, path ...string) Condition {
-	return NewTextCondition(JSONText(col, path...), op, value)
-}
-
-// NewJSONNumberCondition creates a numeric condition against the value at path inside a JSON column.
-// The extracted value is cast to numeric before comparison, e.g. (col->>$1)::numeric > $2.
-func NewJSONNumberCondition[V Number](col Column, op NumberOperation, value V, path ...string) Condition {
-	return NewNumberCondition(jsonNumeric(col, path...), op, value)
-}
-
 // NewColumnCondition creates a condition that compares two columns on equality.
 func NewColumnCondition(col1, col2 Column) Condition {
 	return valueCondition{
