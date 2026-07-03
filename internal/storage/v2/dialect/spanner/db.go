@@ -2,7 +2,6 @@ package spanner
 
 import (
 	"context"
-	"errors"
 
 	"cloud.google.com/go/spanner"
 )
@@ -116,5 +115,3 @@ func collectOneRow[T any](iter *spanner.RowIterator, scan func(*spanner.Row) (T,
 	}
 	return item, nil
 }
-
-var errTooManyRows = errors.New("spanner: multiple rows in result set")

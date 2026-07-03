@@ -10,6 +10,8 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
+var errTooManyRows = errors.New("spanner: multiple rows in result set")
+
 func wrapError(err error) error {
 	if err == nil {
 		return nil
