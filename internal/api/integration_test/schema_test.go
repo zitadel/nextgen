@@ -218,7 +218,7 @@ func TestSchemaRevisions(t *testing.T) {
 					`{
                   "title": "without id",
                   "$schema": "https://json-schema.org/draft/2020-12/schema",
-                  "userType": "client-does-not-provision-id",
+                  "objectType": "client-does-not-provision-id",
                   "metaSchema": "%s/user-schema.json",
                   "kind": "user-schema",
                   "type": "object",
@@ -234,7 +234,7 @@ func TestSchemaRevisions(t *testing.T) {
 					`{
                   "title": "without id",
                   "$schema": "https://json-schema.org/draft/2020-12/schema",
-                  "userType": "client-does-not-provision-id",
+                  "objectType": "client-does-not-provision-id",
                   "metaSchema": "%s/user-schema.json",
                   "kind": "user-schema",
                   "type": "object",
@@ -250,7 +250,7 @@ func TestSchemaRevisions(t *testing.T) {
 					`{
                   "title": "without id",
                   "$schema": "https://json-schema.org/draft/2020-12/schema",
-                  "userType": "client-does-not-provision-id",
+                  "objectType": "client-does-not-provision-id",
                   "metaSchema": "%s/user-schema.json",
                   "kind": "user-schema",
                   "type": "object",
@@ -290,8 +290,8 @@ func TestSchemaRevisions(t *testing.T) {
 			resp, err := client.ListSchemas(
 				t.Context(),
 				api.ListSchemasParams{
-					ProjectID: api.ProjectID(project.ID),
-					UserType:  api.OptString{Value: tc.userType, Set: true},
+					ProjectID:  api.ProjectID(project.ID),
+					ObjectType: api.OptString{Value: tc.userType, Set: true},
 				},
 			)
 			require.NoError(t, err)

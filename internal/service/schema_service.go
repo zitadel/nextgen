@@ -130,13 +130,13 @@ func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID 
 	return schema, nil
 }
 
-func (s *SchemaService) ListSchemas(ctx context.Context, projectID, userType string, offset int, token string) ([]ListSchemasOutputItem, error) {
+func (s *SchemaService) ListSchemas(ctx context.Context, projectID, objectType string, offset int, token string) ([]ListSchemasOutputItem, error) {
 	conditions := []database.Condition{
 		s.schemaRepo.ProjectIDCondition(projectID),
 	}
-	if userType != "" {
+	if objectType != "" {
 		conditions = append(conditions,
-			s.schemaRepo.PayloadTextCondition(database.TextOperationEqual, userType, "userType"),
+			s.schemaRepo.ObjectTypeCondition(objectType),
 		)
 	}
 
@@ -147,6 +147,7 @@ func (s *SchemaService) ListSchemas(ctx context.Context, projectID, userType str
 		database.WithOrderByDescending(s.schemaRepo.CreatedAt()),
 	}
 
+	// TODO: make list not return the entire schema, just the fields we want
 	schemas, err := s.schemaRepo.List(ctx, s.pool, opts...)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to list schemas")

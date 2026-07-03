@@ -5370,15 +5370,15 @@ func (c *Client) sendListSchemas(ctx context.Context, params ListSchemasParams) 
 		}
 	}
 	{
-		// Encode "user_type" parameter.
+		// Encode "object_type" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "user_type",
+			Name:    "object_type",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.UserType.Get(); ok {
+			if val, ok := params.ObjectType.Get(); ok {
 				return e.EncodeValue(conv.StringToString(val))
 			}
 			return nil

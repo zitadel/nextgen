@@ -11169,7 +11169,7 @@ type UserSchema struct {
 	// The JSON Schema version used for this schema.
 	Schema OptString `json:"$schema"`
 	// The type of user this schema describes. This is a customer chosen name.
-	UserType OptString `json:"userType"`
+	ObjectType OptString `json:"objectType"`
 	// Discriminator value for a user schema create request.
 	Kind string `json:"kind"`
 	// The user Schema version used for this schema.
@@ -11186,9 +11186,9 @@ func (s *UserSchema) GetSchema() OptString {
 	return s.Schema
 }
 
-// GetUserType returns the value of UserType.
-func (s *UserSchema) GetUserType() OptString {
-	return s.UserType
+// GetObjectType returns the value of ObjectType.
+func (s *UserSchema) GetObjectType() OptString {
+	return s.ObjectType
 }
 
 // GetKind returns the value of Kind.
@@ -11221,9 +11221,9 @@ func (s *UserSchema) SetSchema(val OptString) {
 	s.Schema = val
 }
 
-// SetUserType sets the value of UserType.
-func (s *UserSchema) SetUserType(val OptString) {
-	s.UserType = val
+// SetObjectType sets the value of ObjectType.
+func (s *UserSchema) SetObjectType(val OptString) {
+	s.ObjectType = val
 }
 
 // SetKind sets the value of Kind.

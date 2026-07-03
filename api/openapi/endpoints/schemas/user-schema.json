@@ -19,7 +19,7 @@
       "const": "https://json-schema.org/draft/2020-12/schema",
       "description": "The JSON Schema version used for this schema."
     },
-    "userType": {
+    "objectType": {
       "type": "string",
       "maxLength": 256,
       "description": "The type of user this schema describes. This is a customer chosen name.",

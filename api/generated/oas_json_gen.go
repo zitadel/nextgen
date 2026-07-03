@@ -4029,9 +4029,9 @@ func (s CreateSchemaReq) encodeFields(e *jx.Encoder) {
 				e.Str("https://json-schema.org/draft/2020-12/schema")
 			}
 			{
-				if s.UserType.Set {
-					e.FieldStart("userType")
-					s.UserType.Encode(e)
+				if s.ObjectType.Set {
+					e.FieldStart("objectType")
+					s.ObjectType.Encode(e)
 				}
 			}
 			{
@@ -10189,9 +10189,9 @@ func (s GetSchemaByIdOK) encodeFields(e *jx.Encoder) {
 				e.Str("https://json-schema.org/draft/2020-12/schema")
 			}
 			{
-				if s.UserType.Set {
-					e.FieldStart("userType")
-					s.UserType.Encode(e)
+				if s.ObjectType.Set {
+					e.FieldStart("objectType")
+					s.ObjectType.Encode(e)
 				}
 			}
 			{
@@ -20271,9 +20271,9 @@ func (s *UserSchema) encodeFields(e *jx.Encoder) {
 		e.Str("https://json-schema.org/draft/2020-12/schema")
 	}
 	{
-		if s.UserType.Set {
-			e.FieldStart("userType")
-			s.UserType.Encode(e)
+		if s.ObjectType.Set {
+			e.FieldStart("objectType")
+			s.ObjectType.Encode(e)
 		}
 	}
 	{
@@ -20305,7 +20305,7 @@ func (s *UserSchema) encodeFields(e *jx.Encoder) {
 
 var jsonFieldsNameOfUserSchema = [6]string{
 	0: "$schema",
-	1: "userType",
+	1: "objectType",
 	2: "kind",
 	3: "metaSchema",
 	4: "x-auth-methods",
@@ -20332,15 +20332,15 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"$schema\"")
 			}
-		case "userType":
+		case "objectType":
 			if err := func() error {
-				s.UserType.Reset()
-				if err := s.UserType.Decode(d); err != nil {
+				s.ObjectType.Reset()
+				if err := s.ObjectType.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"userType\"")
+				return errors.Wrap(err, "decode field \"objectType\"")
 			}
 		case "kind":
 			requiredBitSet[0] |= 1 << 2

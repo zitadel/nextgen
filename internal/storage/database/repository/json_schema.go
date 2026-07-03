@@ -16,10 +16,11 @@ type JSONSchemaRepository struct {
 	now           database.Instruction
 	encodePayload func([]byte) any
 
-	columnProjectID database.Column
-	columnURL       database.Column
-	columnCreatedAt database.Column
-	columnPayload   database.Column
+	columnProjectID  database.Column
+	columnURL        database.Column
+	columnObjectType database.Column
+	columnCreatedAt  database.Column
+	columnPayload    database.Column
 }
 
 func NewJSONSchemaRepository(client database.QueryExecutor) *JSONSchemaRepository {
@@ -37,13 +38,14 @@ func NewJSONSchemaRepository(client database.QueryExecutor) *JSONSchemaRepositor
 
 func newJSONSchemaRepository(table string, now database.Instruction, encodePayload func([]byte) any) *JSONSchemaRepository {
 	return &JSONSchemaRepository{
-		table:           table,
-		now:             now,
-		encodePayload:   encodePayload,
-		columnProjectID: database.NewColumn(table, "project_id"),
-		columnURL:       database.NewColumn(table, "url"),
-		columnCreatedAt: database.NewColumn(table, "created_at"),
-		columnPayload:   database.NewColumn(table, "payload"),
+		table:            table,
+		now:              now,
+		encodePayload:    encodePayload,
+		columnProjectID:  database.NewColumn(table, "project_id"),
+		columnURL:        database.NewColumn(table, "url"),
+		columnObjectType: database.NewColumn(table, "object_type"),
+		columnCreatedAt:  database.NewColumn(table, "created_at"),
+		columnPayload:    database.NewColumn(table, "payload"),
 	}
 }
 
@@ -61,6 +63,10 @@ func (r *JSONSchemaRepository) ProjectID() database.Column {
 
 func (r *JSONSchemaRepository) URL() database.Column {
 	return r.columnURL
+}
+
+func (r *JSONSchemaRepository) ObjectType() database.Column {
+	return r.columnObjectType
 }
 
 func (r *JSONSchemaRepository) CreatedAt() database.Column {
@@ -86,9 +92,8 @@ func (r *JSONSchemaRepository) URLCondition(url string) database.Condition {
 	return database.NewTextCondition(r.URL(), database.TextOperationEqual, url)
 }
 
-// PayloadTextCondition creates a text condition against the value at path inside the payload JSON column.
-func (r *JSONSchemaRepository) PayloadTextCondition(op database.TextOperation, value string, path ...string) database.Condition {
-	return database.NewJSONTextCondition(r.Payload(), op, value, path...)
+func (r *JSONSchemaRepository) ObjectTypeCondition(objectType string) database.Condition {
+	return database.NewTextCondition(r.ObjectType(), database.TextOperationEqual, objectType)
 }
 
 func (r *JSONSchemaRepository) GetByID(ctx context.Context, client database.QueryExecutor, projectID string, schemaID string) (*domain.JSONSchema, error) {
@@ -123,6 +128,7 @@ func (r *JSONSchemaRepository) List(ctx context.Context, client database.QueryEx
 	database.Columns{
 		r.ProjectID(),
 		r.URL(),
+		r.ObjectType(),
 		r.CreatedAt(),
 		r.Payload(),
 	}.WriteQualified(builder)
@@ -152,6 +158,7 @@ func (r *JSONSchemaRepository) Create(ctx context.Context, client database.Query
 	database.Columns{
 		r.ProjectID(),
 		r.URL(),
+		r.ObjectType(),
 		r.CreatedAt(),
 		r.Payload(),
 	}.WriteUnqualified(builder)
@@ -159,6 +166,7 @@ func (r *JSONSchemaRepository) Create(ctx context.Context, client database.Query
 	builder.WriteArgs(
 		schema.ProjectID,
 		schema.URL,
+		schema.ObjectType,
 		r.now,
 		r.encodePayload(schema.Schema),
 	)
@@ -173,18 +181,20 @@ func (r *JSONSchemaRepository) Delete(ctx context.Context, client database.Query
 }
 
 type jsonSchemaRow struct {
-	ProjectID string                `db:"project_id"`
-	URL       string                `db:"url"`
-	CreatedAt time.Time             `db:"created_at"`
-	Payload   JSON[json.RawMessage] `db:"payload"`
+	ProjectID  string                `db:"project_id"`
+	URL        string                `db:"url"`
+	ObjectType *string               `db:"object_type"`
+	CreatedAt  time.Time             `db:"created_at"`
+	Payload    JSON[json.RawMessage] `db:"payload"`
 }
 
 func (r *jsonSchemaRow) toDomain() *domain.JSONSchema {
 	return &domain.JSONSchema{
-		ProjectID: r.ProjectID,
-		URL:       r.URL,
-		CreatedAt: r.CreatedAt,
-		Schema:    r.Payload.Value,
+		ProjectID:  r.ProjectID,
+		URL:        r.URL,
+		ObjectType: r.ObjectType,
+		CreatedAt:  r.CreatedAt,
+		Schema:     r.Payload.Value,
 	}
 }
 

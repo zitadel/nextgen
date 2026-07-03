@@ -2745,7 +2745,7 @@ func (s *UserSchema) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
-		if value, ok := s.UserType.Get(); ok {
+		if value, ok := s.ObjectType.Get(); ok {
 			if err := func() error {
 				if err := (validate.String{
 					MinLength:     0,
@@ -2770,7 +2770,7 @@ func (s *UserSchema) Validate() error {
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "userType",
+			Name:  "objectType",
 			Error: err,
 		})
 	}

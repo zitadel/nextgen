@@ -3949,8 +3949,8 @@ type ListSchemasParams struct {
 	// Omit to start from the beginning.
 	// Its format is opaque and may change between releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The userType of the schema to filter by.
-	UserType OptString `json:",omitempty,omitzero"`
+	// The type of object of the schema to filter by.
+	ObjectType OptString `json:",omitempty,omitzero"`
 }
 
 func unpackListSchemasParams(packed middleware.Parameters) (params ListSchemasParams) {
@@ -3981,11 +3981,11 @@ func unpackListSchemasParams(packed middleware.Parameters) (params ListSchemasPa
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "user_type",
+			Name: "object_type",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
-			params.UserType = v.(OptString)
+			params.ObjectType = v.(OptString)
 		}
 	}
 	return params
@@ -4163,17 +4163,17 @@ func decodeListSchemasParams(args [0]string, argsEscaped bool, r *http.Request) 
 			Err:  err,
 		}
 	}
-	// Decode query: user_type.
+	// Decode query: object_type.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "user_type",
+			Name:    "object_type",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotUserTypeVal string
+				var paramsDotObjectTypeVal string
 				if err := func() error {
 					val, err := d.DecodeValue()
 					if err != nil {
@@ -4185,18 +4185,18 @@ func decodeListSchemasParams(args [0]string, argsEscaped bool, r *http.Request) 
 						return err
 					}
 
-					paramsDotUserTypeVal = c
+					paramsDotObjectTypeVal = c
 					return nil
 				}(); err != nil {
 					return err
 				}
-				params.UserType.SetTo(paramsDotUserTypeVal)
+				params.ObjectType.SetTo(paramsDotObjectTypeVal)
 				return nil
 			}); err != nil {
 				return err
 			}
 			if err := func() error {
-				if value, ok := params.UserType.Get(); ok {
+				if value, ok := params.ObjectType.Get(); ok {
 					if err := func() error {
 						if err := (validate.String{
 							MinLength:     0,
@@ -4226,7 +4226,7 @@ func decodeListSchemasParams(args [0]string, argsEscaped bool, r *http.Request) 
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "user_type",
+			Name: "object_type",
 			In:   "query",
 			Err:  err,
 		}

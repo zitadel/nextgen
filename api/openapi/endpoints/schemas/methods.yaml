@@ -85,10 +85,9 @@ get:
     - $ref: ../../components/parameters/project-id.yaml
     - $ref: ../../components/parameters/offset.yaml
     - $ref: ../../components/parameters/page-token.yaml
-      # TODO: user-type is specific for user schemas. The list schemas endpoint works for all kinds of schemas. This should be made more generic
-    - name: user_type
+    - name: object_type
       in: query
-      description: The userType of the schema to filter by.
+      description: The type of object of the schema to filter by.
       schema:
         type: string
         maxLength: 256
