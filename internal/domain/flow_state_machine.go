@@ -142,9 +142,6 @@ const FlowActionPasskey = "passkey"
 const FlowActionPasskeyRegister = "passkey_register"
 
 // flowBackActionName is the name attached to the injected back action.
-// The client dispatches on FlowActionKindBack, but the submit wire
-// protocol only carries the action name, so the engine echoes it back
-// to reclassify the submission as back.
 const flowBackActionName = "back"
 
 // FlowChallengeMethodPasskey is the [FlowStepChallenge.Method] /
@@ -318,13 +315,6 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	pc := &processCtx{ctx: ctx, client: client, def: def, state: state, currentStep: currentStep, in: in}
 	actionKind := stepActionKind(currentStep, in.Action)
 
-	// Back is engine-injected, so it's not in step.Actions and
-	// stepActionKind returns unset. Recover the kind when the
-	// submission names it; processBack rejects the empty-stack case.
-	if actionKind == FlowActionKindUnset && in.Action == flowBackActionName {
-		actionKind = FlowActionKindBack
-	}
-
 	// Back and Navigate both skip the input pipeline entirely.
 	if actionKind == FlowActionKindBack {
 		return r.processBack(pc)
@@ -440,8 +430,10 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 	applyOutcomeFlip(pc.state, outcome)
 
 	r.advance(pc.state, pc.currentStep, prevPurpose, nextStep.Name)
+
+	// after irreversible actions, clear the back stack so the user can't navigate back in the flow.
 	if irreversible {
-		pc.state.BackStack = nil
+		pc.state.ClearBackStack()
 	}
 
 	if nextStep.Complete != nil {
@@ -1015,8 +1007,10 @@ func (r *FlowStateMachineRuntime) processBack(pc *processCtx) (FlowStepResult, e
 }
 
 // terminate renders a completed step and, when a user was resolved,
-// mints the handoff. Returns the full FlowStepResult.
+// mints the handoff. Clears BackStack — no back past a
+// point-of-no-return.
 func (r *FlowStateMachineRuntime) terminate(pc *processCtx, step *FlowDefinitionStep) (FlowStepResult, error) {
+	pc.state.ClearBackStack()
 	rendered, err := r.renderStep(pc.ctx, pc.client, pc.def, pc.state)
 	if err != nil {
 		return FlowStepResult{}, err
@@ -1183,16 +1177,22 @@ func stepHasActionKind(step *FlowDefinitionStep, kind FlowActionKind) bool {
 // stepActionKind returns the kind of the step's action with the given name.
 // Returns the zero value (unset) when name does not match any action on the
 // step — including the empty action submitted by passive POSTs.
-func stepActionKind(step *FlowDefinitionStep, name string) FlowActionKind {
-	if name == "" {
-		return 0
+func stepActionKind(step *FlowDefinitionStep, actionName string) FlowActionKind {
+	if actionName == "" {
+		return FlowActionKindUnset
 	}
 	for _, a := range step.Actions {
-		if a.Name == name {
+		if a.Name == actionName {
 			return a.Kind
 		}
 	}
-	return 0
+
+	// back is not always defined in the step.Actions, it might be auto-injected.
+	if actionName == flowBackActionName {
+		return FlowActionKindBack
+	}
+
+	return FlowActionKindUnset
 }
 
 // recordResolvedUser stores the resolved user id; if it changed, any

@@ -2377,7 +2377,7 @@ func TestFlowStateMachine_Back_OmittedOnTerminalStep(t *testing.T) {
 
 	require.Equal(t, "done", term.Step.Name)
 	require.NotNil(t, term.Step.Complete)
-	assert.NotEmpty(t, term.State.BackStack, "back stack persists across navigate-kind advances")
+	assert.Empty(t, term.State.BackStack, "terminate must clear the back stack — no back past a point-of-no-return")
 	assert.Nil(t, findBackAction(term.Step), "terminal step must not carry an injected back action")
 }
 

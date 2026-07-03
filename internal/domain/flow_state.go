@@ -161,6 +161,12 @@ type FlowBackEntry struct {
 	Purpose FlowDefinitionPurpose
 }
 
+// ClearBackStack drops any accumulated back-navigation entries. Called
+// past irreversible mutations and at flow termination.
+func (s *FlowState) ClearBackStack() {
+	s.BackStack = nil
+}
+
 type CollectedFlowData struct {
 	UserData    map[string]any
 	UserID      string
