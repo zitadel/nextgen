@@ -12,6 +12,12 @@ var defaultHumanUserSchema []byte
 //go:embed default-login.json
 var defaultLoginFlowDefinition []byte
 
+//go:embed README-schemas.md
+var schemasReadme []byte
+
+//go:embed README-flows.md
+var flowsReadme []byte
+
 // DefaultHumanUserSchema returns a copy of the default human user schema template.
 func DefaultHumanUserSchema() []byte {
 	return append([]byte(nil), defaultHumanUserSchema...)
@@ -20,4 +26,16 @@ func DefaultHumanUserSchema() []byte {
 // DefaultLoginFlowDefinition returns a copy of the default login flow template.
 func DefaultLoginFlowDefinition() []byte {
 	return append([]byte(nil), defaultLoginFlowDefinition...)
+}
+
+// SchemasReadme returns the README content the CLI copies to
+// `.zitadel/schemas/README.md` at setup time.
+func SchemasReadme() []byte {
+	return append([]byte(nil), schemasReadme...)
+}
+
+// FlowsReadme returns the README content the CLI copies to
+// `.zitadel/flows/README.md` at setup time.
+func FlowsReadme() []byte {
+	return append([]byte(nil), flowsReadme...)
 }

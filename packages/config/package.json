@@ -15,6 +15,7 @@
   "files": [
     "dist",
     "defaults/*.json",
+    "defaults/*.md",
     "LICENSE"
   ],
   "type": "module",

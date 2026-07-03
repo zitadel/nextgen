@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import type {
   CreateFlowDefinition201,
@@ -10,8 +10,11 @@ import {
   DEFAULT_FLOW_CONFIG_PATH,
   DEFAULT_FLOW_SCHEMA_URI,
   DEFAULT_SCHEMA_CONFIG_PATH,
+  flowsReadmeContent,
   getDefaultHumanUserSchema,
   getDefaultLoginFlow,
+  resolveSchemaUrl,
+  schemasReadmeContent,
 } from "@zitadel/config/defaults";
 
 import { FLOWS_DIR } from "./flows";
@@ -31,20 +34,28 @@ export type MaterializeSetupResourcesResult = {
  * IDs, hashes, and flow metadata the sync engine expects. Setup calls this only
  * after the framework patcher has created `.zitadel/{flows,schemas}` and the
  * initial state file.
+ *
+ * The upload sequence is: write the local schema file → `POST /schemas` and
+ * capture the server-assigned id → compose the resolved schema URL from the
+ * server base and that id → render the flow template with that URL and write
+ * it to disk → `POST /flow_definitions`. The schema URL is server-assigned
+ * per revision (see ADR 009), so the flow's `user_schema` can only be filled
+ * in after the create call returns.
  */
 export async function materializeSetupResources(opts: {
   cwd: string;
   client: ZitadelClient;
   projectId: string;
   force: boolean;
+  serverBaseUrl: string;
 }): Promise<MaterializeSetupResourcesResult> {
   await mkdir(join(opts.cwd, FLOWS_DIR), { recursive: true });
   await mkdir(join(opts.cwd, SCHEMAS_DIR), { recursive: true });
 
   const filesWritten: string[] = [];
 
-  const schemaBody = getDefaultHumanUserSchema();
-  const flowBody = getDefaultLoginFlow();
+  const builtinSchemaBase = joinPath(opts.serverBaseUrl, "/api/schemas");
+  const schemaBody = getDefaultHumanUserSchema({ builtinSchemaBase });
 
   const schemaWritten = await writeResourceFile(
     opts.cwd,
@@ -56,6 +67,18 @@ export async function materializeSetupResources(opts: {
     filesWritten.push(join(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH));
   }
 
+  const schema = (await opts.client.createSchema(schemaBody, {
+    project_id: opts.projectId,
+  })) as CreateSchema201;
+  const schemaId = requiredString(schema.id, "created schema id");
+  const userSchemaUrl = resolveSchemaUrl(schemaId, builtinSchemaBase);
+  await updateState(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH, {
+    id: schemaId,
+    hash: hashWrittenBody(schemaBody),
+    url: userSchemaUrl,
+  });
+  const flowBody = getDefaultLoginFlow({ userSchemaUrl });
+
   const flowWritten = await writeResourceFile(
     opts.cwd,
     DEFAULT_FLOW_CONFIG_PATH,
@@ -65,14 +88,6 @@ export async function materializeSetupResources(opts: {
   if (flowWritten) {
     filesWritten.push(join(opts.cwd, DEFAULT_FLOW_CONFIG_PATH));
   }
-
-  const schema = (await opts.client.createSchema(schemaBody, {
-    project_id: opts.projectId,
-  })) as CreateSchema201;
-  await updateState(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH, {
-    id: requiredString(schema.id, "created schema id"),
-    hash: hashWrittenBody(schemaBody),
-  });
 
   const flow = (await opts.client.createFlowDefinition({
     project_id: opts.projectId,
@@ -86,6 +101,15 @@ export async function materializeSetupResources(opts: {
     name: flowBody.name,
     status: flow.status,
   });
+
+  const schemasReadme = join(SCHEMAS_DIR, "README.md");
+  const flowsReadme = join(FLOWS_DIR, "README.md");
+  if (await writeReadmeFile(opts.cwd, schemasReadme, schemasReadmeContent())) {
+    filesWritten.push(join(opts.cwd, schemasReadme));
+  }
+  if (await writeReadmeFile(opts.cwd, flowsReadme, flowsReadmeContent())) {
+    filesWritten.push(join(opts.cwd, flowsReadme));
+  }
 
   return { filesWritten };
 }
@@ -110,6 +134,29 @@ async function writeResourceFile(
   }
 }
 
+/**
+ * Write a README file, but never overwrite an existing one. A developer who
+ * has edited the README should keep their edits when `setup --force` is
+ * re-run.
+ */
+async function writeReadmeFile(
+  cwd: string,
+  relPath: string,
+  content: string,
+): Promise<boolean> {
+  const dest = join(cwd, relPath);
+  await mkdir(dirname(dest), { recursive: true });
+  try {
+    await writeFile(dest, content, { flag: "wx" });
+    return true;
+  } catch (error) {
+    if (isErrno(error, "EEXIST")) {
+      return false;
+    }
+    throw error;
+  }
+}
+
 function hashWrittenBody(body: object): string {
   // Match the exact normalized JSON shape written to disk so setup-seeded
   // state is immediately comparable with the sync planner.
@@ -121,6 +168,12 @@ function requiredString(value: unknown, label: string): string {
     return value;
   }
   throw new ZitadelError("E_VALIDATION", `Missing ${label} in server response.`);
+}
+
+function joinPath(baseUrl: string, path: string): string {
+  const base = baseUrl.replace(/\/+$/u, "");
+  const suffix = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${suffix}`;
 }
 
 function isErrno(error: unknown, code: string): boolean {

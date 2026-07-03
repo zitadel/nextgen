@@ -6,7 +6,7 @@ import type {
   GetFlowDefinition200,
 } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "@zitadel/api/client";
-import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
+import { DEFAULT_FLOW_SCHEMA_URI, resolveSchemaUrl } from "@zitadel/config/defaults";
 import { flowConfigSchema, schemaConfigSchema } from "@zitadel/config/schemas";
 
 import { FLOWS_DIR, flowEnvRefs, validateFlows } from "../flows";
@@ -19,19 +19,23 @@ type EnvLookup = Record<string, string | undefined>;
 
 /**
  * Build the syncer list with the context every syncer needs: the
- * `project_id` flow creates carry, and the runtime `env` against which
- * each file's `${VAR}` / `*_env` references are checked. Callers
- * (apply / plan / setup) read `project_id` from `.zitadel/secret` and
- * pass the process environment. The returned array is treated as
- * read-only by the sync loop.
+ * `project_id` flow creates carry, the runtime `env` against which
+ * each file's `${VAR}` / `*_env` references are checked, and the
+ * `serverBaseUrl` revisioned syncers use to compose the URL a new
+ * revision is reachable at. Callers (apply / plan / setup) read
+ * `project_id` from `.zitadel/secret`, pass the process environment,
+ * and pass the resolved server base (`this.meta.source`). The returned
+ * array is treated as read-only by the sync loop.
  */
 export function makeSyncers(opts: {
   client: ZitadelClient;
   projectId: string;
   env: EnvLookup;
+  serverBaseUrl: string;
 }): ReadonlyArray<ResourceSyncer> {
+  const schemasBase = joinPath(opts.serverBaseUrl, "/api/schemas");
   return [
-    new SchemaSyncer(opts.client, opts.projectId, opts.env),
+    new SchemaSyncer(opts.client, opts.projectId, opts.env, schemasBase),
     new FlowDefinitionSyncer(opts.client, opts.projectId, opts.env),
   ];
 }
@@ -53,11 +57,13 @@ class SchemaSyncer implements ResourceSyncer {
   readonly kind = "schema";
   readonly directory = SCHEMAS_DIR;
   readonly mutable = false;
+  readonly revisioned = true;
 
   constructor(
     private readonly client: ZitadelClient,
     private readonly projectId: string,
     private readonly env: EnvLookup,
+    private readonly schemasBaseUrl: string,
   ) {}
 
   /**
@@ -83,9 +89,14 @@ class SchemaSyncer implements ResourceSyncer {
     return result.id;
   }
 
-  /** Never called — schemas are immutable on the platform, so `mutable = false`. */
+  /**
+   * Not called by the sync loop: schemas are `revisioned`, so a hash change
+   * publishes a new immutable revision through {@link create} rather than
+   * mutating an existing row. Kept as a required interface member; throws
+   * loudly if a caller reaches it.
+   */
   async update(_id: string, _data: object): Promise<void> {
-    return;
+    throw new ZitadelError("E_NOT_IMPLEMENTED", "schemas are revisioned — edit publishes a new revision, not an update");
   }
 
   async delete(id: string): Promise<void> {
@@ -104,12 +115,17 @@ class SchemaSyncer implements ResourceSyncer {
     });
     return body as unknown as GetSchemaById200;
   }
+
+  resolveUrl(id: string): string {
+    return resolveSchemaUrl(id, this.schemasBaseUrl);
+  }
 }
 
 class FlowDefinitionSyncer implements ResourceSyncer {
   readonly kind = "flow";
   readonly directory = FLOWS_DIR;
   readonly mutable = true;
+  readonly revisioned = false;
 
   constructor(
     private readonly client: ZitadelClient,
@@ -193,4 +209,10 @@ class FlowDefinitionSyncer implements ResourceSyncer {
     } = envelope;
     return body;
   }
+}
+
+function joinPath(baseUrl: string, path: string): string {
+  const base = baseUrl.replace(/\/+$/u, "");
+  const suffix = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${suffix}`;
 }

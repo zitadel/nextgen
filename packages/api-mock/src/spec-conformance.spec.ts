@@ -214,7 +214,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(res.status).toBe(201);
     const body = (await res.json()) as Record<string, unknown>;
     expect(typeof body.id).toBe("string");
-    expect((body.id as string).startsWith("schema_")).toBe(true);
+    expect((body.id as string).startsWith("sch_")).toBe(true);
   });
 
   test("POST /schemas with invalid kind returns spec-compliant 400 envelope", async () => {
