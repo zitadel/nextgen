@@ -93,7 +93,7 @@ contain, but is not limited to:
 By creating key sets per project, they can be rotated in case of a leak or
 incident. Since all keys are asymmetric, data encrytped/signed with previous
 keys can still be decrypted/verified. The private keys never leave our system.
-The public keys can be requested in the form of a [JWK](https://datatracker.ietf.org/doc/html/rfc7517).
+The public signing keys can be requested in the form of a [JWK](https://datatracker.ietf.org/doc/html/rfc7517).
 
 #### Auto-rotation
 
