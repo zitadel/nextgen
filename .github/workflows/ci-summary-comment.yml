@@ -1,0 +1,36 @@
+name: ci-summary-comment
+
+on:
+  workflow_run:
+    workflows:
+      - ci
+    types:
+      - completed
+
+permissions: {}
+
+jobs:
+  pr-comment:
+    if: ${{ github.event.workflow_run.event == 'pull_request' }}
+    runs-on: depot-ubuntu-24.04-4
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download CI diagnostics
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: ci-diagnostics
+          path: ci-diagnostics
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Comment on PR
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/comment-ci-summary.mjs --summary ci-diagnostics/pr-comment.md

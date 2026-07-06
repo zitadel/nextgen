@@ -16,6 +16,8 @@ jobs:
   full-pr:
     runs-on: depot-ubuntu-24.04-16
     timeout-minutes: 120
+    env:
+      CI_DIAGNOSTICS_DIR: ${{ runner.temp }}/ci-diagnostics
     steps:
       - uses: actions/checkout@v6
         with:
@@ -38,27 +40,27 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: corepack pnpm install --frozen-lockfile
+        run: node scripts/ci-run.mjs --id install --name "Install dependencies" --rerun "corepack pnpm install --frozen-lockfile" -- corepack pnpm install --frozen-lockfile
 
       - name: Detect CI mode
         id: ci-mode
-        run: node scripts/ci-mode.mjs "${{ github.event.pull_request.base.sha || 'origin/main' }}"
+        run: node scripts/ci-run.mjs --id ci-mode --name "Detect CI mode" --rerun "node scripts/ci-mode.mjs origin/main" -- node scripts/ci-mode.mjs "${{ github.event.pull_request.base.sha || 'origin/main' }}"
 
       - name: Check Go generated files
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: moon run server:check-generate
+        run: node scripts/ci-run.mjs --id go-generate --name "Check Go generated files" --rerun "moon run server:check-generate" -- moon run --summary detailed server:check-generate
 
       - name: Run Moon build and test graph
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: moon ci :lint :typecheck :build :test
+        run: node scripts/ci-run.mjs --id moon-graph --name "Run Moon build and test graph" --rerun "moon ci :lint :typecheck :build :test" -- moon ci --summary detailed :lint :typecheck :build :test
 
       - name: Run Go tests
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: moon run server:test
+        run: node scripts/ci-run.mjs --id go-test --name "Run Go tests" --rerun "moon run server:test" -- moon run --summary detailed server:test
 
       - name: Run Go integration tests (postgres)
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: moon run server:test-postgres
+        run: node scripts/ci-run.mjs --id go-postgres --name "Run Go integration tests (postgres)" --rerun "moon run server:test-postgres" -- moon run --summary detailed server:test-postgres
 
       # Spanner integration tests are not run in CI yet: the v2 spanner statement
       # layer is unimplemented (see zitadel/nextgen#457). Re-enable via
@@ -66,31 +68,58 @@ jobs:
 
       - name: Build release snapshot without container
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container
+        run: node scripts/ci-run.mjs --id release-snapshot --name "Build release snapshot without container" --rerun "moon run release:snapshot -- --skip-container" -- env -u CI -u GITHUB_ACTIONS moon run --summary detailed release:snapshot -- --skip-container
 
       - name: Run binary fresh-app journey
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: |
-          version="$(node -p "require('./apps/server/package.json').version")"
-          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- \
-            --runtime binary \
-            --concurrency 5 \
-            --work-dir "${RUNNER_TEMP}/ci-journey" \
-            --tarballs-dir "dist/release/${version}/npm"
+        run: >
+          node scripts/ci-run.mjs
+          --id journey
+          --name "Run binary fresh-app journey"
+          --rerun "moon run cli-journey-e2e:e2e-local -- --runtime binary --concurrency 5 --work-dir <tmp>/ci-journey --tarballs-dir dist/release/<version>/npm"
+          --
+          bash -euo pipefail -c
+          'version="$(node -p "require(\"./apps/server/package.json\").version")";
+          env -u CI -u GITHUB_ACTIONS moon run --summary detailed cli-journey-e2e:e2e-local --
+          --runtime binary
+          --concurrency 5
+          --work-dir "${RUNNER_TEMP}/ci-journey"
+          --tarballs-dir "dist/release/${version}/npm"'
 
       - name: Validate version PR
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run release:version
+        run: node scripts/ci-run.mjs --id release-version --name "Validate version PR" --rerun "moon run release:version" -- env -u CI -u GITHUB_ACTIONS moon run --summary detailed release:version
 
       - name: Pack version PR artifacts
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run release:pack
+        run: node scripts/ci-run.mjs --id release-pack --name "Pack version PR artifacts" --rerun "moon run release:pack" -- env -u CI -u GITHUB_ACTIONS moon run --summary detailed release:pack
 
       - name: Verify version PR tarballs
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
-        run: |
-          version="$(node -p "require('./apps/server/package.json').version")"
-          node apps/cli-journey-e2e/scripts/verify-tarballs.mjs "dist/release/${version}/npm"
+        run: >
+          node scripts/ci-run.mjs
+          --id verify-version-tarballs
+          --name "Verify version PR tarballs"
+          --rerun "node apps/cli-journey-e2e/scripts/verify-tarballs.mjs dist/release/<version>/npm"
+          --
+          bash -euo pipefail -c
+          'version="$(node -p "require(\"./apps/server/package.json\").version")";
+          node apps/cli-journey-e2e/scripts/verify-tarballs.mjs "dist/release/${version}/npm"'
+
+      - name: Write CI diagnostics summary
+        if: ${{ always() }}
+        env:
+          CI_MODE: ${{ steps.ci-mode.outputs.mode || 'unknown' }}
+        run: node scripts/ci-summary.mjs --artifact-name ci-diagnostics
+
+      - name: Upload CI diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-diagnostics
+          path: ${{ runner.temp }}/ci-diagnostics
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Upload release snapshot
         if: ${{ always() }}
