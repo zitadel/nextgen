@@ -3,7 +3,7 @@
 > **Status:** Proposed
 > **Date:** 2026-07-03
 > **Context:** Audit logging for nextgen relational storage
-> **Builds on:** [ADR 028](028-storage-v2-statements-and-dialects.md), [ADR 010](010-session-auth-attempt-check-model.md), [ADR 011](011-resource-identifiers.md), [ADR 008](008-users-eav-store.md)
+> **Builds on:** [ADR 028](028-storage-v2-statements-and-dialects.md), [ADR 010](010-session-auth-attempt-check-model.md), [ADR 011](011-resource-identifiers.md), [ADR 008](008-users-eav-store.md), [oxidel ADR-023](https://github.com/zitadel/oxidel/blob/main/docs/adr/023-wide-events.md)
 > **Related:** [ADR 030](030-events-api-retention-export.md) (API, retention, export)
 
 ## Context
@@ -40,8 +40,9 @@ project begins emitting auditable events only after claim. Pre-claim activity is
 not retroactively audited. This is product policy, not a technical limitation of
 the storage model.
 
-This ADR adapts the wide-event model from oxidel ADR-023 for nextgen tenancy
-(`project_id` instead of `org_id`).
+This ADR adapts the wide-event model from
+[oxidel ADR-023](https://github.com/zitadel/oxidel/blob/main/docs/adr/023-wide-events.md)
+for nextgen tenancy (`project_id` instead of `org_id`).
 
 ## Decision
 
@@ -58,7 +59,6 @@ CREATE TABLE zitadel_nextgen.events (
     , id                BIGINT      GENERATED ALWAYS AS IDENTITY
     , event_type        TEXT        NOT NULL       -- 'user.deactivated', 'request.api', etc.
     , category          TEXT        NOT NULL       -- 'request', 'auth', 'session', 'admin', 'entity', 'signal'
-    , sequence          BIGINT      NOT NULL       -- per-project monotonic ordering
     , created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 
     -- WHO
@@ -66,9 +66,8 @@ CREATE TABLE zitadel_nextgen.events (
     , actor_type        TEXT                    -- 'human', 'service', 'system'
 
     -- WHAT
-    , aggregate_id      TEXT
-    , aggregate_type    TEXT                    -- 'user', 'session', 'project', etc.
-    , resource_type     TEXT
+    , entity_type       TEXT                    -- 'user', 'session', 'token', 'project', etc.
+    , entity_id         TEXT
 
     -- HOW (delegation context)
     , client_id         TEXT        NOT NULL DEFAULT ''
@@ -77,10 +76,6 @@ CREATE TABLE zitadel_nextgen.events (
 
     -- WHERE (device context)
     , fingerprint       TEXT        NOT NULL DEFAULT ''
-
-    -- SDK (informational only)
-    , sdk_name          TEXT        NOT NULL DEFAULT ''
-    , sdk_version       TEXT        NOT NULL DEFAULT ''
 
     -- WHEN (correlation scopes)
     , request_id        TEXT
@@ -91,23 +86,22 @@ CREATE TABLE zitadel_nextgen.events (
     , payload           JSONB       NOT NULL DEFAULT '{}'
     , metadata          JSONB       NOT NULL DEFAULT '{}'
 
-    -- Export lifecycle (see ADR 030)
-    , shipped_at        TIMESTAMPTZ
-
     , PRIMARY KEY (project_id, id)
 );
 ```
+
+Per-sink export delivery is tracked in a separate `event_deliveries` table; see
+[ADR 030 §3](030-events-api-retention-export.md).
 
 **Indexes** (define when query paths are concrete):
 
 - `(project_id, created_at, id)` — keyset list pagination ([ADR 027](027-cursor-based-pagination.md))
 - Partial indexes on high-cardinality filter columns: `category`, `actor_id`,
-  `client_id`, `session_id`, `request_id`, `event_type`
+  `client_id`, `session_id`, `request_id`, `event_type`, `entity_type`
 
-**Per-project sequence:** Assign `sequence` inside the same transaction as the
-event INSERT (e.g. `SELECT COALESCE(MAX(sequence), 0) + 1 FROM events WHERE
-project_id = $1 FOR UPDATE` or a dedicated counter row). Sequence gives stable
-ordering within a project independent of clock skew on `created_at`.
+**Ordering:** List and export use keyset pagination on `(created_at, id)` per
+[ADR 027](027-cursor-based-pagination.md). The `id` identity column provides
+stable tie-breaking without a per-project sequence counter.
 
 ### 2. Six orthogonal correlation scopes
 
@@ -187,8 +181,11 @@ Extend the existing request-ID middleware
 into a **RequestContext** middleware:
 
 - Extract or generate `request_id` (W3C traceparent-compatible 128-bit hex).
-- Stash optional `session_id`, `flow_id`, `fingerprint`, `X-SDK-Name`, and
-  `X-SDK-Version` from request headers into context.
+- Stash optional `session_id`, `flow_id`, and `fingerprint` from request headers
+  into context.
+- Optional `X-SDK-Name` and `X-SDK-Version` headers may be read for operational
+  logging ([`zlog`](../../internal/instrumentation/zlog/)) and OTEL Tier 3
+  export — they are **not persisted** on audit event rows.
 - After the handler completes, if the request was **authenticated**, insert one
   `category=request` wide event containing: `operation_id`, HTTP method, route
   template, status code, duration, and actor/delegation dimensions from context.
@@ -246,12 +243,11 @@ into request context:
 | `actor_id` | Token record (`tokens.user_id`) | Guaranteed by token issuance |
 | `token_id` | Token record | Guaranteed by token issuance |
 | `delegation_type` | Inferred from token structure | Automatic |
-| `sdk_name`, `sdk_version` | `X-SDK-Name` / `X-SDK-Version` headers | Informational only; not trusted for authz |
 
 The SDK's `X-Client-Id` header is **ignored** — the server resolves `client_id`
 from the token itself to prevent spoofing.
 
-`InsertEvent` and request middleware read all dimensions from context — no
+`InsertEvent` and request middleware read delegation dimensions from context — no
 per-handler duplication.
 
 **Delegation models** (same semantics as oxidel):
@@ -329,7 +325,8 @@ Wide Event (internal)  ──→  OTEL Span (Tier 3 export)
   projection only.
 - [`zlog`](../../internal/instrumentation/zlog/) and
   [`zotel`](../../internal/instrumentation/zotel/) remain operational telemetry
-  separate from the audit stream.
+  separate from the audit stream. SDK name/version headers may appear in
+  operational logs but not in the `events` table.
 
 When exporting to OTEL, the projector maps: `request_id → trace_id`,
 `event.id → span_id`, `metadata.parent_span_id → parent_span_id`.
@@ -340,8 +337,6 @@ When exporting to OTEL, the projector maps: `request_id → trace_id`,
 - Database triggers or CDC as the primary audit mechanism.
 - Full unauthenticated/public request logging.
 - Retroactive pre-claim audit.
-- Built-in threat-detection rules engine (external consumers; see
-  [ADR 030](030-events-api-retention-export.md)).
 
 ## Consequences
 
@@ -355,6 +350,7 @@ When exporting to OTEL, the projector maps: `request_id → trace_id`,
   races.
 - Spanner-safe: no triggers; Go-defined emission on v2 statements.
 - Deny-by-default PII policy scales without per-field opt-out annotations.
+- No per-project sequence counter — parallel event inserts within a project.
 
 ### Negative / Risks
 
@@ -365,8 +361,6 @@ When exporting to OTEL, the projector maps: `request_id → trace_id`,
   until ported — document coverage gaps during transition.
 - **Pre-claim blind spot:** forensic history starts at claim; operators must
   accept this or adjust product policy.
-- **Sequence contention:** per-project sequence assignment serializes event
-  inserts per project; acceptable at expected scale but worth monitoring.
 - **Request vs domain correlation:** request events are outside entity
   transactions; cross-correlate via `request_id` when investigating.
 
@@ -374,7 +368,7 @@ When exporting to OTEL, the projector maps: `request_id → trace_id`,
 
 | ADR | Relationship |
 |-----|--------------|
-| [030 Events API, Retention, and Export](030-events-api-retention-export.md) | HTTP surface, `shipped_at`, retention purge, external consumers |
+| [030 Events API, Retention, and Export](030-events-api-retention-export.md) | HTTP surface, `event_deliveries`, retention purge, external export |
 | [028 Storage v2 Statements](028-storage-v2-statements-and-dialects.md) | v2 statement port is the emission boundary |
 | [010 Session/Auth Attempt](010-session-auth-attempt-check-model.md) | Checks table is deep forensic store; events reference by ID |
 | [027 Cursor-Based Pagination](027-cursor-based-pagination.md) | List API pagination over events |

@@ -13,10 +13,8 @@ event model: one `events` table, two Go emission paths, and deny-by-default PII
 policy. Operators and external systems also need:
 
 - A **query API** for incident response and regulatory review.
-- **Reliable export** before local retention purges rows.
-- A documented integration pattern for **threat detection** — external systems
-  that consume the event stream and act on it (e.g. revoke a token, block a
-  device fingerprint).
+- **Reliable export** to one or more external sinks before local retention purges
+  rows.
 
 Classic ZITADEL exposes events via the Event API and supports SIEM streaming.
 nextgen consolidates identity events and admin/configuration changes into a
@@ -39,8 +37,8 @@ GET /events?project_id=…
          &flow_id=…
          &request_id=…
          &fingerprint=…
-         &aggregate_type=…
-         &aggregate_id=…
+         &entity_type=…
+         &entity_id=…
          &created_after=…
          &created_before=…
          &page_token=…
@@ -61,13 +59,13 @@ GET /events/{id}
 | `flow_id` | string | Login flow correlation |
 | `request_id` | string | HTTP request correlation |
 | `fingerprint` | string | Device correlation |
-| `aggregate_type` | string | Resource type affected |
-| `aggregate_id` | string | Resource ID affected |
+| `entity_type` | string | Resource type affected |
+| `entity_id` | string | Resource ID affected |
 | `created_after` | RFC 3339 timestamp | Inclusive lower bound |
 | `created_before` | RFC 3339 timestamp | Exclusive upper bound |
 | `page_token` | opaque string | [ADR 027](027-cursor-based-pagination.md) cursor |
 
-**Response shape** (single event, list items identical):
+**Response shape** (list items):
 
 ```json
 {
@@ -75,33 +73,39 @@ GET /events/{id}
   "project_id": "proj_abc",
   "event_type": "auth.token.issued",
   "category": "auth",
-  "sequence": 42,
   "created_at": "2026-07-03T12:00:00Z",
   "actor_id": "user_xyz",
   "actor_type": "human",
-  "aggregate_id": "987654321",
-  "aggregate_type": "token",
-  "resource_type": "oidc_access_token",
+  "entity_type": "token",
+  "entity_id": "987654321",
   "client_id": "app_dashboard",
   "token_id": "tok_abc",
   "delegation_type": "direct",
   "fingerprint": "fp_device123",
-  "sdk_name": "zitadel-js",
-  "sdk_version": "1.4.0",
   "request_id": "req_128bit_hex",
   "session_id": "sess_456",
   "flow_id": "",
   "payload": { "scope": ["openid", "profile"] },
-  "metadata": {},
-  "shipped_at": "2026-07-03T12:00:05Z"
+  "metadata": {}
+}
+```
+
+`GET /events/{id}` may additionally include delivery status (RECOMMENDED):
+
+```json
+{
+  "deliveries": [
+    { "sink_id": "siem", "delivered_at": "2026-07-03T12:00:05Z" },
+    { "sink_id": "local-collector", "delivered_at": "2026-07-03T12:00:05Z" }
+  ]
 }
 ```
 
 - `payload` and `metadata` are returned **as stored** — already redacted at emit
   time per [ADR 029 §8](029-wide-events-internal-audit-primitive.md).
-- `shipped_at` is included so operators can verify export coverage.
 - List response wraps items in `{ "data": [...], "next_page_token": "..." }` per
-  [ADR 027](027-cursor-based-pagination.md). No total count.
+  [ADR 027](027-cursor-based-pagination.md). No total count. List omits
+  `deliveries` to keep payloads small.
 
 **Pagination:** Keyset cursor on `(created_at, id)` within `project_id`,
 consistent with [ADR 027](027-cursor-based-pagination.md) and v2 storage list
@@ -126,58 +130,94 @@ Events are append-only within their retention window.
 
 - `INSERT` and `SELECT` on `events` — no `UPDATE` or `DELETE` from application
   code during normal operation.
-- The retention background job uses a dedicated role with `DELETE` permission.
+- `INSERT` on `event_deliveries` — shipper only.
+- The retention background job uses a dedicated role with `DELETE` permission on
+  `events` and `event_deliveries`.
 
 **Retention policy:**
 
 - Configurable per deployment via server config (suggested default: **30 days**).
-- Background job deletes rows matching:
+- Background job deletes event rows only when **every enabled sink** has a
+  delivery record and the retention window has elapsed:
 
 ```sql
-DELETE FROM zitadel_nextgen.events
-WHERE project_id = $1
-  AND shipped_at IS NOT NULL
-  AND created_at < now() - $retention_interval
+DELETE FROM zitadel_nextgen.events e
+WHERE e.project_id = $1
+  AND e.created_at < now() - $retention_interval
+  AND NOT EXISTS (
+    SELECT 1 FROM configured_sinks s
+    WHERE NOT EXISTS (
+      SELECT 1 FROM zitadel_nextgen.event_deliveries d
+      WHERE d.project_id = e.project_id
+        AND d.event_id = e.id
+        AND d.sink_id = s.id
+    )
+  );
 ```
 
-- Rows with `shipped_at IS NULL` are **never purged** — unshipped events remain
-  until export succeeds. This prevents data loss when the shipper is down.
+(`configured_sinks` is the in-memory set of enabled sink IDs from server config;
+disabled or removed sinks do not block retention.)
+
+- Events missing delivery to any enabled sink are **never purged** — this
+  prevents data loss when a shipper is down or a sink is misconfigured.
 - Long-term compliance archive is the **operator's responsibility** once events
   are exported to SIEM, object storage, or another durable sink.
 
-**Immutability scope:** Events are immutable for the duration they remain in the
-database. Retention purge is an explicit, scheduled operation — not an
+**Immutability scope:** Event content is immutable for the duration rows remain
+in the database. Retention purge is an explicit, scheduled operation — not an
 application UPDATE that alters event content.
 
 Link to [ADR 024](024-user-team-lifecycle-ownership.md): user/team lifecycle
 purge policies are separate from event retention; this ADR does not define
 user-data purge windows.
 
-### 3. External export (`shipped_at`)
+### 3. External export (per-sink delivery)
 
-A background **shipper** process delivers events to configured external sinks
-before retention deletes them.
+A background **shipper** delivers events to configured external sinks before
+retention deletes them. Delivery is tracked per sink in a companion table:
 
-**Shipper loop:**
+```sql
+CREATE TABLE zitadel_nextgen.event_deliveries (
+    project_id      TEXT        NOT NULL
+    , event_id      BIGINT      NOT NULL
+    , sink_id       TEXT        NOT NULL   -- config name, e.g. "siem", "local-collector"
+    , delivered_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    , PRIMARY KEY (project_id, event_id, sink_id)
+    , FOREIGN KEY (project_id, event_id)
+        REFERENCES zitadel_nextgen.events (project_id, id)
+);
+```
 
-1. Poll: `SELECT ... FROM events WHERE shipped_at IS NULL ORDER BY created_at, id LIMIT $batch_size`
-2. Deliver batch to configured sink.
-3. On successful delivery: `UPDATE events SET shipped_at = now() WHERE (project_id, id) IN (...)`
+```mermaid
+flowchart LR
+  subgraph perSink [Per configured sink]
+    Poll["Poll events missing delivery for sink_id"]
+    Deliver[POST to sink URL]
+    Record["INSERT event_deliveries"]
+  end
+  Poll --> Deliver --> Record
+```
 
-The shipper's `UPDATE` on `shipped_at` is the **only** permitted mutation on
-event rows. It is performed by the shipper role, not application handlers.
+**Shipper behavior:**
+
+- One shipper loop **per configured sink** (or one loop iterating sinks).
+- Poll: events with no `event_deliveries` row for that `sink_id`.
+- Deliver batch to the sink (webhook POST or stdout JSON).
+- On success: `INSERT INTO event_deliveries ...` (idempotent via primary key).
 
 **Delivery semantics:**
 
 - At-least-once delivery. Consumers must be **idempotent** on `event.id`.
-- Shipper retries on transient failure without setting `shipped_at`.
+- Shipper retries on transient failure without inserting a delivery row.
 - Duplicate external delivery is acceptable; missing delivery is not.
+- Duplicate `INSERT` into `event_deliveries` conflicts on the primary key and is
+  a no-op.
 
 **Supported sink patterns (v1 minimum):**
 
 | Sink | Use case |
 |------|----------|
-| **Webhook** (HTTPS POST) | SIEM, SOAR, custom threat-detection service |
+| **Webhook** (HTTPS POST) | SIEM, SOAR, custom integrators |
 | **Stdout JSON** | Sidecar log collectors (self-hosted default) |
 
 Future sinks (Pub/Sub, S3, Kafka) follow the same shipper interface without
@@ -193,51 +233,18 @@ events:
     batch_size: 500
     interval: 10s
     sinks:
-      - type: webhook
+      - id: siem
+        type: webhook
         url: https://siem.example.com/zitadel/events
         headers:
           Authorization: "Bearer ${SIEM_TOKEN}"
-      - type: stdout
+      - id: local-collector
+        type: stdout
 ```
 
-### 4. Threat detection integration pattern
+Each sink's `id` is the `sink_id` stored in `event_deliveries`.
 
-The server **emits facts**; policy execution stays **external** in v1. There is
-no built-in rules engine.
-
-```mermaid
-sequenceDiagram
-  participant API as nextgen API
-  participant DB as events table
-  participant Shipper as Event shipper
-  participant Ext as External consumer
-
-  API->>DB: INSERT domain event
-  API->>DB: INSERT request event
-  Shipper->>DB: SELECT WHERE shipped_at IS NULL
-  Shipper->>Ext: POST webhook batch
-  Ext->>Ext: Evaluate rules
-  Ext->>API: Revoke token / alert SOC
-  Shipper->>DB: SET shipped_at
-```
-
-**Example consumer reactions:**
-
-| Event pattern | External action |
-|---------------|-----------------|
-| `delegation_type=delegated` + high-volume reads | Alert SOC |
-| `auth.check.failed` + `failure_count > N` | Temporary IP block |
-| `client_id=agent_*` + sensitive aggregate access | Revoke `token_id` via Admin API |
-| `fingerprint` seen across many `actor_id` values | Flag device for review |
-
-Consumers subscribe via webhook or poll `/events` with time-bounded filters.
-Webhook delivery is preferred for near-real-time threat response.
-
-**Idempotency contract:** External systems key reactions on `(project_id,
-event.id)`. Re-processing the same event must not double-revoke or
-double-alert.
-
-### 5. Pre-claim and export
+### 4. Pre-claim and export
 
 Per [claim-flow](../design/platform/claim-flow.md) and
 [ADR 029](029-wide-events-internal-audit-primitive.md), pre-claim projects emit
@@ -246,7 +253,6 @@ projects. No retroactive backfill.
 
 ## Non-goals
 
-- Built-in threat-detection rules engine or automatic token revocation.
 - Event mutation API (corrections are new events, not updates).
 - Real-time push subscriptions (webhook shipper is pull-based batching; SSE
   is a future extension).
@@ -258,9 +264,10 @@ projects. No retroactive backfill.
 
 - Single API surface simplifies SDK and SIEM integration vs split
   `/events` + `/audit_events`.
-- `shipped_at` + retention purge gives operators a clear contract: export
-  before purge, or lose local copy.
-- External threat detection integrates without server-side policy complexity.
+- Per-sink `event_deliveries` supports multiple subscribers without a single
+  `shipped_at` timestamp.
+- Retention gated on all enabled sinks prevents premature purge while any
+  subscriber is behind.
 - Category filter maps directly to compliance use cases (auth vs admin vs
   entity).
 
@@ -268,16 +275,16 @@ projects. No retroactive backfill.
 
 - **Webhook reliability:** at-least-once delivery requires consumer idempotency;
   document clearly.
-- **Unshipped backlog:** if shipper is down, events accumulate and are not
-  purged — disk growth until shipper recovers.
+- **Undelivered backlog:** if any shipper is down, events accumulate and are not
+  purged — disk growth until all sinks catch up.
 - **Request event volume:** high-traffic projects generate large `/events` result
   sets when filtering `category=request`; operators should prefer SIEM export
   over repeated full scans.
 - **Permissions TBD:** `events.read` RBAC shape must align with platform authz
   before the API ships.
-- **`shipped_at` UPDATE exception:** the shipper role is the only writer;
-  misconfiguration could allow application code to mutate events if roles are
-  not separated.
+- **Retention SQL complexity:** purge must account for the current enabled-sink
+  set; removing a sink from config should not strand undeliverable events
+  indefinitely (implementation should treat removed sinks as non-blocking).
 
 ## Related ADRs
 
