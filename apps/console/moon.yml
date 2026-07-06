@@ -3,6 +3,7 @@ language: "typescript"
 layer: "application"
 stack: "frontend"
 dependsOn:
+  - "api"
   - "design-tokens"
   - "ui-react"
 
@@ -10,18 +11,21 @@ tasks:
   lint:
     command: "corepack pnpm exec oxlint ."
     deps:
+      - "api:generate"
       - "design-tokens:build"
       - "ui-react:build"
 
   typecheck:
     command: "corepack pnpm run typecheck"
     deps:
+      - "api:build"
       - "design-tokens:build"
       - "ui-react:build"
 
   build:
     command: "corepack pnpm run build"
     deps:
+      - "api:build"
       - "design-tokens:build"
       - "ui-react:build"
     outputs:

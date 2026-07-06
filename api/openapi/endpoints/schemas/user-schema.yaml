@@ -8,17 +8,18 @@ required:
   - metaSchema
   - kind
   - x-auth-methods
-  - $id
 additionalProperties: true
 properties:
   "$schema":
     type: string
     const: https://json-schema.org/draft/2020-12/schema
     description: The JSON Schema version used for this schema.
-  $id:
+  objectType:
     type: string
-    format: uri
-    description: The unique identifier for this user schema.
+    maxLength: 256
+    description: |
+      The type of user this schema describes. This is a customer chosen name.
+    example: human-user
   kind:
     type: string
     const: user-schema
@@ -31,7 +32,8 @@ properties:
     $ref: auth-methods.json
   properties:
     type: object
-    description: A map of additional properties for the user definition, where the
+    description: |
+      A map of additional properties for the user definition, where the
       key is the property name and the value is the property schema
     additionalProperties:
       "$ref": user-property.yaml

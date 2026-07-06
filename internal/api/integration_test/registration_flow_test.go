@@ -35,10 +35,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 
 	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
-	userSchemaURL, err := url.Parse(
-		"https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
-	)
-	require.NoError(t, err)
+	userSchemaURL := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 
 	rpOriginStr := testServer.URL
 	rpOriginURL, err := url.Parse(rpOriginStr)
@@ -77,7 +74,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 	userRepo := harness.EnsureUserRepo(t)
 	require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
 		ProjectID:  project.ID,
-		SchemaURL:  userSchemaURL.String(),
+		SchemaURL:  userSchemaURL,
 		ID:         userID,
 		TeamID:     &team.ID,
 		Attributes: []*domain.CreateAttribute{emailAttr},
@@ -104,7 +101,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 		FlowDefinition: api.FlowDefinition{
 			Name:       "passkey-auth-then-register",
 			Status:     "active",
-			UserSchema: *userSchemaURL,
+			UserSchema: userSchemaURL,
 			Purposes:   api.FlowDefinitionPurposes{"login": "auth-step"},
 			Steps: []api.FlowDefinitionStep{
 				{

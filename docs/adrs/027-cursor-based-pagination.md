@@ -26,4 +26,5 @@ Cursor-based pagination solves these by encoding the position of the last seen i
 - No `total` count is returned. If a total is needed for a specific use case it should be a separate endpoint or query parameter.
 - Existing endpoints that still use `offset`/`limit` (e.g. `GET /users`) are marked with a `TODO` comment and will be migrated. New list endpoints must use `page_token`.
 - See `GET /sessions` as the reference implementation and `components/parameters/page-token.yaml` for the reusable parameter definition.
-
+- Storage-layer keyset pagination is implemented in `internal/storage/v2/` via
+  `ListOptions` and `CursorToken`; see [ADR 028](028-storage-v2-statements-and-dialects.md).

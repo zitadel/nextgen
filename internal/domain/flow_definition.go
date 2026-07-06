@@ -86,9 +86,12 @@ const (
 type FlowActionKind uint8
 
 const (
+	// FlowActionKindUnset is the zero value. stepActionKind returns it
+	// when the submitted name isn't declared on the step.
+	FlowActionKindUnset FlowActionKind = iota
 	// FlowActionKindSubmit advances by collecting the step's fields and
 	// running the standard validate/dispatch/on_success pipeline.
-	FlowActionKindSubmit FlowActionKind = iota + 1
+	FlowActionKindSubmit
 	// FlowActionKindPasskey issues a WebAuthn assertion challenge and
 	// resolves the matching transition once the assertion verifies.
 	FlowActionKindPasskey
@@ -305,3 +308,21 @@ type FlowStepTransition struct {
 func (fst FlowStepTransition) IsCurrentFlow() bool {
 	return fst.Action == nil
 }
+
+// FlowDefinitionField enumerates the fields of FlowDefinition which can be used for ordering in list operations.
+type FlowDefinitionField uint8
+
+const (
+	FlowDefinitionFieldUnspecified FlowDefinitionField = iota
+	FlowDefinitionFieldProjectID
+	FlowDefinitionFieldID
+	FlowDefinitionFieldName
+	FlowDefinitionFieldSchemaVersion
+	FlowDefinitionFieldStatus
+	FlowDefinitionFieldCreatedAt
+	FlowDefinitionFieldUpdatedAt
+	FlowDefinitionFieldUserSchema
+	FlowDefinitionFieldPurposes
+	FlowDefinitionFieldAudience
+	FlowDefinitionFieldSteps
+)
