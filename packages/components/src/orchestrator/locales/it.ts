@@ -60,6 +60,7 @@ export const it: Locale = {
   "register-password.description": "Scegli una password sicura per il tuo account",
   "register-password.field.password": "Password",
   "register-password.action.submit": "Registrati",
+  "register-password.action.back": "Indietro",
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: passkey-upsell (proposta passkey — dopo la registrazione)
@@ -102,6 +103,7 @@ export const it: Locale = {
   "password.field.password": "Password",
   "password.action.signin": "Accedi",
   "password.action.passkey": "Accedi con passkey",
+  "password.action.back": "Indietro",
   "password.action.register.lead": "Non hai un account? ",
   "password.action.register.link": "Registrati",
 
@@ -122,6 +124,7 @@ export const it: Locale = {
   "register.action.password": "Continua con password",
   "register.action.passkey": "Continua con passkey",
   "register.action.submit": "Registrati",
+  "register.action.back": "Indietro",
   "register.action.sign_in.lead": "Hai già un account? ",
   "register.action.sign_in.link": "Accedi",
 

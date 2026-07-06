@@ -39,6 +39,7 @@ const cliPackage = await packageName(repoRoot, "apps/cli");
 const childProcesses = new Set();
 const frameworkContexts = [];
 const usedPorts = new Set([registryPort]);
+const prebuiltTarballsDir = options.tarballsDir || process.env.JOURNEY_TARBALLS_DIR || "";
 let registryProcess;
 let registryLogsCollected = false;
 let cleanupStarted = false;
@@ -69,6 +70,7 @@ try {
     registryPort,
     registryUrl,
     repoRoot,
+    prebuiltTarballsDir: prebuiltTarballsDir ? resolve(repoRoot, prebuiltTarballsDir) : "",
     run,
     workDir,
   });
@@ -125,6 +127,7 @@ Options:
   --concurrency <n>        Number of framework journeys to run in parallel (default: 5)
   --runtime <binary|docker> Local runtime backend (default: binary)
   --image <docker-tag>     Use an existing local runtime image instead of building one
+  --tarballs-dir <path>    Use prebuilt release npm tarballs
   --keep                   Keep the temp work directory after success
   --work-dir <path>        Use an explicit work directory
 `);

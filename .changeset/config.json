@@ -41,6 +41,7 @@
     "@zitadel/demo-next-e2e",
     "@zitadel/demo-nuxt",
     "@zitadel/demo-nuxt-e2e",
-    "@zitadel/login-ui"
+    "@zitadel/login-ui",
+    "@zitadel/storybook"
   ]
 }

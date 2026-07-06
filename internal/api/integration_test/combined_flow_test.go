@@ -3,7 +3,6 @@
 package integration_test
 
 import (
-	"net/url"
 	"testing"
 
 	"github.com/go-faster/jx"
@@ -29,8 +28,6 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
-	userSchemaURL, err := url.Parse(schemaURL)
-	require.NoError(t, err)
 
 	server := harness.EnsureTestServer(t)
 	client, err := helpers.NewApiClient(server.URL)
@@ -39,7 +36,7 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
-		FlowDefinition: combinedPasswordFlowDefinition(*userSchemaURL),
+		FlowDefinition: combinedPasswordFlowDefinition(schemaURL),
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %+v", defResp)
@@ -128,11 +125,12 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 
 // combinedPasswordFlowDefinition mirrors examples/05-combined-login-register
 // using fields available on the default-human-user schema.
-func combinedPasswordFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
+func combinedPasswordFlowDefinition(userSchema string) api.FlowDefinition {
 	createUser := api.FlowDefinitionStepOnSuccessCreateUser
 	return api.FlowDefinition{
 		Name:       "combined-password",
-		UserSchema: userSchemaURL,
+		Status:     "active",
+		UserSchema: userSchema,
 		Purposes: api.FlowDefinitionPurposes{
 			"login":    "identifier",
 			"register": "register-identifier",

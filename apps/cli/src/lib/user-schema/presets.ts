@@ -39,19 +39,9 @@ const FIELD_PRESETS: Record<string, Record<string, unknown>> = {
     "x-sensitive": true,
     "x-editable": true,
   },
-  /**
-   * The password credential property. The platform identifies password
-   * properties by `x-password: true` (see
-   * `internal/domain/flow_field_resolver_schema.go`): combined with the
-   * schema-level `x-auth-methods.password.enabled = true`, the engine
-   * classifies the field as a password challenge and the
-   * `create_user` `on_success` handler uses its value to set the
-   * initial password.
-   */
   password: {
     type: "string",
     title: "Password",
-    "x-password": true,
     "x-sensitive": true,
     "x-editable": true,
     minLength: 1,

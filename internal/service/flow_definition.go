@@ -91,7 +91,10 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 	if err != nil {
 		return nil, err
 	}
-
+	status, err := domain.FlowDefinitionStatusString(req.Status)
+	if err != nil {
+		return nil, domain.ErrFlowDefinitionInvalid(fmt.Sprintf("invalid status: %q", req.Status), err)
+	}
 	flowDefinition, err := domain.NewFlowDefinition(
 		"", // the flow definition ID is auto-generated
 		req.ProjectID,
@@ -101,7 +104,7 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 		purposes,
 		req.Audience,
 		req.Steps,
-		domain.FlowDefinitionStatusActive,
+		status,
 	)
 	if err != nil {
 		return nil, err
@@ -123,20 +126,15 @@ func (fd *flowDefinitionService) Update(ctx context.Context, req FlowDefinitionR
 	if err != nil {
 		return nil, err
 	}
-
-	// if the status is not set, use the existing status
-	if req.Status == "" {
-		req.Status = retrievedFlowDef.Status.String()
-	}
 	status, err := domain.FlowDefinitionStatusString(req.Status)
 	if err != nil {
-		return nil, domain.ErrFlowDefinitionInvalid("invalid status", err)
+		return nil, domain.ErrFlowDefinitionInvalid(fmt.Sprintf("invalid status: %q", req.Status), err)
 	}
 	reqPurposes, err := mapPurposesToDomain(req.Purposes)
 	if err != nil {
 		return nil, err
 	}
-	err = fd.isUpdateAllowed(ctx, req.ProjectID, retrievedFlowDef.ID, retrievedFlowDef.Status, status, retrievedFlowDef.Purposes, reqPurposes)
+	err = fd.isUpdateAllowed(ctx, req.ProjectID, retrievedFlowDef.Status, status, retrievedFlowDef.Purposes, reqPurposes)
 	if err != nil {
 		return nil, err
 	}
@@ -168,10 +166,14 @@ func (fd *flowDefinitionService) Update(ctx context.Context, req FlowDefinitionR
 
 func (fd *flowDefinitionService) isUpdateAllowed(
 	ctx context.Context,
-	projectID,
-	flowDefID string,
+	projectID string,
 	currentStatus, reqStatus domain.FlowDefinitionStatus,
 	currentPurposes, reqPurposes map[domain.FlowDefinitionPurpose]string) error {
+	// if the flow definition being updated is not active, then the update is allowed implicitly
+	if currentStatus != domain.FlowDefinitionStatusActive {
+		return nil
+	}
+
 	// no status change and no purpose change -> the update is allowed implicitly
 	if currentStatus == reqStatus && maps.Equal(currentPurposes, reqPurposes) {
 		return nil
@@ -210,7 +212,7 @@ func (fd *flowDefinitionService) isUpdateAllowed(
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage(fmt.Sprintf("failed to list flow definitions for old purpose %q", purpose))
 		}
-		if !(len(fds) > 1) {
+		if len(fds) <= 1 {
 			return domain.ErrFlowDefinitionUpdateConflict(fmt.Sprintf("cannot update: no other active flow definition found with purpose %q", purpose))
 		}
 	}

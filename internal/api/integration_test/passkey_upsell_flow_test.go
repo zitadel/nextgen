@@ -32,8 +32,6 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
-	userSchemaURL, err := url.Parse(schemaURL)
-	require.NoError(t, err)
 
 	rpOriginURL, err := url.Parse(testServer.URL)
 	require.NoError(t, err)
@@ -51,7 +49,7 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
-		FlowDefinition: passkeyUpsellFlowDefinition(*userSchemaURL),
+		FlowDefinition: passkeyUpsellFlowDefinition(schemaURL),
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %+v", defResp)
@@ -132,12 +130,24 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 
 	require.True(t, issueOK.Response.Step.Challenge.Set, "expected challenge on passkey_register issue")
 	challenge := issueOK.Response.Step.Challenge.Value
+	method, methodSet := challenge.Method.Get()
+	require.True(t, methodSet)
+	require.Equal(t, api.FlowStepChallengeMethodPasskeyRegister, method)
 	challengeID, challengeIDSet := challenge.ChallengeID.Get()
 	require.True(t, challengeIDSet)
 	require.True(t, challenge.Options.Set, "expected creation options on passkey_register issue")
 
 	creationOptionsJSON, err := json.Marshal(challenge.Options.Value)
 	require.NoError(t, err)
+	var creationOptions struct {
+		User struct {
+			Name        string `json:"name"`
+			DisplayName string `json:"displayName"`
+		} `json:"user"`
+	}
+	require.NoError(t, json.Unmarshal(creationOptionsJSON, &creationOptions))
+	require.Equal(t, newEmail, creationOptions.User.Name)
+	require.Equal(t, newEmail, creationOptions.User.DisplayName)
 	attestOpts, err := virtualwebauthn.ParseAttestationOptions(string(creationOptionsJSON))
 	require.NoError(t, err)
 	attestationJSON := virtualwebauthn.CreateAttestationResponse(rp, auth, cred, *attestOpts)
@@ -182,8 +192,6 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
-	userSchemaURL, err := url.Parse(schemaURL)
-	require.NoError(t, err)
 
 	server := harness.EnsureTestServer(t)
 	client, err := helpers.NewApiClient(server.URL)
@@ -192,7 +200,7 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
-		FlowDefinition: passkeyUpsellFlowDefinition(*userSchemaURL),
+		FlowDefinition: passkeyUpsellFlowDefinition(schemaURL),
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp)
@@ -249,10 +257,11 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 // passkeyUpsellFlowDefinition mirrors examples/06-combined-password-passkey's
 // register sub-flow trimmed to the register → register-password → passkey-upsell
 // → done path, using fields available on the default-human-user schema.
-func passkeyUpsellFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
+func passkeyUpsellFlowDefinition(userSchemaURL string) api.FlowDefinition {
 	createUser := api.FlowDefinitionStepOnSuccessCreateUser
 	return api.FlowDefinition{
 		Name:       "register-with-passkey-upsell",
+		Status:     "active",
 		UserSchema: userSchemaURL,
 		Purposes:   api.FlowDefinitionPurposes{"register": "register"},
 		Steps: []api.FlowDefinitionStep{

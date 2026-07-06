@@ -1,6 +1,5 @@
 type: string
 enum: [ active, draft ]
-default: active
 description: |
   The lifecycle state of this flow definition. 
   

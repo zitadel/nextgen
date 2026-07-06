@@ -132,12 +132,10 @@ describe("Next setup integration", () => {
     expect(registerPage).not.toContain('href="/profile"');
     const profilePage = await readFile(join(cwd, "app/profile/page.tsx"), "utf8");
     expect(profilePage).toContain("zitadel-cli: managed-file v1");
-    expect(profilePage).toContain("<zitadel-logout");
+    expect(profilePage).toContain("<zitadel-session");
     expect(profilePage).toContain("configureZitadel");
     expect(profilePage).toContain("project={project}");
     expect(profilePage).toContain('post-sign-out-url="/login"');
-    expect(profilePage).toContain('fetch("/__nextgen/sessions/me"');
-    expect(profilePage).toContain("Signed in profile loaded");
     const proxy = await readFile(join(cwd, "proxy.ts"), "utf8");
     expect(proxy).toContain("zitadel-cli: managed-file v1");
     expect(proxy).toContain("nextgenMiddleware");
@@ -226,9 +224,10 @@ describe("Next setup integration", () => {
 
     const flowWithEnvRef = {
       // Spec: `name` is the slug-pattern stable identifier; required fields
-      // are [name, user_schema, purposes, steps]. `purposes` is a map
+      // are [name, status, user_schema, purposes, steps]. `purposes` is a map
       // from purpose name to entry-point step name.
       name: "default",
+      status: "active",
       user_schema:
         "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml",
       purposes: { login: "identifier" },

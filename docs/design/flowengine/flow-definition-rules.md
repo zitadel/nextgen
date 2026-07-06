@@ -78,6 +78,7 @@ Transition values:
 - A terminal step (`complete` set) has nothing else.
 - Every key in `actions` has a matching key in `transitions`.
 - Every key in `transitions` is either an action name declared in this step's `actions` or a reserved engine-emitted outcome.
+- **`back` is a reserved action name.** The engine injects a `back` action on rendered responses when there's a step to return to (non-empty back stack on a non-terminal step). Authors must not declare an action named `back`, regardless of `kind`.
 - When `sso_providers` is non-empty, `transitions.callback` is defined. The `sso` action itself is engine-handled and never appears in `transitions`.
 - Every entry in `fields` resolves to a property in the referenced `user_schema`.
 - A step with an identifier-shaped field (schema property with non-empty `x-unique`) may declare a `user_not_found` transition; absence of the transition means the engine errors on lookup failure rather than routing. See [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md) for the direction this is heading.
@@ -94,7 +95,7 @@ Transition values:
 
 - **Steps don't have a kind.** Don't try to encode "this is the password step" in the name — encode it in the fields, the `on_success`, and the transitions.
 - **Reserved transition outcomes are part of the contract.** If the engine emits `user_not_found` on a step you didn't wire for it, the step errors instead of routing. Wire it explicitly even when the route is a same-target anti-enumeration redirect.
-- **Schema annotations drive behavior.** `x-unique` makes a field an identifier (and contributes `user_not_found`). `x-password` combined with `x-auth-methods.password.enabled` makes a field a password challenge. Adding annotations to the schema can change how every flow that references the field behaves.
+- **Schema annotations drive behavior.** `x-unique` makes a field an identifier (and contributes `user_not_found`). The reserved `x-auth-methods#password` field name combined with `x-auth-methods.password.enabled` makes a field a password challenge. Adding annotations to the schema can change how every flow that references the field behaves.
 - **`on_success` is a side effect, not a decision.** It can short-circuit a step error, but routing comes from transitions and it never authenticates the user — a terminal step after `create_user` mints no handoff unless an identifier dispatch happens later in the graph.
 
 ## Open questions

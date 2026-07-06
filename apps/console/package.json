@@ -13,6 +13,7 @@
     "@tanstack/react-devtools": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-router-devtools": "catalog:",
+    "@zitadel/api": "workspace:*",
     "@zitadel/design-tokens": "workspace:*",
     "@zitadel/ui-react": "workspace:*",
     "react": "catalog:",
@@ -32,6 +33,7 @@
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "jsdom": "catalog:",
+    "msw": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"

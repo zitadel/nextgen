@@ -416,6 +416,16 @@ func (UnimplementedHandler) ListFlowDefinitions(ctx context.Context, params List
 	return r, ht.ErrNotImplemented
 }
 
+// ListSchemas implements listSchemas operation.
+//
+// Retrieve a list of all schemas available in the system. This endpoint
+// supports pagination and filtering based on schema attributes.
+//
+// GET /schemas
+func (UnimplementedHandler) ListSchemas(ctx context.Context, params ListSchemasParams) (r ListSchemasRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListSessions implements listSessions operation.
 //
 // Returns a paginated list of sessions for a project.
