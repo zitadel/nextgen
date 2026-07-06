@@ -3,9 +3,24 @@ language: "go"
 layer: "application"
 stack: "backend"
 
+fileGroups:
+  serverInputs:
+    - "/**/*.go"
+    - "/go.mod"
+    - "/go.sum"
+    - "/api/**/*.yaml"
+    - "/api/**/*.json"
+    - "/api/.ogen.yaml"
+    - "/scripts/check-go-generate.mjs"
+    - "moon.yml"
+    - "package.json"
+    - "bin/**"
+
 tasks:
   openapi:
     command: "npx --yes @redocly/cli@2.31.5 lint api/openapi/openapi-spec.yaml --format=github-actions"
+    inputs:
+      - "@group(serverInputs)"
     options:
       runFromWorkspaceRoot: true
 
@@ -16,18 +31,37 @@ tasks:
         printf '%s\n' "$unformatted"
         exit 1
       fi
+    inputs:
+      - "@group(serverInputs)"
     options:
       runFromWorkspaceRoot: true
 
   generate:
+    command: "go generate ./..."
+    inputs:
+      - "@group(serverInputs)"
+    outputs:
+      - "/api/generated/**"
+      - "/api/openapi/components/schemas/errors/**"
+      - "/api/openapi/endpoints/**/*-error-response.yaml"
+      - "/internal/**/*_enumer.go"
+      - "/internal/**/*.mock.go"
+    options:
+      runFromWorkspaceRoot: true
+
+  check-generate:
     command: "node scripts/check-go-generate.mjs"
+    inputs:
+      - "@group(serverInputs)"
     options:
       runFromWorkspaceRoot: true
 
   vet:
     command: "go vet ./..."
     deps:
-      - "generate"
+      - "check-generate"
+    inputs:
+      - "@group(serverInputs)"
     options:
       runFromWorkspaceRoot: true
 
@@ -42,8 +76,10 @@ tasks:
     deps:
       - "openapi"
       - "format"
-      - "generate"
+      - "check-generate"
       - "vet"
+    inputs:
+      - "@group(serverInputs)"
     options:
       runFromWorkspaceRoot: true
 
@@ -58,6 +94,8 @@ tasks:
       - "-timeout"
       - "10m"
       - "./..."
+    inputs:
+      - "@group(serverInputs)"
     options:
       runFromWorkspaceRoot: true
       runInCI: false
@@ -72,6 +110,8 @@ tasks:
       - "-timeout"
       - "10m"
       - "./..."
+    inputs:
+      - "@group(serverInputs)"
     options:
       runFromWorkspaceRoot: true
       runInCI: false
@@ -79,7 +119,9 @@ tasks:
   build:
     command: "go build -trimpath -o dist/server/nextgen ."
     deps:
-      - "generate"
+      - "check-generate"
+    inputs:
+      - "@group(serverInputs)"
     outputs:
       - "/dist/server/nextgen"
     options:
