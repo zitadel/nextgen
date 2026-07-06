@@ -2773,10 +2773,13 @@ type FlowDefinition struct {
 	// reference. Acts as the human display label as well; no separate slug.
 	Name   string               `json:"name"`
 	Status FlowDefinitionStatus `json:"status"`
-	// User schema this flow operates on. Step `fields` reference properties
-	// defined in this schema. The engine resolves field types, validation,
-	// and implicit outcomes from schema annotations at runtime.
-	UserSchema url.URL `json:"user_schema"`
+	// Server-assigned identifier of the user schema this flow operates on,
+	// as returned by `POST /schemas`. Opaque to the client — the shape is a
+	// server implementation detail (URL-shaped today, ULID-shaped in some
+	// deployments). Step `fields` reference properties defined in the
+	// resolved schema; the engine resolves field types, validation, and
+	// implicit outcomes from schema annotations at runtime.
+	UserSchema string `json:"user_schema"`
 	// Maps each purpose this definition handles to its entry-point step.
 	// Keys are purpose names; values must match a `name` in `steps`. A
 	// definition can serve multiple purposes (e.g. a combined login/register
@@ -2799,7 +2802,7 @@ func (s *FlowDefinition) GetStatus() FlowDefinitionStatus {
 }
 
 // GetUserSchema returns the value of UserSchema.
-func (s *FlowDefinition) GetUserSchema() url.URL {
+func (s *FlowDefinition) GetUserSchema() string {
 	return s.UserSchema
 }
 
@@ -2829,7 +2832,7 @@ func (s *FlowDefinition) SetStatus(val FlowDefinitionStatus) {
 }
 
 // SetUserSchema sets the value of UserSchema.
-func (s *FlowDefinition) SetUserSchema(val url.URL) {
+func (s *FlowDefinition) SetUserSchema(val string) {
 	s.UserSchema = val
 }
 
