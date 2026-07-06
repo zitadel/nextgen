@@ -42,6 +42,7 @@ const (
 	IntrospectOperation               OperationName = "Introspect"
 	IssueChallengeOperation           OperationName = "IssueChallenge"
 	ListFlowDefinitionsOperation      OperationName = "ListFlowDefinitions"
+	ListSchemasOperation              OperationName = "ListSchemas"
 	ListSessionsOperation             OperationName = "ListSessions"
 	ListUsersOperation                OperationName = "ListUsers"
 	RevokeMySessionOperation          OperationName = "RevokeMySession"

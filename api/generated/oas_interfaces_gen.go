@@ -145,6 +145,10 @@ type ListFlowDefinitionsRes interface {
 	listFlowDefinitionsRes()
 }
 
+type ListSchemasRes interface {
+	listSchemasRes()
+}
+
 type ListSessionsRes interface {
 	listSessionsRes()
 }
