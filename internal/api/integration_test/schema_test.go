@@ -273,7 +273,7 @@ func TestSchemaRevisions(t *testing.T) {
 			var lastCreatedID string
 			for _, rev := range tc.schemaRevisions {
 				sch := api.UserSchema{}
-				err = sch.UnmarshalJSON([]byte(rev))
+				err := sch.UnmarshalJSON([]byte(rev))
 				require.NoError(t, err)
 
 				resp, err := client.CreateSchema(

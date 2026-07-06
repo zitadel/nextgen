@@ -105,6 +105,7 @@ func (r *JSONSchemaRepository) Get(ctx context.Context, client database.QueryExe
 	database.Columns{
 		r.ProjectID(),
 		r.URL(),
+		r.ObjectType(),
 		r.CreatedAt(),
 		r.Payload(),
 	}.WriteQualified(builder)
