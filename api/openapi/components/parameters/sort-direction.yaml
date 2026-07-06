@@ -1,0 +1,7 @@
+name: sort_direction
+description: Direction to sort the results.
+in: query
+required: false
+schema:
+  $ref: '../schemas/sort-direction.yaml'
+  default: asc
