@@ -2319,6 +2319,7 @@ func (*ErrorDetailsStatusCode) getUserByIDRes()              {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()              {}
 func (*ErrorDetailsStatusCode) introspectRes()               {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()      {}
+func (*ErrorDetailsStatusCode) listSchemasRes()              {}
 func (*ErrorDetailsStatusCode) listSessionsRes()             {}
 func (*ErrorDetailsStatusCode) listUsersRes()                {}
 func (*ErrorDetailsStatusCode) revokeMySessionRes()          {}
@@ -2784,12 +2785,14 @@ type FlowDefinition struct {
 	// `switch` and `pivot` transitions. Renaming is not supported — the
 	// `name` is part of the public contract another definition may
 	// reference. Acts as the human display label as well; no separate slug.
-	Name   string                  `json:"name"`
-	Status OptFlowDefinitionStatus `json:"status"`
-	// User schema this flow operates on. Step `fields` reference properties
-	// defined in this schema. The engine resolves field types, validation,
-	// and implicit outcomes from schema annotations at runtime.
-	UserSchema url.URL `json:"user_schema"`
+	Name   string               `json:"name"`
+	Status FlowDefinitionStatus `json:"status"`
+	// Server-assigned identifier of the user schema this flow operates on,
+	// as returned by `POST /schemas`. Opaque to the client — the shape is a
+	// server implementation detail. Step `fields` reference properties
+	// defined in the resolved schema; the engine resolves field types, validation, and
+	// implicit outcomes from schema annotations at runtime.
+	UserSchema string `json:"user_schema"`
 	// Maps each purpose this definition handles to its entry-point step.
 	// Keys are purpose names; values must match a `name` in `steps`. A
 	// definition can serve multiple purposes (e.g. a combined login/register
@@ -2807,12 +2810,12 @@ func (s *FlowDefinition) GetName() string {
 }
 
 // GetStatus returns the value of Status.
-func (s *FlowDefinition) GetStatus() OptFlowDefinitionStatus {
+func (s *FlowDefinition) GetStatus() FlowDefinitionStatus {
 	return s.Status
 }
 
 // GetUserSchema returns the value of UserSchema.
-func (s *FlowDefinition) GetUserSchema() url.URL {
+func (s *FlowDefinition) GetUserSchema() string {
 	return s.UserSchema
 }
 
@@ -2837,12 +2840,12 @@ func (s *FlowDefinition) SetName(val string) {
 }
 
 // SetStatus sets the value of Status.
-func (s *FlowDefinition) SetStatus(val OptFlowDefinitionStatus) {
+func (s *FlowDefinition) SetStatus(val FlowDefinitionStatus) {
 	s.Status = val
 }
 
 // SetUserSchema sets the value of UserSchema.
-func (s *FlowDefinition) SetUserSchema(val url.URL) {
+func (s *FlowDefinition) SetUserSchema(val string) {
 	s.UserSchema = val
 }
 
@@ -2866,11 +2869,10 @@ type FlowDefinitionDetailResponse struct {
 	// Unique identifier for the flow definition.
 	ID string `json:"id"`
 	// Identifier of the project this flow definition belongs to.
-	ProjectID      string               `json:"project_id"`
-	Status         FlowDefinitionStatus `json:"status"`
-	FlowDefinition FlowDefinition       `json:"flow_definition"`
-	CreatedAt      time.Time            `json:"created_at"`
-	UpdatedAt      time.Time            `json:"updated_at"`
+	ProjectID      string         `json:"project_id"`
+	FlowDefinition FlowDefinition `json:"flow_definition"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
 }
 
 // GetID returns the value of ID.
@@ -2881,11 +2883,6 @@ func (s *FlowDefinitionDetailResponse) GetID() string {
 // GetProjectID returns the value of ProjectID.
 func (s *FlowDefinitionDetailResponse) GetProjectID() string {
 	return s.ProjectID
-}
-
-// GetStatus returns the value of Status.
-func (s *FlowDefinitionDetailResponse) GetStatus() FlowDefinitionStatus {
-	return s.Status
 }
 
 // GetFlowDefinition returns the value of FlowDefinition.
@@ -2911,11 +2908,6 @@ func (s *FlowDefinitionDetailResponse) SetID(val string) {
 // SetProjectID sets the value of ProjectID.
 func (s *FlowDefinitionDetailResponse) SetProjectID(val string) {
 	s.ProjectID = val
-}
-
-// SetStatus sets the value of Status.
-func (s *FlowDefinitionDetailResponse) SetStatus(val FlowDefinitionStatus) {
-	s.Status = val
 }
 
 // SetFlowDefinition sets the value of FlowDefinition.
@@ -3434,7 +3426,6 @@ func (s *FlowDefinitionStepTransitionsItemAction) UnmarshalText(data []byte) err
 }
 
 // Replaces the existing flow definition.
-// If `flow_definition.status` is omitted, the current status is preserved.
 // Ref: #
 type FlowDefinitionUpdateRequest struct {
 	SchemaURI      OptSchemaURI   `json:"schema_uri"`
@@ -3933,13 +3924,15 @@ func (s *FlowStepChallenge) SetOptions(val OptFlowStepChallengeOptions) {
 type FlowStepChallengeMethod string
 
 const (
-	FlowStepChallengeMethodPasskey FlowStepChallengeMethod = "passkey"
+	FlowStepChallengeMethodPasskey         FlowStepChallengeMethod = "passkey"
+	FlowStepChallengeMethodPasskeyRegister FlowStepChallengeMethod = "passkey_register"
 )
 
 // AllValues returns all FlowStepChallengeMethod values.
 func (FlowStepChallengeMethod) AllValues() []FlowStepChallengeMethod {
 	return []FlowStepChallengeMethod{
 		FlowStepChallengeMethodPasskey,
+		FlowStepChallengeMethodPasskeyRegister,
 	}
 }
 
@@ -3947,6 +3940,8 @@ func (FlowStepChallengeMethod) AllValues() []FlowStepChallengeMethod {
 func (s FlowStepChallengeMethod) MarshalText() ([]byte, error) {
 	switch s {
 	case FlowStepChallengeMethodPasskey:
+		return []byte(s), nil
+	case FlowStepChallengeMethodPasskeyRegister:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -3958,6 +3953,9 @@ func (s *FlowStepChallengeMethod) UnmarshalText(data []byte) error {
 	switch FlowStepChallengeMethod(data) {
 	case FlowStepChallengeMethodPasskey:
 		*s = FlowStepChallengeMethodPasskey
+		return nil
+	case FlowStepChallengeMethodPasskeyRegister:
+		*s = FlowStepChallengeMethodPasskeyRegister
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -5658,6 +5656,36 @@ func (s *ListFlowDefinitionsPurpose) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+type ListSchemasResponse []ListSchemasResponseItem
+
+func (*ListSchemasResponse) listSchemasRes() {}
+
+type ListSchemasResponseItem struct {
+	// The unique identifier for this schema.
+	ID        string    `json:"id"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// GetID returns the value of ID.
+func (s *ListSchemasResponseItem) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ListSchemasResponseItem) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetID sets the value of ID.
+func (s *ListSchemasResponseItem) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ListSchemasResponseItem) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
 }
 
 type ListSessionsBadRequest ErrorDetails
@@ -7390,52 +7418,6 @@ func (o OptFlowAudience) Get() (v FlowAudience, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowAudience) Or(d FlowAudience) FlowAudience {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptFlowDefinitionStatus returns new OptFlowDefinitionStatus with value set to v.
-func NewOptFlowDefinitionStatus(v FlowDefinitionStatus) OptFlowDefinitionStatus {
-	return OptFlowDefinitionStatus{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptFlowDefinitionStatus is optional FlowDefinitionStatus.
-type OptFlowDefinitionStatus struct {
-	Value FlowDefinitionStatus
-	Set   bool
-}
-
-// IsSet returns true if OptFlowDefinitionStatus was set.
-func (o OptFlowDefinitionStatus) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptFlowDefinitionStatus) Reset() {
-	var v FlowDefinitionStatus
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptFlowDefinitionStatus) SetTo(v FlowDefinitionStatus) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptFlowDefinitionStatus) Get() (v FlowDefinitionStatus, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptFlowDefinitionStatus) Or(d FlowDefinitionStatus) FlowDefinitionStatus {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -11202,15 +11184,15 @@ func (s *UserPropertyXMinusUnique) UnmarshalText(data []byte) error {
 type UserSchema struct {
 	// The JSON Schema version used for this schema.
 	Schema OptString `json:"$schema"`
-	// The unique identifier for this user schema.
-	ID url.URL `json:"$id"`
+	// The type of user this schema describes. This is a customer chosen name.
+	ObjectType OptString `json:"objectType"`
 	// Discriminator value for a user schema create request.
 	Kind string `json:"kind"`
 	// The user Schema version used for this schema.
 	MetaSchema             url.URL     `json:"metaSchema"`
 	XMinusAuthMinusMethods AuthMethods `json:"x-auth-methods"`
-	// A map of additional properties for the user definition, where the key is the property name and the
-	// value is the property schema.
+	// A map of additional properties for the user definition, where the
+	// key is the property name and the value is the property schema.
 	Properties      OptUserSchemaProperties `json:"properties"`
 	AdditionalProps UserSchemaAdditional
 }
@@ -11220,9 +11202,9 @@ func (s *UserSchema) GetSchema() OptString {
 	return s.Schema
 }
 
-// GetID returns the value of ID.
-func (s *UserSchema) GetID() url.URL {
-	return s.ID
+// GetObjectType returns the value of ObjectType.
+func (s *UserSchema) GetObjectType() OptString {
+	return s.ObjectType
 }
 
 // GetKind returns the value of Kind.
@@ -11255,9 +11237,9 @@ func (s *UserSchema) SetSchema(val OptString) {
 	s.Schema = val
 }
 
-// SetID sets the value of ID.
-func (s *UserSchema) SetID(val url.URL) {
-	s.ID = val
+// SetObjectType sets the value of ObjectType.
+func (s *UserSchema) SetObjectType(val OptString) {
+	s.ObjectType = val
 }
 
 // SetKind sets the value of Kind.
@@ -11296,8 +11278,8 @@ func (s *UserSchemaAdditional) init() UserSchemaAdditional {
 	return m
 }
 
-// A map of additional properties for the user definition, where the key is the property name and the
-// value is the property schema.
+// A map of additional properties for the user definition, where the
+// key is the property name and the value is the property schema.
 type UserSchemaProperties map[string]UserProperty
 
 func (s *UserSchemaProperties) init() UserSchemaProperties {

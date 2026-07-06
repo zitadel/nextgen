@@ -34,7 +34,8 @@ describe("commandEventProperties", () => {
     expect(props.invocation_id).toBe("sess-1");
     expect(props.ip).toBe(0);
     expect(props.$os).toBeDefined();
-    expect("$country_code" in props).toBe(true);
+    expect("mp_country_code" in props).toBe(true);
+    expect("$country_code" in props).toBe(false);
   });
 
   it("merges per-command extras", () => {
@@ -49,6 +50,8 @@ describe("deviceProfileProperties", () => {
     const props = deviceProfileProperties(meta(), "09233195-cd34-468c-bb7b-151554e19fbc");
     expect(String(props.$name)).toContain("09233195");
     expect(props.cli_version).toBe("0.1.0-alpha.11");
+    expect("$country_code" in props).toBe(true);
+    expect("mp_country_code" in props).toBe(false);
     const serialized = JSON.stringify(props);
     expect(serialized).not.toContain("/work/app");
     expect(serialized).not.toContain("zitadel.cloud");

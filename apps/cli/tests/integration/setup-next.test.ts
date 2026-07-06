@@ -83,34 +83,34 @@ describe("Next setup integration", () => {
     expect(schema.objectType).toBe("human-user");
     expect(schema).not.toHaveProperty("$id");
     expect(schema.properties).toHaveProperty("email");
+    // The schema id is server-assigned on create; the local file stays
+    // id-less and the flow pins whatever id came back.
+    const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
+      resources: Record<string, { id?: string; hash?: string; name?: string; status?: string }>;
+    };
+    const schemaId = state.resources[".zitadel/schemas/default-human-user.json"]?.id;
+    expect(schemaId).toMatch(/^sch_/);
     const flow = JSON.parse(
       await readFile(join(cwd, ".zitadel/flows/default-login.json"), "utf8"),
     ) as {
       name: string;
+      status: string;
       user_schema: string;
       purposes: Record<string, string>;
     };
     expect(flow.name).toBe("default-login");
-    expect(flow.user_schema).toMatch(/^sch_/);
+    expect(flow.status).toBe("active");
+    expect(flow.user_schema).toBe(schemaId);
     expect(flow.purposes).toMatchObject({ login: "identifier", register: "register" });
-    const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
-      resources: Record<
-        string,
-        { id?: string; hash?: string; name?: string; status?: string }
-      >;
-    };
-    const stampedSchemaId = state.resources[".zitadel/schemas/default-human-user.json"].id;
-    expect(stampedSchemaId).toBe(flow.user_schema);
-    expect(stampedSchemaId).toMatch(/^sch_/);
-    expect(state.resources[".zitadel/schemas/default-human-user.json"]).toMatchObject({
-      id: stampedSchemaId,
-      hash: expect.stringMatching(/^[a-f0-9]{64}$/),
-    });
     expect(snapshotPlatformStore()).toMatchObject({
       projects: 1,
       schemas: 1,
       flowDefinitions: 1,
-      schemaIds: [stampedSchemaId],
+      schemaIds: [schemaId],
+    });
+    expect(state.resources[".zitadel/schemas/default-human-user.json"]).toMatchObject({
+      id: schemaId,
+      hash: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
     expect(state.resources[".zitadel/flows/default-login.json"]).toMatchObject({
       id: expect.stringMatching(/^flow_/),
@@ -139,12 +139,10 @@ describe("Next setup integration", () => {
     expect(registerPage).not.toContain('href="/profile"');
     const profilePage = await readFile(join(cwd, "app/profile/page.tsx"), "utf8");
     expect(profilePage).toContain("zitadel-cli: managed-file v1");
-    expect(profilePage).toContain("<zitadel-logout");
+    expect(profilePage).toContain("<zitadel-session");
     expect(profilePage).toContain("configureZitadel");
     expect(profilePage).toContain("project={project}");
     expect(profilePage).toContain('post-sign-out-url="/login"');
-    expect(profilePage).toContain('fetch("/__nextgen/sessions/me"');
-    expect(profilePage).toContain("Signed in profile loaded");
     const proxy = await readFile(join(cwd, "proxy.ts"), "utf8");
     expect(proxy).toContain("zitadel-cli: managed-file v1");
     expect(proxy).toContain("nextgenMiddleware");
@@ -195,22 +193,10 @@ describe("Next setup integration", () => {
     expect(plan.exitCode).toBe(0);
     const planJson = parseJson(plan.stdout) as {
       status: string;
-      data: {
-        creates: number;
-        updates: number;
-        revisions: number;
-        deletes: number;
-        total: number;
-      };
+      data: { creates: number; updates: number; deletes: number; total: number };
     };
     expect(planJson.status).toBe("ok");
-    expect(planJson.data).toMatchObject({
-      creates: 0,
-      updates: 0,
-      revisions: 0,
-      deletes: 0,
-      total: 0,
-    });
+    expect(planJson.data).toMatchObject({ creates: 0, updates: 0, deletes: 0, total: 0 });
     expect(await readFile(join(cwd, ".zitadel/state.json"), "utf8")).toBe(stateBeforePlan);
 
     const apply = await cli(["apply", "--cwd", cwd, "--json"]);
@@ -245,9 +231,10 @@ describe("Next setup integration", () => {
 
     const flowWithEnvRef = {
       // Spec: `name` is the slug-pattern stable identifier; required fields
-      // are [name, user_schema, purposes, steps]. `purposes` is a map
+      // are [name, status, user_schema, purposes, steps]. `purposes` is a map
       // from purpose name to entry-point step name.
       name: "default",
+      status: "active",
       user_schema:
         "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml",
       purposes: { login: "identifier" },

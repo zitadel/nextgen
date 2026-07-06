@@ -17,6 +17,9 @@ generated app. It must not test the checked-in demo apps.
 - Use `moon run release:pack` when producing workspace tarballs; it stages the
   server platform binaries, packs all public packages, and verifies resolved
   package metadata.
+- CI may pass prebuilt release snapshot tarballs to the journey runner with
+  `--tarballs-dir`; that path must skip rebuilding and still verify/publish the
+  provided tarballs through Verdaccio.
 - CI must install Zitadel packages from current workflow tarballs through the
   temporary Verdaccio registry, not from public npm.
 - CI must run `npx @zitadel/cli@alpha doctor --runtime binary`,

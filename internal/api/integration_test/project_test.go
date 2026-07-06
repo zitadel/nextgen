@@ -32,16 +32,16 @@ func (stubFlowService) Resolve(_ context.Context, _ service.ResolveFlowRequest) 
 	return nil, nil
 }
 
-func (stubFlowService) Start(_ context.Context, _ service.StartFlowRequest) (service.FlowStepResult, error) {
-	return service.FlowStepResult{}, nil
+func (stubFlowService) Start(_ context.Context, _ service.StartFlowRequest) (domain.FlowStepResult, error) {
+	return domain.FlowStepResult{}, nil
 }
 
-func (stubFlowService) Submit(_ context.Context, _ service.SubmitFlowRequest) (service.FlowStepResult, error) {
-	return service.FlowStepResult{}, nil
+func (stubFlowService) Submit(_ context.Context, _ service.SubmitFlowRequest) (domain.FlowStepResult, error) {
+	return domain.FlowStepResult{}, nil
 }
 
-func (stubFlowService) GetStep(_ context.Context, _ service.GetFlowStepRequest) (service.FlowStepResult, error) {
-	return service.FlowStepResult{}, nil
+func (stubFlowService) GetStep(_ context.Context, _ service.GetFlowStepRequest) (domain.FlowStepResult, error) {
+	return domain.FlowStepResult{}, nil
 }
 
 // stubAuthAttemptService satisfies [service.AuthAttemptService] while doing nothing.
@@ -183,7 +183,10 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 }
 
 func TestCreateProjectSkipsDefaultLoginFlow(t *testing.T) {
-	client := harness.EnsureAnonymousAPIClient(t)
+	t.Parallel()
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
 
 	resp, err := client.CreateProject(t.Context(), &api.CreateProjectRequest{
 		PreviewOrigins: make([]string, 0),

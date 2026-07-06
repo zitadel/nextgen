@@ -96,7 +96,7 @@ get:
         - schema.read
   responses:
     '200':
-      description: A list of schemas was retrieved successful.
+      description: A list of schemas was retrieved successfully.
       content:
         application/json:
           schema:

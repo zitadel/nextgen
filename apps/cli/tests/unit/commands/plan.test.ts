@@ -24,6 +24,7 @@ const VALID_USER_SCHEMA = {
 
 const VALID_FLOW = {
   name: "default",
+  status: "active",
   user_schema:
     "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml",
   purposes: { login: "identifier" },

@@ -5,6 +5,7 @@ const GENERATED_PATHS = [
   "api/generated",
   "api/openapi/components/schemas/errors",
   "api/openapi/endpoints",
+  "internal/crypto/mock",
   "internal/domain",
   "internal/instrumentation",
   "internal/service/mocks",

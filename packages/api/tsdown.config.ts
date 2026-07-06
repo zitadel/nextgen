@@ -44,5 +44,5 @@ export default defineConfig({
   // until a full `git clean`.
   clean: false,
   target: "es2022",
-  external: ["msw", "zod", "@faker-js/faker"],
+  deps: { neverBundle: ["msw", "zod", "@faker-js/faker"] },
 });

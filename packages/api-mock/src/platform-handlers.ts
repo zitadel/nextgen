@@ -241,7 +241,7 @@ function seedDefaultProjectResources(projectID: string, createdAt: string): void
     status: "active",
     createdAt,
     updatedAt: createdAt,
-    body: getDefaultLoginFlow({ userSchemaRef: schemaId }) as unknown as Record<string, unknown>,
+    body: getDefaultLoginFlow({ userSchemaUrl: schemaId }) as unknown as Record<string, unknown>,
   });
 }
 

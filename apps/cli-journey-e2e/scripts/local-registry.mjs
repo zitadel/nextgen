@@ -3,27 +3,9 @@ import { spawn } from "node:child_process";
 import { cp, mkdir, open, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-export const packageDirs = [
-  "apps/cli",
-  "apps/server",
-  "apps/server-linux-x64",
-  "apps/server-linux-arm64",
-  "apps/server-darwin-x64",
-  "apps/server-darwin-arm64",
-  "apps/server-win32-x64",
-  "packages/api",
-  "packages/config",
-  "packages/components",
-  "packages/sdk-core",
-  "packages/sdk-next",
-  "packages/sdk-nuxt",
-  "packages/sdk-react",
-  "packages/sdk-vue",
-  "packages/sdk-angular",
-  "packages/sdk-solid",
-  "packages/sdk-svelte",
-  "packages/sdk-qwik",
-];
+import { PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
+
+export const packageDirs = [...PUBLIC_PACKAGE_DIRS];
 
 export function localRegistryPaths(workDir) {
   return {
@@ -52,8 +34,8 @@ export async function prepareLocalRegistry(input) {
   await writeVerdaccioConfig(paths.verdaccioConfigPath, paths.storagePath, input);
   await writeVerdaccioNpmrc(paths.npmrcPath, input.registryUrl, input);
 
-  await buildPackages(input.repoRoot, input.run, env, log);
-  await packPackages(input.repoRoot, paths.tarballsDir, input.run, env, log);
+  await buildPackages(input.repoRoot, input.run, env, log, input.prebuiltTarballsDir);
+  await packPackages(input.repoRoot, paths.tarballsDir, input.run, env, log, input.prebuiltTarballsDir);
   await verifyTarballs(input.repoRoot, paths.tarballsDir, input.run, env);
   const startRegistry = input.startLocalRegistry ?? startLocalRegistry;
   const registry = await startRegistry({
@@ -77,16 +59,20 @@ export async function prepareLocalRegistry(input) {
   return { paths, registry, env: npmEnvironment(env, input.registryUrl, paths.npmrcPath) };
 }
 
-export async function buildPackages(repoRoot, run, env, log = () => undefined) {
+export async function buildPackages(repoRoot, run, env, log = () => undefined, prebuiltTarballsDir = "") {
+  if (prebuiltTarballsDir) {
+    log(`using prebuilt release npm tarballs from ${prebuiltTarballsDir}`);
+    return;
+  }
   const projectNames = await Promise.all(packageDirs.map((dir) => packageName(repoRoot, dir)));
   log(`building release npm tarballs for ${projectNames.join(", ")}`);
   await run("moon", ["run", "release:pack"], { cwd: repoRoot, env });
 }
 
-export async function packPackages(repoRoot, tarballsDir, _run, _env, log = () => undefined) {
+export async function packPackages(repoRoot, tarballsDir, _run, _env, log = () => undefined, prebuiltTarballsDir = "") {
   log(`copying npm tarballs into ${tarballsDir}`);
-  const version = await packageVersion(repoRoot, "apps/server");
-  const sourceDir = join(repoRoot, "dist", "release", version, "npm");
+  const version = prebuiltTarballsDir ? "" : await packageVersion(repoRoot, "apps/server");
+  const sourceDir = prebuiltTarballsDir || join(repoRoot, "dist", "release", version, "npm");
   const tarballs = (await readdir(sourceDir)).filter((file) => file.endsWith(".tgz")).sort();
   if (tarballs.length === 0) {
     throw new Error(`no release npm tarballs found in ${sourceDir}`);

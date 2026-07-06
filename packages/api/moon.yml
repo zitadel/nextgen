@@ -30,8 +30,16 @@ tasks:
     outputs:
       - "dist/**/*"
 
+  build-release:
+    command: "corepack pnpm run build"
+    deps:
+      - "generate"
+    outputs:
+      - "dist/**/*"
+    options:
+      cache: false
+
   test:
     command: "corepack pnpm exec vitest run --passWithNoTests"
     deps:
       - "generate"
-

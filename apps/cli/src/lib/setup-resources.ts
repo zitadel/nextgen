@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import type {
   CreateFlowDefinition201,
   CreateSchema201,
+  CreateSchemaBody,
 } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "@zitadel/api/client";
 import {
@@ -34,10 +35,9 @@ export type MaterializeSetupResourcesResult = {
  * after the framework patcher has created `.zitadel/{flows,schemas}` and the
  * initial state file.
  *
- * The upload sequence is: write the local schema file → `POST /schemas` and
- * capture the server-assigned id → render the flow template with that id as
- * `user_schema` → write it to disk → `POST /flow_definitions`. Flow's
- * `user_schema` can only be filled in after the create call returns.
+ * The schema is uploaded without an `$id`: the server assigns an opaque id on
+ * `POST /schemas`, and the flow file can only be rendered after that id comes
+ * back because `flow_definition.user_schema` must reference it.
  */
 export async function materializeSetupResources(opts: {
   cwd: string;
@@ -50,7 +50,10 @@ export async function materializeSetupResources(opts: {
 
   const filesWritten: string[] = [];
 
-  const schemaBody = getDefaultHumanUserSchema();
+  const { $id: _templateId, ...schemaBody } = getDefaultHumanUserSchema() as {
+    $id?: string;
+  } & Record<string, unknown>;
+  void _templateId;
 
   const schemaWritten = await writeResourceFile(
     opts.cwd,
@@ -62,7 +65,7 @@ export async function materializeSetupResources(opts: {
     filesWritten.push(join(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH));
   }
 
-  const schema = (await opts.client.createSchema(schemaBody, {
+  const schema = (await opts.client.createSchema(schemaBody as CreateSchemaBody, {
     project_id: opts.projectId,
   })) as CreateSchema201;
   const schemaId = requiredString(schema.id, "created schema id");
@@ -71,7 +74,7 @@ export async function materializeSetupResources(opts: {
     hash: hashWrittenBody(schemaBody),
   });
 
-  const flowBody = getDefaultLoginFlow({ userSchemaRef: schemaId });
+  const flowBody = getDefaultLoginFlow({ userSchemaUrl: schemaId });
 
   const flowWritten = await writeResourceFile(
     opts.cwd,
@@ -93,7 +96,7 @@ export async function materializeSetupResources(opts: {
     id: requiredString(flow.id, "created flow definition id"),
     hash: hashWrittenBody(flowBody),
     name: flowBody.name,
-    status: flow.status,
+    status: flowBody.status,
   });
 
   const schemasReadme = join(SCHEMAS_DIR, "README.md");
@@ -106,26 +109,6 @@ export async function materializeSetupResources(opts: {
   }
 
   return { filesWritten };
-}
-
-async function writeResourceFile(
-  cwd: string,
-  relPath: string,
-  body: object,
-  force: boolean,
-): Promise<boolean> {
-  const contents = `${stableStringify(body)}\n`;
-  try {
-    await writeFile(join(cwd, relPath), contents, force ? undefined : { flag: "wx" });
-    return true;
-  } catch (error) {
-    if (isErrno(error, "EEXIST")) {
-      throw new ZitadelError("E_CONFLICT", `${relPath} already exists`, {
-        hint: "Move the file aside or rerun setup with --force if you want setup to replace it.",
-      });
-    }
-    throw error;
-  }
 }
 
 /**
@@ -146,6 +129,26 @@ async function writeReadmeFile(
   } catch (error) {
     if (isErrno(error, "EEXIST")) {
       return false;
+    }
+    throw error;
+  }
+}
+
+async function writeResourceFile(
+  cwd: string,
+  relPath: string,
+  body: object,
+  force: boolean,
+): Promise<boolean> {
+  const contents = `${stableStringify(body)}\n`;
+  try {
+    await writeFile(join(cwd, relPath), contents, force ? undefined : { flag: "wx" });
+    return true;
+  } catch (error) {
+    if (isErrno(error, "EEXIST")) {
+      throw new ZitadelError("E_CONFLICT", `${relPath} already exists`, {
+        hint: "Move the file aside or rerun setup with --force if you want setup to replace it.",
+      });
     }
     throw error;
   }

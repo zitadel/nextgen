@@ -1,7 +1,7 @@
 {
   "name": "@zitadel/demo-next",
   "version": "0.0.0",
-  "description": "Next.js demo app for Nextgen Auth",
+  "description": "Next.js demo app for the pre-release Zitadel preview.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/demo-next#readme",
   "bugs": {
     "url": "https://github.com/zitadel/nextgen/issues"

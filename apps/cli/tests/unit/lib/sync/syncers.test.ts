@@ -130,6 +130,7 @@ describe("SchemaSyncer", () => {
 
 const VALID_FLOW = {
   name: "default",
+  status: "active",
   user_schema:
     "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml",
   purposes: { login: "identifier" },
@@ -169,7 +170,11 @@ describe("FlowDefinitionSyncer", () => {
   });
 
   it("validate passes when the referenced env var is present", () => {
-    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: { MY_SECRET: "hunter2" } });
+    const [, flow] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: { MY_SECRET: "hunter2" },
+    });
     expect(() => flow.validate(FLOW_WITH_ENV_REF)).not.toThrow();
   });
 
@@ -182,7 +187,7 @@ describe("FlowDefinitionSyncer", () => {
       }),
     );
     const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {} });
-    const data = { name: "Default", version: 2 };
+    const data = { name: "Default", status: "active", version: 2 };
 
     const id = await flow.create(data);
 
@@ -206,17 +211,19 @@ describe("FlowDefinitionSyncer", () => {
     );
     const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {} });
 
-    await flow.update("flow-id-1", { version: 3 });
+    await flow.update("flow-id-1", { status: "active", version: 3 });
 
     expect(receivedProjectId).toBe("proj-1");
-    expect(receivedBody).toEqual({ flow_definition: { version: 3 } });
+    expect(receivedBody).toEqual({ flow_definition: { status: "active", version: 3 } });
   });
 
-  it("delete DELETEs /flow_definitions/:id with project_id", async () => {
-    let receivedUrl = "";
+  it("delete DELETEs /flow_definitions/:id with the project_id query param", async () => {
+    let hits = 0;
+    let receivedProjectId: string | null = null;
     server.use(
       http.delete(`${BASE}/flow_definitions/flow-id-1`, ({ request }) => {
-        receivedUrl = request.url;
+        receivedProjectId = new URL(request.url).searchParams.get("project_id");
+        hits += 1;
         return new HttpResponse(null, { status: 204 });
       }),
     );
@@ -224,7 +231,8 @@ describe("FlowDefinitionSyncer", () => {
 
     await flow.delete("flow-id-1");
 
-    expect(new URL(receivedUrl).searchParams.get("project_id")).toBe("proj-1");
+    expect(hits).toBe(1);
+    expect(receivedProjectId).toBe("proj-1");
   });
 
   it("fetch unwraps the detail envelope and sends project_id", async () => {
@@ -235,10 +243,9 @@ describe("FlowDefinitionSyncer", () => {
         return HttpResponse.json({
           id: "flow-id-1",
           project_id: "proj-1",
-          schema_uri: "https://example/schema",
-          status: "active",
           flow_definition: {
             name: "Default",
+            status: "active",
             version: 2,
           },
           created_at: "2026-01-01",
@@ -251,6 +258,6 @@ describe("FlowDefinitionSyncer", () => {
     const body = await flow.fetch?.("flow-id-1");
 
     expect(new URL(receivedUrl).searchParams.get("project_id")).toBe("proj-1");
-    expect(body).toEqual({ name: "Default", version: 2 });
+    expect(body).toEqual({ name: "Default", status: "active", version: 2 });
   });
 });

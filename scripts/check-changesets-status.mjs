@@ -6,32 +6,15 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { forwardedArgs, isDirectRun, runCapture } from "./dev-process.mjs";
+import { PUBLIC_RELEASE_PACKAGES } from "./release-manifest.mjs";
 
-// Public product packages, mirroring the fixed alpha group in
-// `.changeset/config.json` (the source of truth) plus each package's root path.
-// `validateFixedGroup()` fails the release check if the two drift, so update both
-// when adding a public package.
-export const publicPackages = [
-  { name: "@zitadel/cli", root: "apps/cli/" },
-  { name: "@zitadel/server", root: "apps/server/" },
-  { name: "@zitadel/server-linux-x64", root: "apps/server-linux-x64/" },
-  { name: "@zitadel/server-linux-arm64", root: "apps/server-linux-arm64/" },
-  { name: "@zitadel/server-darwin-x64", root: "apps/server-darwin-x64/" },
-  { name: "@zitadel/server-darwin-arm64", root: "apps/server-darwin-arm64/" },
-  { name: "@zitadel/server-win32-x64", root: "apps/server-win32-x64/" },
-  { name: "@zitadel/api", root: "packages/api/" },
-  { name: "@zitadel/config", root: "packages/config/" },
-  { name: "@zitadel/components", root: "packages/components/" },
-  { name: "@zitadel/sdk-core", root: "packages/sdk-core/" },
-  { name: "@zitadel/sdk-next", root: "packages/sdk-next/" },
-  { name: "@zitadel/sdk-nuxt", root: "packages/sdk-nuxt/" },
-  { name: "@zitadel/sdk-react", root: "packages/sdk-react/" },
-  { name: "@zitadel/sdk-vue", root: "packages/sdk-vue/" },
-  { name: "@zitadel/sdk-angular", root: "packages/sdk-angular/" },
-  { name: "@zitadel/sdk-solid", root: "packages/sdk-solid/" },
-  { name: "@zitadel/sdk-svelte", root: "packages/sdk-svelte/" },
-  { name: "@zitadel/sdk-qwik", root: "packages/sdk-qwik/" },
-];
+// Public product packages, mirrored by the fixed alpha group in
+// `.changeset/config.json`. `validateFixedGroup()` fails the release check if
+// the manifest and Changesets config drift.
+export const publicPackages = PUBLIC_RELEASE_PACKAGES.map((pkg) => ({
+  name: pkg.name,
+  root: `${pkg.dir}/`,
+}));
 
 const publicPackageNames = publicPackages.map((pkg) => pkg.name);
 const publicPackageNameSet = new Set(publicPackageNames);

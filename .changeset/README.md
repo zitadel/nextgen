@@ -96,8 +96,8 @@ Publishing uses **npm trusted publishing (OIDC)** — there is no `NPM_TOKEN`. O
 per public package, a maintainer adds a trusted publisher on npmjs.com (Settings →
 Trusted Publishing): provider GitHub Actions, repo `zitadel/nextgen`, workflow
 `release-publish.yml`. The package must exist on npm first (publish `0.0.x` by
-hand if needed). Provenance stays off (`NPM_CONFIG_PROVENANCE=false`) while the
-repo is private; re-enable when public.
+hand if needed). Real publishes set npm provenance on
+(`NPM_CONFIG_PROVENANCE=true`); dry runs leave it off because they do not publish.
 
 Each public package must declare its license and ship a `LICENSE` file before its
 first publish — see [LICENSING.md](../LICENSING.md).

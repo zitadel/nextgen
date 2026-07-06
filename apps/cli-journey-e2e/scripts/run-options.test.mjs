@@ -11,6 +11,7 @@ test("local journey defaults to the full framework matrix", () => {
     image: "",
     keep: false,
     runtime: "binary",
+    tarballsDir: "",
     workDir: "",
   });
 });
@@ -25,6 +26,8 @@ test("local journey can select one framework and tune concurrency", () => {
       "--image",
       "nextgen:test",
       "--keep",
+      "--tarballs-dir",
+      "/tmp/tarballs",
       "--work-dir",
       "/tmp/journey",
     ]),
@@ -34,6 +37,7 @@ test("local journey can select one framework and tune concurrency", () => {
       image: "nextgen:test",
       keep: true,
       runtime: "docker",
+      tarballsDir: "/tmp/tarballs",
       workDir: "/tmp/journey",
     },
   );
@@ -46,6 +50,7 @@ test("local journey can request the binary runtime explicitly", () => {
     image: "",
     keep: false,
     runtime: "binary",
+    tarballsDir: "",
     workDir: "",
   });
 });
@@ -54,6 +59,7 @@ test("local journey rejects invalid options", () => {
   assert.throws(() => parseLocalJourneyArgs(["--framework", "ember"]), /unsupported/);
   assert.throws(() => parseLocalJourneyArgs(["--concurrency", "0"]), /positive integer/);
   assert.throws(() => parseLocalJourneyArgs(["--image"]), /requires a value/);
+  assert.throws(() => parseLocalJourneyArgs(["--tarballs-dir"]), /requires a value/);
   assert.throws(() => parseLocalJourneyArgs(["--runtime", "podman"]), /binary or docker/);
   assert.throws(() => parseLocalJourneyArgs(["--image", "test", "--runtime", "binary"]), /requires --runtime docker/);
   assert.throws(() => parseLocalJourneyArgs(["--unknown"]), /unknown argument/);
