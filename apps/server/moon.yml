@@ -87,7 +87,6 @@ tasks:
     command: "go"
     args:
       - "test"
-      - "-json"
       - "-v"
       - "-tags"
       - "postgres_integration"
