@@ -224,7 +224,6 @@ export default class Setup extends BaseCommand {
           client: createZitadelClient({ baseUrl: answers.server, token: project.projectSecret }),
           projectId: project.id,
           force,
-          serverBaseUrl: answers.server,
         });
     for (const file of resourceResult.filesWritten) {
       const sentence = describeWrittenFile(relativeDisplay(cwd, file), dryRun);

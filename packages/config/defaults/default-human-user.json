@@ -1,7 +1,7 @@
 {
   "title": "DefaultHumanUserSchema",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "metaSchema": "${SERVER_URL}/user-schema.json",
+  "metaSchema": "https://nextgen.com/api/schemas/user-schema.json",
   "objectType": "human-user",
   "kind": "user-schema",
   "type": "object",

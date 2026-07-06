@@ -6,12 +6,13 @@ import type {
   GetFlowDefinition200,
 } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "@zitadel/api/client";
-import { DEFAULT_FLOW_SCHEMA_URI, resolveSchemaUrl } from "@zitadel/config/defaults";
+import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
 import { flowConfigSchema, schemaConfigSchema } from "@zitadel/config/schemas";
 
 import { FLOWS_DIR, flowEnvRefs, validateFlows } from "../flows";
 import { SCHEMAS_DIR } from "../user-schema";
 import { ZitadelError } from "../errors";
+import { newSchemaRef } from "./loop.js";
 import type { ResourceSyncer } from "./types.js";
 
 /** Runtime environment lookup used to resolve `${VAR}` / `*_env` references. */
@@ -19,23 +20,19 @@ type EnvLookup = Record<string, string | undefined>;
 
 /**
  * Build the syncer list with the context every syncer needs: the
- * `project_id` flow creates carry, the runtime `env` against which
- * each file's `${VAR}` / `*_env` references are checked, and the
- * `serverBaseUrl` revisioned syncers use to compose the URL a new
- * revision is reachable at. Callers (apply / plan / setup) read
- * `project_id` from `.zitadel/secret`, pass the process environment,
- * and pass the resolved server base (`this.meta.source`). The returned
- * array is treated as read-only by the sync loop.
+ * `project_id` flow creates carry, and the runtime `env` against which
+ * each file's `${VAR}` / `*_env` references are checked. Callers (apply /
+ * plan / setup) read `project_id` from `.zitadel/secret` and pass the
+ * process environment. The returned array is treated as read-only by the
+ * sync loop.
  */
 export function makeSyncers(opts: {
   client: ZitadelClient;
   projectId: string;
   env: EnvLookup;
-  serverBaseUrl: string;
 }): ReadonlyArray<ResourceSyncer> {
-  const schemasBase = joinPath(opts.serverBaseUrl, "/api/schemas");
   return [
-    new SchemaSyncer(opts.client, opts.projectId, opts.env, schemasBase),
+    new SchemaSyncer(opts.client, opts.projectId, opts.env),
     new FlowDefinitionSyncer(opts.client, opts.projectId, opts.env),
   ];
 }
@@ -63,7 +60,6 @@ class SchemaSyncer implements ResourceSyncer {
     private readonly client: ZitadelClient,
     private readonly projectId: string,
     private readonly env: EnvLookup,
-    private readonly schemasBaseUrl: string,
   ) {}
 
   /**
@@ -82,8 +78,19 @@ class SchemaSyncer implements ResourceSyncer {
     assertEnvRefs(data, this.env);
   }
 
+  /**
+   * `POST /schemas` mints a new immutable row. The CLI stamps a URI-shaped
+   * `$id` client-side (via {@link newSchemaRef}) when the on-disk payload
+   * doesn't already carry one — PR #456's server stores whatever `$id` says
+   * in the URL column, and the flow-definition spec requires `user_schema`
+   * to be a URI, so a bare id would fail flow-level validation downstream.
+   */
   async create(data: object): Promise<string> {
-    const result = await this.client.createSchema(data as CreateSchemaBody, {
+    const withId =
+      typeof (data as { $id?: unknown }).$id === "string"
+        ? (data as CreateSchemaBody)
+        : ({ ...data, $id: newSchemaRef(this.projectId) } as CreateSchemaBody);
+    const result = await this.client.createSchema(withId, {
       project_id: this.projectId,
     });
     return result.id;
@@ -114,10 +121,6 @@ class SchemaSyncer implements ResourceSyncer {
       project_id: this.projectId,
     });
     return body as unknown as GetSchemaById200;
-  }
-
-  resolveUrl(id: string): string {
-    return resolveSchemaUrl(id, this.schemasBaseUrl);
   }
 }
 
@@ -209,10 +212,4 @@ class FlowDefinitionSyncer implements ResourceSyncer {
     } = envelope;
     return body;
   }
-}
-
-function joinPath(baseUrl: string, path: string): string {
-  const base = baseUrl.replace(/\/+$/u, "");
-  const suffix = path.startsWith("/") ? path : `/${path}`;
-  return `${base}${suffix}`;
 }

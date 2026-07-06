@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -93,9 +93,8 @@ export async function buildSyncPlan(
           content,
           hash,
           previousId: entry.id,
-          previousUrl: entry.url,
           oldContent,
-          affectedPaths: entry.url ? findFlowsPinnedTo(entry.url, localFlows) : [],
+          affectedPaths: findFlowsPinnedTo(entry.id, localFlows),
         });
         continue;
       }
@@ -144,10 +143,6 @@ export async function runSyncLoop(
       case "create": {
         const id = await action.syncer.create(action.content);
         const entry: ResourceEntry = { id, hash: action.hash };
-        const url = action.syncer.resolveUrl?.(id);
-        if (url) {
-          entry.url = url;
-        }
         await updateState(cwd, action.path, entry);
         consola.info(
           `Created a new ${action.syncer.kind} on Zitadel from ${action.path} (id ${id})`,
@@ -156,18 +151,14 @@ export async function runSyncLoop(
       }
       case "revise": {
         const id = await action.syncer.create(action.content);
-        const url = action.syncer.resolveUrl?.(id);
         const entry: ResourceEntry = { id, hash: action.hash };
-        if (url) {
-          entry.url = url;
-        }
         await updateState(cwd, action.path, entry);
         consola.info(
           `Published a new ${action.syncer.kind} revision on Zitadel from ${action.path} (id ${id})`,
         );
         if (action.affectedPaths.length > 0) {
           consola.warn(
-            `New ${action.syncer.kind} revision at ${url ?? id}. ` +
+            `New ${action.syncer.kind} revision ${id}. ` +
               `Update user_schema in these flow definitions to adopt it:\n` +
               action.affectedPaths.map((path) => `  - ${path}`).join("\n"),
           );
@@ -255,12 +246,12 @@ async function readLocalFlowUserSchemas(cwd: string): Promise<Map<string, string
 }
 
 function findFlowsPinnedTo(
-  previousUrl: string,
+  previousId: string,
   localFlows: Map<string, string>,
 ): ReadonlyArray<string> {
   const affected: string[] = [];
-  for (const [relPath, url] of localFlows.entries()) {
-    if (url === previousUrl) {
+  for (const [relPath, ref] of localFlows.entries()) {
+    if (ref === previousId) {
       affected.push(relPath);
     }
   }
@@ -269,4 +260,17 @@ function findFlowsPinnedTo(
 
 export function hashResourceContent(data: object): string {
   return createHash("sha256").update(JSON.stringify(data)).digest("hex");
+}
+
+/**
+ * Compose a fresh URI-shaped `$id` for a schema revision. The URI is opaque
+ * — the server doesn't dereference it over HTTP — but the flow-definition
+ * spec requires `user_schema` to be `format: uri`, and PR #456's server
+ * stores whatever the payload's `$id` says in the schema's URL column. The
+ * CLI mints a UUID per revision so schemas that share an `objectType`
+ * still coexist as distinct rows keyed by URL. Namespaced by `projectId`
+ * to keep the URLs self-describing.
+ */
+export function newSchemaRef(projectId: string): string {
+  return `https://schemas.zitadel.com/${projectId}/${randomUUID()}`;
 }

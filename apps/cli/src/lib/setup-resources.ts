@@ -13,13 +13,12 @@ import {
   flowsReadmeContent,
   getDefaultHumanUserSchema,
   getDefaultLoginFlow,
-  resolveSchemaUrl,
   schemasReadmeContent,
 } from "@zitadel/config/defaults";
 
 import { FLOWS_DIR } from "./flows";
 import { stableStringify } from "./json";
-import { hashResourceContent } from "./sync";
+import { hashResourceContent, newSchemaRef } from "./sync";
 import { updateState } from "./sync/state";
 import { SCHEMAS_DIR } from "./user-schema";
 import { ZitadelError } from "./errors";
@@ -36,26 +35,22 @@ export type MaterializeSetupResourcesResult = {
  * initial state file.
  *
  * The upload sequence is: write the local schema file → `POST /schemas` and
- * capture the server-assigned id → compose the resolved schema URL from the
- * server base and that id → render the flow template with that URL and write
- * it to disk → `POST /flow_definitions`. The schema URL is server-assigned
- * per revision (see ADR 009), so the flow's `user_schema` can only be filled
- * in after the create call returns.
+ * capture the server-assigned id → render the flow template with that id as
+ * `user_schema` → write it to disk → `POST /flow_definitions`. Flow's
+ * `user_schema` can only be filled in after the create call returns.
  */
 export async function materializeSetupResources(opts: {
   cwd: string;
   client: ZitadelClient;
   projectId: string;
   force: boolean;
-  serverBaseUrl: string;
 }): Promise<MaterializeSetupResourcesResult> {
   await mkdir(join(opts.cwd, FLOWS_DIR), { recursive: true });
   await mkdir(join(opts.cwd, SCHEMAS_DIR), { recursive: true });
 
   const filesWritten: string[] = [];
 
-  const builtinSchemaBase = joinPath(opts.serverBaseUrl, "/api/schemas");
-  const schemaBody = getDefaultHumanUserSchema({ builtinSchemaBase });
+  const schemaBody = getDefaultHumanUserSchema();
 
   const schemaWritten = await writeResourceFile(
     opts.cwd,
@@ -67,17 +62,18 @@ export async function materializeSetupResources(opts: {
     filesWritten.push(join(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH));
   }
 
-  const schema = (await opts.client.createSchema(schemaBody, {
-    project_id: opts.projectId,
-  })) as CreateSchema201;
+  const schemaRef = newSchemaRef(opts.projectId);
+  const schema = (await opts.client.createSchema(
+    { ...schemaBody, $id: schemaRef },
+    { project_id: opts.projectId },
+  )) as CreateSchema201;
   const schemaId = requiredString(schema.id, "created schema id");
-  const userSchemaUrl = resolveSchemaUrl(schemaId, builtinSchemaBase);
   await updateState(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH, {
     id: schemaId,
     hash: hashWrittenBody(schemaBody),
-    url: userSchemaUrl,
   });
-  const flowBody = getDefaultLoginFlow({ userSchemaUrl });
+
+  const flowBody = getDefaultLoginFlow({ userSchemaRef: schemaId });
 
   const flowWritten = await writeResourceFile(
     opts.cwd,
@@ -168,12 +164,6 @@ function requiredString(value: unknown, label: string): string {
     return value;
   }
   throw new ZitadelError("E_VALIDATION", `Missing ${label} in server response.`);
-}
-
-function joinPath(baseUrl: string, path: string): string {
-  const base = baseUrl.replace(/\/+$/u, "");
-  const suffix = path.startsWith("/") ? path : `/${path}`;
-  return `${base}${suffix}`;
 }
 
 function isErrno(error: unknown, code: string): boolean {

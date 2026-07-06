@@ -1,5 +1,6 @@
 {
   "name": "default-login",
+  "status": "active",
   "user_schema": "${USER_SCHEMA_URL}",
   "purposes": {
     "login": "identifier",

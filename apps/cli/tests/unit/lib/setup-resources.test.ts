@@ -34,8 +34,11 @@ afterEach(async () => {
 
 describe("materializeSetupResources", () => {
   it("persists schema state before creating the flow so apply can recover partial setup", async () => {
+    const createSchema = vi.fn().mockImplementation(async (body: { $id?: string }) => ({
+      id: body.$id ?? "unknown",
+    }));
     const client = {
-      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
+      createSchema,
       createFlowDefinition: vi.fn().mockRejectedValue(new Error("flow create failed")),
     } as unknown as ZitadelClient;
 
@@ -45,22 +48,25 @@ describe("materializeSetupResources", () => {
         client,
         projectId: "project_123",
         force: false,
-        serverBaseUrl: "https://example.test",
       }),
     ).rejects.toThrow("flow create failed");
 
+    const posted = createSchema.mock.calls[0]?.[0] as { $id: string };
     const state = JSON.parse(
       await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
     ) as ZitadelState;
     expect(state.resources[DEFAULT_SCHEMA_CONFIG_PATH]).toMatchObject({
-      id: "sch_01KWHF",
+      id: posted.$id,
       hash: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
   });
 
-  it("stamps the flow's user_schema with the resolved URL from the created schema id", async () => {
+  it("stamps a URI-shaped `$id` on the schema POST and reuses the returned id as user_schema on the flow", async () => {
+    const createSchema = vi.fn().mockImplementation(async (body: { $id?: string }) => ({
+      id: body.$id ?? "unknown",
+    }));
     const client = {
-      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
+      createSchema,
       createFlowDefinition: vi.fn().mockImplementation(async (body: {
         flow_definition: { user_schema: string };
       }) => ({
@@ -75,13 +81,16 @@ describe("materializeSetupResources", () => {
       client,
       projectId: "project_123",
       force: false,
-      serverBaseUrl: "https://example.test",
     });
 
+    const posted = createSchema.mock.calls[0]?.[0] as { $id: string };
+    expect(posted.$id).toMatch(
+      /^https:\/\/schemas\.zitadel\.com\/project_123\/[0-9a-f-]+$/,
+    );
     const flowFile = JSON.parse(
       await readFile(join(cwd, DEFAULT_FLOW_CONFIG_PATH), "utf8"),
     ) as { user_schema: string };
-    expect(flowFile.user_schema).toBe("https://example.test/api/schemas/sch_01KWHF");
+    expect(flowFile.user_schema).toBe(posted.$id);
   });
 
   it("writes schemas and flows READMEs the first time", async () => {
@@ -98,7 +107,6 @@ describe("materializeSetupResources", () => {
       client,
       projectId: "project_123",
       force: false,
-      serverBaseUrl: "https://example.test",
     });
 
     const schemasReadme = await readFile(join(cwd, SCHEMAS_DIR, "README.md"), "utf8");
@@ -129,7 +137,6 @@ describe("materializeSetupResources", () => {
       client,
       projectId: "project_123",
       force: false,
-      serverBaseUrl: "https://example.test",
     });
 
     const schemasReadme = await readFile(join(cwd, SCHEMAS_DIR, "README.md"), "utf8");

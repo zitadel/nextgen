@@ -111,21 +111,17 @@ describe("buildSyncPlan", () => {
       await writeState(cwd, {
         framework: "next",
         resources: {
-          ".zitadel/schemas/user.json": {
-            id: "sch_A",
-            hash: "old-hash",
-            url: "https://example.test/api/schemas/sch_A",
-          },
+          ".zitadel/schemas/user.json": { id: "sch_A", hash: "old-hash" },
         },
       });
       await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema", v: 2 });
       await writeResource(cwd, ".zitadel/flows", "signin.json", {
         name: "signin",
-        user_schema: "https://example.test/api/schemas/sch_A",
+        user_schema: "sch_A",
       });
       await writeResource(cwd, ".zitadel/flows", "signin-alt.json", {
         name: "signin-alt",
-        user_schema: "https://example.test/api/schemas/sch_OTHER",
+        user_schema: "sch_OTHER",
       });
 
       const syncer = makeSyncer({ revisioned: true });
@@ -135,7 +131,6 @@ describe("buildSyncPlan", () => {
       expect(actions[0].kind).toBe("revise");
       if (actions[0].kind === "revise") {
         expect(actions[0].previousId).toBe("sch_A");
-        expect(actions[0].previousUrl).toBe("https://example.test/api/schemas/sch_A");
         expect(actions[0].affectedPaths).toEqual([".zitadel/flows/signin.json"]);
       }
     } finally {
@@ -269,7 +264,7 @@ describe("buildSyncPlan validation (real syncers)", () => {
       await writeResource(cwd, ".zitadel/schemas", "user.json", { type: 123 });
 
       await expect(
-        buildSyncPlan(cwd, makeSyncers({ client, projectId: "proj-1", env: {}, serverBaseUrl: "https://example.test" })),
+        buildSyncPlan(cwd, makeSyncers({ client, projectId: "proj-1", env: {} })),
       ).rejects.toMatchObject({ code: "E_VALIDATION" });
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -283,7 +278,7 @@ describe("buildSyncPlan validation (real syncers)", () => {
       await writeResource(cwd, ".zitadel/flows", "default.json", { version: 99, kind: "wrong" });
 
       await expect(
-        buildSyncPlan(cwd, makeSyncers({ client, projectId: "proj-1", env: {}, serverBaseUrl: "https://example.test" })),
+        buildSyncPlan(cwd, makeSyncers({ client, projectId: "proj-1", env: {} })),
       ).rejects.toMatchObject({ code: "E_VALIDATION" });
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -339,11 +334,7 @@ describe("runSyncLoop", () => {
       await writeState(cwd, {
         framework: "next",
         resources: {
-          ".zitadel/schemas/user.json": {
-            id: "sch_A",
-            hash: "old-hash",
-            url: "https://example.test/api/schemas/sch_A",
-          },
+          ".zitadel/schemas/user.json": { id: "sch_A", hash: "old-hash" },
         },
       });
       await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema", v: 2 });
@@ -351,7 +342,6 @@ describe("runSyncLoop", () => {
       const syncer = makeSyncer({
         revisioned: true,
         create: vi.fn().mockResolvedValue("sch_B"),
-        resolveUrl: (id: string) => `https://example.test/api/schemas/${id}`,
       });
 
       await runSyncLoop(cwd, [syncer]);
@@ -364,11 +354,8 @@ describe("runSyncLoop", () => {
           join(cwd, ".zitadel/state.json"),
           "utf8",
         ),
-      ) as { resources: Record<string, { id: string; url: string }> };
+      ) as { resources: Record<string, { id: string }> };
       expect(state.resources[".zitadel/schemas/user.json"].id).toBe("sch_B");
-      expect(state.resources[".zitadel/schemas/user.json"].url).toBe(
-        "https://example.test/api/schemas/sch_B",
-      );
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }

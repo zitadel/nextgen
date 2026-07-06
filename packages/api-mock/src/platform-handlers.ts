@@ -53,11 +53,9 @@ import {
   UpdateFlowDefinitionResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import {
-  DEFAULT_BUILTIN_SCHEMA_BASE,
   DEFAULT_FLOW_SCHEMA_URI,
   getDefaultHumanUserSchema,
   getDefaultLoginFlow,
-  resolveSchemaUrl,
 } from "@zitadel/config/defaults";
 import { http, HttpResponse } from "msw";
 import type { z } from "zod";
@@ -234,7 +232,6 @@ function seedDefaultProjectResources(projectID: string, createdAt: string): void
     createdAt,
     body,
   });
-  const userSchemaUrl = resolveSchemaUrl(schemaId, DEFAULT_BUILTIN_SCHEMA_BASE);
   const id = `flow_${shortId()}`;
   store.flowDefinitions.set(id, {
     id,
@@ -244,7 +241,7 @@ function seedDefaultProjectResources(projectID: string, createdAt: string): void
     status: "active",
     createdAt,
     updatedAt: createdAt,
-    body: getDefaultLoginFlow({ userSchemaUrl }) as unknown as Record<string, unknown>,
+    body: getDefaultLoginFlow({ userSchemaRef: schemaId }) as unknown as Record<string, unknown>,
   });
 }
 
@@ -377,7 +374,10 @@ export function setupPlatformHandlers() {
       }
 
       const schemaBody = raw as unknown as GetSchemaById200;
-      const id = `sch_${shortId()}`;
+      const stampedId = (schemaBody as unknown as { $id?: unknown }).$id;
+      const id = typeof stampedId === "string" && stampedId.length > 0
+        ? stampedId
+        : `sch_${shortId()}`;
       store.schemas.set(id, {
         id,
         projectId: query.data.project_id,
