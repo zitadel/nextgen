@@ -3,7 +3,6 @@
 package integration_test
 
 import (
-	"net/url"
 	"testing"
 
 	"github.com/go-faster/jx"
@@ -34,8 +33,6 @@ func TestPasswordLoginFlow(t *testing.T) {
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
-	userSchemaURL, err := url.Parse(schemaURL)
-	require.NoError(t, err)
 
 	const (
 		userID    = "pwlogin-user-01"
@@ -74,7 +71,7 @@ func TestPasswordLoginFlow(t *testing.T) {
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
-		FlowDefinition: passwordLoginFlowDefinition(*userSchemaURL),
+		FlowDefinition: passwordLoginFlowDefinition(schemaURL),
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %+v", defResp)
@@ -135,8 +132,6 @@ func TestPasswordLoginFlow_UnknownEmail(t *testing.T) {
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
-	userSchemaURL, err := url.Parse(schemaURL)
-	require.NoError(t, err)
 
 	server := harness.EnsureTestServer(t)
 	client, err := helpers.NewApiClient(server.URL)
@@ -145,7 +140,7 @@ func TestPasswordLoginFlow_UnknownEmail(t *testing.T) {
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
-		FlowDefinition: passwordLoginFlowWithNotFoundFlowDefinition(*userSchemaURL),
+		FlowDefinition: passwordLoginFlowWithNotFoundFlowDefinition(schemaURL),
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %+v", defResp)
@@ -188,8 +183,6 @@ func TestPasswordRegisterFlow(t *testing.T) {
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
-	userSchemaURL, err := url.Parse(schemaURL)
-	require.NoError(t, err)
 
 	server := harness.EnsureTestServer(t)
 	client, err := helpers.NewApiClient(server.URL)
@@ -198,7 +191,7 @@ func TestPasswordRegisterFlow(t *testing.T) {
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
-		FlowDefinition: passwordRegisterFlowDefinition(*userSchemaURL),
+		FlowDefinition: passwordRegisterFlowDefinition(schemaURL),
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %+v", defResp)
@@ -266,8 +259,6 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
-	userSchemaURL, err := url.Parse(schemaURL)
-	require.NoError(t, err)
 
 	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
@@ -293,7 +284,7 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
-		FlowDefinition: passwordRegisterFlowDefinition(*userSchemaURL),
+		FlowDefinition: passwordRegisterFlowDefinition(schemaURL),
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp)
@@ -333,7 +324,7 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 }
 
 // passwordLoginFlowDefinition mirrors examples/01-password-login.
-func passwordLoginFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
+func passwordLoginFlowDefinition(userSchemaURL string) api.FlowDefinition {
 	return api.FlowDefinition{
 		Name:       "password-login",
 		Status:     "active",
@@ -369,7 +360,7 @@ func passwordLoginFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 }
 
 // passwordRegisterFlowDefinition mirrors examples/02-password-register.
-func passwordRegisterFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
+func passwordRegisterFlowDefinition(userSchemaURL string) api.FlowDefinition {
 	createUser := api.FlowDefinitionStepOnSuccessCreateUser
 	return api.FlowDefinition{
 		Name:       "password-register",
@@ -398,7 +389,7 @@ func passwordRegisterFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 
 // passwordLoginFlowWithNotFoundFlowDefinition adds a user_not_found outcome
 // pointing to a `not_found` terminal so the unknown-email path is observable.
-func passwordLoginFlowWithNotFoundFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
+func passwordLoginFlowWithNotFoundFlowDefinition(userSchemaURL string) api.FlowDefinition {
 	return api.FlowDefinition{
 		Name:       "password-login-with-not-found",
 		UserSchema: userSchemaURL,
