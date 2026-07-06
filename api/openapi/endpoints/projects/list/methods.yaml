@@ -1,22 +1,24 @@
 post:
-  operationId: createProject
-  summary: Create project
+  operationId: queryProjects
+  summary: Query projects
   tags:
     - Projects
-  security: []
+  security: 
+    - oauth2:
+        - project.read
   requestBody:
-    required: true
+    description: Request to query projects.
     content:
       application/json:
         schema:
-          $ref: create-project-request.yaml
+          $ref: query-projects-request.yaml
   responses:
-    '201':
-      description: The project was created successfully
+    '200':
+      description: The list of projects was returned successfully
       content:
         application/json:
           schema:
-            $ref: create-project-response.yaml
+            $ref: query-projects-response.yaml
     '429':
       description: |
         Too many requests, the client has sent too many requests in a given
@@ -24,10 +26,10 @@ post:
       content:
         application/json:
           schema:
-            $ref: ../../components/error-details.yaml
+            $ref: ../../../components/error-details.yaml
     default:
       description: Unexpected error response.
       content:
         application/json:
           schema:
-            $ref: ../../components/error-details.yaml
+            $ref: ../../../components/error-details.yaml

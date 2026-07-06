@@ -6255,6 +6255,98 @@ func (s *FieldValidationFormat) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes FilterField as json.
+func (s FilterField) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes FilterField from json.
+func (s *FilterField) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FilterField to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch FilterField(v) {
+	case FilterFieldName:
+		*s = FilterFieldName
+	case FilterFieldCreationDate:
+		*s = FilterFieldCreationDate
+	default:
+		*s = FilterField(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s FilterField) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FilterField) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes FilterOperation as json.
+func (s FilterOperation) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes FilterOperation from json.
+func (s *FilterOperation) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FilterOperation to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch FilterOperation(v) {
+	case FilterOperationEquals:
+		*s = FilterOperationEquals
+	case FilterOperationNotEquals:
+		*s = FilterOperationNotEquals
+	case FilterOperationContains:
+		*s = FilterOperationContains
+	case FilterOperationNotContains:
+		*s = FilterOperationNotContains
+	case FilterOperationLessThan:
+		*s = FilterOperationLessThan
+	case FilterOperationLessThanOrEqual:
+		*s = FilterOperationLessThanOrEqual
+	case FilterOperationGreaterThan:
+		*s = FilterOperationGreaterThan
+	case FilterOperationGreaterThanOrEqual:
+		*s = FilterOperationGreaterThanOrEqual
+	default:
+		*s = FilterOperation(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s FilterOperation) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FilterOperation) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode implements json.Marshaler.
 func (s *FlowAudience) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -12681,125 +12773,42 @@ func (s *KeysResponseKeysItem) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode implements json.Marshaler.
-func (s *ListProjectsResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
+// Encode encodes Limit as json.
+func (s Limit) Encode(e *jx.Encoder) {
+	unwrapped := int(s)
+
+	e.Int(unwrapped)
 }
 
-// encodeFields encodes fields.
-func (s *ListProjectsResponse) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("projects")
-		e.ArrStart()
-		for _, elem := range s.Projects {
-			elem.Encode(e)
-		}
-		e.ArrEnd()
-	}
-	{
-		if s.NextPageToken.Set {
-			e.FieldStart("next_page_token")
-			s.NextPageToken.Encode(e)
-		}
-	}
-}
-
-var jsonFieldsNameOfListProjectsResponse = [2]string{
-	0: "projects",
-	1: "next_page_token",
-}
-
-// Decode decodes ListProjectsResponse from json.
-func (s *ListProjectsResponse) Decode(d *jx.Decoder) error {
+// Decode decodes Limit from json.
+func (s *Limit) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode ListProjectsResponse to nil")
+		return errors.New("invalid: unable to decode Limit to nil")
 	}
-	var requiredBitSet [1]uint8
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "projects":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				s.Projects = make([]GetProjectResponse, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem GetProjectResponse
-					if err := elem.Decode(d); err != nil {
-						return err
-					}
-					s.Projects = append(s.Projects, elem)
-					return nil
-				}); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"projects\"")
-			}
-		case "next_page_token":
-			if err := func() error {
-				s.NextPageToken.Reset()
-				if err := s.NextPageToken.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"next_page_token\"")
-			}
-		default:
-			return d.Skip()
+	var unwrapped int
+	if err := func() error {
+		v, err := d.Int()
+		unwrapped = int(v)
+		if err != nil {
+			return err
 		}
 		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode ListProjectsResponse")
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
 	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00000001,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfListProjectsResponse) {
-					name = jsonFieldsNameOfListProjectsResponse[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
-		}
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
+	*s = Limit(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *ListProjectsResponse) MarshalJSON() ([]byte, error) {
+func (s Limit) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ListProjectsResponse) UnmarshalJSON(data []byte) error {
+func (s *Limit) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -15063,6 +15072,72 @@ func (s *OptFieldValidationFormat) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes FilterField as json.
+func (o OptFilterField) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes FilterField from json.
+func (o *OptFilterField) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptFilterField to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptFilterField) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptFilterField) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes FilterOperation as json.
+func (o OptFilterOperation) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes FilterOperation from json.
+func (o *OptFilterOperation) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptFilterOperation to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptFilterOperation) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptFilterOperation) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes FlowAudience as json.
 func (o OptFlowAudience) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -15734,6 +15809,39 @@ func (s *OptIssueChallengeRequestPasskeyOptionsUserVerification) UnmarshalJSON(d
 	return s.Decode(d)
 }
 
+// Encode encodes Limit as json.
+func (o OptLimit) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes Limit from json.
+func (o *OptLimit) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptLimit to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptLimit) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptLimit) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes time.Time as json.
 func (o OptNilDateTime) Encode(e *jx.Encoder, format func(*jx.Encoder, time.Time)) {
 	if !o.Set {
@@ -16309,6 +16417,39 @@ func (s *OptPasskeyFactorPayloadAuthenticatorAttachment) UnmarshalJSON(data []by
 	return s.Decode(d)
 }
 
+// Encode encodes QueryProjectsRequest as json.
+func (o OptQueryProjectsRequest) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes QueryProjectsRequest from json.
+func (o *OptQueryProjectsRequest) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptQueryProjectsRequest to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptQueryProjectsRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptQueryProjectsRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes SchemaURI as json.
 func (o OptSchemaURI) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -16338,6 +16479,39 @@ func (s OptSchemaURI) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptSchemaURI) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes SortDirection as json.
+func (o OptSortDirection) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes SortDirection from json.
+func (o *OptSortDirection) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptSortDirection to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptSortDirection) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptSortDirection) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -17931,6 +18105,444 @@ func (s *ProjectID) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode implements json.Marshaler.
+func (s *QueryProjectsRequest) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *QueryProjectsRequest) encodeFields(e *jx.Encoder) {
+	{
+		if s.PageSize.Set {
+			e.FieldStart("page_size")
+			s.PageSize.Encode(e)
+		}
+	}
+	{
+		if s.PageToken.Set {
+			e.FieldStart("page_token")
+			s.PageToken.Encode(e)
+		}
+	}
+	{
+		if s.Sorting != nil {
+			e.FieldStart("sorting")
+			e.ArrStart()
+			for _, elem := range s.Sorting {
+				elem.Encode(e)
+			}
+			e.ArrEnd()
+		}
+	}
+	{
+		if s.Filter != nil {
+			e.FieldStart("filter")
+			e.ArrStart()
+			for _, elem := range s.Filter {
+				elem.Encode(e)
+			}
+			e.ArrEnd()
+		}
+	}
+}
+
+var jsonFieldsNameOfQueryProjectsRequest = [4]string{
+	0: "page_size",
+	1: "page_token",
+	2: "sorting",
+	3: "filter",
+}
+
+// Decode decodes QueryProjectsRequest from json.
+func (s *QueryProjectsRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode QueryProjectsRequest to nil")
+	}
+	s.setDefaults()
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "page_size":
+			if err := func() error {
+				s.PageSize.Reset()
+				if err := s.PageSize.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"page_size\"")
+			}
+		case "page_token":
+			if err := func() error {
+				s.PageToken.Reset()
+				if err := s.PageToken.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"page_token\"")
+			}
+		case "sorting":
+			if err := func() error {
+				s.Sorting = make([]QueryProjectsRequestSortingItem, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem QueryProjectsRequestSortingItem
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Sorting = append(s.Sorting, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"sorting\"")
+			}
+		case "filter":
+			if err := func() error {
+				s.Filter = make([]QueryProjectsRequestFilterItem, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem QueryProjectsRequestFilterItem
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Filter = append(s.Filter, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"filter\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode QueryProjectsRequest")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *QueryProjectsRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *QueryProjectsRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *QueryProjectsRequestFilterItem) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *QueryProjectsRequestFilterItem) encodeFields(e *jx.Encoder) {
+	{
+		if s.Field.Set {
+			e.FieldStart("field")
+			s.Field.Encode(e)
+		}
+	}
+	{
+		if s.Value.Set {
+			e.FieldStart("value")
+			s.Value.Encode(e)
+		}
+	}
+	{
+		if s.Operation.Set {
+			e.FieldStart("operation")
+			s.Operation.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfQueryProjectsRequestFilterItem = [3]string{
+	0: "field",
+	1: "value",
+	2: "operation",
+}
+
+// Decode decodes QueryProjectsRequestFilterItem from json.
+func (s *QueryProjectsRequestFilterItem) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode QueryProjectsRequestFilterItem to nil")
+	}
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "field":
+			if err := func() error {
+				s.Field.Reset()
+				if err := s.Field.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"field\"")
+			}
+		case "value":
+			if err := func() error {
+				s.Value.Reset()
+				if err := s.Value.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"value\"")
+			}
+		case "operation":
+			if err := func() error {
+				s.Operation.Reset()
+				if err := s.Operation.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"operation\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode QueryProjectsRequestFilterItem")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *QueryProjectsRequestFilterItem) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *QueryProjectsRequestFilterItem) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *QueryProjectsRequestSortingItem) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *QueryProjectsRequestSortingItem) encodeFields(e *jx.Encoder) {
+	{
+		if s.Field.Set {
+			e.FieldStart("field")
+			s.Field.Encode(e)
+		}
+	}
+	{
+		if s.Direction.Set {
+			e.FieldStart("direction")
+			s.Direction.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfQueryProjectsRequestSortingItem = [2]string{
+	0: "field",
+	1: "direction",
+}
+
+// Decode decodes QueryProjectsRequestSortingItem from json.
+func (s *QueryProjectsRequestSortingItem) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode QueryProjectsRequestSortingItem to nil")
+	}
+	s.setDefaults()
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "field":
+			if err := func() error {
+				s.Field.Reset()
+				if err := s.Field.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"field\"")
+			}
+		case "direction":
+			if err := func() error {
+				s.Direction.Reset()
+				if err := s.Direction.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"direction\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode QueryProjectsRequestSortingItem")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *QueryProjectsRequestSortingItem) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *QueryProjectsRequestSortingItem) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *QueryProjectsResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *QueryProjectsResponse) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("projects")
+		e.ArrStart()
+		for _, elem := range s.Projects {
+			elem.Encode(e)
+		}
+		e.ArrEnd()
+	}
+	{
+		if s.NextPageToken.Set {
+			e.FieldStart("next_page_token")
+			s.NextPageToken.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfQueryProjectsResponse = [2]string{
+	0: "projects",
+	1: "next_page_token",
+}
+
+// Decode decodes QueryProjectsResponse from json.
+func (s *QueryProjectsResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode QueryProjectsResponse to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "projects":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				s.Projects = make([]GetProjectResponse, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem GetProjectResponse
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Projects = append(s.Projects, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"projects\"")
+			}
+		case "next_page_token":
+			if err := func() error {
+				s.NextPageToken.Reset()
+				if err := s.NextPageToken.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"next_page_token\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode QueryProjectsResponse")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000001,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfQueryProjectsResponse) {
+					name = jsonFieldsNameOfQueryProjectsResponse[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *QueryProjectsResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *QueryProjectsResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes RevokeMySessionConflict as json.
 func (s *RevokeMySessionConflict) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
@@ -19465,6 +20077,46 @@ func (s *SetUserPasswordRequest) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *SetUserPasswordRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes SortDirection as json.
+func (s SortDirection) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes SortDirection from json.
+func (s *SortDirection) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode SortDirection to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch SortDirection(v) {
+	case SortDirectionAsc:
+		*s = SortDirectionAsc
+	case SortDirectionDesc:
+		*s = SortDirectionDesc
+	default:
+		*s = SortDirection(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s SortDirection) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *SortDirection) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

@@ -96,9 +96,6 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	ListFlowDefinitionsOperation: []string{
 		"flow_definitions.read",
 	},
-	ListProjectsOperation: []string{
-		"project.read",
-	},
 	ListSchemasOperation: []string{
 		"schema.read",
 	},
@@ -110,6 +107,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	PatchProjectOperation: []string{
 		"project.write",
+	},
+	QueryProjectsOperation: []string{
+		"project.read",
 	},
 	RevokeSessionOperation: []string{
 		"session.delete",

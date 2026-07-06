@@ -2257,7 +2257,7 @@ func (*ErrorDetails) endSessionRes()             {}
 func (*ErrorDetails) getMyUserRes()              {}
 func (*ErrorDetails) introspectRes()             {}
 func (*ErrorDetails) listFlowDefinitionsRes()    {}
-func (*ErrorDetails) listProjectsRes()           {}
+func (*ErrorDetails) queryProjectsRes()          {}
 func (*ErrorDetails) submitFlowStepRes()         {}
 
 // Additional error-specific context.
@@ -2330,11 +2330,11 @@ func (*ErrorDetailsStatusCode) getUserByIDRes()              {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()              {}
 func (*ErrorDetailsStatusCode) introspectRes()               {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()      {}
-func (*ErrorDetailsStatusCode) listProjectsRes()             {}
 func (*ErrorDetailsStatusCode) listSchemasRes()              {}
 func (*ErrorDetailsStatusCode) listSessionsRes()             {}
 func (*ErrorDetailsStatusCode) listUsersRes()                {}
 func (*ErrorDetailsStatusCode) patchProjectRes()             {}
+func (*ErrorDetailsStatusCode) queryProjectsRes()            {}
 func (*ErrorDetailsStatusCode) revokeMySessionRes()          {}
 func (*ErrorDetailsStatusCode) revokeSessionRes()            {}
 func (*ErrorDetailsStatusCode) revokeTokenRes()              {}
@@ -2747,6 +2747,132 @@ func (s *FieldValidationFormat) UnmarshalText(data []byte) error {
 		return nil
 	case FieldValidationFormatURI:
 		*s = FieldValidationFormatURI
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Ref: #
+type FilterField string
+
+const (
+	FilterFieldName         FilterField = "name"
+	FilterFieldCreationDate FilterField = "creationDate"
+)
+
+// AllValues returns all FilterField values.
+func (FilterField) AllValues() []FilterField {
+	return []FilterField{
+		FilterFieldName,
+		FilterFieldCreationDate,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FilterField) MarshalText() ([]byte, error) {
+	switch s {
+	case FilterFieldName:
+		return []byte(s), nil
+	case FilterFieldCreationDate:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FilterField) UnmarshalText(data []byte) error {
+	switch FilterField(data) {
+	case FilterFieldName:
+		*s = FilterFieldName
+		return nil
+	case FilterFieldCreationDate:
+		*s = FilterFieldCreationDate
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Ref: #
+type FilterOperation string
+
+const (
+	FilterOperationEquals             FilterOperation = "equals"
+	FilterOperationNotEquals          FilterOperation = "not_equals"
+	FilterOperationContains           FilterOperation = "contains"
+	FilterOperationNotContains        FilterOperation = "not_contains"
+	FilterOperationLessThan           FilterOperation = "less_than"
+	FilterOperationLessThanOrEqual    FilterOperation = "less_than_or_equal"
+	FilterOperationGreaterThan        FilterOperation = "greater_than"
+	FilterOperationGreaterThanOrEqual FilterOperation = "greater_than_or_equal"
+)
+
+// AllValues returns all FilterOperation values.
+func (FilterOperation) AllValues() []FilterOperation {
+	return []FilterOperation{
+		FilterOperationEquals,
+		FilterOperationNotEquals,
+		FilterOperationContains,
+		FilterOperationNotContains,
+		FilterOperationLessThan,
+		FilterOperationLessThanOrEqual,
+		FilterOperationGreaterThan,
+		FilterOperationGreaterThanOrEqual,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FilterOperation) MarshalText() ([]byte, error) {
+	switch s {
+	case FilterOperationEquals:
+		return []byte(s), nil
+	case FilterOperationNotEquals:
+		return []byte(s), nil
+	case FilterOperationContains:
+		return []byte(s), nil
+	case FilterOperationNotContains:
+		return []byte(s), nil
+	case FilterOperationLessThan:
+		return []byte(s), nil
+	case FilterOperationLessThanOrEqual:
+		return []byte(s), nil
+	case FilterOperationGreaterThan:
+		return []byte(s), nil
+	case FilterOperationGreaterThanOrEqual:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FilterOperation) UnmarshalText(data []byte) error {
+	switch FilterOperation(data) {
+	case FilterOperationEquals:
+		*s = FilterOperationEquals
+		return nil
+	case FilterOperationNotEquals:
+		*s = FilterOperationNotEquals
+		return nil
+	case FilterOperationContains:
+		*s = FilterOperationContains
+		return nil
+	case FilterOperationNotContains:
+		*s = FilterOperationNotContains
+		return nil
+	case FilterOperationLessThan:
+		*s = FilterOperationLessThan
+		return nil
+	case FilterOperationLessThanOrEqual:
+		*s = FilterOperationLessThanOrEqual
+		return nil
+	case FilterOperationGreaterThan:
+		*s = FilterOperationGreaterThan
+		return nil
+	case FilterOperationGreaterThanOrEqual:
+		*s = FilterOperationGreaterThanOrEqual
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -5625,6 +5751,8 @@ func (s *KeysResponseKeysItem) SetX5tS256(val OptString) {
 	s.X5tS256 = val
 }
 
+type Limit int
+
 type ListFlowDefinitionsPurpose string
 
 const (
@@ -5693,37 +5821,6 @@ func (s *ListFlowDefinitionsPurpose) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
-
-// Paginated list of projects.
-// Ref: #
-type ListProjectsResponse struct {
-	Projects []GetProjectResponse `json:"projects"`
-	// Token to pass as `page_token` in the next request to fetch the following page.
-	// Absent when there are no more results.
-	NextPageToken OptNilPageToken `json:"next_page_token"`
-}
-
-// GetProjects returns the value of Projects.
-func (s *ListProjectsResponse) GetProjects() []GetProjectResponse {
-	return s.Projects
-}
-
-// GetNextPageToken returns the value of NextPageToken.
-func (s *ListProjectsResponse) GetNextPageToken() OptNilPageToken {
-	return s.NextPageToken
-}
-
-// SetProjects sets the value of Projects.
-func (s *ListProjectsResponse) SetProjects(val []GetProjectResponse) {
-	s.Projects = val
-}
-
-// SetNextPageToken sets the value of NextPageToken.
-func (s *ListProjectsResponse) SetNextPageToken(val OptNilPageToken) {
-	s.NextPageToken = val
-}
-
-func (*ListProjectsResponse) listProjectsRes() {}
 
 type ListSchemasResponse []ListSchemasResponseItem
 
@@ -7445,6 +7542,98 @@ func (o OptFieldValidationFormat) Or(d FieldValidationFormat) FieldValidationFor
 	return d
 }
 
+// NewOptFilterField returns new OptFilterField with value set to v.
+func NewOptFilterField(v FilterField) OptFilterField {
+	return OptFilterField{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFilterField is optional FilterField.
+type OptFilterField struct {
+	Value FilterField
+	Set   bool
+}
+
+// IsSet returns true if OptFilterField was set.
+func (o OptFilterField) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFilterField) Reset() {
+	var v FilterField
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFilterField) SetTo(v FilterField) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFilterField) Get() (v FilterField, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFilterField) Or(d FilterField) FilterField {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFilterOperation returns new OptFilterOperation with value set to v.
+func NewOptFilterOperation(v FilterOperation) OptFilterOperation {
+	return OptFilterOperation{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFilterOperation is optional FilterOperation.
+type OptFilterOperation struct {
+	Value FilterOperation
+	Set   bool
+}
+
+// IsSet returns true if OptFilterOperation was set.
+func (o OptFilterOperation) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFilterOperation) Reset() {
+	var v FilterOperation
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFilterOperation) SetTo(v FilterOperation) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFilterOperation) Get() (v FilterOperation, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFilterOperation) Or(d FilterOperation) FilterOperation {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptFlowAudience returns new OptFlowAudience with value set to v.
 func NewOptFlowAudience(v FlowAudience) OptFlowAudience {
 	return OptFlowAudience{
@@ -8365,6 +8554,52 @@ func (o OptIssueChallengeRequestPasskeyOptionsUserVerification) Or(d IssueChalle
 	return d
 }
 
+// NewOptLimit returns new OptLimit with value set to v.
+func NewOptLimit(v Limit) OptLimit {
+	return OptLimit{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptLimit is optional Limit.
+type OptLimit struct {
+	Value Limit
+	Set   bool
+}
+
+// IsSet returns true if OptLimit was set.
+func (o OptLimit) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptLimit) Reset() {
+	var v Limit
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptLimit) SetTo(v Limit) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptLimit) Get() (v Limit, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptLimit) Or(d Limit) Limit {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptListFlowDefinitionsPurpose returns new OptListFlowDefinitionsPurpose with value set to v.
 func NewOptListFlowDefinitionsPurpose(v ListFlowDefinitionsPurpose) OptListFlowDefinitionsPurpose {
 	return OptListFlowDefinitionsPurpose{
@@ -9265,6 +9500,52 @@ func (o OptPostTokenRequestGrantType) Get() (v PostTokenRequestGrantType, ok boo
 
 // Or returns value if set, or given parameter if does not.
 func (o OptPostTokenRequestGrantType) Or(d PostTokenRequestGrantType) PostTokenRequestGrantType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptQueryProjectsRequest returns new OptQueryProjectsRequest with value set to v.
+func NewOptQueryProjectsRequest(v QueryProjectsRequest) OptQueryProjectsRequest {
+	return OptQueryProjectsRequest{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptQueryProjectsRequest is optional QueryProjectsRequest.
+type OptQueryProjectsRequest struct {
+	Value QueryProjectsRequest
+	Set   bool
+}
+
+// IsSet returns true if OptQueryProjectsRequest was set.
+func (o OptQueryProjectsRequest) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptQueryProjectsRequest) Reset() {
+	var v QueryProjectsRequest
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptQueryProjectsRequest) SetTo(v QueryProjectsRequest) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptQueryProjectsRequest) Get() (v QueryProjectsRequest, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptQueryProjectsRequest) Or(d QueryProjectsRequest) QueryProjectsRequest {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -10292,6 +10573,153 @@ func (s *PostTokenRequestGrantType) UnmarshalText(data []byte) error {
 }
 
 type ProjectID string
+
+// Request to query projects.
+// Ref: #
+type QueryProjectsRequest struct {
+	PageSize OptLimit `json:"page_size"`
+	// Token to retrieve the next page of results.
+	PageToken OptNilPageToken                   `json:"page_token"`
+	Sorting   []QueryProjectsRequestSortingItem `json:"sorting"`
+	// Filter criteria for querying projects.
+	Filter []QueryProjectsRequestFilterItem `json:"filter"`
+}
+
+// GetPageSize returns the value of PageSize.
+func (s *QueryProjectsRequest) GetPageSize() OptLimit {
+	return s.PageSize
+}
+
+// GetPageToken returns the value of PageToken.
+func (s *QueryProjectsRequest) GetPageToken() OptNilPageToken {
+	return s.PageToken
+}
+
+// GetSorting returns the value of Sorting.
+func (s *QueryProjectsRequest) GetSorting() []QueryProjectsRequestSortingItem {
+	return s.Sorting
+}
+
+// GetFilter returns the value of Filter.
+func (s *QueryProjectsRequest) GetFilter() []QueryProjectsRequestFilterItem {
+	return s.Filter
+}
+
+// SetPageSize sets the value of PageSize.
+func (s *QueryProjectsRequest) SetPageSize(val OptLimit) {
+	s.PageSize = val
+}
+
+// SetPageToken sets the value of PageToken.
+func (s *QueryProjectsRequest) SetPageToken(val OptNilPageToken) {
+	s.PageToken = val
+}
+
+// SetSorting sets the value of Sorting.
+func (s *QueryProjectsRequest) SetSorting(val []QueryProjectsRequestSortingItem) {
+	s.Sorting = val
+}
+
+// SetFilter sets the value of Filter.
+func (s *QueryProjectsRequest) SetFilter(val []QueryProjectsRequestFilterItem) {
+	s.Filter = val
+}
+
+type QueryProjectsRequestFilterItem struct {
+	// The field to filter by.
+	Field OptFilterField `json:"field"`
+	// The value to filter by.
+	Value     OptString          `json:"value"`
+	Operation OptFilterOperation `json:"operation"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryProjectsRequestFilterItem) GetField() OptFilterField {
+	return s.Field
+}
+
+// GetValue returns the value of Value.
+func (s *QueryProjectsRequestFilterItem) GetValue() OptString {
+	return s.Value
+}
+
+// GetOperation returns the value of Operation.
+func (s *QueryProjectsRequestFilterItem) GetOperation() OptFilterOperation {
+	return s.Operation
+}
+
+// SetField sets the value of Field.
+func (s *QueryProjectsRequestFilterItem) SetField(val OptFilterField) {
+	s.Field = val
+}
+
+// SetValue sets the value of Value.
+func (s *QueryProjectsRequestFilterItem) SetValue(val OptString) {
+	s.Value = val
+}
+
+// SetOperation sets the value of Operation.
+func (s *QueryProjectsRequestFilterItem) SetOperation(val OptFilterOperation) {
+	s.Operation = val
+}
+
+type QueryProjectsRequestSortingItem struct {
+	// The field to sort by.
+	Field OptFilterField `json:"field"`
+	// The direction to sort by.
+	Direction OptSortDirection `json:"direction"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryProjectsRequestSortingItem) GetField() OptFilterField {
+	return s.Field
+}
+
+// GetDirection returns the value of Direction.
+func (s *QueryProjectsRequestSortingItem) GetDirection() OptSortDirection {
+	return s.Direction
+}
+
+// SetField sets the value of Field.
+func (s *QueryProjectsRequestSortingItem) SetField(val OptFilterField) {
+	s.Field = val
+}
+
+// SetDirection sets the value of Direction.
+func (s *QueryProjectsRequestSortingItem) SetDirection(val OptSortDirection) {
+	s.Direction = val
+}
+
+// Paginated list of projects.
+// Ref: #
+type QueryProjectsResponse struct {
+	Projects []GetProjectResponse `json:"projects"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetProjects returns the value of Projects.
+func (s *QueryProjectsResponse) GetProjects() []GetProjectResponse {
+	return s.Projects
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *QueryProjectsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetProjects sets the value of Projects.
+func (s *QueryProjectsResponse) SetProjects(val []GetProjectResponse) {
+	s.Projects = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *QueryProjectsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*QueryProjectsResponse) queryProjectsRes() {}
 
 type RevokeMySessionConflict ErrorDetails
 

@@ -47,6 +47,22 @@ func (s *OpenidConfiguration) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *QueryProjectsRequest) setDefaults() {
+	{
+		val := int(20)
+		s.PageSize.SetTo(Limit(val))
+	}
+}
+
+// setDefaults set default value of fields.
+func (s *QueryProjectsRequestSortingItem) setDefaults() {
+	{
+		val := SortDirection("asc")
+		s.Direction.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *StepAction) setDefaults() {
 	{
 		val := bool(false)
