@@ -8,16 +8,15 @@ import (
 	"strings"
 )
 
-const _FlowActionKindName = "submitpasskeypasskey_registernavigateback"
+const _FlowActionKindName = "unsetsubmitpasskeypasskey_registernavigateback"
 
-var _FlowActionKindIndex = [...]uint8{0, 6, 13, 29, 37, 41}
+var _FlowActionKindIndex = [...]uint8{0, 5, 11, 18, 34, 42, 46}
 
-const _FlowActionKindLowerName = "submitpasskeypasskey_registernavigateback"
+const _FlowActionKindLowerName = "unsetsubmitpasskeypasskey_registernavigateback"
 
 func (i FlowActionKind) String() string {
-	i -= 1
 	if i >= FlowActionKind(len(_FlowActionKindIndex)-1) {
-		return fmt.Sprintf("FlowActionKind(%d)", i+1)
+		return fmt.Sprintf("FlowActionKind(%d)", i)
 	}
 	return _FlowActionKindName[_FlowActionKindIndex[i]:_FlowActionKindIndex[i+1]]
 }
@@ -26,6 +25,7 @@ func (i FlowActionKind) String() string {
 // Re-run the stringer command to generate them again.
 func _FlowActionKindNoOp() {
 	var x [1]struct{}
+	_ = x[FlowActionKindUnset-(0)]
 	_ = x[FlowActionKindSubmit-(1)]
 	_ = x[FlowActionKindPasskey-(2)]
 	_ = x[FlowActionKindPasskeyRegister-(3)]
@@ -33,27 +33,30 @@ func _FlowActionKindNoOp() {
 	_ = x[FlowActionKindBack-(5)]
 }
 
-var _FlowActionKindValues = []FlowActionKind{FlowActionKindSubmit, FlowActionKindPasskey, FlowActionKindPasskeyRegister, FlowActionKindNavigate, FlowActionKindBack}
+var _FlowActionKindValues = []FlowActionKind{FlowActionKindUnset, FlowActionKindSubmit, FlowActionKindPasskey, FlowActionKindPasskeyRegister, FlowActionKindNavigate, FlowActionKindBack}
 
 var _FlowActionKindNameToValueMap = map[string]FlowActionKind{
-	_FlowActionKindName[0:6]:        FlowActionKindSubmit,
-	_FlowActionKindLowerName[0:6]:   FlowActionKindSubmit,
-	_FlowActionKindName[6:13]:       FlowActionKindPasskey,
-	_FlowActionKindLowerName[6:13]:  FlowActionKindPasskey,
-	_FlowActionKindName[13:29]:      FlowActionKindPasskeyRegister,
-	_FlowActionKindLowerName[13:29]: FlowActionKindPasskeyRegister,
-	_FlowActionKindName[29:37]:      FlowActionKindNavigate,
-	_FlowActionKindLowerName[29:37]: FlowActionKindNavigate,
-	_FlowActionKindName[37:41]:      FlowActionKindBack,
-	_FlowActionKindLowerName[37:41]: FlowActionKindBack,
+	_FlowActionKindName[0:5]:        FlowActionKindUnset,
+	_FlowActionKindLowerName[0:5]:   FlowActionKindUnset,
+	_FlowActionKindName[5:11]:       FlowActionKindSubmit,
+	_FlowActionKindLowerName[5:11]:  FlowActionKindSubmit,
+	_FlowActionKindName[11:18]:      FlowActionKindPasskey,
+	_FlowActionKindLowerName[11:18]: FlowActionKindPasskey,
+	_FlowActionKindName[18:34]:      FlowActionKindPasskeyRegister,
+	_FlowActionKindLowerName[18:34]: FlowActionKindPasskeyRegister,
+	_FlowActionKindName[34:42]:      FlowActionKindNavigate,
+	_FlowActionKindLowerName[34:42]: FlowActionKindNavigate,
+	_FlowActionKindName[42:46]:      FlowActionKindBack,
+	_FlowActionKindLowerName[42:46]: FlowActionKindBack,
 }
 
 var _FlowActionKindNames = []string{
-	_FlowActionKindName[0:6],
-	_FlowActionKindName[6:13],
-	_FlowActionKindName[13:29],
-	_FlowActionKindName[29:37],
-	_FlowActionKindName[37:41],
+	_FlowActionKindName[0:5],
+	_FlowActionKindName[5:11],
+	_FlowActionKindName[11:18],
+	_FlowActionKindName[18:34],
+	_FlowActionKindName[34:42],
+	_FlowActionKindName[42:46],
 }
 
 // FlowActionKindString retrieves an enum value from the enum constants string name.
