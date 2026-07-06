@@ -145,6 +145,10 @@ type ListFlowDefinitionsRes interface {
 	listFlowDefinitionsRes()
 }
 
+type ListProjectsRes interface {
+	listProjectsRes()
+}
+
 type ListSchemasRes interface {
 	listSchemasRes()
 }
@@ -155,6 +159,10 @@ type ListSessionsRes interface {
 
 type ListUsersRes interface {
 	listUsersRes()
+}
+
+type PatchProjectRes interface {
+	patchProjectRes()
 }
 
 type RevokeMySessionRes interface {

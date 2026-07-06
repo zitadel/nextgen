@@ -303,6 +303,12 @@ type Handler interface {
 	//
 	// GET /flow_definitions
 	ListFlowDefinitions(ctx context.Context, params ListFlowDefinitionsParams) (ListFlowDefinitionsRes, error)
+	// ListProjects implements listProjects operation.
+	//
+	// List projects.
+	//
+	// GET /projects
+	ListProjects(ctx context.Context, params ListProjectsParams) (ListProjectsRes, error)
 	// ListSchemas implements listSchemas operation.
 	//
 	// Retrieve a list of all schemas available in the system. This endpoint
@@ -323,6 +329,12 @@ type Handler interface {
 	//
 	// GET /users
 	ListUsers(ctx context.Context, params ListUsersParams) (ListUsersRes, error)
+	// PatchProject implements patchProject operation.
+	//
+	// Updates the state of a project.
+	//
+	// PATCH /projects/{project_id}
+	PatchProject(ctx context.Context, req *PatchProjectRequest, params PatchProjectParams) (PatchProjectRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
 	// Revokes the session immediately (`state: revoked`). This is the logout operation.

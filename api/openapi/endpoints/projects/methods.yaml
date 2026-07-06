@@ -31,3 +31,36 @@ post:
         application/json:
           schema:
             $ref: ../../components/error-details.yaml
+
+get:
+  operationId: listProjects
+  summary: List projects
+  tags:
+    - Projects
+  security: 
+    - oauth2:
+        - project.read
+  parameters:
+    - $ref: ../../components/parameters/limit.yaml
+    - $ref: ../../components/parameters/page-token.yaml
+  responses:
+    '200':
+      description: The list of projects was returned successfully
+      content:
+        application/json:
+          schema:
+            $ref: list-projects-response.yaml
+    '429':
+      description: |
+        Too many requests, the client has sent too many requests in a given
+        amount of time.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml

@@ -1726,13 +1726,25 @@ func (*CreateHandoffErrorResponseStatusCode) createHandoffRes() {}
 
 // Ref: #
 type CreateProjectRequest struct {
+	// The name of the project.
+	Name string `json:"name"`
 	// Origins which are allowed for previewing and testing the project.
 	PreviewOrigins []string `json:"previewOrigins"`
+}
+
+// GetName returns the value of Name.
+func (s *CreateProjectRequest) GetName() string {
+	return s.Name
 }
 
 // GetPreviewOrigins returns the value of PreviewOrigins.
 func (s *CreateProjectRequest) GetPreviewOrigins() []string {
 	return s.PreviewOrigins
+}
+
+// SetName sets the value of Name.
+func (s *CreateProjectRequest) SetName(val string) {
+	s.Name = val
 }
 
 // SetPreviewOrigins sets the value of PreviewOrigins.
@@ -1744,6 +1756,8 @@ func (s *CreateProjectRequest) SetPreviewOrigins(val []string) {
 type CreateProjectResponse struct {
 	// The unique identifier of the project.
 	ID string `json:"id"`
+	// The name of the project.
+	Name string `json:"name"`
 	// Secret which can be used for authentication when modifying the project.
 	ProjectSecret string `json:"projectSecret"`
 	// Secret which can be used for previewing and testing the project.
@@ -1757,6 +1771,11 @@ type CreateProjectResponse struct {
 // GetID returns the value of ID.
 func (s *CreateProjectResponse) GetID() string {
 	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *CreateProjectResponse) GetName() string {
+	return s.Name
 }
 
 // GetProjectSecret returns the value of ProjectSecret.
@@ -1782,6 +1801,11 @@ func (s *CreateProjectResponse) GetCreatedAt() time.Time {
 // SetID sets the value of ID.
 func (s *CreateProjectResponse) SetID(val string) {
 	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *CreateProjectResponse) SetName(val string) {
+	s.Name = val
 }
 
 // SetProjectSecret sets the value of ProjectSecret.
@@ -2233,6 +2257,7 @@ func (*ErrorDetails) endSessionRes()             {}
 func (*ErrorDetails) getMyUserRes()              {}
 func (*ErrorDetails) introspectRes()             {}
 func (*ErrorDetails) listFlowDefinitionsRes()    {}
+func (*ErrorDetails) listProjectsRes()           {}
 func (*ErrorDetails) submitFlowStepRes()         {}
 
 // Additional error-specific context.
@@ -2305,9 +2330,11 @@ func (*ErrorDetailsStatusCode) getUserByIDRes()              {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()              {}
 func (*ErrorDetailsStatusCode) introspectRes()               {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()      {}
+func (*ErrorDetailsStatusCode) listProjectsRes()             {}
 func (*ErrorDetailsStatusCode) listSchemasRes()              {}
 func (*ErrorDetailsStatusCode) listSessionsRes()             {}
 func (*ErrorDetailsStatusCode) listUsersRes()                {}
+func (*ErrorDetailsStatusCode) patchProjectRes()             {}
 func (*ErrorDetailsStatusCode) revokeMySessionRes()          {}
 func (*ErrorDetailsStatusCode) revokeSessionRes()            {}
 func (*ErrorDetailsStatusCode) revokeTokenRes()              {}
@@ -4447,6 +4474,10 @@ func (*GetProjectNotFound) getProjectRes() {}
 type GetProjectResponse struct {
 	// The unique identifier of the project.
 	ID string `json:"id"`
+	// The name of the project.
+	Name string `json:"name"`
+	// Origins which are allowed for previewing and testing the project.
+	PreviewOrigins []string `json:"previewOrigins"`
 	// The time when the project was created.
 	CreatedAt time.Time `json:"createdAt"`
 	// The time when the project was last updated.
@@ -4456,6 +4487,16 @@ type GetProjectResponse struct {
 // GetID returns the value of ID.
 func (s *GetProjectResponse) GetID() string {
 	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *GetProjectResponse) GetName() string {
+	return s.Name
+}
+
+// GetPreviewOrigins returns the value of PreviewOrigins.
+func (s *GetProjectResponse) GetPreviewOrigins() []string {
+	return s.PreviewOrigins
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -4473,6 +4514,16 @@ func (s *GetProjectResponse) SetID(val string) {
 	s.ID = val
 }
 
+// SetName sets the value of Name.
+func (s *GetProjectResponse) SetName(val string) {
+	s.Name = val
+}
+
+// SetPreviewOrigins sets the value of PreviewOrigins.
+func (s *GetProjectResponse) SetPreviewOrigins(val []string) {
+	s.PreviewOrigins = val
+}
+
 // SetCreatedAt sets the value of CreatedAt.
 func (s *GetProjectResponse) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
@@ -4483,7 +4534,8 @@ func (s *GetProjectResponse) SetUpdatedAt(val time.Time) {
 	s.UpdatedAt = val
 }
 
-func (*GetProjectResponse) getProjectRes() {}
+func (*GetProjectResponse) getProjectRes()   {}
+func (*GetProjectResponse) patchProjectRes() {}
 
 type GetProjectUnauthorized ErrorDetails
 
@@ -5641,6 +5693,37 @@ func (s *ListFlowDefinitionsPurpose) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
+
+// Paginated list of projects.
+// Ref: #
+type ListProjectsResponse struct {
+	Projects []GetProjectResponse `json:"projects"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetProjects returns the value of Projects.
+func (s *ListProjectsResponse) GetProjects() []GetProjectResponse {
+	return s.Projects
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListProjectsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetProjects sets the value of Projects.
+func (s *ListProjectsResponse) SetProjects(val []GetProjectResponse) {
+	s.Projects = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListProjectsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListProjectsResponse) listProjectsRes() {}
 
 type ListSchemasResponse []ListSchemasResponseItem
 
@@ -8815,6 +8898,69 @@ func (o OptNilString) Or(d string) string {
 	return d
 }
 
+// NewOptNilStringArray returns new OptNilStringArray with value set to v.
+func NewOptNilStringArray(v []string) OptNilStringArray {
+	return OptNilStringArray{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilStringArray is optional nullable []string.
+type OptNilStringArray struct {
+	Value []string
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilStringArray was set.
+func (o OptNilStringArray) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilStringArray) Reset() {
+	var v []string
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilStringArray) SetTo(v []string) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilStringArray) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilStringArray) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v []string
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilStringArray) Get() (v []string, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilStringArray) Or(d []string) []string {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilUserID returns new OptNilUserID with value set to v.
 func NewOptNilUserID(v UserID) OptNilUserID {
 	return OptNilUserID{
@@ -9897,6 +10043,45 @@ func (s *PasswordProof) GetPassword() string {
 func (s *PasswordProof) SetPassword(val string) {
 	s.Password = val
 }
+
+type PatchProjectBadRequest ErrorDetails
+
+func (*PatchProjectBadRequest) patchProjectRes() {}
+
+type PatchProjectNotFound ErrorDetails
+
+func (*PatchProjectNotFound) patchProjectRes() {}
+
+// Ref: #
+type PatchProjectRequest struct {
+	// The name of the project.
+	Name           OptNilString      `json:"name"`
+	PreviewOrigins OptNilStringArray `json:"previewOrigins"`
+}
+
+// GetName returns the value of Name.
+func (s *PatchProjectRequest) GetName() OptNilString {
+	return s.Name
+}
+
+// GetPreviewOrigins returns the value of PreviewOrigins.
+func (s *PatchProjectRequest) GetPreviewOrigins() OptNilStringArray {
+	return s.PreviewOrigins
+}
+
+// SetName sets the value of Name.
+func (s *PatchProjectRequest) SetName(val OptNilString) {
+	s.Name = val
+}
+
+// SetPreviewOrigins sets the value of PreviewOrigins.
+func (s *PatchProjectRequest) SetPreviewOrigins(val OptNilStringArray) {
+	s.PreviewOrigins = val
+}
+
+type PatchProjectUnauthorized ErrorDetails
+
+func (*PatchProjectUnauthorized) patchProjectRes() {}
 
 // Ref: #
 type PostTokenRequest struct {

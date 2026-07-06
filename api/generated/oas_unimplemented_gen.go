@@ -416,6 +416,15 @@ func (UnimplementedHandler) ListFlowDefinitions(ctx context.Context, params List
 	return r, ht.ErrNotImplemented
 }
 
+// ListProjects implements listProjects operation.
+//
+// List projects.
+//
+// GET /projects
+func (UnimplementedHandler) ListProjects(ctx context.Context, params ListProjectsParams) (r ListProjectsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListSchemas implements listSchemas operation.
 //
 // Retrieve a list of all schemas available in the system. This endpoint
@@ -442,6 +451,15 @@ func (UnimplementedHandler) ListSessions(ctx context.Context, params ListSession
 //
 // GET /users
 func (UnimplementedHandler) ListUsers(ctx context.Context, params ListUsersParams) (r ListUsersRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// PatchProject implements patchProject operation.
+//
+// Updates the state of a project.
+//
+// PATCH /projects/{project_id}
+func (UnimplementedHandler) PatchProject(ctx context.Context, req *PatchProjectRequest, params PatchProjectParams) (r PatchProjectRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

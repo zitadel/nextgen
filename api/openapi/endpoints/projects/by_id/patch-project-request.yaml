@@ -1,0 +1,15 @@
+type: object
+properties:
+  name:
+    description: The name of the project.
+    oneOf:
+      - type: 'null'
+      - type: string
+  previewOrigins:
+    oneOf:
+      - type: 'null'
+      - type: array
+        items:
+          type: string
+        description: |
+          Origins which are allowed for previewing and testing the project.

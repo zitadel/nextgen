@@ -69,10 +69,12 @@ var (
 		"POST": "Authorization",
 	}
 	rn15AllowedHeaders = map[string]string{
+		"GET":  "Authorization",
 		"POST": "Content-Type",
 	}
 	rn35AllowedHeaders = map[string]string{
-		"GET": "Authorization",
+		"GET":   "Authorization",
+		"PATCH": "Authorization,Content-Type",
 	}
 	rn16AllowedHeaders = map[string]string{
 		"GET":  "Authorization",
@@ -929,11 +931,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 				if len(elem) == 0 {
 					switch r.Method {
+					case "GET":
+						s.handleListProjectsRequest([0]string{}, elemIsEscaped, w, r)
 					case "POST":
 						s.handleCreateProjectRequest([0]string{}, elemIsEscaped, w, r)
 					default:
 						s.notAllowed(w, r, notAllowedParams{
-							allowedMethods: "POST",
+							allowedMethods: "GET,POST",
 							allowedHeaders: rn15AllowedHeaders,
 							acceptPost:     "application/json",
 							acceptPatch:    "",
@@ -967,12 +971,16 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							s.handleGetProjectRequest([1]string{
 								args[0],
 							}, elemIsEscaped, w, r)
+						case "PATCH":
+							s.handlePatchProjectRequest([1]string{
+								args[0],
+							}, elemIsEscaped, w, r)
 						default:
 							s.notAllowed(w, r, notAllowedParams{
-								allowedMethods: "GET",
+								allowedMethods: "GET,PATCH",
 								allowedHeaders: rn35AllowedHeaders,
 								acceptPost:     "",
-								acceptPatch:    "",
+								acceptPatch:    "application/json",
 							})
 						}
 
@@ -2260,6 +2268,15 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 
 				if len(elem) == 0 {
 					switch method {
+					case "GET":
+						r.name = ListProjectsOperation
+						r.summary = "List projects"
+						r.operationID = "listProjects"
+						r.operationGroup = ""
+						r.pathPattern = "/projects"
+						r.args = args
+						r.count = 0
+						return r, true
 					case "POST":
 						r.name = CreateProjectOperation
 						r.summary = "Create project"
@@ -2298,6 +2315,15 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							r.name = GetProjectOperation
 							r.summary = "Get project"
 							r.operationID = "getProject"
+							r.operationGroup = ""
+							r.pathPattern = "/projects/{project_id}"
+							r.args = args
+							r.count = 1
+							return r, true
+						case "PATCH":
+							r.name = PatchProjectOperation
+							r.summary = "Update project"
+							r.operationID = "patchProject"
 							r.operationGroup = ""
 							r.pathPattern = "/projects/{project_id}"
 							r.args = args
