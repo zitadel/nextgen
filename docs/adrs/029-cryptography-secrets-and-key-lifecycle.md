@@ -28,7 +28,7 @@ For password hashing we use the [`passwap`](https://github.com/zitadel/passwap)
 package. It provides all functionality to hash and migrate hashes of passwords.
 
 A project admin should be able to configure which hashing method should be used.
-This so that a tenant can have specific requirements like FIPS.
+This is so that a tenant can have specific requirements such as FIPS.
 
 By default, we should use [`argon2id`](https://datatracker.ietf.org/doc/html/rfc9106)
 for password/secret hashing.
@@ -51,9 +51,9 @@ never has to be exposed.
 
 ### Data at rest
 
-Secret values which might need to be sent to other systems (E.g.: IdP secrets,
-API keys, tokens, etc.) cannot be stored as a simple hash. But we can not store
-them in plain text. For these values we use encryption. More specific, we use
+Secret values which might need to be sent to other systems (e.g. IdP secrets,
+API keys, tokens, etc.) cannot be stored as a simple hash. But we cannot store
+them in plain text. For these values we use encryption. More specifically, we use
 AES-GCM to encrypt these values.
 
 ### Third party secrets
