@@ -2257,7 +2257,6 @@ func (*ErrorDetails) endSessionRes()             {}
 func (*ErrorDetails) getMyUserRes()              {}
 func (*ErrorDetails) introspectRes()             {}
 func (*ErrorDetails) listFlowDefinitionsRes()    {}
-func (*ErrorDetails) queryProjectsRes()          {}
 func (*ErrorDetails) submitFlowStepRes()         {}
 
 // Additional error-specific context.
@@ -9133,69 +9132,6 @@ func (o OptNilString) Or(d string) string {
 	return d
 }
 
-// NewOptNilStringArray returns new OptNilStringArray with value set to v.
-func NewOptNilStringArray(v []string) OptNilStringArray {
-	return OptNilStringArray{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptNilStringArray is optional nullable []string.
-type OptNilStringArray struct {
-	Value []string
-	Set   bool
-	Null  bool
-}
-
-// IsSet returns true if OptNilStringArray was set.
-func (o OptNilStringArray) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptNilStringArray) Reset() {
-	var v []string
-	o.Value = v
-	o.Set = false
-	o.Null = false
-}
-
-// SetTo sets value to v.
-func (o *OptNilStringArray) SetTo(v []string) {
-	o.Set = true
-	o.Null = false
-	o.Value = v
-}
-
-// IsNull returns true if value is Null.
-func (o OptNilStringArray) IsNull() bool { return o.Null }
-
-// SetToNull sets value to null.
-func (o *OptNilStringArray) SetToNull() {
-	o.Set = true
-	o.Null = true
-	var v []string
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptNilStringArray) Get() (v []string, ok bool) {
-	if o.Null {
-		return v, false
-	}
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptNilStringArray) Or(d []string) []string {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptNilUserID returns new OptNilUserID with value set to v.
 func NewOptNilUserID(v UserID) OptNilUserID {
 	return OptNilUserID{
@@ -10382,8 +10318,7 @@ func (*PatchProjectNotFound) patchProjectRes() {}
 // Ref: #
 type PatchProjectRequest struct {
 	// The name of the project.
-	Name           OptNilString      `json:"name"`
-	PreviewOrigins OptNilStringArray `json:"previewOrigins"`
+	Name OptNilString `json:"name"`
 }
 
 // GetName returns the value of Name.
@@ -10391,19 +10326,9 @@ func (s *PatchProjectRequest) GetName() OptNilString {
 	return s.Name
 }
 
-// GetPreviewOrigins returns the value of PreviewOrigins.
-func (s *PatchProjectRequest) GetPreviewOrigins() OptNilStringArray {
-	return s.PreviewOrigins
-}
-
 // SetName sets the value of Name.
 func (s *PatchProjectRequest) SetName(val OptNilString) {
 	s.Name = val
-}
-
-// SetPreviewOrigins sets the value of PreviewOrigins.
-func (s *PatchProjectRequest) SetPreviewOrigins(val OptNilStringArray) {
-	s.PreviewOrigins = val
 }
 
 type PatchProjectUnauthorized ErrorDetails
@@ -10574,6 +10499,14 @@ func (s *PostTokenRequestGrantType) UnmarshalText(data []byte) error {
 
 type ProjectID string
 
+type QueryProjectsBadRequest ErrorDetails
+
+func (*QueryProjectsBadRequest) queryProjectsRes() {}
+
+type QueryProjectsForbidden ErrorDetails
+
+func (*QueryProjectsForbidden) queryProjectsRes() {}
+
 // Request to query projects.
 // Ref: #
 type QueryProjectsRequest struct {
@@ -10720,6 +10653,14 @@ func (s *QueryProjectsResponse) SetNextPageToken(val OptNilPageToken) {
 }
 
 func (*QueryProjectsResponse) queryProjectsRes() {}
+
+type QueryProjectsTooManyRequests ErrorDetails
+
+func (*QueryProjectsTooManyRequests) queryProjectsRes() {}
+
+type QueryProjectsUnauthorized ErrorDetails
+
+func (*QueryProjectsUnauthorized) queryProjectsRes() {}
 
 type RevokeMySessionConflict ErrorDetails
 
