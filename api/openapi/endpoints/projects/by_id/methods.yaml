@@ -53,21 +53,6 @@ patch:
       required: true
       schema:
         $ref: ../../../components/schemas/project-id.yaml
-    - $ref: ../../../components/parameters/sort-direction.yaml
-    - name: created_before
-      description: Filter projects created before this date.
-      in: query
-      required: false
-      schema:
-        type: string
-        format: date-time
-    - name: created_after
-      description: Filter projects created after this date.
-      in: query
-      required: false
-      schema:
-        type: string
-        format: date-time
   security:
     - oauth2:
         - project.write

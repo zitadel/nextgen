@@ -15072,72 +15072,6 @@ func (s *OptFieldValidationFormat) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes FilterField as json.
-func (o OptFilterField) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	e.Str(string(o.Value))
-}
-
-// Decode decodes FilterField from json.
-func (o *OptFilterField) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptFilterField to nil")
-	}
-	o.Set = true
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptFilterField) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptFilterField) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes FilterOperation as json.
-func (o OptFilterOperation) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	e.Str(string(o.Value))
-}
-
-// Decode decodes FilterOperation from json.
-func (o *OptFilterOperation) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptFilterOperation to nil")
-	}
-	o.Set = true
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptFilterOperation) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptFilterOperation) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes FlowAudience as json.
 func (o OptFlowAudience) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -16416,39 +16350,6 @@ func (s OptSchemaURI) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptSchemaURI) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes SortDirection as json.
-func (o OptSortDirection) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	e.Str(string(o.Value))
-}
-
-// Decode decodes SortDirection from json.
-func (o *OptSortDirection) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptSortDirection to nil")
-	}
-	o.Set = true
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptSortDirection) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptSortDirection) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -18248,22 +18149,16 @@ func (s *QueryProjectsRequestFilterItem) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *QueryProjectsRequestFilterItem) encodeFields(e *jx.Encoder) {
 	{
-		if s.Field.Set {
-			e.FieldStart("field")
-			s.Field.Encode(e)
-		}
+		e.FieldStart("field")
+		s.Field.Encode(e)
 	}
 	{
-		if s.Value.Set {
-			e.FieldStart("value")
-			s.Value.Encode(e)
-		}
+		e.FieldStart("value")
+		e.Str(s.Value)
 	}
 	{
-		if s.Operation.Set {
-			e.FieldStart("operation")
-			s.Operation.Encode(e)
-		}
+		e.FieldStart("operation")
+		s.Operation.Encode(e)
 	}
 }
 
@@ -18278,12 +18173,13 @@ func (s *QueryProjectsRequestFilterItem) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode QueryProjectsRequestFilterItem to nil")
 	}
+	var requiredBitSet [1]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
 		case "field":
+			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				s.Field.Reset()
 				if err := s.Field.Decode(d); err != nil {
 					return err
 				}
@@ -18292,9 +18188,11 @@ func (s *QueryProjectsRequestFilterItem) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"field\"")
 			}
 		case "value":
+			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
-				s.Value.Reset()
-				if err := s.Value.Decode(d); err != nil {
+				v, err := d.Str()
+				s.Value = string(v)
+				if err != nil {
 					return err
 				}
 				return nil
@@ -18302,8 +18200,8 @@ func (s *QueryProjectsRequestFilterItem) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"value\"")
 			}
 		case "operation":
+			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
-				s.Operation.Reset()
 				if err := s.Operation.Decode(d); err != nil {
 					return err
 				}
@@ -18317,6 +18215,38 @@ func (s *QueryProjectsRequestFilterItem) Decode(d *jx.Decoder) error {
 		return nil
 	}); err != nil {
 		return errors.Wrap(err, "decode QueryProjectsRequestFilterItem")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000111,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfQueryProjectsRequestFilterItem) {
+					name = jsonFieldsNameOfQueryProjectsRequestFilterItem[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 
 	return nil
@@ -18345,16 +18275,12 @@ func (s *QueryProjectsRequestSortingItem) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *QueryProjectsRequestSortingItem) encodeFields(e *jx.Encoder) {
 	{
-		if s.Field.Set {
-			e.FieldStart("field")
-			s.Field.Encode(e)
-		}
+		e.FieldStart("field")
+		s.Field.Encode(e)
 	}
 	{
-		if s.Direction.Set {
-			e.FieldStart("direction")
-			s.Direction.Encode(e)
-		}
+		e.FieldStart("direction")
+		s.Direction.Encode(e)
 	}
 }
 
@@ -18368,13 +18294,13 @@ func (s *QueryProjectsRequestSortingItem) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode QueryProjectsRequestSortingItem to nil")
 	}
-	s.setDefaults()
+	var requiredBitSet [1]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
 		case "field":
+			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				s.Field.Reset()
 				if err := s.Field.Decode(d); err != nil {
 					return err
 				}
@@ -18383,8 +18309,8 @@ func (s *QueryProjectsRequestSortingItem) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"field\"")
 			}
 		case "direction":
+			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
-				s.Direction.Reset()
 				if err := s.Direction.Decode(d); err != nil {
 					return err
 				}
@@ -18398,6 +18324,38 @@ func (s *QueryProjectsRequestSortingItem) Decode(d *jx.Decoder) error {
 		return nil
 	}); err != nil {
 		return errors.Wrap(err, "decode QueryProjectsRequestSortingItem")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfQueryProjectsRequestSortingItem) {
+					name = jsonFieldsNameOfQueryProjectsRequestSortingItem[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 
 	return nil

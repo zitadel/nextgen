@@ -7541,98 +7541,6 @@ func (o OptFieldValidationFormat) Or(d FieldValidationFormat) FieldValidationFor
 	return d
 }
 
-// NewOptFilterField returns new OptFilterField with value set to v.
-func NewOptFilterField(v FilterField) OptFilterField {
-	return OptFilterField{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptFilterField is optional FilterField.
-type OptFilterField struct {
-	Value FilterField
-	Set   bool
-}
-
-// IsSet returns true if OptFilterField was set.
-func (o OptFilterField) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptFilterField) Reset() {
-	var v FilterField
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptFilterField) SetTo(v FilterField) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptFilterField) Get() (v FilterField, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptFilterField) Or(d FilterField) FilterField {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptFilterOperation returns new OptFilterOperation with value set to v.
-func NewOptFilterOperation(v FilterOperation) OptFilterOperation {
-	return OptFilterOperation{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptFilterOperation is optional FilterOperation.
-type OptFilterOperation struct {
-	Value FilterOperation
-	Set   bool
-}
-
-// IsSet returns true if OptFilterOperation was set.
-func (o OptFilterOperation) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptFilterOperation) Reset() {
-	var v FilterOperation
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptFilterOperation) SetTo(v FilterOperation) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptFilterOperation) Get() (v FilterOperation, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptFilterOperation) Or(d FilterOperation) FilterOperation {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptFlowAudience returns new OptFlowAudience with value set to v.
 func NewOptFlowAudience(v FlowAudience) OptFlowAudience {
 	return OptFlowAudience{
@@ -9534,52 +9442,6 @@ func (o OptSchemaURI) Or(d SchemaURI) SchemaURI {
 	return d
 }
 
-// NewOptSortDirection returns new OptSortDirection with value set to v.
-func NewOptSortDirection(v SortDirection) OptSortDirection {
-	return OptSortDirection{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptSortDirection is optional SortDirection.
-type OptSortDirection struct {
-	Value SortDirection
-	Set   bool
-}
-
-// IsSet returns true if OptSortDirection was set.
-func (o OptSortDirection) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptSortDirection) Reset() {
-	var v SortDirection
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptSortDirection) SetTo(v SortDirection) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptSortDirection) Get() (v SortDirection, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptSortDirection) Or(d SortDirection) SortDirection {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptStepTexts returns new OptStepTexts with value set to v.
 func NewOptStepTexts(v StepTexts) OptStepTexts {
 	return OptStepTexts{
@@ -10560,66 +10422,66 @@ func (s *QueryProjectsRequest) SetFilter(val []QueryProjectsRequestFilterItem) {
 
 type QueryProjectsRequestFilterItem struct {
 	// The field to filter by.
-	Field OptFilterField `json:"field"`
+	Field FilterField `json:"field"`
 	// The value to filter by.
-	Value     OptString          `json:"value"`
-	Operation OptFilterOperation `json:"operation"`
+	Value     string          `json:"value"`
+	Operation FilterOperation `json:"operation"`
 }
 
 // GetField returns the value of Field.
-func (s *QueryProjectsRequestFilterItem) GetField() OptFilterField {
+func (s *QueryProjectsRequestFilterItem) GetField() FilterField {
 	return s.Field
 }
 
 // GetValue returns the value of Value.
-func (s *QueryProjectsRequestFilterItem) GetValue() OptString {
+func (s *QueryProjectsRequestFilterItem) GetValue() string {
 	return s.Value
 }
 
 // GetOperation returns the value of Operation.
-func (s *QueryProjectsRequestFilterItem) GetOperation() OptFilterOperation {
+func (s *QueryProjectsRequestFilterItem) GetOperation() FilterOperation {
 	return s.Operation
 }
 
 // SetField sets the value of Field.
-func (s *QueryProjectsRequestFilterItem) SetField(val OptFilterField) {
+func (s *QueryProjectsRequestFilterItem) SetField(val FilterField) {
 	s.Field = val
 }
 
 // SetValue sets the value of Value.
-func (s *QueryProjectsRequestFilterItem) SetValue(val OptString) {
+func (s *QueryProjectsRequestFilterItem) SetValue(val string) {
 	s.Value = val
 }
 
 // SetOperation sets the value of Operation.
-func (s *QueryProjectsRequestFilterItem) SetOperation(val OptFilterOperation) {
+func (s *QueryProjectsRequestFilterItem) SetOperation(val FilterOperation) {
 	s.Operation = val
 }
 
 type QueryProjectsRequestSortingItem struct {
 	// The field to sort by.
-	Field OptFilterField `json:"field"`
+	Field FilterField `json:"field"`
 	// The direction to sort by.
-	Direction OptSortDirection `json:"direction"`
+	Direction SortDirection `json:"direction"`
 }
 
 // GetField returns the value of Field.
-func (s *QueryProjectsRequestSortingItem) GetField() OptFilterField {
+func (s *QueryProjectsRequestSortingItem) GetField() FilterField {
 	return s.Field
 }
 
 // GetDirection returns the value of Direction.
-func (s *QueryProjectsRequestSortingItem) GetDirection() OptSortDirection {
+func (s *QueryProjectsRequestSortingItem) GetDirection() SortDirection {
 	return s.Direction
 }
 
 // SetField sets the value of Field.
-func (s *QueryProjectsRequestSortingItem) SetField(val OptFilterField) {
+func (s *QueryProjectsRequestSortingItem) SetField(val FilterField) {
 	s.Field = val
 }
 
 // SetDirection sets the value of Direction.
-func (s *QueryProjectsRequestSortingItem) SetDirection(val OptSortDirection) {
+func (s *QueryProjectsRequestSortingItem) SetDirection(val SortDirection) {
 	s.Direction = val
 }
 

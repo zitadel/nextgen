@@ -7194,18 +7194,6 @@ func (s *Server) handlePatchProjectRequest(args [1]string, argsEscaped bool, w h
 					Name: "project_id",
 					In:   "path",
 				}: params.ProjectID,
-				{
-					Name: "sort_direction",
-					In:   "query",
-				}: params.SortDirection,
-				{
-					Name: "created_before",
-					In:   "query",
-				}: params.CreatedBefore,
-				{
-					Name: "created_after",
-					In:   "query",
-				}: params.CreatedAfter,
 			},
 			Raw: r,
 		}

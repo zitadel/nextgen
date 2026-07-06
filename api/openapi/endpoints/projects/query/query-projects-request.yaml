@@ -12,6 +12,9 @@ properties:
     type: array
     items:
       type: object
+      required:
+        - field
+        - direction
       properties:
         field:
           $ref: filter-field.yaml
@@ -24,6 +27,10 @@ properties:
     description: Filter criteria for querying projects.
     items:
       type: object
+      required:
+        - field
+        - value
+        - operation
       properties:
         field:
           $ref: filter-field.yaml

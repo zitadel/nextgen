@@ -5885,61 +5885,6 @@ func (c *Client) sendPatchProject(ctx context.Context, request *PatchProjectRequ
 	}
 	uri.AddPathParts(u, pathParts[:]...)
 
-	stage = "EncodeQueryParams"
-	q := uri.NewQueryEncoder()
-	{
-		// Encode "sort_direction" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "sort_direction",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.SortDirection.Get(); ok {
-				return e.EncodeValue(conv.StringToString(string(val)))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	{
-		// Encode "created_before" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "created_before",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.CreatedBefore.Get(); ok {
-				return e.EncodeValue(conv.DateTimeToString(val))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	{
-		// Encode "created_after" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "created_after",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.CreatedAfter.Get(); ok {
-				return e.EncodeValue(conv.DateTimeToString(val))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	u.RawQuery = q.Values().Encode()
-
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "PATCH", u)
 	if err != nil {

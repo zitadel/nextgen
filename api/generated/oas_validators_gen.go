@@ -2526,15 +2526,8 @@ func (s *QueryProjectsRequestFilterItem) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
-		if value, ok := s.Field.Get(); ok {
-			if err := func() error {
-				if err := value.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
+		if err := s.Field.Validate(); err != nil {
+			return err
 		}
 		return nil
 	}(); err != nil {
@@ -2544,15 +2537,8 @@ func (s *QueryProjectsRequestFilterItem) Validate() error {
 		})
 	}
 	if err := func() error {
-		if value, ok := s.Operation.Get(); ok {
-			if err := func() error {
-				if err := value.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
+		if err := s.Operation.Validate(); err != nil {
+			return err
 		}
 		return nil
 	}(); err != nil {
@@ -2574,15 +2560,8 @@ func (s *QueryProjectsRequestSortingItem) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
-		if value, ok := s.Field.Get(); ok {
-			if err := func() error {
-				if err := value.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
+		if err := s.Field.Validate(); err != nil {
+			return err
 		}
 		return nil
 	}(); err != nil {
@@ -2592,15 +2571,8 @@ func (s *QueryProjectsRequestSortingItem) Validate() error {
 		})
 	}
 	if err := func() error {
-		if value, ok := s.Direction.Get(); ok {
-			if err := func() error {
-				if err := value.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
+		if err := s.Direction.Validate(); err != nil {
+			return err
 		}
 		return nil
 	}(); err != nil {
