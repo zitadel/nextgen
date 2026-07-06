@@ -2,9 +2,8 @@ package spanner
 
 import "strings"
 
-// convertPlaceholders translates PostgreSQL-style positional placeholders ($1, $2, ...)
-// to the @pN style expected by the native Spanner client. It skips replacements
-// inside single-quoted string literals so that '$100' in a literal stays intact.
+// convertPlaceholders translates $1, $2, ... to @pN for the native Spanner client.
+// Skips replacements inside single-quoted string literals.
 func convertPlaceholders(sql string) string {
 	var b strings.Builder
 	b.Grow(len(sql))

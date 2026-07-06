@@ -1,6 +1,10 @@
 package spanner
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestConvertPlaceholders(t *testing.T) {
 	t.Parallel()
@@ -30,14 +34,7 @@ func TestConvertPlaceholders(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			assertEqualSQL(t, tt.want, convertPlaceholders(tt.sql))
+			assert.Equal(t, tt.want, convertPlaceholders(tt.sql))
 		})
-	}
-}
-
-func assertEqualSQL(t *testing.T, want, got string) {
-	t.Helper()
-	if want != got {
-		t.Fatalf("convertPlaceholders() = %q, want %q", got, want)
 	}
 }

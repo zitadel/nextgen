@@ -53,7 +53,6 @@ func newTransaction(txn *spanner.ReadWriteTransaction) transaction {
 
 var _ dbold.QueryExecutor = (*transaction)(nil)
 
-// bridgeRows implements v1 [database.Rows] for the QueryExecutor bridge.
 type bridgeRows struct {
 	iter *spanner.RowIterator
 	row  *spanner.Row
