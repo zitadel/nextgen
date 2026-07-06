@@ -232,7 +232,7 @@ func mapListRequestToService(params api.ListFlowDefinitionsParams) service.ListF
 	}
 	limit, ok := params.Limit.Get()
 	if ok {
-		req.Limit = limit
+		req.Limit = int(limit)
 	}
 	pageToken, ok := params.PageToken.Get()
 	if ok {
