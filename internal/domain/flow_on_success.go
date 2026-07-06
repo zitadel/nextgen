@@ -42,13 +42,13 @@ type FlowOnSuccessInput struct {
 	ResolvedFlow  *FlowDefinition
 }
 
-// FlowOnSuccessResult is what a handler returns. Outcome overrides the
-// transition key (empty = use the submitted action). StepError keeps
-// the user on the current step.
+// FlowOnSuccessResult is what a handler returns. StepError keeps the
+// user on the current step.
 type FlowOnSuccessResult struct {
-	Outcome   string
 	StepError *string
 	// UserID is set when a handler creates a new user. The state machine
 	// records it and registers the user on the auth attempt.
 	UserID string
+	// Irreversible flags mutations the user cannot reverse (e.g. created a user).
+	Irreversible bool
 }
