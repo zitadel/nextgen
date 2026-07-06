@@ -7250,14 +7250,14 @@ func (s *Server) handlePatchProjectRequest(args [1]string, argsEscaped bool, w h
 //
 // Query projects.
 //
-// POST /projects/list
+// POST /projects/query
 func (s *Server) handleQueryProjectsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("queryProjects"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/projects/list"),
+		semconv.HTTPRouteKey.String("/projects/query"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)

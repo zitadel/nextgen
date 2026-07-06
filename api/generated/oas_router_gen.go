@@ -959,9 +959,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						break
 					}
 					switch elem[0] {
-					case 'l': // Prefix: "list"
+					case 'q': // Prefix: "query"
 						origElem := elem
-						if l := len("list"); len(elem) >= l && elem[0:l] == "list" {
+						if l := len("query"); len(elem) >= l && elem[0:l] == "query" {
 							elem = elem[l:]
 						} else {
 							break
@@ -2325,9 +2325,9 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						break
 					}
 					switch elem[0] {
-					case 'l': // Prefix: "list"
+					case 'q': // Prefix: "query"
 						origElem := elem
-						if l := len("list"); len(elem) >= l && elem[0:l] == "list" {
+						if l := len("query"); len(elem) >= l && elem[0:l] == "query" {
 							elem = elem[l:]
 						} else {
 							break
@@ -2341,7 +2341,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 								r.summary = "Query projects"
 								r.operationID = "queryProjects"
 								r.operationGroup = ""
-								r.pathPattern = "/projects/list"
+								r.pathPattern = "/projects/query"
 								r.args = args
 								r.count = 0
 								return r, true

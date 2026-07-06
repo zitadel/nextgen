@@ -353,7 +353,7 @@ type Invoker interface {
 	//
 	// Query projects.
 	//
-	// POST /projects/list
+	// POST /projects/query
 	QueryProjects(ctx context.Context, request OptQueryProjectsRequest) (QueryProjectsRes, error)
 	// RevokeMySession invokes revokeMySession operation.
 	//
@@ -6003,7 +6003,7 @@ func (c *Client) sendPatchProject(ctx context.Context, request *PatchProjectRequ
 //
 // Query projects.
 //
-// POST /projects/list
+// POST /projects/query
 func (c *Client) QueryProjects(ctx context.Context, request OptQueryProjectsRequest) (QueryProjectsRes, error) {
 	res, err := c.sendQueryProjects(ctx, request)
 	return res, err
@@ -6029,7 +6029,7 @@ func (c *Client) sendQueryProjects(ctx context.Context, request OptQueryProjects
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("queryProjects"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.URLTemplateKey.String("/projects/list"),
+		semconv.URLTemplateKey.String("/projects/query"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -6063,7 +6063,7 @@ func (c *Client) sendQueryProjects(ctx context.Context, request OptQueryProjects
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
 	var pathParts [1]string
-	pathParts[0] = "/projects/list"
+	pathParts[0] = "/projects/query"
 	uri.AddPathParts(u, pathParts[:]...)
 
 	stage = "EncodeRequest"

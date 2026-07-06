@@ -458,7 +458,7 @@ func (UnimplementedHandler) PatchProject(ctx context.Context, req *PatchProjectR
 //
 // Query projects.
 //
-// POST /projects/list
+// POST /projects/query
 func (UnimplementedHandler) QueryProjects(ctx context.Context, req OptQueryProjectsRequest) (r QueryProjectsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }

@@ -333,7 +333,7 @@ type Handler interface {
 	//
 	// Query projects.
 	//
-	// POST /projects/list
+	// POST /projects/query
 	QueryProjects(ctx context.Context, req OptQueryProjectsRequest) (QueryProjectsRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
