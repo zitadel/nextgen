@@ -6,15 +6,15 @@ flows collect (email, name, phoneNumber, custom claims, etc.). A project
 can hold as many schemas as you need (e.g. one for end users, one for
 internal admins).
 
-## Files here
+## What's in a schema file
 
-- **`default-human-user.json`** — the default schema for human users,
-  scaffolded during `zitadel setup`.
-  - `properties` / `required` describe the user's attributes.
-  - `x-auth-methods` declares which credentials this user type supports
-    (password, passkey, …).
-  - `objectType` groups revisions of the same logical user type; do not
-    rename it after the first `apply`.
+- `objectType` — groups revisions of the same logical user type. Do not
+  rename it after the first `apply`; the platform correlates history by
+  this key.
+- `properties` / `required` — the user's attributes and which of them
+  must be present on every user.
+- `x-auth-methods` — which credentials this user type supports
+  (password, passkey, …).
 
 ## What you can do
 

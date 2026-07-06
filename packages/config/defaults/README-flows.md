@@ -5,24 +5,23 @@ which fields the user sees at each step, which credentials are checked,
 and how one step transitions to the next. The Zitadel flow engine runs
 these on the platform; the widget renders whatever the engine emits.
 
-## Files here
+## What's in a flow file
 
-- **`default-login.json`** — the default combined login/register flow,
-  scaffolded during `zitadel setup`.
-  - `purposes` names the entry step for each purpose (`login`,
-    `register`, …).
-  - `steps[]` is the ordered list of screens; each step's `fields[]`
-    references properties of the pinned schema, and `transitions` wires
-    it to the next step.
-  - `user_schema` pins the flow to one specific user-schema revision.
-  - `audience` (optional) scopes the flow to specific apps or teams.
+- `purposes` — entry step for each purpose (`login`, `register`, …). A
+  single flow can serve multiple purposes.
+- `steps[]` — the ordered list of screens. Each step's `fields[]`
+  references properties of the pinned schema (or reserved tokens like
+  `x-auth-methods#password`), and `transitions` wires it to the next
+  step.
+- `user_schema` — pins the flow to one specific user-schema revision.
+- `audience` (optional) — scopes the flow to specific apps or teams.
 
 ## What you can do
 
 - **Add or remove a step** — extend `steps[]`.
 - **Change which fields a step collects** — edit `steps[].fields[]`.
-  Values must be properties of the pinned schema (or reserved tokens
-  like `x-auth-methods#password`).
+  Values must be properties of the pinned schema (or reserved credential
+  tokens).
 - **Rewire transitions** — edit `steps[].transitions` to point at a
   different next step, or use `action: switch` / `pivot` to jump to
   another flow.
