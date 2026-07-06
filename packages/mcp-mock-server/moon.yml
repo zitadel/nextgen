@@ -1,0 +1,40 @@
+id: "mcp-mock-server"
+language: "typescript"
+layer: "library"
+stack: "backend"
+
+tasks:
+  lint:
+    command: "corepack pnpm exec oxlint ."
+
+  typecheck:
+    command: "corepack pnpm exec tsc --noEmit -p tsconfig.json"
+
+  build:
+    command: "node -e \"process.exit(0)\""
+
+  test:
+    command: "corepack pnpm run test"
+
+  probe:
+    command: "corepack pnpm run probe"
+    options:
+      runInCI: false
+
+  probe-token:
+    command: "corepack pnpm run probe-token"
+    options:
+      runInCI: false
+      persistent: true
+
+  inspector:
+    command: "corepack pnpm run inspector"
+    options:
+      persistent: true
+      runInCI: false
+
+  start:
+    command: "corepack pnpm run start"
+    options:
+      persistent: true
+      runInCI: false

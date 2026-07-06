@@ -1,0 +1,38 @@
+{
+  "name": "@zitadel/mcp-mock-server",
+  "version": "0.0.0",
+  "description": "Minimal MCP resource server for probing OAuth authorization against Zitadel",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/server.ts",
+      "import": "./src/server.ts"
+    }
+  },
+  "bin": {
+    "mcp-mock-server": "./bin/start.ts",
+    "mcp-oauth-probe": "./bin/probe-oauth.ts",
+    "mcp-token-probe": "./bin/probe-token.ts"
+  },
+  "scripts": {
+    "start": "tsx bin/start.ts",
+    "dev": "tsx watch bin/start.ts",
+    "probe": "tsx bin/probe-oauth.ts",
+    "probe-token": "tsx bin/probe-token.ts",
+    "inspector": "npx @modelcontextprotocol/inspector --config ./mcp-inspector.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "express": "catalog:",
+    "tslib": "catalog:"
+  },
+  "devDependencies": {
+    "@types/express": "catalog:",
+    "@types/node": "catalog:",
+    "@types/supertest": "^6.0.3",
+    "supertest": "^7.1.4",
+    "tsx": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -16,6 +16,7 @@ projects:
     mock-zitadel: "apps/mock-zitadel"
     api: "packages/api"
     api-mock: "packages/api-mock"
+    mcp-mock-server: "packages/mcp-mock-server"
     components: "packages/components"
     design-tokens: "packages/design-tokens"
     sdk-angular: "packages/sdk-angular"

@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "zitadel-probe": {
+      "type": "streamable-http",
+      "url": "http://localhost:9090/mcp",
+      "note": "Start @zitadel/mcp-mock-server first. Unauthenticated requests should trigger OAuth discovery against AUTHORIZATION_SERVER (default http://localhost:8080)."
+    }
+  }
+}
