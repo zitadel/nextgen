@@ -2775,9 +2775,8 @@ type FlowDefinition struct {
 	Status FlowDefinitionStatus `json:"status"`
 	// Server-assigned identifier of the user schema this flow operates on,
 	// as returned by `POST /schemas`. Opaque to the client — the shape is a
-	// server implementation detail (URL-shaped today, ULID-shaped in some
-	// deployments). Step `fields` reference properties defined in the
-	// resolved schema; the engine resolves field types, validation, and
+	// server implementation detail. Step `fields` reference properties
+	// defined in the resolved schema; the engine resolves field types, validation, and
 	// implicit outcomes from schema annotations at runtime.
 	UserSchema string `json:"user_schema"`
 	// Maps each purpose this definition handles to its entry-point step.
