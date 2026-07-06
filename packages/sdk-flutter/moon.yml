@@ -1,0 +1,42 @@
+id: "sdk-flutter"
+# Moon has no Dart toolchain; tasks run as system commands and expect the
+# Flutter SDK on PATH (CI installs it via subosito/flutter-action).
+language: "dart"
+layer: "library"
+stack: "frontend"
+dependsOn:
+  - "sdk-dart"
+
+tasks:
+  lint:
+    command: "dart format --output=none --set-exit-if-changed lib test example/lib"
+    inputs:
+      - "lib/**/*"
+      - "test/**/*"
+      - "example/**/*"
+      - "pubspec.yaml"
+      - "analysis_options.yaml"
+
+  typecheck:
+    command: "flutter pub get && flutter analyze"
+    options:
+      shell: true
+    deps:
+      - "sdk-dart:typecheck"
+    inputs:
+      - "lib/**/*"
+      - "test/**/*"
+      - "example/**/*"
+      - "pubspec.yaml"
+      - "analysis_options.yaml"
+
+  test:
+    command: "flutter pub get && flutter test"
+    options:
+      shell: true
+    deps:
+      - "sdk-dart:test"
+    inputs:
+      - "lib/**/*"
+      - "test/**/*"
+      - "pubspec.yaml"

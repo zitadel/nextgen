@@ -21,6 +21,7 @@ projects:
     sdk-angular: "packages/sdk-angular"
     sdk-core: "packages/sdk-core"
     sdk-dart: "packages/sdk-dart"
+    sdk-flutter: "packages/sdk-flutter"
     sdk-next: "packages/sdk-next"
     sdk-nuxt: "packages/sdk-nuxt"
     sdk-qwik: "packages/sdk-qwik"

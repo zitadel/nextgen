@@ -1,0 +1,28 @@
+name: zitadel_flutter
+description: >-
+  Flutter widgets for Zitadel NextGen authentication: a ZitadelLogin widget
+  that natively renders the server-driven login/registration flow, plus
+  session and logout widgets and secure token storage.
+version: 0.1.0-alpha.1
+homepage: https://github.com/zitadel/nextgen/tree/main/packages/sdk-flutter
+repository: https://github.com/zitadel/nextgen
+issue_tracker: https://github.com/zitadel/nextgen/issues
+
+environment:
+  sdk: ^3.4.0
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Version-locked sibling; resolved from the monorepo via
+  # pubspec_overrides.yaml during development (pub ignores overrides at
+  # publish time).
+  zitadel_client: ^0.1.0-alpha.1
+  crypto: ^3.0.3
+  flutter_secure_storage: ^9.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
