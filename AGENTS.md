@@ -32,7 +32,10 @@ This repo is the pre-release next generation of Zitadel. Moon owns the
 monorepo task graph and release artifact builds. Changesets owns package
 versions, changelogs, npm publishing, and public package tags; Moon owns the
 draft GitHub Release shell for `v<version>` (see "Release, Licensing, And
-Secrets").
+Secrets"). Exception: the Dart/Flutter SDK packages run through the Moon task
+graph like everyone else, but version and publish to pub.dev outside
+Changesets via `.github/workflows/release-flutter.yml` (see
+[`.changeset/README.md`](.changeset/README.md#publishable-npm-packages)).
 
 - `internal/` contains Go server implementation code.
 - `cmd/` is reserved for Go command wiring.
@@ -266,7 +269,14 @@ The changeset decision — including when a Go-only change needs one — lives i
 `.changeset/*.md` file directly rather than using the interactive prompt, then
 verify with `corepack pnpm exec changeset status --since origin/main`.
 
-- npm packages under `apps/cli/` and `packages/*` must stay MIT-licensed.
+The Dart/Flutter SDK is the exception: PRs touching only `packages/sdk-dart/`,
+`packages/sdk-flutter/`, or `apps/demo-flutter/` never need a changeset. To
+release those packages, bump both `pubspec.yaml` versions in lockstep, update
+their hand-maintained `CHANGELOG.md`s in the PR, and after merge dispatch
+`.github/workflows/release-flutter.yml` (dry-run first, then unchecked).
+
+- Published packages under `apps/cli/` and `packages/*` — npm and pub.dev
+  alike — must stay MIT-licensed.
 - Server npm packages under `apps/server*` and console application paths are
   AGPL-3.0-only by default.
 - Keep local secrets, private keys, tokens, and `.zitadel/secret`-style files out

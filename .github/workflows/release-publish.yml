@@ -13,6 +13,11 @@ on:
       - "go.sum"
       - "packages/**/CHANGELOG.md"
       - "packages/**/package.json"
+      # The Dart/Flutter SDK versions outside changesets and publishes to
+      # pub.dev via release-flutter.yml — its changelogs must not trigger
+      # the npm publish path.
+      - "!packages/sdk-dart/**"
+      - "!packages/sdk-flutter/**"
       - "pnpm-lock.yaml"
       - "scripts/check-changesets-status.mjs"
       - "scripts/release*.mjs"

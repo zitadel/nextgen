@@ -213,6 +213,12 @@ preview the package bumps Changesets will plan from your PR. Pull requests also
 get an informational Changesets comment; maintainers use that and the
 [changeset decision table](.changeset/README.md#decision-table) to review release
 intent.
+The Dart/Flutter SDK packages (`packages/sdk-dart`, `packages/sdk-flutter`)
+sit outside Changesets entirely — they version through their `pubspec.yaml`
+files and publish to pub.dev via the manual `release-flutter` workflow; see
+[`.changeset/README.md`](.changeset/README.md#publishable-npm-packages).
+Working on them requires the Flutter SDK (stable channel) on PATH — the same
+Moon targets apply, e.g. `moon run sdk-dart:test sdk-flutter:test`.
 
 To run the full CI-parity suite locally — including integration tests, demo
 end-to-end tests, and the fresh-app journey — run
