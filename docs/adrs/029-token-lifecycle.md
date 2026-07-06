@@ -1,4 +1,4 @@
-# ADR 026: Token lifecycle
+# ADR 029: Token Lifecycle
 
 > **Status:** Proposed
 > **Date:** 2026-06-30
@@ -21,7 +21,7 @@ inconsistent invalidation, and recovery gaps become likely.
 |:----------------------------|:----------------|:-------|:-----------------------------------------|:---------------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Session Tokens              | First-party app | Server | Opaque                                   | Session bound                                                                    | First-party applications need to know whether a session is still active or revoked, whether the user was deactivated,... Those are better served by an authoritative session row than by a self-contained browser token. |
 | Access Tokens               | Third-party app | Client | Self-contained (but opaque configurable) | Short: minutes (default 5 min)                                                   | For short-lived edge tokens we optimize for performance. If a token is self-contained, no database or even api call is required. This reduces system-load and increases responsiveness of the applications.              |
-| Refresh Token               | Auth server     | Client | Opaque                                   | Long: days/weeks (default 2 weeks)                                               | Because refresh tokens are long-lived, they need to be single-use. This is to mitigate replay attacks. Refresh tokens need to be exchanged for access-tokens. In the token response, an new refresh token is provided.   |
+| Refresh Token               | Auth server     | Client | Opaque                                   | Long: days/weeks (default 2 weeks)                                               | Because refresh tokens are long-lived, they need to be single-use. This is to mitigate replay attacks. Refresh tokens need to be exchanged for access-tokens. In the token response, a new refresh token is provided.   |
 | Personal Access Token (PAT) | Auth server     | Client | Opaque                                   | Very long: months/years/infinite (default 3 months, infinite: not recommendable) | PATs need to be exchanged for access-tokens.                                                                                                                                                                             |
 
 ### Self-contained tokens
@@ -64,11 +64,11 @@ server can validate whether the session/user is still active.
 
 ### Storage
 
-All tokens should be stored in the server because the need to be able to be
-revoked. The storage of these tokens is minimal. Only the token-id. All other
-information can be retrieved from the token itself. Since all tokens are signed
-we can trust the information which is encoded in them, we only need to ensure
-the tokens are active.
+All tokens should be stored on the server because they need to be revocable.
+The stored representation should be minimal: only the token ID. All other
+information can be retrieved from the token itself. Since all tokens are signed,
+we can trust the information encoded in them; we only need to ensure the tokens
+are active.
 
 Keeping the data in the database at a minimum and trusting the data in the tokens
 allows for faster token validation in cases where high throughput is required.
@@ -83,7 +83,7 @@ a refresh token is used, it is removed/marked as used/inactive in the database.
 In the token response at the end of its exchange, a new refresh token is
 returned. This token can be used for the next refresh.
 
-[RFC7009 for token revokation](https://datatracker.ietf.org/doc/html/rfc7009#section-2.1)
+[RFC7009 for token revocation](https://datatracker.ietf.org/doc/html/rfc7009#section-2.1)
 states:
 
 > The invalidation takes place immediately, and the token cannot be used again
