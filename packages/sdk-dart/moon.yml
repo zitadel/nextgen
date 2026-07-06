@@ -16,9 +16,7 @@ tasks:
       - "analysis_options.yaml"
 
   typecheck:
-    command: "dart pub get --no-precompile && dart analyze --fatal-infos"
-    options:
-      shell: true
+    script: "dart pub get --no-precompile && dart analyze --fatal-infos"
     inputs:
       - "lib/**/*"
       - "test/**/*"
@@ -31,9 +29,7 @@ tasks:
   # spec-only PRs still trigger the spec-lock tests under affected
   # detection.
   test:
-    command: "dart pub get --no-precompile && dart test"
-    options:
-      shell: true
+    script: "dart pub get --no-precompile && dart test"
     inputs:
       - "lib/**/*"
       - "test/**/*"

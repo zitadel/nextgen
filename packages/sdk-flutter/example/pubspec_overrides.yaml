@@ -1,0 +1,5 @@
+# Monorepo linkage: overrides only apply to the root package, so the
+# example re-points the transitive zitadel_client at the in-repo source.
+dependency_overrides:
+  zitadel_client:
+    path: ../../sdk-dart

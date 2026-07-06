@@ -37,6 +37,17 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
+      # The Dart/Flutter SDK packages (packages/sdk-dart, packages/sdk-flutter,
+      # apps/demo-flutter) run through the same `moon ci` graph below as
+      # system commands; this puts `dart`/`flutter` on PATH. Moon's affected
+      # detection keeps their tasks off PRs that don't touch Dart or the
+      # OpenAPI spec.
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.35.3
+          cache: true
+
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
 

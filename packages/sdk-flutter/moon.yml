@@ -18,9 +18,9 @@ tasks:
       - "analysis_options.yaml"
 
   typecheck:
-    command: "flutter pub get && flutter analyze"
-    options:
-      shell: true
+    # The example app resolves separately (its own pubspec) but is
+    # analyzed as part of the package root, so both need `pub get` first.
+    script: "flutter pub get && flutter pub get --directory example && flutter analyze"
     deps:
       - "sdk-dart:typecheck"
     inputs:
@@ -31,9 +31,7 @@ tasks:
       - "analysis_options.yaml"
 
   test:
-    command: "flutter pub get && flutter test"
-    options:
-      shell: true
+    script: "flutter pub get && flutter test"
     deps:
       - "sdk-dart:test"
     inputs:
