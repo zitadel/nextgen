@@ -5647,7 +5647,7 @@ type ListSchemasResponse []ListSchemasResponseItem
 func (*ListSchemasResponse) listSchemasRes() {}
 
 type ListSchemasResponseItem struct {
-	// The unique identifier for this user schema.
+	// The unique identifier for this schema.
 	ID        string    `json:"id"`
 	CreatedAt time.Time `json:"createdAt"`
 }
