@@ -90,7 +90,7 @@ states:
 > after the revocation.
 
 However, experience learns that some clients do not handle this well. Therefore,
-The revokation endpoint will be idempotent.
+The revocation endpoint will be idempotent.
 
 ### Revocation propagation & invalidation semantics
 
