@@ -56,7 +56,7 @@ func DefaultLoginFlowDefinitions(serverURL string, projectID string, userSchemaU
 			projectID,
 			req.FlowDefinition.GetName(),
 			new(url.URL(req.GetSchemaURI().Value)).String(),
-			new(req.FlowDefinition.GetUserSchema()).String(),
+			req.FlowDefinition.GetUserSchema(),
 			purposes,
 			domain.FlowDefinitionAudience{
 				AppIDs:  req.FlowDefinition.GetAudience().Value.AppIds,
