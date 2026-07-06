@@ -3,15 +3,11 @@ import { Flags } from "@oclif/core";
 import { consola } from "consola";
 
 import { createZitadelClient } from "@zitadel/api/client";
+import type { ListSchemas200Item } from "@zitadel/api/generated/model";
 
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import { environmentSchema } from "../../lib/environment";
 import { readZitadelSecret } from "../../lib/project";
-
-type SchemaRevision = {
-  id: string;
-  createdAt: string;
-};
 
 /**
  * The `schemas list` topic command — inspect the revision history of a
@@ -51,10 +47,10 @@ export default class SchemasList extends BaseCommand {
     });
 
     const objectType = flags["object-type"];
-    const revisions = (await client.listSchemas({
+    const revisions = await client.listSchemas({
       project_id: secret.project_id,
       object_type: objectType,
-    })) as SchemaRevision[];
+    });
 
     if (revisions.length === 0) {
       const message = `No revisions found for objectType "${objectType}".`;
@@ -97,17 +93,12 @@ export default class SchemasList extends BaseCommand {
 
     const s = spinner();
     s.start(`Loading ${String(picked)}…`);
-    const body = await client.getSchemaById(encodeURIComponent(String(picked)), {
+    const body = await client.getSchemaById(String(picked), {
       project_id: secret.project_id,
     });
     s.stop(`Loaded ${String(picked)}`);
 
-    const pretty = [
-      renderTable(objectType, revisions),
-      "",
-      `── ${String(picked)} ──`,
-      JSON.stringify(body, null, 2),
-    ].join("\n");
+    const pretty = JSON.stringify(body, null, 2);
 
     return this.emit({
       status: "ok",
@@ -122,7 +113,7 @@ export default class SchemasList extends BaseCommand {
   }
 }
 
-function renderTable(objectType: string, revisions: ReadonlyArray<SchemaRevision>): string {
+function renderTable(objectType: string, revisions: ReadonlyArray<ListSchemas200Item>): string {
   const header = `Revisions of objectType "${objectType}" (${revisions.length}, newest first)`;
   const idCol = Math.max("id".length, ...revisions.map((r) => r.id.length));
   const createdCol = Math.max("createdAt".length, ...revisions.map((r) => r.createdAt.length));
