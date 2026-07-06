@@ -74,7 +74,7 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"flow_definitions.read",
 	},
 	GetProjectOperation: []string{
-		"projects.read",
+		"project.read",
 	},
 	GetSchemaByIdOperation: []string{
 		"schema.read",
@@ -109,7 +109,7 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"user.read",
 	},
 	PatchProjectOperation: []string{
-		"projects.write",
+		"project.write",
 	},
 	RevokeSessionOperation: []string{
 		"session.delete",

@@ -2652,6 +2652,17 @@ func (s *SessionWithTokenResponseHeaders) Validate() error {
 	return nil
 }
 
+func (s SortDirection) Validate() error {
+	switch s {
+	case "asc":
+		return nil
+	case "desc":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s *StepAction) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer

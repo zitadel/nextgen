@@ -5,6 +5,7 @@ package api
 import (
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/go-faster/errors"
 	"github.com/ogen-go/ogen/conv"
@@ -4929,6 +4930,12 @@ func decodeListUsersParams(args [0]string, argsEscaped bool, r *http.Request) (p
 // PatchProjectParams is parameters of patchProject operation.
 type PatchProjectParams struct {
 	ProjectID ProjectID
+	// Direction to sort the results.
+	SortDirection OptSortDirection `json:",omitempty,omitzero"`
+	// Filter projects created before this date.
+	CreatedBefore OptDateTime `json:",omitempty,omitzero"`
+	// Filter projects created after this date.
+	CreatedAfter OptDateTime `json:",omitempty,omitzero"`
 }
 
 func unpackPatchProjectParams(packed middleware.Parameters) (params PatchProjectParams) {
@@ -4939,10 +4946,38 @@ func unpackPatchProjectParams(packed middleware.Parameters) (params PatchProject
 		}
 		params.ProjectID = packed[key].(ProjectID)
 	}
+	{
+		key := middleware.ParameterKey{
+			Name: "sort_direction",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.SortDirection = v.(OptSortDirection)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "created_before",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.CreatedBefore = v.(OptDateTime)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "created_after",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.CreatedAfter = v.(OptDateTime)
+		}
+	}
 	return params
 }
 
 func decodePatchProjectParams(args [1]string, argsEscaped bool, r *http.Request) (params PatchProjectParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
 	// Decode path: project_id.
 	if err := func() error {
 		param := args[0]
@@ -5000,6 +5035,149 @@ func decodePatchProjectParams(args [1]string, argsEscaped bool, r *http.Request)
 		return params, &ogenerrors.DecodeParamError{
 			Name: "project_id",
 			In:   "path",
+			Err:  err,
+		}
+	}
+	// Set default value for query: sort_direction.
+	{
+		val := SortDirection("asc")
+		params.SortDirection.SetTo(val)
+	}
+	// Decode query: sort_direction.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "sort_direction",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotSortDirectionVal SortDirection
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotSortDirectionVal = SortDirection(c)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.SortDirection.SetTo(paramsDotSortDirectionVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.SortDirection.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "sort_direction",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: created_before.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "created_before",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotCreatedBeforeVal time.Time
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToDateTime(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotCreatedBeforeVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.CreatedBefore.SetTo(paramsDotCreatedBeforeVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "created_before",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: created_after.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "created_after",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotCreatedAfterVal time.Time
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToDateTime(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotCreatedAfterVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.CreatedAfter.SetTo(paramsDotCreatedAfterVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "created_after",
+			In:   "query",
 			Err:  err,
 		}
 	}
