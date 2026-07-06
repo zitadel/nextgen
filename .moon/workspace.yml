@@ -10,6 +10,7 @@ projects:
     docs: "apps/docs"
     demo-next: "apps/demo-next"
     demo-next-e2e: "apps/demo-next-e2e"
+    demo-flutter: "apps/demo-flutter"
     demo-nuxt: "apps/demo-nuxt"
     demo-nuxt-e2e: "apps/demo-nuxt-e2e"
     login-ui: "apps/login-ui"

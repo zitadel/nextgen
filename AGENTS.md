@@ -55,6 +55,17 @@ Secrets").
 - `packages/sdk-core/`, `packages/sdk-next/`, `packages/sdk-nuxt/`,
   `packages/sdk-react/`, `packages/sdk-vue/`, and `packages/sdk-angular/`
   contain public TypeScript SDKs.
+- `packages/sdk-dart/` (pub.dev: `zitadel_client`) and
+  `packages/sdk-flutter/` (pub.dev: `zitadel_flutter`) contain the Dart/
+  Flutter SDK — a native renderer of the flow contract. They have no
+  `package.json`, so they sit outside the pnpm workspace and the
+  Changesets lockstep train; versioning and pub.dev publishing run through
+  `.github/workflows/release-flutter.yml`. Their hand-written models are
+  kept honest by `packages/sdk-dart/test/spec_lock_test.dart`, which fails
+  when `api/openapi/` and the Dart models drift. Plan:
+  `docs/design/sdk-flutter/PLAN.md`.
+- `apps/demo-flutter/` is the reference Flutter integration (counterpart
+  of `apps/demo-next`).
 - `packages/api-mock/` contains the in-process MSW handlers and standalone
   mock auth server used by demos and e2e tests.
 - `docs/` contains design notes and ADRs that explain product intent.
