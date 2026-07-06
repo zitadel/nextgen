@@ -17,18 +17,26 @@ inconsistent invalidation, and recovery gaps become likely.
 
 ## Decision
 
-|                             | Audience        | Owner  | Token type                           | Lifespan                                                                         | Note                                                                                                                                                                                                                     |
-|:----------------------------|:----------------|:-------|:-------------------------------------|:---------------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Session Tokens              | First-party app | Server | Opaque                               | Session bound                                                                    | First-party applications need to know whether a session is still active or revoked, whether the user was deactivated,... Those are better served by an authoritative session row than by a self-contained browser token. |
-| Access Tokens               | Third-party app | Client | Signed JWT (but opaque configurable) | Short: minutes (default 5 min)                                                   | For short-lived edge tokens we optimize for performance. If a token is self-contained, no database or even api call is required. This reduces system-load and increases responsiveness of the applications.              |
-| Refresh Token               | Auth server     | Client | Opaque                               | Long: days/weeks (default 2 weeks)                                               | Because refresh tokens are long-lived, they need to be single-use. This is to mitigate replay attacks. Refresh tokens need to be exchanged for access-tokens. In the token response, an new refresh token is provided.   |
-| Personal Access Token (PAT) | Auth server     | Client | Opaque                               | Very long: months/years/infinite (default 3 months, infinite: not recommendable) | PATs need to be exchanged for access-tokens.                                                                                                                                                                             |
+|                             | Audience        | Owner  | Token type                               | Lifespan                                                                         | Note                                                                                                                                                                                                                     |
+|:----------------------------|:----------------|:-------|:-----------------------------------------|:---------------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Session Tokens              | First-party app | Server | Opaque                                   | Session bound                                                                    | First-party applications need to know whether a session is still active or revoked, whether the user was deactivated,... Those are better served by an authoritative session row than by a self-contained browser token. |
+| Access Tokens               | Third-party app | Client | Self-contained (but opaque configurable) | Short: minutes (default 5 min)                                                   | For short-lived edge tokens we optimize for performance. If a token is self-contained, no database or even api call is required. This reduces system-load and increases responsiveness of the applications.              |
+| Refresh Token               | Auth server     | Client | Opaque                                   | Long: days/weeks (default 2 weeks)                                               | Because refresh tokens are long-lived, they need to be single-use. This is to mitigate replay attacks. Refresh tokens need to be exchanged for access-tokens. In the token response, an new refresh token is provided.   |
+| Personal Access Token (PAT) | Auth server     | Client | Opaque                                   | Very long: months/years/infinite (default 3 months, infinite: not recommendable) | PATs need to be exchanged for access-tokens.                                                                                                                                                                             |
 
-### Signed JWT
+### Self-contained tokens
 
-According to [RFC7519](https://datatracker.ietf.org/doc/html/rfc7519)
+By default, we use signed JWTs according to [RFC7519](https://datatracker.ietf.org/doc/html/rfc7519)
+But other token types might be supported in the future, like SAML assertions. 
+All self-contained tokens should contain some default fields:
 
-By default, provide some standard claims:
+- Issuer: the service which issued the token
+- Target audience: for who is the token intended
+- Subject: who is the token authenticating
+- Expiration time: until when is the token valid
+- Access-scope: what is the user authorized to do
+
+For example, the claims of a JWT would look like this:
 
 ```json
 {
