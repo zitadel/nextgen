@@ -80,7 +80,7 @@ describe("SchemaSyncer", () => {
     expect(() => schema.validate({ type: "object" })).toThrow(ZitadelError);
   });
 
-  it("create injects a URI-shaped $id when missing and POSTs to /schemas with project_id on the query", async () => {
+  it("create POSTs the bare body to /schemas with project_id on the query and returns the server id", async () => {
     let receivedUrl = "";
     let receivedBody: Record<string, unknown> = {};
     server.use(
@@ -97,29 +97,8 @@ describe("SchemaSyncer", () => {
 
     expect(id).toBe("schema-id-1");
     expect(new URL(receivedUrl).searchParams.get("project_id")).toBe("proj-1");
-    expect(receivedBody.kind).toBe("user-schema");
-    expect(receivedBody.version).toBe(1);
-    expect(receivedBody.$id).toMatch(
-      /^https:\/\/schemas\.zitadel\.com\/proj-1\/[0-9a-f-]+$/,
-    );
-  });
-
-  it("create preserves a caller-provided $id — no client-side generation", async () => {
-    let receivedBody: Record<string, unknown> = {};
-    server.use(
-      http.post(`${BASE}/schemas`, async ({ request }) => {
-        receivedBody = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ id: "schema-id-1" }, { status: 201 });
-      }),
-    );
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {} });
-
-    await schema.create({
-      kind: "user-schema",
-      $id: "https://example.test/my-schema",
-    });
-
-    expect(receivedBody.$id).toBe("https://example.test/my-schema");
+    expect(receivedBody).toEqual(data);
+    expect(receivedBody.$id).toBeUndefined();
   });
 
   it("update throws E_NOT_IMPLEMENTED — schemas are revisioned, edits publish a new revision", async () => {

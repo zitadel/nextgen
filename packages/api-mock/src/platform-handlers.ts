@@ -374,10 +374,7 @@ export function setupPlatformHandlers() {
       }
 
       const schemaBody = raw as unknown as GetSchemaById200;
-      const stampedId = (schemaBody as unknown as { $id?: unknown }).$id;
-      const id = typeof stampedId === "string" && stampedId.length > 0
-        ? stampedId
-        : `sch_${shortId()}`;
+      const id = `sch_${shortId()}`;
       store.schemas.set(id, {
         id,
         projectId: query.data.project_id,

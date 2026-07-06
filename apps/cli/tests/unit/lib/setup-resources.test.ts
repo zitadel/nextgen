@@ -34,11 +34,8 @@ afterEach(async () => {
 
 describe("materializeSetupResources", () => {
   it("persists schema state before creating the flow so apply can recover partial setup", async () => {
-    const createSchema = vi.fn().mockImplementation(async (body: { $id?: string }) => ({
-      id: body.$id ?? "unknown",
-    }));
     const client = {
-      createSchema,
+      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
       createFlowDefinition: vi.fn().mockRejectedValue(new Error("flow create failed")),
     } as unknown as ZitadelClient;
 
@@ -51,22 +48,18 @@ describe("materializeSetupResources", () => {
       }),
     ).rejects.toThrow("flow create failed");
 
-    const posted = createSchema.mock.calls[0]?.[0] as { $id: string };
     const state = JSON.parse(
       await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
     ) as ZitadelState;
     expect(state.resources[DEFAULT_SCHEMA_CONFIG_PATH]).toMatchObject({
-      id: posted.$id,
+      id: "sch_01KWHF",
       hash: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
   });
 
-  it("stamps a URI-shaped `$id` on the schema POST and reuses the returned id as user_schema on the flow", async () => {
-    const createSchema = vi.fn().mockImplementation(async (body: { $id?: string }) => ({
-      id: body.$id ?? "unknown",
-    }));
+  it("reuses the server-returned schema id as user_schema on the flow", async () => {
     const client = {
-      createSchema,
+      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
       createFlowDefinition: vi.fn().mockImplementation(async (body: {
         flow_definition: { user_schema: string };
       }) => ({
@@ -83,14 +76,10 @@ describe("materializeSetupResources", () => {
       force: false,
     });
 
-    const posted = createSchema.mock.calls[0]?.[0] as { $id: string };
-    expect(posted.$id).toMatch(
-      /^https:\/\/schemas\.zitadel\.com\/project_123\/[0-9a-f-]+$/,
-    );
     const flowFile = JSON.parse(
       await readFile(join(cwd, DEFAULT_FLOW_CONFIG_PATH), "utf8"),
     ) as { user_schema: string };
-    expect(flowFile.user_schema).toBe(posted.$id);
+    expect(flowFile.user_schema).toBe("sch_01KWHF");
   });
 
   it("writes schemas and flows READMEs the first time", async () => {

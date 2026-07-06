@@ -12,7 +12,6 @@ import { flowConfigSchema, schemaConfigSchema } from "@zitadel/config/schemas";
 import { FLOWS_DIR, flowEnvRefs, validateFlows } from "../flows";
 import { SCHEMAS_DIR } from "../user-schema";
 import { ZitadelError } from "../errors";
-import { newSchemaRef } from "./loop.js";
 import type { ResourceSyncer } from "./types.js";
 
 /** Runtime environment lookup used to resolve `${VAR}` / `*_env` references. */
@@ -79,18 +78,11 @@ class SchemaSyncer implements ResourceSyncer {
   }
 
   /**
-   * `POST /schemas` mints a new immutable row. The CLI stamps a URI-shaped
-   * `$id` client-side (via {@link newSchemaRef}) when the on-disk payload
-   * doesn't already carry one — PR #456's server stores whatever `$id` says
-   * in the URL column, and the flow-definition spec requires `user_schema`
-   * to be a URI, so a bare id would fail flow-level validation downstream.
+   * `POST /schemas` mints a new immutable row. The server allocates the
+   * opaque id; the CLI records it in state and re-pins flows against it.
    */
   async create(data: object): Promise<string> {
-    const withId =
-      typeof (data as { $id?: unknown }).$id === "string"
-        ? (data as CreateSchemaBody)
-        : ({ ...data, $id: newSchemaRef(this.projectId) } as CreateSchemaBody);
-    const result = await this.client.createSchema(withId, {
+    const result = await this.client.createSchema(data as CreateSchemaBody, {
       project_id: this.projectId,
     });
     return result.id;

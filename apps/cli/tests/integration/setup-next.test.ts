@@ -91,9 +91,7 @@ describe("Next setup integration", () => {
       purposes: Record<string, string>;
     };
     expect(flow.name).toBe("default-login");
-    expect(flow.user_schema).toMatch(
-      /^https:\/\/schemas\.zitadel\.com\/[^/]+\/[0-9a-f-]+$/,
-    );
+    expect(flow.user_schema).toMatch(/^sch_/);
     expect(flow.purposes).toMatchObject({ login: "identifier", register: "register" });
     const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
       resources: Record<
@@ -103,7 +101,7 @@ describe("Next setup integration", () => {
     };
     const stampedSchemaId = state.resources[".zitadel/schemas/default-human-user.json"].id;
     expect(stampedSchemaId).toBe(flow.user_schema);
-    expect(stampedSchemaId).toMatch(/^https:\/\/schemas\.zitadel\.com\//);
+    expect(stampedSchemaId).toMatch(/^sch_/);
     expect(state.resources[".zitadel/schemas/default-human-user.json"]).toMatchObject({
       id: stampedSchemaId,
       hash: expect.stringMatching(/^[a-f0-9]{64}$/),

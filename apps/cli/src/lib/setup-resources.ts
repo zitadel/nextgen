@@ -18,7 +18,7 @@ import {
 
 import { FLOWS_DIR } from "./flows";
 import { stableStringify } from "./json";
-import { hashResourceContent, newSchemaRef } from "./sync";
+import { hashResourceContent } from "./sync";
 import { updateState } from "./sync/state";
 import { SCHEMAS_DIR } from "./user-schema";
 import { ZitadelError } from "./errors";
@@ -62,11 +62,9 @@ export async function materializeSetupResources(opts: {
     filesWritten.push(join(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH));
   }
 
-  const schemaRef = newSchemaRef(opts.projectId);
-  const schema = (await opts.client.createSchema(
-    { ...schemaBody, $id: schemaRef },
-    { project_id: opts.projectId },
-  )) as CreateSchema201;
+  const schema = (await opts.client.createSchema(schemaBody, {
+    project_id: opts.projectId,
+  })) as CreateSchema201;
   const schemaId = requiredString(schema.id, "created schema id");
   await updateState(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH, {
     id: schemaId,

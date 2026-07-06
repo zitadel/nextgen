@@ -25,12 +25,13 @@ properties:
 
   user_schema:
     type: string
-    format: uri
     description: |
-      User schema this flow operates on. Step `fields` reference properties
-      defined in this schema. The engine resolves field types, validation,
-      and implicit outcomes from schema annotations at runtime.
-    example: https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml
+      Server-assigned identifier of the user schema this flow operates on,
+      as returned by `POST /schemas`. Opaque to the client — the shape is a
+      server implementation detail. Step `fields` reference properties
+      defined in the resolved schema; the engine resolves field types, validation, and
+      implicit outcomes from schema annotations at runtime.
+    example: sch_01KWHF18816ZQESRCS7Z2STJ05
 
   purposes:
     type: object

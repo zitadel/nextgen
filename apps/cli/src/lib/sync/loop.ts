@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -260,17 +260,4 @@ function findFlowsPinnedTo(
 
 export function hashResourceContent(data: object): string {
   return createHash("sha256").update(JSON.stringify(data)).digest("hex");
-}
-
-/**
- * Compose a fresh URI-shaped `$id` for a schema revision. The URI is opaque
- * — the server doesn't dereference it over HTTP — but the flow-definition
- * spec requires `user_schema` to be `format: uri`, and PR #456's server
- * stores whatever the payload's `$id` says in the schema's URL column. The
- * CLI mints a UUID per revision so schemas that share an `objectType`
- * still coexist as distinct rows keyed by URL. Namespaced by `projectId`
- * to keep the URLs self-describing.
- */
-export function newSchemaRef(projectId: string): string {
-  return `https://schemas.zitadel.com/${projectId}/${randomUUID()}`;
 }
