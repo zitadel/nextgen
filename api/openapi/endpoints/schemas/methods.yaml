@@ -72,3 +72,38 @@ post:
         application/json:
           schema:
             $ref: ../../components/error-details.yaml
+
+get:
+  operationId: listSchemas
+  summary: List all schemas
+  description: |
+    Retrieve a list of all schemas available in the system. This endpoint 
+    supports pagination and filtering based on schema attributes.
+  tags:
+    - Schemas
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+    - $ref: ../../components/parameters/offset.yaml
+    - $ref: ../../components/parameters/page-token.yaml
+    - name: object_type
+      in: query
+      description: The type of object of the schema to filter by.
+      schema:
+        type: string
+        maxLength: 256
+  security:
+    - oauth2:
+        - schema.read
+  responses:
+    '200':
+      description: A list of schemas was retrieved successfully.
+      content:
+        application/json:
+          schema:
+            $ref: list-schemas-response.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
