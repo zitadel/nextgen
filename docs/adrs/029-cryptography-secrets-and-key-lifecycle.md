@@ -66,13 +66,13 @@ database. For that encryption, also AES-GCM will be used.
 
 As an identity platform, we will need to issue tokens. These tokens can be in
 multiple formats according to multiple protocols (OIDC, SAML, etc.). Unless a
-protocol states otherwise, we use an [JWE](https://datatracker.ietf.org/doc/html/rfc7516)
-as authorization token where the client does not need to introspect the claims.
+protocol states otherwise, we use a [JWE](https://datatracker.ietf.org/doc/html/rfc7516)
+as an authorization token where the client does not need to introspect the claims.
 When the client does need to introspect the token (without extra network calls),
 we default to a [JWT](https://datatracker.ietf.org/doc/html/rfc7519).
 
-Authorization token should always be signed using an asymmetric key. For more
-info on keys, see [the signing keys decision](#signing-keys).
+Authorization tokens should always be signed using an asymmetric key. For more
+info on keys, see [the signing/encryption keys decision](#signingencryption-keys).
 
 ### Signing/encryption keys
 
@@ -111,7 +111,7 @@ a [JWK](https://datatracker.ietf.org/doc/html/rfc7517).
 #### Rotation
 
 All signing keys will be periodically and automatically rotated. This happens by
-default each 30 days. But this is also configurable. This is done so that it is
+default every 30 days. This is also configurable. This is done so that it is
 possible to isolate possibly forged tokens within a window of time in case of a
 breach.
 
