@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type {
   CreateFlowDefinition201,
   CreateSchema201,
+  CreateSchemaBody,
 } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "@zitadel/api/client";
 import {
@@ -31,6 +32,10 @@ export type MaterializeSetupResourcesResult = {
  * IDs, hashes, and flow metadata the sync engine expects. Setup calls this only
  * after the framework patcher has created `.zitadel/{flows,schemas}` and the
  * initial state file.
+ *
+ * The schema is uploaded without an `$id`: the server assigns an opaque id on
+ * `POST /schemas`, and the flow file can only be rendered after that id comes
+ * back because `flow_definition.user_schema` must reference it.
  */
 export async function materializeSetupResources(opts: {
   cwd: string;
@@ -43,8 +48,10 @@ export async function materializeSetupResources(opts: {
 
   const filesWritten: string[] = [];
 
-  const schemaBody = getDefaultHumanUserSchema();
-  const flowBody = getDefaultLoginFlow();
+  const { $id: _templateId, ...schemaBody } = getDefaultHumanUserSchema() as {
+    $id?: string;
+  } & Record<string, unknown>;
+  void _templateId;
 
   const schemaWritten = await writeResourceFile(
     opts.cwd,
@@ -56,6 +63,17 @@ export async function materializeSetupResources(opts: {
     filesWritten.push(join(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH));
   }
 
+  const schema = (await opts.client.createSchema(schemaBody as CreateSchemaBody, {
+    project_id: opts.projectId,
+  })) as CreateSchema201;
+  const schemaId = requiredString(schema.id, "created schema id");
+  await updateState(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH, {
+    id: schemaId,
+    hash: hashWrittenBody(schemaBody),
+  });
+
+  const flowBody = getDefaultLoginFlow({ userSchemaUrl: schemaId });
+
   const flowWritten = await writeResourceFile(
     opts.cwd,
     DEFAULT_FLOW_CONFIG_PATH,
@@ -65,14 +83,6 @@ export async function materializeSetupResources(opts: {
   if (flowWritten) {
     filesWritten.push(join(opts.cwd, DEFAULT_FLOW_CONFIG_PATH));
   }
-
-  const schema = (await opts.client.createSchema(schemaBody, {
-    project_id: opts.projectId,
-  })) as CreateSchema201;
-  await updateState(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH, {
-    id: requiredString(schema.id, "created schema id"),
-    hash: hashWrittenBody(schemaBody),
-  });
 
   const flow = (await opts.client.createFlowDefinition({
     project_id: opts.projectId,
@@ -84,7 +94,7 @@ export async function materializeSetupResources(opts: {
     id: requiredString(flow.id, "created flow definition id"),
     hash: hashWrittenBody(flowBody),
     name: flowBody.name,
-    status: flow.status,
+    status: flowBody.status,
   });
 
   return { filesWritten };

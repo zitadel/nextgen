@@ -75,6 +75,7 @@ afterAll(async () => {
 function validFlowDefinitionBody(): Record<string, unknown> {
   return {
     name: "login-flow",
+    status: "active",
     user_schema:
       "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml",
     // Per `flow-definition.yaml`, `purposes` is an object mapping each

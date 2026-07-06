@@ -75,34 +75,41 @@ describe("Next setup integration", () => {
     const schema = JSON.parse(
       await readFile(join(cwd, ".zitadel/schemas/default-human-user.json"), "utf8"),
     ) as {
-      "$id": string;
+      objectType: string;
       kind: string;
       properties: Record<string, unknown>;
     };
     expect(schema.kind).toBe("user-schema");
-    expect(schema["$id"]).toBe("https://nextgen.com/api/schemas/default-human-user.json");
+    expect(schema.objectType).toBe("human-user");
+    expect(schema).not.toHaveProperty("$id");
     expect(schema.properties).toHaveProperty("email");
+    // The schema id is server-assigned on create; the local file stays
+    // id-less and the flow pins whatever id came back.
+    const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
+      resources: Record<string, { id?: string; hash?: string; name?: string; status?: string }>;
+    };
+    const schemaId = state.resources[".zitadel/schemas/default-human-user.json"]?.id;
+    expect(schemaId).toMatch(/^schema_/);
     const flow = JSON.parse(
       await readFile(join(cwd, ".zitadel/flows/default-login.json"), "utf8"),
     ) as {
       name: string;
+      status: string;
       user_schema: string;
       purposes: Record<string, string>;
     };
     expect(flow.name).toBe("default-login");
-    expect(flow.user_schema).toBe(schema["$id"]);
+    expect(flow.status).toBe("active");
+    expect(flow.user_schema).toBe(schemaId);
     expect(flow.purposes).toMatchObject({ login: "identifier", register: "register" });
     expect(snapshotPlatformStore()).toMatchObject({
       projects: 1,
       schemas: 1,
       flowDefinitions: 1,
-      schemaIds: [schema["$id"]],
+      schemaIds: [schemaId],
     });
-    const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
-      resources: Record<string, { id?: string; hash?: string; name?: string; status?: string }>;
-    };
     expect(state.resources[".zitadel/schemas/default-human-user.json"]).toMatchObject({
-      id: schema["$id"],
+      id: schemaId,
       hash: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
     expect(state.resources[".zitadel/flows/default-login.json"]).toMatchObject({

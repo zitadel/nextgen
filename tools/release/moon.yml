@@ -24,6 +24,7 @@ tasks:
       - "release:clean-public-package-dist"
       - "cli:build-release"
       - "api:build-release"
+      - "config:build-release"
       - "components:build-release"
       - "sdk-core:build-release"
       - "sdk-next:build-release"

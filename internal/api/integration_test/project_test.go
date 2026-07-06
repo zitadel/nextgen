@@ -183,7 +183,10 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 }
 
 func TestCreateProjectSkipsDefaultLoginFlow(t *testing.T) {
-	client := harness.EnsureAnonymousAPIClient(t)
+	t.Parallel()
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
 
 	resp, err := client.CreateProject(t.Context(), &api.CreateProjectRequest{
 		PreviewOrigins: make([]string, 0),
