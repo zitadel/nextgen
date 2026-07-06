@@ -1,0 +1,43 @@
+id: "sdk-dart"
+# Moon has no Dart toolchain; tasks run as system commands and expect the
+# Dart SDK on PATH (CI installs it via subosito/flutter-action, which
+# bundles `dart`).
+language: "dart"
+layer: "library"
+stack: "frontend"
+
+tasks:
+  lint:
+    command: "dart format --output=none --set-exit-if-changed ."
+    inputs:
+      - "lib/**/*"
+      - "test/**/*"
+      - "pubspec.yaml"
+      - "analysis_options.yaml"
+
+  typecheck:
+    command: "dart pub get --no-precompile && dart analyze --fatal-infos"
+    options:
+      shell: true
+    inputs:
+      - "lib/**/*"
+      - "test/**/*"
+      - "pubspec.yaml"
+      - "analysis_options.yaml"
+
+  # Runs unit + spec-lock suites. The contract suite (--tags contract)
+  # needs a live mock-zitadel and skips itself when :8080 is silent, so
+  # it stays out of the default graph. The OpenAPI schemas are inputs so
+  # spec-only PRs still trigger the spec-lock tests under affected
+  # detection.
+  test:
+    command: "dart pub get --no-precompile && dart test"
+    options:
+      shell: true
+    inputs:
+      - "lib/**/*"
+      - "test/**/*"
+      - "pubspec.yaml"
+      - "dart_test.yaml"
+      - "/api/openapi/components/**/*"
+      - "/api/openapi/endpoints/sessions/**/*"

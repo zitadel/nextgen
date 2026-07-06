@@ -1,0 +1,20 @@
+name: zitadel_client
+description: >-
+  Pure-Dart client for the Zitadel NextGen flow and session APIs. Drives
+  server-driven login/registration flows (BDUI) and manages the resulting
+  session token. Framework-agnostic; see zitadel_flutter for widgets.
+version: 0.1.0-alpha.1
+homepage: https://github.com/zitadel/nextgen/tree/main/packages/sdk-dart
+repository: https://github.com/zitadel/nextgen
+issue_tracker: https://github.com/zitadel/nextgen/issues
+
+environment:
+  sdk: ^3.4.0
+
+# Runtime dependency-free by design: models are hand-written and the
+# default transport uses dart:io. Keep it that way — consumers should not
+# inherit codegen or HTTP-stack choices from this package.
+dev_dependencies:
+  lints: ^5.0.0
+  test: ^1.25.0
+  yaml: ^3.1.0
