@@ -1,13 +1,11 @@
 import { readFileSync } from "node:fs";
 import { format } from "node:util";
-import { fileURLToPath } from "node:url";
 
 import { run } from "@oclif/core";
 
 import { publicCliCommand } from "../../src/lib/public-cli";
+import { cliPackageRoot } from "./oclif-build";
 
-/** Repo root of the CLI package (where the oclif config + built dist live). */
-const root = fileURLToPath(new URL("../../", import.meta.url));
 const cliVersion = JSON.parse(
   readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
 ) as { version: string };
@@ -49,7 +47,7 @@ export async function runCliForTest(argv: string[], env: NodeJS.ProcessEnv = {})
 
   let exitCode = 0;
   try {
-    await run(argv, root);
+    await run(argv, cliPackageRoot);
   } catch (error) {
     exitCode = exitCodeOf(error);
   } finally {
