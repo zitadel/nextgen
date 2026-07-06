@@ -75,6 +75,7 @@ var (
 		"GET": "Authorization",
 	}
 	rn16AllowedHeaders = map[string]string{
+		"GET":  "Authorization",
 		"POST": "Authorization,Content-Type",
 	}
 	rn38AllowedHeaders = map[string]string{
@@ -1027,11 +1028,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 					if len(elem) == 0 {
 						switch r.Method {
+						case "GET":
+							s.handleListSchemasRequest([0]string{}, elemIsEscaped, w, r)
 						case "POST":
 							s.handleCreateSchemaRequest([0]string{}, elemIsEscaped, w, r)
 						default:
 							s.notAllowed(w, r, notAllowedParams{
-								allowedMethods: "POST",
+								allowedMethods: "GET,POST",
 								allowedHeaders: rn16AllowedHeaders,
 								acceptPost:     "application/json",
 								acceptPatch:    "",
@@ -2354,6 +2357,15 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 
 					if len(elem) == 0 {
 						switch method {
+						case "GET":
+							r.name = ListSchemasOperation
+							r.summary = "List all schemas"
+							r.operationID = "listSchemas"
+							r.operationGroup = ""
+							r.pathPattern = "/schemas"
+							r.args = args
+							r.count = 0
+							return r, true
 						case "POST":
 							r.name = CreateSchemaOperation
 							r.summary = "Create new schema"

@@ -96,6 +96,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	ListFlowDefinitionsOperation: []string{
 		"flow_definitions.read",
 	},
+	ListSchemasOperation: []string{
+		"schema.read",
+	},
 	ListSessionsOperation: []string{
 		"sessions.read",
 	},

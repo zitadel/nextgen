@@ -38,6 +38,10 @@ import (
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/embedded"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
+	v2db "github.com/zitadel/nextgen/internal/storage/v2/database"
+	_ "github.com/zitadel/nextgen/internal/storage/v2/dialect/all"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres"
+
 	"github.com/zitadel/oidc/v3/pkg/op"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/otel/log"
@@ -97,13 +101,16 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 
 	setUpLogging(cfg.Instrumentation.Log, metrics.LoggerProvider())
 
-	pool, err := startDatabase(ctx, cfg)
+	pool, v2Pool, err := startDatabase(ctx, cfg)
 	if err != nil {
 		return err
 	}
 	sfs.Add(func(ctx context.Context) error {
 		if err := pool.Close(ctx); err != nil {
 			return fmt.Errorf("failed close database pool: %w", err)
+		}
+		if err := v2Pool.Close(ctx); err != nil {
+			return fmt.Errorf("failed close v2 database pool: %w", err)
 		}
 		return nil
 	})
@@ -125,7 +132,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	opaqueTokenGenerator := tokengen.NewOpaqueTokenGenerator(crypter)
 
 	// ── Repositories ─────────────────
-	projectRepo := repository.NewProjectRepository(pool)
 	userRepo := repository.NewUserRepository()
 	userPasswordRepo := repository.NewUserPasswordRepository()
 	userPasskeyRepo := repository.NewUserPasskeyRepository()
@@ -135,6 +141,8 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
 	schemaRepo := repository.NewJSONSchemaRepository(pool)
 	teamRepo := repository.NewTeamRepository(pool)
+
+	serviceDBPool := service.NewPool(v2Pool.(service.Pool))
 
 	// ── Schema Stuff ─────────────────
 	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](cfg.Schema.LRUCacheSize)
@@ -163,7 +171,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		pool,
 		attemptRepo,
 		sessionRepo,
-		projectRepo,
 		userRepo,
 		userPasswordRepo,
 		userPasskeyRepo,
@@ -175,7 +182,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	})
 	projectService := service.NewProjectService(
 		pool,
-		projectRepo,
+		serviceDBPool,
 		schemaRepo,
 		flowDefinitionRepo,
 		opaqueTokenGenerator,
@@ -422,29 +429,46 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen idgen.Generator, apiHandler http.Ha
 
 // ----------------------------- STORAGE --------------------------------------
 
-func startDatabase(ctx context.Context, cfg Config) (database.Pool, error) {
-	connector, err := buildDatabaseConnector(cfg)
+func startDatabase(ctx context.Context, cfg Config) (database.Pool, v2db.Pool, error) {
+	connector, dialect, err := buildDatabaseConnector(cfg)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	pool, err := connector.Connect(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	if dialect == nil {
+		if p, ok := pool.(*embedded.Pool); ok {
+			dialect = &postgres.PoolConfig{Pool: p.Pool.Pool}
+		}
+	}
+	v2Pool, err := v2db.Connect(ctx, dialect)
+	if err != nil {
+		return nil, nil, err
 	}
 	err = pool.Migrate(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return pool, nil
+	return pool, v2Pool, nil
 }
 
-func buildDatabaseConnector(cfg Config) (database.Connector, error) {
+func buildDatabaseConnector(cfg Config) (database.Connector, v2db.Dialect, error) {
 	if len(cfg.Database.Raw) == 0 {
 		options := embeddedPostgresOptions(cfg.Server.DataDir)
 		slog.Info("no database dialect configured, starting embedded postgres", slog.String("filePath", filepath.Dir(options.DataPath)))
-		return embedded.NewConnector(options), nil
+		return embedded.NewConnector(options), nil, nil
 	}
-	return cfg.Database.Build()
+	connector, err := cfg.Database.Build()
+	if err != nil {
+		return nil, nil, fmt.Errorf("build database connector: %w", err)
+	}
+	dialect, err := v2db.Config{Raw: cfg.Database.Raw}.Build()
+	if err != nil {
+		return nil, nil, fmt.Errorf("build database dialect: %w", err)
+	}
+	return connector, dialect, nil
 }
 
 func embeddedPostgresOptions(dataDir string) embedded.Options {
