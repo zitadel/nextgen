@@ -15,14 +15,14 @@ type Project struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	// ProjectSecret is a bearer token that authenticates API calls for this project.
-	// Callers of [service.ProjectStatements.CreateProject] must pre-populate this
-	// field; the storage layer does not generate it.
+	// Callers must set this field before the project is persisted; the storage
+	// layer does not generate it.
 	ProjectSecret string
 	// PreviewSecret is an origin-scoped bearer token for preview/testing.
-	// Callers of [service.ProjectStatements.CreateProject] must pre-populate this field.
+	// Callers must set this field before the project is persisted.
 	PreviewSecret string
 	// PreviewOrigins are the allowed origins for the preview secret.
-	// Callers of [service.ProjectStatements.CreateProject] must pre-populate this field.
+	// Callers must set this field before the project is persisted.
 	PreviewOrigins []string
 }
 

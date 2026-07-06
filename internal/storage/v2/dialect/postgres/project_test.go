@@ -76,7 +76,11 @@ func runTests(m *testing.M) int {
 		return 1
 	}
 	defer pool.Close(ctx)
-	testPool = pool.(*Pool)
+	testPool, ok = pool.(*Pool)
+	if !ok {
+		slog.Error("expected *Pool from the v2 postgres dialect", "type", pool)
+		return 1
+	}
 
 	return m.Run()
 }
