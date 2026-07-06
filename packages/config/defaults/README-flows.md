@@ -1,35 +1,38 @@
 # `.zitadel/flows/`
 
-Flow definitions describe the login and register journeys. Each file pins to
-one specific revision of a user-schema via `user_schema`.
+Flow definitions. Each JSON file describes an end-to-end journey —
+which fields the user sees at each step, which credentials are checked,
+and how one step transitions to the next. The Zitadel flow engine runs
+these on the platform; the widget renders whatever the engine emits.
 
-## Editing rules
+## Files here
 
-- **`user_schema`** is the full URL of one schema revision. The value is
-  server-assigned; the CLI writes it here after the schema is created. The
-  pinning is intentional — see below.
-- **`steps[]`** lists the screens of the flow. Each step's `fields[]` names
-  attributes from the pinned user-schema plus reserved credential tokens
-  like `x-auth-methods#password`.
+- **`default-login.json`** — the default combined login/register flow,
+  scaffolded during `zitadel setup`.
+  - `purposes` names the entry step for each purpose (`login`,
+    `register`, …).
+  - `steps[]` is the ordered list of screens; each step's `fields[]`
+    references properties of the pinned schema, and `transitions` wires
+    it to the next step.
+  - `user_schema` pins the flow to one specific user-schema revision.
+  - `audience` (optional) scopes the flow to specific apps or teams.
 
-## The two-step schema/flow update
+## What you can do
 
-When you edit a user-schema and `zitadel apply` it, the server allocates a
-**new** revision id. **This flow is left pinned to the previous revision.**
-That is deliberate: if the new schema adds a required field, silently
-switching the flow would break the register step until the flow's
-`fields[]` catches up.
+- **Add or remove a step** — extend `steps[]`.
+- **Change which fields a step collects** — edit `steps[].fields[]`.
+  Values must be properties of the pinned schema (or reserved tokens
+  like `x-auth-methods#password`).
+- **Rewire transitions** — edit `steps[].transitions` to point at a
+  different next step, or use `action: switch` / `pivot` to jump to
+  another flow.
+- **Add another flow** — drop a new JSON file with its own `purposes`
+  and `audience` (e.g. a per-team login).
 
-`apply` prints the new URL after publishing the revision:
+## Applying changes
 
-```
-⚠  New revision of user-schema `human-user` created.
-   Update `user_schema` in these flow definitions to adopt it:
-     - .zitadel/flows/default-login.json
-```
-
-To adopt the new revision:
-
-1. Copy the URL from the warning into the flow's `user_schema`.
-2. Add or remove the new required fields in the relevant step's `fields[]`.
-3. `zitadel plan` to preview the flow update, then `zitadel apply`.
+`zitadel plan` previews the change; `zitadel apply` PUTs the updated
+flow to the platform. When the pinned user-schema is edited, the flow
+stays pinned to the old revision — `apply` prints the new revision id so
+you can copy it into `user_schema` (and update `steps[].fields[]` for
+any added/removed properties) when you're ready to adopt it.

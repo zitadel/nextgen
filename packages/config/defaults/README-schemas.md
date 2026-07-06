@@ -1,26 +1,32 @@
 # `.zitadel/schemas/`
 
-One JSON file per user type. The filename is a label for humans; the server
-assigns each schema a unique id when you run `zitadel apply`.
+User-schema files. Each JSON file describes one editable user type — the
+shape of the user records the platform stores and the login/register
+flows collect (email, name, phoneNumber, custom claims, etc.). A project
+can hold as many schemas as you need (e.g. one for end users, one for
+internal admins).
 
-## Editing rules
+## Files here
 
-- **`objectType` is the correlation key.** Every revision of the same user
-  type shares one `objectType` value (e.g. `human-user`). Do not rename it
-  after the first `apply` — the server groups revisions under this key, so
-  changing it would fork history.
-- **Never set `$id` manually.** The id is server-assigned per revision. The
-  CLI records it in `.zitadel/state.json` and reads it back on the next run.
-- **`x-auth-methods`** at the root declares which credentials this user type
-  supports; `properties` and `required` describe the attribute shape.
+- **`default-human-user.json`** — the default schema for human users,
+  scaffolded during `zitadel setup`.
+  - `properties` / `required` describe the user's attributes.
+  - `x-auth-methods` declares which credentials this user type supports
+    (password, passkey, …).
+  - `objectType` groups revisions of the same logical user type; do not
+    rename it after the first `apply`.
 
-## What `zitadel apply` does when you edit this file
+## What you can do
 
-Every `apply` that detects a change here **publishes a new immutable
-revision**. The previous revision keeps validating users that were created
-against it — there is no destructive update, and no user is invalidated by
-your edit.
+- **Add or edit a property** — extend `properties`, mark it `required`
+  if it must be present on every user.
+- **Enable or disable an auth method** — flip an `x-auth-methods` entry.
+- **Add another user type** — drop a new JSON file next to this one.
 
-Adopting the new revision on an existing flow is a separate, manual step —
-`apply` prints the new URL and names the flow files that still point at the
-previous revision. See `.zitadel/flows/README.md` for how to re-pin them.
+## Applying changes
+
+`zitadel plan` previews the change; `zitadel apply` publishes it. Editing
+a schema publishes a **new immutable revision** — existing users keep
+validating against the previous revision. Flows that reference this
+schema stay pinned to the old revision until you re-pin them; see
+`.zitadel/flows/README.md`.
