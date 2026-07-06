@@ -313,10 +313,10 @@ func TestValidateFlowDefinition(t *testing.T) {
 						{
 							Name: "middle",
 							Actions: []domain.FlowStepAction{
-								{Name: "back", Kind: domain.FlowActionKindNavigate},
+								{Name: "restart", Kind: domain.FlowActionKindNavigate},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
-								"back": {Target: "start"}, // cycle back to identify
+								"restart": {Target: "start"}, // cycle back to identify
 							},
 						},
 					},
@@ -1509,6 +1509,31 @@ func TestValidator_DeclaredBackKindRejected(t *testing.T) {
 	_, err := domain.ValidateFlowDefinition(schema, def)
 	require.Error(t, err)
 	assert.Contains(t, errorDetails(t, err), `action "back" has kind=back, which is engine-injected and cannot be declared`)
+}
+
+// TestValidator_ReservedBackNameRejected guards the action name "back"
+// itself. Even with a non-back kind, an authored action named "back"
+// would collide at render time with the engine-injected back action —
+// the client would see two "back" buttons and route to the customer's
+// kind rather than the injected one.
+func TestValidator_ReservedBackNameRejected(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	def := domain.FlowDefinition{
+		ProjectID: "p", Name: "f", SchemaVersion: "1",
+		UserSchema: "https://tenant.com/schemas/idpw-user.json",
+		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "step", Fields: []domain.Field{"email"},
+				Actions:     []domain.FlowStepAction{{Name: "back", Kind: domain.FlowActionKindNavigate}},
+				Transitions: map[string]domain.FlowStepTransition{"back": {Target: "done"}},
+			},
+			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
+		},
+	}
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err), `action name "back" is reserved for engine-injected back navigation`)
 }
 
 func TestValidator_MissingRequiredUserSchemaFields(t *testing.T) {
