@@ -32,8 +32,6 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
-	userSchemaURL, err := url.Parse(schemaURL)
-	require.NoError(t, err)
 
 	rpOriginURL, err := url.Parse(testServer.URL)
 	require.NoError(t, err)
@@ -51,7 +49,7 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
-		FlowDefinition: passkeyUpsellFlowDefinition(*userSchemaURL),
+		FlowDefinition: passkeyUpsellFlowDefinition(schemaURL),
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %+v", defResp)
@@ -194,8 +192,6 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
-	userSchemaURL, err := url.Parse(schemaURL)
-	require.NoError(t, err)
 
 	server := harness.EnsureTestServer(t)
 	client, err := helpers.NewApiClient(server.URL)
@@ -204,7 +200,7 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
-		FlowDefinition: passkeyUpsellFlowDefinition(*userSchemaURL),
+		FlowDefinition: passkeyUpsellFlowDefinition(schemaURL),
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp)
@@ -261,7 +257,7 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 // passkeyUpsellFlowDefinition mirrors examples/06-combined-password-passkey's
 // register sub-flow trimmed to the register → register-password → passkey-upsell
 // → done path, using fields available on the default-human-user schema.
-func passkeyUpsellFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
+func passkeyUpsellFlowDefinition(userSchemaURL string) api.FlowDefinition {
 	createUser := api.FlowDefinitionStepOnSuccessCreateUser
 	return api.FlowDefinition{
 		Name:       "register-with-passkey-upsell",
