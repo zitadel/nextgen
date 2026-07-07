@@ -3705,11 +3705,18 @@ func (s *CreateProjectRequest) encodeFields(e *jx.Encoder) {
 			e.ArrEnd()
 		}
 	}
+	{
+		if s.SeedDefaults.Set {
+			e.FieldStart("seedDefaults")
+			s.SeedDefaults.Encode(e)
+		}
+	}
 }
 
-var jsonFieldsNameOfCreateProjectRequest = [2]string{
+var jsonFieldsNameOfCreateProjectRequest = [3]string{
 	0: "name",
 	1: "previewOrigins",
+	2: "seedDefaults",
 }
 
 // Decode decodes CreateProjectRequest from json.
@@ -3718,6 +3725,7 @@ func (s *CreateProjectRequest) Decode(d *jx.Decoder) error {
 		return errors.New("invalid: unable to decode CreateProjectRequest to nil")
 	}
 	var requiredBitSet [1]uint8
+	s.setDefaults()
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
@@ -3751,6 +3759,16 @@ func (s *CreateProjectRequest) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"previewOrigins\"")
+			}
+		case "seedDefaults":
+			if err := func() error {
+				s.SeedDefaults.Reset()
+				if err := s.SeedDefaults.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"seedDefaults\"")
 			}
 		default:
 			return d.Skip()

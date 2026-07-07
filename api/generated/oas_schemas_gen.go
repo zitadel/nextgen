@@ -1730,6 +1730,10 @@ type CreateProjectRequest struct {
 	Name string `json:"name"`
 	// Origins which are allowed for previewing and testing the project.
 	PreviewOrigins []string `json:"previewOrigins"`
+	// Whether the server should provision fallback default user schema and flow
+	// resources for the project. CLI-managed projects set this to false and
+	// upload their local .zitadel config files through the schema and flow APIs.
+	SeedDefaults OptBool `json:"seedDefaults"`
 }
 
 // GetName returns the value of Name.
@@ -1742,6 +1746,11 @@ func (s *CreateProjectRequest) GetPreviewOrigins() []string {
 	return s.PreviewOrigins
 }
 
+// GetSeedDefaults returns the value of SeedDefaults.
+func (s *CreateProjectRequest) GetSeedDefaults() OptBool {
+	return s.SeedDefaults
+}
+
 // SetName sets the value of Name.
 func (s *CreateProjectRequest) SetName(val string) {
 	s.Name = val
@@ -1750,6 +1759,11 @@ func (s *CreateProjectRequest) SetName(val string) {
 // SetPreviewOrigins sets the value of PreviewOrigins.
 func (s *CreateProjectRequest) SetPreviewOrigins(val []string) {
 	s.PreviewOrigins = val
+}
+
+// SetSeedDefaults sets the value of SeedDefaults.
+func (s *CreateProjectRequest) SetSeedDefaults(val OptBool) {
+	s.SeedDefaults = val
 }
 
 // Ref: #
