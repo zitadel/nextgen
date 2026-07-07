@@ -77,10 +77,22 @@
     "msw": "catalog:",
     "orval": "catalog:",
     "tsdown": "catalog:",
-    "tslib": "catalog:",
-    "zod": "catalog:"
+    "tslib": "catalog:"
   },
   "peerDependencies": {
-    "@tanstack/react-query": "catalog:"
+    "@tanstack/react-query": "catalog:",
+    "msw": "catalog:",
+    "@faker-js/faker": "catalog:"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "msw": {
+      "optional": true
+    },
+    "@faker-js/faker": {
+      "optional": true
+    }
   }
 }

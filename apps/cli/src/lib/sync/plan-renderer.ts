@@ -10,6 +10,7 @@ export function summarizePlan(actions: ReadonlyArray<SyncAction>): SyncPlanSumma
   return {
     creates: active.filter((a) => a.kind === "create").length,
     updates: active.filter((a) => a.kind === "update").length,
+    revisions: active.filter((a) => a.kind === "revise").length,
     deletes: active.filter((a) => a.kind === "delete").length,
     total: active.length,
   };
@@ -45,7 +46,7 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
 
   out.push("");
 
-  const { creates, updates, deletes } = summarizePlan(actions);
+  const { creates, updates, revisions, deletes } = summarizePlan(actions);
 
   const parts: string[] = [];
   if (creates > 0) {
@@ -53,6 +54,9 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
   }
   if (updates > 0) {
     parts.push(`${updates} to change`);
+  }
+  if (revisions > 0) {
+    parts.push(`${revisions} new revision${revisions === 1 ? "" : "s"}`);
   }
   if (deletes > 0) {
     parts.push(`${deletes} to destroy`);
@@ -429,6 +433,43 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
         );
       }
       lines.push(`${closePad}}`);
+      break;
+    }
+
+    case "revise": {
+      const header = `${blkPad}# ${action.path} will publish a new revision`;
+      const opening = `${blkPad}~ resource "${action.syncer.kind}" "${resourceName(action.path)}" {`;
+      lines.push(paint(header, A.bold, tty));
+      lines.push(paint(opening, A.yellow, tty));
+
+      if (action.oldContent) {
+        const oldWithId: Record<string, unknown> = {
+          id: action.previousId,
+          ...(action.oldContent as Record<string, unknown>),
+        };
+        const newWithId: Record<string, unknown> = {
+          id: KNOWN_AFTER_APPLY,
+          ...(action.content as Record<string, unknown>),
+        };
+        renderDiff(oldWithId, newWithId, FIELD_COL, tty, lines);
+      } else {
+        lines.push(
+          `${" ".repeat(FIELD_COL)}  # (field diff unavailable — no read endpoint for ${action.syncer.kind})`,
+        );
+      }
+      lines.push(`${closePad}}`);
+      if (action.affectedPaths.length > 0) {
+        lines.push(
+          paint(
+            `${blkPad}# after apply, update user_schema in these flow definitions:`,
+            A.yellow,
+            tty,
+          ),
+        );
+        for (const path of action.affectedPaths) {
+          lines.push(paint(`${blkPad}#   - ${path}`, A.yellow, tty));
+        }
+      }
       break;
     }
 

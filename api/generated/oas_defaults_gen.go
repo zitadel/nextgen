@@ -19,6 +19,14 @@ func (s *CreateFlowRequest) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *CreateProjectRequest) setDefaults() {
+	{
+		val := bool(true)
+		s.SeedDefaults.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *Field) setDefaults() {
 	{
 		val := bool(false)
