@@ -3,11 +3,16 @@ import { describe, expect, it } from "vitest";
 import { renderPlan, summarizePlan } from "../../../../src/lib/sync/plan-renderer";
 import type { ResourceSyncer, SyncAction } from "../../../../src/lib/sync/types";
 
-function makeSyncer(kind: string, directory: string, mutable = false): ResourceSyncer {
+function makeSyncer(
+  kind: string,
+  directory: string,
+  { mutable = false, revisioned = false }: { mutable?: boolean; revisioned?: boolean } = {},
+): ResourceSyncer {
   return {
     kind,
     directory,
     mutable,
+    revisioned,
     validate() { /* no-op: renderer tests do not exercise validation */ },
     async create(_d: object) { return "id"; },
     async update() { /* no-op: renderer tests do not exercise update */ },
@@ -15,8 +20,8 @@ function makeSyncer(kind: string, directory: string, mutable = false): ResourceS
   };
 }
 
-const schema = makeSyncer("schema", ".zitadel/schemas");
-const flow = makeSyncer("flow", ".zitadel/flows", true);
+const schema = makeSyncer("schema", ".zitadel/schemas", { revisioned: true });
+const flow = makeSyncer("flow", ".zitadel/flows", { mutable: true });
 
 describe("summarizePlan", () => {
   it("counts each action kind and ignores skips", () => {
@@ -28,14 +33,27 @@ describe("summarizePlan", () => {
       { kind: "skip", path: "e", reason: "no-change" },
     ];
 
-    expect(summarizePlan(actions)).toEqual({ creates: 2, updates: 1, deletes: 1, total: 4 });
+    expect(summarizePlan(actions)).toEqual({
+      creates: 2,
+      updates: 1,
+      revisions: 0,
+      deletes: 1,
+      total: 4,
+    });
   });
 
   it("returns all-zero for an empty or skip-only plan", () => {
-    expect(summarizePlan([])).toEqual({ creates: 0, updates: 0, deletes: 0, total: 0 });
+    expect(summarizePlan([])).toEqual({
+      creates: 0,
+      updates: 0,
+      revisions: 0,
+      deletes: 0,
+      total: 0,
+    });
     expect(summarizePlan([{ kind: "skip", path: "a", reason: "immutable" }])).toEqual({
       creates: 0,
       updates: 0,
+      revisions: 0,
       deletes: 0,
       total: 0,
     });

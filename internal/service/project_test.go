@@ -21,6 +21,7 @@ func TestProjectService_Create(t *testing.T) {
 	tests := []struct {
 		name                    string
 		previewOrigins          []string
+		seedDefaults            bool
 		setupStatements         func(*domain.Project) testAllStatements
 		setupSchemaRepo         func(*domainmock.MockJSONSchemaRepository)
 		setupFlowDefinitionRepo func(*domainmock.MockFlowDefinitionRepository)
@@ -32,6 +33,7 @@ func TestProjectService_Create(t *testing.T) {
 		{
 			name:           "ok — no preview origins",
 			previewOrigins: nil,
+			seedDefaults:   true,
 			setupStatements: func(_ *domain.Project) testAllStatements {
 				return testAllStatements{
 					createProject: func(_ context.Context, _ *domain.Project) error {
@@ -67,6 +69,7 @@ func TestProjectService_Create(t *testing.T) {
 		{
 			name:           "ok — with preview origins",
 			previewOrigins: []string{"*.vercel.app", "*.netlify.app"},
+			seedDefaults:   true,
 			setupStatements: func(_ *domain.Project) testAllStatements {
 				return testAllStatements{
 					createProject: func(_ context.Context, project *domain.Project) error {
@@ -101,8 +104,39 @@ func TestProjectService_Create(t *testing.T) {
 			},
 		},
 		{
+			name:           "ok — skip fallback defaults",
+			previewOrigins: nil,
+			seedDefaults:   false,
+			setupStatements: func(_ *domain.Project) testAllStatements {
+				return testAllStatements{
+					createProject: func(_ context.Context, _ *domain.Project) error {
+						return nil
+					},
+				}
+			},
+			setupPool: func(pool *servicemocks.MockPool, transaction *dbmock.MockTransaction, statements testAllStatements) {
+				pool.EXPECT().
+					Transaction(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+						return fn(ctx, v2TestTx{
+							QueryExecutor: transaction,
+							stmts:         statements,
+						})
+					})
+			},
+			setupTokenGenerator: func(generator *domainmock.MockTokenGenerator) {
+				generator.EXPECT().
+					Generate(gomock.Any()).Return("token", nil).
+					Times(2)
+			},
+			check: func(t *testing.T, got *domain.Project) {
+				assert.NotNil(t, got)
+			},
+		},
+		{
 			name:           "CreateProject error",
 			previewOrigins: nil,
+			seedDefaults:   true,
 			setupStatements: func(_ *domain.Project) testAllStatements {
 				return testAllStatements{
 					createProject: func(_ context.Context, _ *domain.Project) error {
@@ -167,7 +201,7 @@ func TestProjectService_Create(t *testing.T) {
 				baseURL,
 				schemaValidator,
 			)
-			got, err := svc.Create(context.Background(), tc.previewOrigins)
+			got, err := svc.Create(context.Background(), tc.previewOrigins, tc.seedDefaults)
 
 			if tc.wantErr {
 				require.Error(t, err)

@@ -13,10 +13,38 @@ tasks:
 
   clean-public-package-dist:
     command: "node scripts/release-clean.mjs public-package-dist"
+    deps:
+      # Deletes every public package's dist/ — the same directories these dev
+      # builds write. Within one moon invocation (e.g. release:snapshot, whose
+      # graph also contains dev builds via console:build and cli:test),
+      # `runDepsInParallel: false` on the parent only orders its direct dep
+      # targets, not their subtrees, so without these edges the clean races a
+      # concurrent dev build or cache hydration of the same dist (ENOTEMPTY).
+      # All of these are cache hits by the time the release chain runs.
+      # cli:test is in the release graph too (cli:build-release depends on
+      # it) and drives the built oclif CLI from apps/cli/dist while running.
+      - "cli:build"
+      - "cli:test"
+      - "api:build"
+      - "config:build"
+      - "components:build"
+      - "sdk-core:build"
+      - "sdk-next:build"
+      - "sdk-nuxt:build"
+      - "sdk-react:build"
+      - "sdk-vue:build"
+      - "sdk-angular:build"
+      - "sdk-solid:build"
+      - "sdk-svelte:build"
+      - "sdk-qwik:build"
     options:
       cache: false
       runFromWorkspaceRoot: true
-      runInCI: true
+      # Must never run inside the `moon ci` build/test graph, where consumer
+      # tasks are importing those directories concurrently; the
+      # release:snapshot workflow step invokes it afterwards (with CI unset),
+      # strictly serialized.
+      runInCI: false
 
   build-public-packages:
     command: "node -e 0"
@@ -24,6 +52,7 @@ tasks:
       - "release:clean-public-package-dist"
       - "cli:build-release"
       - "api:build-release"
+      - "config:build-release"
       - "components:build-release"
       - "sdk-core:build-release"
       - "sdk-next:build-release"
@@ -38,7 +67,12 @@ tasks:
       cache: false
       runDepsInParallel: false
       runFromWorkspaceRoot: true
-      runInCI: true
+      # Excluded from `moon ci`: release builds rewrite the same dists that
+      # dev builds produce and consumer tasks read (typechecks, the built-CLI
+      # tests, demo bundles), so running them concurrently with the build/test
+      # graph wipes dists mid-consumption. The release:snapshot step in
+      # .github/workflows/ci.yml builds them afterwards, serially.
+      runInCI: false
 
   version:
     command: "node scripts/release.mjs version"
@@ -85,4 +119,7 @@ tasks:
       cache: false
       runDepsInParallel: false
       runFromWorkspaceRoot: true
-      runInCI: true
+      # Invoked explicitly (`moon run release:publish`) by the
+      # release-publish workflow; never scheduled by `moon ci`, matching the
+      # rest of the release chain (see build-public-packages).
+      runInCI: false
