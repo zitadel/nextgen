@@ -1,16 +1,15 @@
 import type { CreateFlowDefinitionBodyFlowDefinition } from "@zitadel/api/generated/model";
-import { CreateFlowDefinitionBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { flowConfigSchema } from "@zitadel/config/schemas";
 
 import { ZitadelError } from "../errors";
 
 /**
- * The generated `CreateFlowDefinitionBody` Zod schema describes the
- * full envelope (`{project_id, flow_definition, schema_uri?}`); the
- * on-disk flow body is just the inner `flow_definition` shape. Pull
- * that out via `.shape` so on-disk validation runs against exactly the
- * same schema the wire request validates against.
+ * On-disk flow bodies validate against the canonical `flowConfigSchema`
+ * from `@zitadel/config/schemas` — the inner `flow_definition` shape of the
+ * generated create-envelope — so every consumer (sync, doctor, this batch
+ * validator) applies exactly the same rules.
  */
-const flowDefinitionBodySchema = CreateFlowDefinitionBody.shape.flow_definition;
+const flowDefinitionBodySchema = flowConfigSchema;
 
 /**
  * Validate raw JSON bodies against the generated flow-definition Zod

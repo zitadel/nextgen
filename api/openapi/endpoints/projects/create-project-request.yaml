@@ -11,3 +11,10 @@ properties:
       type: string
     description: |
       Origins which are allowed for previewing and testing the project.
+  seedDefaults:
+    type: boolean
+    default: true
+    description: |
+      Whether the server should provision fallback default user schema and flow
+      resources for the project. CLI-managed projects set this to false and
+      upload their local .zitadel config files through the schema and flow APIs.
