@@ -81,8 +81,9 @@ be better to use a JSON-like query language in the body.
 To make the query language readable and definable in OpenAPI, we use a JSON 
 structure.
 
-The sorting is an array of items so that a sort-by, sort-then-by can be done.
-Each element describes a field and direction.
+The sorting is an object with a field and direction. We do not use an array,
+which would enable a sort-by, sort-then-by feature because the storage backend
+currently does not support it.
 
 The filter is an array which combines all statements into an AND-clause. Each
 element describes a field, operation and value. OR-operations are out of scope,
@@ -106,17 +107,15 @@ properties:
       - $ref: /components/schemas/page-token.yaml
       - type: 'null'
   sorting:
-    type: array
-    items:
-      type: object
-      required:
-        - field
-        - direction
-      properties:
-        field:
-          $ref: filter-field.yaml
-        direction:
-          $ref: /components/schemas/sort-direction.yaml
+    type: object
+    required:
+      - field
+      - direction
+    properties:
+      field:
+        $ref: filter-field.yaml
+      direction:
+        $ref: /components/schemas/sort-direction.yaml
   filter:
     type: array
     items:
