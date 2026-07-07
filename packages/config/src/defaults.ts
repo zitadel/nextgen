@@ -10,6 +10,8 @@ import defaultLoginFlowTemplate from "../defaults/default-login.json" with {
   type: "json",
 };
 
+export { flowsReadmeContent, schemasReadmeContent } from "./readmes.js";
+
 export const DEFAULT_BUILTIN_SCHEMA_BASE = "https://nextgen.com/api/schemas";
 export const DEFAULT_FLOW_SCHEMA_URI = "https://nextgen.com/flow-definition.json";
 export const DEFAULT_SCHEMA_CONFIG_PATH = ".zitadel/schemas/default-human-user.json";

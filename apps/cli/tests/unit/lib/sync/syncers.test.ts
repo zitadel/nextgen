@@ -80,13 +80,13 @@ describe("SchemaSyncer", () => {
     expect(() => schema.validate({ type: "object" })).toThrow(ZitadelError);
   });
 
-  it("create POSTs the bare body to /schemas with project_id on the query and returns the platform id", async () => {
+  it("create POSTs the bare body to /schemas with project_id on the query and returns the server id", async () => {
     let receivedUrl = "";
-    let receivedBody: unknown;
+    let receivedBody: Record<string, unknown> = {};
     server.use(
       http.post(`${BASE}/schemas`, async ({ request }) => {
         receivedUrl = request.url;
-        receivedBody = await request.json();
+        receivedBody = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: "schema-id-1" }, { status: 201 });
       }),
     );
@@ -98,11 +98,17 @@ describe("SchemaSyncer", () => {
     expect(id).toBe("schema-id-1");
     expect(new URL(receivedUrl).searchParams.get("project_id")).toBe("proj-1");
     expect(receivedBody).toEqual(data);
+    expect(receivedBody.$id).toBeUndefined();
   });
 
-  it("update is a no-op and makes no network call", async () => {
+  it("update throws E_NOT_IMPLEMENTED — schemas are revisioned, edits publish a new revision", async () => {
     const [schema] = makeSyncers({ client, projectId: "proj-1", env: {} });
-    await expect(schema.update("schema-id-1", { a: 1 })).resolves.toBeUndefined();
+    await expect(schema.update("schema-id-1", { a: 1 })).rejects.toThrow(/revisioned/);
+  });
+
+  it("exposes revisioned=true — a schema-file hash change publishes a new revision", () => {
+    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {} });
+    expect(schema.revisioned).toBe(true);
   });
 
   it("fetch dispatches GET /schemas/:id?project_id=... and returns the body", async () => {

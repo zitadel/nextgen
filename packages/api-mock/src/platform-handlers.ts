@@ -54,7 +54,6 @@ import {
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import {
   DEFAULT_FLOW_SCHEMA_URI,
-  defaultHumanUserSchemaUrl,
   getDefaultHumanUserSchema,
   getDefaultLoginFlow,
 } from "@zitadel/config/defaults";
@@ -164,9 +163,22 @@ type FlowDefinitionRecord = {
   body: Record<string, unknown>;
 };
 
+/**
+ * Server-side metadata wrapped around the schema body so the mock can answer
+ * `POST /schemas` (returns id), `GET /schemas/:id` (returns body), and
+ * `GET /schemas` (list — id + createdAt, filterable by object_type).
+ */
+type SchemaRecord = {
+  id: string;
+  projectId: string;
+  objectType?: string;
+  createdAt: string;
+  body: GetSchemaById200;
+};
+
 type Store = {
   projects: Map<string, ProjectRecord>;
-  schemas: Map<string, GetSchemaById200>;
+  schemas: Map<string, SchemaRecord>;
   flowDefinitions: Map<string, FlowDefinitionRecord>;
 };
 
@@ -210,12 +222,16 @@ function defaultHumanUserSchema(): GetSchemaById200 {
   return getDefaultHumanUserSchema() as unknown as GetSchemaById200;
 }
 
-function defaultLoginFlowBody(): Record<string, unknown> {
-  return getDefaultLoginFlow() as unknown as Record<string, unknown>;
-}
-
 function seedDefaultProjectResources(projectID: string, createdAt: string): void {
-  store.schemas.set(defaultHumanUserSchemaUrl(), defaultHumanUserSchema());
+  const schemaId = `sch_${shortId()}`;
+  const body = defaultHumanUserSchema();
+  store.schemas.set(schemaId, {
+    id: schemaId,
+    projectId: projectID,
+    objectType: schemaObjectType(body),
+    createdAt,
+    body,
+  });
   const id = `flow_${shortId()}`;
   store.flowDefinitions.set(id, {
     id,
@@ -225,8 +241,13 @@ function seedDefaultProjectResources(projectID: string, createdAt: string): void
     status: "active",
     createdAt,
     updatedAt: createdAt,
-    body: defaultLoginFlowBody(),
+    body: getDefaultLoginFlow({ userSchemaUrl: schemaId }) as unknown as Record<string, unknown>,
   });
+}
+
+function schemaObjectType(body: GetSchemaById200): string | undefined {
+  const value = (body as unknown as { objectType?: unknown }).objectType;
+  return typeof value === "string" ? value : undefined;
 }
 
 function requiredProjectID(
@@ -352,14 +373,35 @@ export function setupPlatformHandlers() {
         return body.response;
       }
 
-      const schema = raw as unknown as GetSchemaById200;
-      const id =
-        typeof schema.$id === "string" && schema.$id.length > 0
-          ? schema.$id
-          : `schema_${shortId()}`;
-      store.schemas.set(id, schema);
+      const schemaBody = raw as unknown as GetSchemaById200;
+      const id = `sch_${shortId()}`;
+      store.schemas.set(id, {
+        id,
+        projectId: query.data.project_id,
+        objectType: schemaObjectType(schemaBody),
+        createdAt: nowIso(),
+        body: schemaBody,
+      });
       const responseBody: CreateSchema201 = { id };
       return HttpResponse.json(responseBody, { status: 201 });
+    }),
+
+    http.get("*/schemas", ({ request }) => {
+      const url = new URL(request.url);
+      const projectId = url.searchParams.get("project_id");
+      if (!projectId) {
+        return HttpResponse.json(errorBody("invalid_query", "project_id is required"), {
+          status: 400,
+        });
+      }
+      const objectTypeFilter = url.searchParams.get("object_type") ?? undefined;
+      const records = [...store.schemas.values()]
+        .filter((r) => r.projectId === projectId)
+        .filter((r) => !objectTypeFilter || r.objectType === objectTypeFilter)
+        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+      return HttpResponse.json(
+        records.map((r) => ({ id: r.id, createdAt: r.createdAt })),
+      );
     }),
 
     http.get("*/schemas/:id", ({ params, request }) => {
@@ -372,11 +414,11 @@ export function setupPlatformHandlers() {
         return query.response;
       }
 
-      const schema = store.schemas.get(schemaID(path.data.id));
-      if (!schema) {
+      const record = store.schemas.get(schemaID(path.data.id));
+      if (!record) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
-      return HttpResponse.json(schema);
+      return HttpResponse.json(record.body);
     }),
 
     http.delete("*/schemas/:id", ({ params, request }) => {

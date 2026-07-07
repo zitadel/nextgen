@@ -89,7 +89,7 @@ describe("Next setup integration", () => {
       resources: Record<string, { id?: string; hash?: string; name?: string; status?: string }>;
     };
     const schemaId = state.resources[".zitadel/schemas/default-human-user.json"]?.id;
-    expect(schemaId).toMatch(/^schema_/);
+    expect(schemaId).toMatch(/^sch_/);
     const flow = JSON.parse(
       await readFile(join(cwd, ".zitadel/flows/default-login.json"), "utf8"),
     ) as {

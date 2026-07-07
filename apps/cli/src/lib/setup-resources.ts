@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import type {
   CreateFlowDefinition201,
@@ -11,8 +11,10 @@ import {
   DEFAULT_FLOW_CONFIG_PATH,
   DEFAULT_FLOW_SCHEMA_URI,
   DEFAULT_SCHEMA_CONFIG_PATH,
+  flowsReadmeContent,
   getDefaultHumanUserSchema,
   getDefaultLoginFlow,
+  schemasReadmeContent,
 } from "@zitadel/config/defaults";
 
 import { FLOWS_DIR } from "./flows";
@@ -97,7 +99,39 @@ export async function materializeSetupResources(opts: {
     status: flowBody.status,
   });
 
+  const schemasReadme = join(SCHEMAS_DIR, "README.md");
+  const flowsReadme = join(FLOWS_DIR, "README.md");
+  if (await writeReadmeFile(opts.cwd, schemasReadme, schemasReadmeContent())) {
+    filesWritten.push(join(opts.cwd, schemasReadme));
+  }
+  if (await writeReadmeFile(opts.cwd, flowsReadme, flowsReadmeContent())) {
+    filesWritten.push(join(opts.cwd, flowsReadme));
+  }
+
   return { filesWritten };
+}
+
+/**
+ * Write a README file, but never overwrite an existing one. A developer who
+ * has edited the README should keep their edits when `setup --force` is
+ * re-run.
+ */
+async function writeReadmeFile(
+  cwd: string,
+  relPath: string,
+  content: string,
+): Promise<boolean> {
+  const dest = join(cwd, relPath);
+  await mkdir(dirname(dest), { recursive: true });
+  try {
+    await writeFile(dest, content, { flag: "wx" });
+    return true;
+  } catch (error) {
+    if (isErrno(error, "EEXIST")) {
+      return false;
+    }
+    throw error;
+  }
 }
 
 async function writeResourceFile(
