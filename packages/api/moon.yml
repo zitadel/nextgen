@@ -30,18 +30,26 @@ tasks:
     outputs:
       - "dist/**/*"
 
+  clean-dist:
+    command: "node ../../scripts/release-clean.mjs local-dist"
+    deps:
+      - "build"
+    options:
+      cache: false
+      runInCI: false
+
   build-release:
     command: "corepack pnpm run build"
     deps:
+      - "clean-dist"
       - "generate"
     outputs:
       - "dist/**/*"
     options:
       cache: false
-      # Release builds rewrite the same dist/ that dev builds produce and
-      # consumer tasks read. They are excluded from `moon ci` (the
-      # release:snapshot workflow step builds them afterwards, serially)
-      # so a release clean step can never wipe a dist mid-consumption.
+      # The release preclean is package-local and explicitly upstream of the
+      # release build. Do not rely on parent runDepsInParallel ordering; only
+      # task deps keep dist cleanup from racing builds that read or rewrite it.
       runInCI: false
       # cli:test drives the built oclif CLI, whose commands import this
       # package's dist at runtime. The shared mutex keeps this release build

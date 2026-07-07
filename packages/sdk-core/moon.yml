@@ -21,18 +21,26 @@ tasks:
     outputs:
       - "dist/**/*"
 
+  clean-dist:
+    command: "node ../../scripts/release-clean.mjs local-dist"
+    deps:
+      - "build"
+    options:
+      cache: false
+      runInCI: false
+
   build-release:
     command: "corepack pnpm run build"
     deps:
+      - "clean-dist"
       - "api:build-release"
     outputs:
       - "dist/**/*"
     options:
       cache: false
-      # Release builds rewrite the same dist/ that dev builds produce and
-      # consumer tasks read. They are excluded from `moon ci` (the
-      # release:snapshot workflow step builds them afterwards, serially)
-      # so a release clean step can never wipe a dist mid-consumption.
+      # Release builds rewrite dist after clean-dist removes stale package
+      # output. They stay out of `moon ci`; release:snapshot invokes them in
+      # the later release step instead of the normal build/test graph.
       runInCI: false
 
   test:

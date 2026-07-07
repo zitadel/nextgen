@@ -33,9 +33,18 @@ tasks:
     options:
       mutex: "sdk-nuxt-dist"
 
+  clean-dist:
+    command: "node ../../scripts/release-clean.mjs local-dist"
+    deps:
+      - "build"
+    options:
+      cache: false
+      runInCI: false
+
   build-release:
     command: "corepack pnpm run build"
     deps:
+      - "clean-dist"
       - "api:build-release"
       - "components:build-release"
       - "sdk-core:build-release"
@@ -43,12 +52,11 @@ tasks:
       - "dist/**/*"
     options:
       cache: false
-      # Release builds rewrite the same dist/ that dev builds produce and
-      # consumer tasks read. They are excluded from `moon ci` (the
-      # release:snapshot workflow step builds them afterwards, serially)
-      # so a release clean step can never wipe a dist mid-consumption.
+      # Release builds rewrite dist after clean-dist removes stale package
+      # output. They stay out of `moon ci`; release:snapshot invokes them in
+      # the later release step instead of the normal build/test graph.
       runInCI: false
-      # build-release cleans the same dist/ that demo-nuxt:build resolves
+      # build-release rewrites the same dist/ that demo-nuxt:build resolves
       # modules from; the mutex keeps the two from overlapping in the full
       # CI graph.
       mutex: "sdk-nuxt-dist"
