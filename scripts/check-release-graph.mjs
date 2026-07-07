@@ -15,6 +15,12 @@ const RELEASE_UI_CLEAN_REQUIREMENTS = new Map([
   ["console:build-release", ["api:clean-dist"]],
   ["login-ui:build-release", ["api:clean-dist", "components:clean-dist"]],
 ]);
+const CLEAN_MUTEX_REQUIREMENTS = new Map([
+  ["api:clean-dist", "public-dist"],
+  ["config:clean-dist", "public-dist"],
+  ["sdk-next:clean-dist", "public-dist"],
+  ["sdk-nuxt:clean-dist", "sdk-nuxt-dist"],
+]);
 const RELEASE_ENTRYPOINT_TARGETS = [
   "release:pack",
   "release:snapshot",
@@ -48,6 +54,7 @@ export async function main(args = forwardedArgs()) {
     assertTask(publicTasks, target);
     const cleanTarget = cleanTargetFor(target);
     assertTaskOption(publicTasks, cleanTarget, "runInCI", false);
+    assertCleanMutex(publicTasks, cleanTarget);
 
     if (!aggregateDeps.has(target)) {
       throw new Error(
@@ -67,6 +74,7 @@ export async function main(args = forwardedArgs()) {
 
     for (const cleanTarget of cleanTargets) {
       assertTaskOption(tasks, cleanTarget, "runInCI", false);
+      assertCleanMutex(tasks, cleanTarget);
 
       if (!reaches(tasks, target, cleanTarget)) {
         throw new Error(`${target} does not depend on ${cleanTarget}`);
@@ -108,7 +116,7 @@ async function readTaskGraph(target) {
     return JSON.parse(result.stdout);
   } catch (error) {
     throw new Error(
-      `failed to parse moon task graph for ${target}: ${error.message}\n` +
+      `failed to parse moon task graph for ${target}: ${formatError(error)}\n` +
         result.stdout.slice(0, 1000),
     );
   }
@@ -123,7 +131,7 @@ async function readTask(target) {
     return JSON.parse(result.stdout);
   } catch (error) {
     throw new Error(
-      `failed to parse moon task for ${target}: ${error.message}\n` +
+      `failed to parse moon task for ${target}: ${formatError(error)}\n` +
         result.stdout.slice(0, 1000),
     );
   }
@@ -162,6 +170,15 @@ function assertTaskRunInCI(task, expected) {
   }
 }
 
+function assertCleanMutex(tasks, target) {
+  const expected = CLEAN_MUTEX_REQUIREMENTS.get(target);
+  if (!expected) {
+    return;
+  }
+
+  assertTaskOption(tasks, target, "mutex", expected);
+}
+
 function directDeps(tasks, target) {
   const task = tasks.get(target);
   assertTask(tasks, target);
@@ -193,6 +210,10 @@ function reaches(tasks, start, target) {
 function cleanTargetFor(buildTarget) {
   const [project] = buildTarget.split(":");
   return `${project}:clean-dist`;
+}
+
+function formatError(error) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 if (isDirectRun(import.meta.url)) {

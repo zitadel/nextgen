@@ -39,6 +39,7 @@ tasks:
       - "build"
     options:
       cache: false
+      mutex: "sdk-nuxt-dist"
       runInCI: false
 
   build-release:

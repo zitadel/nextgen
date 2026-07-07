@@ -37,6 +37,7 @@ tasks:
       - "build"
     options:
       cache: false
+      mutex: "public-dist"
       runInCI: false
 
   build-release:
