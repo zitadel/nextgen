@@ -198,8 +198,8 @@ export async function assertNoUnrecordedPendingChangesets(root = repoRoot) {
   }
 }
 
-export function releasePublishEnv(env = process.env) {
-  return { ...env, ZITADEL_TELEMETRY_BUILD_CHANNEL: "production" };
+export function releasePublishEnv(overrides = {}) {
+  return { ...process.env, ...overrides, ZITADEL_TELEMETRY_BUILD_CHANNEL: "production" };
 }
 
 async function assertMainBranch(options, { allowDryRunBypass = true } = {}) {

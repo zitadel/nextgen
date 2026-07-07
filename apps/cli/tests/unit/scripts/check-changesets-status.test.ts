@@ -509,9 +509,24 @@ describe("release-automation", () => {
 describe("release publish guard", () => {
   it("forces production telemetry while publishing npm packages", async () => {
     const { releasePublishEnv } = await loadReleaseModule();
-    const env = releasePublishEnv({ ZITADEL_TELEMETRY_BUILD_CHANNEL: "development" });
+    const originalBase = process.env.ZITADEL_RELEASE_TEST_BASE;
+    process.env.ZITADEL_RELEASE_TEST_BASE = "preserved";
+    try {
+      const env = releasePublishEnv({
+        ZITADEL_RELEASE_TEST_OVERRIDE: "included",
+        ZITADEL_TELEMETRY_BUILD_CHANNEL: "development",
+      });
 
-    expect(env.ZITADEL_TELEMETRY_BUILD_CHANNEL).toBe("production");
+      expect(env.ZITADEL_RELEASE_TEST_BASE).toBe("preserved");
+      expect(env.ZITADEL_RELEASE_TEST_OVERRIDE).toBe("included");
+      expect(env.ZITADEL_TELEMETRY_BUILD_CHANNEL).toBe("production");
+    } finally {
+      if (originalBase === undefined) {
+        delete process.env.ZITADEL_RELEASE_TEST_BASE;
+      } else {
+        process.env.ZITADEL_RELEASE_TEST_BASE = originalBase;
+      }
+    }
   });
 
   it("allows prerelease-recorded pending changesets and rejects unrecorded ones", async () => {
