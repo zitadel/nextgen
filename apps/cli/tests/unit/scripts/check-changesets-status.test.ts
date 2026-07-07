@@ -62,6 +62,7 @@ type ReleaseAutomationModule = {
 
 type ReleaseModule = {
   assertNoUnrecordedPendingChangesets: (repoRoot: string) => Promise<void>;
+  releasePublishEnv: (env?: NodeJS.ProcessEnv) => NodeJS.ProcessEnv;
 };
 
 type CheckChangesetStatus = {
@@ -506,6 +507,13 @@ describe("release-automation", () => {
 });
 
 describe("release publish guard", () => {
+  it("forces production telemetry while publishing npm packages", async () => {
+    const { releasePublishEnv } = await loadReleaseModule();
+    const env = releasePublishEnv({ ZITADEL_TELEMETRY_BUILD_CHANNEL: "development" });
+
+    expect(env.ZITADEL_TELEMETRY_BUILD_CHANNEL).toBe("production");
+  });
+
   it("allows prerelease-recorded pending changesets and rejects unrecorded ones", async () => {
     const { assertNoUnrecordedPendingChangesets } = await loadReleaseModule();
     const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-guard-"));
