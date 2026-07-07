@@ -1,4 +1,7 @@
 type: string
+description: |
+  Filter operation defines the operations which can be used when filtering on a
+  query endpoint.
 enum:
   - equals
   - not_equals
