@@ -58,16 +58,12 @@ export async function main(args = forwardedArgs()) {
     assertTaskOption(publicTasks, target, "runInCI", false);
     assertReleaseBuildCleans(publicTasks, target);
     assertBuildMutex(publicTasks, target);
+    assertSelfBuildNotInReleaseGraph(publicTasks, target);
 
     if (!aggregateDeps.has(target)) {
       throw new Error(
         `${PUBLIC_AGGREGATE_TARGET} is missing manifest build target ${target}`,
       );
-    }
-
-    const readerTarget = readerTargetFor(target);
-    if (!reaches(publicTasks, target, readerTarget)) {
-      throw new Error(`${target} does not depend on ${readerTarget}`);
     }
   }
 
@@ -106,8 +102,9 @@ export async function main(args = forwardedArgs()) {
   }
 
   console.log(
-    "release graph ok: every public package release build cleans and rebuilds " +
-      `dist atomically, and ${RELEASE_UI_BUILD_REQUIREMENTS.size} release UI ` +
+    "release graph ok: public package release builds clean and rebuild dist " +
+      "without self-build readers, and " +
+      `${RELEASE_UI_BUILD_REQUIREMENTS.size} release UI ` +
       "builds depend on the package release chain they consume",
   );
 }
@@ -184,6 +181,24 @@ function assertBuildMutex(tasks, target) {
   assertTaskOption(tasks, target, "mutex", expected);
 }
 
+function assertSelfBuildNotInReleaseGraph(tasks, target) {
+  if (target === "cli:build-release") {
+    assertTaskOption(tasks, target, "runDepsInParallel", false);
+    if (!reaches(tasks, target, "cli:test")) {
+      throw new Error("cli:build-release must depend on cli:test");
+    }
+    return;
+  }
+
+  const buildTarget = normalBuildTargetFor(target);
+  if (reaches(tasks, target, buildTarget)) {
+    throw new Error(
+      `${target} must not depend on ${buildTarget}; release builds clean and ` +
+        "rebuild their own dist, and normal build readers can race that cleanup.",
+    );
+  }
+}
+
 function assertReleaseBuildCleans(tasks, target) {
   assertTask(tasks, target);
   const task = tasks.get(target);
@@ -222,9 +237,9 @@ function reaches(tasks, start, target) {
   return false;
 }
 
-function readerTargetFor(buildTarget) {
+function normalBuildTargetFor(buildTarget) {
   const [project] = buildTarget.split(":");
-  return project === "cli" ? "cli:test" : `${project}:build`;
+  return `${project}:build`;
 }
 
 function formatError(error) {
