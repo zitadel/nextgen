@@ -26,20 +26,6 @@ import {
 } from "./release-artifacts.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
-const PUBLIC_PACKAGE_BUILD_TARGETS = [
-  "cli:build",
-  "api:build",
-  "components:build",
-  "sdk-core:build",
-  "sdk-next:build",
-  "sdk-nuxt:build",
-  "sdk-react:build",
-  "sdk-vue:build",
-  "sdk-angular:build",
-  "sdk-solid:build",
-  "sdk-svelte:build",
-  "sdk-qwik:build",
-];
 
 export async function main(args = forwardedArgs()) {
   const command = args[0];
@@ -71,9 +57,6 @@ async function commandSnapshot(options) {
   const outDir = releaseDir(repoRoot, release.version);
   const info = await gitInfo({ repoRoot });
 
-  await run("corepack", ["pnpm", "install", "--frozen-lockfile"], { cwd: repoRoot });
-  await buildEmbeddedUI();
-  await buildPublicPackageArtifacts();
   await run("go", ["mod", "download"], { cwd: repoRoot });
   await buildServerBinaries({ repoRoot, outDir, version: release.version, gitInfo: info });
   await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
@@ -101,31 +84,11 @@ async function commandPack() {
   const release = await readServerRelease(repoRoot);
   const outDir = releaseDir(repoRoot, release.version);
   const info = await gitInfo({ repoRoot });
-  await buildEmbeddedUI();
-  await buildPublicPackageArtifacts();
   await run("go", ["mod", "download"], { cwd: repoRoot });
   await buildServerBinaries({ repoRoot, outDir, version: release.version, gitInfo: info });
   await stageServerNpmBinaries({ repoRoot, outDir, version: release.version });
   await packPublicPackages({ repoRoot, outDir, version: release.version });
   console.log(`npm tarballs ready: ${join(outDir, "npm")}`);
-}
-
-async function buildEmbeddedUI() {
-  await run("moon", ["run", "console:build", "login-ui:build"], { cwd: repoRoot });
-}
-
-/**
- * Build the public npm package artifacts for a release. Sets
- * `ZITADEL_TELEMETRY_BUILD_CHANNEL=production` so the published CLI bundle is
- * stamped for the production Mixpanel project; only the release pipeline sets
- * this, so contributor/CI builds default to the dev project (see
- * `apps/cli/tsdown.config.ts`).
- */
-async function buildPublicPackageArtifacts() {
-  await run("moon", ["run", ...PUBLIC_PACKAGE_BUILD_TARGETS], {
-    cwd: repoRoot,
-    env: { ...process.env, ZITADEL_TELEMETRY_BUILD_CHANNEL: "production" },
-  });
 }
 
 async function commandPublish(options) {
@@ -171,7 +134,10 @@ async function commandPublish(options) {
   }
 
   await commandSnapshot({ skipContainer: true });
-  await run("corepack", ["pnpm", "exec", "changeset", "publish"], { cwd: repoRoot });
+  await run("corepack", ["pnpm", "exec", "changeset", "publish"], {
+    cwd: repoRoot,
+    env: releasePublishEnv(),
+  });
   await buildContainerImage({ repoRoot, outDir, release, push: true, platforms: CONTAINER_PLATFORMS });
   await commandVerify();
   await upsertProductGithubRelease({ repoRoot, outDir, log: console.log });
@@ -230,6 +196,10 @@ export async function assertNoUnrecordedPendingChangesets(root = repoRoot) {
       `release publish requires all pending changesets to be recorded in .changeset/pre.json: ${unrecorded.join(", ")}`,
     );
   }
+}
+
+export function releasePublishEnv(overrides = {}) {
+  return { ...process.env, ...overrides, ZITADEL_TELEMETRY_BUILD_CHANNEL: "production" };
 }
 
 async function assertMainBranch(options, { allowDryRunBypass = true } = {}) {

@@ -31,6 +31,7 @@ function makeSyncer(overrides: Partial<ResourceSyncer> = {}): ResourceSyncer {
     kind: "schema",
     directory: ".zitadel/schemas",
     mutable: false,
+    revisioned: false,
     validate: vi.fn(),
     create: vi.fn().mockResolvedValue("created-id"),
     update: vi.fn().mockResolvedValue(undefined),
@@ -57,7 +58,7 @@ describe("buildSyncPlan", () => {
     }
   });
 
-  it("returns skip(immutable) when immutable resource already has an id in state", async () => {
+  it("returns skip(no-change) when an unchanged file already has an id in state", async () => {
     const cwd = makeCwd();
     try {
       const data = { kind: "user-schema" };
@@ -75,7 +76,62 @@ describe("buildSyncPlan", () => {
       expect(actions).toHaveLength(1);
       expect(actions[0].kind).toBe("skip");
       if (actions[0].kind === "skip") {
+        expect(actions[0].reason).toBe("no-change");
+      }
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("returns skip(immutable) when a non-mutable non-revisioned resource has a changed hash", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, {
+        framework: "next",
+        resources: { ".zitadel/schemas/user.json": { id: "existing-id", hash: "old-hash" } },
+      });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema", v: 2 });
+
+      const syncer = makeSyncer({ mutable: false, revisioned: false });
+      const actions = await buildSyncPlan(cwd, [syncer]);
+
+      expect(actions).toHaveLength(1);
+      expect(actions[0].kind).toBe("skip");
+      if (actions[0].kind === "skip") {
         expect(actions[0].reason).toBe("immutable");
+      }
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("returns revise action when a revisioned resource has a changed hash", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, {
+        framework: "next",
+        resources: {
+          ".zitadel/schemas/user.json": { id: "sch_A", hash: "old-hash" },
+        },
+      });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema", v: 2 });
+      await writeResource(cwd, ".zitadel/flows", "signin.json", {
+        name: "signin",
+        user_schema: "sch_A",
+      });
+      await writeResource(cwd, ".zitadel/flows", "signin-alt.json", {
+        name: "signin-alt",
+        user_schema: "sch_OTHER",
+      });
+
+      const syncer = makeSyncer({ revisioned: true });
+      const actions = await buildSyncPlan(cwd, [syncer]);
+
+      expect(actions).toHaveLength(1);
+      expect(actions[0].kind).toBe("revise");
+      if (actions[0].kind === "revise") {
+        expect(actions[0].previousId).toBe("sch_A");
+        expect(actions[0].affectedPaths).toEqual([".zitadel/flows/signin.json"]);
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });
@@ -247,24 +303,59 @@ describe("runSyncLoop", () => {
     }
   });
 
-  it("skips immutable resource when id already in state", async () => {
+  it("skips immutable resource with unchanged hash without calling create/update", async () => {
     const cwd = makeCwd();
     try {
       const data = { kind: "user-schema" };
+      const { createHash } = await import("node:crypto");
+      const hash = createHash("sha256").update(JSON.stringify(data)).digest("hex");
       await writeState(cwd, {
         framework: "next",
         resources: {
-          ".zitadel/schemas/user.json": { id: "existing-id", hash: "anything" },
+          ".zitadel/schemas/user.json": { id: "existing-id", hash },
         },
       });
       await writeResource(cwd, ".zitadel/schemas", "user.json", data);
 
       const syncer = makeSyncer({ mutable: false });
-      
+
       await runSyncLoop(cwd, [syncer]);
 
       expect(syncer.create).not.toHaveBeenCalled();
       expect(syncer.update).not.toHaveBeenCalled();
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("publishes a new revision (POST) when a revisioned resource changes on disk", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, {
+        framework: "next",
+        resources: {
+          ".zitadel/schemas/user.json": { id: "sch_A", hash: "old-hash" },
+        },
+      });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema", v: 2 });
+
+      const syncer = makeSyncer({
+        revisioned: true,
+        create: vi.fn().mockResolvedValue("sch_B"),
+      });
+
+      await runSyncLoop(cwd, [syncer]);
+
+      expect(syncer.create).toHaveBeenCalledOnce();
+      expect(syncer.update).not.toHaveBeenCalled();
+
+      const state = JSON.parse(
+        await (await import("node:fs/promises")).readFile(
+          join(cwd, ".zitadel/state.json"),
+          "utf8",
+        ),
+      ) as { resources: Record<string, { id: string }> };
+      expect(state.resources[".zitadel/schemas/user.json"].id).toBe("sch_B");
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }

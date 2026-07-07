@@ -2,9 +2,9 @@ package domain
 
 import (
 	"context"
-
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
+
+//go:generate go tool mockgen -typed -package domainmock -destination ./mock/flow_on_success.mock.go . FlowOnSuccessHandler,FlowPasskeyUserCreater
 
 // FlowOnSuccessHandler is the contract every on_success mutation
 // satisfies. The state machine calls Handle after a step's fields
@@ -13,7 +13,11 @@ import (
 // Each [FlowOnSuccess] value maps to one handler. Implementations live
 // in their own file (e.g. flow_on_success_create_user.go).
 type FlowOnSuccessHandler interface {
-	Handle(ctx context.Context, client database.QueryExecutor, in FlowOnSuccessInput) (FlowOnSuccessResult, error)
+	Handle(ctx context.Context, in FlowOnSuccessInput) (FlowOnSuccessResult, error)
+}
+
+type FlowPasskeyUserCreater interface {
+	CreateProvisionalUser(ctx context.Context, userID string, state *FlowState) error
 }
 
 // ManifestForOnSuccess returns the credential kinds a mutation establishes.
@@ -38,19 +42,13 @@ type FlowOnSuccessInput struct {
 	ResolvedFlow  *FlowDefinition
 }
 
-// FlowOnSuccessResult is what a handler returns. Outcome overrides the
-// transition key (empty = use the submitted action). StepError keeps
-// the user on the current step.
+// FlowOnSuccessResult is what a handler returns. StepError keeps the
+// user on the current step.
 type FlowOnSuccessResult struct {
-	Outcome   string
 	StepError *string
 	// UserID is set when a handler creates a new user. The state machine
 	// records it and registers the user on the auth attempt.
 	UserID string
-}
-
-// FlowPasswordHasher hashes plaintext passwords into the PHC string
-// stored on [UserPassword.EncodedHash].
-type FlowPasswordHasher interface {
-	Hash(plain string) (encoded string, err error)
+	// Irreversible flags mutations the user cannot reverse (e.g. created a user).
+	Irreversible bool
 }

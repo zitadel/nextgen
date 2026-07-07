@@ -3,6 +3,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 
 import { createZitadelClient } from "@zitadel/api/client";
+import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
 
 import { FLOWS_DIR } from "../../../../src/lib/flows";
 import { SCHEMAS_DIR } from "../../../../src/lib/user-schema";
@@ -79,13 +80,13 @@ describe("SchemaSyncer", () => {
     expect(() => schema.validate({ type: "object" })).toThrow(ZitadelError);
   });
 
-  it("create POSTs the bare body to /schemas with project_id on the query and returns the platform id", async () => {
+  it("create POSTs the bare body to /schemas with project_id on the query and returns the server id", async () => {
     let receivedUrl = "";
-    let receivedBody: unknown;
+    let receivedBody: Record<string, unknown> = {};
     server.use(
       http.post(`${BASE}/schemas`, async ({ request }) => {
         receivedUrl = request.url;
-        receivedBody = await request.json();
+        receivedBody = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: "schema-id-1" }, { status: 201 });
       }),
     );
@@ -97,11 +98,17 @@ describe("SchemaSyncer", () => {
     expect(id).toBe("schema-id-1");
     expect(new URL(receivedUrl).searchParams.get("project_id")).toBe("proj-1");
     expect(receivedBody).toEqual(data);
+    expect(receivedBody.$id).toBeUndefined();
   });
 
-  it("update is a no-op and makes no network call", async () => {
+  it("update throws E_NOT_IMPLEMENTED — schemas are revisioned, edits publish a new revision", async () => {
     const [schema] = makeSyncers({ client, projectId: "proj-1", env: {} });
-    await expect(schema.update("schema-id-1", { a: 1 })).resolves.toBeUndefined();
+    await expect(schema.update("schema-id-1", { a: 1 })).rejects.toThrow(/revisioned/);
+  });
+
+  it("exposes revisioned=true — a schema-file hash change publishes a new revision", () => {
+    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {} });
+    expect(schema.revisioned).toBe(true);
   });
 
   it("fetch dispatches GET /schemas/:id?project_id=... and returns the body", async () => {
@@ -123,6 +130,7 @@ describe("SchemaSyncer", () => {
 
 const VALID_FLOW = {
   name: "default",
+  status: "active",
   user_schema:
     "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml",
   purposes: { login: "identifier" },
@@ -162,11 +170,15 @@ describe("FlowDefinitionSyncer", () => {
   });
 
   it("validate passes when the referenced env var is present", () => {
-    const [, flow] = makeSyncers({ projectId: "proj-1", env: { MY_SECRET: "hunter2" } });
+    const [, flow] = makeSyncers({
+      client,
+      projectId: "proj-1",
+      env: { MY_SECRET: "hunter2" },
+    });
     expect(() => flow.validate(FLOW_WITH_ENV_REF)).not.toThrow();
   });
 
-  it("create POSTs the spec envelope `{project_id, flow_definition}` and returns the platform id", async () => {
+  it("create POSTs the spec envelope `{project_id, schema_uri, flow_definition}` and returns the platform id", async () => {
     let receivedBody: unknown;
     server.use(
       http.post(`${BASE}/flow_definitions`, async ({ request }) => {
@@ -175,12 +187,16 @@ describe("FlowDefinitionSyncer", () => {
       }),
     );
     const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {} });
-    const data = { name: "Default", version: 2 };
+    const data = { name: "Default", status: "active", version: 2 };
 
     const id = await flow.create(data);
 
     expect(id).toBe("flow-id-1");
-    expect(receivedBody).toEqual({ project_id: "proj-1", flow_definition: data });
+    expect(receivedBody).toEqual({
+      project_id: "proj-1",
+      schema_uri: DEFAULT_FLOW_SCHEMA_URI,
+      flow_definition: data,
+    });
   });
 
   it("update PUTs the `{flow_definition}` envelope with the project_id query param", async () => {
@@ -195,16 +211,18 @@ describe("FlowDefinitionSyncer", () => {
     );
     const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {} });
 
-    await flow.update("flow-id-1", { version: 3 });
+    await flow.update("flow-id-1", { status: "active", version: 3 });
 
     expect(receivedProjectId).toBe("proj-1");
-    expect(receivedBody).toEqual({ flow_definition: { version: 3 } });
+    expect(receivedBody).toEqual({ flow_definition: { status: "active", version: 3 } });
   });
 
-  it("delete DELETEs /flow_definitions/:id", async () => {
+  it("delete DELETEs /flow_definitions/:id with the project_id query param", async () => {
     let hits = 0;
+    let receivedProjectId: string | null = null;
     server.use(
-      http.delete(`${BASE}/flow_definitions/flow-id-1`, () => {
+      http.delete(`${BASE}/flow_definitions/flow-id-1`, ({ request }) => {
+        receivedProjectId = new URL(request.url).searchParams.get("project_id");
         hits += 1;
         return new HttpResponse(null, { status: 204 });
       }),
@@ -214,27 +232,32 @@ describe("FlowDefinitionSyncer", () => {
     await flow.delete("flow-id-1");
 
     expect(hits).toBe(1);
+    expect(receivedProjectId).toBe("proj-1");
   });
 
-  it("fetch strips the detail envelope and returns only the bare body", async () => {
+  it("fetch unwraps the detail envelope and sends project_id", async () => {
+    let receivedUrl = "";
     server.use(
-      http.get(`${BASE}/flow_definitions/flow-id-1`, () =>
-        HttpResponse.json({
+      http.get(`${BASE}/flow_definitions/flow-id-1`, ({ request }) => {
+        receivedUrl = request.url;
+        return HttpResponse.json({
           id: "flow-id-1",
           project_id: "proj-1",
-          schema_uri: "https://example/schema",
-          status: "active",
+          flow_definition: {
+            name: "Default",
+            status: "active",
+            version: 2,
+          },
           created_at: "2026-01-01",
           updated_at: "2026-01-02",
-          name: "Default",
-          version: 2,
-        }),
-      ),
+        });
+      }),
     );
     const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {} });
 
     const body = await flow.fetch?.("flow-id-1");
 
-    expect(body).toEqual({ name: "Default", version: 2 });
+    expect(new URL(receivedUrl).searchParams.get("project_id")).toBe("proj-1");
+    expect(body).toEqual({ name: "Default", status: "active", version: 2 });
   });
 });

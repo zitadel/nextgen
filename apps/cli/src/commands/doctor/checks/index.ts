@@ -13,6 +13,7 @@ import { EnvExampleCheck } from "./env-example";
 import { FrameworkCheck } from "./framework";
 import { DependencyCheck } from "./dependency";
 import { ProjectMatchCheck } from "./project-match";
+import { SchemaCheck } from "./schema";
 
 export type { SanityCheck, CheckContext, CheckOutcome } from "./types";
 export { AbstractSanityCheck } from "./types";
@@ -34,11 +35,7 @@ export const SANITY_CHECKS: ReadonlyArray<SanityCheck> = [
   new GitignoreCheck(),
   new EnvExampleCheck(),
   new FrameworkCheck(),
-  // SchemaCheck is disabled: the user schema is now provisioned server-side
-  // and no longer scaffolded into `.zitadel/schemas/user.json`, so there is
-  // no local file to verify. The check is kept (imported/exported below) for
-  // the future pull-based workflow that will re-introduce local resources.
-  // new SchemaCheck(),
+  new SchemaCheck(),
   new DependencyCheck(),
   new ProjectMatchCheck(),
 ];

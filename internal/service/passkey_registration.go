@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -12,6 +13,7 @@ import (
 )
 
 const passkeyRegistrationTTL = 5 * time.Minute
+const passkeyRegistrationDefaultUsername = "Passkey account"
 
 // PasskeyRegistrationService is the authoritative service for the passkey registration
 // ceremony. It exposes [Begin] and [Finish] for direct callers and is wrapped by
@@ -42,6 +44,7 @@ type BeginRegistrationInput struct {
 	ProjectID        string
 	UserID           string
 	Username         string
+	DisplayName      string
 	RPID             string
 	RPOrigins        []string
 	UserVerification string
@@ -67,8 +70,9 @@ func (s *PasskeyRegistrationService) Begin(ctx context.Context, in BeginRegistra
 		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: list passkeys: %w", err)
 	}
 
+	username, displayName := passkeyRegistrationLabels(in.Username, in.DisplayName)
 	ceremony, err := domain.CreatePasskeyRegistrationChallenge(
-		in.UserID, in.Username, in.Username,
+		in.UserID, username, displayName,
 		existing,
 		in.RPID, origins,
 		in.UserVerification,
@@ -96,6 +100,18 @@ func (s *PasskeyRegistrationService) Begin(ctx context.Context, in BeginRegistra
 		RegistrationID: regID,
 		Options:        ceremony.ClientOptions(),
 	}, nil
+}
+
+func passkeyRegistrationLabels(username, displayName string) (string, string) {
+	username = strings.TrimSpace(username)
+	displayName = strings.TrimSpace(displayName)
+	if username == "" {
+		return passkeyRegistrationDefaultUsername, ""
+	}
+	if displayName == "" {
+		displayName = username
+	}
+	return username, displayName
 }
 
 // FinishRegistrationInput carries the parameters needed to complete a passkey registration.

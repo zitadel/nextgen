@@ -303,6 +303,13 @@ type Handler interface {
 	//
 	// GET /flow_definitions
 	ListFlowDefinitions(ctx context.Context, params ListFlowDefinitionsParams) (ListFlowDefinitionsRes, error)
+	// ListSchemas implements listSchemas operation.
+	//
+	// Retrieve a list of all schemas available in the system. This endpoint
+	// supports pagination and filtering based on schema attributes.
+	//
+	// GET /schemas
+	ListSchemas(ctx context.Context, params ListSchemasParams) (ListSchemasRes, error)
 	// ListSessions implements listSessions operation.
 	//
 	// Returns a paginated list of sessions for a project.

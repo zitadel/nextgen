@@ -19,34 +19,18 @@ func (s *CreateFlowRequest) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *CreateProjectRequest) setDefaults() {
+	{
+		val := bool(true)
+		s.SeedDefaults.SetTo(val)
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *Field) setDefaults() {
 	{
 		val := bool(false)
 		s.Required.SetTo(val)
-	}
-}
-
-// setDefaults set default value of fields.
-func (s *FlowDefinition) setDefaults() {
-	{
-		val := FlowDefinitionStatus("active")
-		s.Status.SetTo(val)
-	}
-}
-
-// setDefaults set default value of fields.
-func (s *FlowDefinitionDetailResponse) setDefaults() {
-	{
-		val := FlowDefinitionStatus("active")
-		s.Status = val
-	}
-}
-
-// setDefaults set default value of fields.
-func (s *FlowDefinitionResponse) setDefaults() {
-	{
-		val := FlowDefinitionStatus("active")
-		s.Status = val
 	}
 }
 

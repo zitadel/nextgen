@@ -75,6 +75,7 @@ afterAll(async () => {
 function validFlowDefinitionBody(): Record<string, unknown> {
   return {
     name: "login-flow",
+    status: "active",
     user_schema:
       "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml",
     // Per `flow-definition.yaml`, `purposes` is an object mapping each
@@ -167,7 +168,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const res = await fetch(`${BASE}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ previewOrigins: ["http://localhost:3000"] }),
+      body: JSON.stringify({ previewOrigins: ["http://localhost:3000"], seedDefaults: false }),
     });
     expect(res.status).toBe(201);
     const body = (await res.json()) as Record<string, unknown>;
@@ -214,7 +215,60 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(res.status).toBe(201);
     const body = (await res.json()) as Record<string, unknown>;
     expect(typeof body.id).toBe("string");
-    expect((body.id as string).startsWith("schema_")).toBe(true);
+    expect((body.id as string).startsWith("sch_")).toBe(true);
+  });
+
+  test("GET and DELETE /schemas/:id are scoped to the owning project", async () => {
+    const create = await fetch(`${BASE}/schemas?project_id=proj_schema_owner`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "user-schema",
+        metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        "x-auth-methods": { password: { enabled: true, position: 0 } },
+      }),
+    });
+    const { id } = (await create.json()) as { id: string };
+
+    // Another project can neither read nor delete the schema — the real
+    // repository looks rows up by (project_id, id).
+    const foreignGet = await fetch(`${BASE}/schemas/${id}?project_id=proj_other`);
+    expect(foreignGet.status).toBe(404);
+    const foreignDelete = await fetch(`${BASE}/schemas/${id}?project_id=proj_other`, {
+      method: "DELETE",
+    });
+    expect(foreignDelete.status).toBe(404);
+
+    // The owner still can.
+    const ownerGet = await fetch(`${BASE}/schemas/${id}?project_id=proj_schema_owner`);
+    expect(ownerGet.status).toBe(200);
+    const ownerDelete = await fetch(`${BASE}/schemas/${id}?project_id=proj_schema_owner`, {
+      method: "DELETE",
+    });
+    expect(ownerDelete.status).toBe(204);
+  });
+
+  test("GET /schemas/:id round-trips the raw uploaded document (no zod re-shaping)", async () => {
+    // The real server persists the uploaded JSON Schema bytes verbatim, and
+    // schema documents legitimately carry fields the request zod strips
+    // (title, description, custom x-* extensions). The mock must do the same.
+    const doc = {
+      kind: "user-schema",
+      metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+      "x-auth-methods": { password: { enabled: true, position: 0 } },
+      title: "CustomTitle",
+      "x-custom-extension": { keep: true },
+    };
+    const create = await fetch(`${BASE}/schemas?project_id=proj_schema_raw`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(doc),
+    });
+    const { id } = (await create.json()) as { id: string };
+
+    const res = await fetch(`${BASE}/schemas/${id}?project_id=proj_schema_raw`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(doc);
   });
 
   test("POST /schemas with invalid kind returns spec-compliant 400 envelope", async () => {
@@ -271,7 +325,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       }),
     });
     const { id } = (await create.json()) as { id: string };
-    const res = await fetch(`${BASE}/flow_definitions/${id}`);
+    const res = await fetch(`${BASE}/flow_definitions/${id}?project_id=proj_conformance_get`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(() => GetFlowDefinitionResponse.parse(body)).not.toThrow();

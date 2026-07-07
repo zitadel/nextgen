@@ -22,7 +22,7 @@ export function createApp(options: { issuer?: string } = {}): Express {
 
 /**
  * The configured Express app for this deployment, built from the ambient
- * environment. The Vercel entrypoint (`api/index.ts`) re-exports this as
+ * environment. The Vercel entrypoint (`api/index.mjs`) re-exports this as
  * its default export.
  */
 export const app: Express = createApp();

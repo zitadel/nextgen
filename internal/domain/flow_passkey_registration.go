@@ -27,11 +27,13 @@ type FlowPasskeyRegistrationService interface {
 
 // FlowIssuePasskeyRegistrationChallengeInput carries the relying-party
 // parameters and the user context needed to begin a registration ceremony.
-// UserID must already be resolved on the attempt before this is called.
+// UserID is the stable WebAuthn user handle; Username and DisplayName are
+// browser-visible labels when the flow has a collected identifier.
 type FlowIssuePasskeyRegistrationChallengeInput struct {
 	ProjectID        string
 	UserID           string
 	Username         string
+	DisplayName      string
 	RPID             string
 	RPOrigins        []string
 	UserVerification string

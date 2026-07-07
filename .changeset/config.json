@@ -12,6 +12,7 @@
       "@zitadel/server-darwin-arm64",
       "@zitadel/server-win32-x64",
       "@zitadel/api",
+      "@zitadel/config",
       "@zitadel/components",
       "@zitadel/sdk-core",
       "@zitadel/sdk-next",
@@ -40,6 +41,7 @@
     "@zitadel/demo-next-e2e",
     "@zitadel/demo-nuxt",
     "@zitadel/demo-nuxt-e2e",
-    "@zitadel/login-ui"
+    "@zitadel/login-ui",
+    "@zitadel/storybook"
   ]
 }

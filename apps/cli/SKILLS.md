@@ -64,11 +64,14 @@ layer, not the envelope.
 ## Commands
 
 - `setup` — create a Zitadel project and scaffold local auth (routes,
-  middleware, `.zitadel/**`, env templates). The project's default user schema
-  and login flow are provisioned server-side at creation, so setup neither
-  scaffolds nor uploads them. Agents must pass `--framework` when scaffolding
-  into a fresh directory; interactive humans can omit it and choose from the
-  prompt. Flags: `--framework next|react|vue|angular|nuxt|solid|svelte|qwik`, `--renderer
+  middleware, `.zitadel/**`, env templates). Setup writes the versioned local
+  default user schema and login flow into
+  `.zitadel/schemas/default-human-user.json` and
+  `.zitadel/flows/default-login.json`, uploads them through the schema and flow
+  APIs, then seeds `.zitadel/state.json` so `plan` is immediately empty. Agents
+  must pass `--framework` when scaffolding into a fresh directory; interactive
+  humans can omit it and choose from the prompt. Flags:
+  `--framework next|react|vue|angular|nuxt|solid|svelte|qwik`, `--renderer
   react|web-component` (selects the Next.js auth-page renderer; accepted for any
   framework and recorded in `zitadel.json` branding, but only Next varies its
   generated templates by it), `--dev-port` (dev-server port, also the issuer
@@ -76,6 +79,10 @@ layer, not the envelope.
   apps side by side), `--skip-install`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
+- `schemas list` — inspect the revision history of a user-schema, filtered by
+  `--object-type` (e.g. `human-user`). Non-interactive/`--json` prints one row
+  per revision (newest first); interactive adds a picker that fetches and
+  pretty-prints the selected revision body.
 - `doctor` — verify generated app files and local state once `zitadel.json`
   exists. The default local runtime is the `@zitadel/server` npm binary;
   Docker checks apply only when using `--runtime docker` or `--image`.
@@ -158,11 +165,17 @@ exercises fresh-app setup plus registration, logout, and login across the
 supported frameworks.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
-then re-run `plan` and `apply`. Managed files carry a marker comment; `eject`
-removes only files that still carry it, preserving anything the user replaced.
-For app-local development, `--server local` resolves through
-`.zitadel/local/runtime.json` and requires a healthy `npx @zitadel/cli@alpha start`
-runtime. Runtime-only `.zitadel/local/**` state does not block fresh
-same-directory scaffolding. `setup` installs dependencies with the detected
-package manager by default; pass `--skip-install` when the agent or host
-workflow will install dependencies separately.
+then re-run `plan` and `apply`. Schema and flow files are synced from
+`.zitadel/schemas/*.json` and `.zitadel/flows/*.json`; templates are not
+supported until the server exposes template storage and APIs. Server-provisioned
+defaults remain a fallback for non-CLI project creation, but CLI-created
+projects are authored from local files first. Flow create, read, list, and
+update are available, while the server enforces lifecycle rules such as
+draft-only edits. Managed files carry a marker comment; `eject` removes only
+files that still carry it, preserving anything the user replaced. For app-local
+development, `--server local` resolves through `.zitadel/local/runtime.json` and
+requires a healthy
+`npx @zitadel/cli@alpha start` runtime. Runtime-only `.zitadel/local/**` state
+does not block fresh same-directory scaffolding. `setup` installs dependencies
+with the detected package manager by default; pass `--skip-install` when the
+agent or host workflow will install dependencies separately.

@@ -3701,10 +3701,17 @@ func (s *CreateProjectRequest) encodeFields(e *jx.Encoder) {
 			e.ArrEnd()
 		}
 	}
+	{
+		if s.SeedDefaults.Set {
+			e.FieldStart("seedDefaults")
+			s.SeedDefaults.Encode(e)
+		}
+	}
 }
 
-var jsonFieldsNameOfCreateProjectRequest = [1]string{
+var jsonFieldsNameOfCreateProjectRequest = [2]string{
 	0: "previewOrigins",
+	1: "seedDefaults",
 }
 
 // Decode decodes CreateProjectRequest from json.
@@ -3712,6 +3719,7 @@ func (s *CreateProjectRequest) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode CreateProjectRequest to nil")
 	}
+	s.setDefaults()
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
@@ -3733,6 +3741,16 @@ func (s *CreateProjectRequest) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"previewOrigins\"")
+			}
+		case "seedDefaults":
+			if err := func() error {
+				s.SeedDefaults.Reset()
+				if err := s.SeedDefaults.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"seedDefaults\"")
 			}
 		default:
 			return d.Skip()
@@ -4029,8 +4047,10 @@ func (s CreateSchemaReq) encodeFields(e *jx.Encoder) {
 				e.Str("https://json-schema.org/draft/2020-12/schema")
 			}
 			{
-				e.FieldStart("$id")
-				json.EncodeURI(e, s.ID)
+				if s.ObjectType.Set {
+					e.FieldStart("objectType")
+					s.ObjectType.Encode(e)
+				}
 			}
 			{
 				e.FieldStart("metaSchema")
@@ -6306,14 +6326,12 @@ func (s *FlowDefinition) encodeFields(e *jx.Encoder) {
 		e.Str(s.Name)
 	}
 	{
-		if s.Status.Set {
-			e.FieldStart("status")
-			s.Status.Encode(e)
-		}
+		e.FieldStart("status")
+		s.Status.Encode(e)
 	}
 	{
 		e.FieldStart("user_schema")
-		json.EncodeURI(e, s.UserSchema)
+		e.Str(s.UserSchema)
 	}
 	{
 		e.FieldStart("purposes")
@@ -6350,7 +6368,6 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 		return errors.New("invalid: unable to decode FlowDefinition to nil")
 	}
 	var requiredBitSet [1]uint8
-	s.setDefaults()
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
@@ -6367,8 +6384,8 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"name\"")
 			}
 		case "status":
+			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
-				s.Status.Reset()
 				if err := s.Status.Decode(d); err != nil {
 					return err
 				}
@@ -6379,8 +6396,8 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 		case "user_schema":
 			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
-				v, err := json.DecodeURI(d)
-				s.UserSchema = v
+				v, err := d.Str()
+				s.UserSchema = string(v)
 				if err != nil {
 					return err
 				}
@@ -6436,7 +6453,7 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00101101,
+		0b00101111,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -6500,10 +6517,6 @@ func (s *FlowDefinitionDetailResponse) encodeFields(e *jx.Encoder) {
 		e.Str(s.ProjectID)
 	}
 	{
-		e.FieldStart("status")
-		s.Status.Encode(e)
-	}
-	{
 		e.FieldStart("flow_definition")
 		s.FlowDefinition.Encode(e)
 	}
@@ -6517,13 +6530,12 @@ func (s *FlowDefinitionDetailResponse) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowDefinitionDetailResponse = [6]string{
+var jsonFieldsNameOfFlowDefinitionDetailResponse = [5]string{
 	0: "id",
 	1: "project_id",
-	2: "status",
-	3: "flow_definition",
-	4: "created_at",
-	5: "updated_at",
+	2: "flow_definition",
+	3: "created_at",
+	4: "updated_at",
 }
 
 // Decode decodes FlowDefinitionDetailResponse from json.
@@ -6532,7 +6544,6 @@ func (s *FlowDefinitionDetailResponse) Decode(d *jx.Decoder) error {
 		return errors.New("invalid: unable to decode FlowDefinitionDetailResponse to nil")
 	}
 	var requiredBitSet [1]uint8
-	s.setDefaults()
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
@@ -6560,18 +6571,8 @@ func (s *FlowDefinitionDetailResponse) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"project_id\"")
 			}
-		case "status":
-			requiredBitSet[0] |= 1 << 2
-			if err := func() error {
-				if err := s.Status.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"status\"")
-			}
 		case "flow_definition":
-			requiredBitSet[0] |= 1 << 3
+			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
 				if err := s.FlowDefinition.Decode(d); err != nil {
 					return err
@@ -6581,7 +6582,7 @@ func (s *FlowDefinitionDetailResponse) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"flow_definition\"")
 			}
 		case "created_at":
-			requiredBitSet[0] |= 1 << 4
+			requiredBitSet[0] |= 1 << 3
 			if err := func() error {
 				v, err := json.DecodeDateTime(d)
 				s.CreatedAt = v
@@ -6593,7 +6594,7 @@ func (s *FlowDefinitionDetailResponse) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"created_at\"")
 			}
 		case "updated_at":
-			requiredBitSet[0] |= 1 << 5
+			requiredBitSet[0] |= 1 << 4
 			if err := func() error {
 				v, err := json.DecodeDateTime(d)
 				s.UpdatedAt = v
@@ -6614,7 +6615,7 @@ func (s *FlowDefinitionDetailResponse) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00111111,
+		0b00011111,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -6907,7 +6908,6 @@ func (s *FlowDefinitionResponse) Decode(d *jx.Decoder) error {
 		return errors.New("invalid: unable to decode FlowDefinitionResponse to nil")
 	}
 	var requiredBitSet [1]uint8
-	s.setDefaults()
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
@@ -8734,6 +8734,8 @@ func (s *FlowStepChallengeMethod) Decode(d *jx.Decoder) error {
 	switch FlowStepChallengeMethod(v) {
 	case FlowStepChallengeMethodPasskey:
 		*s = FlowStepChallengeMethodPasskey
+	case FlowStepChallengeMethodPasskeyRegister:
+		*s = FlowStepChallengeMethodPasskeyRegister
 	default:
 		*s = FlowStepChallengeMethod(v)
 	}
@@ -10205,8 +10207,10 @@ func (s GetSchemaByIdOK) encodeFields(e *jx.Encoder) {
 				e.Str("https://json-schema.org/draft/2020-12/schema")
 			}
 			{
-				e.FieldStart("$id")
-				json.EncodeURI(e, s.ID)
+				if s.ObjectType.Set {
+					e.FieldStart("objectType")
+					s.ObjectType.Encode(e)
+				}
 			}
 			{
 				e.FieldStart("metaSchema")
@@ -12581,6 +12585,169 @@ func (s *KeysResponseKeysItem) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes ListSchemasResponse as json.
+func (s ListSchemasResponse) Encode(e *jx.Encoder) {
+	unwrapped := []ListSchemasResponseItem(s)
+
+	e.ArrStart()
+	for _, elem := range unwrapped {
+		elem.Encode(e)
+	}
+	e.ArrEnd()
+}
+
+// Decode decodes ListSchemasResponse from json.
+func (s *ListSchemasResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListSchemasResponse to nil")
+	}
+	var unwrapped []ListSchemasResponseItem
+	if err := func() error {
+		unwrapped = make([]ListSchemasResponseItem, 0)
+		if err := d.Arr(func(d *jx.Decoder) error {
+			var elem ListSchemasResponseItem
+			if err := elem.Decode(d); err != nil {
+				return err
+			}
+			unwrapped = append(unwrapped, elem)
+			return nil
+		}); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = ListSchemasResponse(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ListSchemasResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListSchemasResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *ListSchemasResponseItem) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *ListSchemasResponseItem) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		e.Str(s.ID)
+	}
+	{
+		e.FieldStart("createdAt")
+		json.EncodeDateTime(e, s.CreatedAt)
+	}
+}
+
+var jsonFieldsNameOfListSchemasResponseItem = [2]string{
+	0: "id",
+	1: "createdAt",
+}
+
+// Decode decodes ListSchemasResponseItem from json.
+func (s *ListSchemasResponseItem) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListSchemasResponseItem to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.ID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "createdAt":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"createdAt\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ListSchemasResponseItem")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfListSchemasResponseItem) {
+					name = jsonFieldsNameOfListSchemasResponseItem[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ListSchemasResponseItem) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListSchemasResponseItem) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes ListSessionsBadRequest as json.
 func (s *ListSessionsBadRequest) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
@@ -14706,39 +14873,6 @@ func (s OptFlowAudience) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptFlowAudience) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes FlowDefinitionStatus as json.
-func (o OptFlowDefinitionStatus) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	e.Str(string(o.Value))
-}
-
-// Decode decodes FlowDefinitionStatus from json.
-func (o *OptFlowDefinitionStatus) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptFlowDefinitionStatus to nil")
-	}
-	o.Set = true
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptFlowDefinitionStatus) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptFlowDefinitionStatus) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -20155,8 +20289,10 @@ func (s *UserSchema) encodeFields(e *jx.Encoder) {
 		e.Str("https://json-schema.org/draft/2020-12/schema")
 	}
 	{
-		e.FieldStart("$id")
-		json.EncodeURI(e, s.ID)
+		if s.ObjectType.Set {
+			e.FieldStart("objectType")
+			s.ObjectType.Encode(e)
+		}
 	}
 	{
 		e.FieldStart("kind")
@@ -20187,7 +20323,7 @@ func (s *UserSchema) encodeFields(e *jx.Encoder) {
 
 var jsonFieldsNameOfUserSchema = [6]string{
 	0: "$schema",
-	1: "$id",
+	1: "objectType",
 	2: "kind",
 	3: "metaSchema",
 	4: "x-auth-methods",
@@ -20214,17 +20350,15 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"$schema\"")
 			}
-		case "$id":
-			requiredBitSet[0] |= 1 << 1
+		case "objectType":
 			if err := func() error {
-				v, err := json.DecodeURI(d)
-				s.ID = v
-				if err != nil {
+				s.ObjectType.Reset()
+				if err := s.ObjectType.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"$id\"")
+				return errors.Wrap(err, "decode field \"objectType\"")
 			}
 		case "kind":
 			requiredBitSet[0] |= 1 << 2
@@ -20291,7 +20425,7 @@ func (s *UserSchema) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00011110,
+		0b00011100,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.

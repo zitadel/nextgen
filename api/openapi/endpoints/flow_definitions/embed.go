@@ -2,7 +2,6 @@
 package flow_definitions
 
 import (
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -10,21 +9,24 @@ import (
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	configdefaults "github.com/zitadel/nextgen/packages/config/defaults"
 )
 
-//go:embed examples/default-login-flow-definition.json
-var defaultLoginFlowDefinition []byte
-
 func DefaultLoginFlowDefinitions(serverURL string, projectID string, userSchemaURL string) ([]*domain.FlowDefinition, error) {
-	bss := [][]byte{defaultLoginFlowDefinition}
+	bss := [][]byte{configdefaults.DefaultLoginFlowDefinition()}
 
 	defs := make([]*domain.FlowDefinition, len(bss))
 
 	for i, bs := range bss {
 		jscontent := string(bs)
-		jscontent = strings.ReplaceAll(jscontent, "${PROJECT_ID}", projectID)
 		jscontent = strings.ReplaceAll(jscontent, "${SERVER_URL}", serverURL)
 		jscontent = strings.ReplaceAll(jscontent, "${USER_SCHEMA_URL}", userSchemaURL)
+		jscontent = fmt.Sprintf(
+			`{"project_id":%q,"schema_uri":%q,"flow_definition":%s}`,
+			projectID,
+			configdefaults.DefaultFlowSchemaURI,
+			jscontent,
+		)
 
 		req := &api.CreateFlowDefinitionRequest{}
 		err := req.UnmarshalJSON([]byte(jscontent))
@@ -46,19 +48,24 @@ func DefaultLoginFlowDefinitions(serverURL string, projectID string, userSchemaU
 			return nil, err
 		}
 
+		status, err := domain.FlowDefinitionStatusString(string(req.FlowDefinition.GetStatus()))
+		if err != nil {
+			return nil, domain.ErrFlowDefinitionInvalid("invalid status", err)
+		}
+
 		defs[i], err = domain.NewFlowDefinition(
 			"",
 			projectID,
 			req.FlowDefinition.GetName(),
 			new(url.URL(req.GetSchemaURI().Value)).String(),
-			new(req.FlowDefinition.GetUserSchema()).String(),
+			req.FlowDefinition.GetUserSchema(),
 			purposes,
 			domain.FlowDefinitionAudience{
 				AppIDs:  req.FlowDefinition.GetAudience().Value.AppIds,
 				TeamIDs: req.FlowDefinition.GetAudience().Value.TeamIds,
 			},
 			steps,
-			domain.FlowDefinitionStatusActive,
+			status,
 		)
 	}
 

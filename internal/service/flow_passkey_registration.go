@@ -26,9 +26,10 @@ func (a *FlowPasskeyRegistrationAdapter) IssuePasskeyRegistrationChallenge(ctx c
 	out, err := a.svc.Begin(ctx, BeginRegistrationInput{
 		ProjectID:        in.ProjectID,
 		UserID:           in.UserID,
+		Username:         in.Username,
+		DisplayName:      in.DisplayName,
 		RPID:             in.RPID,
 		RPOrigins:        in.RPOrigins,
-		Username:         in.Username,
 		UserVerification: in.UserVerification,
 	})
 	if err != nil {

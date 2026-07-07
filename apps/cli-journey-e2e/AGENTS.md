@@ -17,19 +17,23 @@ generated app. It must not test the checked-in demo apps.
 - Use `moon run release:pack` when producing workspace tarballs; it stages the
   server platform binaries, packs all public packages, and verifies resolved
   package metadata.
+- CI may pass prebuilt release snapshot tarballs to the journey runner with
+  `--tarballs-dir`; that path must skip rebuilding and still verify/publish the
+  provided tarballs through Verdaccio.
 - CI must install Zitadel packages from current workflow tarballs through the
   temporary Verdaccio registry, not from public npm.
 - CI must run `npx @zitadel/cli@alpha doctor --runtime binary`,
   `start --runtime binary`, and
-  `setup --framework <next|nuxt|react|vue|angular> --server local` from the
-  fresh app directory with `--non-interactive --json`.
+  `setup --framework <next|nuxt|react|vue|angular|solid|svelte|qwik> --server local`
+  from the fresh app directory with `--non-interactive --json`.
 - Docker fallback coverage must opt in with `--runtime docker --image <tag>`.
 - Pack and upload only the public packages:
   `@zitadel/cli`, `@zitadel/server`, the `@zitadel/server-*` platform
-  packages, `@zitadel/api`, `@zitadel/components`, `@zitadel/sdk-core`,
+  packages, `@zitadel/api`, `@zitadel/config`, `@zitadel/components`, `@zitadel/sdk-core`,
   `@zitadel/sdk-next`, `@zitadel/sdk-nuxt`, `@zitadel/sdk-react`,
-  `@zitadel/sdk-vue`, and `@zitadel/sdk-angular`. Private support packages
-  must stay out of the artifact set.
+  `@zitadel/sdk-vue`, `@zitadel/sdk-angular`, `@zitadel/sdk-solid`,
+  `@zitadel/sdk-svelte`, and `@zitadel/sdk-qwik`. Private support packages must
+  stay out of the artifact set.
 - Keep the generated app on `localhost` for browser tests. WebAuthn rejects IP
   address relying-party IDs such as `127.0.0.1`.
 - Keep each framework suite Playwright-serial and one-worker. Framework suites

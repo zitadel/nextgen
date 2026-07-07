@@ -44,13 +44,25 @@ jobs:
         id: ci-mode
         run: node scripts/ci-mode.mjs "${{ github.event.pull_request.base.sha || 'origin/main' }}"
 
+      - name: Check Go generated files
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: moon run server:check-generate
+
       - name: Run Moon build and test graph
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: moon ci :lint :typecheck :build :test
 
-      - name: Run Go checks
+      - name: Run Go tests
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: moon run server:test
+
+      - name: Run Go integration tests (postgres)
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: moon run server:test-postgres
+
+      # Spanner integration tests are not run in CI yet: the v2 spanner statement
+      # layer is unimplemented (see zitadel/nextgen#457). Re-enable via
+      # `moon run server:test-spanner` once that lands.
 
       - name: Build release snapshot without container
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
@@ -58,7 +70,13 @@ jobs:
 
       - name: Run binary fresh-app journey
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- --runtime binary --concurrency 1 --work-dir "${RUNNER_TEMP}/ci-journey"
+        run: |
+          version="$(node -p "require('./apps/server/package.json').version")"
+          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- \
+            --runtime binary \
+            --concurrency 5 \
+            --work-dir "${RUNNER_TEMP}/ci-journey" \
+            --tarballs-dir "dist/release/${version}/npm"
 
       - name: Validate version PR
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}

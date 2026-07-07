@@ -378,6 +378,9 @@ importers:
       '@zitadel/api':
         specifier: workspace:*
         version: link:../../packages/api
+      '@zitadel/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@zitadel/server':
         specifier: workspace:*
         version: link:../server
@@ -445,6 +448,9 @@ importers:
       '@tanstack/react-router-devtools':
         specifier: 'catalog:'
         version: 1.166.13(@tanstack/react-router@1.168.23(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/router-core@1.168.15)(csstype@3.2.3)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../../packages/api
       '@zitadel/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens
@@ -497,6 +503,9 @@ importers:
       jsdom:
         specifier: 'catalog:'
         version: 29.0.2
+      msw:
+        specifier: 'catalog:'
+        version: 2.14.6(@types/node@25.6.0)(typescript@6.0.3)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -888,6 +897,9 @@ importers:
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.100.6(react@19.2.5)
+      zod:
+        specifier: 'catalog:'
+        version: 4.3.6
     devDependencies:
       '@faker-js/faker':
         specifier: 'catalog:'
@@ -904,9 +916,6 @@ importers:
       tslib:
         specifier: 'catalog:'
         version: 2.8.1
-      zod:
-        specifier: 'catalog:'
-        version: 4.3.6
 
   packages/api-mock:
     dependencies:
@@ -916,6 +925,9 @@ importers:
       '@zitadel/api':
         specifier: workspace:*
         version: link:../api
+      '@zitadel/config':
+        specifier: workspace:*
+        version: link:../config
       cookie-parser:
         specifier: 'catalog:'
         version: 1.4.7
@@ -1011,6 +1023,22 @@ importers:
       tslib:
         specifier: 'catalog:'
         version: 2.8.1
+
+  packages/config:
+    dependencies:
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../api
+    devDependencies:
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.21.10(@tsdown/css@0.21.10)(@typescript/native-preview@7.0.0-dev.20260421.2)(oxc-resolver@11.20.0)(synckit@0.11.12)(typescript@6.0.3)(vue-tsc@3.2.8(typescript@6.0.3))
+      tslib:
+        specifier: 'catalog:'
+        version: 2.8.1
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.7(@opentelemetry/api@1.9.1)(@types/node@25.6.0)(@vitest/browser-playwright@4.1.7)(jsdom@29.0.2)(msw@2.14.6(@types/node@25.6.0)(typescript@6.0.3))(vite@8.0.16(@types/node@25.6.0)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(sass@1.100.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.9.0))
 
   packages/design-tokens:
     devDependencies:

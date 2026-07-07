@@ -17,6 +17,7 @@ type CreateUserInput struct {
 	ProjectID string
 	TeamID    *string
 	User      map[string]any
+	ID        string
 }
 
 type UserAction interface {
@@ -167,7 +168,7 @@ func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]by
 	return userbs, nil
 }
 
-// ---- CreateUser opts -------------------------------------------------------------
+// ---- Create User ACTION -------------------------------------------------------------
 
 type CreateUserAction struct {
 	CreateUserInput
@@ -175,7 +176,7 @@ type CreateUserAction struct {
 	userRepo   domain.UserRepository
 	schemaRepo domain.JSONSchemaRepository
 
-	createUser *domain.CreateUser
+	CreateUser *domain.CreateUser
 }
 
 func NewCreateUserAction(input CreateUserInput, userRepo domain.UserRepository, schemaRepo domain.JSONSchemaRepository) *CreateUserAction {
@@ -200,16 +201,17 @@ func (o *CreateUserAction) Prepare(ctx context.Context, db database.QueryExecuto
 		return domain.ErrInternal(err).WithMessage("failed to get schema from database")
 	}
 
-	o.createUser, err = domain.NewCreateUser(o.ProjectID, o.TeamID, schemaEntity.Schema, o.User)
+	o.CreateUser, err = domain.NewCreateUser(o.ProjectID, o.TeamID, o.ID, schemaEntity.Schema, o.User)
 	if err != nil {
 		return err
 	}
 
-	o.User["id"] = o.createUser.ID
+	o.User["id"] = o.CreateUser.ID
 	return nil
 }
+
 func (o *CreateUserAction) Apply(ctx context.Context, db database.QueryExecutor) error {
-	err := o.userRepo.Create(ctx, db, o.createUser)
+	err := o.userRepo.Create(ctx, db, o.CreateUser)
 	if err != nil {
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
 			return domain.ErrUserAlreadyExists().WithParent(err)
@@ -219,6 +221,8 @@ func (o *CreateUserAction) Apply(ctx context.Context, db database.QueryExecutor)
 
 	return nil
 }
+
+// ---- Set Password ACTION -------------------------------------------------------------
 
 type SetPasswordUserAction struct {
 	SetPasswordInput
@@ -255,4 +259,53 @@ func (o *SetPasswordUserAction) Apply(ctx context.Context, db database.QueryExec
 		return domain.ErrInternal(err).WithMessage("failed to set password")
 	}
 	return nil
+}
+
+// ---- Lazy ACTION -------------------------------------------------------------
+
+type UserActionFactory = func(ctx context.Context, db database.QueryExecutor) (UserAction, error)
+
+// LazyUserAction allows for lazy initialization of a user-action. It forwards
+// the `Prepare` and `Apply` methods to the generated action. The UserAction is
+// only right before it is used in those functions.
+//
+// This action can be wrapped around an action when the wrapped action requires
+// an output of a previous action. It can then use a clojure to get the data
+// from the other action.
+type LazyUserAction struct {
+	factory UserActionFactory
+	action  UserAction
+}
+
+func NewLazyUserAction(factory UserActionFactory) *LazyUserAction {
+	return &LazyUserAction{
+		factory: factory,
+	}
+}
+
+func (o *LazyUserAction) Prepare(ctx context.Context, db database.QueryExecutor) (err error) {
+	action, err := o.Action(ctx, db)
+	if err != nil {
+		return err
+	}
+	return action.Prepare(ctx, db)
+}
+
+func (o *LazyUserAction) Apply(ctx context.Context, db database.QueryExecutor) error {
+	action, err := o.Action(ctx, db)
+	if err != nil {
+		return err
+	}
+	return action.Apply(ctx, db)
+}
+
+func (o *LazyUserAction) Action(ctx context.Context, db database.QueryExecutor) (UserAction, error) {
+	if o.action == nil {
+		action, err := o.factory(ctx, db)
+		if err != nil {
+			return nil, err
+		}
+		o.action = action
+	}
+	return o.action, nil
 }
