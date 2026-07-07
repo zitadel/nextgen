@@ -24,22 +24,24 @@ tasks:
       - "dist/**/*"
 
   build-release:
-    command: "corepack pnpm run build"
+    script: |
+      node ../../scripts/release-clean.mjs local-dist
+      corepack pnpm run build
     deps:
+      - "build"
       - "api:build-release"
     outputs:
       - "dist/**/*"
     options:
       cache: false
-      # Release builds rewrite the same dist/ that dev builds produce and
-      # consumer tasks read. They are excluded from `moon ci` (the
-      # release:snapshot workflow step builds them afterwards, serially)
-      # so a release clean step can never wipe a dist mid-consumption.
+      # Release builds remove stale package output and rebuild dist inside one
+      # mutex-held task. They stay out of `moon ci`; release:snapshot invokes
+      # them in the later release step instead of the normal build/test graph.
       runInCI: false
       # cli:test drives the built oclif CLI, whose commands import
       # @zitadel/config/defaults from this package's dist at runtime. The
-      # shared mutex keeps this release build (whose tsdown clean step
-      # rewrites dist/) from running while those tests are importing it.
+      # shared mutex keeps this release build and its preclean from running
+      # while those tests are importing it.
       # A task dep on cli:test is not possible: cli dependsOn config, so
       # the reverse edge would cycle the project graph.
       mutex: "public-dist"

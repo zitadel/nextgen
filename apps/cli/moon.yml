@@ -39,17 +39,15 @@ tasks:
       - "dist/**/*"
 
   build-release:
-    command: "corepack pnpm run build"
+    script: |
+      node ../../scripts/release-clean.mjs local-dist
+      corepack pnpm run build
     env:
       ZITADEL_TELEMETRY_BUILD_CHANNEL: "production"
     deps:
+      - "test"
       - "api:build-release"
       - "sdk-next:build-release"
-      # Vitest drives oclif from apps/cli/dist. Run it before the production
-      # build, whose tsdown clean step rewrites that same directory. This dep
-      # also orders every writer of apps/cli/dist (build < test < build-release),
-      # so the cli dist needs no mutex of its own.
-      - "test"
     inputs:
       - "**/*"
       - "$ZITADEL_TELEMETRY_BUILD_CHANNEL"
@@ -57,10 +55,9 @@ tasks:
       - "dist/**/*"
     options:
       cache: false
-      # Release builds rewrite the same dist/ that dev builds produce and
-      # consumer tasks read. They are excluded from `moon ci` (the
-      # release:snapshot workflow step builds them afterwards, serially)
-      # so a release clean step can never wipe a dist mid-consumption.
+      # Release builds remove stale package output and rebuild dist after
+      # cli:test has finished using the dev build. They stay out of `moon ci`;
+      # release:snapshot invokes them in the later release step instead.
       runInCI: false
 
   test:
