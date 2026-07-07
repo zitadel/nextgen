@@ -198,6 +198,7 @@ Every error response is the ogen-generated `api.ErrorDetails` (`api/openapi/comp
 - Status mapping stays in `internal/api/*_errorResponse` functions, keyed by `err.Code`.
 - Prefix-based routing in `errorResponse` chooses the mapper; unknown codes under a prefix become `internal` (500).
 - `internal` responses use the generic domain message regardless of `Parent` content.
+- **HTTP semantics stay in the API layer.** Do not add an `ErrorClass` (or similar) to `domain.Error` — specific codes exist precisely so the same logical failure (for example not-found during auth) need not always map to 404. Follow-up: deduplicate the repetitive per-resource `switch`es via a shared helper, suffix conventions for the common cases, or a central `code → status` table/manifest in `internal/api` only (with explicit overrides for auth/opaque cases).
 
 #### Messages
 
@@ -367,6 +368,7 @@ The canonical mapper (`domainErrorDetails` → only `Code` + `Message`) is clean
 | Shared storage error detection helpers | Storage / service | #48 |
 | Selective API `details` population | API | #367 |
 | Align `WithLogging`: 4xx at `Info`/`Warn`, stop logging raw response bodies | API / instrumentation | #367 |
+| Deduplicate API `code → HTTP status` mapping (helper / manifest in `internal/api`; no `ErrorClass` on domain) | API | #367 |
 | Schema-declared attribute sensitivity; audit no secret/PII in path/query params | API / domain | #367 |
 
 ## References
