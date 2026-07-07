@@ -47,6 +47,9 @@ tasks:
     deps:
       - "api:build-release"
       - "sdk-next:build-release"
+      # Vitest drives oclif from apps/cli/dist. Run it before the production
+      # build, whose tsdown clean step rewrites that same directory.
+      - "test"
     inputs:
       - "**/*"
       - "$ZITADEL_TELEMETRY_BUILD_CHANNEL"
