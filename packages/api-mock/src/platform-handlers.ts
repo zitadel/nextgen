@@ -414,8 +414,10 @@ export function setupPlatformHandlers() {
         return query.response;
       }
 
+      // Scoped by (project_id, id) like the real repository (GetByID takes
+      // both); a schema belonging to another project reads as absent.
       const record = store.schemas.get(schemaID(path.data.id));
-      if (!record) {
+      if (!record || record.projectId !== query.data.project_id) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
       return HttpResponse.json(record.body);
@@ -431,10 +433,13 @@ export function setupPlatformHandlers() {
         return query.response;
       }
 
-      const existed = store.schemas.delete(schemaID(path.data.id));
-      if (!existed) {
+      // Same project scoping as GET: never delete another project's schema.
+      const key = schemaID(path.data.id);
+      const record = store.schemas.get(key);
+      if (!record || record.projectId !== query.data.project_id) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
+      store.schemas.delete(key);
       return new HttpResponse(null, { status: 204 });
     }),
 
