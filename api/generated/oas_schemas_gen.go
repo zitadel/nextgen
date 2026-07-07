@@ -2878,6 +2878,124 @@ func (s *FilterOperation) UnmarshalText(data []byte) error {
 	}
 }
 
+// The value to filter by.
+// Ref: #
+// FilterValue represents sum type.
+type FilterValue struct {
+	Type    FilterValueType // switch on this field
+	String  string
+	Float64 float64
+	Bool    bool
+	Null    struct{}
+}
+
+// FilterValueType is oneOf type of FilterValue.
+type FilterValueType string
+
+// Possible values for FilterValueType.
+const (
+	StringFilterValue  FilterValueType = "string"
+	Float64FilterValue FilterValueType = "float64"
+	BoolFilterValue    FilterValueType = "bool"
+	NullFilterValue    FilterValueType = "struct{}"
+)
+
+// IsString reports whether FilterValue is string.
+func (s FilterValue) IsString() bool { return s.Type == StringFilterValue }
+
+// IsFloat64 reports whether FilterValue is float64.
+func (s FilterValue) IsFloat64() bool { return s.Type == Float64FilterValue }
+
+// IsBool reports whether FilterValue is bool.
+func (s FilterValue) IsBool() bool { return s.Type == BoolFilterValue }
+
+// IsNull reports whether FilterValue is struct{}.
+func (s FilterValue) IsNull() bool { return s.Type == NullFilterValue }
+
+// SetString sets FilterValue to string.
+func (s *FilterValue) SetString(v string) {
+	s.Type = StringFilterValue
+	s.String = v
+}
+
+// GetString returns string and true boolean if FilterValue is string.
+func (s FilterValue) GetString() (v string, ok bool) {
+	if !s.IsString() {
+		return v, false
+	}
+	return s.String, true
+}
+
+// NewStringFilterValue returns new FilterValue from string.
+func NewStringFilterValue(v string) FilterValue {
+	var s FilterValue
+	s.SetString(v)
+	return s
+}
+
+// SetFloat64 sets FilterValue to float64.
+func (s *FilterValue) SetFloat64(v float64) {
+	s.Type = Float64FilterValue
+	s.Float64 = v
+}
+
+// GetFloat64 returns float64 and true boolean if FilterValue is float64.
+func (s FilterValue) GetFloat64() (v float64, ok bool) {
+	if !s.IsFloat64() {
+		return v, false
+	}
+	return s.Float64, true
+}
+
+// NewFloat64FilterValue returns new FilterValue from float64.
+func NewFloat64FilterValue(v float64) FilterValue {
+	var s FilterValue
+	s.SetFloat64(v)
+	return s
+}
+
+// SetBool sets FilterValue to bool.
+func (s *FilterValue) SetBool(v bool) {
+	s.Type = BoolFilterValue
+	s.Bool = v
+}
+
+// GetBool returns bool and true boolean if FilterValue is bool.
+func (s FilterValue) GetBool() (v bool, ok bool) {
+	if !s.IsBool() {
+		return v, false
+	}
+	return s.Bool, true
+}
+
+// NewBoolFilterValue returns new FilterValue from bool.
+func NewBoolFilterValue(v bool) FilterValue {
+	var s FilterValue
+	s.SetBool(v)
+	return s
+}
+
+// SetNull sets FilterValue to struct{}.
+func (s *FilterValue) SetNull(v struct{}) {
+	s.Type = NullFilterValue
+	s.Null = v
+}
+
+// GetNull returns struct{} and true boolean if FilterValue is struct{}.
+func (s FilterValue) GetNull() (v struct{}, ok bool) {
+	if !s.IsNull() {
+		return v, false
+	}
+	return s.Null, true
+}
+
+// NewNullFilterValue returns new FilterValue from struct{}.
+func NewNullFilterValue(v struct{}) FilterValue {
+	var s FilterValue
+	s.SetNull(v)
+	return s
+}
+
 // Scopes which teams or apps this flow definition applies to. Empty or
 // omitted fields mean "no restriction"; when both are empty the definition
 // matches every request in the project. The engine picks the most specific
@@ -7543,6 +7661,52 @@ func (o OptFieldValidationFormat) Or(d FieldValidationFormat) FieldValidationFor
 	return d
 }
 
+// NewOptFilterValue returns new OptFilterValue with value set to v.
+func NewOptFilterValue(v FilterValue) OptFilterValue {
+	return OptFilterValue{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFilterValue is optional FilterValue.
+type OptFilterValue struct {
+	Value FilterValue
+	Set   bool
+}
+
+// IsSet returns true if OptFilterValue was set.
+func (o OptFilterValue) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFilterValue) Reset() {
+	var v FilterValue
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFilterValue) SetTo(v FilterValue) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFilterValue) Get() (v FilterValue, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFilterValue) Or(d FilterValue) FilterValue {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptFlowAudience returns new OptFlowAudience with value set to v.
 func NewOptFlowAudience(v FlowAudience) OptFlowAudience {
 	return OptFlowAudience{
@@ -10424,9 +10588,8 @@ func (s *QueryProjectsRequest) SetFilter(val []QueryProjectsRequestFilterItem) {
 
 type QueryProjectsRequestFilterItem struct {
 	// The field to filter by.
-	Field FilterField `json:"field"`
-	// The value to filter by.
-	Value     string          `json:"value"`
+	Field     FilterField     `json:"field"`
+	Value     OptFilterValue  `json:"value"`
 	Operation FilterOperation `json:"operation"`
 }
 
@@ -10436,7 +10599,7 @@ func (s *QueryProjectsRequestFilterItem) GetField() FilterField {
 }
 
 // GetValue returns the value of Value.
-func (s *QueryProjectsRequestFilterItem) GetValue() string {
+func (s *QueryProjectsRequestFilterItem) GetValue() OptFilterValue {
 	return s.Value
 }
 
@@ -10451,7 +10614,7 @@ func (s *QueryProjectsRequestFilterItem) SetField(val FilterField) {
 }
 
 // SetValue sets the value of Value.
-func (s *QueryProjectsRequestFilterItem) SetValue(val string) {
+func (s *QueryProjectsRequestFilterItem) SetValue(val OptFilterValue) {
 	s.Value = val
 }
 

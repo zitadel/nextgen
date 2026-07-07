@@ -1,0 +1,6 @@
+description: The value to filter by.
+oneOf:
+  - type: string
+  - type: number
+  - type: boolean
+  - type: 'null'

@@ -6347,6 +6347,73 @@ func (s *FilterOperation) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes FilterValue as json.
+func (s FilterValue) Encode(e *jx.Encoder) {
+	switch s.Type {
+	case StringFilterValue:
+		e.Str(s.String)
+	case Float64FilterValue:
+		e.Float64(s.Float64)
+	case BoolFilterValue:
+		e.Bool(s.Bool)
+	case NullFilterValue:
+		_ = s.Null
+		e.Null()
+	}
+}
+
+// Decode decodes FilterValue from json.
+func (s *FilterValue) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FilterValue to nil")
+	}
+	// Sum type type_discriminator.
+	switch t := d.Next(); t {
+	case jx.Bool:
+		v, err := d.Bool()
+		s.Bool = bool(v)
+		if err != nil {
+			return err
+		}
+		s.Type = BoolFilterValue
+	case jx.Null:
+		if err := d.Null(); err != nil {
+			return err
+		}
+		s.Type = NullFilterValue
+	case jx.Number:
+		v, err := d.Float64()
+		s.Float64 = float64(v)
+		if err != nil {
+			return err
+		}
+		s.Type = Float64FilterValue
+	case jx.String:
+		v, err := d.Str()
+		s.String = string(v)
+		if err != nil {
+			return err
+		}
+		s.Type = StringFilterValue
+	default:
+		return errors.Errorf("unexpected json type %q", t)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s FilterValue) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FilterValue) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode implements json.Marshaler.
 func (s *FlowAudience) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -15072,6 +15139,39 @@ func (s *OptFieldValidationFormat) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes FilterValue as json.
+func (o OptFilterValue) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes FilterValue from json.
+func (o *OptFilterValue) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptFilterValue to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptFilterValue) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptFilterValue) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes FlowAudience as json.
 func (o OptFlowAudience) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -18153,8 +18253,10 @@ func (s *QueryProjectsRequestFilterItem) encodeFields(e *jx.Encoder) {
 		s.Field.Encode(e)
 	}
 	{
-		e.FieldStart("value")
-		e.Str(s.Value)
+		if s.Value.Set {
+			e.FieldStart("value")
+			s.Value.Encode(e)
+		}
 	}
 	{
 		e.FieldStart("operation")
@@ -18188,11 +18290,9 @@ func (s *QueryProjectsRequestFilterItem) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"field\"")
 			}
 		case "value":
-			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
-				v, err := d.Str()
-				s.Value = string(v)
-				if err != nil {
+				s.Value.Reset()
+				if err := s.Value.Decode(d); err != nil {
 					return err
 				}
 				return nil
@@ -18219,7 +18319,7 @@ func (s *QueryProjectsRequestFilterItem) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000111,
+		0b00000101,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.

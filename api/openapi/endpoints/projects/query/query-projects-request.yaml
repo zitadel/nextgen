@@ -29,14 +29,12 @@ properties:
       type: object
       required:
         - field
-        - value
         - operation
       properties:
         field:
           $ref: filter-field.yaml
           description: The field to filter by.
         value:
-          type: string
-          description: The value to filter by.
+          $ref: ../../../components/schemas/filter-value.yaml
         operation:
           $ref: ../../../components/schemas/filter-operation.yaml
