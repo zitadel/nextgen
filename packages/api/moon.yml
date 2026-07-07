@@ -38,6 +38,11 @@ tasks:
       - "dist/**/*"
     options:
       cache: false
+      # Release builds rewrite the same dist/ that dev builds produce and
+      # consumer tasks read. They are excluded from `moon ci` (the
+      # release:snapshot workflow step builds them afterwards, serially)
+      # so a release clean step can never wipe a dist mid-consumption.
+      runInCI: false
       # cli:test drives the built oclif CLI, whose commands import this
       # package's dist at runtime. The shared mutex keeps this release build
       # (whose clean step rewrites dist/) from running while those tests are

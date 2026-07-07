@@ -43,6 +43,11 @@ tasks:
       - "dist/**/*"
     options:
       cache: false
+      # Release builds rewrite the same dist/ that dev builds produce and
+      # consumer tasks read. They are excluded from `moon ci` (the
+      # release:snapshot workflow step builds them afterwards, serially)
+      # so a release clean step can never wipe a dist mid-consumption.
+      runInCI: false
       # build-release cleans the same dist/ that demo-nuxt:build resolves
       # modules from; the mutex keeps the two from overlapping in the full
       # CI graph.
