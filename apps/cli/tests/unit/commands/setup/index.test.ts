@@ -227,7 +227,12 @@ describe("setup command pre-flight", () => {
       name: expect.any(String),
       previewOrigins: expect.arrayContaining([expect.any(String)]),
     });
-    expect((capture.body?.name as string).trim().length).toBeGreaterThan(0);
+    const projectName = capture.body?.name;
+    expect(typeof projectName).toBe("string");
+    if (typeof projectName !== "string") {
+      throw new Error("expected create-project payload name to be a string");
+    }
+    expect(projectName.trim().length).toBeGreaterThan(0);
   });
 });
 
