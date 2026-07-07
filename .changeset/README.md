@@ -10,6 +10,8 @@ The public `@zitadel/*` packages are the `fixed` group in
 [`.changeset/config.json`](config.json). Other workspaces do not publish, and
 `AGENTS.md` files under publishable roots do not need a changeset on their own.
 
+`packages/config/` publishes `@zitadel/config` and is part of that fixed group.
+
 ## When a change needs a changeset
 
 A change needs a changeset if it changes what the shipped product does —

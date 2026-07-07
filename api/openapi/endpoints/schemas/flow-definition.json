@@ -22,11 +22,10 @@
     },
     "user_schema": {
       "type": "string",
-      "format": "uri",
       "examples": [
-        "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml"
+        "sch_01KWHF18816ZQESRCS7Z2STJ05"
       ],
-      "description": "URL of the user schema this flow operates on. Step `fields` reference property names defined in that schema; the engine resolves field type, validation, and implicit transition outcomes from the schema's `x-*` annotations at runtime. URLs follow the same publishing convention as this document."
+      "description": "Server-assigned identifier of the user schema this flow operates on, as returned by `POST /schemas`. Opaque to the client — the shape is a server implementation detail. Step `fields` reference property names defined in that schema; the engine resolves field type, validation, and implicit transition outcomes from the schema's `x-*` annotations at runtime."
     },
     "purposes": {
       "type": "object",

@@ -1,19 +1,22 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/")({ component: Home });
+import { PageHeader } from "../components/resource-page";
 
-function Home() {
+export const Route = createFileRoute("/")({
+  staticData: { nav: { label: "Dashboard", order: 0 } },
+  component: Dashboard,
+});
+
+function Dashboard() {
   return (
-    <section className="console-welcome">
-      <h2>Console</h2>
-      <p>
-        The Zitadel console is where users manage their account and settings. This shell is the
-        starting point for that app.
+    <>
+      <PageHeader
+        title="Dashboard"
+        description="Manage identities and configuration for your Zitadel project."
+      />
+      <p className="text-sm text-zl-text-secondary-gray">
+        Select a resource from the sidebar to get started.
       </p>
-      <p className="console-welcome__hint">
-        Component development and review now live in Storybook (<code>moon run storybook:dev</code>
-        ).
-      </p>
-    </section>
+    </>
   );
 }

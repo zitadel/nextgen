@@ -30,17 +30,14 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	testServer := harness.EnsureTestServer(t)
 
 	// --- Seed project ---------------------------------------------------------
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 	require.NoError(t, err)
 
 	// Create the user schema so the resolver can look it up from the DB.  The
 	// schema's $id becomes the URL that the flow definition references.
 	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
-	userSchemaURL, err := url.Parse(
-		"https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
-	)
-	require.NoError(t, err)
+	userSchemaURL := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 
 	// --- Virtual authenticator ------------------------------------------------
 	// The RP origin / id are derived from the test-server URL exactly as the
@@ -76,7 +73,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	userRepo := harness.EnsureUserRepo(t)
 	require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
 		ProjectID:  project.ID,
-		SchemaURL:  userSchemaURL.String(),
+		SchemaURL:  userSchemaURL,
 		ID:         userID,
 		TeamID:     &team.ID,
 		Attributes: []*domain.CreateAttribute{emailAttr},
@@ -103,7 +100,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		FlowDefinition: api.FlowDefinition{
 			Name:       "passkey-login",
 			Status:     "active",
-			UserSchema: *userSchemaURL,
+			UserSchema: userSchemaURL,
 			Purposes:   api.FlowDefinitionPurposes{"login": "passkey-step"},
 			Steps: []api.FlowDefinitionStep{
 				{

@@ -30,10 +30,15 @@ tasks:
       - "sdk-core:build"
     outputs:
       - "dist/**/*"
+    options:
+      mutex: "sdk-nuxt-dist"
 
   build-release:
-    command: "corepack pnpm run build"
+    script: |
+      node ../../scripts/release-clean.mjs local-dist
+      corepack pnpm run build
     deps:
+      - "build"
       - "api:build-release"
       - "components:build-release"
       - "sdk-core:build-release"
@@ -41,6 +46,14 @@ tasks:
       - "dist/**/*"
     options:
       cache: false
+      # Release builds remove stale package output and rebuild dist inside one
+      # mutex-held task. They stay out of `moon ci`; release:snapshot invokes
+      # them in the later release step instead of the normal build/test graph.
+      runInCI: false
+      # build-release rewrites the same dist/ that demo-nuxt:build resolves
+      # modules from; the mutex keeps the two from overlapping in the full
+      # CI graph.
+      mutex: "sdk-nuxt-dist"
 
   test:
     command: "corepack pnpm run test"

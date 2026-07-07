@@ -15,8 +15,10 @@ import (
 // ProjectService is the project use-case surface.
 type ProjectService interface {
 	// Create generates a new project with server-minted secrets and persists it.
+	// If seedDefaults is true, server fallback schema and flow resources are
+	// created with the project for non-CLI creation paths.
 	// Returns the stored project including timestamps.
-	Create(ctx context.Context, previewOrigins []string) (*domain.Project, error)
+	Create(ctx context.Context, previewOrigins []string, seedDefaults bool) (*domain.Project, error)
 
 	// Get retrieves a project by ID.
 	// Returns [database.NoRowFoundError] when no project with the given ID exists.
@@ -26,7 +28,7 @@ type ProjectService interface {
 // NewProjectService returns a [ProjectService] backed by the given repository.
 func NewProjectService(
 	pool database.Pool,
-	repo domain.ProjectRepository,
+	v2Pool *DB,
 	schemaRepo domain.JSONSchemaRepository,
 	flowDefinitionRepo domain.FlowDefinitionRepository,
 	tokenGenerator domain.TokenGenerator,
@@ -35,7 +37,7 @@ func NewProjectService(
 ) ProjectService {
 	return &projectService{
 		pool:               pool,
-		projectRepo:        repo,
+		v2Pool:             v2Pool,
 		schemaRepo:         schemaRepo,
 		flowDefinitionRepo: flowDefinitionRepo,
 		tokenGenerator:     tokenGenerator,
@@ -46,7 +48,7 @@ func NewProjectService(
 
 type projectService struct {
 	pool               database.Pool
-	projectRepo        domain.ProjectRepository
+	v2Pool             *DB
 	schemaRepo         domain.JSONSchemaRepository
 	flowDefinitionRepo domain.FlowDefinitionRepository
 	tokenGenerator     domain.TokenGenerator
@@ -56,44 +58,36 @@ type projectService struct {
 
 var _ ProjectService = (*projectService)(nil)
 
-func (s *projectService) Create(ctx context.Context, previewOrigins []string) (_ *domain.Project, err error) {
-	tx, err := s.pool.Begin(ctx, nil)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to start transaction")
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(ctx)
-		}
-	}()
-
+func (s *projectService) Create(ctx context.Context, previewOrigins []string, seedDefaults bool) (_ *domain.Project, err error) {
 	project, err := domain.NewProject(previewOrigins, s.tokenGenerator)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := s.projectRepo.Create(ctx, tx, project); err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to create project in the database")
-	}
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().CreateProject(ctx, project); err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to create project in the database")
+		}
 
-	userschema, err := s.createDefaultUserSchemas(ctx, tx, project.ID)
-	if err != nil {
-		return nil, err
-	}
-	var userSchema *jsonschema.Schema
-	err = json.Unmarshal(userschema.Schema, &userSchema)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to parse default user schema")
-	}
-	if err := s.createDefaultLoginFlowDefinitions(ctx, tx, project.ID, userSchema); err != nil {
-		return nil, err
-	}
+		if !seedDefaults {
+			return nil
+		}
 
-	err = tx.Commit(ctx)
+		userschema, err := s.createDefaultUserSchemas(ctx, tx.(database.QueryExecutor), project.ID)
+		if err != nil {
+			return err
+		}
+		var userSchema *jsonschema.Schema
+		err = json.Unmarshal(userschema.Schema, &userSchema)
+		if err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to parse default user schema")
+		}
+		return s.createDefaultLoginFlowDefinitions(ctx, tx.(database.QueryExecutor), project.ID, userSchema)
+	})
+
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to commit transaction")
 	}
-
 	return project, nil
 }
 
@@ -138,5 +132,5 @@ func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, 
 func (s *projectService) Get(ctx context.Context, id string) (*domain.Project, error) {
 	logger := getLoggingContext(ctx, "project")
 	logger.Info("getting project", slog.String("project_id", id))
-	return s.projectRepo.Get(ctx, s.pool, id)
+	return s.v2Pool.Statements().GetProjectByID(ctx, id)
 }

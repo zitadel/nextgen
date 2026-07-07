@@ -22,6 +22,7 @@ type Harness struct {
 	SigningKey    *rsa.PrivateKey
 
 	DBPool               database.Pool
+	DB                   *service.DB
 	HttpClient           *http.Client
 	TestServer           *httptest.Server
 	Hasher               *crypto.PasswapHasher
@@ -52,7 +53,6 @@ type Harness struct {
 	FlowDefinitionRepo domain.FlowDefinitionRepository
 	AuthAttemptRepo    domain.AuthAttemptRepository
 	SessionRepo        domain.SessionRepository
-	ProjectRepo        domain.ProjectRepository
 	UserRepo           domain.UserRepository
 	UserPasswordRepo   domain.UserPasswordRepository
 	UserPasskeyRepo    domain.UserPasskeyRepository

@@ -4,7 +4,6 @@ package integration_test
 
 import (
 	"net/http"
-	"net/url"
 	"testing"
 
 	"github.com/go-faster/jx"
@@ -17,9 +16,7 @@ import (
 func TestCreateFlowDefinitionUnauthenticated(t *testing.T) {
 	t.Parallel()
 
-	userSchema := "https://some-tenant.com/schemas/unknown-user-schema.yaml"
-	userSchemaURI, err := url.Parse(userSchema)
-	require.NoError(t, err)
+	userSchemaURI := "https://some-tenant.com/schemas/unknown-user-schema.yaml"
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
@@ -29,7 +26,7 @@ func TestCreateFlowDefinitionUnauthenticated(t *testing.T) {
 		FlowDefinition: api.FlowDefinition{
 			Name:       "login-flow",
 			Status:     "active",
-			UserSchema: *userSchemaURI,
+			UserSchema: userSchemaURI,
 			Purposes:   map[string]string{"login": "step_1"},
 			Audience: api.OptFlowAudience{
 				Value: api.FlowAudience{
@@ -52,17 +49,13 @@ func TestCreateFlowDefinitionUnauthenticated(t *testing.T) {
 func TestCreateFlowDefinition(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 	require.NoError(t, err)
 	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
-	u := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
-	userSchemaURI, err := url.Parse(u)
-	require.NoError(t, err)
+	userSchemaURI := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 
-	unknownUserSchema := "https://some-tenant.com/schemas/unknown-user-schema.yaml"
-	unknownUserSchemaURI, err := url.Parse(unknownUserSchema)
-	require.NoError(t, err)
+	unknownUserSchemaURI := "https://some-tenant.com/schemas/unknown-user-schema.yaml"
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
@@ -70,7 +63,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 
 	_, err = client.CreateFlowDefinition(
 		t.Context(),
-		newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("existing-flow", *userSchemaURI)),
+		newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("existing-flow", userSchemaURI)),
 	)
 	require.NoError(t, err)
 
@@ -81,12 +74,12 @@ func TestCreateFlowDefinition(t *testing.T) {
 	}{
 		{
 			name: "flow definition created successfully",
-			req:  newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("login-flow", *userSchemaURI)),
+			req:  newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("login-flow", userSchemaURI)),
 			wantResp: &api.FlowDefinitionDetailResponse{
 				ProjectID: project.ID,
 				FlowDefinition: api.FlowDefinition{
 					Name:       "login-flow",
-					UserSchema: *userSchemaURI,
+					UserSchema: userSchemaURI,
 					Purposes:   map[string]string{"login": "step_1"},
 					Audience: api.OptFlowAudience{
 						Value: api.FlowAudience{
@@ -102,7 +95,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 		},
 		{
 			name: "unknown user schema",
-			req:  newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("login-flow-2", *unknownUserSchemaURI)),
+			req:  newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("login-flow-2", unknownUserSchemaURI)),
 			wantResp: &api.CreateFlowDefinitionBadRequest{
 				Code:    "flowdef.invalid",
 				Message: "flow definition: invalid",
@@ -116,7 +109,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 		},
 		{
 			name: "already existing flow definition",
-			req:  newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("existing-flow", *userSchemaURI)),
+			req:  newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("existing-flow", userSchemaURI)),
 			wantResp: &api.CreateFlowDefinitionConflict{
 				Code:    "flowdef.already_exists",
 				Message: "flow definition: already exists",
@@ -129,7 +122,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 				FlowDefinition: api.FlowDefinition{
 					Name:       "invalid-flow",
 					Status:     "active",
-					UserSchema: *userSchemaURI,
+					UserSchema: userSchemaURI,
 					Purposes:   map[string]string{"login": "collect_identifier"},
 					Audience: api.OptFlowAudience{
 						Value: api.FlowAudience{
@@ -175,7 +168,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 				ProjectID: api.ProjectID(project.ID),
 				FlowDefinition: api.FlowDefinition{
 					Name:       "invalid-flow",
-					UserSchema: *userSchemaURI,
+					UserSchema: userSchemaURI,
 					Status:     "active",
 					Purposes:   map[string]string{"login": "step_1"},
 					Audience: api.OptFlowAudience{
@@ -222,7 +215,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 				ProjectID: api.ProjectID(project.ID),
 				FlowDefinition: api.FlowDefinition{
 					Name:       "invalid-flow",
-					UserSchema: *userSchemaURI,
+					UserSchema: userSchemaURI,
 					Status:     "active",
 					Purposes:   map[string]string{"login": "step_1"},
 					Audience: api.OptFlowAudience{
@@ -277,9 +270,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 func TestUpdateFlowDefinitionUnauthenticated(t *testing.T) {
 	t.Parallel()
 
-	userSchema := "https://some-tenant.com/schemas/unknown-user-schema.yaml"
-	userSchemaURI, err := url.Parse(userSchema)
-	require.NoError(t, err)
+	userSchemaURI := "https://some-tenant.com/schemas/unknown-user-schema.yaml"
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
@@ -288,7 +279,7 @@ func TestUpdateFlowDefinitionUnauthenticated(t *testing.T) {
 		FlowDefinition: api.FlowDefinition{
 			Name:       "login-flow",
 			Status:     "active",
-			UserSchema: *userSchemaURI,
+			UserSchema: userSchemaURI,
 			Purposes:   map[string]string{"login": "step_1"},
 			Steps:      validSteps(),
 		},
@@ -309,7 +300,7 @@ func TestUpdateFlowDefinitionUnauthenticated(t *testing.T) {
 func TestUpdateFlowDefinition(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 	require.NoError(t, err)
 	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
@@ -317,17 +308,13 @@ func TestUpdateFlowDefinition(t *testing.T) {
 	require.NoError(t, err)
 	client.SetToken(project.ProjectSecret)
 
-	u := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
-	userSchemaURI, err := url.Parse(u)
-	require.NoError(t, err)
+	userSchemaURI := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 
-	unknownUserSchema := "https://some-tenant.com/schemas/unknown-user-schema.yaml"
-	unknownUserSchemaURI, err := url.Parse(unknownUserSchema)
-	require.NoError(t, err)
+	unknownUserSchemaURI := "https://some-tenant.com/schemas/unknown-user-schema.yaml"
 
 	createResp, err := client.CreateFlowDefinition(
 		t.Context(),
-		newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("login-flow", *userSchemaURI)),
+		newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("login-flow", userSchemaURI)),
 	)
 	require.NoError(t, err)
 	loginFlowDef, ok := createResp.(*api.FlowDefinitionDetailResponse)
@@ -336,7 +323,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 	multiPurposeResp, err := client.CreateFlowDefinition(
 		t.Context(),
 		newCreateFlowDefinitionRequest(api.ProjectID(project.ID), func() api.FlowDefinition {
-			def := newFlowDefinitionFixture("multi-purpose-flow", *userSchemaURI)
+			def := newFlowDefinitionFixture("multi-purpose-flow", userSchemaURI)
 			def.Purposes = map[string]string{
 				"login":    "step_1",
 				"recovery": "step_1",
@@ -357,7 +344,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 		{
 			name: "flow definition updated successfully",
 			req: newUpdateFlowDefinitionRequest(func() api.FlowDefinition {
-				def := newFlowDefinitionFixture("updated-flow", *userSchemaURI)
+				def := newFlowDefinitionFixture("updated-flow", userSchemaURI)
 				def.Audience = api.OptFlowAudience{
 					Value: api.FlowAudience{TeamIds: []string{"team-2"}, AppIds: []string{"app-2"}},
 					Set:   true,
@@ -370,7 +357,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 				ProjectID: project.ID,
 				FlowDefinition: api.FlowDefinition{
 					Name:       "updated-flow",
-					UserSchema: *userSchemaURI,
+					UserSchema: userSchemaURI,
 					Purposes:   map[string]string{"login": "step_1"},
 					Audience: api.OptFlowAudience{
 						Value: api.FlowAudience{TeamIds: []string{"team-2"}, AppIds: []string{"app-2"}},
@@ -384,7 +371,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 		{
 			name: "deactivate while removing old purpose fails when removed purpose has no alternate active definition",
 			req: newUpdateFlowDefinitionRequest(func() api.FlowDefinition {
-				def := newFlowDefinitionFixture("multi-purpose-flow-updated", *userSchemaURI)
+				def := newFlowDefinitionFixture("multi-purpose-flow-updated", userSchemaURI)
 				def.Purposes = map[string]string{
 					"login": "step_1", // remove recovery
 				}
@@ -409,7 +396,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 		{
 			name: "active update removing old purpose fails when removed purpose has no alternate active definition",
 			req: newUpdateFlowDefinitionRequest(func() api.FlowDefinition {
-				def := newFlowDefinitionFixture("multi-purpose-flow-remove-recovery", *userSchemaURI)
+				def := newFlowDefinitionFixture("multi-purpose-flow-remove-recovery", userSchemaURI)
 				def.Purposes = map[string]string{
 					"login": "step_1", // remove recovery while staying active
 				}
@@ -434,7 +421,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 		{
 			name: "active update removing purpose succeeds when alternate active definition exists",
 			req: newUpdateFlowDefinitionRequest(func() api.FlowDefinition {
-				def := newFlowDefinitionFixture("multi-purpose-flow-remove-login", *userSchemaURI)
+				def := newFlowDefinitionFixture("multi-purpose-flow-remove-login", userSchemaURI)
 				def.Purposes = map[string]string{
 					"recovery": "step_1", // remove login
 				}
@@ -447,7 +434,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 				ProjectID: project.ID,
 				FlowDefinition: api.FlowDefinition{
 					Name:       "multi-purpose-flow-remove-login",
-					UserSchema: *userSchemaURI,
+					UserSchema: userSchemaURI,
 					Purposes:   map[string]string{"recovery": "step_1"},
 					Audience: api.OptFlowAudience{
 						Value: api.FlowAudience{
@@ -463,7 +450,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 		},
 		{
 			name:   "flow definition not found",
-			req:    newUpdateFlowDefinitionRequest(newFlowDefinitionFixture("updated-flow", *userSchemaURI)),
+			req:    newUpdateFlowDefinitionRequest(newFlowDefinitionFixture("updated-flow", userSchemaURI)),
 			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: "flowdef_missing"},
 			wantResp: &api.UpdateFlowDefinitionNotFound{
 				Code:    "flowdef.not_found",
@@ -472,7 +459,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 		},
 		{
 			name:   "unknown user schema",
-			req:    newUpdateFlowDefinitionRequest(newFlowDefinitionFixture("updated-flow", *unknownUserSchemaURI)),
+			req:    newUpdateFlowDefinitionRequest(newFlowDefinitionFixture("updated-flow", unknownUserSchemaURI)),
 			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginFlowDef.ID},
 			wantResp: &api.UpdateFlowDefinitionBadRequest{
 				Code:    "flowdef.invalid",
@@ -488,7 +475,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 		{
 			name: "invalid flow definition",
 			req: newUpdateFlowDefinitionRequest(func() api.FlowDefinition {
-				def := newFlowDefinitionFixture("updated-flow", *userSchemaURI)
+				def := newFlowDefinitionFixture("updated-flow", userSchemaURI)
 				def.Purposes = map[string]string{"login": "collect_identifier"}
 				return def
 			}()),
@@ -527,7 +514,7 @@ func newUpdateFlowDefinitionRequest(definition api.FlowDefinition) *api.FlowDefi
 	return &api.FlowDefinitionUpdateRequest{FlowDefinition: definition}
 }
 
-func newFlowDefinitionFixture(name string, userSchemaURI url.URL) api.FlowDefinition {
+func newFlowDefinitionFixture(name string, userSchemaURI string) api.FlowDefinition {
 	return api.FlowDefinition{
 		Name:       name,
 		Status:     "active",
@@ -651,13 +638,12 @@ func TestGetFlowDefinitionUnauthenticated(t *testing.T) {
 
 func TestGetFlowDefinition(t *testing.T) {
 	t.Parallel()
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 	require.NoError(t, err)
 
 	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
-	u := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
-	userSchemaURI, err := url.Parse(u)
-	require.NoError(t, err)
+	userSchemaURI := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
@@ -668,7 +654,7 @@ func TestGetFlowDefinition(t *testing.T) {
 		FlowDefinition: api.FlowDefinition{
 			Name:       "existing-flow",
 			Status:     "active",
-			UserSchema: *userSchemaURI,
+			UserSchema: userSchemaURI,
 			Purposes:   map[string]string{"login": "step_1"},
 			Audience: api.OptFlowAudience{
 				Value: api.FlowAudience{
@@ -743,20 +729,19 @@ func TestListFlowDefinitionsUnauthenticated(t *testing.T) {
 
 func TestListFlowDefinitions(t *testing.T) {
 	t.Parallel()
-	project1, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+
+	project1, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 	require.NoError(t, err)
 	harness.CreateUserSchema(t, project1, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
-	project2, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project2, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 	require.NoError(t, err)
 	harness.CreateUserSchema(t, project2, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
-	project3, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project3, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 	require.NoError(t, err)
 
-	u := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
-	userSchemaURI, err := url.Parse(u)
-	require.NoError(t, err)
+	userSchemaURI := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
@@ -767,7 +752,7 @@ func TestListFlowDefinitions(t *testing.T) {
 		FlowDefinition: api.FlowDefinition{
 			Name:       "flow-1",
 			Status:     "active",
-			UserSchema: *userSchemaURI,
+			UserSchema: userSchemaURI,
 			Purposes:   map[string]string{"login": "step_1"},
 			Audience: api.OptFlowAudience{
 				Value: api.FlowAudience{
@@ -787,7 +772,7 @@ func TestListFlowDefinitions(t *testing.T) {
 		ProjectID: api.ProjectID(project1.ID),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "flow-2",
-			UserSchema: *userSchemaURI,
+			UserSchema: userSchemaURI,
 			Status:     "active",
 			Purposes:   map[string]string{"profiling": "step_1"},
 			Audience: api.OptFlowAudience{
@@ -808,7 +793,7 @@ func TestListFlowDefinitions(t *testing.T) {
 		ProjectID: api.ProjectID(project2.ID),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "flow-3",
-			UserSchema: *userSchemaURI,
+			UserSchema: userSchemaURI,
 			Status:     "active",
 			Purposes:   map[string]string{"login": "step_1"},
 			Audience: api.OptFlowAudience{
@@ -1008,22 +993,20 @@ func TestDeleteFlowDefinition(t *testing.T) {
 	client, err := helpers.NewApiClient(server.URL)
 	require.NoError(t, err)
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 	require.NoError(t, err)
 
 	client.SetToken(project.ProjectSecret)
 
 	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
-	u := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
-	userSchemaURI, err := url.Parse(u)
-	require.NoError(t, err)
+	userSchemaURI := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 
 	createResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID: api.ProjectID(project.ID),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "existing-flow",
 			Status:     "active",
-			UserSchema: *userSchemaURI,
+			UserSchema: userSchemaURI,
 			Purposes:   map[string]string{"login": "step_1"},
 			Audience: api.OptFlowAudience{
 				Value: api.FlowAudience{
