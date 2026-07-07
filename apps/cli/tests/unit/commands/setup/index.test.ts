@@ -226,6 +226,7 @@ describe("setup command pre-flight", () => {
     expect(capture.body).toMatchObject({
       name: expect.any(String),
       previewOrigins: expect.arrayContaining([expect.any(String)]),
+      seedDefaults: false,
     });
     const projectName = capture.body?.name;
     expect(typeof projectName).toBe("string");
@@ -274,7 +275,8 @@ async function startCreateProjectCaptureServer(): Promise<{
 }> {
   let body: Record<string, unknown> | null = null;
   const server = createServer(async (req, res) => {
-    if (req.method === "POST" && req.url === "/projects") {
+    const path = new URL(req.url ?? "/", "http://localhost").pathname;
+    if (req.method === "POST" && path === "/projects") {
       const chunks: Buffer[] = [];
       for await (const chunk of req) {
         chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
@@ -283,9 +285,28 @@ async function startCreateProjectCaptureServer(): Promise<{
       res.writeHead(201, { "content-type": "application/json" }).end(
         JSON.stringify({
           id: "proj_test",
+          name: "demo",
           projectSecret: "sk_proj_test_full",
           previewSecret: "sk_proj_test_preview",
           previewOrigins: [],
+          createdAt: "2026-06-01T00:00:00.000Z",
+        }),
+      );
+      return;
+    }
+    if (req.method === "POST" && path === "/schemas") {
+      res.writeHead(201, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          id: "sch_test",
+          createdAt: "2026-06-01T00:00:00.000Z",
+        }),
+      );
+      return;
+    }
+    if (req.method === "POST" && path === "/flow_definitions") {
+      res.writeHead(201, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          id: "flow_test",
           createdAt: "2026-06-01T00:00:00.000Z",
         }),
       );

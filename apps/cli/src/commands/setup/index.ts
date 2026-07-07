@@ -1,4 +1,5 @@
-import { basename } from "node:path";
+import { rm } from "node:fs/promises";
+import { basename, join } from "node:path";
 
 import { intro, outro } from "@clack/prompts";
 import { Flags } from "@oclif/core";
@@ -20,6 +21,10 @@ import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/regist
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import { publicCliCommand } from "../../lib/public-cli";
+import {
+  materializeSetupResources,
+  type MaterializeSetupResourcesResult,
+} from "../../lib/setup-resources";
 import { installDependenciesForSetup } from "./install";
 import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
 import {
@@ -48,9 +53,9 @@ const FRAMEWORK_OPTIONS = createOrca()
  *
  * Detects (or, for an empty directory, scaffolds then re-detects) the
  * framework, runs the wizard prompts to fill in any answers not pre-supplied
- * by flags, creates the remote project (whose default user schema and login
- * flow are provisioned server-side), and patches the local files via
- * `Orca`'s framework patcher.
+ * by flags, creates the remote project without server fallback defaults,
+ * patches the local files via `Orca`'s framework patcher, then scaffolds and
+ * uploads editable schema/flow config from `.zitadel/**`.
  *
  * Every interactive question lives in {@link SETUP_PROMPTS} (the main wizard
  * — each entry is a small class) and {@link PickFrameworkPrompt} (the
@@ -181,9 +186,9 @@ export default class Setup extends BaseCommand {
     // origin (both derived from `answers.devPort`).
     framework = { ...framework, devPort: answers.devPort, url: issuer };
 
-    // `POST /projects` is unauthenticated. Creating the project also
-    // provisions its default user schema and login flow server-side, so the
-    // CLI no longer builds, scaffolds, or uploads those resources here.
+    // `POST /projects` is unauthenticated. CLI-managed projects opt out of
+    // server fallback defaults, then setup uploads the local default schema and
+    // flow files through the typed resource APIs and records the returned IDs.
     consola.start(`Creating project on ${answers.server}${dryRun ? " (dry run)" : ""}`);
     const unauthClient = createZitadelClient({ baseUrl: answers.server });
     const projectName = defaultProjectName(cwd, framework.id);
@@ -220,13 +225,47 @@ export default class Setup extends BaseCommand {
     for (const file of result.filesSkipped) {
       consola.info(`Left ${relativeDisplay(cwd, file)} unchanged (already matches target)`);
     }
+    let resourceResult: MaterializeSetupResourcesResult;
+    try {
+      resourceResult = dryRun
+        ? { filesWritten: [] }
+        : await materializeSetupResources({
+            cwd,
+            client: createZitadelClient({ baseUrl: answers.server, token: project.projectSecret }),
+            projectId: project.id,
+            force,
+          });
+    } catch (error) {
+      // Setup is not atomic: the patcher already wrote `zitadel.json` (the
+      // marker the already-initialized guard skips on) and `.zitadel/secret`.
+      // Remove both so a rerun starts a fresh setup instead of being skipped
+      // forever with no default schema or login flow anywhere. The
+      // half-provisioned project has no usable resources, so its credentials
+      // are not worth keeping.
+      await rm(join(cwd, "zitadel.json"), { force: true });
+      await rm(join(cwd, ".zitadel/secret"), { force: true });
+      const cause = toZitadelError(error);
+      throw new ZitadelError(cause.code, `Default resource setup failed: ${cause.message}`, {
+        hint:
+          "The project was created but its default schema/flow upload did not finish. " +
+          "Re-run `zitadel setup` to start over (add --force to overwrite partially " +
+          "written .zitadel files).",
+        nextCommands: ["zitadel setup --force"],
+        details: cause.details,
+      });
+    }
+    for (const file of resourceResult.filesWritten) {
+      const sentence = describeWrittenFile(relativeDisplay(cwd, file), dryRun);
+      if (sentence) consola.info(sentence);
+    }
+    const allFilesWritten = [...result.filesWritten, ...resourceResult.filesWritten];
     consola.success(
-      `Patched ${result.filesWritten.length} file${result.filesWritten.length === 1 ? "" : "s"}` +
+      `Patched ${allFilesWritten.length} file${allFilesWritten.length === 1 ? "" : "s"}` +
         (result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""),
     );
     this.recordTelemetry({
       step: "files_patched",
-      files_written_count: result.filesWritten.length,
+      files_written_count: allFilesWritten.length,
     });
 
     const installOutcome = await installDependenciesForSetup({
@@ -245,7 +284,7 @@ export default class Setup extends BaseCommand {
       package_manager: installOutcome.install.package_manager,
     });
 
-    const writtenRel = result.filesWritten.map((file) => relativeDisplay(cwd, file));
+    const writtenRel = allFilesWritten.map((file) => relativeDisplay(cwd, file));
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
@@ -282,7 +321,7 @@ export default class Setup extends BaseCommand {
         project: { project_id: project.id, issuer },
         framework: framework.id,
         server: answers.server,
-        files_written: result.filesWritten.map((file) => relativeDisplay(cwd, file)),
+        files_written: allFilesWritten.map((file) => relativeDisplay(cwd, file)),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
         install: installOutcome.install,
         next_actions: installOutcome.nextActions,
@@ -352,15 +391,14 @@ async function createProjectWithLocalHint(
   try {
     // API contract requires a project name; generated TS models may lag
     // briefly until `packages/api` regeneration catches up.
-    const payload = { name: projectName, previewOrigins: [issuer] } as {
+    const payload = { name: projectName, previewOrigins: [issuer], seedDefaults: false } as {
       name: string;
       previewOrigins: string[];
+      seedDefaults: false;
     };
     // Register the app's own origin so the backend's origin check allows the
     // requests the dev proxy forwards from it.
-    return await client.createProject(
-      payload as Parameters<typeof client.createProject>[0],
-    );
+    return await client.createProject(payload as Parameters<typeof client.createProject>[0]);
   } catch (error) {
     const normalized = toZitadelError(error);
     throw new ZitadelError(normalized.code, normalized.message, {
