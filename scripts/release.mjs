@@ -134,7 +134,10 @@ async function commandPublish(options) {
   }
 
   await commandSnapshot({ skipContainer: true });
-  await run("corepack", ["pnpm", "exec", "changeset", "publish"], { cwd: repoRoot });
+  await run("corepack", ["pnpm", "exec", "changeset", "publish"], {
+    cwd: repoRoot,
+    env: releasePublishEnv(),
+  });
   await buildContainerImage({ repoRoot, outDir, release, push: true, platforms: CONTAINER_PLATFORMS });
   await commandVerify();
   await upsertProductGithubRelease({ repoRoot, outDir, log: console.log });
@@ -193,6 +196,10 @@ export async function assertNoUnrecordedPendingChangesets(root = repoRoot) {
       `release publish requires all pending changesets to be recorded in .changeset/pre.json: ${unrecorded.join(", ")}`,
     );
   }
+}
+
+export function releasePublishEnv(overrides = {}) {
+  return { ...process.env, ...overrides, ZITADEL_TELEMETRY_BUILD_CHANNEL: "production" };
 }
 
 async function assertMainBranch(options, { allowDryRunBypass = true } = {}) {
