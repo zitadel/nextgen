@@ -79,6 +79,10 @@ layer, not the envelope.
   apps side by side), `--skip-install`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
+- `schemas list` — inspect the revision history of a user-schema, filtered by
+  `--object-type` (e.g. `human-user`). Non-interactive/`--json` prints one row
+  per revision (newest first); interactive adds a picker that fetches and
+  pretty-prints the selected revision body.
 - `doctor` — verify generated app files and local state once `zitadel.json`
   exists. The default local runtime is the `@zitadel/server` npm binary;
   Docker checks apply only when using `--runtime docker` or `--image`.

@@ -2,7 +2,7 @@ import { cancel, isCancel, select, spinner } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 import { consola } from "consola";
 
-import { createZitadelClient } from "@zitadel/api/client";
+import { createZitadelClient, type ZitadelClient } from "@zitadel/api/client";
 import type { ListSchemas200Item } from "@zitadel/api/generated/model";
 
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
@@ -93,9 +93,7 @@ export default class SchemasList extends BaseCommand {
 
     const s = spinner();
     s.start(`Loading ${String(picked)}…`);
-    const body = await client.getSchemaById(String(picked), {
-      project_id: secret.project_id,
-    });
+    const body = await fetchSchemaRevision(client, String(picked), secret.project_id);
     s.stop(`Loaded ${String(picked)}`);
 
     const pretty = JSON.stringify(body, null, 2);
@@ -113,6 +111,21 @@ export default class SchemasList extends BaseCommand {
   }
 }
 
+/**
+ * Fetch one schema revision body. The id is URL-encoded before it lands in
+ * the path: server-allocated ids are opaque today (`sch_…`), but ids can be
+ * full URLs when a schema carried an `$id` (the server-seeded defaults do),
+ * and an unencoded URL would break the `/schemas/:id` path. Mirrors the
+ * encoding the sync engine's schema syncer applies.
+ */
+export async function fetchSchemaRevision(
+  client: ZitadelClient,
+  id: string,
+  projectId: string,
+): Promise<unknown> {
+  return client.getSchemaById(encodeURIComponent(id), { project_id: projectId });
+}
+
 function renderTable(objectType: string, revisions: ReadonlyArray<ListSchemas200Item>): string {
   const header = `Revisions of objectType "${objectType}" (${revisions.length}, newest first)`;
   const idCol = Math.max("id".length, ...revisions.map((r) => r.id.length));
@@ -127,4 +140,3 @@ function renderTable(objectType: string, revisions: ReadonlyArray<ListSchemas200
     ...rows,
   ].join("\n");
 }
-

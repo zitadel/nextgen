@@ -10,7 +10,9 @@ import {
   resetPlatformStore,
   setupPlatformHandlers,
 } from "@zitadel/api-mock/platform";
+import { createZitadelClient } from "@zitadel/api/client";
 
+import { fetchSchemaRevision } from "../../../src/commands/schemas/list";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
 const server = setupServer(...setupPlatformHandlers());
@@ -109,5 +111,24 @@ describe("schemas list", () => {
     expect(json.data.count).toBe(2);
     expect(json.data.revisions[0].id).toBe("sch_02");
     expect(json.data.revisions[1].id).toBe("sch_01");
+  });
+
+  it("URL-encodes URL-shaped schema ids when fetching a revision", async () => {
+    // Server-seeded default schemas carry a URL `$id`; unencoded it would
+    // shear the `/schemas/:id` path apart at every slash.
+    const urlId = "https://api.zitadel.cloud/default-human-user.json";
+    let receivedPath: string | null = null;
+    server.use(
+      http.get("*/schemas/:id", ({ request }) => {
+        receivedPath = new URL(request.url).pathname;
+        return HttpResponse.json({ kind: "user-schema" });
+      }),
+    );
+    const client = createZitadelClient({ baseUrl: "https://api.zitadel.cloud" });
+
+    const body = await fetchSchemaRevision(client, urlId, "proj_test");
+
+    expect(receivedPath).toBe(`/schemas/${encodeURIComponent(urlId)}`);
+    expect(body).toEqual({ kind: "user-schema" });
   });
 });
