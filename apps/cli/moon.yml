@@ -55,6 +55,10 @@ tasks:
       - "dist/**/*"
     options:
       cache: false
+      # cli:test exercises the normal dev build and its workspace package
+      # readers. Finish it before release deps start cleaning/rebuilding the
+      # public package dist directories.
+      runDepsInParallel: false
       # Release builds remove stale package output and rebuild dist after
       # cli:test has finished using the dev build. They stay out of `moon ci`;
       # release:snapshot invokes them in the later release step instead.
