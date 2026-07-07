@@ -8,6 +8,7 @@ import {
   setupPlatformHandlers,
   snapshotPlatformStore,
 } from "@zitadel/api-mock/platform";
+import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
@@ -223,6 +224,43 @@ describe("Next setup integration", () => {
     expect((parseJson(rerun.stdout) as { status: string }).status).toBe("skipped");
     await expect(readFile(flowPath, "utf8")).resolves.toBe(editedFlow);
     await expect(readFile(schemaPath, "utf8")).resolves.toBe(editedSchema);
+  });
+
+  it("releases the already-initialized marker when resource seeding fails so a rerun can complete", async () => {
+    const cwd = await createNextProject();
+    // First attempt: the platform rejects the schema upload after the
+    // project was already created and zitadel.json was written.
+    server.use(
+      http.post("*/schemas", () =>
+        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+      ),
+    );
+
+    const failed = await cli(["setup", "--cwd", cwd, "--non-interactive", "--json", "--skip-install"]);
+    expect(failed.exitCode).not.toBe(0);
+    expect((parseJson(failed.stdout) as { status: string }).status).toBe("error");
+    // The skip marker must be gone — otherwise every rerun reports
+    // "skipped" and the project is stranded without a login flow.
+    await expect(stat(join(cwd, "zitadel.json"))).rejects.toThrow();
+
+    // Rerun against a healthy platform completes the interrupted setup.
+    server.resetHandlers();
+    const retry = await cli([
+      "setup",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+      "--force",
+    ]);
+    expect(retry.exitCode).toBe(0);
+    expect((parseJson(retry.stdout) as { status: string }).status).toBe("ok");
+    const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
+      resources: Record<string, { id?: string }>;
+    };
+    expect(state.resources[".zitadel/schemas/default-human-user.json"]?.id).toMatch(/^sch_/);
+    expect(state.resources[".zitadel/flows/default-login.json"]?.id).toMatch(/^flow_/);
   });
 
   it("fails apply clearly for missing env refs", async () => {

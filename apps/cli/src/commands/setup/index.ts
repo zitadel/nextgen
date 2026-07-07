@@ -1,3 +1,6 @@
+import { rm } from "node:fs/promises";
+import { join } from "node:path";
+
 import { intro, outro } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 import { createZitadelClient } from "@zitadel/api/client";
@@ -18,7 +21,10 @@ import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/regist
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import { publicCliCommand } from "../../lib/public-cli";
-import { materializeSetupResources } from "../../lib/setup-resources";
+import {
+  materializeSetupResources,
+  type MaterializeSetupResourcesResult,
+} from "../../lib/setup-resources";
 import { installDependenciesForSetup } from "./install";
 import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
 import {
@@ -217,14 +223,35 @@ export default class Setup extends BaseCommand {
     for (const file of result.filesSkipped) {
       consola.info(`Left ${relativeDisplay(cwd, file)} unchanged (already matches target)`);
     }
-    const resourceResult = dryRun
-      ? { filesWritten: [] }
-      : await materializeSetupResources({
-          cwd,
-          client: createZitadelClient({ baseUrl: answers.server, token: project.projectSecret }),
-          projectId: project.id,
-          force,
-        });
+    let resourceResult: MaterializeSetupResourcesResult;
+    try {
+      resourceResult = dryRun
+        ? { filesWritten: [] }
+        : await materializeSetupResources({
+            cwd,
+            client: createZitadelClient({ baseUrl: answers.server, token: project.projectSecret }),
+            projectId: project.id,
+            force,
+          });
+    } catch (error) {
+      // Setup is not atomic: the patcher already wrote `zitadel.json` (the
+      // marker the already-initialized guard skips on) and `.zitadel/secret`.
+      // Remove both so a rerun starts a fresh setup instead of being skipped
+      // forever with no default schema or login flow anywhere. The
+      // half-provisioned project has no usable resources, so its credentials
+      // are not worth keeping.
+      await rm(join(cwd, "zitadel.json"), { force: true });
+      await rm(join(cwd, ".zitadel/secret"), { force: true });
+      const cause = toZitadelError(error);
+      throw new ZitadelError(cause.code, `Default resource setup failed: ${cause.message}`, {
+        hint:
+          "The project was created but its default schema/flow upload did not finish. " +
+          "Re-run `zitadel setup` to start over (add --force to overwrite partially " +
+          "written .zitadel files).",
+        nextCommands: ["zitadel setup --force"],
+        details: cause.details,
+      });
+    }
     for (const file of resourceResult.filesWritten) {
       const sentence = describeWrittenFile(relativeDisplay(cwd, file), dryRun);
       if (sentence) consola.info(sentence);

@@ -9,7 +9,7 @@ import type { ZitadelClient } from "@zitadel/api/client";
 import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
 import { flowConfigSchema, schemaConfigSchema } from "@zitadel/config/schemas";
 
-import { FLOWS_DIR, flowEnvRefs, validateFlows } from "../flows";
+import { FLOWS_DIR, flowEnvRefs } from "../flows";
 import { SCHEMAS_DIR } from "../user-schema";
 import { ZitadelError } from "../errors";
 import type { ResourceSyncer } from "./types.js";
@@ -129,9 +129,8 @@ class FlowDefinitionSyncer implements ResourceSyncer {
   ) {}
 
   /**
-   * Validates one flow file. `validateFlows` takes a batch and throws
-   * `E_VALIDATION` on the first invalid entry; passing a single-element array
-   * lets us reuse the batch validator for one file.
+   * Validates one flow file against the canonical `flowConfigSchema` (the
+   * same Zod `validateFlows` and doctor use), then checks env references.
    */
   validate(data: object): void {
     const result = flowConfigSchema.safeParse(data);
@@ -140,7 +139,6 @@ class FlowDefinitionSyncer implements ResourceSyncer {
         details: { issues: result.error.issues },
       });
     }
-    validateFlows([data]);
     assertEnvRefs(data, this.env);
   }
 

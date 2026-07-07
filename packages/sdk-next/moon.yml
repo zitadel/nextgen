@@ -41,6 +41,11 @@ tasks:
       - "dist/**/*"
     options:
       cache: false
+      # cli:test drives the built oclif CLI, whose commands import this
+      # package's dist at runtime. The shared mutex keeps this release build
+      # (whose clean step rewrites dist/) from running while those tests are
+      # importing it; a task dep on cli:test would cycle the project graph.
+      mutex: "public-dist"
 
   test:
     command: "corepack pnpm run test"

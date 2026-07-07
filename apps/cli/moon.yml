@@ -37,8 +37,6 @@ tasks:
       - "$ZITADEL_TELEMETRY_BUILD_CHANNEL"
     outputs:
       - "dist/**/*"
-    options:
-      mutex: "cli-dist"
 
   build-release:
     command: "corepack pnpm run build"
@@ -48,7 +46,9 @@ tasks:
       - "api:build-release"
       - "sdk-next:build-release"
       # Vitest drives oclif from apps/cli/dist. Run it before the production
-      # build, whose tsdown clean step rewrites that same directory.
+      # build, whose tsdown clean step rewrites that same directory. This dep
+      # also orders every writer of apps/cli/dist (build < test < build-release),
+      # so the cli dist needs no mutex of its own.
       - "test"
     inputs:
       - "**/*"
@@ -57,10 +57,6 @@ tasks:
       - "dist/**/*"
     options:
       cache: false
-      # build-release rewrites the same dist/ the tests import from; the
-      # mutex keeps it from cleaning the directory mid-test in the full
-      # CI graph.
-      mutex: "cli-dist"
 
   test:
     command: "corepack pnpm run test"
@@ -68,7 +64,13 @@ tasks:
       - "build"
       - "api-mock:build"
     options:
-      mutex: "cli-dist"
+      # The built oclif commands import @zitadel/{api,config,sdk-next} from
+      # those packages' dist/ at runtime. Their build-release tasks rewrite
+      # the same directories and cannot take a task dep on this target
+      # (cli dependsOn them — the reverse edge would cycle the project
+      # graph), so a shared mutex keeps them from cleaning a dist while
+      # these tests import from it.
+      mutex: "public-dist"
 
   readme:
     command: "corepack pnpm run readme"

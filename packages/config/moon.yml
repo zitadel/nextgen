@@ -31,6 +31,13 @@ tasks:
       - "dist/**/*"
     options:
       cache: false
+      # cli:test drives the built oclif CLI, whose commands import
+      # @zitadel/config/defaults from this package's dist at runtime. The
+      # shared mutex keeps this release build (whose tsdown clean step
+      # rewrites dist/) from running while those tests are importing it.
+      # A task dep on cli:test is not possible: cli dependsOn config, so
+      # the reverse edge would cycle the project graph.
+      mutex: "public-dist"
 
   test:
     command: "corepack pnpm run test"
