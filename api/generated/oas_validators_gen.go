@@ -2482,22 +2482,15 @@ func (s *QueryProjectsRequest) Validate() error {
 		})
 	}
 	if err := func() error {
-		var failures []validate.FieldError
-		for i, elem := range s.Sorting {
+		if value, ok := s.Sorting.Get(); ok {
 			if err := func() error {
-				if err := elem.Validate(); err != nil {
+				if err := value.Validate(); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				failures = append(failures, validate.FieldError{
-					Name:  fmt.Sprintf("[%d]", i),
-					Error: err,
-				})
+				return err
 			}
-		}
-		if len(failures) > 0 {
-			return &validate.Error{Fields: failures}
 		}
 		return nil
 	}(); err != nil {
@@ -2589,7 +2582,7 @@ func (s *QueryProjectsRequestFilterItem) Validate() error {
 	return nil
 }
 
-func (s *QueryProjectsRequestSortingItem) Validate() error {
+func (s *QueryProjectsRequestSorting) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}

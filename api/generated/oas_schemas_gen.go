@@ -2794,6 +2794,8 @@ func (s *FilterField) UnmarshalText(data []byte) error {
 	}
 }
 
+// Filter operation defines the operations which can be used when filtering on a
+// query endpoint.
 // Ref: #
 type FilterOperation string
 
@@ -2878,7 +2880,9 @@ func (s *FilterOperation) UnmarshalText(data []byte) error {
 	}
 }
 
-// The value to filter by.
+// Filter-value specifies which values can be filtered by a query endpoint. This
+// is a union of types. When a value is specified which is not assignable to the
+// field which is being filtered, a 400 error will be returned.
 // Ref: #
 // FilterValue represents sum type.
 type FilterValue struct {
@@ -9562,6 +9566,52 @@ func (o OptQueryProjectsRequest) Or(d QueryProjectsRequest) QueryProjectsRequest
 	return d
 }
 
+// NewOptQueryProjectsRequestSorting returns new OptQueryProjectsRequestSorting with value set to v.
+func NewOptQueryProjectsRequestSorting(v QueryProjectsRequestSorting) OptQueryProjectsRequestSorting {
+	return OptQueryProjectsRequestSorting{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptQueryProjectsRequestSorting is optional QueryProjectsRequestSorting.
+type OptQueryProjectsRequestSorting struct {
+	Value QueryProjectsRequestSorting
+	Set   bool
+}
+
+// IsSet returns true if OptQueryProjectsRequestSorting was set.
+func (o OptQueryProjectsRequestSorting) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptQueryProjectsRequestSorting) Reset() {
+	var v QueryProjectsRequestSorting
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptQueryProjectsRequestSorting) SetTo(v QueryProjectsRequestSorting) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptQueryProjectsRequestSorting) Get() (v QueryProjectsRequestSorting, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptQueryProjectsRequestSorting) Or(d QueryProjectsRequestSorting) QueryProjectsRequestSorting {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptSchemaURI returns new OptSchemaURI with value set to v.
 func NewOptSchemaURI(v SchemaURI) OptSchemaURI {
 	return OptSchemaURI{
@@ -10540,8 +10590,8 @@ func (*QueryProjectsForbidden) queryProjectsRes() {}
 type QueryProjectsRequest struct {
 	PageSize OptLimit `json:"page_size"`
 	// Token to retrieve the next page of results.
-	PageToken OptNilPageToken                   `json:"page_token"`
-	Sorting   []QueryProjectsRequestSortingItem `json:"sorting"`
+	PageToken OptNilPageToken                `json:"page_token"`
+	Sorting   OptQueryProjectsRequestSorting `json:"sorting"`
 	// Filter criteria for querying projects.
 	Filter []QueryProjectsRequestFilterItem `json:"filter"`
 }
@@ -10557,7 +10607,7 @@ func (s *QueryProjectsRequest) GetPageToken() OptNilPageToken {
 }
 
 // GetSorting returns the value of Sorting.
-func (s *QueryProjectsRequest) GetSorting() []QueryProjectsRequestSortingItem {
+func (s *QueryProjectsRequest) GetSorting() OptQueryProjectsRequestSorting {
 	return s.Sorting
 }
 
@@ -10577,7 +10627,7 @@ func (s *QueryProjectsRequest) SetPageToken(val OptNilPageToken) {
 }
 
 // SetSorting sets the value of Sorting.
-func (s *QueryProjectsRequest) SetSorting(val []QueryProjectsRequestSortingItem) {
+func (s *QueryProjectsRequest) SetSorting(val OptQueryProjectsRequestSorting) {
 	s.Sorting = val
 }
 
@@ -10623,7 +10673,7 @@ func (s *QueryProjectsRequestFilterItem) SetOperation(val FilterOperation) {
 	s.Operation = val
 }
 
-type QueryProjectsRequestSortingItem struct {
+type QueryProjectsRequestSorting struct {
 	// The field to sort by.
 	Field FilterField `json:"field"`
 	// The direction to sort by.
@@ -10631,22 +10681,22 @@ type QueryProjectsRequestSortingItem struct {
 }
 
 // GetField returns the value of Field.
-func (s *QueryProjectsRequestSortingItem) GetField() FilterField {
+func (s *QueryProjectsRequestSorting) GetField() FilterField {
 	return s.Field
 }
 
 // GetDirection returns the value of Direction.
-func (s *QueryProjectsRequestSortingItem) GetDirection() SortDirection {
+func (s *QueryProjectsRequestSorting) GetDirection() SortDirection {
 	return s.Direction
 }
 
 // SetField sets the value of Field.
-func (s *QueryProjectsRequestSortingItem) SetField(val FilterField) {
+func (s *QueryProjectsRequestSorting) SetField(val FilterField) {
 	s.Field = val
 }
 
 // SetDirection sets the value of Direction.
-func (s *QueryProjectsRequestSortingItem) SetDirection(val SortDirection) {
+func (s *QueryProjectsRequestSorting) SetDirection(val SortDirection) {
 	s.Direction = val
 }
 

@@ -16421,6 +16421,39 @@ func (s *OptQueryProjectsRequest) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes QueryProjectsRequestSorting as json.
+func (o OptQueryProjectsRequestSorting) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes QueryProjectsRequestSorting from json.
+func (o *OptQueryProjectsRequestSorting) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptQueryProjectsRequestSorting to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptQueryProjectsRequestSorting) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptQueryProjectsRequestSorting) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes SchemaURI as json.
 func (o OptSchemaURI) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -18124,13 +18157,9 @@ func (s *QueryProjectsRequest) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.Sorting != nil {
+		if s.Sorting.Set {
 			e.FieldStart("sorting")
-			e.ArrStart()
-			for _, elem := range s.Sorting {
-				elem.Encode(e)
-			}
-			e.ArrEnd()
+			s.Sorting.Encode(e)
 		}
 	}
 	{
@@ -18183,15 +18212,8 @@ func (s *QueryProjectsRequest) Decode(d *jx.Decoder) error {
 			}
 		case "sorting":
 			if err := func() error {
-				s.Sorting = make([]QueryProjectsRequestSortingItem, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem QueryProjectsRequestSortingItem
-					if err := elem.Decode(d); err != nil {
-						return err
-					}
-					s.Sorting = append(s.Sorting, elem)
-					return nil
-				}); err != nil {
+				s.Sorting.Reset()
+				if err := s.Sorting.Decode(d); err != nil {
 					return err
 				}
 				return nil
@@ -18366,14 +18388,14 @@ func (s *QueryProjectsRequestFilterItem) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
-func (s *QueryProjectsRequestSortingItem) Encode(e *jx.Encoder) {
+func (s *QueryProjectsRequestSorting) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
 // encodeFields encodes fields.
-func (s *QueryProjectsRequestSortingItem) encodeFields(e *jx.Encoder) {
+func (s *QueryProjectsRequestSorting) encodeFields(e *jx.Encoder) {
 	{
 		e.FieldStart("field")
 		s.Field.Encode(e)
@@ -18384,15 +18406,15 @@ func (s *QueryProjectsRequestSortingItem) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfQueryProjectsRequestSortingItem = [2]string{
+var jsonFieldsNameOfQueryProjectsRequestSorting = [2]string{
 	0: "field",
 	1: "direction",
 }
 
-// Decode decodes QueryProjectsRequestSortingItem from json.
-func (s *QueryProjectsRequestSortingItem) Decode(d *jx.Decoder) error {
+// Decode decodes QueryProjectsRequestSorting from json.
+func (s *QueryProjectsRequestSorting) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode QueryProjectsRequestSortingItem to nil")
+		return errors.New("invalid: unable to decode QueryProjectsRequestSorting to nil")
 	}
 	var requiredBitSet [1]uint8
 
@@ -18423,7 +18445,7 @@ func (s *QueryProjectsRequestSortingItem) Decode(d *jx.Decoder) error {
 		}
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "decode QueryProjectsRequestSortingItem")
+		return errors.Wrap(err, "decode QueryProjectsRequestSorting")
 	}
 	// Validate required fields.
 	var failures []validate.FieldError
@@ -18440,8 +18462,8 @@ func (s *QueryProjectsRequestSortingItem) Decode(d *jx.Decoder) error {
 				bitIdx := bits.TrailingZeros8(result)
 				fieldIdx := i*8 + bitIdx
 				var name string
-				if fieldIdx < len(jsonFieldsNameOfQueryProjectsRequestSortingItem) {
-					name = jsonFieldsNameOfQueryProjectsRequestSortingItem[fieldIdx]
+				if fieldIdx < len(jsonFieldsNameOfQueryProjectsRequestSorting) {
+					name = jsonFieldsNameOfQueryProjectsRequestSorting[fieldIdx]
 				} else {
 					name = strconv.Itoa(fieldIdx)
 				}
@@ -18462,14 +18484,14 @@ func (s *QueryProjectsRequestSortingItem) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *QueryProjectsRequestSortingItem) MarshalJSON() ([]byte, error) {
+func (s *QueryProjectsRequestSorting) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *QueryProjectsRequestSortingItem) UnmarshalJSON(data []byte) error {
+func (s *QueryProjectsRequestSorting) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

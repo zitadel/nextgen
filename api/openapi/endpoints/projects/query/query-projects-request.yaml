@@ -9,19 +9,17 @@ properties:
       - $ref: ../../../components/schemas/page-token.yaml
       - type: 'null'
   sorting:
-    type: array
-    items:
-      type: object
-      required:
-        - field
-        - direction
-      properties:
-        field:
-          $ref: filter-field.yaml
-          description: The field to sort by.
-        direction:
-          $ref: ../../../components/schemas/sort-direction.yaml
-          description: The direction to sort by.  
+    type: object
+    required:
+      - field
+      - direction
+    properties:
+      field:
+        $ref: filter-field.yaml
+        description: The field to sort by.
+      direction:
+        $ref: ../../../components/schemas/sort-direction.yaml
+        description: The direction to sort by.  
   filter:
     type: array
     description: Filter criteria for querying projects.
