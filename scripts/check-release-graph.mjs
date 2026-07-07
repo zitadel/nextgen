@@ -11,15 +11,18 @@ import { PUBLIC_PACKAGE_BUILD_TARGETS } from "./release-manifest.mjs";
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const PUBLIC_AGGREGATE_TARGET = "release:build-public-packages";
 const LEGACY_GLOBAL_CLEAN_TARGET = "release:clean-public-package-dist";
-const RELEASE_UI_CLEAN_REQUIREMENTS = new Map([
-  ["console:build-release", ["api:clean-dist"]],
-  ["login-ui:build-release", ["api:clean-dist", "components:clean-dist"]],
+const RELEASE_UI_BUILD_REQUIREMENTS = new Map([
+  ["console:build-release", ["api:build-release"]],
+  // login-ui imports components directly; api is covered transitively through
+  // components:build-release, but keep both here so the graph check names the
+  // full package release chain that login-ui consumes.
+  ["login-ui:build-release", ["api:build-release", "components:build-release"]],
 ]);
-const CLEAN_MUTEX_REQUIREMENTS = new Map([
-  ["api:clean-dist", "public-dist"],
-  ["config:clean-dist", "public-dist"],
-  ["sdk-next:clean-dist", "public-dist"],
-  ["sdk-nuxt:clean-dist", "sdk-nuxt-dist"],
+const BUILD_MUTEX_REQUIREMENTS = new Map([
+  ["api:build-release", "public-dist"],
+  ["config:build-release", "public-dist"],
+  ["sdk-next:build-release", "public-dist"],
+  ["sdk-nuxt:build-release", "sdk-nuxt-dist"],
 ]);
 const RELEASE_ENTRYPOINT_TARGETS = [
   "release:pack",
@@ -52,9 +55,9 @@ export async function main(args = forwardedArgs()) {
 
   for (const target of PUBLIC_PACKAGE_BUILD_TARGETS) {
     assertTask(publicTasks, target);
-    const cleanTarget = cleanTargetFor(target);
-    assertTaskOption(publicTasks, cleanTarget, "runInCI", false);
-    assertCleanMutex(publicTasks, cleanTarget);
+    assertTaskOption(publicTasks, target, "runInCI", false);
+    assertReleaseBuildCleans(publicTasks, target);
+    assertBuildMutex(publicTasks, target);
 
     if (!aggregateDeps.has(target)) {
       throw new Error(
@@ -62,22 +65,24 @@ export async function main(args = forwardedArgs()) {
       );
     }
 
-    if (!reaches(publicTasks, target, cleanTarget)) {
-      throw new Error(`${target} does not depend on ${cleanTarget}`);
+    const readerTarget = readerTargetFor(target);
+    if (!reaches(publicTasks, target, readerTarget)) {
+      throw new Error(`${target} does not depend on ${readerTarget}`);
     }
   }
 
-  for (const [target, cleanTargets] of RELEASE_UI_CLEAN_REQUIREMENTS) {
+  for (const [target, releaseBuildTargets] of RELEASE_UI_BUILD_REQUIREMENTS) {
     const graph = await readTaskGraph(target);
     const tasks = indexTasks(graph);
     assertTask(tasks, target);
 
-    for (const cleanTarget of cleanTargets) {
-      assertTaskOption(tasks, cleanTarget, "runInCI", false);
-      assertCleanMutex(tasks, cleanTarget);
+    for (const releaseBuildTarget of releaseBuildTargets) {
+      assertTaskOption(tasks, releaseBuildTarget, "runInCI", false);
+      assertReleaseBuildCleans(tasks, releaseBuildTarget);
+      assertBuildMutex(tasks, releaseBuildTarget);
 
-      if (!reaches(tasks, target, cleanTarget)) {
-        throw new Error(`${target} does not depend on ${cleanTarget}`);
+      if (!reaches(tasks, target, releaseBuildTarget)) {
+        throw new Error(`${target} does not depend on ${releaseBuildTarget}`);
       }
     }
   }
@@ -93,7 +98,7 @@ export async function main(args = forwardedArgs()) {
     if (deps.has("console:build")) {
       throw new Error(`${target} must use console:build-release, not console:build`);
     }
-    for (const uiTarget of RELEASE_UI_CLEAN_REQUIREMENTS.keys()) {
+    for (const uiTarget of RELEASE_UI_BUILD_REQUIREMENTS.keys()) {
       if (!deps.has(uiTarget)) {
         throw new Error(`${target} must depend on ${uiTarget}`);
       }
@@ -101,9 +106,9 @@ export async function main(args = forwardedArgs()) {
   }
 
   console.log(
-    "release graph ok: every public package release build cleans its own " +
-      `dist, and ${RELEASE_UI_CLEAN_REQUIREMENTS.size} release UI builds ` +
-      "depend on the package release chain they consume",
+    "release graph ok: every public package release build cleans and rebuilds " +
+      `dist atomically, and ${RELEASE_UI_BUILD_REQUIREMENTS.size} release UI ` +
+      "builds depend on the package release chain they consume",
   );
 }
 
@@ -170,13 +175,23 @@ function assertTaskRunInCI(task, expected) {
   }
 }
 
-function assertCleanMutex(tasks, target) {
-  const expected = CLEAN_MUTEX_REQUIREMENTS.get(target);
+function assertBuildMutex(tasks, target) {
+  const expected = BUILD_MUTEX_REQUIREMENTS.get(target);
   if (!expected) {
     return;
   }
 
   assertTaskOption(tasks, target, "mutex", expected);
+}
+
+function assertReleaseBuildCleans(tasks, target) {
+  assertTask(tasks, target);
+  const task = tasks.get(target);
+  const script = task.script ?? [task.command, ...(task.args ?? [])].join(" ");
+
+  if (!script.includes("release-clean.mjs local-dist")) {
+    throw new Error(`${target} must clean local dist inside build-release`);
+  }
 }
 
 function directDeps(tasks, target) {
@@ -207,9 +222,9 @@ function reaches(tasks, start, target) {
   return false;
 }
 
-function cleanTargetFor(buildTarget) {
+function readerTargetFor(buildTarget) {
   const [project] = buildTarget.split(":");
-  return `${project}:clean-dist`;
+  return project === "cli" ? "cli:test" : `${project}:build`;
 }
 
 function formatError(error) {

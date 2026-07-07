@@ -30,27 +30,20 @@ tasks:
     outputs:
       - "dist/**/*"
 
-  clean-dist:
-    command: "node ../../scripts/release-clean.mjs local-dist"
+  build-release:
+    script: |
+      node ../../scripts/release-clean.mjs local-dist
+      corepack pnpm run build
     deps:
       - "build"
-    options:
-      cache: false
-      mutex: "public-dist"
-      runInCI: false
-
-  build-release:
-    command: "corepack pnpm run build"
-    deps:
-      - "clean-dist"
       - "generate"
     outputs:
       - "dist/**/*"
     options:
       cache: false
-      # The release preclean is package-local and explicitly upstream of the
-      # release build. Do not rely on parent runDepsInParallel ordering; only
-      # task deps keep dist cleanup from racing builds that read or rewrite it.
+      # The release preclean and rebuild run in one mutex-held task. Do not
+      # rely on parent runDepsInParallel ordering; only task deps and mutexes
+      # keep dist cleanup from racing builds that read or rewrite it.
       runInCI: false
       # cli:test drives the built oclif CLI, whose commands import this
       # package's dist at runtime. The shared mutex keeps this release build

@@ -39,9 +39,9 @@ tasks:
       cache: false
       runDepsInParallel: false
       runFromWorkspaceRoot: true
-      # Excluded from `moon ci`: release package builds rewrite dist output
-      # after each package-local clean-dist task removes stale files. The
-      # check-graph guard verifies those edges before packaging runs.
+      # Excluded from `moon ci`: release package builds remove stale files and
+      # rewrite dist output inside their build-release tasks. The check-graph
+      # guard verifies those scripts and mutexes before packaging runs.
       runInCI: false
 
   version:
