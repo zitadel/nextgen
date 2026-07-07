@@ -7,7 +7,7 @@
 ## Context
 
 When performing CRUD operations on resources a list operation is often required.
-However, with listing comes filtering and sorting. URL's provide query 
+However, with listing comes filtering and sorting. URLs provide query
 parameters to solve this issue but when applying complex filters, this becomes
 very bloated, very quickly due to possible combinations of filter operations, 
 fields and values. We need a standardized way to allow a customer to query 
@@ -32,8 +32,8 @@ need:
 > identifiable information via HTTP, they are generally referring to making a 
 > GET request.
 
-However, because the `GET` does not allow for a body, then entire quer has to be
-put inside the query-string. There are solutions for this, see [query language](#query-language).
+However, because the `GET` does not allow for a body, the entire query has to be
+put inside the query string. There are solutions for this; see [query language](#query-language).
 
 #### `QUERY`
 
@@ -54,7 +54,7 @@ widely adopted. Most important for us:
 - Ogen: Only supports OpenAPI v3.1.0, so the `QUERY` method is not yet supported
   (feature request: https://github.com/ogen-go/ogen/issues/1610)
 
-Once Ogen supports OpenAPI v3.2, we should implement it, so that client can use
+Once Ogen supports OpenAPI v3.2, we should implement it so that clients can use
 it if they want. But since `QUERY` is not yet widely adopted, we should provide
 an alternative anyway.
 
@@ -70,7 +70,7 @@ we are willing to take.
 
 #### Query string
 
-There are query language which can fit inside the query string. These are often
+There are query languages which can fit inside the query string. These are often
 used in combination with a full-text-search service like ElasticSearch or 
 Algolia. Since we are not going to use such a service, implementing our own
 language would be a lot of complexity added to the product. Therefore, it would
