@@ -1,4 +1,10 @@
+import { originFromResourceUri } from "./config.js";
 import { parseResourceMetadataUrl, probeFetch } from "./mcp-discovery.js";
+import {
+  cimdClientIdUrl,
+  cimdRedirectUri,
+  isCimdCompatibleOrigin,
+} from "./cimd.js";
 
 export type ProbeStatus = "pass" | "fail" | "warn" | "skip";
 
@@ -14,6 +20,7 @@ export type OAuthProbeReport = {
   authorizationServer?: string;
   authorizeClientId?: string;
   authorizeRedirectUri?: string;
+  cimdClientId?: string;
   mcpBaseUrl: string;
   mcpEndpoint: string;
   protectedResourceMetadataUrl?: string;
@@ -34,6 +41,7 @@ export type OAuthProbeOptions = {
   mcpBaseUrl: string;
   probeClientId?: string;
   probeRedirectUri?: string;
+  publicOrigin?: string;
 };
 
 async function discoverProbeClientId(
@@ -73,6 +81,7 @@ type ProtectedResourceMetadata = {
 
 type AuthorizationServerMetadata = {
   authorization_endpoint?: string;
+  client_id_metadata_document_supported?: boolean;
   code_challenge_methods_supported?: string[];
   grant_types_supported?: string[];
   issuer?: string;
@@ -243,6 +252,118 @@ export async function runOAuthProbe(options: OAuthProbeOptions): Promise<OAuthPr
         ),
       );
     }
+  }
+
+  const cimdSupported = asMetadata?.client_id_metadata_document_supported === true;
+  let cimdClientId: string | undefined;
+
+  if (cimdSupported) {
+    steps.push(
+      step(
+        "Client ID Metadata Document (CIMD) advertised",
+        asMetadataUrl,
+        "pass",
+        "client_id_metadata_document_supported=true",
+      ),
+    );
+  } else if (asMetadata) {
+    steps.push(
+      step(
+        "Client ID Metadata Document (CIMD) advertised",
+        asMetadataUrl,
+        "warn",
+        "client_id_metadata_document_supported is not true",
+        "Zitadel PR #12316 enables this via oidc_client_id_metadata_document",
+      ),
+    );
+  }
+
+  const discoveredResourceUri = metadata?.resource ?? mcpEndpoint;
+  const publicOrigin =
+    originFromResourceUri(discoveredResourceUri) ?? options.publicOrigin;
+  if (cimdSupported && publicOrigin && isCimdCompatibleOrigin(publicOrigin)) {
+    cimdClientId = cimdClientIdUrl(publicOrigin);
+    const localCimdUrl = `${mcpBaseUrl}/.well-known/oauth-client`;
+    const localCimdResponse = await probeFetch(fetchImpl, localCimdUrl);
+    const localCimdBody = await readResponse(localCimdResponse);
+    if (localCimdResponse.status === 200) {
+      steps.push(
+        step(
+          "Mock server serves CIMD metadata document",
+          localCimdUrl,
+          "pass",
+          `client_id=${cimdClientId}`,
+          `redirect_uri=${cimdRedirectUri(publicOrigin)}`,
+        ),
+      );
+    } else {
+      steps.push(
+        step(
+          "Mock server serves CIMD metadata document",
+          localCimdUrl,
+          "fail",
+          `HTTP ${localCimdResponse.status}`,
+          localCimdBody.body.slice(0, 200),
+        ),
+      );
+    }
+
+    const cimdAuthorizeEndpoint =
+      asMetadata?.authorization_endpoint ?? `${authorizationServer}/oauth/v2/authorize`;
+    const cimdAuthorizeUrl = new URL(cimdAuthorizeEndpoint);
+    cimdAuthorizeUrl.searchParams.set("response_type", "code");
+    cimdAuthorizeUrl.searchParams.set("client_id", cimdClientId);
+    cimdAuthorizeUrl.searchParams.set("redirect_uri", cimdRedirectUri(publicOrigin));
+    cimdAuthorizeUrl.searchParams.set("scope", "openid");
+    cimdAuthorizeUrl.searchParams.set("state", "mcp-oauth-probe-cimd");
+    cimdAuthorizeUrl.searchParams.set(
+      "code_challenge",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    );
+    cimdAuthorizeUrl.searchParams.set("code_challenge_method", "S256");
+    cimdAuthorizeUrl.searchParams.set("resource", discoveredResourceUri);
+
+    const cimdAuthorizeResponse = await probeFetch(fetchImpl, cimdAuthorizeUrl.toString(), {
+      redirect: "manual",
+    });
+    const cimdAuthorizeBody = await readResponse(cimdAuthorizeResponse);
+    const cimdLocation = cimdAuthorizeResponse.headers.get("location") ?? "";
+    if (
+      cimdAuthorizeResponse.status === 302 ||
+      cimdAuthorizeResponse.status === 303 ||
+      cimdLocation.includes("login") ||
+      cimdLocation.includes("authRequest=")
+    ) {
+      steps.push(
+        step(
+          "CIMD authorization request with RFC 8707 resource parameter",
+          cimdAuthorizeUrl.toString(),
+          "pass",
+          `HTTP ${cimdAuthorizeResponse.status}`,
+          "authorize accepted URL-form client_id; complete login with probe-token --cimd",
+        ),
+      );
+    } else {
+      steps.push(
+        step(
+          "CIMD authorization request with RFC 8707 resource parameter",
+          cimdAuthorizeUrl.toString(),
+          "fail",
+          `HTTP ${cimdAuthorizeResponse.status}`,
+          cimdAuthorizeBody.body.slice(0, 200),
+        ),
+      );
+    }
+  } else if (cimdSupported) {
+    steps.push(
+      step(
+        "CIMD authorization request",
+        asMetadataUrl,
+        "skip",
+        "requires MCP_PUBLIC_ORIGIN=https://… on the mock server",
+        "Start the mock server with MCP_RESOURCE_URI=https://<tunnel>/mcp (or set MCP_PUBLIC_ORIGIN); Zitadel rejects loopback origins",
+      ),
+    );
   }
 
   const registrationEndpoint =
@@ -455,6 +576,7 @@ export async function runOAuthProbe(options: OAuthProbeOptions): Promise<OAuthPr
     authorizationServer,
     authorizeClientId,
     authorizeRedirectUri,
+    cimdClientId,
     mcpBaseUrl,
     mcpEndpoint,
     protectedResourceMetadataUrl: resourceMetadataUrl,
@@ -474,6 +596,7 @@ export function formatOAuthProbeReport(report: OAuthProbeReport): string {
     `Authorization server:      ${report.authorizationServer ?? "(unknown)"}`,
     `Canonical resource URI:    ${report.resourceUri ?? "(unknown)"}`,
     `DCR client_id:           ${report.registeredClientId ?? "(not registered)"}`,
+    `CIMD client_id:          ${report.cimdClientId ?? "(not probed)"}`,
     `Authorize client_id:       ${report.authorizeClientId ?? "(unknown)"}`,
     `Authorize redirect_uri:    ${report.authorizeRedirectUri ?? "(unknown)"}`,
     "",

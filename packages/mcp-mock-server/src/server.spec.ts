@@ -66,6 +66,20 @@ describe("mcp mock server", () => {
     });
   });
 
+  it("serves CIMD metadata when public origin is https", async () => {
+    const httpsConfig: McpMockServerConfig = {
+      ...config,
+      publicOrigin: "https://mcp.example.com",
+      resourceUri: "https://mcp.example.com/mcp",
+    };
+    const httpsApp = createMcpMockApp(httpsConfig);
+    const response = await request(httpsApp).get("/.well-known/oauth-client");
+
+    expect(response.status).toBe(200);
+    expect(response.body.redirect_uris).toEqual(["https://mcp.example.com/oauth/callback"]);
+    expect(response.body.token_endpoint_auth_method).toBe("none");
+  });
+
   it("returns 202 for initialized notification", async () => {
     const init = await request(app)
       .post("/mcp")

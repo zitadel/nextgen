@@ -5,11 +5,16 @@ import path from "node:path";
 
 import { createCodeChallenge, createPkcePair } from "./pkce.js";
 import { audienceMatchesResource, decodeJwt } from "./jwt.js";
+import { cimdClientIdUrl, cimdRedirectUri, isCimdCompatibleOrigin } from "./cimd.js";
+
+export type ClientRegistrationMode = "dcr" | "cimd";
 
 export type TokenProbeSession = {
   authorizationServer: string;
   clientId: string;
+  clientRegistration: ClientRegistrationMode;
   codeVerifier: string;
+  mcpBaseUrl: string;
   mcpEndpoint: string;
   redirectUri: string;
   resourceUri: string;
@@ -42,9 +47,12 @@ export type TokenProbeOptions = {
   authorizationServer: string;
   callbackPort?: number;
   callbackTimeoutMs?: number;
+  clientRegistration?: ClientRegistrationMode;
   fetchImpl?: typeof fetch;
+  mcpBaseUrl: string;
   mcpEndpoint: string;
   openBrowser?: boolean;
+  publicOrigin?: string;
   redirectUri?: string;
   resourceUri: string;
   sessionFile?: string;
@@ -121,6 +129,31 @@ export async function registerDynamicClient(
     throw new Error("DCR succeeded but response did not include client_id");
   }
   return { clientId, registrationEndpoint };
+}
+
+export async function waitForOAuthCallbackViaMockServer(input: {
+  fetchImpl: typeof fetch;
+  mcpBaseUrl: string;
+  state: string;
+  timeoutMs: number;
+}): Promise<string> {
+  const deadline = Date.now() + input.timeoutMs;
+  const pollUrl = `${input.mcpBaseUrl}/_probe/oauth/callback`;
+  while (Date.now() < deadline) {
+    const response = await input.fetchImpl(
+      `${pollUrl}?state=${encodeURIComponent(input.state)}`,
+    );
+    if (response.status === 200) {
+      const payload = (await response.json()) as { code?: string };
+      if (payload.code) {
+        return payload.code;
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(
+    `timed out after ${input.timeoutMs}ms waiting for OAuth callback on ${pollUrl}`,
+  );
 }
 
 export function buildAuthorizeUrl(input: {
@@ -270,13 +303,20 @@ async function openBrowser(url: string): Promise<void> {
 export async function runTokenProbe(options: TokenProbeOptions): Promise<TokenProbeReport> {
   const fetchImpl = options.fetchImpl ?? fetch;
   const callbackPort = options.callbackPort ?? 8765;
-  const redirectUri = options.redirectUri ?? `http://127.0.0.1:${callbackPort}/callback`;
+  const mcpBaseUrl = options.mcpBaseUrl.replace(/\/$/, "");
+  const clientRegistration = options.clientRegistration ?? "dcr";
+  const redirectUri =
+    options.redirectUri ??
+    (clientRegistration === "cimd"
+      ? cimdRedirectUri(options.publicOrigin ?? "")
+      : `http://127.0.0.1:${callbackPort}/callback`);
   const sessionFile = options.sessionFile ?? DEFAULT_SESSION_FILE;
   const steps: TokenProbeStep[] = [];
   const state = "mcp-token-probe";
 
   let clientId: string;
   let codeVerifier: string;
+  let activeRegistration = clientRegistration;
 
   if (options.authorizationCode) {
     const savedSession = await loadTokenProbeSession(sessionFile);
@@ -287,6 +327,7 @@ export async function runTokenProbe(options: TokenProbeOptions): Promise<TokenPr
     }
     clientId = savedSession.clientId;
     codeVerifier = savedSession.codeVerifier;
+    activeRegistration = savedSession.clientRegistration;
     steps.push(
       step(
         "Reuse persisted probe session",
@@ -295,6 +336,36 @@ export async function runTokenProbe(options: TokenProbeOptions): Promise<TokenPr
         sessionFile,
       ),
     );
+  } else if (clientRegistration === "cimd") {
+    if (!options.publicOrigin || !isCimdCompatibleOrigin(options.publicOrigin)) {
+      throw new Error(
+        "CIMD requires MCP_PUBLIC_ORIGIN=https://… so the mock server can host metadata and callbacks on a public HTTPS origin",
+      );
+    }
+    const pkce = createPkcePair();
+    codeVerifier = pkce.codeVerifier;
+    clientId = cimdClientIdUrl(options.publicOrigin);
+    steps.push(
+      step(
+        "Client ID Metadata Document (CIMD) client",
+        "pass",
+        `client_id=${clientId}`,
+        redirectUri,
+      ),
+    );
+
+    await saveTokenProbeSession(sessionFile, {
+      authorizationServer: options.authorizationServer,
+      clientId,
+      clientRegistration: "cimd",
+      codeVerifier,
+      mcpBaseUrl,
+      mcpEndpoint: options.mcpEndpoint,
+      redirectUri,
+      resourceUri: options.resourceUri,
+      state,
+    });
+    steps.push(step("Persist probe session", "pass", sessionFile));
   } else {
     const pkce = createPkcePair();
     codeVerifier = pkce.codeVerifier;
@@ -316,7 +387,9 @@ export async function runTokenProbe(options: TokenProbeOptions): Promise<TokenPr
     await saveTokenProbeSession(sessionFile, {
       authorizationServer: options.authorizationServer,
       clientId,
+      clientRegistration: "dcr",
       codeVerifier,
+      mcpBaseUrl,
       mcpEndpoint: options.mcpEndpoint,
       redirectUri,
       resourceUri: options.resourceUri,
@@ -371,13 +444,21 @@ export async function runTokenProbe(options: TokenProbeOptions): Promise<TokenPr
     }
 
     try {
-      const callback = await waitForAuthorizationCode(
-        redirectUri,
-        state,
-        options.callbackTimeoutMs ?? 5 * 60 * 1000,
-      );
-      authorizationCode = callback.code;
-      steps.push(step("Receive authorization callback", "pass", `code received for state=${callback.state}`));
+      const callback =
+        activeRegistration === "cimd"
+          ? await waitForOAuthCallbackViaMockServer({
+              fetchImpl,
+              mcpBaseUrl,
+              state,
+              timeoutMs: options.callbackTimeoutMs ?? 5 * 60 * 1000,
+            })
+          : await waitForAuthorizationCode(
+              redirectUri,
+              state,
+              options.callbackTimeoutMs ?? 5 * 60 * 1000,
+            );
+      authorizationCode = callback;
+      steps.push(step("Receive authorization callback", "pass", `code received for state=${state}`));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       steps.push(step("Receive authorization callback", "fail", message, authorizeUrl));

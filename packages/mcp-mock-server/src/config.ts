@@ -33,6 +33,8 @@ function originFromResourceUri(resourceUri: string): string | undefined {
   }
 }
 
+export { originFromResourceUri };
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): McpMockServerConfig {
   const host = env.MCP_MOCK_HOST ?? "localhost";
   const port = parsePort(env.PORT, 9090);

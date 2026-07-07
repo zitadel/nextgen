@@ -1,15 +1,17 @@
-import { loadConfig } from "../src/config.js";
+import { loadConfig, originFromResourceUri } from "../src/config.js";
 import { discoverMcpResourceContext } from "../src/mcp-discovery.js";
 import { formatTokenProbeReport, runTokenProbe } from "../src/token-probe.js";
 
 function parseArgs(argv: string[]): {
   authorizationCode?: string;
   callbackPort: number;
+  cimd: boolean;
   json: boolean;
   noOpen: boolean;
 } {
   let json = false;
   let noOpen = false;
+  let cimd = false;
   let callbackPort = 8765;
   let authorizationCode: string | undefined;
 
@@ -19,6 +21,8 @@ function parseArgs(argv: string[]): {
       json = true;
     } else if (arg === "--no-open") {
       noOpen = true;
+    } else if (arg === "--cimd") {
+      cimd = true;
     } else if (arg === "--code") {
       authorizationCode = argv[index + 1];
       index += 1;
@@ -32,11 +36,11 @@ function parseArgs(argv: string[]): {
     }
   }
 
-  return { authorizationCode, callbackPort, json, noOpen };
+  return { authorizationCode, callbackPort, cimd, json, noOpen };
 }
 
 async function main(): Promise<void> {
-  const { authorizationCode, callbackPort, json, noOpen } = parseArgs(process.argv.slice(2));
+  const { authorizationCode, callbackPort, cimd, json, noOpen } = parseArgs(process.argv.slice(2));
   const config = loadConfig();
   const mcpBaseUrl = `http://${config.host}:${config.port}`;
   const context = await discoverMcpResourceContext({
@@ -45,13 +49,20 @@ async function main(): Promise<void> {
       ? { authorizationServerOverride: config.authorizationServer }
       : {}),
   });
+  const publicOrigin =
+    process.env.MCP_PUBLIC_ORIGIN || process.env.MCP_RESOURCE_URI
+      ? config.publicOrigin
+      : (originFromResourceUri(context.resourceUri) ?? config.publicOrigin);
 
   const report = await runTokenProbe({
     authorizationCode,
     authorizationServer: context.authorizationServer,
     callbackPort,
+    clientRegistration: cimd ? "cimd" : "dcr",
+    mcpBaseUrl,
     mcpEndpoint: context.mcpEndpoint,
     openBrowser: !noOpen,
+    publicOrigin,
     resourceUri: process.env.MCP_RESOURCE_URI ? config.resourceUri : context.resourceUri,
   });
 

@@ -114,7 +114,9 @@ This chains the MCP client discovery steps automatically:
 3. `GET /.well-known/oauth-authorization-server` (RFC 8414)
 4. `GET /.well-known/openid-configuration` (fallback)
 5. `POST /oauth/v2/register` (RFC 7591 DCR) with a native public MCP client
-6. `GET /oauth/v2/authorize` using the **freshly registered** `client_id` + `resource=` (RFC 8707)
+6. When `client_id_metadata_document_supported` is true and `MCP_PUBLIC_ORIGIN` is
+   `https://…`, probe the mock server's CIMD document and a URL-form `client_id`
+7. `GET /oauth/v2/authorize` using the **freshly registered** `client_id` + `resource=` (RFC 8707)
 
 Optional env vars:
 
@@ -177,8 +179,48 @@ Flags:
 | ------------------------ | ----------------------------------------------------- |
 | `--no-open`              | Print the authorize URL without launching a browser   |
 | `--code <code>`          | Skip the callback server and exchange a code manually |
-| `--callback-port <port>` | Callback listener port (default `8765`)               |
-| `--json`                 | Machine-readable output with tokens redacted          |
+| `--callback-port <port>` | Callback listener port for DCR mode (default `8765`)      |
+| `--cimd`                 | Use Client ID Metadata Document registration (see below) |
+| `--json`                 | Machine-readable output with tokens redacted              |
+
+
+## CIMD probe (Zitadel PR #12316)
+
+[Client ID Metadata Documents](https://modelcontextprotocol.io/community/seps/991-enable-url-based-client-registration-using-oauth-c.md)
+use an HTTPS URL as `client_id`. Zitadel fetches the JSON document from that URL,
+so **pure localhost will not work** — Zitadel's outbound client blocks loopback and
+requires a valid TLS certificate.
+
+Prerequisites on Zitadel (`feat/oidc-cimd` / PR #12316):
+
+1. Enable `oidc_client_id_metadata_document` on the instance (feature API)
+2. Ensure v2 login is configured
+3. Run Zitadel so the mock server can reach it as `AUTHORIZATION_SERVER`
+
+Tunnel setup (two ngrok tunnels or one tunnel to the mock server):
+
+```sh
+# Terminal 1 — expose mock MCP + CIMD document + callback on HTTPS
+MCP_PUBLIC_ORIGIN=https://<mcp-tunnel> \
+AUTHORIZATION_SERVER=https://<zitadel-tunnel> \
+corepack pnpm --filter @zitadel/mcp-mock-server start
+
+# Terminal 2 — non-interactive CIMD checklist
+corepack pnpm --filter @zitadel/mcp-mock-server probe
+
+# Terminal 3 — full browser login via CIMD (callback via mock server /oauth/callback)
+corepack pnpm --filter @zitadel/mcp-mock-server probe-token -- --cimd
+```
+
+The mock server serves:
+
+| Path | Purpose |
+| ---- | ------- |
+| `/.well-known/oauth-client` | CIMD metadata (`client_id` = this URL) |
+| `/oauth/callback` | OAuth redirect target (same origin as `MCP_PUBLIC_ORIGIN`) |
+| `/_probe/oauth/callback?state=…` | Local poll endpoint used by `probe-token --cimd` |
+
+DCR mode (`probe-token` without `--cimd`) still uses `http://127.0.0.1:8765/callback`.
 
 
 Example manual code exchange:

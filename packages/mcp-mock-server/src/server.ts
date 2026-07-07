@@ -4,12 +4,20 @@ import express, { type Express, type Request, type Response } from "express";
 
 import { type McpMockServerConfig, loadConfig } from "./config.js";
 import {
+  CIMD_CALLBACK_PATH,
+  CIMD_METADATA_PATH,
+  buildCimdClientMetadata,
+  cimdClientIdUrl,
+  isCimdCompatibleOrigin,
+} from "./cimd.js";
+import {
   buildProtectedResourceMetadata,
   buildWwwAuthenticateHeader,
   protectedResourceMetadataPath,
   protectedResourceMetadataUrl,
 } from "./protected-resource.js";
 import { dispatchMcpBody, isKnownSession } from "./mcp-protocol.js";
+import { storeOAuthCallback, takeOAuthCallback } from "./oauth-callback-store.js";
 import { validateAccessToken } from "./token-validation.js";
 
 function bearerToken(req: Request): string | undefined {
@@ -70,6 +78,7 @@ export function createMcpMockApp(config: McpMockServerConfig): Express {
         `MCP endpoint:        POST ${config.resourceUri}`,
         `Protected metadata:  ${protectedResourceMetadataUrl(config)}`,
         `Authorization server: ${config.authorizationServer}`,
+        `CIMD metadata:       ${isCimdCompatibleOrigin(config.publicOrigin) ? cimdClientIdUrl(config.publicOrigin) : "(requires MCP_PUBLIC_ORIGIN=https://…)"}`,
         `Token validation:    ${config.introspect ? "Zitadel introspection" : "accept any bearer token"}`,
         "",
         "Unauthenticated MCP requests return HTTP 401 with WWW-Authenticate.",
@@ -83,6 +92,52 @@ export function createMcpMockApp(config: McpMockServerConfig): Express {
 
   app.get("/.well-known/oauth-protected-resource", serveProtectedResourceMetadata);
   app.get(protectedResourceMetadataPath(config), serveProtectedResourceMetadata);
+
+  app.get(CIMD_METADATA_PATH, (_req, res) => {
+    if (!isCimdCompatibleOrigin(config.publicOrigin)) {
+      res.status(400).json({
+        error: "cimd_unavailable",
+        message: "Set MCP_PUBLIC_ORIGIN to an https URL reachable by Zitadel (for example an ngrok tunnel)",
+      });
+      return;
+    }
+    res.json(buildCimdClientMetadata(config.publicOrigin));
+  });
+
+  app.get(CIMD_CALLBACK_PATH, (req, res) => {
+    const error = typeof req.query.error === "string" ? req.query.error : undefined;
+    if (error) {
+      res.status(400).type("text/plain").send(`Authorization failed: ${error}`);
+      return;
+    }
+
+    const code = typeof req.query.code === "string" ? req.query.code : undefined;
+    const state = typeof req.query.state === "string" ? req.query.state : undefined;
+    if (!code || !state) {
+      res.status(400).type("text/plain").send("missing code or state");
+      return;
+    }
+
+    storeOAuthCallback(state, code);
+    res
+      .status(200)
+      .type("text/plain")
+      .send("Authorization complete. You can close this tab and return to the terminal.");
+  });
+
+  app.get("/_probe/oauth/callback", (req, res) => {
+    const state = typeof req.query.state === "string" ? req.query.state : undefined;
+    if (!state) {
+      res.status(400).json({ error: "missing_state" });
+      return;
+    }
+    const code = takeOAuthCallback(state);
+    if (!code) {
+      res.status(404).json({ error: "callback_pending" });
+      return;
+    }
+    res.json({ code, state });
+  });
 
   const handleMcpRequest = async (req: Request, res: Response): Promise<void> => {
     const token = bearerToken(req);
