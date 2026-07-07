@@ -6472,7 +6472,7 @@ func (s *FlowDefinition) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("user_schema")
-		json.EncodeURI(e, s.UserSchema)
+		e.Str(s.UserSchema)
 	}
 	{
 		e.FieldStart("purposes")
@@ -6537,8 +6537,8 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 		case "user_schema":
 			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
-				v, err := json.DecodeURI(d)
-				s.UserSchema = v
+				v, err := d.Str()
+				s.UserSchema = string(v)
 				if err != nil {
 					return err
 				}
