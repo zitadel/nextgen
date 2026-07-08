@@ -1,6 +1,8 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+import { consola } from "consola";
+
 import type {
   CreateFlowDefinition201,
   CreateSchema201,
@@ -17,9 +19,11 @@ import {
   schemasReadmeContent,
 } from "@zitadel/config/defaults";
 
+import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
+
 import { FLOWS_DIR } from "./flows";
 import { stableStringify } from "./json";
-import { hashResourceContent } from "./sync";
+import { hashForState, writeBackResource } from "./sync";
 import { updateState } from "./sync/state";
 import { SCHEMAS_DIR } from "./user-schema";
 import { ZitadelError } from "./errors";
@@ -69,9 +73,27 @@ export async function materializeSetupResources(opts: {
     project_id: opts.projectId,
   })) as CreateSchema201;
   const schemaId = requiredString(schema.id, "created schema id");
+  // Reconcile the just-written file with the server's stored body so local
+  // config matches live state from the first second; a fetch failure keeps
+  // the template body and its hash (parity is best-effort at setup).
+  let schemaHash = hashForState({ normalize: normalizeSchemaBody }, schemaBody);
+  try {
+    const canonical = (await opts.client.getSchemaById(encodeURIComponent(schemaId), {
+      project_id: opts.projectId,
+    })) as object;
+    const written = await writeBackResource(
+      opts.cwd,
+      DEFAULT_SCHEMA_CONFIG_PATH,
+      { normalize: normalizeSchemaBody },
+      canonical,
+    );
+    schemaHash = written.hash;
+  } catch (err) {
+    consola.debug(`fetch created schema ${schemaId} during setup failed:`, err);
+  }
   await updateState(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH, {
     id: schemaId,
-    hash: hashWrittenBody(schemaBody),
+    hash: schemaHash,
   });
 
   const flowBody = getDefaultLoginFlow({ userSchemaUrl: schemaId });
@@ -92,9 +114,19 @@ export async function materializeSetupResources(opts: {
     flow_definition: flowBody,
   })) as CreateFlowDefinition201;
 
+  let flowHash = hashForState({ normalize: normalizeFlowBody }, flowBody);
+  if (flow.flow_definition) {
+    const written = await writeBackResource(
+      opts.cwd,
+      DEFAULT_FLOW_CONFIG_PATH,
+      { normalize: normalizeFlowBody },
+      flow.flow_definition as object,
+    );
+    flowHash = written.hash;
+  }
   await updateState(opts.cwd, DEFAULT_FLOW_CONFIG_PATH, {
     id: requiredString(flow.id, "created flow definition id"),
-    hash: hashWrittenBody(flowBody),
+    hash: flowHash,
     name: flowBody.name,
     status: flowBody.status,
   });
@@ -152,12 +184,6 @@ async function writeResourceFile(
     }
     throw error;
   }
-}
-
-function hashWrittenBody(body: object): string {
-  // Match the exact normalized JSON shape written to disk so setup-seeded
-  // state is immediately comparable with the sync planner.
-  return hashResourceContent(JSON.parse(stableStringify(body)) as object);
 }
 
 function requiredString(value: unknown, label: string): string {

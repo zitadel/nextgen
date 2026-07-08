@@ -44,10 +44,26 @@ export interface ResourceSyncer {
    * and `apply` both go through here.
    */
   validate(data: object): void;
-  create(data: object): Promise<string>;
-  update(id: string, data: object): Promise<void>;
+  /**
+   * Create the resource on the platform. `canonical` is the server's
+   * stored representation when the response (or a follow-up fetch)
+   * provides one; the sync loop writes it back to the local file so
+   * repo config matches live state byte-for-byte.
+   */
+  create(data: object): Promise<{ id: string; canonical?: object }>;
+  /** Replace the resource. `canonical` as in {@link create}. */
+  update(id: string, data: object): Promise<{ canonical?: object }>;
   delete(id: string): Promise<void>;
   fetch?(id: string): Promise<object>;
+  /**
+   * Reduce a body to its canonical comparison form: strip server-echoed
+   * noise (empty `audience`) and spelled-out meta-schema defaults
+   * (`x-editable` et al) so hashing and diff rendering treat semantically
+   * identical bodies as identical. Comparison/local-file use only — never
+   * applied to upload payloads (the server does not materialize the
+   * stripped defaults).
+   */
+  normalize?(data: object): object;
 }
 
 /**

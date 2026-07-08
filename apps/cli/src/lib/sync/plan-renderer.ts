@@ -1,4 +1,4 @@
-import type { SyncAction, SyncPlanSummary } from "./types.js";
+import type { ResourceSyncer, SyncAction, SyncPlanSummary } from "./types.js";
 
 /**
  * Count the non-`skip` actions in a {@link buildSyncPlan} result. Pure; the
@@ -360,6 +360,18 @@ function resourceName(path: string): string {
 }
 
 /**
+ * Diff both sides in the syncer's canonical form so server-echoed noise
+ * (empty `audience`, spelled-out meta-schema defaults) never renders as a
+ * change the author didn't make. Rendering only — upload payloads stay raw.
+ */
+function normalized(
+  syncer: Pick<ResourceSyncer, "normalize">,
+  content: object,
+): Record<string, unknown> {
+  return (syncer.normalize?.(content) ?? content) as Record<string, unknown>;
+}
+
+/**
  * Renders one Terraform-style resource block for a single `SyncAction`.
  *
  * Per-case notes:
@@ -421,8 +433,8 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
 
       if (action.oldContent) {
         renderDiff(
-          action.oldContent as Record<string, unknown>,
-          action.content as Record<string, unknown>,
+          normalized(action.syncer, action.oldContent),
+          normalized(action.syncer, action.content),
           FIELD_COL,
           tty,
           lines,
@@ -445,11 +457,11 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
       if (action.oldContent) {
         const oldWithId: Record<string, unknown> = {
           id: action.previousId,
-          ...(action.oldContent as Record<string, unknown>),
+          ...normalized(action.syncer, action.oldContent),
         };
         const newWithId: Record<string, unknown> = {
           id: KNOWN_AFTER_APPLY,
-          ...(action.content as Record<string, unknown>),
+          ...normalized(action.syncer, action.content),
         };
         renderDiff(oldWithId, newWithId, FIELD_COL, tty, lines);
       } else {

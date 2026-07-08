@@ -1,21 +1,32 @@
 import { describe, expect, it } from "vitest";
 
+import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
+
 import { renderPlan, summarizePlan } from "../../../../src/lib/sync/plan-renderer";
 import type { ResourceSyncer, SyncAction } from "../../../../src/lib/sync/types";
 
 function makeSyncer(
   kind: string,
   directory: string,
-  { mutable = false, revisioned = false }: { mutable?: boolean; revisioned?: boolean } = {},
+  {
+    mutable = false,
+    revisioned = false,
+    normalize,
+  }: {
+    mutable?: boolean;
+    revisioned?: boolean;
+    normalize?: (data: object) => object;
+  } = {},
 ): ResourceSyncer {
   return {
     kind,
     directory,
     mutable,
     revisioned,
+    ...(normalize ? { normalize } : {}),
     validate() { /* no-op: renderer tests do not exercise validation */ },
-    async create(_d: object) { return "id"; },
-    async update() { /* no-op: renderer tests do not exercise update */ },
+    async create(_d: object) { return { id: "id" }; },
+    async update() { return {}; },
     async delete() { /* no-op: renderer tests do not exercise delete */ },
   };
 }
@@ -325,5 +336,65 @@ describe("renderPlan — string escaping", () => {
       },
     ];
     expect(renderPlan(actions, false)).toContain('"line1\\nline2"');
+  });
+});
+
+describe("renderPlan — normalized diffs", () => {
+  const normalizedFlow = makeSyncer("flow", ".zitadel/flows", {
+    mutable: true,
+    normalize: normalizeFlowBody,
+  });
+  const normalizedSchema = makeSyncer("schema", ".zitadel/schemas", {
+    revisioned: true,
+    normalize: normalizeSchemaBody,
+  });
+
+  it("does not render a server-echoed empty audience as a deletion", () => {
+    const actions: SyncAction[] = [
+      {
+        kind: "update",
+        path: ".zitadel/flows/default.json",
+        syncer: normalizedFlow,
+        id: "flow-1",
+        content: { name: "login", version: 2 },
+        hash: "h",
+        oldContent: { name: "login", version: 1, audience: {} },
+      },
+    ];
+
+    const out = renderPlan(actions, false);
+    expect(out).not.toContain("audience");
+    expect(out).toContain('~ version = 1 -> 2');
+  });
+
+  it("does not render spelled-out meta-schema defaults as schema changes", () => {
+    const actions: SyncAction[] = [
+      {
+        kind: "revise",
+        path: ".zitadel/schemas/user.json",
+        syncer: normalizedSchema,
+        content: {
+          properties: {
+            email: { type: "string" },
+            company: { type: "string" },
+          },
+        },
+        hash: "h",
+        previousId: "sch_A",
+        oldContent: {
+          properties: {
+            email: { type: "string", "x-editable": true, "x-sensitive": false },
+          },
+        },
+        affectedPaths: [],
+      },
+    ];
+
+    const out = renderPlan(actions, false);
+    // The only property-level change is the added `company`; the defaults
+    // spelled out on the server side must not read as removals.
+    expect(out).not.toContain("x-editable");
+    expect(out).not.toContain("x-sensitive");
+    expect(out).toContain("company");
   });
 });

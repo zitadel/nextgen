@@ -5,8 +5,9 @@ import { tmpdir } from "node:os";
 import { describe, expect, it, vi } from "vitest";
 
 import { createZitadelClient } from "@zitadel/api/client";
+import { normalizeFlowBody } from "@zitadel/config/normalize";
 
-import { buildSyncPlan, runSyncLoop } from "../../../../src/lib/sync/loop";
+import { buildSyncPlan, hashForState, runSyncLoop } from "../../../../src/lib/sync/loop";
 import { makeSyncers } from "../../../../src/lib/sync/syncers";
 import type { ResourceSyncer } from "../../../../src/lib/sync/syncers";
 
@@ -33,8 +34,8 @@ function makeSyncer(overrides: Partial<ResourceSyncer> = {}): ResourceSyncer {
     mutable: false,
     revisioned: false,
     validate: vi.fn(),
-    create: vi.fn().mockResolvedValue("created-id"),
-    update: vi.fn().mockResolvedValue(undefined),
+    create: vi.fn().mockResolvedValue({ id: "created-id" }),
+    update: vi.fn().mockResolvedValue({}),
     delete: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
@@ -341,7 +342,7 @@ describe("runSyncLoop", () => {
 
       const syncer = makeSyncer({
         revisioned: true,
-        create: vi.fn().mockResolvedValue("sch_B"),
+        create: vi.fn().mockResolvedValue({ id: "sch_B" }),
       });
 
       await runSyncLoop(cwd, [syncer]);
@@ -416,10 +417,153 @@ describe("runSyncLoop", () => {
       await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
 
       const syncer = makeSyncer();
-      
+
       await runSyncLoop(cwd, [syncer]);
 
       expect(syncer.delete).toHaveBeenCalledWith("old-schema-id");
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("normalized hashing and write-back", () => {
+  it("skips when state holds a legacy hash even though the normalized hash differs", async () => {
+    const cwd = makeCwd();
+    try {
+      const data = { name: "login", audience: {} };
+      const { createHash } = await import("node:crypto");
+      const legacyHash = createHash("sha256").update(JSON.stringify(data)).digest("hex");
+      await writeState(cwd, {
+        framework: "next",
+        resources: { ".zitadel/flows/default.json": { id: "flow-001", hash: legacyHash } },
+      });
+      await writeResource(cwd, ".zitadel/flows", "default.json", data);
+
+      const syncer = makeSyncer({
+        directory: ".zitadel/flows",
+        mutable: true,
+        normalize: normalizeFlowBody,
+      });
+      const actions = await buildSyncPlan(cwd, [syncer]);
+
+      // A legacy-format state hash must never read as an edit — a spurious
+      // mismatch would publish an unintended update/revision.
+      expect(actions[0].kind).toBe("skip");
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("skips when only key order differs from the hashed state", async () => {
+    const cwd = makeCwd();
+    try {
+      const syncer = makeSyncer({ directory: ".zitadel/flows", mutable: true });
+      const hash = hashForState(syncer, { a: 1, b: 2 });
+      await writeState(cwd, {
+        framework: "next",
+        resources: { ".zitadel/flows/default.json": { id: "flow-001", hash } },
+      });
+      await writeResource(cwd, ".zitadel/flows", "default.json", { b: 2, a: 1 });
+
+      const actions = await buildSyncPlan(cwd, [syncer]);
+
+      expect(actions[0].kind).toBe("skip");
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("skips when the file omits noise the hashed state was normalized over", async () => {
+    const cwd = makeCwd();
+    try {
+      const syncer = makeSyncer({
+        directory: ".zitadel/flows",
+        mutable: true,
+        normalize: normalizeFlowBody,
+      });
+      // State was seeded from a server body that carried `audience: {}`.
+      const hash = hashForState(syncer, { name: "login", audience: {} });
+      await writeState(cwd, {
+        framework: "next",
+        resources: { ".zitadel/flows/default.json": { id: "flow-001", hash } },
+      });
+      await writeResource(cwd, ".zitadel/flows", "default.json", { name: "login" });
+
+      const actions = await buildSyncPlan(cwd, [syncer]);
+
+      expect(actions[0].kind).toBe("skip");
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("writes the canonical body back after an update and converges to an empty plan", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, {
+        framework: "next",
+        resources: { ".zitadel/flows/default.json": { id: "flow-001", hash: "old-hash" } },
+      });
+      await writeResource(cwd, ".zitadel/flows", "default.json", { name: "login", version: 2 });
+
+      const syncer = makeSyncer({
+        directory: ".zitadel/flows",
+        mutable: true,
+        normalize: normalizeFlowBody,
+        update: vi.fn().mockResolvedValue({
+          // Server canonicalized the body: echoed audience plus a defaulted field.
+          canonical: { name: "login", version: 2, status: "active", audience: {} },
+        }),
+      });
+
+      const { filesUpdated } = await runSyncLoop(cwd, [syncer]);
+
+      expect(filesUpdated).toEqual([".zitadel/flows/default.json"]);
+      const { readFile } = await import("node:fs/promises");
+      const onDisk = JSON.parse(
+        await readFile(join(cwd, ".zitadel/flows/default.json"), "utf8"),
+      ) as Record<string, unknown>;
+      // Write-back stores the normalized canonical form: server noise
+      // (empty audience) stays out of the user's file.
+      expect(onDisk).toEqual({ name: "login", version: 2, status: "active" });
+
+      const actions = await buildSyncPlan(cwd, [syncer]);
+      expect(actions.every((a) => a.kind === "skip")).toBe(true);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("leaves the file untouched when the canonical body matches in normalized form", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, {
+        framework: "next",
+        resources: { ".zitadel/flows/default.json": { id: "flow-001", hash: "old-hash" } },
+      });
+      const raw = JSON.stringify({ version: 2, name: "login" });
+      await mkdir(join(cwd, ".zitadel/flows"), { recursive: true });
+      await writeFile(join(cwd, ".zitadel/flows/default.json"), raw);
+
+      const syncer = makeSyncer({
+        directory: ".zitadel/flows",
+        mutable: true,
+        normalize: normalizeFlowBody,
+        update: vi.fn().mockResolvedValue({
+          canonical: { name: "login", version: 2, audience: {} },
+        }),
+      });
+
+      const { filesUpdated } = await runSyncLoop(cwd, [syncer]);
+
+      expect(filesUpdated).toEqual([]);
+      const { readFile } = await import("node:fs/promises");
+      // Byte-identical: the churn guard skipped the rewrite.
+      expect(await readFile(join(cwd, ".zitadel/flows/default.json"), "utf8")).toBe(raw);
+
+      const actions = await buildSyncPlan(cwd, [syncer]);
+      expect(actions.every((a) => a.kind === "skip")).toBe(true);
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }

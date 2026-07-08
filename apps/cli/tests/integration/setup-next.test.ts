@@ -209,6 +209,24 @@ describe("Next setup integration", () => {
     const applyJson = parseJson(apply.stdout) as { status: string; data: { synced: boolean } };
     expect(applyJson.status).toBe("ok");
     expect(applyJson.data.synced).toBe(true);
+
+    // Noise regression guard: a one-field schema edit must render as exactly
+    // that. Server-echoed fields (`audience: {}` on flows, spelled-out x-*
+    // meta-schema defaults) must never surface as changes the user didn't make.
+    const editedSchemaPath = join(cwd, ".zitadel/schemas/default-human-user.json");
+    const editedSchema = JSON.parse(await readFile(editedSchemaPath, "utf8")) as {
+      properties: Record<string, unknown>;
+    };
+    editedSchema.properties.company = { type: "string", description: "Company name" };
+    await writeFile(editedSchemaPath, `${JSON.stringify(editedSchema, null, 2)}\n`);
+
+    const planAfterEdit = await cli(["plan", "--cwd", cwd]);
+    expect(planAfterEdit.exitCode).toBe(0);
+    const planOutput = `${planAfterEdit.stdout}\n${planAfterEdit.stderr}`;
+    expect(planOutput).toContain("company");
+    expect(planOutput).toContain("will publish a new revision");
+    expect(planOutput).not.toContain("audience");
+    expect(planOutput).not.toContain("x-editable");
   });
 
   it("skips rerun setup without rewriting edited schema or flow config", async () => {

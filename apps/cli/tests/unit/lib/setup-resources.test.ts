@@ -9,9 +9,12 @@ import {
 } from "@zitadel/config/defaults";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
+
 import { materializeSetupResources } from "../../../src/lib/setup-resources";
 import { FLOWS_DIR } from "../../../src/lib/flows";
 import { SCHEMAS_DIR } from "../../../src/lib/user-schema";
+import { hashForState } from "../../../src/lib/sync";
 import type { ZitadelState } from "../../../src/lib/sync/types";
 
 let cwd: string;
@@ -80,6 +83,67 @@ describe("materializeSetupResources", () => {
       await readFile(join(cwd, DEFAULT_FLOW_CONFIG_PATH), "utf8"),
     ) as { user_schema: string };
     expect(flowFile.user_schema).toBe("sch_01KWHF");
+  });
+
+  it("reconciles the schema file with the server's stored body and seeds its hash", async () => {
+    const canonical = {
+      objectType: "human-user",
+      kind: "user-schema",
+      title: "ServerCanonicalTitle",
+      properties: { email: { type: "string", "x-editable": true } },
+    };
+    const client = {
+      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
+      getSchemaById: vi.fn().mockResolvedValue(canonical),
+      createFlowDefinition: vi.fn().mockResolvedValue({
+        id: "flow_01KWHG",
+        status: "active",
+      }),
+    } as unknown as ZitadelClient;
+
+    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false });
+
+    const schemaFile = JSON.parse(
+      await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8"),
+    ) as Record<string, unknown>;
+    // The file holds the server's stored body in normalized form: the
+    // canonicalized title survives, the meta-schema default does not.
+    expect(schemaFile.title).toBe("ServerCanonicalTitle");
+    expect(schemaFile.properties).toEqual({ email: { type: "string" } });
+
+    const state = JSON.parse(
+      await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
+    ) as ZitadelState;
+    expect(state.resources[DEFAULT_SCHEMA_CONFIG_PATH]?.hash).toBe(
+      hashForState({ normalize: normalizeSchemaBody }, schemaFile),
+    );
+  });
+
+  it("keeps the server's empty audience echo out of the flow file and hashes past it", async () => {
+    const client = {
+      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
+      createFlowDefinition: vi.fn().mockImplementation(async (body: {
+        flow_definition: Record<string, unknown>;
+      }) => ({
+        id: "flow_01KWHG",
+        status: "active",
+        flow_definition: { audience: {}, ...body.flow_definition },
+      })),
+    } as unknown as ZitadelClient;
+
+    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false });
+
+    const flowFile = JSON.parse(
+      await readFile(join(cwd, DEFAULT_FLOW_CONFIG_PATH), "utf8"),
+    ) as Record<string, unknown>;
+    expect(flowFile).not.toHaveProperty("audience");
+
+    const state = JSON.parse(
+      await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
+    ) as ZitadelState;
+    expect(state.resources[DEFAULT_FLOW_CONFIG_PATH]?.hash).toBe(
+      hashForState({ normalize: normalizeFlowBody }, flowFile),
+    );
   });
 
   it("writes schemas and flows READMEs the first time", async () => {

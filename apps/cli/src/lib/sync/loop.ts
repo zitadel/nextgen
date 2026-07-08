@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { consola } from "consola";
 
 import { FLOWS_DIR } from "../flows";
+import { stableStringify } from "../json";
 import { readState, removeFromState, updateState } from "./state.js";
 import type { ResourceEntry, ResourceSyncer, SyncAction } from "./types.js";
 
@@ -72,14 +73,19 @@ export async function buildSyncPlan(
     for (const [absPath, content] of onDisk.entries()) {
       const relPath = absPath.slice(cwd.length + 1);
       const entry = state.resources[relPath];
-      const hash = hashResourceContent(content);
+      const hash = hashForState(syncer, content);
 
       if (!entry?.id) {
         actions.push({ kind: "create", path: relPath, syncer, content, hash });
         continue;
       }
 
-      if (entry.hash === hash) {
+      // State files written before normalized hashing hold legacy hashes
+      // (order-sensitive, un-normalized). Accepting either format keeps an
+      // untouched file a skip — a spurious mismatch here would publish a
+      // garbage schema revision. Writes always store the new format, so
+      // state converges on the next real change.
+      if (entry.hash === hash || entry.hash === hashResourceContent(content)) {
         actions.push({ kind: "skip", path: relPath, reason: "no-change" });
         continue;
       }
@@ -120,10 +126,23 @@ export async function buildSyncPlan(
   return actions;
 }
 
+/** Result of {@link runSyncLoop}: the local files the loop rewrote. */
+export type SyncLoopResult = {
+  /**
+   * Project-relative paths of files updated from the server's canonical
+   * responses (write-back). Surfaced in human and `--json` output so a
+   * local rewrite is never silent.
+   */
+  filesUpdated: string[];
+};
+
 /**
  * Execute every action returned by {@link buildSyncPlan} against the
  * platform. Updates the local state file (`.zitadel/state.json`) as
- * each action completes so an interrupted run can resume.
+ * each action completes so an interrupted run can resume. After each
+ * mutation, the server's canonical body is written back to the local
+ * file (when it differs in normalized form), so repo config matches
+ * live state by construction and the next `plan` is empty.
  *
  * The platform target (base URL + bearer auth) lives in the api
  * package's runtime registries; callers set them before invoking this.
@@ -135,14 +154,30 @@ export async function buildSyncPlan(
 export async function runSyncLoop(
   cwd: string,
   syncers: ReadonlyArray<ResourceSyncer>,
-): Promise<void> {
+): Promise<SyncLoopResult> {
   const actions = await buildSyncPlan(cwd, syncers);
+  const filesUpdated: string[] = [];
+
+  const writeBack = async (
+    action: Extract<SyncAction, { kind: "create" | "revise" | "update" }>,
+    canonical: object | undefined,
+  ): Promise<string> => {
+    if (!canonical) {
+      return action.hash;
+    }
+    const { hash, changed } = await writeBackResource(cwd, action.path, action.syncer, canonical);
+    if (changed) {
+      filesUpdated.push(action.path);
+      consola.info(`Updated ${action.path} from the server's canonical response`);
+    }
+    return hash;
+  };
 
   for (const action of actions) {
     switch (action.kind) {
       case "create": {
-        const id = await action.syncer.create(action.content);
-        const entry: ResourceEntry = { id, hash: action.hash };
+        const { id, canonical } = await action.syncer.create(action.content);
+        const entry: ResourceEntry = { id, hash: await writeBack(action, canonical) };
         await updateState(cwd, action.path, entry);
         consola.info(
           `Created a new ${action.syncer.kind} on Zitadel from ${action.path} (id ${id})`,
@@ -150,8 +185,8 @@ export async function runSyncLoop(
         break;
       }
       case "revise": {
-        const id = await action.syncer.create(action.content);
-        const entry: ResourceEntry = { id, hash: action.hash };
+        const { id, canonical } = await action.syncer.create(action.content);
+        const entry: ResourceEntry = { id, hash: await writeBack(action, canonical) };
         await updateState(cwd, action.path, entry);
         consola.info(
           `Published a new ${action.syncer.kind} revision on Zitadel from ${action.path} (id ${id})`,
@@ -166,8 +201,8 @@ export async function runSyncLoop(
         break;
       }
       case "update": {
-        await action.syncer.update(action.id, action.content);
-        await updateState(cwd, action.path, { hash: action.hash });
+        const { canonical } = await action.syncer.update(action.id, action.content);
+        await updateState(cwd, action.path, { hash: await writeBack(action, canonical) });
         consola.info(`Updated the ${action.syncer.kind} on Zitadel from ${action.path}`);
         break;
       }
@@ -185,6 +220,38 @@ export async function runSyncLoop(
       }
     }
   }
+
+  return { filesUpdated };
+}
+
+/**
+ * Reconcile a local file with the server's canonical body: normalize the
+ * canonical form (write-back must not inject server noise like an empty
+ * `audience` into user files), rewrite the file only when it materially
+ * differs from what's on disk, and return the state hash of the canonical
+ * form. The churn guard keeps hand-formatted files untouched unless the
+ * server actually canonicalized something.
+ */
+export async function writeBackResource(
+  cwd: string,
+  relPath: string,
+  syncer: Pick<ResourceSyncer, "normalize">,
+  canonical: object,
+): Promise<{ hash: string; changed: boolean }> {
+  const normalizedBody = syncer.normalize?.(canonical) ?? canonical;
+  const absPath = join(cwd, relPath);
+  let changed = true;
+  try {
+    const onDisk = JSON.parse(await readFile(absPath, "utf8")) as object;
+    const onDiskNormalized = syncer.normalize?.(onDisk) ?? onDisk;
+    changed = stableStringify(normalizedBody) !== stableStringify(onDiskNormalized);
+  } catch (err) {
+    consola.debug(`read ${relPath} for write-back failed:`, err);
+  }
+  if (changed) {
+    await writeFile(absPath, `${stableStringify(normalizedBody)}\n`);
+  }
+  return { hash: hashForState(syncer, normalizedBody), changed };
 }
 
 async function fetchOldIfAsked(
@@ -258,6 +325,25 @@ function findFlowsPinnedTo(
   return affected;
 }
 
+/**
+ * Legacy content hash: order-sensitive and normalization-blind. Kept only
+ * so state entries written by older CLI versions still match; new hashes
+ * come from {@link hashForState}.
+ */
 export function hashResourceContent(data: object): string {
   return createHash("sha256").update(JSON.stringify(data)).digest("hex");
+}
+
+/**
+ * The content hash stored in `.zitadel/state.json`: key-order-insensitive
+ * (via `stableStringify`) and computed on the syncer's normalized form, so
+ * reordering keys or spelling out a meta-schema default does not read as an
+ * edit.
+ */
+export function hashForState(
+  syncer: Pick<ResourceSyncer, "normalize">,
+  data: object,
+): string {
+  const normalized = syncer.normalize?.(data) ?? data;
+  return createHash("sha256").update(stableStringify(normalized)).digest("hex");
 }
