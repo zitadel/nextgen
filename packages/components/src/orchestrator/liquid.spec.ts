@@ -289,6 +289,32 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain("forgot-password-href");
     expect(result).toContain('label="Sign in"');
     expect(result).not.toContain('label="Continue"');
+    expect(result.match(/data-testid="zitadel-action-passkey"/g)).toHaveLength(1);
+  });
+
+  it("renders a primary passkey action as exactly one button (passkey-first flow)", () => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    const a = toArray({
+      passkey: { text_key: "identifier.action.passkey", primary: true },
+      register: { text_key: "identifier.action.register.link" },
+    });
+    const context = {
+      step: { name: "identifier", texts: { title_key: "identifier.title" } },
+      fields: [],
+      actions: a,
+      branding: {},
+      loading: false,
+      errors: [],
+      gates: {},
+      sso_providers: [],
+      messages: [],
+      identity: null,
+    };
+    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    const passkeyButtons = result.match(/data-testid="zitadel-action-passkey"/g);
+    expect(passkeyButtons).toHaveLength(1);
+    expect(result).toContain('hierarchy="primary"');
+    expect(result).not.toContain('hierarchy="secondary"');
   });
 
   it("renders sign-in wrong credentials (6602:180268): inline password error, no form alert", () => {
