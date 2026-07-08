@@ -18,11 +18,11 @@ enum FlowPurpose {
   ];
 
   String get wire => switch (this) {
-        login => 'login',
-        register => 'register',
-        recovery => 'recovery',
-        profiling => 'profiling',
-        reauth => 'reauth',
-        linkAccount => 'link_account',
-      };
+    login => 'login',
+    register => 'register',
+    recovery => 'recovery',
+    profiling => 'profiling',
+    reauth => 'reauth',
+    linkAccount => 'link_account',
+  };
 }

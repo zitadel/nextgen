@@ -19,12 +19,12 @@ enum SessionState {
   static const wireValues = ['building', 'active', 'expired', 'revoked'];
 
   static SessionState fromWire(String? value) => switch (value) {
-        'building' => building,
-        'active' => active,
-        'expired' => expired,
-        'revoked' => revoked,
-        _ => unknown,
-      };
+    'building' => building,
+    'active' => active,
+    'expired' => expired,
+    'revoked' => revoked,
+    _ => unknown,
+  };
 }
 
 /// The durable post-auth primitive: accumulated verified factors plus the

@@ -27,8 +27,10 @@ class ZitadelLocalizer {
     String? languageCode,
     Map<String, Map<String, String>>? overrides,
   }) {
-    final primary =
-        (languageCode ?? 'en').split(RegExp('[-_]')).first.toLowerCase();
+    final primary = (languageCode ?? 'en')
+        .split(RegExp('[-_]'))
+        .first
+        .toLowerCase();
     final base = builtinLocales[primary] ?? l10n_en.en;
     final custom = overrides?[primary] ?? overrides?[languageCode];
     return ZitadelLocalizer._(

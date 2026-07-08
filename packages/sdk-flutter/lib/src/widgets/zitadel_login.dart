@@ -29,6 +29,7 @@ class ZitadelLogin extends StatefulWidget {
     this.purpose = FlowPurpose.login,
     this.resumeFlowId,
     this.autoExchange = true,
+    this.enableAltchaGates = false,
     this.languageCode,
     this.localeOverrides,
     this.onStep,
@@ -51,6 +52,11 @@ class ZitadelLogin extends StatefulWidget {
   /// to handle the exchange yourself from [onComplete].
   final bool autoExchange;
 
+  /// Solve and submit altcha captcha gates. Off by default — the current
+  /// server rejects gate proofs as reserved; see
+  /// [FlowController.enableAltchaGates].
+  final bool enableAltchaGates;
+
   /// BCP 47 tag for label resolution; defaults to the ambient
   /// [Localizations] locale, falling back to English.
   final String? languageCode;
@@ -69,7 +75,7 @@ class ZitadelLogin extends StatefulWidget {
 
   /// Replaces the built-in success screen for `complete: "show"`.
   final Widget Function(BuildContext context, FlowCompletion completion)?
-      completedBuilder;
+  completedBuilder;
 
   /// Inject a preconfigured controller (tests, custom clients). When set,
   /// `project`/`purpose`/`resumeFlowId`/`autoExchange` and the callbacks on
@@ -98,14 +104,15 @@ class _ZitadelLoginState extends State<ZitadelLogin> {
   }
 
   FlowController _buildController() => FlowController(
-        project: widget.project,
-        purpose: widget.purpose,
-        resumeFlowId: widget.resumeFlowId,
-        autoExchange: widget.autoExchange,
-        onComplete: widget.onComplete,
-        onError: widget.onError,
-        onUnsupportedCapability: widget.onUnsupportedCapability,
-      );
+    project: widget.project,
+    purpose: widget.purpose,
+    resumeFlowId: widget.resumeFlowId,
+    autoExchange: widget.autoExchange,
+    enableAltchaGates: widget.enableAltchaGates,
+    onComplete: widget.onComplete,
+    onError: widget.onError,
+    onUnsupportedCapability: widget.onUnsupportedCapability,
+  );
 
   void _onControllerChanged() {
     final state = _controller.state;
@@ -123,49 +130,51 @@ class _ZitadelLoginState extends State<ZitadelLogin> {
   }
 
   ZitadelLocalizer get _localizer => ZitadelLocalizer.resolve(
-        languageCode: widget.languageCode ??
-            Localizations.maybeLocaleOf(context)?.toLanguageTag(),
-        overrides: widget.localeOverrides,
-      );
+    languageCode:
+        widget.languageCode ??
+        Localizations.maybeLocaleOf(context)?.toLanguageTag(),
+    overrides: widget.localeOverrides,
+  );
 
   @override
   Widget build(BuildContext context) {
     final state = _controller.state;
     final body = switch (state) {
-      FlowLoading() => widget.loadingBuilder?.call(context) ??
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.all(48),
-              child: CircularProgressIndicator(),
+      FlowLoading() =>
+        widget.loadingBuilder?.call(context) ??
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(48),
+                child: CircularProgressIndicator(),
+              ),
             ),
-          ),
       FlowStepReady() => StepRenderer(
-          step: state.step,
-          values: state.values,
-          localizer: _localizer,
-          submitting: state.submitting,
-          transportError: state.transportError,
-          branding: state.response.branding,
-          onValueChanged: (name, value) {
-            _controller.setValue(name, value);
-            widget.onInput?.call(name, value);
-          },
-          onAction: (action) {
-            // ignore: discarded_futures
-            _controller.submitAction(action);
-          },
-        ),
+        step: state.step,
+        values: state.values,
+        localizer: _localizer,
+        submitting: state.submitting,
+        transportError: state.transportError,
+        branding: state.response.branding,
+        onValueChanged: (name, value) {
+          _controller.setValue(name, value);
+          widget.onInput?.call(name, value);
+        },
+        onAction: (action) {
+          // ignore: discarded_futures
+          _controller.submitAction(action);
+        },
+      ),
       FlowCompleted() =>
         widget.completedBuilder?.call(context, state.completion) ??
             _CompletedView(completion: state.completion, localizer: _localizer),
       FlowFailed() => _FailedView(
-          error: state.error,
-          localizer: _localizer,
-          onRetry: () {
-            // ignore: discarded_futures
-            _controller.start();
-          },
-        ),
+        error: state.error,
+        localizer: _localizer,
+        onRetry: () {
+          // ignore: discarded_futures
+          _controller.start();
+        },
+      ),
     };
 
     return ConstrainedBox(
@@ -236,7 +245,9 @@ class _FailedView extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         TextButton(
-            onPressed: onRetry, child: Text(localizer.t('submit.continue'))),
+          onPressed: onRetry,
+          child: Text(localizer.t('submit.continue')),
+        ),
       ],
     );
   }

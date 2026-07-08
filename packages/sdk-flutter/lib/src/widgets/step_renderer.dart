@@ -66,7 +66,8 @@ class StepRenderer extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 16),
               child: _ErrorBanner(
-                message: transportError ??
+                message:
+                    transportError ??
                     (step.errorIsTextKey
                         ? localizer.t(step.error!)
                         : step.error!),
@@ -278,19 +279,19 @@ class _FieldWidget extends StatelessWidget {
   }
 
   TextInputType? get _keyboardType => switch (field.type) {
-        FieldType.email => TextInputType.emailAddress,
-        FieldType.tel => TextInputType.phone,
-        FieldType.number => TextInputType.number,
-        FieldType.url => TextInputType.url,
-        _ => null,
-      };
+    FieldType.email => TextInputType.emailAddress,
+    FieldType.tel => TextInputType.phone,
+    FieldType.number => TextInputType.number,
+    FieldType.url => TextInputType.url,
+    _ => null,
+  };
 
   List<String>? get _autofillHints => switch (field.type) {
-        FieldType.email => const [AutofillHints.email],
-        FieldType.password => const [AutofillHints.password],
-        FieldType.tel => const [AutofillHints.telephoneNumber],
-        _ => null,
-      };
+    FieldType.email => const [AutofillHints.email],
+    FieldType.password => const [AutofillHints.password],
+    FieldType.tel => const [AutofillHints.telephoneNumber],
+    _ => null,
+  };
 
   /// Client-side hints from `validation` — a UX nicety; the server
   /// re-validates on submit and is the only authority.

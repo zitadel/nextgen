@@ -8,8 +8,9 @@ void main() {
   test('solves a known SHA-256 proof-of-work challenge', () async {
     const salt = 'abc123';
     const secretNumber = 4242;
-    final challenge =
-        sha256.convert(utf8.encode('$salt$secretNumber')).toString();
+    final challenge = sha256
+        .convert(utf8.encode('$salt$secretNumber'))
+        .toString();
 
     final proof = await const AltchaSolver().solve({
       'algorithm': 'SHA-256',

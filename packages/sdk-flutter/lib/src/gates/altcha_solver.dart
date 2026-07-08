@@ -38,14 +38,18 @@ class AltchaSolver {
     );
     if (number == null) return null;
 
-    return base64Encode(utf8.encode(jsonEncode({
-      'algorithm': 'SHA-256',
-      'challenge': challenge,
-      'number': number,
-      'salt': salt,
-      'signature': config['signature'] ?? '',
-      'took': DateTime.now().difference(started).inMilliseconds,
-    })));
+    return base64Encode(
+      utf8.encode(
+        jsonEncode({
+          'algorithm': 'SHA-256',
+          'challenge': challenge,
+          'number': number,
+          'salt': salt,
+          'signature': config['signature'] ?? '',
+          'took': DateTime.now().difference(started).inMilliseconds,
+        }),
+      ),
+    );
   }
 
   static int? _search({

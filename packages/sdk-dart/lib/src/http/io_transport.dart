@@ -11,16 +11,17 @@ import 'transport.dart';
 /// JS SDKs instead.
 class IoTransport implements ZitadelTransport {
   IoTransport({HttpClient? client, Duration? timeout})
-      : _client = client ?? HttpClient(),
-        _timeout = timeout ?? const Duration(seconds: 30);
+    : _client = client ?? HttpClient(),
+      _timeout = timeout ?? const Duration(seconds: 30);
 
   final HttpClient _client;
   final Duration _timeout;
 
   @override
   Future<ZitadelResponse> send(ZitadelRequest request) async {
-    final ioRequest =
-        await _client.openUrl(request.method, request.url).timeout(_timeout);
+    final ioRequest = await _client
+        .openUrl(request.method, request.url)
+        .timeout(_timeout);
     // We manage the _zflow cookie through CookieStore explicitly; the
     // HttpClient's own jar must not interfere or duplicate headers.
     ioRequest.followRedirects = false;

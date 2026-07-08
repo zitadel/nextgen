@@ -23,9 +23,8 @@ ZitadelResponse jsonResponse(
   int status,
   Object? body, {
   List<String>? setCookies,
-}) =>
-    ZitadelResponse(
-      status: status,
-      body: body == null ? '' : jsonEncode(body),
-      setCookies: setCookies,
-    );
+}) => ZitadelResponse(
+  status: status,
+  body: body == null ? '' : jsonEncode(body),
+  setCookies: setCookies,
+);

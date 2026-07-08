@@ -53,8 +53,9 @@ class _ZitadelLogoutState extends State<ZitadelLogout> {
 
   @override
   Widget build(BuildContext context) {
-    final localizer =
-        ZitadelLocalizer.resolve(languageCode: widget.languageCode);
+    final localizer = ZitadelLocalizer.resolve(
+      languageCode: widget.languageCode,
+    );
     return OutlinedButton(
       onPressed: _busy
           ? null

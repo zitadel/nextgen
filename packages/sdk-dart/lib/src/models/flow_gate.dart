@@ -11,10 +11,10 @@ class FlowGate {
   });
 
   factory FlowGate.fromJson(Map<String, Object?> json) => FlowGate(
-        kind: reqString(json, 'kind'),
-        provider: reqString(json, 'provider'),
-        config: optMap(json, 'config') ?? const {},
-      );
+    kind: reqString(json, 'kind'),
+    provider: reqString(json, 'provider'),
+    config: optMap(json, 'config') ?? const {},
+  );
 
   static const specProperties = {'kind', 'provider', 'config'};
   static const specRequired = {'kind', 'provider'};

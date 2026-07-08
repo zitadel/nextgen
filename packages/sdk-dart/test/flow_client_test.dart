@@ -7,24 +7,23 @@ Map<String, Object?> flowBody({
   String id = 'flow_1',
   String stepName = 'login',
   String? error,
-}) =>
-    {
-      'id': id,
-      'session_id': 'sess_1',
-      'step': {
-        'name': stepName,
-        if (error != null) 'error': error,
-        'fields': <Object?>[],
-        'actions': <Object?>[],
-        'gates': <String, Object?>{},
-      },
-    };
+}) => {
+  'id': id,
+  'session_id': 'sess_1',
+  'step': {
+    'name': stepName,
+    if (error != null) 'error': error,
+    'fields': <Object?>[],
+    'actions': <Object?>[],
+    'gates': <String, Object?>{},
+  },
+};
 
 ZitadelProject projectWith(FakeTransport transport) => configureZitadel(
-      projectId: 'proj_1',
-      baseUrl: Uri.parse('https://app.example/__nextgen'),
-      transport: transport,
-    );
+  projectId: 'proj_1',
+  baseUrl: Uri.parse('https://app.example/__nextgen'),
+  transport: transport,
+);
 
 void main() {
   test('create posts project_id and purpose to /flow', () async {
@@ -36,10 +35,7 @@ void main() {
     final request = transport.requests.single;
     expect(request.method, 'POST');
     expect(request.url.toString(), 'https://app.example/__nextgen/flow');
-    expect(request.jsonBody, {
-      'project_id': 'proj_1',
-      'purpose': 'register',
-    });
+    expect(request.jsonBody, {'project_id': 'proj_1', 'purpose': 'register'});
     expect(response.id, 'flow_1');
   });
 
@@ -65,21 +61,23 @@ void main() {
     expect(transport.requests[1].headers['cookie'], '_zflow=state1');
   });
 
-  test('submit unwraps a 400 that echoes the step (field validation)',
-      () async {
-    final transport = FakeTransport([
-      jsonResponse(400, flowBody(error: 'error.invalid_credentials')),
-    ]);
-    final client = FlowClient(projectWith(transport));
+  test(
+    'submit unwraps a 400 that echoes the step (field validation)',
+    () async {
+      final transport = FakeTransport([
+        jsonResponse(400, flowBody(error: 'error.invalid_credentials')),
+      ]);
+      final client = FlowClient(projectWith(transport));
 
-    final response = await client.submit(
-      'flow_1',
-      const SubmitRequest(action: 'submit', fields: {'password': 'nope'}),
-    );
+      final response = await client.submit(
+        'flow_1',
+        const SubmitRequest(action: 'submit', fields: {'password': 'nope'}),
+      );
 
-    expect(response.step.error, 'error.invalid_credentials');
-    expect(response.step.errorIsTextKey, isTrue);
-  });
+      expect(response.step.error, 'error.invalid_credentials');
+      expect(response.step.errorIsTextKey, isTrue);
+    },
+  );
 
   test('submit rethrows a 400 without a step in the body', () async {
     final transport = FakeTransport([

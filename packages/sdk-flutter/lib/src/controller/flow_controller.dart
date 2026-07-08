@@ -95,7 +95,9 @@ class FlowFailed extends FlowUiState {
 /// - re-reads the flow handle from every response (it rotates on pivots);
 /// - unwrapped validation errors surface as `step.error` on a new step
 ///   state, transport errors as [FlowStepReady.transportError];
-/// - solves supported gates (altcha proof-of-work) before submitting;
+/// - optionally solves altcha proof-of-work gates before submitting
+///   ([enableAltchaGates], off by default until the server accepts
+///   gate proofs);
 /// - on a terminal step, optionally exchanges the handoff token
 ///   ([autoExchange]) and emits a [FlowCompletion].
 class FlowController extends ChangeNotifier {
@@ -104,15 +106,16 @@ class FlowController extends ChangeNotifier {
     this.purpose = FlowPurpose.login,
     this.resumeFlowId,
     this.autoExchange = false,
+    this.enableAltchaGates = false,
     this.onComplete,
     this.onError,
     this.onUnsupportedCapability,
     FlowClient? flowClient,
     SessionClient? sessionClient,
     AltchaSolver? altchaSolver,
-  })  : _flows = flowClient ?? FlowClient(project),
-        _sessions = sessionClient ?? SessionClient(project),
-        _altcha = altchaSolver ?? const AltchaSolver();
+  }) : _flows = flowClient ?? FlowClient(project),
+       _sessions = sessionClient ?? SessionClient(project),
+       _altcha = altchaSolver ?? const AltchaSolver();
 
   final ZitadelProject project;
   final FlowPurpose purpose;
@@ -126,12 +129,22 @@ class FlowController extends ChangeNotifier {
   /// Requires the base URL to point at a credentialed proxy.
   final bool autoExchange;
 
+  /// Solve altcha proof-of-work gates and submit their proofs. **Off by
+  /// default:** the current server rejects any non-empty `gate_proofs`
+  /// with an unsupported error (`internal/domain/flow_state_machine.go`
+  /// treats them as reserved) and never emits gates yet. Until server-side
+  /// gate verification lands, altcha gates are reported through
+  /// [onUnsupportedCapability] like every other provider. Flip this on
+  /// against a backend that accepts proofs (e.g. the mock server).
+  final bool enableAltchaGates;
+
   final void Function(FlowCompletion completion)? onComplete;
   final void Function(Object error)? onError;
 
   /// Invoked when the server sends a capability this SDK version cannot
-  /// drive natively yet (passkey actions, non-altcha captcha gates, SSO
-  /// providers). The step still renders; the capability is omitted.
+  /// drive natively yet (passkey actions, captcha gates unless
+  /// [enableAltchaGates] covers them, SSO providers). The step still
+  /// renders; the capability is omitted.
   final void Function(String capability)? onUnsupportedCapability;
 
   final FlowClient _flows;
@@ -166,11 +179,13 @@ class FlowController extends ChangeNotifier {
     _values = {..._values, name: value};
     final current = _state;
     if (current is FlowStepReady) {
-      _setState(FlowStepReady(
-        response: current.response,
-        values: _values,
-        submitting: current.submitting,
-      ));
+      _setState(
+        FlowStepReady(
+          response: current.response,
+          values: _values,
+          submitting: current.submitting,
+        ),
+      );
     }
   }
 
@@ -183,11 +198,13 @@ class FlowController extends ChangeNotifier {
     final current = _state;
     if (current is! FlowStepReady || current.submitting) return;
 
-    _setState(FlowStepReady(
-      response: current.response,
-      values: _values,
-      submitting: true,
-    ));
+    _setState(
+      FlowStepReady(
+        response: current.response,
+        values: _values,
+        submitting: true,
+      ),
+    );
     try {
       final step = current.step;
       final fields = <String, Object?>{
@@ -210,12 +227,15 @@ class FlowController extends ChangeNotifier {
       onError?.call(error);
       // Keep the step interactive: show the transport failure inline and
       // let the user retry, mirroring the web orchestrator.
-      _setState(FlowStepReady(
-        response: current.response,
-        values: _values,
-        transportError:
-            error is ZitadelApiException ? error.message : error.toString(),
-      ));
+      _setState(
+        FlowStepReady(
+          response: current.response,
+          values: _values,
+          transportError: error is ZitadelApiException
+              ? error.message
+              : error.toString(),
+        ),
+      );
     }
   }
 
@@ -270,6 +290,7 @@ class FlowController extends ChangeNotifier {
 
   Future<Map<String, String>> _solveGates(FlowStep step) async {
     final proofs = <String, String>{};
+    if (!enableAltchaGates) return proofs;
     for (final entry in step.gates.entries) {
       final gate = entry.value;
       if (gate.kind == 'captcha' && gate.provider == 'altcha') {
@@ -296,7 +317,11 @@ class FlowController extends ChangeNotifier {
       }
     }
     for (final gate in step.gates.values) {
-      if (gate.kind != 'captcha' || gate.provider != 'altcha') {
+      final solvable =
+          enableAltchaGates &&
+          gate.kind == 'captcha' &&
+          gate.provider == 'altcha';
+      if (!solvable) {
         report('gate:${gate.kind}:${gate.provider}');
       }
     }

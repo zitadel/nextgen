@@ -15,11 +15,11 @@ enum StepComplete {
   static const wireValues = ['redirect', 'show'];
 
   static StepComplete? fromWire(String? value) => switch (value) {
-        null => null,
-        'redirect' => redirect,
-        'show' => show,
-        _ => unknown,
-      };
+    null => null,
+    'redirect' => redirect,
+    'show' => show,
+    _ => unknown,
+  };
 }
 
 /// Step-level localization keys.
@@ -28,9 +28,9 @@ class StepTexts {
   const StepTexts({this.titleKey, this.descriptionKey});
 
   factory StepTexts.fromJson(Map<String, Object?> json) => StepTexts(
-        titleKey: optString(json, 'title_key'),
-        descriptionKey: optString(json, 'description_key'),
-      );
+    titleKey: optString(json, 'title_key'),
+    descriptionKey: optString(json, 'description_key'),
+  );
 
   static const specProperties = {'title_key', 'description_key'};
 
@@ -48,10 +48,10 @@ class SsoProvider {
   });
 
   factory SsoProvider.fromJson(Map<String, Object?> json) => SsoProvider(
-        id: reqString(json, 'id'),
-        name: reqString(json, 'name'),
-        template: reqString(json, 'template'),
-      );
+    id: reqString(json, 'id'),
+    name: reqString(json, 'name'),
+    template: reqString(json, 'template'),
+  );
 
   static const specProperties = {'id', 'name', 'template'};
   static const specRequired = {'id', 'name', 'template'};
@@ -76,10 +76,10 @@ class FlowChallenge {
   });
 
   factory FlowChallenge.fromJson(Map<String, Object?> json) => FlowChallenge(
-        method: reqString(json, 'method'),
-        challengeId: reqString(json, 'challenge_id'),
-        options: optMap(json, 'options') ?? const {},
-      );
+    method: reqString(json, 'method'),
+    challengeId: reqString(json, 'challenge_id'),
+    options: optMap(json, 'options') ?? const {},
+  );
 
   static const specProperties = {'method', 'challenge_id', 'options'};
   static const specMethodWireValues = ['passkey', 'passkey_register'];

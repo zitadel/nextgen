@@ -19,13 +19,13 @@ enum ActionKind {
   ];
 
   static ActionKind fromWire(String? value) => switch (value) {
-        'submit' => submit,
-        'passkey' => passkey,
-        'passkey_register' => passkeyRegister,
-        'navigate' => navigate,
-        'back' => back,
-        _ => unknown,
-      };
+    'submit' => submit,
+    'passkey' => passkey,
+    'passkey_register' => passkeyRegister,
+    'navigate' => navigate,
+    'back' => back,
+    _ => unknown,
+  };
 }
 
 /// A user-invokable action on a step. `name` goes back on the wire as the
@@ -40,11 +40,11 @@ class FlowAction {
   });
 
   factory FlowAction.fromJson(Map<String, Object?> json) => FlowAction(
-        name: reqString(json, 'name'),
-        kind: ActionKind.fromWire(optString(json, 'kind')),
-        primary: boolOr(json, 'primary', orElse: false),
-        textKey: optString(json, 'text_key'),
-      );
+    name: reqString(json, 'name'),
+    kind: ActionKind.fromWire(optString(json, 'kind')),
+    primary: boolOr(json, 'primary', orElse: false),
+    textKey: optString(json, 'text_key'),
+  );
 
   static const specProperties = {'name', 'kind', 'primary', 'text_key'};
   static const specRequired = {'name', 'kind'};

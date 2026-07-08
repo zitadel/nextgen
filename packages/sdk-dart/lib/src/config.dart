@@ -17,9 +17,9 @@ class ZitadelProject {
     ZitadelTransport? transport,
     CookieStore? cookieStore,
     TokenStore? tokenStore,
-  })  : transport = transport ?? IoTransport(),
-        cookieStore = cookieStore ?? InMemoryCookieStore(),
-        tokenStore = tokenStore ?? InMemoryTokenStore() {
+  }) : transport = transport ?? IoTransport(),
+       cookieStore = cookieStore ?? InMemoryCookieStore(),
+       tokenStore = tokenStore ?? InMemoryTokenStore() {
     if (!baseUrl.isAbsolute) {
       throw ArgumentError.value(
         baseUrl,
@@ -68,11 +68,10 @@ ZitadelProject configureZitadel({
   ZitadelTransport? transport,
   CookieStore? cookieStore,
   TokenStore? tokenStore,
-}) =>
-    ZitadelProject(
-      projectId: projectId,
-      baseUrl: baseUrl,
-      transport: transport,
-      cookieStore: cookieStore,
-      tokenStore: tokenStore,
-    );
+}) => ZitadelProject(
+  projectId: projectId,
+  baseUrl: baseUrl,
+  transport: transport,
+  cookieStore: cookieStore,
+  tokenStore: tokenStore,
+);

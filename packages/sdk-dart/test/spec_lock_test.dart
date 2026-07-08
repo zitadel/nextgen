@@ -23,8 +23,7 @@ YamlMap loadSpec(String relativePath) =>
     loadYaml(File('$specRoot/$relativePath').readAsStringSync()) as YamlMap;
 
 Set<String> properties(YamlMap schema) =>
-    ((schema['properties'] as YamlMap?) ?? YamlMap())
-        .keys
+    ((schema['properties'] as YamlMap?) ?? YamlMap()).keys
         .cast<String>()
         .toSet();
 
@@ -33,8 +32,9 @@ Set<String> required(YamlMap schema) =>
 
 List<String> enumOf(YamlMap schema, String property) =>
     ((schema['properties'] as YamlMap)[property] as YamlMap)['enum']
-        .cast<String>()
-        .toList() as List<String>;
+            .cast<String>()
+            .toList()
+        as List<String>;
 
 YamlMap propertySchema(YamlMap schema, String property) =>
     (schema['properties'] as YamlMap)[property] as YamlMap;
@@ -64,10 +64,7 @@ void main() {
 
     final challenge = propertySchema(schema, 'challenge');
     expect(properties(challenge), FlowChallenge.specProperties);
-    expect(
-      enumOf(challenge, 'method'),
-      FlowChallenge.specMethodWireValues,
-    );
+    expect(enumOf(challenge, 'method'), FlowChallenge.specMethodWireValues);
   });
 
   test('field.yaml matches FlowField, FieldType, and FieldValidation', () {
@@ -138,15 +135,17 @@ void main() {
   });
 
   test('session-with-token-response.yaml matches SessionWithToken', () {
-    final schema =
-        loadSpec('endpoints/sessions/session-with-token-response.yaml');
+    final schema = loadSpec(
+      'endpoints/sessions/session-with-token-response.yaml',
+    );
     expect(properties(schema), SessionWithToken.specProperties);
     expect(required(schema), SessionWithToken.specRequired);
   });
 
   test('exchange-request.yaml matches SessionClient.exchange', () {
-    final schema =
-        loadSpec('endpoints/sessions/exchange/exchange-request.yaml');
+    final schema = loadSpec(
+      'endpoints/sessions/exchange/exchange-request.yaml',
+    );
     // exchange() builds this body inline; the manifest lives here.
     expect(properties(schema), {'handoff_token', 'ttl'});
     expect(required(schema), {'handoff_token'});

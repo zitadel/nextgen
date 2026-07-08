@@ -8,9 +8,9 @@ void main() {
   late Map<String, Object?> fixture;
 
   setUpAll(() {
-    fixture = jsonDecode(
-      File('test/fixtures/flow_response.json').readAsStringSync(),
-    ) as Map<String, Object?>;
+    fixture =
+        jsonDecode(File('test/fixtures/flow_response.json').readAsStringSync())
+            as Map<String, Object?>;
   });
 
   group('FlowResponse.fromJson', () {
@@ -30,14 +30,12 @@ void main() {
     test('preserves server-declared field and action order', () {
       final step = FlowResponse.fromJson(fixture).step;
 
-      expect(
-        step.fields.map((f) => f.name),
-        ['email', 'password', 'country'],
-      );
-      expect(
-        step.actions.map((a) => a.name),
-        ['submit', 'register', 'recover'],
-      );
+      expect(step.fields.map((f) => f.name), ['email', 'password', 'country']);
+      expect(step.actions.map((a) => a.name), [
+        'submit',
+        'register',
+        'recover',
+      ]);
     });
 
     test('decodes field metadata, validation, and pre-filled values', () {
@@ -127,10 +125,10 @@ void main() {
   group('SubmitRequest.toJson', () {
     test('emits only populated optional keys', () {
       const minimal = SubmitRequest(action: 'submit');
-      expect(
-        minimal.toJson(),
-        {'action': 'submit', 'fields': <String, Object?>{}},
-      );
+      expect(minimal.toJson(), {
+        'action': 'submit',
+        'fields': <String, Object?>{},
+      });
 
       const full = SubmitRequest(
         action: 'passkey',
@@ -145,14 +143,11 @@ void main() {
       );
       final json = full.toJson();
       expect(json['gate_proofs'], {'captcha': 'proof'});
-      expect(
-        json['challenge_response'],
-        {
-          'challenge_id': 'ch_1',
-          'method': 'passkey',
-          'proof': {'id': 'cred'}
-        },
-      );
+      expect(json['challenge_response'], {
+        'challenge_id': 'ch_1',
+        'method': 'passkey',
+        'proof': {'id': 'cred'},
+      });
       expect(json['session_token'], 'stok_1');
       expect(json.containsKey('sso_provider_id'), isFalse);
     });

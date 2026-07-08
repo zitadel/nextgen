@@ -20,10 +20,10 @@ class ChallengeResponse {
   final Map<String, Object?> proof;
 
   Map<String, Object?> toJson() => {
-        'challenge_id': challengeId,
-        'method': method,
-        'proof': proof,
-      };
+    'challenge_id': challengeId,
+    'method': method,
+    'proof': proof,
+  };
 }
 
 /// Body of `POST /flow/{id}/submit`.
@@ -71,12 +71,12 @@ class SubmitRequest {
   final String? sessionToken;
 
   Map<String, Object?> toJson() => {
-        'action': action,
-        'fields': fields,
-        if (gateProofs.isNotEmpty) 'gate_proofs': gateProofs,
-        if (challengeResponse != null)
-          'challenge_response': challengeResponse!.toJson(),
-        if (ssoProviderId != null) 'sso_provider_id': ssoProviderId,
-        if (sessionToken != null) 'session_token': sessionToken,
-      };
+    'action': action,
+    'fields': fields,
+    if (gateProofs.isNotEmpty) 'gate_proofs': gateProofs,
+    if (challengeResponse != null)
+      'challenge_response': challengeResponse!.toJson(),
+    if (ssoProviderId != null) 'sso_provider_id': ssoProviderId,
+    if (sessionToken != null) 'session_token': sessionToken,
+  };
 }

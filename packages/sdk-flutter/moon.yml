@@ -8,8 +8,10 @@ dependsOn:
   - "sdk-dart"
 
 tasks:
+  # `flutter pub get` first: pins the formatter style via the package
+  # config (see packages/sdk-dart/moon.yml).
   lint:
-    command: "dart format --output=none --set-exit-if-changed lib test example/lib"
+    script: "flutter pub get && flutter pub get --directory example && dart format --output=none --set-exit-if-changed lib test example/lib"
     inputs:
       - "lib/**/*"
       - "test/**/*"

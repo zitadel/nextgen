@@ -7,8 +7,11 @@ layer: "library"
 stack: "frontend"
 
 tasks:
+  # `dart pub get` first: without a resolved package config, `dart format`
+  # assumes the latest language version and the expected style drifts with
+  # every SDK upgrade. The config pins it to this package's SDK floor.
   lint:
-    command: "dart format --output=none --set-exit-if-changed ."
+    script: "dart pub get --no-precompile && dart format --output=none --set-exit-if-changed ."
     inputs:
       - "lib/**/*"
       - "test/**/*"

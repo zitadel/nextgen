@@ -9,7 +9,7 @@ repository: https://github.com/zitadel/nextgen
 issue_tracker: https://github.com/zitadel/nextgen/issues
 
 environment:
-  sdk: ^3.4.0
+  sdk: ^3.8.0
 
 # Runtime dependency-free by design: models are hand-written and the
 # default transport uses dart:io. Keep it that way — consumers should not

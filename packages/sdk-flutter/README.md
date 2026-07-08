@@ -68,11 +68,14 @@ use it with your own UI. For no Flutter dependency at all, use
 
 ## Capability support in v1
 
-Rendered natively: all field types, submit/navigate/back actions, altcha
-captcha gates (pure proof-of-work, solved in a background isolate).
+Rendered natively: all field types and submit/navigate/back actions.
 Not yet driven natively — surfaced via `onUnsupportedCapability` and
-omitted from the UI: passkey actions/ceremonies, SSO providers,
-turnstile/hcaptcha gates. See the plan's deferred milestone in
+omitted from the UI: passkey actions/ceremonies, SSO providers, and all
+captcha gates. An altcha proof-of-work solver ships in the package
+(pure computation, runs in a background isolate) but is **disabled by
+default** because the current server rejects `gate_proofs` as reserved;
+opt in with `enableAltchaGates: true` once server-side gate verification
+lands (or against the mock server). See the plan's deferred milestone in
 `docs/design/sdk-flutter/PLAN.md`.
 
 ## Localization

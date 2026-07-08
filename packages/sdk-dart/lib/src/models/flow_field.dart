@@ -32,18 +32,18 @@ enum FieldType {
   ];
 
   static FieldType fromWire(String? value) => switch (value) {
-        'text' => text,
-        'email' => email,
-        'password' => password,
-        'tel' => tel,
-        'number' => number,
-        'url' => url,
-        'date' => date,
-        'hidden' => hidden,
-        'checkbox' => checkbox,
-        'select' => select,
-        _ => unknown,
-      };
+    'text' => text,
+    'email' => email,
+    'password' => password,
+    'tel' => tel,
+    'number' => number,
+    'url' => url,
+    'date' => date,
+    'hidden' => hidden,
+    'checkbox' => checkbox,
+    'select' => select,
+    _ => unknown,
+  };
 }
 
 /// Semantic format rule from `validation.format`.
@@ -57,12 +57,12 @@ enum FieldFormat {
   static const wireValues = ['email', 'date-time', 'uuid', 'uri'];
 
   static FieldFormat fromWire(String? value) => switch (value) {
-        'email' => email,
-        'date-time' => dateTime,
-        'uuid' => uuid,
-        'uri' => uri,
-        _ => unknown,
-      };
+    'email' => email,
+    'date-time' => dateTime,
+    'uuid' => uuid,
+    'uri' => uri,
+    _ => unknown,
+  };
 }
 
 /// Schema-derived input rules — a UX hint to reduce round trips; the server
@@ -113,15 +113,15 @@ class FlowField {
   });
 
   factory FlowField.fromJson(Map<String, Object?> json) => FlowField(
-        name: reqString(json, 'name'),
-        type: FieldType.fromWire(optString(json, 'type')),
-        textKey: reqString(json, 'text_key'),
-        required: boolOr(json, 'required', orElse: false),
-        value: json['value'],
-        validation: optMap(json, 'validation') != null
-            ? FieldValidation.fromJson(optMap(json, 'validation')!)
-            : null,
-      );
+    name: reqString(json, 'name'),
+    type: FieldType.fromWire(optString(json, 'type')),
+    textKey: reqString(json, 'text_key'),
+    required: boolOr(json, 'required', orElse: false),
+    value: json['value'],
+    validation: optMap(json, 'validation') != null
+        ? FieldValidation.fromJson(optMap(json, 'validation')!)
+        : null,
+  );
 
   static const specProperties = {
     'name',

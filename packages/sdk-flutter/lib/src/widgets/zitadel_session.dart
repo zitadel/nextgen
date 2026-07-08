@@ -26,7 +26,7 @@ class ZitadelSession extends StatefulWidget {
   final VoidCallback? onSignedOut;
 
   final Widget Function(BuildContext context, AsyncSnapshot<Session> session)?
-      builder;
+  builder;
 
   final String? languageCode;
 
@@ -50,8 +50,9 @@ class _ZitadelSessionState extends State<ZitadelSession> {
         if (widget.builder != null) {
           return widget.builder!(context, snapshot);
         }
-        final localizer =
-            ZitadelLocalizer.resolve(languageCode: widget.languageCode);
+        final localizer = ZitadelLocalizer.resolve(
+          languageCode: widget.languageCode,
+        );
         if (snapshot.connectionState != ConnectionState.done) {
           return const Center(child: CircularProgressIndicator());
         }

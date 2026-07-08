@@ -16,9 +16,9 @@ class DemoSettings {
   const DemoSettings({required this.baseUrl, required this.projectId});
 
   factory DemoSettings.load(SharedPreferences prefs) => DemoSettings(
-        baseUrl: prefs.getString(_baseUrlKey) ?? defaultBaseUrl,
-        projectId: prefs.getString(_projectIdKey) ?? 'proj_demo',
-      );
+    baseUrl: prefs.getString(_baseUrlKey) ?? defaultBaseUrl,
+    projectId: prefs.getString(_projectIdKey) ?? 'proj_demo',
+  );
 
   final String baseUrl;
   final String projectId;

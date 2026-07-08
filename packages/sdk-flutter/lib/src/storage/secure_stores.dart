@@ -11,7 +11,7 @@ const _cookiesKey = 'zitadel_flow_cookies';
 /// survives app restarts without ever touching plain-text storage.
 class SecureTokenStore implements TokenStore {
   SecureTokenStore({FlutterSecureStorage? storage})
-      : _storage = storage ?? const FlutterSecureStorage();
+    : _storage = storage ?? const FlutterSecureStorage();
 
   final FlutterSecureStorage _storage;
 
@@ -35,8 +35,8 @@ class SecureTokenStore implements TokenStore {
 /// [InMemoryCookieStore].
 class SecureCookieStore implements CookieStore {
   SecureCookieStore({FlutterSecureStorage? storage, DateTime Function()? clock})
-      : _storage = storage ?? const FlutterSecureStorage(),
-        _clock = clock ?? DateTime.now;
+    : _storage = storage ?? const FlutterSecureStorage(),
+      _clock = clock ?? DateTime.now;
 
   final FlutterSecureStorage _storage;
   final DateTime Function() _clock;

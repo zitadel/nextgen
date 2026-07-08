@@ -40,7 +40,7 @@ class StoredCookie {
 /// killed app can resume a flow.
 class InMemoryCookieStore implements CookieStore {
   InMemoryCookieStore({DateTime Function()? clock})
-      : _clock = clock ?? DateTime.now;
+    : _clock = clock ?? DateTime.now;
 
   final DateTime Function() _clock;
   final Map<String, StoredCookie> _cookies = {};
@@ -95,8 +95,8 @@ StoredCookie? parseSetCookie(String line, {DateTime? now}) {
   for (final segment in segments.skip(1)) {
     final attr = segment.trim();
     final attrEq = attr.indexOf('=');
-    final attrName =
-        (attrEq > 0 ? attr.substring(0, attrEq) : attr).toLowerCase();
+    final attrName = (attrEq > 0 ? attr.substring(0, attrEq) : attr)
+        .toLowerCase();
     final attrValue = attrEq > 0 ? attr.substring(attrEq + 1).trim() : '';
     switch (attrName) {
       case 'max-age':

@@ -9,7 +9,7 @@ repository: https://github.com/zitadel/nextgen
 issue_tracker: https://github.com/zitadel/nextgen/issues
 
 environment:
-  sdk: ^3.4.0
+  sdk: ^3.8.0
   flutter: ">=3.22.0"
 
 dependencies:

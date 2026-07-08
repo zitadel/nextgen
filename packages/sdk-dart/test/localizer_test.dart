@@ -50,10 +50,7 @@ void main() {
         'en': {'greeting': 'Hi, {{displayName}}!'},
       },
     );
-    expect(
-      localizer.t('greeting', {'displayName': 'Alice'}),
-      'Hi, Alice!',
-    );
+    expect(localizer.t('greeting', {'displayName': 'Alice'}), 'Hi, Alice!');
   });
 
   test('all built-in dictionaries carry the same key set', () {

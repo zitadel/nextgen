@@ -16,8 +16,9 @@ void main() {
     expect(find.text('Create account'), findsOneWidget);
   });
 
-  testWidgets('settings screen edits and returns the configuration',
-      (tester) async {
+  testWidgets('settings screen edits and returns the configuration', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const DemoApp());
     await tester.pumpAndSettle();
@@ -42,7 +43,9 @@ void main() {
       projectId: 'proj_demo',
       baseUrl: Uri.parse('http://localhost:8080'),
     );
-    expect(project.resolveApiPath('/flow').toString(),
-        'http://localhost:8080/flow');
+    expect(
+      project.resolveApiPath('/flow').toString(),
+      'http://localhost:8080/flow',
+    );
   });
 }
