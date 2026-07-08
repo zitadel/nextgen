@@ -148,9 +148,10 @@ jobs:
           if [ -n "$RECOVER_VERSION" ]; then
             args+=(--recover-version "$RECOVER_VERSION")
           fi
-          # Dry runs do not publish, so provenance stays off here. Real
-          # publishes keep the GitHub Actions environment intact for OIDC.
-          moon run "${args[@]}"
+          # Release tasks are excluded from `moon ci`, but this workflow invokes
+          # them explicitly. Unset only CI so Moon keeps the task in the action
+          # pipeline while preserving the GitHub Actions/OIDC environment.
+          env -u CI moon run "${args[@]}"
         env:
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -164,9 +165,10 @@ jobs:
           if [ -n "$RECOVER_VERSION" ]; then
             args+=(-- --recover-version "$RECOVER_VERSION")
           fi
-          # Keep the GitHub Actions environment intact: npm trusted publishing
-          # and provenance use it to exchange the workflow OIDC token.
-          moon run "${args[@]}"
+          # Release tasks are excluded from `moon ci`, but this workflow invokes
+          # them explicitly. Unset only CI so Moon keeps the task in the action
+          # pipeline while preserving the GitHub Actions/OIDC environment.
+          env -u CI moon run "${args[@]}"
         env:
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
