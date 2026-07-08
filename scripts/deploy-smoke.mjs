@@ -140,13 +140,15 @@ export async function probeDeployment(options) {
     }
   }
 
-  // The API surface must answer with the structured error model, not a bare
-  // 404/500: this proves the generated router and middleware are in the
-  // binary, which a stub health endpoint cannot.
+  // The API surface must reject the request through the structured error
+  // model, not a bare 404/500: this proves the generated router and error
+  // handler are in the binary, which a stub health endpoint cannot. The
+  // session cookie is a required parameter, so today's rejection is a 400
+  // ("req.invalid") from the decode layer; 401/403 also count as rejections.
   const response = await fetchImpl(`${baseUrl}/sessions/me`);
-  if (response.status !== 401 && response.status !== 403) {
+  if (![400, 401, 403].includes(response.status)) {
     throw new Error(
-      `deploy smoke: unauthenticated /sessions/me should be rejected with 401/403, got ${response.status}`,
+      `deploy smoke: unauthenticated /sessions/me should be rejected with 400/401/403, got ${response.status}`,
     );
   }
   let body;
@@ -155,10 +157,15 @@ export async function probeDeployment(options) {
   } catch {
     throw new Error("deploy smoke: unauthenticated /sessions/me must return a JSON error body");
   }
-  if (!body || typeof body !== "object") {
-    throw new Error("deploy smoke: unauthenticated /sessions/me returned a non-object error body");
+  if (!body || typeof body !== "object" || typeof body.code !== "string") {
+    throw new Error(
+      "deploy smoke: unauthenticated /sessions/me must return the structured error model " +
+        `(object with a string code), got: ${JSON.stringify(body).slice(0, 200)}`,
+    );
   }
-  log(`deploy smoke: API surface rejects unauthenticated /sessions/me with ${response.status}`);
+  log(
+    `deploy smoke: API surface rejects unauthenticated /sessions/me with ${response.status} (${body.code})`,
+  );
 }
 
 async function waitForOk(url, { fetchImpl, timeoutMs, delayMs }) {

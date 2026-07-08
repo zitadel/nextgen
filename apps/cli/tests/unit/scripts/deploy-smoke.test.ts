@@ -77,7 +77,10 @@ function healthyFetch(overrides: Record<string, () => Response> = {}) {
       return new Response("ok", { status: 200 });
     }
     if (path === "/sessions/me") {
-      return jsonResponse(401, { error: { code: "unauthenticated" } });
+      return jsonResponse(400, {
+        code: "req.invalid",
+        message: 'cookie: "__nextgen_session": field required',
+      });
     }
     return new Response("not found", { status: 404 });
   };
@@ -165,7 +168,7 @@ describe("deploy smoke", () => {
     expect(calls.some((call) => call.args.includes("down"))).toBe(true);
   });
 
-  it("fails when the API surface does not answer with a structured 401", async () => {
+  it("fails when the API surface does not reject through the structured error model", async () => {
     const { probeDeployment } = await loadModule();
 
     await expect(
@@ -176,7 +179,7 @@ describe("deploy smoke", () => {
         }),
         log: () => undefined,
       }),
-    ).rejects.toThrow("should be rejected with 401/403");
+    ).rejects.toThrow("should be rejected with 400/401/403");
 
     await expect(
       probeDeployment({
@@ -187,6 +190,16 @@ describe("deploy smoke", () => {
         log: () => undefined,
       }),
     ).rejects.toThrow("JSON error body");
+
+    await expect(
+      probeDeployment({
+        baseUrl: "http://127.0.0.1:18082",
+        fetchImpl: healthyFetch({
+          "/sessions/me": () => jsonResponse(400, { unexpected: "shape" }),
+        }),
+        log: () => undefined,
+      }),
+    ).rejects.toThrow("structured error model");
   });
 
   it("fails when a service is no longer running after probes", async () => {
