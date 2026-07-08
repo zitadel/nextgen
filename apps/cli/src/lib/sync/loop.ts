@@ -97,14 +97,10 @@ export async function buildSyncPlan(
       const entry = state.resources[relPath];
       const hash = hashForState(syncer, content);
 
-      if (!entry?.id) {
-        actions.push({ kind: "create", path: relPath, syncer, content, hash });
-        continue;
-      }
-
       // A flow pinned to a schema revision superseded in this plan (or by an
-      // interrupted earlier run) needs its `user_schema` rewritten even when
-      // the file itself is untouched.
+      // interrupted earlier run) needs its `user_schema` rewritten — whether
+      // the flow is untouched, edited, or brand new (a create in the same
+      // run as the revise must not POST the stale id).
       const flowRef = localFlows.get(relPath);
       const pending = flowRef ? pendingRevisions.get(flowRef) : undefined;
       const recovered = flowRef ? recoveredRevisions.get(flowRef) : undefined;
@@ -117,7 +113,7 @@ export async function buildSyncPlan(
               newId: recovered.newId,
             }
           : undefined;
-      if (repin && syncer.mutable) {
+      if (repin) {
         assertRepinnedFlowFields(
           relPath,
           content,
@@ -126,12 +122,29 @@ export async function buildSyncPlan(
         );
       }
 
+      if (!entry?.id) {
+        actions.push({
+          kind: "create",
+          path: relPath,
+          syncer,
+          content,
+          hash,
+          ...(repin ? { repin } : {}),
+        });
+        continue;
+      }
+
       // State files written before normalized hashing hold legacy hashes
-      // (order-sensitive, un-normalized). Accepting either format keeps an
-      // untouched file a skip — a spurious mismatch here would publish a
-      // garbage schema revision. Writes always store the new format, so
-      // state converges on the next real change.
-      const unchanged = entry.hash === hash || entry.hash === hashResourceContent(content);
+      // (order-sensitive, un-normalized). Accepting the legacy format —
+      // both over the raw file and over its stably-sorted form, since
+      // setup-era hashes were computed on sorted keys — keeps an untouched
+      // or merely reordered file a skip; a spurious mismatch here would
+      // publish a garbage schema revision. Writes always store the new
+      // format, so state converges on the next real change.
+      const unchanged =
+        entry.hash === hash ||
+        entry.hash === hashResourceContent(content) ||
+        entry.hash === hashResourceContent(JSON.parse(stableStringify(content)) as object);
       if (unchanged && !(repin && syncer.mutable)) {
         actions.push({ kind: "skip", path: relPath, reason: "no-change" });
         continue;
@@ -229,8 +242,20 @@ export async function runSyncLoop(
   for (const action of actions) {
     switch (action.kind) {
       case "create": {
-        const { id, canonical } = await action.syncer.create(action.content);
-        const entry: ResourceEntry = { id, hash: await writeBack(action, canonical, action.hash) };
+        let content = action.content;
+        const newId = action.repin
+          ? (repinned.get(action.repin.previousId) ?? action.repin.newId)
+          : undefined;
+        if (newId) {
+          // A flow created in the same run as (or after an interrupted)
+          // schema revise must adopt the new revision — POSTing the stale
+          // pin would fail validation, and its canonical echo would revert
+          // the re-pinned local file.
+          content = { ...(content as Record<string, unknown>), user_schema: newId };
+        }
+        const { id, canonical } = await action.syncer.create(content);
+        const fallbackHash = newId ? hashForState(action.syncer, content) : action.hash;
+        const entry: ResourceEntry = { id, hash: await writeBack(action, canonical, fallbackHash) };
         await updateState(cwd, action.path, entry);
         consola.info(
           `Created a new ${action.syncer.kind} on Zitadel from ${action.path} (id ${id})`,

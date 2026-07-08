@@ -460,6 +460,30 @@ describe("normalized hashing and write-back", () => {
     }
   });
 
+  it("skips a reordered file whose legacy state hash was computed on sorted keys", async () => {
+    const cwd = makeCwd();
+    try {
+      const { createHash } = await import("node:crypto");
+      // Setup-era legacy hashes were sha256(JSON.stringify(...)) over
+      // stably-sorted content; the user then reordered keys by hand.
+      const sortedLegacyHash = createHash("sha256")
+        .update(JSON.stringify({ a: 1, b: 2 }))
+        .digest("hex");
+      await writeState(cwd, {
+        framework: "next",
+        resources: { ".zitadel/flows/default.json": { id: "flow-001", hash: sortedLegacyHash } },
+      });
+      await writeResource(cwd, ".zitadel/flows", "default.json", { b: 2, a: 1 });
+
+      const syncer = makeSyncer({ directory: ".zitadel/flows", mutable: true });
+      const actions = await buildSyncPlan(cwd, [syncer]);
+
+      expect(actions[0].kind).toBe("skip");
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("skips when only key order differs from the hashed state", async () => {
     const cwd = makeCwd();
     try {
@@ -804,6 +828,67 @@ describe("auto-repin on schema revise", () => {
       for (const call of update.mock.calls) {
         expect((call[1] as { user_schema: string }).user_schema).toBe("sch_B");
       }
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("creates a new flow with the revision minted in the same run, not its stale pin", async () => {
+    const cwd = makeCwd();
+    try {
+      // The flow file is brand new (no state entry) and pins the schema id
+      // that this same run supersedes.
+      await writeState(cwd, {
+        framework: "next",
+        resources: { [SCHEMA_PATH]: { id: "sch_A", hash: "stale" } },
+      });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema", v: 2 });
+      await writeResource(cwd, ".zitadel/flows", "default.json", {
+        name: "login",
+        user_schema: "sch_A",
+      });
+
+      const schemaSyncer = makeSchemaSyncer();
+      const create = vi.fn().mockResolvedValue({ id: "flow-001" });
+      const flowSyncer = makeFlowSyncer({ create });
+
+      await runSyncLoop(cwd, [schemaSyncer, flowSyncer]);
+
+      expect(create).toHaveBeenCalledWith(expect.objectContaining({ user_schema: "sch_B" }));
+      expect((await readJson(join(cwd, FLOW_PATH))).user_schema).toBe("sch_B");
+
+      const followUp = await buildSyncPlan(cwd, [schemaSyncer, flowSyncer]);
+      expect(followUp.every((a) => a.kind === "skip")).toBe(true);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("does not let a stale canonical echo revert a re-pinned file on flow create", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, {
+        framework: "next",
+        resources: { [SCHEMA_PATH]: { id: "sch_A", hash: "stale" } },
+      });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema", v: 2 });
+      await writeResource(cwd, ".zitadel/flows", "default.json", {
+        name: "login",
+        user_schema: "sch_A",
+      });
+
+      const schemaSyncer = makeSchemaSyncer();
+      // The server echoes back exactly what was POSTed — which must already
+      // carry the new pin, so write-back cannot resurrect sch_A.
+      const create = vi.fn().mockImplementation(async (body: object) => ({
+        id: "flow-001",
+        canonical: structuredClone(body),
+      }));
+      const flowSyncer = makeFlowSyncer({ create });
+
+      await runSyncLoop(cwd, [schemaSyncer, flowSyncer]);
+
+      expect((await readJson(join(cwd, FLOW_PATH))).user_schema).toBe("sch_B");
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }

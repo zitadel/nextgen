@@ -405,6 +405,11 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
         id: KNOWN_AFTER_APPLY,
         ...(action.content as Record<string, unknown>),
       };
+      if (action.repin) {
+        // The executor POSTs this flow with the new revision id, not the
+        // stale pin still in the file — render what will actually be sent.
+        display.user_schema = action.repin.newId ?? KNOWN_AFTER_APPLY;
+      }
       renderFields(display, "+", FIELD_COL, { tty, deleteMode: false }, lines);
       lines.push(`${closePad}}`);
       break;

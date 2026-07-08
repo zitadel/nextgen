@@ -103,8 +103,24 @@ export type SyncPlanSummary = {
  * currently pinned to `previousId` and would need re-pinning to adopt the
  * new revision (see `.zitadel/flows/README.md`).
  */
+/**
+ * Present on flow create/update actions whose `user_schema` pins a schema
+ * revision that is superseded in the same run (a pending `revise`) or was
+ * superseded by an interrupted earlier run. The executor rewrites
+ * `user_schema` to the new revision id — `newId` when the revision already
+ * exists (crash recovery), otherwise the id minted by this run's revise.
+ */
+export type FlowRepin = { previousId: string; schemaPath: string; newId?: string };
+
 export type SyncAction =
-  | { kind: "create"; path: string; syncer: ResourceSyncer; content: object; hash: string }
+  | {
+      kind: "create";
+      path: string;
+      syncer: ResourceSyncer;
+      content: object;
+      hash: string;
+      repin?: FlowRepin;
+    }
   | {
       kind: "update";
       path: string;
@@ -113,14 +129,7 @@ export type SyncAction =
       content: object;
       hash: string;
       oldContent: object | null;
-      /**
-       * Present when this flow's `user_schema` pins a schema revision that
-       * is superseded in the same run (a pending `revise`) or was superseded
-       * by an interrupted earlier run. The executor rewrites `user_schema`
-       * to the new revision id — `newId` when the revision already exists
-       * (crash recovery), otherwise the id minted by this run's revise.
-       */
-      repin?: { previousId: string; schemaPath: string; newId?: string };
+      repin?: FlowRepin;
     }
   | {
       kind: "revise";
