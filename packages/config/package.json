@@ -1,0 +1,59 @@
+{
+  "name": "@zitadel/config",
+  "version": "0.1.0-alpha.14",
+  "description": "Versioned Zitadel local config schemas and defaults",
+  "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/config#readme",
+  "bugs": {
+    "url": "https://github.com/zitadel/nextgen/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zitadel/nextgen.git",
+    "directory": "packages/config"
+  },
+  "files": [
+    "dist",
+    "defaults/*.json",
+    "defaults/*.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "@zitadel/source": "./src/index.ts",
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./defaults": {
+      "@zitadel/source": "./src/defaults.ts",
+      "types": "./dist/defaults.d.mts",
+      "import": "./dist/defaults.mjs"
+    },
+    "./schemas": {
+      "@zitadel/source": "./src/schemas.ts",
+      "types": "./dist/schemas.d.mts",
+      "import": "./dist/schemas.mjs"
+    },
+    "./defaults/default-human-user.json": "./defaults/default-human-user.json",
+    "./defaults/default-login.json": "./defaults/default-login.json",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "lint": "oxlint ."
+  },
+  "dependencies": {
+    "@zitadel/api": "workspace:*"
+  },
+  "devDependencies": {
+    "tsdown": "catalog:",
+    "tslib": "catalog:",
+    "vitest": "catalog:"
+  }
+}

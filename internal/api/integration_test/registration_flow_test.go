@@ -30,7 +30,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 
 	testServer := harness.EnsureTestServer(t)
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 	require.NoError(t, err)
 
 	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)

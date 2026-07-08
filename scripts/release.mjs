@@ -110,7 +110,18 @@ async function commandPublish(options) {
       throw new Error(message);
     }
     if (!preflight.shouldRun) {
-      console.log(`release publish: skip - ${preflight.reason}`);
+      const message = `release publish: skip - ${preflight.reason}`;
+      if (shouldFailManualPublishSkip(options)) {
+        throw new Error(
+          [
+            message,
+            "manual release dispatch would not publish anything; " +
+              `pass recover_version=${release.version} to recover this checked-out version, ` +
+              "or run from a Changesets version package commit.",
+          ].join("\n"),
+        );
+      }
+      console.log(message);
       return;
     }
   }
@@ -134,7 +145,10 @@ async function commandPublish(options) {
   }
 
   await commandSnapshot({ skipContainer: true });
-  await run("corepack", ["pnpm", "exec", "changeset", "publish"], { cwd: repoRoot });
+  await run("corepack", ["pnpm", "exec", "changeset", "publish"], {
+    cwd: repoRoot,
+    env: releasePublishEnv(),
+  });
   await buildContainerImage({ repoRoot, outDir, release, push: true, platforms: CONTAINER_PLATFORMS });
   await commandVerify();
   await upsertProductGithubRelease({ repoRoot, outDir, log: console.log });
@@ -193,6 +207,14 @@ export async function assertNoUnrecordedPendingChangesets(root = repoRoot) {
       `release publish requires all pending changesets to be recorded in .changeset/pre.json: ${unrecorded.join(", ")}`,
     );
   }
+}
+
+export function releasePublishEnv(overrides = {}) {
+  return { ...process.env, ...overrides, ZITADEL_TELEMETRY_BUILD_CHANNEL: "production" };
+}
+
+export function shouldFailManualPublishSkip(options = {}, env = process.env) {
+  return env.GITHUB_EVENT_NAME === "workflow_dispatch" && !options.dryRun && !options.recoverVersion;
 }
 
 async function assertMainBranch(options, { allowDryRunBypass = true } = {}) {

@@ -98,7 +98,7 @@ export function toZitadelError(error: unknown): ZitadelError {
         : error.status >= 500
           ? "E_NETWORK"
           : "E_VALIDATION";
-    return new ZitadelError(code, error.message, {
+    return new ZitadelError(code, apiErrorMessage(error), {
       details: { status: error.status, url: error.url, body: error.body },
     });
   }
@@ -145,6 +145,51 @@ export function toZitadelError(error: unknown): ZitadelError {
   }
 
   return new ZitadelError("E_VALIDATION", "Unknown error", { details: error });
+}
+
+/**
+ * Extracts the server's `{code, message, details}` envelope from an
+ * {@link ApiError} into a display string. Falls back to the fetch layer's
+ * `"METHOD url returned N"` when the body isn't shaped like an envelope, so
+ * transport-level failures (HTML from a proxy, empty 5xx) still say
+ * something.
+ */
+function apiErrorMessage(error: ApiError): string {
+  const body = error.body;
+  if (!isRecord(body)) {
+    return error.message;
+  }
+  const serverMessage = typeof body.message === "string" ? body.message : undefined;
+  const detail = pickDetailString(body.details);
+  if (!serverMessage) {
+    return error.message;
+  }
+  return detail ? `${serverMessage}: ${detail}` : serverMessage;
+}
+
+/**
+ * Reads the innermost human-readable string out of the spec's error
+ * `details` field. Handles both `details: "..."` and the nested
+ * `details: { details: "..." }` shape the platform emits for validation
+ * failures.
+ */
+function pickDetailString(details: unknown): string | undefined {
+  if (typeof details === "string") {
+    return details;
+  }
+  if (isRecord(details)) {
+    if (typeof details.details === "string") {
+      return details.details;
+    }
+    if (typeof details.message === "string") {
+      return details.message;
+    }
+  }
+  return undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isErrnoException(error: unknown): error is NodeJS.ErrnoException {

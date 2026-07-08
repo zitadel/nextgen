@@ -62,6 +62,7 @@ coverage/
 **/__screenshots__/
 test-results/
 playwright-report/
+*.har
 
 ## dependencies
 node_modules

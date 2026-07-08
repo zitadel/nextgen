@@ -96,7 +96,7 @@ describe("NextPatcher.plan", () => {
     expect(dep).toMatchObject({ name: "@zitadel/sdk-next", version: "0.1.0-alpha.0" });
   });
 
-  it("does not scaffold the user schema or flow (server-provisioned)", () => {
+  it("leaves schema and flow files for setup's resource materializer", () => {
     const plan = new NextPatcher().plan(ctxFor("app"));
     expect(writeContents(plan, ".zitadel/schemas/user.json")).toBeUndefined();
     expect(writeContents(plan, ".zitadel/flows/default.json")).toBeUndefined();
