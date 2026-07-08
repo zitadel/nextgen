@@ -1,5 +1,14 @@
 # @zitadel/sdk-nuxt
 
+## 0.1.0-alpha.14
+
+### Patch Changes
+
+- Updated dependencies [[`54dcc87`](https://github.com/zitadel/nextgen/commit/54dcc87084dd2d2b8314d08221354683bae64c6b), [`605abe1`](https://github.com/zitadel/nextgen/commit/605abe1f04a011c05bd4be2179556052eae6c007), [`ea193dc`](https://github.com/zitadel/nextgen/commit/ea193dc0fabdf3c49fa9c3e3bae4cf242001d630)]:
+  - @zitadel/components@0.1.0-alpha.14
+  - @zitadel/api@0.1.0-alpha.14
+  - @zitadel/sdk-core@0.1.0-alpha.14
+
 ## 0.1.0-alpha.13
 
 ### Patch Changes
