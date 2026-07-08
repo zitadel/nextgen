@@ -1,12 +1,15 @@
-# nextgen
+# Zitadel — next generation
 
-Next iteration of the Zitadel identity platform.
+The next generation of the Zitadel identity platform, built for developers
+and AI agents alike: registration and login live in your app, under your
+brand, while Zitadel guards the credentials, sessions, and tokens underneath.
 
-> **Preview status:** This repository is a pre-release next-generation Zitadel
-> preview. The public name may change, and APIs, CLI flags, package surfaces,
-> and docs are still in flux. The checked-in CLI currently supports the local
-> npm-binary flow documented below; create-first, claim-later is the product
-> direction, but `zitadel claim` is not shipped in this repo yet. See
+> **Preview status:** This work rebuilds Zitadel's storage core and API
+> surface, so it ships as a preview in its own repository and is intended to
+> merge back into [zitadel/zitadel](https://github.com/zitadel/zitadel) as the
+> foundation of a future major version. APIs, CLI flags, package surfaces, and
+> docs are still in flux; create-first, claim-later is the product direction,
+> but `zitadel claim` is not shipped in this repo yet. The full story is in
 > [VISION.md](VISION.md).
 
 ## Workflow front doors
@@ -37,6 +40,15 @@ The published `zitadel` runtime commands run the released local runtime through
 the `@zitadel/server` npm binary by default and do not require Docker, Go, Moon,
 or a source checkout. Docker remains available with
 `zitadel start --runtime docker`.
+
+### I am an agent (or driving one)
+
+The CLI is the agent-facing surface today: every command supports
+`--non-interactive --json` and returns a structured envelope.
+[apps/cli/SKILLS.md](apps/cli/SKILLS.md) is the canonical contract for agents
+integrating Zitadel into an app; [AGENTS.md](AGENTS.md) is for agents
+contributing to this repository. The documentation site publishes LLM-friendly
+text at `/llms.txt`, `/llms-full.txt`, and page-level `.md` URLs.
 
 ## Customer quick start
 
@@ -95,7 +107,7 @@ This repository is pre-release. The Go `server` command serves the OpenAPI
 surface and embeds the console and login UIs at `/ui/console/` and `/ui/login/`.
 CI produces installable snapshots for review, not official releases.
 
-For product direction and public-readiness notes, see [VISION.md](VISION.md).
+For product direction and the four pillars, see [VISION.md](VISION.md).
 
 ## Contributor workflows
 

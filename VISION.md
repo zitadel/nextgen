@@ -1,53 +1,124 @@
 # Vision
 
-The next-generation Zitadel preview is an evolution of the identity platform
-people already trust and enjoy, rebuilt to be more flexible, more
-developer-friendly, and native to the way humans and AI agents build software
-together.
+Zitadel's next generation is an identity platform designed for two kinds of
+builders: developers, and the AI agents that increasingly work beside them.
+Both get the same promise:
 
-Our north star is simple: a human or agent should be able to add real
-authentication to an app in about 90 seconds, without signup ceremony,
-dashboard detours, or hand-copied client IDs. When the project is ready to be
-shared, deployed, or governed, a human claims it, the work stays in place, and
-the system becomes a team-owned identity platform configured like code.
+**You own the experience. Zitadel guards the state.**
 
-This preview is not the finished product, and its public name may change. The
-direction is clear: ship auth before signup, claim ownership when it matters,
-and grow into production trust without surprising developers, agents, or
-downstream applications.
+Registration, login, and every screen around them live in your app — your
+code, your brand, your framework. What must never live in your app stays in
+Zitadel: credentials, sessions, tokens, and policy, kept with the durability
+and security discipline of a dedicated identity service. Most identity
+products force a choice between a hosted UI you don't control and hand-rolled
+auth where every mistake is yours. This platform is built so you never have
+to make that choice.
 
-## Current Reality
+## Why agent-native
 
-This repository is pre-release. The current checked-in CLI supports the local
-npm-binary setup flow documented in [README.md](README.md); Docker remains
-available as an explicit fallback runtime. The CLI does not currently ship a
-`zitadel claim` command.
+A growing share of software is written with an agent in the loop, yet
+identity vendors still assume a human who can click through a signup form,
+verify an email, and paste a client ID into `.env`. An agent can do none of
+that reliably — and a developer shouldn't have to.
 
-Create-first, claim-later remains the product direction. The previous mock-only
-claim lifecycle was removed until the real server-side claim contract exists;
-[ADR 003](docs/adrs/003-create-first-claim-later.md) records that current
-implementation state. Platform design notes may still describe the intended
-claim flow, but those examples are target design, not shipped CLI behavior.
+Agent-native is not about shipping AI features. It means every capability of
+the platform is a contract a machine can discover, call, and verify:
+structured input, structured output, deterministic behavior, no hidden steps.
+Those are the same properties that make a platform pleasant for people, which
+is why this vision never separates the two audiences. What serves the agent
+serves the developer.
 
-## Pre-Public Checklist
+## What this repository is
 
-- **Vision and naming:** Use "next-generation Zitadel preview" and say the
-  public name may change. Avoid treating `nextgen` as a permanent product name
-  outside literal repository, package, Docker, or artifact identifiers.
-- **Claim/link-first honesty:** Keep "ship auth before signup, claim later" as
-  the direction, but label claim flow docs as target design until OpenAPI,
-  server, and CLI support exist.
-- **Agent-native contract:** Preserve the boundary that agents configure and
-  humans claim. Keep `--non-interactive --json` and
-  [apps/cli/SKILLS.md](apps/cli/SKILLS.md) as the canonical agent-facing CLI
-  surface.
-- **Licensing clarity:** Keep [LICENSING.md](LICENSING.md) explicit that the
-  server, embedded console, and Docker images are AGPL-3.0-only, while root
-  public docs, API contracts, CLI, SDKs, demos, and client-facing integration
-  surfaces are MIT-licensed.
-- **Metadata audit:** Keep the private root package metadata aligned with the
-  AGPL default. Keep published MIT packages on `"license": "MIT"` with
-  package-level `LICENSE` files.
-- **Release posture:** Keep copy preview/alpha-safe: no official-release
-  claims, no stable API promises, no claim-command promises, and no stale
-  `@zitadel-nextgen/*` package wording unless referring to historical context.
+This preview rebuilds Zitadel's storage core and API surface — work that cuts
+too deep to land incrementally in the main repository. It happens here
+instead, in the open, and is intended to merge back into
+[zitadel/zitadel](https://github.com/zitadel/zitadel) as the foundation of a
+future major version. This is a preview of Zitadel — not a separate product,
+not a fork.
+
+## The four pillars
+
+Four capabilities describe what the platform is for, and each builds on the
+one before it: build, operate, investigate, govern.
+
+### 1. Build — auth you own
+
+Add registration and login to an app without giving up the experience.
+Headless APIs and framework SDKs carry the flow; ready-made UI components are
+available when you want them and never required. Your app renders every
+screen; the server holds every secret.
+
+**Today:** the CLI scaffolds auth into an app against a local runtime (see
+[README.md](README.md)), framework SDKs live under [packages/](packages/),
+and the embedded login and console UIs double as working references.
+
+**Direction:** create-first, claim-later — working auth before any signup,
+and a free claim once ownership starts to matter.
+[ADR 003](docs/adrs/003-create-first-claim-later.md) records where the
+implementation stands; `zitadel claim` is not shipped, and design notes that
+describe it are target design.
+
+### 2. Operate — one contract, every surface
+
+Everything Zitadel can do is defined once and reachable everywhere: HTTP API,
+CLI, MCP, and console UI expose the same operations with the same semantics
+and the same permissions. A human clicks what a script pipes and an agent
+calls — nothing is dashboard-only.
+
+**Today:** the OpenAPI 3.1 sources under [api/openapi/](api/openapi/) are the
+contract of record. Every CLI command runs with `--non-interactive --json`
+and returns a structured envelope, and
+[apps/cli/SKILLS.md](apps/cli/SKILLS.md) is the contract agents consume
+([ADR 004](docs/adrs/004-agent-contract-and-agents-md.md)). Configuration is
+repo state that can be planned and applied
+([ADR 007](docs/adrs/007-gitops-configuration-surface.md)), and the docs site
+publishes LLM-readable text at `/llms.txt` and page-level `.md` URLs.
+
+**Direction:** management operations exposed over MCP. Whether the CLI or MCP
+ends up as the primary agent transport is deliberately open — the contract is
+the invariant, and transports compete on ergonomics.
+
+### 3. Investigate — events answer questions
+
+Identity activity should be a dataset, not a log file. When every
+authentication, session, check, and change lands as a structured,
+identity-scoped event, forensics stops being an archaeology project and
+becomes a task you can hand to an agent: who accessed what, through which
+delegation, and what changed in the hours before an incident.
+
+**Today:** the storage core records structured identity activity — auth
+attempts, sessions, checks, token issuance — but no unified event stream or
+query surface exists yet.
+
+**Direction:** a first-class event stream with query and export surfaces
+built for agent-driven analysis, through open interfaces: your events, your
+agents, no black box between them.
+
+### 4. Govern — accountable agents
+
+Products now ship with agents inside, and the companies building them — B2C
+or B2B — inherit a question network operators answered for humans long ago
+with AAA: authentication, authorization, and accounting. Agents need the same
+treatment. Give an agent an identity of its own, record the delegation chain
+— which user granted which scope to which agent — and account for every
+action the agent takes on someone's behalf. Any product with agents in it
+must be able to answer: who authorized this agent to do what, and did it stay
+within scope?
+
+This is the platform's long-term goal. It is target design, not shipped
+capability: the standards underneath (token exchange, actor claims, MCP
+authorization) are still stabilizing, and these primitives build on the event
+foundation of pillar 3.
+
+## Current reality
+
+This repository is pre-release. The checked-in CLI supports the local
+npm-binary setup flow documented in [README.md](README.md), with Docker as an
+explicit fallback runtime. There is no `zitadel claim` command and no cloud
+service; the pillar sections above mark what is direction rather than
+shipped.
+
+Further out, past the four pillars, lies AI inside the platform itself —
+anomaly detection, threat intelligence, assisted configuration. That work is
+exploratory and will arrive as design documents before it arrives as code.
