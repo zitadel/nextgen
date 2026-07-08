@@ -57,10 +57,14 @@ describe("Next setup integration", () => {
       package_manager: "npm",
       command: "npm install",
     });
-    expect(setupJson.data.next_commands).toEqual(["npm run dev"]);
+    expect(setupJson.data.next_commands[0]).toBe("npm run dev");
+    expect(setupJson.data.next_commands[1]).toMatch(/^npx @zitadel\/cli@\S+ plan$/);
     expect(setupJson.data.next_actions.join("\n")).toContain("register a user");
     expect(setupJson.data.next_actions.join("\n")).toContain("log in again");
     expect(setupJson.data.next_actions.join("\n")).toContain("/profile shows Signed in");
+    expect(setupJson.data.next_actions.join("\n")).toContain(".zitadel/schemas/");
+    expect(setupJson.data.next_actions.join("\n")).toContain(".zitadel/flows/");
+    expect(setupJson.data.next_actions.join("\n")).toContain("Preview and publish config changes");
     expect(setupJson.data.files_written).toContain(".zitadel/schemas/default-human-user.json");
     expect(setupJson.data.files_written).toContain(".zitadel/flows/default-login.json");
     const installLog = JSON.parse((await readFile(fakeNpm.logPath, "utf8")).trim()) as {
