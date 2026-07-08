@@ -1,3 +1,4 @@
+import { stableStringify } from "../json";
 import type { ResourceSyncer, SyncAction, SyncPlanSummary } from "./types.js";
 
 /**
@@ -287,7 +288,10 @@ function renderDiff(
         lines.push(col(`${pad}~ ${pk} = ${fmtPrimitive(oldVal)} -> ${fmtPrimitive(newVal)}`));
       }
     } else if (Array.isArray(oldVal) && Array.isArray(newVal)) {
-      if (JSON.stringify(oldVal) === JSON.stringify(newVal)) {
+      // Key-order-insensitive equality: the server echoes objects in its own
+      // field order while local files are stably sorted — that difference is
+      // not a change.
+      if (stableStringify(oldVal) === stableStringify(newVal)) {
         if (newVal.length === 0) {
           lines.push(`${pad}  ${pk} = []`);
         } else {
