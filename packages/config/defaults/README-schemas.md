@@ -1,32 +1,135 @@
 # `.zitadel/schemas/`
 
-User-schema files. Each JSON file describes one editable user type — the
-shape of the user records the platform stores and the login/register
-flows collect (email, name, phoneNumber, custom claims, etc.). A project
-can hold as many schemas as you need (e.g. one for end users, one for
-internal admins).
+This folder contains your project's user schemas.
 
-## What's in a schema file
+A user schema defines **what information is stored about a user** and
+**how that type of user can authenticate**.
 
-- `objectType` — groups revisions of the same logical user type. Do not
-  rename it after the first `apply`; the platform correlates history by
-  this key.
-- `properties` / `required` — the user's attributes and which of them
-  must be present on every user.
-- `x-auth-methods` — which credentials this user type supports
-  (password, passkey, …).
+You can have as many schemas as you need. For example:
 
-## What you can do
+-   `customer.json`
+-   `employee.json`
+-   `admin.json`
 
-- **Add or edit a property** — extend `properties`, mark it `required`
-  if it must be present on every user.
-- **Enable or disable an auth method** — flip an `x-auth-methods` entry.
-- **Add another user type** — drop a new JSON file next to this one.
+Here's a simplified example:
 
-## Applying changes
+``` json
+{
+  "objectType": "customer",
+  "properties": {
+    "firstName": {
+      "type": "string"
+    },
+    "company": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "firstName"
+  ],
+  "x-auth-methods": [
+    "password",
+    "passkey"
+  ]
+}
+```
 
-`zitadel plan` previews the change; `zitadel apply` publishes it. Editing
-a schema publishes a **new immutable revision** — existing users keep
-validating against the previous revision. Flows that reference this
-schema stay pinned to the old revision until you re-pin them; see
-`.zitadel/flows/README.md`.
+Each schema is made up of four main sections:
+
+## `objectType`
+
+Identifies this type of user.
+
+Once you've applied a schema for the first time, don't rename it.
+Zitadel uses it to recognise future revisions of the same user type.
+
+## `properties`
+
+Defines the information stored for users of this type.
+
+For example:
+
+-   First name
+-   Last name
+-   Company
+-   Phone number
+-   Custom attributes
+
+Every property becomes available to the rest of the identity system,
+including login and registration flows.
+
+## `required`
+
+Lists which properties every user must provide.
+
+Properties that aren't listed here are optional.
+
+## `x-auth-methods`
+
+Controls how users of this type can authenticate.
+
+For example:
+
+-   Password
+-   Passkeys
+-   Social login
+
+------------------------------------------------------------------------
+
+# Making changes
+
+The most common workflow looks like this:
+
+1.  Update your schema.
+2.  If you've added, removed or renamed fields, update the corresponding
+    login flow in `.zitadel/flows/`.
+3.  Run `zitadel plan` to preview the changes.
+4.  Run `zitadel apply` to publish them.
+
+## Why do I need to update the login flow?
+
+The schema defines **what data exists**.
+
+The login flow defines **when and where users are asked to provide that
+data**.
+
+For example, if you add a `company` property to your schema, users won't
+see a new field on the registration form until you also update the
+registration flow.
+
+Likewise, if you remove or rename a property, you'll usually need to
+update any login flows that reference it.
+
+------------------------------------------------------------------------
+
+# Common changes
+
+## Add a new field
+
+Add it under `properties`.
+
+If every user must provide it, also add it to `required`.
+
+Finally, update the login flow if users should be able to enter it.
+
+## Make a field optional
+
+Remove it from `required`.
+
+## Enable passkeys
+
+Update `x-auth-methods`.
+
+## Create another user type
+
+Create another JSON file in this directory.
+
+------------------------------------------------------------------------
+
+## Next step
+
+Once you've updated your schema, continue with:
+
+    .zitadel/flows/
+
+to update your login and registration flows.
