@@ -106,10 +106,11 @@ describe("materializeSetupResources", () => {
     const schemaFile = JSON.parse(
       await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8"),
     ) as Record<string, unknown>;
-    // The file holds the server's stored body in normalized form: the
-    // canonicalized title survives, the meta-schema default does not.
+    // The file holds the server's stored body VERBATIM: the server keeps
+    // schema bytes as uploaded, so a spelled-out meta-schema default must
+    // survive write-back or the next revision would publish without it.
     expect(schemaFile.title).toBe("ServerCanonicalTitle");
-    expect(schemaFile.properties).toEqual({ email: { type: "string" } });
+    expect(schemaFile.properties).toEqual({ email: { type: "string", "x-editable": true } });
 
     const state = JSON.parse(
       await readFile(join(cwd, ".zitadel/state.json"), "utf8"),

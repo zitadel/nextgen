@@ -60,6 +60,10 @@ class SchemaSyncer implements ResourceSyncer {
   readonly mutable = false;
   readonly revisioned = true;
   readonly normalize = normalizeSchemaBody;
+  // Deliberately no `normalizeWrite`: the server stores schema bytes
+  // verbatim, so stripping spelled-out x-* defaults from the local file
+  // would drop them from the next published revision. Canonical schema
+  // bodies are written back as-is; `normalize` is comparison-only.
 
   constructor(
     private readonly client: ZitadelClient,
@@ -136,6 +140,9 @@ class FlowDefinitionSyncer implements ResourceSyncer {
   readonly mutable = true;
   readonly revisioned = false;
   readonly normalize = normalizeFlowBody;
+  // For flows the comparison form doubles as the file form: everything it
+  // strips (envelope keys, the empty `audience` echo) is transport noise.
+  readonly normalizeWrite = normalizeFlowBody;
 
   constructor(
     private readonly client: ZitadelClient,

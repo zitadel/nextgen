@@ -6,6 +6,7 @@ import { consola } from "consola";
 
 import { FLOWS_DIR } from "../flows";
 import { stableStringify } from "../json";
+import { ZitadelError } from "../errors";
 import { readState, removeFromState, updateState } from "./state.js";
 import type { ResourceEntry, ResourceSyncer, SyncAction } from "./types.js";
 
@@ -57,6 +58,11 @@ export async function buildSyncPlan(
     }
   }
 
+  // Every scanned file body, keyed by project-relative path. Schema syncers
+  // run before the flow syncer, so by the time a re-pin is planned the new
+  // schema revision's content is available for the pre-flight field check.
+  const scannedContents = new Map<string, object>();
+
   for (const syncer of syncers) {
     const dirPath = join(cwd, syncer.directory);
     consola.debug(`scanning ${syncer.directory}`);
@@ -87,6 +93,7 @@ export async function buildSyncPlan(
 
     for (const [absPath, content] of onDisk.entries()) {
       const relPath = absPath.slice(cwd.length + 1);
+      scannedContents.set(relPath, content);
       const entry = state.resources[relPath];
       const hash = hashForState(syncer, content);
 
@@ -110,6 +117,14 @@ export async function buildSyncPlan(
               newId: recovered.newId,
             }
           : undefined;
+      if (repin && syncer.mutable) {
+        assertRepinnedFlowFields(
+          relPath,
+          content,
+          repin.schemaPath,
+          scannedContents.get(repin.schemaPath),
+        );
+      }
 
       // State files written before normalized hashing hold legacy hashes
       // (order-sensitive, un-normalized). Accepting either format keeps an
@@ -353,33 +368,35 @@ function escapeRegExp(value: string): string {
 }
 
 /**
- * Reconcile a local file with the server's canonical body: normalize the
- * canonical form (write-back must not inject server noise like an empty
- * `audience` into user files), rewrite the file only when it materially
- * differs from what's on disk, and return the state hash of the canonical
- * form. The churn guard keeps hand-formatted files untouched unless the
- * server actually canonicalized something.
+ * Reconcile a local file with the server's canonical body. What gets
+ * written is the `normalizeWrite` form (strips pure transport noise like
+ * the empty `audience` echo; for schemas the canonical body verbatim —
+ * spelled-out x-* defaults must survive, or the next apply would publish
+ * a revision without them). Equality is judged in the `normalize`
+ * comparison form, so the file is rewritten only when it materially
+ * differs from live state; hand-formatted files stay untouched otherwise.
+ * Returns the state hash of the written form.
  */
 export async function writeBackResource(
   cwd: string,
   relPath: string,
-  syncer: Pick<ResourceSyncer, "normalize">,
+  syncer: Pick<ResourceSyncer, "normalize" | "normalizeWrite">,
   canonical: object,
 ): Promise<{ hash: string; changed: boolean }> {
-  const normalizedBody = syncer.normalize?.(canonical) ?? canonical;
+  const writeBody = syncer.normalizeWrite?.(canonical) ?? canonical;
+  const compare = (body: object) => stableStringify(syncer.normalize?.(body) ?? body);
   const absPath = join(cwd, relPath);
   let changed = true;
   try {
     const onDisk = JSON.parse(await readFile(absPath, "utf8")) as object;
-    const onDiskNormalized = syncer.normalize?.(onDisk) ?? onDisk;
-    changed = stableStringify(normalizedBody) !== stableStringify(onDiskNormalized);
+    changed = compare(writeBody) !== compare(onDisk);
   } catch (err) {
     consola.debug(`read ${relPath} for write-back failed:`, err);
   }
   if (changed) {
-    await writeFile(absPath, `${stableStringify(normalizedBody)}\n`);
+    await writeFile(absPath, `${stableStringify(writeBody)}\n`);
   }
-  return { hash: hashForState(syncer, normalizedBody), changed };
+  return { hash: hashForState(syncer, writeBody), changed };
 }
 
 async function fetchOldIfAsked(
@@ -438,6 +455,55 @@ async function readLocalFlowUserSchemas(cwd: string): Promise<Map<string, string
     }
   }
   return result;
+}
+
+/**
+ * Fail fast when a flow that is about to adopt a new schema revision
+ * references properties the new revision no longer has (the server would
+ * reject the flow update with `flow field: not a property in the user
+ * schema`). Runs at plan time, before any platform mutation — otherwise
+ * the revise would publish first and the run would die half-applied.
+ * Only plain property fields are checked; reserved credential tokens
+ * (`x-auth-methods#…`) resolve outside the schema.
+ */
+function assertRepinnedFlowFields(
+  flowPath: string,
+  flowContent: object,
+  schemaPath: string,
+  schemaContent: object | undefined,
+): void {
+  if (!schemaContent) {
+    return;
+  }
+  const properties = (schemaContent as { properties?: unknown }).properties;
+  if (typeof properties !== "object" || properties === null) {
+    return;
+  }
+  const steps = (flowContent as { steps?: Array<{ name?: unknown; fields?: unknown }> }).steps;
+  const missing: string[] = [];
+  for (const step of Array.isArray(steps) ? steps : []) {
+    const fields = Array.isArray(step.fields) ? step.fields : [];
+    for (const field of fields) {
+      if (typeof field !== "string" || field.includes("#")) {
+        continue;
+      }
+      if (!Object.prototype.hasOwnProperty.call(properties, field)) {
+        missing.push(`step ${JSON.stringify(step.name ?? "?")}: ${JSON.stringify(field)}`);
+      }
+    }
+  }
+  if (missing.length > 0) {
+    throw new ZitadelError(
+      "E_VALIDATION",
+      `${flowPath} cannot adopt the new revision of ${schemaPath}: ` +
+        `flow fields missing from the edited schema — ${missing.join(", ")}`,
+      {
+        hint:
+          "Update the flow's steps[].fields to match the edited schema " +
+          "(or restore the removed/renamed properties), then re-run plan/apply.",
+      },
+    );
+  }
 }
 
 function findFlowsPinnedTo(

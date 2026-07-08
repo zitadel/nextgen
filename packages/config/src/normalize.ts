@@ -6,10 +6,14 @@
  * on flows) and the meta-schema declares defaults an author may or may
  * not spell out (`x-editable` et al on schema properties). Normalizing
  * both sides before hashing or diffing keeps a one-field edit rendering
- * as a one-field diff. Normalized bodies are for comparison and local
- * files only — never upload them: the server does not materialize
- * meta-schema defaults, so stripping `"x-editable": true` from a wire
- * request would silently drop the flag from the stored schema.
+ * as a one-field diff.
+ *
+ * Normalized bodies are for COMPARISON. Never upload them, and never
+ * write a normalized schema body to a file: the server stores schema
+ * bytes verbatim without materializing meta-schema defaults, so a
+ * stripped `"x-editable": true` would vanish from the next published
+ * revision. (Flow write-back may reuse {@link normalizeFlowBody} —
+ * everything it strips is pure transport noise.)
  */
 
 /**

@@ -119,7 +119,7 @@ export async function materializeSetupResources(opts: {
     const written = await writeBackResource(
       opts.cwd,
       DEFAULT_FLOW_CONFIG_PATH,
-      { normalize: normalizeFlowBody },
+      { normalize: normalizeFlowBody, normalizeWrite: normalizeFlowBody },
       flow.flow_definition as object,
     );
     flowHash = written.hash;

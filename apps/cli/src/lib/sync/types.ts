@@ -63,11 +63,21 @@ export interface ResourceSyncer {
    * Reduce a body to its canonical comparison form: strip server-echoed
    * noise (empty `audience`) and spelled-out meta-schema defaults
    * (`x-editable` et al) so hashing and diff rendering treat semantically
-   * identical bodies as identical. Comparison/local-file use only — never
-   * applied to upload payloads (the server does not materialize the
-   * stripped defaults).
+   * identical bodies as identical. Comparison only — never applied to
+   * upload payloads or written to files (the server does not materialize
+   * the stripped defaults, so dropping them from stored bytes would lose
+   * them).
    */
   normalize?(data: object): object;
+  /**
+   * Reduce a canonical server body to what belongs in the local file
+   * during write-back: strip pure transport noise (detail-envelope keys,
+   * the empty `audience` echo) and nothing else. Unlike {@link normalize},
+   * this must preserve every semantically meaningful field — defaulted or
+   * not — because its output becomes the bytes the next apply uploads.
+   * Absent means the canonical body is written verbatim.
+   */
+  normalizeWrite?(data: object): object;
 }
 
 /**

@@ -1,7 +1,6 @@
 ---
 "@zitadel/config": patch
 "@zitadel/cli": patch
-"@zitadel/api-mock": patch
 ---
 
 Make `plan` diffs trustworthy and keep local config in lockstep with live
