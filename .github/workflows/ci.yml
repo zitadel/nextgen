@@ -64,9 +64,9 @@ jobs:
       # layer is unimplemented (see zitadel/nextgen#457). Re-enable via
       # `moon run server:test-spanner` once that lands.
 
-      - name: Build release snapshot without container
+      - name: Build release artifacts
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container
+        run: env -u CI -u GITHUB_ACTIONS moon run release:build
 
       - name: Run binary fresh-app journey
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}

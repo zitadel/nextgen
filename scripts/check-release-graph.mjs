@@ -24,10 +24,21 @@ const BUILD_MUTEX_REQUIREMENTS = new Map([
   ["sdk-next:build-release", "public-dist"],
   ["sdk-nuxt:build-release", "sdk-nuxt-dist"],
 ]);
-const RELEASE_ENTRYPOINT_TARGETS = [
+const RELEASE_BUILD_ENTRYPOINTS = [
   "release:pack",
   "release:snapshot",
-  "release:publish",
+  "release:build",
+];
+const PUBLISH_AGGREGATE_TARGET = "release:publish";
+// Gate first, then each publish surface in promotion order. The aggregate
+// runs deps serially, so this list is also the execution order.
+const PUBLISH_SURFACE_ORDER = [
+  "release:gate",
+  "release:verify-artifacts",
+  "release:publish-npm",
+  "release:publish-tags",
+  "release:publish-container",
+  "release:publish-github",
 ];
 
 export async function main(args = forwardedArgs()) {
@@ -83,30 +94,71 @@ export async function main(args = forwardedArgs()) {
     }
   }
 
-  for (const target of RELEASE_ENTRYPOINT_TARGETS) {
-    const task = await readTask(target);
-    const deps = new Set((task.deps ?? []).map((dep) => dep.target));
-    assertTaskRunInCI(task, false);
+  for (const target of RELEASE_BUILD_ENTRYPOINTS) {
+    const graph = await readTaskGraph(target);
+    const tasks = indexTasks(graph);
+    assertTask(tasks, target);
+    assertTaskOption(tasks, target, "runInCI", false);
 
-    if (!deps.has(PUBLIC_AGGREGATE_TARGET)) {
+    if (!reaches(tasks, target, PUBLIC_AGGREGATE_TARGET)) {
       throw new Error(`${target} must depend on ${PUBLIC_AGGREGATE_TARGET}`);
     }
-    if (deps.has("console:build")) {
+    if (directDeps(tasks, target).has("console:build")) {
       throw new Error(`${target} must use console:build-release, not console:build`);
     }
     for (const uiTarget of RELEASE_UI_BUILD_REQUIREMENTS.keys()) {
-      if (!deps.has(uiTarget)) {
+      if (!reaches(tasks, target, uiTarget)) {
         throw new Error(`${target} must depend on ${uiTarget}`);
       }
     }
   }
 
+  await assertPublishGraph();
+
   console.log(
     "release graph ok: public package release builds clean and rebuild dist " +
-      "without self-build readers, and " +
+      "without self-build readers, " +
       `${RELEASE_UI_BUILD_REQUIREMENTS.size} release UI ` +
-      "builds depend on the package release chain they consume",
+      "builds depend on the package release chain they consume, and the " +
+      "publish graph promotes built artifacts without rebuilding them",
   );
+}
+
+// The publish aggregate must run gate + surfaces in promotion order and must
+// never reach the build chain: the publish job promotes artifacts downloaded
+// from the build job, and a rebuild there would publish untested bits.
+async function assertPublishGraph() {
+  const graph = await readTaskGraph(PUBLISH_AGGREGATE_TARGET);
+  const tasks = indexTasks(graph);
+  assertTask(tasks, PUBLISH_AGGREGATE_TARGET);
+  assertTaskOption(tasks, PUBLISH_AGGREGATE_TARGET, "runInCI", false);
+  assertTaskOption(tasks, PUBLISH_AGGREGATE_TARGET, "runDepsInParallel", false);
+
+  const aggregate = tasks.get(PUBLISH_AGGREGATE_TARGET);
+  const orderedDeps = (aggregate.deps ?? []).map((dep) => dep.target);
+  if (orderedDeps.join(" ") !== PUBLISH_SURFACE_ORDER.join(" ")) {
+    throw new Error(
+      `${PUBLISH_AGGREGATE_TARGET} deps must be exactly [${PUBLISH_SURFACE_ORDER.join(", ")}] ` +
+        `in that order, got [${orderedDeps.join(", ")}]`,
+    );
+  }
+
+  for (const target of PUBLISH_SURFACE_ORDER) {
+    assertTaskOption(tasks, target, "runInCI", false);
+  }
+
+  const forbidden = [...tasks.keys()].filter(
+    (target) =>
+      target === PUBLIC_AGGREGATE_TARGET ||
+      target === "release:build" ||
+      target.endsWith(":build-release"),
+  );
+  if (forbidden.length > 0) {
+    throw new Error(
+      `${PUBLISH_AGGREGATE_TARGET} graph must not rebuild release artifacts; ` +
+        `found build tasks: ${forbidden.sort().join(", ")}`,
+    );
+  }
 }
 
 async function readTaskGraph(target) {
@@ -119,21 +171,6 @@ async function readTaskGraph(target) {
   } catch (error) {
     throw new Error(
       `failed to parse moon task graph for ${target}: ${formatError(error)}\n` +
-        result.stdout.slice(0, 1000),
-    );
-  }
-}
-
-async function readTask(target) {
-  const result = await runCapture("moon", ["task", target, "--json"], {
-    cwd: repoRoot,
-  });
-
-  try {
-    return JSON.parse(result.stdout);
-  } catch (error) {
-    throw new Error(
-      `failed to parse moon task for ${target}: ${formatError(error)}\n` +
         result.stdout.slice(0, 1000),
     );
   }
@@ -160,14 +197,6 @@ function assertTaskOption(tasks, target, option, expected) {
   if (task.options?.[option] !== expected) {
     throw new Error(
       `${target} must set options.${option} to ${String(expected)}`,
-    );
-  }
-}
-
-function assertTaskRunInCI(task, expected) {
-  if (task.options?.runInCI !== expected) {
-    throw new Error(
-      `${task.target} must set options.runInCI to ${String(expected)}`,
     );
   }
 }

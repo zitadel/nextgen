@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -21,9 +22,16 @@ import {
   readServerRelease,
   releaseDir,
   stageServerNpmBinaries,
+  verifyArchiveChecksums,
   verifyLocalArtifacts,
   writeReleaseMetadata,
 } from "./release-artifacts.mjs";
+import {
+  planSkipMessage,
+  readPublishPlan,
+  readPublishPlanIfExists,
+  writePublishPlan,
+} from "./release-plan.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
@@ -34,14 +42,22 @@ export async function main(args = forwardedArgs()) {
   switch (command) {
     case "version":
       return await commandVersion();
+    case "build":
+      return await commandBuild();
     case "snapshot":
       return await commandSnapshot(options);
     case "pack":
       return await commandPack();
-    case "publish":
-      return await commandPublish(options);
+    case "gate":
+      return await commandGate(options);
     case "verify":
       return await commandVerify();
+    case "publish-container":
+      return await commandPublishContainer();
+    case "publish-github":
+      return await commandPublishGithub();
+    case "publish-tags":
+      return await commandPublishTags();
     default:
       usage(command ? `unknown release command: ${command}` : undefined);
   }
@@ -52,7 +68,11 @@ async function commandVersion() {
   console.log(`${release.name} ${release.version} (${release.tag})`);
 }
 
-async function commandSnapshot(options) {
+// Builds every promotable release artifact except container images: binaries
+// for all platforms, npm-staged binaries, archives with checksums, public
+// package tarballs, the docker build context, and release metadata. This is
+// the only step that compiles; everything publish-side promotes its output.
+async function commandBuild() {
   const release = await readServerRelease(repoRoot);
   const outDir = releaseDir(repoRoot, release.version);
   const info = await gitInfo({ repoRoot });
@@ -64,6 +84,16 @@ async function commandSnapshot(options) {
   await packPublicPackages({ repoRoot, outDir, version: release.version });
   await prepareDockerContext({ repoRoot, outDir, version: release.version });
   await writeReleaseMetadata({ repoRoot, outDir, release, gitInfo: info });
+  await verifyLocalArtifacts({ repoRoot, outDir, release });
+  console.log(`release artifacts ready: ${outDir}`);
+}
+
+// Local convenience on top of release:build (a Moon task dep): loads a
+// host-platform container image for local runs. CI and publish never use it.
+async function commandSnapshot(options) {
+  const release = await readServerRelease(repoRoot);
+  const outDir = releaseDir(repoRoot, release.version);
+  await verifyLocalArtifacts({ repoRoot, outDir, release });
 
   if (!options.skipContainer) {
     await buildContainerImage({
@@ -76,7 +106,6 @@ async function commandSnapshot(options) {
     });
   }
 
-  await verifyLocalArtifacts({ repoRoot, outDir, release });
   console.log(`release snapshot ready: ${outDir}`);
 }
 
@@ -91,67 +120,155 @@ async function commandPack() {
   console.log(`npm tarballs ready: ${join(outDir, "npm")}`);
 }
 
-async function commandPublish(options) {
+// Evaluates whether this checkout should publish and records the decision in
+// the publish plan. All publish-side tasks read the plan and no-op on a skip,
+// which is how a Moon task graph carries a runtime gate decision.
+async function commandGate(options) {
   const release = await readServerRelease(repoRoot);
-  const outDir = releaseDir(repoRoot, release.version);
-  if (options.recoverVersion) {
-    assertRecoverVersion(release, options.recoverVersion);
+  const dryRun = options.dryRun || isEnvFlag(process.env.ZITADEL_RELEASE_DRY_RUN);
+  const recoverVersion = options.recoverVersion || process.env.RECOVER_VERSION || "";
+  const base = options.base || process.env.BASE_SHA || "HEAD^";
+
+  let decision;
+  if (recoverVersion) {
+    assertRecoverVersion(release, recoverVersion);
+    decision = { shouldPublish: true, reason: `manual recovery for ${recoverVersion}` };
   } else {
-    const preflight = await detectReleaseAutomation({
-      repoRoot,
-      mode: "publish",
-      base: options.base || process.env.BASE_SHA || "HEAD^",
-    });
-    if (!preflight.ok) {
-      const message = [
+    const preflight = await detectReleaseAutomation({ repoRoot, mode: "publish", base });
+    decision = resolvePublishGate({ dryRun, recoverVersion, preflight, release });
+  }
+
+  if (decision.shouldPublish) {
+    await assertNoUnrecordedPendingChangesets();
+    await assertMainBranch({ dryRun, recoverVersion }, { allowDryRunBypass: !recoverVersion });
+  }
+
+  const plan = await writePublishPlan(repoRoot, {
+    shouldPublish: decision.shouldPublish,
+    dryRun,
+    reason: decision.reason,
+    version: release.version,
+    tag: release.tag,
+    prerelease: release.prerelease,
+    recoverVersion,
+  });
+  console.log(
+    `release gate: ${plan.shouldPublish ? (plan.dryRun ? "publish (dry run)" : "publish") : "skip"}` +
+      ` - ${plan.reason}`,
+  );
+}
+
+export function resolvePublishGate({ dryRun = false, recoverVersion = "", preflight, release, env = process.env }) {
+  if (recoverVersion) {
+    return { shouldPublish: true, reason: `manual recovery for ${recoverVersion}` };
+  }
+  if (!preflight.ok) {
+    throw new Error(
+      [
         `release publish preflight failed: ${preflight.reason}`,
         ...preflight.errors.map((error) => `- ${error}`),
-      ].join("\n");
-      throw new Error(message);
-    }
-    if (!preflight.shouldRun) {
-      const message = `release publish: skip - ${preflight.reason}`;
-      if (shouldFailManualPublishSkip(options)) {
-        throw new Error(
-          [
-            message,
-            "manual release dispatch would not publish anything; " +
-              `pass recover_version=${release.version} to recover this checked-out version, ` +
-              "or run from a Changesets version package commit.",
-          ].join("\n"),
-        );
-      }
-      console.log(message);
-      return;
-    }
+      ].join("\n"),
+    );
   }
+  if (!preflight.shouldRun) {
+    if (shouldFailManualPublishSkip({ dryRun, recoverVersion }, env)) {
+      throw new Error(
+        [
+          `release publish: skip - ${preflight.reason}`,
+          "manual release dispatch would not publish anything; " +
+            `pass recover_version=${release.version} to recover this checked-out version, ` +
+            "or run from a Changesets version package commit.",
+        ].join("\n"),
+      );
+    }
+    return { shouldPublish: false, reason: preflight.reason };
+  }
+  return { shouldPublish: true, reason: preflight.reason };
+}
 
-  await assertNoUnrecordedPendingChangesets();
-  await assertMainBranch(options, { allowDryRunBypass: !options.recoverVersion });
-
-  if (options.dryRun) {
-    await commandSnapshot({ skipContainer: true });
-    await buildContainerImage({
-      repoRoot,
-      outDir,
-      release,
-      dryRun: true,
-      push: true,
-      platforms: CONTAINER_PLATFORMS,
-    });
-    await upsertProductGithubRelease({ repoRoot, outDir, dryRun: true, log: console.log });
-    console.log("dry run: would publish npm packages, push container images, and update the draft GitHub Release");
+async function commandVerify() {
+  const release = await readServerRelease(repoRoot);
+  const outDir = releaseDir(repoRoot, release.version);
+  const plan = await readPublishPlanIfExists(repoRoot);
+  if (plan && !plan.shouldPublish) {
+    console.log(planSkipMessage("verify-artifacts", plan));
     return;
   }
-
-  await commandSnapshot({ skipContainer: true });
-  await run("corepack", ["pnpm", "exec", "changeset", "publish"], {
+  if (plan) {
+    assertPlanVersion(plan, release);
+  }
+  await verifyLocalArtifacts({ repoRoot, release, outDir });
+  await verifyArchiveChecksums({ outDir });
+  await run("node", ["apps/cli-journey-e2e/scripts/verify-tarballs.mjs", join(outDir, "npm")], {
     cwd: repoRoot,
-    env: releasePublishEnv(),
   });
-  await buildContainerImage({ repoRoot, outDir, release, push: true, platforms: CONTAINER_PLATFORMS });
-  await commandVerify();
-  await upsertProductGithubRelease({ repoRoot, outDir, log: console.log });
+  console.log(`release artifacts verified for ${release.version}`);
+}
+
+async function commandPublishContainer() {
+  const release = await readServerRelease(repoRoot);
+  const plan = await readPublishPlan(repoRoot);
+  if (!plan.shouldPublish) {
+    console.log(planSkipMessage("publish-container", plan));
+    return;
+  }
+  assertPlanVersion(plan, release);
+
+  const outDir = releaseDir(repoRoot, release.version);
+  const contextDir = join(outDir, "docker-context");
+  if (!(await exists(join(contextDir, "Dockerfile")))) {
+    throw new Error(
+      `missing docker context at ${contextDir}; run moon run release:build first`,
+    );
+  }
+
+  const result = await buildContainerImage({
+    repoRoot,
+    outDir,
+    release,
+    contextDir,
+    dryRun: plan.dryRun,
+    push: true,
+    platforms: CONTAINER_PLATFORMS,
+  });
+  if (plan.dryRun) {
+    console.log(`release publish-container: dry run - would run docker ${result.args.join(" ")}`);
+    return;
+  }
+  console.log(`release publish-container: pushed ${result.tags.join(", ")}`);
+}
+
+async function commandPublishGithub() {
+  const release = await readServerRelease(repoRoot);
+  const plan = await readPublishPlan(repoRoot);
+  if (!plan.shouldPublish) {
+    console.log(planSkipMessage("publish-github", plan));
+    return;
+  }
+  assertPlanVersion(plan, release);
+  const outDir = releaseDir(repoRoot, release.version);
+  await upsertProductGithubRelease({ repoRoot, outDir, dryRun: plan.dryRun, log: console.log });
+}
+
+// `changeset publish` used to create per-package git tags locally on the
+// runner, where they were discarded. `changeset tag` recreates the same tags
+// for the checked-out versions (skipping ones that already exist locally), so
+// pushing after it converges the remote tag surface on every publish run.
+async function commandPublishTags() {
+  const release = await readServerRelease(repoRoot);
+  const plan = await readPublishPlan(repoRoot);
+  if (!plan.shouldPublish) {
+    console.log(planSkipMessage("publish-tags", plan));
+    return;
+  }
+  assertPlanVersion(plan, release);
+  if (plan.dryRun) {
+    console.log("release publish-tags: dry run - would run changeset tag and push tags to origin");
+    return;
+  }
+  await run("corepack", ["pnpm", "exec", "changeset", "tag"], { cwd: repoRoot });
+  await run("git", ["push", "origin", "--tags"], { cwd: repoRoot });
+  console.log("release publish-tags: git tags pushed");
 }
 
 function assertRecoverVersion(release, recoverVersion) {
@@ -162,10 +279,13 @@ function assertRecoverVersion(release, recoverVersion) {
   }
 }
 
-async function commandVerify() {
-  const release = await readServerRelease(repoRoot);
-  await verifyLocalArtifacts({ repoRoot, release, outDir: releaseDir(repoRoot, release.version) });
-  console.log(`release artifacts verified for ${release.version}`);
+function assertPlanVersion(plan, release) {
+  if (plan.version !== release.version) {
+    throw new Error(
+      `publish plan version ${plan.version} does not match checked-out server version ${release.version}; ` +
+        "re-run the release gate on this checkout",
+    );
+  }
 }
 
 function parseOptions(args) {
@@ -209,10 +329,6 @@ export async function assertNoUnrecordedPendingChangesets(root = repoRoot) {
   }
 }
 
-export function releasePublishEnv(overrides = {}) {
-  return { ...process.env, ...overrides, ZITADEL_TELEMETRY_BUILD_CHANNEL: "production" };
-}
-
 export function shouldFailManualPublishSkip(options = {}, env = process.env) {
   return env.GITHUB_EVENT_NAME === "workflow_dispatch" && !options.dryRun && !options.recoverVersion;
 }
@@ -227,6 +343,19 @@ async function assertMainBranch(options, { allowDryRunBypass = true } = {}) {
   }
 }
 
+function isEnvFlag(value) {
+  return value === "1" || value === "true";
+}
+
+async function exists(path) {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function hostLinuxPlatform() {
   const arch = process.arch === "arm64" ? "arm64" : "amd64";
   return { goos: "linux", goarch: arch };
@@ -237,14 +366,31 @@ function usage(error) {
     console.error(error);
     console.error("");
   }
-  console.log(`usage: node scripts/release.mjs <version|pack|snapshot|publish|verify> [options]
+  console.log(`usage: node scripts/release.mjs <command> [options]
+
+Build commands:
+  version            Print the release name, version, and tag.
+  build              Build all release artifacts except container images.
+  snapshot           Load a host-platform container image from built artifacts.
+  pack               Build binaries and npm tarballs only.
+
+Publish commands (read the publish plan written by gate):
+  gate               Evaluate publish preconditions and write the publish plan.
+  verify             Verify built artifacts, archive checksums, and tarballs.
+  publish-container  Push the multi-arch container image (dry run per plan).
+  publish-github     Create or update the draft GitHub Release.
+  publish-tags       Create Changesets git tags and push them to origin.
+
+npm publishing lives in scripts/release-npm.mjs (release:publish-npm task).
 
 Options:
-  --dry-run          Do not publish or mutate remote registries.
-  --skip-container   Build release files without building a local Docker image.
+  --dry-run          Gate only: record a dry-run plan (no remote mutations).
+  --skip-container   Snapshot only: verify artifacts without a local image.
   --recover-version <v>
-                     Publish recovery target version from release-publish.
-  --base <ref>       Base ref for release publish detection.
+                     Gate only: manual recovery target version.
+  --base <ref>       Gate only: base ref for release publish detection.
+
+Environment fallbacks for gate: ZITADEL_RELEASE_DRY_RUN, RECOVER_VERSION, BASE_SHA.
 `);
   process.exit(error ? 1 : 0);
 }

@@ -368,6 +368,43 @@ export function artifactPackageRows(metadata) {
   return (metadata.packages ?? []).map((pkg) => `| \`${pkg.name}\` | \`${pkg.version}\` |`).join("\n");
 }
 
+// Recomputes archive digests against checksums.txt. The publish job runs this
+// after downloading the build artifact, so promoted bits are exactly the bits
+// the build job produced.
+export async function verifyArchiveChecksums(options = {}) {
+  const outDir = options.outDir;
+  if (!outDir) {
+    throw new Error("archive checksum verification requires outDir");
+  }
+  const archivesDir = join(outDir, "archives");
+  const source = await readFile(join(archivesDir, "checksums.txt"), "utf8");
+  const entries = source
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => {
+      const [expected, name] = line.split(/\s+/).filter(Boolean);
+      if (!expected || !name) {
+        throw new Error(`invalid checksums.txt line: ${line}`);
+      }
+      return { expected, name };
+    });
+  if (entries.length === 0) {
+    throw new Error(`checksums.txt in ${archivesDir} is empty`);
+  }
+
+  const mismatches = [];
+  for (const entry of entries) {
+    const actual = await sha256File(join(archivesDir, entry.name));
+    if (actual !== entry.expected) {
+      mismatches.push(entry.name);
+    }
+  }
+  if (mismatches.length > 0) {
+    throw new Error(`release archive checksums do not match: ${mismatches.join(", ")}`);
+  }
+  return entries.length;
+}
+
 export async function verifyLocalArtifacts(options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
   const release = options.release ?? (await readServerRelease(repoRoot));

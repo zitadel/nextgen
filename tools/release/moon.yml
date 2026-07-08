@@ -64,8 +64,11 @@ tasks:
       runFromWorkspaceRoot: true
       runInCI: false
 
-  snapshot:
-    command: "node scripts/release.mjs snapshot"
+  # Builds every promotable release artifact except container images. The
+  # publish surfaces below never compile; they promote this task's output
+  # (in CI it travels between the build and publish jobs as an artifact).
+  build:
+    command: "node scripts/release.mjs build"
     deps:
       - "server:test"
       - "release:build-public-packages"
@@ -79,12 +82,86 @@ tasks:
       runFromWorkspaceRoot: true
       runInCI: false
 
-  publish:
-    command: "node scripts/release.mjs publish"
+  # Local convenience: release:build plus a loaded host-platform image.
+  snapshot:
+    command: "node scripts/release.mjs snapshot"
     deps:
-      - "release:build-public-packages"
-      - "console:build-release"
-      - "login-ui:build-release"
+      - "release:build"
+    options:
+      cache: false
+      runFromWorkspaceRoot: true
+      runInCI: false
+
+  # Evaluates publish preconditions and writes dist/release/publish-plan.json.
+  # Every publish surface reads that plan and no-ops when it says skip, so the
+  # gate decision flows through the task graph without leaving Moon.
+  gate:
+    command: "node scripts/release.mjs gate"
+    options:
+      cache: false
+      runFromWorkspaceRoot: true
+      runInCI: false
+
+  verify-artifacts:
+    command: "node scripts/release.mjs verify"
+    options:
+      cache: false
+      runFromWorkspaceRoot: true
+      runInCI: false
+
+  publish-npm:
+    command: "node scripts/release-npm.mjs"
+    deps:
+      - "release:verify-artifacts"
+    options:
+      cache: false
+      runDepsInParallel: false
+      runFromWorkspaceRoot: true
+      runInCI: false
+
+  publish-tags:
+    command: "node scripts/release.mjs publish-tags"
+    deps:
+      - "release:verify-artifacts"
+    options:
+      cache: false
+      runDepsInParallel: false
+      runFromWorkspaceRoot: true
+      runInCI: false
+
+  publish-container:
+    command: "node scripts/release.mjs publish-container"
+    deps:
+      - "release:verify-artifacts"
+    options:
+      cache: false
+      runDepsInParallel: false
+      runFromWorkspaceRoot: true
+      runInCI: false
+
+  publish-github:
+    command: "node scripts/release.mjs publish-github"
+    deps:
+      - "release:verify-artifacts"
+    options:
+      cache: false
+      runDepsInParallel: false
+      runFromWorkspaceRoot: true
+      runInCI: false
+
+  # Aggregate publish entrypoint: gate first, then each surface in order.
+  # Deliberately independent of the build chain — the publish job promotes
+  # downloaded artifacts and must never rebuild them (check-release-graph
+  # enforces this).
+  publish:
+    command: "node -e 0"
+    deps:
+      - "release:gate"
+      - "release:verify-artifacts"
+      - "release:publish-npm"
+      - "release:publish-tags"
+      - "release:publish-container"
+      - "release:publish-github"
     options:
       cache: false
       runDepsInParallel: false

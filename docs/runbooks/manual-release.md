@@ -2,8 +2,16 @@
 
 This repo uses Moon for CI/build orchestration, server artifacts, containers,
 and the draft GitHub Release shell for `v<version>`. Changesets owns package
-versioning, changelogs, npm publishing, and public package tags. Product release
-prose is written manually by maintainers.
+versioning and changelogs. Release automation publishes the prebuilt npm
+tarballs from the build job (tarball promotion — nothing is rebuilt at publish
+time), pushes Changesets git tags, and pushes container images. Product
+release prose is written manually by maintainers.
+
+The `release-publish` workflow runs two jobs: `build` compiles every release
+artifact without publish credentials and uploads them; `publish` downloads
+that artifact, verifies checksums, and promotes each surface (npm, git tags,
+container, GitHub Release) behind a gate that records its decision in
+`dist/release/publish-plan.json`.
 
 ## Normal release
 
@@ -16,8 +24,9 @@ prose is written manually by maintainers.
 4. Review the generated version PR. It should update package versions,
    changelogs, and the `@zitadel/server` npm runtime version.
 5. Merge the version PR only after CI is green.
-6. `release-publish` runs automatically from that merge commit on `main`,
-   publishes npm packages with Changesets, and pushes the
+6. `release-publish` runs automatically from that merge commit on `main`:
+   the build job produces all artifacts, and the publish job promotes the
+   prebuilt npm tarballs to npmjs, pushes Changesets git tags, and pushes the
    `ghcr.io/zitadel/nextgen:<version>` container image. It also creates or
    updates the draft GitHub Release for `v<version>` with generated artifact and
    package facts.
@@ -51,9 +60,9 @@ prose is written manually by maintainers.
 Use `release-publish` with `recover_version=<version>` for an already-versioned
 release when any publish-side artifact may be missing. This is the single
 recovery path. It verifies the checked-out `@zitadel/server` version, rebuilds
-release artifacts, runs Changesets publish, pushes containers, and updates the
-draft GitHub Release facts block.
-`changeset publish` only publishes package versions that are not already
+release artifacts in the build job, promotes the npm tarballs, pushes git tags
+and containers, and updates the draft GitHub Release facts block.
+The npm promotion step only publishes package versions that are not already
 present on npm, so the same recovery path is safe when npm packages are already
 complete and only Docker needs repair.
 
@@ -100,7 +109,10 @@ announcement.
 
 ```sh
 moon ci
-moon run release:snapshot
-moon run release:publish -- --dry-run  # from a generated version commit
-moon run release:publish -- --dry-run --recover-version 0.1.0-alpha.8
+moon run release:build     # all release artifacts except container images
+moon run release:snapshot  # release:build plus a loaded host-platform image
+
+# Publish dry runs promote the artifacts release:build produced:
+ZITADEL_RELEASE_DRY_RUN=1 moon run release:publish  # from a generated version commit
+ZITADEL_RELEASE_DRY_RUN=1 RECOVER_VERSION=0.1.0-alpha.14 moon run release:publish
 ```

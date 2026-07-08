@@ -62,7 +62,13 @@ type ReleaseAutomationModule = {
 
 type ReleaseModule = {
   assertNoUnrecordedPendingChangesets: (repoRoot: string) => Promise<void>;
-  releasePublishEnv: (env?: NodeJS.ProcessEnv) => NodeJS.ProcessEnv;
+  resolvePublishGate: (options: {
+    dryRun?: boolean;
+    recoverVersion?: string;
+    preflight?: { ok: boolean; shouldRun: boolean; reason: string; errors: string[] };
+    release?: { version: string };
+    env?: NodeJS.ProcessEnv;
+  }) => { shouldPublish: boolean; reason: string };
   shouldFailManualPublishSkip: (
     options: { dryRun?: boolean; recoverVersion?: string },
     env?: NodeJS.ProcessEnv,
@@ -534,26 +540,56 @@ describe("release publish guard", () => {
     ).toBe(false);
   });
 
-  it("forces production telemetry while publishing npm packages", async () => {
-    const { releasePublishEnv } = await loadReleaseModule();
-    const originalBase = process.env.ZITADEL_RELEASE_TEST_BASE;
-    process.env.ZITADEL_RELEASE_TEST_BASE = "preserved";
-    try {
-      const env = releasePublishEnv({
-        ZITADEL_RELEASE_TEST_OVERRIDE: "included",
-        ZITADEL_TELEMETRY_BUILD_CHANNEL: "development",
-      });
+  it("resolves the publish gate decision from preflight state", async () => {
+    const { resolvePublishGate } = await loadReleaseModule();
+    const release = { version: "0.1.0-alpha.14" };
+    const pushEnv = { GITHUB_EVENT_NAME: "push" } as NodeJS.ProcessEnv;
+    const dispatchEnv = { GITHUB_EVENT_NAME: "workflow_dispatch" } as NodeJS.ProcessEnv;
 
-      expect(env.ZITADEL_RELEASE_TEST_BASE).toBe("preserved");
-      expect(env.ZITADEL_RELEASE_TEST_OVERRIDE).toBe("included");
-      expect(env.ZITADEL_TELEMETRY_BUILD_CHANNEL).toBe("production");
-    } finally {
-      if (originalBase === undefined) {
-        delete process.env.ZITADEL_RELEASE_TEST_BASE;
-      } else {
-        process.env.ZITADEL_RELEASE_TEST_BASE = originalBase;
-      }
-    }
+    expect(
+      resolvePublishGate({
+        preflight: { ok: true, shouldRun: true, reason: "version commit detected", errors: [] },
+        release,
+        env: pushEnv,
+      }),
+    ).toEqual({ shouldPublish: true, reason: "version commit detected" });
+
+    expect(
+      resolvePublishGate({
+        preflight: { ok: true, shouldRun: false, reason: "not a version commit", errors: [] },
+        release,
+        env: pushEnv,
+      }),
+    ).toEqual({ shouldPublish: false, reason: "not a version commit" });
+
+    expect(
+      resolvePublishGate({ recoverVersion: "0.1.0-alpha.14", release, env: dispatchEnv }),
+    ).toEqual({ shouldPublish: true, reason: "manual recovery for 0.1.0-alpha.14" });
+
+    expect(() =>
+      resolvePublishGate({
+        preflight: { ok: false, shouldRun: false, reason: "preflight failed", errors: ["boom"] },
+        release,
+        env: pushEnv,
+      }),
+    ).toThrow("preflight failed");
+
+    expect(() =>
+      resolvePublishGate({
+        preflight: { ok: true, shouldRun: false, reason: "not a version commit", errors: [] },
+        release,
+        env: dispatchEnv,
+      }),
+    ).toThrow("manual release dispatch would not publish anything");
+
+    expect(
+      resolvePublishGate({
+        dryRun: true,
+        preflight: { ok: true, shouldRun: false, reason: "not a version commit", errors: [] },
+        release,
+        env: dispatchEnv,
+      }),
+    ).toEqual({ shouldPublish: false, reason: "not a version commit" });
   });
 
   it("allows prerelease-recorded pending changesets and rejects unrecorded ones", async () => {

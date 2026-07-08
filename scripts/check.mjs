@@ -123,7 +123,7 @@ async function phasePack() {
 }
 
 async function phaseRelease() {
-  await run("moon", ["run", "release:snapshot", "--", "--skip-container"]);
+  await run("moon", ["run", "release:build"]);
 }
 
 async function phaseJourney() {
