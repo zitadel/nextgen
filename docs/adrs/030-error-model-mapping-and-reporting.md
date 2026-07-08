@@ -1,4 +1,4 @@
-# ADR 029: Error Model, Mapping, and Reporting
+# ADR 030: Error Model, Mapping, and Reporting
 
 > **Status:** Proposed
 > **Date:** 2026-06-26
