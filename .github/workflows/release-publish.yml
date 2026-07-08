@@ -19,15 +19,10 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Dry run: build and verify only. Uncheck to allow publishing."
+        description: "Dry run: build and report what a real run would publish. Uncheck to idempotently publish whatever is missing for the checked-out main version."
         required: true
         default: true
         type: boolean
-      recover_version:
-        description: "Exact already-versioned release to recover through the publish path, for example 0.1.0-alpha.8. Leave empty for normal publish detection."
-        required: false
-        default: ""
-        type: string
 
 permissions:
   contents: write
@@ -203,7 +198,10 @@ jobs:
           # npm provenance until the release job runs on GitHub-hosted runners.
           NPM_CONFIG_PROVENANCE: "false"
           ZITADEL_RELEASE_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '' }}
-          RECOVER_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.recover_version || '' }}
+          # Manual dispatch = idempotent re-run: every surface checks the
+          # registry/release state and skips what already exists, so recovery
+          # is just dispatching again - no special recover mode.
+          ZITADEL_RELEASE_MANUAL: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
 
       - name: Smoke the compose deployment (dry run)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}

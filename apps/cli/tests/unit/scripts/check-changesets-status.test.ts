@@ -63,16 +63,11 @@ type ReleaseAutomationModule = {
 type ReleaseModule = {
   assertNoUnrecordedPendingChangesets: (repoRoot: string) => Promise<void>;
   resolvePublishGate: (options: {
-    dryRun?: boolean;
+    manual?: boolean;
     recoverVersion?: string;
     preflight?: { ok: boolean; shouldRun: boolean; reason: string; errors: string[] };
     release?: { version: string };
-    env?: NodeJS.ProcessEnv;
   }) => { shouldPublish: boolean; reason: string };
-  shouldFailManualPublishSkip: (
-    options: { dryRun?: boolean; recoverVersion?: string },
-    env?: NodeJS.ProcessEnv,
-  ) => boolean;
 };
 
 type CheckChangesetStatus = {
@@ -517,40 +512,14 @@ describe("release-automation", () => {
 });
 
 describe("release publish guard", () => {
-  it("fails manual non-dry publish skips instead of silently succeeding", async () => {
-    const { shouldFailManualPublishSkip } = await loadReleaseModule();
-    const workflowDispatchEnv = { GITHUB_EVENT_NAME: "workflow_dispatch" } as NodeJS.ProcessEnv;
-
-    expect(shouldFailManualPublishSkip({ dryRun: false, recoverVersion: "" }, workflowDispatchEnv)).toBe(
-      true,
-    );
-    expect(shouldFailManualPublishSkip({ dryRun: true, recoverVersion: "" }, workflowDispatchEnv)).toBe(
-      false,
-    );
-    expect(
-      shouldFailManualPublishSkip(
-        { dryRun: false, recoverVersion: "0.1.0-alpha.14" },
-        workflowDispatchEnv,
-      ),
-    ).toBe(false);
-    expect(
-      shouldFailManualPublishSkip({ dryRun: false, recoverVersion: "" }, {
-        GITHUB_EVENT_NAME: "push",
-      } as NodeJS.ProcessEnv),
-    ).toBe(false);
-  });
-
   it("resolves the publish gate decision from preflight state", async () => {
     const { resolvePublishGate } = await loadReleaseModule();
     const release = { version: "0.1.0-alpha.14" };
-    const pushEnv = { GITHUB_EVENT_NAME: "push" } as NodeJS.ProcessEnv;
-    const dispatchEnv = { GITHUB_EVENT_NAME: "workflow_dispatch" } as NodeJS.ProcessEnv;
 
     expect(
       resolvePublishGate({
         preflight: { ok: true, shouldRun: true, reason: "version commit detected", errors: [] },
         release,
-        env: pushEnv,
       }),
     ).toEqual({ shouldPublish: true, reason: "version commit detected" });
 
@@ -558,38 +527,30 @@ describe("release publish guard", () => {
       resolvePublishGate({
         preflight: { ok: true, shouldRun: false, reason: "not a version commit", errors: [] },
         release,
-        env: pushEnv,
       }),
     ).toEqual({ shouldPublish: false, reason: "not a version commit" });
-
-    expect(
-      resolvePublishGate({ recoverVersion: "0.1.0-alpha.14", release, env: dispatchEnv }),
-    ).toEqual({ shouldPublish: true, reason: "manual recovery for 0.1.0-alpha.14" });
 
     expect(() =>
       resolvePublishGate({
         preflight: { ok: false, shouldRun: false, reason: "preflight failed", errors: ["boom"] },
         release,
-        env: pushEnv,
       }),
     ).toThrow("preflight failed");
+  });
 
-    expect(() =>
-      resolvePublishGate({
-        preflight: { ok: true, shouldRun: false, reason: "not a version commit", errors: [] },
-        release,
-        env: dispatchEnv,
-      }),
-    ).toThrow("manual release dispatch would not publish anything");
+  it("treats manual dispatch as an idempotent re-run without preflight detection", async () => {
+    const { resolvePublishGate } = await loadReleaseModule();
+    const release = { version: "0.1.0-alpha.14" };
 
-    expect(
-      resolvePublishGate({
-        dryRun: true,
-        preflight: { ok: true, shouldRun: false, reason: "not a version commit", errors: [] },
-        release,
-        env: dispatchEnv,
-      }),
-    ).toEqual({ shouldPublish: false, reason: "not a version commit" });
+    expect(resolvePublishGate({ manual: true, release })).toEqual({
+      shouldPublish: true,
+      reason: "manual dispatch: idempotent re-run for 0.1.0-alpha.14",
+    });
+
+    expect(resolvePublishGate({ recoverVersion: "0.1.0-alpha.14", release })).toEqual({
+      shouldPublish: true,
+      reason: "manual recovery for 0.1.0-alpha.14 (deprecated recover_version input)",
+    });
   });
 
   it("allows prerelease-recorded pending changesets and rejects unrecorded ones", async () => {

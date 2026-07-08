@@ -100,6 +100,85 @@ describe("release artifact helpers", () => {
     expect(() => validateSemver("v1.2.3")).toThrow("invalid release version");
   });
 
+  it("treats only missing manifests as absent container images", async () => {
+    const { containerImageExists } = (await loadModule()) as unknown as {
+      containerImageExists: (options: {
+        reference: string;
+        runCapture: (command: string, args: string[]) => Promise<{ stdout: string }>;
+      }) => Promise<boolean>;
+    };
+
+    await expect(
+      containerImageExists({
+        reference: "ghcr.io/zitadel/nextgen:0.1.0-alpha.14",
+        runCapture: async () => ({ stdout: "manifest data" }),
+      }),
+    ).resolves.toBe(true);
+
+    await expect(
+      containerImageExists({
+        reference: "ghcr.io/zitadel/nextgen:0.1.0-alpha.99",
+        runCapture: async () => {
+          throw Object.assign(new Error("docker failed with exit 1"), {
+            stderr: "ERROR: ghcr.io/zitadel/nextgen:0.1.0-alpha.99: not found",
+          });
+        },
+      }),
+    ).resolves.toBe(false);
+
+    await expect(
+      containerImageExists({
+        reference: "ghcr.io/zitadel/nextgen:0.1.0-alpha.14",
+        runCapture: async () => {
+          throw Object.assign(new Error("docker failed with exit 1"), {
+            stderr: "ERROR: unauthorized: authentication required",
+          });
+        },
+      }),
+    ).rejects.toThrow("failed to check");
+  });
+
+  it("re-points only missing secondary tags at the published version", async () => {
+    const { ensureContainerTags } = (await loadModule()) as unknown as {
+      ensureContainerTags: (options: {
+        primary: string;
+        tags: string[];
+        run: (command: string, args: string[]) => Promise<void>;
+        runCapture: (command: string, args: string[]) => Promise<{ stdout: string }>;
+      }) => Promise<string[]>;
+    };
+
+    const created: string[][] = [];
+    const result = await ensureContainerTags({
+      primary: "ghcr.io/zitadel/nextgen:1.2.3",
+      tags: ["ghcr.io/zitadel/nextgen:1.2.3", "ghcr.io/zitadel/nextgen:latest"],
+      run: async (_command, args) => {
+        created.push(args);
+      },
+      runCapture: async (_command, args) => {
+        const reference = args.at(-1) ?? "";
+        if (reference.endsWith(":latest")) {
+          throw Object.assign(new Error("docker failed with exit 1"), {
+            stderr: "manifest unknown",
+          });
+        }
+        return { stdout: "manifest data" };
+      },
+    });
+
+    expect(result).toEqual(["ghcr.io/zitadel/nextgen:latest"]);
+    expect(created).toEqual([
+      [
+        "buildx",
+        "imagetools",
+        "create",
+        "-t",
+        "ghcr.io/zitadel/nextgen:latest",
+        "ghcr.io/zitadel/nextgen:1.2.3",
+      ],
+    ]);
+  });
+
   it("stages built server binaries into platform npm packages", async () => {
     const { stageServerNpmBinaries } = await loadModule();
     const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-server-package-"));

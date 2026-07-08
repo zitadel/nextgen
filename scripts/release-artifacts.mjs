@@ -312,6 +312,46 @@ export function hostLinuxPlatform() {
   return { goos: "linux", goarch: arch };
 }
 
+// Version tags are immutable release coordinates: once <image>:<version>
+// exists on the registry, a re-run must not rebuild or re-push it. A missing
+// manifest is the only "does not exist" signal; auth or network errors must
+// surface instead of being treated as absence.
+export async function containerImageExists(options = {}) {
+  const runCaptureFn = options.runCapture ?? runCapture;
+  try {
+    await runCaptureFn("docker", ["buildx", "imagetools", "inspect", options.reference]);
+    return true;
+  } catch (error) {
+    const output = `${error?.stdout ?? ""}${error?.stderr ?? ""}${error?.message ?? ""}`;
+    if (/not found|manifest unknown|MANIFEST_UNKNOWN|no such manifest/i.test(output)) {
+      return false;
+    }
+    throw new Error(
+      `failed to check ${options.reference} on the registry: ${error?.message ?? error}`,
+    );
+  }
+}
+
+// Re-points secondary tags (e.g. :latest on stable releases) at an already
+// published version manifest without rebuilding.
+export async function ensureContainerTags(options = {}) {
+  const runFn = options.run ?? run;
+  const runCaptureFn = options.runCapture ?? runCapture;
+  const primary = options.primary;
+  const created = [];
+  for (const tag of options.tags ?? []) {
+    if (tag === primary) {
+      continue;
+    }
+    if (await containerImageExists({ reference: tag, runCapture: runCaptureFn })) {
+      continue;
+    }
+    await runFn("docker", ["buildx", "imagetools", "create", "-t", tag, primary]);
+    created.push(tag);
+  }
+  return created;
+}
+
 export function containerTags({ image = SERVER_IMAGE, version, prerelease }) {
   const tags = [`${image}:${version}`];
   if (!prerelease) {

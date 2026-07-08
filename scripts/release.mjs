@@ -13,9 +13,13 @@ import {
 } from "./release-automation.mjs";
 import {
   CONTAINER_PLATFORMS,
+  SERVER_IMAGE,
   buildContainerImage,
   buildServerBinaries,
+  containerImageExists,
+  containerTags,
   createArchives,
+  ensureContainerTags,
   gitInfo,
   hostLinuxPlatform,
   packPublicPackages,
@@ -126,24 +130,35 @@ async function commandPack() {
 // Evaluates whether this checkout should publish and records the decision in
 // the publish plan. All publish-side tasks read the plan and no-op on a skip,
 // which is how a Moon task graph carries a runtime gate decision.
+//
+// Two modes: the automatic push path requires a Changesets version commit;
+// manual dispatch is an idempotent re-run that publishes whatever is still
+// missing for the checked-out main version (each surface checks-and-skips),
+// so recovery is just "dispatch again" instead of a special mode.
 async function commandGate(options) {
   const release = await readServerRelease(repoRoot);
   const dryRun = options.dryRun || isEnvFlag(process.env.ZITADEL_RELEASE_DRY_RUN);
   const recoverVersion = options.recoverVersion || process.env.RECOVER_VERSION || "";
+  const manual =
+    options.manual || isEnvFlag(process.env.ZITADEL_RELEASE_MANUAL) || Boolean(recoverVersion);
   const base = options.base || process.env.BASE_SHA || "HEAD^";
 
-  let decision;
   if (recoverVersion) {
     assertRecoverVersion(release, recoverVersion);
-    decision = { shouldPublish: true, reason: `manual recovery for ${recoverVersion}` };
-  } else {
-    const preflight = await detectReleaseAutomation({ repoRoot, mode: "publish", base });
-    decision = resolvePublishGate({ dryRun, recoverVersion, preflight, release });
+    console.warn(
+      "release gate: recover_version is deprecated - manual dispatch is already an " +
+        "idempotent re-run of the checked-out version; drop the input",
+    );
   }
+
+  const preflight = manual
+    ? undefined
+    : await detectReleaseAutomation({ repoRoot, mode: "publish", base });
+  const decision = resolvePublishGate({ dryRun, manual, recoverVersion, preflight, release });
 
   if (decision.shouldPublish) {
     await assertNoUnrecordedPendingChangesets();
-    await assertMainBranch({ dryRun, recoverVersion }, { allowDryRunBypass: !recoverVersion });
+    await assertMainBranch({ dryRun }, { allowDryRunBypass: !manual });
   }
 
   const plan = await writePublishPlan(repoRoot, {
@@ -179,9 +194,18 @@ async function commandRehearsePlan() {
   console.log(`release rehearse-plan: dry-run plan written for ${plan.version}`);
 }
 
-export function resolvePublishGate({ dryRun = false, recoverVersion = "", preflight, release, env = process.env }) {
+export function resolvePublishGate({ manual = false, recoverVersion = "", preflight, release }) {
   if (recoverVersion) {
-    return { shouldPublish: true, reason: `manual recovery for ${recoverVersion}` };
+    return {
+      shouldPublish: true,
+      reason: `manual recovery for ${recoverVersion} (deprecated recover_version input)`,
+    };
+  }
+  if (manual) {
+    return {
+      shouldPublish: true,
+      reason: `manual dispatch: idempotent re-run for ${release.version}`,
+    };
   }
   if (!preflight.ok) {
     throw new Error(
@@ -192,16 +216,6 @@ export function resolvePublishGate({ dryRun = false, recoverVersion = "", prefli
     );
   }
   if (!preflight.shouldRun) {
-    if (shouldFailManualPublishSkip({ dryRun, recoverVersion }, env)) {
-      throw new Error(
-        [
-          `release publish: skip - ${preflight.reason}`,
-          "manual release dispatch would not publish anything; " +
-            `pass recover_version=${release.version} to recover this checked-out version, ` +
-            "or run from a Changesets version package commit.",
-        ].join("\n"),
-      );
-    }
     return { shouldPublish: false, reason: preflight.reason };
   }
   return { shouldPublish: true, reason: preflight.reason };
@@ -243,19 +257,58 @@ async function commandPublishContainer() {
     );
   }
 
+  const primary = `${SERVER_IMAGE}:${release.version}`;
+  const tags = containerTags({ version: release.version, prerelease: release.prerelease });
+
+  if (plan.dryRun) {
+    const result = await buildContainerImage({
+      repoRoot,
+      outDir,
+      release,
+      contextDir,
+      dryRun: true,
+      push: true,
+      platforms: CONTAINER_PLATFORMS,
+    });
+    // Dry runs tolerate unknown registry state (PR rehearsals run without
+    // registry credentials); the real publish path throws instead.
+    let existence;
+    try {
+      existence = (await containerImageExists({ reference: primary })) ? "exists" : "missing";
+    } catch (error) {
+      existence = `unknown (${error instanceof Error ? error.message : error})`;
+    }
+    if (existence === "exists") {
+      console.log(
+        `release publish-container: dry run - ${primary} already on the registry; ` +
+          "real publish would skip the push and only ensure secondary tags",
+      );
+    } else {
+      console.log(
+        `release publish-container: dry run - registry state ${existence}; ` +
+          `real publish would run docker ${result.args.join(" ")}`,
+      );
+    }
+    return;
+  }
+
+  if (await containerImageExists({ reference: primary })) {
+    const created = await ensureContainerTags({ primary, tags });
+    console.log(
+      `release publish-container: ${primary} already published - skipping push` +
+        (created.length > 0 ? `; re-pointed tags: ${created.join(", ")}` : ""),
+    );
+    return;
+  }
+
   const result = await buildContainerImage({
     repoRoot,
     outDir,
     release,
     contextDir,
-    dryRun: plan.dryRun,
     push: true,
     platforms: CONTAINER_PLATFORMS,
   });
-  if (plan.dryRun) {
-    console.log(`release publish-container: dry run - would run docker ${result.args.join(" ")}`);
-    return;
-  }
   console.log(`release publish-container: pushed ${result.tags.join(", ")}`);
 }
 
@@ -310,12 +363,15 @@ function assertPlanVersion(plan, release) {
 }
 
 function parseOptions(args) {
-  const parsed = { dryRun: false, skipContainer: false, recoverVersion: "", base: "" };
+  const parsed = { dryRun: false, manual: false, skipContainer: false, recoverVersion: "", base: "" };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     switch (arg) {
       case "--dry-run":
         parsed.dryRun = true;
+        break;
+      case "--manual":
+        parsed.manual = true;
         break;
       case "--skip-container":
         parsed.skipContainer = true;
@@ -348,10 +404,6 @@ export async function assertNoUnrecordedPendingChangesets(root = repoRoot) {
       `release publish requires all pending changesets to be recorded in .changeset/pre.json: ${unrecorded.join(", ")}`,
     );
   }
-}
-
-export function shouldFailManualPublishSkip(options = {}, env = process.env) {
-  return env.GITHUB_EVENT_NAME === "workflow_dispatch" && !options.dryRun && !options.recoverVersion;
 }
 
 async function assertMainBranch(options, { allowDryRunBypass = true } = {}) {
@@ -402,12 +454,15 @@ npm publishing lives in scripts/release-npm.mjs (release:publish-npm task).
 
 Options:
   --dry-run          Gate only: record a dry-run plan (no remote mutations).
+  --manual           Gate only: manual dispatch - idempotently publish
+                     whatever is missing for the checked-out main version.
   --skip-container   Snapshot only: verify artifacts without a local image.
   --recover-version <v>
-                     Gate only: manual recovery target version.
+                     Deprecated alias for --manual with a version assertion.
   --base <ref>       Gate only: base ref for release publish detection.
 
-Environment fallbacks for gate: ZITADEL_RELEASE_DRY_RUN, RECOVER_VERSION, BASE_SHA.
+Environment fallbacks for gate: ZITADEL_RELEASE_DRY_RUN, ZITADEL_RELEASE_MANUAL,
+RECOVER_VERSION (deprecated), BASE_SHA.
 `);
   process.exit(error ? 1 : 0);
 }

@@ -35,66 +35,49 @@ container, GitHub Release) behind a gate that records its decision in
 
 ## Manual controls
 
-- GitHub renders the `dry_run` workflow input as a checkbox: checked means no
-  remote mutations; unchecked allows publishing when the normal or recovery
-  gates pass.
-- Run `release-publish` manually with `dry_run=true` to build and verify
-  server archives, checksums, npm tarballs, Docker metadata, and the generated
-  GitHub Release facts block without publishing.
-- Run `release-publish` manually with `dry_run=false` only when the current
-  `main` commit is still the generated `build: version packages` commit.
-- Run `release-publish` manually with `recover_version=<version>` when `main`
-  has moved past the generated version commit or any publish-side artifact may
-  be missing. Use `dry_run=true` first, then `dry_run=false`.
+A manual `release-publish` dispatch is an **idempotent re-run** for the
+version checked out on `main`: every surface checks what already exists and
+skips it (npm publishes only missing package versions, the container push is
+skipped when `ghcr.io/zitadel/nextgen:<version>` exists, git tags converge,
+the draft GitHub Release is upserted). A re-run after a fully successful
+publish is a green no-op — the logs state per surface what was skipped.
+
+- `dry_run=true` (default checkbox) builds and verifies everything and
+  reports per surface what a real run would do — including whether the
+  container image already exists. It also smokes the compose deployment.
+- `dry_run=false` publishes whatever is still missing.
+- Remaining gates for manual runs: the workflow runs from `main`, the
+  checked-out version is valid semver, and no pending release changesets are
+  unrecorded in `.changeset/pre.json`.
 - Verify npm packages and `ghcr.io/zitadel/nextgen:<version>` after publish.
 
 ## Recover
 
-### Pick the mode
-
-| Situation | Workflow | Inputs |
-| --- | --- | --- |
-| `main` is still on the generated version commit and the first publish failed before finishing | `release-publish` | `dry_run=true`, then `dry_run=false` |
-| `main` has moved past the generated version commit, or the missing artifact surface is unclear | `release-publish` | `recover_version=<version>` with `dry_run=true`, then `dry_run=false` |
-
-Use `release-publish` with `recover_version=<version>` for an already-versioned
-release when any publish-side artifact may be missing. This is the single
-recovery path. It verifies the checked-out `@zitadel/server` version, rebuilds
-release artifacts in the build job, promotes the npm tarballs, pushes git tags
-and containers, and updates the draft GitHub Release facts block.
-The npm promotion step only publishes package versions that are not already
-present on npm, so the same recovery path is safe when npm packages are already
-complete and only Docker needs repair.
+Recovery is not a separate mode: dispatch `release-publish` again.
 
 ```sh
-gh workflow run release-publish.yml \
-  --repo zitadel/nextgen \
-  --ref main \
-  -f dry_run=true \
-  -f recover_version=0.1.0-alpha.8
-
-gh workflow run release-publish.yml \
-  --repo zitadel/nextgen \
-  --ref main \
-  -f dry_run=false \
-  -f recover_version=0.1.0-alpha.8
+gh workflow run release-publish.yml --repo zitadel/nextgen --ref main -f dry_run=true
+# read the per-surface summary in the run logs, then:
+gh workflow run release-publish.yml --repo zitadel/nextgen --ref main -f dry_run=false
 ```
 
-The `recover_version` path deliberately bypasses the normal "latest commit must
-be a generated version commit" gate, but it still requires:
+The run rebuilds artifacts in the build job and promotes only the missing
+surfaces. This is safe at any time — even when npm is complete and only the
+container or the GitHub Release needs repair.
 
-- the checked-out `@zitadel/server` version to equal `recover_version`;
-- the workflow to run from `main`;
-- no unrecorded pending release changesets;
-- the normal artifact preflight and snapshot verification to pass.
+If a *published* container image is corrupt, delete the
+`ghcr.io/zitadel/nextgen:<version>` tag in the GHCR package settings first;
+the next manual run detects the missing manifest and pushes a fresh build.
+Version tags are otherwise immutable — publish never overwrites an existing
+image.
 
-After the recovery run, verify the public surfaces and draft release shell:
+After the run, verify the public surfaces and draft release shell:
 
 ```sh
-npm view @zitadel/server@0.1.0-alpha.8 version
-npm view @zitadel/sdk-angular@0.1.0-alpha.8 version
-docker buildx imagetools inspect ghcr.io/zitadel/nextgen:0.1.0-alpha.8
-gh release view v0.1.0-alpha.8 --repo zitadel/nextgen
+npm view @zitadel/server@0.1.0-alpha.14 version
+npm view @zitadel/sdk-angular@0.1.0-alpha.14 version
+docker buildx imagetools inspect ghcr.io/zitadel/nextgen:0.1.0-alpha.14
+gh release view v0.1.0-alpha.14 --repo zitadel/nextgen
 ```
 
 ## Product notes
@@ -118,5 +101,6 @@ moon run release:rehearse -- --npm-rehearsal  # also publish to a local Verdacci
 
 # Publish dry runs promote the artifacts release:build produced:
 ZITADEL_RELEASE_DRY_RUN=1 moon run release:publish  # from a generated version commit
-ZITADEL_RELEASE_DRY_RUN=1 RECOVER_VERSION=0.1.0-alpha.14 moon run release:publish
+# Manual-mode dry run (requires main, like the dispatched workflow):
+ZITADEL_RELEASE_DRY_RUN=1 ZITADEL_RELEASE_MANUAL=1 moon run release:publish
 ```
