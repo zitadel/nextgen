@@ -57,6 +57,15 @@ const REHEARSE_FORBIDDEN_TARGETS = [
   "release:publish-tags",
   PUBLISH_AGGREGATE_TARGET,
 ];
+// Release graphs promote; they never re-verify. Test tasks in a release
+// graph re-run in an environment no PR exercised (the alpha.14 release
+// failed exactly there: cli:test met a real GITHUB_TOKEN inside publish).
+const TEST_TASK_PATTERN = /:(test|test-[a-z-]+)$/;
+// The public-dist mutex on cli:test defends explicit multi-target runs where
+// release builds clean the package dist the tests import from. No release
+// graph schedules cli:test anymore, so only this assertion keeps the mutex
+// from being silently dropped.
+const TEST_MUTEX_REQUIREMENTS = new Map([["cli:test", "public-dist"]]);
 
 export async function main(args = forwardedArgs()) {
   if (args.includes("--help")) {
@@ -116,6 +125,7 @@ export async function main(args = forwardedArgs()) {
     const tasks = indexTasks(graph);
     assertTask(tasks, target);
     assertTaskOption(tasks, target, "runInCI", false);
+    assertNoTestTasksInGraph(tasks, target);
 
     if (!reaches(tasks, target, PUBLIC_AGGREGATE_TARGET)) {
       throw new Error(`${target} must depend on ${PUBLIC_AGGREGATE_TARGET}`);
@@ -130,6 +140,8 @@ export async function main(args = forwardedArgs()) {
     }
   }
 
+  await assertTestMutexes();
+
   await assertPublishGraph();
   await assertRehearseGraph();
 
@@ -142,6 +154,24 @@ export async function main(args = forwardedArgs()) {
   );
 }
 
+function assertNoTestTasksInGraph(tasks, entrypoint) {
+  const testTasks = [...tasks.keys()].filter((target) => TEST_TASK_PATTERN.test(target));
+  if (testTasks.length > 0) {
+    throw new Error(
+      `${entrypoint} graph must not schedule test tasks (release graphs promote, ` +
+        `they never re-verify); found: ${testTasks.sort().join(", ")}`,
+    );
+  }
+}
+
+async function assertTestMutexes() {
+  for (const [target, expected] of TEST_MUTEX_REQUIREMENTS) {
+    const graph = await readTaskGraph(target);
+    const tasks = indexTasks(graph);
+    assertTaskOption(tasks, target, "mutex", expected);
+  }
+}
+
 // The rehearsal runs build + dry surfaces in a fixed order and must never
 // pull in the gate or the surfaces that mutate remote state by default.
 async function assertRehearseGraph() {
@@ -150,6 +180,7 @@ async function assertRehearseGraph() {
   assertTask(tasks, REHEARSE_TARGET);
   assertTaskOption(tasks, REHEARSE_TARGET, "runInCI", false);
   assertTaskOption(tasks, REHEARSE_TARGET, "runDepsInParallel", false);
+  assertNoTestTasksInGraph(tasks, REHEARSE_TARGET);
 
   const rehearse = tasks.get(REHEARSE_TARGET);
   const orderedDeps = (rehearse.deps ?? []).map((dep) => dep.target);
@@ -204,6 +235,7 @@ async function assertPublishGraph() {
         `found build tasks: ${forbidden.sort().join(", ")}`,
     );
   }
+  assertNoTestTasksInGraph(tasks, PUBLISH_AGGREGATE_TARGET);
 }
 
 async function readTaskGraph(target) {
@@ -256,14 +288,6 @@ function assertBuildMutex(tasks, target) {
 }
 
 function assertSelfBuildNotInReleaseGraph(tasks, target) {
-  if (target === "cli:build-release") {
-    assertTaskOption(tasks, target, "runDepsInParallel", false);
-    if (!reaches(tasks, target, "cli:test")) {
-      throw new Error("cli:build-release must depend on cli:test");
-    }
-    return;
-  }
-
   const buildTarget = normalBuildTargetFor(target);
   if (reaches(tasks, target, buildTarget)) {
     throw new Error(

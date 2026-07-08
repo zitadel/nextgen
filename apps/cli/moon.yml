@@ -45,7 +45,9 @@ tasks:
     env:
       ZITADEL_TELEMETRY_BUILD_CHANNEL: "production"
     deps:
-      - "test"
+      # No test dep: release builds promote, they do not re-verify. The gate
+      # for shipping is green CI on the PRs that produced this commit;
+      # check-release-graph asserts no test task appears in release graphs.
       - "api:build-release"
       - "sdk-next:build-release"
     inputs:
@@ -55,13 +57,10 @@ tasks:
       - "dist/**/*"
     options:
       cache: false
-      # cli:test exercises the normal dev build and its workspace package
-      # readers. Finish it before release deps start cleaning/rebuilding the
-      # public package dist directories.
-      runDepsInParallel: false
-      # Release builds remove stale package output and rebuild dist after
-      # cli:test has finished using the dev build. They stay out of `moon ci`;
-      # release:snapshot invokes them in the later release step instead.
+      # Release builds remove stale package output and rebuild dist. They
+      # stay out of `moon ci`; release:build invokes them in the release
+      # step instead. The api/sdk-next release builds serialize against
+      # dist readers through the public-dist mutex.
       runInCI: false
 
   test:
@@ -75,7 +74,10 @@ tasks:
       # the same directories and cannot take a task dep on this target
       # (cli dependsOn them — the reverse edge would cycle the project
       # graph), so a shared mutex keeps them from cleaning a dist while
-      # these tests import from it.
+      # these tests import from it. Since release graphs no longer schedule
+      # cli:test, the mutex only matters for explicit multi-target runs
+      # (e.g. `moon run cli:test release:build`) — keep it, it costs
+      # nothing and check-release-graph asserts it stays.
       mutex: "public-dist"
 
   readme:

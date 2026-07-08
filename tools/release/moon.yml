@@ -67,10 +67,12 @@ tasks:
   # Builds every promotable release artifact except container images. The
   # publish surfaces below never compile; they promote this task's output
   # (in CI it travels between the build and publish jobs as an artifact).
+  # No test tasks anywhere in this graph (check-release-graph enforces it):
+  # the release gate is green CI on the PRs that produced the commit, and
+  # re-running tests at release time only adds an untested environment.
   build:
     command: "node scripts/release.mjs build"
     deps:
-      - "server:test"
       - "release:build-public-packages"
       - "console:build-release"
       - "login-ui:build-release"
