@@ -40,6 +40,23 @@ const PUBLISH_SURFACE_ORDER = [
   "release:publish-container",
   "release:publish-github",
 ];
+const REHEARSE_TARGET = "release:rehearse";
+const REHEARSE_DEP_ORDER = [
+  "release:build",
+  "release:rehearse-plan",
+  "release:verify-artifacts",
+  "release:publish-container",
+  "release:publish-github",
+];
+// The rehearsal must never schedule the surfaces that mutate remote state by
+// default: npm is rehearsed against a local registry inside the rehearse
+// command, tags and the gate belong to the real publish path only.
+const REHEARSE_FORBIDDEN_TARGETS = [
+  "release:gate",
+  "release:publish-npm",
+  "release:publish-tags",
+  PUBLISH_AGGREGATE_TARGET,
+];
 
 export async function main(args = forwardedArgs()) {
   if (args.includes("--help")) {
@@ -114,6 +131,7 @@ export async function main(args = forwardedArgs()) {
   }
 
   await assertPublishGraph();
+  await assertRehearseGraph();
 
   console.log(
     "release graph ok: public package release builds clean and rebuild dist " +
@@ -122,6 +140,33 @@ export async function main(args = forwardedArgs()) {
       "builds depend on the package release chain they consume, and the " +
       "publish graph promotes built artifacts without rebuilding them",
   );
+}
+
+// The rehearsal runs build + dry surfaces in a fixed order and must never
+// pull in the gate or the surfaces that mutate remote state by default.
+async function assertRehearseGraph() {
+  const graph = await readTaskGraph(REHEARSE_TARGET);
+  const tasks = indexTasks(graph);
+  assertTask(tasks, REHEARSE_TARGET);
+  assertTaskOption(tasks, REHEARSE_TARGET, "runInCI", false);
+  assertTaskOption(tasks, REHEARSE_TARGET, "runDepsInParallel", false);
+
+  const rehearse = tasks.get(REHEARSE_TARGET);
+  const orderedDeps = (rehearse.deps ?? []).map((dep) => dep.target);
+  if (orderedDeps.join(" ") !== REHEARSE_DEP_ORDER.join(" ")) {
+    throw new Error(
+      `${REHEARSE_TARGET} deps must be exactly [${REHEARSE_DEP_ORDER.join(", ")}] ` +
+        `in that order, got [${orderedDeps.join(", ")}]`,
+    );
+  }
+
+  const forbidden = REHEARSE_FORBIDDEN_TARGETS.filter((target) => tasks.has(target));
+  if (forbidden.length > 0) {
+    throw new Error(
+      `${REHEARSE_TARGET} graph must not schedule real publish surfaces; ` +
+        `found: ${forbidden.sort().join(", ")}`,
+    );
+  }
 }
 
 // The publish aggregate must run gate + surfaces in promotion order and must

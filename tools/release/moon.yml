@@ -149,6 +149,33 @@ tasks:
       runFromWorkspaceRoot: true
       runInCI: false
 
+  rehearse-plan:
+    command: "node scripts/release.mjs rehearse-plan"
+    options:
+      cache: false
+      runFromWorkspaceRoot: true
+      runInCI: false
+
+  # PR rehearsal of the publish path: builds the artifacts, writes a gate-free
+  # dry-run plan, then runs the same verify/container/GitHub Release surfaces
+  # the real publish uses. The command finalizes the rehearsal and, with
+  # --npm-rehearsal, publishes the tarballs to a throwaway local Verdaccio
+  # through the production npm promotion path. publish-npm/publish-tags are
+  # deliberately absent: npm is rehearsed locally, tags have no dry surface.
+  rehearse:
+    command: "node scripts/release-rehearsal.mjs"
+    deps:
+      - "release:build"
+      - "release:rehearse-plan"
+      - "release:verify-artifacts"
+      - "release:publish-container"
+      - "release:publish-github"
+    options:
+      cache: false
+      runDepsInParallel: false
+      runFromWorkspaceRoot: true
+      runInCI: false
+
   # Aggregate publish entrypoint: gate first, then each surface in order.
   # Deliberately independent of the build chain — the publish job promotes
   # downloaded artifacts and must never rebuild them (check-release-graph

@@ -112,6 +112,10 @@ moon ci
 moon run release:build     # all release artifacts except container images
 moon run release:snapshot  # release:build plus a loaded host-platform image
 
+# Gate-free rehearsal of the publish path (what PR CI runs; works anywhere):
+moon run release:rehearse
+moon run release:rehearse -- --npm-rehearsal  # also publish to a local Verdaccio
+
 # Publish dry runs promote the artifacts release:build produced:
 ZITADEL_RELEASE_DRY_RUN=1 moon run release:publish  # from a generated version commit
 ZITADEL_RELEASE_DRY_RUN=1 RECOVER_VERSION=0.1.0-alpha.14 moon run release:publish

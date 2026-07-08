@@ -50,6 +50,8 @@ export async function main(args = forwardedArgs()) {
       return await commandPack();
     case "gate":
       return await commandGate(options);
+    case "rehearse-plan":
+      return await commandRehearsePlan();
     case "verify":
       return await commandVerify();
     case "publish-container":
@@ -156,6 +158,24 @@ async function commandGate(options) {
     `release gate: ${plan.shouldPublish ? (plan.dryRun ? "publish (dry run)" : "publish") : "skip"}` +
       ` - ${plan.reason}`,
   );
+}
+
+// PR rehearsals run the publish surfaces without the gate: gating conditions
+// (version commit, recorded changesets, main branch) are meaningless on a
+// feature branch and would fail any PR that adds a changeset. The plan is
+// always dry, so no surface can mutate anything remote.
+async function commandRehearsePlan() {
+  const release = await readServerRelease(repoRoot);
+  const plan = await writePublishPlan(repoRoot, {
+    shouldPublish: true,
+    dryRun: true,
+    reason: "release rehearsal (gate-free dry run)",
+    version: release.version,
+    tag: release.tag,
+    prerelease: release.prerelease,
+    recoverVersion: "",
+  });
+  console.log(`release rehearse-plan: dry-run plan written for ${plan.version}`);
 }
 
 export function resolvePublishGate({ dryRun = false, recoverVersion = "", preflight, release, env = process.env }) {
@@ -376,6 +396,7 @@ Build commands:
 
 Publish commands (read the publish plan written by gate):
   gate               Evaluate publish preconditions and write the publish plan.
+  rehearse-plan      Write a gate-free dry-run plan for PR rehearsals.
   verify             Verify built artifacts, archive checksums, and tarballs.
   publish-container  Push the multi-arch container image (dry run per plan).
   publish-github     Create or update the draft GitHub Release.

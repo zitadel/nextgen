@@ -237,7 +237,7 @@ async function resetDirectory(path, input) {
   await mkdirFn(input)(path, { recursive: true });
 }
 
-async function writeVerdaccioConfig(path, storagePath, input) {
+export async function writeVerdaccioConfig(path, storagePath, input = {}) {
   await writeFileFn(input)(
     path,
     `storage: ${storagePath}
@@ -266,7 +266,7 @@ logs:
   );
 }
 
-async function writeVerdaccioNpmrc(path, registryUrl, input) {
+export async function writeVerdaccioNpmrc(path, registryUrl, input = {}) {
   const url = new URL(registryUrl);
   await writeFileFn(input)(
     path,

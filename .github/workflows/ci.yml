@@ -35,6 +35,9 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
+          # Parity with release-publish.yml: the publish job configures the
+          # npm registry, so the rehearsal must run under the same setup.
+          registry-url: "https://registry.npmjs.org"
           cache: pnpm
 
       - name: Install dependencies
@@ -64,9 +67,16 @@ jobs:
       # layer is unimplemented (see zitadel/nextgen#457). Re-enable via
       # `moon run server:test-spanner` once that lands.
 
-      - name: Build release artifacts
+      - name: Rehearse release publish (dry run)
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run release:build
+        # Environment parity with the release-publish publish job: unset only
+        # CI (keep GITHUB_ACTIONS), provide GITHUB_TOKEN, disable provenance.
+        # Code that behaves differently in the publish environment breaks
+        # here, on the offending PR, instead of on release day.
+        run: env -u CI moon run release:rehearse
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "false"
 
       - name: Run binary fresh-app journey
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
@@ -78,13 +88,15 @@ jobs:
             --work-dir "${RUNNER_TEMP}/ci-journey" \
             --tarballs-dir "dist/release/${version}/npm"
 
-      - name: Validate version PR
+      - name: Rehearse version PR publish (dry run with npm rehearsal)
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run release:version
-
-      - name: Pack version PR artifacts
-        if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run release:pack
+        # The version PR is the last gate before the exact publishing commit:
+        # rehearse everything, including a real `npm publish` of every tarball
+        # to a throwaway local Verdaccio through the production promotion path.
+        run: env -u CI moon run release:rehearse -- --npm-rehearsal
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "false"
 
       - name: Verify version PR tarballs
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
