@@ -104,7 +104,7 @@ describe("deploy smoke", () => {
         throw new Error(`unexpected capture ${command} ${args.join(" ")}`);
       },
       fetchImpl: healthyFetch(),
-      log: () => {},
+      log: () => undefined,
     });
 
     expect(result.baseUrl).toBe("http://127.0.0.1:18080");
@@ -155,7 +155,7 @@ describe("deploy smoke", () => {
           return { stdout: "" };
         },
         fetchImpl: async () => new Response("boom", { status: 500 }),
-        log: () => {},
+        log: () => undefined,
       }),
     ).rejects.toThrow("timed out waiting for");
 
@@ -174,7 +174,7 @@ describe("deploy smoke", () => {
         fetchImpl: healthyFetch({
           "/sessions/me": () => new Response("plain 404", { status: 404 }),
         }),
-        log: () => {},
+        log: () => undefined,
       }),
     ).rejects.toThrow("should be rejected with 401/403");
 
@@ -184,7 +184,7 @@ describe("deploy smoke", () => {
         fetchImpl: healthyFetch({
           "/sessions/me": () => new Response("<html>login</html>", { status: 401 }),
         }),
-        log: () => {},
+        log: () => undefined,
       }),
     ).rejects.toThrow("JSON error body");
   });
@@ -198,7 +198,7 @@ describe("deploy smoke", () => {
         image: "ghcr.io/zitadel/nextgen:test-smoke",
         workDir,
         port: 18083,
-        run: async () => {},
+        run: async () => undefined,
         runCapture: async (command, args) => {
           if (args.includes("--filter")) {
             return { stdout: "postgres\n" };
@@ -206,7 +206,7 @@ describe("deploy smoke", () => {
           return { stdout: "" };
         },
         fetchImpl: healthyFetch(),
-        log: () => {},
+        log: () => undefined,
       }),
     ).rejects.toThrow("services not running after probes: nextgen");
   });

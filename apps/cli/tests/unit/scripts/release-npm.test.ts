@@ -143,7 +143,7 @@ describe("release npm tarball promotion", () => {
         },
         existingSpecs: ["@zitadel/cli@0.1.0-alpha.14"],
       }),
-      log: () => {},
+      log: () => undefined,
     });
 
     expect(result.results).toEqual([
@@ -187,7 +187,7 @@ describe("release npm tarball promotion", () => {
           "zitadel-cli-0.1.0-alpha.14.tgz": { name: "@zitadel/cli", version: "0.1.0-alpha.14" },
         },
       }),
-      log: () => {},
+      log: () => undefined,
     });
 
     expect(publishCalls).toHaveLength(0);
@@ -207,7 +207,7 @@ describe("release npm tarball promotion", () => {
       runCapture: async () => {
         throw new Error("must not inspect");
       },
-      log: () => {},
+      log: () => undefined,
     });
 
     expect(result).toEqual({ skipped: true, results: [] });
@@ -228,7 +228,7 @@ describe("release npm tarball promotion", () => {
             "internal-0.0.1.tgz": { name: "@zitadel/internal", version: "0.0.1", private: true },
           },
         }),
-        log: () => {},
+        log: () => undefined,
       }),
     ).rejects.toThrow("refusing to publish private package");
 
@@ -242,7 +242,7 @@ describe("release npm tarball promotion", () => {
             "internal-0.0.1.tgz": { name: "@zitadel/internal", version: "0.0.1" },
           },
         }),
-        log: () => {},
+        log: () => undefined,
       }),
     ).rejects.toThrow("unexpected package");
   });

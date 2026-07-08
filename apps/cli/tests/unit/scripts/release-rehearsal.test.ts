@@ -120,7 +120,7 @@ describe("release npm rehearsal", () => {
           results: [{ name: "@zitadel/cli", version: "0.1.0-alpha.14", action: "published" }],
         };
       },
-      log: () => {},
+      log: () => undefined,
     });
 
     expect(events).toEqual(["start", "wait:http://127.0.0.1:54873/-/ping", "publish", "stop"]);
@@ -144,13 +144,13 @@ describe("release npm rehearsal", () => {
         stopRegistry: async () => {
           stopped = true;
         },
-        waitForHttp: async () => {},
+        waitForHttp: async () => undefined,
         publishTarballs: async () => ({
           skipped: false,
           distTag: "alpha",
           results: [{ name: "@zitadel/cli", version: "0.1.0-alpha.14", action: "exists" }],
         }),
-        log: () => {},
+        log: () => undefined,
       }),
     ).rejects.toThrow("must publish every tarball");
     expect(stopped).toBe(true);
