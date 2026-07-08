@@ -204,3 +204,21 @@ jobs:
           NPM_CONFIG_PROVENANCE: "false"
           ZITADEL_RELEASE_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '' }}
           RECOVER_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.recover_version || '' }}
+
+      - name: Smoke the compose deployment (dry run)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        # Manual dry runs also validate the deployment surface: build a
+        # host-platform image from the downloaded docker context and boot it
+        # through docs/operations/docker-compose.yaml.
+        run: env -u CI moon run release:smoke-deploy
+        env:
+          ZITADEL_SMOKE_DIAGNOSTICS_DIR: ${{ runner.temp }}/deploy-smoke/diagnostics
+
+      - name: Upload smoke diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-smoke-diagnostics
+          path: ${{ runner.temp }}/deploy-smoke/diagnostics
+          if-no-files-found: ignore
+          retention-days: 7

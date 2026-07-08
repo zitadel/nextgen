@@ -72,11 +72,19 @@ jobs:
         # Environment parity with the release-publish publish job: unset only
         # CI (keep GITHUB_ACTIONS), provide GITHUB_TOKEN, disable provenance.
         # Code that behaves differently in the publish environment breaks
-        # here, on the offending PR, instead of on release day.
-        run: env -u CI moon run release:rehearse
+        # here, on the offending PR, instead of on release day. The compose
+        # deployment smoke joins in when the diff touches the deploy surface.
+        run: |
+          args=(release:rehearse)
+          if [ "${DEPLOY_SMOKE}" = "true" ]; then
+            args+=(-- --smoke)
+          fi
+          env -u CI moon run "${args[@]}"
         env:
+          DEPLOY_SMOKE: ${{ steps.ci-mode.outputs.deploy_smoke }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: "false"
+          ZITADEL_SMOKE_DIAGNOSTICS_DIR: ${{ runner.temp }}/deploy-smoke/diagnostics
 
       - name: Run binary fresh-app journey
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
@@ -92,11 +100,13 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
         # The version PR is the last gate before the exact publishing commit:
         # rehearse everything, including a real `npm publish` of every tarball
-        # to a throwaway local Verdaccio through the production promotion path.
-        run: env -u CI moon run release:rehearse -- --npm-rehearsal
+        # to a throwaway local Verdaccio through the production promotion
+        # path, and a compose deployment smoke of the built image.
+        run: env -u CI moon run release:rehearse -- --npm-rehearsal --smoke
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: "false"
+          ZITADEL_SMOKE_DIAGNOSTICS_DIR: ${{ runner.temp }}/deploy-smoke/diagnostics
 
       - name: Verify version PR tarballs
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
@@ -118,6 +128,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: journey-diagnostics
-          path: ${{ runner.temp }}/ci-journey/diagnostics
+          path: |
+            ${{ runner.temp }}/ci-journey/diagnostics
+            ${{ runner.temp }}/deploy-smoke/diagnostics
           if-no-files-found: ignore
           retention-days: 7

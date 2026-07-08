@@ -15,6 +15,7 @@ import {
   writeVerdaccioNpmrc,
 } from "../apps/cli-journey-e2e/scripts/local-registry.mjs";
 
+import { buildSmokeImage, runDeploySmoke } from "./deploy-smoke.mjs";
 import { forwardedArgs, isDirectRun } from "./dev-process.mjs";
 import { publishNpmTarballs } from "./release-npm.mjs";
 import { releaseDir } from "./release-artifacts.mjs";
@@ -104,11 +105,14 @@ export async function runNpmRehearsal(options = {}) {
 }
 
 export function parseArgs(args) {
-  const parsed = { npmRehearsal: false, help: false };
+  const parsed = { npmRehearsal: false, smoke: false, help: false };
   for (const arg of args) {
     switch (arg) {
       case "--npm-rehearsal":
         parsed.npmRehearsal = true;
+        break;
+      case "--smoke":
+        parsed.smoke = true;
         break;
       case "--help":
       case "-h":
@@ -124,12 +128,13 @@ export function parseArgs(args) {
 export async function main(args = forwardedArgs()) {
   const parsed = parseArgs(args);
   if (parsed.help) {
-    console.log(`usage: node scripts/release-rehearsal.mjs [--npm-rehearsal]
+    console.log(`usage: node scripts/release-rehearsal.mjs [--npm-rehearsal] [--smoke]
 
 Finalizes the release rehearsal after the release:rehearse task deps ran the
 container and GitHub Release surfaces in dry-run mode. With --npm-rehearsal,
 also publishes the built tarballs to a throwaway local Verdaccio through the
-production npm promotion path.
+production npm promotion path. With --smoke, builds a host-platform image
+from the built docker context and smokes the compose deployment surface.
 `);
     return;
   }
@@ -138,10 +143,15 @@ production npm promotion path.
   if (parsed.npmRehearsal) {
     await runNpmRehearsal({ repoRoot: defaultRepoRoot, plan });
   }
+  if (parsed.smoke) {
+    const image = await buildSmokeImage({ repoRoot: defaultRepoRoot });
+    await runDeploySmoke({ repoRoot: defaultRepoRoot, image });
+  }
   console.log(
     `release rehearsal complete for ${plan.version}: ` +
       "artifacts verified, container and GitHub Release surfaces ran dry" +
-      (parsed.npmRehearsal ? ", npm publish rehearsed against a local registry" : ""),
+      (parsed.npmRehearsal ? ", npm publish rehearsed against a local registry" : "") +
+      (parsed.smoke ? ", compose deployment smoked" : ""),
   );
 }
 

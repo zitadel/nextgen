@@ -17,6 +17,7 @@ import {
   buildServerBinaries,
   createArchives,
   gitInfo,
+  hostLinuxPlatform,
   packPublicPackages,
   prepareDockerContext,
   readServerRelease,
@@ -374,11 +375,6 @@ async function exists(path) {
   } catch {
     return false;
   }
-}
-
-function hostLinuxPlatform() {
-  const arch = process.arch === "arm64" ? "arm64" : "amd64";
-  return { goos: "linux", goarch: arch };
 }
 
 function usage(error) {

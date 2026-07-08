@@ -149,6 +149,20 @@ tasks:
       runFromWorkspaceRoot: true
       runInCI: false
 
+  # Deploys the built image through the documented compose surface and
+  # smoke-tests it. Depends on verify-artifacts (not release:build) so the
+  # publish job can run it against downloaded artifacts without rebuilding;
+  # locally run release:build first.
+  smoke-deploy:
+    command: "node scripts/deploy-smoke.mjs"
+    deps:
+      - "release:verify-artifacts"
+    options:
+      cache: false
+      runDepsInParallel: false
+      runFromWorkspaceRoot: true
+      runInCI: false
+
   rehearse-plan:
     command: "node scripts/release.mjs rehearse-plan"
     options:

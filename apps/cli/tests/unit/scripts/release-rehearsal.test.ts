@@ -22,7 +22,7 @@ type PublishResult = {
 
 type ReleaseRehearsalModule = {
   assertLocalRegistryUrl: (registryUrl: string) => void;
-  parseArgs: (args: string[]) => { npmRehearsal: boolean; help: boolean };
+  parseArgs: (args: string[]) => { npmRehearsal: boolean; smoke: boolean; help: boolean };
   runNpmRehearsal: (options: {
     repoRoot?: string;
     plan: PublishPlan;
@@ -166,11 +166,15 @@ describe("release npm rehearsal", () => {
     ).rejects.toThrow("requires a rehearsal publish plan");
   });
 
-  it("parses the npm-rehearsal flag", async () => {
+  it("parses the npm-rehearsal and smoke flags", async () => {
     const { parseArgs } = await loadModule();
 
-    expect(parseArgs([])).toEqual({ npmRehearsal: false, help: false });
-    expect(parseArgs(["--npm-rehearsal"])).toEqual({ npmRehearsal: true, help: false });
+    expect(parseArgs([])).toEqual({ npmRehearsal: false, smoke: false, help: false });
+    expect(parseArgs(["--npm-rehearsal", "--smoke"])).toEqual({
+      npmRehearsal: true,
+      smoke: true,
+      help: false,
+    });
     expect(() => parseArgs(["--bogus"])).toThrow("unknown option");
   });
 });

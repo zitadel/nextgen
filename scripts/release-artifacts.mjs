@@ -307,6 +307,11 @@ export async function buildContainerImage(options = {}) {
   return { args, contextDir, tags };
 }
 
+export function hostLinuxPlatform() {
+  const arch = process.arch === "arm64" ? "arm64" : "amd64";
+  return { goos: "linux", goarch: arch };
+}
+
 export function containerTags({ image = SERVER_IMAGE, version, prerelease }) {
   const tags = [`${image}:${version}`];
   if (!prerelease) {
