@@ -569,3 +569,224 @@ describe("normalized hashing and write-back", () => {
     }
   });
 });
+
+describe("auto-repin on schema revise", () => {
+  const FLOW_PATH = ".zitadel/flows/default.json";
+  const SCHEMA_PATH = ".zitadel/schemas/user.json";
+
+  function makeFlowSyncer(overrides: Partial<ResourceSyncer> = {}): ResourceSyncer {
+    return makeSyncer({
+      kind: "flow",
+      directory: ".zitadel/flows",
+      mutable: true,
+      normalize: normalizeFlowBody,
+      ...overrides,
+    });
+  }
+
+  function makeSchemaSyncer(overrides: Partial<ResourceSyncer> = {}): ResourceSyncer {
+    return makeSyncer({
+      revisioned: true,
+      create: vi.fn().mockResolvedValue({ id: "sch_B" }),
+      ...overrides,
+    });
+  }
+
+  async function readJson(path: string): Promise<Record<string, unknown>> {
+    const { readFile } = await import("node:fs/promises");
+    return JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
+  }
+
+  it("re-pins an edited flow and updates it with the new revision in one apply", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, {
+        framework: "next",
+        resources: {
+          [SCHEMA_PATH]: { id: "sch_A", hash: "stale" },
+          [FLOW_PATH]: { id: "flow-001", hash: "stale" },
+        },
+      });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema", v: 2 });
+      await writeResource(cwd, ".zitadel/flows", "default.json", {
+        name: "login",
+        user_schema: "sch_A",
+        version: 2,
+      });
+
+      const schemaSyncer = makeSchemaSyncer();
+      const update = vi.fn().mockResolvedValue({});
+      const flowSyncer = makeFlowSyncer({ update });
+
+      const { filesUpdated } = await runSyncLoop(cwd, [schemaSyncer, flowSyncer]);
+
+      // The wire request adopted the new revision without a second apply.
+      expect(update).toHaveBeenCalledWith(
+        "flow-001",
+        expect.objectContaining({ user_schema: "sch_B" }),
+      );
+      const flowFile = await readJson(join(cwd, FLOW_PATH));
+      expect(flowFile.user_schema).toBe("sch_B");
+      expect(filesUpdated).toContain(FLOW_PATH);
+
+      const state = await readJson(join(cwd, ".zitadel/state.json"));
+      const resources = state.resources as Record<string, { id?: string; previousId?: string }>;
+      expect(resources[SCHEMA_PATH]?.id).toBe("sch_B");
+      // The re-pin completed, so the recovery marker is cleaned up — a later
+      // deliberate pin of sch_A must not be force-bumped.
+      expect(resources[SCHEMA_PATH]?.previousId).toBeUndefined();
+
+      const followUp = await buildSyncPlan(cwd, [schemaSyncer, flowSyncer]);
+      expect(followUp.every((a) => a.kind === "skip")).toBe(true);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("emits a repin update for an untouched flow pinned to a revised schema", async () => {
+    const cwd = makeCwd();
+    try {
+      const flowSyncer = makeFlowSyncer({ update: vi.fn().mockResolvedValue({}) });
+      const flowBody = { name: "login", user_schema: "sch_A" };
+      await writeState(cwd, {
+        framework: "next",
+        resources: {
+          [SCHEMA_PATH]: { id: "sch_A", hash: "stale" },
+          [FLOW_PATH]: { id: "flow-001", hash: hashForState(flowSyncer, flowBody) },
+        },
+      });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema", v: 2 });
+      await writeResource(cwd, ".zitadel/flows", "default.json", flowBody);
+
+      const schemaSyncer = makeSchemaSyncer();
+      const actions = await buildSyncPlan(cwd, [schemaSyncer, flowSyncer]);
+      const flowAction = actions.find((a) => a.path === FLOW_PATH);
+      expect(flowAction?.kind).toBe("update");
+      if (flowAction?.kind === "update") {
+        expect(flowAction.repin).toEqual({ previousId: "sch_A", schemaPath: SCHEMA_PATH });
+      }
+
+      await runSyncLoop(cwd, [schemaSyncer, flowSyncer]);
+      const flowFile = await readJson(join(cwd, FLOW_PATH));
+      expect(flowFile.user_schema).toBe("sch_B");
+
+      const followUp = await buildSyncPlan(cwd, [schemaSyncer, flowSyncer]);
+      expect(followUp.every((a) => a.kind === "skip")).toBe(true);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("recovers a re-pin from state.previousId when a prior run died mid-apply", async () => {
+    const cwd = makeCwd();
+    try {
+      const flowSyncer = makeFlowSyncer({ update: vi.fn().mockResolvedValue({}) });
+      const schemaSyncer = makeSchemaSyncer({
+        create: vi.fn().mockRejectedValue(new Error("must not revise again")),
+      });
+      const schemaBody = { kind: "user-schema", v: 2 };
+      const flowBody = { name: "login", user_schema: "sch_A" };
+      // A previous apply published sch_B (state advanced, previousId kept)
+      // but died before rewriting the flow.
+      await writeState(cwd, {
+        framework: "next",
+        resources: {
+          [SCHEMA_PATH]: {
+            id: "sch_B",
+            previousId: "sch_A",
+            hash: hashForState(schemaSyncer, schemaBody),
+          },
+          [FLOW_PATH]: { id: "flow-001", hash: hashForState(flowSyncer, flowBody) },
+        },
+      });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", schemaBody);
+      await writeResource(cwd, ".zitadel/flows", "default.json", flowBody);
+
+      const actions = await buildSyncPlan(cwd, [schemaSyncer, flowSyncer]);
+      const flowAction = actions.find((a) => a.path === FLOW_PATH);
+      expect(flowAction?.kind).toBe("update");
+      if (flowAction?.kind === "update") {
+        expect(flowAction.repin).toEqual({
+          previousId: "sch_A",
+          schemaPath: SCHEMA_PATH,
+          newId: "sch_B",
+        });
+      }
+
+      await runSyncLoop(cwd, [schemaSyncer, flowSyncer]);
+      expect(schemaSyncer.create).not.toHaveBeenCalled();
+      const flowFile = await readJson(join(cwd, FLOW_PATH));
+      expect(flowFile.user_schema).toBe("sch_B");
+
+      const followUp = await buildSyncPlan(cwd, [schemaSyncer, flowSyncer]);
+      expect(followUp.every((a) => a.kind === "skip")).toBe(true);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("re-pins every flow pinned to the revised schema, including URL-form ids", async () => {
+    const cwd = makeCwd();
+    try {
+      const urlId = "https://example.test/api/schemas/human.json";
+      await writeState(cwd, {
+        framework: "next",
+        resources: {
+          [SCHEMA_PATH]: { id: urlId, hash: "stale" },
+          [FLOW_PATH]: { id: "flow-001", hash: "stale" },
+          ".zitadel/flows/admin.json": { id: "flow-002", hash: "stale" },
+        },
+      });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema", v: 2 });
+      await writeResource(cwd, ".zitadel/flows", "default.json", {
+        name: "login",
+        user_schema: urlId,
+        version: 2,
+      });
+      await writeResource(cwd, ".zitadel/flows", "admin.json", {
+        name: "admin",
+        user_schema: urlId,
+        version: 2,
+      });
+
+      const schemaSyncer = makeSchemaSyncer();
+      const update = vi.fn().mockResolvedValue({});
+      const flowSyncer = makeFlowSyncer({ update });
+
+      await runSyncLoop(cwd, [schemaSyncer, flowSyncer]);
+
+      expect((await readJson(join(cwd, FLOW_PATH))).user_schema).toBe("sch_B");
+      expect((await readJson(join(cwd, ".zitadel/flows/admin.json"))).user_schema).toBe("sch_B");
+      expect(update).toHaveBeenCalledTimes(2);
+      for (const call of update.mock.calls) {
+        expect((call[1] as { user_schema: string }).user_schema).toBe("sch_B");
+      }
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("plan (buildSyncPlan) never writes files, even with a pending re-pin", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, {
+        framework: "next",
+        resources: {
+          [SCHEMA_PATH]: { id: "sch_A", hash: "stale" },
+          [FLOW_PATH]: { id: "flow-001", hash: "stale" },
+        },
+      });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema", v: 2 });
+      const rawFlow = JSON.stringify({ name: "login", user_schema: "sch_A", version: 2 });
+      await mkdir(join(cwd, ".zitadel/flows"), { recursive: true });
+      await writeFile(join(cwd, FLOW_PATH), rawFlow);
+
+      await buildSyncPlan(cwd, [makeSchemaSyncer(), makeFlowSyncer()]);
+
+      const { readFile } = await import("node:fs/promises");
+      expect(await readFile(join(cwd, FLOW_PATH), "utf8")).toBe(rawFlow);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});

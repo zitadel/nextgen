@@ -398,3 +398,68 @@ describe("renderPlan — normalized diffs", () => {
     expect(out).toContain("company");
   });
 });
+
+describe("renderPlan — re-pin messaging", () => {
+  it("announces the pending re-pin on the revise block", () => {
+    const actions: SyncAction[] = [
+      {
+        kind: "revise",
+        path: ".zitadel/schemas/user.json",
+        syncer: schema,
+        content: { kind: "user-schema", v: 2 },
+        hash: "h",
+        previousId: "sch_A",
+        oldContent: { kind: "user-schema", v: 1 },
+        affectedPaths: [".zitadel/flows/default.json"],
+      },
+    ];
+
+    const out = renderPlan(actions, false);
+    expect(out).toContain(
+      "# user_schema will be re-pinned to the new revision (known after apply) in:",
+    );
+    expect(out).toContain("#   - .zitadel/flows/default.json");
+    expect(out).not.toContain("after apply, update user_schema");
+  });
+
+  it("renders a repin update as a user_schema change to (known after apply)", () => {
+    const actions: SyncAction[] = [
+      {
+        kind: "update",
+        path: ".zitadel/flows/default.json",
+        syncer: flow,
+        id: "flow-001",
+        content: { name: "login", user_schema: "sch_A" },
+        hash: "h",
+        oldContent: { name: "login", user_schema: "sch_A" },
+        repin: { previousId: "sch_A", schemaPath: ".zitadel/schemas/user.json" },
+      },
+    ];
+
+    const out = renderPlan(actions, false);
+    expect(out).toContain("will be updated in-place (re-pin user_schema)");
+    expect(out).toContain('~ user_schema = "sch_A" -> (known after apply)');
+  });
+
+  it("renders a recovered repin with the concrete revision id", () => {
+    const actions: SyncAction[] = [
+      {
+        kind: "update",
+        path: ".zitadel/flows/default.json",
+        syncer: flow,
+        id: "flow-001",
+        content: { name: "login", user_schema: "sch_A" },
+        hash: "h",
+        oldContent: { name: "login", user_schema: "sch_A" },
+        repin: {
+          previousId: "sch_A",
+          schemaPath: ".zitadel/schemas/user.json",
+          newId: "sch_B",
+        },
+      },
+    ];
+
+    const out = renderPlan(actions, false);
+    expect(out).toContain('~ user_schema = "sch_A" -> "sch_B"');
+  });
+});

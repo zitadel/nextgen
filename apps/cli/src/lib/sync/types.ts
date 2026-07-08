@@ -1,13 +1,17 @@
 /**
  * One row in the local state file: the platform `id` returned at create time
  * and the content `hash` last successfully synced. Both fields are optional so
- * the engine can recover from partial writes.
+ * the engine can recover from partial writes. For revisioned resources,
+ * `previousId` records the revision the current `id` superseded — the planner
+ * uses it to recover flow re-pins when a run died between publishing the
+ * revision and rewriting the pinned flows.
  */
 export type ResourceEntry = {
   id?: string;
   hash?: string;
   name?: string;
   status?: string;
+  previousId?: string;
 };
 
 /**
@@ -99,6 +103,14 @@ export type SyncAction =
       content: object;
       hash: string;
       oldContent: object | null;
+      /**
+       * Present when this flow's `user_schema` pins a schema revision that
+       * is superseded in the same run (a pending `revise`) or was superseded
+       * by an interrupted earlier run. The executor rewrites `user_schema`
+       * to the new revision id — `newId` when the revision already exists
+       * (crash recovery), otherwise the id minted by this run's revise.
+       */
+      repin?: { previousId: string; schemaPath: string; newId?: string };
     }
   | {
       kind: "revise";

@@ -44,8 +44,9 @@ Typical edits:
 
 ## Schema revisions
 
-Editing a schema publishes a new immutable revision. This flow stays
-pinned to the old revision until `user_schema` points at the new one —
-`apply` prints the new revision id so you can copy it into
-`user_schema` (and update `steps[].fields[]` for any added/removed
-properties) when you're ready to adopt it.
+Editing a schema publishes a new immutable revision. When you `apply` a
+schema edit, the CLI rewrites `user_schema` in the flow files pinned to
+the old revision and updates the flows in the same run — the plan
+announces the re-pin beforehand, and the rewrite shows up in your git
+diff. Remember to update `steps[].fields[]` yourself when the edit
+added or removed properties the flow should collect.
