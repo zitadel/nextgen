@@ -37,7 +37,6 @@ tasks:
       node ../../scripts/release-clean.mjs local-dist
       corepack pnpm run build
     deps:
-      - "build"
       - "api:build-release"
       - "design-tokens:build"
       - "shared-component-styles:build"
