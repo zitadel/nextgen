@@ -289,7 +289,10 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain("forgot-password-href");
     expect(result).toContain('label="Sign in"');
     expect(result).not.toContain('label="Continue"');
-    expect(result.match(/data-testid="zitadel-action-passkey"/g)).toHaveLength(1);
+    const passkeyButtons =
+      result.match(/<zl-button[^>]*data-testid="zitadel-action-passkey"[^>]*>/g) ?? [];
+    expect(passkeyButtons).toHaveLength(1);
+    expect(passkeyButtons[0]).toContain('hierarchy="secondary"');
   });
 
   it("renders a primary passkey action as exactly one button (passkey-first flow)", () => {
@@ -311,9 +314,10 @@ describe("LiquidJS engine", () => {
       identity: null,
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
-    const passkeyButtons = result.match(/data-testid="zitadel-action-passkey"/g);
+    const passkeyButtons =
+      result.match(/<zl-button[^>]*data-testid="zitadel-action-passkey"[^>]*>/g) ?? [];
     expect(passkeyButtons).toHaveLength(1);
-    expect(result).toContain('hierarchy="primary"');
+    expect(passkeyButtons[0]).toContain('hierarchy="primary"');
     expect(result).not.toContain('hierarchy="secondary"');
   });
 
