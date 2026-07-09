@@ -2,16 +2,15 @@
 
 > **Status:** Proposed
 > **Date:** 2026-07-09
-> **Context:** Authorization for Zitadel-owned internal resources (projects, teams, users, apps, flows, policies), including staff/support access and agent delegation. Builds on [ADR 031](031-permission-catalogs.md).
+> **Context:** Authorization for Zitadel-owned internal resources (projects, teams, users, apps, flows, policies) and agent delegation. Builds on [ADR 031](031-permission-catalogs.md).
 
 ## Introduction
 
 nextgen's own API needs to answer questions like: can this token read this
-specific project? Can a support engineer temporarily see a customer's
-session data to debug a login failure — and can we prove afterwards exactly
-who authorized that and why? Can an automated agent acting on a user's
-behalf take one specific action without inheriting everything that user
-could do?
+specific project? Can it list only the teams a caller actually has access
+to, in one SQL query, instead of fetching everything and filtering in
+application code? Can an automated agent acting on a user's behalf take one
+specific action without inheriting everything that user could do?
 
 These are **internal, Zitadel-owned decisions** — they gate access to
 Zitadel's own resources (projects, teams, users, apps, flows, policies), not
@@ -21,13 +20,22 @@ authorization here can (and must) be exact and immediate in a way that isn't
 always true once a decision crosses into a customer's own systems (see
 [ADR 033](033-external-permission-management.md)).
 
-This ADR defines how internal permissions are catalogued, resolved,
-audited, and — for staff, support, and agent access — explicitly granted
-rather than implied by role names. It builds on the shared catalog model in
+This ADR defines how internal permissions are catalogued, resolved, and
+audited, and how agent access is explicitly granted rather than implied by
+role names. It builds on the shared catalog model in
 [ADR 031](031-permission-catalogs.md); see that document's glossary for
 FGA-engine vocabulary (relation, tuple, userset, catalog) and
 [`docs/design/glossary.md` § 5 Authorization (FGA)](../design/glossary.md#5-authorization-fga)
 for cross-cutting terms (scope, principal, `resource_scope_index`, delegation).
+
+**Out of scope:** staff/support access, cross-project human identity
+(agencies, consultants, platform operators), and the break-glass escape
+hatch are deliberately not defined here. They're the subject of a separate,
+open architecture question — [issue #333, "Define Architecture for
+Cross-Project Identity and Collaboration"](https://github.com/zitadel/nextgen/issues/333)
+— which needs its own focused ADR rather than a subsection of this one.
+This ADR's resolver and audit-trail mechanisms (§4–5 below) are generic
+enough to support whatever that future ADR defines, without modification.
 
 ## Glossary
 
@@ -39,8 +47,6 @@ Terms specific to internal/system-catalog authorization, in addition to
 |---|---|
 | **System catalog** | The catalog of Zitadel-owned permissions and optional bundles for internal API resources; replaces legacy level-specific role semantics. See [ADR 031 §1](031-permission-catalogs.md#1-one-model-two-catalogs). |
 | **Credential class** | The kind of principal presenting a request (user token, `sk_proj_`, `sk_team_`, origin-bound browser nonce), which constrains which permissions/scopes are even reachable regardless of grants. |
-| **Staff/support grant tier** | One of four named permission sets (`support.read` … `support.admin`) that bound what a scoped, time-limited staff grant can do. |
-| **Break-glass access** | An escape hatch for platform operators when normal grant issuance is unavailable; skips grant issuance but still produces audit events. |
 | **Agent delegation** | A scoped, explicit, auditable grant of authority from a human or service principal to an agent, distinct from the agent inheriting the grantor's full permission set. |
 
 ## Context
@@ -67,21 +73,26 @@ must respect:
 - [`internal/storage/AGENTS.md`](../../internal/storage/AGENTS.md) requires
   SQL-first storage that works on both PostgreSQL and Spanner.
 
-Three related issue areas constrain the decision:
+Two related issue areas constrain the decision:
 
 - Tenant isolation and data residency need project/tenant boundaries that
   can be enforced before resource data is fetched.
-- Cross-project identity needs explicit grants for agencies, consultants,
-  staff, and operators instead of assuming a global human account can see
-  every duplicated project-scoped user.
 - Agent identity needs first-class principals and scoped delegations, not
   broad inherited user authority.
 
-Prior oxidel design work provides useful reference patterns:
+Cross-project human identity (agencies, consultants, platform staff, and
+operators) is a related but distinct issue area, tracked by
+[issue #333](https://github.com/zitadel/nextgen/issues/333) and out of
+scope here — see the Introduction.
 
-- [ADR-036 (Staff Access and Support Grants)](https://github.com/zitadel/oxidel/blob/main/docs/adr/036-staff-access-support-grants.md) defines scoped, time-limited staff grants with four privilege tiers and an explicit audit-trail contract.
-- [ADR-041 (Cloud Platform Collaboration Model)](https://github.com/zitadel/oxidel/blob/main/docs/adr/041-cloud-customer-portal-collaboration.md) establishes org membership as the share primitive for cross-project access.
+Prior oxidel design work provides a useful reference pattern for this ADR's
+scope:
+
 - [ADR-042 (Projects and Apps Use Owner-Org AuthZ)](https://github.com/zitadel/oxidel/blob/main/docs/adr/042-projects-apps-owner-org-authz.md) defines resource-oriented permission names and 403/404 denial semantics.
+
+(ADR-036 "Staff Access and Support Grants" and ADR-041 "Cloud Platform
+Collaboration Model" are relevant reference material for #333's future ADR,
+not for this one.)
 
 ## Decision
 
@@ -108,10 +119,10 @@ Authorization facts for local Zitadel resources live in the same database
 as the resources they protect and are updated in the **same transaction**
 whenever a resource mutation changes access. This ADR requires authorization
 rows to be stored with the same residency/partition metadata as the
-resources they protect, and requires all cross-project staff, operator,
-agency, and support access to be represented as explicit grants with scope,
-expiry, grantor, and audit provenance — never as a side effect of role
-naming.
+resources they protect. Cross-project staff, operator, agency, and support
+access is out of scope here (see Introduction, [#333](https://github.com/zitadel/nextgen/issues/333));
+whatever grant model that future ADR defines must fit this same
+storage/residency invariant, not bypass it.
 
 ### 3. Agent delegation
 
@@ -123,28 +134,7 @@ owner. The resolver must be able to explain which delegation authorized or
 denied an agent action, so that both audit review and the agent itself can
 see exactly why an action succeeded or failed.
 
-### 4. Staff and support grants
-
-Staff and support grants use the same storage shape as any other
-assignment: each record carries a `grant_id`, issuer principal,
-human-readable `reason`, role tier, expiry timestamp, and revocation state
-alongside the standard assignment tuple. The authoritative grant record
-drives both access decisions and audit export — there is no separate access
-path that bypasses the grant check. Cross-project privileged access is
-modeled through four tiers in the system catalog:
-
-| Tier | Permitted scope |
-|---|---|
-| `support.read` | Read resources, sessions, event streams, and settings |
-| `support.write` | Above plus reset credentials, revoke sessions, suspend/unsuspend principals |
-| `support.config` | Above plus modify resource configuration and policy |
-| `support.admin` | Full delegated access including impersonation grants |
-
-Each tier is a named permission set in the system catalog, not a runtime
-bypass. Tier escalation requires a new grant at the higher tier; chaining
-lower-tier grants cannot yield higher-tier access.
-
-### 5. Resolver and list filtering for internal resources
+### 4. Resolver and list filtering for internal resources
 
 Every protected internal endpoint declares:
 
@@ -193,28 +183,27 @@ accelerator behind the same resolver interface. The portable behavior
 remains the application/query-builder path so Spanner and PostgreSQL share
 the same authorization semantics.
 
-### 6. Audit trail and grant provenance
+### 5. Audit trail and grant provenance
 
-Every action performed under a scoped grant or agent delegation records the
-grant context in the event actor metadata:
+Every action performed under an explicit grant or agent delegation records
+the grant context in the event actor metadata. For example, an agent acting
+under a delegation:
 
 ```
-actor:     staff:alice
-grant_id:  grant-123
-reason:    "SUPPORT-456: customer reports login failures"
-role:      support.write
-action:    session.revoke
-target:    user:bob
+actor:        agent:report-bot
+delegation_id: delegation-123
+grantor:      user:alice
+action:       project.export.create
+target:       project:42
 ```
 
-This makes support actions and delegated agent actions visible in the
-resource owner's audit log. There is no hidden access path: the grant check
-and the audit record are the same code path.
-
-A break-glass escape hatch (equivalent to oxidel's `operator_admin`) must be
-defined for platform operators when normal grant issuance is unavailable.
-Unlike regular grants, break-glass access skips the grant-issuance flow but
-still produces audit events. Break-glass design is deferred to a follow-up.
+This makes delegated agent actions visible in the resource owner's audit
+log. There is no hidden access path: the grant check and the audit record
+are the same code path. (The equivalent shape for staff/support grants —
+issuer, human-readable `reason`, role tier, and a break-glass escape hatch
+for when normal grant issuance is unavailable — is defined by
+[#333](https://github.com/zitadel/nextgen/issues/333)'s future ADR, using
+this same actor-metadata mechanism.)
 
 ## Consequences
 
@@ -224,8 +213,8 @@ still produces audit events. Break-glass design is deferred to a follow-up.
 - Listing queries remain single-roundtrip SQL with injected predicates.
 - Local resource authorization is strongly consistent with local resource
   writes.
-- Staff, support, and agent access are always explicit, scoped, expiring,
-  and audited — there is no implicit "admin can see everything" path.
+- Agent access is always explicit, scoped, expiring, and audited — there is
+  no implicit "agent inherits everything its owner can do" path.
 
 ### Negative / Risks
 
@@ -234,9 +223,6 @@ still produces audit events. Break-glass design is deferred to a follow-up.
 - Optional PostgreSQL accelerators (generated functions, RLS) can drift from
   portable behavior unless they run the same conformance tests as the
   application/query-builder path.
-- The break-glass mechanism is a real operational necessity but also a
-  standing risk if its audit trail is ever weaker than the standard grant
-  path; its design needs the same scrutiny as regular grants.
 
 ## Rejected Alternatives
 
@@ -263,11 +249,11 @@ scoped SQL query against data we already own.
    `project.create`, `project.read`, `project.write`, `project.delete`,
    `project.app.read`, `project.app.write`, `project.app.delete` — and
    extend to all nextgen resource types.
-2. Design relational migrations for `resource_scope_index`, staff/support
-   grant tables, and agent delegation tables.
+2. Design relational migrations for `resource_scope_index` and agent
+   delegation tables.
 3. Update OpenAPI security declarations to use the final permission names.
 4. Define agent delegation schema, audit record shape, and denial
    explanation fields.
-5. Define the break-glass access mechanism for platform operators when
-   normal grant issuance is unavailable, specifying which checks it
-   bypasses and what audit events it must emit.
+5. Staff/support access, cross-project human identity, and the break-glass
+   escape hatch are tracked by [issue #333](https://github.com/zitadel/nextgen/issues/333)
+   and intentionally out of scope here.
