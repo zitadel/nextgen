@@ -57,6 +57,7 @@ export abstract class AbstractRulePatcher implements Patcher {
       envBackups: [".env.local"],
       dependencies: this.routeDeps(view),
       configEdits: this.routeConfigEdits(view),
+      guidanceFiles: ["AGENTS.md", "README.md"],
     };
   }
 

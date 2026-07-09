@@ -4,6 +4,7 @@ import {
   AGENTS_HEADER,
   agentsGuidanceSection,
   readmeGuidanceSection,
+  removeGuidanceSection,
   upsertGuidanceSection,
 } from "../../../../../../src/lib/orca/patchers/rule/guidance";
 import type { PatchContext } from "../../../../../../src/lib/orca/patchers/types";
@@ -59,6 +60,40 @@ describe("upsertGuidanceSection", () => {
     expect(out).toContain("trailer");
     expect(out).toContain("new");
     expect(out).not.toContain("old\n<!--");
+  });
+});
+
+describe("removeGuidanceSection", () => {
+  const section = "## Authentication (Zitadel)\n\nbody";
+
+  it("inverts an upsert into a fresh file down to the bare header", () => {
+    const created = upsertGuidanceSection(undefined, section, AGENTS_HEADER);
+    expect(removeGuidanceSection(created)).toBe(AGENTS_HEADER);
+  });
+
+  it("strips only the managed section and keeps surrounding content", () => {
+    const doc = `intro\n\n<!-- zitadel:guidance:begin -->\nmanaged\n<!-- zitadel:guidance:end -->\ntrailer\n`;
+    const out = removeGuidanceSection(doc);
+    expect(out).toContain("intro");
+    expect(out).toContain("trailer");
+    expect(out).not.toContain("managed");
+    expect(out).not.toContain("zitadel:guidance");
+  });
+
+  it("returns the source unchanged without a marker pair", () => {
+    expect(removeGuidanceSection("# My app\n\nno markers here\n")).toBe(
+      "# My app\n\nno markers here\n",
+    );
+    const malformed = "before\n<!-- zitadel:guidance:begin -->\nnever closed\n";
+    expect(removeGuidanceSection(malformed)).toBe(malformed);
+  });
+
+  it("round-trips an append: user content survives byte-for-byte up front", () => {
+    const existing = "# My app\n\nHand-written notes.\n";
+    const upserted = upsertGuidanceSection(existing, section, "");
+    const removed = removeGuidanceSection(upserted);
+    expect(removed.startsWith("# My app\n\nHand-written notes.\n")).toBe(true);
+    expect(removed).not.toContain("zitadel:guidance");
   });
 });
 

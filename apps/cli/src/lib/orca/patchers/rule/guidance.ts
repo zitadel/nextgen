@@ -35,6 +35,21 @@ export function upsertGuidanceSection(
   return `${source.replace(/\n*$/, "\n\n")}${block}`;
 }
 
+/**
+ * Remove the managed guidance section (markers inclusive) from `source` —
+ * the inverse of {@link upsertGuidanceSection}, for `eject`. Content outside
+ * the markers is preserved byte-for-byte; a missing or malformed marker pair
+ * returns `source` unchanged.
+ */
+export function removeGuidanceSection(source: string): string {
+  const begin = source.indexOf(MARKER_BEGIN);
+  const end = source.indexOf(MARKER_END);
+  if (begin === -1 || end <= begin) {
+    return source;
+  }
+  return `${source.slice(0, begin)}${source.slice(end + MARKER_END.length).replace(/^\n/, "")}`;
+}
+
 /** The agent-facing golden path, written into `AGENTS.md`. */
 export function agentsGuidanceSection(ctx: PatchContext): string {
   const plan = publicCliCommand("plan", ctx.cliVersion);
