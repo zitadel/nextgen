@@ -412,13 +412,20 @@ export async function writeBackResource(
   syncer: Pick<ResourceSyncer, "normalize" | "normalizeWrite">,
   canonical: object,
 ): Promise<{ hash: string; changed: boolean }> {
-  const writeBody = syncer.normalizeWrite?.(canonical) ?? canonical;
+  let writeBody = syncer.normalizeWrite?.(canonical) ?? canonical;
   const compare = (body: object) => stableStringify(syncer.normalize?.(body) ?? body);
   const absPath = join(cwd, relPath);
   let changed = true;
   try {
-    const onDisk = JSON.parse(await readFile(absPath, "utf8")) as object;
+    const onDisk = JSON.parse(await readFile(absPath, "utf8")) as Record<string, unknown>;
     changed = compare(writeBody) !== compare(onDisk);
+    // `$schema` is a local editor affordance (points at the dialect spec in
+    // .zitadel/meta/); the server never echoes it, so a rewrite would drop
+    // it. Carry the on-disk pointer over unless the canonical body has its
+    // own (user-schema documents do).
+    if (typeof onDisk.$schema === "string" && !("$schema" in writeBody)) {
+      writeBody = { ...writeBody, $schema: onDisk.$schema };
+    }
   } catch (err) {
     consola.debug(`read ${relPath} for write-back failed:`, err);
   }

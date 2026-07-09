@@ -43,7 +43,10 @@ describe("NuxtPatcher.plan", () => {
     expect(writeContents(plan, "app/pages/login.vue")).not.toContain("background: #f3f4f6");
     expect(writeContents(plan, "app/pages/login.vue")).not.toContain("align-items: center");
     expect(writeContents(plan, "app/plugins/auth.server.ts")).toContain(MANAGED_MARKER);
-    const edit = plan.ops.find((op): op is Extract<FileOp, { kind: "edit" }> => op.kind === "edit");
+    const edit = plan.ops.find(
+      (op): op is Extract<FileOp, { kind: "edit" }> =>
+        op.kind === "edit" && String(op.path).includes("nuxt.config"),
+    );
     // nuxt.config stays at the project root, not under app/.
     expect(edit?.path).toContain("nuxt.config.ts");
   });
