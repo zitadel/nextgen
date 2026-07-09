@@ -463,3 +463,52 @@ describe("renderPlan — re-pin messaging", () => {
     expect(out).toContain('~ user_schema = "sch_A" -> "sch_B"');
   });
 });
+
+describe("renderPlan — validation warnings", () => {
+  const warning = {
+    rule: "warn/password-without-identifier",
+    message:
+      'step "start" collects x-auth-methods#password on the login path but no upstream step collects an identifier field — the engine cannot resolve which user to challenge',
+  };
+
+  it("renders a # warning comment line under a create block", () => {
+    const actions: SyncAction[] = [
+      {
+        kind: "create",
+        path: ".zitadel/flows/default.json",
+        syncer: flow,
+        content: { name: "login" },
+        hash: "h",
+        warnings: [warning],
+      },
+    ];
+
+    const out = renderPlan(actions, false);
+    expect(out).toContain(`# warning: ${warning.message}`);
+    expect(out).toContain("Warnings: 1 (non-blocking");
+  });
+
+  it("renders warnings under an update block", () => {
+    const actions: SyncAction[] = [
+      {
+        kind: "update",
+        path: ".zitadel/flows/default.json",
+        syncer: flow,
+        id: "flow-001",
+        content: { name: "login" },
+        hash: "h",
+        oldContent: { name: "login" },
+        warnings: [warning],
+      },
+    ];
+
+    expect(renderPlan(actions, false)).toContain(`# warning: ${warning.message}`);
+  });
+
+  it("emits no warning summary when the plan is warning-free", () => {
+    const actions: SyncAction[] = [
+      { kind: "create", path: "a", syncer: flow, content: {}, hash: "h" },
+    ];
+    expect(renderPlan(actions, false)).not.toContain("Warnings:");
+  });
+});

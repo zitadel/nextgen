@@ -342,7 +342,8 @@ describe("Next setup integration", () => {
         {
           name: "identifier",
           fields: [],
-          actions: [],
+          actions: [{ name: "submit", kind: "submit", primary: true }],
+          transitions: { submit: { target: "done" } },
           gates: {
             captcha: {
               kind: "captcha",
@@ -351,6 +352,7 @@ describe("Next setup integration", () => {
             },
           },
         },
+        { name: "done", complete: "show" },
       ],
     };
     await writeFile(
@@ -368,6 +370,52 @@ describe("Next setup integration", () => {
       MY_CAPTCHA_SECRET: "hunter2",
     });
     expect(applyWithEnv.exitCode).toBe(0);
+  });
+
+  it("catches server-side flow invariants at plan time, before any mutation", async () => {
+    const cwd = await createNextProject();
+    const fakeNpm = await fakePackageManager("npm");
+    const setup = await cli(["setup", "--cwd", cwd, "--non-interactive", "--json"], {
+      PACKAGE_MANAGER_LOG: fakeNpm.logPath,
+      PATH: `${fakeNpm.binDir}:${process.env.PATH ?? ""}`,
+    });
+    expect(setup.exitCode).toBe(0);
+
+    // The codex incident: drop the login entry's user_not_found transition.
+    // The server rejects this on apply — but only after the schema (in the
+    // combined-edit case) already revised. Plan must catch it first.
+    const flowPath = join(cwd, ".zitadel/flows/default-login.json");
+    const flow = JSON.parse(await readFile(flowPath, "utf8")) as {
+      steps: Array<{ name: string; transitions: Record<string, unknown> }>;
+    };
+    const entry = flow.steps.find((s) => s.name === "identifier");
+    delete entry?.transitions.user_not_found;
+    await writeFile(flowPath, `${JSON.stringify(flow, null, 2)}\n`);
+
+    const before = snapshotPlatformStore();
+
+    const plan = await cli(["plan", "--cwd", cwd, "--json"]);
+    expect(plan.exitCode).toBe(3);
+    const planJson = parseJson(plan.stdout) as { code: string; message: string };
+    expect(planJson.code).toBe("E_VALIDATION");
+    expect(planJson.message).toContain(
+      'entry step for purpose "login" must wire "user_not_found" transition',
+    );
+
+    const apply = await cli(["apply", "--cwd", cwd, "--json"]);
+    expect(apply.exitCode).toBe(3);
+    // The partial-apply failure mode: nothing may have mutated.
+    expect(snapshotPlatformStore()).toEqual(before);
+
+    // Restoring the transition restores a clean plan.
+    if (entry) {
+      entry.transitions.user_not_found = { target: "register" };
+    }
+    await writeFile(flowPath, `${JSON.stringify(flow, null, 2)}\n`);
+    const planAfter = await cli(["plan", "--cwd", cwd, "--json"]);
+    expect(planAfter.exitCode).toBe(0);
+    const planAfterJson = parseJson(planAfter.stdout) as { data: { total: number } };
+    expect(planAfterJson.data.total).toBe(0);
   });
 
 });

@@ -40,6 +40,11 @@
       "types": "./dist/normalize.d.mts",
       "import": "./dist/normalize.mjs"
     },
+    "./validate": {
+      "@zitadel/source": "./src/validate.ts",
+      "types": "./dist/validate.d.mts",
+      "import": "./dist/validate.mjs"
+    },
     "./defaults/default-human-user.json": "./defaults/default-human-user.json",
     "./defaults/default-login.json": "./defaults/default-login.json",
     "./package.json": "./package.json"

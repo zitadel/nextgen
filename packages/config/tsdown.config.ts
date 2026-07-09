@@ -6,6 +6,7 @@ export default defineConfig({
     defaults: "src/defaults.ts",
     normalize: "src/normalize.ts",
     schemas: "src/schemas.ts",
+    validate: "src/validate.ts",
   },
   outDir: "dist",
   format: ["esm"],
