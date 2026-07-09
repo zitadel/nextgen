@@ -185,6 +185,8 @@ enum:
   - less_than_or_equal
   - greater_than
   - greater_than_or_equal
+  - is_empty
+  - is_not_empty
 ```
 
 This results in a filter request which looks like: 
