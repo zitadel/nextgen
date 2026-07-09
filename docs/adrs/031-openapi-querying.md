@@ -112,7 +112,7 @@ Spec:
 --- # Request.yaml
 type: object
 properties:
-  page_size:
+  limit:
     $ref: /components/schemas/limit.yaml
   page_token:
     oneOf:
