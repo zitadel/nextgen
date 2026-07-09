@@ -16,6 +16,7 @@
     "dist",
     "defaults/*.json",
     "defaults/*.md",
+    "defaults/presets/*/*.json",
     "LICENSE"
   ],
   "type": "module",
