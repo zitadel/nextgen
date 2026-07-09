@@ -202,14 +202,19 @@ async function runFrameworkJourney(context) {
     await run("node", ["apps/cli-journey-e2e/scripts/prepare-app.mjs"], {
       env: {
         ...process.env,
+        // Pin every JOURNEY_* variable prepare-app reads: a preceding CI
+        // journey step exports its final values through GITHUB_ENV, so the
+        // inherited process.env may carry another run's (deleted) app dir
+        // or preset.
+        JOURNEY_APP_DIR: context.appDir,
         JOURNEY_APP_URL: context.appUrl,
         JOURNEY_FRAMEWORK: framework.id,
+        JOURNEY_PRESET: options.preset,
         JOURNEY_ZITADEL_PORT: String(context.zitadelPort),
         JOURNEY_REGISTRY_URL: registryUrl,
         JOURNEY_RUNTIME: options.runtime,
         JOURNEY_WORK_DIR: context.frameworkWorkDir,
         NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
-        ...(options.preset ? { JOURNEY_PRESET: options.preset } : {}),
         ...(localRuntimeImage ? { ZITADEL_LOCAL_IMAGE: localRuntimeImage } : {}),
       },
     });
@@ -250,7 +255,8 @@ async function runFrameworkJourney(context) {
           JOURNEY_OUTPUT_DIR: context.frameworkWorkDir,
           JOURNEY_PLAYWRIGHT_OUTPUT_DIR: context.playwrightOutputDir,
           JOURNEY_PLAYWRIGHT_REPORT_DIR: context.playwrightReportDir,
-          ...(options.preset ? { JOURNEY_PRESET: options.preset } : {}),
+          // Always explicit ("" = default preset): see the prepare-app note.
+          JOURNEY_PRESET: options.preset,
         },
       },
     );

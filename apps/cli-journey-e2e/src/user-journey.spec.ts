@@ -7,8 +7,10 @@ test.setTimeout(60_000);
 const framework = process.env.JOURNEY_FRAMEWORK ?? "next";
 // The scaffolded sign-in preset decides which journeys apply: the default
 // password-first scaffold enters on the identifier step; passkey-first
-// enters on a fields-less passkey step with an email fallback.
-const preset = process.env.JOURNEY_PRESET ?? "password-first";
+// enters on a fields-less passkey step with an email fallback. `||`, not
+// `??`: the runner passes an empty string for "default preset", and an
+// empty preset must still register the password-first journeys.
+const preset = process.env.JOURNEY_PRESET || "password-first";
 const expectsProtectedRouteRedirect = framework === "next" || framework === "nuxt";
 const loginUrl = /\/login(?:[/?#]|$)/;
 const profileUrl = /\/profile(?:[/?#]|$)/;
