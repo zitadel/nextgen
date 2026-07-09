@@ -75,10 +75,8 @@ describe("NextPatcher.plan", () => {
     const homePage = editContents(plan, "app/page.tsx", "starter");
 
     expect(homePage).toContain(MANAGED_MARKER);
-    expect(homePage).toContain('href="/login"');
-    expect(homePage).toContain('href="/register"');
-    expect(homePage).toContain('href="/profile"');
-    expect(homePage).toContain('colorScheme: "dark"');
+    expect(homePage).toContain('redirect("/login")');
+    expect(homePage).not.toContain("Sign in, create an account");
   });
 
   it("emits proxy.ts for Next 16 projects", () => {

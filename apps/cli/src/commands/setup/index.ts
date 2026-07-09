@@ -502,7 +502,7 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
     subject: "the editable default human user schema",
   },
   ".zitadel/schemas/README.md": { subject: "the schemas folder README" },
-  "app/page.tsx": { subject: "the auth home page" },
+  "app/page.tsx": { subject: "the home page redirect" },
   "app/login/page.tsx": { subject: "the login page" },
   "app/register/page.tsx": { subject: "the registration page" },
   "app/profile/page.tsx": { subject: "the profile page" },
@@ -539,7 +539,7 @@ function buildSummary(opts: {
     });
   }
   for (const [label, suffix] of [
-    ["Home page", "app/page.tsx"],
+    ["Home redirect", "app/page.tsx"],
     ["Login page", "app/login/page.tsx"],
     ["Register page", "app/register/page.tsx"],
     ["Profile page", "app/profile/page.tsx"],
