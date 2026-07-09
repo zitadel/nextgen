@@ -89,13 +89,16 @@ packages/design-tokens/
 
 ## Adding a new token
 
-1. Add the variable in Figma → publish the library → bump
-   `figma-tokens.lock.version`.
-2. Run `moon run design-tokens:sync`, `moon run design-tokens:generate`, and
-   `moon run design-tokens:test`. Update the snapshot if the new
-   name is intentional; otherwise fix the input.
-3. Commit the resulting `figma.tokens.json`, `tokens.{css,ts}`, and
-   `tailwind.css` together with the lockfile bump.
+1. Add the variable in Figma → publish the library.
+2. Push from the Community sync plugin (or run `:sync-export` locally if you
+   have a committed export under `figma-export/`).
+3. Run `moon run design-tokens:generate` and `moon run design-tokens:test`.
+   Update the snapshot if the new name is intentional.
+4. Commit `figma.tokens.json`, `tokens.{css,ts}`, and `tailwind.css` together
+   in the sync PR.
+
+For Enterprise REST sync instead: bump `figma-tokens.lock.version`, run
+`:sync`, then `:generate` and `:test`.
 
 For values Figma doesn't own (typography stacks, motion, etc.), edit
 `src/overrides.ts` and re-run `:generate`.
