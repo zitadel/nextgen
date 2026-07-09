@@ -1,0 +1,86 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  AGENTS_HEADER,
+  agentsGuidanceSection,
+  readmeGuidanceSection,
+  upsertGuidanceSection,
+} from "../../../../../../src/lib/orca/patchers/rule/guidance";
+import type { PatchContext } from "../../../../../../src/lib/orca/patchers/types";
+
+const ctx: PatchContext = {
+  framework: { id: "next", devPort: 3000, url: "http://localhost:3000" },
+  rendererId: "react",
+  project: {
+    id: "proj_test",
+    projectSecret: "sk",
+    previewSecret: "pk",
+    previewOrigins: [],
+    createdAt: "2026-01-01T00:00:00Z",
+  },
+  issuer: "http://localhost:3000",
+  server: "http://localhost:8080",
+  cliVersion: "0.1.0-alpha.15",
+  preset: "passkey-first",
+} as PatchContext;
+
+describe("upsertGuidanceSection", () => {
+  const section = "## Authentication (Zitadel)\n\nbody";
+
+  it("creates the file from header + section when absent", () => {
+    const out = upsertGuidanceSection(undefined, section, AGENTS_HEADER);
+    expect(out.startsWith("# AGENTS.md")).toBe(true);
+    expect(out).toContain("<!-- zitadel:guidance:begin -->");
+    expect(out).toContain(section);
+  });
+
+  it("appends the managed section to existing content without touching it", () => {
+    const existing = "# My app\n\nHand-written notes.\n";
+    const out = upsertGuidanceSection(existing, section, "");
+    expect(out.startsWith("# My app")).toBe(true);
+    expect(out).toContain("Hand-written notes.");
+    expect(out).toContain(section);
+  });
+
+  it("replaces only its own section on rerun (idempotent)", () => {
+    const first = upsertGuidanceSection("# My app\n", section, "");
+    const rerun = upsertGuidanceSection(first, section, "");
+    expect(rerun).toBe(first);
+    const updated = upsertGuidanceSection(first, "## Authentication (Zitadel)\n\nnew body", "");
+    expect(updated).toContain("new body");
+    expect(updated).not.toContain("\nbody");
+    expect(updated.match(/zitadel:guidance:begin/g)).toHaveLength(1);
+  });
+
+  it("keeps content after the managed section intact", () => {
+    const doc = `intro\n\n<!-- zitadel:guidance:begin -->\nold\n<!-- zitadel:guidance:end -->\ntrailer\n`;
+    const out = upsertGuidanceSection(doc, "new", "");
+    expect(out).toContain("intro");
+    expect(out).toContain("trailer");
+    expect(out).toContain("new");
+    expect(out).not.toContain("old\n<!--");
+  });
+});
+
+describe("guidance content", () => {
+  it("names the exact origin and warns off 127.0.0.1", () => {
+    const agents = agentsGuidanceSection(ctx);
+    expect(agents).toContain("http://localhost:3000");
+    expect(agents).toContain("not 127.0.0.1");
+  });
+
+  it("points agents at the dialect meta-schemas and the plan/apply loop", () => {
+    const agents = agentsGuidanceSection(ctx);
+    expect(agents).toContain('"$schema": "../meta/flow-definition.json"');
+    expect(agents).toContain(".zitadel/meta/user-schema.json");
+    expect(agents).toContain("npx @zitadel/cli@0.1.0-alpha.15 plan");
+    expect(agents).toContain("--non-interactive --json");
+    expect(agents).toContain("Never edit `.zitadel/state.json`");
+  });
+
+  it("gives the README the human journey with pinned CLI commands", () => {
+    const readme = readmeGuidanceSection(ctx);
+    expect(readme).toContain("register a user, sign out, and sign in again");
+    expect(readme).toContain("npx @zitadel/cli@0.1.0-alpha.15 apply");
+  });
+});

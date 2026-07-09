@@ -137,6 +137,12 @@ export const de: Locale = {
   // --- Passkey-Anmeldung ---
   "passkey-login.title": "Mit Passkey anmelden",
 
+  // --- Step: passkey-first (Einstiegsschritt des Passkey-first-Presets) ---
+  "passkey-first.title": "Anmelden",
+  "passkey-first.description": "Verwende deinen Passkey, um fortzufahren",
+  "passkey-first.action.passkey": "Weiter mit Passkey",
+  "passkey-first.action.email_fallback": "Stattdessen E-Mail verwenden",
+
   // --- Passwort-Wiederherstellung ---
   "recover.title": "E-Mail prüfen",
   "recover.description":
@@ -148,6 +154,9 @@ export const de: Locale = {
   "submit.signin": "Anmelden",
   "action.forgot_password": "Passwort vergessen?",
   "action.cancel": "Abbrechen",
+  // Generische Rückfalloption für den vom Engine injizierten
+  // `<step>.action.back`-Schlüssel (siehe INJECTED_KEY_FALLBACKS in liquid.ts).
+  "action.back": "Zurück",
 
   // --- SSO ---
   "sso.redirect.title": "Weiterleitung zum Anbieter…",

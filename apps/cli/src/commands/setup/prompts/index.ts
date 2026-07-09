@@ -12,6 +12,7 @@
 import { DevPortPrompt } from "./dev-port";
 import { FrameworkConfirmPrompt } from "./framework-confirm";
 import { ServerPrompt } from "./server";
+import { SignInPresetPrompt } from "./sign-in-preset";
 import type { SetupPrompt } from "./types";
 
 export type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
@@ -19,6 +20,7 @@ export { bail } from "./cancel";
 export { DevPortPrompt } from "./dev-port";
 export { FrameworkConfirmPrompt } from "./framework-confirm";
 export { ServerPrompt } from "./server";
+export { SignInPresetPrompt } from "./sign-in-preset";
 export { PickFrameworkPrompt } from "./pick-framework";
 
 /** Every question the main setup wizard asks, in ask order. */
@@ -26,4 +28,5 @@ export const SETUP_PROMPTS: ReadonlyArray<SetupPrompt> = [
   new FrameworkConfirmPrompt(),
   new ServerPrompt(),
   new DevPortPrompt(),
+  new SignInPresetPrompt(),
 ];

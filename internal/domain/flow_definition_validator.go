@@ -19,6 +19,10 @@ type PivotingTarget struct {
 	Transition string
 }
 
+// ValidateFlowDefinition is ported (rules and message strings) to
+// packages/config/src/validate.ts for CLI plan-time validation — keep
+// rule changes in sync; a drift-audit test over this file guards the
+// function names and shared literals.
 func ValidateFlowDefinition(userSchema *jsonschema.Schema, flowDefinition FlowDefinition) ([]PivotingTarget, error) {
 	// 1. validate purpose and initial steps
 	if err := validateDefinition(flowDefinition); err != nil {
