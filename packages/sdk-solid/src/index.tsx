@@ -33,6 +33,8 @@ declare module "solid-js" {
       "zitadel-login": Omit<HTMLAttributes<HTMLElement>, "ref"> & {
         ref?: ZitadelLoginElement | ((el: ZitadelLoginElement) => void);
         "prop:project"?: ZitadelProject;
+        "prop:locales"?: Record<string, Record<string, string>>;
+        "prop:lang"?: string;
         "project-id"?: string;
         "proxy-path"?: string;
         purpose?: string;
