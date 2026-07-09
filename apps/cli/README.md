@@ -38,8 +38,8 @@ starting a local runtime. Use `--runtime docker`, `--image`, or
 framework to scaffold when the directory is fresh, writes the Next.js app into
 the current directory, scaffolds `app/login`, `app/register`, `app/profile`, and
 `proxy.ts` for Next 16+ or `middleware.ts` for older Next versions. Fresh
-scaffolds also replace the starter `app/page.tsx` with links to sign in, create
-an account, and profile. Setup writes `.env.local` and `.zitadel/`, and installs
+scaffolds also replace the starter `app/page.tsx` with a redirect to `/login`.
+Setup writes `.env.local` and `.zitadel/`, and installs
 dependencies with the detected package manager. Pass `--skip-install` to install
 them yourself. The project's default user schema and login flow are provisioned
 from versioned local defaults; setup writes editable copies into
