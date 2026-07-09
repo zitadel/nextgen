@@ -44,6 +44,13 @@ describe("preset selection", () => {
       /unknown setup preset "topt-first".*password-first.*passkey-first/,
     );
   });
+
+  it("rejects prototype-chain keys as unknown presets", () => {
+    for (const preset of ["__proto__", "constructor", "toString"]) {
+      expect(() => getDefaultLoginFlow({ preset })).toThrowError(/unknown setup preset/);
+      expect(() => getDefaultHumanUserSchema({ preset })).toThrowError(/unknown setup preset/);
+    }
+  });
 });
 
 describe("passkey-first preset shape", () => {
