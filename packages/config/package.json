@@ -71,6 +71,7 @@
   "devDependencies": {
     "tsdown": "catalog:",
     "tslib": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "ajv": "catalog:"
   }
 }
