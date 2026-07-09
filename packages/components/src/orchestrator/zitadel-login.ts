@@ -6,6 +6,7 @@ import type {
   SubmitFlowStepBody,
   SubmitFlowStepBodyChallengeResponse,
 } from "@zitadel/api/generated/model";
+import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
@@ -731,8 +732,14 @@ export class ZitadelLogin extends LitElement {
   }
 
   private handleTransportError(error: unknown): void {
+    // For API rejections, prefer the server's error-envelope message (e.g.
+    // which origins a project allows) over the generic "POST … returned N".
     const message =
-      error instanceof Error ? error.message : "Unexpected error contacting the Flow API.";
+      error instanceof ApiError
+        ? apiErrorMessage(error)
+        : error instanceof Error
+          ? error.message
+          : "Unexpected error contacting the Flow API.";
     this.startupError = message;
     console.error("[zitadel-login]", error);
     emit(this, "zitadel-flow-error", { message });
