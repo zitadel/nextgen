@@ -58,9 +58,11 @@ describe("setup dependency installation", () => {
       command: "npm install",
     });
     expect(result.nextActions.join("\n")).toContain(
+      "Start your project: npm run dev (then open http://localhost:3000/login)",
+    );
+    expect(result.nextActions.join("\n")).not.toContain(
       "Start your project: npm run dev (then open http://localhost:3000)",
     );
-    expect(result.nextActions.join("\n")).not.toContain("http://localhost:3000/login");
     expect(result.nextActions.join("\n")).toContain("register a user");
     expect(result.nextActions.join("\n")).toContain("log in again");
     expect(result.nextActions.join("\n")).toContain(".zitadel/schemas/");

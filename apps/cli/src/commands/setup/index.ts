@@ -531,12 +531,18 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   ".env.example": { subject: "the .env example template" },
   ".env.local": { subject: "the local development environment variables" },
   ".zitadel/state.json": { subject: "the empty sync state file" },
+  ".zitadel/flows/default-login.json": { subject: "the editable default login flow" },
+  ".zitadel/flows/README.md": { subject: "the flows folder README" },
+  ".zitadel/schemas/default-human-user.json": {
+    subject: "the editable default human user schema",
+  },
+  ".zitadel/schemas/README.md": { subject: "the schemas folder README" },
   ".zitadel/meta/flow-definition.json": { subject: "the flow dialect spec (editor $schema)" },
   ".zitadel/meta/user-schema.json": { subject: "the user-schema dialect spec" },
   ".zitadel/meta/user-property.json": { subject: "the user-property dialect spec" },
   "AGENTS.md": { subject: "the agent guidance (golden journey + config dialect)" },
   "README.md": { subject: "the README's Zitadel section" },
-  "app/page.tsx": { subject: "the auth home page" },
+  "app/page.tsx": { subject: "the home page redirect" },
   "app/login/page.tsx": { subject: "the login page" },
   "app/register/page.tsx": { subject: "the registration page" },
   "app/profile/page.tsx": { subject: "the profile page" },
@@ -573,7 +579,7 @@ function buildSummary(opts: {
     });
   }
   for (const [label, suffix] of [
-    ["Home page", "app/page.tsx"],
+    ["Home redirect", "app/page.tsx"],
     ["Login page", "app/login/page.tsx"],
     ["Register page", "app/register/page.tsx"],
     ["Profile page", "app/profile/page.tsx"],
