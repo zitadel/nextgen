@@ -87,11 +87,17 @@ async function advanceMockLoginFlow(element: ZitadelLogin, email = "alice@acme.c
   );
 }
 
-async function mount(host: HTMLElement): Promise<ZitadelLogin> {
+/** Create and attach a login element without waiting for a render. */
+function attachLogin(host: HTMLElement): ZitadelLogin {
   const element = document.createElement("zitadel-login") as ZitadelLogin;
   element.purpose = "login";
   element.project = testProject;
   host.appendChild(element);
+  return element;
+}
+
+async function mount(host: HTMLElement): Promise<ZitadelLogin> {
+  const element = attachLogin(host);
   await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
   return element;
 }
@@ -297,16 +303,13 @@ describe("<zitadel-login> against the typed Flow API", () => {
     // client-side default rendered.
     const element = await mount(host);
     expect(
-      element.shadowRoot?.querySelector('zl-field[data-testid="zitadel-field-email"]'),
+      element.shadowRoot!.querySelector('zl-field[data-testid="zitadel-field-email"]'),
     ).toBeTruthy();
   });
 
   it("renders a server-sent branding.liquid_template instead of the bundled default", async () => {
     applyBranding({ liquid_template: '<p data-testid="tenant-template">tenant-owned</p>' });
-    const element = document.createElement("zitadel-login") as ZitadelLogin;
-    element.purpose = "login";
-    element.project = testProject;
-    host.appendChild(element);
+    const element = attachLogin(host);
 
     // Can't use mount(): the marker is what signals the render completed.
     const marker = await waitFor(() =>
@@ -318,7 +321,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     // bundled default (recognisable by its data-testid markers) must not be
     // the template that rendered.
     expect(
-      element.shadowRoot?.querySelector('zl-field[data-testid="zitadel-field-email"]'),
+      element.shadowRoot!.querySelector('zl-field[data-testid="zitadel-field-email"]'),
     ).toBeNull();
   });
 
@@ -346,15 +349,12 @@ describe("<zitadel-login> against the typed Flow API", () => {
       ),
     );
 
-    const element = document.createElement("zitadel-login") as ZitadelLogin;
-    element.purpose = "login";
-    element.project = testProject;
-    host.appendChild(element);
+    const element = attachLogin(host);
 
     await waitFor(() => element.shadowRoot?.querySelector('zl-button[action="passkey"]'));
-    const passkeyButtons = element.shadowRoot?.querySelectorAll('zl-button[action="passkey"]');
+    const passkeyButtons = element.shadowRoot!.querySelectorAll('zl-button[action="passkey"]');
     expect(passkeyButtons).toHaveLength(1);
-    expect(passkeyButtons?.[0]?.getAttribute("hierarchy")).toBe("primary");
+    expect(passkeyButtons[0]?.getAttribute("hierarchy")).toBe("primary");
   });
 
   it("auto-submits challenge_response when zl-passkey-result is dispatched", async () => {
