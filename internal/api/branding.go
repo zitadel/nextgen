@@ -1,18 +1,15 @@
 package api
 
 import (
-	_ "embed"
-
 	api "github.com/zitadel/nextgen/api/generated"
 )
 
-//go:embed branding/default.liquid
-var defaultLiquidTemplate string
-
-// defaultBranding returns the MVP fallback until the Branding API ships.
+// defaultBranding returns the MVP layout fallback until the Branding API
+// ships. The default login template is not sent from the server: it is
+// bundled with @zitadel/components, and the orchestrator falls back to it
+// whenever branding carries no liquid_template.
 func defaultBranding() api.Branding {
 	return api.Branding{
-		Layout:         api.NewOptBrandingLayout(api.BrandingLayoutCentered),
-		LiquidTemplate: api.NewOptString(defaultLiquidTemplate),
+		Layout: api.NewOptBrandingLayout(api.BrandingLayoutCentered),
 	}
 }

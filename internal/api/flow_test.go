@@ -188,8 +188,8 @@ func TestCreateFlow_ReturnsCookieAndFlowID(t *testing.T) {
 	if fr.ID != "flow_1" {
 		t.Errorf("id = %q, want flow_1", fr.ID)
 	}
-	if b, ok := fr.Branding.Get(); !ok || !b.LiquidTemplate.IsSet() || b.LiquidTemplate.Value == "" {
-		t.Errorf("expected branding.liquid_template to be set, got %+v", fr.Branding)
+	if b, ok := fr.Branding.Get(); !ok || !b.Layout.IsSet() || b.LiquidTemplate.IsSet() {
+		t.Errorf("expected branding with layout and no liquid_template, got %+v", fr.Branding)
 	}
 }
 
