@@ -27,6 +27,7 @@
   },
   "scripts": {
     "sync": "tsx scripts/sync-from-figma.ts",
+    "sync:export": "tsx scripts/sync-from-export.ts",
     "generate": "tsx scripts/build.ts",
     "build": "tsdown",
     "test": "vitest run"

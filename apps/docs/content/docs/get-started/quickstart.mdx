@@ -60,6 +60,17 @@ register a user -> log out -> log in with the same user -> profile shows signed 
 
 Do not treat a rendered login form as completion. The useful proof is a full register, logout, and login loop in a real browser.
 
+## Customize the login
+
+Setup scaffolded editable copies of your user schema and login flow into `.zitadel/schemas/` and `.zitadel/flows/` — each folder has a README explaining what you can change. Edit the files, then preview and publish:
+
+```sh
+npx @zitadel/cli@alpha plan
+npx @zitadel/cli@alpha apply
+```
+
+See [Plan and apply](/docs/cli/plan-apply) for a walkthrough that adds a `company` field to registration.
+
 ## Stop or reset
 
 Stop local Zitadel while keeping runtime data:

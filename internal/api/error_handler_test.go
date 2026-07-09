@@ -1,0 +1,93 @@
+package api
+
+import (
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/domain"
+)
+
+// newErrorHandlerTestServer builds the generated server around a zero-value
+// Handler. Every request in these tests fails before reaching a handler
+// method (security check or parameter decode), so no services are needed.
+func newErrorHandlerTestServer(t *testing.T) *api.Server {
+	t.Helper()
+	srv, err := api.NewServer(&Handler{}, NewSecurityHandler(nil), api.WithErrorHandler(OgenErrorHandler))
+	require.NoError(t, err)
+	return srv
+}
+
+func TestOgenErrorHandlerMissingSessionCookie(t *testing.T) {
+	t.Parallel()
+	srv := newErrorHandlerTestServer(t)
+
+	tests := []struct {
+		method string
+		path   string
+	}{
+		{http.MethodGet, "/sessions/me"},
+		{http.MethodDelete, "/sessions/me"},
+		{http.MethodGet, "/users/me"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.method+" "+tc.path, func(t *testing.T) {
+			t.Parallel()
+			rec := httptest.NewRecorder()
+			srv.ServeHTTP(rec, httptest.NewRequest(tc.method, tc.path, nil))
+
+			require.Equal(t, http.StatusUnauthorized, rec.Code)
+			// Exact match: proves the stable code and that no internal
+			// diagnostics (parent, location) leak into the response.
+			require.JSONEq(t,
+				`{"code":"auth.unauthorized","message":"Missing or invalid session token."}`,
+				rec.Body.String(),
+			)
+		})
+	}
+}
+
+func TestOgenErrorHandlerNonCredentialCookieDecodeStays400(t *testing.T) {
+	t.Parallel()
+	srv := newErrorHandlerTestServer(t)
+
+	// The _zflow cookie is flow state, not a session credential: its absence
+	// must stay a structural 400, not become a 401.
+	req := httptest.NewRequest(http.MethodPost, "/flow/flow_123/submit", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Contains(t, rec.Body.String(), `"code":"req.invalid"`)
+}
+
+func TestOgenErrorHandlerSecurityErrorNormalizedMessage(t *testing.T) {
+	t.Parallel()
+	srv := newErrorHandlerTestServer(t)
+
+	// listSessions requires oauth2; without credentials the security check
+	// fails before parameter decode and before any handler method runs.
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/sessions", nil))
+
+	require.Equal(t, http.StatusUnauthorized, rec.Code)
+	require.JSONEq(t,
+		`{"code":"auth.unauthorized","message":"The request lacks valid authentication credentials."}`,
+		rec.Body.String(),
+	)
+}
+
+func TestDomainErrorDetailsOmitsDiagnostics(t *testing.T) {
+	t.Parallel()
+
+	details := domainErrorDetails(domain.ErrInternal(errors.New("pq: secret driver detail")))
+
+	require.Equal(t, api.ErrorCode("internal"), details.Code)
+	require.Equal(t, "An unexpected error occurred.", details.Message)
+	require.False(t, details.Details.Set, "parent/location diagnostics must not be serialized")
+}

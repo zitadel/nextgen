@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/config",
-  "version": "0.1.0-alpha.14",
+  "version": "0.1.0-alpha.15",
   "description": "Versioned Zitadel local config schemas and defaults",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/config#readme",
   "bugs": {
@@ -34,6 +34,11 @@
       "@zitadel/source": "./src/schemas.ts",
       "types": "./dist/schemas.d.mts",
       "import": "./dist/schemas.mjs"
+    },
+    "./normalize": {
+      "@zitadel/source": "./src/normalize.ts",
+      "types": "./dist/normalize.d.mts",
+      "import": "./dist/normalize.mjs"
     },
     "./defaults/default-human-user.json": "./defaults/default-human-user.json",
     "./defaults/default-login.json": "./defaults/default-login.json",

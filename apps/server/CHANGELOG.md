@@ -1,5 +1,11 @@
 # @zitadel/server
 
+## 0.1.0-alpha.15
+
+### Patch Changes
+
+- [#488](https://github.com/zitadel/nextgen/pull/488) [`6e4a11a`](https://github.com/zitadel/nextgen/commit/6e4a11a7cd07587a51362d751fcc0320b00a4301) Thanks [@fforootd](https://github.com/fforootd)! - Unauthenticated requests to cookie-secured endpoints (`GET`/`DELETE /sessions/me`, `GET /users/me`) now return `401` with the stable code `auth.unauthorized` instead of `400 req.invalid`, matching the documented OpenAPI contract. API error responses no longer serialize internal diagnostics (`parent`, `location`) into `details`, and security errors return a normalized message instead of raw framework text.
+
 ## 0.1.0-alpha.14
 
 ### Minor Changes

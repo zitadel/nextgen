@@ -267,6 +267,7 @@ export default class Setup extends BaseCommand {
     });
 
     const installOutcome = await installDependenciesForSetup({
+      cliVersion: this.meta.cliVersion,
       cwd,
       depsAdded: result.depsAdded,
       dryRun,

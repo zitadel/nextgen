@@ -59,7 +59,7 @@ export default class Plan extends BaseCommand {
         `${summary.updates} update${summary.updates === 1 ? "" : "s"}, ` +
         `${summary.revisions} new revision${summary.revisions === 1 ? "" : "s"}, ` +
         `${summary.deletes} delete${summary.deletes === 1 ? "" : "s"}, ` +
-        `${summary.total - summary.creates - summary.updates - summary.revisions - summary.deletes} unchanged`,
+        `${plan.length - summary.total} unchanged`,
     );
     return this.emit({
       status: "ok",
