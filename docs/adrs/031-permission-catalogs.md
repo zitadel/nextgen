@@ -10,8 +10,9 @@ Two everyday situations need the same underlying answer — "is this action
 allowed?" — but come from very different audiences:
 
 - A Zitadel support engineer opens a customer's project to investigate a
-  login issue. Before they see anything, the system must decide whether
-  they're allowed to view it, and record why.
+  login issue under an explicit staff/support grant (out of scope for this ADR
+  series; see issue #333). Before they see anything, the system must decide
+  whether they're allowed to view it, and record why.
 - A customer's own application — say, an expense-report tool built on
   Zitadel — wants to let their user Alice approve reports but not delete the
   expense policy. The customer defines that permission model themselves;
