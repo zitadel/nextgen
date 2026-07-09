@@ -101,9 +101,7 @@ func OgenErrorHandler(_ context.Context, w http.ResponseWriter, _ *http.Request,
 	switch {
 	case isSecurityError(err):
 		status = http.StatusUnauthorized
-		d := domainErrorDetails(domain.ErrAuthUnauthorized(err))
-		d.Message = err.Error()
-		details = d
+		details = securityErrorDetails(err)
 
 	case isDecodeError(err):
 		status = http.StatusBadRequest
@@ -128,6 +126,23 @@ func OgenErrorHandler(_ context.Context, w http.ResponseWriter, _ *http.Request,
 func isSecurityError(err error) bool {
 	var target *ogenerrors.SecurityError
 	return errors.As(err, &target)
+}
+
+// securityErrorDetails maps an ogen security failure to the auth.unauthorized
+// wire contract. Operations secured by the session cookie return a normalized
+// message so ogen's framework text never reaches clients (ADR 030, Decision 4).
+// TODO(#367): normalize the remaining schemes as well; echoing err.Error() is a
+// leak flagged by ADR 030 Decision 6.
+func securityErrorDetails(err error) api.ErrorDetails {
+	if secErr := new(ogenerrors.SecurityError); errors.As(err, &secErr) && sessionCookieOperations[secErr.OperationContext.Name] {
+		return api.ErrorDetails{
+			Code:    api.ErrorCode(domain.ErrAuthUnauthorized(nil).Code),
+			Message: sessionUnauthorizedMessage,
+		}
+	}
+	d := domainErrorDetails(domain.ErrAuthUnauthorized(err))
+	d.Message = err.Error()
+	return d
 }
 
 func isDecodeError(err error) bool {

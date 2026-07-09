@@ -5778,6 +5778,31 @@ func (s *ListUsersOKItem) init() ListUsersOKItem {
 	return m
 }
 
+type NextgenSession struct {
+	APIKey string
+	Roles  []string
+}
+
+// GetAPIKey returns the value of APIKey.
+func (s *NextgenSession) GetAPIKey() string {
+	return s.APIKey
+}
+
+// GetRoles returns the value of Roles.
+func (s *NextgenSession) GetRoles() []string {
+	return s.Roles
+}
+
+// SetAPIKey sets the value of APIKey.
+func (s *NextgenSession) SetAPIKey(val string) {
+	s.APIKey = val
+}
+
+// SetRoles sets the value of Roles.
+func (s *NextgenSession) SetRoles(val []string) {
+	s.Roles = val
+}
+
 type OAuth2 struct {
 	Token  string
 	Scopes []string

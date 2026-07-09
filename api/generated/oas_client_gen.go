@@ -235,13 +235,13 @@ type Invoker interface {
 	// against the same `session_id`) to restore a dropped assurance level.
 	//
 	// GET /sessions/me
-	GetMySession(ctx context.Context, params GetMySessionParams) (GetMySessionRes, error)
+	GetMySession(ctx context.Context) (GetMySessionRes, error)
 	// GetMyUser invokes getMyUser operation.
 	//
 	// Get my user information.
 	//
 	// GET /users/me
-	GetMyUser(ctx context.Context, params GetMyUserParams) (GetMyUserRes, error)
+	GetMyUser(ctx context.Context) (GetMyUserRes, error)
 	// GetOpenIDConfiguration invokes getOpenIDConfiguration operation.
 	//
 	// Retrieve the OpenID Connect configuration.
@@ -351,7 +351,7 @@ type Invoker interface {
 	//  which is cleared in the response.
 	//
 	// DELETE /sessions/me
-	RevokeMySession(ctx context.Context, params RevokeMySessionParams) (RevokeMySessionRes, error)
+	RevokeMySession(ctx context.Context) (RevokeMySessionRes, error)
 	// RevokeSession invokes revokeSession operation.
 	//
 	// Revokes the session immediately (`state: revoked`). This is the logout operation.
@@ -3509,12 +3509,12 @@ func (c *Client) sendGetLive(ctx context.Context) (res GetLiveRes, err error) {
 // against the same `session_id`) to restore a dropped assurance level.
 //
 // GET /sessions/me
-func (c *Client) GetMySession(ctx context.Context, params GetMySessionParams) (GetMySessionRes, error) {
-	res, err := c.sendGetMySession(ctx, params)
+func (c *Client) GetMySession(ctx context.Context) (GetMySessionRes, error) {
+	res, err := c.sendGetMySession(ctx)
 	return res, err
 }
 
-func (c *Client) sendGetMySession(ctx context.Context, params GetMySessionParams) (res GetMySessionRes, err error) {
+func (c *Client) sendGetMySession(ctx context.Context) (res GetMySessionRes, err error) {
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getMySession"),
 		semconv.HTTPRequestMethodKey.String("GET"),
@@ -3561,19 +3561,36 @@ func (c *Client) sendGetMySession(ctx context.Context, params GetMySessionParams
 		return res, errors.Wrap(err, "create request")
 	}
 
-	stage = "EncodeCookieParams"
-	cookie := uri.NewCookieEncoder(r)
 	{
-		// Encode "__nextgen_session" parameter.
-		cfg := uri.CookieParameterEncodingConfig{
-			Name:    "__nextgen_session",
-			Explode: true,
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, GetMySessionOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
 		}
 
-		if err := cookie.EncodeParam(cfg, func(e uri.Encoder) error {
-			return e.EncodeValue(conv.StringToString(params.NextgenSession))
-		}); err != nil {
-			return res, errors.Wrap(err, "encode cookie")
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 		}
 	}
 
@@ -3599,12 +3616,12 @@ func (c *Client) sendGetMySession(ctx context.Context, params GetMySessionParams
 // Get my user information.
 //
 // GET /users/me
-func (c *Client) GetMyUser(ctx context.Context, params GetMyUserParams) (GetMyUserRes, error) {
-	res, err := c.sendGetMyUser(ctx, params)
+func (c *Client) GetMyUser(ctx context.Context) (GetMyUserRes, error) {
+	res, err := c.sendGetMyUser(ctx)
 	return res, err
 }
 
-func (c *Client) sendGetMyUser(ctx context.Context, params GetMyUserParams) (res GetMyUserRes, err error) {
+func (c *Client) sendGetMyUser(ctx context.Context) (res GetMyUserRes, err error) {
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getMyUser"),
 		semconv.HTTPRequestMethodKey.String("GET"),
@@ -3651,19 +3668,36 @@ func (c *Client) sendGetMyUser(ctx context.Context, params GetMyUserParams) (res
 		return res, errors.Wrap(err, "create request")
 	}
 
-	stage = "EncodeCookieParams"
-	cookie := uri.NewCookieEncoder(r)
 	{
-		// Encode "__nextgen_session" parameter.
-		cfg := uri.CookieParameterEncodingConfig{
-			Name:    "__nextgen_session",
-			Explode: true,
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, GetMyUserOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
 		}
 
-		if err := cookie.EncodeParam(cfg, func(e uri.Encoder) error {
-			return e.EncodeValue(conv.StringToString(params.NextgenSession))
-		}); err != nil {
-			return res, errors.Wrap(err, "encode cookie")
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 		}
 	}
 
@@ -5801,12 +5835,12 @@ func (c *Client) sendListUsers(ctx context.Context, params ListUsersParams) (res
 //	which is cleared in the response.
 //
 // DELETE /sessions/me
-func (c *Client) RevokeMySession(ctx context.Context, params RevokeMySessionParams) (RevokeMySessionRes, error) {
-	res, err := c.sendRevokeMySession(ctx, params)
+func (c *Client) RevokeMySession(ctx context.Context) (RevokeMySessionRes, error) {
+	res, err := c.sendRevokeMySession(ctx)
 	return res, err
 }
 
-func (c *Client) sendRevokeMySession(ctx context.Context, params RevokeMySessionParams) (res RevokeMySessionRes, err error) {
+func (c *Client) sendRevokeMySession(ctx context.Context) (res RevokeMySessionRes, err error) {
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("revokeMySession"),
 		semconv.HTTPRequestMethodKey.String("DELETE"),
@@ -5853,19 +5887,36 @@ func (c *Client) sendRevokeMySession(ctx context.Context, params RevokeMySession
 		return res, errors.Wrap(err, "create request")
 	}
 
-	stage = "EncodeCookieParams"
-	cookie := uri.NewCookieEncoder(r)
 	{
-		// Encode "__nextgen_session" parameter.
-		cfg := uri.CookieParameterEncodingConfig{
-			Name:    "__nextgen_session",
-			Explode: true,
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, RevokeMySessionOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
 		}
 
-		if err := cookie.EncodeParam(cfg, func(e uri.Encoder) error {
-			return e.EncodeValue(conv.StringToString(params.NextgenSession))
-		}); err != nil {
-			return res, errors.Wrap(err, "encode cookie")
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 		}
 	}
 

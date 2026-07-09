@@ -45,7 +45,51 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 	return ctx, nil
 }
 
+// HandleNextgenSession handles the nextgenSession security scheme: the
+// __nextgen_session cookie on the sessions/me and users/me operations.
+// It verifies that the cookie value decrypts to a session token and stashes
+// both the raw value and the parsed token in the context for the handlers.
+func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName api.OperationName, t api.NextgenSession) (context.Context, error) {
+	token, err := domain.DecryptSessionTokenString(t.APIKey, s.tokenVerifier)
+	if err != nil {
+		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+	}
+	return context.WithValue(ctx, sessionCredentialsKey{}, sessionCredentials{
+		raw:   t.APIKey,
+		token: token,
+	}), nil
+}
+
 var _ api.SecurityHandler = (*SecurityHandler)(nil)
+
+// sessionCookieOperations lists the operations secured by the nextgenSession
+// scheme. ogen reports an absent credential as a scheme-anonymous
+// "security requirement is not satisfied" error, so OgenErrorHandler decides
+// the 401 message by operation name instead.
+var sessionCookieOperations = map[api.OperationName]bool{
+	api.GetMySessionOperation:    true,
+	api.RevokeMySessionOperation: true,
+	api.GetMyUserOperation:       true,
+}
+
+// sessionUnauthorizedMessage mirrors the 401 descriptions of the
+// cookie-secured operations in api/openapi.
+const sessionUnauthorizedMessage = "Missing or invalid session token."
+
+type sessionCredentialsKey struct{}
+
+// sessionCredentials carries the __nextgen_session cookie through the context:
+// raw for services that verify the token themselves, token for handlers that
+// consume the parsed claims.
+type sessionCredentials struct {
+	raw   string
+	token *domain.Token
+}
+
+func sessionCredentialsFromContext(ctx context.Context) (sessionCredentials, bool) {
+	v, ok := ctx.Value(sessionCredentialsKey{}).(sessionCredentials)
+	return v, ok
+}
 
 type contextKey struct{}
 
