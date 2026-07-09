@@ -31,7 +31,9 @@ This is the first of three related ADRs on permission management:
   catalogs, and the storage/resolver core both catalogs run on.
 - **[ADR 032](032-internal-permission-management.md):** how the **system
   catalog** authorizes Zitadel's own resources (projects, teams, users, apps,
-  flows, policies), including staff/support access and agent delegation.
+  flows, policies) and agent delegation. (Staff/support access and
+  cross-project human identity are tracked separately by
+  [issue #333](https://github.com/zitadel/nextgen/issues/333).)
 - **[ADR 033](033-external-permission-management.md):** how the **app-group
   catalog** lets customers author their own OpenFGA-flavored policies for
   their own apps.
@@ -100,14 +102,19 @@ Three related issue areas constrain the decision:
   can be enforced before resource data is fetched.
 - Cross-project identity needs explicit grants for agencies, consultants,
   staff, and operators instead of assuming a global human account can see
-  every duplicated project-scoped user.
+  every duplicated project-scoped user. This ADR only requires that the
+  storage/resolver core stay compatible with such grants; the concrete
+  grant model is defined separately by
+  [issue #333](https://github.com/zitadel/nextgen/issues/333), not by this
+  ADR or [ADR 032](032-internal-permission-management.md).
 - Agent identity needs first-class principals and scoped delegations, not
   broad inherited user authority.
 
 Prior oxidel design work provides useful reference patterns:
 
-- [ADR-036 (Staff Access and Support Grants)](https://github.com/zitadel/oxidel/blob/main/docs/adr/036-staff-access-support-grants.md) defines scoped, time-limited staff grants with four privilege tiers and an explicit audit-trail contract.
-- [ADR-041 (Cloud Platform Collaboration Model)](https://github.com/zitadel/oxidel/blob/main/docs/adr/041-cloud-customer-portal-collaboration.md) establishes org membership as the share primitive for cross-project access.
+- [ADR-036 (Staff Access and Support Grants)](https://github.com/zitadel/oxidel/blob/main/docs/adr/036-staff-access-support-grants.md) and
+  [ADR-041 (Cloud Platform Collaboration Model)](https://github.com/zitadel/oxidel/blob/main/docs/adr/041-cloud-customer-portal-collaboration.md)
+  are reference material for issue #333's future ADR, not for this series.
 - [ADR-042 (Projects and Apps Use Owner-Org AuthZ)](https://github.com/zitadel/oxidel/blob/main/docs/adr/042-projects-apps-owner-org-authz.md) defines resource-oriented permission names and 403/404 denial semantics.
 
 Fine-grained authorization products are useful references, but external
@@ -211,8 +218,9 @@ Delegations — an agent or machine principal acting with explicit,
 time-bounded authority — are stored as assignments with an explicit
 grantor, delegation id, expiry/revocation state, and scope, never as a copy
 of everything the grantor could do. See [ADR 032](032-internal-permission-management.md)
-for how this applies to staff, support, and agent access to internal
-resources.
+for how this applies to agent access to internal resources. (Staff/support
+delegation is out of scope for this ADR series — see
+[issue #333](https://github.com/zitadel/nextgen/issues/333).)
 
 ### 3. Resolver: one evaluation path for both catalogs
 
@@ -305,9 +313,10 @@ policies without reintroducing hard-coded levels and special cases.
 
 1. Design relational migrations for catalogs, permission/relation
    definitions, expression edges, and assignments shared by both catalogs.
-   (Catalog-specific tables — `resource_scope_index`, staff/support grants,
-   and app grants — are tracked in [ADR 032](032-internal-permission-management.md)
-   and [ADR 033](033-external-permission-management.md).)
+   (Catalog-specific tables — `resource_scope_index` and app grants — are
+   tracked in [ADR 032](032-internal-permission-management.md) and
+   [ADR 033](033-external-permission-management.md); staff/support grant
+   tables are tracked by [issue #333](https://github.com/zitadel/nextgen/issues/333).)
 2. Add resolver conformance tests that compare single-resource checks and
    list predicates across PostgreSQL and Spanner.
 3. Validate the Leopard-style flattening approach for relation closure
