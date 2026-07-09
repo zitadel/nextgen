@@ -1,95 +1,111 @@
 package api
 
 import (
-	"context"
-	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
-	"github.com/go-faster/errors"
-	"github.com/ogen-go/ogen/ogenerrors"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
-func TestOgenErrorHandlerSessionCookieSecurityError(t *testing.T) {
+// newErrorHandlerTestServer builds the generated server around a zero-value
+// Handler. Every request in these tests fails before reaching a handler
+// method (security check or parameter decode), so no services are needed.
+func newErrorHandlerTestServer(t *testing.T, verifier domain.TokenVerifier) *api.Server {
+	t.Helper()
+	srv, err := api.NewServer(&Handler{}, NewSecurityHandler(verifier), api.WithErrorHandler(OgenErrorHandler))
+	require.NoError(t, err)
+	return srv
+}
+
+func TestOgenErrorHandlerMissingSessionCookie(t *testing.T) {
 	t.Parallel()
+	// The security handler is never invoked when the cookie is absent, so no
+	// verifier is needed.
+	srv := newErrorHandlerTestServer(t, nil)
 
-	for _, op := range []struct {
-		name api.OperationName
-		id   string
+	tests := []struct {
+		method string
+		path   string
 	}{
-		{api.GetMySessionOperation, "getMySession"},
-		{api.RevokeMySessionOperation, "revokeMySession"},
-		{api.GetMyUserOperation, "getMyUser"},
-	} {
-		t.Run(op.id, func(t *testing.T) {
+		{http.MethodGet, "/sessions/me"},
+		{http.MethodDelete, "/sessions/me"},
+		{http.MethodGet, "/users/me"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.method+" "+tc.path, func(t *testing.T) {
 			t.Parallel()
+			rec := httptest.NewRecorder()
+			srv.ServeHTTP(rec, httptest.NewRequest(tc.method, tc.path, nil))
 
-			// Missing cookie: ogen reports an unsatisfied requirement without
-			// naming the scheme.
-			missing := &ogenerrors.SecurityError{
-				OperationContext: ogenerrors.OperationContext{Name: op.name, ID: op.id},
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			// Invalid cookie: the SecurityHandler rejected the credential.
-			invalid := &ogenerrors.SecurityError{
-				OperationContext: ogenerrors.OperationContext{Name: op.name, ID: op.id},
-				Security:         "NextgenSession",
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-
-			for _, err := range []error{missing, invalid} {
-				rec := httptest.NewRecorder()
-				OgenErrorHandler(context.Background(), rec, httptest.NewRequest(http.MethodGet, "/", nil), err)
-
-				require.Equal(t, http.StatusUnauthorized, rec.Code)
-				require.Equal(t, "application/json", rec.Header().Get("Content-Type"))
-				require.JSONEq(t,
-					`{"code":"auth.unauthorized","message":"Missing or invalid session token."}`,
-					rec.Body.String(),
-				)
-			}
+			require.Equal(t, http.StatusUnauthorized, rec.Code)
+			// Exact match: proves the stable code and that no internal
+			// diagnostics (parent, location) leak into the response.
+			require.JSONEq(t,
+				`{"code":"auth.unauthorized","message":"Missing or invalid session token."}`,
+				rec.Body.String(),
+			)
 		})
 	}
 }
 
-func TestOgenErrorHandlerOtherSecurityError(t *testing.T) {
+func TestOgenErrorHandlerInvalidSessionCookie(t *testing.T) {
 	t.Parallel()
+	srv := newErrorHandlerTestServer(t, stubTokenVerifier{err: errors.New("bad token")})
 
-	err := &ogenerrors.SecurityError{
-		OperationContext: ogenerrors.OperationContext{Name: api.CreateSchemaOperation, ID: "createSchema"},
-		Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-	}
-
+	req := httptest.NewRequest(http.MethodGet, "/sessions/me", nil)
+	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "garbage"})
 	rec := httptest.NewRecorder()
-	OgenErrorHandler(context.Background(), rec, httptest.NewRequest(http.MethodPost, "/", nil), err)
+	srv.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusUnauthorized, rec.Code)
-
-	var details api.ErrorDetails
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &details))
-	require.Equal(t, api.ErrorCode("auth.unauthorized"), details.Code)
-	// Non-cookie schemes keep the raw ogen message until the ADR 030
-	// Decision 6 normalization lands.
-	require.Equal(t, err.Error(), details.Message)
+	require.JSONEq(t,
+		`{"code":"auth.unauthorized","message":"Missing or invalid session token."}`,
+		rec.Body.String(),
+	)
 }
 
-func TestOgenErrorHandlerDecodeParamsError(t *testing.T) {
+func TestOgenErrorHandlerNonCredentialCookieDecodeStays400(t *testing.T) {
 	t.Parallel()
+	srv := newErrorHandlerTestServer(t, nil)
 
-	err := &ogenerrors.DecodeParamsError{
-		OperationContext: ogenerrors.OperationContext{Name: api.GetSessionOperation, ID: "getSession"},
-		Err:              errors.New("query: session_id: invalid"),
-	}
-
+	// The _zflow cookie is flow state, not a session credential: its absence
+	// must stay a structural 400, not become a 401.
+	req := httptest.NewRequest(http.MethodPost, "/flow/flow_123/submit", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
-	OgenErrorHandler(context.Background(), rec, httptest.NewRequest(http.MethodGet, "/", nil), err)
+	srv.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Contains(t, rec.Body.String(), `"code":"req.invalid"`)
+}
 
-	var details api.ErrorDetails
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &details))
-	require.Equal(t, api.ErrorCode("req.invalid"), details.Code)
+func TestOgenErrorHandlerSecurityErrorNormalizedMessage(t *testing.T) {
+	t.Parallel()
+	srv := newErrorHandlerTestServer(t, nil)
+
+	// listSessions requires oauth2; without credentials the security check
+	// fails before parameter decode and before any handler method runs.
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/sessions", nil))
+
+	require.Equal(t, http.StatusUnauthorized, rec.Code)
+	require.JSONEq(t,
+		`{"code":"auth.unauthorized","message":"The request lacks valid authentication credentials."}`,
+		rec.Body.String(),
+	)
+}
+
+func TestDomainErrorDetailsOmitsDiagnostics(t *testing.T) {
+	t.Parallel()
+
+	details := domainErrorDetails(domain.ErrInternal(errors.New("pq: secret driver detail")))
+
+	require.Equal(t, api.ErrorCode("internal"), details.Code)
+	require.Equal(t, "An unexpected error occurred.", details.Message)
+	require.False(t, details.Details.Set, "parent/location diagnostics must not be serialized")
 }

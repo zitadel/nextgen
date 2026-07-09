@@ -15,28 +15,14 @@ import (
 // domainErrorDetails extracts a domain.Error from err and returns it as an
 // api.ErrorDetails. If err is not a domain.Error, ErrInternal is used as
 // the fallback so the response is always well-formed.
+//
+// Only Code, Message, and explicitly attached Details cross the wire.
+// Parent and Location are diagnostics for logs and must never be serialized
+// into API responses (ADR 030).
 func domainErrorDetails(err error) api.ErrorDetails {
 	var domErr domain.Error
-	details := make(api.ErrorDetailsDetails)
 	if !errors.As(err, &domErr) {
 		domErr = domain.ErrInternal(err)
-	}
-
-	if domErr.Details != nil {
-		if j, err := json.Marshal(domErr.Details); err == nil {
-			details["details"] = j
-		}
-	}
-	if domErr.Parent != nil {
-		strParent := domErr.Parent.Error()
-		if j, err := json.Marshal(strParent); err == nil {
-			details["parent"] = j
-		}
-	}
-	if domErr.Location != "" {
-		if j, err := json.Marshal(domErr.Location); err == nil {
-			details["location"] = j
-		}
 	}
 
 	errDetails := api.ErrorDetails{
@@ -44,8 +30,12 @@ func domainErrorDetails(err error) api.ErrorDetails {
 		Message: domErr.Message,
 	}
 
-	if len(details) > 0 {
-		errDetails.Details = api.NewOptErrorDetailsDetails(details)
+	if domErr.Details != nil {
+		if j, err := json.Marshal(domErr.Details); err == nil {
+			errDetails.Details = api.NewOptErrorDetailsDetails(api.ErrorDetailsDetails{
+				"details": j,
+			})
+		}
 	}
 
 	return errDetails
@@ -129,20 +119,16 @@ func isSecurityError(err error) bool {
 }
 
 // securityErrorDetails maps an ogen security failure to the auth.unauthorized
-// wire contract. Operations secured by the session cookie return a normalized
-// message so ogen's framework text never reaches clients (ADR 030, Decision 4).
-// TODO(#367): normalize the remaining schemes as well; echoing err.Error() is a
-// leak flagged by ADR 030 Decision 6.
+// wire contract. Operations secured by the session cookie use the normalized
+// message from their OpenAPI 401 descriptions; ogen reports an absent
+// credential without naming the scheme, so the operation decides (ADR 030,
+// Decision 4).
 func securityErrorDetails(err error) api.ErrorDetails {
+	unauthorized := domain.ErrAuthUnauthorized(err)
 	if secErr := new(ogenerrors.SecurityError); errors.As(err, &secErr) && sessionCookieOperations[secErr.OperationContext.Name] {
-		return api.ErrorDetails{
-			Code:    api.ErrorCode(domain.ErrAuthUnauthorized(nil).Code),
-			Message: sessionUnauthorizedMessage,
-		}
+		unauthorized = unauthorized.WithMessage(sessionUnauthorizedMessage)
 	}
-	d := domainErrorDetails(domain.ErrAuthUnauthorized(err))
-	d.Message = err.Error()
-	return d
+	return domainErrorDetails(unauthorized)
 }
 
 func isDecodeError(err error) bool {
