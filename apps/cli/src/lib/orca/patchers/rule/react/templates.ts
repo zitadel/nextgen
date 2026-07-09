@@ -13,6 +13,7 @@ import { PROXY_PATH } from "../proxy";
  */
 export function appTemplate(): string {
   return `${MANAGED_MARKER}
+import { useEffect } from "react";
 import { ZitadelLogin, ZitadelSession, configureZitadel } from "@zitadel/sdk-react";
 
 const project = configureZitadel({
@@ -23,8 +24,13 @@ const project = configureZitadel({
 export default function App() {
   const path = window.location.pathname;
 
+  useEffect(() => {
+    if (path === "/") {
+      window.location.replace("/login");
+    }
+  }, [path]);
+
   if (path === "/") {
-    window.location.replace("/login");
     return null;
   }
   if (path.startsWith("/profile")) {

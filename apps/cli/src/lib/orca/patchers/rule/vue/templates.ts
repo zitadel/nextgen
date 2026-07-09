@@ -14,6 +14,7 @@ import { PROXY_PATH } from "../proxy";
 export function appTemplate(): string {
   return `<script setup lang="ts">
 ${MANAGED_MARKER}
+import { onMounted } from "vue";
 import { ZitadelLogin, ZitadelSession, configureZitadel } from "@zitadel/sdk-vue";
 
 const project = configureZitadel({
@@ -22,9 +23,12 @@ const project = configureZitadel({
 });
 
 const path = window.location.pathname;
-if (path === "/") {
-  window.location.replace("/login");
-}
+
+onMounted(() => {
+  if (path === "/") {
+    window.location.replace("/login");
+  }
+});
 </script>
 
 <template>

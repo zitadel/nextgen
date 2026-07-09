@@ -14,7 +14,7 @@ import { PROXY_PATH } from "../proxy";
  */
 export function appTemplate(): string {
   return `${MANAGED_MARKER}
-import { component$ } from "@builder.io/qwik";
+import { component$, useVisibleTask$ } from "@builder.io/qwik";
 import { ZitadelLogin, ZitadelSession, configureZitadel } from "@zitadel/sdk-qwik";
 
 const project = configureZitadel({
@@ -25,8 +25,13 @@ const project = configureZitadel({
 export const App = component$(() => {
   const path = window.location.pathname;
 
+  useVisibleTask$(() => {
+    if (path === "/") {
+      window.location.replace("/login");
+    }
+  });
+
   if (path === "/") {
-    window.location.replace("/login");
     return null;
   }
   if (path.startsWith("/profile")) {

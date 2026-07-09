@@ -10,7 +10,7 @@ import { PROXY_PATH } from "../proxy";
  */
 export function appComponentTemplate(projectId: string): string {
   return `${MANAGED_MARKER}
-import { Component } from "@angular/core";
+import { Component, OnInit } from "@angular/core";
 import {
   ZitadelLoginComponent,
   ZitadelSessionComponent,
@@ -23,14 +23,14 @@ import {
   imports: [ZitadelLoginComponent, ZitadelSessionComponent],
   templateUrl: "./app.html",
 })
-export class App {
+export class App implements OnInit {
   protected readonly project = configureZitadel({
     projectId: ${JSON.stringify(projectId)},
     proxyPath: "${PROXY_PATH}",
   });
   protected readonly path = window.location.pathname;
 
-  constructor() {
+  ngOnInit(): void {
     if (this.path === "/") {
       window.location.replace("/login");
     }

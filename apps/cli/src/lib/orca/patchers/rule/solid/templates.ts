@@ -13,6 +13,7 @@ import { PROXY_PATH } from "../proxy";
  */
 export function appTemplate(): string {
   return `${MANAGED_MARKER}
+import { onMount } from "solid-js";
 import { ZitadelLogin, ZitadelSession, configureZitadel } from "@zitadel/sdk-solid";
 
 const project = configureZitadel({
@@ -23,8 +24,13 @@ const project = configureZitadel({
 export default function App() {
   const path = window.location.pathname;
 
+  onMount(() => {
+    if (path === "/") {
+      window.location.replace("/login");
+    }
+  });
+
   if (path === "/") {
-    window.location.replace("/login");
     return null;
   }
   if (path.startsWith("/profile")) {

@@ -15,6 +15,7 @@ import { PROXY_PATH } from "../proxy";
 export function appTemplate(): string {
   return `<script lang="ts">
 ${MANAGED_MARKER}
+import { onMount } from "svelte";
 import { ZitadelLogin, ZitadelSession, configureZitadel } from "@zitadel/sdk-svelte";
 
 const project = configureZitadel({
@@ -23,9 +24,12 @@ const project = configureZitadel({
 });
 
 const path = window.location.pathname;
-if (path === "/") {
-  window.location.replace("/login");
-}
+
+onMount(() => {
+  if (path === "/") {
+    window.location.replace("/login");
+  }
+});
 </script>
 
 {#if path.startsWith("/profile")}
