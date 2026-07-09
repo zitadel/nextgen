@@ -72,11 +72,10 @@ func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (a
 }
 
 func (h Handler) GetMySession(ctx context.Context) (api.GetMySessionRes, error) {
-	creds, ok := sessionCredentialsFromContext(ctx)
+	sessionToken, ok := sessionTokenFromContext(ctx)
 	if !ok {
 		return nil, domain.ErrSessionTokenInvalid()
 	}
-	sessionToken := creds.token
 	input := service.GetSessionInput{
 		ProjectID: sessionToken.ProjectID,
 		SessionID: gu.Value(sessionToken.SessionID),
@@ -120,11 +119,10 @@ func (h Handler) RevokeSession(ctx context.Context, params api.RevokeSessionPara
 }
 
 func (h Handler) RevokeMySession(ctx context.Context) (api.RevokeMySessionRes, error) {
-	creds, ok := sessionCredentialsFromContext(ctx)
+	sessionToken, ok := sessionTokenFromContext(ctx)
 	if !ok {
 		return nil, domain.ErrSessionTokenInvalid()
 	}
-	sessionToken := creds.token
 	input := service.DeleteSessionInput{
 		ProjectID: sessionToken.ProjectID,
 		SessionID: gu.Value(sessionToken.SessionID),

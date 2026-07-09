@@ -33,9 +33,11 @@ func (f FakeSecuritySource) UsernamePassword(ctx context.Context, operationName 
 	}, nil
 }
 
-// NextgenSession provides the __nextgen_session cookie. An empty SessionToken
-// skips the scheme so the request is sent without the cookie, exercising the
-// server's missing-credential path.
+// NextgenSession provides the __nextgen_session cookie. With an empty
+// SessionToken the scheme is skipped and the generated client fails fast with
+// "security requirement is not satisfied" instead of sending the request —
+// to exercise the server's missing-credential path, send a raw HTTP request
+// (see TestGetMyUser/missing_session_cookie).
 func (f FakeSecuritySource) NextgenSession(ctx context.Context, operationName api.OperationName) (api.NextgenSession, error) {
 	if f.SessionToken == "" {
 		return api.NextgenSession{}, ogenerrors.ErrSkipClientSecurity

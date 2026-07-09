@@ -37,10 +37,9 @@ func TestHandleNextgenSession(t *testing.T) {
 		ctx, err := handler.HandleNextgenSession(t.Context(), api.GetMySessionOperation, api.NextgenSession{APIKey: "raw-cookie"})
 		require.NoError(t, err)
 
-		creds, ok := sessionCredentialsFromContext(ctx)
+		token, ok := sessionTokenFromContext(ctx)
 		require.True(t, ok)
-		require.Equal(t, "raw-cookie", creds.raw)
-		require.Equal(t, valid, creds.token)
+		require.Equal(t, valid, token)
 	})
 
 	t.Run("invalid token is an unsatisfied requirement", func(t *testing.T) {

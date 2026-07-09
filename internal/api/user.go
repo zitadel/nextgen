@@ -65,12 +65,12 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 }
 
 func (h *Handler) GetMyUser(ctx context.Context) (api.GetMyUserRes, error) {
-	creds, ok := sessionCredentialsFromContext(ctx)
+	sessionToken, ok := sessionTokenFromContext(ctx)
 	if !ok {
 		return nil, domain.ErrSessionTokenInvalid()
 	}
 	input := service.GetMyUserInput{
-		SessionToken: creds.raw,
+		SessionToken: sessionToken,
 	}
 
 	userbs, err := h.userService.GetMyUser(ctx, input)

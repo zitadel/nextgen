@@ -48,16 +48,13 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 // HandleNextgenSession handles the nextgenSession security scheme: the
 // __nextgen_session cookie on the sessions/me and users/me operations.
 // It verifies that the cookie value decrypts to a session token and stashes
-// both the raw value and the parsed token in the context for the handlers.
+// the parsed token in the context for the handlers.
 func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName api.OperationName, t api.NextgenSession) (context.Context, error) {
 	token, err := domain.DecryptSessionTokenString(t.APIKey, s.tokenVerifier)
 	if err != nil {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
-	return context.WithValue(ctx, sessionCredentialsKey{}, sessionCredentials{
-		raw:   t.APIKey,
-		token: token,
-	}), nil
+	return context.WithValue(ctx, sessionTokenKey{}, token), nil
 }
 
 var _ api.SecurityHandler = (*SecurityHandler)(nil)
@@ -76,19 +73,13 @@ var sessionCookieOperations = map[api.OperationName]bool{
 // cookie-secured operations in api/openapi.
 const sessionUnauthorizedMessage = "Missing or invalid session token."
 
-type sessionCredentialsKey struct{}
+type sessionTokenKey struct{}
 
-// sessionCredentials carries the __nextgen_session cookie through the context:
-// raw for services that verify the token themselves, token for handlers that
-// consume the parsed claims.
-type sessionCredentials struct {
-	raw   string
-	token *domain.Token
-}
-
-func sessionCredentialsFromContext(ctx context.Context) (sessionCredentials, bool) {
-	v, ok := ctx.Value(sessionCredentialsKey{}).(sessionCredentials)
-	return v, ok
+// sessionTokenFromContext returns the session token parsed from the
+// __nextgen_session cookie by HandleNextgenSession.
+func sessionTokenFromContext(ctx context.Context) (*domain.Token, bool) {
+	v, ok := ctx.Value(sessionTokenKey{}).(*domain.Token)
+	return v, ok && v != nil
 }
 
 type contextKey struct{}

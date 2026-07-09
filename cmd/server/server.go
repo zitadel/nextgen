@@ -204,7 +204,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		userPasswordRepo,
 		schemaRepo,
 		passwordHasher,
-		opaqueTokenGenerator,
 	)
 
 	// ── Flow engine ──────────────────
