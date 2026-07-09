@@ -354,7 +354,7 @@ type Invoker interface {
 	// Query projects.
 	//
 	// POST /projects/query
-	QueryProjects(ctx context.Context, request OptQueryProjectsRequest) (QueryProjectsRes, error)
+	QueryProjects(ctx context.Context, request *QueryProjectsRequest) (QueryProjectsRes, error)
 	// RevokeMySession invokes revokeMySession operation.
 	//
 	// Revokes the session immediately (`state: revoked`). This is the logout operation.
@@ -5949,23 +5949,16 @@ func (c *Client) sendPatchProject(ctx context.Context, request *PatchProjectRequ
 // Query projects.
 //
 // POST /projects/query
-func (c *Client) QueryProjects(ctx context.Context, request OptQueryProjectsRequest) (QueryProjectsRes, error) {
+func (c *Client) QueryProjects(ctx context.Context, request *QueryProjectsRequest) (QueryProjectsRes, error) {
 	res, err := c.sendQueryProjects(ctx, request)
 	return res, err
 }
 
-func (c *Client) sendQueryProjects(ctx context.Context, request OptQueryProjectsRequest) (res QueryProjectsRes, err error) {
+func (c *Client) sendQueryProjects(ctx context.Context, request *QueryProjectsRequest) (res QueryProjectsRes, err error) {
 	// Validate request before sending.
 	if err := func() error {
-		if value, ok := request.Get(); ok {
-			if err := func() error {
-				if err := value.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
+		if err := request.Validate(); err != nil {
+			return err
 		}
 		return nil
 	}(); err != nil {

@@ -1,4 +1,4 @@
 type: string
 enum:
   - name
-  - creationDate
+  - createdAt

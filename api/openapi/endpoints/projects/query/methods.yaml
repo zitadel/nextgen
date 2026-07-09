@@ -8,6 +8,7 @@ post:
         - project.read
   requestBody:
     description: Request to query projects.
+    required: true
     content:
       application/json:
         schema:

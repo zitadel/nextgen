@@ -58,7 +58,7 @@ func (s *OpenidConfiguration) setDefaults() {
 func (s *QueryProjectsRequest) setDefaults() {
 	{
 		val := int(20)
-		s.PageSize.SetTo(Limit(val))
+		s.Limit.SetTo(Limit(val))
 	}
 }
 

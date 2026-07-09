@@ -6291,8 +6291,8 @@ func (s *FilterField) Decode(d *jx.Decoder) error {
 	switch FilterField(v) {
 	case FilterFieldName:
 		*s = FilterFieldName
-	case FilterFieldCreationDate:
-		*s = FilterFieldCreationDate
+	case FilterFieldCreatedAt:
+		*s = FilterFieldCreatedAt
 	default:
 		*s = FilterField(v)
 	}
@@ -16406,39 +16406,6 @@ func (s *OptPasskeyFactorPayloadAuthenticatorAttachment) UnmarshalJSON(data []by
 	return s.Decode(d)
 }
 
-// Encode encodes QueryProjectsRequest as json.
-func (o OptQueryProjectsRequest) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	o.Value.Encode(e)
-}
-
-// Decode decodes QueryProjectsRequest from json.
-func (o *OptQueryProjectsRequest) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptQueryProjectsRequest to nil")
-	}
-	o.Set = true
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptQueryProjectsRequest) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptQueryProjectsRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes QueryProjectsRequestSorting as json.
 func (o OptQueryProjectsRequestSorting) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -18163,9 +18130,9 @@ func (s *QueryProjectsRequest) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *QueryProjectsRequest) encodeFields(e *jx.Encoder) {
 	{
-		if s.PageSize.Set {
-			e.FieldStart("page_size")
-			s.PageSize.Encode(e)
+		if s.Limit.Set {
+			e.FieldStart("limit")
+			s.Limit.Encode(e)
 		}
 	}
 	{
@@ -18193,7 +18160,7 @@ func (s *QueryProjectsRequest) encodeFields(e *jx.Encoder) {
 }
 
 var jsonFieldsNameOfQueryProjectsRequest = [4]string{
-	0: "page_size",
+	0: "limit",
 	1: "page_token",
 	2: "sorting",
 	3: "filter",
@@ -18208,15 +18175,15 @@ func (s *QueryProjectsRequest) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "page_size":
+		case "limit":
 			if err := func() error {
-				s.PageSize.Reset()
-				if err := s.PageSize.Decode(d); err != nil {
+				s.Limit.Reset()
+				if err := s.Limit.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"page_size\"")
+				return errors.Wrap(err, "decode field \"limit\"")
 			}
 		case "page_token":
 			if err := func() error {

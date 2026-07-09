@@ -982,7 +982,7 @@ func (s FilterField) Validate() error {
 	switch s {
 	case "name":
 		return nil
-	case "creationDate":
+	case "createdAt":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
@@ -2464,7 +2464,7 @@ func (s *QueryProjectsRequest) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
-		if value, ok := s.PageSize.Get(); ok {
+		if value, ok := s.Limit.Get(); ok {
 			if err := func() error {
 				if err := value.Validate(); err != nil {
 					return err
@@ -2477,7 +2477,7 @@ func (s *QueryProjectsRequest) Validate() error {
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "page_size",
+			Name:  "limit",
 			Error: err,
 		})
 	}

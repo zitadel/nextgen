@@ -2770,15 +2770,15 @@ func (s *FieldValidationFormat) UnmarshalText(data []byte) error {
 type FilterField string
 
 const (
-	FilterFieldName         FilterField = "name"
-	FilterFieldCreationDate FilterField = "creationDate"
+	FilterFieldName      FilterField = "name"
+	FilterFieldCreatedAt FilterField = "createdAt"
 )
 
 // AllValues returns all FilterField values.
 func (FilterField) AllValues() []FilterField {
 	return []FilterField{
 		FilterFieldName,
-		FilterFieldCreationDate,
+		FilterFieldCreatedAt,
 	}
 }
 
@@ -2787,7 +2787,7 @@ func (s FilterField) MarshalText() ([]byte, error) {
 	switch s {
 	case FilterFieldName:
 		return []byte(s), nil
-	case FilterFieldCreationDate:
+	case FilterFieldCreatedAt:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -2800,8 +2800,8 @@ func (s *FilterField) UnmarshalText(data []byte) error {
 	case FilterFieldName:
 		*s = FilterFieldName
 		return nil
-	case FilterFieldCreationDate:
-		*s = FilterFieldCreationDate
+	case FilterFieldCreatedAt:
+		*s = FilterFieldCreatedAt
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -9534,52 +9534,6 @@ func (o OptPostTokenRequestGrantType) Or(d PostTokenRequestGrantType) PostTokenR
 	return d
 }
 
-// NewOptQueryProjectsRequest returns new OptQueryProjectsRequest with value set to v.
-func NewOptQueryProjectsRequest(v QueryProjectsRequest) OptQueryProjectsRequest {
-	return OptQueryProjectsRequest{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptQueryProjectsRequest is optional QueryProjectsRequest.
-type OptQueryProjectsRequest struct {
-	Value QueryProjectsRequest
-	Set   bool
-}
-
-// IsSet returns true if OptQueryProjectsRequest was set.
-func (o OptQueryProjectsRequest) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptQueryProjectsRequest) Reset() {
-	var v QueryProjectsRequest
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptQueryProjectsRequest) SetTo(v QueryProjectsRequest) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptQueryProjectsRequest) Get() (v QueryProjectsRequest, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptQueryProjectsRequest) Or(d QueryProjectsRequest) QueryProjectsRequest {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptQueryProjectsRequestSorting returns new OptQueryProjectsRequestSorting with value set to v.
 func NewOptQueryProjectsRequestSorting(v QueryProjectsRequestSorting) OptQueryProjectsRequestSorting {
 	return OptQueryProjectsRequestSorting{
@@ -10602,7 +10556,7 @@ func (*QueryProjectsForbidden) queryProjectsRes() {}
 // Request to query projects.
 // Ref: #
 type QueryProjectsRequest struct {
-	PageSize OptLimit `json:"page_size"`
+	Limit OptLimit `json:"limit"`
 	// Token to retrieve the next page of results.
 	PageToken OptNilPageToken                `json:"page_token"`
 	Sorting   OptQueryProjectsRequestSorting `json:"sorting"`
@@ -10610,9 +10564,9 @@ type QueryProjectsRequest struct {
 	Filter []QueryProjectsRequestFilterItem `json:"filter"`
 }
 
-// GetPageSize returns the value of PageSize.
-func (s *QueryProjectsRequest) GetPageSize() OptLimit {
-	return s.PageSize
+// GetLimit returns the value of Limit.
+func (s *QueryProjectsRequest) GetLimit() OptLimit {
+	return s.Limit
 }
 
 // GetPageToken returns the value of PageToken.
@@ -10630,9 +10584,9 @@ func (s *QueryProjectsRequest) GetFilter() []QueryProjectsRequestFilterItem {
 	return s.Filter
 }
 
-// SetPageSize sets the value of PageSize.
-func (s *QueryProjectsRequest) SetPageSize(val OptLimit) {
-	s.PageSize = val
+// SetLimit sets the value of Limit.
+func (s *QueryProjectsRequest) SetLimit(val OptLimit) {
+	s.Limit = val
 }
 
 // SetPageToken sets the value of PageToken.

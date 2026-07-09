@@ -7386,7 +7386,7 @@ func (s *Server) handleQueryProjectsRequest(args [0]string, argsEscaped bool, w 
 		}
 
 		type (
-			Request  = OptQueryProjectsRequest
+			Request  = *QueryProjectsRequest
 			Params   = struct{}
 			Response = QueryProjectsRes
 		)

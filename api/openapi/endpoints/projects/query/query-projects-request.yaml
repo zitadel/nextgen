@@ -1,7 +1,7 @@
 type: object
 description: Request to query projects.
 properties:
-  page_size:
+  limit:
     $ref: ../../../components/schemas/limit.yaml
   page_token:
     description: Token to retrieve the next page of results.

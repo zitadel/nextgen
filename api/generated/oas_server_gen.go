@@ -334,7 +334,7 @@ type Handler interface {
 	// Query projects.
 	//
 	// POST /projects/query
-	QueryProjects(ctx context.Context, req OptQueryProjectsRequest) (QueryProjectsRes, error)
+	QueryProjects(ctx context.Context, req *QueryProjectsRequest) (QueryProjectsRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
 	// Revokes the session immediately (`state: revoked`). This is the logout operation.
