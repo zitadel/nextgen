@@ -6,7 +6,7 @@
 
 ## Introduction
 
-nextgen's own API needs to answer questions like: can this token read this
+Zitadel's own API needs to answer questions like: can this token read this
 specific project? Can it list only the teams a caller actually has access
 to, in one SQL query, instead of fetching everything and filtering in
 application code? Can an automated agent acting on a user's behalf take one
@@ -53,7 +53,7 @@ Terms specific to internal/system-catalog authorization, in addition to
 
 Legacy Zitadel used runtime-configured internal roles at fixed levels such
 as instance, organization, project, and project grant. That matched the
-legacy API split, where different APIs owned different levels. The nextgen
+legacy API split, where different APIs owned different levels. The Zitadel
 API is resource-oriented: a request can carry only a token and a resource
 id, and the server must resolve the resource scope before deciding access.
 Listing endpoints must filter in SQL, not fetch rows and check each one in
@@ -248,7 +248,7 @@ scoped SQL query against data we already own.
    Use resource-oriented naming consistent with the ADR-042 pattern — e.g.
    `project.create`, `project.read`, `project.write`, `project.delete`,
    `project.app.read`, `project.app.write`, `project.app.delete` — and
-   extend to all nextgen resource types.
+   extend to all Zitadel resource types.
 2. Design relational migrations for `resource_scope_index` and agent
    delegation tables.
 3. Update OpenAPI security declarations to use the final permission names.
