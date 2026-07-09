@@ -364,6 +364,25 @@ describe("schema-dependent rules", () => {
     );
   });
 
+  it("rejects passkey / passkey_register actions when passkey is not enabled", () => {
+    const disabled = structuredClone(schema);
+    (disabled["x-auth-methods"] as Record<string, { enabled: boolean }>).passkey.enabled = false;
+    const msgs = messages(validateFlowDefinition(flow(), disabled));
+    expect(msgs).toContain(
+      'step "identifier": action "passkey" has kind "passkey" but "passkey" is not an enabled authentication method',
+    );
+    expect(msgs).toContain(
+      'step "register": action "passkey_register" has kind "passkey_register" but "passkey" is not an enabled authentication method',
+    );
+  });
+
+  it("accepts passkey actions when passkey is enabled (default schema)", () => {
+    const msgs = messages(validateFlowDefinition(flow(), schema));
+    expect(msgs).not.toContain(
+      'step "identifier": action "passkey" has kind "passkey" but "passkey" is not an enabled authentication method',
+    );
+  });
+
   it("rejects on_success create_user without an upstream identifier", () => {
     // Minimal register-only flow: the create_user step collects a password
     // but no step on its path collects an identifier-challenge field.

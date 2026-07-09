@@ -53,6 +53,7 @@ export const FLOW_VALIDATION_RULES = {
   "flip-table": { goRef: "validateFlipTableCoverage" },
   "schema/required-fields": { goRef: "validateRequiredUserSchemaFields" },
   "schema/fields-resolve": { goRef: "resolveAllStepFields" },
+  "schema/passkey-auth-method": { goRef: "validatePasskeyActionsEnabled" },
   "schema/on-success-manifest": { goRef: "validateOnSuccessManifests" },
   "warn/password-without-identifier": { goRef: null },
 } as const;
@@ -86,6 +87,9 @@ const BACK_ACTION_NAME = "back";
 
 /** Mirrors `authMethodPrefix` in flow_definition.go. */
 const AUTH_METHOD_PREFIX = "x-auth-methods#";
+
+/** Mirrors `authMethodPasskey` in flow_definition.go. */
+const AUTH_METHOD_PASSKEY = "passkey";
 
 /** Mirrors `ManifestForOnSuccess` in flow_on_success.go. */
 const ON_SUCCESS_MANIFESTS: Readonly<Record<string, readonly FieldChallenge[]>> = {
@@ -639,6 +643,24 @@ function validateAgainstSchema(def: FlowDef, schema: object): FlowValidationIssu
   }
   if (resolutionFailed) {
     return issues;
+  }
+
+  // Passkey action gate (validatePasskeyActionsEnabled): a passkey or
+  // passkey_register action requires the passkey auth method to be
+  // enabled on the user schema.
+  for (const step of def.steps) {
+    for (const action of step.actions) {
+      if (action.kind !== "passkey" && action.kind !== "passkey_register") continue;
+      if (!authMethodEnabled(raw, AUTH_METHOD_PASSKEY)) {
+        issues.push(
+          error(
+            "schema/passkey-auth-method",
+            `step ${q(step.name)}: action ${q(action.name)} has kind ${q(action.kind)} but ${q(AUTH_METHOD_PASSKEY)} is not an enabled authentication method`,
+            step.name,
+          ),
+        );
+      }
+    }
   }
 
   // on_success manifests (validateOnSuccessManifests): every kind the

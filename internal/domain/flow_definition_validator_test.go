@@ -81,6 +81,20 @@ var userSchemaIDAndPassword = []byte(`{
   }
 }`)
 
+var userSchemaPasskeyEnabled = []byte(`{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant.com/schemas/passkey-user.json",
+  "type": "object",
+  "required": ["email"],
+  "x-auth-methods": {
+    "password": { "enabled": true, "position": 0 },
+    "passkey":  { "enabled": true, "position": 1 }
+  },
+  "properties": {
+    "email": { "type": "string", "format": "email", "x-unique": "team" }
+  }
+}`)
+
 var userSchemaRequiredProps = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tenant.com/schemas/idpw-user.json",
@@ -1563,4 +1577,75 @@ func TestValidator_MissingRequiredUserSchemaFields(t *testing.T) {
 	_, err := domain.ValidateFlowDefinition(schema, def)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, domain.ErrFlowDefinitionInvalid(`required fields [first_name last_name] in user schema are missing in the flow definition steps`, nil))
+}
+
+// passkeyActionFlow builds a minimal login flow whose entry step offers a
+// single passkey-family action (kind) alongside the wiring the validator
+// requires (matching transition, terminal target).
+func passkeyActionFlow(actionName string, kind domain.FlowActionKind) domain.FlowDefinition {
+	return domain.FlowDefinition{
+		ProjectID: "p", Name: "f", SchemaVersion: "1",
+		UserSchema: "https://tenant.com/schemas/passkey-user.json",
+		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identifier"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "identifier", Fields: []domain.Field{"email"},
+				Actions:     []domain.FlowStepAction{{Name: actionName, Kind: kind, Primary: true}},
+				Transitions: map[string]domain.FlowStepTransition{actionName: {Target: "done"}},
+			},
+			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteRedirect)},
+		},
+	}
+}
+
+// TestValidator_PasskeyActionsRequireEnabledMethod rejects a flow that
+// declares a passkey or passkey_register action while the user schema
+// does not enable the passkey authentication method under
+// x-auth-methods. Catching it at definition time keeps a WebAuthn
+// ceremony from being offered against a schema that never opted in.
+func TestValidator_PasskeyActionsRequireEnabledMethod(t *testing.T) {
+	tests := []struct {
+		name       string
+		actionName string
+		kind       domain.FlowActionKind
+	}{
+		{"passkey", "passkey", domain.FlowActionKindPasskey},
+		{"passkey_register", "enroll", domain.FlowActionKindPasskeyRegister},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// password-only schema: passkey is not enabled.
+			schema := mustSchema(t, userSchemaIDAndPassword)
+			def := passkeyActionFlow(tt.actionName, tt.kind)
+			def.UserSchema = "https://tenant.com/schemas/idpw-user.json"
+
+			_, err := domain.ValidateFlowDefinition(schema, def)
+			require.Error(t, err)
+			assert.Contains(t, errorDetails(t, err), fmt.Sprintf(
+				`action %q has kind %q but "passkey" is not an enabled authentication method`, tt.actionName, tt.name))
+		})
+	}
+}
+
+// TestValidator_PasskeyActionsAcceptEnabledMethod is the positive
+// counterpart: the same actions validate cleanly once the user schema
+// enables passkey under x-auth-methods.
+func TestValidator_PasskeyActionsAcceptEnabledMethod(t *testing.T) {
+	tests := []struct {
+		name       string
+		actionName string
+		kind       domain.FlowActionKind
+	}{
+		{"passkey", "passkey", domain.FlowActionKindPasskey},
+		{"passkey_register", "enroll", domain.FlowActionKindPasskeyRegister},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			schema := mustSchema(t, userSchemaPasskeyEnabled)
+			def := passkeyActionFlow(tt.actionName, tt.kind)
+
+			_, err := domain.ValidateFlowDefinition(schema, def)
+			require.NoError(t, err)
+		})
+	}
 }

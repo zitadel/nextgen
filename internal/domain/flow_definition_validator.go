@@ -42,6 +42,12 @@ func ValidateFlowDefinition(userSchema *jsonschema.Schema, flowDefinition FlowDe
 		return nil, err
 	}
 
+	// 3b. passkey / passkey_register actions require the passkey
+	// authentication method to be enabled on the user schema.
+	if err := validatePasskeyActionsEnabled(userSchema, flowDefinition.Steps); err != nil {
+		return nil, err
+	}
+
 	// 4. validate the graph structure: every step reachable from an initial step, no unreachable steps
 	pivotingTargets, err := validateGraph(flowDefinition)
 	if err != nil {
@@ -136,6 +142,32 @@ func resolveAllStepFields(schema *jsonschema.Schema, steps []FlowDefinitionStep)
 		out[step.Name] = resolved
 	}
 	return out, nil
+}
+
+// validatePasskeyActionsEnabled rejects a flow that declares a passkey
+// or passkey_register action while the user schema does not enable the
+// passkey authentication method under `x-auth-methods`. A passkey action
+// drives a WebAuthn ceremony that only makes sense once the tenant has
+// opted the method in, so the mismatch is caught at definition time
+// rather than surfacing as a runtime failure.
+func validatePasskeyActionsEnabled(schema *jsonschema.Schema, steps []FlowDefinitionStep) error {
+	authMethods, err := newSchemaReader(schema).AuthMethods()
+	if err != nil {
+		return ErrFlowDefinitionInvalid(fmt.Sprintf("read x-auth-methods: %v", err), nil)
+	}
+	for _, step := range steps {
+		for _, a := range step.Actions {
+			if a.Kind != FlowActionKindPasskey && a.Kind != FlowActionKindPasskeyRegister {
+				continue
+			}
+			if !authMethods.IsEnabled(authMethodPasskey) {
+				return ErrFlowDefinitionInvalid(fmt.Sprintf(
+					"step %q: action %q has kind %q but %q is not an enabled authentication method",
+					step.Name, a.Name, a.Kind, authMethodPasskey), nil)
+			}
+		}
+	}
+	return nil
 }
 
 // validateRequiredUserSchemaFields checks that all required fields in the

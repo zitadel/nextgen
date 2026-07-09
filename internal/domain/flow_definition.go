@@ -191,6 +191,11 @@ type FlowDefinitionAudience struct {
 // "x-auth-methods#password") rather than to a top-level user property.
 const authMethodPrefix = "x-auth-methods#"
 
+// authMethodPasskey is the `x-auth-methods` key the passkey and
+// passkey_register action kinds require to be enabled on the user
+// schema.
+const authMethodPasskey = "passkey"
+
 // Field carries the raw field name from a flow-definition step.
 type Field string
 
