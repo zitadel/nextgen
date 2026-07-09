@@ -127,6 +127,7 @@ Options:
   --concurrency <n>        Number of framework journeys to run in parallel (default: 5)
   --runtime <binary|docker> Local runtime backend (default: binary)
   --image <docker-tag>     Use an existing local runtime image instead of building one
+  --preset <id>            Pass a sign-in preset to setup (e.g. passkey-first)
   --tarballs-dir <path>    Use prebuilt release npm tarballs
   --keep                   Keep the temp work directory after success
   --work-dir <path>        Use an explicit work directory
@@ -208,6 +209,7 @@ async function runFrameworkJourney(context) {
         JOURNEY_RUNTIME: options.runtime,
         JOURNEY_WORK_DIR: context.frameworkWorkDir,
         NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
+        ...(options.preset ? { JOURNEY_PRESET: options.preset } : {}),
         ...(localRuntimeImage ? { ZITADEL_LOCAL_IMAGE: localRuntimeImage } : {}),
       },
     });
@@ -248,6 +250,7 @@ async function runFrameworkJourney(context) {
           JOURNEY_OUTPUT_DIR: context.frameworkWorkDir,
           JOURNEY_PLAYWRIGHT_OUTPUT_DIR: context.playwrightOutputDir,
           JOURNEY_PLAYWRIGHT_REPORT_DIR: context.playwrightReportDir,
+          ...(options.preset ? { JOURNEY_PRESET: options.preset } : {}),
         },
       },
     );

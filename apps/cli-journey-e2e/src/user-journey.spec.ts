@@ -5,31 +5,77 @@ test.describe.configure({ mode: "serial" });
 test.setTimeout(60_000);
 
 const framework = process.env.JOURNEY_FRAMEWORK ?? "next";
+// The scaffolded sign-in preset decides which journeys apply: the default
+// password-first scaffold enters on the identifier step; passkey-first
+// enters on a fields-less passkey step with an email fallback.
+const preset = process.env.JOURNEY_PRESET ?? "password-first";
 const expectsProtectedRouteRedirect = framework === "next" || framework === "nuxt";
 const loginUrl = /\/login(?:[/?#]|$)/;
 const profileUrl = /\/profile(?:[/?#]|$)/;
 
-test(`password-only registration, logout, and password login work in a fresh ${framework} app`, async ({
-  page,
-}) => {
-  const email = uniqueEmail("password");
-  const password = "Correct-Horse-42!";
+if (preset === "password-first") {
+  test(`password-only registration, logout, and password login work in a fresh ${framework} app`, async ({
+    page,
+  }) => {
+    const email = uniqueEmail("password");
+    const password = "Correct-Horse-42!";
 
-  if (expectsProtectedRouteRedirect) {
-    await expectProtectedRouteToRedirect(page);
-  }
-  await gotoLogin(page);
-  await registerWithPassword(page, email, password);
-  await expectSignedIn(page);
-  await expectSessionCookie(page);
+    if (expectsProtectedRouteRedirect) {
+      await expectProtectedRouteToRedirect(page);
+    }
+    await gotoLogin(page);
+    await registerWithPassword(page, email, password);
+    await expectSignedIn(page);
+    await expectSessionCookie(page);
 
-  await logout(page);
-  await loginWithPassword(page, email, password);
-  await expectSignedIn(page);
-  await expectSessionCookie(page);
-});
+    await logout(page);
+    await loginWithPassword(page, email, password);
+    await expectSignedIn(page);
+    await expectSessionCookie(page);
+  });
+}
 
-if (process.env.JOURNEY_ENABLE_PASSKEY !== "0") {
+if (preset === "passkey-first") {
+  test(`passkey-first preset: fallback registration, then one-tap passkey login in a fresh ${framework} app`, async ({
+    page,
+  }) => {
+    const authenticator = await enableVirtualAuthenticator(page);
+    const email = uniqueEmail("passkey-first");
+
+    await gotoLogin(page);
+    // Entry step renders the primary passkey action exactly once (a stale
+    // server-owned template used to render a second passkey button — the
+    // regression #495 fixed) plus the email fallback.
+    const passkeyButtons = page.getByRole("button", { name: /passkey/i });
+    await expect(passkeyButtons.first()).toBeVisible({ timeout: 30_000 });
+    await expect(passkeyButtons).toHaveCount(1);
+
+    // Fresh user, no credential yet: take the email fallback into
+    // registration and create the account with a passkey.
+    await clickAction(page, /use email instead|email_fallback/i, ["email_fallback"]);
+    await registerWithPasskey(page, email);
+    await expectSignedIn(page);
+    await expectSessionCookie(page);
+    await expectVirtualCredentialCount(authenticator, 1);
+
+    await logout(page);
+
+    // Returning user: one tap on the entry step's primary action — the
+    // discoverable credential signs in without typing an email. Wait for
+    // the re-rendered entry step first: clickAction probes visibility
+    // without waiting, and right after the logout redirect the login
+    // component is still hydrating.
+    await gotoLogin(page);
+    await expect(passkeyButtons.first()).toBeVisible({ timeout: 30_000 });
+    await expect(passkeyButtons).toHaveCount(1);
+    await clickAction(page, /continue with passkey|passkey/i, ["passkey"]);
+    await expectSignedIn(page);
+    await expectSessionCookie(page);
+    await expectVirtualCredentialCount(authenticator, 1);
+  });
+}
+
+if (preset === "password-first" && process.env.JOURNEY_ENABLE_PASSKEY !== "0") {
   test(`passkey-only registration, logout, and passkey login work in a fresh ${framework} app`, async ({
     page,
   }) => {
