@@ -40,6 +40,17 @@ function projectProp(
   return { project, projectId, proxyPath };
 }
 
+/**
+ * Login-only copy overrides, spread for the same reason as {@link projectProp}:
+ * `locales`/`lang` are property-only members the custom-element JSX types omit.
+ */
+function localeProps(
+  locales: Record<string, Record<string, string>> | undefined,
+  lang: string | undefined,
+): Record<string, unknown> {
+  return { locales, lang };
+}
+
 function eventDetail<T>(event: Event): T {
   return (event as CustomEvent<T>).detail;
 }
@@ -116,6 +127,7 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
         }
       }}
       {...projectProp(props.project, props.projectId, props.proxyPath)}
+      {...localeProps(props.locales, props.lang)}
       purpose={props.purpose ?? "login"}
       post-sign-in-url={props.postSignInUrl}
     />

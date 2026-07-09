@@ -507,7 +507,12 @@ function describeWrittenFile(relPath: string, dryRun: boolean): string | null {
   // Mkdir ops surface in `filesWritten` alongside actual file writes.
   // They're noise at the per-step layer (the files inside them get
   // narrated on their own lines), so swallow them here.
-  if (relPath === ".zitadel" || relPath === ".zitadel/flows" || relPath === ".zitadel/schemas") {
+  if (
+    relPath === ".zitadel" ||
+    relPath === ".zitadel/flows" ||
+    relPath === ".zitadel/schemas" ||
+    relPath === ".zitadel/meta"
+  ) {
     return null;
   }
   const verb = dryRun ? "Would write" : "Wrote";
@@ -537,6 +542,11 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
     subject: "the editable default human user schema",
   },
   ".zitadel/schemas/README.md": { subject: "the schemas folder README" },
+  ".zitadel/meta/flow-definition.json": { subject: "the flow dialect spec (editor $schema)" },
+  ".zitadel/meta/user-schema.json": { subject: "the user-schema dialect spec" },
+  ".zitadel/meta/user-property.json": { subject: "the user-property dialect spec" },
+  "AGENTS.md": { subject: "the agent guidance (golden journey + config dialect)" },
+  "README.md": { subject: "the README's Zitadel section" },
   "app/page.tsx": { subject: "the home page redirect" },
   "app/login/page.tsx": { subject: "the login page" },
   "app/register/page.tsx": { subject: "the registration page" },

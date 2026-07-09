@@ -54,7 +54,7 @@ Start the generated app:
 npm run dev
 ```
 
-Then open the dev server URL, usually `http://localhost:3000/login`, and complete the browser proof:
+Then open the dev server URL, usually `http://localhost:3000/login` — **use exactly the origin setup registered** (`localhost`, not `127.0.0.1`): the origin allowlist and passkeys are bound to it, and a passkey registered under one hostname can never assert under another. Complete the browser proof:
 
 ```text
 register a user -> log out -> log in with the same user -> profile shows signed in

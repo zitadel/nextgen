@@ -44,6 +44,11 @@ export default defineComponent({
       default: "login",
     },
     postSignInUrl: { type: String, default: undefined },
+    locales: {
+      type: Object as PropType<Record<string, Record<string, string>>>,
+      default: undefined,
+    },
+    lang: { type: String, default: undefined },
   },
   emits: ["flowStep", "flowInput", "flowComplete", "flowError"],
   setup(props, { emit, expose }) {
@@ -63,6 +68,10 @@ export default defineComponent({
         proxyPath: props.proxyPath,
         purpose: props.purpose,
         "post-sign-in-url": props.postSignInUrl,
+        // Same raw-unwrap rationale as `project`: hand the widget the plain
+        // dictionaries, not Vue's reactive proxy.
+        locales: props.locales === undefined ? undefined : toRaw(props.locales),
+        lang: props.lang,
         onZitadelFlowStep: (event: CustomEvent<ZitadelFlowStepDetail>) => {
           emit("flowStep", event.detail);
         },
