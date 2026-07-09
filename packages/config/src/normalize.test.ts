@@ -43,6 +43,12 @@ describe("normalizeFlowBody", () => {
     ).toEqual({ name: "login" });
   });
 
+  it("strips the local-only $schema editor pointer", () => {
+    expect(
+      normalizeFlowBody({ $schema: "../meta/flow-definition.json", name: "login" }),
+    ).toEqual({ name: "login" });
+  });
+
   it("does not mutate its input and is idempotent", () => {
     const body = { name: "login", audience: {} };
     const once = normalizeFlowBody(body);

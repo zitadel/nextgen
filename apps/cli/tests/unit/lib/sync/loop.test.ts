@@ -601,6 +601,37 @@ describe("normalized hashing and write-back", () => {
     }
   });
 
+  it("write-back carries the local $schema pointer over a rewrite", async () => {
+    const cwd = makeCwd();
+    try {
+      await mkdir(join(cwd, ".zitadel/flows"), { recursive: true });
+      await writeFile(
+        join(cwd, ".zitadel/flows/default.json"),
+        JSON.stringify({ $schema: "../meta/flow-definition.json", name: "login", version: 1 }),
+      );
+      // A real server-side difference forces a rewrite; the editor pointer
+      // is local-only (the canonical body never carries it) and must survive.
+      const canonical = { name: "login", version: 2 };
+
+      const { changed } = await writeBackResource(
+        cwd,
+        ".zitadel/flows/default.json",
+        { normalize: normalizeFlowBody, normalizeWrite: normalizeFlowBody },
+        canonical,
+      );
+
+      expect(changed).toBe(true);
+      const { readFile } = await import("node:fs/promises");
+      const onDisk = JSON.parse(
+        await readFile(join(cwd, ".zitadel/flows/default.json"), "utf8"),
+      ) as Record<string, unknown>;
+      expect(onDisk.$schema).toBe("../meta/flow-definition.json");
+      expect(onDisk.version).toBe(2);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("leaves the file untouched when the canonical body matches in normalized form", async () => {
     const cwd = makeCwd();
     try {

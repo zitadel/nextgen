@@ -36,6 +36,9 @@ async function exists(path: string): Promise<boolean> {
 describe("patch then eject round-trip", () => {
   it("patches a Next project, then ejects the managed files it created", async () => {
     const cwd = await createNextProject();
+    // A pre-existing README proves eject strips only the managed guidance
+    // section; AGENTS.md (created wholesale by setup) must vanish entirely.
+    await writeFile(join(cwd, "README.md"), "# demo-next-app\n\nDeploy notes.\n");
 
     const setup = await cli([
       "setup",
@@ -53,6 +56,10 @@ describe("patch then eject round-trip", () => {
     expect(await readFile(join(cwd, "zitadel.json"), "utf8")).toContain('"project"');
     expect(await readFile(join(cwd, "app/login/page.tsx"), "utf8")).toContain(MANAGED_MARKER);
     expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toContain(MANAGED_MARKER);
+    expect(await readFile(join(cwd, "AGENTS.md"), "utf8")).toContain("zitadel:guidance:begin");
+    expect(await readFile(join(cwd, "README.md"), "utf8")).toContain(
+      "## Authentication (Zitadel)",
+    );
 
     // Simulate the user replacing the register page with their own (unmarked) file.
     await writeFile(
@@ -81,6 +88,16 @@ describe("patch then eject round-trip", () => {
     expect(await exists(join(cwd, "middleware.ts"))).toBe(false);
     expect(await exists(join(cwd, "app/register/page.tsx"))).toBe(true);
     expect(await exists(join(cwd, ".env.local"))).toBe(false);
+
+    // Guidance follows the integration out: the scaffold-created AGENTS.md is
+    // gone, and the user's README keeps everything but the managed section.
+    expect(ejectJson.data.files_removed).toContain("AGENTS.md");
+    expect(ejectJson.data.files_removed).toContain("README.md (managed section)");
+    expect(await exists(join(cwd, "AGENTS.md"))).toBe(false);
+    const readmeAfter = await readFile(join(cwd, "README.md"), "utf8");
+    expect(readmeAfter).toContain("Deploy notes.");
+    expect(readmeAfter).not.toContain("zitadel:guidance");
+    expect(readmeAfter).not.toContain("## Authentication (Zitadel)");
   });
 });
 

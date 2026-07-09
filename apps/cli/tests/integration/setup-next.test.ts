@@ -67,6 +67,19 @@ describe("Next setup integration", () => {
     expect(setupJson.data.next_actions.join("\n")).toContain("Preview and publish config changes");
     expect(setupJson.data.files_written).toContain(".zitadel/schemas/default-human-user.json");
     expect(setupJson.data.files_written).toContain(".zitadel/flows/default-login.json");
+
+    // Scaffolded guidance: AGENTS.md for agents, a README section for
+    // humans, and the dialect meta-schemas the flow files' $schema points at.
+    const agentsMd = await readFile(join(cwd, "AGENTS.md"), "utf8");
+    expect(agentsMd).toContain("## Authentication (Zitadel)");
+    expect(agentsMd).toContain("not 127.0.0.1");
+    expect(agentsMd).toContain('"$schema": "../meta/flow-definition.json"');
+    const readme = await readFile(join(cwd, "README.md"), "utf8");
+    expect(readme).toContain("## Authentication (Zitadel)");
+    const metaSchema = JSON.parse(
+      await readFile(join(cwd, ".zitadel/meta/flow-definition.json"), "utf8"),
+    ) as Record<string, unknown>;
+    expect(metaSchema.title).toBe("FlowDefinition");
     const installLog = JSON.parse((await readFile(fakeNpm.logPath, "utf8")).trim()) as {
       cwd: string;
       args: string[];
@@ -106,6 +119,9 @@ describe("Next setup integration", () => {
     expect(flow.name).toBe("default-login");
     expect(flow.status).toBe("active");
     expect(flow.user_schema).toBe(schemaId);
+    // The editor pointer survives the upload/write-back round-trip: the
+    // server ignores it and sync treats it as noise, so it stays on disk.
+    expect((flow as { $schema?: string }).$schema).toBe("../meta/flow-definition.json");
     expect(flow.purposes).toMatchObject({ login: "identifier", register: "register" });
     expect(snapshotPlatformStore()).toMatchObject({
       projects: 1,
@@ -136,11 +152,12 @@ describe("Next setup integration", () => {
     expect(loginPage).toContain("project={project}");
     expect(loginPage).not.toContain("NEXT_PUBLIC_ZITADEL_API_BASE");
     expect(loginPage).toContain('post-sign-in-url="/profile"');
-    expect(loginPage).toContain('href="/register"');
+    expect(loginPage).not.toContain('href="/register"');
+    expect(loginPage).not.toContain("next/link");
     expect(loginPage).not.toContain('href="/profile"');
     const registerPage = await readFile(join(cwd, "app/register/page.tsx"), "utf8");
     expect(registerPage).toContain('purpose="register"');
-    expect(registerPage).toContain('href="/login"');
+    expect(registerPage).not.toContain('href="/login"');
     expect(registerPage).not.toContain('href="/profile"');
     const profilePage = await readFile(join(cwd, "app/profile/page.tsx"), "utf8");
     expect(profilePage).toContain("zitadel-cli: managed-file v1");

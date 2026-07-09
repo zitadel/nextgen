@@ -22,7 +22,9 @@ type PivotingTarget struct {
 // ValidateFlowDefinition is ported (rules and message strings) to
 // packages/config/src/validate.ts for CLI plan-time validation — keep
 // rule changes in sync; a drift-audit test over this file guards the
-// function names and shared literals.
+// function names and shared literals. The sync burden is interim: the
+// validate-only bundle endpoint (zitadel/nextgen#449) supersedes the
+// port, and the TS side is deleted when it lands.
 func ValidateFlowDefinition(userSchema *jsonschema.Schema, flowDefinition FlowDefinition) ([]PivotingTarget, error) {
 	// 1. validate purpose and initial steps
 	if err := validateDefinition(flowDefinition); err != nil {

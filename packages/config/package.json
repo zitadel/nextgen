@@ -17,6 +17,7 @@
     "defaults/*.json",
     "defaults/*.md",
     "defaults/presets/*/*.json",
+    "meta-schemas/*.json",
     "LICENSE"
   ],
   "type": "module",
@@ -46,6 +47,11 @@
       "types": "./dist/validate.d.mts",
       "import": "./dist/validate.mjs"
     },
+    "./meta-schemas": {
+      "@zitadel/source": "./src/meta-schemas.ts",
+      "types": "./dist/meta-schemas.d.mts",
+      "import": "./dist/meta-schemas.mjs"
+    },
     "./defaults/default-human-user.json": "./defaults/default-human-user.json",
     "./defaults/default-login.json": "./defaults/default-login.json",
     "./package.json": "./package.json"
@@ -65,6 +71,7 @@
   "devDependencies": {
     "tsdown": "catalog:",
     "tslib": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "ajv": "catalog:"
   }
 }

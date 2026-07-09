@@ -19,6 +19,13 @@
  * Scope cuts (server/service-side, not portable): pivot/switch targets
  * must name an active flow definition in the same project (needs the
  * DB); the user schema itself is assumed meta-schema-valid.
+ *
+ * Lifecycle: this port is a local-first interim, not a second source of
+ * truth to grow. Its designed successor is the server-side validate-only
+ * bundle endpoint (zitadel/nextgen#449); once plan can ask the server,
+ * this file, its drift audit, and the keep-in-sync comment on the Go
+ * validator all go away. New rules land in Go first and are ported here
+ * only until then.
  */
 
 export type FlowValidationSeverity = "error" | "warning";
@@ -680,25 +687,32 @@ function validateAgainstSchema(def: FlowDef, schema: object): FlowValidationIssu
 
   // CLI-only guidance (no Go counterpart): a password collected on the
   // login path with no identifier upstream leaves the engine unable to
-  // resolve which user to challenge.
+  // resolve which user to challenge. Path-sensitive: walk forward from
+  // the login entry and stop at any step that collects an identifier
+  // (every route through it is covered), so an identifier on a
+  // *different* route — e.g. only on the register-purpose chain into a
+  // shared step — cannot mask a login route that never collects one.
   const loginEntry = def.purposes.get("login");
   if (loginEntry !== undefined) {
-    const loginReachable = new Set<string>();
-    bfs(loginEntry, localAdjacency(def), loginReachable);
+    const adj = localAdjacency(def);
+    const identifierFree = new Set<string>();
+    const queue = [loginEntry];
+    for (let head = 0; head < queue.length; head += 1) {
+      const name = queue[head];
+      if (name === undefined || identifierFree.has(name)) continue;
+      if (challengesByStep.get(name)?.has("identifier")) continue;
+      identifierFree.add(name);
+      queue.push(...(adj.get(name) ?? []));
+    }
     for (const step of def.steps) {
-      if (!loginReachable.has(step.name)) continue;
+      if (!identifierFree.has(step.name)) continue;
       if (!challengesByStep.get(step.name)?.has("password")) continue;
-      const upstream = new Set<string>();
-      bfs(step.name, reverse, upstream);
-      const identified = [...upstream].some((name) => challengesByStep.get(name)?.has("identifier"));
-      if (!identified) {
-        issues.push({
-          severity: "warning",
-          rule: "warn/password-without-identifier",
-          message: `step ${q(step.name)} collects ${AUTH_METHOD_PREFIX}password on the login path but no upstream step collects an identifier field — the engine cannot resolve which user to challenge`,
-          step: step.name,
-        });
-      }
+      issues.push({
+        severity: "warning",
+        rule: "warn/password-without-identifier",
+        message: `step ${q(step.name)} collects ${AUTH_METHOD_PREFIX}password on the login path but no upstream step collects an identifier field — the engine cannot resolve which user to challenge`,
+        step: step.name,
+      });
     }
   }
 
