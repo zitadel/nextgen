@@ -1,5 +1,5 @@
 import { rm } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 import { intro, outro } from "@clack/prompts";
 import { Flags } from "@oclif/core";
@@ -204,6 +204,7 @@ export default class Setup extends BaseCommand {
     // flow files through the typed resource APIs and records the returned IDs.
     consola.start(`Creating project on ${answers.server}${dryRun ? " (dry run)" : ""}`);
     const unauthClient = createZitadelClient({ baseUrl: answers.server });
+    const projectName = defaultProjectName(cwd, framework.id);
     // Register the app's own origin so the backend's origin check allows
     // requests the dev proxy forwards from it.
     const project = dryRun
@@ -212,6 +213,7 @@ export default class Setup extends BaseCommand {
           unauthClient,
           answers.server,
           this.meta.cliVersion,
+          projectName,
           issuer,
           framework.id,
         );
@@ -398,13 +400,21 @@ async function createProjectWithLocalHint(
   client: ReturnType<typeof createZitadelClient>,
   server: string,
   cliVersion: string,
+  projectName: string,
   issuer: string,
   framework: string,
 ): Promise<CreateProject201> {
   try {
+    // API contract requires a project name; generated TS models may lag
+    // briefly until `packages/api` regeneration catches up.
+    const payload = { name: projectName, previewOrigins: [issuer], seedDefaults: false } as {
+      name: string;
+      previewOrigins: string[];
+      seedDefaults: false;
+    };
     // Register the app's own origin so the backend's origin check allows the
     // requests the dev proxy forwards from it.
-    return await client.createProject({ previewOrigins: [issuer], seedDefaults: false });
+    return await client.createProject(payload as Parameters<typeof client.createProject>[0]);
   } catch (error) {
     const normalized = toZitadelError(error);
     throw new ZitadelError(normalized.code, normalized.message, {
@@ -422,6 +432,11 @@ async function createProjectWithLocalHint(
       },
     });
   }
+}
+
+function defaultProjectName(cwd: string, framework: string): string {
+  const fromDirectory = basename(cwd).trim();
+  return fromDirectory.length > 0 ? fromDirectory : `zitadel-${framework}-app`;
 }
 
 function localSetupHint(error: unknown, framework: string | undefined, cliVersion: string): unknown {
