@@ -44,14 +44,16 @@ A release is a snapshot of the project's configuration at one point in time. It 
 
 For example, release `rel_2026-07-08_14:22` might contain:
 
-| Kind      | Name           | Revision                   |
-|---        |---             |---                         |
-| schema    | human-user     | `sch_01KWHF18816ZQE…`      |
-| flow      | default-login  | `flowdef_01KWHG09JXA…`     |
-| idp       | google         | `idp_01KWH3B72K7M…`        |
-| branding  | default        | `brand_01KWH1P4MYS…`       |
-| app       | web            | `app_01KWJC2B78ZQ…`        |
-| policy    | password       | `pol_01KWHF3XY6RN…`        |
+| Kind      | Handle                       | Revision                   |
+|---        |---                           |---                         |
+| schema    | `objectType` = `human-user`  | `sch_01KWHF18816ZQE…`      |
+| flow      | `name` = `default-login`     | `flowdef_01KWHG09JXA…`     |
+| idp       | `name` = `google`            | `idp_01KWH3B72K7M…`        |
+| branding  | `name` = `default`           | `brand_01KWH1P4MYS…`       |
+| app       | `name` = `web`               | `app_01KWJC2B78ZQ…`        |
+| policy    | `name` = `password`          | `pol_01KWHF3XY6RN…`        |
+
+The "handle" is the field each resource kind uses as its stable identifier across revisions — the customer-chosen `objectType` for schemas, `name` for the others. Renaming a handle is a breaking change; the platform correlates a resource's revision history by it.
 
 The release also validates cross-resource references: the flow's `user_schema` points at the schema revision in the same release, and both were checked to be structurally compatible when the release was constructed.
 
