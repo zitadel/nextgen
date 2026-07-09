@@ -1726,12 +1726,19 @@ func (*CreateHandoffErrorResponseStatusCode) createHandoffRes() {}
 
 // Ref: #
 type CreateProjectRequest struct {
+	// The name of the project.
+	Name string `json:"name"`
 	// Origins which are allowed for previewing and testing the project.
 	PreviewOrigins []string `json:"previewOrigins"`
 	// Whether the server should provision fallback default user schema and flow
 	// resources for the project. CLI-managed projects set this to false and
 	// upload their local .zitadel config files through the schema and flow APIs.
 	SeedDefaults OptBool `json:"seedDefaults"`
+}
+
+// GetName returns the value of Name.
+func (s *CreateProjectRequest) GetName() string {
+	return s.Name
 }
 
 // GetPreviewOrigins returns the value of PreviewOrigins.
@@ -1742,6 +1749,11 @@ func (s *CreateProjectRequest) GetPreviewOrigins() []string {
 // GetSeedDefaults returns the value of SeedDefaults.
 func (s *CreateProjectRequest) GetSeedDefaults() OptBool {
 	return s.SeedDefaults
+}
+
+// SetName sets the value of Name.
+func (s *CreateProjectRequest) SetName(val string) {
+	s.Name = val
 }
 
 // SetPreviewOrigins sets the value of PreviewOrigins.
@@ -1758,6 +1770,8 @@ func (s *CreateProjectRequest) SetSeedDefaults(val OptBool) {
 type CreateProjectResponse struct {
 	// The unique identifier of the project.
 	ID string `json:"id"`
+	// The name of the project.
+	Name string `json:"name"`
 	// Secret which can be used for authentication when modifying the project.
 	ProjectSecret string `json:"projectSecret"`
 	// Secret which can be used for previewing and testing the project.
@@ -1771,6 +1785,11 @@ type CreateProjectResponse struct {
 // GetID returns the value of ID.
 func (s *CreateProjectResponse) GetID() string {
 	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *CreateProjectResponse) GetName() string {
+	return s.Name
 }
 
 // GetProjectSecret returns the value of ProjectSecret.
@@ -1796,6 +1815,11 @@ func (s *CreateProjectResponse) GetCreatedAt() time.Time {
 // SetID sets the value of ID.
 func (s *CreateProjectResponse) SetID(val string) {
 	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *CreateProjectResponse) SetName(val string) {
+	s.Name = val
 }
 
 // SetProjectSecret sets the value of ProjectSecret.
@@ -2322,6 +2346,8 @@ func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()      {}
 func (*ErrorDetailsStatusCode) listSchemasRes()              {}
 func (*ErrorDetailsStatusCode) listSessionsRes()             {}
 func (*ErrorDetailsStatusCode) listUsersRes()                {}
+func (*ErrorDetailsStatusCode) patchProjectRes()             {}
+func (*ErrorDetailsStatusCode) queryProjectsRes()            {}
 func (*ErrorDetailsStatusCode) revokeMySessionRes()          {}
 func (*ErrorDetailsStatusCode) revokeSessionRes()            {}
 func (*ErrorDetailsStatusCode) revokeTokenRes()              {}
@@ -2738,6 +2764,254 @@ func (s *FieldValidationFormat) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// Ref: #
+type FilterField string
+
+const (
+	FilterFieldName      FilterField = "name"
+	FilterFieldCreatedAt FilterField = "createdAt"
+)
+
+// AllValues returns all FilterField values.
+func (FilterField) AllValues() []FilterField {
+	return []FilterField{
+		FilterFieldName,
+		FilterFieldCreatedAt,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FilterField) MarshalText() ([]byte, error) {
+	switch s {
+	case FilterFieldName:
+		return []byte(s), nil
+	case FilterFieldCreatedAt:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FilterField) UnmarshalText(data []byte) error {
+	switch FilterField(data) {
+	case FilterFieldName:
+		*s = FilterFieldName
+		return nil
+	case FilterFieldCreatedAt:
+		*s = FilterFieldCreatedAt
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Filter operation defines the operations which can be used when filtering on a
+// query endpoint.
+// Ref: #
+type FilterOperation string
+
+const (
+	FilterOperationEquals             FilterOperation = "equals"
+	FilterOperationNotEquals          FilterOperation = "not_equals"
+	FilterOperationContains           FilterOperation = "contains"
+	FilterOperationNotContains        FilterOperation = "not_contains"
+	FilterOperationLessThan           FilterOperation = "less_than"
+	FilterOperationLessThanOrEqual    FilterOperation = "less_than_or_equal"
+	FilterOperationGreaterThan        FilterOperation = "greater_than"
+	FilterOperationGreaterThanOrEqual FilterOperation = "greater_than_or_equal"
+)
+
+// AllValues returns all FilterOperation values.
+func (FilterOperation) AllValues() []FilterOperation {
+	return []FilterOperation{
+		FilterOperationEquals,
+		FilterOperationNotEquals,
+		FilterOperationContains,
+		FilterOperationNotContains,
+		FilterOperationLessThan,
+		FilterOperationLessThanOrEqual,
+		FilterOperationGreaterThan,
+		FilterOperationGreaterThanOrEqual,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FilterOperation) MarshalText() ([]byte, error) {
+	switch s {
+	case FilterOperationEquals:
+		return []byte(s), nil
+	case FilterOperationNotEquals:
+		return []byte(s), nil
+	case FilterOperationContains:
+		return []byte(s), nil
+	case FilterOperationNotContains:
+		return []byte(s), nil
+	case FilterOperationLessThan:
+		return []byte(s), nil
+	case FilterOperationLessThanOrEqual:
+		return []byte(s), nil
+	case FilterOperationGreaterThan:
+		return []byte(s), nil
+	case FilterOperationGreaterThanOrEqual:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FilterOperation) UnmarshalText(data []byte) error {
+	switch FilterOperation(data) {
+	case FilterOperationEquals:
+		*s = FilterOperationEquals
+		return nil
+	case FilterOperationNotEquals:
+		*s = FilterOperationNotEquals
+		return nil
+	case FilterOperationContains:
+		*s = FilterOperationContains
+		return nil
+	case FilterOperationNotContains:
+		*s = FilterOperationNotContains
+		return nil
+	case FilterOperationLessThan:
+		*s = FilterOperationLessThan
+		return nil
+	case FilterOperationLessThanOrEqual:
+		*s = FilterOperationLessThanOrEqual
+		return nil
+	case FilterOperationGreaterThan:
+		*s = FilterOperationGreaterThan
+		return nil
+	case FilterOperationGreaterThanOrEqual:
+		*s = FilterOperationGreaterThanOrEqual
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Filter-value specifies which values can be filtered by a query endpoint. This
+// is a union of types. When a value is specified which is not assignable to the
+// field which is being filtered, a 400 error will be returned.
+// Ref: #
+// FilterValue represents sum type.
+type FilterValue struct {
+	Type    FilterValueType // switch on this field
+	String  string
+	Float64 float64
+	Bool    bool
+	Null    struct{}
+}
+
+// FilterValueType is oneOf type of FilterValue.
+type FilterValueType string
+
+// Possible values for FilterValueType.
+const (
+	StringFilterValue  FilterValueType = "string"
+	Float64FilterValue FilterValueType = "float64"
+	BoolFilterValue    FilterValueType = "bool"
+	NullFilterValue    FilterValueType = "struct{}"
+)
+
+// IsString reports whether FilterValue is string.
+func (s FilterValue) IsString() bool { return s.Type == StringFilterValue }
+
+// IsFloat64 reports whether FilterValue is float64.
+func (s FilterValue) IsFloat64() bool { return s.Type == Float64FilterValue }
+
+// IsBool reports whether FilterValue is bool.
+func (s FilterValue) IsBool() bool { return s.Type == BoolFilterValue }
+
+// IsNull reports whether FilterValue is struct{}.
+func (s FilterValue) IsNull() bool { return s.Type == NullFilterValue }
+
+// SetString sets FilterValue to string.
+func (s *FilterValue) SetString(v string) {
+	s.Type = StringFilterValue
+	s.String = v
+}
+
+// GetString returns string and true boolean if FilterValue is string.
+func (s FilterValue) GetString() (v string, ok bool) {
+	if !s.IsString() {
+		return v, false
+	}
+	return s.String, true
+}
+
+// NewStringFilterValue returns new FilterValue from string.
+func NewStringFilterValue(v string) FilterValue {
+	var s FilterValue
+	s.SetString(v)
+	return s
+}
+
+// SetFloat64 sets FilterValue to float64.
+func (s *FilterValue) SetFloat64(v float64) {
+	s.Type = Float64FilterValue
+	s.Float64 = v
+}
+
+// GetFloat64 returns float64 and true boolean if FilterValue is float64.
+func (s FilterValue) GetFloat64() (v float64, ok bool) {
+	if !s.IsFloat64() {
+		return v, false
+	}
+	return s.Float64, true
+}
+
+// NewFloat64FilterValue returns new FilterValue from float64.
+func NewFloat64FilterValue(v float64) FilterValue {
+	var s FilterValue
+	s.SetFloat64(v)
+	return s
+}
+
+// SetBool sets FilterValue to bool.
+func (s *FilterValue) SetBool(v bool) {
+	s.Type = BoolFilterValue
+	s.Bool = v
+}
+
+// GetBool returns bool and true boolean if FilterValue is bool.
+func (s FilterValue) GetBool() (v bool, ok bool) {
+	if !s.IsBool() {
+		return v, false
+	}
+	return s.Bool, true
+}
+
+// NewBoolFilterValue returns new FilterValue from bool.
+func NewBoolFilterValue(v bool) FilterValue {
+	var s FilterValue
+	s.SetBool(v)
+	return s
+}
+
+// SetNull sets FilterValue to struct{}.
+func (s *FilterValue) SetNull(v struct{}) {
+	s.Type = NullFilterValue
+	s.Null = v
+}
+
+// GetNull returns struct{} and true boolean if FilterValue is struct{}.
+func (s FilterValue) GetNull() (v struct{}, ok bool) {
+	if !s.IsNull() {
+		return v, false
+	}
+	return s.Null, true
+}
+
+// NewNullFilterValue returns new FilterValue from struct{}.
+func NewNullFilterValue(v struct{}) FilterValue {
+	var s FilterValue
+	s.SetNull(v)
+	return s
 }
 
 // Scopes which teams or apps this flow definition applies to. Empty or
@@ -4463,6 +4737,10 @@ func (*GetProjectNotFound) getProjectRes() {}
 type GetProjectResponse struct {
 	// The unique identifier of the project.
 	ID string `json:"id"`
+	// The name of the project.
+	Name string `json:"name"`
+	// Origins which are allowed for previewing and testing the project.
+	PreviewOrigins []string `json:"previewOrigins"`
 	// The time when the project was created.
 	CreatedAt time.Time `json:"createdAt"`
 	// The time when the project was last updated.
@@ -4472,6 +4750,16 @@ type GetProjectResponse struct {
 // GetID returns the value of ID.
 func (s *GetProjectResponse) GetID() string {
 	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *GetProjectResponse) GetName() string {
+	return s.Name
+}
+
+// GetPreviewOrigins returns the value of PreviewOrigins.
+func (s *GetProjectResponse) GetPreviewOrigins() []string {
+	return s.PreviewOrigins
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -4489,6 +4777,16 @@ func (s *GetProjectResponse) SetID(val string) {
 	s.ID = val
 }
 
+// SetName sets the value of Name.
+func (s *GetProjectResponse) SetName(val string) {
+	s.Name = val
+}
+
+// SetPreviewOrigins sets the value of PreviewOrigins.
+func (s *GetProjectResponse) SetPreviewOrigins(val []string) {
+	s.PreviewOrigins = val
+}
+
 // SetCreatedAt sets the value of CreatedAt.
 func (s *GetProjectResponse) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
@@ -4499,7 +4797,8 @@ func (s *GetProjectResponse) SetUpdatedAt(val time.Time) {
 	s.UpdatedAt = val
 }
 
-func (*GetProjectResponse) getProjectRes() {}
+func (*GetProjectResponse) getProjectRes()   {}
+func (*GetProjectResponse) patchProjectRes() {}
 
 type GetProjectUnauthorized ErrorDetails
 
@@ -5588,6 +5887,8 @@ func (s *KeysResponseKeysItem) SetX5t(val OptString) {
 func (s *KeysResponseKeysItem) SetX5tS256(val OptString) {
 	s.X5tS256 = val
 }
+
+type Limit int
 
 type ListFlowDefinitionsPurpose string
 
@@ -7378,6 +7679,52 @@ func (o OptFieldValidationFormat) Or(d FieldValidationFormat) FieldValidationFor
 	return d
 }
 
+// NewOptFilterValue returns new OptFilterValue with value set to v.
+func NewOptFilterValue(v FilterValue) OptFilterValue {
+	return OptFilterValue{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFilterValue is optional FilterValue.
+type OptFilterValue struct {
+	Value FilterValue
+	Set   bool
+}
+
+// IsSet returns true if OptFilterValue was set.
+func (o OptFilterValue) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFilterValue) Reset() {
+	var v FilterValue
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFilterValue) SetTo(v FilterValue) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFilterValue) Get() (v FilterValue, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFilterValue) Or(d FilterValue) FilterValue {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptFlowAudience returns new OptFlowAudience with value set to v.
 func NewOptFlowAudience(v FlowAudience) OptFlowAudience {
 	return OptFlowAudience{
@@ -8298,6 +8645,52 @@ func (o OptIssueChallengeRequestPasskeyOptionsUserVerification) Or(d IssueChalle
 	return d
 }
 
+// NewOptLimit returns new OptLimit with value set to v.
+func NewOptLimit(v Limit) OptLimit {
+	return OptLimit{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptLimit is optional Limit.
+type OptLimit struct {
+	Value Limit
+	Set   bool
+}
+
+// IsSet returns true if OptLimit was set.
+func (o OptLimit) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptLimit) Reset() {
+	var v Limit
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptLimit) SetTo(v Limit) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptLimit) Get() (v Limit, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptLimit) Or(d Limit) Limit {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptListFlowDefinitionsPurpose returns new OptListFlowDefinitionsPurpose with value set to v.
 func NewOptListFlowDefinitionsPurpose(v ListFlowDefinitionsPurpose) OptListFlowDefinitionsPurpose {
 	return OptListFlowDefinitionsPurpose{
@@ -9141,6 +9534,52 @@ func (o OptPostTokenRequestGrantType) Or(d PostTokenRequestGrantType) PostTokenR
 	return d
 }
 
+// NewOptQueryProjectsRequestSorting returns new OptQueryProjectsRequestSorting with value set to v.
+func NewOptQueryProjectsRequestSorting(v QueryProjectsRequestSorting) OptQueryProjectsRequestSorting {
+	return OptQueryProjectsRequestSorting{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptQueryProjectsRequestSorting is optional QueryProjectsRequestSorting.
+type OptQueryProjectsRequestSorting struct {
+	Value QueryProjectsRequestSorting
+	Set   bool
+}
+
+// IsSet returns true if OptQueryProjectsRequestSorting was set.
+func (o OptQueryProjectsRequestSorting) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptQueryProjectsRequestSorting) Reset() {
+	var v QueryProjectsRequestSorting
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptQueryProjectsRequestSorting) SetTo(v QueryProjectsRequestSorting) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptQueryProjectsRequestSorting) Get() (v QueryProjectsRequestSorting, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptQueryProjectsRequestSorting) Or(d QueryProjectsRequestSorting) QueryProjectsRequestSorting {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptSchemaURI returns new OptSchemaURI with value set to v.
 func NewOptSchemaURI(v SchemaURI) OptSchemaURI {
 	return OptSchemaURI{
@@ -9914,6 +10353,34 @@ func (s *PasswordProof) SetPassword(val string) {
 	s.Password = val
 }
 
+type PatchProjectBadRequest ErrorDetails
+
+func (*PatchProjectBadRequest) patchProjectRes() {}
+
+type PatchProjectNotFound ErrorDetails
+
+func (*PatchProjectNotFound) patchProjectRes() {}
+
+// Ref: #
+type PatchProjectRequest struct {
+	// The name of the project.
+	Name OptNilString `json:"name"`
+}
+
+// GetName returns the value of Name.
+func (s *PatchProjectRequest) GetName() OptNilString {
+	return s.Name
+}
+
+// SetName sets the value of Name.
+func (s *PatchProjectRequest) SetName(val OptNilString) {
+	s.Name = val
+}
+
+type PatchProjectUnauthorized ErrorDetails
+
+func (*PatchProjectUnauthorized) patchProjectRes() {}
+
 // Ref: #
 type PostTokenRequest struct {
 	// The authorization code received from the authorization server. Required
@@ -10077,6 +10544,168 @@ func (s *PostTokenRequestGrantType) UnmarshalText(data []byte) error {
 }
 
 type ProjectID string
+
+type QueryProjectsBadRequest ErrorDetails
+
+func (*QueryProjectsBadRequest) queryProjectsRes() {}
+
+type QueryProjectsForbidden ErrorDetails
+
+func (*QueryProjectsForbidden) queryProjectsRes() {}
+
+// Request to query projects.
+// Ref: #
+type QueryProjectsRequest struct {
+	Limit OptLimit `json:"limit"`
+	// Token to retrieve the next page of results.
+	PageToken OptNilPageToken                `json:"page_token"`
+	Sorting   OptQueryProjectsRequestSorting `json:"sorting"`
+	// Filter criteria for querying projects.
+	Filter []QueryProjectsRequestFilterItem `json:"filter"`
+}
+
+// GetLimit returns the value of Limit.
+func (s *QueryProjectsRequest) GetLimit() OptLimit {
+	return s.Limit
+}
+
+// GetPageToken returns the value of PageToken.
+func (s *QueryProjectsRequest) GetPageToken() OptNilPageToken {
+	return s.PageToken
+}
+
+// GetSorting returns the value of Sorting.
+func (s *QueryProjectsRequest) GetSorting() OptQueryProjectsRequestSorting {
+	return s.Sorting
+}
+
+// GetFilter returns the value of Filter.
+func (s *QueryProjectsRequest) GetFilter() []QueryProjectsRequestFilterItem {
+	return s.Filter
+}
+
+// SetLimit sets the value of Limit.
+func (s *QueryProjectsRequest) SetLimit(val OptLimit) {
+	s.Limit = val
+}
+
+// SetPageToken sets the value of PageToken.
+func (s *QueryProjectsRequest) SetPageToken(val OptNilPageToken) {
+	s.PageToken = val
+}
+
+// SetSorting sets the value of Sorting.
+func (s *QueryProjectsRequest) SetSorting(val OptQueryProjectsRequestSorting) {
+	s.Sorting = val
+}
+
+// SetFilter sets the value of Filter.
+func (s *QueryProjectsRequest) SetFilter(val []QueryProjectsRequestFilterItem) {
+	s.Filter = val
+}
+
+type QueryProjectsRequestFilterItem struct {
+	// The field to filter by.
+	Field     FilterField     `json:"field"`
+	Value     OptFilterValue  `json:"value"`
+	Operation FilterOperation `json:"operation"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryProjectsRequestFilterItem) GetField() FilterField {
+	return s.Field
+}
+
+// GetValue returns the value of Value.
+func (s *QueryProjectsRequestFilterItem) GetValue() OptFilterValue {
+	return s.Value
+}
+
+// GetOperation returns the value of Operation.
+func (s *QueryProjectsRequestFilterItem) GetOperation() FilterOperation {
+	return s.Operation
+}
+
+// SetField sets the value of Field.
+func (s *QueryProjectsRequestFilterItem) SetField(val FilterField) {
+	s.Field = val
+}
+
+// SetValue sets the value of Value.
+func (s *QueryProjectsRequestFilterItem) SetValue(val OptFilterValue) {
+	s.Value = val
+}
+
+// SetOperation sets the value of Operation.
+func (s *QueryProjectsRequestFilterItem) SetOperation(val FilterOperation) {
+	s.Operation = val
+}
+
+type QueryProjectsRequestSorting struct {
+	// The field to sort by.
+	Field FilterField `json:"field"`
+	// The direction to sort by.
+	Direction SortDirection `json:"direction"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryProjectsRequestSorting) GetField() FilterField {
+	return s.Field
+}
+
+// GetDirection returns the value of Direction.
+func (s *QueryProjectsRequestSorting) GetDirection() SortDirection {
+	return s.Direction
+}
+
+// SetField sets the value of Field.
+func (s *QueryProjectsRequestSorting) SetField(val FilterField) {
+	s.Field = val
+}
+
+// SetDirection sets the value of Direction.
+func (s *QueryProjectsRequestSorting) SetDirection(val SortDirection) {
+	s.Direction = val
+}
+
+// Paginated list of projects.
+// Ref: #
+type QueryProjectsResponse struct {
+	Projects []GetProjectResponse `json:"projects"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetProjects returns the value of Projects.
+func (s *QueryProjectsResponse) GetProjects() []GetProjectResponse {
+	return s.Projects
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *QueryProjectsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetProjects sets the value of Projects.
+func (s *QueryProjectsResponse) SetProjects(val []GetProjectResponse) {
+	s.Projects = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *QueryProjectsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*QueryProjectsResponse) queryProjectsRes() {}
+
+type QueryProjectsTooManyRequests ErrorDetails
+
+func (*QueryProjectsTooManyRequests) queryProjectsRes() {}
+
+type QueryProjectsUnauthorized ErrorDetails
+
+func (*QueryProjectsUnauthorized) queryProjectsRes() {}
 
 type RevokeMySessionConflict ErrorDetails
 
@@ -10644,6 +11273,48 @@ func (s *SetUserPasswordRequest) SetPassword(val string) {
 // SetIsChangeRequired sets the value of IsChangeRequired.
 func (s *SetUserPasswordRequest) SetIsChangeRequired(val OptBool) {
 	s.IsChangeRequired = val
+}
+
+// Ref: #
+type SortDirection string
+
+const (
+	SortDirectionAsc  SortDirection = "asc"
+	SortDirectionDesc SortDirection = "desc"
+)
+
+// AllValues returns all SortDirection values.
+func (SortDirection) AllValues() []SortDirection {
+	return []SortDirection{
+		SortDirectionAsc,
+		SortDirectionDesc,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s SortDirection) MarshalText() ([]byte, error) {
+	switch s {
+	case SortDirectionAsc:
+		return []byte(s), nil
+	case SortDirectionDesc:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *SortDirection) UnmarshalText(data []byte) error {
+	switch SortDirection(data) {
+	case SortDirectionAsc:
+		*s = SortDirectionAsc
+		return nil
+	case SortDirectionDesc:
+		*s = SortDirectionDesc
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Configuration for a user-invokable action on a step. The `name` is sent
