@@ -200,6 +200,41 @@ describe("setup command pre-flight", () => {
       expectedPublicCliCommand("setup --framework next --server local"),
     ]);
   });
+
+  it("sends a project name in create-project payload", async () => {
+    const cwd = await makeTempDir();
+    await mkdir(join(cwd, "app"), { recursive: true });
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
+    );
+    const capture = await startCreateProjectCaptureServer();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--server",
+      capture.url,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(capture.body).toBeTruthy();
+    expect(capture.body).toMatchObject({
+      name: expect.any(String),
+      previewOrigins: expect.arrayContaining([expect.any(String)]),
+      seedDefaults: false,
+    });
+    const projectName = capture.body?.name;
+    expect(typeof projectName).toBe("string");
+    if (typeof projectName !== "string") {
+      throw new Error("expected create-project payload name to be a string");
+    }
+    expect(projectName.trim().length).toBeGreaterThan(0);
+  });
 });
 
 async function startHealthServer(): Promise<string> {
@@ -232,6 +267,65 @@ async function startNotFoundServer(): Promise<string> {
     throw new Error("not-found server did not expose a TCP address");
   }
   return `http://localhost:${String(address.port)}`;
+}
+
+async function startCreateProjectCaptureServer(): Promise<{
+  url: string;
+  body: Record<string, unknown> | null;
+}> {
+  let body: Record<string, unknown> | null = null;
+  const server = createServer(async (req, res) => {
+    const path = new URL(req.url ?? "/", "http://localhost").pathname;
+    if (req.method === "POST" && path === "/projects") {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+      }
+      body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
+      res.writeHead(201, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          id: "proj_test",
+          name: "demo",
+          projectSecret: "sk_proj_test_full",
+          previewSecret: "sk_proj_test_preview",
+          previewOrigins: [],
+          createdAt: "2026-06-01T00:00:00.000Z",
+        }),
+      );
+      return;
+    }
+    if (req.method === "POST" && path === "/schemas") {
+      res.writeHead(201, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          id: "sch_test",
+          createdAt: "2026-06-01T00:00:00.000Z",
+        }),
+      );
+      return;
+    }
+    if (req.method === "POST" && path === "/flow_definitions") {
+      res.writeHead(201, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          id: "flow_test",
+          createdAt: "2026-06-01T00:00:00.000Z",
+        }),
+      );
+      return;
+    }
+    res.writeHead(404).end();
+  });
+  servers.push(server);
+  await new Promise<void>((resolve) => server.listen(0, "localhost", () => resolve()));
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("capture server did not expose a TCP address");
+  }
+  return {
+    url: `http://localhost:${String(address.port)}`,
+    get body() {
+      return body;
+    },
+  };
 }
 
 function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
