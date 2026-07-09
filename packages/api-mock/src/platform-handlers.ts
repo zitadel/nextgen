@@ -193,6 +193,9 @@ function makeStore(): Store {
 /**
  * Build a `flow-definition-detail-response` envelope around a stored body, as
  * specified by `api/openapi/components/flows/flow-definition-detail-response.yaml`.
+ * The Go server unconditionally echoes an `audience` (empty `{}` when the
+ * stored flow has none — `internal/api/flow_definition.go`); mirror that so
+ * consumers exercise the same wire shape the live server produces.
  */
 function flowDetailResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
   return {
@@ -200,7 +203,10 @@ function flowDetailResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
     project_id: r.projectId,
     schema_uri: r.schemaUri,
     status: r.status,
-    flow_definition: r.body as unknown as GetFlowDefinition200['flow_definition'],
+    flow_definition: {
+      audience: {},
+      ...(r.body as Record<string, unknown>),
+    } as unknown as GetFlowDefinition200['flow_definition'],
     created_at: r.createdAt,
     updated_at: r.updatedAt,
   } as unknown as GetFlowDefinition200;
