@@ -427,6 +427,48 @@ describe("warn/password-without-identifier", () => {
   it("does not warn when an identifier is collected upstream (default flow)", () => {
     expect(warnings(validateFlowDefinition(flow(), schema))).toEqual([]);
   });
+
+  it("warns when only a non-login route into a shared step collects the identifier", () => {
+    // The login entry reaches `password` directly (no identifier); only the
+    // register chain collects email. An ancestor-set check would see the
+    // register-side identifier and stay silent — but the direct login route
+    // still cannot resolve which user to challenge.
+    const def = {
+      name: "login",
+      status: "active",
+      user_schema: "sch_x",
+      purposes: { login: "quick", register: "register" },
+      steps: [
+        {
+          name: "quick",
+          fields: [],
+          actions: [{ name: "go", kind: "navigate", primary: true }],
+          transitions: { go: { target: "password" }, user_not_found: { target: "register" } },
+        },
+        {
+          name: "register",
+          fields: ["email"],
+          actions: [{ name: "submit", kind: "submit", primary: true }],
+          transitions: {
+            submit: { target: "password" },
+            user_already_exists: { target: "password" },
+          },
+        },
+        {
+          name: "password",
+          fields: ["x-auth-methods#password"],
+          actions: [{ name: "submit", kind: "submit", primary: true }],
+          transitions: { submit: { target: "done" } },
+        },
+        { name: "done", complete: "show" },
+      ],
+    };
+    const relaxed = structuredClone(schema);
+    delete relaxed.required;
+    const issues = validateFlowDefinition(def, relaxed);
+    expect(errors(issues)).toEqual([]);
+    expect(warnings(issues).map((i) => i.step)).toEqual(["password"]);
+  });
 });
 
 // ── drift audit against the Go source ────────────────────────────────────────
