@@ -110,7 +110,18 @@ async function commandPublish(options) {
       throw new Error(message);
     }
     if (!preflight.shouldRun) {
-      console.log(`release publish: skip - ${preflight.reason}`);
+      const message = `release publish: skip - ${preflight.reason}`;
+      if (shouldFailManualPublishSkip(options)) {
+        throw new Error(
+          [
+            message,
+            "manual release dispatch would not publish anything; " +
+              `pass recover_version=${release.version} to recover this checked-out version, ` +
+              "or run from a Changesets version package commit.",
+          ].join("\n"),
+        );
+      }
+      console.log(message);
       return;
     }
   }
@@ -200,6 +211,10 @@ export async function assertNoUnrecordedPendingChangesets(root = repoRoot) {
 
 export function releasePublishEnv(overrides = {}) {
   return { ...process.env, ...overrides, ZITADEL_TELEMETRY_BUILD_CHANNEL: "production" };
+}
+
+export function shouldFailManualPublishSkip(options = {}, env = process.env) {
+  return env.GITHUB_EVENT_NAME === "workflow_dispatch" && !options.dryRun && !options.recoverVersion;
 }
 
 async function assertMainBranch(options, { allowDryRunBypass = true } = {}) {

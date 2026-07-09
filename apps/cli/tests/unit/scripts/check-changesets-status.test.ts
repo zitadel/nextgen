@@ -63,6 +63,10 @@ type ReleaseAutomationModule = {
 type ReleaseModule = {
   assertNoUnrecordedPendingChangesets: (repoRoot: string) => Promise<void>;
   releasePublishEnv: (env?: NodeJS.ProcessEnv) => NodeJS.ProcessEnv;
+  shouldFailManualPublishSkip: (
+    options: { dryRun?: boolean; recoverVersion?: string },
+    env?: NodeJS.ProcessEnv,
+  ) => boolean;
 };
 
 type CheckChangesetStatus = {
@@ -507,6 +511,29 @@ describe("release-automation", () => {
 });
 
 describe("release publish guard", () => {
+  it("fails manual non-dry publish skips instead of silently succeeding", async () => {
+    const { shouldFailManualPublishSkip } = await loadReleaseModule();
+    const workflowDispatchEnv = { GITHUB_EVENT_NAME: "workflow_dispatch" } as NodeJS.ProcessEnv;
+
+    expect(shouldFailManualPublishSkip({ dryRun: false, recoverVersion: "" }, workflowDispatchEnv)).toBe(
+      true,
+    );
+    expect(shouldFailManualPublishSkip({ dryRun: true, recoverVersion: "" }, workflowDispatchEnv)).toBe(
+      false,
+    );
+    expect(
+      shouldFailManualPublishSkip(
+        { dryRun: false, recoverVersion: "0.1.0-alpha.14" },
+        workflowDispatchEnv,
+      ),
+    ).toBe(false);
+    expect(
+      shouldFailManualPublishSkip({ dryRun: false, recoverVersion: "" }, {
+        GITHUB_EVENT_NAME: "push",
+      } as NodeJS.ProcessEnv),
+    ).toBe(false);
+  });
+
   it("forces production telemetry while publishing npm packages", async () => {
     const { releasePublishEnv } = await loadReleaseModule();
     const originalBase = process.env.ZITADEL_RELEASE_TEST_BASE;
