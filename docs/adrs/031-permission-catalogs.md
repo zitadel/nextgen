@@ -13,7 +13,7 @@ allowed?" — but come from very different audiences:
   login issue. Before they see anything, the system must decide whether
   they're allowed to view it, and record why.
 - A customer's own application — say, an expense-report tool built on
-  nextgen — wants to let their user Alice approve reports but not delete the
+  Zitadel — wants to let their user Alice approve reports but not delete the
   expense policy. The customer defines that permission model themselves;
   Zitadel just has to enforce it and hand back the right claims in Alice's
   token.
@@ -47,7 +47,7 @@ vocabulary that has no audience outside this document set. For terms other
 design docs already assume the reader knows — **principal**, **scope**,
 **`resource_scope_index`**, **delegation** — see
 [`docs/design/glossary.md` § 5 Authorization (FGA)](../design/glossary.md#5-authorization-fga)
-instead of redefining them here. For nextgen resource nouns (project, team,
+instead of redefining them here. For Zitadel resource nouns (project, team,
 user, app_group, grant, role, team_membership), see the same file's §4
 Resources.
 
@@ -61,14 +61,14 @@ Resources.
 | **Userset** | A set of principals defined implicitly through a relation on another object — "everyone who is a `member` of `team:9`" — instead of one explicitly listed user. |
 | **Tuple-to-userset (TTU)** | A rule that derives a permission on one resource from a relation on a *different*, related resource, e.g. "you can read a document if you're a `viewer` of the project that owns it." |
 | **Relation implication / closure** | The precomputed answer to "which relations imply which other relations" for one catalog version, so a single check doesn't have to re-derive the whole rule graph on every request. |
-| **Catalog** | A versioned collection of relation/permission definitions, their expressions, and optional bundles. nextgen has two: the **system catalog** ([ADR 032](032-internal-permission-management.md)) and the **app-group catalog** ([ADR 033](033-external-permission-management.md)). |
+| **Catalog** | A versioned collection of relation/permission definitions, their expressions, and optional bundles. Zitadel has two: the **system catalog** ([ADR 032](032-internal-permission-management.md)) and the **app-group catalog** ([ADR 033](033-external-permission-management.md)). |
 | **Grant / assignment** | A stored row binding a principal to a permission or relation at an explicit scope. See [`docs/design/glossary.md`](../design/glossary.md#4-resources) for the canonical **grant** definition; "assignment" is this ADR's storage-layer term for the same row. |
 | **IR (intermediate representation)** | The normalized internal shape produced after parsing and validating a policy, before it is compiled into relational rows and query plans. |
 | **Leopard index / flattening** | A technique (named after Google Zanzibar's Leopard index) for precomputing set membership so deeply nested group/relation checks stay fast, without re-walking the whole graph or rewriting per-member state on every write. See [§ Canonical relational storage](#2-canonical-relational-storage). |
 
 ## Context
 
-nextgen needs one permission model for two surfaces:
+Zitadel needs one permission model for two surfaces:
 
 1. **Internal permissions** decide whether a principal can read or write a
    Zitadel resource such as a project, team, user, app, flow, or policy.
@@ -78,7 +78,7 @@ nextgen needs one permission model for two surfaces:
 
 Legacy Zitadel used runtime-configured internal roles at fixed levels such as
 instance, organization, project, and project grant. That matched the legacy
-API split, where different APIs owned different levels. The nextgen API is
+API split, where different APIs owned different levels. The Zitadel API is
 resource-oriented: a request can carry only a token and a resource id, and
 the server must resolve the resource scope before deciding access. Listing
 endpoints must filter in SQL, not fetch rows and check each one in
@@ -241,7 +241,7 @@ path is identical for system-catalog and app-group-catalog permissions; only
 the catalog rows it reads differ.
 
 [ADR 032](032-internal-permission-management.md) covers how this resolver
-is wired into nextgen's own resource-oriented API, including list filtering
+is wired into Zitadel's own resource-oriented API, including list filtering
 across scopes and the 403/404 denial contract.
 
 PostgreSQL may later use generated SQL functions, views, or RLS as an
