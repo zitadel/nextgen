@@ -47,7 +47,8 @@ jobs:
         with:
           ref: >-
             ${{
-              github.event_name == 'push'
+              (github.event_name == 'push'
+              || (github.event_name == 'workflow_dispatch' && inputs.source == 'export'))
               && 'design-tokens/figma-sync'
               || github.ref
             }}
