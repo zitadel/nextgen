@@ -15,6 +15,7 @@
     projectId,
     proxyPath,
     purpose = 'login',
+    flowName,
     postSignInUrl,
     onFlowStep,
     onFlowInput,
@@ -66,4 +67,5 @@
   project-id={projectId}
   proxy-path={proxyPath}
   post-sign-in-url={postSignInUrl}
+  flow-name={flowName}
 ></zitadel-login>

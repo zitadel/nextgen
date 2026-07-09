@@ -44,6 +44,7 @@ export default defineComponent({
       default: "login",
     },
     postSignInUrl: { type: String, default: undefined },
+    flowName: { type: String, default: undefined },
   },
   emits: ["flowStep", "flowInput", "flowComplete", "flowError"],
   setup(props, { emit, expose }) {
@@ -63,6 +64,7 @@ export default defineComponent({
         proxyPath: props.proxyPath,
         purpose: props.purpose,
         "post-sign-in-url": props.postSignInUrl,
+        "flow-name": props.flowName,
         onZitadelFlowStep: (event: CustomEvent<ZitadelFlowStepDetail>) => {
           emit("flowStep", event.detail);
         },

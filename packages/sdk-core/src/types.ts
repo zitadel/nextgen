@@ -127,6 +127,11 @@ export interface ZitadelLoginConfig {
   readonly proxyPath?: string;
   /** Flow purpose. @default "login" */
   readonly purpose?: CreateFlowBodyPurpose;
+  /**
+   * Selects a specific flow definition by its `name` (the `name` field in
+   * the flow file). Omit to run the project's default flow for the purpose.
+   */
+  readonly flowName?: string;
   /** Where to navigate after a completed sign-in. */
   readonly postSignInUrl?: string;
   /**

@@ -53,6 +53,7 @@ import "@zitadel/components";
     [projectId]="projectId"
     [proxyPath]="proxyPath"
     [attr.purpose]="purpose"
+    [attr.flow-name]="flowName"
     [attr.post-sign-in-url]="postSignInUrl"
     (zitadel-flow-step)="onFlowStep($event)"
     (zitadel-flow-input)="onFlowInput($event)"
@@ -65,6 +66,7 @@ export class ZitadelLoginComponent {
   @Input() projectId?: string;
   @Input() proxyPath?: string;
   @Input() purpose: CreateFlowBodyPurpose = "login";
+  @Input() flowName?: string;
   @Input() postSignInUrl?: string;
   @Output() flowStep = new EventEmitter<ZitadelFlowStepDetail>();
   @Output() flowInput = new EventEmitter<ZitadelFlowInputDetail>();
