@@ -165,6 +165,48 @@ test("collects local runtime logs when a CLI step fails", async () => {
   }
 });
 
+test("passes the sign-in preset through to setup and records it", async () => {
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-journey-prepare-preset-test-"));
+  const calls = [];
+  const registryUrl = "http://127.0.0.1:4873";
+
+  try {
+    const metadata = await prepareApp({
+      env: {
+        JOURNEY_APP_URL: "http://localhost:3010",
+        JOURNEY_CLI_PACKAGE: "@zitadel/cli",
+        JOURNEY_FRAMEWORK: "next",
+        JOURNEY_PRESET: "passkey-first",
+        JOURNEY_REGISTRY_URL: registryUrl,
+        JOURNEY_SDK_PACKAGE: "@zitadel/sdk-next",
+        JOURNEY_WORK_DIR: workDir,
+      },
+      logMetadata: false,
+      runCapture: async (command, args, options) => {
+        calls.push({ command, args });
+        if (args.includes("setup")) {
+          await writeGeneratedApp(options.cwd, registryUrl, "@zitadel/sdk-next");
+        }
+        return {
+          code: 0,
+          stdout: `${JSON.stringify(okEnvelope(args))}\n`,
+          stderr: "",
+        };
+      },
+    });
+
+    const setupCall = calls.find((call) => call.args.includes("setup"));
+    assert.ok(setupCall, "setup step ran");
+    assert.equal(setupCall.args[setupCall.args.indexOf("--preset") + 1], "passkey-first");
+    assert.equal(metadata.preset, "passkey-first");
+
+    const doctorCall = calls.find((call) => call.args.includes("doctor"));
+    assert.ok(!doctorCall.args.includes("--preset"), "only setup takes the preset");
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+});
+
 test("accepts generated apps that use pnpm lockfiles", async () => {
   const workDir = await mkdtemp(join(tmpdir(), "zitadel-journey-prepare-pnpm-test-"));
   const registryUrl = "http://127.0.0.1:4873";

@@ -35,6 +35,7 @@ import {
   FrameworkConfirmPrompt,
   PickFrameworkPrompt,
   ServerPrompt,
+  SignInPresetPrompt,
   type PromptContext,
   type SetupAnswers,
 } from "../../../../src/commands/setup/prompts";
@@ -199,6 +200,41 @@ describe("PickFrameworkPrompt", () => {
 
     await expect(
       new PickFrameworkPrompt().ask([{ id: "next", displayName: "Next.js" }]),
+    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+  });
+});
+
+describe("SignInPresetPrompt", () => {
+  it("writes the selected preset into the answers", async () => {
+    vi.mocked(select).mockResolvedValueOnce("passkey-first" as never);
+
+    const answers = await new SignInPresetPrompt().ask(
+      baseAnswers({ preset: "password-first" }),
+      ctx,
+    );
+
+    expect(answers.preset).toBe("passkey-first");
+    expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
+      initialValue: "password-first",
+    });
+  });
+
+  it("skips and keeps the flagged preset when --preset was passed", async () => {
+    const answers = await new SignInPresetPrompt().ask(baseAnswers({ preset: "passkey-first" }), {
+      ...ctx,
+      presetFromFlag: true,
+    });
+
+    expect(answers.preset).toBe("passkey-first");
+    expect(select).not.toHaveBeenCalled();
+  });
+
+  it("throws E_VALIDATION on Ctrl-C", async () => {
+    vi.mocked(select).mockResolvedValueOnce(Symbol("cancel") as never);
+    vi.mocked(isCancel).mockReturnValueOnce(true);
+
+    await expect(
+      new SignInPresetPrompt().ask(baseAnswers({ preset: "password-first" }), ctx),
     ).rejects.toMatchObject({ code: "E_VALIDATION" });
   });
 });
