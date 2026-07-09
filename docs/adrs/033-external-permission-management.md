@@ -6,11 +6,11 @@
 
 ## Introduction
 
-Customers build their own applications on top of nextgen and want to define
+Customers build their own applications on top of Zitadel and want to define
 their own authorization rules for their own users. An expense-report app
 might want a `submitter` role that can create reports and an `approver`
 role that can approve them, scoped to one team; a project-management app
-might want per-board `viewer`/`editor` relations. nextgen doesn't run those
+might want per-board `viewer`/`editor` relations. Zitadel doesn't run those
 apps and doesn't know their business logic, so it needs to let customers
 **author their own permission models**, compile them safely, and expose the
 result as token claims or introspection data their app can trust — without
@@ -37,7 +37,7 @@ Terms specific to external/app-group authorization, in addition to
 |---|---|
 | **App-group catalog** | The catalog of customer-owned permissions, relations, and optional bundles for apps/APIs; replaces legacy project authorizations. See [ADR 031 §1](031-permission-catalogs.md#1-one-model-two-catalogs). |
 | **OpenFGA DSL / JSON** | The human-authorable and machine-interchange syntax customers use to describe their permission model — the input to the compiler pipeline below. |
-| **Profile** | The bounded subset of OpenFGA's modeling language nextgen supports, chosen so checks stay portable and predictable on both PostgreSQL and Spanner. |
+| **Profile** | The bounded subset of OpenFGA's modeling language Zitadel supports, chosen so checks stay portable and predictable on both PostgreSQL and Spanner. |
 | **Contextual tuple** | An OpenFGA fact supplied at check time rather than stored ahead of time. Not supported on request hot paths in our profile (see § Unsupported constructs). |
 | **Caveat / condition** | An OpenFGA construct that attaches a runtime-evaluated condition to a relationship. Arbitrary caveats are unsupported in our profile when they need non-indexed attribute evaluation. |
 | **App grant** | A stored row binding a user or team to an app or app-group, feeding token claims / introspection responses. |
@@ -144,7 +144,7 @@ audience, scope request, and claim-size limits (tracked as a follow-up).
 External resource existence *outside* Zitadel — e.g., the customer's own
 expense reports, boards, or documents — is out of scope for this ADR. For
 now, external permissions authorize app/API access and are exposed as
-claims; nextgen does not track or evaluate facts about resources it doesn't
+claims; Zitadel does not track or evaluate facts about resources it doesn't
 own. A future customer-resource FGA API must define how external resources
 are imported, versioned, and made causally fresh before Zitadel evaluates
 checks against them — that is a distinct, larger consistency problem than
