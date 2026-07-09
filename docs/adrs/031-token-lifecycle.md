@@ -90,7 +90,9 @@ states:
 > after the revocation.
 
 However, experience learns that some clients do not handle this well. Therefore,
-The revocation endpoint will be idempotent.
+The revocation endpoint will be idempotent using an idempotency header. Making 
+it idempotent without header would create a security issue because a leaked 
+refresh token can be reused to fetch an access token and new refresh token.
 
 ### Revocation propagation & invalidation semantics
 
