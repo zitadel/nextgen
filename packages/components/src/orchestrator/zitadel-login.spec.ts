@@ -280,6 +280,39 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(errorEvents[0]?.detail.message).toBeTypeOf("string");
   });
 
+  it("surfaces the server's error-envelope message on a req.invalid submit rejection", async () => {
+    const element = await mount(host);
+    const serverMessage =
+      'origin "http://127.0.0.1:3000" is not allowed for this project (allowed: http://localhost:3000)';
+    // Envelope-shaped 400 (no `step`), like the flow handler's passkey
+    // origin-allowlist rejection — must bubble past submitStep's
+    // flow-response unwrap and reach the user verbatim.
+    server.use(
+      http.post(
+        "*/flow/*/submit",
+        () => HttpResponse.json({ code: "req.invalid", message: serverMessage }, { status: 400 }),
+        { once: true },
+      ),
+    );
+
+    const errorEvents: CustomEvent[] = [];
+    element.addEventListener("zitadel-flow-error", (event: Event) =>
+      errorEvents.push(event as CustomEvent),
+    );
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
+    );
+
+    await waitFor(() => (errorEvents.length > 0 ? errorEvents : null), 3000);
+    expect(errorEvents[0]?.detail.message).toBe(serverMessage);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
+    expect(element.shadowRoot?.querySelector("zl-alert")?.textContent).toContain(serverMessage);
+  });
+
   it("renders branding overlay applied via api-mock applyBranding", async () => {
     applyBranding({ layout: "split", logo_url: "https://logo.example/img.svg" });
     await mount(host);
