@@ -65,7 +65,8 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
     "t",
     function tFilter(this: { context: unknown }, key: unknown, ...args: unknown[]) {
       const lookupKey = stringify(key);
-      const template = options.locale[lookupKey] ?? lookupKey;
+      const template =
+        options.locale[lookupKey] ?? injectedKeyFallback(options.locale, lookupKey) ?? lookupKey;
       return interpolate(template, args.map(stringify));
     },
   );
@@ -150,6 +151,24 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
   });
 
   return engine;
+}
+
+/**
+ * Fallbacks for text keys the flow engine derives from tenant-chosen step
+ * names (`<step>.action.back` for the injected back action — see
+ * `internal/domain/flow_state_machine.go` `buildStep`). Step names are open,
+ * so no dictionary can enumerate them; a missing step-specific key falls back
+ * to its generic entry instead of leaking the raw key into the UI.
+ */
+const INJECTED_KEY_FALLBACKS: ReadonlyArray<{ suffix: string; fallback: string }> = [
+  { suffix: ".action.back", fallback: "action.back" },
+];
+
+function injectedKeyFallback(locale: Locale, key: string): string | undefined {
+  for (const { suffix, fallback } of INJECTED_KEY_FALLBACKS) {
+    if (key.endsWith(suffix)) return locale[fallback];
+  }
+  return undefined;
 }
 
 function stringify(value: unknown): string {
