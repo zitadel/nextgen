@@ -41,7 +41,7 @@ func TestCreateFlowDefinitionUnauthenticated(t *testing.T) {
 		StatusCode: http.StatusUnauthorized,
 		Response: api.ErrorDetails{
 			Code:    "auth.unauthorized",
-			Message: `operation CreateFlowDefinition: security "": security requirement is not satisfied`,
+			Message: "The request lacks valid authentication credentials.",
 		},
 	}, resp)
 }
@@ -292,7 +292,7 @@ func TestUpdateFlowDefinitionUnauthenticated(t *testing.T) {
 		StatusCode: http.StatusUnauthorized,
 		Response: api.ErrorDetails{
 			Code:    "auth.unauthorized",
-			Message: `operation UpdateFlowDefinition: security "": security requirement is not satisfied`,
+			Message: "The request lacks valid authentication credentials.",
 		},
 	}, resp)
 }
@@ -631,7 +631,7 @@ func TestGetFlowDefinitionUnauthenticated(t *testing.T) {
 		StatusCode: http.StatusUnauthorized,
 		Response: api.ErrorDetails{
 			Code:    "auth.unauthorized",
-			Message: `operation GetFlowDefinition: security "": security requirement is not satisfied`,
+			Message: "The request lacks valid authentication credentials.",
 		},
 	}, getResp)
 }
@@ -722,7 +722,7 @@ func TestListFlowDefinitionsUnauthenticated(t *testing.T) {
 		StatusCode: http.StatusUnauthorized,
 		Response: api.ErrorDetails{
 			Code:    "auth.unauthorized",
-			Message: `operation ListFlowDefinitions: security "": security requirement is not satisfied`,
+			Message: "The request lacks valid authentication credentials.",
 		},
 	}, getResp)
 }
@@ -981,7 +981,7 @@ func TestDeleteFlowDefinitionUnauthenticated(t *testing.T) {
 		StatusCode: http.StatusUnauthorized,
 		Response: api.ErrorDetails{
 			Code:    "auth.unauthorized",
-			Message: `operation DeleteFlowDefinition: security "": security requirement is not satisfied`,
+			Message: "The request lacks valid authentication credentials.",
 		},
 	}, resp)
 }
