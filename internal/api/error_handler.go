@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-faster/errors"
 	"github.com/ogen-go/ogen/ogenerrors"
+	"github.com/ogen-go/ogen/openapi"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 )
@@ -15,28 +16,14 @@ import (
 // domainErrorDetails extracts a domain.Error from err and returns it as an
 // api.ErrorDetails. If err is not a domain.Error, ErrInternal is used as
 // the fallback so the response is always well-formed.
+//
+// Only Code, Message, and explicitly attached Details cross the wire.
+// Parent and Location are diagnostics for logs and must never be serialized
+// into API responses (ADR 030).
 func domainErrorDetails(err error) api.ErrorDetails {
 	var domErr domain.Error
-	details := make(api.ErrorDetailsDetails)
 	if !errors.As(err, &domErr) {
 		domErr = domain.ErrInternal(err)
-	}
-
-	if domErr.Details != nil {
-		if j, err := json.Marshal(domErr.Details); err == nil {
-			details["details"] = j
-		}
-	}
-	if domErr.Parent != nil {
-		strParent := domErr.Parent.Error()
-		if j, err := json.Marshal(strParent); err == nil {
-			details["parent"] = j
-		}
-	}
-	if domErr.Location != "" {
-		if j, err := json.Marshal(domErr.Location); err == nil {
-			details["location"] = j
-		}
 	}
 
 	errDetails := api.ErrorDetails{
@@ -44,8 +31,12 @@ func domainErrorDetails(err error) api.ErrorDetails {
 		Message: domErr.Message,
 	}
 
-	if len(details) > 0 {
-		errDetails.Details = api.NewOptErrorDetailsDetails(details)
+	if domErr.Details != nil {
+		if j, err := json.Marshal(domErr.Details); err == nil {
+			errDetails.Details = api.NewOptErrorDetailsDetails(api.ErrorDetailsDetails{
+				"details": j,
+			})
+		}
 	}
 
 	return errDetails
@@ -101,9 +92,15 @@ func OgenErrorHandler(_ context.Context, w http.ResponseWriter, _ *http.Request,
 	switch {
 	case isSecurityError(err):
 		status = http.StatusUnauthorized
-		d := domainErrorDetails(domain.ErrAuthUnauthorized(err))
-		d.Message = err.Error()
-		details = d
+		details = domainErrorDetails(domain.ErrAuthUnauthorized(err))
+
+	case isSessionCookieDecodeError(err):
+		// The session cookie is a credential, not request structure: a request
+		// that fails to provide it is unauthenticated (401), not invalid (400).
+		// The message mirrors the OpenAPI 401 description for these operations.
+		status = http.StatusUnauthorized
+		details = domainErrorDetails(
+			domain.ErrAuthUnauthorized(err).WithMessage("Missing or invalid session token."))
 
 	case isDecodeError(err):
 		status = http.StatusBadRequest
@@ -134,4 +131,15 @@ func isDecodeError(err error) bool {
 	var decodeParams *ogenerrors.DecodeParamsError
 	var decodeRequest *ogenerrors.DecodeRequestError
 	return errors.As(err, &decodeParams) || errors.As(err, &decodeRequest)
+}
+
+// isSessionCookieDecodeError reports whether err is a parameter-decode failure
+// for the __nextgen_session cookie, i.e. the request lacks session credentials.
+// The cookie is modeled as a required ogen parameter on the */me operations, so
+// its absence surfaces as a decode error rather than a security error.
+func isSessionCookieDecodeError(err error) bool {
+	var paramErr *ogenerrors.DecodeParamError
+	return errors.As(err, &paramErr) &&
+		paramErr.In == openapi.LocationCookie &&
+		paramErr.Name == sessionCookieName
 }

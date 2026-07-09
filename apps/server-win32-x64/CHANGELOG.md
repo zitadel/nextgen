@@ -1,5 +1,7 @@
 # @zitadel/server-win32-x64
 
+## 0.1.0-alpha.15
+
 ## 0.1.0-alpha.14
 
 ### Patch Changes
