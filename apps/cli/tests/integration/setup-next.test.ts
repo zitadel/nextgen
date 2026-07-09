@@ -152,11 +152,12 @@ describe("Next setup integration", () => {
     expect(loginPage).toContain("project={project}");
     expect(loginPage).not.toContain("NEXT_PUBLIC_ZITADEL_API_BASE");
     expect(loginPage).toContain('post-sign-in-url="/profile"');
-    expect(loginPage).toContain('href="/register"');
+    expect(loginPage).not.toContain('href="/register"');
+    expect(loginPage).not.toContain("next/link");
     expect(loginPage).not.toContain('href="/profile"');
     const registerPage = await readFile(join(cwd, "app/register/page.tsx"), "utf8");
     expect(registerPage).toContain('purpose="register"');
-    expect(registerPage).toContain('href="/login"');
+    expect(registerPage).not.toContain('href="/login"');
     expect(registerPage).not.toContain('href="/profile"');
     const profilePage = await readFile(join(cwd, "app/profile/page.tsx"), "utf8");
     expect(profilePage).toContain("zitadel-cli: managed-file v1");

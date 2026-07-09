@@ -122,7 +122,7 @@ function outcome(input: {
   const statusCommand = publicCliCommand("status", input.cliVersion);
   const verifyActions = [
     ...(input.includeInstallCommand ? [`Install dependencies: ${input.install.command}`] : []),
-    `Start your project: ${input.devCommand} (then open ${input.issuer})`,
+    `Start your project: ${input.devCommand} (then open ${input.issuer}/login)`,
     verifyLoginAction(),
   ];
   const breadcrumb = `Once login works: ${statusCommand} shows your next steps; customizing is covered in your README's Zitadel section.`;
