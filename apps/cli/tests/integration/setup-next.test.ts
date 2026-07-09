@@ -3,7 +3,12 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
+import {
+  resetPlatformStore,
+  setupPlatformHandlers,
+  snapshotPlatformStore,
+} from "@zitadel/api-mock/platform";
+import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
@@ -38,6 +43,7 @@ describe("Next setup integration", () => {
       status: string;
       data: {
         install: { status: string; package_manager: string; command: string };
+        files_written: string[];
         next_actions: string[];
         next_commands: string[];
       };
@@ -55,17 +61,64 @@ describe("Next setup integration", () => {
     expect(setupJson.data.next_actions.join("\n")).toContain("register a user");
     expect(setupJson.data.next_actions.join("\n")).toContain("log in again");
     expect(setupJson.data.next_actions.join("\n")).toContain("/profile shows Signed in");
+    expect(setupJson.data.files_written).toContain(".zitadel/schemas/default-human-user.json");
+    expect(setupJson.data.files_written).toContain(".zitadel/flows/default-login.json");
     const installLog = JSON.parse((await readFile(fakeNpm.logPath, "utf8")).trim()) as {
       cwd: string;
       args: string[];
     };
     expect(installLog).toEqual({ cwd: await realpath(cwd), args: ["install"] });
 
-    // The user schema and flow are provisioned server-side when the project
-    // is created, so setup does not write `.zitadel/schemas` or
-    // `.zitadel/flows`; only the framework files and project config are
-    // scaffolded locally.
+    // Setup scaffolds the default schema and flow locally, uploads those files
+    // through the resource APIs, and seeds sync state with the returned
+    // ids/hashes, so `plan` is immediately empty.
     expect(await readFile(join(cwd, "zitadel.json"), "utf8")).toContain('"project"');
+    const schema = JSON.parse(
+      await readFile(join(cwd, ".zitadel/schemas/default-human-user.json"), "utf8"),
+    ) as {
+      objectType: string;
+      kind: string;
+      properties: Record<string, unknown>;
+    };
+    expect(schema.kind).toBe("user-schema");
+    expect(schema.objectType).toBe("human-user");
+    expect(schema).not.toHaveProperty("$id");
+    expect(schema.properties).toHaveProperty("email");
+    // The schema id is server-assigned on create; the local file stays
+    // id-less and the flow pins whatever id came back.
+    const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
+      resources: Record<string, { id?: string; hash?: string; name?: string; status?: string }>;
+    };
+    const schemaId = state.resources[".zitadel/schemas/default-human-user.json"]?.id;
+    expect(schemaId).toMatch(/^sch_/);
+    const flow = JSON.parse(
+      await readFile(join(cwd, ".zitadel/flows/default-login.json"), "utf8"),
+    ) as {
+      name: string;
+      status: string;
+      user_schema: string;
+      purposes: Record<string, string>;
+    };
+    expect(flow.name).toBe("default-login");
+    expect(flow.status).toBe("active");
+    expect(flow.user_schema).toBe(schemaId);
+    expect(flow.purposes).toMatchObject({ login: "identifier", register: "register" });
+    expect(snapshotPlatformStore()).toMatchObject({
+      projects: 1,
+      schemas: 1,
+      flowDefinitions: 1,
+      schemaIds: [schemaId],
+    });
+    expect(state.resources[".zitadel/schemas/default-human-user.json"]).toMatchObject({
+      id: schemaId,
+      hash: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+    expect(state.resources[".zitadel/flows/default-login.json"]).toMatchObject({
+      id: expect.stringMatching(/^flow_/),
+      hash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      name: "default-login",
+      status: "active",
+    });
     const loginPage = await readFile(join(cwd, "app/login/page.tsx"), "utf8");
     expect(loginPage).toContain("zitadel-cli: managed-file v1");
     expect(loginPage).toContain('"use client"');
@@ -139,9 +192,12 @@ describe("Next setup integration", () => {
     const stateBeforePlan = await readFile(join(cwd, ".zitadel/state.json"), "utf8");
     const plan = await cli(["plan", "--cwd", cwd, "--json"]);
     expect(plan.exitCode).toBe(0);
-    const planJson = parseJson(plan.stdout) as { status: string; data: { total: number } };
+    const planJson = parseJson(plan.stdout) as {
+      status: string;
+      data: { creates: number; updates: number; deletes: number; total: number };
+    };
     expect(planJson.status).toBe("ok");
-    expect(typeof planJson.data.total).toBe("number");
+    expect(planJson.data).toMatchObject({ creates: 0, updates: 0, deletes: 0, total: 0 });
     expect(await readFile(join(cwd, ".zitadel/state.json"), "utf8")).toBe(stateBeforePlan);
 
     const apply = await cli(["apply", "--cwd", cwd, "--json"]);
@@ -149,6 +205,62 @@ describe("Next setup integration", () => {
     const applyJson = parseJson(apply.stdout) as { status: string; data: { synced: boolean } };
     expect(applyJson.status).toBe("ok");
     expect(applyJson.data.synced).toBe(true);
+  });
+
+  it("skips rerun setup without rewriting edited schema or flow config", async () => {
+    const cwd = await createNextProject();
+    const setup = await cli(["setup", "--cwd", cwd, "--non-interactive", "--json", "--skip-install"]);
+    expect(setup.exitCode).toBe(0);
+
+    const flowPath = join(cwd, ".zitadel/flows/default-login.json");
+    const schemaPath = join(cwd, ".zitadel/schemas/default-human-user.json");
+    const editedFlow = `${await readFile(flowPath, "utf8")}\n`;
+    const editedSchema = `${await readFile(schemaPath, "utf8")}\n`;
+    await writeFile(flowPath, editedFlow);
+    await writeFile(schemaPath, editedSchema);
+
+    const rerun = await cli(["setup", "--cwd", cwd, "--non-interactive", "--json", "--skip-install"]);
+    expect(rerun.exitCode).toBe(0);
+    expect((parseJson(rerun.stdout) as { status: string }).status).toBe("skipped");
+    await expect(readFile(flowPath, "utf8")).resolves.toBe(editedFlow);
+    await expect(readFile(schemaPath, "utf8")).resolves.toBe(editedSchema);
+  });
+
+  it("releases the already-initialized marker when resource seeding fails so a rerun can complete", async () => {
+    const cwd = await createNextProject();
+    // First attempt: the platform rejects the schema upload after the
+    // project was already created and zitadel.json was written.
+    server.use(
+      http.post("*/schemas", () =>
+        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+      ),
+    );
+
+    const failed = await cli(["setup", "--cwd", cwd, "--non-interactive", "--json", "--skip-install"]);
+    expect(failed.exitCode).not.toBe(0);
+    expect((parseJson(failed.stdout) as { status: string }).status).toBe("error");
+    // The skip marker must be gone — otherwise every rerun reports
+    // "skipped" and the project is stranded without a login flow.
+    await expect(stat(join(cwd, "zitadel.json"))).rejects.toThrow();
+
+    // Rerun against a healthy platform completes the interrupted setup.
+    server.resetHandlers();
+    const retry = await cli([
+      "setup",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+      "--force",
+    ]);
+    expect(retry.exitCode).toBe(0);
+    expect((parseJson(retry.stdout) as { status: string }).status).toBe("ok");
+    const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
+      resources: Record<string, { id?: string }>;
+    };
+    expect(state.resources[".zitadel/schemas/default-human-user.json"]?.id).toMatch(/^sch_/);
+    expect(state.resources[".zitadel/flows/default-login.json"]?.id).toMatch(/^flow_/);
   });
 
   it("fails apply clearly for missing env refs", async () => {

@@ -329,6 +329,10 @@ ${GENERATED_BLOCK_END}`,
     await expect(
       upsertProductGithubRelease({
         metadata: metadata(),
+        env: {
+          GITHUB_REPOSITORY: "zitadel/nextgen",
+          GITHUB_SHA: "abc123",
+        },
         fetchImpl: async () => jsonResponse(500, {}),
         log: () => undefined,
       }),

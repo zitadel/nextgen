@@ -1,0 +1,51 @@
+id: "config"
+language: "typescript"
+layer: "library"
+stack: "frontend"
+dependsOn:
+  - "api"
+
+tasks:
+  lint:
+    command: "corepack pnpm run lint"
+    deps:
+      - "api:build"
+
+  typecheck:
+    command: "corepack pnpm run typecheck"
+    deps:
+      - "api:build"
+
+  build:
+    command: "corepack pnpm run build"
+    deps:
+      - "api:build"
+    outputs:
+      - "dist/**/*"
+
+  build-release:
+    script: |
+      node ../../scripts/release-clean.mjs local-dist
+      corepack pnpm run build
+    deps:
+      - "api:build-release"
+    outputs:
+      - "dist/**/*"
+    options:
+      cache: false
+      # Release builds remove stale package output and rebuild dist inside one
+      # mutex-held task. They stay out of `moon ci`; release:snapshot invokes
+      # them in the later release step instead of the normal build/test graph.
+      runInCI: false
+      # cli:test drives the built oclif CLI, whose commands import
+      # @zitadel/config/defaults from this package's dist at runtime. The
+      # shared mutex keeps this release build and its preclean from running
+      # while those tests are importing it.
+      # A task dep on cli:test is not possible: cli dependsOn config, so
+      # the reverse edge would cycle the project graph.
+      mutex: "public-dist"
+
+  test:
+    command: "corepack pnpm run test"
+    deps:
+      - "build"

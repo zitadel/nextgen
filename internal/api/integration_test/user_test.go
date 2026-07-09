@@ -19,7 +19,7 @@ import (
 func TestCreateUser(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 	require.NoError(t, err)
 
 	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
@@ -198,7 +198,7 @@ func TestCreateUser(t *testing.T) {
 func TestSetUserPassword(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 	require.NoError(t, err)
 
 	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
@@ -285,7 +285,7 @@ func TestSetUserPassword(t *testing.T) {
 		t.Run("user not found", func(t *testing.T) {
 			t.Parallel()
 
-			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 			require.NoError(t, err)
 
 			request := &api.SetUserPasswordRequest{
@@ -307,7 +307,7 @@ func TestSetUserPassword(t *testing.T) {
 func TestGetUser(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 	require.NoError(t, err)
 
 	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
@@ -337,7 +337,7 @@ func TestGetMyUser(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()
 
-		project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+		project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 		require.NoError(t, err)
 		client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
