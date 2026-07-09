@@ -44,7 +44,7 @@ npx @zitadel/cli@alpha apply
 - Schemas are **revisioned**: an edit publishes a new immutable revision instead of mutating the old one, so existing users and flows keep validating against the revision they were created with.
 - Flows are **mutable**: an edit updates the flow in place.
 - Flows pin one schema revision via `user_schema`. When a schema edit publishes a new revision, `apply` rewrites `user_schema` in the pinned flow files and updates the flows in the same run — the plan announces the re-pin, and the file rewrite shows up in your git diff.
-- Your files are stored as written — locally and on the platform. Comparison, however, is semantic: an edit that only spells out a default the meta-schema already implies (for example adding `"x-editable": true` to a property) changes no behavior, so `plan` reports no change. The spelled-out value stays in your file and is included verbatim the next time a real edit publishes.
+- Your local files stay as written — the CLI never rewrites them except to reconcile with a real server-side change. The platform stores a canonicalized form of what you upload: meta-schema defaults are spelled out (e.g. `"x-editable": true`), so every immutable revision is self-contained. Comparison is semantic, bridging the two: an edit that only spells out a default changes no behavior, so `plan` reports no change, and the platform's spelled-out defaults never show up as a diff against your leaner file.
 
 For agents:
 
