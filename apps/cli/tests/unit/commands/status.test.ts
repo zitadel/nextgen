@@ -2,7 +2,9 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import {
   localContainerName,
@@ -11,6 +13,14 @@ import {
   type RuntimeMetadata,
 } from "../../../src/lib/local-server/runtime";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
+
+// The platform is unreachable unless a test says otherwise — a network error,
+// not an HTTP status — so the user-presence probe reads as "unknown" and
+// status keeps its lifecycle-only output.
+const server = setupServer(http.get("*/users", () => HttpResponse.error()));
+
+beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
+afterAll(() => server.close());
 
 const SECRET = {
   project_id: "proj-001",
@@ -34,6 +44,7 @@ function status(cwd: string) {
 }
 
 afterEach(async () => {
+  server.resetHandlers();
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop();
     if (dir) {
@@ -42,18 +53,23 @@ afterEach(async () => {
   }
 });
 
+async function configuredProject(): Promise<string> {
+  const cwd = await makeProject();
+  await writeFile(
+    join(cwd, "zitadel.json"),
+    JSON.stringify({
+      project: "proj-001",
+      server: "https://api.zitadel.cloud",
+      environments: { development: { issuer: "http://localhost:3000" } },
+    }),
+  );
+  await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
+  return cwd;
+}
+
 describe("status command", () => {
   it("returns an ok envelope for a healthy project with config and secret", async () => {
-    const cwd = await makeProject();
-    await writeFile(
-      join(cwd, "zitadel.json"),
-      JSON.stringify({
-        project: "proj-001",
-        server: "https://api.zitadel.cloud",
-        environments: { development: { issuer: "http://localhost:3000" } },
-      }),
-    );
-    await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
+    const cwd = await configuredProject();
 
     const res = await status(cwd);
 
@@ -155,6 +171,51 @@ describe("status command", () => {
     expect(json.data.project.lifecycle).toBe("configured");
     expect(json.data.project.project_id).toBe("proj-001");
     expect(json.data.project.issuer).toBeUndefined();
+  });
+
+  it("stages verify-login guidance while the project has no users", async () => {
+    const cwd = await configuredProject();
+    server.use(http.get("*/users", () => HttpResponse.json([])));
+
+    const res = await status(cwd);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { data: { next_actions: string[] } };
+    const actions = json.data.next_actions.join("\n");
+    expect(actions).toContain("open http://localhost:3000");
+    expect(actions).toContain("register a user");
+    expect(actions).not.toContain(".zitadel/schemas/");
+  });
+
+  it("switches to customize/publish guidance once users exist", async () => {
+    const cwd = await configuredProject();
+    server.use(http.get("*/users", () => HttpResponse.json([{ id: "usr_1" }])));
+
+    const res = await status(cwd);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { data: { next_actions: string[] } };
+    const actions = json.data.next_actions.join("\n");
+    expect(actions).toContain("Customize what you ask for and how people sign in");
+    expect(actions).toContain(".zitadel/schemas/");
+    expect(actions).toContain(
+      `See your changes before they go live: ${expectedPublicCliCommand("plan")} to preview, ` +
+        `then ${expectedPublicCliCommand("apply")} to publish.`,
+    );
+    expect(actions).not.toContain("register a user");
+  });
+
+  it("keeps lifecycle-only output when the platform is unreachable", async () => {
+    const cwd = await configuredProject();
+
+    const res = await status(cwd);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      data: { next_actions: string[]; next_commands: string[] };
+    };
+    expect(json.data.next_actions).toEqual([]);
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("apply"));
   });
 });
 

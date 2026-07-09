@@ -1,6 +1,7 @@
 import { consola } from "consola";
 
 import { ZitadelError } from "../../lib/errors";
+import { customizeAndPublishActions, verifyLoginAction } from "../../lib/journey-guidance";
 import {
   detectPackageManager,
   devCommandFor,
@@ -23,6 +24,13 @@ export type SetupInstall = {
 export type SetupInstallOutcome = {
   install: SetupInstall;
   devCommand: string;
+  /**
+   * Journey-staged subset for the human terminal box: the verify mission
+   * plus one breadcrumb to `status`/README. Customize/publish guidance stays
+   * out until login demonstrably works (Elina, alpha.15).
+   */
+  boxActions: string[];
+  /** Complete journey for the JSON envelope — agents consume all of it. */
   nextActions: string[];
   nextCommands: string[];
 };
@@ -111,20 +119,18 @@ function outcome(input: {
   includeInstallCommand: boolean;
 }): SetupInstallOutcome {
   const planCommand = publicCliCommand("plan", input.cliVersion);
-  const applyCommand = publicCliCommand("apply", input.cliVersion);
-  const startAction = `Start your project: ${input.devCommand} (then open ${input.issuer})`;
-  const verifyAction =
-    "Verify auth in the browser: register a user, log out, log in again with the same user, and confirm /profile shows Signed in.";
-  const customizeAction =
-    "Customize auth: edit the user schema (.zitadel/schemas/) and login flow (.zitadel/flows/) — each folder has a README explaining what you can change.";
-  const applyAction = `Preview and publish config changes: ${planCommand} then ${applyCommand}`;
-  const afterInstall = [startAction, verifyAction, customizeAction, applyAction];
+  const statusCommand = publicCliCommand("status", input.cliVersion);
+  const verifyActions = [
+    ...(input.includeInstallCommand ? [`Install dependencies: ${input.install.command}`] : []),
+    `Start your project: ${input.devCommand} (then open ${input.issuer})`,
+    verifyLoginAction(),
+  ];
+  const breadcrumb = `Once login works: ${statusCommand} shows your next steps; customizing is covered in your README's Zitadel section.`;
   return {
     install: input.install,
     devCommand: input.devCommand,
-    nextActions: input.includeInstallCommand
-      ? [`Install dependencies: ${input.install.command}`, ...afterInstall]
-      : afterInstall,
+    boxActions: [...verifyActions, breadcrumb],
+    nextActions: [...verifyActions, ...customizeAndPublishActions(input.cliVersion)],
     nextCommands: input.includeInstallCommand
       ? [input.install.command, input.devCommand, planCommand]
       : [input.devCommand, planCommand],
