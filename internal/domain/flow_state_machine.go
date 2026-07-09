@@ -705,7 +705,13 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 	// created before the passkey rule (or submissions bypassing the UI)
 	// must not run WebAuthn ceremonies when the schema disables passkey.
 	// Refuses every leg — issuing, resuming, and verifying, for
-	// assertion and registration alike.
+	// assertion and registration alike. That breadth is the decided
+	// semantics, not an implementation shortcut: x-auth-methods is an
+	// enforcement declaration, so disabling passkey also blocks
+	// assertion of already-registered credentials — a disabled method
+	// that still signs users in would make the schema lie. Should the
+	// product ever want enrollment-only enforcement, gate the issue
+	// legs below instead of this whole-ceremony refusal.
 	enabled, err := r.passkeyEnabled(ctx, client, state)
 	if err != nil {
 		return passkeyPhaseResult{}, err
