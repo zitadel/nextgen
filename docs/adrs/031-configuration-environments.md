@@ -1,4 +1,4 @@
-# ADR 028: Configuration Environments
+# ADR 031: Configuration Environments
 
 > **Status:** Draft
 > **Date:** 2026-07-07
