@@ -1,4 +1,4 @@
-# ADR 31: OpenAPI querying
+# ADR 031: OpenAPI querying
 
 > **Status:** Proposed
 > **Date:** 2026-06-30
