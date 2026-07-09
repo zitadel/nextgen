@@ -78,6 +78,7 @@ Transition values:
 - A terminal step (`complete` set) has nothing else.
 - Every key in `actions` has a matching key in `transitions`.
 - Every key in `transitions` is either an action name declared in this step's `actions` or a reserved engine-emitted outcome.
+- **`back` is a reserved action name.** The engine injects a `back` action on rendered responses when there's a step to return to (non-empty back stack on a non-terminal step). Authors must not declare an action named `back`, regardless of `kind`.
 - When `sso_providers` is non-empty, `transitions.callback` is defined. The `sso` action itself is engine-handled and never appears in `transitions`.
 - Every entry in `fields` resolves to a property in the referenced `user_schema`.
 - A step with an identifier-shaped field (schema property with non-empty `x-unique`) may declare a `user_not_found` transition; absence of the transition means the engine errors on lookup failure rather than routing. See [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md) for the direction this is heading.

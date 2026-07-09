@@ -1,6 +1,7 @@
 import { build } from "tsdown";
 
 import config from "../../tsdown.config";
+import { waitForBuiltCli } from "./oclif-build";
 
 /**
  * The integration harness drives the built oclif CLI in-process (oclif
@@ -11,4 +12,5 @@ import config from "../../tsdown.config";
  */
 export default async function setup(): Promise<void> {
   await build(config);
+  await waitForBuiltCli();
 }

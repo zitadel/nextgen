@@ -169,7 +169,8 @@ describe("setup command", () => {
       reason: "dry-run",
       command: "npm install",
     });
-    expect(json.data.next_commands).toEqual(["npm install", "npm run dev"]);
+    expect(json.data.next_commands.slice(0, 2)).toEqual(["npm install", "npm run dev"]);
+    expect(json.data.next_commands[2]).toMatch(/^npx @zitadel\/cli@\S+ plan$/);
   });
 
   it.each(FRAMEWORK_FIXTURES)(
@@ -193,7 +194,8 @@ describe("setup command", () => {
       expect(json.data.framework).toBe(framework);
       expect(json.data.install).toMatchObject({ status: "skipped", reason: "dry-run" });
       expect(json.data.files_written).toContain(expectedFile);
-      expect(json.data.next_commands).toEqual(["npm install", "npm run dev"]);
+      expect(json.data.next_commands.slice(0, 2)).toEqual(["npm install", "npm run dev"]);
+      expect(json.data.next_commands[2]).toMatch(/^npx @zitadel\/cli@\S+ plan$/);
     },
   );
 

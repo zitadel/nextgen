@@ -1,4 +1,5 @@
-import type { SyncAction, SyncPlanSummary } from "./types.js";
+import { stableStringify } from "../json";
+import type { ResourceSyncer, SyncAction, SyncPlanSummary } from "./types.js";
 
 /**
  * Count the non-`skip` actions in a {@link buildSyncPlan} result. Pure; the
@@ -10,6 +11,7 @@ export function summarizePlan(actions: ReadonlyArray<SyncAction>): SyncPlanSumma
   return {
     creates: active.filter((a) => a.kind === "create").length,
     updates: active.filter((a) => a.kind === "update").length,
+    revisions: active.filter((a) => a.kind === "revise").length,
     deletes: active.filter((a) => a.kind === "delete").length,
     total: active.length,
   };
@@ -45,7 +47,7 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
 
   out.push("");
 
-  const { creates, updates, deletes } = summarizePlan(actions);
+  const { creates, updates, revisions, deletes } = summarizePlan(actions);
 
   const parts: string[] = [];
   if (creates > 0) {
@@ -53,6 +55,9 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
   }
   if (updates > 0) {
     parts.push(`${updates} to change`);
+  }
+  if (revisions > 0) {
+    parts.push(`${revisions} new revision${revisions === 1 ? "" : "s"}`);
   }
   if (deletes > 0) {
     parts.push(`${deletes} to destroy`);
@@ -283,7 +288,10 @@ function renderDiff(
         lines.push(col(`${pad}~ ${pk} = ${fmtPrimitive(oldVal)} -> ${fmtPrimitive(newVal)}`));
       }
     } else if (Array.isArray(oldVal) && Array.isArray(newVal)) {
-      if (JSON.stringify(oldVal) === JSON.stringify(newVal)) {
+      // Key-order-insensitive equality: the server echoes objects in its own
+      // field order while local files are stably sorted — that difference is
+      // not a change.
+      if (stableStringify(oldVal) === stableStringify(newVal)) {
         if (newVal.length === 0) {
           lines.push(`${pad}  ${pk} = []`);
         } else {
@@ -356,6 +364,18 @@ function resourceName(path: string): string {
 }
 
 /**
+ * Diff both sides in the syncer's canonical form so server-echoed noise
+ * (empty `audience`, spelled-out meta-schema defaults) never renders as a
+ * change the author didn't make. Rendering only — upload payloads stay raw.
+ */
+function normalized(
+  syncer: Pick<ResourceSyncer, "normalize">,
+  content: object,
+): Record<string, unknown> {
+  return (syncer.normalize?.(content) ?? content) as Record<string, unknown>;
+}
+
+/**
  * Renders one Terraform-style resource block for a single `SyncAction`.
  *
  * Per-case notes:
@@ -385,6 +405,11 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
         id: KNOWN_AFTER_APPLY,
         ...(action.content as Record<string, unknown>),
       };
+      if (action.repin) {
+        // The executor POSTs this flow with the new revision id, not the
+        // stale pin still in the file — render what will actually be sent.
+        display.user_schema = action.repin.newId ?? KNOWN_AFTER_APPLY;
+      }
       renderFields(display, "+", FIELD_COL, { tty, deleteMode: false }, lines);
       lines.push(`${closePad}}`);
       break;
@@ -410,18 +435,31 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
     }
 
     case "update": {
-      const header = `${blkPad}# ${action.path} will be updated in-place`;
+      const headerSuffix = action.repin ? " (re-pin user_schema)" : "";
+      const header = `${blkPad}# ${action.path} will be updated in-place${headerSuffix}`;
       const opening = `${blkPad}~ resource "${action.syncer.kind}" "${resourceName(action.path)}" {`;
       lines.push(paint(header, A.bold, tty));
       lines.push(paint(opening, A.yellow, tty));
 
+      // A repin update ships with `user_schema` rewritten to the revision id
+      // the revise mints (or already minted, for crash recovery) — render the
+      // content the executor will actually PUT.
+      const newContent = action.repin
+        ? {
+            ...normalized(action.syncer, action.content),
+            user_schema: action.repin.newId ?? KNOWN_AFTER_APPLY,
+          }
+        : normalized(action.syncer, action.content);
+
       if (action.oldContent) {
-        renderDiff(
-          action.oldContent as Record<string, unknown>,
-          action.content as Record<string, unknown>,
-          FIELD_COL,
-          tty,
-          lines,
+        renderDiff(normalized(action.syncer, action.oldContent), newContent, FIELD_COL, tty, lines);
+      } else if (action.repin) {
+        lines.push(
+          paint(
+            `${" ".repeat(FIELD_COL)}~ user_schema = "${action.repin.previousId}" -> ${action.repin.newId ? `"${action.repin.newId}"` : KNOWN_AFTER_APPLY}`,
+            A.yellow,
+            tty,
+          ),
         );
       } else {
         lines.push(
@@ -429,6 +467,43 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
         );
       }
       lines.push(`${closePad}}`);
+      break;
+    }
+
+    case "revise": {
+      const header = `${blkPad}# ${action.path} will publish a new revision`;
+      const opening = `${blkPad}~ resource "${action.syncer.kind}" "${resourceName(action.path)}" {`;
+      lines.push(paint(header, A.bold, tty));
+      lines.push(paint(opening, A.yellow, tty));
+
+      if (action.oldContent) {
+        const oldWithId: Record<string, unknown> = {
+          id: action.previousId,
+          ...normalized(action.syncer, action.oldContent),
+        };
+        const newWithId: Record<string, unknown> = {
+          id: KNOWN_AFTER_APPLY,
+          ...normalized(action.syncer, action.content),
+        };
+        renderDiff(oldWithId, newWithId, FIELD_COL, tty, lines);
+      } else {
+        lines.push(
+          `${" ".repeat(FIELD_COL)}  # (field diff unavailable — no read endpoint for ${action.syncer.kind})`,
+        );
+      }
+      lines.push(`${closePad}}`);
+      if (action.affectedPaths.length > 0) {
+        lines.push(
+          paint(
+            `${blkPad}# user_schema will be re-pinned to the new revision ${KNOWN_AFTER_APPLY} in:`,
+            A.yellow,
+            tty,
+          ),
+        );
+        for (const path of action.affectedPaths) {
+          lines.push(paint(`${blkPad}#   - ${path}`, A.yellow, tty));
+        }
+      }
       break;
     }
 

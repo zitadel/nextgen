@@ -1,22 +1,38 @@
 import { describe, expect, it } from "vitest";
 
+import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
+
 import { renderPlan, summarizePlan } from "../../../../src/lib/sync/plan-renderer";
 import type { ResourceSyncer, SyncAction } from "../../../../src/lib/sync/types";
 
-function makeSyncer(kind: string, directory: string, mutable = false): ResourceSyncer {
+function makeSyncer(
+  kind: string,
+  directory: string,
+  {
+    mutable = false,
+    revisioned = false,
+    normalize,
+  }: {
+    mutable?: boolean;
+    revisioned?: boolean;
+    normalize?: (data: object) => object;
+  } = {},
+): ResourceSyncer {
   return {
     kind,
     directory,
     mutable,
+    revisioned,
+    ...(normalize ? { normalize } : {}),
     validate() { /* no-op: renderer tests do not exercise validation */ },
-    async create(_d: object) { return "id"; },
-    async update() { /* no-op: renderer tests do not exercise update */ },
+    async create(_d: object) { return { id: "id" }; },
+    async update() { return {}; },
     async delete() { /* no-op: renderer tests do not exercise delete */ },
   };
 }
 
-const schema = makeSyncer("schema", ".zitadel/schemas");
-const flow = makeSyncer("flow", ".zitadel/flows", true);
+const schema = makeSyncer("schema", ".zitadel/schemas", { revisioned: true });
+const flow = makeSyncer("flow", ".zitadel/flows", { mutable: true });
 
 describe("summarizePlan", () => {
   it("counts each action kind and ignores skips", () => {
@@ -28,14 +44,27 @@ describe("summarizePlan", () => {
       { kind: "skip", path: "e", reason: "no-change" },
     ];
 
-    expect(summarizePlan(actions)).toEqual({ creates: 2, updates: 1, deletes: 1, total: 4 });
+    expect(summarizePlan(actions)).toEqual({
+      creates: 2,
+      updates: 1,
+      revisions: 0,
+      deletes: 1,
+      total: 4,
+    });
   });
 
   it("returns all-zero for an empty or skip-only plan", () => {
-    expect(summarizePlan([])).toEqual({ creates: 0, updates: 0, deletes: 0, total: 0 });
+    expect(summarizePlan([])).toEqual({
+      creates: 0,
+      updates: 0,
+      revisions: 0,
+      deletes: 0,
+      total: 0,
+    });
     expect(summarizePlan([{ kind: "skip", path: "a", reason: "immutable" }])).toEqual({
       creates: 0,
       updates: 0,
+      revisions: 0,
       deletes: 0,
       total: 0,
     });
@@ -307,5 +336,130 @@ describe("renderPlan — string escaping", () => {
       },
     ];
     expect(renderPlan(actions, false)).toContain('"line1\\nline2"');
+  });
+});
+
+describe("renderPlan — normalized diffs", () => {
+  const normalizedFlow = makeSyncer("flow", ".zitadel/flows", {
+    mutable: true,
+    normalize: normalizeFlowBody,
+  });
+  const normalizedSchema = makeSyncer("schema", ".zitadel/schemas", {
+    revisioned: true,
+    normalize: normalizeSchemaBody,
+  });
+
+  it("does not render a server-echoed empty audience as a deletion", () => {
+    const actions: SyncAction[] = [
+      {
+        kind: "update",
+        path: ".zitadel/flows/default.json",
+        syncer: normalizedFlow,
+        id: "flow-1",
+        content: { name: "login", version: 2 },
+        hash: "h",
+        oldContent: { name: "login", version: 1, audience: {} },
+      },
+    ];
+
+    const out = renderPlan(actions, false);
+    expect(out).not.toContain("audience");
+    expect(out).toContain('~ version = 1 -> 2');
+  });
+
+  it("does not render spelled-out meta-schema defaults as schema changes", () => {
+    const actions: SyncAction[] = [
+      {
+        kind: "revise",
+        path: ".zitadel/schemas/user.json",
+        syncer: normalizedSchema,
+        content: {
+          properties: {
+            email: { type: "string" },
+            company: { type: "string" },
+          },
+        },
+        hash: "h",
+        previousId: "sch_A",
+        oldContent: {
+          properties: {
+            email: { type: "string", "x-editable": true, "x-sensitive": false },
+          },
+        },
+        affectedPaths: [],
+      },
+    ];
+
+    const out = renderPlan(actions, false);
+    // The only property-level change is the added `company`; the defaults
+    // spelled out on the server side must not read as removals.
+    expect(out).not.toContain("x-editable");
+    expect(out).not.toContain("x-sensitive");
+    expect(out).toContain("company");
+  });
+});
+
+describe("renderPlan — re-pin messaging", () => {
+  it("announces the pending re-pin on the revise block", () => {
+    const actions: SyncAction[] = [
+      {
+        kind: "revise",
+        path: ".zitadel/schemas/user.json",
+        syncer: schema,
+        content: { kind: "user-schema", v: 2 },
+        hash: "h",
+        previousId: "sch_A",
+        oldContent: { kind: "user-schema", v: 1 },
+        affectedPaths: [".zitadel/flows/default.json"],
+      },
+    ];
+
+    const out = renderPlan(actions, false);
+    expect(out).toContain(
+      "# user_schema will be re-pinned to the new revision (known after apply) in:",
+    );
+    expect(out).toContain("#   - .zitadel/flows/default.json");
+    expect(out).not.toContain("after apply, update user_schema");
+  });
+
+  it("renders a repin update as a user_schema change to (known after apply)", () => {
+    const actions: SyncAction[] = [
+      {
+        kind: "update",
+        path: ".zitadel/flows/default.json",
+        syncer: flow,
+        id: "flow-001",
+        content: { name: "login", user_schema: "sch_A" },
+        hash: "h",
+        oldContent: { name: "login", user_schema: "sch_A" },
+        repin: { previousId: "sch_A", schemaPath: ".zitadel/schemas/user.json" },
+      },
+    ];
+
+    const out = renderPlan(actions, false);
+    expect(out).toContain("will be updated in-place (re-pin user_schema)");
+    expect(out).toContain('~ user_schema = "sch_A" -> (known after apply)');
+  });
+
+  it("renders a recovered repin with the concrete revision id", () => {
+    const actions: SyncAction[] = [
+      {
+        kind: "update",
+        path: ".zitadel/flows/default.json",
+        syncer: flow,
+        id: "flow-001",
+        content: { name: "login", user_schema: "sch_A" },
+        hash: "h",
+        oldContent: { name: "login", user_schema: "sch_A" },
+        repin: {
+          previousId: "sch_A",
+          schemaPath: ".zitadel/schemas/user.json",
+          newId: "sch_B",
+        },
+      },
+    ];
+
+    const out = renderPlan(actions, false);
+    expect(out).toContain('~ user_schema = "sch_A" -> "sch_B"');
   });
 });

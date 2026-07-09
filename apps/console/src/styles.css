@@ -4,46 +4,16 @@
 @import "@zitadel/design-tokens/css/tailwind.css";
 @import "@zitadel/ui-react/styles.css";
 
+/*
+ * Console styling model (see apps/console/docs/styling.md):
+ *   - Colours/spacing/etc. live in @zitadel/design-tokens and are exposed as
+ *     Tailwind theme utilities (e.g. bg-zl-surface-default-black).
+ *   - React-only components style themselves with Tailwind utilities.
+ *   - This file holds ONLY the Tailwind entry, token imports, and genuinely
+ *     global page theming. Do not add component-scoped class rules here.
+ */
 body {
-  margin: 0;
   font-family: var(--zl-font-family-sans, system-ui, sans-serif);
-  color: var(--zl-color-text-default, #1a1a1a);
-}
-
-header {
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid var(--zl-color-border-default, #e2e8f0);
-}
-
-header h1 {
-  margin: 0;
-  font-size: 1.125rem;
-  font-weight: 600;
-}
-
-main {
-  padding: 2rem 1.5rem;
-}
-
-.console-welcome {
-  max-width: 32rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.console-welcome h2 {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 600;
-}
-
-.console-welcome p {
-  margin: 0;
-  line-height: 1.6;
-}
-
-.console-welcome__hint {
-  font-size: 0.875rem;
-  color: var(--zl-color-text-muted, #64748b);
+  background: var(--zl-color-surface-default-black);
+  color: var(--zl-color-text-primary-white);
 }

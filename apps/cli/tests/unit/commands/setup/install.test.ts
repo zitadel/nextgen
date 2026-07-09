@@ -24,6 +24,7 @@ async function tempProject(packageJson: Record<string, unknown> = {}): Promise<s
 
 function input(overrides: Partial<SetupInstallInput> = {}): SetupInstallInput {
   return {
+    cliVersion: "1.2.3",
     cwd: "",
     depsAdded: ["@zitadel/sdk-next"],
     dryRun: false,
@@ -35,6 +36,8 @@ function input(overrides: Partial<SetupInstallInput> = {}): SetupInstallInput {
     ...overrides,
   };
 }
+
+const planCommand = "npx @zitadel/cli@latest plan";
 
 describe("setup dependency installation", () => {
   it("installs when setup added a dependency", async () => {
@@ -60,7 +63,12 @@ describe("setup dependency installation", () => {
     expect(result.nextActions.join("\n")).not.toContain("http://localhost:3000/login");
     expect(result.nextActions.join("\n")).toContain("register a user");
     expect(result.nextActions.join("\n")).toContain("log in again");
-    expect(result.nextCommands).toEqual(["npm run dev"]);
+    expect(result.nextActions.join("\n")).toContain(".zitadel/schemas/");
+    expect(result.nextActions.join("\n")).toContain(".zitadel/flows/");
+    expect(result.nextActions.join("\n")).toContain(
+      `Preview and publish config changes: ${planCommand} then npx @zitadel/cli@latest apply`,
+    );
+    expect(result.nextCommands).toEqual(["npm run dev", planCommand]);
   });
 
   it("installs after fresh scaffolding even when no Zitadel dependency changed", async () => {
@@ -72,7 +80,7 @@ describe("setup dependency installation", () => {
     );
 
     expect(run.mock.calls[0]?.[0].display).toBe("pnpm install");
-    expect(result.nextCommands).toEqual(["pnpm dev"]);
+    expect(result.nextCommands).toEqual(["pnpm dev", planCommand]);
   });
 
   it("skips and recommends install when --skip-install is set", async () => {
@@ -83,7 +91,7 @@ describe("setup dependency installation", () => {
 
     expect(run).not.toHaveBeenCalled();
     expect(result.install).toMatchObject({ status: "skipped", reason: "skip-install" });
-    expect(result.nextCommands).toEqual(["npm install", "npm run dev"]);
+    expect(result.nextCommands).toEqual(["npm install", "npm run dev", planCommand]);
   });
 
   it("skips and recommends install during dry-run", async () => {
@@ -94,7 +102,7 @@ describe("setup dependency installation", () => {
 
     expect(run).not.toHaveBeenCalled();
     expect(result.install).toMatchObject({ status: "skipped", reason: "dry-run" });
-    expect(result.nextCommands).toEqual(["npm install", "npm run dev"]);
+    expect(result.nextCommands).toEqual(["npm install", "npm run dev", planCommand]);
   });
 
   it("does not install when no dependency changed", async () => {
@@ -105,7 +113,7 @@ describe("setup dependency installation", () => {
 
     expect(run).not.toHaveBeenCalled();
     expect(result.install).toMatchObject({ status: "not-needed" });
-    expect(result.nextCommands).toEqual(["npm run dev"]);
+    expect(result.nextCommands).toEqual(["npm run dev", planCommand]);
   });
 
   it("surfaces install failures with remediation", async () => {

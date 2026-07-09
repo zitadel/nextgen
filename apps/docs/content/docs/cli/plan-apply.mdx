@@ -1,7 +1,9 @@
 ---
 title: Plan and apply
-description: Validate local Zitadel configuration before uploading it.
+description: Edit local Zitadel configuration and sync it to the platform.
 ---
+
+`.zitadel/schemas/*.json` and `.zitadel/flows/*.json` are the source of truth for your project's user schemas and login flows. Edit them, preview with `plan`, publish with `apply`.
 
 `plan` previews the configuration sync diff without mutating files or platform state:
 
@@ -14,6 +16,35 @@ npx @zitadel/cli@alpha plan
 ```sh
 npx @zitadel/cli@alpha apply
 ```
+
+## Walkthrough: add a field to registration
+
+Add an optional `company` property to `.zitadel/schemas/default-human-user.json`:
+
+```json
+"properties": {
+  "company": { "type": "string", "description": "Company name" }
+}
+```
+
+(Leave `required` untouched to keep the field optional.)
+
+Then let users enter it during registration — add `"company"` to the `register` step's `fields` in `.zitadel/flows/default-login.json`.
+
+Preview and publish:
+
+```sh
+npx @zitadel/cli@alpha plan
+npx @zitadel/cli@alpha apply
+```
+
+## How syncing works
+
+- `.zitadel/state.json` maps each config file to its platform id and last-synced content hash. `plan` and `apply` compare against it to decide what changed; don't edit it by hand.
+- Schemas are **revisioned**: an edit publishes a new immutable revision instead of mutating the old one, so existing users and flows keep validating against the revision they were created with.
+- Flows are **mutable**: an edit updates the flow in place.
+- Flows pin one schema revision via `user_schema`. When a schema edit publishes a new revision, `apply` rewrites `user_schema` in the pinned flow files and updates the flows in the same run — the plan announces the re-pin, and the file rewrite shows up in your git diff.
+- Your local files stay as written — the CLI never rewrites them except to reconcile with a real server-side change. The platform stores a canonicalized form of what you upload: meta-schema defaults are spelled out (e.g. `"x-editable": true`), so every immutable revision is self-contained. Comparison is semantic, bridging the two: an edit that only spells out a default changes no behavior, so `plan` reports no change, and the platform's spelled-out defaults never show up as a diff against your leaner file.
 
 For agents:
 

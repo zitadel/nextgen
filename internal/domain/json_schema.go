@@ -41,10 +41,11 @@ func ErrJSONSchemaAlreadyExists() Error {
 var absoluteScheme = regexp.MustCompile(`^https?://`)
 
 type JSONSchema struct {
-	ProjectID string
-	URL       string
-	CreatedAt time.Time
-	Schema    []byte
+	ProjectID  string
+	URL        string
+	ObjectType *string
+	CreatedAt  time.Time
+	Schema     []byte
 }
 
 func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error) {
@@ -61,11 +62,17 @@ func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error)
 		}
 	}
 
+	var objectType *string
+	if ot, ok := maputil.Get[string](schema, "objectType"); ok {
+		objectType = &ot
+	}
+
 	return &JSONSchema{
-		ProjectID: projectID,
-		URL:       schemaID,
-		CreatedAt: time.Now().UTC(),
-		Schema:    schemabs,
+		ProjectID:  projectID,
+		URL:        schemaID,
+		ObjectType: objectType,
+		CreatedAt:  time.Now().UTC(),
+		Schema:     schemabs,
 	}, nil
 }
 
@@ -91,6 +98,7 @@ type JSONSchemaRepository interface {
 type jsonSchemaColumns interface {
 	ProjectID() database.Column
 	URL() database.Column
+	ObjectType() database.Column
 	CreatedAt() database.Column
 	Payload() database.Column
 }
@@ -99,6 +107,7 @@ type jsonSchemaConditions interface {
 	PrimaryKeyCondition(projectID, url string) database.Condition
 	ProjectIDCondition(projectID string) database.Condition
 	URLCondition(url string) database.Condition
+	ObjectTypeCondition(objectType string) database.Condition
 }
 
 const (

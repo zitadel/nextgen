@@ -28,8 +28,9 @@ describe("verify-tarballs script", () => {
       "@zitadel/sdk-next": "0.1.0-alpha.4",
     });
 
+    const packageCount = (await publicPackageDirs()).length;
     await expect(runVerify(tarballsDir)).resolves.toMatchObject({
-      stdout: expect.stringContaining("verified 18 installable tarballs"),
+      stdout: expect.stringContaining(`verified ${packageCount} installable tarballs`),
     });
   });
 

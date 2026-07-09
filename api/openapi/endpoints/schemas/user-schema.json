@@ -5,8 +5,7 @@
   "required": [
     "metaSchema",
     "kind",
-    "x-auth-methods",
-    "$id"
+    "x-auth-methods"
   ],
   "allOf": [
     {
@@ -20,10 +19,11 @@
       "const": "https://json-schema.org/draft/2020-12/schema",
       "description": "The JSON Schema version used for this schema."
     },
-    "$id": {
+    "objectType": {
       "type": "string",
-      "format": "uri",
-      "description": "The unique identifier for this user schema."
+      "maxLength": 256,
+      "description": "The type of user this schema describes. This is a customer chosen name.",
+      "example": "human-user"
     },
     "kind": {
       "type": "string",

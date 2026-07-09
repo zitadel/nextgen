@@ -39,13 +39,17 @@ export default class Apply extends BaseCommand {
       baseUrl: source,
       token: secret.project_secret,
     });
-    const syncers = makeSyncers({ client, projectId: secret.project_id, env });
+    const syncers = makeSyncers({
+      client,
+      projectId: secret.project_id,
+      env,
+    });
 
     if (!dryRun) {
       consola.start("Syncing schemas and flows to Zitadel");
-      await runSyncLoop(cwd, syncers);
+      const { filesUpdated } = await runSyncLoop(cwd, syncers);
       consola.success("Sync complete");
-      return this.emit({ status: "ok", data: { synced: true } });
+      return this.emit({ status: "ok", data: { synced: true, files_updated: filesUpdated } });
     }
 
     consola.start("Building plan (dry run)");
@@ -54,12 +58,14 @@ export default class Apply extends BaseCommand {
     this.recordTelemetry({
       creates: summary.creates,
       updates: summary.updates,
+      revisions: summary.revisions,
       deletes: summary.deletes,
       total: summary.total,
     });
     consola.success(
       `Plan: ${summary.creates} create${summary.creates === 1 ? "" : "s"}, ` +
         `${summary.updates} update${summary.updates === 1 ? "" : "s"}, ` +
+        `${summary.revisions} new revision${summary.revisions === 1 ? "" : "s"}, ` +
         `${summary.deletes} delete${summary.deletes === 1 ? "" : "s"}`,
     );
     return this.emit({

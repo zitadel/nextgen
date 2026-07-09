@@ -1728,6 +1728,10 @@ func (*CreateHandoffErrorResponseStatusCode) createHandoffRes() {}
 type CreateProjectRequest struct {
 	// Origins which are allowed for previewing and testing the project.
 	PreviewOrigins []string `json:"previewOrigins"`
+	// Whether the server should provision fallback default user schema and flow
+	// resources for the project. CLI-managed projects set this to false and
+	// upload their local .zitadel config files through the schema and flow APIs.
+	SeedDefaults OptBool `json:"seedDefaults"`
 }
 
 // GetPreviewOrigins returns the value of PreviewOrigins.
@@ -1735,9 +1739,19 @@ func (s *CreateProjectRequest) GetPreviewOrigins() []string {
 	return s.PreviewOrigins
 }
 
+// GetSeedDefaults returns the value of SeedDefaults.
+func (s *CreateProjectRequest) GetSeedDefaults() OptBool {
+	return s.SeedDefaults
+}
+
 // SetPreviewOrigins sets the value of PreviewOrigins.
 func (s *CreateProjectRequest) SetPreviewOrigins(val []string) {
 	s.PreviewOrigins = val
+}
+
+// SetSeedDefaults sets the value of SeedDefaults.
+func (s *CreateProjectRequest) SetSeedDefaults(val OptBool) {
+	s.SeedDefaults = val
 }
 
 // Ref: #
@@ -2305,6 +2319,7 @@ func (*ErrorDetailsStatusCode) getUserByIDRes()              {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()              {}
 func (*ErrorDetailsStatusCode) introspectRes()               {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()      {}
+func (*ErrorDetailsStatusCode) listSchemasRes()              {}
 func (*ErrorDetailsStatusCode) listSessionsRes()             {}
 func (*ErrorDetailsStatusCode) listUsersRes()                {}
 func (*ErrorDetailsStatusCode) revokeMySessionRes()          {}
@@ -2772,10 +2787,12 @@ type FlowDefinition struct {
 	// reference. Acts as the human display label as well; no separate slug.
 	Name   string               `json:"name"`
 	Status FlowDefinitionStatus `json:"status"`
-	// User schema this flow operates on. Step `fields` reference properties
-	// defined in this schema. The engine resolves field types, validation,
-	// and implicit outcomes from schema annotations at runtime.
-	UserSchema url.URL `json:"user_schema"`
+	// Server-assigned identifier of the user schema this flow operates on,
+	// as returned by `POST /schemas`. Opaque to the client — the shape is a
+	// server implementation detail. Step `fields` reference properties
+	// defined in the resolved schema; the engine resolves field types, validation, and
+	// implicit outcomes from schema annotations at runtime.
+	UserSchema string `json:"user_schema"`
 	// Maps each purpose this definition handles to its entry-point step.
 	// Keys are purpose names; values must match a `name` in `steps`. A
 	// definition can serve multiple purposes (e.g. a combined login/register
@@ -2798,7 +2815,7 @@ func (s *FlowDefinition) GetStatus() FlowDefinitionStatus {
 }
 
 // GetUserSchema returns the value of UserSchema.
-func (s *FlowDefinition) GetUserSchema() url.URL {
+func (s *FlowDefinition) GetUserSchema() string {
 	return s.UserSchema
 }
 
@@ -2828,7 +2845,7 @@ func (s *FlowDefinition) SetStatus(val FlowDefinitionStatus) {
 }
 
 // SetUserSchema sets the value of UserSchema.
-func (s *FlowDefinition) SetUserSchema(val url.URL) {
+func (s *FlowDefinition) SetUserSchema(val string) {
 	s.UserSchema = val
 }
 
@@ -5639,6 +5656,36 @@ func (s *ListFlowDefinitionsPurpose) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+type ListSchemasResponse []ListSchemasResponseItem
+
+func (*ListSchemasResponse) listSchemasRes() {}
+
+type ListSchemasResponseItem struct {
+	// The unique identifier for this schema.
+	ID        string    `json:"id"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// GetID returns the value of ID.
+func (s *ListSchemasResponseItem) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ListSchemasResponseItem) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetID sets the value of ID.
+func (s *ListSchemasResponseItem) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ListSchemasResponseItem) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
 }
 
 type ListSessionsBadRequest ErrorDetails
@@ -11137,15 +11184,15 @@ func (s *UserPropertyXMinusUnique) UnmarshalText(data []byte) error {
 type UserSchema struct {
 	// The JSON Schema version used for this schema.
 	Schema OptString `json:"$schema"`
-	// The unique identifier for this user schema.
-	ID url.URL `json:"$id"`
+	// The type of user this schema describes. This is a customer chosen name.
+	ObjectType OptString `json:"objectType"`
 	// Discriminator value for a user schema create request.
 	Kind string `json:"kind"`
 	// The user Schema version used for this schema.
 	MetaSchema             url.URL     `json:"metaSchema"`
 	XMinusAuthMinusMethods AuthMethods `json:"x-auth-methods"`
-	// A map of additional properties for the user definition, where the key is the property name and the
-	// value is the property schema.
+	// A map of additional properties for the user definition, where the
+	// key is the property name and the value is the property schema.
 	Properties      OptUserSchemaProperties `json:"properties"`
 	AdditionalProps UserSchemaAdditional
 }
@@ -11155,9 +11202,9 @@ func (s *UserSchema) GetSchema() OptString {
 	return s.Schema
 }
 
-// GetID returns the value of ID.
-func (s *UserSchema) GetID() url.URL {
-	return s.ID
+// GetObjectType returns the value of ObjectType.
+func (s *UserSchema) GetObjectType() OptString {
+	return s.ObjectType
 }
 
 // GetKind returns the value of Kind.
@@ -11190,9 +11237,9 @@ func (s *UserSchema) SetSchema(val OptString) {
 	s.Schema = val
 }
 
-// SetID sets the value of ID.
-func (s *UserSchema) SetID(val url.URL) {
-	s.ID = val
+// SetObjectType sets the value of ObjectType.
+func (s *UserSchema) SetObjectType(val OptString) {
+	s.ObjectType = val
 }
 
 // SetKind sets the value of Kind.
@@ -11231,8 +11278,8 @@ func (s *UserSchemaAdditional) init() UserSchemaAdditional {
 	return m
 }
 
-// A map of additional properties for the user definition, where the key is the property name and the
-// value is the property schema.
+// A map of additional properties for the user definition, where the
+// key is the property name and the value is the property schema.
 type UserSchemaProperties map[string]UserProperty
 
 func (s *UserSchemaProperties) init() UserSchemaProperties {
