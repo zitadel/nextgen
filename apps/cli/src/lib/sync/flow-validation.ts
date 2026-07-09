@@ -1,0 +1,120 @@
+import { consola } from "consola";
+
+import { validateFlowDefinition, type FlowValidationIssue } from "@zitadel/config/validate";
+
+import { ZitadelError } from "../errors";
+import type { ResourceEntry, SyncAction } from "./types.js";
+
+/**
+ * Pre-flight semantic validation for every flow this plan uploads,
+ * mirroring the server-side `ValidateFlowDefinition` (see
+ * `@zitadel/config/validate`). Runs inside `buildSyncPlan`, so `plan`
+ * reports the violations the server would only reveal on apply — and
+ * `apply` fails before any platform mutation instead of half-applied
+ * (a schema revision would otherwise publish before the flow update
+ * fails).
+ *
+ * Only actions that upload a flow (create/update, including repin-forced
+ * updates) are validated: an unchanged flow is never re-judged, so a
+ * validator behavior change cannot break an already-applied project.
+ *
+ * Warning-severity issues attach to their action (`action.warnings`) for
+ * plan rendering; error-severity issues aggregate into one E_VALIDATION
+ * carrying every violation.
+ *
+ * Escape hatch: setting `ZITADEL_SKIP_FLOW_VALIDATION` skips the check —
+ * insurance against a port bug rejecting something the server accepts.
+ */
+export function validatePlannedFlows(opts: {
+  actions: ReadonlyArray<SyncAction>;
+  scannedContents: ReadonlyMap<string, object>;
+  stateResources: Readonly<Record<string, ResourceEntry>>;
+}): void {
+  if (process.env.ZITADEL_SKIP_FLOW_VALIDATION) {
+    consola.warn("Flow validation skipped (ZITADEL_SKIP_FLOW_VALIDATION is set)");
+    return;
+  }
+
+  const failures: Array<{ path: string; issue: FlowValidationIssue }> = [];
+  let anyRepin = false;
+
+  for (const action of opts.actions) {
+    if (action.kind !== "create" && action.kind !== "update") {
+      continue;
+    }
+    if (action.syncer.kind !== "flow") {
+      continue;
+    }
+
+    const issues = validateFlowDefinition(
+      action.content,
+      resolveSchemaContent(action, opts.scannedContents, opts.stateResources),
+    );
+    const warnings = issues.filter((issue) => issue.severity === "warning");
+    if (warnings.length > 0) {
+      action.warnings = warnings.map(({ rule, message }) => ({ rule, message }));
+    }
+    for (const issue of issues) {
+      if (issue.severity === "error") {
+        failures.push({ path: action.path, issue });
+        anyRepin ||= action.repin !== undefined;
+      }
+    }
+  }
+
+  if (failures.length === 0) {
+    return;
+  }
+
+  const noun = failures.length === 1 ? "issue" : "issues";
+  throw new ZitadelError(
+    "E_VALIDATION",
+    `Flow validation failed (${failures.length} ${noun}):\n` +
+      failures.map(({ path, issue }) => `  - ${path}: ${issue.message}`).join("\n"),
+    {
+      hint:
+        "These are the same rules the server enforces on apply. Fix the flow definition(s) and re-run plan." +
+        (anyRepin
+          ? " A failing flow is adopting an edited schema revision — update its steps[].fields to match the edited schema (or restore the removed/renamed properties)."
+          : ""),
+      details: {
+        issues: failures.map(({ path, issue }) => ({
+          path,
+          rule: issue.rule,
+          message: issue.message,
+          ...(issue.step === undefined ? {} : { step: issue.step }),
+        })),
+      },
+    },
+  );
+}
+
+/**
+ * Locate the local content of the schema a flow's `user_schema` pins.
+ * A repin action already names the schema file (the pin is adopting that
+ * file's next/new revision); otherwise the pinned id is looked up in
+ * state and its file body taken from this scan. Unresolvable refs (e.g.
+ * an un-substituted `${USER_SCHEMA_URL}` placeholder or a server-side
+ * schema not tracked locally) return undefined — flow-local rules still
+ * run, schema-dependent rules are skipped.
+ */
+function resolveSchemaContent(
+  action: Extract<SyncAction, { kind: "create" | "update" }>,
+  scannedContents: ReadonlyMap<string, object>,
+  stateResources: Readonly<Record<string, ResourceEntry>>,
+): object | undefined {
+  if (action.repin) {
+    return scannedContents.get(action.repin.schemaPath);
+  }
+  const ref = (action.content as { user_schema?: unknown }).user_schema;
+  if (typeof ref !== "string" || ref === "") {
+    return undefined;
+  }
+  for (const [path, entry] of Object.entries(stateResources)) {
+    if (entry.id === ref) {
+      return scannedContents.get(path);
+    }
+  }
+  consola.debug(`flow validation: no local schema for user_schema ${ref}; flow-local rules only`);
+  return undefined;
+}
