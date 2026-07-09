@@ -26,18 +26,30 @@ contract is one rebuild away, never a copy-paste.
 
 ## How a sync works
 
-`figma-tokens.lock` pins the Figma published library version that
-`src/generated/figma.tokens.json` was built from. The lockfile is the
-only knob that controls what gets pulled.
+### Figma plugin push (default)
+
+A Figma Community sync plugin pushes DTCG JSON to GitHub. Plugin settings:
+
+| Field | Value |
+| --- | --- |
+| Name (repo) | `nextgen` |
+| Branch | `design-tokens/figma-sync` |
+| Token path | `packages/design-tokens/figma-export` |
+
+CI ([`.github/workflows/sync-design-tokens.yml`](../../.github/workflows/sync-design-tokens.yml))
+runs on push to that branch under `figma-export/**` → `:sync-export` →
+`:generate` → `:test` → opens or **updates one PR**.
+
+### Engineering path (Enterprise only)
+
+REST sync via `workflow_dispatch` with `figma-rest`, or locally:
 
 ```sh
 FIGMA_TOKEN=... moon run design-tokens:sync
 moon run design-tokens:generate
-moon run design-tokens:test       # snapshot guard
+moon run design-tokens:test
 ```
 
-In CI, [`.github/workflows/sync-design-tokens.yml`](../../.github/workflows/sync-design-tokens.yml)
-runs the same sequence on a manual trigger and opens a PR with the diff.
 Sync **never** commits to `main` directly.
 
 ## Safety guarantees
@@ -58,7 +70,9 @@ Sync **never** commits to `main` directly.
 ```
 packages/design-tokens/
 ├── figma-tokens.lock                 ← pinned library version (committed)
+├── figma-export/                     ← DTCG JSON from Figma plugin push (Semantic only)
 ├── scripts/
+│   ├── sync-from-export.ts           ← figma-export → figma.tokens.json
 │   ├── sync-from-figma.ts            ← Figma REST → figma.tokens.json
 │   └── build.ts                      ← figma.tokens.json + overrides → outputs
 ├── src/
