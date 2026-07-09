@@ -1,4 +1,4 @@
-# ADR 029: OpenAPI querying
+# ADR 31: OpenAPI querying
 
 > **Status:** Proposed
 > **Date:** 2026-06-30
@@ -17,10 +17,17 @@ collections, without having to build these complex queries.
 
 ### HTTP-method
 
-#### TLDR
+#### TL;DR
 
 We use HTTP-`POST` for querying but should also implement `QUERY` as soon as it
-is available in Ogen.
+is available in Ogen. Next to the `POST` method we still allow for a `GET` but
+it won't have filter/sort functionality.
+
+URLS:
+
+- `GET https://example.com/resources`
+- `QUERY https://example.com/resources`
+- `POST https://example.com/resources/query`
 
 #### `GET`
 
@@ -32,8 +39,9 @@ need:
 > identifiable information via HTTP, they are generally referring to making a 
 > GET request.
 
-However, because the `GET` does not allow for a body, the entire query has to be
-put inside the query string. There are solutions for this; see [query language](#query-language).
+However, because a `GET` request body has no standardized semantics and is often
+ignored by clients/proxies, the entire query typically has to be put inside the 
+query string. There are solutions for this; see [query language](#query-language).
 
 #### `QUERY`
 
@@ -65,6 +73,10 @@ needs: it allows for a request body and is widely supported. Where POST lacks,
 is in caching. Browsers, reverse proxies, api gateways all don't cache `POST`
 requests. This can lead to increased system resources. But it is a trade-off
 we are willing to take.
+
+Since the `POST`-method on a URL is reserved for creating new resources, a 
+path-segment needs to be added. To keep things consistent over the api, we will
+use `/query` to indicate a customer wants to query a resource.
 
 ### Query language
 
@@ -179,16 +191,10 @@ This results in a filter request which looks like:
 
 ```json
 {
-  "sorting": [
-    {
+  "sorting": {
       "field": "creationDate",
       "direction": "desc"
-    },
-    {
-      "field": "name",
-      "direction": "asc"
-    }
-  ],
+  },
   "filter": [
     {
       "field": "creationDate",
