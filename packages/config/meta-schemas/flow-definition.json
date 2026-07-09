@@ -5,12 +5,17 @@
   "type": "object",
   "required": [
     "name",
+    "status",
     "user_schema",
     "purposes",
     "steps"
   ],
   "additionalProperties": false,
   "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Editor-only pointer to this dialect file (scaffolded as `../meta/flow-definition.json`) so editors validate and autocomplete flow edits offline. Ignored by the platform: sync strips it before upload and write-back preserves it."
+    },
     "name": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*$",
@@ -19,6 +24,14 @@
         "combined-auth"
       ],
       "description": "Stable identifier for this flow, used as the target of cross-flow `switch` and `pivot` transitions. Renaming is not supported \u2014 the `name` is part of the public contract another definition may reference. Acts as the human display label as well; no separate slug."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "draft"
+      ],
+      "description": "The lifecycle state of this flow definition. - active: ready to be used; the flow engine can select it for new flows. - draft: the engine will not select it for new flows. Allowed transitions: draft -> active (activate), active -> draft (remove from active use immediately)."
     },
     "user_schema": {
       "type": "string",
@@ -141,11 +154,12 @@
           "description": "Schema property names to collect from the user on this step. Each entry must resolve to a property in the definition's `user_schema`. The engine reads the schema's `x-*` annotations to derive: - field type and validation (rendered into the runtime payload), - implicit transition outcomes - e.g. a property with a non-empty   `x-unique` scope makes `user_not_found` a valid `transitions` key   on this step, - credential verification - e.g. `x-credential: password` causes   submission to invoke an auth_attempt verification before the   transition fires."
         },
         "actions": {
-          "type": "object",
-          "additionalProperties": {
+          "type": "array",
+          "items": {
             "$ref": "#/$defs/Action"
           },
-          "description": "Actions the user can take on this step. The key is the action name the client echoes back on submit. Every action key must have a matching key in `transitions`; the engine rejects submissions for actions without a defined transition."
+          "default": [],
+          "description": "Ordered list of actions the user can take on this step. Each action's `name` is what the client echoes back on submit and must have a matching key in `transitions`; the engine rejects submissions for actions without a defined transition. If omitted, the engine provides a default `submit` action."
         },
         "gates": {
           "type": "object",
@@ -187,8 +201,34 @@
     },
     "Action": {
       "type": "object",
+      "required": [
+        "name",
+        "kind"
+      ],
       "additionalProperties": false,
       "properties": {
+        "name": {
+          "type": "string",
+          "examples": [
+            "submit",
+            "email_fallback"
+          ],
+          "description": "Action identifier. Sent back in the submit request as `action` and used as the matching key in this step's `transitions`."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "submit",
+            "passkey",
+            "passkey_register",
+            "navigate",
+            "back"
+          ],
+          "examples": [
+            "submit"
+          ],
+          "description": "Classifies how the engine handles this action: - submit: collect the step's fields and run validate/dispatch/on_success. - passkey: issue a WebAuthn assertion challenge; the matching transition   fires once the returned assertion verifies. - passkey_register: issue a WebAuthn registration challenge; the matching   transition fires once the returned attestation verifies. - navigate: route through the transition without running the input   pipeline. Used for pure-routing actions declared in the flow definition. - back: return the user to the previous step. Surfaced by the engine   when going back is available."
+        },
         "primary": {
           "type": "boolean",
           "default": false,
@@ -202,7 +242,7 @@
           "description": "Optional localization key override for the action's label. When omitted, the engine derives a key from the step and action names. Display text is resolved client-side from a locale dictionary, never by the engine."
         }
       },
-      "description": "Configuration for a user-invokable action on a step."
+      "description": "Configuration for a user-invokable action on a step. The `name` is sent back in the submit request as `action`; the engine resolves the action's declared `kind` to decide how to handle the submission."
     },
     "Gate": {
       "type": "object",
