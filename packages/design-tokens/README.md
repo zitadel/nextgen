@@ -34,10 +34,10 @@ A Figma Community sync plugin pushes DTCG JSON to GitHub. Plugin settings:
 | --- | --- |
 | Name (repo) | `nextgen` |
 | Branch | `design-tokens/figma-sync` |
-| Token path | `tokens` |
+| Token path | `packages/design-tokens/figma-export` |
 
 CI ([`.github/workflows/sync-design-tokens.yml`](../../.github/workflows/sync-design-tokens.yml))
-runs on push to that branch under `tokens/**` → `:sync-export` →
+runs on push to that branch under `figma-export/**` → `:sync-export` →
 `:generate` → `:test` → opens or **updates one PR**.
 
 ### Engineering path (Enterprise only)
@@ -70,8 +70,9 @@ Sync **never** commits to `main` directly.
 ```
 packages/design-tokens/
 ├── figma-tokens.lock                 ← pinned library version (committed)
+├── figma-export/                     ← DTCG JSON from Figma plugin push
 ├── scripts/
-│   ├── sync-from-export.ts           ← tokens/*.json → figma.tokens.json
+│   ├── sync-from-export.ts           ← figma-export/*.json → figma.tokens.json
 │   ├── sync-from-figma.ts            ← Figma REST → figma.tokens.json
 │   └── build.ts                      ← figma.tokens.json + overrides → outputs
 ├── src/
@@ -86,14 +87,13 @@ packages/design-tokens/
 └── dist/                             ← gitignored; built by tsdown for npm
 ```
 
-Designer exports land at repo-root `tokens/` (e.g. `tokens/primitives.json`), not
-inside this package.
+Export files: `primitives.json`, `semantic---light-dark.json`, `layout.json`.
 
 ## Adding a new token
 
 1. Add the variable in Figma → publish the library.
 2. Push from the Community sync plugin (or run `:sync-export` locally if you
-   have a committed export under `tokens/`).
+   have a committed export under `figma-export/`).
 3. Run `moon run design-tokens:generate` and `moon run design-tokens:test`.
    Update the snapshot if the new name is intentional.
 4. Commit `figma.tokens.json`, `tokens.{css,ts}`, and `tailwind.css` together
