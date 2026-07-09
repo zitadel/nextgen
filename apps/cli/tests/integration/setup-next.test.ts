@@ -57,10 +57,14 @@ describe("Next setup integration", () => {
       package_manager: "npm",
       command: "npm install",
     });
-    expect(setupJson.data.next_commands).toEqual(["npm run dev"]);
+    expect(setupJson.data.next_commands[0]).toBe("npm run dev");
+    expect(setupJson.data.next_commands[1]).toMatch(/^npx @zitadel\/cli@\S+ plan$/);
     expect(setupJson.data.next_actions.join("\n")).toContain("register a user");
     expect(setupJson.data.next_actions.join("\n")).toContain("log in again");
     expect(setupJson.data.next_actions.join("\n")).toContain("/profile shows Signed in");
+    expect(setupJson.data.next_actions.join("\n")).toContain(".zitadel/schemas/");
+    expect(setupJson.data.next_actions.join("\n")).toContain(".zitadel/flows/");
+    expect(setupJson.data.next_actions.join("\n")).toContain("Preview and publish config changes");
     expect(setupJson.data.files_written).toContain(".zitadel/schemas/default-human-user.json");
     expect(setupJson.data.files_written).toContain(".zitadel/flows/default-login.json");
     const installLog = JSON.parse((await readFile(fakeNpm.logPath, "utf8")).trim()) as {
@@ -205,6 +209,63 @@ describe("Next setup integration", () => {
     const applyJson = parseJson(apply.stdout) as { status: string; data: { synced: boolean } };
     expect(applyJson.status).toBe("ok");
     expect(applyJson.data.synced).toBe(true);
+
+    // Noise regression guard: a one-field schema edit must render as exactly
+    // that. Server-echoed fields (`audience: {}` on flows, spelled-out x-*
+    // meta-schema defaults) must never surface as changes the user didn't make.
+    const editedSchemaPath = join(cwd, ".zitadel/schemas/default-human-user.json");
+    const editedSchema = JSON.parse(await readFile(editedSchemaPath, "utf8")) as {
+      properties: Record<string, unknown>;
+    };
+    editedSchema.properties.company = { type: "string", description: "Company name" };
+    await writeFile(editedSchemaPath, `${JSON.stringify(editedSchema, null, 2)}\n`);
+
+    const planAfterEdit = await cli(["plan", "--cwd", cwd]);
+    expect(planAfterEdit.exitCode).toBe(0);
+    const planOutput = `${planAfterEdit.stdout}\n${planAfterEdit.stderr}`;
+    expect(planOutput).toContain("company");
+    expect(planOutput).toContain("will publish a new revision");
+    expect(planOutput).toContain("user_schema will be re-pinned to the new revision");
+    expect(planOutput).not.toContain("audience");
+    expect(planOutput).not.toContain("x-editable");
+
+    // The Elina journey: use the new field in the register step and publish
+    // schema + flow in ONE apply — the CLI re-pins user_schema to the freshly
+    // minted revision id so the flow update validates against it.
+    const editedFlowPath = join(cwd, ".zitadel/flows/default-login.json");
+    const editedFlow = JSON.parse(await readFile(editedFlowPath, "utf8")) as {
+      user_schema: string;
+      steps: Array<{ name: string; fields?: string[] }>;
+    };
+    const registerStep = editedFlow.steps.find((step) => step.name === "register");
+    registerStep?.fields?.push("company");
+    await writeFile(editedFlowPath, `${JSON.stringify(editedFlow, null, 2)}\n`);
+
+    const singleApply = await cli(["apply", "--cwd", cwd, "--json"]);
+    expect(singleApply.exitCode).toBe(0);
+    const singleApplyJson = parseJson(singleApply.stdout) as {
+      status: string;
+      data: { synced: boolean; files_updated: string[] };
+    };
+    expect(singleApplyJson.status).toBe("ok");
+    expect(singleApplyJson.data.files_updated).toContain(".zitadel/flows/default-login.json");
+
+    const stateAfter = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
+      resources: Record<string, { id?: string; previousId?: string }>;
+    };
+    const newSchemaId = stateAfter.resources[".zitadel/schemas/default-human-user.json"]?.id;
+    expect(newSchemaId).toMatch(/^sch_/);
+    expect(newSchemaId).not.toBe(schemaId);
+    const repinnedFlow = JSON.parse(await readFile(editedFlowPath, "utf8")) as {
+      user_schema: string;
+      steps: Array<{ name: string; fields?: string[] }>;
+    };
+    expect(repinnedFlow.user_schema).toBe(newSchemaId);
+    expect(repinnedFlow.steps.find((s) => s.name === "register")?.fields).toContain("company");
+
+    const planAfterApply = await cli(["plan", "--cwd", cwd, "--json"]);
+    expect(planAfterApply.exitCode).toBe(0);
+    expect((parseJson(planAfterApply.stdout) as { data: { total: number } }).data.total).toBe(0);
   });
 
   it("skips rerun setup without rewriting edited schema or flow config", async () => {

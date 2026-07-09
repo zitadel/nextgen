@@ -35,6 +35,11 @@
       "types": "./dist/schemas.d.mts",
       "import": "./dist/schemas.mjs"
     },
+    "./normalize": {
+      "@zitadel/source": "./src/normalize.ts",
+      "types": "./dist/normalize.d.mts",
+      "import": "./dist/normalize.mjs"
+    },
     "./defaults/default-human-user.json": "./defaults/default-human-user.json",
     "./defaults/default-login.json": "./defaults/default-login.json",
     "./package.json": "./package.json"

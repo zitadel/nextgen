@@ -89,16 +89,38 @@ describe("SchemaSyncer", () => {
         receivedBody = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: "schema-id-1" }, { status: 201 });
       }),
+      http.get(`${BASE}/schemas/schema-id-1`, () =>
+        HttpResponse.json({ kind: "user-schema", version: 1 }),
+      ),
     );
     const [schema] = makeSyncers({ client, projectId: "proj-1", env: {} });
     const data = { kind: "user-schema", version: 1 };
 
-    const id = await schema.create(data);
+    const result = await schema.create(data);
 
-    expect(id).toBe("schema-id-1");
+    expect(result.id).toBe("schema-id-1");
+    // The stored body comes from the follow-up fetch, feeding write-back.
+    expect(result.canonical).toEqual({ kind: "user-schema", version: 1 });
     expect(new URL(receivedUrl).searchParams.get("project_id")).toBe("proj-1");
     expect(receivedBody).toEqual(data);
     expect(receivedBody.$id).toBeUndefined();
+  });
+
+  it("create degrades to no canonical body when the follow-up fetch fails", async () => {
+    server.use(
+      http.post(`${BASE}/schemas`, () =>
+        HttpResponse.json({ id: "schema-id-2" }, { status: 201 }),
+      ),
+      http.get(`${BASE}/schemas/schema-id-2`, () =>
+        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+      ),
+    );
+    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {} });
+
+    const result = await schema.create({ kind: "user-schema" });
+
+    expect(result.id).toBe("schema-id-2");
+    expect(result.canonical).toBeUndefined();
   });
 
   it("update throws E_NOT_IMPLEMENTED — schemas are revisioned, edits publish a new revision", async () => {
@@ -183,15 +205,20 @@ describe("FlowDefinitionSyncer", () => {
     server.use(
       http.post(`${BASE}/flow_definitions`, async ({ request }) => {
         receivedBody = await request.json();
-        return HttpResponse.json({ id: "flow-id-1" }, { status: 201 });
+        return HttpResponse.json(
+          { id: "flow-id-1", flow_definition: { name: "Default", audience: {} } },
+          { status: 201 },
+        );
       }),
     );
     const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {} });
     const data = { name: "Default", status: "active", version: 2 };
 
-    const id = await flow.create(data);
+    const result = await flow.create(data);
 
-    expect(id).toBe("flow-id-1");
+    expect(result.id).toBe("flow-id-1");
+    // The response envelope's flow_definition is the canonical stored body.
+    expect(result.canonical).toEqual({ name: "Default", audience: {} });
     expect(receivedBody).toEqual({
       project_id: "proj-1",
       schema_uri: DEFAULT_FLOW_SCHEMA_URI,
@@ -206,15 +233,19 @@ describe("FlowDefinitionSyncer", () => {
       http.put(`${BASE}/flow_definitions/flow-id-1`, async ({ request }) => {
         receivedProjectId = new URL(request.url).searchParams.get("project_id");
         receivedBody = await request.json();
-        return HttpResponse.json({});
+        return HttpResponse.json({
+          id: "flow-id-1",
+          flow_definition: { status: "active", version: 3, audience: {} },
+        });
       }),
     );
     const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {} });
 
-    await flow.update("flow-id-1", { status: "active", version: 3 });
+    const result = await flow.update("flow-id-1", { status: "active", version: 3 });
 
     expect(receivedProjectId).toBe("proj-1");
     expect(receivedBody).toEqual({ flow_definition: { status: "active", version: 3 } });
+    expect(result.canonical).toEqual({ status: "active", version: 3, audience: {} });
   });
 
   it("delete DELETEs /flow_definitions/:id with the project_id query param", async () => {
