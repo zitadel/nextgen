@@ -35,7 +35,9 @@ const FIELD_PRESETS: Record<string, Record<string, unknown>> = {
     type: "string",
     format: "phone",
     title: "Phone number",
-    "x-mfa": "sms",
+    // The meta-schema types x-mfa as boolean (user-property.json); the
+    // delivery channel is implied by the property, not encoded here.
+    "x-mfa": true,
     "x-sensitive": true,
     "x-editable": true,
   },

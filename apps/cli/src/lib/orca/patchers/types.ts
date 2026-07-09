@@ -28,6 +28,12 @@ export type PatchContext = PatchView &
     server: string;
     cliVersion: string;
     scaffoldedFramework?: boolean;
+    /**
+     * Sign-in preset the scaffold starts from (`SETUP_PRESETS` in
+     * @zitadel/config). Recorded in `zitadel.json` so later tooling knows
+     * the project's starting point; absent means password-first.
+     */
+    preset?: string;
   }>;
 
 /** Where and how a patch is applied. Family-neutral (no file-op coupling). */

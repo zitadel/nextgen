@@ -143,6 +143,12 @@ export const en: Record<string, string> = {
   // --- Passkey login ---
   "passkey-login.title": "Sign in with your passkey",
 
+  // --- Step: passkey-first (entry step of the passkey-first preset) ---
+  "passkey-first.title": "Sign in",
+  "passkey-first.description": "Use your passkey to continue",
+  "passkey-first.action.passkey": "Continue with passkey",
+  "passkey-first.action.email_fallback": "Use email instead",
+
   // --- Password recovery ---
   "recover.title": "Check your email",
   "recover.description": "We sent a password reset link to your email address.",

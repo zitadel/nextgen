@@ -9,6 +9,12 @@ import defaultHumanUserSchemaTemplate from "../defaults/default-human-user.json"
 import defaultLoginFlowTemplate from "../defaults/default-login.json" with {
   type: "json",
 };
+import passkeyFirstHumanUserSchemaTemplate from "../defaults/presets/passkey-first/human-user.json" with {
+  type: "json",
+};
+import passkeyFirstLoginFlowTemplate from "../defaults/presets/passkey-first/login.json" with {
+  type: "json",
+};
 
 export { flowsReadmeContent, schemasReadmeContent } from "./readmes.js";
 
@@ -17,9 +23,45 @@ export const DEFAULT_FLOW_SCHEMA_URI = "https://nextgen.com/flow-definition.json
 export const DEFAULT_SCHEMA_CONFIG_PATH = ".zitadel/schemas/default-human-user.json";
 export const DEFAULT_FLOW_CONFIG_PATH = ".zitadel/flows/default-login.json";
 
+/**
+ * Named schema+flow bundles `zitadel setup` can scaffold (#448: the prompt
+ * fires before any `.zitadel/` file is written; each preset maps to a
+ * pre-defined bundle the CLI copies on first setup). `password-first` is
+ * today's default; `passkey-first` puts a passkey ceremony on the login
+ * entry step with an email→password fallback path.
+ */
+export const SETUP_PRESETS = ["password-first", "passkey-first"] as const;
+
+export type SetupPreset = (typeof SETUP_PRESETS)[number];
+
+export const DEFAULT_SETUP_PRESET: SetupPreset = "password-first";
+
+const PRESET_TEMPLATES: Record<SetupPreset, { schema: unknown; flow: unknown }> = {
+  "password-first": {
+    schema: defaultHumanUserSchemaTemplate,
+    flow: defaultLoginFlowTemplate,
+  },
+  "passkey-first": {
+    schema: passkeyFirstHumanUserSchemaTemplate,
+    flow: passkeyFirstLoginFlowTemplate,
+  },
+};
+
+function presetTemplates(preset: string): { schema: unknown; flow: unknown } {
+  const entry = PRESET_TEMPLATES[preset as SetupPreset];
+  if (entry === undefined) {
+    throw new Error(
+      `unknown setup preset ${JSON.stringify(preset)} (known presets: ${SETUP_PRESETS.join(", ")})`,
+    );
+  }
+  return entry;
+}
+
 export type DefaultConfigRenderOptions = {
   builtinSchemaBase?: string;
   userSchemaUrl?: string;
+  /** Which bundle to render; defaults to {@link DEFAULT_SETUP_PRESET}. */
+  preset?: string;
 };
 
 export function defaultHumanUserSchemaUrl(
@@ -34,7 +76,7 @@ export function getDefaultHumanUserSchema(
   const builtinSchemaBase = trimTrailingSlash(
     options.builtinSchemaBase ?? DEFAULT_BUILTIN_SCHEMA_BASE,
   );
-  return renderTemplate(defaultHumanUserSchemaTemplate, {
+  return renderTemplate(presetTemplates(options.preset ?? DEFAULT_SETUP_PRESET).schema, {
     SERVER_URL: builtinSchemaBase,
     USER_SCHEMA_URL: options.userSchemaUrl ?? defaultHumanUserSchemaUrl(builtinSchemaBase),
   }) as CreateSchemaBody;
@@ -46,7 +88,7 @@ export function getDefaultLoginFlow(
   const builtinSchemaBase = trimTrailingSlash(
     options.builtinSchemaBase ?? DEFAULT_BUILTIN_SCHEMA_BASE,
   );
-  return renderTemplate(defaultLoginFlowTemplate, {
+  return renderTemplate(presetTemplates(options.preset ?? DEFAULT_SETUP_PRESET).flow, {
     SERVER_URL: builtinSchemaBase,
     USER_SCHEMA_URL: options.userSchemaUrl ?? defaultHumanUserSchemaUrl(builtinSchemaBase),
   }) as CreateFlowDefinitionBodyFlowDefinition;

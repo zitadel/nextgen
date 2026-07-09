@@ -13,10 +13,12 @@ import {
   DEFAULT_FLOW_CONFIG_PATH,
   DEFAULT_FLOW_SCHEMA_URI,
   DEFAULT_SCHEMA_CONFIG_PATH,
+  DEFAULT_SETUP_PRESET,
   flowsReadmeContent,
   getDefaultHumanUserSchema,
   getDefaultLoginFlow,
   schemasReadmeContent,
+  type SetupPreset,
 } from "@zitadel/config/defaults";
 
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
@@ -48,13 +50,16 @@ export async function materializeSetupResources(opts: {
   client: ZitadelClient;
   projectId: string;
   force: boolean;
+  /** Which schema+flow bundle to scaffold; defaults to password-first. */
+  preset?: SetupPreset;
 }): Promise<MaterializeSetupResourcesResult> {
   await mkdir(join(opts.cwd, FLOWS_DIR), { recursive: true });
   await mkdir(join(opts.cwd, SCHEMAS_DIR), { recursive: true });
 
   const filesWritten: string[] = [];
+  const preset = opts.preset ?? DEFAULT_SETUP_PRESET;
 
-  const { $id: _templateId, ...schemaBody } = getDefaultHumanUserSchema() as {
+  const { $id: _templateId, ...schemaBody } = getDefaultHumanUserSchema({ preset }) as {
     $id?: string;
   } & Record<string, unknown>;
   void _templateId;
@@ -96,7 +101,7 @@ export async function materializeSetupResources(opts: {
     hash: schemaHash,
   });
 
-  const flowBody = getDefaultLoginFlow({ userSchemaUrl: schemaId });
+  const flowBody = getDefaultLoginFlow({ userSchemaUrl: schemaId, preset });
 
   const flowWritten = await writeResourceFile(
     opts.cwd,
