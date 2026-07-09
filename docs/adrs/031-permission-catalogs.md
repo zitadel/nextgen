@@ -39,11 +39,15 @@ This is the first of three related ADRs on permission management:
 ## Glossary
 
 FGA vocabulary is unusually dense and mostly unfamiliar outside teams who've
-worked with Zanzibar-style systems before. This glossary defines the terms
-used across all three permission-management ADRs. For nextgen resource nouns
-(project, team, user, app_group, grant, role, team_membership), see the
-canonical [`docs/design/glossary.md`](../design/glossary.md) instead —
-this glossary only covers FGA-specific vocabulary, not resource names.
+worked with Zanzibar-style systems before. This glossary defines the
+FGA-engine-internal terms used across all three permission-management ADRs —
+vocabulary that has no audience outside this document set. For terms other
+design docs already assume the reader knows — **principal**, **scope**,
+**`resource_scope_index`**, **delegation** — see
+[`docs/design/glossary.md` § 5 Authorization (FGA)](../design/glossary.md#5-authorization-fga)
+instead of redefining them here. For nextgen resource nouns (project, team,
+user, app_group, grant, role, team_membership), see the same file's §4
+Resources.
 
 | Term | Meaning |
 |---|---|
@@ -56,10 +60,7 @@ this glossary only covers FGA-specific vocabulary, not resource names.
 | **Tuple-to-userset (TTU)** | A rule that derives a permission on one resource from a relation on a *different*, related resource, e.g. "you can read a document if you're a `viewer` of the project that owns it." |
 | **Relation implication / closure** | The precomputed answer to "which relations imply which other relations" for one catalog version, so a single check doesn't have to re-derive the whole rule graph on every request. |
 | **Catalog** | A versioned collection of relation/permission definitions, their expressions, and optional bundles. nextgen has two: the **system catalog** ([ADR 032](032-internal-permission-management.md)) and the **app-group catalog** ([ADR 033](033-external-permission-management.md)). |
-| **Scope** | The resolved project/team/resource boundary a check runs against, produced by `resource_scope_index` before authorization runs. |
-| **Grant / assignment** | A stored row binding a principal to a permission or relation at an explicit scope. |
-| **Delegation** | An explicit, audited transfer of authority from one principal to another (e.g. a person to an agent) — distinct from an agent silently inheriting everything its owner could do. |
-| **Principal** | Whatever presents a credential to be checked: a user token, an agent, a service token (`sk_proj_`, `sk_team_`), or an origin-bound browser nonce. |
+| **Grant / assignment** | A stored row binding a principal to a permission or relation at an explicit scope. See [`docs/design/glossary.md`](../design/glossary.md#4-resources) for the canonical **grant** definition; "assignment" is this ADR's storage-layer term for the same row. |
 | **IR (intermediate representation)** | The normalized internal shape produced after parsing and validating a policy, before it is compiled into relational rows and query plans. |
 | **Leopard index / flattening** | A technique (named after Google Zanzibar's Leopard index) for precomputing set membership so deeply nested group/relation checks stay fast, without re-walking the whole graph or rewriting per-member state on every write. See [§ Canonical relational storage](#2-canonical-relational-storage). |
 
