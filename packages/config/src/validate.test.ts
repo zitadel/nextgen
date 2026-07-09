@@ -480,6 +480,8 @@ describe("drift audit (Go validator)", () => {
     "internal/domain/flow_definition_validator.go",
   );
 
+  const snake = (name: string) => name.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+
   it.skipIf(!existsSync(goSource))("every goRef function still exists in the Go source", () => {
     const source = readFileSync(goSource, "utf8");
     for (const [rule, { goRef }] of Object.entries(FLOW_VALIDATION_RULES)) {
@@ -488,6 +490,30 @@ describe("drift audit (Go validator)", () => {
         new RegExp(`func ${goRef}\\(`),
       );
     }
+  });
+
+  it.skipIf(!existsSync(goSource))("the Go validator gained no unported functions", () => {
+    const source = readFileSync(goSource, "utf8");
+    const goFuncs = [...source.matchAll(/^func (\w+)\(/gm)].map((m) => m[1]).sort();
+    const ported = Object.values(FLOW_VALIDATION_RULES)
+      .map((rule) => rule.goRef)
+      .filter((ref): ref is string => ref !== null);
+    // Traversal/aggregation helpers of already-ported rules, plus the
+    // orchestrator itself. NOT a place to park an unported rule: the
+    // "still exists" check above is one-directional and can never
+    // notice an addition — a new Go rule that stays unported silently
+    // reopens the plan-passes/apply-fails gap this port closes. When
+    // this test fails on a new function, port the rule (or record a
+    // scope cut in validate.ts) before extending the list.
+    const helpers = [
+      "ValidateFlowDefinition",
+      "uniqueNonEmptyFields",
+      "bfsReachable",
+      "isEscapeNode",
+      "reachableSteps",
+      "someStepEstablishesKind",
+    ];
+    expect(goFuncs).toEqual([...ported, ...helpers].sort());
   });
 
   it.skipIf(!existsSync(goSource))("shared literals still match the Go source", () => {
@@ -508,14 +534,46 @@ describe("drift audit (Go validator)", () => {
     "internal/domain/flow_definition.go",
   );
 
-  it.skipIf(!existsSync(purposesSource))("purpose enum matches the Go source", () => {
+  it.skipIf(!existsSync(purposesSource))("purpose enum matches the Go source exactly", () => {
     const source = readFileSync(purposesSource, "utf8");
-    for (const purpose of FLOW_PURPOSES) {
-      const goName = `FlowDefinitionPurpose${purpose
-        .split("_")
-        .map((part) => part[0]?.toUpperCase() + part.slice(1))
-        .join("")}`;
-      expect(source, `purpose ${purpose}`).toContain(goName);
-    }
+    const block =
+      source.match(/FlowDefinitionPurposeLogin FlowDefinitionPurpose = iota[\s\S]*?\n\)/)?.[0] ?? "";
+    const goPurposes = [...block.matchAll(/FlowDefinitionPurpose(\w+)/g)].map(([, name]) =>
+      snake(name ?? ""),
+    );
+    // Exact, not subset: a purpose added in Go but missing here makes
+    // the port reject a valid flow at plan time.
+    expect(goPurposes).toEqual([...FLOW_PURPOSES]);
+  });
+
+  it.skipIf(!existsSync(purposesSource))("action kinds match the Go enum exactly", () => {
+    const source = readFileSync(purposesSource, "utf8");
+    const block =
+      source.match(/FlowActionKindUnset FlowActionKind = iota[\s\S]*?\n\)/)?.[0] ?? "";
+    const goKinds = [
+      ...block.matchAll(/^\s*FlowActionKind(\w+)(?: FlowActionKind = iota)?$/gm),
+    ].map(([, name]) => snake(name ?? ""));
+    // unset and back are rejected by the steps rule; the rest is
+    // DECLARABLE_ACTION_KINDS in validate.ts — keep the two in sync.
+    expect(goKinds).toEqual(["unset", "submit", "passkey", "passkey_register", "navigate", "back"]);
+  });
+
+  const onSuccessSource = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "../../..",
+    "internal/domain/flow_on_success.go",
+  );
+
+  it.skipIf(!existsSync(onSuccessSource))("on_success manifests match the Go source exactly", () => {
+    const source = readFileSync(onSuccessSource, "utf8");
+    const body = source.match(/func ManifestForOnSuccess[\s\S]*?\n}/)?.[0] ?? "";
+    const cases = [...body.matchAll(/case FlowOnSuccess(\w+):/g)].map(([, name]) =>
+      snake(name ?? ""),
+    );
+    // Mirrors ON_SUCCESS_MANIFESTS in validate.ts (keys and kinds): an
+    // on_success gaining a manifest in Go without a port here skips its
+    // collected-upstream check at plan time.
+    expect(cases).toEqual(["create_user"]);
+    expect(body).toContain("FlowFieldChallengeIdentifier, FlowFieldChallengePassword");
   });
 });
