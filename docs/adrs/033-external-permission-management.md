@@ -21,15 +21,17 @@ This ADR defines the **app-group catalog**: how customer policies are
 authored using a bounded, well-known subset of the OpenFGA modeling
 language, validated, compiled, and evaluated. It builds on the shared
 catalog model in [ADR 031](031-permission-catalogs.md); see that document's
-glossary for core FGA vocabulary (relation, tuple, userset, scope,
-principal, catalog), and [ADR 032](032-internal-permission-management.md)
-for how the *other* catalog — Zitadel's own internal resources — is
-authorized.
+glossary for FGA-engine vocabulary (relation, tuple, userset, catalog) and
+[`docs/design/glossary.md` § 5 Authorization (FGA)](../design/glossary.md#5-authorization-fga)
+for cross-cutting terms (scope, principal, delegation), and
+[ADR 032](032-internal-permission-management.md) for how the *other*
+catalog — Zitadel's own internal resources — is authorized.
 
 ## Glossary
 
 Terms specific to external/app-group authorization, in addition to
-[ADR 031's glossary](031-permission-catalogs.md#glossary):
+[ADR 031's glossary](031-permission-catalogs.md#glossary) and
+[`docs/design/glossary.md` § 5](../design/glossary.md#5-authorization-fga):
 
 | Term | Meaning |
 |---|---|
