@@ -52,6 +52,7 @@ import {
   UpdateFlowDefinitionQueryParams,
   UpdateFlowDefinitionResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { validateFlowDefinition } from "@zitadel/config/validate";
 import {
   DEFAULT_FLOW_SCHEMA_URI,
   getDefaultHumanUserSchema,
@@ -306,6 +307,41 @@ export function snapshotPlatformStore(): PlatformStoreSnapshot {
   };
 }
 
+/**
+ * Mirror of the server's definition-time validation
+ * (`internal/domain/flow_definition_validator.go`, ported to
+ * `@zitadel/config/validate`): same rules, same fail-fast single-detail
+ * `flowdef.invalid` envelope. Divergence kept deliberately lenient: the
+ * schema-dependent subset runs only when the pinned `user_schema` resolves
+ * in the mock store — the real server would fail such a flow with
+ * `schema_fetch_failed`, but fixtures here may pin external URLs.
+ * Returns null when the definition is valid.
+ */
+function invalidFlowDefinitionResponse(
+  flowDefinition: Record<string, unknown>,
+): Response | null {
+  const ref = flowDefinition.user_schema;
+  const schema = typeof ref === "string" ? store.schemas.get(ref)?.body : undefined;
+  const firstError = validateFlowDefinition(
+    flowDefinition,
+    schema as object | undefined,
+  ).find((issue) => issue.severity === "error");
+  if (!firstError) {
+    return null;
+  }
+  // `details` is a bare string here — mirroring what the Go server actually
+  // emits for ErrFlowDefinitionInvalid (its Details field is `any`), which
+  // the CLI's pickDetailString handles alongside the spec's object shape.
+  return HttpResponse.json(
+    {
+      code: "flowdef.invalid",
+      message: "flow definition: invalid",
+      details: firstError.message,
+    },
+    { status: 400 },
+  );
+}
+
 export function setupPlatformHandlers() {
   return [
     http.post("*/projects", async ({ request }) => {
@@ -458,6 +494,12 @@ export function setupPlatformHandlers() {
       if (!body.ok) {
         return body.response;
       }
+      const invalid = invalidFlowDefinitionResponse(
+        body.data.flow_definition as Record<string, unknown>,
+      );
+      if (invalid) {
+        return invalid;
+      }
 
       const id = `flow_${shortId()}`;
       const now = nowIso();
@@ -547,6 +589,12 @@ export function setupPlatformHandlers() {
       const body = parse(UpdateFlowDefinitionBody, raw, "invalid_request");
       if (!body.ok) {
         return body.response;
+      }
+      const invalid = invalidFlowDefinitionResponse(
+        body.data.flow_definition as unknown as Record<string, unknown>,
+      );
+      if (invalid) {
+        return invalid;
       }
 
       const flowDefinition = body.data.flow_definition as unknown as Record<string, unknown>;
