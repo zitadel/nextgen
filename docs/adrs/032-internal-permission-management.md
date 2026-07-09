@@ -25,17 +25,19 @@ This ADR defines how internal permissions are catalogued, resolved,
 audited, and — for staff, support, and agent access — explicitly granted
 rather than implied by role names. It builds on the shared catalog model in
 [ADR 031](031-permission-catalogs.md); see that document's glossary for
-core FGA vocabulary (relation, tuple, userset, scope, principal, catalog).
+FGA-engine vocabulary (relation, tuple, userset, catalog) and
+[`docs/design/glossary.md` § 5 Authorization (FGA)](../design/glossary.md#5-authorization-fga)
+for cross-cutting terms (scope, principal, `resource_scope_index`, delegation).
 
 ## Glossary
 
 Terms specific to internal/system-catalog authorization, in addition to
-[ADR 031's glossary](031-permission-catalogs.md#glossary):
+[ADR 031's glossary](031-permission-catalogs.md#glossary) and
+[`docs/design/glossary.md` § 5](../design/glossary.md#5-authorization-fga):
 
 | Term | Meaning |
 |---|---|
 | **System catalog** | The catalog of Zitadel-owned permissions and optional bundles for internal API resources; replaces legacy level-specific role semantics. See [ADR 031 §1](031-permission-catalogs.md#1-one-model-two-catalogs). |
-| **`resource_scope_index`** | A global lookup table mapping a globally-addressable resource id to its project/team scope, consulted before authorization runs. See [`docs/design/api/url-architecture.md`](../design/api/url-architecture.md). |
 | **Credential class** | The kind of principal presenting a request (user token, `sk_proj_`, `sk_team_`, origin-bound browser nonce), which constrains which permissions/scopes are even reachable regardless of grants. |
 | **Staff/support grant tier** | One of four named permission sets (`support.read` … `support.admin`) that bound what a scoped, time-limited staff grant can do. |
 | **Break-glass access** | An escape hatch for platform operators when normal grant issuance is unavailable; skips grant issuance but still produces audit events. |
