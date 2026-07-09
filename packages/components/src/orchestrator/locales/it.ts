@@ -146,6 +146,9 @@ export const it: Locale = {
   "submit.signin": "Accedi",
   "action.forgot_password": "Password dimenticata?",
   "action.cancel": "Annulla",
+  // Fallback generico per la chiave `<step>.action.back` iniettata dal motore
+  // (vedi INJECTED_KEY_FALLBACKS in liquid.ts).
+  "action.back": "Indietro",
 
   // --- SSO ---
   "sso.redirect.title": "Reindirizzamento al provider…",
