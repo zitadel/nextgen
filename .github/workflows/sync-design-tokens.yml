@@ -3,10 +3,10 @@ name: sync-design-tokens
 # Regenerates @zitadel/design-tokens from Figma and opens (or updates) a review PR.
 #
 # Triggers:
-#   - push to design-tokens/figma-sync (figma-export/**) — Community plugin push
+#   - push to design-tokens/figma-sync (tokens/**) — Community plugin push
 #   - workflow_dispatch — manual re-run or Enterprise REST sync
 #
-# Never auto-merges. Push trigger is scoped to figma-export/** only so commits
+# Never auto-merges. Push trigger is scoped to tokens/** only so commits
 # from create-pull-request (generated CSS/TS) do not re-trigger this workflow.
 
 on:
@@ -14,7 +14,7 @@ on:
     branches:
       - design-tokens/figma-sync
     paths:
-      - packages/design-tokens/figma-export/**
+      - tokens/**
   workflow_dispatch:
     inputs:
       source:
@@ -117,13 +117,13 @@ jobs:
             **Trigger:** ${{ github.event_name }}${{ github.event_name == 'push' && format(' (push by {0})', github.actor) || '' }}
 
             **Before merging:**
-            1. Review `packages/design-tokens/figma-export/` and `src/generated/`.
+            1. Review `tokens/` and `packages/design-tokens/src/generated/`.
             2. If the snapshot test failed, update consumers or the snapshot intentionally.
             3. Spot-check console light + dark in `apps/console`.
 
             Repeat syncs before merge append commits to this PR instead of opening a new one.
           add-paths: |
-            packages/design-tokens/figma-export/**
+            tokens/**
             packages/design-tokens/figma-tokens.lock
             packages/design-tokens/src/generated/figma.tokens.json
             packages/design-tokens/src/generated/tokens.css
