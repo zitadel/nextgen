@@ -106,6 +106,22 @@ principal, scope). It replaces legacy level-specific role semantics: instead
 of a role fixed to "instance admin" or "project admin", a permission such as
 `project.settings.write` is granted at an explicit, resolved scope.
 
+The system catalog ships a **Zitadel-defined default schema** built from
+those primitives: RBAC-style bundles today (see [ADR 031 §1](031-permission-catalogs.md#1-one-model-two-catalogs)'s
+"roles are optional convenience" framing), with room to grow into
+ReBAC-style relations — e.g. user groups — later. Definitions are authored
+and compiled through the same OpenFGA-flavored pipeline as the app-group
+catalog (see [ADR 031 §2](031-permission-catalogs.md#2-openfga-parser-and-profile-compiler));
+only the storage rows differ, not the mechanism.
+
+This is not a permanent restriction to Zitadel-only authorship. Customizing
+the system catalog's schema beyond the shipped default — using the same
+primitives and pipeline — is anticipated future work, not decided here. A
+real motivating case: a customer running an AI agent that manages that
+customer's own Zitadel resources (projects, teams, users) may eventually
+need a tailored internal permission schema, not just the default one. See
+Follow-ups.
+
 ### 2. `resource_scope_index` and canonical storage
 
 `resource_scope_index` maps globally-addressable resources to project/team
@@ -128,7 +144,7 @@ storage/residency invariant, not bypass it.
 
 Agent delegations are stored as assignments with an explicit grantor,
 delegation id, expiry/revocation state, and scope (the general storage
-shape from [ADR 031 §2](031-permission-catalogs.md#2-canonical-relational-storage)).
+shape from [ADR 031 §3](031-permission-catalogs.md#3-canonical-relational-storage)).
 An agent never receives permissions by copying all permissions from its
 owner. The resolver must be able to explain which delegation authorized or
 denied an agent action, so that both audit review and the agent itself can
@@ -154,7 +170,7 @@ credential -> resolve path/body/query scope -> permission resolver -> scope-boun
 Single-resource checks use indexed semi-joins over the principal's
 assignments, relation/permission closure, credential class constraints, and
 resolved scope (mechanism defined in
-[ADR 031 §2–3](031-permission-catalogs.md#2-canonical-relational-storage)).
+[ADR 031 §3–4](031-permission-catalogs.md#3-canonical-relational-storage)).
 
 List endpoints receive a permission predicate from the resolver and inject
 it into the resource query. Repositories tell the predicate builder which
@@ -257,3 +273,8 @@ scoped SQL query against data we already own.
 5. Staff/support access, cross-project human identity, and the break-glass
    escape hatch are tracked by [issue #333](https://github.com/zitadel/nextgen/issues/333)
    and intentionally out of scope here.
+6. Define how system-catalog schema customization (beyond the shipped
+   default) would work — using the primitives and pipeline from
+   [ADR 031 §2](031-permission-catalogs.md#2-openfga-parser-and-profile-compiler) —
+   including who is authorized to customize it and how a customized schema
+   coexists with the default. Out of scope for this ADR round.
