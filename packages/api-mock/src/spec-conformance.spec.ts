@@ -169,7 +169,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        name: "conformance",
+        name: "conformance-app",
         previewOrigins: ["http://localhost:3000"],
         seedDefaults: false,
       }),
@@ -179,6 +179,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     // No CreateProjectResponse zod schema is emitted by orval. Validate
     // structurally against the fields create-project-response.yaml requires.
     expect(typeof body.id).toBe("string");
+    expect(body.name).toBe("conformance-app");
     expect(typeof body.projectSecret).toBe("string");
     expect(typeof body.previewSecret).toBe("string");
     expect(Array.isArray(body.previewOrigins)).toBe(true);
@@ -189,7 +190,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const create = await fetch(`${BASE}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "conformance" }),
+      body: JSON.stringify({ name: "conformance-app" }),
     });
     const { id } = (await create.json()) as { id: string };
     const res = await fetch(`${BASE}/projects/${id}`);

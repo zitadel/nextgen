@@ -336,6 +336,7 @@ export function setupPlatformHandlers() {
       }
       const responseBody: CreateProject201 = {
         id: project.id,
+        name: project.name,
         projectSecret: project.projectSecret,
         previewSecret: project.previewSecret,
         previewOrigins: project.previewOrigins,
