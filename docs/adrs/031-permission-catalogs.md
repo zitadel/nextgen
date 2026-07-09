@@ -57,14 +57,18 @@ Resources.
 | **ReBAC (Relationship-Based Access Control)** | Access decided by walking relationships — "Alice is a member of Team X, Team X owns Project Y, so Alice can read Project Y" — rather than only checking a role name. FGA systems are usually ReBAC systems with some RBAC-style bundling on top for convenience. |
 | **Relation / permission** | The named action or relationship being checked, e.g. `users.read`, `viewer`, `can_manage`. |
 | **Permission expression** | The rule that computes whether a relation/permission holds for a given principal and resource: a direct assignment, a union of other rules, or bounded inheritance across the resource hierarchy. |
-| **Tuple** | OpenFGA's atomic fact shape: `(object, relation, user)`, e.g. `(project:42, viewer, user:alice)`. We use tuples as an *authoring and interchange* shape (see [ADR 033](033-external-permission-management.md)); our runtime storage is relational rows, not a tuple store. |
+| **Tuple** | OpenFGA's atomic fact shape: `(object, relation, user)`, e.g. `(project:42, viewer, user:alice)`. We use tuples as an *authoring and interchange* shape (see §2 below); our runtime storage is relational rows, not a tuple store. |
 | **Userset** | A set of principals defined implicitly through a relation on another object — "everyone who is a `member` of `team:9`" — instead of one explicitly listed user. |
 | **Tuple-to-userset (TTU)** | A rule that derives a permission on one resource from a relation on a *different*, related resource, e.g. "you can read a document if you're a `viewer` of the project that owns it." |
 | **Relation implication / closure** | The precomputed answer to "which relations imply which other relations" for one catalog version, so a single check doesn't have to re-derive the whole rule graph on every request. |
 | **Catalog** | A versioned collection of relation/permission definitions, their expressions, and optional bundles. Zitadel has two: the **system catalog** ([ADR 032](032-internal-permission-management.md)) and the **app-group catalog** ([ADR 033](033-external-permission-management.md)). |
 | **Grant / assignment** | A stored row binding a principal to a permission or relation at an explicit scope. See [`docs/design/glossary.md`](../design/glossary.md#4-resources) for the canonical **grant** definition; "assignment" is this ADR's storage-layer term for the same row. |
+| **OpenFGA DSL / JSON** | The human-authorable and machine-interchange syntax used to describe a permission schema — the input to the compiler pipeline in §2. |
+| **Profile** | The bounded subset of OpenFGA's modeling language Zitadel supports, chosen so checks stay portable and predictable on both PostgreSQL and Spanner. |
+| **Contextual tuple** | An OpenFGA fact supplied at check time rather than stored ahead of time. Not supported on request hot paths in our profile (see §2's Unsupported constructs). |
+| **Caveat / condition** | An OpenFGA construct that attaches a runtime-evaluated condition to a relationship. Arbitrary caveats are unsupported in our profile when they need non-indexed attribute evaluation. |
 | **IR (intermediate representation)** | The normalized internal shape produced after parsing and validating a policy, before it is compiled into relational rows and query plans. |
-| **Leopard index / flattening** | A technique (named after Google Zanzibar's Leopard index) for precomputing set membership so deeply nested group/relation checks stay fast, without re-walking the whole graph or rewriting per-member state on every write. See [§ Canonical relational storage](#2-canonical-relational-storage). |
+| **Leopard index / flattening** | A technique (named after Google Zanzibar's Leopard index) for precomputing set membership so deeply nested group/relation checks stay fast, without re-walking the whole graph or rewriting per-member state on every write. See [§ Canonical relational storage](#3-canonical-relational-storage). |
 
 ## Context
 
@@ -129,9 +133,10 @@ be the portable contract while Spanner remains supported.
 ## Decision
 
 Implement a **portable relational FGA core**. OpenFGA remains the preferred
-authoring and interchange shape where it fits (see [ADR 033](033-external-permission-management.md)
-for where it applies), but the runtime contract is Zitadel-owned relational
-state plus dialect-portable query plans.
+authoring and interchange shape where it fits (see §2 below for the
+compiler pipeline, and [ADR 033](033-external-permission-management.md)
+for how the app-group catalog uses it), but the runtime contract is
+Zitadel-owned relational state plus dialect-portable query plans.
 
 ### 1. One model, two catalogs
 
@@ -166,7 +171,74 @@ The permission resolver does not know whether a permission is "internal" or
 "external" after catalog lookup. It evaluates the same assignment and scope
 rules in both cases; only the catalog content differs.
 
-### 2. Canonical relational storage
+### 2. OpenFGA parser and profile compiler
+
+Zitadel accepts and emits a documented OpenFGA-compatible profile for
+catalog schemas — default or customized, system or app-group — but it
+does not run an external OpenFGA service or store the canonical policy as
+opaque OpenFGA tuples.
+
+Use the maintained OpenFGA language package for parsing and syntax support:
+[`github.com/openfga/language/pkg/go`](https://pkg.go.dev/github.com/openfga/language/pkg/go).
+Do not build a custom OpenFGA DSL parser.
+
+The compiler pipeline is:
+
+```
+OpenFGA DSL / JSON
+  -> upstream OpenFGA language parser / transformer
+  -> Zitadel profile validator
+  -> Zitadel authz IR
+  -> relational catalog rows + query plans
+```
+
+The upstream parser owns grammar compatibility, source locations, DSL/JSON
+round-tripping, and syntactic validation. Zitadel owns semantic validation
+against our supported profile, because the Go package does not currently
+provide enough semantic/profile validation for our portability and
+performance requirements.
+
+The internal package boundary should be:
+
+| Package | Responsibility |
+|---|---|
+| `internal/authz/openfga` | Parse DSL/JSON with the upstream language package and normalize it into Zitadel's IR. |
+| `internal/authz/profile` | Reject unsupported OpenFGA constructs and enforce bounded, portable rules. |
+| `internal/authz/compiler` | Compute relation/permission closure and produce relational catalog mutations/query-plan metadata. |
+| `internal/authz/resolver` | Evaluate single-resource checks and produce list predicates against repository metadata. |
+
+**Supported profile.** The profile starts with:
+
+- direct relations,
+- relation implication / computed usersets,
+- union,
+- bounded tuple-to-userset through known Zitadel hierarchy edges
+  (`project`, `team`, `app_group`, `app`, `user`),
+- userset references for team membership and assignment.
+
+**Unsupported constructs.** The MVP rejects constructs that cannot be
+planned predictably across PostgreSQL and Spanner:
+
+- unbounded recursion,
+- contextual tuples on request hot paths,
+- wildcard expansion for list endpoints,
+- arbitrary caveats/conditions that need non-indexed attribute evaluation.
+
+Unsupported OpenFGA constructs fail at policy upload/plan time with explicit
+diagnostics, rather than degrading silently or timing out at check time. We
+can widen the profile later when benchmarks and dialect support prove the
+shape.
+
+This pipeline compiles policy content for both catalogs; the mechanism does
+not depend on who authors the input. Today, the system catalog ships a
+Zitadel-defined default schema (see
+[ADR 032 §1](032-internal-permission-management.md#1-system-catalog)),
+while the app-group catalog is customer-authored from the start (see
+[ADR 033](033-external-permission-management.md)). Neither is an
+architectural ceiling: customizing the system catalog's schema using these
+same primitives is anticipated future work, not foreclosed by this ADR.
+
+### 3. Canonical relational storage
 
 Relationships that affect authorization are first-class local rows, not
 sidecar-synchronized facts. Per catalog/version, storage holds:
@@ -222,7 +294,7 @@ for how this applies to agent access to internal resources. (Staff/support
 delegation is out of scope for this ADR series — see
 [issue #333](https://github.com/zitadel/nextgen/issues/333).)
 
-### 3. Resolver: one evaluation path for both catalogs
+### 4. Resolver: one evaluation path for both catalogs
 
 Every protected endpoint declares:
 
@@ -249,7 +321,7 @@ accelerator behind the same resolver interface. The portable behavior
 remains the application/query-builder path so Spanner and PostgreSQL share
 the same authorization semantics.
 
-### 4. Consistency and caching
+### 5. Consistency and caching
 
 Permission decisions are cached only inside a request. Compiled policy
 metadata, permission ids, and relation closure by catalog version may be
@@ -275,12 +347,18 @@ versioned the same way regardless of which catalog they belong to.
   the hot path.
 - A single resolver implementation serves both catalogs, so performance and
   correctness work is not duplicated across two engines.
+- The implementation does not start with parser work: it reuses the
+  maintained OpenFGA language parser and focuses local code on validation,
+  compilation, storage, and query planning.
 
 ### Negative / Risks
 
 - We own the compiler, validation profile, and SQL plan generation instead
   of delegating them to OpenFGA or Melange.
-- The write-cheap / check-time-expansion storage model (§2) is a design
+- The upstream OpenFGA Go language package is only a parser/transformer and
+  syntactic validator for our purposes; semantic checks and performance
+  bounds remain Zitadel-owned.
+- The write-cheap / check-time-expansion storage model (§3) is a design
   intent that still needs a validated, benchmarked implementation on both
   PostgreSQL and Spanner before we can claim it holds under real group
   sizes and nesting depth.
@@ -303,6 +381,13 @@ functions and relies on PostgreSQL execution features. It is a strong
 reference for schema compilation, relation closure, and optional PostgreSQL
 acceleration, but not a portable contract for Spanner.
 
+### Build a custom OpenFGA parser
+
+Rejected because OpenFGA already maintains Go parser/transformer packages
+for the DSL and JSON syntax. Building a parser would spend implementation
+effort on grammar compatibility instead of Zitadel-specific validation,
+relational compilation, and query planning.
+
 ### Pure RBAC without ReBAC/FGA
 
 Rejected because it cannot naturally express team membership, parent/child
@@ -321,3 +406,6 @@ policies without reintroducing hard-coded levels and special cases.
    list predicates across PostgreSQL and Spanner.
 3. Validate the Leopard-style flattening approach for relation closure
    against both dialects before relying on it for hot-path checks.
+4. Add the upstream OpenFGA language package and implement the IR/profile
+   compiler behind `internal/authz/openfga`.
+5. Define the OpenFGA profile grammar and upload diagnostics.
