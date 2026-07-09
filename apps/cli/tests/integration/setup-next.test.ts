@@ -371,6 +371,50 @@ describe("Next setup integration", () => {
     expect(applyWithEnv.exitCode).toBe(0);
   });
 
+  it("scaffolds the passkey-first preset with a clean first plan", async () => {
+    const cwd = await createNextProject();
+    const fakeNpm = await fakePackageManager("npm");
+    const setup = await cli(
+      ["setup", "--cwd", cwd, "--preset", "passkey-first", "--non-interactive", "--json"],
+      {
+        PACKAGE_MANAGER_LOG: fakeNpm.logPath,
+        PATH: `${fakeNpm.binDir}:${process.env.PATH ?? ""}`,
+      },
+    );
+    expect(setup.exitCode).toBe(0);
+
+    // The preset decides the scaffolded journey: login enters on a
+    // fields-less passkey step with the email fallback wired.
+    const flow = JSON.parse(
+      await readFile(join(cwd, ".zitadel/flows/default-login.json"), "utf8"),
+    ) as {
+      purposes: Record<string, string>;
+      steps: Array<{ name: string; transitions?: Record<string, { target: string }> }>;
+    };
+    expect(flow.purposes).toMatchObject({ login: "passkey-first", register: "register" });
+    expect(flow.steps.find((s) => s.name === "passkey-first")?.transitions).toMatchObject({
+      email_fallback: { target: "identifier" },
+      user_not_found: { target: "register" },
+    });
+
+    const schema = JSON.parse(
+      await readFile(join(cwd, ".zitadel/schemas/default-human-user.json"), "utf8"),
+    ) as { "x-auth-methods": Record<string, { position: number }> };
+    expect(schema["x-auth-methods"].passkey?.position).toBe(1);
+
+    // The chosen preset is recorded for later tooling.
+    const zitadelJson = JSON.parse(await readFile(join(cwd, "zitadel.json"), "utf8")) as {
+      preset?: string;
+    };
+    expect(zitadelJson.preset).toBe("passkey-first");
+
+    // Preset scaffolds converge like the default: the first plan is empty.
+    const plan = await cli(["plan", "--cwd", cwd, "--json"]);
+    expect(plan.exitCode).toBe(0);
+    const planJson = parseJson(plan.stdout) as { data: { total: number } };
+    expect(planJson.data.total).toBe(0);
+  });
+
   it("catches server-side flow invariants at plan time, before any mutation", async () => {
     const cwd = await createNextProject();
     const fakeNpm = await fakePackageManager("npm");

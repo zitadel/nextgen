@@ -42,6 +42,8 @@ npx @zitadel/cli@alpha setup --server local
 
 In a fresh directory, setup asks which framework to scaffold. Scripted runs should pass `--framework next`, `--framework nuxt`, `--framework react`, `--framework vue`, or `--framework angular`.
 
+Setup also asks how users should sign in and scaffolds the matching schema and login flow: `--preset password-first` (the default: email + password, passkey offered after sign-up) or `--preset passkey-first` (a one-tap passkey up front, with an email + password fallback). The preset only picks the starting point — everything under `.zitadel/` stays editable.
+
 Setup writes the app files, `.env.local`, `zitadel.json`, and `.zitadel/**`, then installs dependencies with the detected package manager unless `--skip-install` is passed.
 
 ## Prove the browser flow

@@ -160,6 +160,7 @@ function projectConfig(ctx: PatchContext): Record<string, unknown> {
     framework: { id: ctx.framework.id },
     branding: { renderer: ctx.rendererId, attribution: "visible" },
     environments,
+    ...(ctx.preset === undefined ? {} : { preset: ctx.preset }),
   };
 }
 

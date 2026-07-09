@@ -135,6 +135,12 @@ export const it: Locale = {
   // --- Accesso con passkey ---
   "passkey-login.title": "Accedi con la tua passkey",
 
+  // --- Step: passkey-first (passo iniziale del preset passkey-first) ---
+  "passkey-first.title": "Accedi",
+  "passkey-first.description": "Usa la tua passkey per continuare",
+  "passkey-first.action.passkey": "Continua con passkey",
+  "passkey-first.action.email_fallback": "Usa invece l'email",
+
   // --- Recupero password ---
   "recover.title": "Controlla la tua e-mail",
   "recover.description":
