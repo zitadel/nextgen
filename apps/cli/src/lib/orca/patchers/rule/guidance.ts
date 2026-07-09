@@ -58,7 +58,7 @@ The golden path:
 Machine-readable dialect (read these before authoring flow or schema edits):
 
 - Flow files carry \`"$schema": "../meta/flow-definition.json"\` — the flow dialect spec (steps, actions and their kinds, transitions, reserved outcomes like \`user_not_found\`). Editors validate against it.
-- \`.zitadel/meta/user-schema.json\` and \`.zitadel/meta/user-property.json\` specify the user-schema dialect (\`x-auth-methods\`, \`x-unique\`, property constraints).
+- \`.zitadel/meta/user-schema.json\` (with its companions \`user-property.json\`, \`auth-methods.json\`, \`auth-method.json\`) specifies the user-schema dialect (\`x-auth-methods\`, \`x-unique\`, property constraints).
 - Worked flow examples: https://github.com/zitadel/nextgen/tree/main/api/openapi/endpoints/flow_definitions/examples
 
 Never edit \`.zitadel/state.json\` (sync bookkeeping) or \`.zitadel/secret\` (credentials, git-ignored). Keep \`.zitadel/local/\` out of source control.`;

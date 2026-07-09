@@ -11,6 +11,21 @@
   ],
   "additionalProperties": false,
   "properties": {
+    "$schema": {
+      "type": "string",
+      "examples": [
+        "../meta/flow-definition.json"
+      ],
+      "description": "Editor-only pointer at this dialect spec so flow files validate and autocomplete offline. Local convenience: the sync layer strips it before upload and the platform ignores it."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "draft"
+      ],
+      "description": "Lifecycle state. active: the flow engine can select this definition for new flows. draft: not selectable for new flows."
+    },
     "name": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*$",
@@ -141,11 +156,11 @@
           "description": "Schema property names to collect from the user on this step. Each entry must resolve to a property in the definition's `user_schema`. The engine reads the schema's `x-*` annotations to derive: - field type and validation (rendered into the runtime payload), - implicit transition outcomes - e.g. a property with a non-empty   `x-unique` scope makes `user_not_found` a valid `transitions` key   on this step, - credential verification - e.g. `x-credential: password` causes   submission to invoke an auth_attempt verification before the   transition fires."
         },
         "actions": {
-          "type": "object",
-          "additionalProperties": {
+          "type": "array",
+          "items": {
             "$ref": "#/$defs/Action"
           },
-          "description": "Actions the user can take on this step. The key is the action name the client echoes back on submit. Every action key must have a matching key in `transitions`; the engine rejects submissions for actions without a defined transition."
+          "description": "Ordered list of actions the user can take on this step. Each action's `name` is what the client echoes back on submit and must have a matching key in `transitions`; the engine rejects submissions for actions without a defined transition. If omitted, the engine provides a default `submit` action."
         },
         "gates": {
           "type": "object",
@@ -187,8 +202,32 @@
     },
     "Action": {
       "type": "object",
+      "required": [
+        "name",
+        "kind"
+      ],
       "additionalProperties": false,
       "properties": {
+        "name": {
+          "type": "string",
+          "examples": [
+            "submit"
+          ],
+          "description": "Action identifier. Sent back in the submit request as `action`, and must have a matching key in the step's `transitions`."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "submit",
+            "passkey",
+            "passkey_register",
+            "navigate"
+          ],
+          "examples": [
+            "submit"
+          ],
+          "description": "Classifies how the engine handles this action: - submit: collect the step's fields and run validate/dispatch/on_success. - passkey: issue a WebAuthn assertion challenge; the matching transition   fires once the returned assertion verifies. - passkey_register: issue a WebAuthn registration challenge; the matching   transition fires once the returned attestation verifies. - navigate: route through the transition without running the input   pipeline. Used for pure-routing actions. (`back` is engine-injected and cannot be declared by flow authors.)"
+        },
         "primary": {
           "type": "boolean",
           "default": false,
