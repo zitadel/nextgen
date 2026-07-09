@@ -700,6 +700,24 @@ type passkeyPhaseResult struct {
 //     issue a creation challenge.
 func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowResolvedFields, passkeyResolved FlowResolvedFields, actionKind FlowActionKind) (passkeyPhaseResult, error) {
 	ctx, client, state, step, in := pc.ctx, pc.client, pc.state, pc.currentStep, pc.in
+
+	// Runtime gate, independent of definition-time validation: flows
+	// created before the passkey rule (or submissions bypassing the UI)
+	// must not run WebAuthn ceremonies when the schema disables passkey.
+	// Refuses every leg — issuing, resuming, and verifying, for
+	// assertion and registration alike.
+	enabled, err := r.passkeyEnabled(ctx, client, state)
+	if err != nil {
+		return passkeyPhaseResult{}, err
+	}
+	if !enabled {
+		state.ClearPendingChallenge()
+		msg := "auth_attempt.passkey_disabled"
+		rendered := r.buildStep(state, step, resolved, &msg, nil, nil)
+		state.IssuedAt = r.now()
+		return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
+	}
+
 	switch {
 	// A ceremony is in flight but no proof arrived: resume or abandon.
 	case state.PendingChallenge != nil && in.ChallengeResponse == nil:
@@ -1032,6 +1050,22 @@ func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, client databas
 	}
 	prefillFromCollected(&resolved, state.CollectedData.UserData)
 	return r.buildStep(state, step, resolved, nil, nil, nil), nil
+}
+
+// passkeyEnabled reports whether the resolved user schema's
+// `x-auth-methods` enables passkey. An absent keyword counts as
+// disabled, matching [xAuthMethodsReader.IsEnabled] and the
+// definition-time validator.
+func (r *FlowStateMachineRuntime) passkeyEnabled(ctx context.Context, client database.QueryExecutor, state *FlowState) (bool, error) {
+	schema, err := r.schemas.Resolve(ctx, client, state.ProjectID, state.UserSchemaURL, nil)
+	if err != nil {
+		return false, fmt.Errorf("flow state machine: load user schema for passkey gate: %w", err)
+	}
+	authMethods, err := newSchemaReader(schema).AuthMethods()
+	if err != nil {
+		return false, fmt.Errorf("flow state machine: read x-auth-methods for passkey gate: %w", err)
+	}
+	return authMethods.IsEnabled("passkey"), nil
 }
 
 func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, client database.QueryExecutor, state *FlowState, step *FlowDefinitionStep) (FlowResolvedFields, error) {

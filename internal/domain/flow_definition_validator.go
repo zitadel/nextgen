@@ -40,6 +40,12 @@ func ValidateFlowDefinition(userSchema *jsonschema.Schema, flowDefinition FlowDe
 		return nil, err
 	}
 
+	// 3b. passkey is action-shaped, not field-shaped, so the per-field
+	// enabled-method cross-check above never sees it.
+	if err := validatePasskeyActionsEnabled(newSchemaReader(userSchema), flowDefinition.Steps); err != nil {
+		return nil, err
+	}
+
 	// 4. validate the graph structure: every step reachable from an initial step, no unreachable steps
 	pivotingTargets, err := validateGraph(flowDefinition)
 	if err != nil {
@@ -134,6 +140,32 @@ func resolveAllStepFields(schema *jsonschema.Schema, steps []FlowDefinitionStep)
 		out[step.Name] = resolved
 	}
 	return out, nil
+}
+
+// validatePasskeyActionsEnabled rejects any step declaring a `passkey`
+// or `passkey_register` action when the user schema's `x-auth-methods`
+// does not enable passkey — the action-shaped counterpart of the
+// enabled-method check [resolveAllStepFields] applies to the
+// `x-auth-methods#password` field. An absent keyword counts as
+// disabled, matching [xAuthMethodsReader.IsEnabled].
+func validatePasskeyActionsEnabled(sr schemaReader, steps []FlowDefinitionStep) error {
+	authMethods, err := sr.AuthMethods()
+	if err != nil {
+		return ErrFlowDefinitionInvalid(fmt.Sprintf("user schema: %v", err), nil)
+	}
+	if authMethods.IsEnabled("passkey") {
+		return nil
+	}
+	for _, step := range steps {
+		for _, a := range step.Actions {
+			if a.Kind == FlowActionKindPasskey || a.Kind == FlowActionKindPasskeyRegister {
+				return ErrFlowDefinitionInvalid(fmt.Sprintf(
+					`step %q: action %q offers passkey but "passkey" is not an enabled authentication method`,
+					step.Name, a.Name), nil)
+			}
+		}
+	}
+	return nil
 }
 
 // validateRequiredUserSchemaFields checks that all required fields in the

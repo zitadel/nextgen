@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { describe, expect, it, vi } from "vitest";
 
 import { createZitadelClient } from "@zitadel/api/client";
+import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 
 import {
@@ -1191,6 +1192,51 @@ describe("plan-time flow validation", () => {
         expect(flowAction.warnings).toHaveLength(1);
         expect(flowAction.warnings?.[0]?.rule).toBe("warn/password-without-identifier");
       }
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("fails plan pre-mutation when the scaffolded schema disables passkey (Elina journey)", async () => {
+    // The exact journey the rule protects: scaffold the defaults, flip
+    // x-auth-methods.passkey.enabled to false in the schema, run plan.
+    // The scaffolded flow still offers passkey actions on three steps —
+    // plan must fail before anything mutates, naming each of them.
+    const cwd = makeCwd();
+    try {
+      const schemaBody = getDefaultHumanUserSchema() as unknown as Record<
+        string,
+        Record<string, { enabled: boolean }>
+      >;
+      schemaBody["x-auth-methods"].passkey.enabled = false;
+      const schemaSyncer = makeSyncer({ normalize: normalizeSchemaBody });
+      await writeState(cwd, {
+        framework: "next",
+        resources: {
+          [SCHEMA_PATH]: { id: "sch_A", hash: hashForState(schemaSyncer, schemaBody) },
+        },
+      });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", schemaBody);
+      const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_A" });
+      await writeResource(cwd, ".zitadel/flows", "default.json", flow);
+
+      const plan = buildSyncPlan(cwd, [schemaSyncer, makeFlowSyncer()]);
+      await expect(plan).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        message: expect.stringContaining(
+          'step "identifier": action "passkey" offers passkey but "passkey" is not an enabled authentication method',
+        ),
+      });
+      await expect(plan).rejects.toMatchObject({
+        message: expect.stringContaining(
+          'step "password": action "passkey" offers passkey but "passkey" is not an enabled authentication method',
+        ),
+      });
+      await expect(plan).rejects.toMatchObject({
+        message: expect.stringContaining(
+          'step "register": action "passkey_register" offers passkey but "passkey" is not an enabled authentication method',
+        ),
+      });
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }
