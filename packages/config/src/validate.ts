@@ -19,6 +19,13 @@
  * Scope cuts (server/service-side, not portable): pivot/switch targets
  * must name an active flow definition in the same project (needs the
  * DB); the user schema itself is assumed meta-schema-valid.
+ *
+ * Lifecycle: this port is a local-first interim, not a second source of
+ * truth to grow. Its designed successor is the server-side validate-only
+ * bundle endpoint (zitadel/nextgen#449); once plan can ask the server,
+ * this file, its drift audit, and the keep-in-sync comment on the Go
+ * validator all go away. New rules land in Go first and are ported here
+ * only until then.
  */
 
 export type FlowValidationSeverity = "error" | "warning";

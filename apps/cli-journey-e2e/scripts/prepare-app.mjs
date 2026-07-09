@@ -25,6 +25,7 @@ export async function prepareApp(options = {}) {
   const appPort = appPortFromUrl(appUrl);
   const zitadelPort = optionalPort(env.JOURNEY_ZITADEL_PORT, "JOURNEY_ZITADEL_PORT");
   const runtime = localRuntime(env.JOURNEY_RUNTIME);
+  const preset = options.preset ?? env.JOURNEY_PRESET ?? "";
   const fs = {
     appendFile: options.appendFile ?? appendFile,
     mkdir: options.mkdir ?? mkdir,
@@ -85,6 +86,7 @@ export async function prepareApp(options = {}) {
         "local",
         "--dev-port",
         String(appPort),
+        ...(preset ? ["--preset", preset] : []),
       ],
       writeFile: fs.writeFile,
     });
@@ -116,6 +118,7 @@ export async function prepareApp(options = {}) {
     framework: framework.id,
     frameworkDisplayName: framework.displayName,
     localRuntimeUrl: startJson?.data?.urls?.api ?? null,
+    preset: preset || null,
     runtime,
     outputDir,
     registryUrl,
@@ -132,6 +135,9 @@ export async function prepareApp(options = {}) {
   await exportEnv("JOURNEY_APP_DIR", appDir, fs.appendFile, env);
   await exportEnv("JOURNEY_APP_URL", appUrl, fs.appendFile, env);
   await exportEnv("JOURNEY_FRAMEWORK", framework.id, fs.appendFile, env);
+  if (preset) {
+    await exportEnv("JOURNEY_PRESET", preset, fs.appendFile, env);
+  }
   await exportEnv("JOURNEY_OUTPUT_DIR", outputDir, fs.appendFile, env);
   await exportOutput("app_dir", appDir, fs.appendFile, env);
   await exportOutput("framework", framework.id, fs.appendFile, env);
