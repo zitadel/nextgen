@@ -1,5 +1,11 @@
 # @zitadel/components
 
+## 0.1.0-alpha.15
+
+### Patch Changes
+
+- [#486](https://github.com/zitadel/nextgen/pull/486) [`f45d47c`](https://github.com/zitadel/nextgen/commit/f45d47c5850edc83a55b5ad7364a59ffac4fd37c) Thanks [@fforootd](https://github.com/fforootd)! - Fix the default login template rendering two passkey buttons when the flow marks the passkey action as primary.
+
 ## 0.1.0-alpha.14
 
 ### Minor Changes

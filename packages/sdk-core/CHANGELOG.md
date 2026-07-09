@@ -1,5 +1,12 @@
 # @zitadel/sdk-core
 
+## 0.1.0-alpha.15
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @zitadel/api@0.1.0-alpha.15
+
 ## 0.1.0-alpha.14
 
 ### Minor Changes
