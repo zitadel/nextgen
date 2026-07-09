@@ -116,6 +116,8 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
         }
       }}
       {...projectProp(props.project, props.projectId, props.proxyPath)}
+      locales={props.locales}
+      lang={props.lang}
       purpose={props.purpose ?? "login"}
       post-sign-in-url={props.postSignInUrl}
     />

@@ -98,10 +98,13 @@ describe("removeGuidanceSection", () => {
 });
 
 describe("guidance content", () => {
-  it("names the exact origin and warns off 127.0.0.1", () => {
+  it("opens /login on the exact origin and warns off 127.0.0.1", () => {
     const agents = agentsGuidanceSection(ctx);
-    expect(agents).toContain("http://localhost:3000");
+    // /login, not the bare origin: only freshly scaffolded apps redirect /
+    // there — a pre-existing app keeps its homepage.
+    expect(agents).toContain("http://localhost:3000/login");
     expect(agents).toContain("not 127.0.0.1");
+    expect(readmeGuidanceSection(ctx)).toContain("http://localhost:3000/login");
   });
 
   it("points agents at the dialect meta-schemas and the plan/apply loop", () => {

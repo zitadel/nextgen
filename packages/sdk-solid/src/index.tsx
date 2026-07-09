@@ -86,6 +86,8 @@ export function ZitadelLogin(
     <zitadel-login
       ref={props.ref}
       prop:project={props.project}
+      prop:locales={props.locales}
+      prop:lang={props.lang}
       project-id={props.projectId}
       proxy-path={props.proxyPath}
       purpose={props.purpose ?? "login"}

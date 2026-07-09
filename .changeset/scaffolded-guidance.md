@@ -2,6 +2,12 @@
 "@zitadel/cli": patch
 "@zitadel/config": patch
 "@zitadel/sdk-core": patch
+"@zitadel/server": patch
+"@zitadel/sdk-solid": patch
+"@zitadel/sdk-qwik": patch
+"@zitadel/sdk-svelte": patch
+"@zitadel/sdk-vue": patch
+"@zitadel/sdk-angular": patch
 ---
 
 Scaffolded projects now explain their own next step. `zitadel setup` writes
@@ -20,3 +26,10 @@ is stripped from `README.md`/`AGENTS.md` (content outside the markers is
 untouched), and a file is deleted only when nothing but the scaffold-created
 header would remain — no stale golden path survives pointing at deleted
 `.zitadel/` files.
+
+Every SDK wrapper now forwards `locales`/`lang` to the widget (previously
+only React did; Solid/Qwik/Svelte accepted and discarded them, Vue/Angular
+did not expose them). The flow dialect meta-schema (`@zitadel/server`
+embeds it; `@zitadel/config` ships the committed copy) marks a transition's
+`action` as nullable, matching the OpenAPI contract — editors no longer
+flag `"action": null`.

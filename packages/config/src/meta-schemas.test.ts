@@ -51,6 +51,27 @@ describe("meta-schemas", () => {
     }
   });
 
+  it("accepts an explicit `action: null` transition, as the OpenAPI contract does", () => {
+    const ajv = new Ajv2020({ strict: false });
+    const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
+    const check = ajv.compile(flowSchema?.body as object);
+    const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }) as unknown as {
+      steps: Array<{
+        transitions?: Record<string, { target: string; action?: string | null }>;
+      }>;
+    };
+    const step = flow.steps.find((s) => s.transitions && Object.keys(s.transitions).length > 0);
+    const transition = Object.values(step?.transitions ?? {})[0];
+    if (!transition) throw new Error("fixture flow has no transitions");
+    // `action: null` means "current flow" — the wire contract marks the enum
+    // nullable, so the editor-facing dialect must not flag it.
+    transition.action = null;
+    expect(check(flow), JSON.stringify(check.errors)).toBe(true);
+    // The enum still constrains real values.
+    (transition as { action: unknown }).action = "warp";
+    expect(check(flow)).toBe(false);
+  });
+
   it("rejects the pre-array actions dialect and unknown keys", () => {
     const ajv = new Ajv2020({ strict: false });
     const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
