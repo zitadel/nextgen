@@ -6,12 +6,12 @@
 
 ## Context
 
-When performing CRUD operations on resources a list operation is often required.
-However, with listing comes filtering and sorting. URLs provide query
-parameters to solve this issue but when applying complex filters, this becomes
-very bloated, very quickly due to possible combinations of filter operations, 
-fields and values. We need a standardized way to allow a customer to query 
-collections, without having to build these complex queries.
+When performing CRUD operations on resources, a list operation is often required.
+However, listing often requires filtering and sorting. URLs provide query
+parameters to solve this, but when applying complex filters, this becomes
+bloated very quickly due to possible combinations of filter operations,
+fields, and values. We need a standardized way to allow a customer to query
+collections without having to build these complex queries.
 
 ## Decision
 
@@ -23,7 +23,7 @@ We use HTTP-`POST` for querying but should also implement `QUERY` as soon as it
 is available in Ogen. Next to the `POST` method we still allow for a `GET` but
 it won't have filter/sort functionality.
 
-URLS:
+URLs:
 
 - `GET https://example.com/resources`
 - `QUERY https://example.com/resources`
@@ -45,7 +45,7 @@ query string. There are solutions for this; see [query language](#query-language
 
 #### `QUERY`
 
-Since June 2026,  the IETF published [RFC 10008](https://datatracker.ietf.org/doc/html/rfc10008), 
+Since June 2026, the IETF published [RFC 10008](https://datatracker.ietf.org/doc/html/rfc10008),
 "The HTTP QUERY Method". The `QUERY` method is meant for exactly this use-case:
 
 > The QUERY method is used to initiate a server-side query. Unlike the GET 
