@@ -208,6 +208,31 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain("invalid");
   });
 
+  it("renders the engine's passkey-disabled refusal as a localized alert", () => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    const a = toArray({
+      submit: { text_key: "identifier.action.continue", primary: true },
+    });
+    const context = {
+      step: { name: "identifier", texts: { title_key: "identifier.title" } },
+      fields: [],
+      actions: a,
+      branding: {},
+      loading: false,
+      // The state machine halts passkey ceremonies on schemas that disable
+      // the method with this key (flow_state_machine.go processPasskey).
+      errors: [{ text_key: "error.passkey_disabled" }],
+      gates: {},
+      sso_providers: [],
+      messages: [],
+      identity: null,
+    };
+    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    expect(result).toContain('<zl-alert severity="error"');
+    expect(result).toContain("Passkey sign-in is turned off for this account type");
+    expect(result).not.toContain("error.passkey_disabled");
+  });
+
   it("renders passkey registration challenges with registration ceremony", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
     const context = {

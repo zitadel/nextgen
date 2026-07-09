@@ -169,6 +169,7 @@ export const de: Locale = {
     "Passkey-Registrierung wurde nicht abgeschlossen. Bitte versuche es erneut.",
   "error.passkey_unsupported": "Dieses Gerät unterstützt keine Passkeys",
   "error.passkey_failed": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+  "error.passkey_disabled": "Passkey-Anmeldung ist für diesen Kontotyp deaktiviert. Nutze eine andere Anmeldemethode.",
 
   // --- Feld- / Formularfehler ---
   "error.email_required": "Bitte gib eine E-Mail-Adresse ein",

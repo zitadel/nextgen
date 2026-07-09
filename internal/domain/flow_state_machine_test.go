@@ -181,7 +181,8 @@ func TestFlowStateMachine_Start_RendersInitialStep(t *testing.T) {
 
 	w.schemaResolver.EXPECT().
 		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
-		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil)
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
 
 	w.authAttemptService.EXPECT().
 		Start(gomock.Any(), gomock.Cond(func(in domain.FlowCreateAttemptInput) bool {
@@ -2113,7 +2114,8 @@ func TestFlowStateMachine_Start_PreservesActionOrder(t *testing.T) {
 
 	w.schemaResolver.EXPECT().
 		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
-		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil)
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 
 	show := domain.FlowStepCompleteShow
@@ -2322,6 +2324,11 @@ func findFieldByName(fields []domain.FlowField, name string) *domain.FlowField {
 func TestFlowStateMachine_Back_NotInjectedOnInitialStep(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
 	def := navigateOnlyDefinition()
 
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
@@ -2341,6 +2348,11 @@ func TestFlowStateMachine_Back_NotInjectedOnInitialStep(t *testing.T) {
 func TestFlowStateMachine_Back_InjectedAfterAdvance(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
 	def := navigateOnlyDefinition()
 
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
@@ -2370,6 +2382,11 @@ func TestFlowStateMachine_Back_InjectedAfterAdvance(t *testing.T) {
 func TestFlowStateMachine_Back_OmittedOnTerminalStep(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
 	def := navigateOnlyDefinition()
 
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
@@ -2396,6 +2413,11 @@ func TestFlowStateMachine_Back_OmittedOnTerminalStep(t *testing.T) {
 func TestFlowStateMachine_Back_PopsAndRendersPreviousStep(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
 	def := navigateOnlyDefinition()
 
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
@@ -2423,6 +2445,11 @@ func TestFlowStateMachine_Back_PopsAndRendersPreviousStep(t *testing.T) {
 func TestFlowStateMachine_Back_EmptyBackStackRejected(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
 	def := navigateOnlyDefinition()
 
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
@@ -2609,6 +2636,11 @@ func navigateThreeStepDefinition() *domain.FlowDefinition {
 func TestFlowStateMachine_Back_MultiHopPopsProgressively(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
 	def := navigateThreeStepDefinition()
 
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
@@ -2688,6 +2720,11 @@ func TestFlowStateMachine_Back_PreservesCollectedData(t *testing.T) {
 func TestFlowStateMachine_Back_DropsPendingChallenge(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
 	def := navigateOnlyDefinition()
 
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
@@ -2763,7 +2800,7 @@ func TestFlowStateMachine_Process_PasskeyRefusedWhenSchemaDisablesPasskey(t *tes
 	})
 	require.NoError(t, err)
 	require.NotNil(t, result.Step.Error)
-	assert.Equal(t, "auth_attempt.passkey_disabled", *result.Step.Error)
+	assert.Equal(t, "error.passkey_disabled", *result.Step.Error)
 	assert.Nil(t, result.Step.Challenge)
 	assert.Nil(t, result.State.PendingChallenge)
 	assert.Equal(t, "authenticate", result.State.CurrentStep)
@@ -2792,7 +2829,7 @@ func TestFlowStateMachine_Process_PasskeyRegisterRefusedWhenSchemaDisablesPasske
 	})
 	require.NoError(t, err)
 	require.NotNil(t, result.Step.Error)
-	assert.Equal(t, "auth_attempt.passkey_disabled", *result.Step.Error)
+	assert.Equal(t, "error.passkey_disabled", *result.Step.Error)
 	assert.Nil(t, result.Step.Challenge)
 	assert.Equal(t, "register", result.State.CurrentStep)
 }
@@ -2829,7 +2866,58 @@ func TestFlowStateMachine_Process_PasskeyProofRefusedWhenSchemaDisablesPasskey(t
 	})
 	require.NoError(t, err)
 	require.NotNil(t, result.Step.Error)
-	assert.Equal(t, "auth_attempt.passkey_disabled", *result.Step.Error)
+	assert.Equal(t, "error.passkey_disabled", *result.Step.Error)
 	assert.Nil(t, result.State.PendingChallenge)
 	assert.Equal(t, "authenticate", result.State.CurrentStep)
+}
+
+// Hiding is the offer-side half the gate can't provide: a legacy flow
+// declaring passkey actions on a schema that disables them renders
+// without the passkey buttons, while its other actions survive. The
+// gate above still refuses direct submissions of the hidden action.
+func TestFlowStateMachine_Start_HidesPasskeyActionsWhenSchemaDisablesPasskey(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	expectPasskeyDisabledSchema(w, t)
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+
+	show := domain.FlowStepCompleteShow
+	def := &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-passkey-first-legacy",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "entry",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "entry",
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionPasskey, Kind: domain.FlowActionKindPasskey, Primary: true},
+					{Name: "email_fallback", Kind: domain.FlowActionKindNavigate},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionPasskey: {Target: "done"},
+					"email_fallback":         {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	names := make([]string, 0, len(start.Step.Actions))
+	for _, action := range start.Step.Actions {
+		assert.NotEqual(t, domain.FlowActionKindPasskey, action.Kind)
+		assert.NotEqual(t, domain.FlowActionKindPasskeyRegister, action.Kind)
+		names = append(names, action.Name)
+	}
+	assert.Equal(t, []string{"email_fallback"}, names)
 }
