@@ -141,6 +141,7 @@ function queryRecord(request: Request): Record<string, string> {
  */
 type ProjectRecord = {
   id: string;
+  name: string;
   projectSecret: string;
   previewSecret: string;
   previewOrigins: string[];
@@ -322,6 +323,7 @@ export function setupPlatformHandlers() {
       const createdAt = nowIso();
       const project: ProjectRecord = {
         id,
+        name: body.data.name,
         projectSecret: `sk_proj_${id.replaceAll("-", "")}_full`,
         previewSecret: `sk_proj_${id.replaceAll("-", "")}_preview`,
         previewOrigins: body.data.previewOrigins ?? [],
@@ -334,6 +336,7 @@ export function setupPlatformHandlers() {
       }
       const responseBody: CreateProject201 = {
         id: project.id,
+        name: project.name,
         projectSecret: project.projectSecret,
         previewSecret: project.previewSecret,
         previewOrigins: project.previewOrigins,
@@ -354,6 +357,7 @@ export function setupPlatformHandlers() {
       }
       const responseBody: GetProject200 = {
         id: project.id,
+        name: project.name,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
       };
