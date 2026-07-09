@@ -23,7 +23,7 @@ Cross-resource references are stored as concrete ids on the referencing side. A 
 
 When the user edits the schema, the server allocates a new id, but the flow file keeps pointing at the previous one, there is no way to say "the current `human-user` schema" in the flow, only "this specific revision." Adopting the new schema requires a two-step change: first edit and apply the schema, then edit the flow file to substitute the new id and apply again.
 
-<img width="2948" height="1364" alt="Status quo diagram" src="https://github.com/user-attachments/assets/6a11c652-57f2-49c6-bb87-ed75fd11ce0c" />
+<img width="2372" height="1316" alt="Status quo diagram" src="https://github.com/user-attachments/assets/05cc1691-80a4-4c27-9047-ce5f072669b6" />
 
 `zitadel apply` is a client-side orchestrator over those per-resource APIs. It walks `.zitadel/`, computes what changed, and issues one API call per changed resource  (e.g. `POST /schemas`). There is no atomicity: a run that fails halfway through leaves the server holding a partially updated state, and the CLI's local `state.json` has to reconcile on the next run. The server has no visibility into which changes were applied together, it treats them as independent writes.
 
