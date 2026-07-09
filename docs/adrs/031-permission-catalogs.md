@@ -36,11 +36,6 @@ This is the first of three related ADRs on permission management:
   catalog** lets customers author their own OpenFGA-flavored policies for
   their own apps.
 
-These three documents replace a single earlier draft ADR that tried to cover
-all of this ground at once and was hard to review because it mixed a
-foundational architecture decision with two very different concrete use
-cases.
-
 ## Glossary
 
 FGA vocabulary is unusually dense and mostly unfamiliar outside teams who've
@@ -56,7 +51,7 @@ this glossary only covers FGA-specific vocabulary, not resource names.
 | **ReBAC (Relationship-Based Access Control)** | Access decided by walking relationships — "Alice is a member of Team X, Team X owns Project Y, so Alice can read Project Y" — rather than only checking a role name. FGA systems are usually ReBAC systems with some RBAC-style bundling on top for convenience. |
 | **Relation / permission** | The named action or relationship being checked, e.g. `users.read`, `viewer`, `can_manage`. |
 | **Permission expression** | The rule that computes whether a relation/permission holds for a given principal and resource: a direct assignment, a union of other rules, or bounded inheritance across the resource hierarchy. |
-| **Tuple** | OpenFGA's atomic fact shape: `(object, relation, user)`, e.g. `(project:42, viewer, user:alice)`. We use tuples as an *authoring and interchange* shape (see ADR 033); our runtime storage is relational rows, not a tuple store. |
+| **Tuple** | OpenFGA's atomic fact shape: `(object, relation, user)`, e.g. `(project:42, viewer, user:alice)`. We use tuples as an *authoring and interchange* shape (see [ADR 033](033-external-permission-management.md)); our runtime storage is relational rows, not a tuple store. |
 | **Userset** | A set of principals defined implicitly through a relation on another object — "everyone who is a `member` of `team:9`" — instead of one explicitly listed user. |
 | **Tuple-to-userset (TTU)** | A rule that derives a permission on one resource from a relation on a *different*, related resource, e.g. "you can read a document if you're a `viewer` of the project that owns it." |
 | **Relation implication / closure** | The precomputed answer to "which relations imply which other relations" for one catalog version, so a single check doesn't have to re-derive the whole rule graph on every request. |
