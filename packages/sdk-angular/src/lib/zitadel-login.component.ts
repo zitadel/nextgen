@@ -52,6 +52,8 @@ import "@zitadel/components";
     [project]="project"
     [projectId]="projectId"
     [proxyPath]="proxyPath"
+    [locales]="locales"
+    [lang]="lang"
     [attr.purpose]="purpose"
     [attr.flow-name]="flowName"
     [attr.post-sign-in-url]="postSignInUrl"
@@ -68,6 +70,8 @@ export class ZitadelLoginComponent {
   @Input() purpose: CreateFlowBodyPurpose = "login";
   @Input() flowName?: string;
   @Input() postSignInUrl?: string;
+  @Input() locales?: Record<string, Record<string, string>>;
+  @Input() lang?: string;
   @Output() flowStep = new EventEmitter<ZitadelFlowStepDetail>();
   @Output() flowInput = new EventEmitter<ZitadelFlowInputDetail>();
   @Output() flowComplete = new EventEmitter<ZitadelFlowCompleteDetail>();

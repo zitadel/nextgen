@@ -35,6 +35,21 @@ export function upsertGuidanceSection(
   return `${source.replace(/\n*$/, "\n\n")}${block}`;
 }
 
+/**
+ * Remove the managed guidance section (markers inclusive) from `source` —
+ * the inverse of {@link upsertGuidanceSection}, for `eject`. Content outside
+ * the markers is preserved byte-for-byte; a missing or malformed marker pair
+ * returns `source` unchanged.
+ */
+export function removeGuidanceSection(source: string): string {
+  const begin = source.indexOf(MARKER_BEGIN);
+  const end = source.indexOf(MARKER_END);
+  if (begin === -1 || end <= begin) {
+    return source;
+  }
+  return `${source.slice(0, begin)}${source.slice(end + MARKER_END.length).replace(/^\n/, "")}`;
+}
+
 /** The agent-facing golden path, written into `AGENTS.md`. */
 export function agentsGuidanceSection(ctx: PatchContext): string {
   const plan = publicCliCommand("plan", ctx.cliVersion);
@@ -45,7 +60,7 @@ This app's login is managed by Zitadel. Local config is the source of truth; nev
 
 The golden path:
 
-1. Start the dev server and open ${ctx.issuer} — **exactly this origin, not 127.0.0.1**. Passkeys and the origin allowlist are bound to it.
+1. Start the dev server and open ${ctx.issuer}/login — **exactly this origin, not 127.0.0.1**. Passkeys and the origin allowlist are bound to it. (Freshly scaffolded apps also redirect / there; pre-existing apps keep their homepage.)
 2. Prove the loop in a real browser: register a user → sign out → sign in → /profile shows signed in.
 3. Customize by editing local config:
    - \`.zitadel/schemas/*.json\` — what a user is (fields, required, auth methods). See \`.zitadel/schemas/README.md\`.
@@ -70,7 +85,7 @@ export function readmeGuidanceSection(ctx: PatchContext): string {
   const apply = publicCliCommand("apply", ctx.cliVersion);
   return `## Authentication (Zitadel)
 
-Login for this app is managed by [Zitadel](https://zitadel.com). Try it: start the dev server, open ${ctx.issuer} (use this exact origin — passkeys are bound to it), register a user, sign out, and sign in again.
+Login for this app is managed by [Zitadel](https://zitadel.com). Try it: start the dev server, open ${ctx.issuer}/login (use this exact origin — passkeys are bound to it), register a user, sign out, and sign in again.
 
 To change what the login collects or how sign-in works, edit the files under \`.zitadel/schemas/\` and \`.zitadel/flows/\` (each folder has a README), then:
 

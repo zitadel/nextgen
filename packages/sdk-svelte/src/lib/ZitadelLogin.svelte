@@ -17,6 +17,8 @@
     purpose = 'login',
     flowName,
     postSignInUrl,
+    locales,
+    lang,
     onFlowStep,
     onFlowInput,
     onFlowComplete,
@@ -64,6 +66,8 @@
   bind:this={el}
   {project}
   {purpose}
+  {locales}
+  {lang}
   project-id={projectId}
   proxy-path={proxyPath}
   post-sign-in-url={postSignInUrl}

@@ -47,6 +47,7 @@ import {
   GetSchemaByIdQueryParams,
   ListFlowDefinitionsQueryParams,
   ListFlowDefinitionsResponse,
+  ListUsersQueryParams,
   UpdateFlowDefinitionBody,
   UpdateFlowDefinitionParams,
   UpdateFlowDefinitionQueryParams,
@@ -394,7 +395,6 @@ export function setupPlatformHandlers() {
       const responseBody: GetProject200 = {
         id: project.id,
         name: project.name,
-        previewOrigins: project.previewOrigins,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
       };
@@ -403,6 +403,31 @@ export function setupPlatformHandlers() {
         return out.response;
       }
       return HttpResponse.json(out.data);
+    }),
+
+    // Users exist only through real sign-ups, which the platform mock has no
+    // endpoint for — the list is always empty. That is exactly the state a
+    // freshly set-up project is in, and what `status` keys its journey-staged
+    // guidance on. Auth mirrors the real server: the project secret is the
+    // bearer and scopes the (empty) result.
+    http.get("*/users", ({ request }) => {
+      // Both spec'd query params (offset, limit) are numeric, but URLs carry
+      // strings and the generated zod does not coerce — convert before parsing.
+      const raw = Object.fromEntries(
+        Object.entries(queryRecord(request)).map(([key, value]) => [key, Number(value)]),
+      );
+      const query = parse(ListUsersQueryParams, raw, "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const token = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+      const project = [...store.projects.values()].find((p) => p.projectSecret === token);
+      if (!project) {
+        return HttpResponse.json(errorBody("unauthenticated", "missing or invalid credentials"), {
+          status: 401,
+        });
+      }
+      return HttpResponse.json([]);
     }),
 
     http.post("*/schemas", async ({ request }) => {

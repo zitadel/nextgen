@@ -2,9 +2,10 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { Ajv2020 } from "ajv/dist/2020.js";
+import Ajv2020 from "ajv/dist/2020";
 import { describe, expect, it } from "vitest";
 
+import { getDefaultLoginFlow, SETUP_PRESETS } from "./defaults.js";
 import { FLOW_FILE_SCHEMA_REF, META_SCHEMA_DIR, metaSchemaFiles } from "./meta-schemas.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -67,10 +68,67 @@ describe("meta-schemas", () => {
     }
   });
 
-  // The dialect must accept the very files this package ships: editors
-  // validate scaffolded flow files against these schemas, so a divergence
-  // between the dialect spec and the real config shape lights up every
-  // valid file as an error.
+  // The whole point of shipping the meta-schema: it must accept the exact
+  // files that carry the `$schema` pointer at it. A dialect drift here means
+  // editors flag every scaffolded flow as invalid.
+  it("validates every scaffolded preset flow", () => {
+    const ajv = new Ajv2020({ strict: false });
+    const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
+    const check = ajv.compile(flowSchema?.body as object);
+    for (const preset of SETUP_PRESETS) {
+      const flow = getDefaultLoginFlow({ preset, userSchemaUrl: "sch_TEST" });
+      expect(check(flow), `${preset}: ${JSON.stringify(check.errors)}`).toBe(true);
+    }
+  });
+
+  it("accepts an explicit `action: null` transition, as the OpenAPI contract does", () => {
+    const ajv = new Ajv2020({ strict: false });
+    const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
+    const check = ajv.compile(flowSchema?.body as object);
+    const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }) as unknown as {
+      steps: Array<{
+        transitions?: Record<string, { target: string; action?: string | null }>;
+      }>;
+    };
+    const step = flow.steps.find((s) => s.transitions && Object.keys(s.transitions).length > 0);
+    const transition = Object.values(step?.transitions ?? {})[0];
+    if (!transition) throw new Error("fixture flow has no transitions");
+    // `action: null` means "current flow" — the wire contract marks the enum
+    // nullable, so the editor-facing dialect must not flag it.
+    transition.action = null;
+    expect(check(flow), JSON.stringify(check.errors)).toBe(true);
+    // The enum still constrains real values.
+    (transition as { action: unknown }).action = "warp";
+    expect(check(flow)).toBe(false);
+  });
+
+  it("rejects the pre-array actions dialect and unknown keys", () => {
+    const ajv = new Ajv2020({ strict: false });
+    const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
+    const check = ajv.compile(flowSchema?.body as object);
+    const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }) as unknown as {
+      steps: Array<{ actions?: unknown }>;
+    };
+    // Old dialect: actions keyed by name instead of an ordered array.
+    const [entry] = flow.steps;
+    if (entry) {
+      entry.actions = { submit: { primary: true } };
+    }
+    expect(check(flow)).toBe(false);
+
+    const withUnknown = {
+      ...getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }),
+      not_a_flow_key: true,
+    };
+    expect(check(withUnknown)).toBe(false);
+  });
+
+  // The dialect must also accept the raw files this package ships from disk
+  // (placeholders included): editors validate scaffolded flow and schema
+  // files against these specs, so a divergence between the dialect and the
+  // real config shape lights up every valid file as an error. $ref-registered
+  // compilation exercises the cross-file references (user-schema →
+  // auth-methods → auth-method) that standalone compiles skip.
   describe("dialect accepts the shipped defaults and presets", () => {
     const defaultsDir = join(packageRoot, "defaults");
     const presetDirs = readdirSync(join(defaultsDir, "presets"));

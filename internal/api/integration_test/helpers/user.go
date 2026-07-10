@@ -19,7 +19,6 @@ func (h *Harness) EnsureUserService(t *testing.T) *service.UserService {
 			h.EnsureUserPasswordRepo(t),
 			h.EnsureSchemaRepo(t),
 			h.EnsureHasher(t),
-			h.EnsureAnyTokenVerifier(t),
 		)
 	}
 	return h.UserService

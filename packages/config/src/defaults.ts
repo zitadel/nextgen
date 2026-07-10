@@ -48,13 +48,15 @@ const PRESET_TEMPLATES: Record<SetupPreset, { schema: unknown; flow: unknown }> 
 };
 
 function presetTemplates(preset: string): { schema: unknown; flow: unknown } {
-  const entry = PRESET_TEMPLATES[preset as SetupPreset];
-  if (entry === undefined) {
+  // Own-property check: indexing a plain object with an arbitrary string
+  // would let "__proto__"/"constructor" resolve via the prototype chain
+  // and bypass the unknown-preset error.
+  if (!Object.hasOwn(PRESET_TEMPLATES, preset)) {
     throw new Error(
       `unknown setup preset ${JSON.stringify(preset)} (known presets: ${SETUP_PRESETS.join(", ")})`,
     );
   }
-  return entry;
+  return PRESET_TEMPLATES[preset as SetupPreset];
 }
 
 export type DefaultConfigRenderOptions = {

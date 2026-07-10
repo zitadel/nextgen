@@ -18,15 +18,17 @@ import type { ResourceEntry, SyncAction } from "./types.js";
  * updates) are validated: an unchanged flow is never re-judged, so a
  * validator behavior change cannot break an already-applied project.
  *
- * Warning-severity issues attach to their action (`action.warnings`) for
- * plan rendering; error-severity issues aggregate into one E_VALIDATION
+ * Warning-severity issues ANNOTATE the actions in place (`action.warnings`)
+ * for plan rendering — `actions` is deliberately typed mutable because the
+ * caller (`buildSyncPlan`, which owns the array it just built) expects the
+ * annotations. Error-severity issues aggregate into one E_VALIDATION
  * carrying every violation.
  *
  * Escape hatch: setting `ZITADEL_SKIP_FLOW_VALIDATION` skips the check —
  * insurance against a port bug rejecting something the server accepts.
  */
 export function validatePlannedFlows(opts: {
-  actions: ReadonlyArray<SyncAction>;
+  actions: SyncAction[];
   scannedContents: ReadonlyMap<string, object>;
   stateResources: Readonly<Record<string, ResourceEntry>>;
 }): void {

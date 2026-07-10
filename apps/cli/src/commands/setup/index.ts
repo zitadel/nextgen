@@ -192,6 +192,11 @@ export default class Setup extends BaseCommand {
       outro("Configuration captured");
     }
 
+    // The interactive prompt can override the flag/default preset recorded at
+    // framework_resolved — re-record so telemetry carries the preset that
+    // actually scaffolds.
+    this.recordTelemetry({ preset: answers.preset });
+
     const issuer = issuerFromPort(answers.devPort);
     // The DevPortPrompt can change the port interactively, so fold the answer
     // back into the framework: the patched dev-server config reads
@@ -320,7 +325,7 @@ export default class Setup extends BaseCommand {
       // pre-coloured rows (path/url/id helpers) survive intact.
       consola.box({
         title: "Zitadel is ready",
-        message: [renderSummary(sections), "", installOutcome.nextActions.join("\n")].join("\n"),
+        message: [renderSummary(sections), "", installOutcome.boxActions.join("\n")].join("\n"),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
     }
@@ -540,8 +545,6 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   ".zitadel/meta/flow-definition.json": { subject: "the flow dialect spec (editor $schema)" },
   ".zitadel/meta/user-schema.json": { subject: "the user-schema dialect spec" },
   ".zitadel/meta/user-property.json": { subject: "the user-property dialect spec" },
-  ".zitadel/meta/auth-methods.json": { subject: "the auth-methods dialect spec" },
-  ".zitadel/meta/auth-method.json": { subject: "the auth-method dialect spec" },
   "AGENTS.md": { subject: "the agent guidance (golden journey + config dialect)" },
   "README.md": { subject: "the README's Zitadel section" },
   "app/page.tsx": { subject: "the home page redirect" },

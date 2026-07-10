@@ -68,9 +68,42 @@ describe("setup dependency installation", () => {
     expect(result.nextActions.join("\n")).toContain(".zitadel/schemas/");
     expect(result.nextActions.join("\n")).toContain(".zitadel/flows/");
     expect(result.nextActions.join("\n")).toContain(
-      `Preview and publish config changes: ${planCommand} then npx @zitadel/cli@latest apply`,
+      `See your changes before they go live: ${planCommand} to preview, then npx @zitadel/cli@latest apply to publish.`,
     );
     expect(result.nextCommands).toEqual(["npm run dev", planCommand]);
+  });
+
+  it("stages the human box to the verify mission while the JSON envelope stays complete", async () => {
+    const cwd = await tempProject();
+    const run = vi.fn(async () => undefined);
+
+    const result = await installDependenciesForSetup(input({ cwd, run }));
+
+    // The box ends on one breadcrumb instead of the customize/publish pair —
+    // those steps only make sense after the first successful login.
+    expect(result.boxActions.at(-1)).toBe(
+      "Once login works: npx @zitadel/cli@latest status shows your next steps; " +
+        "customizing is covered in your README's Zitadel section.",
+    );
+    expect(result.boxActions.join("\n")).toContain("register a user");
+    expect(result.boxActions.join("\n")).not.toContain(".zitadel/schemas/");
+    expect(result.boxActions.join("\n")).not.toContain(planCommand);
+    // Every box line except the breadcrumb is also in the envelope, which
+    // additionally carries the customize/publish pair for agents.
+    for (const action of result.boxActions.slice(0, -1)) {
+      expect(result.nextActions).toContain(action);
+    }
+    expect(result.nextActions.join("\n")).toContain(".zitadel/schemas/");
+  });
+
+  it("keeps the install step first in the box when installation was skipped", async () => {
+    const cwd = await tempProject();
+    const run = vi.fn(async () => undefined);
+
+    const result = await installDependenciesForSetup(input({ cwd, run, skipInstall: true }));
+
+    expect(result.boxActions[0]).toBe("Install dependencies: npm install");
+    expect(result.nextActions[0]).toBe("Install dependencies: npm install");
   });
 
   it("installs after fresh scaffolding even when no Zitadel dependency changed", async () => {

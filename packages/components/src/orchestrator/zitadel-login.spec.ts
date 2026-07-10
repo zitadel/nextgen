@@ -87,11 +87,17 @@ async function advanceMockLoginFlow(element: ZitadelLogin, email = "alice@acme.c
   );
 }
 
-async function mount(host: HTMLElement): Promise<ZitadelLogin> {
+/** Create and attach a login element without waiting for a render. */
+function attachLogin(host: HTMLElement): ZitadelLogin {
   const element = document.createElement("zitadel-login") as ZitadelLogin;
   element.purpose = "login";
   element.project = testProject;
   host.appendChild(element);
+  return element;
+}
+
+async function mount(host: HTMLElement): Promise<ZitadelLogin> {
+  const element = attachLogin(host);
   await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
   return element;
 }
@@ -391,6 +397,67 @@ describe("<zitadel-login> against the typed Flow API", () => {
       kind: "createFlow",
       body: { purpose: "login", project_id: "demo-project" },
     });
+  });
+
+  it("renders the bundled default template when the server sends no liquid_template", async () => {
+    // `clearBranding()` in beforeEach means the mock — like the real server —
+    // ships no `branding.liquid_template`. The `data-testid` markers exist
+    // only in the components-bundled template, so their presence proves the
+    // client-side default rendered.
+    const element = await mount(host);
+    expect(
+      element.shadowRoot!.querySelector('zl-field[data-testid="zitadel-field-email"]'),
+    ).toBeTruthy();
+  });
+
+  it("renders a server-sent branding.liquid_template instead of the bundled default", async () => {
+    applyBranding({ liquid_template: '<p data-testid="tenant-template">tenant-owned</p>' });
+    const element = attachLogin(host);
+
+    // Can't use mount(): the marker is what signals the render completed.
+    const marker = await waitFor(() =>
+      element.shadowRoot?.querySelector('[data-testid="tenant-template"]'),
+    );
+    expect(marker.textContent).toBe("tenant-owned");
+    // patchMandatoryGates re-injects the step's mandatory fields into tenant
+    // templates that omit them, so a bare zl-field is expected — but the
+    // bundled default (recognisable by its data-testid markers) must not be
+    // the template that rendered.
+    expect(
+      element.shadowRoot!.querySelector('zl-field[data-testid="zitadel-field-email"]'),
+    ).toBeNull();
+  });
+
+  it("renders a primary passkey action as exactly one button", async () => {
+    // Regression for the duplicate "Continue with passkey" button: the
+    // template renders primary actions generically AND has a dedicated
+    // passkey block, which must skip a passkey that is already primary.
+    server.use(
+      http.post("*/flow", () =>
+        HttpResponse.json(
+          {
+            id: "flow_test",
+            session_id: "sess_test",
+            session_token: "st_test",
+            step: {
+              name: "passkey-first",
+              texts: { title_key: "identifier.title" },
+              fields: [],
+              actions: [{ name: "passkey", text_key: "identifier.action.passkey", primary: true }],
+              gates: {},
+            },
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+
+    const element = attachLogin(host);
+
+    await waitFor(() => element.shadowRoot?.querySelector('zl-button[action="passkey"]'));
+    const passkeyButtons = element.shadowRoot!.querySelectorAll('zl-button[action="passkey"]');
+    expect(passkeyButtons).toHaveLength(1);
+    expect(passkeyButtons[0]?.getAttribute("hierarchy")).toBe("primary");
   });
 
   it("auto-submits challenge_response when zl-passkey-result is dispatched", async () => {
