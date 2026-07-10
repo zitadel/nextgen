@@ -92,7 +92,7 @@ export class NuxtPatcher extends AbstractRulePatcher {
     return {
       title: "Nuxt integration",
       detail:
-        "Wrote landing/login/register/profile pages + plugins and registered @zitadel/sdk-nuxt in nuxt.config.*.",
+        "Wrote login/register/profile pages + plugins and registered @zitadel/sdk-nuxt in nuxt.config.*.",
     };
   }
 }

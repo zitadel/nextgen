@@ -112,7 +112,7 @@ function outcome(input: {
 }): SetupInstallOutcome {
   const planCommand = publicCliCommand("plan", input.cliVersion);
   const applyCommand = publicCliCommand("apply", input.cliVersion);
-  const startAction = `Start your project: ${input.devCommand} (then open ${input.issuer})`;
+  const startAction = `Start your project: ${input.devCommand} (then open ${input.issuer}/login)`;
   const verifyAction =
     "Verify auth in the browser: register a user, log out, log in again with the same user, and confirm /profile shows Signed in.";
   const customizeAction =

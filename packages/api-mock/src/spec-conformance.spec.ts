@@ -80,13 +80,18 @@ function validFlowDefinitionBody(): Record<string, unknown> {
       "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.yaml",
     // Per `flow-definition.yaml`, `purposes` is an object mapping each
     // purpose name to its entry-point step (must match a `name` in `steps`).
+    // The shape must satisfy the definition-time validator the mock now
+    // mirrors: every action wires a transition, every non-terminal step can
+    // reach a terminal step.
     purposes: { login: "identifier" },
     steps: [
       {
         name: "identifier",
         fields: ["email"],
         actions: [{ name: "submit", kind: "submit", text_key: "submit", primary: true }],
+        transitions: { submit: { target: "done" } },
       },
+      { name: "done", complete: "show" },
     ],
   };
 }
@@ -168,13 +173,18 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const res = await fetch(`${BASE}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ previewOrigins: ["http://localhost:3000"], seedDefaults: false }),
+      body: JSON.stringify({
+        name: "conformance-app",
+        previewOrigins: ["http://localhost:3000"],
+        seedDefaults: false,
+      }),
     });
     expect(res.status).toBe(201);
     const body = (await res.json()) as Record<string, unknown>;
     // No CreateProjectResponse zod schema is emitted by orval. Validate
     // structurally against the fields create-project-response.yaml requires.
     expect(typeof body.id).toBe("string");
+    expect(body.name).toBe("conformance-app");
     expect(typeof body.projectSecret).toBe("string");
     expect(typeof body.previewSecret).toBe("string");
     expect(Array.isArray(body.previewOrigins)).toBe(true);
@@ -185,7 +195,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const create = await fetch(`${BASE}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ name: "conformance-app" }),
     });
     const { id } = (await create.json()) as { id: string };
     const res = await fetch(`${BASE}/projects/${id}`);
@@ -296,6 +306,23 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     // POST 201 and GET 200 share the `flow-definition-detail-response`
     // envelope per the spec, so the GET response zod schema validates both.
     expect(() => GetFlowDefinitionResponse.parse(body)).not.toThrow();
+  });
+
+  test("POST /flow_definitions rejects an invalid definition with the server's flowdef.invalid envelope", async () => {
+    const flowDefinition = validFlowDefinitionBody();
+    // Wire register as a purpose without the flip transition — the exact
+    // class of definition the real server rejects at apply time.
+    flowDefinition.purposes = { login: "identifier", register: "identifier" };
+    const res = await fetch(`${BASE}/flow_definitions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project_id: "proj_conformance", flow_definition: flowDefinition }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { code: string; message: string; details: string };
+    expect(body.code).toBe("flowdef.invalid");
+    expect(body.message).toBe("flow definition: invalid");
+    expect(body.details).toContain('must wire "user_not_found" transition');
   });
 
   test("GET /flow_definitions matches ListFlowDefinitionsResponse", async () => {
