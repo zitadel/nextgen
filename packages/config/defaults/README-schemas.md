@@ -124,6 +124,12 @@ Set `"passkey": { "enabled": true }` in `x-auth-methods`.
 
 Create another JSON file in this directory.
 
+## Start from a different preset
+
+`zitadel setup` scaffolds this folder from a preset (`--preset
+password-first` or `--preset passkey-first`). The preset only decides the
+starting point — everything in it is editable afterwards.
+
 ------------------------------------------------------------------------
 
 ## Next step

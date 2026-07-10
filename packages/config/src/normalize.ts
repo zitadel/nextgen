@@ -56,13 +56,19 @@ function isEmptyAudience(value: unknown): boolean {
 
 /**
  * Return a deep copy of a bare flow-definition body with server-echoed
- * noise removed: an empty `audience` and any detail-envelope keys.
+ * noise removed: an empty `audience` and any detail-envelope keys. A
+ * top-level `$schema` is stripped too — it is a local editor affordance
+ * (scaffolded flow files point it at `.zitadel/meta/flow-definition.json`),
+ * never part of the resource: the server skips it on decode and omits it
+ * from responses, so comparing with it would read every scaffolded file
+ * as permanently diverged.
  */
 export function normalizeFlowBody(body: object): object {
   const result = structuredClone(body) as Record<string, unknown>;
   for (const key of FLOW_ENVELOPE_KEYS) {
     delete result[key];
   }
+  delete result.$schema;
   if ("audience" in result && isEmptyAudience(result.audience)) {
     delete result.audience;
   }

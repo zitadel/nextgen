@@ -32,6 +32,38 @@ func (h *Handler) CreateUser(ctx context.Context, req *api.User, params api.Crea
 	return convertUsingJson[api.CreateUserResponse](u)
 }
 
+// ListUsers scopes to the bearer's project: the operation carries no
+// project parameter, so the oauth2 principal (the project secret the
+// CLI's status probe sends) is the only authority. Spec defaults are
+// applied here: limit 20 (max 100 enforced by decode), offset 0.
+func (h *Handler) ListUsers(ctx context.Context, params api.ListUsersParams) (api.ListUsersRes, error) {
+	scopeCtx, _ := GetScopeContext(ctx)
+
+	limit := uint32(20)
+	if params.Limit.IsSet() {
+		limit = uint32(params.Limit.Value)
+	}
+	var offset uint32
+	if params.Offset.IsSet() && params.Offset.Value > 0 {
+		offset = uint32(params.Offset.Value)
+	}
+
+	users, err := h.userService.ListUsers(ctx, service.ListUsersInput{
+		ProjectID: scopeCtx.ProjectID,
+		Offset:    offset,
+		Limit:     limit,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := convertUsingJson[api.ListUsersOKApplicationJSON](users)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
 func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams) (api.GetUserByIDRes, error) {
 	var teamID *string
 	if params.TeamID.IsSet() {
@@ -64,9 +96,13 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 	return &api.SetUserPasswordNoContent{}, nil
 }
 
-func (h *Handler) GetMyUser(ctx context.Context, params api.GetMyUserParams) (api.GetMyUserRes, error) {
+func (h *Handler) GetMyUser(ctx context.Context) (api.GetMyUserRes, error) {
+	sessionToken, ok := sessionTokenFromContext(ctx)
+	if !ok {
+		return nil, domain.ErrSessionTokenInvalid()
+	}
 	input := service.GetMyUserInput{
-		SessionToken: params.NextgenSession,
+		SessionToken: sessionToken,
 	}
 
 	userbs, err := h.userService.GetMyUser(ctx, input)

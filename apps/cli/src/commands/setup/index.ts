@@ -1,10 +1,15 @@
 import { rm } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 import { intro, outro } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 import { createZitadelClient } from "@zitadel/api/client";
 import type { CreateProject201 } from "@zitadel/api/generated/model";
+import {
+  DEFAULT_SETUP_PRESET,
+  SETUP_PRESETS,
+  type SetupPreset,
+} from "@zitadel/config/defaults";
 import { consola } from "consola";
 
 import { toZitadelError, ZitadelError } from "../../lib/errors";
@@ -80,6 +85,11 @@ export default class Setup extends BaseCommand {
     "skip-install": Flags.boolean({
       description: "Do not install dependencies after setup updates package.json.",
     }),
+    preset: Flags.string({
+      description:
+        "Sign-in preset for the scaffolded schema and login flow (default: password-first).",
+      options: [...SETUP_PRESETS],
+    }),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -137,6 +147,7 @@ export default class Setup extends BaseCommand {
       scaffolded_skeleton: scaffoldedFramework,
       skip_install: Boolean(flags["skip-install"]),
       dev_port_explicit: flags["dev-port"] !== undefined,
+      preset: flags.preset ?? DEFAULT_SETUP_PRESET,
       step: "framework_resolved",
     });
 
@@ -164,6 +175,7 @@ export default class Setup extends BaseCommand {
     let answers: SetupAnswers = {
       server: this.meta.source,
       devPort: framework.devPort,
+      preset: (flags.preset as SetupPreset | undefined) ?? DEFAULT_SETUP_PRESET,
     };
 
     if (!nonInteractive && !dryRun) {
@@ -172,12 +184,18 @@ export default class Setup extends BaseCommand {
         framework,
         serverFlag: this.meta.serverFlag,
         devPortFromFlag: flags["dev-port"] !== undefined,
+        presetFromFlag: flags.preset !== undefined,
       };
       for (const prompt of SETUP_PROMPTS) {
         answers = await prompt.ask(answers, promptCtx);
       }
       outro("Configuration captured");
     }
+
+    // The interactive prompt can override the flag/default preset recorded at
+    // framework_resolved — re-record so telemetry carries the preset that
+    // actually scaffolds.
+    this.recordTelemetry({ preset: answers.preset });
 
     const issuer = issuerFromPort(answers.devPort);
     // The DevPortPrompt can change the port interactively, so fold the answer
@@ -191,6 +209,7 @@ export default class Setup extends BaseCommand {
     // flow files through the typed resource APIs and records the returned IDs.
     consola.start(`Creating project on ${answers.server}${dryRun ? " (dry run)" : ""}`);
     const unauthClient = createZitadelClient({ baseUrl: answers.server });
+    const projectName = defaultProjectName(cwd, framework.id);
     // Register the app's own origin so the backend's origin check allows
     // requests the dev proxy forwards from it.
     const project = dryRun
@@ -199,6 +218,7 @@ export default class Setup extends BaseCommand {
           unauthClient,
           answers.server,
           this.meta.cliVersion,
+          projectName,
           issuer,
           framework.id,
         );
@@ -213,6 +233,7 @@ export default class Setup extends BaseCommand {
       server: answers.server,
       cliVersion: this.meta.cliVersion,
       scaffoldedFramework,
+      preset: answers.preset,
     };
     consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
     const result = await orca.patcherFor(framework.id).patch(ctx, { cwd, dryRun, force });
@@ -232,6 +253,7 @@ export default class Setup extends BaseCommand {
             client: createZitadelClient({ baseUrl: answers.server, token: project.projectSecret }),
             projectId: project.id,
             force,
+            preset: answers.preset,
           });
     } catch (error) {
       // Setup is not atomic: the patcher already wrote `zitadel.json` (the
@@ -303,7 +325,7 @@ export default class Setup extends BaseCommand {
       // pre-coloured rows (path/url/id helpers) survive intact.
       consola.box({
         title: "Zitadel is ready",
-        message: [renderSummary(sections), "", installOutcome.nextActions.join("\n")].join("\n"),
+        message: [renderSummary(sections), "", installOutcome.boxActions.join("\n")].join("\n"),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
     }
@@ -383,13 +405,21 @@ async function createProjectWithLocalHint(
   client: ReturnType<typeof createZitadelClient>,
   server: string,
   cliVersion: string,
+  projectName: string,
   issuer: string,
   framework: string,
 ): Promise<CreateProject201> {
   try {
+    // API contract requires a project name; generated TS models may lag
+    // briefly until `packages/api` regeneration catches up.
+    const payload = { name: projectName, previewOrigins: [issuer], seedDefaults: false } as {
+      name: string;
+      previewOrigins: string[];
+      seedDefaults: false;
+    };
     // Register the app's own origin so the backend's origin check allows the
     // requests the dev proxy forwards from it.
-    return await client.createProject({ previewOrigins: [issuer], seedDefaults: false });
+    return await client.createProject(payload as Parameters<typeof client.createProject>[0]);
   } catch (error) {
     const normalized = toZitadelError(error);
     throw new ZitadelError(normalized.code, normalized.message, {
@@ -407,6 +437,11 @@ async function createProjectWithLocalHint(
       },
     });
   }
+}
+
+function defaultProjectName(cwd: string, framework: string): string {
+  const fromDirectory = basename(cwd).trim();
+  return fromDirectory.length > 0 ? fromDirectory : `zitadel-${framework}-app`;
 }
 
 function localSetupHint(error: unknown, framework: string | undefined, cliVersion: string): unknown {
@@ -472,7 +507,12 @@ function describeWrittenFile(relPath: string, dryRun: boolean): string | null {
   // Mkdir ops surface in `filesWritten` alongside actual file writes.
   // They're noise at the per-step layer (the files inside them get
   // narrated on their own lines), so swallow them here.
-  if (relPath === ".zitadel" || relPath === ".zitadel/flows" || relPath === ".zitadel/schemas") {
+  if (
+    relPath === ".zitadel" ||
+    relPath === ".zitadel/flows" ||
+    relPath === ".zitadel/schemas" ||
+    relPath === ".zitadel/meta"
+  ) {
     return null;
   }
   const verb = dryRun ? "Would write" : "Wrote";
@@ -502,7 +542,12 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
     subject: "the editable default human user schema",
   },
   ".zitadel/schemas/README.md": { subject: "the schemas folder README" },
-  "app/page.tsx": { subject: "the auth home page" },
+  ".zitadel/meta/flow-definition.json": { subject: "the flow dialect spec (editor $schema)" },
+  ".zitadel/meta/user-schema.json": { subject: "the user-schema dialect spec" },
+  ".zitadel/meta/user-property.json": { subject: "the user-property dialect spec" },
+  "AGENTS.md": { subject: "the agent guidance (golden journey + config dialect)" },
+  "README.md": { subject: "the README's Zitadel section" },
+  "app/page.tsx": { subject: "the home page redirect" },
   "app/login/page.tsx": { subject: "the login page" },
   "app/register/page.tsx": { subject: "the registration page" },
   "app/profile/page.tsx": { subject: "the profile page" },
@@ -539,7 +584,7 @@ function buildSummary(opts: {
     });
   }
   for (const [label, suffix] of [
-    ["Home page", "app/page.tsx"],
+    ["Home redirect", "app/page.tsx"],
     ["Login page", "app/login/page.tsx"],
     ["Register page", "app/register/page.tsx"],
     ["Profile page", "app/profile/page.tsx"],

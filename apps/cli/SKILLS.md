@@ -76,7 +76,11 @@ layer, not the envelope.
   framework and recorded in `zitadel.json` branding, but only Next varies its
   generated templates by it), `--dev-port` (dev-server port, also the issuer
   origin registered with Zitadel — use distinct ports to run several scaffolded
-  apps side by side), `--skip-install`.
+  apps side by side), `--preset password-first|passkey-first` (the sign-in
+  experience the scaffold starts from: `password-first` is the default —
+  email + password with passkey optional during registration; `passkey-first`
+  enters login on a one-tap passkey step with an email + password fallback;
+  recorded in `zitadel.json`), `--skip-install`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
 - `schemas list` — inspect the revision history of a user-schema, filtered by

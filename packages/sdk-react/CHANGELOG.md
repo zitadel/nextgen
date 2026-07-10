@@ -1,5 +1,14 @@
 # @zitadel/sdk-react
 
+## 0.1.0-alpha.15
+
+### Patch Changes
+
+- Updated dependencies [[`f45d47c`](https://github.com/zitadel/nextgen/commit/f45d47c5850edc83a55b5ad7364a59ffac4fd37c)]:
+  - @zitadel/components@0.1.0-alpha.15
+  - @zitadel/api@0.1.0-alpha.15
+  - @zitadel/sdk-core@0.1.0-alpha.15
+
 ## 0.1.0-alpha.14
 
 ### Minor Changes

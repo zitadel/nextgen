@@ -87,11 +87,17 @@ async function advanceMockLoginFlow(element: ZitadelLogin, email = "alice@acme.c
   );
 }
 
-async function mount(host: HTMLElement): Promise<ZitadelLogin> {
+/** Create and attach a login element without waiting for a render. */
+function attachLogin(host: HTMLElement): ZitadelLogin {
   const element = document.createElement("zitadel-login") as ZitadelLogin;
   element.purpose = "login";
   element.project = testProject;
   host.appendChild(element);
+  return element;
+}
+
+async function mount(host: HTMLElement): Promise<ZitadelLogin> {
+  const element = attachLogin(host);
   await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
   return element;
 }
@@ -162,6 +168,76 @@ describe("<zitadel-login> against the typed Flow API", () => {
       kind: "createFlow",
       body: { purpose: "login", project_id: "demo-project" },
     });
+  });
+
+  it("sends flow_definition_name when flow-name is set", async () => {
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.project = testProject;
+    element.setAttribute("flow-name", "kiosk-login");
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+    // Exact match: nothing but the three keys — the default (no flow-name)
+    // body shape is pinned by the startup tests above.
+    expect(mock.getCaptured()[0]).toEqual({
+      kind: "createFlow",
+      body: {
+        purpose: "login",
+        project_id: "demo-project",
+        flow_definition_name: "kiosk-login",
+      },
+    });
+  });
+
+  it("explains a flow-name that matches no active flow definition", async () => {
+    // The server envelope only says "not found" — the orchestrator owns
+    // knowing the name came from its `flow-name` attribute.
+    server.use(
+      http.post(
+        "*/flow",
+        () =>
+          HttpResponse.json(
+            { code: "flowdef.not_found", message: "flow definition: not found" },
+            { status: 404 },
+          ),
+        { once: true },
+      ),
+    );
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.project = testProject;
+    element.setAttribute("flow-name", "no-such-flow");
+    host.appendChild(element);
+
+    await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
+    const text = element.shadowRoot?.querySelector("zl-alert")?.textContent ?? "";
+    expect(text).toContain('flow-name="no-such-flow"');
+    expect(text).toContain("zitadel apply");
+  });
+
+  it("explains a flow-name that does not serve the requested purpose", async () => {
+    server.use(
+      http.post(
+        "*/flow",
+        () =>
+          HttpResponse.json(
+            {
+              code: "flowdef.purpose_mismatch",
+              message: "flow definition: does not serve requested purpose",
+            },
+            { status: 400 },
+          ),
+        { once: true },
+      ),
+    );
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.project = testProject;
+    element.setAttribute("flow-name", "register-only");
+    host.appendChild(element);
+
+    await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
+    const text = element.shadowRoot?.querySelector("zl-alert")?.textContent ?? "";
+    expect(text).toContain('flow-name="register-only"');
+    expect(text).toContain('purpose "login"');
   });
 
   it("submits with {session_token, action, fields} and applies the next step", async () => {
@@ -280,6 +356,39 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(errorEvents[0]?.detail.message).toBeTypeOf("string");
   });
 
+  it("surfaces the server's error-envelope message on a req.invalid submit rejection", async () => {
+    const element = await mount(host);
+    const serverMessage =
+      'origin "http://127.0.0.1:3000" is not allowed for this project (allowed: http://localhost:3000)';
+    // Envelope-shaped 400 (no `step`), like the flow handler's passkey
+    // origin-allowlist rejection — must bubble past submitStep's
+    // flow-response unwrap and reach the user verbatim.
+    server.use(
+      http.post(
+        "*/flow/*/submit",
+        () => HttpResponse.json({ code: "req.invalid", message: serverMessage }, { status: 400 }),
+        { once: true },
+      ),
+    );
+
+    const errorEvents: CustomEvent[] = [];
+    element.addEventListener("zitadel-flow-error", (event: Event) =>
+      errorEvents.push(event as CustomEvent),
+    );
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", {
+        bubbles: true,
+        composed: true,
+        detail: { action: "submit" },
+      }),
+    );
+
+    await waitFor(() => (errorEvents.length > 0 ? errorEvents : null), 3000);
+    expect(errorEvents[0]?.detail.message).toBe(serverMessage);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
+    expect(element.shadowRoot?.querySelector("zl-alert")?.textContent).toContain(serverMessage);
+  });
+
   it("renders branding overlay applied via api-mock applyBranding", async () => {
     applyBranding({ layout: "split", logo_url: "https://logo.example/img.svg" });
     await mount(host);
@@ -288,6 +397,67 @@ describe("<zitadel-login> against the typed Flow API", () => {
       kind: "createFlow",
       body: { purpose: "login", project_id: "demo-project" },
     });
+  });
+
+  it("renders the bundled default template when the server sends no liquid_template", async () => {
+    // `clearBranding()` in beforeEach means the mock — like the real server —
+    // ships no `branding.liquid_template`. The `data-testid` markers exist
+    // only in the components-bundled template, so their presence proves the
+    // client-side default rendered.
+    const element = await mount(host);
+    expect(
+      element.shadowRoot!.querySelector('zl-field[data-testid="zitadel-field-email"]'),
+    ).toBeTruthy();
+  });
+
+  it("renders a server-sent branding.liquid_template instead of the bundled default", async () => {
+    applyBranding({ liquid_template: '<p data-testid="tenant-template">tenant-owned</p>' });
+    const element = attachLogin(host);
+
+    // Can't use mount(): the marker is what signals the render completed.
+    const marker = await waitFor(() =>
+      element.shadowRoot?.querySelector('[data-testid="tenant-template"]'),
+    );
+    expect(marker.textContent).toBe("tenant-owned");
+    // patchMandatoryGates re-injects the step's mandatory fields into tenant
+    // templates that omit them, so a bare zl-field is expected — but the
+    // bundled default (recognisable by its data-testid markers) must not be
+    // the template that rendered.
+    expect(
+      element.shadowRoot!.querySelector('zl-field[data-testid="zitadel-field-email"]'),
+    ).toBeNull();
+  });
+
+  it("renders a primary passkey action as exactly one button", async () => {
+    // Regression for the duplicate "Continue with passkey" button: the
+    // template renders primary actions generically AND has a dedicated
+    // passkey block, which must skip a passkey that is already primary.
+    server.use(
+      http.post("*/flow", () =>
+        HttpResponse.json(
+          {
+            id: "flow_test",
+            session_id: "sess_test",
+            session_token: "st_test",
+            step: {
+              name: "passkey-first",
+              texts: { title_key: "identifier.title" },
+              fields: [],
+              actions: [{ name: "passkey", text_key: "identifier.action.passkey", primary: true }],
+              gates: {},
+            },
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+
+    const element = attachLogin(host);
+
+    await waitFor(() => element.shadowRoot?.querySelector('zl-button[action="passkey"]'));
+    const passkeyButtons = element.shadowRoot!.querySelectorAll('zl-button[action="passkey"]');
+    expect(passkeyButtons).toHaveLength(1);
+    expect(passkeyButtons[0]?.getAttribute("hierarchy")).toBe("primary");
   });
 
   it("auto-submits challenge_response when zl-passkey-result is dispatched", async () => {
