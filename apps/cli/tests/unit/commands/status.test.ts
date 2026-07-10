@@ -180,11 +180,17 @@ describe("status command", () => {
     const res = await status(cwd);
 
     expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { data: { next_actions: string[] } };
+    const json = parseJson(res.stdout) as {
+      data: { next_actions: string[]; next_commands: string[] };
+    };
     const actions = json.data.next_actions.join("\n");
     expect(actions).toContain("open http://localhost:3000");
     expect(actions).toContain("register a user");
     expect(actions).not.toContain(".zitadel/schemas/");
+    // next_commands is staged in lockstep: preview is fine, publishing
+    // waits for the first proven login.
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("plan"));
+    expect(json.data.next_commands).not.toContain(expectedPublicCliCommand("apply"));
   });
 
   it("switches to customize/publish guidance once users exist", async () => {
@@ -194,7 +200,9 @@ describe("status command", () => {
     const res = await status(cwd);
 
     expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { data: { next_actions: string[] } };
+    const json = parseJson(res.stdout) as {
+      data: { next_actions: string[]; next_commands: string[] };
+    };
     const actions = json.data.next_actions.join("\n");
     expect(actions).toContain("Customize what you ask for and how people sign in");
     expect(actions).toContain(".zitadel/schemas/");
@@ -203,6 +211,7 @@ describe("status command", () => {
         `then ${expectedPublicCliCommand("apply")} to publish.`,
     );
     expect(actions).not.toContain("register a user");
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("apply"));
   });
 
   it("keeps lifecycle-only output when the platform is unreachable", async () => {

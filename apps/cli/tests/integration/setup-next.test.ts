@@ -204,9 +204,11 @@ describe("Next setup integration", () => {
       data: { next_actions: string[]; next_commands: string[] };
     };
     expect(status.status).toBe("ok");
-    expect(status.data.next_commands.join(" ")).toContain("apply");
-    // The project exists but nobody has registered yet, so status stages the
-    // guidance to the verify mission, not customize/publish.
+    // The project exists but nobody has registered yet, so status stages BOTH
+    // channels to the verify mission: next_actions carries the browser proof,
+    // next_commands previews with plan and withholds apply until users exist.
+    expect(status.data.next_commands.join(" ")).toContain("plan");
+    expect(status.data.next_commands.join(" ")).not.toContain("apply");
     expect(status.data.next_actions.join("\n")).toContain("register a user");
     expect(status.data.next_actions.join("\n")).not.toContain(".zitadel/schemas/");
 
