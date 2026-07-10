@@ -23,13 +23,17 @@ Cross-resource references are stored as concrete ids on the referencing side. A 
 
 When the user edits the schema, the server allocates a new id. The flow file keeps pointing at the previous one, there is no way to write "the current `human-user` schema" in the flow, only "this specific revision." Adopting the new schema is a two-step change: edit and apply the schema, then edit the flow file to substitute the new id and apply it again.
 
-<img width="2372" height="1316" alt="Status quo diagram" src="https://github.com/user-attachments/assets/05cc1691-80a4-4c27-9047-ce5f072669b6" />
+<img width="2372" height="1316" alt="Status quo diagram" src="https://github.com/user-attachments/assets/a8e3313d-11e8-4255-acac-092ad15681b5" />
+
 
 `zitadel apply` is a client-side orchestrator over those per-resource APIs. It walks `.zitadel/`, computes what changed, and issues one API call per changed resource (e.g. `POST /schemas`). There is no atomicity: a run that fails halfway through leaves the server holding a partially updated state.
 
 ## Decision
 
 Configuration changes are bundled as immutable **releases**. A release pins a specific revision of every resource it includes. **Environments** are runtime slots on a project, each running one release at a time, the same release can be deployed to any number of environments unchanged.
+
+<img width="3288" height="2532" alt="Proposal" src="https://github.com/user-attachments/assets/8606b58f-c6e1-457f-868b-bc401f318c5a" />
+
 
 The three subsections below define each concept: what an environment is, what a release is, and how the two relate. Concrete surfaces (CLI, API, release bundle format) follow further down.
 
