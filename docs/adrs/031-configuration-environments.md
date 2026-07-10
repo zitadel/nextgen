@@ -96,6 +96,8 @@ Releases are project-scoped and immutable. They exist on their own — created o
 
 An environment activates a release. Activation is a separate operation from release creation — a release must exist before it can be activated, and one release can be activated on any number of environments.
 
+TBD: what is the best terminology? 1: environment **activates** a release, 2: release is **applied** to an environment, 3: a release is **deployed** to an environment
+
 - **Apply** — construct a new release from `.zitadel/` and activate it on one environment. Atomic.
 - **Promotion** — activate an existing release on another environment. No new revisions minted; no new release created. The same release id can travel end-to-end across environments.
 - **Rollback** — activate a prior release on the current environment. The release log does not grow.
@@ -116,11 +118,9 @@ The sections that follow specify the concrete surfaces: how the CLI orchestrates
 
 ### API
 
-Project scope is derived from the caller's project secret (as on the existing endpoints), so no `project_id` appears in the URL path. Resources are kept top-level: releases and environments are addressed at `/releases` and `/environments/{env}` respectively, not nested under each other.
-
 | Endpoint                            | Purpose                                                                                                                                                                    |
 |---                                  |---                                                                                                                                                                         |
-| `POST /configuration-releases` †    | Build a release from a source-content bundle in one transaction. Allocates revisions, resolves handle references, validates, creates the release. Returns `{release_id, revision_ids[]}`. Payload in [Release bundle](#release-bundle). |
+| `POST /configuration-releases`*     | Build a release from a source-content bundle in one transaction. Allocates revisions, resolves handle references, validates, creates the release. Returns `{release_id, revision_ids[]}`. Payload in [Release bundle](#release-bundle). |
 | `POST /releases`                    | Assemble a release from existing revision ids. Payload is a list of `(kind, handle, revision_id)` tuples. No new revisions minted. Same validation as above.                |
 | `GET /releases`                     | List all releases in the project, newest first.                                                                                                                             |
 | `GET /releases?env=<env>`           | List releases activated on `<env>`, newest first. The first row is the currently active release; the rest is the audit log.                                                 |
@@ -129,7 +129,7 @@ Project scope is derived from the caller's project secret (as on the existing en
 | `GET /environments/{env}`           | Read one environment.                                                                                                                                                       |
 | `PATCH /environments/{env}`         | Update the environment. Setting `current_release_id` activates a release; server resolves `${env.X}` and `${secrets.Y}` templates before applying.                          |
 
-† Endpoint name is a placeholder; a shorter form may replace it.
+\* Endpoint name is a placeholder; a shorter form may replace it.
 
 Direct per-resource CRUD (`POST /schemas`, `PUT /flow_definitions/:id`, …) remains available and creates a new revision on write. It does not touch any environment's activated release.
 
