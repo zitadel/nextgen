@@ -1,5 +1,7 @@
 # @zitadel/server-linux-arm64
 
+## 0.1.0-alpha.15
+
 ## 0.1.0-alpha.14
 
 ### Patch Changes

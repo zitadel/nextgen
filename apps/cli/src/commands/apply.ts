@@ -5,7 +5,14 @@ import { createZitadelClient } from "@zitadel/api/client";
 
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { environmentSchema } from "../lib/environment";
-import { buildSyncPlan, makeSyncers, renderPlan, runSyncLoop, summarizePlan } from "../lib/sync";
+import {
+  buildSyncPlan,
+  collectPlanWarnings,
+  makeSyncers,
+  renderPlan,
+  runSyncLoop,
+  summarizePlan,
+} from "../lib/sync";
 import { readZitadelSecret } from "../lib/project";
 
 /**
@@ -47,9 +54,9 @@ export default class Apply extends BaseCommand {
 
     if (!dryRun) {
       consola.start("Syncing schemas and flows to Zitadel");
-      await runSyncLoop(cwd, syncers);
+      const { filesUpdated } = await runSyncLoop(cwd, syncers);
       consola.success("Sync complete");
-      return this.emit({ status: "ok", data: { synced: true } });
+      return this.emit({ status: "ok", data: { synced: true, files_updated: filesUpdated } });
     }
 
     consola.start("Building plan (dry run)");
@@ -70,7 +77,7 @@ export default class Apply extends BaseCommand {
     );
     return this.emit({
       status: "ok",
-      data: summary,
+      data: { ...summary, warnings: collectPlanWarnings(plan) },
       pretty: renderPlan(plan, isTTY),
     });
   }

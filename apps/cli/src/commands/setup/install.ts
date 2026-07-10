@@ -9,6 +9,7 @@ import {
   type PackageCommand,
   type PackageManager,
 } from "../../lib/package-manager";
+import { publicCliCommand } from "../../lib/public-cli";
 
 type InstallReason = "dry-run" | "skip-install" | "no-dependency-changes";
 
@@ -27,6 +28,7 @@ export type SetupInstallOutcome = {
 };
 
 export type SetupInstallInput = {
+  cliVersion: string;
   cwd: string;
   depsAdded: ReadonlyArray<string>;
   dryRun: boolean;
@@ -55,6 +57,7 @@ export async function installDependenciesForSetup(
         reason: "no-dependency-changes",
       },
       devCommand: devCommand.display,
+      cliVersion: input.cliVersion,
       issuer: input.issuer,
       includeInstallCommand: false,
     });
@@ -69,6 +72,7 @@ export async function installDependenciesForSetup(
         reason: input.dryRun ? "dry-run" : "skip-install",
       },
       devCommand: devCommand.display,
+      cliVersion: input.cliVersion,
       issuer: input.issuer,
       includeInstallCommand: true,
     });
@@ -93,6 +97,7 @@ export async function installDependenciesForSetup(
       command: installCommand.display,
     },
     devCommand: devCommand.display,
+    cliVersion: input.cliVersion,
     issuer: input.issuer,
     includeInstallCommand: false,
   });
@@ -101,21 +106,28 @@ export async function installDependenciesForSetup(
 function outcome(input: {
   install: SetupInstall;
   devCommand: string;
+  cliVersion: string;
   issuer: string;
   includeInstallCommand: boolean;
 }): SetupInstallOutcome {
-  const startAction = `Start your project: ${input.devCommand} (then open ${input.issuer})`;
+  const planCommand = publicCliCommand("plan", input.cliVersion);
+  const applyCommand = publicCliCommand("apply", input.cliVersion);
+  const startAction = `Start your project: ${input.devCommand} (then open ${input.issuer}/login)`;
   const verifyAction =
     "Verify auth in the browser: register a user, log out, log in again with the same user, and confirm /profile shows Signed in.";
+  const customizeAction =
+    "Customize auth: edit the user schema (.zitadel/schemas/) and login flow (.zitadel/flows/) — each folder has a README explaining what you can change.";
+  const applyAction = `Preview and publish config changes: ${planCommand} then ${applyCommand}`;
+  const afterInstall = [startAction, verifyAction, customizeAction, applyAction];
   return {
     install: input.install,
     devCommand: input.devCommand,
     nextActions: input.includeInstallCommand
-      ? [`Install dependencies: ${input.install.command}`, startAction, verifyAction]
-      : [startAction, verifyAction],
+      ? [`Install dependencies: ${input.install.command}`, ...afterInstall]
+      : afterInstall,
     nextCommands: input.includeInstallCommand
-      ? [input.install.command, input.devCommand]
-      : [input.devCommand],
+      ? [input.install.command, input.devCommand, planCommand]
+      : [input.devCommand, planCommand],
   };
 }
 

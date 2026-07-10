@@ -1,12 +1,17 @@
 import type {
+  CreateFlowDefinition201,
   CreateFlowDefinitionBodyFlowDefinition,
+  UpdateFlowDefinition200,
   UpdateFlowDefinitionBodyFlowDefinition,
   CreateSchemaBody,
   GetSchemaById200,
   GetFlowDefinition200,
 } from "@zitadel/api/generated/model";
+import { consola } from "consola";
+
 import type { ZitadelClient } from "@zitadel/api/client";
 import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
+import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 import { flowConfigSchema, schemaConfigSchema } from "@zitadel/config/schemas";
 
 import { FLOWS_DIR, flowEnvRefs } from "../flows";
@@ -54,6 +59,11 @@ class SchemaSyncer implements ResourceSyncer {
   readonly directory = SCHEMAS_DIR;
   readonly mutable = false;
   readonly revisioned = true;
+  readonly normalize = normalizeSchemaBody;
+  // Deliberately no `normalizeWrite`: the server stores schema bytes
+  // verbatim, so stripping spelled-out x-* defaults from the local file
+  // would drop them from the next published revision. Canonical schema
+  // bodies are written back as-is; `normalize` is comparison-only.
 
   constructor(
     private readonly client: ZitadelClient,
@@ -80,12 +90,20 @@ class SchemaSyncer implements ResourceSyncer {
   /**
    * `POST /schemas` mints a new immutable row. The server allocates the
    * opaque id; the CLI records it in state and re-pins flows against it.
+   * The create response carries only the id, so the canonical stored body
+   * comes from a follow-up fetch; a fetch failure degrades to no
+   * write-back rather than failing the create.
    */
-  async create(data: object): Promise<string> {
+  async create(data: object): Promise<{ id: string; canonical?: object }> {
     const result = await this.client.createSchema(data as CreateSchemaBody, {
       project_id: this.projectId,
     });
-    return result.id;
+    try {
+      return { id: result.id, canonical: await this.fetch(result.id) };
+    } catch (err) {
+      consola.debug(`fetch created schema ${result.id} failed:`, err);
+      return { id: result.id };
+    }
   }
 
   /**
@@ -94,7 +112,7 @@ class SchemaSyncer implements ResourceSyncer {
    * mutating an existing row. Kept as a required interface member; throws
    * loudly if a caller reaches it.
    */
-  async update(_id: string, _data: object): Promise<void> {
+  async update(_id: string, _data: object): Promise<{ canonical?: object }> {
     throw new ZitadelError("E_NOT_IMPLEMENTED", "schemas are revisioned — edit publishes a new revision, not an update");
   }
 
@@ -121,6 +139,10 @@ class FlowDefinitionSyncer implements ResourceSyncer {
   readonly directory = FLOWS_DIR;
   readonly mutable = true;
   readonly revisioned = false;
+  readonly normalize = normalizeFlowBody;
+  // For flows the comparison form doubles as the file form: everything it
+  // strips (envelope keys, the empty `audience` echo) is transport noise.
+  readonly normalizeWrite = normalizeFlowBody;
 
   constructor(
     private readonly client: ZitadelClient,
@@ -149,13 +171,13 @@ class FlowDefinitionSyncer implements ResourceSyncer {
    * only the wire request carries `project_id` and the surrounding
    * envelope.
    */
-  async create(data: object): Promise<string> {
-    const result = await this.client.createFlowDefinition({
+  async create(data: object): Promise<{ id: string; canonical?: object }> {
+    const result = (await this.client.createFlowDefinition({
       project_id: this.projectId,
       schema_uri: DEFAULT_FLOW_SCHEMA_URI,
       flow_definition: data as CreateFlowDefinitionBodyFlowDefinition,
-    });
-    return result.id;
+    })) as CreateFlowDefinition201;
+    return { id: result.id, canonical: result.flow_definition as object };
   }
 
   /**
@@ -165,12 +187,13 @@ class FlowDefinitionSyncer implements ResourceSyncer {
    * carries `project_id` as a query parameter; the file on disk stays bare so
    * it is human-editable.
    */
-  async update(id: string, data: object): Promise<void> {
-    await this.client.updateFlowDefinition(
+  async update(id: string, data: object): Promise<{ canonical?: object }> {
+    const result = (await this.client.updateFlowDefinition(
       id,
       { flow_definition: data as UpdateFlowDefinitionBodyFlowDefinition },
       { project_id: this.projectId },
-    );
+    )) as UpdateFlowDefinition200;
+    return { canonical: result.flow_definition as object };
   }
 
   async delete(id: string): Promise<void> {

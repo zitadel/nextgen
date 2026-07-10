@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/config",
-  "version": "0.1.0-alpha.14",
+  "version": "0.1.0-alpha.15",
   "description": "Versioned Zitadel local config schemas and defaults",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/config#readme",
   "bugs": {
@@ -16,6 +16,8 @@
     "dist",
     "defaults/*.json",
     "defaults/*.md",
+    "defaults/presets/*/*.json",
+    "meta-schemas/*.json",
     "LICENSE"
   ],
   "type": "module",
@@ -34,6 +36,21 @@
       "@zitadel/source": "./src/schemas.ts",
       "types": "./dist/schemas.d.mts",
       "import": "./dist/schemas.mjs"
+    },
+    "./normalize": {
+      "@zitadel/source": "./src/normalize.ts",
+      "types": "./dist/normalize.d.mts",
+      "import": "./dist/normalize.mjs"
+    },
+    "./validate": {
+      "@zitadel/source": "./src/validate.ts",
+      "types": "./dist/validate.d.mts",
+      "import": "./dist/validate.mjs"
+    },
+    "./meta-schemas": {
+      "@zitadel/source": "./src/meta-schemas.ts",
+      "types": "./dist/meta-schemas.d.mts",
+      "import": "./dist/meta-schemas.mjs"
     },
     "./defaults/default-human-user.json": "./defaults/default-human-user.json",
     "./defaults/default-login.json": "./defaults/default-login.json",
@@ -54,6 +71,7 @@
   "devDependencies": {
     "tsdown": "catalog:",
     "tslib": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "ajv": "catalog:"
   }
 }

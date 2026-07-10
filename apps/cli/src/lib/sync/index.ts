@@ -16,5 +16,12 @@
  */
 export type { ResourceSyncer, SyncAction, SyncPlanSummary } from "./types";
 export { makeSyncers } from "./syncers";
-export { buildSyncPlan, hashResourceContent, runSyncLoop } from "./loop";
-export { renderPlan, summarizePlan } from "./plan-renderer";
+export type { SyncLoopResult } from "./loop";
+export {
+  buildSyncPlan,
+  hashForState,
+  hashResourceContent,
+  runSyncLoop,
+  writeBackResource,
+} from "./loop";
+export { collectPlanWarnings, renderPlan, summarizePlan } from "./plan-renderer";
