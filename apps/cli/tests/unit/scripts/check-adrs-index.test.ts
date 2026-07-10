@@ -11,6 +11,7 @@ type CheckAdrsIndexModule = {
     number: number;
     filename: string;
     title: string;
+    status: string;
     summary: string;
   }>;
   validateAdrIndex: (options: {
@@ -20,6 +21,7 @@ type CheckAdrsIndexModule = {
       number: number;
       filename: string;
       title: string;
+      status: string;
       summary: string;
     }>;
     headings?: Map<string, { id: string; title: string }>;
@@ -36,11 +38,11 @@ const sampleReadme = `# Architecture Decision Records
 
 ## Index
 
-| ID | Title | Summary |
-|---|---|---|
-| [001](001-first.md) | First ADR | Summary one. |
-| [002](002-second.md) | Second ADR | Summary two. |
-| [003](003-third.md) | Third ADR | Summary three. |
+| ID | Title | Status | Summary |
+|---|---|---|---|
+| [001](001-first.md) | First ADR | Proposed | Summary one. |
+| [002](002-second.md) | Second ADR | Proposed | Summary two. |
+| [003](003-third.md) | Third ADR | Proposed | Summary three. |
 `;
 
 function sampleFiles() {
@@ -100,10 +102,10 @@ describe("check-adrs-index", () => {
 
 ## Index
 
-| ID | Title | Summary |
-|---|---|---|
-| [009](009-user-json-schema-validation.md) | User JSON Schema Validation | Summary. |
-| [010](010-session-auth-attempt-check-model.md) | Session Model | Summary. |
+| ID | Title | Status | Summary |
+|---|---|---|---|
+| [009](009-user-json-schema-validation.md) | User JSON Schema Validation | Proposed | Summary. |
+| [010](010-session-auth-attempt-check-model.md) | Session Model | Proposed | Summary. |
 `),
       headings: new Map([
         ["009-user-json-schema-validation.md", { id: "009", title: "User JSON Schema Validation" }],
@@ -127,10 +129,10 @@ describe("check-adrs-index", () => {
 
 ## Index
 
-| ID | Title | Summary |
-|---|---|---|
-| [001](001-first.md) | First ADR | Summary one. |
-| [003](003-third.md) | Third ADR | Summary three. |
+| ID | Title | Status | Summary |
+|---|---|---|---|
+| [001](001-first.md) | First ADR | Proposed | Summary one. |
+| [003](003-third.md) | Third ADR | Proposed | Summary three. |
 `),
       headings: sampleHeadings(),
     });
@@ -147,10 +149,10 @@ describe("check-adrs-index", () => {
 
 ## Index
 
-| ID | Title | Summary |
-|---|---|---|
-| [001](001-first.md) | First ADR | Summary one. |
-| [002](002-second.md) | Second ADR | Summary two. |
+| ID | Title | Status | Summary |
+|---|---|---|---|
+| [001](001-first.md) | First ADR | Proposed | Summary one. |
+| [002](002-second.md) | Second ADR | Proposed | Summary two. |
 `),
       headings: sampleHeadings(),
     });
@@ -167,11 +169,11 @@ describe("check-adrs-index", () => {
 
 ## Index
 
-| ID | Title | Summary |
-|---|---|---|
-| [001](001-first.md) | First ADR | Summary one. |
-| [002](002-second.md) | Second ADR | Summary two. |
-| [003](003-missing.md) | Third ADR | Summary three. |
+| ID | Title | Status | Summary |
+|---|---|---|---|
+| [001](001-first.md) | First ADR | Proposed | Summary one. |
+| [002](002-second.md) | Second ADR | Proposed | Summary two. |
+| [003](003-missing.md) | Third ADR | Proposed | Summary three. |
 `),
       headings: sampleHeadings(),
     });
