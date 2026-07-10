@@ -62,6 +62,12 @@ A flow scoped to an app or team never captures the project default —
 requests that don't identify that audience fall back to the unscoped
 flow.
 
+The flip side: a **new active flow without an `audience` becomes the
+newest unscoped definition, i.e. the default**, the moment it applies.
+`plan` calls this out with a `# warning:` line on the create so an
+experiment can't silently take over `/login` — scope it or pin
+`flow-name` in the widget if that isn't the intent.
+
 ## Presets
 
 `zitadel setup` scaffolds this folder from a preset (`--preset
