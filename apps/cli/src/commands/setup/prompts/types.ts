@@ -1,3 +1,5 @@
+import type { SetupPreset } from "@zitadel/config/defaults";
+
 import type { FrameworkFacts } from "../../../lib/orca";
 
 /**
@@ -13,6 +15,8 @@ import type { FrameworkFacts } from "../../../lib/orca";
 export type SetupAnswers = {
   server: string;
   devPort: number;
+  /** Schema+flow bundle to scaffold; see `SETUP_PRESETS` in @zitadel/config. */
+  preset: SetupPreset;
 };
 
 /** Read-only facts a prompt may need (today only the resolved framework). */
@@ -34,6 +38,12 @@ export type PromptContext = {
    * an interactive answer can't override a scripted/flagged port.
    */
   readonly devPortFromFlag?: boolean;
+  /**
+   * Whether `--preset` was passed explicitly. When set, the flag is
+   * authoritative and {@link import("./sign-in-preset").SignInPresetPrompt}
+   * skips itself.
+   */
+  readonly presetFromFlag?: boolean;
 };
 
 /**

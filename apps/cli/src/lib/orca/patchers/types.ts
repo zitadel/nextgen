@@ -28,6 +28,12 @@ export type PatchContext = PatchView &
     server: string;
     cliVersion: string;
     scaffoldedFramework?: boolean;
+    /**
+     * Sign-in preset the scaffold starts from (`SETUP_PRESETS` in
+     * @zitadel/config). Recorded in `zitadel.json` so later tooling knows
+     * the project's starting point; absent means password-first.
+     */
+    preset?: string;
   }>;
 
 /** Where and how a patch is applied. Family-neutral (no file-op coupling). */
@@ -68,6 +74,10 @@ export type PatchResult = Readonly<{
  *   op (e.g. `vite.config.ts`, `angular.json`, `nuxt.config.ts`). `eject` cannot
  *   reverse an in-place merge, so it surfaces these as manual cleanup steps
  *   rather than deleting the whole file.
+ * - `guidanceFiles` — user-owned docs (`README.md`, `AGENTS.md`) carrying a
+ *   marker-fenced managed guidance section. `eject` strips just the section
+ *   (content outside the markers is preserved); the whole file is deleted only
+ *   when nothing but the scaffold-created header would remain.
  */
 export type EjectActions = Readonly<{
   markedFiles: ReadonlyArray<string>;
@@ -76,6 +86,7 @@ export type EjectActions = Readonly<{
   envBackups: ReadonlyArray<string>;
   dependencies: ReadonlyArray<string>;
   configEdits: ReadonlyArray<string>;
+  guidanceFiles: ReadonlyArray<string>;
 }>;
 
 /**

@@ -1,8 +1,8 @@
-# ADR 032: Internal Permission Management (System Catalog)
+# ADR 033: Internal Permission Management (System Catalog)
 
 > **Status:** Proposed
 > **Date:** 2026-07-09
-> **Context:** Authorization for Zitadel-owned internal resources (projects, teams, users, apps, flows, policies) and agent delegation. Builds on [ADR 031](031-permission-catalogs.md).
+> **Context:** Authorization for Zitadel-owned internal resources (projects, teams, users, apps, flows, policies) and agent delegation. Builds on [ADR 032](032-permission-catalogs.md).
 
 ## Introduction
 
@@ -18,12 +18,12 @@ a customer's downstream application data. That distinction matters because
 internal resources are strongly consistent with Zitadel's own database, so
 authorization here can (and must) be exact and immediate in a way that isn't
 always true once a decision crosses into a customer's own systems (see
-[ADR 033](033-external-permission-management.md)).
+[ADR 034](034-external-permission-management.md)).
 
 This ADR defines how internal permissions are catalogued, resolved, and
 audited, and how agent access is explicitly granted rather than implied by
 role names. It builds on the shared catalog model in
-[ADR 031](031-permission-catalogs.md); see that document's glossary for
+[ADR 032](032-permission-catalogs.md); see that document's glossary for
 FGA-engine vocabulary (relation, tuple, userset, catalog) and
 [`docs/design/glossary.md` § 5 Authorization (FGA)](../design/glossary.md#5-authorization-fga)
 for cross-cutting terms (scope, principal, `resource_scope_index`, delegation).
@@ -40,12 +40,12 @@ enough to support whatever that future ADR defines, without modification.
 ## Glossary
 
 Terms specific to internal/system-catalog authorization, in addition to
-[ADR 031's glossary](031-permission-catalogs.md#glossary) and
+[ADR 032's glossary](032-permission-catalogs.md#glossary) and
 [`docs/design/glossary.md` § 5](../design/glossary.md#5-authorization-fga):
 
 | Term | Meaning |
 |---|---|
-| **System catalog** | The catalog of Zitadel-owned permissions and optional bundles for internal API resources; replaces legacy level-specific role semantics. See [ADR 031 §1](031-permission-catalogs.md#1-one-model-two-catalogs). |
+| **System catalog** | The catalog of Zitadel-owned permissions and optional bundles for internal API resources; replaces legacy level-specific role semantics. See [ADR 032 §1](032-permission-catalogs.md#1-one-model-two-catalogs). |
 | **Credential class** | The kind of principal presenting a request (user token, `sk_proj_`, `sk_team_`, origin-bound browser nonce), which constrains which permissions/scopes are even reachable regardless of grants. |
 | **Agent delegation** | A scoped, explicit, auditable grant of authority from a human or service principal to an agent, distinct from the agent inheriting the grantor's full permission set. |
 
@@ -100,18 +100,18 @@ not for this one.)
 
 The system catalog holds Zitadel-owned permissions and optional bundles for
 internal API resources, using the shared primitives defined in
-[ADR 031 §1](031-permission-catalogs.md#1-one-model-two-catalogs)
+[ADR 032 §1](032-permission-catalogs.md#1-one-model-two-catalogs)
 (permission/relation, permission expression, grant/assignment, delegation,
 principal, scope). It replaces legacy level-specific role semantics: instead
 of a role fixed to "instance admin" or "project admin", a permission such as
 `project.settings.write` is granted at an explicit, resolved scope.
 
 The system catalog ships a **Zitadel-defined default schema** built from
-those primitives: RBAC-style bundles today (see [ADR 031 §1](031-permission-catalogs.md#1-one-model-two-catalogs)'s
+those primitives: RBAC-style bundles today (see [ADR 032 §1](032-permission-catalogs.md#1-one-model-two-catalogs)'s
 "roles are optional convenience" framing), with room to grow into
 ReBAC-style relations — e.g. user groups — later. Definitions are authored
 and compiled through the same OpenFGA-flavored pipeline as the app-group
-catalog (see [ADR 031 §2](031-permission-catalogs.md#2-openfga-parser-and-profile-compiler));
+catalog (see [ADR 032 §2](032-permission-catalogs.md#2-openfga-parser-and-profile-compiler));
 only the storage rows differ, not the mechanism.
 
 This is not a permanent restriction to Zitadel-only authorship. Customizing
@@ -144,7 +144,7 @@ storage/residency invariant, not bypass it.
 
 Agent delegations are stored as assignments with an explicit grantor,
 delegation id, expiry/revocation state, and scope (the general storage
-shape from [ADR 031 §3](031-permission-catalogs.md#3-canonical-relational-storage)).
+shape from [ADR 032 §3](032-permission-catalogs.md#3-canonical-relational-storage)).
 An agent never receives permissions by copying all permissions from its
 owner. The resolver must be able to explain which delegation authorized or
 denied an agent action, so that both audit review and the agent itself can
@@ -170,7 +170,7 @@ credential -> resolve path/body/query scope -> permission resolver -> scope-boun
 Single-resource checks use indexed semi-joins over the principal's
 assignments, relation/permission closure, credential class constraints, and
 resolved scope (mechanism defined in
-[ADR 031 §3–4](031-permission-catalogs.md#3-canonical-relational-storage)).
+[ADR 032 §3–4](032-permission-catalogs.md#3-canonical-relational-storage)).
 
 List endpoints receive a permission predicate from the resolver and inject
 it into the resource query. Repositories tell the predicate builder which
@@ -252,7 +252,7 @@ levels.
 ### Run OpenFGA or SpiceDB as a sidecar for internal resources
 
 Rejected for the same reasons as the core architecture decision (see
-[ADR 031](031-permission-catalogs.md#rejected-alternatives)), with extra
+[ADR 032](032-permission-catalogs.md#rejected-alternatives)), with extra
 force for internal resources specifically: synchronization lag would create
 stale decisions on delete/revoke paths for Zitadel's own data, and list
 filtering would depend on remote `ListObjects`-style calls instead of one
@@ -275,6 +275,6 @@ scoped SQL query against data we already own.
    and intentionally out of scope here.
 6. Define how system-catalog schema customization (beyond the shipped
    default) would work — using the primitives and pipeline from
-   [ADR 031 §2](031-permission-catalogs.md#2-openfga-parser-and-profile-compiler) —
+   [ADR 032 §2](032-permission-catalogs.md#2-openfga-parser-and-profile-compiler) —
    including who is authorized to customize it and how a customized schema
    coexists with the default. Out of scope for this ADR round.

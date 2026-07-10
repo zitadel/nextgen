@@ -29,7 +29,13 @@ const VALID_FLOW = {
     "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/human-user.yaml",
   purposes: { login: "identifier" },
   steps: [
-    { name: "identifier", fields: [], actions: [], gates: {} },
+    {
+      name: "identifier",
+      fields: [],
+      actions: [{ name: "submit", kind: "submit", primary: true }],
+      transitions: { submit: { target: "done" } },
+    },
+    { name: "done", complete: "show" },
   ],
 };
 
@@ -96,6 +102,7 @@ describe("plan command", () => {
       revisions: 0,
       deletes: 0,
       total: 2,
+      warnings: [],
     });
   });
 

@@ -37,7 +37,10 @@ describe("SveltePatcher.plan", () => {
   it("writes the managed App.svelte and merges the Vite config", () => {
     const plan = new SveltePatcher().plan(ctx());
     expect(writeContents(plan, "src/App.svelte")).toContain(MANAGED_MARKER);
-    const edit = plan.ops.find((op): op is Extract<FileOp, { kind: "edit" }> => op.kind === "edit");
+    const edit = plan.ops.find(
+      (op): op is Extract<FileOp, { kind: "edit" }> =>
+        op.kind === "edit" && String(op.path).includes("vite.config"),
+    );
     expect(edit?.path).toContain("vite.config.ts");
   });
 

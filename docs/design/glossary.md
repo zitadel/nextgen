@@ -66,7 +66,7 @@ Core nouns used across the API. Full endpoint map in [`api/resource-map.md`](api
 | **idp** | External identity provider the project federates **to**. Zitadel acts as OIDC/SAML client downstream. |
 | **user** | See §1. Identity inside a project. |
 | **session** | Durable post-auth container, carries verified factors and every currently satisfied `assurance_levels[]` value. Produced by a completed auth_attempt. Detail in [`flowengine/session-api.md`](flowengine/session-api.md). |
-| **grant** | Explicit access record binding a principal to a permission/relation at a scope (user ↔ app, team ↔ project, member ↔ role, or a raw permission/relation assignment). Long-form in [ADR 031](../adrs/031-permission-catalogs.md). |
+| **grant** | Explicit access record binding a principal to a permission/relation at a scope (user ↔ app, team ↔ project, member ↔ role, or a raw permission/relation assignment). Long-form in [ADR 032](../adrs/032-permission-catalogs.md). |
 | **role** | Named permission bundle inside an app_group. |
 | **team_membership** | Dedicated team roster/status shape when team participation is stored outside FGA tuples. It can carry roles, provisioning metadata, and member status, but it is not lifecycle ownership; FGA may consume or mirror it for authorization. |
 | **auth_attempt** | Ephemeral state machine driving a single authentication attempt. Exposes *auth primitives* (challenges, verify, handoff). OIDC context is owned by the OIDC adapter (`auth_requests`), not by auth_attempt. Long-form in [`api/authn-and-auth-flows.md`](api/authn-and-auth-flows.md). |
@@ -79,9 +79,9 @@ Core nouns used across the API. Full endpoint map in [`api/resource-map.md`](api
 
 ## 5. Authorization (FGA)
 
-How a permission check is framed and resolved. Long-form in [ADR 031](../adrs/031-permission-catalogs.md)
-(shared catalog/storage/resolver core), [ADR 032](../adrs/032-internal-permission-management.md)
-(internal/system-catalog specifics), and [ADR 033](../adrs/033-external-permission-management.md)
+How a permission check is framed and resolved. Long-form in [ADR 032](../adrs/032-permission-catalogs.md)
+(shared catalog/storage/resolver core), [ADR 033](../adrs/033-internal-permission-management.md)
+(internal/system-catalog specifics), and [ADR 034](../adrs/034-external-permission-management.md)
 (external/app-group-catalog specifics).
 
 | Term | Meaning |

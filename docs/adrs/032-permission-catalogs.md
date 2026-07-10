@@ -1,4 +1,4 @@
-# ADR 031: Permission Catalogs — A Portable Relational FGA Core
+# ADR 032: Permission Catalogs — A Portable Relational FGA Core
 
 > **Status:** Proposed
 > **Date:** 2026-07-09
@@ -28,14 +28,14 @@ policy content.**
 
 This is the first of three related ADRs on permission management:
 
-- **ADR 031 (this document):** the shared decision — one engine, two
+- **ADR 032 (this document):** the shared decision — one engine, two
   catalogs, and the storage/resolver core both catalogs run on.
-- **[ADR 032](032-internal-permission-management.md):** how the **system
+- **[ADR 033](033-internal-permission-management.md):** how the **system
   catalog** authorizes Zitadel's own resources (projects, teams, users, apps,
   flows, policies) and agent delegation. (Staff/support access and
   cross-project human identity are tracked separately by
   [issue #333](https://github.com/zitadel/nextgen/issues/333).)
-- **[ADR 033](033-external-permission-management.md):** how the **app-group
+- **[ADR 034](034-external-permission-management.md):** how the **app-group
   catalog** lets customers author their own OpenFGA-flavored policies for
   their own apps.
 
@@ -62,7 +62,7 @@ Resources.
 | **Userset** | A set of principals defined implicitly through a relation on another object — "everyone who is a `member` of `team:9`" — instead of one explicitly listed user. |
 | **Tuple-to-userset (TTU)** | A rule that derives a permission on one resource from a relation on a *different*, related resource, e.g. "you can read a document if you're a `viewer` of the project that owns it." |
 | **Relation implication / closure** | The precomputed answer to "which relations imply which other relations" for one catalog version, so a single check doesn't have to re-derive the whole rule graph on every request. |
-| **Catalog** | A versioned collection of relation/permission definitions, their expressions, and optional bundles. Zitadel has two: the **system catalog** ([ADR 032](032-internal-permission-management.md)) and the **app-group catalog** ([ADR 033](033-external-permission-management.md)). |
+| **Catalog** | A versioned collection of relation/permission definitions, their expressions, and optional bundles. Zitadel has two: the **system catalog** ([ADR 033](033-internal-permission-management.md)) and the **app-group catalog** ([ADR 034](034-external-permission-management.md)). |
 | **Grant / assignment** | A stored row binding a principal to a permission or relation at an explicit scope. See [`docs/design/glossary.md`](../design/glossary.md#4-resources) for the canonical **grant** definition; "assignment" is this ADR's storage-layer term for the same row. |
 | **OpenFGA DSL / JSON** | The human-authorable and machine-interchange syntax used to describe a permission schema — the input to the compiler pipeline in §2. |
 | **Profile** | The bounded subset of OpenFGA's modeling language Zitadel supports, chosen so checks stay portable and predictable on both PostgreSQL and Spanner. |
@@ -111,7 +111,7 @@ Three related issue areas constrain the decision:
   storage/resolver core stay compatible with such grants; the concrete
   grant model is defined separately by
   [issue #333](https://github.com/zitadel/nextgen/issues/333), not by this
-  ADR or [ADR 032](032-internal-permission-management.md).
+  ADR or [ADR 033](033-internal-permission-management.md).
 - Agent identity needs first-class principals and scoped delegations, not
   broad inherited user authority.
 
@@ -135,7 +135,7 @@ be the portable contract while Spanner remains supported.
 
 Implement a **portable relational FGA core**. OpenFGA remains the preferred
 authoring and interchange shape where it fits (see §2 below for the
-compiler pipeline, and [ADR 033](033-external-permission-management.md)
+compiler pipeline, and [ADR 034](034-external-permission-management.md)
 for how the app-group catalog uses it), but the runtime contract is
 Zitadel-owned relational state plus dialect-portable query plans.
 
@@ -156,12 +156,12 @@ There are two catalogs:
 
 - **System catalog:** Zitadel-owned permissions and optional bundles for
   internal API resources. These replace legacy level-specific role
-  semantics. Details in [ADR 032](032-internal-permission-management.md).
+  semantics. Details in [ADR 033](033-internal-permission-management.md).
 - **App-group catalog:** customer-owned permissions, relations, and optional
   role-like bundles for apps/APIs. These replace legacy project
   authorizations and are emitted in tokens and introspection responses
   grouped by app group / app audience. Details in
-  [ADR 033](033-external-permission-management.md).
+  [ADR 034](034-external-permission-management.md).
 
 Roles are not a required primitive. They are an optional catalog convenience
 when a policy author wants RBAC-style bundles such as `admin` or `support`.
@@ -233,9 +233,9 @@ shape.
 This pipeline compiles policy content for both catalogs; the mechanism does
 not depend on who authors the input. Today, the system catalog ships a
 Zitadel-defined default schema (see
-[ADR 032 §1](032-internal-permission-management.md#1-system-catalog)),
+[ADR 033 §1](033-internal-permission-management.md#1-system-catalog)),
 while the app-group catalog is customer-authored from the start (see
-[ADR 033](033-external-permission-management.md)). Neither is an
+[ADR 034](034-external-permission-management.md)). Neither is an
 architectural ceiling: customizing the system catalog's schema using these
 same primitives is anticipated future work, not foreclosed by this ADR.
 
@@ -290,7 +290,7 @@ checks.
 Delegations — an agent or machine principal acting with explicit,
 time-bounded authority — are stored as assignments with an explicit
 grantor, delegation id, expiry/revocation state, and scope, never as a copy
-of everything the grantor could do. See [ADR 032](032-internal-permission-management.md)
+of everything the grantor could do. See [ADR 033](033-internal-permission-management.md)
 for how this applies to agent access to internal resources. (Staff/support
 delegation is out of scope for this ADR series — see
 [issue #333](https://github.com/zitadel/nextgen/issues/333).)
@@ -313,7 +313,7 @@ resolver instead of being checked row-by-row after fetch. The resolver code
 path is identical for system-catalog and app-group-catalog permissions; only
 the catalog rows it reads differ.
 
-[ADR 032](032-internal-permission-management.md) covers how this resolver
+[ADR 033](033-internal-permission-management.md) covers how this resolver
 is wired into Zitadel's own resource-oriented API, including list filtering
 across scopes and the 403/404 denial contract.
 
@@ -331,7 +331,7 @@ decision caching requires an explicit invalidation design and is out of
 scope for MVP.
 
 Tenant partitioning and cross-project human identity remain separate
-concerns handled in [ADR 032](032-internal-permission-management.md). This
+concerns handled in [ADR 033](033-internal-permission-management.md). This
 ADR only fixes the shared invariant: authorization rows are stored and
 versioned the same way regardless of which catalog they belong to.
 
@@ -400,8 +400,8 @@ policies without reintroducing hard-coded levels and special cases.
 1. Design relational migrations for catalogs, permission/relation
    definitions, expression edges, and assignments shared by both catalogs.
    (Catalog-specific tables — `resource_scope_index` and app grants — are
-   tracked in [ADR 032](032-internal-permission-management.md) and
-   [ADR 033](033-external-permission-management.md); staff/support grant
+   tracked in [ADR 033](033-internal-permission-management.md) and
+   [ADR 034](034-external-permission-management.md); staff/support grant
    tables are tracked by [issue #333](https://github.com/zitadel/nextgen/issues/333).)
 2. Add resolver conformance tests that compare single-resource checks and
    list predicates across PostgreSQL and Spanner.

@@ -3,6 +3,7 @@ package helpers
 import (
 	"context"
 
+	"github.com/ogen-go/ogen/ogenerrors"
 	api "github.com/zitadel/nextgen/api/generated"
 )
 
@@ -13,6 +14,8 @@ type FakeSecuritySource struct {
 	Username string
 	Password string
 	Roles    []string
+
+	SessionToken string
 }
 
 func (f FakeSecuritySource) OAuth2(ctx context.Context, operationName api.OperationName) (api.OAuth2, error) {
@@ -27,6 +30,20 @@ func (f FakeSecuritySource) UsernamePassword(ctx context.Context, operationName 
 		Username: f.Username,
 		Password: f.Password,
 		Roles:    f.Roles,
+	}, nil
+}
+
+// NextgenSession provides the __nextgen_session cookie. With an empty
+// SessionToken the scheme is skipped and the generated client fails fast with
+// "security requirement is not satisfied" instead of sending the request —
+// to exercise the server's missing-credential path, send a raw HTTP request
+// (see TestGetMyUser/missing_session_cookie).
+func (f FakeSecuritySource) NextgenSession(ctx context.Context, operationName api.OperationName) (api.NextgenSession, error) {
+	if f.SessionToken == "" {
+		return api.NextgenSession{}, ogenerrors.ErrSkipClientSecurity
+	}
+	return api.NextgenSession{
+		APIKey: f.SessionToken,
 	}, nil
 }
 
@@ -65,4 +82,7 @@ func (c *ApiClient) SetPassword(password string) {
 }
 func (c *ApiClient) SetRoles(roles []string) {
 	c.securitySource.Roles = roles
+}
+func (c *ApiClient) SetSessionToken(token string) {
+	c.securitySource.SessionToken = token
 }

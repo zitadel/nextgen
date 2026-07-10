@@ -71,10 +71,10 @@ func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (a
 	return sessionToAPI(session), nil
 }
 
-func (h Handler) GetMySession(ctx context.Context, params api.GetMySessionParams) (api.GetMySessionRes, error) {
-	sessionToken, err := domain.DecryptSessionTokenString(params.NextgenSession, h.sessionTokenVerifier)
-	if err != nil {
-		return nil, err
+func (h Handler) GetMySession(ctx context.Context) (api.GetMySessionRes, error) {
+	sessionToken, ok := sessionTokenFromContext(ctx)
+	if !ok {
+		return nil, domain.ErrSessionTokenInvalid()
 	}
 	input := service.GetSessionInput{
 		ProjectID: sessionToken.ProjectID,
@@ -118,10 +118,10 @@ func (h Handler) RevokeSession(ctx context.Context, params api.RevokeSessionPara
 	}, nil
 }
 
-func (h Handler) RevokeMySession(ctx context.Context, params api.RevokeMySessionParams) (api.RevokeMySessionRes, error) {
-	sessionToken, err := domain.DecryptSessionTokenString(params.NextgenSession, h.sessionTokenVerifier)
-	if err != nil {
-		return nil, err
+func (h Handler) RevokeMySession(ctx context.Context) (api.RevokeMySessionRes, error) {
+	sessionToken, ok := sessionTokenFromContext(ctx)
+	if !ok {
+		return nil, domain.ErrSessionTokenInvalid()
 	}
 	input := service.DeleteSessionInput{
 		ProjectID: sessionToken.ProjectID,

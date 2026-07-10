@@ -1,8 +1,8 @@
-# ADR 033: External Permission Management (App-Group Catalog)
+# ADR 034: External Permission Management (App-Group Catalog)
 
 > **Status:** Proposed
 > **Date:** 2026-07-09
-> **Context:** Authorization for customer-owned apps/APIs — app-group catalog, app grants, and token claims. Builds on the shared OpenFGA parser/profile/compiler pipeline in [ADR 031](031-permission-catalogs.md).
+> **Context:** Authorization for customer-owned apps/APIs — app-group catalog, app grants, and token claims. Builds on the shared OpenFGA parser/profile/compiler pipeline in [ADR 032](032-permission-catalogs.md).
 
 ## Introduction
 
@@ -20,27 +20,27 @@ service of their own.
 This ADR defines the **app-group catalog**: what customer-authored policies
 look like, how they're grouped and evaluated, and how they become app
 grants and token claims. It uses the shared OpenFGA parser/profile/compiler
-pipeline defined in [ADR 031 §2](031-permission-catalogs.md#2-openfga-parser-and-profile-compiler) —
+pipeline defined in [ADR 032 §2](032-permission-catalogs.md#2-openfga-parser-and-profile-compiler) —
 that pipeline is catalog-agnostic; this ADR covers what's specific to the
 app-group audience: customer authoring literacy, app grants, and token
 claims. It builds on the shared catalog model in
-[ADR 031](031-permission-catalogs.md); see that document's glossary for
+[ADR 032](032-permission-catalogs.md); see that document's glossary for
 FGA-engine vocabulary (relation, tuple, userset, catalog, OpenFGA DSL,
 profile) and
 [`docs/design/glossary.md` § 5 Authorization (FGA)](../design/glossary.md#5-authorization-fga)
 for cross-cutting terms (scope, principal, delegation), and
-[ADR 032](032-internal-permission-management.md) for how the *other*
+[ADR 033](033-internal-permission-management.md) for how the *other*
 catalog — Zitadel's own internal resources — is authorized.
 
 ## Glossary
 
 Terms specific to external/app-group authorization, in addition to
-[ADR 031's glossary](031-permission-catalogs.md#glossary) and
+[ADR 032's glossary](032-permission-catalogs.md#glossary) and
 [`docs/design/glossary.md` § 5](../design/glossary.md#5-authorization-fga):
 
 | Term | Meaning |
 |---|---|
-| **App-group catalog** | The catalog of customer-owned permissions, relations, and optional bundles for apps/APIs; replaces legacy project authorizations. See [ADR 031 §1](031-permission-catalogs.md#1-one-model-two-catalogs). |
+| **App-group catalog** | The catalog of customer-owned permissions, relations, and optional bundles for apps/APIs; replaces legacy project authorizations. See [ADR 032 §1](032-permission-catalogs.md#1-one-model-two-catalogs). |
 | **App grant** | A stored row binding a user or team to an app or app-group, feeding token claims / introspection responses. |
 | **Token claim** | The app-group permission data embedded in an OIDC access token or returned from introspection, which the customer's app reads locally instead of calling back into Zitadel per request. |
 
@@ -56,10 +56,10 @@ Fine-grained authorization products (OpenFGA, SpiceDB) and compilers
 (Melange) are useful references for this space specifically because
 authoring literacy matters here: customers, not Zitadel, write these
 policies, and OpenFGA's DSL is the closest thing to a common language for
-that audience. [ADR 031](031-permission-catalogs.md#rejected-alternatives)
+that audience. [ADR 032](032-permission-catalogs.md#rejected-alternatives)
 covers why none of these are adopted as the *runtime engine* (sidecar
 staleness risk; Melange's PostgreSQL-only compiled output), and
-[ADR 031 §2](031-permission-catalogs.md#2-openfga-parser-and-profile-compiler)
+[ADR 032 §2](032-permission-catalogs.md#2-openfga-parser-and-profile-compiler)
 defines the shared parser/profile/compiler pipeline both catalogs use. This
 ADR is about what's specific to the app-group audience given that shared
 pipeline: customer authoring literacy, app grants, and token claims.
@@ -70,7 +70,7 @@ pipeline: customer authoring literacy, app grants, and token claims.
 
 The app-group catalog holds customer-owned permissions, relations, and
 optional role-like bundles for apps/APIs, using the shared primitives
-defined in [ADR 031 §1](031-permission-catalogs.md#1-one-model-two-catalogs).
+defined in [ADR 032 §1](032-permission-catalogs.md#1-one-model-two-catalogs).
 These are emitted in tokens and introspection responses grouped by app
 group / app audience. Roles remain optional: a policy that only uses direct
 relations and computed permissions compiles without ever defining a role
@@ -116,7 +116,7 @@ anything covered here.
 
 Rejected alternatives for the shared OpenFGA parser/profile/compiler
 pipeline (custom parser, Melange as compiler) are covered in
-[ADR 031's Rejected Alternatives](031-permission-catalogs.md#rejected-alternatives) —
+[ADR 032's Rejected Alternatives](032-permission-catalogs.md#rejected-alternatives) —
 they apply to both catalogs, not just this one.
 
 ## Follow-ups

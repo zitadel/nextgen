@@ -69,6 +69,7 @@
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "@zitadel/api-mock": "workspace:*",
+    "@zitadel/config": "workspace:*",
     "jsdom": "catalog:",
     "msw": "catalog:",
     "playwright": "catalog:",
