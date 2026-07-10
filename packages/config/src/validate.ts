@@ -53,6 +53,7 @@ export const FLOW_VALIDATION_RULES = {
   "flip-table": { goRef: "validateFlipTableCoverage" },
   "schema/required-fields": { goRef: "validateRequiredUserSchemaFields" },
   "schema/fields-resolve": { goRef: "resolveAllStepFields" },
+  "schema/passkey-actions": { goRef: "validatePasskeyActionsEnabled" },
   "schema/on-success-manifest": { goRef: "validateOnSuccessManifests" },
   "warn/password-without-identifier": { goRef: null },
 } as const;
@@ -637,6 +638,26 @@ function validateAgainstSchema(def: FlowDef, schema: object): FlowValidationIssu
     }
     challengesByStep.set(step.name, challenges);
   }
+
+  // Passkey enablement (validatePasskeyActionsEnabled): passkey is
+  // action-shaped, not field-shaped, so the per-field enabled-method
+  // check above never sees it.
+  if (!authMethodEnabled(raw, "passkey")) {
+    for (const step of def.steps) {
+      for (const action of step.actions) {
+        if (action.kind === "passkey" || action.kind === "passkey_register") {
+          issues.push(
+            error(
+              "schema/passkey-actions",
+              `step ${q(step.name)}: action ${q(action.name)} offers passkey but "passkey" is not an enabled authentication method`,
+              step.name,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   if (resolutionFailed) {
     return issues;
   }
