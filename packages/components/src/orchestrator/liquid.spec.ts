@@ -50,6 +50,34 @@ describe("LiquidJS engine", () => {
     expect(result).toBe("unknown.key");
   });
 
+  it("the | t filter falls back to the generic action.back for custom step names", () => {
+    // The engine injects `<step>.action.back` from tenant-chosen step names
+    // (flow_state_machine.go buildStep) — no dictionary can enumerate them.
+    const engine = createLiquidEngine({ locale: { ...locale, "action.back": "Back" } });
+    const result = engine.parseAndRenderSync("{{ key | t }}", {
+      key: "passkey-first.action.back",
+    });
+    expect(result).toBe("Back");
+  });
+
+  it("a step-specific action.back key wins over the generic fallback", () => {
+    const engine = createLiquidEngine({
+      locale: { ...locale, "action.back": "Back", "recover.action.back": "Back to sign in" },
+    });
+    const result = engine.parseAndRenderSync("{{ key | t }}", { key: "recover.action.back" });
+    expect(result).toBe("Back to sign in");
+  });
+
+  it("action.back keys still fall through to the raw key when no generic exists", () => {
+    const engine = createLiquidEngine({ locale });
+    const result = engine.parseAndRenderSync("{{ key | t }}", { key: "custom.action.back" });
+    expect(result).toBe("custom.action.back");
+  });
+
+  it("the builtin locales ship the generic action.back", () => {
+    expect(fullLocale["action.back"]).toBe("Back");
+  });
+
   it("fieldPlaceholder resolves sibling keys", () => {
     const engine = createLiquidEngine({ locale });
     const result = engine.parseAndRenderSync(
@@ -289,6 +317,36 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain("forgot-password-href");
     expect(result).toContain('label="Sign in"');
     expect(result).not.toContain('label="Continue"');
+    const passkeyButtons =
+      result.match(/<zl-button[^>]*data-testid="zitadel-action-passkey"[^>]*>/g) ?? [];
+    expect(passkeyButtons).toHaveLength(1);
+    expect(passkeyButtons[0]).toContain('hierarchy="secondary"');
+  });
+
+  it("renders a primary passkey action as exactly one button (passkey-first flow)", () => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    const a = toArray({
+      passkey: { text_key: "identifier.action.passkey", primary: true },
+      register: { text_key: "identifier.action.register.link" },
+    });
+    const context = {
+      step: { name: "identifier", texts: { title_key: "identifier.title" } },
+      fields: [],
+      actions: a,
+      branding: {},
+      loading: false,
+      errors: [],
+      gates: {},
+      sso_providers: [],
+      messages: [],
+      identity: null,
+    };
+    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    const passkeyButtons =
+      result.match(/<zl-button[^>]*data-testid="zitadel-action-passkey"[^>]*>/g) ?? [];
+    expect(passkeyButtons).toHaveLength(1);
+    expect(passkeyButtons[0]).toContain('hierarchy="primary"');
+    expect(result).not.toContain('hierarchy="secondary"');
   });
 
   it("renders sign-in wrong credentials (6602:180268): inline password error, no form alert", () => {

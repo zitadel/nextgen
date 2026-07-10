@@ -135,6 +135,12 @@ export const it: Locale = {
   // --- Accesso con passkey ---
   "passkey-login.title": "Accedi con la tua passkey",
 
+  // --- Step: passkey-first (passo iniziale del preset passkey-first) ---
+  "passkey-first.title": "Accedi",
+  "passkey-first.description": "Usa la tua passkey per continuare",
+  "passkey-first.action.passkey": "Continua con passkey",
+  "passkey-first.action.email_fallback": "Usa invece l'email",
+
   // --- Recupero password ---
   "recover.title": "Controlla la tua e-mail",
   "recover.description":
@@ -146,6 +152,9 @@ export const it: Locale = {
   "submit.signin": "Accedi",
   "action.forgot_password": "Password dimenticata?",
   "action.cancel": "Annulla",
+  // Fallback generico per la chiave `<step>.action.back` iniettata dal motore
+  // (vedi INJECTED_KEY_FALLBACKS in liquid.ts).
+  "action.back": "Indietro",
 
   // --- SSO ---
   "sso.redirect.title": "Reindirizzamento al provider…",

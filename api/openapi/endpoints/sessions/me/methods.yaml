@@ -10,9 +10,8 @@ get:
     against the same `session_id`) to restore a dropped assurance level.
   tags:
     - Sessions
-  parameters:
-    - $ref: ../../../components/parameters/session-cookie.yaml
-  security: []
+  security:
+    - nextgenSession: []
   responses:
     '200':
       description: Session state.
@@ -49,9 +48,8 @@ delete:
     After revocation, any tokens derived from this session are invalidated including the cookie itself, which is cleared in the response.
   tags:
     - Sessions
-  parameters:
-    - $ref: ../../../components/parameters/session-cookie.yaml
-  security: []
+  security:
+    - nextgenSession: []
   responses:
     '204':
       description: Session revoked successfully.

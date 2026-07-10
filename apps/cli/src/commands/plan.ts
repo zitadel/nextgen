@@ -5,7 +5,13 @@ import { createZitadelClient } from "@zitadel/api/client";
 
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { environmentSchema } from "../lib/environment";
-import { buildSyncPlan, makeSyncers, renderPlan, summarizePlan } from "../lib/sync";
+import {
+  buildSyncPlan,
+  collectPlanWarnings,
+  makeSyncers,
+  renderPlan,
+  summarizePlan,
+} from "../lib/sync";
 import { readZitadelSecret } from "../lib/project";
 
 /**
@@ -59,11 +65,11 @@ export default class Plan extends BaseCommand {
         `${summary.updates} update${summary.updates === 1 ? "" : "s"}, ` +
         `${summary.revisions} new revision${summary.revisions === 1 ? "" : "s"}, ` +
         `${summary.deletes} delete${summary.deletes === 1 ? "" : "s"}, ` +
-        `${summary.total - summary.creates - summary.updates - summary.revisions - summary.deletes} unchanged`,
+        `${plan.length - summary.total} unchanged`,
     );
     return this.emit({
       status: "ok",
-      data: summary,
+      data: { ...summary, warnings: collectPlanWarnings(plan) },
       pretty: renderPlan(plan, isTTY),
     });
   }

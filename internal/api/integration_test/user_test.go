@@ -5,6 +5,8 @@
 package integration_test
 
 import (
+	"io"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -378,12 +380,32 @@ func TestGetMyUser(t *testing.T) {
 
 		// GET USER USING TOKEN
 
-		params := api.GetMyUserParams{
-			NextgenSession: sessionToken,
-		}
-		resp, err := client.GetMyUser(t.Context(), params)
+		client.SetSessionToken(sessionToken)
+		resp, err := client.GetMyUser(t.Context())
 		assert.NoError(t, err)
 
 		assert.IsType(t, &api.GetMyUserOK{}, resp, helpers.MustMarshal(t, resp))
+	})
+
+	t.Run("missing session cookie", func(t *testing.T) {
+		t.Parallel()
+
+		// The generated client refuses to send an unauthenticated request, so
+		// exercise the server's missing-credential path with a raw request.
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, harness.EnsureTestServer(t).URL+"/users/me", nil)
+		require.NoError(t, err)
+
+		resp, err := harness.EnsureHttpClient(t).Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+		assert.JSONEq(t,
+			`{"code":"auth.unauthorized","message":"Missing or invalid session token."}`,
+			string(body),
+		)
 	})
 }

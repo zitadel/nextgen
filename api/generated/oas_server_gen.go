@@ -215,13 +215,13 @@ type Handler interface {
 	// against the same `session_id`) to restore a dropped assurance level.
 	//
 	// GET /sessions/me
-	GetMySession(ctx context.Context, params GetMySessionParams) (GetMySessionRes, error)
+	GetMySession(ctx context.Context) (GetMySessionRes, error)
 	// GetMyUser implements getMyUser operation.
 	//
 	// Get my user information.
 	//
 	// GET /users/me
-	GetMyUser(ctx context.Context, params GetMyUserParams) (GetMyUserRes, error)
+	GetMyUser(ctx context.Context) (GetMyUserRes, error)
 	// GetOpenIDConfiguration implements getOpenIDConfiguration operation.
 	//
 	// Retrieve the OpenID Connect configuration.
@@ -323,6 +323,18 @@ type Handler interface {
 	//
 	// GET /users
 	ListUsers(ctx context.Context, params ListUsersParams) (ListUsersRes, error)
+	// PatchProject implements patchProject operation.
+	//
+	// Updates the state of a project.
+	//
+	// PATCH /projects/{project_id}
+	PatchProject(ctx context.Context, req *PatchProjectRequest, params PatchProjectParams) (PatchProjectRes, error)
+	// QueryProjects implements queryProjects operation.
+	//
+	// Query projects.
+	//
+	// POST /projects/query
+	QueryProjects(ctx context.Context, req *QueryProjectsRequest) (QueryProjectsRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
 	// Revokes the session immediately (`state: revoked`). This is the logout operation.
@@ -331,7 +343,7 @@ type Handler interface {
 	//  which is cleared in the response.
 	//
 	// DELETE /sessions/me
-	RevokeMySession(ctx context.Context, params RevokeMySessionParams) (RevokeMySessionRes, error)
+	RevokeMySession(ctx context.Context) (RevokeMySessionRes, error)
 	// RevokeSession implements revokeSession operation.
 	//
 	// Revokes the session immediately (`state: revoked`). This is the logout operation.
