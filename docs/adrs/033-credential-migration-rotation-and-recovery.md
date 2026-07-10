@@ -1,7 +1,7 @@
 # ADR 033: Credential Migration, Rotation, and Recovery
 
 > **Status:** Proposed
-> **Date:** 2026-07-10
+> **Date:** 2026-07-11
 > **Context:** credential migration, key rotation, and recovery flows
 
 ## Context
