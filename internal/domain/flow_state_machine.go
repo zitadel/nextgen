@@ -292,10 +292,6 @@ type processCtx struct {
 	state       *FlowState
 	currentStep *FlowDefinitionStep
 	in          FlowSubmitInput
-	// passkeyOn caches the schema's x-auth-methods passkey verdict for
-	// the whole submission: buildStep hides passkey actions with it and
-	// processPasskey refuses ceremonies on it.
-	passkeyOn bool
 }
 
 // Process advances the flow one step by dispatching the submission to
@@ -316,11 +312,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 		return FlowStepResult{}, fmt.Errorf("%w: current step %q missing from definition", ErrIntegrity, state.CurrentStep)
 	}
 
-	passkeyOn, err := r.passkeyEnabled(ctx, client, state)
-	if err != nil {
-		return FlowStepResult{}, err
-	}
-	pc := &processCtx{ctx: ctx, client: client, def: def, state: state, currentStep: currentStep, in: in, passkeyOn: passkeyOn}
+	pc := &processCtx{ctx: ctx, client: client, def: def, state: state, currentStep: currentStep, in: in}
 	actionKind := stepActionKind(currentStep, in.Action)
 
 	// Back and Navigate both skip the input pipeline entirely.
@@ -386,7 +378,7 @@ func (r *FlowStateMachineRuntime) resolveInputs(pc *processCtx) (FlowResolvedFie
 func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved FlowResolvedFields) (*FlowStepResult, error) {
 	if validationErr := r.fields.Validate(resolved, pc.in.Fields); validationErr != nil {
 		if errs, ok := errors.AsType[FlowFieldValidationErrors](validationErr); ok {
-			step := r.buildStep(pc.state, pc.currentStep, resolved, new(errs.Error()), nil, nil, pc.passkeyOn)
+			step := r.buildStep(pc.state, pc.currentStep, resolved, new(errs.Error()), nil, nil)
 			pc.state.IssuedAt = r.now()
 			return &FlowStepResult{State: pc.state, Step: step}, nil
 		}
@@ -403,7 +395,7 @@ func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved Flow
 // renderStepError re-renders the current step with an error key set,
 // so the user stays put and sees what went wrong.
 func (r *FlowStateMachineRuntime) renderStepError(pc *processCtx, resolved FlowResolvedFields, errKey *string) FlowStepResult {
-	step := r.buildStep(pc.state, pc.currentStep, resolved, errKey, nil, nil, pc.passkeyOn)
+	step := r.buildStep(pc.state, pc.currentStep, resolved, errKey, nil, nil)
 	pc.state.IssuedAt = r.now()
 	return FlowStepResult{State: pc.state, Step: step}
 }
@@ -708,28 +700,6 @@ type passkeyPhaseResult struct {
 //     issue a creation challenge.
 func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowResolvedFields, passkeyResolved FlowResolvedFields, actionKind FlowActionKind) (passkeyPhaseResult, error) {
 	ctx, client, state, step, in := pc.ctx, pc.client, pc.state, pc.currentStep, pc.in
-
-	// Runtime gate, independent of definition-time validation: flows
-	// created before the passkey rule (or submissions bypassing the UI)
-	// must not run WebAuthn ceremonies when the schema disables passkey.
-	// buildStep already hides passkey actions on such flows, so this
-	// refuses direct submissions of hidden actions — every leg: issuing,
-	// resuming, and verifying, for assertion and registration alike.
-	// That breadth is the decided semantics, not an implementation
-	// shortcut: x-auth-methods is an enforcement declaration, so
-	// disabling passkey also blocks assertion of already-registered
-	// credentials — a disabled method that still signs users in would
-	// make the schema lie. Should the product ever want enrollment-only
-	// enforcement, gate the issue legs below instead of this
-	// whole-ceremony refusal.
-	if !pc.passkeyOn {
-		state.ClearPendingChallenge()
-		msg := "error.passkey_disabled"
-		rendered := r.buildStep(state, step, resolved, &msg, nil, nil, false)
-		state.IssuedAt = r.now()
-		return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
-	}
-
 	switch {
 	// A ceremony is in flight but no proof arrived: resume or abandon.
 	case state.PendingChallenge != nil && in.ChallengeResponse == nil:
@@ -737,7 +707,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 			state.ClearPendingChallenge()
 			return passkeyPhaseResult{}, nil
 		}
-		rendered := r.buildStep(pc.state, pc.currentStep, resolved, nil, nil, nil, pc.passkeyOn)
+		rendered := r.buildStep(pc.state, pc.currentStep, resolved, nil, nil, nil)
 		attachPendingChallenge(rendered, state.PendingChallenge)
 		state.IssuedAt = r.now()
 		return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
@@ -775,7 +745,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
 				state.ClearPendingChallenge()
 				msg := "auth_attempt.passkey_registration_invalid"
-				rendered := r.buildStep(pc.state, pc.currentStep, resolved, &msg, nil, nil, pc.passkeyOn)
+				rendered := r.buildStep(pc.state, pc.currentStep, resolved, &msg, nil, nil)
 				state.IssuedAt = r.now()
 				return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
 			}
@@ -808,7 +778,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
 				state.ClearPendingChallenge()
 				msg := "auth_attempt.passkey_invalid"
-				rendered := r.buildStep(pc.state, pc.currentStep, resolved, &msg, nil, nil, pc.passkeyOn)
+				rendered := r.buildStep(pc.state, pc.currentStep, resolved, &msg, nil, nil)
 				state.IssuedAt = r.now()
 				return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
 			}
@@ -843,7 +813,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 			Options:  out.Options,
 			IssuedAt: r.now(),
 		}
-		rendered := r.buildStep(pc.state, pc.currentStep, resolved, nil, nil, nil, pc.passkeyOn)
+		rendered := r.buildStep(pc.state, pc.currentStep, resolved, nil, nil, nil)
 		attachPendingChallenge(rendered, state.PendingChallenge)
 		state.IssuedAt = r.now()
 		return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
@@ -889,7 +859,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 			Options:  out.Options,
 			IssuedAt: r.now(),
 		}
-		rendered := r.buildStep(pc.state, pc.currentStep, resolved, nil, nil, nil, pc.passkeyOn)
+		rendered := r.buildStep(pc.state, pc.currentStep, resolved, nil, nil, nil)
 		attachPendingChallenge(rendered, state.PendingChallenge)
 		state.IssuedAt = r.now()
 		return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
@@ -1061,27 +1031,7 @@ func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, client databas
 		return nil, err
 	}
 	prefillFromCollected(&resolved, state.CollectedData.UserData)
-	passkeyOn, err := r.passkeyEnabled(ctx, client, state)
-	if err != nil {
-		return nil, err
-	}
-	return r.buildStep(state, step, resolved, nil, nil, nil, passkeyOn), nil
-}
-
-// passkeyEnabled reports whether the resolved user schema's
-// `x-auth-methods` enables passkey. An absent keyword counts as
-// disabled, matching [xAuthMethodsReader.IsEnabled] and the
-// definition-time validator.
-func (r *FlowStateMachineRuntime) passkeyEnabled(ctx context.Context, client database.QueryExecutor, state *FlowState) (bool, error) {
-	schema, err := r.schemas.Resolve(ctx, client, state.ProjectID, state.UserSchemaURL, nil)
-	if err != nil {
-		return false, fmt.Errorf("flow state machine: load user schema for passkey gate: %w", err)
-	}
-	authMethods, err := newSchemaReader(schema).AuthMethods()
-	if err != nil {
-		return false, fmt.Errorf("flow state machine: read x-auth-methods for passkey gate: %w", err)
-	}
-	return authMethods.IsEnabled("passkey"), nil
+	return r.buildStep(state, step, resolved, nil, nil, nil), nil
 }
 
 func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, client database.QueryExecutor, state *FlowState, step *FlowDefinitionStep) (FlowResolvedFields, error) {
@@ -1140,22 +1090,13 @@ func (r *FlowStateMachineRuntime) resolveVisitedFields(pc *processCtx) (FlowReso
 
 // buildStep assembles a FlowStep from the raw pieces. Callers without a
 // processCtx (Start, renderStep) supply state + step directly; callers
-// mid-pipeline pass pc.state + pc.currentStep. `passkeyOn` is the
-// schema's x-auth-methods verdict: when false, passkey actions are not
-// offered at all — hiding matches the gate in processPasskey, which
-// refuses submissions of hidden actions as defense in depth.
-func (r *FlowStateMachineRuntime) buildStep(state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, errorKey *string, complete *FlowStepComplete, redirectURL *string, passkeyOn bool) *FlowStep {
+// mid-pipeline pass pc.state + pc.currentStep.
+func (r *FlowStateMachineRuntime) buildStep(state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, errorKey *string, complete *FlowStepComplete, redirectURL *string) *FlowStep {
 	// Surface only user-selectable actions declared on the step.
 	// Implicit outcomes (e.g. user_not_found) live in step.Transitions
 	// but are engine-emitted routing keys, not buttons for the client.
 	actions := make([]FlowAction, 0, len(step.Actions)+1)
 	for _, a := range step.Actions {
-		// A legacy flow (applied before the passkey validation rule) may
-		// still declare passkey actions on a schema that disables them:
-		// don't render buttons the engine would refuse.
-		if !passkeyOn && (a.Kind == FlowActionKindPasskey || a.Kind == FlowActionKindPasskeyRegister) {
-			continue
-		}
 		textKey := a.TextKey
 		if textKey == "" {
 			textKey = step.Name + ".action." + a.Name

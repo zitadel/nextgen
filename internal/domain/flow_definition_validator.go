@@ -150,6 +150,13 @@ func resolveAllStepFields(schema *jsonschema.Schema, steps []FlowDefinitionStep)
 // enabled-method check [resolveAllStepFields] applies to the
 // `x-auth-methods#password` field. An absent keyword counts as
 // disabled, matching [xAuthMethodsReader.IsEnabled].
+//
+// Definition time is the only enforcement point, like every rule in
+// this file: a flow pins its schema revision by URL (schema edits mint
+// a new revision; repinning a flow re-validates it), so a validated
+// flow's verdict cannot change at runtime and the state machine trusts
+// it. Flows applied before this rule surface the violation on their
+// next plan/apply.
 func validatePasskeyActionsEnabled(sr schemaReader, steps []FlowDefinitionStep) error {
 	authMethods, err := sr.AuthMethods()
 	if err != nil {

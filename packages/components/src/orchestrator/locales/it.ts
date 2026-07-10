@@ -167,7 +167,6 @@ export const it: Locale = {
     "La registrazione della passkey non è stata completata. Riprova.",
   "error.passkey_unsupported": "Questo dispositivo non supporta le passkey",
   "error.passkey_failed": "Qualcosa è andato storto. Riprova.",
-  "error.passkey_disabled": "L'accesso con passkey è disattivato per questo tipo di account. Usa un altro metodo di accesso.",
 
   // --- Errori campo / modulo ---
   "error.email_required": "Inserisci un indirizzo e-mail",
