@@ -128,3 +128,5 @@ components:
       $ref: security/oauth2.yaml
     usernamePassword:
       $ref: security/username-password.yaml
+    nextgenSession:
+      $ref: security/session-cookie.yaml

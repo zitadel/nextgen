@@ -64,9 +64,13 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 	return &api.SetUserPasswordNoContent{}, nil
 }
 
-func (h *Handler) GetMyUser(ctx context.Context, params api.GetMyUserParams) (api.GetMyUserRes, error) {
+func (h *Handler) GetMyUser(ctx context.Context) (api.GetMyUserRes, error) {
+	sessionToken, ok := sessionTokenFromContext(ctx)
+	if !ok {
+		return nil, domain.ErrSessionTokenInvalid()
+	}
 	input := service.GetMyUserInput{
-		SessionToken: params.NextgenSession,
+		SessionToken: sessionToken,
 	}
 
 	userbs, err := h.userService.GetMyUser(ctx, input)
