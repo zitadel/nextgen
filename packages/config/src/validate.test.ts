@@ -364,6 +364,37 @@ describe("schema-dependent rules", () => {
     );
   });
 
+  it("rejects every step offering a passkey action when the schema disables passkey", () => {
+    const disabled = structuredClone(schema);
+    (disabled["x-auth-methods"] as Record<string, { enabled: boolean }>).passkey.enabled = false;
+    const issues = validateFlowDefinition(flow(), disabled);
+    const msgs = messages(issues);
+    expect(msgs).toContain(
+      'step "identifier": action "passkey" offers passkey but "passkey" is not an enabled authentication method',
+    );
+    expect(msgs).toContain(
+      'step "password": action "passkey" offers passkey but "passkey" is not an enabled authentication method',
+    );
+    expect(msgs).toContain(
+      'step "register": action "passkey_register" offers passkey but "passkey" is not an enabled authentication method',
+    );
+    expect(issues.every((i) => i.rule === "schema/passkey-actions")).toBe(true);
+  });
+
+  it("rejects passkey actions when the schema has no passkey entry", () => {
+    const absent = structuredClone(schema);
+    delete (absent["x-auth-methods"] as Record<string, unknown>).passkey;
+    expect(messages(validateFlowDefinition(flow(), absent))).toContain(
+      'step "identifier": action "passkey" offers passkey but "passkey" is not an enabled authentication method',
+    );
+  });
+
+  it("accepts passkey and passkey_register actions when passkey is enabled", () => {
+    // The default schema enables passkey; the default flow offers passkey
+    // on identifier/password and passkey_register on register.
+    expect(validateFlowDefinition(flow(), schema)).toEqual([]);
+  });
+
   it("rejects on_success create_user without an upstream identifier", () => {
     // Minimal register-only flow: the create_user step collects a password
     // but no step on its path collects an identifier-challenge field.
@@ -521,6 +552,10 @@ describe("drift audit (Go validator)", () => {
     for (const outcome of RESERVED_OUTCOMES) {
       expect(source).toContain(`"${outcome}"`);
     }
+    // The passkey-action rule's message must stay verbatim-identical.
+    expect(source).toContain(
+      'offers passkey but "passkey" is not an enabled authentication method',
+    );
     // purposeFlipTargets: login→user_not_found→register, register→user_already_exists→login.
     expect(source).toContain("FlowDefinitionPurposeLogin: {");
     expect(source).toContain("FlowImplicitOutcomeUserNotFound: FlowDefinitionPurposeRegister");
