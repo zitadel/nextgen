@@ -192,6 +192,11 @@ export default class Setup extends BaseCommand {
       outro("Configuration captured");
     }
 
+    // The interactive prompt can override the flag/default preset recorded at
+    // framework_resolved — re-record so telemetry carries the preset that
+    // actually scaffolds.
+    this.recordTelemetry({ preset: answers.preset });
+
     const issuer = issuerFromPort(answers.devPort);
     // The DevPortPrompt can change the port interactively, so fold the answer
     // back into the framework: the patched dev-server config reads

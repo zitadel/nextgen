@@ -2,10 +2,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import Ajv2020 from "ajv/dist/2020.js";
+import Ajv2020 from "ajv/dist/2020";
 import { describe, expect, it } from "vitest";
 
-import { SETUP_PRESETS, getDefaultLoginFlow } from "./defaults.js";
+import { getDefaultLoginFlow, SETUP_PRESETS } from "./defaults.js";
 import { FLOW_FILE_SCHEMA_REF, META_SCHEMA_DIR, metaSchemaFiles } from "./meta-schemas.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -38,32 +38,58 @@ describe("meta-schemas", () => {
     }
   });
 
-  // The meta-schema's whole purpose is editor validation of scaffolded flow
-  // files — every preset's rendered flow, `$schema` pointer included, must
-  // validate cleanly or setup ships files its own dialect spec rejects.
-  describe("flow dialect matches what setup scaffolds", () => {
-    const flowDialect = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
+  // The whole point of shipping the meta-schema: it must accept the exact
+  // files that carry the `$schema` pointer at it. A dialect drift here means
+  // editors flag every scaffolded flow as invalid.
+  it("validates every scaffolded preset flow", () => {
     const ajv = new Ajv2020({ strict: false });
-    const validate = ajv.compile(flowDialect?.body ?? {});
+    const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
+    const check = ajv.compile(flowSchema?.body as object);
+    for (const preset of SETUP_PRESETS) {
+      const flow = getDefaultLoginFlow({ preset, userSchemaUrl: "sch_TEST" });
+      expect(check(flow), `${preset}: ${JSON.stringify(check.errors)}`).toBe(true);
+    }
+  });
 
-    const scaffoldedFlow = (preset: string): Record<string, unknown> => ({
-      $schema: FLOW_FILE_SCHEMA_REF,
-      ...(getDefaultLoginFlow({ userSchemaUrl: "sch_test123", preset }) as Record<
-        string,
-        unknown
-      >),
-    });
+  it("accepts an explicit `action: null` transition, as the OpenAPI contract does", () => {
+    const ajv = new Ajv2020({ strict: false });
+    const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
+    const check = ajv.compile(flowSchema?.body as object);
+    const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }) as unknown as {
+      steps: Array<{
+        transitions?: Record<string, { target: string; action?: string | null }>;
+      }>;
+    };
+    const step = flow.steps.find((s) => s.transitions && Object.keys(s.transitions).length > 0);
+    const transition = Object.values(step?.transitions ?? {})[0];
+    if (!transition) throw new Error("fixture flow has no transitions");
+    // `action: null` means "current flow" — the wire contract marks the enum
+    // nullable, so the editor-facing dialect must not flag it.
+    transition.action = null;
+    expect(check(flow), JSON.stringify(check.errors)).toBe(true);
+    // The enum still constrains real values.
+    (transition as { action: unknown }).action = "warp";
+    expect(check(flow)).toBe(false);
+  });
 
-    it.each(SETUP_PRESETS)("the %s preset's flow validates", (preset) => {
-      validate(scaffoldedFlow(preset));
-      expect(validate.errors ?? []).toEqual([]);
-    });
+  it("rejects the pre-array actions dialect and unknown keys", () => {
+    const ajv = new Ajv2020({ strict: false });
+    const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
+    const check = ajv.compile(flowSchema?.body as object);
+    const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }) as unknown as {
+      steps: Array<{ actions?: unknown }>;
+    };
+    // Old dialect: actions keyed by name instead of an ordered array.
+    const [entry] = flow.steps;
+    if (entry) {
+      entry.actions = { submit: { primary: true } };
+    }
+    expect(check(flow)).toBe(false);
 
-    it("rejects the stale map-of-actions dialect", () => {
-      const flow = scaffoldedFlow("password-first");
-      const steps = flow.steps as Array<{ actions?: unknown }>;
-      steps[0].actions = { submit: { primary: true } };
-      expect(validate(flow)).toBe(false);
-    });
+    const withUnknown = {
+      ...getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }),
+      not_a_flow_key: true,
+    };
+    expect(check(withUnknown)).toBe(false);
   });
 });

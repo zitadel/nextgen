@@ -14,7 +14,7 @@
   "properties": {
     "$schema": {
       "type": "string",
-      "description": "Editor-only pointer to this dialect file (scaffolded as `../meta/flow-definition.json`) so editors validate and autocomplete flow edits offline. Ignored by the platform: sync strips it before upload and write-back preserves it."
+      "description": "Editor affordance: path or URL of this meta-schema so editors validate and autocomplete the file (scaffolded flow files point at `.zitadel/meta/flow-definition.json`). Ignored by the platform."
     },
     "name": {
       "type": "string",
@@ -23,7 +23,7 @@
         "standard-login",
         "combined-auth"
       ],
-      "description": "Stable identifier for this flow, used as the target of cross-flow `switch` and `pivot` transitions. Renaming is not supported \u2014 the `name` is part of the public contract another definition may reference. Acts as the human display label as well; no separate slug."
+      "description": "Stable identifier for this flow, used as the target of cross-flow `switch` and `pivot` transitions. Renaming is not supported — the `name` is part of the public contract another definition may reference. Acts as the human display label as well; no separate slug."
     },
     "status": {
       "type": "string",
@@ -31,7 +31,7 @@
         "active",
         "draft"
       ],
-      "description": "The lifecycle state of this flow definition. - active: ready to be used; the flow engine can select it for new flows. - draft: the engine will not select it for new flows. Allowed transitions: draft -> active (activate), active -> draft (remove from active use immediately)."
+      "description": "Lifecycle state. - active: the engine can select this definition for new flows. - draft: never selected for new flows; existing flows referencing it must handle it gracefully."
     },
     "user_schema": {
       "type": "string",
@@ -151,15 +151,14 @@
               "password"
             ]
           ],
-          "description": "Schema property names to collect from the user on this step. Each entry must resolve to a property in the definition's `user_schema`. The engine reads the schema's `x-*` annotations to derive: - field type and validation (rendered into the runtime payload), - implicit transition outcomes - e.g. a property with a non-empty   `x-unique` scope makes `user_not_found` a valid `transitions` key   on this step, - credential verification - e.g. `x-credential: password` causes   submission to invoke an auth_attempt verification before the   transition fires."
+          "description": "Schema property names to collect from the user on this step. Each entry must resolve to a property in the definition's `user_schema`, or use the reserved token `x-auth-methods#<method>` (e.g. `x-auth-methods#password`) to collect a credential proof for a method enabled at the schema root. The engine reads the schema's `x-*` annotations to derive: - field type and validation (rendered into the runtime payload), - implicit transition outcomes - e.g. a property with a non-empty `x-unique` scope makes `user_not_found` a valid `transitions` key on this step."
         },
         "actions": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/Action"
           },
-          "default": [],
-          "description": "Ordered list of actions the user can take on this step. Each action's `name` is what the client echoes back on submit and must have a matching key in `transitions`; the engine rejects submissions for actions without a defined transition. If omitted, the engine provides a default `submit` action."
+          "description": "Ordered list of actions the user can take on this step. The `name` is what the client echoes back on submit. Every action's name must have a matching key in `transitions`; the engine rejects submissions for actions without a defined transition."
         },
         "gates": {
           "type": "object",
@@ -173,7 +172,7 @@
           "items": {
             "$ref": "#/$defs/SSOProvider"
           },
-          "description": "Identity providers available on this step. When non-empty, the step must define a `transitions.callback` entry \u2014 the engine handles the reserved `sso` action transparently (redirect to the IdP, code exchange, user resolution) and fires `callback` on this step when the IdP returns. The flow author never writes a `transitions.sso`."
+          "description": "Identity providers available on this step. When non-empty, the step must define a `transitions.callback` entry — the engine handles the reserved `sso` action transparently (redirect to the IdP, code exchange, user resolution) and fires `callback` on this step when the IdP returns. The flow author never writes a `transitions.sso`."
         },
         "on_success": {
           "type": "string",
@@ -195,25 +194,23 @@
           "additionalProperties": {
             "$ref": "#/$defs/Transition"
           },
-          "description": "Maps action names and engine-emitted outcomes to the next state. Keys are either: - an action name declared in this step's `actions`, or - a reserved outcome the engine produces:   - `user_not_found` - emitted when a unique field     (`x-unique`) does not match an existing user.   - `callback` - emitted when an external system returns control     to the flow (SSO callback, device authorization poll, etc.). A transition's `action` field controls whether the target is interpreted as a step in this definition (default) or as the name of another definition to switch or pivot into. "
+          "description": "Maps action names and engine-emitted outcomes to the next state. Keys are either: - an action name declared in this step's `actions`, or - a reserved outcome the engine produces: - `user_not_found` - emitted when a unique field (`x-unique`) does not match an existing user. - `user_already_exists` - emitted when registration matches an existing user. - `callback` - emitted when an external system returns control to the flow (SSO callback, device authorization poll, etc.). A transition's `action` field controls whether the target is interpreted as a step in this definition (default) or as the name of another definition to switch or pivot into."
         }
       }
     },
     "Action": {
       "type": "object",
-      "required": [
-        "name",
-        "kind"
-      ],
       "additionalProperties": false,
       "properties": {
         "name": {
           "type": "string",
+          "minLength": 1,
           "examples": [
             "submit",
+            "passkey",
             "email_fallback"
           ],
-          "description": "Action identifier. Sent back in the submit request as `action` and used as the matching key in this step's `transitions`."
+          "description": "Action identifier, echoed back by the client on submit and matched against `transitions`. The name `back` is reserved for engine-injected back navigation."
         },
         "kind": {
           "type": "string",
@@ -221,13 +218,9 @@
             "submit",
             "passkey",
             "passkey_register",
-            "navigate",
-            "back"
+            "navigate"
           ],
-          "examples": [
-            "submit"
-          ],
-          "description": "Classifies how the engine handles this action: - submit: collect the step's fields and run validate/dispatch/on_success. - passkey: issue a WebAuthn assertion challenge; the matching transition   fires once the returned assertion verifies. - passkey_register: issue a WebAuthn registration challenge; the matching   transition fires once the returned attestation verifies. - navigate: route through the transition without running the input   pipeline. Used for pure-routing actions declared in the flow definition. - back: return the user to the previous step. Surfaced by the engine   when going back is available."
+          "description": "How the engine handles the action. - submit: collect the step's fields and run validate/dispatch/on_success. - passkey: issue a WebAuthn assertion challenge; the matching transition fires once the assertion verifies. - passkey_register: issue a WebAuthn registration challenge; the matching transition fires once the attestation verifies. - navigate: route through the transition without running the input pipeline. (`back` exists on the wire but is engine-injected; declaring it is rejected.)"
         },
         "primary": {
           "type": "boolean",
@@ -242,7 +235,11 @@
           "description": "Optional localization key override for the action's label. When omitted, the engine derives a key from the step and action names. Display text is resolved client-side from a locale dictionary, never by the engine."
         }
       },
-      "description": "Configuration for a user-invokable action on a step. The `name` is sent back in the submit request as `action`; the engine resolves the action's declared `kind` to decide how to handle the submission."
+      "description": "Configuration for a user-invokable action on a step.",
+      "required": [
+        "name",
+        "kind"
+      ]
     },
     "Gate": {
       "type": "object",
@@ -266,7 +263,7 @@
             "turnstile",
             "hcaptcha"
           ],
-          "description": "Provider identifier within the gate kind \u2014 e.g. `altcha`, `turnstile`, `hcaptcha`. The engine looks up an implementation in its provider registry."
+          "description": "Provider identifier within the gate kind — e.g. `altcha`, `turnstile`, `hcaptcha`. The engine looks up an implementation in its provider registry."
         },
         "config": {
           "type": "object",
@@ -312,7 +309,7 @@
             "entraid",
             "github"
           ],
-          "description": "Hint for rendering (logo, brand colors) \u2014 e.g. `google`, `entraid`, `github`. Consumed by the runtime template, not by the engine."
+          "description": "Hint for rendering (logo, brand colors) — e.g. `google`, `entraid`, `github`. Consumed by the runtime template, not by the engine."
         }
       }
     },
@@ -333,12 +330,13 @@
           "description": "When `action` is omitted, the `name` of a step in the same definition. When `action` is `switch` or `pivot`, the `name` of another flow definition in the same project."
         },
         "action": {
-          "type": "string",
+          "type": ["string", "null"],
           "enum": [
             "switch",
-            "pivot"
+            "pivot",
+            null
           ],
-          "description": "How to interpret `target`. - Omitted: transition to a step in the current definition. - `switch`: replace the current flow with the target flow.   No return; the current flow is discarded. Typical use:   navigating between peer flows like login \u2194 register. - `pivot`: push the target flow onto the stack. The current   flow is paused; when the target flow completes the engine   auto-pops back. Typical use: login \u2192 recovery \u2192 back to login."
+          "description": "How to interpret `target`. - Omitted: transition to a step in the current definition. - `switch`: replace the current flow with the target flow.   No return; the current flow is discarded. Typical use:   navigating between peer flows like login ↔ register. - `pivot`: push the target flow onto the stack. The current   flow is paused; when the target flow completes the engine   auto-pops back. Typical use: login → recovery → back to login."
         }
       }
     }
