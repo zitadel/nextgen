@@ -8,7 +8,6 @@ import (
 
 	"github.com/go-faster/errors"
 	"github.com/ogen-go/ogen/ogenerrors"
-	"github.com/ogen-go/ogen/openapi"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 )
@@ -92,15 +91,7 @@ func OgenErrorHandler(_ context.Context, w http.ResponseWriter, _ *http.Request,
 	switch {
 	case isSecurityError(err):
 		status = http.StatusUnauthorized
-		details = domainErrorDetails(domain.ErrAuthUnauthorized(err))
-
-	case isSessionCookieDecodeError(err):
-		// The session cookie is a credential, not request structure: a request
-		// that fails to provide it is unauthenticated (401), not invalid (400).
-		// The message mirrors the OpenAPI 401 description for these operations.
-		status = http.StatusUnauthorized
-		details = domainErrorDetails(
-			domain.ErrAuthUnauthorized(err).WithMessage("Missing or invalid session token."))
+		details = securityErrorDetails(err)
 
 	case isDecodeError(err):
 		status = http.StatusBadRequest
@@ -127,19 +118,21 @@ func isSecurityError(err error) bool {
 	return errors.As(err, &target)
 }
 
+// securityErrorDetails maps an ogen security failure to the auth.unauthorized
+// wire contract. Operations secured by the session cookie use the normalized
+// message from their OpenAPI 401 descriptions; ogen reports an absent
+// credential without naming the scheme, so the operation decides (ADR 030,
+// Decision 4).
+func securityErrorDetails(err error) api.ErrorDetails {
+	unauthorized := domain.ErrAuthUnauthorized(err)
+	if secErr := new(ogenerrors.SecurityError); errors.As(err, &secErr) && sessionCookieOperations[secErr.OperationContext.Name] {
+		unauthorized = unauthorized.WithMessage(sessionUnauthorizedMessage)
+	}
+	return domainErrorDetails(unauthorized)
+}
+
 func isDecodeError(err error) bool {
 	var decodeParams *ogenerrors.DecodeParamsError
 	var decodeRequest *ogenerrors.DecodeRequestError
 	return errors.As(err, &decodeParams) || errors.As(err, &decodeRequest)
-}
-
-// isSessionCookieDecodeError reports whether err is a parameter-decode failure
-// for the __nextgen_session cookie, i.e. the request lacks session credentials.
-// The cookie is modeled as a required ogen parameter on the */me operations, so
-// its absence surfaces as a decode error rather than a security error.
-func isSessionCookieDecodeError(err error) bool {
-	var paramErr *ogenerrors.DecodeParamError
-	return errors.As(err, &paramErr) &&
-		paramErr.In == openapi.LocationCookie &&
-		paramErr.Name == sessionCookieName
 }

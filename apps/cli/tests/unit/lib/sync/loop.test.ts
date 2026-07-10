@@ -600,6 +600,37 @@ describe("normalized hashing and write-back", () => {
     }
   });
 
+  it("write-back carries the local $schema pointer over a rewrite", async () => {
+    const cwd = makeCwd();
+    try {
+      await mkdir(join(cwd, ".zitadel/flows"), { recursive: true });
+      await writeFile(
+        join(cwd, ".zitadel/flows/default.json"),
+        JSON.stringify({ $schema: "../meta/flow-definition.json", name: "login", version: 1 }),
+      );
+      // A real server-side difference forces a rewrite; the editor pointer
+      // is local-only (the canonical body never carries it) and must survive.
+      const canonical = { name: "login", version: 2 };
+
+      const { changed } = await writeBackResource(
+        cwd,
+        ".zitadel/flows/default.json",
+        { normalize: normalizeFlowBody, normalizeWrite: normalizeFlowBody },
+        canonical,
+      );
+
+      expect(changed).toBe(true);
+      const { readFile } = await import("node:fs/promises");
+      const onDisk = JSON.parse(
+        await readFile(join(cwd, ".zitadel/flows/default.json"), "utf8"),
+      ) as Record<string, unknown>;
+      expect(onDisk.$schema).toBe("../meta/flow-definition.json");
+      expect(onDisk.version).toBe(2);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("leaves the file untouched when the canonical body matches in normalized form", async () => {
     const cwd = makeCwd();
     try {
@@ -640,6 +671,39 @@ describe("auto-repin on schema revise", () => {
   const FLOW_PATH = ".zitadel/flows/default.json";
   const SCHEMA_PATH = ".zitadel/schemas/user.json";
 
+  // Fixtures must satisfy the plan-time flow validator (the same rules the
+  // server enforces): flows need purposes, wired transitions, and a terminal
+  // step; the paired schema needs `properties` covering every plain field
+  // and an enabled auth method for `x-auth-methods#…` tokens.
+  const SCHEMA_BODY = {
+    kind: "user-schema",
+    properties: { email: { type: "string", "x-unique": "project" } },
+    "x-auth-methods": { password: { enabled: true } },
+  };
+
+  function validFlowBody(
+    userSchema: string,
+    extra: Record<string, unknown> = {},
+    entryFields: string[] = ["email"],
+  ): Record<string, unknown> {
+    return {
+      name: "login",
+      status: "active",
+      user_schema: userSchema,
+      purposes: { login: "start" },
+      steps: [
+        {
+          name: "start",
+          fields: entryFields,
+          actions: [{ name: "submit", kind: "submit", primary: true }],
+          transitions: { submit: { target: "done" } },
+        },
+        { name: "done", complete: "show" },
+      ],
+      ...extra,
+    };
+  }
+
   function makeFlowSyncer(overrides: Partial<ResourceSyncer> = {}): ResourceSyncer {
     return makeSyncer({
       kind: "flow",
@@ -674,12 +738,8 @@ describe("auto-repin on schema revise", () => {
           [FLOW_PATH]: { id: "flow-001", hash: "stale" },
         },
       });
-      await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema", v: 2 });
-      await writeResource(cwd, ".zitadel/flows", "default.json", {
-        name: "login",
-        user_schema: "sch_A",
-        version: 2,
-      });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", { ...SCHEMA_BODY, v: 2 });
+      await writeResource(cwd, ".zitadel/flows", "default.json", validFlowBody("sch_A", { version: 2 }));
 
       const schemaSyncer = makeSchemaSyncer();
       const update = vi.fn().mockResolvedValue({});
@@ -714,7 +774,7 @@ describe("auto-repin on schema revise", () => {
     const cwd = makeCwd();
     try {
       const flowSyncer = makeFlowSyncer({ update: vi.fn().mockResolvedValue({}) });
-      const flowBody = { name: "login", user_schema: "sch_A" };
+      const flowBody = validFlowBody("sch_A");
       await writeState(cwd, {
         framework: "next",
         resources: {
@@ -722,7 +782,7 @@ describe("auto-repin on schema revise", () => {
           [FLOW_PATH]: { id: "flow-001", hash: hashForState(flowSyncer, flowBody) },
         },
       });
-      await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema", v: 2 });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", { ...SCHEMA_BODY, v: 2 });
       await writeResource(cwd, ".zitadel/flows", "default.json", flowBody);
 
       const schemaSyncer = makeSchemaSyncer();
@@ -751,8 +811,8 @@ describe("auto-repin on schema revise", () => {
       const schemaSyncer = makeSchemaSyncer({
         create: vi.fn().mockRejectedValue(new Error("must not revise again")),
       });
-      const schemaBody = { kind: "user-schema", v: 2 };
-      const flowBody = { name: "login", user_schema: "sch_A" };
+      const schemaBody = { ...SCHEMA_BODY, v: 2 };
+      const flowBody = validFlowBody("sch_A");
       // A previous apply published sch_B (state advanced, previousId kept)
       // but died before rewriting the flow.
       await writeState(cwd, {
@@ -804,17 +864,19 @@ describe("auto-repin on schema revise", () => {
           ".zitadel/flows/admin.json": { id: "flow-002", hash: "stale" },
         },
       });
-      await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema", v: 2 });
-      await writeResource(cwd, ".zitadel/flows", "default.json", {
-        name: "login",
-        user_schema: urlId,
-        version: 2,
-      });
-      await writeResource(cwd, ".zitadel/flows", "admin.json", {
-        name: "admin",
-        user_schema: urlId,
-        version: 2,
-      });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", { ...SCHEMA_BODY, v: 2 });
+      await writeResource(
+        cwd,
+        ".zitadel/flows",
+        "default.json",
+        validFlowBody(urlId, { version: 2 }),
+      );
+      await writeResource(
+        cwd,
+        ".zitadel/flows",
+        "admin.json",
+        validFlowBody(urlId, { name: "admin", version: 2 }),
+      );
 
       const schemaSyncer = makeSchemaSyncer();
       const update = vi.fn().mockResolvedValue({});
@@ -842,11 +904,8 @@ describe("auto-repin on schema revise", () => {
         framework: "next",
         resources: { [SCHEMA_PATH]: { id: "sch_A", hash: "stale" } },
       });
-      await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema", v: 2 });
-      await writeResource(cwd, ".zitadel/flows", "default.json", {
-        name: "login",
-        user_schema: "sch_A",
-      });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", { ...SCHEMA_BODY, v: 2 });
+      await writeResource(cwd, ".zitadel/flows", "default.json", validFlowBody("sch_A"));
 
       const schemaSyncer = makeSchemaSyncer();
       const create = vi.fn().mockResolvedValue({ id: "flow-001" });
@@ -871,11 +930,8 @@ describe("auto-repin on schema revise", () => {
         framework: "next",
         resources: { [SCHEMA_PATH]: { id: "sch_A", hash: "stale" } },
       });
-      await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema", v: 2 });
-      await writeResource(cwd, ".zitadel/flows", "default.json", {
-        name: "login",
-        user_schema: "sch_A",
-      });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", { ...SCHEMA_BODY, v: 2 });
+      await writeResource(cwd, ".zitadel/flows", "default.json", validFlowBody("sch_A"));
 
       const schemaSyncer = makeSchemaSyncer();
       // The server echoes back exactly what was POSTed — which must already
@@ -898,13 +954,7 @@ describe("auto-repin on schema revise", () => {
     const cwd = makeCwd();
     try {
       const flowSyncer = makeFlowSyncer();
-      const flowBody = {
-        name: "login",
-        user_schema: "sch_A",
-        steps: [
-          { name: "register", fields: ["email", "company", "x-auth-methods#password"] },
-        ],
-      };
+      const flowBody = validFlowBody("sch_A", {}, ["email", "company", "x-auth-methods#password"]);
       await writeState(cwd, {
         framework: "next",
         resources: {
@@ -914,7 +964,7 @@ describe("auto-repin on schema revise", () => {
       });
       // The edit renamed `company` away — the untouched flow still lists it.
       await writeResource(cwd, ".zitadel/schemas", "user.json", {
-        kind: "user-schema",
+        ...SCHEMA_BODY,
         properties: { email: { type: "string" }, companyName: { type: "string" } },
       });
       await writeResource(cwd, ".zitadel/flows", "default.json", flowBody);
@@ -939,11 +989,7 @@ describe("auto-repin on schema revise", () => {
     const cwd = makeCwd();
     try {
       const flowSyncer = makeFlowSyncer({ update: vi.fn().mockResolvedValue({}) });
-      const flowBody = {
-        name: "login",
-        user_schema: "sch_A",
-        steps: [{ name: "register", fields: ["email", "x-auth-methods#password"] }],
-      };
+      const flowBody = validFlowBody("sch_A", {}, ["email", "x-auth-methods#password"]);
       await writeState(cwd, {
         framework: "next",
         resources: {
@@ -952,8 +998,11 @@ describe("auto-repin on schema revise", () => {
         },
       });
       await writeResource(cwd, ".zitadel/schemas", "user.json", {
-        kind: "user-schema",
-        properties: { email: { type: "string" }, company: { type: "string" } },
+        ...SCHEMA_BODY,
+        properties: {
+          email: { type: "string", "x-unique": "project" },
+          company: { type: "string" },
+        },
       });
       await writeResource(cwd, ".zitadel/flows", "default.json", flowBody);
 
@@ -974,8 +1023,8 @@ describe("auto-repin on schema revise", () => {
           [FLOW_PATH]: { id: "flow-001", hash: "stale" },
         },
       });
-      await writeResource(cwd, ".zitadel/schemas", "user.json", { kind: "user-schema", v: 2 });
-      const rawFlow = JSON.stringify({ name: "login", user_schema: "sch_A", version: 2 });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", { ...SCHEMA_BODY, v: 2 });
+      const rawFlow = JSON.stringify(validFlowBody("sch_A", { version: 2 }));
       await mkdir(join(cwd, ".zitadel/flows"), { recursive: true });
       await writeFile(join(cwd, FLOW_PATH), rawFlow);
 
@@ -984,6 +1033,213 @@ describe("auto-repin on schema revise", () => {
       const { readFile } = await import("node:fs/promises");
       expect(await readFile(join(cwd, FLOW_PATH), "utf8")).toBe(rawFlow);
     } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("plan-time flow validation", () => {
+  const FLOW_PATH = ".zitadel/flows/default.json";
+  const SCHEMA_PATH = ".zitadel/schemas/user.json";
+
+  function makeFlowSyncer(overrides: Partial<ResourceSyncer> = {}): ResourceSyncer {
+    return makeSyncer({
+      kind: "flow",
+      directory: ".zitadel/flows",
+      mutable: true,
+      normalize: normalizeFlowBody,
+      normalizeWrite: normalizeFlowBody,
+      ...overrides,
+    });
+  }
+
+  type TestFlow = {
+    name: string;
+    status: string;
+    user_schema: string;
+    purposes: Record<string, string>;
+    steps: Array<{
+      name: string;
+      fields: string[];
+      actions: Array<{ name: string; kind: string; primary?: boolean }>;
+      transitions: Record<string, { target: string }>;
+      complete?: string;
+    }>;
+  };
+
+  function stepOf(flow: TestFlow, name: string): TestFlow["steps"][number] {
+    const found = flow.steps.find((s) => s.name === name);
+    if (!found) throw new Error(`fixture step ${name} missing`);
+    return found;
+  }
+
+  /** Combined login+register flow — the shape of the codex incident. */
+  function combinedFlow(): TestFlow {
+    return {
+      name: "login",
+      status: "active",
+      user_schema: "sch_A",
+      purposes: { login: "start", register: "register" },
+      steps: [
+        {
+          name: "start",
+          fields: ["email"],
+          actions: [{ name: "submit", kind: "submit", primary: true }],
+          transitions: { submit: { target: "done" }, user_not_found: { target: "register" } },
+        },
+        {
+          name: "register",
+          fields: ["email"],
+          actions: [{ name: "submit", kind: "submit", primary: true }],
+          transitions: { submit: { target: "done" }, user_already_exists: { target: "start" } },
+        },
+        { name: "done", fields: [], actions: [], transitions: {}, complete: "show" },
+      ],
+    };
+  }
+
+  it("rejects a login entry missing user_not_found before any mutation (codex regression)", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, { framework: "next", resources: {} });
+      const flow = combinedFlow();
+      delete stepOf(flow, "start").transitions.user_not_found;
+      await writeResource(cwd, ".zitadel/flows", "default.json", flow);
+
+      await expect(buildSyncPlan(cwd, [makeFlowSyncer()])).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        message: expect.stringContaining(
+          'step "start": entry step for purpose "login" must wire "user_not_found" transition because "register" is also a purpose',
+        ),
+      });
+      await expect(buildSyncPlan(cwd, [makeFlowSyncer()])).rejects.toMatchObject({
+        message: expect.stringContaining(FLOW_PATH),
+      });
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("aggregates errors across flows into one E_VALIDATION with structured issues", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, { framework: "next", resources: {} });
+      const broken = combinedFlow();
+      delete stepOf(broken, "start").transitions.user_not_found;
+      await writeResource(cwd, ".zitadel/flows", "default.json", broken);
+      const alsoBroken = combinedFlow();
+      alsoBroken.name = "admin";
+      stepOf(alsoBroken, "register").transitions.hop = { target: "done" };
+      await writeResource(cwd, ".zitadel/flows", "admin.json", alsoBroken);
+
+      await expect(buildSyncPlan(cwd, [makeFlowSyncer()])).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        details: { issues: [expect.anything(), expect.anything()] },
+        message: expect.stringContaining("2 issues"),
+      });
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("never validates an unchanged flow (upgrade safety)", async () => {
+    const cwd = makeCwd();
+    try {
+      const flowSyncer = makeFlowSyncer();
+      const flow = combinedFlow();
+      delete stepOf(flow, "start").transitions.user_not_found;
+      await writeState(cwd, {
+        framework: "next",
+        resources: {
+          [FLOW_PATH]: { id: "flow-001", hash: hashForState(flowSyncer, flow) },
+        },
+      });
+      await writeResource(cwd, ".zitadel/flows", "default.json", flow);
+
+      const actions = await buildSyncPlan(cwd, [flowSyncer]);
+      expect(actions.find((a) => a.path === FLOW_PATH)?.kind).toBe("skip");
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("runs flow-local rules only when the pinned schema is not local", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, { framework: "next", resources: {} });
+      // The flow references a schema property that exists nowhere locally —
+      // schema-dependent rules cannot judge it, flow-local rules can.
+      const flow = combinedFlow();
+      flow.user_schema = "sch_REMOTE";
+      stepOf(flow, "start").fields = ["definitely-not-a-property"];
+      await writeResource(cwd, ".zitadel/flows", "default.json", flow);
+
+      const actions = await buildSyncPlan(cwd, [makeFlowSyncer()]);
+      expect(actions.find((a) => a.path === FLOW_PATH)?.kind).toBe("create");
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("attaches non-blocking warnings to the action instead of failing", async () => {
+    const cwd = makeCwd();
+    try {
+      const schemaBody = {
+        kind: "user-schema",
+        properties: { email: { type: "string", "x-unique": "project" } },
+        "x-auth-methods": { password: { enabled: true } },
+      };
+      const schemaSyncer = makeSyncer({ normalize: normalizeSchemaBody });
+      await writeState(cwd, {
+        framework: "next",
+        resources: {
+          [SCHEMA_PATH]: { id: "sch_A", hash: hashForState(schemaSyncer, schemaBody) },
+        },
+      });
+      await writeResource(cwd, ".zitadel/schemas", "user.json", schemaBody);
+      // Login entry collects the password directly — no identifier upstream.
+      const flow = {
+        name: "login",
+        status: "active",
+        user_schema: "sch_A",
+        purposes: { login: "start" },
+        steps: [
+          {
+            name: "start",
+            fields: ["x-auth-methods#password"],
+            actions: [{ name: "submit", kind: "submit", primary: true }],
+            transitions: { submit: { target: "done" } },
+          },
+          { name: "done", complete: "show" },
+        ],
+      };
+      await writeResource(cwd, ".zitadel/flows", "default.json", flow);
+
+      const actions = await buildSyncPlan(cwd, [schemaSyncer, makeFlowSyncer()]);
+      const flowAction = actions.find((a) => a.path === FLOW_PATH);
+      expect(flowAction?.kind).toBe("create");
+      if (flowAction?.kind === "create") {
+        expect(flowAction.warnings).toHaveLength(1);
+        expect(flowAction.warnings?.[0]?.rule).toBe("warn/password-without-identifier");
+      }
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("skips validation entirely when ZITADEL_SKIP_FLOW_VALIDATION is set", async () => {
+    const cwd = makeCwd();
+    vi.stubEnv("ZITADEL_SKIP_FLOW_VALIDATION", "1");
+    try {
+      await writeState(cwd, { framework: "next", resources: {} });
+      const flow = combinedFlow();
+      delete stepOf(flow, "start").transitions.user_not_found;
+      await writeResource(cwd, ".zitadel/flows", "default.json", flow);
+
+      const actions = await buildSyncPlan(cwd, [makeFlowSyncer()]);
+      expect(actions.find((a) => a.path === FLOW_PATH)?.kind).toBe("create");
+    } finally {
+      vi.unstubAllEnvs();
       await rm(cwd, { recursive: true, force: true });
     }
   });

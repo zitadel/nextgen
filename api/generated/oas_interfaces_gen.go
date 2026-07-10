@@ -157,6 +157,14 @@ type ListUsersRes interface {
 	listUsersRes()
 }
 
+type PatchProjectRes interface {
+	patchProjectRes()
+}
+
+type QueryProjectsRes interface {
+	queryProjectsRes()
+}
+
 type RevokeMySessionRes interface {
 	revokeMySessionRes()
 }

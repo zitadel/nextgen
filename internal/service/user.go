@@ -39,18 +39,19 @@ type GetUserInput struct {
 }
 
 type GetMyUserInput struct {
-	SessionToken string
+	// SessionToken is the parsed session token, already verified at the API
+	// security boundary.
+	SessionToken *domain.Token
 }
 
 // ---- Implementation -------------------------------------------------------------
 
 type UserService struct {
-	pool          database.Pool
-	userRepo      domain.UserRepository
-	passwordRepo  domain.UserPasswordRepository
-	schemaRepo    domain.JSONSchemaRepository
-	hasher        crypto.Hasher
-	tokenVerifier domain.TokenVerifier
+	pool         database.Pool
+	userRepo     domain.UserRepository
+	passwordRepo domain.UserPasswordRepository
+	schemaRepo   domain.JSONSchemaRepository
+	hasher       crypto.Hasher
 }
 
 func NewUserService(
@@ -59,15 +60,13 @@ func NewUserService(
 	passwordRepo domain.UserPasswordRepository,
 	schemaRepo domain.JSONSchemaRepository,
 	hasher crypto.Hasher,
-	tokenVerifier domain.TokenVerifier,
 ) *UserService {
 	return &UserService{
-		pool:          pool,
-		userRepo:      userRepo,
-		passwordRepo:  passwordRepo,
-		schemaRepo:    schemaRepo,
-		hasher:        hasher,
-		tokenVerifier: tokenVerifier,
+		pool:         pool,
+		userRepo:     userRepo,
+		passwordRepo: passwordRepo,
+		schemaRepo:   schemaRepo,
+		hasher:       hasher,
 	}
 }
 
@@ -144,8 +143,8 @@ func (s *UserService) SetPassword(ctx context.Context, input SetPasswordInput) (
 }
 
 func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]byte, error) {
-	sessionToken, err := domain.DecryptSessionTokenString(input.SessionToken, s.tokenVerifier)
-	if err != nil {
+	sessionToken := input.SessionToken
+	if sessionToken == nil {
 		return nil, domain.ErrSessionTokenInvalid()
 	}
 	if sessionToken.ExpiresAt != nil && time.Now().After(*sessionToken.ExpiresAt) {

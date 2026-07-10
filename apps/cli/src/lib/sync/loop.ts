@@ -6,7 +6,7 @@ import { consola } from "consola";
 
 import { FLOWS_DIR } from "../flows";
 import { stableStringify } from "../json";
-import { ZitadelError } from "../errors";
+import { validatePlannedFlows } from "./flow-validation.js";
 import { readState, removeFromState, updateState } from "./state.js";
 import type { ResourceEntry, ResourceSyncer, SyncAction } from "./types.js";
 
@@ -113,14 +113,6 @@ export async function buildSyncPlan(
               newId: recovered.newId,
             }
           : undefined;
-      if (repin) {
-        assertRepinnedFlowFields(
-          relPath,
-          content,
-          repin.schemaPath,
-          scannedContents.get(repin.schemaPath),
-        );
-      }
 
       if (!entry?.id) {
         actions.push({
@@ -185,6 +177,11 @@ export async function buildSyncPlan(
     }
   }
 
+  // Semantic pre-flight over every flow this plan uploads — the rules the
+  // server would otherwise enforce mid-apply, after the schema revision
+  // already published. Throws E_VALIDATION before any mutation.
+  validatePlannedFlows({ actions, scannedContents, stateResources: state.resources });
+
   return actions;
 }
 
@@ -218,6 +215,13 @@ export async function runSyncLoop(
   syncers: ReadonlyArray<ResourceSyncer>,
 ): Promise<SyncLoopResult> {
   const actions = await buildSyncPlan(cwd, syncers);
+  for (const action of actions) {
+    if (action.kind === "create" || action.kind === "update") {
+      for (const warning of action.warnings ?? []) {
+        consola.warn(`${action.path}: ${warning.message}`);
+      }
+    }
+  }
   const filesUpdated: string[] = [];
   // Revisions published by this run: superseded id → new id. Update actions
   // carrying a `repin` patch their `user_schema` from here.
@@ -408,13 +412,20 @@ export async function writeBackResource(
   syncer: Pick<ResourceSyncer, "normalize" | "normalizeWrite">,
   canonical: object,
 ): Promise<{ hash: string; changed: boolean }> {
-  const writeBody = syncer.normalizeWrite?.(canonical) ?? canonical;
+  let writeBody = syncer.normalizeWrite?.(canonical) ?? canonical;
   const compare = (body: object) => stableStringify(syncer.normalize?.(body) ?? body);
   const absPath = join(cwd, relPath);
   let changed = true;
   try {
-    const onDisk = JSON.parse(await readFile(absPath, "utf8")) as object;
+    const onDisk = JSON.parse(await readFile(absPath, "utf8")) as Record<string, unknown>;
     changed = compare(writeBody) !== compare(onDisk);
+    // `$schema` is a local editor affordance (points at the dialect spec in
+    // .zitadel/meta/); the server never echoes it, so a rewrite would drop
+    // it. Carry the on-disk pointer over unless the canonical body has its
+    // own (user-schema documents do).
+    if (typeof onDisk.$schema === "string" && !("$schema" in writeBody)) {
+      writeBody = { ...writeBody, $schema: onDisk.$schema };
+    }
   } catch (err) {
     consola.debug(`read ${relPath} for write-back failed:`, err);
   }
@@ -480,55 +491,6 @@ async function readLocalFlowUserSchemas(cwd: string): Promise<Map<string, string
     }
   }
   return result;
-}
-
-/**
- * Fail fast when a flow that is about to adopt a new schema revision
- * references properties the new revision no longer has (the server would
- * reject the flow update with `flow field: not a property in the user
- * schema`). Runs at plan time, before any platform mutation — otherwise
- * the revise would publish first and the run would die half-applied.
- * Only plain property fields are checked; reserved credential tokens
- * (`x-auth-methods#…`) resolve outside the schema.
- */
-function assertRepinnedFlowFields(
-  flowPath: string,
-  flowContent: object,
-  schemaPath: string,
-  schemaContent: object | undefined,
-): void {
-  if (!schemaContent) {
-    return;
-  }
-  const properties = (schemaContent as { properties?: unknown }).properties;
-  if (typeof properties !== "object" || properties === null) {
-    return;
-  }
-  const steps = (flowContent as { steps?: Array<{ name?: unknown; fields?: unknown }> }).steps;
-  const missing: string[] = [];
-  for (const step of Array.isArray(steps) ? steps : []) {
-    const fields = Array.isArray(step.fields) ? step.fields : [];
-    for (const field of fields) {
-      if (typeof field !== "string" || field.includes("#")) {
-        continue;
-      }
-      if (!Object.prototype.hasOwnProperty.call(properties, field)) {
-        missing.push(`step ${JSON.stringify(step.name ?? "?")}: ${JSON.stringify(field)}`);
-      }
-    }
-  }
-  if (missing.length > 0) {
-    throw new ZitadelError(
-      "E_VALIDATION",
-      `${flowPath} cannot adopt the new revision of ${schemaPath}: ` +
-        `flow fields missing from the edited schema — ${missing.join(", ")}`,
-      {
-        hint:
-          "Update the flow's steps[].fields to match the edited schema " +
-          "(or restore the removed/renamed properties), then re-run plan/apply.",
-      },
-    );
-  }
 }
 
 function findFlowsPinnedTo(

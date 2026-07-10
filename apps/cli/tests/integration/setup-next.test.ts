@@ -67,6 +67,19 @@ describe("Next setup integration", () => {
     expect(setupJson.data.next_actions.join("\n")).toContain("Preview and publish config changes");
     expect(setupJson.data.files_written).toContain(".zitadel/schemas/default-human-user.json");
     expect(setupJson.data.files_written).toContain(".zitadel/flows/default-login.json");
+
+    // Scaffolded guidance: AGENTS.md for agents, a README section for
+    // humans, and the dialect meta-schemas the flow files' $schema points at.
+    const agentsMd = await readFile(join(cwd, "AGENTS.md"), "utf8");
+    expect(agentsMd).toContain("## Authentication (Zitadel)");
+    expect(agentsMd).toContain("not 127.0.0.1");
+    expect(agentsMd).toContain('"$schema": "../meta/flow-definition.json"');
+    const readme = await readFile(join(cwd, "README.md"), "utf8");
+    expect(readme).toContain("## Authentication (Zitadel)");
+    const metaSchema = JSON.parse(
+      await readFile(join(cwd, ".zitadel/meta/flow-definition.json"), "utf8"),
+    ) as Record<string, unknown>;
+    expect(metaSchema.title).toBe("FlowDefinition");
     const installLog = JSON.parse((await readFile(fakeNpm.logPath, "utf8")).trim()) as {
       cwd: string;
       args: string[];
@@ -106,6 +119,9 @@ describe("Next setup integration", () => {
     expect(flow.name).toBe("default-login");
     expect(flow.status).toBe("active");
     expect(flow.user_schema).toBe(schemaId);
+    // The editor pointer survives the upload/write-back round-trip: the
+    // server ignores it and sync treats it as noise, so it stays on disk.
+    expect((flow as { $schema?: string }).$schema).toBe("../meta/flow-definition.json");
     expect(flow.purposes).toMatchObject({ login: "identifier", register: "register" });
     expect(snapshotPlatformStore()).toMatchObject({
       projects: 1,
@@ -136,11 +152,12 @@ describe("Next setup integration", () => {
     expect(loginPage).toContain("project={project}");
     expect(loginPage).not.toContain("NEXT_PUBLIC_ZITADEL_API_BASE");
     expect(loginPage).toContain('post-sign-in-url="/profile"');
-    expect(loginPage).toContain('href="/register"');
+    expect(loginPage).not.toContain('href="/register"');
+    expect(loginPage).not.toContain("next/link");
     expect(loginPage).not.toContain('href="/profile"');
     const registerPage = await readFile(join(cwd, "app/register/page.tsx"), "utf8");
     expect(registerPage).toContain('purpose="register"');
-    expect(registerPage).toContain('href="/login"');
+    expect(registerPage).not.toContain('href="/login"');
     expect(registerPage).not.toContain('href="/profile"');
     const profilePage = await readFile(join(cwd, "app/profile/page.tsx"), "utf8");
     expect(profilePage).toContain("zitadel-cli: managed-file v1");
@@ -341,7 +358,8 @@ describe("Next setup integration", () => {
         {
           name: "identifier",
           fields: [],
-          actions: [],
+          actions: [{ name: "submit", kind: "submit", primary: true }],
+          transitions: { submit: { target: "done" } },
           gates: {
             captcha: {
               kind: "captcha",
@@ -350,6 +368,7 @@ describe("Next setup integration", () => {
             },
           },
         },
+        { name: "done", complete: "show" },
       ],
     };
     await writeFile(
@@ -367,6 +386,96 @@ describe("Next setup integration", () => {
       MY_CAPTCHA_SECRET: "hunter2",
     });
     expect(applyWithEnv.exitCode).toBe(0);
+  });
+
+  it("scaffolds the passkey-first preset with a clean first plan", async () => {
+    const cwd = await createNextProject();
+    const fakeNpm = await fakePackageManager("npm");
+    const setup = await cli(
+      ["setup", "--cwd", cwd, "--preset", "passkey-first", "--non-interactive", "--json"],
+      {
+        PACKAGE_MANAGER_LOG: fakeNpm.logPath,
+        PATH: `${fakeNpm.binDir}:${process.env.PATH ?? ""}`,
+      },
+    );
+    expect(setup.exitCode).toBe(0);
+
+    // The preset decides the scaffolded journey: login enters on a
+    // fields-less passkey step with the email fallback wired.
+    const flow = JSON.parse(
+      await readFile(join(cwd, ".zitadel/flows/default-login.json"), "utf8"),
+    ) as {
+      purposes: Record<string, string>;
+      steps: Array<{ name: string; transitions?: Record<string, { target: string }> }>;
+    };
+    expect(flow.purposes).toMatchObject({ login: "passkey-first", register: "register" });
+    expect(flow.steps.find((s) => s.name === "passkey-first")?.transitions).toMatchObject({
+      email_fallback: { target: "identifier" },
+      user_not_found: { target: "register" },
+    });
+
+    const schema = JSON.parse(
+      await readFile(join(cwd, ".zitadel/schemas/default-human-user.json"), "utf8"),
+    ) as { "x-auth-methods": Record<string, { position: number }> };
+    expect(schema["x-auth-methods"].passkey?.position).toBe(1);
+
+    // The chosen preset is recorded for later tooling.
+    const zitadelJson = JSON.parse(await readFile(join(cwd, "zitadel.json"), "utf8")) as {
+      preset?: string;
+    };
+    expect(zitadelJson.preset).toBe("passkey-first");
+
+    // Preset scaffolds converge like the default: the first plan is empty.
+    const plan = await cli(["plan", "--cwd", cwd, "--json"]);
+    expect(plan.exitCode).toBe(0);
+    const planJson = parseJson(plan.stdout) as { data: { total: number } };
+    expect(planJson.data.total).toBe(0);
+  });
+
+  it("catches server-side flow invariants at plan time, before any mutation", async () => {
+    const cwd = await createNextProject();
+    const fakeNpm = await fakePackageManager("npm");
+    const setup = await cli(["setup", "--cwd", cwd, "--non-interactive", "--json"], {
+      PACKAGE_MANAGER_LOG: fakeNpm.logPath,
+      PATH: `${fakeNpm.binDir}:${process.env.PATH ?? ""}`,
+    });
+    expect(setup.exitCode).toBe(0);
+
+    // The codex incident: drop the login entry's user_not_found transition.
+    // The server rejects this on apply — but only after the schema (in the
+    // combined-edit case) already revised. Plan must catch it first.
+    const flowPath = join(cwd, ".zitadel/flows/default-login.json");
+    const flow = JSON.parse(await readFile(flowPath, "utf8")) as {
+      steps: Array<{ name: string; transitions: Record<string, unknown> }>;
+    };
+    const entry = flow.steps.find((s) => s.name === "identifier");
+    delete entry?.transitions.user_not_found;
+    await writeFile(flowPath, `${JSON.stringify(flow, null, 2)}\n`);
+
+    const before = snapshotPlatformStore();
+
+    const plan = await cli(["plan", "--cwd", cwd, "--json"]);
+    expect(plan.exitCode).toBe(3);
+    const planJson = parseJson(plan.stdout) as { code: string; message: string };
+    expect(planJson.code).toBe("E_VALIDATION");
+    expect(planJson.message).toContain(
+      'entry step for purpose "login" must wire "user_not_found" transition',
+    );
+
+    const apply = await cli(["apply", "--cwd", cwd, "--json"]);
+    expect(apply.exitCode).toBe(3);
+    // The partial-apply failure mode: nothing may have mutated.
+    expect(snapshotPlatformStore()).toEqual(before);
+
+    // Restoring the transition restores a clean plan.
+    if (entry) {
+      entry.transitions.user_not_found = { target: "register" };
+    }
+    await writeFile(flowPath, `${JSON.stringify(flow, null, 2)}\n`);
+    const planAfter = await cli(["plan", "--cwd", cwd, "--json"]);
+    expect(planAfter.exitCode).toBe(0);
+    const planAfterJson = parseJson(planAfter.stdout) as { data: { total: number } };
+    expect(planAfterJson.data.total).toBe(0);
   });
 
 });

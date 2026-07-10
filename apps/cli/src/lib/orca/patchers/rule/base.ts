@@ -1,7 +1,16 @@
+import { metaSchemaFiles, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
+
 import { stableStringify } from "../../../json";
 import { DEFAULT_SERVER } from "../../../server";
 import { scaffold } from "./file-writer";
 import type { FileOp, ScaffoldPlan } from "./file-writer/types";
+import {
+  AGENTS_HEADER,
+  agentsGuidanceSection,
+  README_HEADER,
+  readmeGuidanceSection,
+  upsertGuidanceSection,
+} from "./guidance";
 import type {
   EjectActions,
   Patcher,
@@ -48,6 +57,7 @@ export abstract class AbstractRulePatcher implements Patcher {
       envBackups: [".env.local"],
       dependencies: this.routeDeps(view),
       configEdits: this.routeConfigEdits(view),
+      guidanceFiles: ["AGENTS.md", "README.md"],
     };
   }
 
@@ -127,6 +137,30 @@ export abstract class AbstractRulePatcher implements Patcher {
         path: ".zitadel/state.json",
         contents: `${stableStringify({ framework: ctx.framework.id, resources: {} })}\n`,
       },
+      // The dialect meta-schemas, committed with the project so flow files'
+      // relative `$schema` pointers resolve offline (editor validation) and
+      // agents can read the flow/schema dialect without the docs site.
+      { kind: "mkdir", path: META_SCHEMA_DIR },
+      ...metaSchemaFiles().map(
+        (file): FileOp => ({
+          kind: "write",
+          path: `${META_SCHEMA_DIR}/${file.name}`,
+          contents: `${JSON.stringify(file.body, null, 2)}\n`,
+        }),
+      ),
+      // Guidance for humans (README) and agents (AGENTS.md): the golden
+      // journey and the customize→plan→apply loop. Marker-fenced managed
+      // sections — existing content is never clobbered.
+      {
+        kind: "edit",
+        path: "AGENTS.md",
+        edit: (source) => upsertGuidanceSection(source, agentsGuidanceSection(ctx), AGENTS_HEADER),
+      },
+      {
+        kind: "edit",
+        path: "README.md",
+        edit: (source) => upsertGuidanceSection(source, readmeGuidanceSection(ctx), README_HEADER),
+      },
     ];
   }
 
@@ -160,6 +194,7 @@ function projectConfig(ctx: PatchContext): Record<string, unknown> {
     framework: { id: ctx.framework.id },
     branding: { renderer: ctx.rendererId, attribution: "visible" },
     environments,
+    ...(ctx.preset === undefined ? {} : { preset: ctx.preset }),
   };
 }
 
