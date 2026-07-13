@@ -160,8 +160,10 @@ func (s *PasskeyRegistrationService) listPasskeys(ctx context.Context, projectID
 	return s.passkeys.List(
 		ctx,
 		s.pool,
-		database.WithCondition(s.passkeys.ProjectIDCondition(projectID)),
-		database.WithCondition(s.passkeys.UserIDCondition(userID)),
+		database.WithCondition(database.And(
+			s.passkeys.ProjectIDCondition(projectID),
+			s.passkeys.UserIDCondition(userID),
+		)),
 	)
 }
 
