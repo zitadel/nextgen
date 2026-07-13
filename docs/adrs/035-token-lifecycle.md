@@ -17,12 +17,11 @@ inconsistent invalidation, and recovery gaps become likely.
 
 ## Decision
 
-|                             | Audience        | Owner  | Token type                               | Lifespan                                                                         | Note                                                                                                                                                                                                                     |
-|:----------------------------|:----------------|:-------|:-----------------------------------------|:---------------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Session Tokens              | First-party app | Server | Opaque                                   | Session bound                                                                    | First-party applications need to know whether a session is still active or revoked, whether the user was deactivated,... Those are better served by an authoritative session row than by a self-contained browser token. |
-| Access Tokens               | Third-party app | Client | Self-contained (but opaque configurable) | Short: minutes (default 5 min)                                                   | For short-lived edge tokens we optimize for performance. If a token is self-contained, no database or even api call is required. This reduces system-load and increases responsiveness of the applications.              |
-| Refresh Token               | Auth server     | Client | Opaque                                   | Long: days/weeks (default 2 weeks)                                               | Because refresh tokens are long-lived, they need to be single-use. This is to mitigate replay attacks. Refresh tokens need to be exchanged for access-tokens. In the token response, a new refresh token is provided.    |
-| Personal Access Token (PAT) | Auth server     | Client | Self-contained (but opaque configurable) | Very long: months/years/infinite (default 3 months, infinite: not recommendable) | Long-lived access-tokens, primarily used for offline applications.                                                                                                                                                       |
+|                | Audience        | Owner  | Token type     | Lifespan                           | Note                                                                                                                                                                                                                     |
+|:---------------|:----------------|:-------|:---------------|:-----------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Session Tokens | First-party app | Server | Opaque         | Session bound                      | First-party applications need to know whether a session is still active or revoked, whether the user was deactivated,... Those are better served by an authoritative session row than by a self-contained browser token. |
+| Access Tokens  | Third-party app | Client | Self-contained | Short: minutes (default 5 min)     | For short-lived edge tokens we optimize for performance. If a token is self-contained, no database or even api call is required. This reduces system-load and increases responsiveness of the applications.              |
+| Refresh Token  | Auth server     | Client | Opaque         | Long: days/weeks (default 2 weeks) | Because refresh tokens are long-lived, they need to be single-use. This is to mitigate replay attacks. Refresh tokens need to be exchanged for access-tokens. In the token response, a new refresh token is provided.    |
 
 ### Self-contained tokens
 
@@ -64,11 +63,11 @@ server can validate whether the session/user is still active.
 
 ### Storage
 
-All tokens should be stored on the server because they need to be revocable.
-The stored representation should be minimal: only the token ID. All other
-information can be retrieved from the token itself. Since all tokens are signed,
-we can trust the information encoded in them; we only need to ensure the tokens
-are active.
+Session- and refresh-tokens should be stored on the server because they need to 
+be revocable. The stored representation should be minimal: only the token ID. 
+All other information can be retrieved from the token itself. Since all tokens 
+are signed, we can trust the information encoded in them; we only need to ensure 
+the tokens are active.
 
 Keeping the data in the database at a minimum and trusting the data in the tokens
 allows for faster token validation in cases where high throughput is required.
@@ -90,8 +89,8 @@ states:
 > after the revocation.
 
 However, experience learns that some clients do not handle this well. Therefore,
-The revocation endpoint will be idempotent using an idempotency header. Making 
-it idempotent without header would create a security issue because a leaked 
+The revocation endpoint will be idempotent using an idempotency header. Making
+it idempotent without header would create a security issue because a leaked
 refresh token can be reused to fetch an access token and new refresh token.
 
 ### Revocation propagation & invalidation semantics
@@ -104,10 +103,26 @@ via two distinct operational models.
    the server on every single call. Administrative lockouts or logouts take
    effect instantly on all first-party UI/UX applications.
 2. Third-Party Edges (Eventually Consistent):
-    - Active Access Tokens and PATs can be revoked but because of their 
-      self-contained nature, and not all clients using token introspection via 
-      the api, clients will still use them but naturally burn out at the end of
-      their lifespan. Opaque access tokens do need to be introspected via the 
-      api, so they can be revoked and won't be valid anymore immediately.
+    - Active Access Tokens cannot be revoked clients will still use them but 
+      naturally burn out at the end of their lifespan.
     - Refresh tokens need to be exchanged for access-tokens. So once
       they are revoked they won't be usable anymore and access has been revoked.
+
+## Notes
+
+### Opaque access-tokens
+
+Opaque access tokens are out of scope. Since one of the primary advantages is 
+token size, and we use a JWE for opaque tokens, that advantage is no longer
+there.
+
+### Introspection
+
+Token introspection requires tokens to be stored in the database, or at least
+a token id. Since we do not store any data for access-tokens, this is not
+possible right now.
+
+### Personal Access Tokens
+
+PATs are out of scope for now as well. They do not provide any extra value yet
+in the MVP.
