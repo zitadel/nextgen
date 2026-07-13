@@ -123,6 +123,8 @@ The sections that follow specify the concrete surfaces: how the CLI orchestrates
 - `zitadel deploy [--env <env>]`: packages `.zitadel/`, creates a release (`POST /configuration-releases`), and deploys it.
   - With `--env`, the CLI deploys the release to that environment (`POST /environments/{env}/deployments`). `--env` is required in non-interactive mode;
   - without it, the CLI lists environments (`GET /environments`) and prompts the user to pick one or defer the deployment.
+- `zitadel status`: local bundle summary, plus each environment's currently deployed release and how it relates to local.
+- `zitadel pull <kind> <handle>`: fetch the newest server-side revision of a specific resource and write it into `.zitadel/`, so the next deploy incorporates it.
 - `zitadel promote --env <env> --from <release-id>`: deploy an existing release to a different environment.
 - `zitadel rollback --env <env> --to <release-id>`: deploy a prior release on the current environment.
 - `zitadel releases list`: releases in the project, newest first.
@@ -208,7 +210,14 @@ An environment either runs the previous release or the new one, never a mixture.
 
 Direct writes to the per-resource CRUD APIs remain available. Editing a resource through the dashboard, MCP, or a direct API call produces a new immutable revision but leaves every environment's current release unchanged. The change is saved, not live. To make it live, the user constructs a new release that includes the drafted revision and deploys it, the same pattern as Vercel's "you edited env vars, redeploy to apply."
 
-The CLI is source of truth for release construction. `zitadel deploy` packages `.zitadel/` as-is; drafts made outside the CLI are not incorporated and become superseded by the next deploy. `zitadel plan` compares the local bundle against server-side drafts and surfaces any drafts not represented locally, so the user can pull them into `.zitadel/` before deploying — or deliberately overwrite them.
+The CLI is source of truth for release construction. `zitadel deploy` packages `.zitadel/` as-is; drafts made outside the CLI are not incorporated and become superseded by the next deploy.
+
+Two commands handle the "I edited something outside the CLI and want to keep it" case:
+
+- `zitadel status` — reports the local bundle hash, plus each environment's currently deployed release and how it relates to local. Does not enumerate server-side drafts.
+- `zitadel pull <kind> <handle>` — fetches the newest server-side revision of a specific resource and writes it into `.zitadel/`, so the next deploy incorporates it. Targeted only; there is no bulk mode.
+
+Discovery of server-side drafts the user doesn't know about (bulk pull, draft-aware status) is a follow-up, not this ADR's concern.
 
 ## Out of scope
 
