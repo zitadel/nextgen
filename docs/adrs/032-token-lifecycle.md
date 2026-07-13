@@ -45,8 +45,8 @@ For example, the claims of a JWT would look like this:
   "aud": [
     "the_audience_"
   ],
-  "iat": 1516299022,
-  "exp": 1516239022,
+  "iat": 1516239022,
+  "exp": 1516249022,
   "scope": "openid email"
 }
 ```
