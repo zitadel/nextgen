@@ -213,6 +213,8 @@ Each entry is the resource's own content as authored on disk — no bundle-speci
 - create the release,
 - return `{ release_id, revision_ids[] }`.
 
+Empty bundles are rejected — a release must contain at least one resource across all kinds. Removal safety (a release dropping resources that the target environment is currently running) is handled client-side by `zitadel deploy`'s confirmation prompt (see [CLI](#cli)); it is not enforced by the release constructor, because a release is env-agnostic and there is no natural "previous" release to compare against at construction time.
+
 Either the whole bundle is committed and a release exists, or nothing changes on the server. That is the atomicity guarantee the current per-resource orchestration cannot offer.
 
 **Idempotency.** If the bundle's resource content matches a prior release for this project (audit metadata excluded from the hash), the endpoint returns that release's id and skips allocation. Same-content re-runs of `zitadel deploy` do not create duplicate releases.
