@@ -120,9 +120,7 @@ The sections that follow specify the concrete surfaces: how the CLI orchestrates
 
 ### CLI
 
-- `zitadel deploy [--env <env>]`: packages `.zitadel/`, creates a release (`POST /configuration-releases`), and deploys it.
-  - With `--env`, the CLI deploys the release to that environment (`POST /environments/{env}/deployments`). `--env` is required in non-interactive mode;
-  - without it, the CLI lists environments (`GET /environments`) and prompts the user to pick one or defer the deployment.
+- `zitadel deploy [--env <env>]`: packages `.zitadel/`, creates a release (`POST /configuration-releases`), and deploys it. `--env` is required in non-interactive mode; in interactive mode the CLI lists environments (`GET /environments`) and prompts the user to pick one or defer the deployment. There is no implicit default environment — every deploy explicitly names its target.
 - `zitadel status`: local bundle summary, plus each environment's currently deployed release and how it relates to local.
 - `zitadel pull <kind> <handle>`: fetch the newest server-side revision of a specific resource and write it into `.zitadel/`, so the next deploy incorporates it.
 - `zitadel promote --env <env> --from <release-id>`: deploy an existing release to a different environment.
@@ -221,5 +219,6 @@ Discovery of server-side drafts the user doesn't know about (bulk pull, draft-aw
 
 ## Out of scope
 
-- **Approval mechanics for release activation.** Whether some environments require reviewer approval before a release is activated, and the concrete approval surface (who can approve, how a pending activation is represented, notification/UI shape), is a separate ADR alongside the RBAC/identity model.
+- **Approval mechanics for release deployment.** Whether some environments require reviewer approval before a release is deployed, and the concrete approval surface (who can approve, how a pending deployment is represented, notification/UI shape), is a separate ADR alongside the RBAC/identity model.
 - **Retention policy** for superseded releases and their revisions.
+- **Auto-deploy defaults for bare `zitadel deploy` (per #449).** Whether bare `deploy` should auto-target a designated non-prod environment (Vercel-style: implicit for preview, explicit for prod) depends on env-metadata this ADR treats as out of scope (which envs are production-class). Follow-up once env-classes are defined.
