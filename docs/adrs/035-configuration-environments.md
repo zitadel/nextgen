@@ -132,11 +132,13 @@ The sections that follow specify the concrete surfaces: how the CLI orchestrates
 - `zitadel deploy [--env <env>]`: packages `.zitadel/`, creates a release (`POST /configuration-releases`), and deploys it. `--env` is required in non-interactive mode; in interactive mode the CLI lists environments (`GET /environments`) and prompts the user to pick one or defer the deployment. There is no implicit default environment — every deploy explicitly names its target.
 - `zitadel status`: local bundle summary, plus each environment's currently deployed release and how it relates to local.
 - `zitadel pull <kind> <handle>`: fetch the newest server-side revision of a specific resource and write it into `.zitadel/`, so the next deploy incorporates it.
-- `zitadel promote --env <env> --from <release-id>`: deploy an existing release to a different environment.
-- `zitadel rollback --env <env> --to <release-id>`: deploy a prior release on the current environment.
+- `zitadel promote --from <env> --to <env>`: deploy the release currently running on `<from>` to `<to>`. Optional `--release <release-id>` overrides which release to promote.
+- `zitadel rollback --env <env>`: deploy the previous release on `<env>` (the one that ran before the current). Optional `--to <release-id>` targets a specific prior release.
 - `zitadel releases list`: releases in the project, newest first.
 - `zitadel deployments list --env <env>`: deployment history for an environment, newest first.
 - `zitadel env list`: environments and each one's current release.
+
+Before creating a deployment (via `deploy`, `promote`, or `rollback`), the CLI computes what would be removed from the target environment — resources present in its current release but absent from the incoming one — and prints them. In interactive mode the user confirms; in non-interactive mode an explicit `--confirm-removals` flag is required. Deleting `.zitadel/idps/` locally, for example, does not silently drop every idp on the next deploy: the removal is explicit and acknowledged. Local `.zitadel/` (and the incoming release generally) is authoritative, but deletions are never silent.
 
 ### API
 
@@ -210,6 +212,8 @@ Each entry is the resource's own content as authored on disk — no bundle-speci
 - return `{ release_id, revision_ids[] }`.
 
 Either the whole bundle is committed and a release exists, or nothing changes on the server. That is the atomicity guarantee the current per-resource orchestration cannot offer.
+
+**Idempotency.** If the bundle's resource content matches a prior release for this project (audit metadata excluded from the hash), the endpoint returns that release's id and skips allocation. Same-content re-runs of `zitadel deploy` do not create duplicate releases.
 
 `POST /releases` skips the revision-allocation step: the caller supplies revision ids drafted through other paths. Same validation, same output shape. It exists because a release is fundamentally a snapshot of revision ids; content is only in the picture when the caller is source of truth.
 
