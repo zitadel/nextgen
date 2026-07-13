@@ -22,7 +22,7 @@ inconsistent invalidation, and recovery gaps become likely.
 | Session Tokens              | First-party app | Server | Opaque                                   | Session bound                                                                    | First-party applications need to know whether a session is still active or revoked, whether the user was deactivated,... Those are better served by an authoritative session row than by a self-contained browser token. |
 | Access Tokens               | Third-party app | Client | Self-contained (but opaque configurable) | Short: minutes (default 5 min)                                                   | For short-lived edge tokens we optimize for performance. If a token is self-contained, no database or even api call is required. This reduces system-load and increases responsiveness of the applications.              |
 | Refresh Token               | Auth server     | Client | Opaque                                   | Long: days/weeks (default 2 weeks)                                               | Because refresh tokens are long-lived, they need to be single-use. This is to mitigate replay attacks. Refresh tokens need to be exchanged for access-tokens. In the token response, a new refresh token is provided.    |
-| Personal Access Token (PAT) | Auth server     | Client | Opaque                                   | Very long: months/years/infinite (default 3 months, infinite: not recommendable) | PATs need to be exchanged for access-tokens.                                                                                                                                                                             |
+| Personal Access Token (PAT) | Auth server     | Client | Self-contained (but opaque configurable) | Very long: months/years/infinite (default 3 months, infinite: not recommendable) | Long-lived access-tokens, primarily used for offline applications.                                                                                                                                                       |
 
 ### Self-contained tokens
 
@@ -104,10 +104,10 @@ via two distinct operational models.
    the server on every single call. Administrative lockouts or logouts take
    effect instantly on all first-party UI/UX applications.
 2. Third-Party Edges (Eventually Consistent):
-    - Active Access Tokens can be revoked but because of their self-contained
-      nature, and not all clients using token introspection via the api, clients
-      will still use them but naturally burn out at the end of their lifespan.
-      Opaque access tokens do need to be introspected via the api, so they can
-      be revoked and won't be valid anymore immediately.
-    - Refresh tokens and PATs need to be exchanged for access-tokens. So once
+    - Active Access Tokens and PATs can be revoked but because of their 
+      self-contained nature, and not all clients using token introspection via 
+      the api, clients will still use them but naturally burn out at the end of
+      their lifespan. Opaque access tokens do need to be introspected via the 
+      api, so they can be revoked and won't be valid anymore immediately.
+    - Refresh tokens need to be exchanged for access-tokens. So once
       they are revoked they won't be usable anymore and access has been revoked.
