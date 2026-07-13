@@ -38,6 +38,14 @@ type GetUserInput struct {
 	UserID    string
 }
 
+type ListUsersInput struct {
+	ProjectID string
+	// Offset/Limit window the creation-ordered result; zero means
+	// "from the start" / "server default applied at the API edge".
+	Offset uint32
+	Limit  uint32
+}
+
 type GetMyUserInput struct {
 	// SessionToken is the parsed session token, already verified at the API
 	// security boundary.
@@ -117,6 +125,36 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 	}
 
 	return action.User, nil
+}
+
+// ListUsers returns the project's users as attribute trees (the same
+// shape CreateUser returns and GET /users/{id} serves), ordered by
+// creation time so pagination windows are stable.
+func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) ([]map[string]any, error) {
+	opts := []database.QueryOption{
+		database.WithCondition(s.userRepo.ProjectIDCondition(input.ProjectID)),
+	}
+	if input.Limit > 0 {
+		opts = append(opts, database.WithLimit(input.Limit))
+	}
+	if input.Offset > 0 {
+		opts = append(opts, database.WithOffset(input.Offset))
+	}
+	flatUsers, err := s.userRepo.List(ctx, s.pool, opts...)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to list users from database")
+	}
+
+	users := make([]map[string]any, 0, len(flatUsers))
+	for _, flatUser := range flatUsers {
+		user, err := domain.BuildAttributeTree(flatUser.Attributes)
+		if err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to parse user attributes")
+		}
+		user["id"] = flatUser.ID
+		users = append(users, user)
+	}
+	return users, nil
 }
 
 func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[string]any, error) {

@@ -2,13 +2,19 @@
  * The dialect meta-schemas `zitadel setup` copies into a project's
  * `.zitadel/meta/` so the flow/schema dialect is machine-readable offline:
  * editors validate flow files against `flow-definition.json` via a relative
- * `$schema` pointer, and agents read all three before authoring edits —
- * no docs crawl, no hosted schema required.
+ * `$schema` pointer, and agents read the dialect files before authoring
+ * edits — no docs crawl, no hosted schema required.
  *
  * The files under `meta-schemas/` are committed copies of
  * `api/openapi/endpoints/schemas/*.json` (the source the server embeds);
  * a drift-audit test keeps them byte-identical in the monorepo.
  */
+import authMethodMetaSchema from "../meta-schemas/auth-method.json" with {
+  type: "json",
+};
+import authMethodsMetaSchema from "../meta-schemas/auth-methods.json" with {
+  type: "json",
+};
 import flowDefinitionMetaSchema from "../meta-schemas/flow-definition.json" with {
   type: "json",
 };
@@ -30,11 +36,17 @@ export const FLOW_FILE_SCHEMA_REF = "../meta/flow-definition.json";
 
 export type MetaSchemaFile = { name: string; body: object };
 
-/** The dialect files to materialize, in write order. */
+/**
+ * The dialect files to materialize, in write order. `auth-methods.json` and
+ * `auth-method.json` are pulled in by `user-schema.json`'s relative `$ref`s —
+ * without them the copied dialect cannot resolve offline.
+ */
 export function metaSchemaFiles(): ReadonlyArray<MetaSchemaFile> {
   return [
     { name: "flow-definition.json", body: flowDefinitionMetaSchema as object },
     { name: "user-schema.json", body: userSchemaMetaSchema as object },
     { name: "user-property.json", body: userPropertyMetaSchema as object },
+    { name: "auth-methods.json", body: authMethodsMetaSchema as object },
+    { name: "auth-method.json", body: authMethodMetaSchema as object },
   ];
 }

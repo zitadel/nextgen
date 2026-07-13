@@ -38,6 +38,7 @@ declare module "solid-js" {
         "project-id"?: string;
         "proxy-path"?: string;
         purpose?: string;
+        "flow-name"?: string;
         "post-sign-in-url"?: string;
         "on:zitadel-flow-step"?: (event: CustomEvent<ZitadelFlowStepDetail>) => void;
         "on:zitadel-flow-input"?: (event: CustomEvent<ZitadelFlowInputDetail>) => void;
@@ -93,6 +94,7 @@ export function ZitadelLogin(
       project-id={props.projectId}
       proxy-path={props.proxyPath}
       purpose={props.purpose ?? "login"}
+      flow-name={props.flowName}
       post-sign-in-url={props.postSignInUrl}
       on:zitadel-flow-step={(event) => props.onFlowStep?.(event.detail)}
       on:zitadel-flow-input={(event) => props.onFlowInput?.(event.detail)}

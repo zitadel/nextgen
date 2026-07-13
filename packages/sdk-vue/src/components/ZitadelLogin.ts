@@ -49,6 +49,7 @@ export default defineComponent({
       default: undefined,
     },
     lang: { type: String, default: undefined },
+    flowName: { type: String, default: undefined },
   },
   emits: ["flowStep", "flowInput", "flowComplete", "flowError"],
   setup(props, { emit, expose }) {
@@ -72,6 +73,7 @@ export default defineComponent({
         // dictionaries, not Vue's reactive proxy.
         locales: props.locales === undefined ? undefined : toRaw(props.locales),
         lang: props.lang,
+        "flow-name": props.flowName,
         onZitadelFlowStep: (event: CustomEvent<ZitadelFlowStepDetail>) => {
           emit("flowStep", event.detail);
         },

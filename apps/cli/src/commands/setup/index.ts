@@ -325,7 +325,7 @@ export default class Setup extends BaseCommand {
       // pre-coloured rows (path/url/id helpers) survive intact.
       consola.box({
         title: "Zitadel is ready",
-        message: [renderSummary(sections), "", installOutcome.nextActions.join("\n")].join("\n"),
+        message: [renderSummary(sections), "", installOutcome.boxActions.join("\n")].join("\n"),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
     }
@@ -535,7 +535,7 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   "zitadel.json": { subject: "the Zitadel project configuration" },
   ".env.example": { subject: "the .env example template" },
   ".env.local": { subject: "the local development environment variables" },
-  ".zitadel/state.json": { subject: "the empty sync state file" },
+  ".zitadel/state.json": { subject: "the sync state file" },
   ".zitadel/flows/default-login.json": { subject: "the editable default login flow" },
   ".zitadel/flows/README.md": { subject: "the flows folder README" },
   ".zitadel/schemas/default-human-user.json": {
