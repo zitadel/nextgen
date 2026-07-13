@@ -593,10 +593,21 @@ describe("localiseFlowErrorKeys", () => {
     ]);
   });
 
+  it("localises the engine's credential rejections via the catalog", () => {
+    // SubmitPassword / SubmitPasskey rejections re-render the step with
+    // these catalog keys (flow_state_machine.go) — invalid_credentials
+    // routes inline to the password field via fieldErrorKeys.
+    expect(localiseFlowErrorKeys("error.invalid_credentials", ctx)).toEqual([
+      { text_key: "error.invalid_credentials" },
+    ]);
+    expect(localiseFlowErrorKeys("error.passkey_invalid", ctx)).toEqual([
+      { text_key: "error.passkey_invalid" },
+    ]);
+  });
+
   it("returns null for anything that is not an error.* key payload", () => {
-    // Outcome names and diagnostics stay verbatim with the caller.
+    // Outcome tokens stay verbatim with the caller.
     expect(localiseFlowErrorKeys("user_not_found", ctx)).toBeNull();
-    expect(localiseFlowErrorKeys("auth_attempt.password_invalid", ctx)).toBeNull();
     expect(localiseFlowErrorKeys("", ctx)).toBeNull();
     // A single non-key segment rejects the whole payload.
     expect(localiseFlowErrorKeys("error.email_required; user_not_found", ctx)).toBeNull();

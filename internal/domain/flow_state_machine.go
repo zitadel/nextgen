@@ -632,7 +632,9 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 				Plain:     value,
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
-				msg := "auth_attempt.password_invalid"
+				// Catalog key the client routes inline to the password
+				// field (fieldErrorKeys in liquid.ts).
+				msg := "error.invalid_credentials"
 				return flowDispatchResult{StepError: &msg}, nil
 			}
 			if err != nil {

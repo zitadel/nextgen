@@ -216,8 +216,8 @@ const FLOW_ERROR_CATCH_ALL_KEY = "error.field_invalid";
 /**
  * Localises a `step.error` payload of field-validation text keys.
  * Returns `null` unless EVERY `"; "`-joined segment is an `error.*` key
- * — the caller keeps other payloads (outcome names, `auth_attempt.*`
- * diagnostics) verbatim.
+ * — the caller keeps other payloads (outcome tokens such as
+ * `user_not_found`) verbatim.
  *
  * Keys the locale knows pass through as `text_key` entries: the template
  * localises them via `| t`, and `fieldErrorKeys` routes the known ones

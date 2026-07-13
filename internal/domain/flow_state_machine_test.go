@@ -428,7 +428,7 @@ func TestFlowStateMachine_Process_LoginInvalidPassword(t *testing.T) {
 	require.NotNil(t, result.Step)
 	require.Equal(t, "credentials", result.Step.Name)
 	require.NotNil(t, result.Step.Error)
-	assert.Contains(t, *result.Step.Error, "password")
+	assert.Equal(t, "error.invalid_credentials", *result.Step.Error)
 }
 
 func TestFlowStateMachine_Process_FieldValidationErrorKeepsStep(t *testing.T) {
