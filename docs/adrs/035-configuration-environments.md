@@ -353,7 +353,7 @@ sequenceDiagram
     participant API
 
     Note over API: dashboard edit → PUT /schemas
-    Note over API: draft revision exists;<br/>no environment runs it yet
+    Note over API: draft revision exists —<br/>no environment runs it yet
 
     Dev->>CLI: zitadel pull schema human-user
     CLI->>API: GET /schemas?object_type=human-user
@@ -365,7 +365,7 @@ sequenceDiagram
     CLI-->>Dev: pulled sch_...
 
     Dev->>CLI: zitadel deploy
-    Note over CLI,API: bundle now includes the pulled draft;<br/>proceeds as the deploy flow above
+    Note over CLI,API: bundle now includes the pulled draft —<br/>proceeds as the deploy flow above
 ```
 
 ## Out of scope
