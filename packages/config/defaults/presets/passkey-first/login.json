@@ -102,7 +102,9 @@
         "email",
         "givenName",
         "familyName",
-        "dateOfBirth"
+        "dateOfBirth",
+        "maritalStatus",
+        "newsletterOptIn"
       ],
       "actions": [
         {

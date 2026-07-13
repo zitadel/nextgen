@@ -41,6 +41,15 @@
       "type": "string",
       "format": "date",
       "description": "The user's date of birth (ISO 8601, YYYY-MM-DD)."
+    },
+    "maritalStatus": {
+      "type": "string",
+      "enum": ["Single", "Married", "Divorced", "Widowed"],
+      "description": "The user's marital status."
+    },
+    "newsletterOptIn": {
+      "type": "boolean",
+      "description": "The user's consent to receive newsletter."
     }
   }
 }
