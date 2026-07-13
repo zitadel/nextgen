@@ -234,6 +234,140 @@ Two commands handle the "I edited something outside the CLI and want to keep it"
 
 Discovery of server-side drafts the user doesn't know about (bulk pull, draft-aware status) is a follow-up, not this ADR's concern.
 
+## Command flows
+
+Sequence diagrams for the main CLI commands and the drift-adoption pattern. Participants left-to-right: local files under `.zitadel/`, developer, CLI, API.
+
+### `zitadel deploy`
+
+Interactive path from local edits through deployment: read the bundle, construct a release atomically, pick a target environment, preview removals, deploy. On a same-content re-run, `POST /configuration-releases` returns the existing release id (idempotent) but the CLI still creates a new deployment on the target env.
+
+```mermaid
+sequenceDiagram
+    participant Local as .zitadel/
+    actor Dev as Developer
+    participant CLI
+    participant API
+
+    Dev->>Local: edit resource files
+    Dev->>CLI: zitadel deploy
+    CLI->>Local: read bundle (schemas, flows, ..., audit)
+    CLI->>API: POST /configuration-releases
+    Note right of API: allocate revisions,<br/>resolve handles,<br/>validate closed set
+    API-->>CLI: { release_id, revision_ids }
+    CLI->>API: GET /environments
+    API-->>CLI: env list + current release ids
+    CLI->>Dev: prompt for target env
+    Dev-->>CLI: pick "dev"
+    CLI->>API: GET /releases/{dev.current}
+    API-->>CLI: current release contents
+    Note over CLI: compute removals<br/>local vs. current
+    CLI->>Dev: show removals summary, confirm?
+    Dev-->>CLI: yes
+    CLI->>API: POST /environments/dev/deployments<br/>{ release_id, reason: deploy }
+    API-->>CLI: { deployment_id }
+    CLI-->>Dev: dev now runs rel_...
+```
+
+Non-interactive variant (`zitadel deploy --env dev`) skips the env-listing and prompt steps; `--confirm-removals` replaces the confirmation dialog.
+
+### `zitadel promote` and `zitadel rollback`
+
+Both create a new deployment referencing an existing release — no construction, no revisions minted. Promote sources the release from another environment's current deployment; rollback sources it from the same environment's deployment history.
+
+```mermaid
+sequenceDiagram
+    participant Local as .zitadel/
+    actor Dev as Developer
+    participant CLI
+    participant API
+
+    Note over Dev,API: zitadel promote --from dev --to prod
+    Dev->>CLI: promote --from dev --to prod
+    CLI->>API: GET /environments/dev
+    API-->>CLI: dev's current release_id
+    CLI->>API: GET /releases/{dev.current} + /environments/prod
+    API-->>CLI: dev release contents + prod's current release
+    Note over CLI: compute removals<br/>dev's release vs. prod's current
+    CLI->>Dev: show diff, confirm?
+    Dev-->>CLI: yes
+    CLI->>API: POST /environments/prod/deployments<br/>{ release_id: <dev's>, reason: promote }
+    API-->>CLI: { deployment_id }
+    CLI-->>Dev: prod now runs rel_...
+```
+
+```mermaid
+sequenceDiagram
+    participant Local as .zitadel/
+    actor Dev as Developer
+    participant CLI
+    participant API
+
+    Note over Dev,API: zitadel rollback --env prod
+    Dev->>CLI: rollback --env prod
+    CLI->>API: GET /environments/prod/deployments
+    API-->>CLI: history, newest first
+    Note over CLI: pick previous (2nd row)
+    CLI->>API: GET /releases/{previous}
+    API-->>CLI: previous release contents
+    Note over CLI: compute removals<br/>previous vs. current
+    CLI->>Dev: show diff, confirm?
+    Dev-->>CLI: yes
+    CLI->>API: POST /environments/prod/deployments<br/>{ release_id: <previous>, reason: rollback }
+    API-->>CLI: { deployment_id }
+    CLI-->>Dev: prod rolled back to rel_...
+```
+
+### `zitadel status`
+
+Read-only overview: local bundle hash + per-environment current release + relation to local. No writes anywhere.
+
+```mermaid
+sequenceDiagram
+    participant Local as .zitadel/
+    actor Dev as Developer
+    participant CLI
+    participant API
+
+    Dev->>CLI: zitadel status
+    CLI->>Local: read + hash bundle
+    CLI->>API: GET /environments
+    API-->>CLI: env list + current release ids
+    loop for each env
+        CLI->>API: GET /releases/{id}
+        API-->>CLI: release contents
+        Note over CLI: compare local vs. release
+    end
+    CLI-->>Dev: local hash + per-env relation table
+```
+
+### Drift adoption: `zitadel pull` after an external edit
+
+Composite flow: someone edits a resource via the dashboard (creating a server-side draft revision that no environment sees yet); the developer knows what they touched and pulls that specific resource, then deploys to fold it into a release.
+
+```mermaid
+sequenceDiagram
+    participant Local as .zitadel/
+    actor Dev as Developer
+    participant CLI
+    participant API
+
+    Note over API: dashboard edit → PUT /schemas
+    Note over API: draft revision exists;<br/>no environment runs it yet
+
+    Dev->>CLI: zitadel pull schema human-user
+    CLI->>API: GET /schemas?object_type=human-user
+    API-->>CLI: revisions, newest first
+    CLI->>API: GET /schemas/{newest}
+    API-->>CLI: schema content
+    Note over CLI: rewrite concrete id refs<br/>to handle refs
+    CLI->>Local: write schemas/human-user.json
+    CLI-->>Dev: pulled sch_...
+
+    Dev->>CLI: zitadel deploy
+    Note over CLI,API: bundle now includes the pulled draft;<br/>proceeds as the deploy flow above
+```
+
 ## Out of scope
 
 - **Approval mechanics for release deployment.** Whether some environments require reviewer approval before a release is deployed, and the concrete approval surface (who can approve, how a pending deployment is represented, notification/UI shape), is a separate ADR alongside the RBAC/identity model.
