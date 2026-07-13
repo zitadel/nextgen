@@ -1,4 +1,4 @@
-# ADR 032: Token Lifecycle
+# ADR 035: Token Lifecycle
 
 > **Status:** Proposed
 > **Date:** 2026-06-30
