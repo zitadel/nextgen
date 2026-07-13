@@ -119,7 +119,7 @@ If an active signing key is compromised:
 
 **Notes on key deletion:**
 - Deletion has two sources. The purge sweep removes only keys already past `retired_at + grace_period`, which by construction are neither the signer nor still in grace. Any other deletion (the emergency path, or cancelling a queued successor) must refuse to remove the key currently matching the signing-key predicate above. The emergency path satisfies this by inserting the replacement first, which retires the compromised key before it is deleted; cancelling a not-yet-active successor is allowed but must reset its predecessor's `retired_at` to null.
-- The exposure from a compromised signing key is forged *self-contained* tokens (access tokens). Deleting the key removes it from the JWKS immediately, but clients holding a cached copy keep honoring the `kid` until their cache expires, so forged tokens remain accepted for at most one JWKS cache lifetime. This is the eventually-consistent edge from [ADR 032](032-token-lifecycle.md#revocation-propagation--invalidation-semantics). Opaque tokens are unaffected by the key; revoking them (step 3) is a separate precaution.
+- The exposure from a compromised signing key is forged *self-contained* tokens (access tokens). Deleting the key removes it from the JWKS immediately, but clients holding a cached copy keep honoring the `kid` until their cache expires, so forged tokens remain accepted for at most one JWKS cache lifetime. Opaque tokens are unaffected by the key; revoking them (step 3) is a separate precaution.
 
 ### 6. Encryption-at-Rest Key Rotation
 
