@@ -1,4 +1,4 @@
-# ADR 031: Environment Releases for Configuration Resources
+# ADR 035: Environment Releases for Configuration Resources
 
 > **Status:** Draft
 > **Date:** 2026-07-07
