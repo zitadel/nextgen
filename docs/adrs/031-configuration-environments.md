@@ -30,7 +30,7 @@ When the user edits the schema, the server allocates a new id. The flow file kee
 
 ## Decision
 
-Configuration changes are bundled as immutable **releases**. A release pins a specific revision of every resource it includes. **Environments** are runtime slots on a project, each running one release at a time, the same release can be deployed to any number of environments unchanged.
+Configuration changes are bundled as immutable **releases**. A release pins a specific revision of every resource it includes. **Environments** are runtime slots on a project; each runs one release at a time, and the same release can be deployed to any number of environments unchanged. A **deployment** is the record of a release being made live on an environment.
 
 <img width="3288" height="2532" alt="Proposal" src="https://github.com/user-attachments/assets/8606b58f-c6e1-457f-868b-bc401f318c5a" />
 
@@ -39,7 +39,7 @@ The three subsections below define each concept: what an environment is, what a 
 
 ### Environments
 
-An environment is a runtime slot of a project. Each environment has its own currently applied release. A project has one or more environments; every environment belongs to exactly one project.
+An environment is a runtime slot of a project. Each environment runs the release from its latest deployment. A project has one or more environments; every environment belongs to exactly one project.
 
 ```mermaid
 flowchart TD
@@ -78,7 +78,7 @@ For example, release `rel_2026-07-08_14:22` might contain:
 
 The "handle" is the field each resource kind uses as its stable identifier across revisions. For example, schemas use `objectType`.
 
-**A release is a closed boundary.** An environment sees only what is inside its currently activated release: resources outside the release are invisible, and drafted revisions on the server that never made it into a release do not exist at runtime. Per-resource CRUD (`POST /schemas`, `PUT /flow_definitions/:id`, …) operates outside any release.
+**A release is a closed boundary.** An environment sees only what is inside its current release: resources outside the release are invisible, and drafted revisions on the server that never made it into a release do not exist at runtime. Per-resource CRUD (`POST /schemas`, `PUT /flow_definitions/:id`, …) operates outside any release.
 
 > Exception: users carry their own user-schema revision. A user record persists the sch_… id of the user-schema revision it was created against.
 
@@ -100,37 +100,38 @@ Releases are project-scoped and immutable. They exist on their own, and are not 
 
 ### Environments and releases
 
-TBD: what is the best terminology? 1: environment **activates** a release, 2: release is **applied** to an environment, 3: a release is **deployed** to an environment, 4: a release is **runs** on an environment
+Deploying a release to an environment creates a **deployment** — an immutable record linking a release to an environment at a moment in time. Every environment runs the release of its latest deployment.
 
-- An environment runs exactly one release at any moment. Assigning a release atomically replaces the previous one.
-- A release can run on any number of environments at the same time. Releases are project-scoped artifacts, not environment-scoped. Activating the same release id on dev, staging, and prod is normal; each environment holds an independent pointer to the same release.
+- An environment runs exactly one release at any moment. Creating a new deployment atomically replaces the previous one.
+- A release can be deployed to any number of environments at the same time. Releases are project-scoped artifacts; deploying the same release to dev, staging, and prod is normal, and each environment holds an independent deployment history referencing the same release.
 
 Workflows:
 
-- **Promotion** — activating a release that already runs on one environment onto another (e.g. dev → staging → prod). No new release is created.
-- **Rollback** — activating a prior release on the same environment. No new release is created; the environment's pointer moves back to a release that ran there earlier.
+- **Promotion** — deploying a release that already runs on one environment onto another (e.g. dev → staging → prod). No new release is created; a new deployment is recorded on the target environment.
+- **Rollback** — deploying a prior release on the same environment. No new release is created; the new deployment references a release the environment ran earlier.
 
-Every activation is recorded per environment. The log is exposed via `GET /releases?env=<env>`.
+Every deployment is recorded per environment. The log is exposed via `GET /environments/{env}/deployments`.
 
 ---
 
-The sections that follow specify the concrete surfaces: how the CLI orchestrates `apply`, what the API endpoints look like, and the release bundle format on the wire.
+The sections that follow specify the concrete surfaces: how the CLI orchestrates `deploy`, what the API endpoints look like, and the release bundle format on the wire.
 
 ## Release lifecycle
 
 ### CLI
 
-- `zitadel apply [--env <env>]`: packages `.zitadel/` and creates a release (`POST /configuration-releases`).
-  - With `--env`, the CLI then activates the release on that environment (`PATCH /environments/{env}`). `--env` is required in non-interactive mode;
-  - without it, the CLI lists environments (`GET /environments`) and prompts the user to pick one or defer activation.
-- `zitadel promote --env <env> --from <release-id>`: activate an existing release on a different environment.
-- `zitadel rollback --env <env> --to <release-id>`: activate a prior release on the current environment.
+- `zitadel deploy [--env <env>]`: packages `.zitadel/`, creates a release (`POST /configuration-releases`), and deploys it.
+  - With `--env`, the CLI deploys the release to that environment (`POST /environments/{env}/deployments`). `--env` is required in non-interactive mode;
+  - without it, the CLI lists environments (`GET /environments`) and prompts the user to pick one or defer the deployment.
+- `zitadel promote --env <env> --from <release-id>`: deploy an existing release to a different environment.
+- `zitadel rollback --env <env> --to <release-id>`: deploy a prior release on the current environment.
 - `zitadel releases list`: releases in the project, newest first.
-- `zitadel env list`: environments and each one's currently activated release.
+- `zitadel deployments list --env <env>`: deployment history for an environment, newest first.
+- `zitadel env list`: environments and each one's current release.
 
 ### API
 
-Three groupings, in order of layering: `releases` (primary resource), `environments` (runtime slots), and `configuration-releases` (CLI orchestrator entry point).
+Three groupings, in order of layering: `releases` (primary resource), `environments` and their `deployments` (runtime slots and their history), and `configuration-releases` (CLI orchestrator entry point).
 
 #### `releases`
 
@@ -140,36 +141,37 @@ The canonical resource. A release is project-scoped and immutable; these endpoin
 |---                             |---                                                                                                                                                                          |
 | `POST /releases`               | Assemble a release from existing revision ids. Payload is a list of `(kind, handle, revision_id)` tuples. No new revisions minted. Validates handle references and templates. |
 | `GET /releases`                | List releases in the project, newest first.                                                                                                                                 |
-| `GET /releases?env=<env>`      | List releases activated on `<env>`, newest first. The first row is the currently active release; the rest is the audit log.                                                 |
 | `GET /releases/{release_id}`   | Read one release.                                                                                                                                                           |
 
-#### `environments`
+#### `environments` and `deployments`
 
-Environments hold a pointer to the release they currently run. Activation is expressed as an update on the environment.
+An environment holds a history of deployments; each deployment references a release. The environment's current release is the release of its newest deployment. Deploying is expressed as creating a deployment on the environment.
 
-| Endpoint                       | Purpose                                                                                                                                                    |
-|---                             |---                                                                                                                                                         |
-| `GET /environments`            | List every environment with its currently activated release id. Used by `zitadel apply` in interactive mode to prompt for an activation target.            |
-| `GET /environments/{env}`      | Read one environment.                                                                                                                                      |
-| `PATCH /environments/{env}`    | Update the environment. Setting `current_release_id` activates that release; server resolves `${env.X}` and `${secrets.Y}` templates before applying.      |
+| Endpoint                                       | Purpose                                                                                                                                                                             |
+|---                                             |---                                                                                                                                                                                  |
+| `GET /environments`                            | List every environment with its current release id. Used by `zitadel deploy` in interactive mode to prompt for a deployment target.                                                 |
+| `GET /environments/{env}`                      | Read one environment.                                                                                                                                                               |
+| `POST /environments/{env}/deployments`         | Deploy a release to this environment. Payload: `{ release_id, reason }` where `reason` is `deploy` \| `promote` \| `rollback`. Server resolves `${env.X}` templates before applying. |
+| `GET /environments/{env}/deployments`          | List deployments for this environment, newest first. The first row is the current deployment (whose release is live); the rest is the audit log.                                    |
+| `GET /environments/{env}/deployments/{id}`     | Read one deployment.                                                                                                                                                                |
 
 #### `configuration-releases` — CLI orchestrator entry point
 
-A single endpoint that backs `zitadel apply`. It accepts a source-content bundle (the contents of `.zitadel/`), allocates a new revision for every changed resource, resolves handle references, and constructs a release, all in one **transaction**.
+A single endpoint that backs `zitadel deploy`. It accepts a source-content bundle (the contents of `.zitadel/`), allocates a new revision for every changed resource, resolves handle references, and constructs a release, all in one **transaction**.
 
 | Endpoint                          | Purpose                                                                                                                                                                    |
 |---                                |---                                                                                                                                                                         |
-| `POST /configuration-releases`\*  | Build a release from a source-content bundle in one transaction. Allocates revisions, resolves handle references, validates, creates the release. Important: this endpoint does not activate the release in any environments. |
+| `POST /configuration-releases`\*  | Build a release from a source-content bundle in one transaction. Allocates revisions, resolves handle references, validates, creates the release. Important: this endpoint does not deploy the release to any environment. |
 
 TODO: Which endpoint would be used when a new release is created via the UI?
 
 \* Endpoint name is a placeholder; a shorter form may replace it.
 
-Direct per-resource CRUD (`POST /schemas`, `PUT /flow_definitions/:id`, …) remains available and creates a new revision on write. It does not touch any environment's activated release.
+Direct per-resource CRUD (`POST /schemas`, `PUT /flow_definitions/:id`, …) remains available and creates a new revision on write. It does not touch any environment's current deployment.
 
 ## Release bundle
 
-`zitadel apply` serializes the contents of `.zitadel/` into a single JSON bundle, one key per resource kind, and submits it to `POST /configuration-releases`:
+`zitadel deploy` serializes the contents of `.zitadel/` into a single JSON bundle, one key per resource kind, and submits it to `POST /configuration-releases`:
 
 ```json
 {
@@ -198,15 +200,15 @@ Either the whole bundle is commited and a release exists, or nothing changes on 
 
 `POST /releases` skips the revision-allocation step: the caller supplies revision ids drafted through other paths. Same validation, same output shape. It exists because a release is fundamentally a snapshot of revision ids; content is only in the picture when the caller is source of truth.
 
-Neither endpoint activates the release. Activation is a separate `PATCH /environments/{env}` call with `{ current_release_id: <returned> }`, preserving the decision that releases exist on their own, the same release can later be promoted unchanged. The CLI's `zitadel apply` orchestrates the two calls internally.
+Neither endpoint deploys the release. Deploying is a separate `POST /environments/{env}/deployments` call with `{ release_id: <returned> }`, preserving the decision that releases exist on their own, the same release can later be promoted unchanged. The CLI's `zitadel deploy` orchestrates the two calls internally.
 
-An environment either runs the previous release or the new one, never a mixture. A partial failure (release constructed, activation refused) leaves the environment unchanged and the release available for a later attempt.
+An environment either runs the previous release or the new one, never a mixture. A partial failure (release constructed, deployment refused) leaves the environment unchanged and the release available for a later attempt.
 
 ## CLI and drift
 
-Direct writes to the per-resource CRUD APIs remain available. Editing a resource through the dashboard, MCP, or a direct API call produces a new immutable revision but leaves every environment's activated release unchanged. The change is saved, not live. To make it live, the user constructs a new release that includes the drafted revision and activates it, the same pattern as Vercel's "you edited env vars, redeploy to apply."
+Direct writes to the per-resource CRUD APIs remain available. Editing a resource through the dashboard, MCP, or a direct API call produces a new immutable revision but leaves every environment's current release unchanged. The change is saved, not live. To make it live, the user constructs a new release that includes the drafted revision and deploys it, the same pattern as Vercel's "you edited env vars, redeploy to apply."
 
-The CLI is source of truth for release construction. `zitadel apply` packages `.zitadel/` as-is; drafts made outside the CLI are not incorporated and become superseded by the next apply. `zitadel plan` compares the local bundle against server-side drafts and surfaces any drafts not represented locally, so the user can pull them into `.zitadel/` before applying — or deliberately overwrite them.
+The CLI is source of truth for release construction. `zitadel deploy` packages `.zitadel/` as-is; drafts made outside the CLI are not incorporated and become superseded by the next deploy. `zitadel plan` compares the local bundle against server-side drafts and surfaces any drafts not represented locally, so the user can pull them into `.zitadel/` before deploying — or deliberately overwrite them.
 
 ## Out of scope
 
