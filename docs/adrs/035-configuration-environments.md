@@ -65,7 +65,7 @@ Every configurable resource must be revisioned. A content change produces a new 
 
 A release is a snapshot of the project's configuration. It records exactly which revision of each resource is included, so activating the release on any environment produces a known, self-consistent runtime state.
 
-For example, release `rel_2026-07-08_14:22` might contain:
+For example, release `rel_01KX3RG8A7F0N9WD3P2E4YM5C1` might contain:
 
 | Kind      | Handle                       | Revision                   |
 |---        |---                           |---                         |
@@ -151,19 +151,17 @@ An environment holds a history of deployments; each deployment references a rele
 |---                                             |---                                                                                                                                                                                  |
 | `GET /environments`                            | List every environment with its current release id. Used by `zitadel deploy` in interactive mode to prompt for a deployment target.                                                 |
 | `GET /environments/{env}`                      | Read one environment.                                                                                                                                                               |
-| `POST /environments/{env}/deployments`         | Deploy a release to this environment. Payload: `{ release_id, reason }` where `reason` is `deploy` \| `promote` \| `rollback`. Server resolves `${env.X}` templates before applying. |
+| `POST /environments/{env}/deployments`         | Deploy a release to this environment. Payload: `{ release_id, reason }` where `reason` is `deploy` \| `promote` \| `rollback`.                                                       |
 | `GET /environments/{env}/deployments`          | List deployments for this environment, newest first. The first row is the current deployment (whose release is live); the rest is the audit log.                                    |
 | `GET /environments/{env}/deployments/{id}`     | Read one deployment.                                                                                                                                                                |
 
 #### `configuration-releases` — CLI orchestrator entry point
 
-A single endpoint that backs `zitadel deploy`. It accepts a source-content bundle (the contents of `.zitadel/`), allocates a new revision for every changed resource, resolves handle references, and constructs a release, all in one **transaction**.
+A single endpoint that backs `zitadel deploy`. It accepts a source-content bundle (the contents of `.zitadel/`), allocates a new revision for every changed resource, resolves handle references, and constructs a release, all in one **transaction**. The UI does not use this endpoint — its workflows create deployments from existing releases (promotion, rollback); when the UI needs to construct a release from revision ids drafted through direct CRUD, it uses `POST /releases` instead.
 
 | Endpoint                          | Purpose                                                                                                                                                                    |
 |---                                |---                                                                                                                                                                         |
 | `POST /configuration-releases`\*  | Build a release from a source-content bundle in one transaction. Allocates revisions, resolves handle references, validates, creates the release. Important: this endpoint does not deploy the release to any environment. |
-
-TODO: Which endpoint would be used when a new release is created via the UI?
 
 \* Endpoint name is a placeholder; a shorter form may replace it.
 
@@ -196,7 +194,7 @@ Kinds not present in the local project are sent as empty arrays. Each entry carr
 - create the release,
 - return `{ release_id, revision_ids[] }`.
 
-Either the whole bundle is commited and a release exists, or nothing changes on the server. That is the atomicity guarantee the current per-resource orchestration cannot offer.
+Either the whole bundle is committed and a release exists, or nothing changes on the server. That is the atomicity guarantee the current per-resource orchestration cannot offer.
 
 `POST /releases` skips the revision-allocation step: the caller supplies revision ids drafted through other paths. Same validation, same output shape. It exists because a release is fundamentally a snapshot of revision ids; content is only in the picture when the caller is source of truth.
 
@@ -222,3 +220,5 @@ Discovery of server-side drafts the user doesn't know about (bulk pull, draft-aw
 - **Approval mechanics for release deployment.** Whether some environments require reviewer approval before a release is deployed, and the concrete approval surface (who can approve, how a pending deployment is represented, notification/UI shape), is a separate ADR alongside the RBAC/identity model.
 - **Retention policy** for superseded releases and their revisions.
 - **Auto-deploy defaults for bare `zitadel deploy` (per #449).** Whether bare `deploy` should auto-target a designated non-prod environment (Vercel-style: implicit for preview, explicit for prod) depends on env-metadata this ADR treats as out of scope (which envs are production-class). Follow-up once env-classes are defined.
+- **Environment lifecycle, values, and data isolation.** Environment creation, retirement, per-env value shape (base URLs, custom domains, template values referenced from releases), template resolution semantics on deployment, and cross-env data isolation (including the exception that users carry their own user-schema revision) are covered by a follow-up ADR.
+- **Inner-loop semantics.** Whether every local save creates a release (Vercel-shaped local dev) or only explicit `zitadel deploy` does (Terraform-shaped) is a follow-up decision affecting local-dev ergonomics.
