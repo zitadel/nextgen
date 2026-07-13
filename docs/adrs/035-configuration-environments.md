@@ -173,8 +173,8 @@ Direct per-resource CRUD (`POST /schemas`, `PUT /flow_definitions/:id`, …) rem
 
 ```json
 {
-  "schemas":  [ { "objectType": "human-user", "content": { /* JSON Schema */ } } ],
-  "flows":    [ { "name": "default-login", "user_schema": "human-user", "content": { /* flow definition */ } } ],
+  "schemas":  [ { "objectType": "human-user", "$schema": "…", "properties": { /* … */ } } ],
+  "flows":    [ { "name": "default-login", "user_schema": "human-user", "steps": [ /* … */ ] } ],
   "idps":     [ ],
   "brandings":[ ],
   "apps":     [ ],
@@ -182,7 +182,7 @@ Direct per-resource CRUD (`POST /schemas`, `PUT /flow_definitions/:id`, …) rem
 }
 ```
 
-Kinds not present in the local project are sent as empty arrays. Each entry carries the resource's stable handle and its content. Cross-resource references are by handle, for example, the flow's `user_schema` field carries `"human-user"`, not a concrete `sch_…` id.
+Each entry is the resource's own content as authored on disk — no bundle-specific envelope. The server extracts the handle from the per-kind field (`objectType` for schemas, `name` for the others). Cross-resource references are by handle, for example, the flow's `user_schema` field carries `"human-user"`, not a concrete `sch_…` id. Kinds not present in the local project are sent as empty arrays.
 
 ### Endpoint responsibilities
 
