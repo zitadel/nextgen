@@ -176,7 +176,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		userPasskeyRepo,
 		passwordHasher,
 	)
-	sessionService := service.NewSessionService(pool, sessionRepo, service.SessionConfig{
+	sessionService := service.NewSessionService(pool, sessionRepo, userRepo, service.SessionConfig{
 		DefaultTTL: cfg.Session.DefaultTTL,
 		MaxTTL:     cfg.Session.MaxTTL,
 	})

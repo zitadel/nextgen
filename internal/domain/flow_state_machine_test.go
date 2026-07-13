@@ -461,7 +461,9 @@ func TestFlowStateMachine_Process_FieldValidationErrorKeepsStep(t *testing.T) {
 	require.NotNil(t, result.Step)
 	require.Equal(t, "credentials", result.Step.Name)
 	if assert.NotNil(t, result.Step.Error) {
-		assert.Contains(t, *result.Step.Error, "email")
+		// The wire dialect end to end: format violations surface as the
+		// `_invalid`-spelled text key, not a raw diagnostic string.
+		assert.Equal(t, "error.email_invalid", *result.Step.Error)
 	}
 }
 

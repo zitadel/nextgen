@@ -15,6 +15,7 @@ func (h *Harness) EnsureSessionService(t *testing.T) service.SessionService {
 		h.SessionService = service.NewSessionService(
 			h.EnsureDBPool(t),
 			h.EnsureSessionRepo(t),
+			repository.NewUserRepository(),
 			service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour},
 		)
 	}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createLiquidEngine } from "./liquid.js";
+import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
 import { TEMPLATE_NAMES } from "./template-names.js";
 import { en as fullLocale } from "./locales/en.js";
 import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
@@ -203,7 +203,7 @@ describe("LiquidJS engine", () => {
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
     expect(result).toContain('<zl-alert severity="error"');
-    expect(result).toContain("Passkey setup was cancelled");
+    expect(result).toContain("The passkey prompt was closed before completing.");
     expect(result).toContain('action="setup"');
     expect(result).not.toContain("invalid");
   });
@@ -466,5 +466,123 @@ describe("LiquidJS engine", () => {
     };
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
     expect(result).toContain("zl-card-title");
+  });
+});
+
+/**
+ * Pure-function matrix for localising the server's `step.error` validation
+ * keys (`error.<field>_<rule>`, "; "-joined — see
+ * `FlowFieldValidationErrors.StepError()` in
+ * `internal/domain/flow_field_resolver.go`).
+ */
+describe("localiseFlowErrorKeys", () => {
+  const ctx = { locale: fullLocale, stepName: "register" };
+
+  it("passes catalog-known field-specific keys through as text keys", () => {
+    expect(localiseFlowErrorKeys("error.email_required", ctx)).toEqual([
+      { text_key: "error.email_required" },
+    ]);
+    // The server spells format violations `_invalid` — the catalog's
+    // existing convention, which fieldErrorKeys routes inline.
+    expect(localiseFlowErrorKeys("error.email_invalid", ctx)).toEqual([
+      { text_key: "error.email_invalid" },
+    ]);
+    expect(localiseFlowErrorKeys("error.password_required", ctx)).toEqual([
+      { text_key: "error.password_required" },
+    ]);
+  });
+
+  it("falls back to a localised generic message with the step's field label", () => {
+    // No `error.email_min_length` key exists; the label comes from
+    // `register.field.email` when present, else the humanised name.
+    const result = localiseFlowErrorKeys("error.email_min_length", {
+      locale: { ...fullLocale, "register.field.email": "Work email" },
+      stepName: "register",
+    });
+    expect(result).toEqual([{ message: "Work email is too short." }]);
+  });
+
+  it("humanises unknown field names (camelCase, snake_case, x-auth-methods#…)", () => {
+    expect(localiseFlowErrorKeys("error.givenName_required", ctx)).toEqual([
+      { message: "Given name is required." },
+    ]);
+    expect(localiseFlowErrorKeys("error.date_of_birth_invalid", ctx)).toEqual([
+      { message: "Please enter a valid date of birth." },
+    ]);
+    expect(localiseFlowErrorKeys("error.x-auth-methods#password_min_length", ctx)).toEqual([
+      { message: "Password is too short." },
+    ]);
+  });
+
+  it("covers every rule suffix's generic fallback, including unknown_field", () => {
+    expect(localiseFlowErrorKeys("error.nickname_max_length", ctx)).toEqual([
+      { message: "Nickname is too long." },
+    ]);
+    expect(localiseFlowErrorKeys("error.nickname_unknown_field", ctx)).toEqual([
+      { message: "Please check nickname." },
+    ]);
+  });
+
+  it("splits '; '-joined violations into one error per key", () => {
+    const result = localiseFlowErrorKeys("error.email_invalid; error.password_min_length", {
+      locale: { ...fullLocale, "register.field.password": "Password" },
+      stepName: "register",
+    });
+    expect(result).toEqual([
+      { text_key: "error.email_invalid" },
+      { message: "Password is too short." },
+    ]);
+  });
+
+  it("passes non-validation error keys through for the template's key lookups", () => {
+    // `error.sign_in_server` localises via its `.title`/`.body` sub-keys
+    // in the alert filters; no rule suffix must not mean a lost error.
+    expect(localiseFlowErrorKeys("error.sign_in_server", ctx)).toEqual([
+      { text_key: "error.sign_in_server" },
+    ]);
+  });
+
+  it("returns null for anything that is not an error.* key payload", () => {
+    // Outcome names and diagnostics stay verbatim with the caller.
+    expect(localiseFlowErrorKeys("user_not_found", ctx)).toBeNull();
+    expect(localiseFlowErrorKeys("auth_attempt.password_invalid", ctx)).toBeNull();
+    expect(localiseFlowErrorKeys("", ctx)).toBeNull();
+    // A single non-key segment rejects the whole payload.
+    expect(localiseFlowErrorKeys("error.email_required; user_not_found", ctx)).toBeNull();
+  });
+
+  it("survives a locale without the generic keys via the hardcoded fallback", () => {
+    const result = localiseFlowErrorKeys("error.nickname_required", {
+      locale: {},
+      stepName: "register",
+    });
+    expect(result).toEqual([{ message: "Please check nickname." }]);
+  });
+
+  it("downgrades inline-routed keys to a banner message when the step lacks the field", () => {
+    // fieldErrorKeys routes error.email_* inline to the email field, and
+    // formLevelError suppresses their banner. On a step without an email
+    // field the inline outlet doesn't exist — without the downgrade the
+    // error would render nowhere.
+    // The label resolves through the step's catalog entry
+    // (`register.field.email` → "Work email"), not the bare field name.
+    expect(
+      localiseFlowErrorKeys("error.email_required", { ...ctx, fields: ["password"] }),
+    ).toEqual([{ message: "Work email is required." }]);
+    // Inline key without a recognised rule suffix: its catalog copy
+    // becomes the banner message verbatim.
+    expect(localiseFlowErrorKeys("error.email_exists", { ...ctx, fields: ["password"] })).toEqual([
+      { message: "An account with this email already exists." },
+    ]);
+  });
+
+  it("keeps inline routing when the step carries the field", () => {
+    expect(
+      localiseFlowErrorKeys("error.email_required", { ...ctx, fields: ["email", "password"] }),
+    ).toEqual([{ text_key: "error.email_required" }]);
+    // Without a fields list (pure lookups) the check is skipped entirely.
+    expect(localiseFlowErrorKeys("error.email_required", ctx)).toEqual([
+      { text_key: "error.email_required" },
+    ]);
   });
 });

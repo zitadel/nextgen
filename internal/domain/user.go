@@ -49,6 +49,49 @@ type User struct {
 	AvailableAuthMethods []AuthMethod
 }
 
+// IdentityAttributeKeys are the conventional user-schema property names the
+// platform reads to render a user's identity (e.g. `name` and `email` on
+// `GET /sessions/me`). Schemas stay free-form: a schema that names these
+// properties differently simply yields no display name or email, and callers
+// fall back to the user ID.
+var IdentityAttributeKeys = []string{"email", "family_name", "given_name", "name"}
+
+// StringAttribute returns the value of the attribute with the given key when
+// it is a non-empty string, and "" otherwise (absent key or non-string value).
+func (u *User) StringAttribute(key string) string {
+	for _, a := range u.Attributes {
+		if a.Key != key {
+			continue
+		}
+		value, _ := a.Value.(string)
+		return value
+	}
+	return ""
+}
+
+// DisplayName resolves the user's human-readable name from the conventional
+// identity attributes: `name` when present, otherwise `given_name` and
+// `family_name` joined. Returns "" when the loaded attributes carry neither.
+func (u *User) DisplayName() string {
+	if name := u.StringAttribute("name"); name != "" {
+		return name
+	}
+	name := u.StringAttribute("given_name")
+	if familyName := u.StringAttribute("family_name"); familyName != "" {
+		if name != "" {
+			name += " "
+		}
+		name += familyName
+	}
+	return name
+}
+
+// Email returns the conventional `email` identity attribute, or "" when the
+// loaded attributes do not carry one.
+func (u *User) Email() string {
+	return u.StringAttribute("email")
+}
+
 type CreateUser struct {
 	ProjectID  string
 	SchemaURL  string
