@@ -234,6 +234,42 @@ Two commands handle the "I edited something outside the CLI and want to keep it"
 - `zitadel status` — reports the local bundle hash, plus each environment's currently deployed release and how it relates to local. Does not enumerate server-side drafts.
 - `zitadel pull <kind> <handle>` — fetches the newest server-side revision of a specific resource and writes it into `.zitadel/`, so the next deploy incorporates it. Targeted only; there is no bulk mode.
 
+**Example — aligned state.** `zitadel status` shows local matches every environment's current release; nothing to do.
+
+```
+$ zitadel status
+
+Local (.zitadel/)
+  bundle hash    abc123f4...
+  git            main @ 4a5b6c7  (clean)
+
+Environments
+  ENV       CURRENT RELEASE                     DEPLOYED   RELATION TO LOCAL
+  dev       rel_01KX3RG8A7F0N9WD3P2E4YM5C1      2h ago     matches
+  staging   rel_01KX2ZJ4X0YJKP0JTN428A6DPB      1d ago     matches
+  prod      rel_01KX2ZJ4X0YJKP0JTN428A6DPB      3d ago     matches
+```
+
+**Example — adopting a dashboard edit.** A colleague added a `phone_number` property to the `human-user` schema through the dashboard. `status` cannot detect this on its own (drafts aren't enumerated), but you know it happened and want to fold the change into your local project before deploying:
+
+```
+$ zitadel pull schema human-user
+Fetched sch_01KX4A1S9F... (created 15m ago).
+Wrote .zitadel/schemas/human-user.json.
+
+$ git diff .zitadel/schemas/human-user.json
++  "phone_number": { "type": "string" },
+   "required": ["email", "phone_number"]
+
+$ zitadel deploy --env dev
+Packaging .zitadel/  →  6 resources
+POST /configuration-releases        ✓  rel_01KX4B2M8G...
+POST /environments/dev/deployments  ✓  deployment_01KX4B2M8H...
+dev now runs rel_01KX4B2M8G...
+```
+
+The dashboard edit exists on the server as a draft revision, but no environment ran it until your `deploy` folded it into a new release. Your git history records the adoption.
+
 Discovery of server-side drafts the user doesn't know about (bulk pull, draft-aware status) is a follow-up, not this ADR's concern.
 
 ## Command flows
