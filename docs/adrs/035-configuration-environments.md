@@ -78,6 +78,15 @@ For example, release `rel_01KX3RG8A7F0N9WD3P2E4YM5C1` might contain:
 
 The "handle" is the field each resource kind uses as its stable identifier across revisions. For example, schemas use `objectType`.
 
+Each release also records **audit metadata** — who created it, when, and from what source:
+
+- `release_id` — opaque, immutable id assigned at construction time.
+- `created_at`, `created_by` — timestamp and identity of the caller who assembled the release.
+- `message` — a short caller-supplied summary, analogous to a git commit message. How the CLI sources it (git HEAD, `-m` flag, other) is a CLI-ergonomics follow-up.
+- `git_sha` — the source commit the CLI was operating from, when the release was constructed via `POST /configuration-releases`. Enables `git diff <prev-release-sha>..HEAD -- .zitadel/` as an env-diff mechanism.
+
+These fields are set at construction time and never mutate.
+
 **A release is a closed boundary.** An environment sees only what is inside its current release: resources outside the release are invisible, and drafted revisions on the server that never made it into a release do not exist at runtime. Per-resource CRUD (`POST /schemas`, `PUT /flow_definitions/:id`, …) operates outside any release.
 
 > Exception: users carry their own user-schema revision. A user record persists the sch_… id of the user-schema revision it was created against.
@@ -173,6 +182,10 @@ Direct per-resource CRUD (`POST /schemas`, `PUT /flow_definitions/:id`, …) rem
 
 ```json
 {
+  "audit": {
+    "message": "add phone_number to human-user schema",
+    "git_sha": "4a5b6c7d8e9f0a1b2c3d..."
+  },
   "schemas":  [ { "objectType": "human-user", "$schema": "…", "properties": { /* … */ } } ],
   "flows":    [ { "name": "default-login", "user_schema": "human-user", "steps": [ /* … */ ] } ],
   "idps":     [ ],
@@ -181,6 +194,8 @@ Direct per-resource CRUD (`POST /schemas`, `PUT /flow_definitions/:id`, …) rem
   "policies": [ ]
 }
 ```
+
+`audit.message` and `audit.git_sha` are recorded on the release and surface in `zitadel releases list`. `created_by` is derived from the caller's auth context, not sent in the payload.
 
 Each entry is the resource's own content as authored on disk — no bundle-specific envelope. The server extracts the handle from the per-kind field (`objectType` for schemas, `name` for the others). Cross-resource references are by handle, for example, the flow's `user_schema` field carries `"human-user"`, not a concrete `sch_…` id. Kinds not present in the local project are sent as empty arrays.
 
