@@ -1,4 +1,4 @@
-# ADR 033: Credential Migration, Rotation, and Recovery
+# ADR 035: Credential Migration, Rotation, and Recovery
 
 > **Status:** Proposed
 > **Date:** 2026-07-11
