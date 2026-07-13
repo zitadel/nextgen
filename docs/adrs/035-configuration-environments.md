@@ -227,14 +227,19 @@ An environment either runs the previous release or the new one, never a mixture.
 
 ## CLI and drift
 
-Direct writes to the per-resource CRUD APIs remain available. Editing a resource through the dashboard, MCP, or a direct API call produces a new immutable revision but leaves every environment's current release unchanged. The change is saved, not live. To make it live, the user constructs a new release that includes the drafted revision and deploys it, the same pattern as Vercel's "you edited env vars, redeploy to apply."
+Two kinds of drift can arise between local `.zitadel/` and the server:
 
-The CLI is source of truth for release construction. `zitadel deploy` packages `.zitadel/` as-is; drafts made outside the CLI are not incorporated and become superseded by the next deploy.
+1. **Local vs. an environment's current release.** Your local bundle differs from what an environment is actually running — either because you've edited files and haven't deployed, or because a colleague deployed something you don't have locally.
+2. **Local vs. server-side draft revisions.** A dashboard, MCP, or direct-API caller wrote a resource revision that no environment runs. It exists on the server but is inert — invisible at runtime until a release includes it.
 
-Two commands handle the "I edited something outside the CLI and want to keep it" case:
+The first kind matters — it's what `zitadel status` reports and `zitadel deploy` reconciles. The second doesn't: a draft revision that never makes it into a release affects nothing.
 
-- `zitadel status` — reports the local bundle hash, plus each environment's currently deployed release and how it relates to local. Does not enumerate server-side drafts.
-- `zitadel pull <kind> <handle>` — fetches the newest server-side revision of a specific resource and writes it into `.zitadel/`, so the next deploy incorporates it. Targeted only; there is no bulk mode.
+The CLI is source of truth for release construction. `zitadel deploy` packages `.zitadel/` as-is; drafts made outside the CLI are not incorporated automatically and are effectively superseded by the next deploy — the same pattern as Vercel's "you edited env vars, redeploy to apply." To fold a specific draft into local before deploying, use `zitadel pull`.
+
+Two commands, two different jobs:
+
+- `zitadel status` — compares local against each environment's currently deployed release; reports matches / local ahead / local behind, per env.
+- `zitadel pull <kind> <handle>` — fetches the newest server-side revision of a specific resource and writes it into `.zitadel/`. Use it when you knowingly edited a resource outside the CLI and want to fold the change into your local project. Targeted only; there is no bulk mode.
 
 **Example — aligned state.** `zitadel status` shows local matches every environment's current release; nothing to do.
 
@@ -271,8 +276,6 @@ dev now runs rel_01KX4B2M8G...
 ```
 
 The dashboard edit exists on the server as a draft revision, but no environment ran it until your `deploy` folded it into a new release. Your git history records the adoption.
-
-Discovery of server-side drafts the user doesn't know about (bulk pull, draft-aware status) is a follow-up, not this ADR's concern.
 
 ## Command flows
 
