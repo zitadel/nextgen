@@ -129,6 +129,8 @@ The sections that follow specify the concrete surfaces: how the CLI orchestrates
 
 ### CLI
 
+> **Note.** `zitadel apply` and `zitadel plan` from [ADR 007](007-gitops-configuration-surface.md) are removed. `deploy` replaces `apply`; `plan` has no replacement — under the release model, releases are immutable artifacts and deployments are atomic pointer swaps, so the Terraform-style plan-then-apply preview frame no longer fits. Removal warnings surface in `deploy`'s confirmation prompt (see below); drift detection lives in `zitadel status`.
+
 - `zitadel deploy [--env <env>]`: packages `.zitadel/`, creates a release (`POST /configuration-releases`), and deploys it. `--env` is required in non-interactive mode; in interactive mode the CLI lists environments (`GET /environments`) and prompts the user to pick one or defer the deployment. There is no implicit default environment — every deploy explicitly names its target.
 - `zitadel status`: local bundle summary, plus each environment's currently deployed release and how it relates to local.
 - `zitadel pull <kind> <handle>`: fetch the newest server-side revision of a specific resource and write it into `.zitadel/`, so the next deploy incorporates it.
