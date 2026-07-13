@@ -64,7 +64,7 @@ describe("Next setup integration", () => {
     expect(setupJson.data.next_actions.join("\n")).toContain("/profile shows Signed in");
     expect(setupJson.data.next_actions.join("\n")).toContain(".zitadel/schemas/");
     expect(setupJson.data.next_actions.join("\n")).toContain(".zitadel/flows/");
-    expect(setupJson.data.next_actions.join("\n")).toContain("Preview and publish config changes");
+    expect(setupJson.data.next_actions.join("\n")).toContain("See your changes before they go live");
     expect(setupJson.data.files_written).toContain(".zitadel/schemas/default-human-user.json");
     expect(setupJson.data.files_written).toContain(".zitadel/flows/default-login.json");
 
@@ -201,10 +201,16 @@ describe("Next setup integration", () => {
     expect(noArg.exitCode).toBe(0);
     const status = parseJson(noArg.stdout) as {
       status: string;
-      data: { next_commands: string[] };
+      data: { next_actions: string[]; next_commands: string[] };
     };
     expect(status.status).toBe("ok");
-    expect(status.data.next_commands.join(" ")).toContain("apply");
+    // The project exists but nobody has registered yet, so status stages BOTH
+    // channels to the verify mission: next_actions carries the browser proof,
+    // next_commands previews with plan and withholds apply until users exist.
+    expect(status.data.next_commands.join(" ")).toContain("plan");
+    expect(status.data.next_commands.join(" ")).not.toContain("apply");
+    expect(status.data.next_actions.join("\n")).toContain("register a user");
+    expect(status.data.next_actions.join("\n")).not.toContain(".zitadel/schemas/");
 
     const rerun = await cli(["setup", "--cwd", cwd, "--json"]);
     expect(rerun.exitCode).toBe(0);

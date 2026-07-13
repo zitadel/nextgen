@@ -1228,6 +1228,95 @@ describe("plan-time flow validation", () => {
     }
   });
 
+  it("warns when a new active unscoped flow will take over the default", async () => {
+    const cwd = makeCwd();
+    try {
+      const flowSyncer = makeFlowSyncer();
+      // An applied flow already exists (tracked + unchanged on disk).
+      const existing = combinedFlow();
+      existing.user_schema = "sch_REMOTE";
+      await writeState(cwd, {
+        framework: "next",
+        resources: {
+          [FLOW_PATH]: { id: "flow_A", hash: hashForState(flowSyncer, existing) },
+        },
+      });
+      await writeResource(cwd, ".zitadel/flows", "default.json", existing);
+      // The newcomer: active, no audience — newest-unscoped-wins makes it
+      // the default login the moment it applies.
+      const experiment = combinedFlow();
+      experiment.name = "experiment";
+      experiment.user_schema = "sch_REMOTE";
+      await writeResource(cwd, ".zitadel/flows", "experiment.json", experiment);
+
+      const actions = await buildSyncPlan(cwd, [flowSyncer]);
+      const created = actions.find((a) => a.path === ".zitadel/flows/experiment.json");
+      expect(created?.kind).toBe("create");
+      if (created?.kind === "create") {
+        expect(created.warnings?.map((w) => w.rule)).toContain("warn/default-flow-swap");
+        expect(created.warnings?.at(-1)?.message).toContain("newest unscoped definition");
+      }
+      expect(actions.find((a) => a.path === FLOW_PATH)?.kind).toBe("skip");
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("does not warn about the default for a project's first flow", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, { framework: "next", resources: {} });
+      const flow = combinedFlow();
+      flow.user_schema = "sch_REMOTE";
+      await writeResource(cwd, ".zitadel/flows", "default.json", flow);
+
+      const actions = await buildSyncPlan(cwd, [makeFlowSyncer()]);
+      const created = actions.find((a) => a.path === FLOW_PATH);
+      expect(created?.kind).toBe("create");
+      if (created?.kind === "create") {
+        expect(created.warnings?.map((w) => w.rule) ?? []).not.toContain(
+          "warn/default-flow-swap",
+        );
+      }
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("does not warn about the default when the new flow is audience-scoped", async () => {
+    const cwd = makeCwd();
+    try {
+      const flowSyncer = makeFlowSyncer();
+      const existing = combinedFlow();
+      existing.user_schema = "sch_REMOTE";
+      await writeState(cwd, {
+        framework: "next",
+        resources: {
+          [FLOW_PATH]: { id: "flow_A", hash: hashForState(flowSyncer, existing) },
+        },
+      });
+      await writeResource(cwd, ".zitadel/flows", "default.json", existing);
+      const scoped = combinedFlow() as ReturnType<typeof combinedFlow> & {
+        audience?: { team_ids?: string[] };
+      };
+      scoped.name = "team-login";
+      scoped.user_schema = "sch_REMOTE";
+      scoped.audience = { team_ids: ["team_acme"] };
+      await writeResource(cwd, ".zitadel/flows", "team-login.json", scoped);
+
+      const actions = await buildSyncPlan(cwd, [flowSyncer]);
+      const created = actions.find((a) => a.path === ".zitadel/flows/team-login.json");
+      expect(created?.kind).toBe("create");
+      if (created?.kind === "create") {
+        expect(created.warnings?.map((w) => w.rule) ?? []).not.toContain(
+          "warn/default-flow-swap",
+        );
+      }
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("fails plan pre-mutation when the scaffolded schema disables passkey (Elina journey)", async () => {
     // The exact journey the rule protects: scaffold the defaults, flip
     // x-auth-methods.passkey.enabled to false in the schema, run plan.

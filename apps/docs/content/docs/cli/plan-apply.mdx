@@ -38,6 +38,33 @@ npx @zitadel/cli@alpha plan
 npx @zitadel/cli@alpha apply
 ```
 
+## Walkthrough: a second flow, selected by name
+
+All files in `.zitadel/flows/` sync on `apply`, but the widget runs exactly one flow per sign-in — an extra flow needs a distinct `name` so the app can ask for it.
+
+Drop `.zitadel/flows/kiosk-login.json` next to the default flow. Same shape as `default-login.json` (start from a copy), with its own `name` and whatever steps the journey needs:
+
+```json
+{
+  "$schema": "../meta/flow-definition.json",
+  "name": "kiosk-login",
+  "status": "active",
+  "user_schema": "(same revision the default flow pins)",
+  "purposes": { "login": "identifier" },
+  "steps": [ "…copied from default-login.json, then edited…" ]
+}
+```
+
+Publish with `plan` / `apply`, then point the widget at it:
+
+```tsx
+<ZitadelLogin flowName="kiosk-login" />
+```
+
+(or `flow-name="kiosk-login"` on the plain `<zitadel-login>` element). An unknown name or a flow that doesn't serve the requested purpose surfaces as a startup error in the widget.
+
+Without `flowName`, the platform serves the newest active flow that has no `audience`. A flow scoped via `audience.app_ids` / `audience.team_ids` is selected only when the flow-start request's hints identify that app or team (app match beats team match) — it never captures the project default.
+
 ## How syncing works
 
 - `.zitadel/state.json` maps each config file to its platform id and last-synced content hash. `plan` and `apply` compare against it to decide what changed; don't edit it by hand.

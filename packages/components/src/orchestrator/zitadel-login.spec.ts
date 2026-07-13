@@ -170,6 +170,76 @@ describe("<zitadel-login> against the typed Flow API", () => {
     });
   });
 
+  it("sends flow_definition_name when flow-name is set", async () => {
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.project = testProject;
+    element.setAttribute("flow-name", "kiosk-login");
+    host.appendChild(element);
+    await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+    // Exact match: nothing but the three keys — the default (no flow-name)
+    // body shape is pinned by the startup tests above.
+    expect(mock.getCaptured()[0]).toEqual({
+      kind: "createFlow",
+      body: {
+        purpose: "login",
+        project_id: "demo-project",
+        flow_definition_name: "kiosk-login",
+      },
+    });
+  });
+
+  it("explains a flow-name that matches no active flow definition", async () => {
+    // The server envelope only says "not found" — the orchestrator owns
+    // knowing the name came from its `flow-name` attribute.
+    server.use(
+      http.post(
+        "*/flow",
+        () =>
+          HttpResponse.json(
+            { code: "flowdef.not_found", message: "flow definition: not found" },
+            { status: 404 },
+          ),
+        { once: true },
+      ),
+    );
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.project = testProject;
+    element.setAttribute("flow-name", "no-such-flow");
+    host.appendChild(element);
+
+    await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
+    const text = element.shadowRoot?.querySelector("zl-alert")?.textContent ?? "";
+    expect(text).toContain('flow-name="no-such-flow"');
+    expect(text).toContain("zitadel apply");
+  });
+
+  it("explains a flow-name that does not serve the requested purpose", async () => {
+    server.use(
+      http.post(
+        "*/flow",
+        () =>
+          HttpResponse.json(
+            {
+              code: "flowdef.purpose_mismatch",
+              message: "flow definition: does not serve requested purpose",
+            },
+            { status: 400 },
+          ),
+        { once: true },
+      ),
+    );
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.project = testProject;
+    element.setAttribute("flow-name", "register-only");
+    host.appendChild(element);
+
+    await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
+    const text = element.shadowRoot?.querySelector("zl-alert")?.textContent ?? "";
+    expect(text).toContain('flow-name="register-only"');
+    expect(text).toContain('purpose "login"');
+  });
+
   it("submits with {session_token, action, fields} and applies the next step", async () => {
     const element = await mount(host);
 

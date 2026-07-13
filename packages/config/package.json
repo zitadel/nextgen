@@ -69,6 +69,7 @@
     "@zitadel/api": "workspace:*"
   },
   "devDependencies": {
+    "ajv": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",
     "vitest": "catalog:",

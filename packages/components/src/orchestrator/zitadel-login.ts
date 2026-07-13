@@ -91,6 +91,13 @@ export class ZitadelLogin extends LitElement {
   @property({ type: String }) accessor purpose: CreateFlowBodyPurpose = "login";
 
   /**
+   * Name of the flow definition to run, matching the `name` in its flow
+   * file. When set, the server resolves that definition directly instead
+   * of picking one by audience. Omit to run the project's default flow.
+   */
+  @property({ type: String, attribute: "flow-name" }) accessor flowName = "";
+
+  /**
    * SDK project handle returned by `configureZitadel()`. Set from JS (or a
    * framework binding). When set, takes precedence over both the
    * `project-id`/`proxy-path`/`url` attributes and the global singleton from
@@ -376,14 +383,46 @@ export class ZitadelLogin extends LitElement {
               "`configureZitadel({ projectId })`, or a `project` handle) to start a flow.",
           );
         }
-        wire = await apiStartFlow(api, { project_id: cfg.projectId, purpose: this.purpose });
+        wire = await apiStartFlow(api, {
+          project_id: cfg.projectId,
+          purpose: this.purpose,
+          ...(this.flowName ? { flow_definition_name: this.flowName } : {}),
+        });
       }
       this.applyResponse(wire);
     } catch (error) {
-      this.handleTransportError(error);
+      this.handleTransportError(this.describeFlowSelectionError(error));
     } finally {
       this.loading = false;
     }
+  }
+
+  /**
+   * When a `flow-name` lookup fails, the server's envelope only says
+   * "not found" / "purpose mismatch" — it cannot know the name came from
+   * an attribute. Rewrap those two codes with the attribute and the fix;
+   * every other error passes through untouched.
+   */
+  private describeFlowSelectionError(error: unknown): unknown {
+    if (!this.flowName || !(error instanceof ApiError)) return error;
+    const code =
+      typeof error.body === "object" && error.body !== null && "code" in error.body
+        ? String((error.body as { code: unknown }).code)
+        : "";
+    if (code === "flowdef.not_found") {
+      return new Error(
+        `<zitadel-login> flow-name="${this.flowName}" does not match any active flow ` +
+          `definition in this project. Check the \`name\` in your flow file and that ` +
+          `it has been applied (\`zitadel apply\`).`,
+      );
+    }
+    if (code === "flowdef.purpose_mismatch") {
+      return new Error(
+        `<zitadel-login> flow-name="${this.flowName}" matched a flow definition that ` +
+          `does not serve purpose "${this.purpose}".`,
+      );
+    }
+    return error;
   }
 
   private applyResponse(wire: CreateFlow201): void {

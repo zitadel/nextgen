@@ -129,6 +129,7 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
       {...projectProp(props.project, props.projectId, props.proxyPath)}
       {...localeProps(props.locales, props.lang)}
       purpose={props.purpose ?? "login"}
+      flow-name={props.flowName}
       post-sign-in-url={props.postSignInUrl}
     />
   );
