@@ -26,11 +26,13 @@ func seedIdentityUser(t *testing.T, pool database.QueryExecutor, projectID strin
 	)
 	require.NoError(t, err)
 
+	// camelCase name parts: the shape the shipped presets actually collect
+	// (packages/config/defaults/*.json).
 	attrs := make([]*domain.CreateAttribute, 0, 3)
 	for key, value := range map[string]any{
-		"email":       "ada@example.com",
-		"given_name":  "Ada",
-		"family_name": "Lovelace",
+		"email":      "ada@example.com",
+		"givenName":  "Ada",
+		"familyName": "Lovelace",
 	} {
 		attr, err := domain.NewCreateAttribute(key, value, domain.AttributeUniquenessUnspecified)
 		require.NoError(t, err)
