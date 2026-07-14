@@ -157,69 +157,13 @@ An environment holds a history of deployments; each deployment references a rele
 
 Optional payload fields on `POST .../deployments`:
 
-- **`source_environment`** — set on `reason: promote`. Names the env the release was promoted from. Keeps the audit log first-class about the interesting fact instead of leaving readers to infer it.
-- **`rolled_back_from`** — set on `reason: rollback`. Points at the deployment id being rolled back from (the previous "current" deployment). Same rationale.
-- **`expected_current_deployment_id`** — optimistic-concurrency guard for the removal preview (see below).
-
-**On `expected_current_deployment_id`.** The CLI's confirm flow is inherently a check-then-act:
-
-1. Read the env's current deployment and its release (the *check*).
-2. Compute what would be removed (handle-set diff of local vs. that release).
-3. Show the removals to the developer, wait for `yes` (the *think*).
-4. Submit the new deployment (the *act*).
-
-Between steps 1 and 4 nothing in the API stops another actor from deploying to the same env. If that happens, the developer's `yes` was against a stale baseline: the preview said "you'll drop `idps/google`" but the current release now runs a different idp — the actual removal is different from what the human agreed to. The pointer swap itself is still atomic, but the *consent* attached to it is void.
-
-`expected_current_deployment_id` fixes that in one field. The CLI sends the deployment id it observed at step 1 alongside the deploy request at step 4. The server compares:
-
-- match → proceed with the pointer swap;
-- mismatch → return `409 Conflict` with the new `current_deployment_id`; the CLI loops back to step 1, recomputes the preview, and re-prompts.
-
-Analogous to HTTP `If-Match: <etag>` or a compare-and-swap. It's opt-in — clients that don't care (dashboard "force redeploy this release" style) omit the field. But once the API is public, adding this field later means either breaking existing clients or leaving the confirm race in place indefinitely; adding it now is a couple of columns of check logic.
-
-*Happy path — nothing changed in the interim:*
-
-```
-# 1. CLI reads current state
-GET /environments/prod
-→ { "current_deployment": { "id": "dep_01KX4B", "release_id": "rel_A", ... } }
-
-# 2. CLI computes preview against rel_A, developer confirms.
-
-# 3. CLI submits with the observed deployment id.
-POST /environments/prod/deployments
-{ "release_id": "rel_B", "reason": "promote",
-  "expected_current_deployment_id": "dep_01KX4B" }
-
-→ 201 Created  { "id": "dep_01KX5N", "release_id": "rel_B", ... }
-```
-
-*Failure path — a colleague slipped in between:*
-
-```
-# 1. CLI reads current state
-GET /environments/prod
-→ { "current_deployment": { "id": "dep_01KX4B", "release_id": "rel_A", ... } }
-
-# 2. CLI computes preview against rel_A, developer confirms.
-#    Meanwhile, someone else deploys rel_C to prod.
-
-# 3. CLI submits with the stale deployment id.
-POST /environments/prod/deployments
-{ "release_id": "rel_B", "reason": "promote",
-  "expected_current_deployment_id": "dep_01KX4B" }
-
-→ 409 Conflict  { "current_deployment_id": "dep_01KX4Q",
-                  "current_release_id": "rel_C" }
-
-# 4. CLI recomputes preview against rel_C and re-prompts.
-#    Removals may differ: rel_C might drop idps/legacy, or add flow steps,
-#    that rel_A didn't — the developer must agree to the new picture.
-```
+- **`source_environment`** — set on `reason: promote`. Names the env the release was promoted from.
+- **`rolled_back_from`** — set on `reason: rollback`. Points at the deployment id being rolled back from.
+- **`expected_current_deployment_id`** — optional optimistic-concurrency check. When provided, the server verifies the env's current deployment matches this id before applying the pointer swap; a mismatch returns `409`. Not persisted; only used to guard against overwriting a deployment the caller didn't expect.
 
 #### `configuration-releases` — CLI orchestrator entry point
 
-A single endpoint that backs `zitadel deploy`. It accepts a source-content bundle (the contents of `.zitadel/`), allocates a new revision for every changed resource, resolves handle references, and constructs a release, all in one **transaction**. The UI does not use this endpoint — its workflows create deployments from existing releases (promotion, rollback); when the UI needs to construct a release from revision ids drafted through direct CRUD, it uses `POST /releases` instead.
+Tailored for the CLI: a single endpoint that backs `zitadel deploy` (and `zitadel releases create`). It accepts a source-content bundle (the contents of `.zitadel/`), allocates a new revision for every changed resource, resolves handle references, and constructs a release, all in one **transaction**.
 
 | Endpoint                          | Purpose                                                                                                                                                                    |
 |---                                |---                                                                                                                                                                         |
