@@ -219,11 +219,11 @@ If an active signing key is compromised:
 1. Generate a new signing key pair and insert it with `active_from = now()`, which retires the
    compromised key at the same instant, so the replacement signs immediately.
 2. Delete the compromised key. It leaves the JWKS and isn't chosen for signing.
-3. Revoke the project's sessions, refresh tokens, and PATs (out of scope in the current MVP
-   ([ADR 032](032-token-lifecycle.md#personal-access-tokens))). These opaque tokens are encrypted
-   under the DEK and are independent of the signing key, so the compromise does not touch them.
-   Revoking them is a precaution against a broader breach, forcing re-authentication, not a step
-   needed to contain the key.
+3. Revoke the project's sessions and refresh tokens. These opaque tokens are encrypted under the DEK
+   and are independent of the signing key, so the compromise does not affect them. Revoking them is
+   a precaution against a broader breach, forcing re-authentication. PATs are out of scope in the
+   current MVP ([ADR 032](032-token-lifecycle.md#personal-access-tokens)), and their exposure depends
+   on their eventual token format ([Open Question 5](#open-questions)).
 
 **Notes on key deletion:**
 
@@ -327,9 +327,9 @@ Adopting these consolidated migration and recovery strategies introduces the fol
 
 ### Positive
 
-- The policies prioritize immediate neutralization of threats. Compromised signing keys stop signing
-  at once and lost TOTP devices are immediately invalidated, though verifiers holding a cached JWKS
-  lag by up to one cache lifetime.
+- The policies prioritize immediate neutralization of threats. A compromised signing key stops
+  signing at once (though verifiers holding a cached JWKS lag by up to one cache lifetime), and
+  compromised TOTP secrets are invalidated server-side immediately.
 - Per-project signing keys with explicit, auditable lifecycles give tenants the key isolation and
   rotation evidence that compliance regimes ask for, and support the per-project NIST/FIPS profiles
   in [ADR 029](029-cryptography-secrets-and-key-lifecycle.md#nist).
@@ -388,6 +388,12 @@ Adopting these consolidated migration and recovery strategies introduces the fol
 
    Either way, the derived timestamps remain the source of truth, and both still need a sweep to
    rotate keys and purge expired ones. Whether to add the column is open.
+
+5. How does a compromised or rotated signing key interact with PATs once they come into scope
+   ([ADR 032](032-token-lifecycle.md#personal-access-tokens) defers them)? If opaque, the DEK
+   protects them like a session or refresh token; if self-contained, a signing-key compromise can
+   forge them. If PATs can live indefinitely, what is the policy for retiring the keys that signed
+   them, and do we need a max cap (product decision)?
 
 ## Follow-up work
 
