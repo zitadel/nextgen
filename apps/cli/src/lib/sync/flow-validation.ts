@@ -3,6 +3,7 @@ import { consola } from "consola";
 import { validateFlowDefinition, type FlowValidationIssue } from "@zitadel/config/validate";
 
 import { ZitadelError } from "../errors";
+import { FLOWS_DIR } from "../flows";
 import type { ResourceEntry, SyncAction } from "./types.js";
 
 /**
@@ -40,6 +41,16 @@ export function validatePlannedFlows(opts: {
   const failures: Array<{ path: string; issue: FlowValidationIssue }> = [];
   let anyRepin = false;
 
+  // The default-swap warning needs plan-wide context: a project's very
+  // first flow becoming the default is expected, an additional one
+  // silently taking over /login is the footgun.
+  const flowCreatePaths = opts.actions
+    .filter((a) => a.kind === "create" && a.syncer.kind === "flow")
+    .map((a) => a.path);
+  const trackedFlowPaths = Object.keys(opts.stateResources).filter((path) =>
+    path.startsWith(`${FLOWS_DIR}/`),
+  );
+
   for (const action of opts.actions) {
     if (action.kind !== "create" && action.kind !== "update") {
       continue;
@@ -61,6 +72,11 @@ export function validatePlannedFlows(opts: {
         failures.push({ path: action.path, issue });
         anyRepin ||= action.repin !== undefined;
       }
+    }
+
+    const swapWarning = defaultSwapWarning(action, flowCreatePaths, trackedFlowPaths);
+    if (swapWarning !== undefined) {
+      action.warnings = [...(action.warnings ?? []), swapWarning];
     }
   }
 
@@ -89,6 +105,56 @@ export function validatePlannedFlows(opts: {
       },
     },
   );
+}
+
+/**
+ * Warn when applying a NEW active, unscoped flow into a project that
+ * already has flows: the engine's default selection is newest-unscoped-
+ * wins (ties broken by id), so this flow silently becomes what
+ * `<zitadel-login>` renders for its purposes unless the widget pins a
+ * `flow-name`. Deliberately engine-level rather than a validator rule:
+ * the verdict depends on the action kind and the rest of the plan/state,
+ * which `validateFlowDefinition` never sees. A project's first flow is
+ * exempt — becoming the default is the point of creating it.
+ */
+function defaultSwapWarning(
+  action: Extract<SyncAction, { kind: "create" | "update" }>,
+  flowCreatePaths: readonly string[],
+  trackedFlowPaths: readonly string[],
+): { rule: string; message: string } | undefined {
+  if (action.kind !== "create") {
+    return undefined; // updates keep their created_at; the default cannot move
+  }
+  const body = action.content as {
+    status?: unknown;
+    purposes?: Record<string, unknown>;
+    audience?: { team_ids?: unknown[]; app_ids?: unknown[] };
+  };
+  if (body.status !== "active") {
+    return undefined;
+  }
+  const scoped =
+    (body.audience?.team_ids?.length ?? 0) > 0 || (body.audience?.app_ids?.length ?? 0) > 0;
+  if (scoped) {
+    return undefined;
+  }
+  const purposes = Object.keys(body.purposes ?? {});
+  if (purposes.length === 0) {
+    return undefined;
+  }
+  const otherFlows =
+    trackedFlowPaths.filter((path) => path !== action.path).length +
+    flowCreatePaths.filter((path) => path !== action.path).length;
+  if (otherFlows === 0) {
+    return undefined;
+  }
+  return {
+    rule: "warn/default-flow-swap",
+    message:
+      `applying this new active flow makes it the newest unscoped definition — ` +
+      `clients that do not pin a flow-name will get it as the default for ${purposes.join(", ")}. ` +
+      `Scope it via "audience" or set flow-name in the widget if that is not intended.`,
+  };
 }
 
 /**

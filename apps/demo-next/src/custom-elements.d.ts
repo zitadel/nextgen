@@ -10,6 +10,7 @@ declare module "react" {
         "session-exchange-path"?: string;
         "post-sign-in-url"?: string;
         purpose?: string;
+        "flow-name"?: string;
         lang?: string;
         locales?: Record<string, Locale>;
       };
