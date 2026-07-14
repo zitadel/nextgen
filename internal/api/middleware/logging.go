@@ -54,27 +54,32 @@ func WithLogging(next http.Handler) http.Handler {
 		}
 
 		operationID, _ := GetOperationIDContext(ctx)
+		duration := time.Since(start)
+
+		if lrw.statusCode < http.StatusBadRequest {
+			logger.Info("handled request",
+				slog.Int("status_code", lrw.statusCode),
+				slog.Duration("duration", duration),
+				slog.String("operation_id", operationID),
+			)
+			return
+		}
+
+		// Only buffer+parse error responses (≥400). Success bodies are never
+		// buffered, so JSON decode cannot run on the hot 2xx path.
 		attrs := []any{
 			slog.Int("status_code", lrw.statusCode),
-			slog.Duration("duration", time.Since(start)),
+			slog.Duration("duration", duration),
 			slog.String("operation_id", operationID),
 		}
 		if code := extractWireErrorCode(lrw.errorBody.Bytes()); code != "" {
 			attrs = append(attrs, slog.String("error_code", code))
 		}
-
-		switch {
-		case lrw.statusCode >= http.StatusInternalServerError:
+		if lrw.statusCode >= http.StatusInternalServerError {
 			logger.Error("request failed", attrs...)
-		case lrw.statusCode >= http.StatusBadRequest:
-			logger.Warn("request rejected", attrs...)
-		default:
-			logger.Info("handled request",
-				slog.Int("status_code", lrw.statusCode),
-				slog.Duration("duration", time.Since(start)),
-				slog.String("operation_id", operationID),
-			)
+			return
 		}
+		logger.Warn("request rejected", attrs...)
 	})
 }
 

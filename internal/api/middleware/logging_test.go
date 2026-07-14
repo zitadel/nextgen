@@ -105,6 +105,7 @@ func TestWithLogging_successLogsInfo(t *testing.T) {
 
 	mw := middleware.WithLogging(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true,"payload":"should-not-be-parsed"}`))
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/ok", nil).WithContext(ctx)
@@ -120,4 +121,6 @@ func TestWithLogging_successLogsInfo(t *testing.T) {
 	}
 	require.NotNil(t, handled)
 	assert.Equal(t, slog.LevelInfo, handled.Level)
+	_, hasErrorCode := attrString(t, *handled, "error_code")
+	assert.False(t, hasErrorCode)
 }
