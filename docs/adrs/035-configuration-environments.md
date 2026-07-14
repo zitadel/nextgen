@@ -312,6 +312,54 @@ Environments
   prod      rel_01KX2ZJ4X0YJKP0JTN428A6DPB      3d ago     matches
 ```
 
+Example — local ahead of every env. You've edited files but haven't deployed yet; running `zitadel deploy --env dev` is the next step:
+
+```
+$ zitadel status
+
+Local (.zitadel/)
+  bundle hash    9f2e8a1b...
+  git            feature/phone-number @ 8d4e1a0  (2 modified)
+
+Environments
+  ENV       CURRENT RELEASE                     DEPLOYED   RELATION TO LOCAL
+  dev       rel_01KX3RG8A7F0N9WD3P2E4YM5C1      2h ago     local ahead (2 changes)
+  staging   rel_01KX2ZJ4X0YJKP0JTN428A6DPB      1d ago     local ahead (2 changes)
+  prod      rel_01KX2ZJ4X0YJKP0JTN428A6DPB      3d ago     local ahead (2 changes)
+```
+
+Example — mid-promotion. Dev is caught up to local; staging and prod haven't been promoted yet:
+
+```
+$ zitadel status
+
+Local (.zitadel/)
+  bundle hash    c3a9b71e...
+  git            main @ e0f2b8c  (clean)
+
+Environments
+  ENV       CURRENT RELEASE                     DEPLOYED   RELATION TO LOCAL
+  dev       rel_01KX4B2M8G7V3Q8W9P1D5N2K7R      1h ago     matches
+  staging   rel_01KX3RG8A7F0N9WD3P2E4YM5C1      2d ago     local ahead (1 change)
+  prod      rel_01KX2ZJ4X0YJKP0JTN428A6DPB      5d ago     local ahead (3 changes)
+```
+
+Example — local behind. A colleague deployed a release from their branch; your local `.zitadel/` doesn't yet include what dev is running. Fix with `git pull` (their branch carries the source files) or, if the release was assembled from server-side drafts, with `zitadel pull` per resource:
+
+```
+$ zitadel status
+
+Local (.zitadel/)
+  bundle hash    5b81c0f2...
+  git            main @ 4a5b6c7  (clean)
+
+Environments
+  ENV       CURRENT RELEASE                     DEPLOYED   RELATION TO LOCAL
+  dev       rel_01KX5N7C4P9E2A1B7Y3F6H8T9M      20m ago    local behind (1 change on dev)
+  staging   rel_01KX2ZJ4X0YJKP0JTN428A6DPB      1d ago     matches
+  prod      rel_01KX2ZJ4X0YJKP0JTN428A6DPB      3d ago     matches
+```
+
 #### `pull`
 
 `zitadel pull <kind> <handle>` fetches the newest server-side revision of a specific resource and writes it into `.zitadel/`. Use it when you knowingly edited a resource outside the CLI and want to fold the change into your local project before deploying. Targeted only; there is no bulk mode.
