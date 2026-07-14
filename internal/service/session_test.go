@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -44,6 +45,32 @@ func (s *sessionRepoStub) List(context.Context, database.QueryExecutor, string) 
 
 func (s *sessionRepoStub) Delete(context.Context, database.QueryExecutor, string, string) error {
 	panic("unexpected Delete call")
+}
+
+// userReaderStub implements service.UserIdentityReader and records the
+// condition/option inputs so tests can assert which user was hydrated.
+type userReaderStub struct {
+	getFunc          func(context.Context, database.QueryExecutor, ...database.QueryOption) (*domain.User, error)
+	gotProjectID     string
+	gotUserID        string
+	gotAttributeKeys []string
+}
+
+func (s *userReaderStub) Get(ctx context.Context, q database.QueryExecutor, opts ...database.QueryOption) (*domain.User, error) {
+	if s.getFunc == nil {
+		panic("unexpected users.Get call")
+	}
+	return s.getFunc(ctx, q, opts...)
+}
+
+func (s *userReaderStub) PrimaryKeyCondition(projectID, id string) database.Condition {
+	s.gotProjectID, s.gotUserID = projectID, id
+	return nil
+}
+
+func (s *userReaderStub) WithAttributes(keys ...string) database.QueryOption {
+	s.gotAttributeKeys = keys
+	return func(*database.QueryOpts) {}
 }
 
 func sessionConfigForTest() service.SessionConfig {
@@ -104,7 +131,7 @@ func TestSessionService_Create(t *testing.T) {
 				},
 			}
 
-			got, err := service.NewSessionService(stubPool(), repo, sessionConfigForTest()).Create(t.Context(), tt.input)
+			got, err := service.NewSessionService(stubPool(), repo, &userReaderStub{}, sessionConfigForTest()).Create(t.Context(), tt.input)
 			if tt.wantErr != nil {
 				assertSessionResult(t, "Create", got, err, nil, tt.wantErr)
 				return
@@ -229,7 +256,7 @@ func TestSessionService_Exchange(t *testing.T) {
 				},
 			}
 
-			got, err := service.NewSessionService(stubPool(), repo, cfg).Exchange(t.Context(), tt.input)
+			got, err := service.NewSessionService(stubPool(), repo, &userReaderStub{}, cfg).Exchange(t.Context(), tt.input)
 			assertSessionResult(t, "Exchange", got, err, tt.want, tt.wantErr)
 		})
 	}
@@ -290,8 +317,92 @@ func TestSessionService_Get(t *testing.T) {
 				},
 			}
 
-			got, err := service.NewSessionService(stubPool(), repo, sessionConfigForTest()).Get(t.Context(), tt.input)
+			got, err := service.NewSessionService(stubPool(), repo, &userReaderStub{}, sessionConfigForTest()).Get(t.Context(), tt.input)
 			assertSessionResult(t, "Get", got, err, tt.want, tt.wantErr)
+		})
+	}
+}
+
+func TestSessionService_Get_UserIdentity(t *testing.T) {
+	userID := "user-1"
+	identityUser := &domain.User{
+		ProjectID: "proj",
+		ID:        userID,
+		Attributes: []domain.Attribute{
+			{Key: "email", Value: "ada@example.com"},
+			{Key: "given_name", Value: "Ada"},
+		},
+	}
+
+	for _, tt := range []struct {
+		name          string
+		sessionUserID *string
+		userResult    *domain.User
+		userErr       error
+		wantUser      *domain.User
+		wantErr       error
+	}{
+		{
+			name:          "hydrates the linked user",
+			sessionUserID: &userID,
+			userResult:    identityUser,
+			wantUser:      identityUser,
+		},
+		{
+			name:          "skips anonymous sessions",
+			sessionUserID: nil,
+		},
+		{
+			name:          "tolerates a session that outlived its user",
+			sessionUserID: &userID,
+			userErr:       database.NewNoRowFoundError(nil),
+		},
+		{
+			name:          "wraps unexpected user lookup error",
+			sessionUserID: &userID,
+			userErr:       errors.New("boom"),
+			wantErr:       domain.ErrInternal(nil),
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &sessionRepoStub{
+				getFunc: func(context.Context, database.QueryExecutor, string, string) (*domain.Session, error) {
+					return &domain.Session{ProjectID: "proj", ID: "sess", UserID: tt.sessionUserID}, nil
+				},
+			}
+			users := &userReaderStub{}
+			if tt.sessionUserID != nil {
+				users.getFunc = func(_ context.Context, q database.QueryExecutor, _ ...database.QueryOption) (*domain.User, error) {
+					if q != stubPool() {
+						t.Fatalf("users.Get q = %v, want service pool", q)
+					}
+					return tt.userResult, tt.userErr
+				}
+			}
+
+			input := service.GetSessionInput{ProjectID: "proj", SessionID: "sess", WithUserIdentity: true}
+			got, err := service.NewSessionService(stubPool(), repo, users, sessionConfigForTest()).Get(t.Context(), input)
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("Get err = %v, want %v", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Get returned error: %v", err)
+			}
+			if got.User != tt.wantUser {
+				t.Fatalf("Get session.User = %v, want %v", got.User, tt.wantUser)
+			}
+			if tt.sessionUserID == nil {
+				return
+			}
+			if users.gotProjectID != "proj" || users.gotUserID != userID {
+				t.Fatalf("users queried with (%q, %q), want (%q, %q)", users.gotProjectID, users.gotUserID, "proj", userID)
+			}
+			if !slices.Equal(users.gotAttributeKeys, domain.IdentityAttributeKeys) {
+				t.Fatalf("users.WithAttributes keys = %v, want %v", users.gotAttributeKeys, domain.IdentityAttributeKeys)
+			}
 		})
 	}
 }

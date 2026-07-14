@@ -713,6 +713,129 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(postErrorSubmits[0]?.body.action).toBe("passkey");
   });
 
+  it("shows the pending UI during a hung ceremony; cancel lands in the cancelled banner", async () => {
+    const originalCredentials = Object.getOwnPropertyDescriptor(navigator, "credentials");
+    const originalPublicKeyCredential = Object.getOwnPropertyDescriptor(
+      window,
+      "PublicKeyCredential",
+    );
+    // A ceremony that never resolves on its own — only the abort signal
+    // (wired to the atom's Cancel button) can end it.
+    const create = vi.fn(
+      (arg: { signal?: AbortSignal }) =>
+        new Promise<PublicKeyCredential>((_resolve, reject) => {
+          arg.signal?.addEventListener("abort", () =>
+            reject(new DOMException("aborted", "AbortError")),
+          );
+        }),
+    );
+
+    Object.defineProperty(window, "PublicKeyCredential", {
+      configurable: true,
+      value: class PublicKeyCredentialStub {},
+    });
+    Object.defineProperty(navigator, "credentials", {
+      configurable: true,
+      value: { create: create as unknown as CredentialsContainer["create"], get: vi.fn() },
+    });
+
+    try {
+      const element = await mount(host);
+      const submitsBefore = mock
+        .getCaptured()
+        .filter((req) => req.kind === "submitFlowStep").length;
+      Reflect.set(element, "response", {
+        id: "flow-1",
+        session_id: "sess-1",
+        session_token: "token-1",
+        step: {
+          name: "passkey-enroll",
+          texts: { title_key: "passkey-enroll.title" },
+          fields: [],
+          actions: [],
+          gates: {},
+          challenge: {
+            method: "passkey_register",
+            challenge_id: "reg-1",
+            options: {
+              challenge: "AAAA",
+              rp: { id: "localhost", name: "localhost" },
+              user: {
+                id: "dXNlcl8x",
+                name: "alice@example.com",
+                displayName: "alice@example.com",
+              },
+              pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+            },
+          },
+        },
+        branding: {},
+      });
+      Reflect.set(element, "loading", false);
+      await element.updateComplete;
+      await waitFor(() => (create.mock.calls.length === 1 ? true : null));
+
+      // The atom renders its pending UI into its light DOM inside the
+      // orchestrator's shadow root, without a step re-render.
+      const cancel = await waitFor(() =>
+        element.shadowRoot?.querySelector<HTMLElement>('[data-testid="zitadel-passkey-cancel"]'),
+      );
+      expect(
+        element.shadowRoot?.querySelector('[data-testid="zitadel-passkey-pending"]'),
+      ).toBeTruthy();
+
+      cancel.click();
+
+      // Cancel → abort → cancelled banner; challenge stripped so the atom
+      // (and its pending UI) unmounts and the ceremony is not restarted.
+      await waitFor(() => {
+        const alert = element.shadowRoot?.querySelector("zl-alert");
+        return alert?.textContent?.includes("closed before completing") ? alert : null;
+      });
+      expect(element.shadowRoot?.querySelector("zl-passkey")).toBeNull();
+      expect(create).toHaveBeenCalledTimes(1);
+      // The cancel click must not have produced a step submission.
+      const submitsAfter = mock
+        .getCaptured()
+        .filter((req) => req.kind === "submitFlowStep").length;
+      expect(submitsAfter).toBe(submitsBefore);
+    } finally {
+      if (originalCredentials) {
+        Object.defineProperty(navigator, "credentials", originalCredentials);
+      } else {
+        delete (navigator as unknown as Record<string, unknown>).credentials;
+      }
+      if (originalPublicKeyCredential) {
+        Object.defineProperty(window, "PublicKeyCredential", originalPublicKeyCredential);
+      } else {
+        delete (window as unknown as Record<string, unknown>).PublicKeyCredential;
+      }
+    }
+  });
+
+  it("renders the timeout copy when the ceremony reports timed_out", async () => {
+    const element = await mount(host);
+
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-passkey-error", {
+        bubbles: true,
+        composed: true,
+        detail: {
+          challenge_id: "ch_mock_passkey_login",
+          error: "The operation timed out.",
+          aborted: true,
+          timed_out: true,
+        },
+      }),
+    );
+
+    const alert = await waitFor(() => {
+      const candidate = element.shadowRoot?.querySelector("zl-alert");
+      return candidate?.textContent?.includes("timed out") ? candidate : null;
+    });
+    expect(alert.textContent).toContain("The passkey request timed out. Please try again.");
+  });
+
   it("preserves typed input when the server rejects a submit with a step-level error", async () => {
     const element = await mount(host);
 
@@ -744,7 +867,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
               ],
               actions: [{ name: "submit", text_key: "submit.signin", primary: true }],
               gates: {},
-              error: "flow field email: format",
+              error: "error.email_invalid",
             },
             branding: {},
           },
@@ -768,8 +891,13 @@ describe("<zitadel-login> against the typed Flow API", () => {
       }),
     );
 
-    // Wait until the error alert renders — confirms applyResponse ran.
-    await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
+    // Wait until the inline error renders — confirms applyResponse ran.
+    // `error.email_invalid` attaches to the email field via the
+    // fieldErrorKeys routing.
+    await waitFor(() => {
+      const field = element.shadowRoot?.querySelector('zl-field[name="email"]');
+      return field?.getAttribute("error") ? field : null;
+    });
     // One more frame so the post-render applyValuesToFields callback fires.
     await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
 
@@ -780,6 +908,363 @@ describe("<zitadel-login> against the typed Flow API", () => {
       'zl-field[name="email"]',
     );
     expect(emailField?.value).toBe("bad-email");
+  });
+
+  it("routes a field-validation error key inline on the field, not as a banner", async () => {
+    const element = await mount(host);
+
+    server.use(
+      http.post("*/flow/*/submit", () =>
+        HttpResponse.json(
+          {
+            id: "flow_test",
+            session_token: "st_test",
+            step: {
+              name: "identifier",
+              texts: { title_key: "identifier.title" },
+              fields: [
+                { name: "email", type: "email", text_key: "identifier.field.email", required: true },
+              ],
+              actions: [{ name: "submit", text_key: "submit.signin", primary: true }],
+              gates: {},
+              error: "error.email_invalid",
+            },
+            branding: {},
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+    );
+
+    const field = await waitFor(() => {
+      const candidate = element.shadowRoot?.querySelector('zl-field[name="email"][invalid]');
+      return candidate?.getAttribute("error") ? candidate : null;
+    });
+    expect(field.getAttribute("error")).toBe("Please enter a valid email");
+    // The raw key must not leak anywhere, and no banner renders.
+    expect(element.shadowRoot?.querySelector("zl-alert")).toBeNull();
+    expect(element.shadowRoot?.textContent).not.toContain("error.email_invalid");
+  });
+
+  it("splits '; '-joined violation keys into an inline error plus a generic banner", async () => {
+    const element = await mount(host);
+
+    server.use(
+      http.post("*/flow/*/submit", () =>
+        HttpResponse.json(
+          {
+            id: "flow_test",
+            session_token: "st_test",
+            step: {
+              name: "identifier",
+              texts: { title_key: "identifier.title" },
+              fields: [
+                { name: "email", type: "email", text_key: "identifier.field.email", required: true },
+                {
+                  name: "password",
+                  type: "password",
+                  text_key: "identifier.field.password",
+                  required: true,
+                },
+              ],
+              actions: [{ name: "submit", text_key: "submit.signin", primary: true }],
+              gates: {},
+              error: "error.email_invalid; error.password_min_length",
+            },
+            branding: {},
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+    );
+
+    // Email violation → inline (catalog-known error.email_invalid key);
+    // error.password_min_length has no catalog entry → localised generic
+    // banner with the step's field label.
+    const alert = await waitFor(() => {
+      const candidate = element.shadowRoot?.querySelector("zl-alert");
+      return candidate?.textContent?.includes("Password is too short.") ? candidate : null;
+    });
+    expect(alert).toBeTruthy();
+    const field = element.shadowRoot?.querySelector('zl-field[name="email"][invalid]');
+    expect(field?.getAttribute("error")).toBe("Please enter a valid email");
+  });
+
+  it("surfaces an inline-routed key as a banner when the step lacks its field", async () => {
+    const element = await mount(host);
+
+    server.use(
+      http.post("*/flow/*/submit", () =>
+        HttpResponse.json(
+          {
+            id: "flow_test",
+            session_token: "st_test",
+            step: {
+              name: "password",
+              texts: { title_key: "password.title" },
+              // No email field on this step — error.email_invalid has no
+              // inline outlet, and formLevelError would suppress its
+              // banner; the downgrade must keep it visible.
+              fields: [
+                {
+                  name: "password",
+                  type: "password",
+                  text_key: "password.field.password",
+                  required: true,
+                },
+              ],
+              actions: [{ name: "submit", text_key: "submit.signin", primary: true }],
+              gates: {},
+              error: "error.email_invalid",
+            },
+            branding: {},
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+    );
+
+    const alert = await waitFor(() => {
+      const candidate = element.shadowRoot?.querySelector("zl-alert");
+      return candidate?.textContent?.includes("Please enter a valid email") ? candidate : null;
+    });
+    expect(alert).toBeTruthy();
+    expect(element.shadowRoot?.querySelector("zl-field[invalid]")).toBeNull();
+  });
+
+  it("leaves unrecognised raw step errors verbatim in the banner", async () => {
+    const element = await mount(host);
+
+    server.use(
+      http.post("*/flow/*/submit", () =>
+        HttpResponse.json(
+          {
+            id: "flow_test",
+            session_token: "st_test",
+            step: {
+              name: "identifier",
+              texts: { title_key: "identifier.title" },
+              fields: [
+                { name: "email", type: "email", text_key: "identifier.field.email", required: true },
+              ],
+              actions: [{ name: "submit", text_key: "submit.signin", primary: true }],
+              gates: {},
+              error: "user_not_found",
+            },
+            branding: {},
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+    );
+
+    const alert = await waitFor(() => {
+      const candidate = element.shadowRoot?.querySelector("zl-alert");
+      return candidate?.textContent?.includes("user_not_found") ? candidate : null;
+    });
+    expect(alert).toBeTruthy();
+  });
+
+  /** Drives the flow into a 400 step error; resolves once `ready` probes truthy. */
+  async function mountWithStepError(
+    hostEl: HTMLElement,
+    error: string,
+    ready: (element: ZitadelLogin) => Element | null | undefined,
+  ): Promise<ZitadelLogin> {
+    const element = await mount(hostEl);
+    server.use(
+      http.post("*/flow/*/submit", () =>
+        HttpResponse.json(
+          {
+            id: "flow_test",
+            session_token: "st_test",
+            step: {
+              name: "identifier",
+              texts: { title_key: "identifier.title" },
+              fields: [
+                { name: "email", type: "email", text_key: "identifier.field.email", required: true },
+                {
+                  name: "password",
+                  type: "password",
+                  text_key: "identifier.field.password",
+                  required: true,
+                },
+              ],
+              actions: [{ name: "submit", text_key: "submit.signin", primary: true }],
+              gates: {},
+              error,
+            },
+            branding: {},
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+    );
+    await waitFor(() => ready(element));
+    return element;
+  }
+
+  function mountWithStepErrorBanner(hostEl: HTMLElement, error: string): Promise<ZitadelLogin> {
+    return mountWithStepError(hostEl, error, (element) =>
+      element.shadowRoot?.querySelector("zl-alert[data-zl-step-error]"),
+    );
+  }
+
+  function typeInto(element: ZitadelLogin, name: string, value: string): void {
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-input", { bubbles: true, composed: true, detail: { name, value } }),
+    );
+  }
+
+  it("clears the step error banner when the user edits a field, keeping typed input", async () => {
+    const element = await mountWithStepErrorBanner(host, "user_not_found");
+
+    typeInto(element, "email", "fixed@acme.com");
+
+    expect(element.shadowRoot?.querySelector("zl-alert[data-zl-step-error]")).toBeNull();
+    // No step rebuild happened: the typed value survives further keystrokes.
+    typeInto(element, "email", "fixed2@acme.com");
+    expect(element.shadowRoot?.querySelector("zl-alert[data-zl-step-error]")).toBeNull();
+    const emailField = element.shadowRoot?.querySelector<HTMLElement & { value?: string }>(
+      'zl-field[name="email"]',
+    );
+    expect(emailField?.value).toBe("fixed2@acme.com");
+  });
+
+  it("clears only the edited field's inline error", async () => {
+    const element = await mountWithStepError(
+      host,
+      // Both keys are catalog-known and field-specific → both inline,
+      // no banner.
+      "error.email_invalid; error.password_required",
+      (el) => el.shadowRoot?.querySelector('zl-field[name="email"][invalid]'),
+    );
+
+    const password = element.shadowRoot?.querySelector<HTMLElement & { invalid?: boolean }>(
+      'zl-field[name="password"]',
+    );
+    expect(password?.invalid).toBe(true);
+
+    typeInto(element, "email", "fixed@acme.com");
+
+    const email = element.shadowRoot?.querySelector<HTMLElement & { invalid?: boolean }>(
+      'zl-field[name="email"]',
+    );
+    expect(email?.invalid).toBe(false);
+    // The untouched field keeps its inline error until it is edited too.
+    expect(password?.invalid).toBe(true);
+  });
+
+  it("does not resurrect a dismissed banner during the loading re-render", async () => {
+    const element = await mountWithStepErrorBanner(host, "user_not_found");
+    typeInto(element, "email", "fixed@acme.com");
+    expect(element.shadowRoot?.querySelector("zl-alert[data-zl-step-error]")).toBeNull();
+
+    // Park the next submit so the loading re-render is observable.
+    let releaseSubmit: (() => void) | undefined;
+    server.use(
+      http.post(
+        "*/flow/*/submit",
+        () =>
+          new Promise((resolve) => {
+            releaseSubmit = () =>
+              resolve(
+                HttpResponse.json({
+                  id: "flow_test",
+                  session_token: "st_test",
+                  step: {
+                    name: "done",
+                    texts: {},
+                    fields: [],
+                    actions: [],
+                    gates: {},
+                    complete: "show",
+                  },
+                  branding: {},
+                }),
+              );
+          }),
+      ),
+    );
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+    );
+    await waitFor(() => (Reflect.get(element, "loading") === true ? true : null));
+    await element.updateComplete;
+    expect(element.shadowRoot?.querySelector("zl-alert[data-zl-step-error]")).toBeNull();
+    releaseSubmit?.();
+  });
+
+  it("shows the banner again when the next response re-reports the error", async () => {
+    const element = await mountWithStepErrorBanner(host, "user_not_found");
+    typeInto(element, "email", "still-wrong@acme.com");
+    expect(element.shadowRoot?.querySelector("zl-alert[data-zl-step-error]")).toBeNull();
+
+    // The 400 handler from mountWithStepErrorBanner is still active: the
+    // server re-reports the same error on the next submit.
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+    );
+    await waitFor(() => element.shadowRoot?.querySelector("zl-alert[data-zl-step-error]"));
+  });
+
+  it("keeps an explicitly dismissed banner away through the next loading render", async () => {
+    const element = await mountWithStepErrorBanner(host, "user_not_found");
+
+    const closeButton = element.shadowRoot
+      ?.querySelector("zl-alert[data-zl-step-error]")
+      ?.shadowRoot?.querySelector<HTMLButtonElement>('[part="close"]');
+    expect(closeButton).toBeTruthy();
+    closeButton?.click();
+    expect(element.shadowRoot?.querySelector("zl-alert[data-zl-step-error]")).toBeNull();
+
+    let releaseSubmit: (() => void) | undefined;
+    server.use(
+      http.post(
+        "*/flow/*/submit",
+        () =>
+          new Promise((resolve) => {
+            releaseSubmit = () =>
+              resolve(
+                HttpResponse.json({
+                  id: "flow_test",
+                  session_token: "st_test",
+                  step: {
+                    name: "done",
+                    texts: {},
+                    fields: [],
+                    actions: [],
+                    gates: {},
+                    complete: "show",
+                  },
+                  branding: {},
+                }),
+              );
+          }),
+      ),
+    );
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+    );
+    await waitFor(() => (Reflect.get(element, "loading") === true ? true : null));
+    await element.updateComplete;
+    expect(element.shadowRoot?.querySelector("zl-alert[data-zl-step-error]")).toBeNull();
+    releaseSubmit?.();
   });
 
   it("sends declared step fields on submit even when the user typed nothing", async () => {

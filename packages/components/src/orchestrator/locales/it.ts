@@ -159,8 +159,12 @@ export const it: Locale = {
   // --- SSO ---
   "sso.redirect.title": "Reindirizzamento al provider…",
 
+  // --- Cerimonia passkey ---
+  "passkey.pending.status": "In attesa della tua passkey…",
+
   // --- Errori passkey ---
-  "error.passkey_cancelled": "La configurazione della passkey è stata annullata",
+  "error.passkey_cancelled": "La richiesta della passkey è stata chiusa prima del completamento.",
+  "error.passkey_timeout": "La richiesta della passkey è scaduta. Riprova.",
   "error.passkey_not_registered":
     "Questa passkey non è registrata. Accedi con e-mail e password.",
   "error.passkey_setup_failed":
@@ -176,6 +180,13 @@ export const it: Locale = {
   "error.email_exists": "Esiste già un account con questo indirizzo e-mail.",
   "error.invalid_credentials": "E-mail o password errata.",
   "error.required": "Questo campo è obbligatorio.",
+
+  // --- Fallback generici per regole di campo ({0} = etichetta del campo) ---
+  "error.field_required": "{0} è obbligatorio.",
+  "error.field_format": "Inserisci un valore valido per {0}.",
+  "error.field_min_length": "{0} è troppo corto.",
+  "error.field_max_length": "{0} è troppo lungo.",
+  "error.field_invalid": "Controlla {0}.",
 
   // --- Alert a livello di modulo ---
   "error.sign_in_server.title": "Non è stato possibile completare l'accesso.",

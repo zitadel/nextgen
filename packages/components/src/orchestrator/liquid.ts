@@ -34,6 +34,22 @@ export type CreateLiquidOptions = {
   templates?: Record<string, string>;
 };
 
+/**
+ * Maps `error.*` text keys to a field name (Figma inline-error
+ * annotations). Shared by the template filters (`fieldError` routes these
+ * inline, `formLevelError` suppresses their banner) and by
+ * {@link localiseFlowErrorKeys}, which must downgrade them to a banner
+ * message when the step doesn't render the mapped field.
+ */
+const fieldErrorKeys: Record<string, string> = {
+  "error.email_required": "email",
+  "error.email_invalid": "email",
+  "error.email_exists": "email",
+  "error.password_required": "password",
+  "error.password_incorrect": "password",
+  "error.invalid_credentials": "password",
+};
+
 export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
   const templates: Record<string, string> = {
     [TEMPLATE_NAMES.default]: defaultTemplate,
@@ -96,16 +112,6 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
       return { value: v, label: v };
     });
   });
-
-  /** Maps `error.*` text keys to a field name (Figma inline-error annotations). */
-  const fieldErrorKeys: Record<string, string> = {
-    "error.email_required": "email",
-    "error.email_invalid": "email",
-    "error.email_exists": "email",
-    "error.password_required": "password",
-    "error.password_incorrect": "password",
-    "error.invalid_credentials": "password",
-  };
 
   /** Resolves `{text_key}.title` for form-level `<zl-alert heading>`. */
   engine.registerFilter("alertHeading", (textKey: unknown) => {
@@ -171,6 +177,116 @@ function injectedKeyFallback(locale: Locale, key: string): string | undefined {
   return undefined;
 }
 
+export type FlowErrorKeyContext = {
+  locale: Locale;
+  /** Step name, for `<step>.field.<name>` label lookups. */
+  stepName: string;
+  /**
+   * Names of the fields the step renders. When provided, an inline-routed
+   * key (see `fieldErrorKeys`) whose field is absent is downgraded to a
+   * pre-localised banner message — its inline outlet doesn't exist, and
+   * `formLevelError` would otherwise suppress the banner too, silently
+   * hiding the error. Omit to skip the check (pure lookups).
+   */
+  fields?: readonly string[];
+};
+
+/**
+ * Rule-suffix fallbacks for the server's field-validation keys
+ * (`error.<field>_<rule>` — see `FlowFieldValidationError.TextKey` in
+ * `internal/domain/flow_field_resolver.go`). Field names come from the
+ * tenant's user schema, so no catalog can enumerate the specific keys;
+ * a miss resolves to the rule's generic entry, interpolated with the
+ * field's label (`{0}`). The server spells the format rule `_invalid`
+ * (the catalog's existing convention, e.g. `error.email_invalid`), so
+ * that suffix takes the format wording; `_unknown_field` (a submitted
+ * name that is not a step field) takes the catch-all.
+ */
+const FLOW_ERROR_RULE_FALLBACKS: ReadonlyArray<{ suffix: string; generic: string }> = [
+  { suffix: "_required", generic: "error.field_required" },
+  { suffix: "_min_length", generic: "error.field_min_length" },
+  { suffix: "_max_length", generic: "error.field_max_length" },
+  { suffix: "_format", generic: "error.field_format" },
+  { suffix: "_invalid", generic: "error.field_format" },
+  { suffix: "_unknown_field", generic: "error.field_invalid" },
+];
+
+const FLOW_ERROR_CATCH_ALL_KEY = "error.field_invalid";
+
+/**
+ * Localises a `step.error` payload of field-validation text keys.
+ * Returns `null` unless EVERY `"; "`-joined segment is an `error.*` key
+ * — the caller keeps other payloads (outcome names, `auth_attempt.*`
+ * diagnostics) verbatim.
+ *
+ * Keys the locale knows pass through as `text_key` entries: the template
+ * localises them via `| t`, and `fieldErrorKeys` routes the known ones
+ * inline to their field. Unknown keys with a recognised rule suffix are
+ * pre-localised here from their generic {@link FLOW_ERROR_RULE_FALLBACKS}
+ * entry; unknown keys without one pass through as `text_key` (matching
+ * `| t`'s behaviour for non-validation keys such as
+ * `error.sign_in_server`, which localises via `.title`/`.body`).
+ */
+export function localiseFlowErrorKeys(
+  raw: string,
+  ctx: FlowErrorKeyContext,
+): FlowError[] | null {
+  const segments = raw.split("; ");
+  if (!segments.every((segment) => segment.startsWith("error."))) return null;
+  return segments.map((key) => localiseFlowErrorKey(key, ctx));
+}
+
+function localiseFlowErrorKey(key: string, ctx: FlowErrorKeyContext): FlowError {
+  // An inline-routed key can only render on its field; when the step
+  // doesn't carry that field, fall through to the pre-localised message
+  // paths so the error surfaces as a banner instead of vanishing.
+  const inlineField = fieldErrorKeys[key];
+  const orphanedInline =
+    inlineField !== undefined && ctx.fields !== undefined && !ctx.fields.includes(inlineField);
+  if (!orphanedInline && ctx.locale[key] !== undefined) {
+    return { text_key: key };
+  }
+  for (const { suffix, generic } of FLOW_ERROR_RULE_FALLBACKS) {
+    if (!key.endsWith(suffix)) continue;
+    const field = key.slice("error.".length, key.length - suffix.length);
+    if (field === "") break;
+    const template =
+      ctx.locale[generic] ?? ctx.locale[FLOW_ERROR_CATCH_ALL_KEY] ?? "Please check {0}.";
+    const message = interpolate(template, [fieldLabel(ctx, field)]);
+    return { message: capitaliseFirst(message) };
+  }
+  // Orphaned inline key without a recognised rule suffix (e.g.
+  // `error.email_exists`): surface its catalog copy as a banner message.
+  if (orphanedInline && ctx.locale[key] !== undefined) {
+    return { message: ctx.locale[key] };
+  }
+  return { text_key: key };
+}
+
+/** `<step>.field.<name>` from the locale, else a humanised field name. */
+function fieldLabel(ctx: FlowErrorKeyContext, field: string): string {
+  const fromStep = ctx.locale[`${ctx.stepName}.field.${field}`];
+  return fromStep ?? humaniseFieldName(field);
+}
+
+/**
+ * `x-auth-methods#password` → "password", `givenName` → "given name",
+ * `date_of_birth` → "date of birth".
+ */
+function humaniseFieldName(field: string): string {
+  const afterHash = field.includes("#") ? (field.split("#").pop() as string) : field;
+  return afterHash
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_.-]+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+/** Messages may open with a lowercase field label; sentence-case them. */
+function capitaliseFirst(text: string): string {
+  return text.length > 0 ? text[0]?.toUpperCase() + text.slice(1) : text;
+}
+
 function stringify(value: unknown): string {
   if (value == null) return "";
   if (typeof value === "string") return value;
@@ -182,6 +298,11 @@ function stringify(value: unknown): string {
   }
 }
 
+/**
+ * Positional `{n}` substitution shared by the `| t` filter and the
+ * pre-localising fallback in {@link localiseFlowErrorKeys}, so both
+ * produce byte-identical output for the same template and args.
+ */
 function interpolate(template: string, args: readonly string[]): string {
   if (args.length === 0) return template;
   return template.replace(/\{(\d+)\}/g, (match, index) => {
