@@ -17,8 +17,7 @@ func TestLoadConfigReadsPostgresDatabaseEnv(t *testing.T) {
 	t.Setenv("NEXTGEN_DATABASE_POSTGRES", "postgresql://postgres@localhost:5432/nextgen?sslmode=disable")
 
 	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
-	_, err := os.Create(configPath)
-	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
 
 	cfg, err := loadConfig(configPath)
 	require.NoError(t, err)
@@ -35,8 +34,7 @@ func TestLoadConfigReadsPostgresDatabaseEnv(t *testing.T) {
 // still verifying (and rehashing) pre-existing bcrypt hashes.
 func TestLoadConfigDefaultsToArgon2id(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
-	_, err := os.Create(configPath)
-	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
 
 	cfg, err := loadConfig(configPath)
 	require.NoError(t, err)
