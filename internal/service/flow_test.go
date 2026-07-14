@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/domain/crypto"
 	"go.uber.org/mock/gomock"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -66,6 +67,18 @@ func (testAllStatements) ListFlowDefinitions(context.Context, *v2database.ListOp
 
 func (testAllStatements) DeleteFlowDefinitionByID(context.Context, string) error {
 	panic("unexpected call to DeleteFlowDefinitionByID")
+}
+
+func (s testAllStatements) GetActiveDEK(ctx context.Context, projectID string) (*crypto.DEK, error) {
+	panic("unexpected call to GetActiveDEK")
+}
+
+func (s testAllStatements) CreateDEK(ctx context.Context, dek *crypto.DEK) error {
+	panic("unexpected call to CreateDEK")
+}
+
+func (s testAllStatements) UpdateDEK(ctx context.Context, dek *crypto.DEK) error {
+	panic("unexpected call to UpdateDEK")
 }
 
 var _ service.AllStatements = testAllStatements{}
