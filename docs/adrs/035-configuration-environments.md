@@ -83,6 +83,7 @@ Each release also records **audit metadata** — who created it, when, and from 
 - `created_at`, `created_by` — timestamp and identity of the caller who assembled the release.
 - `message` — a short caller-supplied summary, analogous to a git commit message. How the CLI sources it (git HEAD, `-m` flag, other) is a CLI-ergonomics follow-up.
 - `git_sha` — the source commit the CLI was operating from, when the release was constructed via `POST /configuration-releases`. Enables `git diff <prev-release-sha>..HEAD -- .zitadel/` as an env-diff mechanism.
+- `git_dirty` — boolean. `true` when the working tree had uncommitted changes at construction time; `git_sha` in that case points at HEAD but the release content does **not** correspond to that commit exactly. The CLI warns on dirty deploys; consumers of `git diff <sha>..<sha>` should skip the mechanism when either side is `git_dirty`.
 
 These fields are set at construction time and never mutate.
 
@@ -150,9 +151,71 @@ An environment holds a history of deployments; each deployment references a rele
 |---                                             |---                                                                                                                                                                                  |
 | `GET /environments`                            | List every environment with its current deployment (`id`, `release_id`, `deployed_at`, `reason`). Used by `zitadel deploy` in interactive mode to prompt for a deployment target.   |
 | `GET /environments/{env}`                      | Read one environment: identity plus its current deployment (`id`, `release_id`, `deployed_at`, `reason`).                                                                            |
-| `POST /environments/{env}/deployments`         | Deploy a release to this environment. Payload: `{ release_id, reason }` where `reason` is `deploy` \| `promote` \| `rollback`.                                                       |
+| `POST /environments/{env}/deployments`         | Deploy a release to this environment. Payload: `{ release_id, reason, source_environment?, rolled_back_from?, expected_current_deployment_id? }`. `reason` is `deploy` \| `promote` \| `rollback`. See notes below on the optional fields.                                              |
 | `GET /environments/{env}/deployments`          | List deployments for this environment, newest first. The first row is the current deployment (whose release is live); the rest is the audit log.                                    |
-| `GET /environments/{env}/deployments/{id}`     | Read one deployment.                                                                                                                                                                |
+| `GET /environments/{env}/deployments/{id}`     | Read one deployment: `{ id, release_id, reason, source_environment?, rolled_back_from?, deployed_at, deployed_by }`.                                                                 |
+
+Optional payload fields on `POST .../deployments`:
+
+- **`source_environment`** — set on `reason: promote`. Names the env the release was promoted from. Keeps the audit log first-class about the interesting fact instead of leaving readers to infer it.
+- **`rolled_back_from`** — set on `reason: rollback`. Points at the deployment id being rolled back from (the previous "current" deployment). Same rationale.
+- **`expected_current_deployment_id`** — optimistic-concurrency guard for the removal preview (see below).
+
+**On `expected_current_deployment_id`.** The CLI's confirm flow is inherently a check-then-act:
+
+1. Read the env's current deployment and its release (the *check*).
+2. Compute what would be removed (handle-set diff of local vs. that release).
+3. Show the removals to the developer, wait for `yes` (the *think*).
+4. Submit the new deployment (the *act*).
+
+Between steps 1 and 4 nothing in the API stops another actor from deploying to the same env. If that happens, the developer's `yes` was against a stale baseline: the preview said "you'll drop `idps/google`" but the current release now runs a different idp — the actual removal is different from what the human agreed to. The pointer swap itself is still atomic, but the *consent* attached to it is void.
+
+`expected_current_deployment_id` fixes that in one field. The CLI sends the deployment id it observed at step 1 alongside the deploy request at step 4. The server compares:
+
+- match → proceed with the pointer swap;
+- mismatch → return `409 Conflict` with the new `current_deployment_id`; the CLI loops back to step 1, recomputes the preview, and re-prompts.
+
+Analogous to HTTP `If-Match: <etag>` or a compare-and-swap. It's opt-in — clients that don't care (dashboard "force redeploy this release" style) omit the field. But once the API is public, adding this field later means either breaking existing clients or leaving the confirm race in place indefinitely; adding it now is a couple of columns of check logic.
+
+*Happy path — nothing changed in the interim:*
+
+```
+# 1. CLI reads current state
+GET /environments/prod
+→ { "current_deployment": { "id": "dep_01KX4B", "release_id": "rel_A", ... } }
+
+# 2. CLI computes preview against rel_A, developer confirms.
+
+# 3. CLI submits with the observed deployment id.
+POST /environments/prod/deployments
+{ "release_id": "rel_B", "reason": "promote",
+  "expected_current_deployment_id": "dep_01KX4B" }
+
+→ 201 Created  { "id": "dep_01KX5N", "release_id": "rel_B", ... }
+```
+
+*Failure path — a colleague slipped in between:*
+
+```
+# 1. CLI reads current state
+GET /environments/prod
+→ { "current_deployment": { "id": "dep_01KX4B", "release_id": "rel_A", ... } }
+
+# 2. CLI computes preview against rel_A, developer confirms.
+#    Meanwhile, someone else deploys rel_C to prod.
+
+# 3. CLI submits with the stale deployment id.
+POST /environments/prod/deployments
+{ "release_id": "rel_B", "reason": "promote",
+  "expected_current_deployment_id": "dep_01KX4B" }
+
+→ 409 Conflict  { "current_deployment_id": "dep_01KX4Q",
+                  "current_release_id": "rel_C" }
+
+# 4. CLI recomputes preview against rel_C and re-prompts.
+#    Removals may differ: rel_C might drop idps/legacy, or add flow steps,
+#    that rel_A didn't — the developer must agree to the new picture.
+```
 
 #### `configuration-releases` — CLI orchestrator entry point
 
@@ -181,11 +244,21 @@ The first matters — it's what `zitadel status` reports and `zitadel deploy` re
 
 The subsections below cover each command's purpose, its wire flow (participants: local files under `.zitadel/`, developer, CLI, API), and an example.
 
-#### `deploy`
+#### `releases create` and `deploy`
 
-`zitadel deploy [--env <env>]` packages `.zitadel/`, creates a release (`POST /configuration-releases`), and deploys it. `--env` is required in non-interactive mode; in interactive mode the CLI lists environments (`GET /environments`) and prompts the user to pick one or defer the deployment. There is no implicit default environment — every deploy explicitly names its target.
+Construction and deployment are separate commands so a release can be built once and rolled through multiple environments unchanged — the CI shape "build on merge, walk the same id through dev → staging → prod."
 
-Interactive path: read the bundle, construct a release atomically, pick a target environment, preview removals, deploy. On a same-content re-run, `POST /configuration-releases` returns the existing release id (idempotent) but the CLI still creates a new deployment on the target env.
+- `zitadel releases create` packages `.zitadel/` and posts to `POST /configuration-releases`. Prints the `release_id`. Does not touch any environment.
+- `zitadel deploy --release <release_id> --env <env>` deploys an existing release to an env. No packaging, no construction.
+- `zitadel deploy [--env <env>]` (no `--release`) is a convenience that does both: constructs from local, then deploys the returned id to the target env. Backward compatible with the earlier drafts of this ADR and the primary developer workflow.
+
+`--env` is required in non-interactive mode; in interactive mode the CLI lists environments (`GET /environments`) and prompts the user to pick one or defer the deployment. There is no implicit default environment — every deploy explicitly names its target.
+
+**Warn on dirty deploys.** If the working tree has uncommitted changes when `releases create` runs, the CLI prints a warning and records `git_dirty: true` on the release (see [audit metadata](#releases)). The release still constructs; `git_sha` still points at HEAD, but consumers of the "git diff between releases" mechanism should treat dirty releases as opaque.
+
+**Same-content re-run.** `POST /configuration-releases` is idempotent on content — it returns the existing `release_id` when the bundle hashes to a prior release. `zitadel deploy` builds on that: if the target env already runs the release the CLI would deploy, the CLI skips the deployment entirely and prints "nothing to do." `--force` overrides to record a new deployment anyway (useful for future template-re-resolution flows, where the release contents are identical but per-env resolved values may differ).
+
+Interactive path: read the bundle, construct a release atomically, pick a target environment, preview removals, deploy.
 
 ```mermaid
 sequenceDiagram
@@ -228,9 +301,17 @@ dev now runs rel_01KX4B2M8G...
 
 `zitadel promote --from <env> --to <env>` deploys the release currently running on `<from>` to `<to>`. Optional `--release <release-id>` overrides which release to promote.
 
-`zitadel rollback --env <env>` deploys the previous release on `<env>` (the one that ran before the current). Optional `--to <release-id>` targets a specific prior release.
+`zitadel rollback --env <env>` deploys the **previous distinct release** on `<env>` — the most recent release different from the current one, skipping past re-deploys of the current release. Optional `--to <release-id>` targets a specific prior release.
 
 Both create a new deployment referencing an existing release — no construction, no revisions minted. Promote sources the release from another environment's current deployment; rollback sources it from the same environment's deployment history.
+
+**Diff fidelity on promote.** Removal preview (handle-set diff) tells you what will disappear, not what will change. When both releases carry a `git_sha` and neither is `git_dirty`, the CLI additionally prints the exact command that reproduces the field-level diff locally:
+
+```
+git diff rel_from.git_sha..rel_to.git_sha -- .zitadel/
+```
+
+Optionally the CLI runs it inline if the repo is checked out at a superset commit. That's the moment the release audit metadata pays off — for prod promotions, "what actually changed" beats "what handles were touched."
 
 ```mermaid
 sequenceDiagram
@@ -264,7 +345,7 @@ sequenceDiagram
     Dev->>CLI: rollback --env prod
     CLI->>API: GET /environments/prod/deployments
     API-->>CLI: history, newest first
-    Note over CLI: pick previous (2nd row)
+    Note over CLI: walk history for previous distinct release<br/>(skip re-deploys of current)
     CLI->>API: GET /releases/{previous}
     API-->>CLI: previous release pointers
     Note over CLI: compute removals<br/>(handle-set diff, no content needed)
@@ -299,6 +380,13 @@ sequenceDiagram
 ```
 
 Output aims for scannability: a compact `Local` header, one line per environment (state, running release + audit message, age), and a plain-English summary with next-step suggestions at the bottom.
+
+**Relation states.** Comparing local against an env's current release yields one of four states, not two — the two directions are independent, so both can be non-zero at once:
+
+- `in sync` — same handles, same content per handle.
+- `ahead by N` — local has content the env doesn't (edited but not deployed).
+- `behind by N` — the env's release has content local doesn't (colleague deployed something you don't have).
+- `diverged (+A / -B)` — both directions non-empty. Some resources are ahead, others are behind. Example: you edited the human-user schema locally, and in the meantime a colleague deployed an idp change from their branch. `ahead by 1` and `behind by 1` are both true, and neither on its own tells the whole story.
 
 Example — aligned state. Local matches every environment's current release:
 
@@ -372,11 +460,33 @@ assembled from server-drafted revisions (via UI or MCP).
   → zitadel pull <kind> <handle>      if the release was assembled from server drafts
 ```
 
+Example — diverged. You edited the human-user schema locally; in the meantime a colleague deployed an idp swap:
+
+```
+$ zitadel status
+
+Local
+  feature/phone-number @ 8d4e1a0 · 6 resources (1 modified)
+
+Environments
+  dev       diverged (+1 / -1)   running rel_01KX5N7C... (25m ago)  "swap google idp for corporate SSO"
+  staging   ahead by 1 change    running rel_01KX2ZJ4... (1d ago)   "initial import"
+  prod      ahead by 1 change    running rel_01KX2ZJ4... (3d ago)   "initial import"
+
+dev has content you don't (idps/google), and you have content dev doesn't
+(schemas/human-user). Deploying now would revert dev's idp swap.
+
+  → zitadel pull idp google     to fold dev's idp change into local
+  → zitadel deploy --env dev    once local has everything you want in the next release
+```
+
 #### `pull`
 
 `zitadel pull <kind> <handle>` fetches the newest server-side revision of a specific resource and writes it into `.zitadel/`. Use it when you knowingly edited a resource outside the CLI and want to fold the change into your local project before deploying. Targeted only; there is no bulk mode.
 
 Composite flow: someone edits a resource via the dashboard (creating a server-side draft revision that no environment sees yet); the developer knows what they touched and pulls that specific resource, then deploys to fold it into a release.
+
+> **Enumerating drafts is a follow-up.** Drafts are enumerable via the per-kind list endpoints (`GET /schemas?object_type=…`, etc.), so a discovery UX like `zitadel status --include-drafts` or `zitadel pull --list` is feasible. It's out of scope for this ADR because the primary drift the CLI must reconcile (local vs. env's current release) is inert-draft-free; enumerating drafts is a nice-to-have for onboarding onto an existing project that has been drifted-into. Lives with the CLI ergonomics follow-up.
 
 ```mermaid
 sequenceDiagram
