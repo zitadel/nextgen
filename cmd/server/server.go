@@ -320,10 +320,32 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("server.console_path", "/ui/console")
 	v.SetDefault("server.login_enabled", true)
 	v.SetDefault("server.login_path", "/ui/login")
-	v.SetDefault("password_hasher.hasher.algorithm", crypto.HashNameBcrypt)
-	v.SetDefault("password_hasher.hasher.cost", 10)
+	// Default to argon2id (per ADR 029). Params follow the RFC 9106 second
+	// recommended option (t=3, m=64 MiB, p=4), a good balance for servers.
+	v.SetDefault("password_hasher.hasher.algorithm", crypto.HashNameArgon2id)
+	v.SetDefault("password_hasher.hasher.time", 3)
+	v.SetDefault("password_hasher.hasher.memory", 64*1024)
+	v.SetDefault("password_hasher.hasher.threads", 4)
+	// Keep bcrypt and legacy verifiers registered so pre-existing hashes still
+	// validate and transparently rehash to argon2id on the next successful login.
+	v.SetDefault("password_hasher.verifiers", []crypto.HashName{
+		crypto.HashNameArgon2,
+		crypto.HashNameBcrypt,
+		crypto.HashNameScrypt,
+		crypto.HashNamePBKDF2,
+		crypto.HashNameSha2,
+		crypto.HashNameMd5,
+		crypto.HashNameMd5Salted,
+		crypto.HashNamePHPass,
+		crypto.HashNameDrupal7,
+	})
 	v.SetDefault("password_hasher.limits", crypto.HashLimitsConfig{
 		Bcrypt: crypto.BcryptLimitsConfig{MinCost: 10, MaxCost: 16},
+		Argon2: crypto.Argon2LimitsConfig{
+			MinTime: 1, MaxTime: 10,
+			MinMemory: 8 * 1024, MaxMemory: 512 * 1024,
+			MinThreads: 1, MaxThreads: 16,
+		},
 	})
 	v.SetDefault("schema.lru_cache_size", 1000)                                   // todo: temp, review
 	v.SetDefault("schema.builtin_public_base", "https://nextgen.com/api/schemas") // todo: temp, review
