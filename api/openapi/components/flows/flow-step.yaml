@@ -56,7 +56,15 @@ properties:
     oneOf:
       - type: string
       - type: 'null'
-    description: Error message from a previous failed submission.
+    description: |
+      Error from a previous failed submission. Field-validation failures
+      carry localisation text keys: `error.<field>_<rule>` per violation
+      (e.g. `error.email_required`; the `format` rule is spelled
+      `error.<field>_invalid`), multiple violations joined with `"; "`.
+      Field names appear verbatim, so clients localise unknown keys via
+      the generic `error.field_<rule>` catalog entries. Other failures
+      carry a verbatim diagnostic token instead (e.g. `user_not_found`,
+      `auth_attempt.password_invalid`).
   complete:
     type: string
     enum: [redirect, show]

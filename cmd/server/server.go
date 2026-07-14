@@ -28,6 +28,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/domain/tokengen"
+	"github.com/zitadel/nextgen/internal/errreport"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
@@ -176,7 +177,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		userPasskeyRepo,
 		passwordHasher,
 	)
-	sessionService := service.NewSessionService(pool, sessionRepo, service.SessionConfig{
+	sessionService := service.NewSessionService(pool, sessionRepo, userRepo, service.SessionConfig{
 		DefaultTTL: cfg.Session.DefaultTTL,
 		MaxTTL:     cfg.Session.MaxTTL,
 	})
@@ -526,6 +527,10 @@ func buildCrypter(hexKey string) (crypto.Crypter, error) {
 // ----------------------------- INSTRUMENTATION --------------------------------------
 
 func setUpLogging(cfg instrumentation.LogConfig, otelProvider log.LoggerProvider) {
+	errreport.EnableLocation(cfg.Errors.ReportLocation)
+	errreport.EnableStack(cfg.Errors.StackTrace)
+	errreport.GCPReporting(cfg.Format == instrumentation.LogFormatGCPErrorReporting)
+
 	otelHandler := otelslog.NewHandler(
 		Name,
 		otelslog.WithLoggerProvider(otelProvider),
