@@ -81,8 +81,6 @@ func (f LogFormat) ErrorHandler(options *slog.HandlerOptions) slog.Handler {
 	case LogFormatGCP:
 		stdErrHandler = slog.NewJSONHandler(os.Stderr, options)
 	case LogFormatGCPErrorReporting:
-		// TODO refactor this out (move to param instead of global?)
-		// zerrors.GCPErrorReportingEnabled(true)
 		stdErrHandler = sloggcp.NewErrorReportingHandler(os.Stderr, options)
 	}
 
