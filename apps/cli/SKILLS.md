@@ -43,11 +43,16 @@ Each invocation prints one JSON object:
 - `cli_version`, `command`, `source`: always present.
 - On success: `data` with the command-specific payload.
 - On a no-op: `reason` (e.g. `no-framework-detected`, `orphaned-config`).
-- On failure: `code` (e.g. `E_VALIDATION`, `E_NETWORK`, `E_CONFLICT`) and
-  `message`.
+- On failure: `code` (e.g. `E_VALIDATION`, `E_NETWORK`, `E_NOT_FOUND`,
+  `E_CONFLICT`) and `message`.
 - `next_commands`: the suggested follow-ups. Prefer these over free-text hints.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime with
   `npx @zitadel/cli@alpha start`, then retry with `--server local`.
+- `E_NOT_FOUND`: an HTTP 404 from the target server. With the platform's
+  error envelope it names a missing resource (e.g. an unknown schema id);
+  without one the endpoint itself is missing — the `--server` value likely
+  points at something that is not a Zitadel platform API. Follow
+  `next_commands` (usually `start` + retry with `--server local`).
 - `E_PORT_IN_USE`: the requested local runtime port already has a listener.
   Stop that process, run `npx @zitadel/cli@alpha stop --all` for host-wide
   CLI-managed local runtimes, or choose another `start --port`.
@@ -57,9 +62,9 @@ UIs display both streams together, but the machine contract is one parseable
 JSON object on stdout; installer, audit, and package-manager progress belongs
 on stderr.
 
-Exit codes mirror the error class (3 = validation, 4 = network, 5 = conflict,
-1 = auth, 2 = not-implemented). An unknown command is handled by the CLI's help
-layer, not the envelope.
+Exit codes mirror the error class (3 = validation, 4 = network or not-found,
+5 = conflict, 1 = auth, 2 = not-implemented). An unknown command is handled by
+the CLI's help layer, not the envelope.
 
 ## Commands
 

@@ -10,9 +10,16 @@ import (
 
 type QueryOption func(opts *QueryOpts)
 
-// WithCondition sets the condition for the query.
+// WithCondition adds a condition to the query. Repeated options combine with
+// AND: a later condition narrows the result set and never silently replaces
+// an earlier one (a tenant-scope filter must not drop out just because a
+// later option added another filter).
 func WithCondition(condition Condition) QueryOption {
 	return func(opts *QueryOpts) {
+		if opts.Condition != nil {
+			opts.Condition = And(opts.Condition, condition)
+			return
+		}
 		opts.Condition = condition
 	}
 }

@@ -1,6 +1,10 @@
 package domain
 
-import "strings"
+import (
+	"cmp"
+	"slices"
+	"strings"
+)
 
 // Validate applies the rules carried by a previously resolved field
 // set to the submitted values. Pure: no I/O, no schema loading.
@@ -41,6 +45,11 @@ func (r *SchemaFieldResolver) Validate(fields FlowResolvedFields, values map[str
 		errs = append(errs, applyValidationRules(name, str, field.Validation)...)
 	}
 	if len(errs) > 0 {
+		// values is a map, so violation order is random per run; sort
+		// for deterministic wire (StepError) and log (Error) output.
+		slices.SortFunc(errs, func(a, b FlowFieldValidationError) int {
+			return cmp.Or(cmp.Compare(a.Field, b.Field), cmp.Compare(a.Rule, b.Rule))
+		})
 		return errs
 	}
 	return nil
