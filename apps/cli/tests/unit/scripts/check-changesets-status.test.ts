@@ -62,6 +62,11 @@ type ReleaseAutomationModule = {
 
 type ReleaseModule = {
   assertNoUnrecordedPendingChangesets: (repoRoot: string) => Promise<void>;
+  releasePublishEnv: (env?: NodeJS.ProcessEnv) => NodeJS.ProcessEnv;
+  shouldFailManualPublishSkip: (
+    options: { dryRun?: boolean; recoverVersion?: string },
+    env?: NodeJS.ProcessEnv,
+  ) => boolean;
 };
 
 type CheckChangesetStatus = {
@@ -77,6 +82,10 @@ type CheckChangesetStatus = {
     changesets?: string[];
   }>;
 };
+
+const releaseManifest = (await import(
+  new URL("../../../../../scripts/release-manifest.mjs", import.meta.url).href
+)) as { PUBLIC_PACKAGE_NAMES: string[] };
 
 async function loadModule(): Promise<CheckChangesetsStatusModule> {
   return (await import(
@@ -502,6 +511,51 @@ describe("release-automation", () => {
 });
 
 describe("release publish guard", () => {
+  it("fails manual non-dry publish skips instead of silently succeeding", async () => {
+    const { shouldFailManualPublishSkip } = await loadReleaseModule();
+    const workflowDispatchEnv = { GITHUB_EVENT_NAME: "workflow_dispatch" } as NodeJS.ProcessEnv;
+
+    expect(shouldFailManualPublishSkip({ dryRun: false, recoverVersion: "" }, workflowDispatchEnv)).toBe(
+      true,
+    );
+    expect(shouldFailManualPublishSkip({ dryRun: true, recoverVersion: "" }, workflowDispatchEnv)).toBe(
+      false,
+    );
+    expect(
+      shouldFailManualPublishSkip(
+        { dryRun: false, recoverVersion: "0.1.0-alpha.14" },
+        workflowDispatchEnv,
+      ),
+    ).toBe(false);
+    expect(
+      shouldFailManualPublishSkip({ dryRun: false, recoverVersion: "" }, {
+        GITHUB_EVENT_NAME: "push",
+      } as NodeJS.ProcessEnv),
+    ).toBe(false);
+  });
+
+  it("forces production telemetry while publishing npm packages", async () => {
+    const { releasePublishEnv } = await loadReleaseModule();
+    const originalBase = process.env.ZITADEL_RELEASE_TEST_BASE;
+    process.env.ZITADEL_RELEASE_TEST_BASE = "preserved";
+    try {
+      const env = releasePublishEnv({
+        ZITADEL_RELEASE_TEST_OVERRIDE: "included",
+        ZITADEL_TELEMETRY_BUILD_CHANNEL: "development",
+      });
+
+      expect(env.ZITADEL_RELEASE_TEST_BASE).toBe("preserved");
+      expect(env.ZITADEL_RELEASE_TEST_OVERRIDE).toBe("included");
+      expect(env.ZITADEL_TELEMETRY_BUILD_CHANNEL).toBe("production");
+    } finally {
+      if (originalBase === undefined) {
+        delete process.env.ZITADEL_RELEASE_TEST_BASE;
+      } else {
+        process.env.ZITADEL_RELEASE_TEST_BASE = originalBase;
+      }
+    }
+  });
+
   it("allows prerelease-recorded pending changesets and rejects unrecorded ones", async () => {
     const { assertNoUnrecordedPendingChangesets } = await loadReleaseModule();
     const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-guard-"));
@@ -540,27 +594,6 @@ describe("release publish guard", () => {
 
 function validConfig(): { fixed: string[][] } {
   return {
-    fixed: [
-      [
-        "@zitadel/cli",
-        "@zitadel/server",
-        "@zitadel/server-linux-x64",
-        "@zitadel/server-linux-arm64",
-        "@zitadel/server-darwin-x64",
-        "@zitadel/server-darwin-arm64",
-        "@zitadel/server-win32-x64",
-        "@zitadel/api",
-        "@zitadel/components",
-        "@zitadel/sdk-core",
-        "@zitadel/sdk-next",
-        "@zitadel/sdk-nuxt",
-        "@zitadel/sdk-react",
-        "@zitadel/sdk-vue",
-        "@zitadel/sdk-angular",
-        "@zitadel/sdk-solid",
-        "@zitadel/sdk-svelte",
-        "@zitadel/sdk-qwik",
-      ],
-    ],
+    fixed: [[...releaseManifest.PUBLIC_PACKAGE_NAMES]],
   };
 }

@@ -11,6 +11,8 @@ flows:
       schema.write: Permission to create and manage schemas
       user.write: Permission to create users
       user.read: Permission to read users
+      project.read: Permission to read projects
+      project.write: Permission to create and manage projects
   clientCredentials: 
     tokenUrl: https://acc.nextgen.zitadel.com/oauth/token
     scopes: 
@@ -19,3 +21,5 @@ flows:
       schema.write: Permission to create and manage schemas
       user.read: Permission to read users
       user.create: Permission to create users
+      project.read: Permission to read projects
+      project.write: Permission to create and manage projects

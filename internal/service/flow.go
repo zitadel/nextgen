@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
-	"time"
+	"slices"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
@@ -17,22 +17,12 @@ type FlowService interface {
 	// when Name is set; audience match otherwise.
 	Resolve(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error)
 	// Start mints a fresh flow on the resolved definition.
-	Start(ctx context.Context, req StartFlowRequest) (FlowStepResult, error)
+	Start(ctx context.Context, req StartFlowRequest) (domain.FlowStepResult, error)
 	// Submit advances the state machine. Re-fetches the definition
 	// from FlowState.DefinitionID.
-	Submit(ctx context.Context, req SubmitFlowRequest) (FlowStepResult, error)
+	Submit(ctx context.Context, req SubmitFlowRequest) (domain.FlowStepResult, error)
 	// GetStep re-emits the current step without advancing.
-	GetStep(ctx context.Context, req GetFlowStepRequest) (FlowStepResult, error)
-}
-
-// FlowStepResult is what Start/Submit/GetStep return. HandoffToken and
-// HandoffTokenExpiresAt are populated only on the submit that terminates
-// the flow; zero values on every other call.
-type FlowStepResult struct {
-	State                 *domain.FlowState
-	Step                  *domain.FlowStep
-	HandoffToken          string
-	HandoffTokenExpiresAt time.Time
+	GetStep(ctx context.Context, req GetFlowStepRequest) (domain.FlowStepResult, error)
 }
 
 type StartFlowRequest struct {
@@ -67,7 +57,8 @@ type ResolveFlowRequest struct {
 	Name          *string // direct-lookup slug
 	SchemaVersion *string // nil = latest active
 	AuthRequestID *string
-	// Hint is plumbed through but not yet honored — see TODO on resolveByAudience.
+	// Hint scopes audience resolution (ignored when Name is set) — see
+	// resolveByAudience for the scoring rules.
 	Hint ResolveFlowHint
 }
 
@@ -131,8 +122,18 @@ func (s *flowService) resolveByName(ctx context.Context, req ResolveFlowRequest)
 	return def, nil
 }
 
-// TODO: honor ResolveFlowRequest.Hint — score by AppIDs > TeamIDs > project-wide,
-// tie-break by created_at DESC.
+// resolveByAudience picks the active definition whose audience most
+// specifically matches the request hint.
+//
+// A user_schema_id hint is a hard filter: only definitions operating on
+// that schema stay candidates. The remaining candidates are scored
+// app match > team match > project-wide (unscoped); definitions scoped
+// to other apps/teams rank below unscoped so a targeted flow never
+// captures the project default. Hints are client-supplied routing
+// suggestions, not a security boundary — with no eligible tier above
+// them, scoped definitions still resolve rather than failing the login.
+// Ties break newest-first (created_at, then id, so one bulk apply with
+// colliding timestamps still yields a stable pick).
 func (s *flowService) resolveByAudience(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error) {
 	opts := []domain.FlowDefinitionListOption{
 		domain.WithFlowDefinitionStatus(domain.FlowDefinitionStatusActive),
@@ -146,24 +147,63 @@ func (s *flowService) resolveByAudience(ctx context.Context, req ResolveFlowRequ
 	if err != nil {
 		return nil, err
 	}
-	if len(defs) == 0 {
+
+	var best *domain.FlowDefinition
+	bestScore := -1
+	for _, def := range defs {
+		if req.Hint.UserSchemaID != nil && def.UserSchema != *req.Hint.UserSchemaID {
+			continue
+		}
+		score := flowAudienceScore(def, req.Hint)
+		if score > bestScore || (score == bestScore && flowCreatedAfter(def, best)) {
+			best, bestScore = def, score
+		}
+	}
+	if best == nil {
 		return nil, domain.ErrFlowDefinitionNotFound()
 	}
-	return defs[0], nil
+	return best, nil
 }
 
-func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (FlowStepResult, error) {
+// flowAudienceScore ranks def for the hinted request: 3 for a hinted-app
+// match, 2 for a hinted-team match, 1 for an unscoped (project-wide)
+// definition, 0 for a definition scoped to apps/teams the hint does not
+// identify.
+func flowAudienceScore(def *domain.FlowDefinition, hint ResolveFlowHint) int {
+	switch {
+	case hint.AppID != nil && slices.Contains(def.Audience.AppIDs, *hint.AppID):
+		return 3
+	case hint.TeamID != nil && slices.Contains(def.Audience.TeamIDs, *hint.TeamID):
+		return 2
+	case len(def.Audience.AppIDs) == 0 && len(def.Audience.TeamIDs) == 0:
+		return 1
+	default:
+		return 0
+	}
+}
+
+// flowCreatedAfter reports whether a was created after b (id as the
+// timestamp tie-break).
+func flowCreatedAfter(a, b *domain.FlowDefinition) bool {
+	if !a.CreatedAt.Equal(b.CreatedAt) {
+		return a.CreatedAt.After(b.CreatedAt)
+	}
+	return a.ID > b.ID
+}
+
+func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.FlowStepResult, error) {
 	if req.Definition == nil {
-		return FlowStepResult{}, fmt.Errorf("flow service: start without definition")
+		return domain.FlowStepResult{}, fmt.Errorf("flow service: start without definition")
 	}
 
+	// TODO(wim): use SessionService to create sessions (#412)
 	sessionID := ""
 	if req.SessionID != nil {
 		sessionID = *req.SessionID
 	} else {
 		id, err := s.ids.New("sess")
 		if err != nil {
-			return FlowStepResult{}, fmt.Errorf("flow service: mint session id: %w", err)
+			return domain.FlowStepResult{}, fmt.Errorf("flow service: mint session id: %w", err)
 		}
 		sessionID = id
 	}
@@ -181,26 +221,26 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (FlowStep
 
 	result, err := s.stateMachine.Start(ctx, s.pool, in)
 	if err != nil {
-		return FlowStepResult{}, err
+		return domain.FlowStepResult{}, err
 	}
 
 	flowID, err := s.ids.New("flow")
 	if err != nil {
-		return FlowStepResult{}, fmt.Errorf("flow service: mint flow id: %w", err)
+		return domain.FlowStepResult{}, fmt.Errorf("flow service: mint flow id: %w", err)
 	}
 	result.State.ID = flowID
 
-	return FlowStepResult{State: result.State, Step: result.Step}, nil
+	return domain.FlowStepResult{State: result.State, Step: result.Step}, nil
 }
 
-func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (FlowStepResult, error) {
+func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (domain.FlowStepResult, error) {
 	if req.State == nil {
-		return FlowStepResult{}, fmt.Errorf("flow service: submit without state")
+		return domain.FlowStepResult{}, fmt.Errorf("flow service: submit without state")
 	}
 	// todo: gracefully handle when the definition was updated (status, steps, etc.,) since the flow started
 	def, err := s.flowDefs.GetFlowDefinition(ctx, s.pool, req.State.ProjectID, req.State.DefinitionID)
 	if err != nil {
-		return FlowStepResult{}, err
+		return domain.FlowStepResult{}, err
 	}
 	in := domain.FlowSubmitInput{
 		Action:            req.Action,
@@ -214,9 +254,9 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (FlowSt
 	}
 	result, err := s.stateMachine.Process(ctx, s.pool, def, req.State, in)
 	if err != nil {
-		return FlowStepResult{}, err
+		return domain.FlowStepResult{}, err
 	}
-	return FlowStepResult{
+	return domain.FlowStepResult{
 		State:                 result.State,
 		Step:                  result.Step,
 		HandoffToken:          result.HandoffToken,
@@ -224,19 +264,19 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (FlowSt
 	}, nil
 }
 
-func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (FlowStepResult, error) {
+func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (domain.FlowStepResult, error) {
 	if req.State == nil {
-		return FlowStepResult{}, fmt.Errorf("flow service: get step without state")
+		return domain.FlowStepResult{}, fmt.Errorf("flow service: get step without state")
 	}
 	def, err := s.flowDefs.GetFlowDefinition(ctx, s.pool, req.State.ProjectID, req.State.DefinitionID)
 	if err != nil {
-		return FlowStepResult{}, err
+		return domain.FlowStepResult{}, err
 	}
 	result, err := s.stateMachine.Render(ctx, s.pool, def, req.State)
 	if err != nil {
-		return FlowStepResult{}, err
+		return domain.FlowStepResult{}, err
 	}
-	return FlowStepResult{State: result.State, Step: result.Step}, nil
+	return domain.FlowStepResult{State: result.State, Step: result.Step}, nil
 }
 
 func flowServesPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {

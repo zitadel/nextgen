@@ -81,6 +81,34 @@ var userSchemaIDAndPassword = []byte(`{
   }
 }`)
 
+var userSchemaPasskeyEnabled = []byte(`{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant.com/schemas/passkey-user.json",
+  "type": "object",
+  "required": ["email"],
+  "x-auth-methods": {
+    "password": { "enabled": true, "position": 0 },
+    "passkey":  { "enabled": true, "position": 1 }
+  },
+  "properties": {
+    "email":    { "type": "string", "format": "email", "x-unique": "team" }
+  }
+}`)
+
+var userSchemaPasskeyDisabled = []byte(`{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant.com/schemas/passkey-disabled-user.json",
+  "type": "object",
+  "required": ["email"],
+  "x-auth-methods": {
+    "password": { "enabled": true, "position": 0 },
+    "passkey":  { "enabled": false, "position": 1 }
+  },
+  "properties": {
+    "email":    { "type": "string", "format": "email", "x-unique": "team" }
+  }
+}`)
+
 var userSchemaRequiredProps = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tenant.com/schemas/idpw-user.json",
@@ -313,10 +341,10 @@ func TestValidateFlowDefinition(t *testing.T) {
 						{
 							Name: "middle",
 							Actions: []domain.FlowStepAction{
-								{Name: "back", Kind: domain.FlowActionKindNavigate},
+								{Name: "restart", Kind: domain.FlowActionKindNavigate},
 							},
 							Transitions: map[string]domain.FlowStepTransition{
-								"back": {Target: "start"}, // cycle back to identify
+								"restart": {Target: "start"}, // cycle back to identify
 							},
 						},
 					},
@@ -1511,6 +1539,31 @@ func TestValidator_DeclaredBackKindRejected(t *testing.T) {
 	assert.Contains(t, errorDetails(t, err), `action "back" has kind=back, which is engine-injected and cannot be declared`)
 }
 
+// TestValidator_ReservedBackNameRejected guards the action name "back"
+// itself. Even with a non-back kind, an authored action named "back"
+// would collide at render time with the engine-injected back action —
+// the client would see two "back" buttons and route to the customer's
+// kind rather than the injected one.
+func TestValidator_ReservedBackNameRejected(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	def := domain.FlowDefinition{
+		ProjectID: "p", Name: "f", SchemaVersion: "1",
+		UserSchema: "https://tenant.com/schemas/idpw-user.json",
+		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "step", Fields: []domain.Field{"email"},
+				Actions:     []domain.FlowStepAction{{Name: "back", Kind: domain.FlowActionKindNavigate}},
+				Transitions: map[string]domain.FlowStepTransition{"back": {Target: "done"}},
+			},
+			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
+		},
+	}
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err), `action name "back" is reserved for engine-injected back navigation`)
+}
+
 func TestValidator_MissingRequiredUserSchemaFields(t *testing.T) {
 	schema := mustSchema(t, userSchemaRequiredProps)
 	def := domain.FlowDefinition{
@@ -1538,4 +1591,64 @@ func TestValidator_MissingRequiredUserSchemaFields(t *testing.T) {
 	_, err := domain.ValidateFlowDefinition(schema, def)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, domain.ErrFlowDefinitionInvalid(`required fields [first_name last_name] in user schema are missing in the flow definition steps`, nil))
+}
+
+// ---- Passkey action enablement ----
+
+// passkeyActionFlow builds a minimal login flow whose entry step offers
+// a WebAuthn action of the given kind next to a plain submit.
+func passkeyActionFlow(actionName string, kind domain.FlowActionKind) domain.FlowDefinition {
+	return domain.FlowDefinition{
+		ProjectID: "p", Name: "f", SchemaVersion: "1",
+		UserSchema: "https://tenant.com/schemas/passkey-user.json",
+		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "step", Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: actionName, Kind: kind},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit":   {Target: "done"},
+					actionName: {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
+		},
+	}
+}
+
+func TestValidator_PasskeyActionRejectedWhenSchemaDisablesPasskey(t *testing.T) {
+	schema := mustSchema(t, userSchemaPasskeyDisabled)
+	_, err := domain.ValidateFlowDefinition(schema, passkeyActionFlow("passkey", domain.FlowActionKindPasskey))
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err),
+		`step "step": action "passkey" offers passkey but "passkey" is not an enabled authentication method`)
+}
+
+// An absent passkey entry counts as disabled, matching the field-shaped
+// precedent for x-auth-methods#password.
+func TestValidator_PasskeyActionRejectedWhenSchemaOmitsPasskey(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	_, err := domain.ValidateFlowDefinition(schema, passkeyActionFlow("passkey", domain.FlowActionKindPasskey))
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err),
+		`step "step": action "passkey" offers passkey but "passkey" is not an enabled authentication method`)
+}
+
+func TestValidator_PasskeyRegisterActionRejectedWhenSchemaDisablesPasskey(t *testing.T) {
+	schema := mustSchema(t, userSchemaPasskeyDisabled)
+	_, err := domain.ValidateFlowDefinition(schema, passkeyActionFlow("enroll", domain.FlowActionKindPasskeyRegister))
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err),
+		`step "step": action "enroll" offers passkey but "passkey" is not an enabled authentication method`)
+}
+
+func TestValidator_PasskeyActionsAcceptedWhenSchemaEnablesPasskey(t *testing.T) {
+	schema := mustSchema(t, userSchemaPasskeyEnabled)
+	_, err := domain.ValidateFlowDefinition(schema, passkeyActionFlow("passkey", domain.FlowActionKindPasskey))
+	assert.NoError(t, err)
+	_, err = domain.ValidateFlowDefinition(schema, passkeyActionFlow("enroll", domain.FlowActionKindPasskeyRegister))
+	assert.NoError(t, err)
 }

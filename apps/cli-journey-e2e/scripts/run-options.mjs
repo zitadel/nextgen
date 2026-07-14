@@ -6,7 +6,9 @@ export function parseLocalJourneyArgs(args) {
     frameworkIds: [...frameworkIds],
     image: "",
     keep: false,
+    preset: "",
     runtime: "binary",
+    tarballsDir: "",
     workDir: "",
   };
 
@@ -38,8 +40,16 @@ export function parseLocalJourneyArgs(args) {
         parsed.runtime = "docker";
         break;
       }
+      case "--preset": {
+        parsed.preset = readValue(args, ++index, arg);
+        break;
+      }
       case "--runtime": {
         parsed.runtime = parseRuntime(readValue(args, ++index, arg));
+        break;
+      }
+      case "--tarballs-dir": {
+        parsed.tarballsDir = readValue(args, ++index, arg);
         break;
       }
       case "--keep": {

@@ -10,25 +10,31 @@ import { PROXY_PATH } from "../proxy";
  */
 export function appComponentTemplate(projectId: string): string {
   return `${MANAGED_MARKER}
-import { Component } from "@angular/core";
+import { Component, OnInit } from "@angular/core";
 import {
   ZitadelLoginComponent,
-  ZitadelLogoutComponent,
+  ZitadelSessionComponent,
   configureZitadel,
 } from "@zitadel/sdk-angular";
 
 @Component({
   selector: "app-root",
   standalone: true,
-  imports: [ZitadelLoginComponent, ZitadelLogoutComponent],
+  imports: [ZitadelLoginComponent, ZitadelSessionComponent],
   templateUrl: "./app.html",
 })
-export class App {
+export class App implements OnInit {
   protected readonly project = configureZitadel({
     projectId: ${JSON.stringify(projectId)},
     proxyPath: "${PROXY_PATH}",
   });
   protected readonly path = window.location.pathname;
+
+  ngOnInit(): void {
+    if (this.path === "/") {
+      window.location.replace("/login");
+    }
+  }
 }
 `;
 }
@@ -39,21 +45,12 @@ export class App {
  */
 export function appTemplateHtml(): string {
   return `<!-- ${MANAGED_MARKER} -->
-@if (path === '/') {
-  <main style="position:fixed;inset:0;padding:48px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:#0f0f11;color-scheme:dark;color:#f4f4f6;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.5;letter-spacing:normal;text-align:center">
-    <section style="width:100%;max-width:560px">
-      <p style="margin:0 0 12px;color:#9ca3af;font-size:14px">Zitadel auth</p>
-      <h1 style="margin:0 0 24px;font-size:32px;line-height:1.15;font-weight:600;color:#f4f4f6">Sign in, create an account, or open your profile.</h1>
-      <div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center">
-        <a href="/login" style="padding:10px 16px;border-radius:8px;background:#f4f4f6;color:#0f0f11;text-decoration:none;font-weight:600;font-size:14px">Sign in</a>
-        <a href="/register" style="padding:10px 16px;border-radius:8px;border:1px solid #3f3f46;color:#f4f4f6;text-decoration:none;font-weight:600;font-size:14px">Create account</a>
-        <a href="/profile" style="padding:10px 16px;border-radius:8px;border:1px solid #3f3f46;color:#f4f4f6;text-decoration:none;font-weight:600;font-size:14px">Profile</a>
-      </div>
-    </section>
-  </main>
-} @else if (path.startsWith('/profile')) {
+@if (path.startsWith('/profile')) {
   <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
-    <zitadel-auth-logout [project]="project" [postSignOutUrl]="'/login'"></zitadel-auth-logout>
+    <zitadel-auth-session
+      [project]="project"
+      [postSignOutUrl]="'/login'"
+    ></zitadel-auth-session>
   </div>
 } @else if (path.startsWith('/register')) {
   <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">

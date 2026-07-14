@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/go-faster/jx"
@@ -253,7 +254,7 @@ func flowSetCookie(value string, clear bool) string {
 	return c.String()
 }
 
-func (h *Handler) buildFlowResponse(result service.FlowStepResult, terminal bool) api.FlowResponse {
+func (h *Handler) buildFlowResponse(result domain.FlowStepResult, terminal bool) api.FlowResponse {
 	resp := api.FlowResponse{
 		ID:        result.State.ID,
 		SessionID: result.State.SessionID,
@@ -328,6 +329,12 @@ func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
 // validateOriginAgainstProject returns an error if the origin is not in the
 // project's PreviewOrigins allowlist. An empty allowlist means allow all
 // (development/test mode).
+//
+// Matching is deliberately exact — no loopback aliasing between localhost,
+// 127.0.0.1, and [::1]. The WebAuthn RP ID derives from the origin hostname
+// (passkeyRPFromOrigin), so a passkey registered under one loopback spelling
+// can never assert under another; aliasing here would replace this clear 400
+// with a confusing "no passkey found" during the ceremony.
 func validateOriginAgainstProject(originStr string, project *domain.Project) error {
 	if len(project.PreviewOrigins) == 0 {
 		return nil
@@ -337,7 +344,8 @@ func validateOriginAgainstProject(originStr string, project *domain.Project) err
 			return nil
 		}
 	}
-	return fmt.Errorf("origin %q is not allowed for this project", originStr)
+	return fmt.Errorf("origin %q is not allowed for this project (allowed: %s)",
+		originStr, strings.Join(project.PreviewOrigins, ", "))
 }
 
 // passkeyRPFromOrigin derives the WebAuthn relying-party id (the origin host,

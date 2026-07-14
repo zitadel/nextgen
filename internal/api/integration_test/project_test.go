@@ -32,16 +32,16 @@ func (stubFlowService) Resolve(_ context.Context, _ service.ResolveFlowRequest) 
 	return nil, nil
 }
 
-func (stubFlowService) Start(_ context.Context, _ service.StartFlowRequest) (service.FlowStepResult, error) {
-	return service.FlowStepResult{}, nil
+func (stubFlowService) Start(_ context.Context, _ service.StartFlowRequest) (domain.FlowStepResult, error) {
+	return domain.FlowStepResult{}, nil
 }
 
-func (stubFlowService) Submit(_ context.Context, _ service.SubmitFlowRequest) (service.FlowStepResult, error) {
-	return service.FlowStepResult{}, nil
+func (stubFlowService) Submit(_ context.Context, _ service.SubmitFlowRequest) (domain.FlowStepResult, error) {
+	return domain.FlowStepResult{}, nil
 }
 
-func (stubFlowService) GetStep(_ context.Context, _ service.GetFlowStepRequest) (service.FlowStepResult, error) {
-	return service.FlowStepResult{}, nil
+func (stubFlowService) GetStep(_ context.Context, _ service.GetFlowStepRequest) (domain.FlowStepResult, error) {
+	return domain.FlowStepResult{}, nil
 }
 
 // stubAuthAttemptService satisfies [service.AuthAttemptService] while doing nothing.
@@ -125,7 +125,7 @@ func TestCreateProject(t *testing.T) {
 func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
@@ -182,10 +182,43 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestCreateProjectSkipsDefaultLoginFlow(t *testing.T) {
+	t.Parallel()
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+
+	resp, err := client.CreateProject(t.Context(), &api.CreateProjectRequest{
+		PreviewOrigins: make([]string, 0),
+		SeedDefaults:   api.NewOptBool(false),
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.CreateProjectResponse{}, resp, helpers.MustMarshal(t, resp))
+	projectID := resp.(*api.CreateProjectResponse).ID
+
+	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
+	_, err = harness.EnsureSchemaRepo(t).GetByID(
+		t.Context(),
+		harness.EnsureDBPool(t),
+		projectID,
+		schemaURL,
+	)
+	require.Error(t, err)
+
+	flowDefs, err := harness.EnsureFlowDefinitionRepo(t).ListFlowDefinitions(
+		t.Context(),
+		harness.EnsureDBPool(t),
+		projectID,
+		domain.WithFlowDefinitionName("default-login"),
+	)
+	require.NoError(t, err)
+	assert.Empty(t, flowDefs)
+}
+
 func TestGetProject(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 	require.NoError(t, err)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)

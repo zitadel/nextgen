@@ -39,6 +39,7 @@ const cliPackage = await packageName(repoRoot, "apps/cli");
 const childProcesses = new Set();
 const frameworkContexts = [];
 const usedPorts = new Set([registryPort]);
+const prebuiltTarballsDir = options.tarballsDir || process.env.JOURNEY_TARBALLS_DIR || "";
 let registryProcess;
 let registryLogsCollected = false;
 let cleanupStarted = false;
@@ -69,6 +70,7 @@ try {
     registryPort,
     registryUrl,
     repoRoot,
+    prebuiltTarballsDir: prebuiltTarballsDir ? resolve(repoRoot, prebuiltTarballsDir) : "",
     run,
     workDir,
   });
@@ -125,6 +127,8 @@ Options:
   --concurrency <n>        Number of framework journeys to run in parallel (default: 5)
   --runtime <binary|docker> Local runtime backend (default: binary)
   --image <docker-tag>     Use an existing local runtime image instead of building one
+  --preset <id>            Pass a sign-in preset to setup (e.g. passkey-first)
+  --tarballs-dir <path>    Use prebuilt release npm tarballs
   --keep                   Keep the temp work directory after success
   --work-dir <path>        Use an explicit work directory
 `);
@@ -198,8 +202,14 @@ async function runFrameworkJourney(context) {
     await run("node", ["apps/cli-journey-e2e/scripts/prepare-app.mjs"], {
       env: {
         ...process.env,
+        // Pin every JOURNEY_* variable prepare-app reads: a preceding CI
+        // journey step exports its final values through GITHUB_ENV, so the
+        // inherited process.env may carry another run's (deleted) app dir
+        // or preset.
+        JOURNEY_APP_DIR: context.appDir,
         JOURNEY_APP_URL: context.appUrl,
         JOURNEY_FRAMEWORK: framework.id,
+        JOURNEY_PRESET: options.preset,
         JOURNEY_ZITADEL_PORT: String(context.zitadelPort),
         JOURNEY_REGISTRY_URL: registryUrl,
         JOURNEY_RUNTIME: options.runtime,
@@ -245,6 +255,8 @@ async function runFrameworkJourney(context) {
           JOURNEY_OUTPUT_DIR: context.frameworkWorkDir,
           JOURNEY_PLAYWRIGHT_OUTPUT_DIR: context.playwrightOutputDir,
           JOURNEY_PLAYWRIGHT_REPORT_DIR: context.playwrightReportDir,
+          // Always explicit ("" = default preset): see the prepare-app note.
+          JOURNEY_PRESET: options.preset,
         },
       },
     );

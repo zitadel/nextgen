@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -14,17 +15,31 @@ import (
 // domainErrorDetails extracts a domain.Error from err and returns it as an
 // api.ErrorDetails. If err is not a domain.Error, ErrInternal is used as
 // the fallback so the response is always well-formed.
+//
+// Only Code, Message, and explicitly attached Details cross the wire.
+// Parent and Location are diagnostics for logs and must never be serialized
+// into API responses (ADR 030).
 func domainErrorDetails(err error) api.ErrorDetails {
 	var domErr domain.Error
 	if !errors.As(err, &domErr) {
 		domErr = domain.ErrInternal(err)
 	}
-	return api.ErrorDetails{
+
+	errDetails := api.ErrorDetails{
 		Code:    api.ErrorCode(domErr.Code),
 		Message: domErr.Message,
 	}
-}
 
+	if domErr.Details != nil {
+		if j, err := json.Marshal(domErr.Details); err == nil {
+			errDetails.Details = api.NewOptErrorDetailsDetails(api.ErrorDetailsDetails{
+				"details": j,
+			})
+		}
+	}
+
+	return errDetails
+}
 func errorResponse(err error) *api.ErrorDetailsStatusCode {
 	var e domain.Error
 	if !errors.As(err, &e) {
@@ -76,9 +91,7 @@ func OgenErrorHandler(_ context.Context, w http.ResponseWriter, _ *http.Request,
 	switch {
 	case isSecurityError(err):
 		status = http.StatusUnauthorized
-		d := domainErrorDetails(domain.ErrAuthUnauthorized(err))
-		d.Message = err.Error()
-		details = d
+		details = securityErrorDetails(err)
 
 	case isDecodeError(err):
 		status = http.StatusBadRequest
@@ -103,6 +116,19 @@ func OgenErrorHandler(_ context.Context, w http.ResponseWriter, _ *http.Request,
 func isSecurityError(err error) bool {
 	var target *ogenerrors.SecurityError
 	return errors.As(err, &target)
+}
+
+// securityErrorDetails maps an ogen security failure to the auth.unauthorized
+// wire contract. Operations secured by the session cookie use the normalized
+// message from their OpenAPI 401 descriptions; ogen reports an absent
+// credential without naming the scheme, so the operation decides (ADR 030,
+// Decision 4).
+func securityErrorDetails(err error) api.ErrorDetails {
+	unauthorized := domain.ErrAuthUnauthorized(err)
+	if secErr := new(ogenerrors.SecurityError); errors.As(err, &secErr) && sessionCookieOperations[secErr.OperationContext.Name] {
+		unauthorized = unauthorized.WithMessage(sessionUnauthorizedMessage)
+	}
+	return domainErrorDetails(unauthorized)
 }
 
 func isDecodeError(err error) bool {

@@ -6,58 +6,17 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { run, runCapture } from "./dev-process.mjs";
+import {
+  PUBLIC_PACKAGE_DIRS,
+  PUBLIC_RELEASE_PACKAGES,
+  SERVER_PLATFORM_PACKAGES,
+} from "./release-manifest.mjs";
+
+export { PUBLIC_PACKAGE_DIRS, SERVER_PLATFORM_PACKAGES } from "./release-manifest.mjs";
 
 export const SERVER_IMAGE = "ghcr.io/zitadel/nextgen";
 export const SERVER_PACKAGE = "@zitadel/server";
 export const SERVER_PACKAGE_MANIFEST = "apps/server/package.json";
-export const SERVER_PLATFORM_PACKAGES = [
-  {
-    goos: "linux",
-    goarch: "amd64",
-    packageName: "@zitadel/server-linux-x64",
-    packageDir: "apps/server-linux-x64",
-  },
-  {
-    goos: "linux",
-    goarch: "arm64",
-    packageName: "@zitadel/server-linux-arm64",
-    packageDir: "apps/server-linux-arm64",
-  },
-  {
-    goos: "darwin",
-    goarch: "amd64",
-    packageName: "@zitadel/server-darwin-x64",
-    packageDir: "apps/server-darwin-x64",
-  },
-  {
-    goos: "darwin",
-    goarch: "arm64",
-    packageName: "@zitadel/server-darwin-arm64",
-    packageDir: "apps/server-darwin-arm64",
-  },
-  {
-    goos: "windows",
-    goarch: "amd64",
-    packageName: "@zitadel/server-win32-x64",
-    packageDir: "apps/server-win32-x64",
-  },
-];
-export const PUBLIC_PACKAGE_DIRS = [
-  "apps/cli",
-  "apps/server",
-  ...SERVER_PLATFORM_PACKAGES.map((platform) => platform.packageDir),
-  "packages/api",
-  "packages/components",
-  "packages/sdk-core",
-  "packages/sdk-next",
-  "packages/sdk-nuxt",
-  "packages/sdk-react",
-  "packages/sdk-vue",
-  "packages/sdk-angular",
-  "packages/sdk-solid",
-  "packages/sdk-svelte",
-  "packages/sdk-qwik",
-];
 export const SERVER_PLATFORMS = [
   { goos: "linux", goarch: "amd64" },
   { goos: "linux", goarch: "arm64" },
@@ -274,7 +233,7 @@ export async function packPublicPackages(options = {}) {
     // `pnpm pack` runs the package's `prepack`, which for @zitadel/cli rebuilds
     // the bundle via tsdown. Stamp the production telemetry channel here so the
     // published tarball routes to the prod Mixpanel project — setting it only on
-    // the earlier `moon run cli:build` is not enough, since prepack rebuilds.
+    // the earlier release build is not enough, since prepack rebuilds.
     const env =
       dir === "apps/cli"
         ? { ...process.env, ZITADEL_TELEMETRY_BUILD_CHANNEL: "production" }
@@ -289,6 +248,14 @@ export async function packPublicPackages(options = {}) {
 }
 
 async function assertPublishDirectoryReady({ repoRoot, dir, manifest }) {
+  const releasePackage = PUBLIC_RELEASE_PACKAGES.find((pkg) => pkg.dir === dir);
+  if (releasePackage?.buildTarget && !(await exists(join(repoRoot, dir, "dist")))) {
+    throw new Error(
+      `${manifest.name} requires ${dir}/dist before packing. ` +
+        `Run moon run ${releasePackage.buildTarget} or moon run release:build-public-packages.`,
+    );
+  }
+
   const publishDirectory = manifest.publishConfig?.directory;
   if (!publishDirectory) {
     return;

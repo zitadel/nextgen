@@ -11,8 +11,8 @@ type Error struct {
 	Code     string `json:"code"`
 	Message  string `json:"message"`
 	Details  any    `json:"details,omitempty"`
-	Parent   error
-	Location string
+	Parent   error  `json:"parent,omitempty"`
+	Location string `json:"location,omitempty"`
 }
 
 func (e Error) Error() string {
@@ -68,8 +68,10 @@ func (e Error) WithParent(parent error) Error {
 
 func newError(code string, message string, details any, parent error) Error {
 	_, file, line, _ := runtime.Caller(2) // Skip 2: newErr + the Wrapper function
-	if details == nil || details == "" {
-		details = parent
+	// Details is client-facing and only ever what a caller attaches explicitly;
+	// Parent stays a log-only diagnostic and must not fall back into Details (ADR 030).
+	if details == "" {
+		details = nil
 	}
 	return Error{
 		Code:     code,
@@ -86,7 +88,7 @@ func ErrNotImplemented() Error {
 
 // ErrInternal is the catch-all for unexpected errors that have no specific domain code.
 func ErrInternal(err error) Error {
-	return newError("internal", "An unexpected error occurred. Check the details for more information.", nil, err)
+	return newError("internal", "An unexpected error occurred.", nil, err)
 }
 
 // ErrRequestInvalid is returned when an incoming HTTP request fails structural

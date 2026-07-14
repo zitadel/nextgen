@@ -3,9 +3,8 @@ get:
   summary: Get my user information
   tags:
     - Users
-  parameters:
-    - $ref: ../../../components/parameters/session-cookie.yaml
-  security: []
+  security:
+    - nextgenSession: []
   responses:
     '200':
       description: Current user information retrieved successfully

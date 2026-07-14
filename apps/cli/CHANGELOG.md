@@ -1,5 +1,68 @@
 # @zitadel/cli
 
+## 0.1.0-alpha.15
+
+### Patch Changes
+
+- [#485](https://github.com/zitadel/nextgen/pull/485) [`9e9ccb3`](https://github.com/zitadel/nextgen/commit/9e9ccb39997eda62a8eeb673fff4a46e9f2ddc0e) Thanks [@fforootd](https://github.com/fforootd)! - `apply` now re-pins flows to a freshly published schema revision in the same
+  run: the CLI rewrites `user_schema` in every local flow file pinned to the
+  superseded revision (lockfile-style, announced by `plan` and reported in the
+  output) and the flow update carries the new id — editing a schema and using
+  the new field in a flow no longer fails validation or needs a second apply.
+  Interrupted runs recover via a `previousId` marker in `.zitadel/state.json`.
+
+- [#485](https://github.com/zitadel/nextgen/pull/485) [`9e9ccb3`](https://github.com/zitadel/nextgen/commit/9e9ccb39997eda62a8eeb673fff4a46e9f2ddc0e) Thanks [@fforootd](https://github.com/fforootd)! - Make `plan` diffs trustworthy and keep local config in lockstep with live
+  state. `@zitadel/config/normalize` is the shared canonical-form normalizer
+  (drops the server's empty `audience` echo and spelled-out `x-*` meta-schema
+  property defaults); the sync engine hashes and diffs in normalized form
+  (with a legacy-hash fallback so existing state files don't read as edits),
+  and setup/apply write the server's canonical body back to the local file —
+  reported in human and `--json` output — so a one-field edit renders as a
+  one-field diff and applying can no longer silently strip live settings.
+  The api-mock now mirrors the server's unconditional `audience` echo.
+
+- [#485](https://github.com/zitadel/nextgen/pull/485) [`9e9ccb3`](https://github.com/zitadel/nextgen/commit/9e9ccb39997eda62a8eeb673fff4a46e9f2ddc0e) Thanks [@fforootd](https://github.com/fforootd)! - Surface the customize loop after setup: the "Zitadel is ready" next steps now
+  point at the editable `.zitadel/schemas/` and `.zitadel/flows/` files and the
+  `plan`/`apply` commands, and the scaffolded READMEs are restructured
+  workflow-first (mental model → example → making changes → common changes).
+- Updated dependencies [[`9e9ccb3`](https://github.com/zitadel/nextgen/commit/9e9ccb39997eda62a8eeb673fff4a46e9f2ddc0e), [`f52841d`](https://github.com/zitadel/nextgen/commit/f52841df9c1d5da857c2ff48d50a894c66fbcb5b), [`9e9ccb3`](https://github.com/zitadel/nextgen/commit/9e9ccb39997eda62a8eeb673fff4a46e9f2ddc0e), [`6e4a11a`](https://github.com/zitadel/nextgen/commit/6e4a11a7cd07587a51362d751fcc0320b00a4301), [`9e9ccb3`](https://github.com/zitadel/nextgen/commit/9e9ccb39997eda62a8eeb673fff4a46e9f2ddc0e)]:
+  - @zitadel/config@0.1.0-alpha.15
+  - @zitadel/server@0.1.0-alpha.15
+  - @zitadel/api@0.1.0-alpha.15
+
+## 0.1.0-alpha.14
+
+### Minor Changes
+
+- [#341](https://github.com/zitadel/nextgen/pull/341) [`605abe1`](https://github.com/zitadel/nextgen/commit/605abe1f04a011c05bd4be2179556052eae6c007) Thanks [@fforootd](https://github.com/fforootd)! - Scaffold editable schema and flow config from shared local defaults, add project default seeding control, and seed sync state so plan is idempotent immediately after setup.
+
+- [#443](https://github.com/zitadel/nextgen/pull/443) [`ea193dc`](https://github.com/zitadel/nextgen/commit/ea193dc0fabdf3c49fa9c3e3bae4cf242001d630) Thanks [@bastionstack](https://github.com/bastionstack)! - Add a post-sign-in `<zitadel-session>` "signed in as" card: a dedicated element exposed through every SPA SDK and re-exported from sdk-next. CLI scaffolds now render it as the post-sign-in `/profile` page (with a Logout action) across all frameworks. Identity is read from `GET /sessions/me`, preferring `name` then `email` then `user_id`.
+
+  `<zitadel-logout>` now sources its identity from the same `getMySession` operation instead of the `__nextgen_display` cookie, so both signed-in surfaces work against the real backend. Both components route their `getMySession`/`revokeMySession` calls through the shared `api-client` wrappers that enforce `credentials: "include"`.
+
+### Patch Changes
+
+- [#469](https://github.com/zitadel/nextgen/pull/469) [`f55a293`](https://github.com/zitadel/nextgen/commit/f55a2932610ba92315d7174704ca24b940d8d7a6) Thanks [@fforootd](https://github.com/fforootd)! - Route published CLI telemetry to the production Mixpanel project during npm publish.
+
+- [#436](https://github.com/zitadel/nextgen/pull/436) [`13ef6b6`](https://github.com/zitadel/nextgen/commit/13ef6b6b59dde33358c72a93d81be4d0af9458ee) Thanks [@fforootd](https://github.com/fforootd)! - Map CLI telemetry events to Mixpanel's event country property so country appears correctly in analytics.
+
+- [#474](https://github.com/zitadel/nextgen/pull/474) [`ec0a33c`](https://github.com/zitadel/nextgen/commit/ec0a33cfb1ace9e845d5aea6f60c46529fa06f7b) Thanks [@fforootd](https://github.com/fforootd)! - Verify public npm provenance after repository publication.
+
+- Updated dependencies [[`eedc8fe`](https://github.com/zitadel/nextgen/commit/eedc8fe94a850fb2c7173c0b782bcae9d30817a1), [`ddc0c13`](https://github.com/zitadel/nextgen/commit/ddc0c1323ac7eac7332344931fe7c077857f70dc), [`54dcc87`](https://github.com/zitadel/nextgen/commit/54dcc87084dd2d2b8314d08221354683bae64c6b), [`605abe1`](https://github.com/zitadel/nextgen/commit/605abe1f04a011c05bd4be2179556052eae6c007)]:
+  - @zitadel/server@0.1.0-alpha.14
+  - @zitadel/api@0.1.0-alpha.14
+  - @zitadel/config@0.1.0-alpha.14
+
+## 0.1.0-alpha.13
+
+### Patch Changes
+
+- [#411](https://github.com/zitadel/nextgen/pull/411) [`720e526`](https://github.com/zitadel/nextgen/commit/720e526f0f29181b1ae5824dee18cf57b10bea3f) Thanks [@vitorbari](https://github.com/vitorbari)! - Drop the `x-password` user-property annotation. The flow engine sources the password challenge from the reserved `x-auth-methods#password` field name combined with `x-auth-methods.password.enabled` at the schema root (introduced in [#400](https://github.com/zitadel/nextgen/issues/400)); `x-password` is no longer read by any code path. Removed from the `user-property.json` meta-schema and the CLI's generated `password` preset; comments and docs updated to match.
+
+- Updated dependencies [[`720e526`](https://github.com/zitadel/nextgen/commit/720e526f0f29181b1ae5824dee18cf57b10bea3f), [`b574f3a`](https://github.com/zitadel/nextgen/commit/b574f3a6e6122439fadd6f971b73a61b8554f293)]:
+  - @zitadel/server@0.1.0-alpha.13
+  - @zitadel/api@0.1.0-alpha.13
+
 ## 0.1.0-alpha.12
 
 ### Minor Changes

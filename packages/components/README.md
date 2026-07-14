@@ -191,6 +191,7 @@ renders the bundled `default.liquid`. Tracked as a follow-up.
 | Property | Type | Notes |
 | --- | --- | --- |
 | `purpose` | `'login' \| 'register' \| 'reset_password' \| string` | Which flow purpose to drive |
+| `flowName` / `flow-name` | `string` | Run the flow definition with this `name` instead of the project default |
 | `project` | `ZitadelProject` | SDK handle from `configureZitadel()`. Object property (not an attribute). When unset, the element falls back to the global handle from `getZitadelConfig()` |
 | `lang` | `string` | BCP 47 tag (e.g. `"de"`, `"en-US"`). Resolves to a built-in dictionary; falls back to `<html lang>` / `navigator.language` |
 | `locales` | `Record<string, Locale>` | Custom locale dictionaries keyed by language code; spread over the built-in dictionary so partial overrides work |
@@ -204,10 +205,11 @@ on each update.
 
 ### `<zitadel-logout>`
 
-Session menu / sign-out control for embedded apps. Reads the
-`__nextgen_display` cookie set during sign-in, calls `revokeMySession`
-(`DELETE /sessions/me`) through the SDK handle, and clears the session. Uses
-the same token adoption as `<zitadel-login>` (`applyBaseTokens`).
+Session menu / sign-out control for embedded apps. Reads the signed-in
+identity from `getMySession` (`GET /sessions/me`) — the same source as
+`<zitadel-session>` — calls `revokeMySession` (`DELETE /sessions/me`) through
+the SDK handle, and clears the session. Uses the same token adoption as
+`<zitadel-login>` (`applyBaseTokens`).
 
 | Property | Type | Notes |
 | --- | --- | --- |

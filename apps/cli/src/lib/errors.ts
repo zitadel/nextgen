@@ -1,4 +1,4 @@
-import { ApiError } from "@zitadel/api/runtime/fetch";
+import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 
 /**
  * Closed set of failure categories the CLI can surface. Every error the
@@ -98,7 +98,7 @@ export function toZitadelError(error: unknown): ZitadelError {
         : error.status >= 500
           ? "E_NETWORK"
           : "E_VALIDATION";
-    return new ZitadelError(code, error.message, {
+    return new ZitadelError(code, apiErrorMessage(error), {
       details: { status: error.status, url: error.url, body: error.body },
     });
   }

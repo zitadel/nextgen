@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/muhlemmer/gu"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -91,11 +90,10 @@ func mapUpdateRequestToService(params api.UpdateFlowDefinitionParams, req *api.F
 }
 
 func mapFlowDefinitionRequestToService(projectID string, schemaURI api.OptSchemaURI, definition api.FlowDefinition, status string) (service.FlowDefinitionRequest, error) {
-	userSchemaURI := definition.GetUserSchema()
 	svcReq := service.FlowDefinitionRequest{
 		ProjectID:     projectID,
 		Name:          definition.GetName(),
-		UserSchema:    userSchemaURI.String(),
+		UserSchema:    definition.GetUserSchema(),
 		Status:        status,
 		SchemaVersion: "1.0.0", // todo (grvijayan): find a way to set this based on the schema URI or the request (currently not set in the request)
 	}
@@ -232,7 +230,7 @@ func mapListRequestToService(params api.ListFlowDefinitionsParams) service.ListF
 	}
 	limit, ok := params.Limit.Get()
 	if ok {
-		req.Limit = limit
+		req.Limit = int(limit)
 	}
 	pageToken, ok := params.PageToken.Get()
 	if ok {
@@ -265,8 +263,6 @@ func flowDefinitionDetailResponse(flowDefinition *domain.FlowDefinition) *api.Fl
 	}
 	steps := mapDomainStepsToAPI(flowDefinition.Steps)
 
-	userSchemaURI, _ := url.Parse(flowDefinition.UserSchema)
-
 	return &api.FlowDefinitionDetailResponse{
 		ID:        flowDefinition.ID,
 		ProjectID: flowDefinition.ProjectID,
@@ -276,7 +272,7 @@ func flowDefinitionDetailResponse(flowDefinition *domain.FlowDefinition) *api.Fl
 			Steps:      steps,
 			Purposes:   purposes,
 			Audience:   audience,
-			UserSchema: gu.Value(userSchemaURI),
+			UserSchema: flowDefinition.UserSchema,
 		},
 		CreatedAt: flowDefinition.CreatedAt,
 		UpdatedAt: flowDefinition.UpdatedAt,

@@ -60,6 +60,7 @@ export const it: Locale = {
   "register-password.description": "Scegli una password sicura per il tuo account",
   "register-password.field.password": "Password",
   "register-password.action.submit": "Registrati",
+  "register-password.action.back": "Indietro",
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: passkey-upsell (proposta passkey — dopo la registrazione)
@@ -76,8 +77,7 @@ export const it: Locale = {
   // Step: collect-passkey-email (solo e-mail — registrazione solo passkey)
   // ═══════════════════════════════════════════════════════════════════════════
   "collect-passkey-email.title": "Crea il tuo account",
-  "collect-passkey-email.description":
-    "Inserisci la tua e-mail per configurare una passkey",
+  "collect-passkey-email.description": "Inserisci la tua e-mail per configurare una passkey",
   "collect-passkey-email.field.email": "E-mail aziendale",
   "collect-passkey-email.field.email.placeholder": "tu@azienda.com",
   "collect-passkey-email.action.submit": "Continua",
@@ -102,6 +102,7 @@ export const it: Locale = {
   "password.field.password": "Password",
   "password.action.signin": "Accedi",
   "password.action.passkey": "Accedi con passkey",
+  "password.action.back": "Indietro",
   "password.action.register.lead": "Non hai un account? ",
   "password.action.register.link": "Registrati",
 
@@ -122,6 +123,7 @@ export const it: Locale = {
   "register.action.password": "Continua con password",
   "register.action.passkey": "Continua con passkey",
   "register.action.submit": "Registrati",
+  "register.action.back": "Indietro",
   "register.action.sign_in.lead": "Hai già un account? ",
   "register.action.sign_in.link": "Accedi",
 
@@ -131,6 +133,12 @@ export const it: Locale = {
 
   // --- Accesso con passkey ---
   "passkey-login.title": "Accedi con la tua passkey",
+
+  // --- Step: passkey-first (passo iniziale del preset passkey-first) ---
+  "passkey-first.title": "Accedi",
+  "passkey-first.description": "Usa la tua passkey per continuare",
+  "passkey-first.action.passkey": "Continua con passkey",
+  "passkey-first.action.email_fallback": "Usa invece l'email",
 
   // --- Recupero password ---
   "recover.title": "Controlla la tua e-mail",
@@ -143,6 +151,8 @@ export const it: Locale = {
   "submit.signin": "Accedi",
   "action.forgot_password": "Password dimenticata?",
   "action.cancel": "Annulla",
+  // Fallback generico per la chiave `<step>.action.back` iniettata dal motore
+  // (vedi INJECTED_KEY_FALLBACKS in liquid.ts).
   "action.back": "Indietro",
 
   // --- SSO ---
@@ -150,10 +160,8 @@ export const it: Locale = {
 
   // --- Errori passkey ---
   "error.passkey_cancelled": "La configurazione della passkey è stata annullata",
-  "error.passkey_not_registered":
-    "Questa passkey non è registrata. Accedi con e-mail e password.",
-  "error.passkey_setup_failed":
-    "La registrazione della passkey non è stata completata. Riprova.",
+  "error.passkey_not_registered": "Questa passkey non è registrata. Accedi con e-mail e password.",
+  "error.passkey_setup_failed": "La registrazione della passkey non è stata completata. Riprova.",
   "error.passkey_unsupported": "Questo dispositivo non supporta le passkey",
   "error.passkey_failed": "Qualcosa è andato storto. Riprova.",
 

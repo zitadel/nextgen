@@ -112,14 +112,16 @@
 
     {% assign passkey = actions | where: "name", "passkey" | first %}
     {% if passkey %}
-      <zl-button
-        hierarchy="secondary"
-        size="medium"
-        block
-        action="passkey"
-        data-testid="zitadel-action-passkey"
-        label="{{ passkey.text_key | t }}"
-      ></zl-button>
+      {% unless passkey.primary %}
+        <zl-button
+          hierarchy="secondary"
+          size="medium"
+          block
+          action="passkey"
+          data-testid="zitadel-action-passkey"
+          label="{{ passkey.text_key | t }}"
+        ></zl-button>
+      {% endunless %}
     {% endif %}
 
 

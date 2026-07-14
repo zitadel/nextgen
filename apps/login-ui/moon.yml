@@ -27,6 +27,19 @@ tasks:
     outputs:
       - "/internal/staticui/login/dist/**/*"
 
+  build-release:
+    command: "corepack pnpm run build"
+    deps:
+      - "components:build-release"
+      - "design-tokens:build"
+    outputs:
+      - "/internal/staticui/login/dist/**/*"
+    options:
+      cache: false
+      # Release UI builds consume package release output and run from the later
+      # release step instead of the normal `moon ci` build/test graph.
+      runInCI: false
+
   dev:
     command: "corepack pnpm run dev"
     options:

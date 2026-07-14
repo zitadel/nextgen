@@ -4,7 +4,7 @@ import { defineConfig } from "tsdown";
  * Telemetry channel stamped into the bundle (replaces `__ZITADEL_TELEMETRY_CHANNEL__`).
  * Defaults to `development` so every contributor/CI build routes to the dev
  * Mixpanel project; only the release pipeline sets
- * `ZITADEL_TELEMETRY_BUILD_CHANNEL=production` (see `scripts/release.mjs`) so the
+ * `ZITADEL_TELEMETRY_BUILD_CHANNEL=production` (see `cli:build-release`) so the
  * published CLI routes to production. Releases bump the version, so this build's
  * input hash changes and moon rebuilds rather than serving a dev-stamped cache.
  */
@@ -31,6 +31,7 @@ export default defineConfig({
     "commands/stop": "src/commands/stop.ts",
     "commands/eject": "src/commands/eject.ts",
     "commands/status": "src/commands/status.ts",
+    "commands/schemas/list": "src/commands/schemas/list.ts",
   },
   outDir: "dist",
   format: ["esm"],

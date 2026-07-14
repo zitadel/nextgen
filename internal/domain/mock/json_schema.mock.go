@@ -283,6 +283,82 @@ func (c *MockJSONSchemaRepositoryListCall) DoAndReturn(f func(context.Context, d
 	return c
 }
 
+// ObjectType mocks base method.
+func (m *MockJSONSchemaRepository) ObjectType() database.Column {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ObjectType")
+	ret0, _ := ret[0].(database.Column)
+	return ret0
+}
+
+// ObjectType indicates an expected call of ObjectType.
+func (mr *MockJSONSchemaRepositoryMockRecorder) ObjectType() *MockJSONSchemaRepositoryObjectTypeCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ObjectType", reflect.TypeOf((*MockJSONSchemaRepository)(nil).ObjectType))
+	return &MockJSONSchemaRepositoryObjectTypeCall{Call: call}
+}
+
+// MockJSONSchemaRepositoryObjectTypeCall wrap *gomock.Call
+type MockJSONSchemaRepositoryObjectTypeCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJSONSchemaRepositoryObjectTypeCall) Return(arg0 database.Column) *MockJSONSchemaRepositoryObjectTypeCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJSONSchemaRepositoryObjectTypeCall) Do(f func() database.Column) *MockJSONSchemaRepositoryObjectTypeCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJSONSchemaRepositoryObjectTypeCall) DoAndReturn(f func() database.Column) *MockJSONSchemaRepositoryObjectTypeCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ObjectTypeCondition mocks base method.
+func (m *MockJSONSchemaRepository) ObjectTypeCondition(objectType string) database.Condition {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ObjectTypeCondition", objectType)
+	ret0, _ := ret[0].(database.Condition)
+	return ret0
+}
+
+// ObjectTypeCondition indicates an expected call of ObjectTypeCondition.
+func (mr *MockJSONSchemaRepositoryMockRecorder) ObjectTypeCondition(objectType any) *MockJSONSchemaRepositoryObjectTypeConditionCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ObjectTypeCondition", reflect.TypeOf((*MockJSONSchemaRepository)(nil).ObjectTypeCondition), objectType)
+	return &MockJSONSchemaRepositoryObjectTypeConditionCall{Call: call}
+}
+
+// MockJSONSchemaRepositoryObjectTypeConditionCall wrap *gomock.Call
+type MockJSONSchemaRepositoryObjectTypeConditionCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJSONSchemaRepositoryObjectTypeConditionCall) Return(arg0 database.Condition) *MockJSONSchemaRepositoryObjectTypeConditionCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJSONSchemaRepositoryObjectTypeConditionCall) Do(f func(string) database.Condition) *MockJSONSchemaRepositoryObjectTypeConditionCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJSONSchemaRepositoryObjectTypeConditionCall) DoAndReturn(f func(string) database.Condition) *MockJSONSchemaRepositoryObjectTypeConditionCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // Payload mocks base method.
 func (m *MockJSONSchemaRepository) Payload() database.Column {
 	m.ctrl.T.Helper()

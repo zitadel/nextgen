@@ -1,17 +1,20 @@
 import type {
   ZitadelLogin as ZitadelLoginElement,
   ZitadelLogout as ZitadelLogoutElement,
+  ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 
 import { render } from "@testing-library/angular";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
+  ZITADEL_SESSION_EVENT_HANDLERS,
 } from "@zitadel/sdk-core/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ZitadelLoginComponent } from "./zitadel-login.component";
 import { ZitadelLogoutComponent } from "./zitadel-logout.component";
+import { ZitadelSessionComponent } from "./zitadel-session.component";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
@@ -63,6 +66,16 @@ describe("ZitadelLogin", () => {
     const el = container.querySelector<ZitadelLoginElement>("zitadel-login");
     expect(el!.projectId).toBe("proj-test");
     expect(el!.proxyPath).toBe("/__nextgen");
+  });
+
+  it("forwards locales and lang to the widget", async () => {
+    const locales = { en: { "identifier.title": "Welcome back" } };
+    const { container } = await render(ZitadelLoginComponent, {
+      inputs: { project, locales, lang: "de" },
+    });
+    const el = container.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(el!.locales).toBe(locales);
+    expect(el!.lang).toBe("de");
   });
 
   it.each(Object.keys(ZITADEL_LOGIN_EVENT_HANDLERS))(
@@ -136,6 +149,53 @@ describe("ZitadelLogout", () => {
     const exposed = fixture.componentInstance.element;
     expect(exposed).not.toBeNull();
     expect(exposed!.tagName.toLowerCase()).toBe("zitadel-logout");
+    expect(exposed).toBe(el);
+  });
+});
+
+describe("ZitadelSession", () => {
+  it("binds the project handle as a property", async () => {
+    const { container } = await render(ZitadelSessionComponent, {
+      inputs: { project },
+    });
+    const el = container.querySelector<ZitadelSessionElement>("zitadel-session");
+    expect(el).not.toBeNull();
+    expect(el!.project).toBe(project);
+  });
+
+  it("binds discrete projectId/proxyPath", async () => {
+    const { container } = await render(ZitadelSessionComponent, {
+      inputs: { projectId: "proj-test", proxyPath: "/__nextgen" },
+    });
+    const el = container.querySelector<ZitadelSessionElement>("zitadel-session");
+    expect(el!.projectId).toBe("proj-test");
+    expect(el!.proxyPath).toBe("/__nextgen");
+  });
+
+  it.each(Object.keys(ZITADEL_SESSION_EVENT_HANDLERS))(
+    "forwards %s through its @Output",
+    async (eventName) => {
+      const { fixture, container } = await render(ZitadelSessionComponent, {
+        inputs: { project },
+      });
+      const spy = vi.fn();
+      outputOf(fixture.componentInstance, eventName).subscribe(spy);
+      const el = container.querySelector<ZitadelSessionElement>("zitadel-session");
+      const detail = { probe: eventName };
+      el?.dispatchEvent(new CustomEvent(eventName, { detail }));
+      expect(spy).toHaveBeenCalledWith(detail);
+    },
+  );
+
+  it("exposes the underlying element via the element getter", async () => {
+    const { fixture, container } = await render(ZitadelSessionComponent, {
+      inputs: { project },
+    });
+    fixture.detectChanges();
+    const el = container.querySelector<ZitadelSessionElement>("zitadel-session");
+    const exposed = fixture.componentInstance.element;
+    expect(exposed).not.toBeNull();
+    expect(exposed!.tagName.toLowerCase()).toBe("zitadel-session");
     expect(exposed).toBe(el);
   });
 });

@@ -17,6 +17,7 @@ type CreateUserInput struct {
 	ProjectID string
 	TeamID    *string
 	User      map[string]any
+	ID        string
 }
 
 type UserAction interface {
@@ -37,19 +38,28 @@ type GetUserInput struct {
 	UserID    string
 }
 
+type ListUsersInput struct {
+	ProjectID string
+	// Offset/Limit window the creation-ordered result; zero means
+	// "from the start" / "server default applied at the API edge".
+	Offset uint32
+	Limit  uint32
+}
+
 type GetMyUserInput struct {
-	SessionToken string
+	// SessionToken is the parsed session token, already verified at the API
+	// security boundary.
+	SessionToken *domain.Token
 }
 
 // ---- Implementation -------------------------------------------------------------
 
 type UserService struct {
-	pool          database.Pool
-	userRepo      domain.UserRepository
-	passwordRepo  domain.UserPasswordRepository
-	schemaRepo    domain.JSONSchemaRepository
-	hasher        crypto.Hasher
-	tokenVerifier domain.TokenVerifier
+	pool         database.Pool
+	userRepo     domain.UserRepository
+	passwordRepo domain.UserPasswordRepository
+	schemaRepo   domain.JSONSchemaRepository
+	hasher       crypto.Hasher
 }
 
 func NewUserService(
@@ -58,15 +68,13 @@ func NewUserService(
 	passwordRepo domain.UserPasswordRepository,
 	schemaRepo domain.JSONSchemaRepository,
 	hasher crypto.Hasher,
-	tokenVerifier domain.TokenVerifier,
 ) *UserService {
 	return &UserService{
-		pool:          pool,
-		userRepo:      userRepo,
-		passwordRepo:  passwordRepo,
-		schemaRepo:    schemaRepo,
-		hasher:        hasher,
-		tokenVerifier: tokenVerifier,
+		pool:         pool,
+		userRepo:     userRepo,
+		passwordRepo: passwordRepo,
+		schemaRepo:   schemaRepo,
+		hasher:       hasher,
 	}
 }
 
@@ -119,6 +127,36 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 	return action.User, nil
 }
 
+// ListUsers returns the project's users as attribute trees (the same
+// shape CreateUser returns and GET /users/{id} serves), ordered by
+// creation time so pagination windows are stable.
+func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) ([]map[string]any, error) {
+	opts := []database.QueryOption{
+		database.WithCondition(s.userRepo.ProjectIDCondition(input.ProjectID)),
+	}
+	if input.Limit > 0 {
+		opts = append(opts, database.WithLimit(input.Limit))
+	}
+	if input.Offset > 0 {
+		opts = append(opts, database.WithOffset(input.Offset))
+	}
+	flatUsers, err := s.userRepo.List(ctx, s.pool, opts...)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to list users from database")
+	}
+
+	users := make([]map[string]any, 0, len(flatUsers))
+	for _, flatUser := range flatUsers {
+		user, err := domain.BuildAttributeTree(flatUser.Attributes)
+		if err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to parse user attributes")
+		}
+		user["id"] = flatUser.ID
+		users = append(users, user)
+	}
+	return users, nil
+}
+
 func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[string]any, error) {
 	flatUser, err := s.userRepo.GetByID(ctx, s.pool, input.ProjectID, input.TeamID, input.UserID)
 	if err != nil {
@@ -143,8 +181,8 @@ func (s *UserService) SetPassword(ctx context.Context, input SetPasswordInput) (
 }
 
 func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]byte, error) {
-	sessionToken, err := domain.DecryptSessionTokenString(input.SessionToken, s.tokenVerifier)
-	if err != nil {
+	sessionToken := input.SessionToken
+	if sessionToken == nil {
 		return nil, domain.ErrSessionTokenInvalid()
 	}
 	if sessionToken.ExpiresAt != nil && time.Now().After(*sessionToken.ExpiresAt) {
@@ -167,7 +205,7 @@ func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]by
 	return userbs, nil
 }
 
-// ---- CreateUser opts -------------------------------------------------------------
+// ---- Create User ACTION -------------------------------------------------------------
 
 type CreateUserAction struct {
 	CreateUserInput
@@ -175,7 +213,7 @@ type CreateUserAction struct {
 	userRepo   domain.UserRepository
 	schemaRepo domain.JSONSchemaRepository
 
-	createUser *domain.CreateUser
+	CreateUser *domain.CreateUser
 }
 
 func NewCreateUserAction(input CreateUserInput, userRepo domain.UserRepository, schemaRepo domain.JSONSchemaRepository) *CreateUserAction {
@@ -200,16 +238,17 @@ func (o *CreateUserAction) Prepare(ctx context.Context, db database.QueryExecuto
 		return domain.ErrInternal(err).WithMessage("failed to get schema from database")
 	}
 
-	o.createUser, err = domain.NewCreateUser(o.ProjectID, o.TeamID, schemaEntity.Schema, o.User)
+	o.CreateUser, err = domain.NewCreateUser(o.ProjectID, o.TeamID, o.ID, schemaEntity.Schema, o.User)
 	if err != nil {
 		return err
 	}
 
-	o.User["id"] = o.createUser.ID
+	o.User["id"] = o.CreateUser.ID
 	return nil
 }
+
 func (o *CreateUserAction) Apply(ctx context.Context, db database.QueryExecutor) error {
-	err := o.userRepo.Create(ctx, db, o.createUser)
+	err := o.userRepo.Create(ctx, db, o.CreateUser)
 	if err != nil {
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
 			return domain.ErrUserAlreadyExists().WithParent(err)
@@ -219,6 +258,8 @@ func (o *CreateUserAction) Apply(ctx context.Context, db database.QueryExecutor)
 
 	return nil
 }
+
+// ---- Set Password ACTION -------------------------------------------------------------
 
 type SetPasswordUserAction struct {
 	SetPasswordInput
@@ -255,4 +296,53 @@ func (o *SetPasswordUserAction) Apply(ctx context.Context, db database.QueryExec
 		return domain.ErrInternal(err).WithMessage("failed to set password")
 	}
 	return nil
+}
+
+// ---- Lazy ACTION -------------------------------------------------------------
+
+type UserActionFactory = func(ctx context.Context, db database.QueryExecutor) (UserAction, error)
+
+// LazyUserAction allows for lazy initialization of a user-action. It forwards
+// the `Prepare` and `Apply` methods to the generated action. The UserAction is
+// only right before it is used in those functions.
+//
+// This action can be wrapped around an action when the wrapped action requires
+// an output of a previous action. It can then use a clojure to get the data
+// from the other action.
+type LazyUserAction struct {
+	factory UserActionFactory
+	action  UserAction
+}
+
+func NewLazyUserAction(factory UserActionFactory) *LazyUserAction {
+	return &LazyUserAction{
+		factory: factory,
+	}
+}
+
+func (o *LazyUserAction) Prepare(ctx context.Context, db database.QueryExecutor) (err error) {
+	action, err := o.Action(ctx, db)
+	if err != nil {
+		return err
+	}
+	return action.Prepare(ctx, db)
+}
+
+func (o *LazyUserAction) Apply(ctx context.Context, db database.QueryExecutor) error {
+	action, err := o.Action(ctx, db)
+	if err != nil {
+		return err
+	}
+	return action.Apply(ctx, db)
+}
+
+func (o *LazyUserAction) Action(ctx context.Context, db database.QueryExecutor) (UserAction, error) {
+	if o.action == nil {
+		action, err := o.factory(ctx, db)
+		if err != nil {
+			return nil, err
+		}
+		o.action = action
+	}
+	return o.action, nil
 }

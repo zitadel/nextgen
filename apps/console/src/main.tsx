@@ -1,20 +1,9 @@
-import { RouterProvider, createRouter } from "@tanstack/react-router";
+import { RouterProvider } from "@tanstack/react-router";
 import ReactDOM from "react-dom/client";
 
-import { routeTree } from "./routeTree.gen";
+import { createAppRouter } from "./router";
 
-const router = createRouter({
-  routeTree,
-  basepath: import.meta.env.PROD ? "/ui/console" : undefined,
-  defaultPreload: "intent",
-  scrollRestoration: true,
-});
-
-declare module "@tanstack/react-router" {
-  interface Register {
-    router: typeof router;
-  }
-}
+const router = createAppRouter();
 
 /** Drop stale MSW service workers from when the console embedded the orchestrator. */
 async function clearStaleServiceWorkers(): Promise<void> {

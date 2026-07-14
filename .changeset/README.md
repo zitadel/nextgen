@@ -10,6 +10,8 @@ The public `@zitadel/*` packages are the `fixed` group in
 [`.changeset/config.json`](config.json). Other workspaces do not publish, and
 `AGENTS.md` files under publishable roots do not need a changeset on their own.
 
+`packages/config/` publishes `@zitadel/config` and is part of that fixed group.
+
 ## When a change needs a changeset
 
 A change needs a changeset if it changes what the shipped product does —
@@ -94,8 +96,9 @@ Publishing uses **npm trusted publishing (OIDC)** — there is no `NPM_TOKEN`. O
 per public package, a maintainer adds a trusted publisher on npmjs.com (Settings →
 Trusted Publishing): provider GitHub Actions, repo `zitadel/nextgen`, workflow
 `release-publish.yml`. The package must exist on npm first (publish `0.0.x` by
-hand if needed). Provenance stays off (`NPM_CONFIG_PROVENANCE=false`) while the
-repo is private; re-enable when public.
+hand if needed). The release job runs on Depot, which npm treats as self-hosted;
+keep `NPM_CONFIG_PROVENANCE=false` until npm provenance is supported for that
+runner environment or the publish job moves to GitHub-hosted runners.
 
 Each public package must declare its license and ship a `LICENSE` file before its
 first publish — see [LICENSING.md](../LICENSING.md).

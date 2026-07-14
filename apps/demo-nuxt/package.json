@@ -1,7 +1,7 @@
 {
   "name": "@zitadel/demo-nuxt",
   "version": "0.0.0",
-  "description": "Nuxt demo app for Nextgen Auth",
+  "description": "Nuxt demo app for the pre-release Zitadel preview.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/demo-nuxt#readme",
   "bugs": {
     "url": "https://github.com/zitadel/nextgen/issues"
@@ -24,7 +24,7 @@
     "@zitadel/components": "workspace:*",
     "@zitadel/design-tokens": "workspace:*",
     "@zitadel/shared-component-styles": "workspace:*",
-    "nuxt": "^4.4.6"
+    "nuxt": "^4.4.8"
   },
   "devDependencies": {
     "typescript": "^5.7.3",

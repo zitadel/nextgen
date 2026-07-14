@@ -56,7 +56,7 @@ const defaultSchemaURL = "https://example.test/user/v1/default.user.schema.json"
 const defaultSchemaContent string = `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
-		"x-auth-methods": { "password": { "enabled": true } },
+		"x-auth-methods": { "password": { "enabled": true }, "passkey": { "enabled": true } },
 		"required": ["email", "username", "given_name", "family_name"],
 		"properties": {
 			"email":       { "type": "string", "format": "email", "maxLength": 320, "x-unique": "team" },

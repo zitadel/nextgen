@@ -66,7 +66,7 @@ Core nouns used across the API. Full endpoint map in [`api/resource-map.md`](api
 | **idp** | External identity provider the project federates **to**. Zitadel acts as OIDC/SAML client downstream. |
 | **user** | See §1. Identity inside a project. |
 | **session** | Durable post-auth container, carries verified factors and every currently satisfied `assurance_levels[]` value. Produced by a completed auth_attempt. Detail in [`flowengine/session-api.md`](flowengine/session-api.md). |
-| **grant** | Explicit access record (user ↔ app, team ↔ project, member ↔ role). |
+| **grant** | Explicit access record binding a principal to a permission/relation at a scope (user ↔ app, team ↔ project, member ↔ role, or a raw permission/relation assignment). Long-form in [ADR 032](../adrs/032-permission-catalogs.md). |
 | **role** | Named permission bundle inside an app_group. |
 | **team_membership** | Dedicated team roster/status shape when team participation is stored outside FGA tuples. It can carry roles, provisioning metadata, and member status, but it is not lifecycle ownership; FGA may consume or mirror it for authorization. |
 | **auth_attempt** | Ephemeral state machine driving a single authentication attempt. Exposes *auth primitives* (challenges, verify, handoff). OIDC context is owned by the OIDC adapter (`auth_requests`), not by auth_attempt. Long-form in [`api/authn-and-auth-flows.md`](api/authn-and-auth-flows.md). |
@@ -77,7 +77,23 @@ Core nouns used across the API. Full endpoint map in [`api/resource-map.md`](api
 
 ---
 
-## 5. Config terms
+## 5. Authorization (FGA)
+
+How a permission check is framed and resolved. Long-form in [ADR 032](../adrs/032-permission-catalogs.md)
+(shared catalog/storage/resolver core), [ADR 033](../adrs/033-internal-permission-management.md)
+(internal/system-catalog specifics), and [ADR 034](../adrs/034-external-permission-management.md)
+(external/app-group-catalog specifics).
+
+| Term | Meaning |
+|---|---|
+| **principal** | Whatever presents a credential to be checked in a permission decision: a user token, an agent, a service token (`sk_proj_…`, `sk_team_…`), or an origin-bound browser nonce. |
+| **scope** | The resolved project/team/resource boundary a permission check runs against, produced by `resource_scope_index` before authorization runs. |
+| **`resource_scope_index`** | A global lookup table mapping a globally-addressable resource id to its project/team scope, consulted by middleware before authorization runs. See [`api/url-architecture.md`](api/url-architecture.md). |
+| **delegation** | An explicit, audited transfer of authority from one principal to another (e.g. a person to an agent), distinct from an agent silently inheriting everything its grantor could do. |
+
+---
+
+## 6. Config terms
 
 From the configuration surface and flow engine. Long-form in [`platform/configuration-surface.md`](platform/configuration-surface.md) and [`flowengine/flow-engine-guide.md`](flowengine/flow-engine-guide.md).
 
@@ -94,13 +110,13 @@ From the configuration surface and flow engine. Long-form in [`platform/configur
 
 ---
 
-## 6. URL shape
+## 7. URL shape
 
 **LOCKED: no version segment in paths.** All endpoints live directly under the root (`POST /users`, `GET /teams/{id}`). Versioning is header-selected via `Zitadel-Version: 2026-04-21`, pinned per API key and per webhook endpoint. See [`api/conventions.md`](api/conventions.md#versioning).
 
 ---
 
-## 7. Orthogonal axes
+## 8. Orthogonal axes
 
 Four independent axes the system moves on.
 
@@ -113,7 +129,7 @@ Four independent axes the system moves on.
 
 ---
 
-## 8. Renames (LOCKED)
+## 9. Renames (LOCKED)
 
 | Was | Now | Notes |
 |---|---|---|
@@ -142,7 +158,7 @@ Five distinct uses of "instance" existed in the branch. Each resolves to a diffe
 
 ---
 
-## 9. Prose exceptions
+## 10. Prose exceptions
 
 - **developer** — allowed in audience/marketing prose ("developer-first audience"). Not the API resource term.
 - **organization** (plain English) — avoid. Use "team" even in prose.
@@ -150,7 +166,7 @@ Five distinct uses of "instance" existed in the branch. Each resolves to a diffe
 
 ---
 
-## 10. See also
+## 11. See also
 
 - [`api/README.md`](api/README.md) — API design guide index
 - [`platform/README.md`](platform/README.md) — platform lifecycle, claim, configuration

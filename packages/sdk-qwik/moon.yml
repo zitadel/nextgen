@@ -31,6 +31,23 @@ tasks:
     outputs:
       - "dist/**/*"
 
+  build-release:
+    script: |
+      node ../../scripts/release-clean.mjs local-dist
+      corepack pnpm run build
+    deps:
+      - "api:build-release"
+      - "components:build-release"
+      - "sdk-core:build-release"
+    outputs:
+      - "dist/**/*"
+    options:
+      cache: false
+      # Release builds remove stale package output and rebuild dist in one
+      # task. They stay out of `moon ci`; release:snapshot invokes them in
+      # the later release step instead of the normal build/test graph.
+      runInCI: false
+
   test:
     command: "corepack pnpm run test"
     deps:

@@ -1,0 +1,7 @@
+type: object
+properties:
+  name:
+    description: The name of the project.
+    oneOf:
+      - type: 'null'
+      - type: string

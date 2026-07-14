@@ -142,6 +142,24 @@ describe("doctor command", () => {
     expect(names).not.toContain("managed-middleware");
   });
 
+  it("warns (but passes) when .zitadel/schemas is empty — legacy or interrupted projects", async () => {
+    const cwd = await makeHealthyProject();
+    await rm(join(cwd, ".zitadel/schemas/user.json"));
+
+    const res = await doctor(cwd);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      status: string;
+      data: { ok: boolean; checks: Check[] };
+    };
+    expect(json.status).toBe("ok");
+    expect(json.data.ok).toBe(true);
+    const schemaCheck = json.data.checks.find((check) => check.name === "schema");
+    expect(schemaCheck?.status).toBe("warn");
+    expect(schemaCheck?.message).toContain("No schema files found");
+  });
+
   it("fails the dependency check when no @zitadel package is present", async () => {
     const cwd = await makeHealthyProject();
     await writeFile(

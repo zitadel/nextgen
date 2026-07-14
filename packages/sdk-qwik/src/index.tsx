@@ -1,12 +1,15 @@
 import type {
   ZitadelLogin as ZitadelLoginElement,
   ZitadelLogout as ZitadelLogoutElement,
+  ZitadelSession as ZitadelSessionElement,
 } from "@zitadel/components";
 import type {
   ZitadelLoginConfig,
   ZitadelLoginHandlers,
   ZitadelLogoutConfig,
   ZitadelLogoutHandlers,
+  ZitadelSessionConfig,
+  ZitadelSessionHandlers,
 } from "@zitadel/sdk-core/types";
 
 import "@zitadel/components";
@@ -35,6 +38,17 @@ function projectProp(
   proxyPath: string | undefined,
 ): Record<string, unknown> {
   return { project, projectId, proxyPath };
+}
+
+/**
+ * Login-only copy overrides, spread for the same reason as {@link projectProp}:
+ * `locales`/`lang` are property-only members the custom-element JSX types omit.
+ */
+function localeProps(
+  locales: Record<string, Record<string, string>> | undefined,
+  lang: string | undefined,
+): Record<string, unknown> {
+  return { locales, lang };
 }
 
 function eventDetail<T>(event: Event): T {
@@ -113,7 +127,9 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
         }
       }}
       {...projectProp(props.project, props.projectId, props.proxyPath)}
+      {...localeProps(props.locales, props.lang)}
       purpose={props.purpose ?? "login"}
+      flow-name={props.flowName}
       post-sign-in-url={props.postSignInUrl}
     />
   );
@@ -169,6 +185,61 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
       }}
       {...projectProp(props.project, props.projectId, props.proxyPath)}
       post-sign-out-url={props.postSignOutUrl}
+    />
+  );
+});
+
+/**
+ * Props for {@link ZitadelSession}. Supply the SDK handle via {@link project},
+ * or the discrete `projectId` / `proxyPath` the widget reads as properties. The
+ * `on…$` QRL callbacks are derived from the shared {@link ZitadelSessionHandlers}
+ * contract. Pass an optional {@link ref} signal to obtain the underlying
+ * `<zitadel-session>` element imperatively.
+ */
+export type ZitadelSessionProps = ZitadelSessionConfig &
+  Qrlify<ZitadelSessionHandlers> & {
+    /**
+     * Optional signal populated with the underlying `<zitadel-session>` element
+     * once it mounts, mirroring React's `forwardRef`.
+     */
+    readonly ref?: Signal<ZitadelSessionElement | undefined>;
+  };
+
+/**
+ * Qwik component wrapping the `<zitadel-session>` web component — the
+ * post-sign-in "signed in as" card. Binds the {@link ZitadelProject} handle as
+ * a DOM property (or the discrete project id / proxy path) and forwards the
+ * widget's `zitadel-signout` event as an optional callback.
+ */
+export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
+  const host = useSignal<ZitadelSessionElement>();
+  // eslint-disable-next-line qwik/no-use-visible-task
+  useVisibleTask$(
+    ({ track, cleanup }) => {
+      const el = track(() => host.value);
+      if (!el) {
+        return;
+      }
+      const onSignout = (event: Event): void => void props.onSignout$?.(eventDetail(event));
+      el.addEventListener("zitadel-signout", onSignout);
+      cleanup(() => {
+        el.removeEventListener("zitadel-signout", onSignout);
+      });
+    },
+    { strategy: "document-ready" },
+  );
+  return (
+    <zitadel-session
+      ref={(el) => {
+        host.value = el;
+        if (props.ref) {
+          props.ref.value = el;
+        }
+      }}
+      {...projectProp(props.project, props.projectId, props.proxyPath)}
+      post-sign-out-url={props.postSignOutUrl}
+      heading={props.heading}
+      logout-label={props.logoutLabel}
     />
   );
 });

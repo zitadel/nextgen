@@ -67,6 +67,7 @@ export const en: Record<string, string> = {
   "register-password.description": "Choose a secure password for your account",
   "register-password.field.password": "Password",
   "register-password.action.submit": "Sign up",
+  "register-password.action.back": "Back",
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: passkey-upsell (passkey enrollment offer — after registration)
@@ -110,6 +111,7 @@ export const en: Record<string, string> = {
   "password.field.password": "Password",
   "password.action.signin": "Sign in",
   "password.action.passkey": "Sign in with a passkey",
+  "password.action.back": "Back",
   "password.action.register.lead": "Don't have an account? ",
   "password.action.register.link": "Sign up",
 
@@ -130,15 +132,22 @@ export const en: Record<string, string> = {
   "register.action.password": "Continue with password",
   "register.action.passkey": "Continue with a passkey",
   "register.action.submit": "Sign up",
+  "register.action.back": "Back",
   "register.action.sign_in.lead": "Already have an account? ",
   "register.action.sign_in.link": "Sign in",
 
   "complete.title": "You're signed in as",
   "signed-in.continue": "Continue",
-  "signed-in.logout": "Logout",
+  "signed-in.logout": "Sign out",
 
   // --- Passkey login ---
   "passkey-login.title": "Sign in with your passkey",
+
+  // --- Step: passkey-first (entry step of the passkey-first preset) ---
+  "passkey-first.title": "Sign in",
+  "passkey-first.description": "Use your passkey to continue",
+  "passkey-first.action.passkey": "Continue with passkey",
+  "passkey-first.action.email_fallback": "Use email instead",
 
   // --- Password recovery ---
   "recover.title": "Check your email",
@@ -150,6 +159,8 @@ export const en: Record<string, string> = {
   "submit.signin": "Sign in",
   "action.forgot_password": "Forgot password?",
   "action.cancel": "Cancel",
+  // Generic fallback for the engine-injected `<step>.action.back` key on
+  // custom step names (see INJECTED_KEY_FALLBACKS in liquid.ts).
   "action.back": "Back",
 
   // --- SSO ---
