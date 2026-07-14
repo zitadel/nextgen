@@ -17,47 +17,47 @@ const (
 
 // ErrAuthAttemptNotFound returns an error indicating that the requested auth attempt was not found.
 func ErrAuthAttemptNotFound() Error {
-	return newError(PrefixAuthAttempt.ErrorCodePrefix("not_found"), "The auth attempt was not found.", nil, nil)
+	return NewError(PrefixAuthAttempt.ErrorCodePrefix("not_found"), "The auth attempt was not found.", nil, nil)
 }
 
 // ErrAuthAttemptInvalidRequest returns an error indicating that the request is invalid.
 func ErrAuthAttemptInvalidRequest() Error {
-	return newError(PrefixAuthAttempt.ErrorCodePrefix("invalid_request"), "invalid request", nil, nil)
+	return NewError(PrefixAuthAttempt.ErrorCodePrefix("invalid_request"), "invalid request", nil, nil)
 }
 
 // ErrAuthAttemptInvalidState returns an error indicating that the attempt is in an invalid state (e.g. expired).
 func ErrAuthAttemptInvalidState() Error {
-	return newError(PrefixAuthAttempt.ErrorCodePrefix("invalid_state"), "The auth attempt is in an invalid state for the intended change.", nil, nil)
+	return NewError(PrefixAuthAttempt.ErrorCodePrefix("invalid_state"), "The auth attempt is in an invalid state for the intended change.", nil, nil)
 }
 
 // ErrAuthAttemptAlreadyCompleted returns an error indicating that the attempt is already completed.
 func ErrAuthAttemptAlreadyCompleted() Error {
-	return newError(PrefixAuthAttempt.ErrorCodePrefix("already_completed"), "The auth attempt is already completed and can no longer be changed.", nil, nil)
+	return NewError(PrefixAuthAttempt.ErrorCodePrefix("already_completed"), "The auth attempt is already completed and can no longer be changed.", nil, nil)
 }
 
 // ErrAuthAttemptNotCompleted returns an error indicating that the attempt is not completed.
 func ErrAuthAttemptNotCompleted() Error {
-	return newError(PrefixAuthAttempt.ErrorCodePrefix("not_completed"), "The auth attempt must be completed for any further action.", nil, nil)
+	return NewError(PrefixAuthAttempt.ErrorCodePrefix("not_completed"), "The auth attempt must be completed for any further action.", nil, nil)
 }
 
 // ErrAuthAttemptAlreadyHandedOff returns an error indicating that the attempt is already handed off.
 func ErrAuthAttemptAlreadyHandedOff() Error {
-	return newError(PrefixAuthAttempt.ErrorCodePrefix("already_handed_off"), "The auth attempt was already handed off. No new handoff can be created and the previous token will only be returned if the same Idempotency-Key header is provided.", nil, nil)
+	return NewError(PrefixAuthAttempt.ErrorCodePrefix("already_handed_off"), "The auth attempt was already handed off. No new handoff can be created and the previous token will only be returned if the same Idempotency-Key header is provided.", nil, nil)
 }
 
 // ErrAuthAttemptInvalidProof returns an error indicating that the proof is invalid.
 func ErrAuthAttemptInvalidProof() Error {
-	return newError(PrefixAuthAttempt.ErrorCodePrefix("invalid_proof"), "The proof or request is invalid.", nil, nil)
+	return NewError(PrefixAuthAttempt.ErrorCodePrefix("invalid_proof"), "The proof or request is invalid.", nil, nil)
 }
 
 // ErrAuthAttemptProofRejected returns an error indicating that the proof was rejected.
 func ErrAuthAttemptProofRejected(err error) Error {
-	return newError(PrefixAuthAttempt.ErrorCodePrefix("proof_rejected"), "The proof was rejected.", nil, err)
+	return NewError(PrefixAuthAttempt.ErrorCodePrefix("proof_rejected"), "The proof was rejected.", nil, err)
 }
 
 // ErrAuthAttemptStaleChallenge returns an error indicating that the challenge is stale or has been re-issued.
 func ErrAuthAttemptStaleChallenge() Error {
-	return newError(PrefixAuthAttempt.ErrorCodePrefix("stale_challenge"), "The challenge is stale or was re-issued.", nil, nil)
+	return NewError(PrefixAuthAttempt.ErrorCodePrefix("stale_challenge"), "The challenge is stale or was re-issued.", nil, nil)
 }
 
 // AuthAttempt represents the object defined [here](https://github.com/zitadel/nextgen/blob/15bd7f438d709fcd5205a163e24374f6f667b68f/docs/design/api/resource-map.md#auth-flows)
@@ -108,7 +108,7 @@ func WithSession(sessionID *string, authFactors ...AuthFactor) AuthAttemptOption
 }
 
 func NewAuthAttempt(projectID string, requiredChecks []AuthCheckType, opts ...AuthAttemptOption) (*AuthAttempt, error) {
-	id, err := newID(PrefixAuthAttempt)
+	id, err := NewID(PrefixAuthAttempt)
 	if err != nil {
 		return nil, err
 	}

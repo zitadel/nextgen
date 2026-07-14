@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/domain/crypto"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -19,6 +20,7 @@ type Statements interface {
 type AllStatements interface {
 	ProjectStatements
 	FlowDefinitionStatements
+	CryptoKeyStatements
 	Statements
 }
 
@@ -48,4 +50,11 @@ type FlowDefinitionStatements interface {
 	GetFlowDefinitionByID(ctx context.Context, id string) (*domain.FlowDefinition, error)
 	ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error)
 	DeleteFlowDefinitionByID(ctx context.Context, id string) error
+}
+
+type CryptoKeyStatements interface {
+	Statements
+	GetActiveDEK(ctx context.Context, projectID string) (*crypto.DEK, error)
+	CreateDEK(ctx context.Context, dek *crypto.DEK) error
+	UpdateDEK(ctx context.Context, dek *crypto.DEK) error
 }

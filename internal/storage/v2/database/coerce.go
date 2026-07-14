@@ -152,6 +152,16 @@ func CoerceEnumKeyMapAsAny[K ~uint8, V any](parseKey func(string) (K, error)) fu
 	}
 }
 
+// CoerceBytes coerces a slice of bytes for SQL binding.
+func CoerceBytes(v any) (any, error) {
+	switch bs := v.(type) {
+	case []byte:
+		return bs, nil
+	default:
+		return nil, ErrCoerceExpectedType("[]byte", v)
+	}
+}
+
 // CoerceSlice converts JSON-decoded slice shapes into []T.
 // It accepts []T (identity) or []any (coerce each element).
 func CoerceSlice[T any](v any, coerceElem func(any) (T, error)) ([]T, error) {

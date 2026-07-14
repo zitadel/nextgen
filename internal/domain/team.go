@@ -12,11 +12,11 @@ const (
 )
 
 func ErrTeamNotFound() Error {
-	return newError(PrefixTeam.ErrorCodePrefix("team_not_found"), "team not found", nil, nil)
+	return NewError(PrefixTeam.ErrorCodePrefix("team_not_found"), "team not found", nil, nil)
 }
 
 func ErrTeamProjectNotFound() Error {
-	return newError(PrefixTeam.ErrorCodePrefix("project_not_found"), "project not found", nil, nil)
+	return NewError(PrefixTeam.ErrorCodePrefix("project_not_found"), "project not found", nil, nil)
 }
 
 // Team represents the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#teams)
@@ -31,7 +31,7 @@ type Team struct {
 }
 
 func NewTeam(projectID string) (*Team, error) {
-	id, err := newID(PrefixTeam)
+	id, err := NewID(PrefixTeam)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to create team id")
 	}

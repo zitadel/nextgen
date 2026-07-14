@@ -27,7 +27,7 @@ type Project struct {
 }
 
 func NewProject(previewOrigins []string, tokenGenerator TokenGenerator) (*Project, error) {
-	id, err := newID(PrefixProject)
+	id, err := NewID(PrefixProject)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to create project id")
 	}

@@ -1,5 +1,7 @@
 package crypto
 
+//go:generate go tool mockgen -typed -package cryptomock -destination ./mock/encryption.mock.go . Encrypter,Decrypter,Crypter
+
 type Encrypter interface {
 	Encrypt(string) (string, error)
 }

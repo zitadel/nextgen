@@ -27,15 +27,15 @@ const (
 )
 
 func ErrJSONSchemaNotFound() Error {
-	return newError(PrefixJSONSchema.ErrorCodePrefix("not_found"), "schema not found", nil, nil)
+	return NewError(PrefixJSONSchema.ErrorCodePrefix("not_found"), "schema not found", nil, nil)
 }
 
 func ErrJSONSchemaInvalid() Error {
-	return newError(PrefixJSONSchema.ErrorCodePrefix("invalid_request"), "invalid request", nil, nil)
+	return NewError(PrefixJSONSchema.ErrorCodePrefix("invalid_request"), "invalid request", nil, nil)
 }
 
 func ErrJSONSchemaAlreadyExists() Error {
-	return newError(PrefixJSONSchema.ErrorCodePrefix("already_exists"), "a schema with the given id already exists", nil, nil)
+	return NewError(PrefixJSONSchema.ErrorCodePrefix("already_exists"), "a schema with the given id already exists", nil, nil)
 }
 
 var absoluteScheme = regexp.MustCompile(`^https?://`)
@@ -56,7 +56,7 @@ func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error)
 
 	schemaID, _ := maputil.Get[string](schema, "$id")
 	if schemaID == "" {
-		schemaID, err = newID(PrefixJSONSchema)
+		schemaID, err = NewID(PrefixJSONSchema)
 		if err != nil {
 			return nil, ErrInternal(err).WithMessage("failed to generate schema id")
 		}

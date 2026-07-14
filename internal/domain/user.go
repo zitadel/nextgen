@@ -24,15 +24,15 @@ const (
 )
 
 func ErrUserInvalid() Error {
-	return newError(PrefixUser.ErrorCodePrefix("invalid"), "user invalid", nil, nil)
+	return NewError(PrefixUser.ErrorCodePrefix("invalid"), "user invalid", nil, nil)
 }
 
 func ErrUserNotFound() Error {
-	return newError(PrefixUser.ErrorCodePrefix("not_found"), "user not found", nil, nil)
+	return NewError(PrefixUser.ErrorCodePrefix("not_found"), "user not found", nil, nil)
 }
 
 func ErrUserAlreadyExists() Error {
-	return newError(PrefixUser.ErrorCodePrefix("already_exists"), "a user already exists with the given unique attributes", nil, nil)
+	return NewError(PrefixUser.ErrorCodePrefix("already_exists"), "a user already exists with the given unique attributes", nil, nil)
 }
 
 // User is a hydrated user projection (header + optional EAV joins).
@@ -83,7 +83,7 @@ func NewCreateUser(projectID string, teamID *string, id string, schemabs []byte,
 	}
 
 	if id == "" {
-		id, err = newID(PrefixUser)
+		id, err = NewID(PrefixUser)
 		if err != nil {
 			return nil, ErrInternal(err).WithMessage("failed to create user id")
 		}
