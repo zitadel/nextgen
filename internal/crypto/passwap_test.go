@@ -467,7 +467,7 @@ func TestPasswordHashConfig_PasswordHasher(t *testing.T) {
 func TestPasswordHasher_Argon2idRehashesBcrypt(t *testing.T) {
 	const password = "Passw0rd!"
 
-	// A hasher configured just like the server default (bcrypt kept as verifier).
+	// A hasher configured with argon2id as the target hasher and bcrypt as a legacy verifier.
 	cfg := &HashConfig{
 		Verifiers: []HashName{HashNameBcrypt},
 		Hasher: HasherConfig{
