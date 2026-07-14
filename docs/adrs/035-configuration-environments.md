@@ -298,36 +298,39 @@ sequenceDiagram
     CLI-->>Dev: local hash + per-env relation table
 ```
 
-Example — aligned state. Local matches every environment's current release; nothing to do:
+Output aims for scannability: a compact `Local` header, one line per environment (state, running release + audit message, age), and a plain-English summary with next-step suggestions at the bottom.
+
+Example — aligned state. Local matches every environment's current release:
 
 ```
 $ zitadel status
 
-Local (.zitadel/)
-  bundle hash    abc123f4...
-  git            main @ 4a5b6c7  (clean)
+Local
+  main @ 4a5b6c7 (clean) · 6 resources
 
 Environments
-  ENV       CURRENT RELEASE                     DEPLOYED   RELATION TO LOCAL
-  dev       rel_01KX3RG8A7F0N9WD3P2E4YM5C1      2h ago     matches
-  staging   rel_01KX2ZJ4X0YJKP0JTN428A6DPB      1d ago     matches
-  prod      rel_01KX2ZJ4X0YJKP0JTN428A6DPB      3d ago     matches
+  dev       in sync   running rel_01KX3RG8... (2h ago)  "add phone_number to human-user"
+  staging   in sync   running rel_01KX2ZJ4... (1d ago)  "initial import"
+  prod      in sync   running rel_01KX2ZJ4... (3d ago)  "initial import"
+
+All environments match local. Nothing to do.
 ```
 
-Example — local ahead of every env. You've edited files but haven't deployed yet; running `zitadel deploy --env dev` is the next step:
+Example — local ahead of every env. You've edited files but haven't deployed yet:
 
 ```
 $ zitadel status
 
-Local (.zitadel/)
-  bundle hash    9f2e8a1b...
-  git            feature/phone-number @ 8d4e1a0  (2 modified)
+Local
+  feature/phone-number @ 8d4e1a0 · 6 resources (2 modified)
 
 Environments
-  ENV       CURRENT RELEASE                     DEPLOYED   RELATION TO LOCAL
-  dev       rel_01KX3RG8A7F0N9WD3P2E4YM5C1      2h ago     local ahead (2 changes)
-  staging   rel_01KX2ZJ4X0YJKP0JTN428A6DPB      1d ago     local ahead (2 changes)
-  prod      rel_01KX2ZJ4X0YJKP0JTN428A6DPB      3d ago     local ahead (2 changes)
+  dev       ahead by 2 changes   running rel_01KX3RG8... (2h ago)  "initial import"
+  staging   ahead by 2 changes   running rel_01KX2ZJ4... (1d ago)  "initial import"
+  prod      ahead by 2 changes   running rel_01KX2ZJ4... (3d ago)  "initial import"
+
+Your local .zitadel/ has 2 resource changes not deployed to any environment yet.
+  → zitadel deploy --env dev
 ```
 
 Example — mid-promotion. Dev is caught up to local; staging and prod haven't been promoted yet:
@@ -335,31 +338,38 @@ Example — mid-promotion. Dev is caught up to local; staging and prod haven't b
 ```
 $ zitadel status
 
-Local (.zitadel/)
-  bundle hash    c3a9b71e...
-  git            main @ e0f2b8c  (clean)
+Local
+  main @ e0f2b8c (clean) · 6 resources
 
 Environments
-  ENV       CURRENT RELEASE                     DEPLOYED   RELATION TO LOCAL
-  dev       rel_01KX4B2M8G7V3Q8W9P1D5N2K7R      1h ago     matches
-  staging   rel_01KX3RG8A7F0N9WD3P2E4YM5C1      2d ago     local ahead (1 change)
-  prod      rel_01KX2ZJ4X0YJKP0JTN428A6DPB      5d ago     local ahead (3 changes)
+  dev       in sync              running rel_01KX4B2M... (1h ago)  "add phone_number to human-user"
+  staging   ahead by 1 change    running rel_01KX3RG8... (2d ago)  "initial import"
+  prod      ahead by 3 changes   running rel_01KX2ZJ4... (5d ago)  "initial import"
+
+Local matches dev. Staging and prod are running older releases.
+  → zitadel promote --from dev --to staging
+  → zitadel promote --from dev --to prod
 ```
 
-Example — local behind. A colleague deployed a release from their branch; your local `.zitadel/` doesn't yet include what dev is running. Fix with `git pull` (their branch carries the source files) or, if the release was assembled from server-side drafts, with `zitadel pull` per resource:
+Example — local behind. A colleague deployed something you don't have locally:
 
 ```
 $ zitadel status
 
-Local (.zitadel/)
-  bundle hash    5b81c0f2...
-  git            main @ 4a5b6c7  (clean)
+Local
+  main @ 4a5b6c7 (clean) · 6 resources
 
 Environments
-  ENV       CURRENT RELEASE                     DEPLOYED   RELATION TO LOCAL
-  dev       rel_01KX5N7C4P9E2A1B7Y3F6H8T9M      20m ago    local behind (1 change on dev)
-  staging   rel_01KX2ZJ4X0YJKP0JTN428A6DPB      1d ago     matches
-  prod      rel_01KX2ZJ4X0YJKP0JTN428A6DPB      3d ago     matches
+  dev       behind by 1 change   running rel_01KX5N7C... (20m ago)  "swap google idp for corporate SSO"
+  staging   in sync              running rel_01KX2ZJ4... (1d ago)   "initial import"
+  prod      in sync              running rel_01KX2ZJ4... (3d ago)   "initial import"
+
+dev is running content not in your local .zitadel/. This usually means a
+colleague deployed from a branch you don't have, or the release was
+assembled from server-drafted revisions (via UI or MCP).
+
+  → git pull                          if the deploy came from a branch you don't have
+  → zitadel pull <kind> <handle>      if the release was assembled from server drafts
 ```
 
 #### `pull`
