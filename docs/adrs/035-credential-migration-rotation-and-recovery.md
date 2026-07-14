@@ -161,14 +161,13 @@ Three configured durations govern the signing key lifecycle:
   - Defined per project, defaulting to 30 days per
     [ADR 029](029-cryptography-secrets-and-key-lifecycle.md#rotation).
   - Setting it to zero disables automatic rotation, leaving rotation a manual, admin-triggered
-    action; a key then signs indefinitely.
+    action; a key then signs indefinitely, or until rotated manually.
 
 The signing key, the JWKS contents, and each key's phase are all computed from `active_from` and
 `retired_at` at read time:
 
 - **Signing key:** the key whose `active_from` has passed and whose `retired_at` is null or still in
-  the future (`active_from <= now()` and (`retired_at IS NULL` or `retired_at > now()`)). At most
-  one key satisfies this at any instant.
+  the future (`active_from <= now()` and (`retired_at IS NULL` or `retired_at > now()`)).
 - **Served in the JWKS:** from creation until one grace period after it retires
   (`retired_at IS NULL` or `retired_at + grace_period > now()`). A key that never retires stays
   indefinitely.
@@ -224,7 +223,7 @@ If an active signing key is compromised:
    and are independent of the signing key, so the compromise does not affect them. Revoking them is
    a precaution against a broader breach, forcing re-authentication. PATs are out of scope in the
    current MVP ([ADR 032](032-token-lifecycle.md#personal-access-tokens)), and their exposure depends
-   on their eventual token format ([Open Question 5](#open-questions)).
+   on their eventual token format ([Open Question 5](#questions)).
 
 **Notes on key deletion:**
 
@@ -251,7 +250,7 @@ provisioning are out of scope for this document.
 This document assumes one DEK per project, matching the per-project scope of signing keys in
 [ADR 029](029-cryptography-secrets-and-key-lifecycle.md#scope). A per-project DEK contains a
 DEK-level compromise to a single project. If the KEK stays global
-([Open Question 3](#open-questions)), a KEK compromise still reaches every DEK it wrapped, and the
+([Open Question 3](#questions)), a KEK compromise still reaches every DEK it wrapped, and the
 emergency procedure below stays platform-wide. The procedures are written per project; a global DEK
 would collapse each per-project step into one.
 
@@ -332,7 +331,7 @@ Adopting these consolidated migration and recovery strategies introduces the fol
   signing at once (though verifiers holding a cached JWKS lag by up to one cache lifetime), and
   compromised TOTP secrets are invalidated server-side immediately.
 - Per-project signing keys with explicit, auditable lifecycles give tenants the key isolation and
-  rotation evidence that compliance regimes ask for, and support the per-project NIST/FIPS profiles
+  rotation evidence for compliance reasons, and support the per-project NIST/FIPS profiles
   in [ADR 029](029-cryptography-secrets-and-key-lifecycle.md#nist).
 - Multi-path account recovery (single-use codes and short-lived magic links) means losing one
   authentication factor is a recoverable event rather than a lockout.
@@ -342,8 +341,9 @@ Adopting these consolidated migration and recovery strategies introduces the fol
 
 ### Negative / Risks
 
-- Recovery is not a guarantee against lockout. A user who loses their recovery codes and their email
-  access has no path back in. We accept that outcome because the only way to recover is via support/admin.
+- Recovery is not a guarantee against lockout. A user who loses both their recovery codes and their
+  email access has no path back in. We accept that outcome because the only escape hatch would be
+  letting support restore access.
 - Magic-link recovery floors an account's security at the security of its email inbox, because it
   bypasses every enrolled factor. For an account otherwise protected by a passkey this is a
   downgrade. Projects that cannot accept that downgrade can disable magic-link recovery
