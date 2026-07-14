@@ -7,12 +7,14 @@ type queryExecutor any
 type statements struct {
 	projectStatements
 	flowDefinitionStatements
+	cryptoKeyStatements
 }
 
 func newStatements(client queryExecutor) statements {
 	return statements{
 		projectStatements:        newProjectStatements(client),
 		flowDefinitionStatements: newFlowDefinitionStatements(client),
+		cryptoKeyStatements:      newCryptoKeyStatements(client),
 	}
 }
 

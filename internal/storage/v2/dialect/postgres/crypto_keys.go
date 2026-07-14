@@ -20,13 +20,13 @@ func newCryptoKeyStatements(client queryExecutor) cryptoKeyStatements {
 }
 
 const createDEKStmt = `
-	INSERT INTO zitadel_nextgen.deks (id, project_id, key, algorithm, state, created_at, activated_at, retired_at)
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	INSERT INTO zitadel_nextgen.deks (id, project_id, key, algorithm, state, activated_at, retired_at)
+	VALUES ($1, $2, $3, $4, $5, $6, $7)
 	RETURNING id, created_at
 `
 
 func (s cryptoKeyStatements) CreateDEK(ctx context.Context, dek *crypto.DEK) error {
-	return s.client.QueryRow(ctx, createDEKStmt, dek.Id, dek.ProjectID, dek.Algorithm, dek.State, dek.CreatedAt, dek.ActivatedAt, dek.RetiredAt).
+	return s.client.QueryRow(ctx, createDEKStmt, dek.Id, dek.ProjectID, dek.Key, dek.Algorithm, dek.State, dek.ActivatedAt, dek.RetiredAt).
 		Scan(&dek.Id, &dek.CreatedAt)
 }
 
@@ -58,7 +58,7 @@ func (s cryptoKeyStatements) GetActiveDEK(ctx context.Context, projectID string)
 		return nil, err
 	}
 
-	rows, err := s.client.Query(ctx, compiler.String(), compiler.args)
+	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}
