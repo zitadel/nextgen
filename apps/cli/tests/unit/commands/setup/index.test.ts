@@ -130,7 +130,7 @@ describe("setup command pre-flight", () => {
     expect(json.hint).toContain("Start local Zitadel first");
     expect(json.next_commands).toEqual([
       expectedPublicCliCommand("start"),
-      expectedPublicCliCommand("setup --framework next --server local"),
+      expectedPublicCliCommand("setup --framework next --non-interactive --server local"),
     ]);
   });
 
@@ -185,7 +185,53 @@ describe("setup command pre-flight", () => {
       "--skip-install",
     ]);
 
-    expect(res.exitCode).toBe(3);
+    expect(res.exitCode).toBe(4);
+    const json = parseJson(res.stdout) as {
+      status: string;
+      code: string;
+      hint?: string;
+      message: string;
+      next_commands?: string[];
+    };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_NOT_FOUND");
+    expect(json.message).toContain("has no such endpoint");
+    // The retry pins the resolved dev port: the issuer registered with the
+    // project derives from it, so the rerun must reproduce it verbatim.
+    expect(json.hint).toContain(
+      "--framework next --dev-port 3000 --non-interactive --server local",
+    );
+    expect(json.next_commands).toEqual([
+      expectedPublicCliCommand("start"),
+      expectedPublicCliCommand(
+        "setup --framework next --dev-port 3000 --non-interactive --server local",
+      ),
+    ]);
+  });
+
+  it("keeps the sign-in preset in cloud-failure retry guidance", async () => {
+    const cwd = await makeTempDir();
+    await mkdir(join(cwd, "app"), { recursive: true });
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
+    );
+    const serverUrl = await startNotFoundServer();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--preset",
+      "passkey-first",
+      "--server",
+      serverUrl,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+    ]);
+
+    expect(res.exitCode).toBe(4);
     const json = parseJson(res.stdout) as {
       status: string;
       code: string;
@@ -193,11 +239,14 @@ describe("setup command pre-flight", () => {
       next_commands?: string[];
     };
     expect(json.status).toBe("error");
-    expect(json.code).toBe("E_VALIDATION");
-    expect(json.hint).toContain("--framework next --server local");
+    // Following the printed retry verbatim must reproduce the requested
+    // sign-in preset, not silently fall back to the default.
+    expect(json.hint).toContain("--preset passkey-first");
     expect(json.next_commands).toEqual([
       expectedPublicCliCommand("start"),
-      expectedPublicCliCommand("setup --framework next --server local"),
+      expectedPublicCliCommand(
+        "setup --framework next --preset passkey-first --dev-port 3000 --non-interactive --server local",
+      ),
     ]);
   });
 

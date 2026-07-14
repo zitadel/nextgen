@@ -26,7 +26,7 @@ func newUserPasskeysMock(ctrl *gomock.Controller, keys []*domain.UserPasskey) *m
 	m := mocks.NewMockUserPasskeys(ctrl)
 	m.EXPECT().ProjectIDCondition(gomock.Any()).Return(nil).AnyTimes()
 	m.EXPECT().UserIDCondition(gomock.Any()).Return(nil).AnyTimes()
-	m.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(keys, nil)
+	m.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any()).Return(keys, nil)
 	return m
 }
 

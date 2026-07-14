@@ -121,4 +121,20 @@ describe("guidance content", () => {
     expect(readme).toContain("register a user, sign out, and sign in again");
     expect(readme).toContain("npx @zitadel/cli@0.1.0-alpha.15 apply");
   });
+
+  it("tells agents how to verify a passkey-first flow they cannot complete", () => {
+    // The fixture ctx is passkey-first: the verify step must explain the
+    // WebAuthn limitation and both workarounds.
+    const agents = agentsGuidanceSection(ctx);
+    expect(agents).toContain("can't complete passkey ceremonies");
+    expect(agents).toContain("email/password fallback");
+    expect(agents).toContain("CDP WebAuthn virtual authenticator");
+    // Human-facing README stays free of automation caveats.
+    expect(readmeGuidanceSection(ctx)).not.toContain("passkey ceremonies");
+  });
+
+  it("omits the passkey verification note for password-first scaffolds", () => {
+    const passwordCtx = { ...ctx, preset: "password-first" } as PatchContext;
+    expect(agentsGuidanceSection(passwordCtx)).not.toContain("passkey ceremonies");
+  });
 });
