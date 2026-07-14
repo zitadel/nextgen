@@ -354,7 +354,7 @@ Adopting these consolidated migration and recovery strategies introduces the fol
   every third-party secret re-issued by the third party that owns it. Recovery time is therefore
   partly outside the platform's control.
 
-## Open questions
+## Questions
 
 1. During an account recovery event, what is the exact policy for invalidating a user's pre-existing
    active sessions and revoking outstanding refresh tokens? Does recovery revoke every session, or
