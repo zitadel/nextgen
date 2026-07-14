@@ -32,8 +32,7 @@ When the user edits the schema, the server allocates a new id. The flow file kee
 
 Configuration changes are bundled as immutable **releases**. A release pins a specific revision of every resource it includes. **Environments** are runtime slots on a project; each runs one release at a time, and the same release can be deployed to any number of environments unchanged. A **deployment** is the record of a release being made live on an environment.
 
-<img width="3288" height="2532" alt="Proposal" src="https://github.com/user-attachments/assets/8606b58f-c6e1-457f-868b-bc401f318c5a" />
-
+<img width="3288" height="2532" alt="Proposal" src="https://github.com/user-attachments/assets/dc644cf6-8837-4781-a20a-b630d72db0b2" />
 
 The three subsections below define each concept: what an environment is, what a release is, and how the two relate. Concrete surfaces (CLI, API, release bundle format) follow further down.
 
