@@ -137,8 +137,10 @@ The canonical resource. A release is project-scoped and immutable; these endpoin
 | Endpoint                       | Purpose                                                                                                                                                                     |
 |---                             |---                                                                                                                                                                          |
 | `POST /releases`               | Assemble a release from existing revision ids. Payload is a list of `(kind, handle, revision_id)` tuples. No new revisions minted. Validates handle references and templates. |
-| `GET /releases`                | List releases in the project, newest first.                                                                                                                                 |
-| `GET /releases/{release_id}`   | Read one release.                                                                                                                                                           |
+| `GET /releases`                | List releases in the project, newest first. Each entry carries audit metadata; pointer tuples are omitted (fetch via `GET /releases/{release_id}`).                         |
+| `GET /releases/{release_id}`   | Read one release: audit metadata (`message`, `git_sha`, `created_at`, `created_by`) and the list of `(kind, handle, revision_id)` tuples it pins. Does **not** embed resource content — callers that need content resolve each `revision_id` via per-kind reads (`GET /schemas/{id}`, `GET /flow_definitions/{id}`, …). |
+
+A release owns pointers and audit metadata, not content. Per-kind endpoints stay the single source of truth for resource bytes; a release is the immutable snapshot of *which* revisions belong together. Consumers that need content (e.g. `zitadel status` diffing against local, or a UI rendering a release preview) resolve each pointer themselves. This keeps releases lightweight and avoids duplicating resource storage.
 
 #### `environments` and `deployments`
 
@@ -146,8 +148,8 @@ An environment holds a history of deployments; each deployment references a rele
 
 | Endpoint                                       | Purpose                                                                                                                                                                             |
 |---                                             |---                                                                                                                                                                                  |
-| `GET /environments`                            | List every environment with its current release id. Used by `zitadel deploy` in interactive mode to prompt for a deployment target.                                                 |
-| `GET /environments/{env}`                      | Read one environment.                                                                                                                                                               |
+| `GET /environments`                            | List every environment with its current deployment (`id`, `release_id`, `deployed_at`, `reason`). Used by `zitadel deploy` in interactive mode to prompt for a deployment target.   |
+| `GET /environments/{env}`                      | Read one environment: identity plus its current deployment (`id`, `release_id`, `deployed_at`, `reason`).                                                                            |
 | `POST /environments/{env}/deployments`         | Deploy a release to this environment. Payload: `{ release_id, reason }` where `reason` is `deploy` \| `promote` \| `rollback`.                                                       |
 | `GET /environments/{env}/deployments`          | List deployments for this environment, newest first. The first row is the current deployment (whose release is live); the rest is the audit log.                                    |
 | `GET /environments/{env}/deployments/{id}`     | Read one deployment.                                                                                                                                                                |
@@ -203,8 +205,8 @@ sequenceDiagram
     CLI->>Dev: prompt for target env
     Dev-->>CLI: pick "dev"
     CLI->>API: GET /releases/{dev.current}
-    API-->>CLI: current release contents
-    Note over CLI: compute removals<br/>local vs. current
+    API-->>CLI: pointers
+    Note over CLI: compute removals<br/>(handle-set diff, no content needed)
     CLI->>Dev: show removals summary, confirm?
     Dev-->>CLI: yes
     CLI->>API: POST /environments/dev/deployments<br/>{ release_id, reason: deploy }
@@ -242,8 +244,8 @@ sequenceDiagram
     CLI->>API: GET /environments/dev
     API-->>CLI: dev's current release_id
     CLI->>API: GET /releases/{dev.current} + /environments/prod
-    API-->>CLI: dev release contents + prod's current release
-    Note over CLI: compute removals<br/>dev's release vs. prod's current
+    API-->>CLI: dev release pointers + prod's current deployment
+    Note over CLI: compute removals<br/>(handle-set diff, no content needed)
     CLI->>Dev: show diff, confirm?
     Dev-->>CLI: yes
     CLI->>API: POST /environments/prod/deployments<br/>{ release_id: <dev's>, reason: promote }
@@ -264,8 +266,8 @@ sequenceDiagram
     API-->>CLI: history, newest first
     Note over CLI: pick previous (2nd row)
     CLI->>API: GET /releases/{previous}
-    API-->>CLI: previous release contents
-    Note over CLI: compute removals<br/>previous vs. current
+    API-->>CLI: previous release pointers
+    Note over CLI: compute removals<br/>(handle-set diff, no content needed)
     CLI->>Dev: show diff, confirm?
     Dev-->>CLI: yes
     CLI->>API: POST /environments/prod/deployments<br/>{ release_id: <previous>, reason: rollback }
@@ -287,11 +289,11 @@ sequenceDiagram
     Dev->>CLI: zitadel status
     CLI->>Local: read + hash bundle
     CLI->>API: GET /environments
-    API-->>CLI: env list + current release ids
+    API-->>CLI: envs + current deployment metadata
     loop for each env
         CLI->>API: GET /releases/{id}
-        API-->>CLI: release contents
-        Note over CLI: compare local vs. release
+        API-->>CLI: pointers + audit metadata
+        Note over CLI: resolve pointers via per-kind reads,<br/>diff resolved content vs. local
     end
     CLI-->>Dev: local hash + per-env relation table
 ```
