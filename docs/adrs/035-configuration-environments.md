@@ -126,21 +126,6 @@ The sections that follow specify the concrete surfaces: how the CLI orchestrates
 
 ## Release lifecycle
 
-### CLI
-
-> **Note.** `zitadel apply` and `zitadel plan` from [ADR 007](007-gitops-configuration-surface.md) are removed. `deploy` replaces `apply`; `plan` has no replacement — under the release model, releases are immutable artifacts and deployments are atomic pointer swaps, so the Terraform-style plan-then-apply preview frame no longer fits. Removal warnings surface in `deploy`'s confirmation prompt (see below); drift detection lives in `zitadel status`.
-
-- `zitadel deploy [--env <env>]`: packages `.zitadel/`, creates a release (`POST /configuration-releases`), and deploys it. `--env` is required in non-interactive mode; in interactive mode the CLI lists environments (`GET /environments`) and prompts the user to pick one or defer the deployment. There is no implicit default environment — every deploy explicitly names its target.
-- `zitadel status`: local bundle summary, plus each environment's currently deployed release and how it relates to local.
-- `zitadel pull <kind> <handle>`: fetch the newest server-side revision of a specific resource and write it into `.zitadel/`, so the next deploy incorporates it.
-- `zitadel promote --from <env> --to <env>`: deploy the release currently running on `<from>` to `<to>`. Optional `--release <release-id>` overrides which release to promote.
-- `zitadel rollback --env <env>`: deploy the previous release on `<env>` (the one that ran before the current). Optional `--to <release-id>` targets a specific prior release.
-- `zitadel releases list`: releases in the project, newest first.
-- `zitadel deployments list --env <env>`: deployment history for an environment, newest first.
-- `zitadel env list`: environments and each one's current release.
-
-Before creating a deployment (via `deploy`, `promote`, or `rollback`), the CLI computes what would be removed from the target environment — resources present in its current release but absent from the incoming one — and prints them. In interactive mode the user confirms; in non-interactive mode an explicit `--confirm-removals` flag is required. Deleting `.zitadel/idps/` locally, for example, does not silently drop every idp on the next deploy: the removal is explicit and acknowledged. Local `.zitadel/` (and the incoming release generally) is authoritative, but deletions are never silent.
-
 ### API
 
 Three groupings, in order of layering: `releases` (primary resource), `environments` and their `deployments` (runtime slots and their history), and `configuration-releases` (CLI orchestrator entry point).
@@ -179,110 +164,26 @@ A single endpoint that backs `zitadel deploy`. It accepts a source-content bundl
 
 Direct per-resource CRUD (`POST /schemas`, `PUT /flow_definitions/:id`, …) remains available and creates a new revision on write. It does not touch any environment's current deployment.
 
-## Release bundle
+### CLI
 
-`zitadel deploy` serializes the contents of `.zitadel/` into a single JSON bundle, one key per resource kind, and submits it to `POST /configuration-releases`:
+`zitadel apply` and `zitadel plan` from [ADR 007](007-gitops-configuration-surface.md) are removed. `deploy` replaces `apply`; `plan` has no replacement — under the release model, releases are immutable artifacts and deployments are atomic pointer swaps, so the Terraform-style plan-then-apply preview frame no longer fits. Removal warnings surface in `deploy`'s confirmation prompt; drift detection lives in `zitadel status`.
 
-```json
-{
-  "audit": {
-    "message": "add phone_number to human-user schema",
-    "git_sha": "4a5b6c7d8e9f0a1b2c3d..."
-  },
-  "schemas":  [ { "objectType": "human-user", "$schema": "…", "properties": { /* … */ } } ],
-  "flows":    [ { "name": "default-login", "user_schema": "human-user", "steps": [ /* … */ ] } ],
-  "idps":     [ ],
-  "brandings":[ ],
-  "apps":     [ ],
-  "policies": [ ]
-}
-```
+**Removal safety.** Before creating a deployment (via `deploy`, `promote`, or `rollback`), the CLI computes what would be removed from the target environment — resources present in its current release but absent from the incoming one — and prints them. In interactive mode the user confirms; in non-interactive mode an explicit `--confirm-removals` flag is required. Deleting `.zitadel/idps/` locally, for example, does not silently drop every idp on the next deploy: the removal is explicit and acknowledged. Local `.zitadel/` (and the incoming release generally) is authoritative, but deletions are never silent.
 
-`audit.message` and `audit.git_sha` are recorded on the release and surface in `zitadel releases list`. `created_by` is derived from the caller's auth context, not sent in the payload.
-
-Each entry is the resource's own content as authored on disk — no bundle-specific envelope. The server extracts the handle from the per-kind field (`objectType` for schemas, `name` for the others). Cross-resource references are by handle, for example, the flow's `user_schema` field carries `"human-user"`, not a concrete `sch_…` id. Kinds not present in the local project are sent as empty arrays.
-
-### Endpoint responsibilities
-
-`POST /configuration-releases` runs the whole construction in one transaction:
-
-- allocate a new immutable revision for every changed resource in the bundle,
-- resolve cross-resource references (by handle) to the newly allocated revision ids (TBD),
-- validate the release as a closed set,
-- create the release,
-- return `{ release_id, revision_ids[] }`.
-
-Empty bundles are rejected — a release must contain at least one resource across all kinds. Removal safety (a release dropping resources that the target environment is currently running) is handled client-side by `zitadel deploy`'s confirmation prompt (see [CLI](#cli)); it is not enforced by the release constructor, because a release is env-agnostic and there is no natural "previous" release to compare against at construction time.
-
-Either the whole bundle is committed and a release exists, or nothing changes on the server. That is the atomicity guarantee the current per-resource orchestration cannot offer.
-
-**Idempotency.** If the bundle's resource content matches a prior release for this project (audit metadata excluded from the hash), the endpoint returns that release's id and skips allocation. Same-content re-runs of `zitadel deploy` do not create duplicate releases.
-
-`POST /releases` skips the revision-allocation step: the caller supplies revision ids drafted through other paths. Same validation, same output shape. It exists because a release is fundamentally a snapshot of revision ids; content is only in the picture when the caller is source of truth.
-
-Neither endpoint deploys the release. Deploying is a separate `POST /environments/{env}/deployments` call with `{ release_id: <returned> }`, preserving the decision that releases exist on their own, the same release can later be promoted unchanged. The CLI's `zitadel deploy` orchestrates the two calls internally.
-
-An environment either runs the previous release or the new one, never a mixture. A partial failure (release constructed, deployment refused) leaves the environment unchanged and the release available for a later attempt.
-
-## CLI and drift
-
-Two kinds of drift can arise between local `.zitadel/` and the server:
+**Drift.** Two kinds can arise between local `.zitadel/` and the server:
 
 1. **Local vs. an environment's current release.** Your local bundle differs from what an environment is actually running — either because you've edited files and haven't deployed, or because a colleague deployed something you don't have locally.
 2. **Local vs. server-side draft revisions.** A dashboard, MCP, or direct-API caller wrote a resource revision that no environment runs. It exists on the server but is inert — invisible at runtime until a release includes it.
 
-The first kind matters — it's what `zitadel status` reports and `zitadel deploy` reconciles. The second doesn't: a draft revision that never makes it into a release affects nothing.
+The first matters — it's what `zitadel status` reports and `zitadel deploy` reconciles. The second doesn't: a draft revision that never makes it into a release affects nothing. Local `.zitadel/` is source of truth for release construction; drafts made outside the CLI are not incorporated automatically and are effectively superseded by the next deploy — the same pattern as Vercel's "you edited env vars, redeploy to apply." To fold a specific draft into local before deploying, use `zitadel pull`.
 
-The CLI is source of truth for release construction. `zitadel deploy` packages `.zitadel/` as-is; drafts made outside the CLI are not incorporated automatically and are effectively superseded by the next deploy — the same pattern as Vercel's "you edited env vars, redeploy to apply." To fold a specific draft into local before deploying, use `zitadel pull`.
+The subsections below cover each command's purpose, its wire flow (participants: local files under `.zitadel/`, developer, CLI, API), and an example.
 
-Two commands, two different jobs:
+#### `deploy`
 
-- `zitadel status` — compares local against each environment's currently deployed release; reports matches / local ahead / local behind, per env.
-- `zitadel pull <kind> <handle>` — fetches the newest server-side revision of a specific resource and writes it into `.zitadel/`. Use it when you knowingly edited a resource outside the CLI and want to fold the change into your local project. Targeted only; there is no bulk mode.
+`zitadel deploy [--env <env>]` packages `.zitadel/`, creates a release (`POST /configuration-releases`), and deploys it. `--env` is required in non-interactive mode; in interactive mode the CLI lists environments (`GET /environments`) and prompts the user to pick one or defer the deployment. There is no implicit default environment — every deploy explicitly names its target.
 
-**Example — aligned state.** `zitadel status` shows local matches every environment's current release; nothing to do.
-
-```
-$ zitadel status
-
-Local (.zitadel/)
-  bundle hash    abc123f4...
-  git            main @ 4a5b6c7  (clean)
-
-Environments
-  ENV       CURRENT RELEASE                     DEPLOYED   RELATION TO LOCAL
-  dev       rel_01KX3RG8A7F0N9WD3P2E4YM5C1      2h ago     matches
-  staging   rel_01KX2ZJ4X0YJKP0JTN428A6DPB      1d ago     matches
-  prod      rel_01KX2ZJ4X0YJKP0JTN428A6DPB      3d ago     matches
-```
-
-**Example — adopting a dashboard edit.** A colleague added a `phone_number` property to the `human-user` schema through the dashboard. `status` cannot detect this on its own (drafts aren't enumerated), but you know it happened and want to fold the change into your local project before deploying:
-
-```
-$ zitadel pull schema human-user
-Fetched sch_01KX4A1S9F... (created 15m ago).
-Wrote .zitadel/schemas/human-user.json.
-
-$ git diff .zitadel/schemas/human-user.json
-+  "phone_number": { "type": "string" },
-   "required": ["email", "phone_number"]
-
-$ zitadel deploy --env dev
-Packaging .zitadel/  →  6 resources
-POST /configuration-releases        ✓  rel_01KX4B2M8G...
-POST /environments/dev/deployments  ✓  deployment_01KX4B2M8H...
-dev now runs rel_01KX4B2M8G...
-```
-
-The dashboard edit exists on the server as a draft revision, but no environment ran it until your `deploy` folded it into a new release. Your git history records the adoption.
-
-## Command flows
-
-Sequence diagrams for the main CLI commands and the drift-adoption pattern. Participants left-to-right: local files under `.zitadel/`, developer, CLI, API.
-
-### `zitadel deploy`
-
-Interactive path from local edits through deployment: read the bundle, construct a release atomically, pick a target environment, preview removals, deploy. On a same-content re-run, `POST /configuration-releases` returns the existing release id (idempotent) but the CLI still creates a new deployment on the target env.
+Interactive path: read the bundle, construct a release atomically, pick a target environment, preview removals, deploy. On a same-content re-run, `POST /configuration-releases` returns the existing release id (idempotent) but the CLI still creates a new deployment on the target env.
 
 ```mermaid
 sequenceDiagram
@@ -313,7 +214,19 @@ sequenceDiagram
 
 Non-interactive variant (`zitadel deploy --env dev`) skips the env-listing and prompt steps; `--confirm-removals` replaces the confirmation dialog.
 
-### `zitadel promote` and `zitadel rollback`
+```
+$ zitadel deploy --env dev
+Packaging .zitadel/  →  6 resources
+POST /configuration-releases        ✓  rel_01KX4B2M8G...
+POST /environments/dev/deployments  ✓  deployment_01KX4B2M8H...
+dev now runs rel_01KX4B2M8G...
+```
+
+#### `promote` and `rollback`
+
+`zitadel promote --from <env> --to <env>` deploys the release currently running on `<from>` to `<to>`. Optional `--release <release-id>` overrides which release to promote.
+
+`zitadel rollback --env <env>` deploys the previous release on `<env>` (the one that ran before the current). Optional `--to <release-id>` targets a specific prior release.
 
 Both create a new deployment referencing an existing release — no construction, no revisions minted. Promote sources the release from another environment's current deployment; rollback sources it from the same environment's deployment history.
 
@@ -360,9 +273,9 @@ sequenceDiagram
     CLI-->>Dev: prod rolled back to rel_...
 ```
 
-### `zitadel status`
+#### `status`
 
-Read-only overview: local bundle hash + per-environment current release + relation to local. No writes anywhere.
+`zitadel status` shows the local bundle summary plus each environment's currently deployed release and how it relates to local. Read-only, no writes anywhere.
 
 ```mermaid
 sequenceDiagram
@@ -383,7 +296,25 @@ sequenceDiagram
     CLI-->>Dev: local hash + per-env relation table
 ```
 
-### Drift adoption: `zitadel pull` after an external edit
+Example — aligned state. Local matches every environment's current release; nothing to do:
+
+```
+$ zitadel status
+
+Local (.zitadel/)
+  bundle hash    abc123f4...
+  git            main @ 4a5b6c7  (clean)
+
+Environments
+  ENV       CURRENT RELEASE                     DEPLOYED   RELATION TO LOCAL
+  dev       rel_01KX3RG8A7F0N9WD3P2E4YM5C1      2h ago     matches
+  staging   rel_01KX2ZJ4X0YJKP0JTN428A6DPB      1d ago     matches
+  prod      rel_01KX2ZJ4X0YJKP0JTN428A6DPB      3d ago     matches
+```
+
+#### `pull`
+
+`zitadel pull <kind> <handle>` fetches the newest server-side revision of a specific resource and writes it into `.zitadel/`. Use it when you knowingly edited a resource outside the CLI and want to fold the change into your local project before deploying. Targeted only; there is no bulk mode.
 
 Composite flow: someone edits a resource via the dashboard (creating a server-side draft revision that no environment sees yet); the developer knows what they touched and pulls that specific resource, then deploys to fold it into a release.
 
@@ -409,6 +340,77 @@ sequenceDiagram
     Dev->>CLI: zitadel deploy
     Note over CLI,API: bundle now includes the pulled draft —<br/>proceeds as the deploy flow above
 ```
+
+Example — adopting a dashboard edit. A colleague added a `phone_number` property to the `human-user` schema through the dashboard. `status` cannot detect this on its own (drafts aren't enumerated), but you know it happened and want to fold the change into your local project before deploying:
+
+```
+$ zitadel pull schema human-user
+Fetched sch_01KX4A1S9F... (created 15m ago).
+Wrote .zitadel/schemas/human-user.json.
+
+$ git diff .zitadel/schemas/human-user.json
++  "phone_number": { "type": "string" },
+   "required": ["email", "phone_number"]
+
+$ zitadel deploy --env dev
+Packaging .zitadel/  →  6 resources
+POST /configuration-releases        ✓  rel_01KX4B2M8G...
+POST /environments/dev/deployments  ✓  deployment_01KX4B2M8H...
+dev now runs rel_01KX4B2M8G...
+```
+
+The dashboard edit exists on the server as a draft revision, but no environment ran it until your `deploy` folded it into a new release. Your git history records the adoption.
+
+#### Inspection commands
+
+- `zitadel releases list` — releases in the project, newest first.
+- `zitadel deployments list --env <env>` — deployment history for an environment, newest first.
+- `zitadel env list` — environments and each one's current release.
+
+## Release bundle
+
+`zitadel deploy` serializes the contents of `.zitadel/` into a single JSON bundle, one key per resource kind, and submits it to `POST /configuration-releases`:
+
+```json
+{
+  "audit": {
+    "message": "add phone_number to human-user schema",
+    "git_sha": "4a5b6c7d8e9f0a1b2c3d..."
+  },
+  "schemas":  [ { "objectType": "human-user", "$schema": "…", "properties": { /* … */ } } ],
+  "flows":    [ { "name": "default-login", "user_schema": "human-user", "steps": [ /* … */ ] } ],
+  "idps":     [ ],
+  "brandings":[ ],
+  "apps":     [ ],
+  "policies": [ ]
+}
+```
+
+`audit.message` and `audit.git_sha` are recorded on the release and surface in `zitadel releases list`. `created_by` is derived from the caller's auth context, not sent in the payload.
+
+Each entry is the resource's own content as authored on disk — no bundle-specific envelope. The server extracts the handle from the per-kind field (`objectType` for schemas, `name` for the others). Cross-resource references are by handle, for example, the flow's `user_schema` field carries `"human-user"`, not a concrete `sch_…` id. Kinds not present in the local project are sent as empty arrays.
+
+### Endpoint responsibilities
+
+`POST /configuration-releases` runs the whole construction in one transaction:
+
+- allocate a new immutable revision for every changed resource in the bundle,
+- resolve cross-resource references (by handle) to the newly allocated revision ids (TBD),
+- validate the release as a closed set,
+- create the release,
+- return `{ release_id, revision_ids[] }`.
+
+Empty bundles are rejected — a release must contain at least one resource across all kinds. Removal safety (a release dropping resources that the target environment is currently running) is handled client-side by `zitadel deploy`'s confirmation prompt (see [CLI](#cli)); it is not enforced by the release constructor, because a release is env-agnostic and there is no natural "previous" release to compare against at construction time.
+
+Either the whole bundle is committed and a release exists, or nothing changes on the server. That is the atomicity guarantee the current per-resource orchestration cannot offer.
+
+**Idempotency.** If the bundle's resource content matches a prior release for this project (audit metadata excluded from the hash), the endpoint returns that release's id and skips allocation. Same-content re-runs of `zitadel deploy` do not create duplicate releases.
+
+`POST /releases` skips the revision-allocation step: the caller supplies revision ids drafted through other paths. Same validation, same output shape. It exists because a release is fundamentally a snapshot of revision ids; content is only in the picture when the caller is source of truth.
+
+Neither endpoint deploys the release. Deploying is a separate `POST /environments/{env}/deployments` call with `{ release_id: <returned> }`, preserving the decision that releases exist on their own, the same release can later be promoted unchanged. The CLI's `zitadel deploy` orchestrates the two calls internally.
+
+An environment either runs the previous release or the new one, never a mixture. A partial failure (release constructed, deployment refused) leaves the environment unchanged and the release available for a later attempt.
 
 ## Out of scope
 
