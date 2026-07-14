@@ -62,21 +62,21 @@ passkeys. The migration is therefore:
 - Over that transition window, prompt users to register a fresh passkey under the new `rpId`, then
   retire reliance on the old one.
 
-### 3. TOTP Enrollment and Rotation
+### 3. TOTP Enrollment
 
-Rotating a TOTP secret mandates invalidating the current shared secret and establishing a new one.
-Two TOTP secrets cannot coexist the way two passkeys can, so rotation replaces in place and there is
-no last-factor safeguard; account recovery ([Section 4](#4-account-recovery)) is the fallback if
-setup is interrupted.
+A user can enroll more than one TOTP secret, the same way they can enroll more than one passkey. The
+secrets are independent, and at verification a submitted code is accepted if it matches any enrolled
+secret for the user. Adding an authenticator is enrollment, and retiring one is a separate, optional
+removal.
 
-- **Device Change:** When registering a new device to replace an old one, the new TOTP secret
-  replaces the old one. Remove the existing TOTP configuration and register a new one.
-- **Device Loss:** In the event of device loss or compromise, the user authenticates via a recovery
-  method (see [Section 4](#4-account-recovery)). Upon successful recovery, the system immediately
-  prompts the user to re-register their TOTP secret.
-- **Deregistration:** Removing TOTP outright, rather than rotating it, is subject to the same
-  last-factor safeguard as passkeys ([Section 2](#2-passkey-migration)): if TOTP is the account's
-  only remaining usable factor, the user must set up an alternative before it can be removed.
+- **Adding or replacing a device:** The user enrolls the new device's secret alongside any existing
+  ones. The old secret keeps working until the user removes it.
+- **Device Loss:** If the user can still authenticate (a second TOTP secret or another factor), they
+  enroll a replacement and remove the lost one. If the lost device held their only factor, they
+  recover via a method in [Section 4](#4-account-recovery) and then enroll a new secret.
+- **Deregistration:** Removing a TOTP secret is subject to the same last-factor safeguard as
+  passkeys ([Section 2](#2-passkey-migration)): if it is the account's only remaining usable factor,
+  the user must set up an alternative before it can be removed.
 
 ### 4. Account Recovery
 
@@ -327,8 +327,6 @@ Adopting these consolidated migration and recovery strategies introduces the fol
 
 ### Positive
 
-- By enforcing a strict teardown/rebuild for TOTP, we avoid building complex, stateful transition
-  flows.
 - The policies prioritize immediate neutralization of threats. Compromised signing keys stop signing
   at once and lost TOTP devices are immediately invalidated, though verifiers holding a cached JWKS
   lag by up to one cache lifetime.
@@ -343,12 +341,8 @@ Adopting these consolidated migration and recovery strategies introduces the fol
 
 ### Negative / Risks
 
-- Increased UX friction (TOTP): if a user experiences a network failure or browser crash mid-setup,
-  their previous configuration is already invalid. They will be forced to use their other factors,
-  or a fallback recovery method if TOTP was their only additional factor, to gain access.
 - Recovery is not a guarantee against lockout. A user who loses their recovery codes and their email
-  access has no path back in. We accept that outcome, because the only way to open one is to let
-  support staff restore access to someone who can prove nothing, and an attacker can do that too.
+  access has no path back in. We accept that outcome because the only way to recover is via support/admin.
 - Magic-link recovery floors an account's security at the security of its email inbox, because it
   bypasses every enrolled factor. For an account otherwise protected by a passkey this is a
   downgrade. Projects that cannot accept that downgrade can disable magic-link recovery
