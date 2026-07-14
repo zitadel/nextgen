@@ -196,10 +196,16 @@ describe("setup command pre-flight", () => {
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_NOT_FOUND");
     expect(json.message).toContain("has no such endpoint");
-    expect(json.hint).toContain("--framework next --non-interactive --server local");
+    // The retry pins the resolved dev port: the issuer registered with the
+    // project derives from it, so the rerun must reproduce it verbatim.
+    expect(json.hint).toContain(
+      "--framework next --dev-port 3000 --non-interactive --server local",
+    );
     expect(json.next_commands).toEqual([
       expectedPublicCliCommand("start"),
-      expectedPublicCliCommand("setup --framework next --non-interactive --server local"),
+      expectedPublicCliCommand(
+        "setup --framework next --dev-port 3000 --non-interactive --server local",
+      ),
     ]);
   });
 
@@ -239,7 +245,7 @@ describe("setup command pre-flight", () => {
     expect(json.next_commands).toEqual([
       expectedPublicCliCommand("start"),
       expectedPublicCliCommand(
-        "setup --framework next --preset passkey-first --non-interactive --server local",
+        "setup --framework next --preset passkey-first --dev-port 3000 --non-interactive --server local",
       ),
     ]);
   });
