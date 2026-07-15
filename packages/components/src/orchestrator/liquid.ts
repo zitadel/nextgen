@@ -82,7 +82,10 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
     function tFilter(this: { context: unknown }, key: unknown, ...args: unknown[]) {
       const lookupKey = stringify(key);
       const template =
-        options.locale[lookupKey] ?? injectedKeyFallback(options.locale, lookupKey) ?? lookupKey;
+        options.locale[lookupKey] ??
+        injectedKeyFallback(options.locale, lookupKey) ??
+        fieldLabelFallback(lookupKey) ??
+        lookupKey;
       return interpolate(template, args.map(stringify));
     },
   );
@@ -175,6 +178,24 @@ function injectedKeyFallback(locale: Locale, key: string): string | undefined {
     if (key.endsWith(suffix)) return locale[fallback];
   }
   return undefined;
+}
+
+/**
+ * Fallback for field-label keys (`<step>.field.<name>` — see
+ * `FlowField.TextKey` in `internal/domain/flow_field_resolver.go`). Both
+ * halves are tenant-chosen (step names and schema property names), so no
+ * catalog can enumerate the keys; a miss renders a humanised property name
+ * ("dateOfBirth" → "Date of birth") instead of leaking the raw key into the
+ * form. Sub-keys like `.placeholder`/`.help` are excluded — they resolve
+ * through their own filters, which stay empty on a miss.
+ */
+function fieldLabelFallback(key: string): string | undefined {
+  const marker = ".field.";
+  const index = key.indexOf(marker);
+  if (index === -1) return undefined;
+  const field = key.slice(index + marker.length);
+  if (field === "" || field.includes(".")) return undefined;
+  return capitaliseFirst(humaniseFieldName(field));
 }
 
 export type FlowErrorKeyContext = {
