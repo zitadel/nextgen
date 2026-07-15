@@ -208,6 +208,57 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain("invalid");
   });
 
+  it("renders the engine's passkey proof rejection as a localized alert", () => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    const a = toArray({
+      submit: { text_key: "identifier.action.continue", primary: true },
+    });
+    const context = {
+      step: { name: "identifier", texts: { title_key: "identifier.title" } },
+      fields: [],
+      actions: a,
+      branding: {},
+      loading: false,
+      // The state machine re-renders the step with this key when the server
+      // rejects a passkey assertion (flow_state_machine.go processPasskey).
+      errors: [{ text_key: "error.passkey_invalid" }],
+      gates: {},
+      sso_providers: [],
+      messages: [],
+      identity: null,
+    };
+    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    expect(result).toContain('<zl-alert severity="error"');
+    expect(result).toContain("This passkey could not be verified");
+    expect(result).not.toContain("error.passkey_invalid");
+  });
+
+  it("renders the engine's passkey registration rejection as a localized alert", () => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    const a = toArray({
+      setup: { text_key: "passkey-upsell.action.setup", primary: true },
+      skip: { text_key: "passkey-upsell.action.skip" },
+    });
+    const context = {
+      step: { name: "passkey-upsell", texts: { title_key: "passkey-upsell.title" } },
+      fields: [],
+      actions: a,
+      branding: {},
+      loading: false,
+      // The state machine re-renders the step with this key when the server
+      // rejects a registration attestation (flow_state_machine.go processPasskey).
+      errors: [{ text_key: "error.passkey_registration_invalid" }],
+      gates: {},
+      sso_providers: [],
+      messages: [],
+      identity: null,
+    };
+    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    expect(result).toContain('<zl-alert severity="error"');
+    expect(result).toContain("The new passkey could not be verified");
+    expect(result).not.toContain("error.passkey_registration_invalid");
+  });
+
   it("renders passkey registration challenges with registration ceremony", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
     const context = {
@@ -374,7 +425,7 @@ describe("LiquidJS engine", () => {
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
     expect(result).toContain("Wrong email or password.");
     expect(result).toContain('name="password"');
-    expect(result).toContain('invalid');
+    expect(result).toContain("invalid");
     expect(result).not.toContain('<zl-alert severity="error">Wrong email');
     expect(result).not.toContain('<zl-alert severity="error"');
   });
@@ -447,7 +498,7 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain('data-action="sign_in"');
     expect(result).not.toContain('class="zl-card-nav"');
     expect(result).toContain('label="Sign up"');
-    expect(result).not.toContain('compact');
+    expect(result).not.toContain("compact");
   });
 
   it("renders the default template when the API returns a terminal step (complete: show)", () => {
@@ -542,10 +593,21 @@ describe("localiseFlowErrorKeys", () => {
     ]);
   });
 
+  it("localises the engine's credential rejections via the catalog", () => {
+    // SubmitPassword / SubmitPasskey rejections re-render the step with
+    // these catalog keys (flow_state_machine.go) — invalid_credentials
+    // routes inline to the password field via fieldErrorKeys.
+    expect(localiseFlowErrorKeys("error.invalid_credentials", ctx)).toEqual([
+      { text_key: "error.invalid_credentials" },
+    ]);
+    expect(localiseFlowErrorKeys("error.passkey_invalid", ctx)).toEqual([
+      { text_key: "error.passkey_invalid" },
+    ]);
+  });
+
   it("returns null for anything that is not an error.* key payload", () => {
-    // Outcome names and diagnostics stay verbatim with the caller.
+    // Outcome tokens stay verbatim with the caller.
     expect(localiseFlowErrorKeys("user_not_found", ctx)).toBeNull();
-    expect(localiseFlowErrorKeys("auth_attempt.password_invalid", ctx)).toBeNull();
     expect(localiseFlowErrorKeys("", ctx)).toBeNull();
     // A single non-key segment rejects the whole payload.
     expect(localiseFlowErrorKeys("error.email_required; user_not_found", ctx)).toBeNull();
