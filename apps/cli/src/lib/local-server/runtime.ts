@@ -190,6 +190,32 @@ export async function checkLocalServerHealth(serverUrl: string, timeoutMs = 1500
   }
 }
 
+/**
+ * Best-effort local-server detection for optional UI (the setup wizard's
+ * server choice). Same sources as {@link resolveLocalServer} — the runtime
+ * metadata written by `zitadel start`, then the default localhost URL — but
+ * never throws: a malformed `runtime.json` or an unhealthy server yields
+ * `undefined` (doctor owns diagnosing those states), and an unhealthy
+ * metadata URL still falls back to the default-port probe so a server
+ * started from a different directory is found.
+ */
+export async function detectHealthyLocalServer(cwd: string): Promise<string | undefined> {
+  let runtime: RuntimeMetadata | undefined;
+  try {
+    runtime = await readRuntimeMetadata(cwd);
+  } catch {
+    runtime = undefined;
+  }
+  if (runtime && (await checkLocalServerHealth(runtime.server_url))) {
+    return runtime.server_url;
+  }
+  const alreadyProbedDefault = runtime?.server_url === DEFAULT_LOCAL_SERVER_URL;
+  if (!alreadyProbedDefault && (await checkLocalServerHealth(DEFAULT_LOCAL_SERVER_URL))) {
+    return DEFAULT_LOCAL_SERVER_URL;
+  }
+  return undefined;
+}
+
 export async function resolveLocalServer(cwd: string): Promise<string> {
   const runtime = await readRuntimeMetadata(cwd);
   if (runtime) {
