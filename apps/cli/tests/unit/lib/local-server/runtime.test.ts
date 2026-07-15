@@ -2,11 +2,13 @@ import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  DEFAULT_LOCAL_SERVER_URL,
   LOCAL_RUNTIME_FILE,
   defaultLocalServerImageForCliVersion,
+  detectHealthyLocalServer,
   ensureContainerIdentity,
   ensureLocalState,
   localContainerName,
@@ -134,6 +136,74 @@ describe("local server runtime metadata", () => {
     await expect(readFile(join(paths.dataDir, "sample"), "utf8")).rejects.toMatchObject({
       code: "ENOENT",
     });
+  });
+});
+
+describe("detectHealthyLocalServer", () => {
+  // `checkLocalServerHealth` probes real URLs (including the fixed default
+  // localhost:8080, which a dev machine may genuinely occupy), so stub the
+  // global fetch and answer per-origin instead of binding real sockets.
+  let healthyOrigins: ReadonlySet<string>;
+
+  beforeEach(() => {
+    healthyOrigins = new Set();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL) => {
+        const url = new URL(String(input));
+        if (url.pathname === "/healthz" && healthyOrigins.has(url.origin)) {
+          return new Response("ok", { status: 200 });
+        }
+        throw new TypeError("fetch failed (stub: connection refused)");
+      }),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns the runtime-metadata URL when that server is healthy", async () => {
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd));
+    healthyOrigins = new Set(["http://localhost:8081"]);
+
+    await expect(detectHealthyLocalServer(cwd)).resolves.toBe("http://localhost:8081");
+  });
+
+  it("falls back to the default URL when the metadata URL is unhealthy", async () => {
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd));
+    healthyOrigins = new Set([DEFAULT_LOCAL_SERVER_URL]);
+
+    await expect(detectHealthyLocalServer(cwd)).resolves.toBe(DEFAULT_LOCAL_SERVER_URL);
+  });
+
+  it("probes the default URL only once when the metadata already points there", async () => {
+    await writeRuntimeMetadata(cwd, {
+      ...runtimeFor(cwd),
+      port: 8080,
+      server_url: DEFAULT_LOCAL_SERVER_URL,
+    });
+
+    await expect(detectHealthyLocalServer(cwd)).resolves.toBeUndefined();
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns the default URL when no metadata exists but the default server is healthy", async () => {
+    healthyOrigins = new Set([DEFAULT_LOCAL_SERVER_URL]);
+
+    await expect(detectHealthyLocalServer(cwd)).resolves.toBe(DEFAULT_LOCAL_SERVER_URL);
+  });
+
+  it("swallows malformed runtime metadata instead of throwing", async () => {
+    const paths = localRuntimePaths(cwd);
+    await ensureLocalState(cwd);
+    await writeFile(paths.runtimeFile, "{not json", "utf8");
+
+    await expect(detectHealthyLocalServer(cwd)).resolves.toBeUndefined();
+  });
+
+  it("returns undefined when nothing is running", async () => {
+    await expect(detectHealthyLocalServer(cwd)).resolves.toBeUndefined();
   });
 });
 

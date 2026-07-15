@@ -182,6 +182,7 @@ export default class Setup extends BaseCommand {
       intro("Zitadel setup");
       const promptCtx = {
         framework,
+        cwd,
         serverFlag: this.meta.serverFlag,
         devPortFromFlag: flags["dev-port"] !== undefined,
         presetFromFlag: flags.preset !== undefined,
