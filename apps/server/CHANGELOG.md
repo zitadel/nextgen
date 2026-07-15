@@ -1,5 +1,38 @@
 # @zitadel/server
 
+## 0.1.0-alpha.17
+
+### Patch Changes
+
+- [#544](https://github.com/zitadel/nextgen/pull/544) [`79d4179`](https://github.com/zitadel/nextgen/commit/79d417924518c9ea272136db1f46aaf237497999) Thanks [@fforootd](https://github.com/fforootd)! - Fixes from alpha.16 community feedback:
+  - Custom schema fields now render a readable label. A property with no
+    catalog entry (e.g. `department`, `dateOfBirth`) falls back to a
+    humanised name ("Department", "Date of birth") on the form instead of
+    leaking the raw `<step>.field.<name>` text key. A catalogued key still
+    wins, so localised labels are unaffected.
+  - The scaffolded `.zitadel/flows/README.md` no longer contains the
+    "Presets" section twice.
+  - The `warn/default-flow-swap` plan warning now leads with the impact in
+    plain language: the new flow becomes the default for its purposes, and
+    every page that does not explicitly set `flow-name` on
+    `<zitadel-login>` will start rendering it — scope it via `audience`
+    or pin `flow-name` to opt out.
+  - The flip-table validation error (login/register entry step missing its
+    `user_not_found`/`user_already_exists` transition) now explains who
+    gets stuck where: someone without an account would be stuck at
+    sign-in instead of being routed to registration, and vice versa. Plan,
+    apply, and the server report the same wording.
+
+- [#525](https://github.com/zitadel/nextgen/pull/525) [`363482e`](https://github.com/zitadel/nextgen/commit/363482e27c88ac96c9a2b48c880e5caa5a4dcf65) Thanks [@fforootd](https://github.com/fforootd)! - Every engine-emitted step error is now a localizable `error.*` catalog
+  key — no `auth_attempt.*` literals leak into the login UI anymore.
+  Rejected passkey proofs emit `error.passkey_invalid` (assertion) and
+  `error.passkey_registration_invalid` (attestation), translated in every
+  builtin locale; rejected password submissions emit the existing
+  `error.invalid_credentials`, which the login component routes inline to
+  the password field. The `step.error` contract docs now describe the
+  `error.*` catalog plus verbatim outcome tokens (e.g. `user_not_found`)
+  instead of citing `auth_attempt.*` diagnostics.
+
 ## 0.1.0-alpha.16
 
 ### Minor Changes
