@@ -1,114 +1,19 @@
-# ADR 035: Credential Migration, Rotation, and Recovery
+# ADR 036: Signing Key Rotation and Incident Response
 
 > **Status:** Proposed
-> **Date:** 2026-07-11
-> **Context:** credential migration, key rotation, and recovery flows
+> **Date:** 2026-07-15
+> **Context:** signing-key lifecycle, key rotation, and compromise handling
 
 ## Context
 
-This document defines the standard operating procedures for credential migration and rotation,
-account recovery flows, and emergency key compromise handling. The primary objective of these
-policies is to prevent irreversible security exposures while ensuring legitimate users are not
-accidentally locked out of their accounts during routine security lifecycle events.
+This document defines the lifecycle and rotation of the platform's cryptographic keys, the
+per-project signing keys and the encryption-at-rest KEK/DEK envelope, together with the emergency
+procedures for handling their compromise. It builds on the key hierarchy and rotation policy in
+[ADR 029](029-cryptography-secrets-and-key-lifecycle.md).
 
 ## Decision
 
-### 1. Password Rehashing and Migration
-
-The system leverages `passwap.Swapper` combined with the `password_hasher` configuration to handle
-both parameter upgrades (rehashing) and complete algorithmic switches (migration).
-
-When a user logs in, the provided password is verified against the stored hash.
-`(*passwap.Swapper).Verify` returns `(upgradedEncodedHash, error)`; when it returns an upgraded hash
-for parameter upgrades or algorithm migration, the server will persist that upgraded hash to the
-database. It returns an empty string otherwise.
-
-Persisting the upgraded hash is not part of the login's critical path. The user has already
-authenticated by the time it is available, so a failed write is logged and the login succeeds; the
-rehash is simply retried on the next login.
-
-### 2. Passkey Migration
-
-Unlike passwords, passkeys (asymmetric keys) cannot be transparently rehashed or migrated by the
-server.
-
-- **Soft Enrollment Nudge:** The system will prompt users to register a second passkey after their
-  first successful passkey authentication if they have fewer than two enrolled. This prompt is a
-  dismissible "soft nudge," not a strict gate.
-- **Device Change:** The user registers a new passkey on the new device. They may manually revoke
-  the old passkey if it is no longer necessary.
-- **Deregistration Safeguards:** If a user attempts to deregister their final passkey, they must
-  first register a new passkey or set up an alternative authentication method. A qualifying
-  alternative is another factor the account can authenticate with on its own: a second passkey, a
-  password, or an enrolled TOTP secret. This guarantees the account always retains at least one
-  usable factor and the user isn't locked out.
-- **Device Loss:** Users regain access via configured account recovery methods (see
-  [Section 4](#4-account-recovery)). Upon successful recovery, the system immediately prompts the
-  user to register a replacement passkey and then revoke the lost one. The order matters: when the
-  lost passkey was the user's only one, the deregistration safeguard above forbids revoking it
-  first.
-
-#### RP ID Migration (Domain Changes)
-
-Passkey credentials are permanently bound to the WebAuthn Relying Party ID (`rpId`) they were
-created under, and that binding cannot be changed, so a new `rpId` cannot reuse existing
-credentials. Related Origin Requests do not move a credential onto a new `rpId`; they let the
-existing `rpId` be exercised from additional origins, so a new domain can keep using the old-`rpId`
-passkeys. The migration is therefore:
-
-- Keep the old `rpId` and serve it from the new domain via
-  [**Related Origin Requests (ROR)**](https://passkeys.dev/docs/advanced/related-origins/), listing
-  the new origin in the RP's `.well-known/webauthn`. ROR caps the number of related origins and has
-  uneven browser support, so treat it as a transition aid, not a permanent state.
-- Over that transition window, prompt users to register a fresh passkey under the new `rpId`, then
-  retire reliance on the old one.
-
-### 3. TOTP Enrollment
-
-A user can enroll more than one TOTP secret, the same way they can enroll more than one passkey. The
-secrets are independent, and at verification a submitted code is accepted if it matches any enrolled
-secret for the user. Adding an authenticator is enrollment, and retiring one is a separate, optional
-removal.
-
-- **Adding or replacing a device:** The user enrolls the new device's secret alongside any existing
-  ones. The old secret keeps working until the user removes it.
-- **Device Loss:** If the user can still authenticate (a second TOTP secret or another factor), they
-  enroll a replacement and remove the lost one. If the lost device held their only factor, they
-  recover via a method in [Section 4](#4-account-recovery) and then enroll a new secret.
-- **Deregistration:** Removing a TOTP secret is subject to the same last-factor safeguard as
-  passkeys ([Section 2](#2-passkey-migration)): if it is the account's only remaining usable factor,
-  the user must set up an alternative before it can be removed.
-
-### 4. Account Recovery
-
-Account recovery acts as the fallback mechanism when a user loses an authentication factor (Passkey,
-TOTP) and cannot authenticate with a remaining one.
-
-#### Recovery Codes
-
-- A set of static recovery codes is generated and cryptographically hashed during the user's initial
-  MFA enrollment.
-- Each code is strictly single-use.
-- Because each code is single-use, the set depletes over time. When a user runs low on or exhausts
-  their codes, they are prompted to regenerate a fresh set; regenerating invalidates any codes
-  remaining from the old set.
-- A user only has recovery codes if they enrolled an MFA factor. A password-only user relies on
-  ordinary password reset, which is out of scope here.
-
-#### Magic Links
-
-- A single-use magic link is generated and sent to the user's verified email address.
-- Links enforce a strict, configurable expiration window (e.g., 15 minutes) and are only valid for a
-  single use.
-- Magic-link recovery is a per-project setting and can be disabled. Because it bypasses every
-  enrolled factor and reduces account security to email possession, high-assurance projects (for
-  example under a NIST profile per [ADR 029](029-cryptography-secrets-and-key-lifecycle.md#nist))
-  can turn it off.
-
-Post-recovery, the user should be prompted to re-register their lost authentication factors
-(Passkey, TOTP, etc.) to ensure they have at least one valid factor for future logins.
-
-### 5. Signing Key Lifecycle
+### 1. Signing Key Lifecycle
 
 #### Background and Pain Points
 
@@ -219,12 +124,12 @@ If an active signing key is compromised:
 1. Generate a new signing key pair and insert it with `active_from = now()`, which retires the
    compromised key at the same instant, so the replacement signs immediately.
 2. Delete the compromised key. It leaves the JWKS and isn't chosen for signing.
-3. Revoke the project's sessions and refresh tokens. These opaque tokens are signed by the same key
-   but also encrypted under the DEK, so a signing-key compromise alone cannot forge them: an
+3. The project's sessions and refresh tokens may also be revoked. These opaque tokens are signed by
+   the same key but also encrypted under the DEK, so a signing-key compromise alone cannot forge them: an
    attacker would also need the DEK. Revoking them is a precaution against a broader breach, forcing
    re-authentication. PATs are out of scope in the
    current MVP ([ADR 032](032-token-lifecycle.md#personal-access-tokens)), and their exposure depends
-   on their eventual token format ([Open Question 5](#questions)).
+   on their eventual token format ([Open Question 4](#questions)).
 
 **Notes on key deletion:**
 
@@ -241,7 +146,7 @@ If an active signing key is compromised:
   JWKS cache lifetime. Opaque tokens are signed by the key too but cannot be forged without the DEK,
   so this compromise does not expose them; revoking them (step 3) is a separate precaution.
 
-### 6. Encryption-at-Rest Key Rotation
+### 2. Encryption-at-Rest Key Rotation
 
 Nextgen's encryption-at-rest uses the KEK/DEK envelope per
 [ADR 029](029-cryptography-secrets-and-key-lifecycle.md#master-key). An asymmetric KEK wraps a
@@ -250,8 +155,8 @@ provisioning are out of scope for this document.
 
 This document assumes one DEK per project, matching the per-project scope of signing keys in
 [ADR 029](029-cryptography-secrets-and-key-lifecycle.md#scope). A per-project DEK contains a
-DEK-level compromise to a single project. If the KEK stays global
-([Open Question 3](#questions)), a KEK compromise still reaches every DEK it wrapped, and the
+DEK-level compromise to a single project. The KEK stays global
+([Question 2](#questions)), so a KEK compromise still reaches every DEK it wrapped, and the
 emergency procedure below stays platform-wide. The procedures are written per project; a global DEK
 would collapse each per-project step into one.
 
@@ -311,7 +216,8 @@ does nothing for the secrets themselves. They must be rotated, not re-wrapped.
 5. **Authenticator secrets.** Every TOTP shared secret is exposed, so an attacker holding the
    database can compute valid codes. Invalidate all TOTP secrets and require affected users to
    re-enroll. Until they do, users fall back to their other factors, or to account recovery
-   ([Section 4](#4-account-recovery)) if TOTP was their only second factor.
+   ([ADR 035, Section 4](035-user-credential-migration-and-recovery.md#4-account-recovery)) if TOTP
+   was their only second factor.
 6. Once secrets in steps 4 and 5 are re-encrypted, remove the compromised KEK from configuration and
    destroy it at its source (for example, through the cert-manager or equivalent tooling that
    provisioned it). The KEK is supplied by config, so there is no in-application revocation
@@ -324,8 +230,6 @@ has a recovery time bounded by third parties rather than by the platform.
 
 ## Consequences
 
-Adopting these consolidated migration and recovery strategies introduces the following trade-offs:
-
 ### Positive
 
 - The policies prioritize immediate neutralization of threats. A compromised signing key stops
@@ -334,41 +238,28 @@ Adopting these consolidated migration and recovery strategies introduces the fol
 - Per-project signing keys with explicit, auditable lifecycles give tenants the key isolation and
   rotation evidence for compliance reasons, and support the per-project NIST/FIPS profiles
   in [ADR 029](029-cryptography-secrets-and-key-lifecycle.md#nist).
-- Multi-path account recovery (single-use codes and short-lived magic links) means losing one
-  authentication factor is a recoverable event rather than a lockout.
-- Routine KEK rotation ([Section 6](#6-encryption-at-rest-key-rotation)) is inexpensive because only
+- Routine KEK rotation ([Section 2](#2-encryption-at-rest-key-rotation)) is inexpensive because only
   wrapped DEKs are re-wrapped rather than every stored secret, and it keeps master-key lifecycle
   ownership on external infra tooling (e.g., cert-manager) rather than the application.
 
 ### Negative / Risks
 
-- Recovery is not a guarantee against lockout. A user who loses both their recovery codes and their
-  email access has no path back in. We accept that outcome because the only escape hatch would be
-  letting support restore access.
-- Magic-link recovery floors an account's security at the security of its email inbox, because it
-  bypasses every enrolled factor. For an account otherwise protected by a passkey this is a
-  downgrade. Projects that cannot accept that downgrade can disable magic-link recovery
-  ([Section 4](#4-account-recovery)).
 - Emergency KEK compromise handling in case of KEK and database compromise
-  ([Section 6](#6-encryption-at-rest-key-rotation)) is not a larger routine rotation. It is a full
+  ([Section 2](#2-encryption-at-rest-key-rotation)) is not a larger routine rotation. It is a full
   platform credential compromise: every signing key must be rotated, every opaque token revoked, and
   every third-party secret re-issued by the third party that owns it. Recovery time is therefore
   partly outside the platform's control.
 
 ## Questions
 
-1. During an account recovery event, what is the exact policy for invalidating a user's pre-existing
-   active sessions and revoking outstanding refresh tokens? Does recovery revoke every session, or
-   only the ones bound to the lost factor?
-
-2. Should a retired signing key pair be kept as audit evidence past the point it is purgeable
-   ([Section 5](#5-signing-key-lifecycle))? Section 5 already settles when a key becomes deletable:
+1. Should a retired signing key pair be kept as audit evidence past the point it is purgeable
+   ([Section 1](#1-signing-key-lifecycle))? Section 1 already settles when a key becomes deletable:
    once it leaves the JWKS after its grace period, every self-contained token it signed has expired,
    so the row can be purged. The open question is only whether to retain the key pair beyond that as
    rotation/audit evidence, and for how long.
 
-3. **(Resolved)** Should the KEK be per project as well as the DEK
-   ([Section 6](#6-encryption-at-rest-key-rotation))? A per-project KEK would contain even a KEK
+2. **(Resolved)** Should the KEK be per project as well as the DEK
+   ([Section 2](#2-encryption-at-rest-key-rotation))? A per-project KEK would contain even a KEK
    compromise to one project, closing the gap a per-project DEK under a global KEK leaves open. But
    the KEK is provisioned externally (cert-manager, per
    [ADR 029](029-cryptography-secrets-and-key-lifecycle.md#master-key)), so one KEK per project
@@ -378,8 +269,8 @@ Adopting these consolidated migration and recovery strategies introduces the fol
    **Answer:** The KEK stays global and externally provisioned for now; the per-project DEK remains
    the isolation boundary.
 
-4. Should an explicit status column supplement the `retired_at` model
-   ([Section 5](#5-signing-key-lifecycle))? Section 5 decides the lifecycle state is the two
+3. Should an explicit status column supplement the `retired_at` model
+   ([Section 1](#1-signing-key-lifecycle))? Section 1 decides the lifecycle state is the two
    timestamps `active_from` and `retired_at`, with signing, grace, and expiry all derived at read
    time. The open part is only whether to _also_ store an explicit active/retiring/retired column,
    as sketched in issue [#509](https://github.com/zitadel/nextgen/issues/509), as a convenience for
@@ -391,7 +282,7 @@ Adopting these consolidated migration and recovery strategies introduces the fol
    Either way, the derived timestamps remain the source of truth, and both still need a sweep to
    rotate keys and purge expired ones. Whether to add the column is open.
 
-5. How does a compromised or rotated signing key interact with PATs once they come into scope
+4. How does a compromised or rotated signing key interact with PATs once they come into scope
    ([ADR 032](032-token-lifecycle.md#personal-access-tokens) defers them)? If opaque, the DEK
    protects them like a session or refresh token; if self-contained, a signing-key compromise can
    forge them. If PATs can live indefinitely, what is the policy for retiring the keys that signed
@@ -399,15 +290,11 @@ Adopting these consolidated migration and recovery strategies introduces the fol
 
 ## Follow-up work
 
-1. Password rehash persistence ([Section 1](#1-password-rehashing-and-migration)).
-2. `signing_keys` schema ([Section 5](#5-signing-key-lifecycle)).
-3. Signing key rotation mechanics, including the JWKS endpoint and the autorotation sweep
+1. `signing_keys` schema ([Section 1](#1-signing-key-lifecycle)).
+2. Signing key rotation mechanics, including the JWKS endpoint and the autorotation sweep
    ([Routine Signing Key Rotation](#routine-signing-key-rotation)).
-4. Purging retired signing keys once their grace period has elapsed
-   ([Section 5](#5-signing-key-lifecycle)).
-5. Recovery code generation / consumption flow ([Recovery Codes](#recovery-codes)).
-6. Magic-link recovery flow, including the email-sending infrastructure it depends on
-   ([Magic Links](#magic-links)).
-7. Setup needed for encryption-at-rest key rotation
-   ([Section 6](#6-encryption-at-rest-key-rotation)): tracked in
+3. Purging retired signing keys once their grace period has elapsed
+   ([Section 1](#1-signing-key-lifecycle)).
+4. Setup needed for encryption-at-rest key rotation
+   ([Section 2](#2-encryption-at-rest-key-rotation)): tracked in
    https://github.com/zitadel/nextgen/issues/505
