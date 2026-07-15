@@ -891,4 +891,76 @@ describe("<zitadel-login> against the typed Flow API", () => {
     await waitFor(() => submittedFields ?? null);
     expect(submittedFields).toEqual({ maritalStatus: "Married", newsletterOptIn: "true" });
   });
+
+  it("omits an untouched enum select instead of submitting an empty string", async () => {
+    // An optional select renders a leading empty placeholder option, so an
+    // untouched field holds "". "" is not a member of the enum, so sending it
+    // would fail the server's enum validation (create_user: "no enum value
+    // matched"). The orchestrator must omit the field entirely. A text field
+    // in the same step still submits its "" default so required-checks run.
+    server.use(
+      http.post("*/flow", () =>
+        HttpResponse.json(
+          {
+            id: "flow_test",
+            session_token: "st_test",
+            step: {
+              name: "register",
+              texts: { title_key: "register.title" },
+              fields: [
+                {
+                  name: "email",
+                  type: "email",
+                  text_key: "register.field.email",
+                  required: true,
+                },
+                {
+                  name: "maritalStatus",
+                  type: "select",
+                  text_key: "register.field.maritalStatus",
+                  required: false,
+                  validation: { enum: ["Single", "Married", "Divorced", "Widowed"] },
+                },
+              ],
+              actions: [{ name: "submit", text_key: "submit.register", primary: true }],
+              gates: {},
+            },
+            branding: {},
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+
+    let submittedFields: Record<string, string> | undefined;
+    server.use(
+      http.post("*/flow/*/submit", async ({ request }) => {
+        const body = (await request.json()) as { fields: Record<string, string> };
+        submittedFields = body.fields;
+        return HttpResponse.json({
+          id: "flow_test",
+          session_token: "st_test",
+          step: { name: "done", texts: { title_key: "done.title" }, fields: [], actions: [], gates: {} },
+          branding: {},
+        });
+      }),
+    );
+
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.project = testProject;
+    host.appendChild(element);
+
+    // Wait for the select to render, then submit without choosing an option.
+    await waitFor(() =>
+      element.shadowRoot?.querySelector<HTMLElement>('zl-select[name="maritalStatus"]'),
+    );
+
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+    );
+
+    await waitFor(() => submittedFields ?? null);
+    expect(submittedFields).toEqual({ email: "" });
+    expect(submittedFields).not.toHaveProperty("maritalStatus");
+  });
 });

@@ -2,6 +2,7 @@ import { type ZitadelProject } from "@zitadel/api/config";
 import type {
   CreateFlow201,
   CreateFlow201Step,
+  CreateFlow201StepFieldsItem,
   CreateFlowBodyPurpose,
   SubmitFlowStepBody,
   SubmitFlowStepBodyChallengeResponse,
@@ -621,7 +622,19 @@ export class ZitadelLogin extends LitElement {
     }
     const fields: Record<string, string> = {};
     for (const f of this.response?.step.fields ?? []) {
-      fields[f.name] = current.get(f.name) ?? "";
+      const value = current.get(f.name) ?? "";
+      // A `select` renders a closed `enum`. Its leading placeholder option
+      // submits "" when the user picks nothing, but "" is not a member of the
+      // enum, so sending it fails the server's enum validation (e.g.
+      // create_user rejects with "no enum value matched"). Omit the field
+      // unless the value is an actual enum member the schema allows — which
+      // includes "" only when the schema explicitly lists it. An omitted
+      // required select still fails the server's required-check, surfacing a
+      // clearer "required" error instead of an enum mismatch. Non-select
+      // fields keep the "" default so required-checks and challenge dispatch
+      // still run.
+      if (f.type === "select" && !isAllowedSelectValue(f, value)) continue;
+      fields[f.name] = value;
     }
     return fields;
   }
@@ -795,6 +808,17 @@ export class ZitadelLogin extends LitElement {
     console.error("[zitadel-login]", error);
     emit(this, "zitadel-flow-error", { message });
   }
+}
+
+/**
+ * Whether `value` is a member of a select field's closed `enum`. A select
+ * with no explicit enum has no submittable value, so this returns `false`
+ * and the caller omits the field. Because the enum never contains "" unless
+ * the schema deliberately lists it, an untouched placeholder ("") is omitted
+ * rather than sent and rejected by the server's enum validation.
+ */
+function isAllowedSelectValue(field: CreateFlow201StepFieldsItem, value: string): boolean {
+  return field.validation?.enum?.includes(value) ?? false;
 }
 
 function collectInitialValues(step: CreateFlow201Step): Record<string, string> {
