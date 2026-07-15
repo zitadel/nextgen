@@ -78,6 +78,52 @@ describe("LiquidJS engine", () => {
     expect(fullLocale["action.back"]).toBe("Back");
   });
 
+  it("the | t filter humanises uncatalogued field-label keys", () => {
+    // Custom schema properties (`department`, `dateOfBirth`) produce
+    // `<step>.field.<name>` label keys no catalog can enumerate — the
+    // form must not render the raw key.
+    const engine = createLiquidEngine({ locale });
+    expect(
+      engine.parseAndRenderSync("{{ key | t }}", { key: "register.field.department" }),
+    ).toBe("Department");
+    expect(
+      engine.parseAndRenderSync("{{ key | t }}", { key: "register.field.dateOfBirth" }),
+    ).toBe("Date of birth");
+    expect(
+      engine.parseAndRenderSync("{{ key | t }}", { key: "register.field.emergency_contact" }),
+    ).toBe("Emergency contact");
+  });
+
+  it("a catalogued field-label key wins over the humanised fallback", () => {
+    const engine = createLiquidEngine({
+      locale: { ...locale, "register.field.department": "Team" },
+    });
+    const result = engine.parseAndRenderSync("{{ key | t }}", {
+      key: "register.field.department",
+    });
+    expect(result).toBe("Team");
+  });
+
+  it("splits on the last .field. for step names that contain the marker", () => {
+    // Step names are tenant-chosen: "signup.field.v2" is a legal step
+    // name, and the property name always follows the final ".field.".
+    const engine = createLiquidEngine({ locale });
+    const result = engine.parseAndRenderSync("{{ key | t }}", {
+      key: "signup.field.v2.field.department",
+    });
+    expect(result).toBe("Department");
+  });
+
+  it("field sub-keys (placeholder/help) do not take the humanised fallback", () => {
+    // `.placeholder`/`.help` resolve through their own filters, which stay
+    // empty on a miss; `| t` keeps returning the raw key for them.
+    const engine = createLiquidEngine({ locale });
+    const result = engine.parseAndRenderSync("{{ key | t }}", {
+      key: "register.field.department.placeholder",
+    });
+    expect(result).toBe("register.field.department.placeholder");
+  });
+
   it("fieldPlaceholder resolves sibling keys", () => {
     const engine = createLiquidEngine({ locale });
     const result = engine.parseAndRenderSync(
