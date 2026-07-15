@@ -6,6 +6,7 @@ import { ZitadelError, toZitadelError } from "../lib/errors";
 import {
   binaryLogs,
   isProcessRunning,
+  reapEmbeddedPostgres,
   startBinaryRuntime,
   stopBinaryRuntime,
   type StopBinaryRuntimeResult,
@@ -115,6 +116,10 @@ export default class Start extends BaseCommand {
       }
       await stopExistingRuntime(existingRuntime);
       await assertPortAvailableForStart(port, serverUrl, this.meta.cliVersion);
+      // Self-heal: an embedded Postgres orphaned by an earlier unclean shutdown
+      // (crash, SIGKILL) still holds the data-dir lock and would fail the fresh
+      // server's `pg_ctl start`. Reap it before launching. No-op when clean.
+      await reapEmbeddedPostgres(paths.dataDir);
       const metadata = await startBinaryRuntime({
         cliVersion: this.meta.cliVersion,
         dataDir: paths.dataDir,

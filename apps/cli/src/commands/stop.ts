@@ -1,7 +1,12 @@
 import { Flags } from "@oclif/core";
 
 import { ZitadelError } from "../lib/errors";
-import { stopBinaryRuntime, type StopBinaryRuntimeResult } from "../lib/local-server/binary";
+import {
+  reapEmbeddedPostgres,
+  stopBinaryRuntime,
+  type ReapEmbeddedPostgresResult,
+  type StopBinaryRuntimeResult,
+} from "../lib/local-server/binary";
 import { stopAndRemoveContainer } from "../lib/local-server/docker";
 import {
   discoverManagedRuntimeProcesses,
@@ -57,7 +62,8 @@ export default class Stop extends BaseCommand {
       });
     }
 
-    let stopResult: Awaited<ReturnType<typeof stopBinaryRuntime>> | undefined;
+    let stopResult: StopBinaryRuntimeResult | undefined;
+    let postgresResult: ReapEmbeddedPostgresResult | undefined;
     if (runtime?.backend === "binary") {
       stopResult = await stopBinaryRuntime(runtime.pid);
       if (stopResult.status === "failed") {
@@ -66,6 +72,9 @@ export default class Stop extends BaseCommand {
           details: { runtime, stop_result: stopResult },
         });
       }
+      // The server binary's embedded Postgres escapes its process group, so the
+      // stop above cannot reach it; reap it directly so the next start is clean.
+      postgresResult = await reapEmbeddedPostgres(runtime.data_dir);
     } else {
       await stopAndRemoveContainer(containerName);
     }
@@ -80,7 +89,12 @@ export default class Stop extends BaseCommand {
         runtime: {
           backend: runtime?.backend ?? "missing",
           ...(runtime?.backend === "binary"
-            ? { pid: runtime.pid, log_path: runtime.log_path, stop_result: stopResult }
+            ? {
+                pid: runtime.pid,
+                log_path: runtime.log_path,
+                stop_result: stopResult,
+                embedded_postgres: postgresResult,
+              }
             : { container_name: containerName }),
           data_preserved: true,
           data_dir: runtime?.data_dir,
