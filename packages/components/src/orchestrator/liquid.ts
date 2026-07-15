@@ -214,7 +214,9 @@ const FLOW_ERROR_RULE_FALLBACKS: ReadonlyArray<{ suffix: string; generic: string
 const FLOW_ERROR_CATCH_ALL_KEY = "error.field_invalid";
 
 /**
- * Localises a `step.error` payload of field-validation text keys.
+ * Localises a `step.error` payload of `error.*` catalog keys —
+ * field-validation violations and general engine failures (e.g.
+ * `error.invalid_credentials`, `error.passkey_invalid`) alike.
  * Returns `null` unless EVERY `"; "`-joined segment is an `error.*` key
  * — the caller keeps other payloads (outcome tokens such as
  * `user_not_found`) verbatim.
