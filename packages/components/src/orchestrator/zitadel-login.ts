@@ -6,6 +6,7 @@ import type {
   CreateFlowBodyPurpose,
   SubmitFlowStepBody,
   SubmitFlowStepBodyChallengeResponse,
+  SubmitFlowStepBodyFields,
 } from "@zitadel/api/generated/model";
 import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { css, html, LitElement, type PropertyValues } from "lit";
@@ -611,7 +612,7 @@ export class ZitadelLogin extends LitElement {
    * field-less payload. Captured values are folded into `formValues` for
    * cross-step identity (the signed-in greeting) and post-error restoration.
    */
-  private collectSubmitFields(): Record<string, string> {
+  private collectSubmitFields(): SubmitFlowStepBodyFields {
     const current = new Map<string, string>();
     for (const atom of this.fieldAtoms()) {
       const name = atom.getAttribute("name");
@@ -620,19 +621,27 @@ export class ZitadelLogin extends LitElement {
     if (current.size > 0) {
       this.formValues = { ...this.formValues, ...Object.fromEntries(current) };
     }
-    const fields: Record<string, string> = {};
+    const fields: SubmitFlowStepBodyFields = {};
     for (const f of this.response?.step.fields ?? []) {
       const value = current.get(f.name) ?? "";
+      // A `checkbox` maps to a JSON `boolean` schema property. The atom carries
+      // its value token when checked and "" when unchecked (native-checkbox
+      // semantics), but the server validates the property as a real boolean and
+      // rejects a string, so submit `true`/`false` rather than the token.
+      if (f.type === "checkbox") {
+        fields[f.name] = value !== "";
+        continue;
+      }
       // A `select` renders a closed `enum`. Its leading placeholder option
       // submits "" when the user picks nothing, but "" is not a member of the
       // enum, so sending it fails the server's enum validation (e.g.
       // create_user rejects with "no enum value matched"). Omit the field
       // unless the value is an actual enum member the schema allows — which
-      // includes "" only when the schema explicitly lists it. An omitted
-      // required select still fails the server's required-check, surfacing a
-      // clearer "required" error instead of an enum mismatch. Non-select
-      // fields keep the "" default so required-checks and challenge dispatch
-      // still run.
+      // includes "" only when the schema explicitly lists it, so an
+      // intentionally-allowed empty option is still sent. An omitted required
+      // select still fails the server's required-check, surfacing a clearer
+      // "required" error instead of an enum mismatch. Other fields keep the ""
+      // default so required-checks and challenge dispatch still run.
       if (f.type === "select" && !isAllowedSelectValue(f, value)) continue;
       fields[f.name] = value;
     }

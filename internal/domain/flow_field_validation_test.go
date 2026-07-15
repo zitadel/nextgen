@@ -111,6 +111,35 @@ func TestSchemaFieldResolver_Validate_NonStringValueReportsFormat(t *testing.T) 
 	}
 }
 
+func TestSchemaFieldResolver_Validate_CheckboxAcceptsBool(t *testing.T) {
+	t.Parallel()
+	resolver := domain.NewSchemaFieldResolver()
+	fields := domain.FlowResolvedFields{
+		Fields: []domain.FlowField{{Name: "newsletterOptIn", Type: domain.FlowFieldTypeCheckbox}},
+	}
+
+	for _, v := range []any{true, false} {
+		if err := resolver.Validate(fields, map[string]any{"newsletterOptIn": v}); err != nil {
+			t.Fatalf("Validate(newsletterOptIn=%v) returned error: %v", v, err)
+		}
+	}
+}
+
+func TestSchemaFieldResolver_Validate_CheckboxRejectsString(t *testing.T) {
+	t.Parallel()
+	resolver := domain.NewSchemaFieldResolver()
+	fields := domain.FlowResolvedFields{
+		Fields: []domain.FlowField{{Name: "newsletterOptIn", Type: domain.FlowFieldTypeCheckbox}},
+	}
+
+	// A checkbox is a boolean property; the "true" string the client used to
+	// send must be rejected so the schema-type mismatch surfaces early.
+	err := resolver.Validate(fields, map[string]any{"newsletterOptIn": "true"})
+	if !hasValidationRule(t, err, "newsletterOptIn", domain.FlowFieldValidationRuleFormat) {
+		t.Fatalf("Validate err = %v, want format violation for string checkbox value", err)
+	}
+}
+
 func hasValidationRule(t *testing.T, err error, field string, rule domain.FlowFieldValidationRule) bool {
 	t.Helper()
 	var errs domain.FlowFieldValidationErrors

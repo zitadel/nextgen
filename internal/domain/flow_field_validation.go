@@ -8,7 +8,8 @@ import "strings"
 // Per-value checks (in order):
 //
 //   - name not in fields → [FlowFieldValidationRuleUnknown]
-//   - non-string value → [FlowFieldValidationRuleFormat]
+//   - checkbox field: non-bool value → [FlowFieldValidationRuleFormat]
+//   - non-string value (non-checkbox) → [FlowFieldValidationRuleFormat]
 //   - empty string + [FlowField.Required] → [FlowFieldValidationRuleRequired]
 //   - rules in [FlowField.Validation] (MinLength, MaxLength, Format)
 //
@@ -25,6 +26,15 @@ func (r *SchemaFieldResolver) Validate(fields FlowResolvedFields, values map[str
 		field, known := byName[name]
 		if !known {
 			errs = append(errs, FlowFieldValidationError{Field: name, Rule: FlowFieldValidationRuleUnknown})
+			continue
+		}
+		// A checkbox maps to a JSON `boolean` property, so its submitted value
+		// is a real bool (not a string). Accept the bool and skip the
+		// string-shaped rules; the schema type check runs later at create_user.
+		if field.Type == FlowFieldTypeCheckbox {
+			if _, isBool := value.(bool); !isBool {
+				errs = append(errs, FlowFieldValidationError{Field: name, Rule: FlowFieldValidationRuleFormat})
+			}
 			continue
 		}
 		str, isString := value.(string)

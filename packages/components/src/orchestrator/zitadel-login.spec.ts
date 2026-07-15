@@ -854,10 +854,10 @@ describe("<zitadel-login> against the typed Flow API", () => {
       ),
     );
 
-    let submittedFields: Record<string, string> | undefined;
+    let submittedFields: Record<string, unknown> | undefined;
     server.use(
       http.post("*/flow/*/submit", async ({ request }) => {
-        const body = (await request.json()) as { fields: Record<string, string> };
+        const body = (await request.json()) as { fields: Record<string, unknown> };
         submittedFields = body.fields;
         return HttpResponse.json({
           id: "flow_test",
@@ -888,8 +888,71 @@ describe("<zitadel-login> against the typed Flow API", () => {
       new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
     );
 
+    // A checkbox maps to a JSON boolean property, so a ticked box submits the
+    // real boolean `true` (not the "true"/"on" value token) to satisfy the
+    // server's schema-type validation on create_user.
     await waitFor(() => submittedFields ?? null);
-    expect(submittedFields).toEqual({ maritalStatus: "Married", newsletterOptIn: "true" });
+    expect(submittedFields).toEqual({ maritalStatus: "Married", newsletterOptIn: true });
+  });
+
+  it("submits an unticked checkbox as boolean false", async () => {
+    // An untouched optional checkbox must submit real `false`, not "" — the
+    // schema validates the property as a boolean and rejects an empty string.
+    server.use(
+      http.post("*/flow", () =>
+        HttpResponse.json(
+          {
+            id: "flow_test",
+            session_token: "st_test",
+            step: {
+              name: "register",
+              texts: { title_key: "register.title" },
+              fields: [
+                {
+                  name: "newsletterOptIn",
+                  type: "checkbox",
+                  text_key: "register.field.newsletterOptIn",
+                  required: false,
+                },
+              ],
+              actions: [{ name: "submit", text_key: "submit.register", primary: true }],
+              gates: {},
+            },
+            branding: {},
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+
+    let submittedFields: Record<string, unknown> | undefined;
+    server.use(
+      http.post("*/flow/*/submit", async ({ request }) => {
+        const body = (await request.json()) as { fields: Record<string, unknown> };
+        submittedFields = body.fields;
+        return HttpResponse.json({
+          id: "flow_test",
+          session_token: "st_test",
+          step: { name: "done", texts: { title_key: "done.title" }, fields: [], actions: [], gates: {} },
+          branding: {},
+        });
+      }),
+    );
+
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.project = testProject;
+    host.appendChild(element);
+
+    await waitFor(() =>
+      element.shadowRoot?.querySelector<HTMLElement>('zl-checkbox[name="newsletterOptIn"]'),
+    );
+
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+    );
+
+    await waitFor(() => submittedFields ?? null);
+    expect(submittedFields).toEqual({ newsletterOptIn: false });
   });
 
   it("omits an untouched enum select instead of submitting an empty string", async () => {
