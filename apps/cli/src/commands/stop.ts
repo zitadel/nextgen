@@ -75,6 +75,16 @@ export default class Stop extends BaseCommand {
       // The server binary's embedded Postgres escapes its process group, so the
       // stop above cannot reach it; reap it directly so the next start is clean.
       postgresResult = await reapEmbeddedPostgres(runtime.data_dir);
+      if (postgresResult.status === "failed") {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          "The local server's embedded Postgres did not stop",
+          {
+            hint: "Stop the lingering postgres process manually, then rerun `zitadel stop`.",
+            details: { runtime, stop_result: stopResult, postgres_result: postgresResult },
+          },
+        );
+      }
     } else {
       await stopAndRemoveContainer(containerName);
     }

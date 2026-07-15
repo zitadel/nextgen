@@ -35,8 +35,8 @@ export type StopBinaryRuntimeResult = Readonly<{
 
 export type ReapEmbeddedPostgresResult = Readonly<{
   // `absent`: no lock file, nothing to reap. `stale`: lock file pointed at a
-  // dead process; we cleared it. `stopped`: we terminated a live postmaster.
-  // `failed`: a live postmaster ignored SIGINT and SIGKILL.
+  // dead process or was corrupt; we cleared it. `stopped`: we terminated a live
+  // postmaster. `failed`: a live postmaster ignored SIGINT and SIGKILL.
   status: "absent" | "failed" | "stale" | "stopped";
   pid?: number;
   signal?: NodeJS.Signals;
@@ -162,9 +162,17 @@ export async function reapEmbeddedPostgres(
   const fastShutdownTimeoutMs = options.fastShutdownTimeoutMs ?? STOP_TIMEOUT_MS;
   const killTimeoutMs = options.killTimeoutMs ?? STOP_KILL_TIMEOUT_MS;
   const pidFile = join(dataDir, EMBEDDED_POSTGRES_PID_FILE);
-  const pid = await readPostmasterPid(pidFile);
-  if (pid === undefined) {
+  const raw = await readLockFile(pidFile);
+  if (raw === undefined) {
     return { status: "absent" };
+  }
+  const pid = parsePostmasterPid(raw);
+  if (pid === undefined) {
+    // A lock file whose first line is not a pid is corrupt (e.g. a torn write
+    // during a crash). No owner can be identified, so clear it — leaving it
+    // would keep blocking `pg_ctl start`, the exact failure this reap prevents.
+    await rm(pidFile, { force: true });
+    return { status: "stale" };
   }
   if (!isProcessRunning(pid)) {
     // A dead owner is a stale lock. `pg_ctl start` would clear it itself, but
@@ -187,20 +195,25 @@ export async function reapEmbeddedPostgres(
   return { status: "failed", pid };
 }
 
-async function readPostmasterPid(pidFile: string): Promise<number | undefined> {
-  let raw: string;
+async function readLockFile(pidFile: string): Promise<string | undefined> {
   try {
-    raw = await readFile(pidFile, "utf8");
+    return await readFile(pidFile, "utf8");
   } catch (error) {
     if (isErrno(error, "ENOENT")) {
       return undefined;
     }
     throw error;
   }
+}
+
+function parsePostmasterPid(raw: string): number | undefined {
   // postmaster.pid records the postmaster PID on its first line.
-  const [firstLine] = raw.split(/\r?\n/, 1);
-  const pid = Number.parseInt(firstLine ?? "", 10);
-  return Number.isInteger(pid) && pid > 0 ? pid : undefined;
+  const firstLine = (raw.split(/\r?\n/, 1)[0] ?? "").trim();
+  if (!/^\d+$/.test(firstLine)) {
+    return undefined;
+  }
+  const pid = Number.parseInt(firstLine, 10);
+  return pid > 0 && Number.isSafeInteger(pid) ? pid : undefined;
 }
 
 export function isProcessRunning(pid: number): boolean {

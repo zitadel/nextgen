@@ -104,6 +104,17 @@ describe("reapEmbeddedPostgres", () => {
     expect(kill).not.toHaveBeenCalled();
   });
 
+  it("clears a corrupt lock file whose first line is not a pid", async () => {
+    // e.g. a torn write during a crash. Leaving it would keep blocking
+    // `pg_ctl start` with no identifiable owner to stop.
+    const dataDir = await dataDirWithPostmasterPid("garbage\n/some/data\n");
+    const kill = vi.spyOn(process, "kill");
+
+    await expect(reapEmbeddedPostgres(dataDir)).resolves.toEqual({ status: "stale" });
+    expect(kill).not.toHaveBeenCalled();
+    await expect(stat(pidFileFor(dataDir))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
   it("clears a stale lock file left by a dead postmaster", async () => {
     // A pid far above any real process reads as dead through the real kill(pid, 0).
     const dataDir = await dataDirWithPostmasterPid("999999999\n/some/data\n");
@@ -153,7 +164,12 @@ describe("reapEmbeddedPostgres", () => {
       ["-e", "process.on('SIGINT', () => {}); console.log('ready'); setInterval(() => {}, 1 << 30);"],
       { stdio: ["ignore", "pipe", "ignore"] },
     );
-    strayPids.push(child.pid ?? 0);
+    if (!child.pid) {
+      // Never push a falsy pid: kill(0) would signal the test runner's own
+      // process group during cleanup.
+      throw new Error("test child did not expose a pid");
+    }
+    strayPids.push(child.pid);
     await new Promise<void>((resolve, reject) => {
       child.stdout.once("data", () => resolve());
       child.once("error", reject);
