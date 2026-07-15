@@ -103,14 +103,18 @@ describe("schemas list", () => {
       status: string;
       data: {
         object_type: string;
-        revisions: Array<{ id: string; createdAt: string }>;
+        revisions: Array<{ id: string; created_at: string }>;
         count: number;
       };
     };
     expect(json.status).toBe("ok");
     expect(json.data.count).toBe(2);
-    expect(json.data.revisions[0].id).toBe("sch_02");
-    expect(json.data.revisions[1].id).toBe("sch_01");
+    // Envelope rows are snake_case like the rest of the data contract,
+    // even though the server response is camelCase.
+    expect(json.data.revisions).toEqual([
+      { id: "sch_02", created_at: "2026-07-02T00:00:00Z" },
+      { id: "sch_01", created_at: "2026-06-01T00:00:00Z" },
+    ]);
   });
 
   it("URL-encodes URL-shaped schema ids when fetching a revision", async () => {

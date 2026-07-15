@@ -19,9 +19,15 @@ export type SetupAnswers = {
   preset: SetupPreset;
 };
 
-/** Read-only facts a prompt may need (today only the resolved framework). */
+/** Read-only facts a prompt may need. */
 export type PromptContext = {
   readonly framework: FrameworkFacts;
+  /**
+   * The app directory setup runs in. {@link import("./server").ServerPrompt}
+   * reads the local runtime metadata (`.zitadel/local/runtime.json`) under it
+   * to detect a managed local server started here.
+   */
+  readonly cwd: string;
   /**
    * The raw `--server` flag value as the user passed it, or `undefined`
    * when not provided. Prompts use this to skip themselves when the flag

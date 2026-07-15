@@ -15,9 +15,29 @@ database:
   postgres: postgres://zitadel:zitadel@localhost:5432/nextgen?sslmode=disable
 
 password_hasher:
+  # Algorithm used to hash new passwords/secrets. Defaults to argon2id
+  # (RFC 9106). Existing hashes made with any of the verifiers below still
+  # validate and are transparently rehashed to the hasher algorithm on the
+  # next successful verification.
   hasher:
-    algorithm: bcrypt
-    cost: 10
+    algorithm: argon2id
+    # RFC 9106 second recommended option.
+    time: 3
+    memory: 65536 # KiB (64 MiB)
+    threads: 4
+    # To keep bcrypt as the hashing algorithm instead:
+    # algorithm: bcrypt
+    # cost: 10
+  verifiers:
+    - argon2
+    - bcrypt
+    - scrypt
+    - pbkdf2
+    - sha2
+    - md5
+    - md5salted
+    - phpass
+    - drupal7
 
 schema:
   lru_cache_size: 1000

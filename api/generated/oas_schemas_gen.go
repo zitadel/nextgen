@@ -2330,13 +2330,11 @@ func (*ErrorDetailsStatusCode) getFlowStepRes()              {}
 func (*ErrorDetailsStatusCode) getHealthRes()                {}
 func (*ErrorDetailsStatusCode) getKeysRes()                  {}
 func (*ErrorDetailsStatusCode) getLiveRes()                  {}
-func (*ErrorDetailsStatusCode) getMySessionRes()             {}
 func (*ErrorDetailsStatusCode) getMyUserRes()                {}
 func (*ErrorDetailsStatusCode) getOpenIDConfigurationRes()   {}
 func (*ErrorDetailsStatusCode) getProjectRes()               {}
 func (*ErrorDetailsStatusCode) getReadyRes()                 {}
 func (*ErrorDetailsStatusCode) getSchemaByIdRes()            {}
-func (*ErrorDetailsStatusCode) getSessionRes()               {}
 func (*ErrorDetailsStatusCode) getTeamRes()                  {}
 func (*ErrorDetailsStatusCode) getTokenRes()                 {}
 func (*ErrorDetailsStatusCode) getUserByIDRes()              {}
@@ -4014,7 +4012,16 @@ type FlowStep struct {
 	// Step name from the flow definition.
 	Name  string       `json:"name"`
 	Texts OptStepTexts `json:"texts"`
-	// Error message from a previous failed submission.
+	// Error from a previous failed submission. Field-validation failures
+	// carry localisation text keys: `error.<field>_<rule>` per violation
+	// (e.g. `error.email_required`; the `format` rule is spelled
+	// `error.<field>_invalid`), multiple violations joined with `"; "`.
+	// Field names appear verbatim, so clients localise unknown keys via
+	// the generic `error.field_<rule>` catalog entries. Other engine
+	// failures carry `error.*` catalog keys as well (e.g.
+	// `error.invalid_credentials`, `error.passkey_invalid`); a
+	// non-`error.` payload is an outcome token (e.g. `user_not_found`)
+	// that clients keep verbatim.
 	Error OptNilString `json:"error"`
 	// Present only on terminal steps. Tells the frontend what to do:
 	// - redirect: navigate to redirect_uri immediately (OIDC/SAML done)
@@ -4707,6 +4714,102 @@ func (s GetLiveOK) Read(p []byte) (n int, err error) {
 
 func (*GetLiveOK) getLiveRes() {}
 
+// GetMySessionErrorResponse represents sum type.
+type GetMySessionErrorResponse struct {
+	Type         GetMySessionErrorResponseType // switch on this field
+	SessNotFound SessNotFound
+	Internal     Internal
+}
+
+// GetMySessionErrorResponseType is oneOf type of GetMySessionErrorResponse.
+type GetMySessionErrorResponseType string
+
+// Possible values for GetMySessionErrorResponseType.
+const (
+	SessNotFoundGetMySessionErrorResponse GetMySessionErrorResponseType = "sess.not_found"
+	InternalGetMySessionErrorResponse     GetMySessionErrorResponseType = "internal"
+)
+
+// IsSessNotFound reports whether GetMySessionErrorResponse is SessNotFound.
+func (s GetMySessionErrorResponse) IsSessNotFound() bool {
+	return s.Type == SessNotFoundGetMySessionErrorResponse
+}
+
+// IsInternal reports whether GetMySessionErrorResponse is Internal.
+func (s GetMySessionErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetMySessionErrorResponse
+}
+
+// SetSessNotFound sets GetMySessionErrorResponse to SessNotFound.
+func (s *GetMySessionErrorResponse) SetSessNotFound(v SessNotFound) {
+	s.Type = SessNotFoundGetMySessionErrorResponse
+	s.SessNotFound = v
+}
+
+// GetSessNotFound returns SessNotFound and true boolean if GetMySessionErrorResponse is SessNotFound.
+func (s GetMySessionErrorResponse) GetSessNotFound() (v SessNotFound, ok bool) {
+	if !s.IsSessNotFound() {
+		return v, false
+	}
+	return s.SessNotFound, true
+}
+
+// NewSessNotFoundGetMySessionErrorResponse returns new GetMySessionErrorResponse from SessNotFound.
+func NewSessNotFoundGetMySessionErrorResponse(v SessNotFound) GetMySessionErrorResponse {
+	var s GetMySessionErrorResponse
+	s.SetSessNotFound(v)
+	return s
+}
+
+// SetInternal sets GetMySessionErrorResponse to Internal.
+func (s *GetMySessionErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetMySessionErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetMySessionErrorResponse is Internal.
+func (s GetMySessionErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetMySessionErrorResponse returns new GetMySessionErrorResponse from Internal.
+func NewInternalGetMySessionErrorResponse(v Internal) GetMySessionErrorResponse {
+	var s GetMySessionErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// GetMySessionErrorResponseStatusCode wraps GetMySessionErrorResponse with StatusCode.
+type GetMySessionErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetMySessionErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetMySessionErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetMySessionErrorResponseStatusCode) GetResponse() GetMySessionErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetMySessionErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetMySessionErrorResponseStatusCode) SetResponse(val GetMySessionErrorResponse) {
+	s.Response = val
+}
+
+func (*GetMySessionErrorResponseStatusCode) getMySessionRes() {}
+
 type GetMySessionNotFound ErrorDetails
 
 func (*GetMySessionNotFound) getMySessionRes() {}
@@ -4867,6 +4970,100 @@ func NewUserSchemaGetSchemaByIdOK(v UserSchema) GetSchemaByIdOK {
 }
 
 func (*GetSchemaByIdOK) getSchemaByIdRes() {}
+
+// GetSessionErrorResponse represents sum type.
+type GetSessionErrorResponse struct {
+	Type         GetSessionErrorResponseType // switch on this field
+	SessNotFound SessNotFound
+	Internal     Internal
+}
+
+// GetSessionErrorResponseType is oneOf type of GetSessionErrorResponse.
+type GetSessionErrorResponseType string
+
+// Possible values for GetSessionErrorResponseType.
+const (
+	SessNotFoundGetSessionErrorResponse GetSessionErrorResponseType = "sess.not_found"
+	InternalGetSessionErrorResponse     GetSessionErrorResponseType = "internal"
+)
+
+// IsSessNotFound reports whether GetSessionErrorResponse is SessNotFound.
+func (s GetSessionErrorResponse) IsSessNotFound() bool {
+	return s.Type == SessNotFoundGetSessionErrorResponse
+}
+
+// IsInternal reports whether GetSessionErrorResponse is Internal.
+func (s GetSessionErrorResponse) IsInternal() bool { return s.Type == InternalGetSessionErrorResponse }
+
+// SetSessNotFound sets GetSessionErrorResponse to SessNotFound.
+func (s *GetSessionErrorResponse) SetSessNotFound(v SessNotFound) {
+	s.Type = SessNotFoundGetSessionErrorResponse
+	s.SessNotFound = v
+}
+
+// GetSessNotFound returns SessNotFound and true boolean if GetSessionErrorResponse is SessNotFound.
+func (s GetSessionErrorResponse) GetSessNotFound() (v SessNotFound, ok bool) {
+	if !s.IsSessNotFound() {
+		return v, false
+	}
+	return s.SessNotFound, true
+}
+
+// NewSessNotFoundGetSessionErrorResponse returns new GetSessionErrorResponse from SessNotFound.
+func NewSessNotFoundGetSessionErrorResponse(v SessNotFound) GetSessionErrorResponse {
+	var s GetSessionErrorResponse
+	s.SetSessNotFound(v)
+	return s
+}
+
+// SetInternal sets GetSessionErrorResponse to Internal.
+func (s *GetSessionErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetSessionErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetSessionErrorResponse is Internal.
+func (s GetSessionErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetSessionErrorResponse returns new GetSessionErrorResponse from Internal.
+func NewInternalGetSessionErrorResponse(v Internal) GetSessionErrorResponse {
+	var s GetSessionErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// GetSessionErrorResponseStatusCode wraps GetSessionErrorResponse with StatusCode.
+type GetSessionErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetSessionErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetSessionErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetSessionErrorResponseStatusCode) GetResponse() GetSessionErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetSessionErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetSessionErrorResponseStatusCode) SetResponse(val GetSessionErrorResponse) {
+	s.Response = val
+}
+
+func (*GetSessionErrorResponseStatusCode) getSessionRes() {}
 
 type GetSessionNotFound ErrorDetails
 
@@ -9651,6 +9848,52 @@ func (o OptSchemaURI) Or(d SchemaURI) SchemaURI {
 	return d
 }
 
+// NewOptSessNotFoundDetails returns new OptSessNotFoundDetails with value set to v.
+func NewOptSessNotFoundDetails(v SessNotFoundDetails) OptSessNotFoundDetails {
+	return OptSessNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSessNotFoundDetails is optional SessNotFoundDetails.
+type OptSessNotFoundDetails struct {
+	Value SessNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSessNotFoundDetails was set.
+func (o OptSessNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSessNotFoundDetails) Reset() {
+	var v SessNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSessNotFoundDetails) SetTo(v SessNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSessNotFoundDetails) Get() (v SessNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSessNotFoundDetails) Or(d SessNotFoundDetails) SessNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptStepTexts returns new OptStepTexts with value set to v.
 func NewOptStepTexts(v StepTexts) OptStepTexts {
 	return OptStepTexts{
@@ -10896,6 +11139,59 @@ func (s *SchemaURL) SetURL(val url.URL) {
 	s.URL = val
 }
 
+// Merged schema.
+// Ref: #
+type SessNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSessNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SessNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SessNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SessNotFound) GetDetails() OptSessNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SessNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SessNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SessNotFound) SetDetails(val OptSessNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SessNotFoundDetails map[string]jx.Raw
+
+func (s *SessNotFoundDetails) init() SessNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 type SessionID string
 
 // Paginated list of sessions.
@@ -10948,6 +11244,21 @@ type SessionResponse struct {
 	// The authenticated user. Null for anonymous sessions and until the `user`
 	// factor has been verified through an `auth_attempt`.
 	UserID OptNilUserID `json:"user_id"`
+	// Human-readable name of the authenticated user, resolved from the
+	// conventional user-schema properties: `name` when defined, otherwise
+	// the given and family name parts joined — `givenName`/`familyName`
+	// (the shipped presets' spelling) or `given_name`/`family_name`. Only
+	// present on reads that hydrate the user's identity
+	// (`GET /sessions/me`) and only when the session has an authenticated
+	// user whose schema carries those properties; clients fall back to
+	// `email`, then `user_id`.
+	Name OptString `json:"name"`
+	// Email address of the authenticated user, resolved from the
+	// conventional `email` user-schema property. Only present on reads
+	// that hydrate the user's identity (`GET /sessions/me`) and only when
+	// the session has an authenticated user whose schema carries that
+	// property.
+	Email OptString `json:"email"`
 	// Verified authentication factors accumulated by this session.
 	// Each key is a factor type (e.g. `password`, `totp`, `passkey`).
 	// Each value is a factor event object with at least `verified_at` and
@@ -10987,6 +11298,16 @@ func (s *SessionResponse) GetState() SessionResponseState {
 // GetUserID returns the value of UserID.
 func (s *SessionResponse) GetUserID() OptNilUserID {
 	return s.UserID
+}
+
+// GetName returns the value of Name.
+func (s *SessionResponse) GetName() OptString {
+	return s.Name
+}
+
+// GetEmail returns the value of Email.
+func (s *SessionResponse) GetEmail() OptString {
+	return s.Email
 }
 
 // GetFactors returns the value of Factors.
@@ -11037,6 +11358,16 @@ func (s *SessionResponse) SetState(val SessionResponseState) {
 // SetUserID sets the value of UserID.
 func (s *SessionResponse) SetUserID(val OptNilUserID) {
 	s.UserID = val
+}
+
+// SetName sets the value of Name.
+func (s *SessionResponse) SetName(val OptString) {
+	s.Name = val
+}
+
+// SetEmail sets the value of Email.
+func (s *SessionResponse) SetEmail(val OptString) {
+	s.Email = val
 }
 
 // SetFactors sets the value of Factors.

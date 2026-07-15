@@ -11,6 +11,38 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
+// Step error text keys the state machine emits when an auth-attempt
+// proof is rejected. Every engine-emitted step error must be a
+// localizable `error.*` catalog key or a reserved outcome token:
+// /login localizes only `error.*`-prefixed step errors and treats
+// outcome tokens as routing, so anything else renders verbatim (see
+// `localiseFlowErrorKeys` in
+// packages/components/src/orchestrator/liquid.ts). New emission sites
+// add a const here; [FlowStepErrorAllowed] and its contract test keep
+// the set honest.
+const (
+	// FlowStepErrorInvalidCredentials reports a rejected password
+	// proof. The client routes it inline to the password field
+	// (fieldErrorKeys in liquid.ts).
+	FlowStepErrorInvalidCredentials = "error.invalid_credentials"
+	// FlowStepErrorPasskeyInvalid reports a rejected passkey assertion.
+	FlowStepErrorPasskeyInvalid = "error.passkey_invalid"
+	// FlowStepErrorPasskeyRegistrationInvalid reports a rejected
+	// passkey registration attestation.
+	FlowStepErrorPasskeyRegistrationInvalid = "error.passkey_registration_invalid"
+)
+
+// FlowStepErrorAllowed reports whether a step error value honors the
+// client contract: a localizable `error.*` text key or a reserved
+// outcome token (reservedOutcomes in flow_definition_validator.go).
+func FlowStepErrorAllowed(key string) bool {
+	if strings.HasPrefix(key, "error.") {
+		return true
+	}
+	_, ok := reservedOutcomes[key]
+	return ok
+}
+
 // FlowStateMachine drives a flow definition forward in response to
 // client submissions. The handler owns cookie I/O; the state machine
 // never touches cookies.
@@ -378,7 +410,7 @@ func (r *FlowStateMachineRuntime) resolveInputs(pc *processCtx) (FlowResolvedFie
 func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved FlowResolvedFields) (*FlowStepResult, error) {
 	if validationErr := r.fields.Validate(resolved, pc.in.Fields); validationErr != nil {
 		if errs, ok := errors.AsType[FlowFieldValidationErrors](validationErr); ok {
-			step := r.buildStep(pc.state, pc.currentStep, resolved, new(errs.Error()), nil, nil)
+			step := r.buildStep(pc.state, pc.currentStep, resolved, new(errs.StepError()), nil, nil)
 			pc.state.IssuedAt = r.now()
 			return &FlowStepResult{State: pc.state, Step: step}, nil
 		}
@@ -632,7 +664,7 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 				Plain:     value,
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
-				msg := "auth_attempt.password_invalid"
+				msg := FlowStepErrorInvalidCredentials
 				return flowDispatchResult{StepError: &msg}, nil
 			}
 			if err != nil {
@@ -744,7 +776,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
 				state.ClearPendingChallenge()
-				msg := "auth_attempt.passkey_registration_invalid"
+				msg := FlowStepErrorPasskeyRegistrationInvalid
 				rendered := r.buildStep(pc.state, pc.currentStep, resolved, &msg, nil, nil)
 				state.IssuedAt = r.now()
 				return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
@@ -777,7 +809,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
 				state.ClearPendingChallenge()
-				msg := "auth_attempt.passkey_invalid"
+				msg := FlowStepErrorPasskeyInvalid
 				rendered := r.buildStep(pc.state, pc.currentStep, resolved, &msg, nil, nil)
 				state.IssuedAt = r.now()
 				return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil

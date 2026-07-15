@@ -28,7 +28,7 @@ import { validateBranding } from "./branding-validator.js";
 import { applyDefaultFont, applyFontUrl } from "./font-loader.js";
 import { emit } from "../internal/emit.js";
 import { escapeHtml } from "../internal/escape-html.js";
-import { createLiquidEngine } from "./liquid.js";
+import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
 import { TEMPLATE_NAMES } from "./template-names.js";
 import { en, builtinLocales, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
@@ -214,9 +214,13 @@ export class ZitadelLogin extends LitElement {
       sheet.replaceSync(layoutChromeCss);
       root.adoptedStyleSheets = [...existing, sheet];
       root.addEventListener("zl-input", this.handleAtomInput as EventListener);
-      // <zl-select> and <zl-checkbox> commit their value through `zl-change`
-      // rather than `zl-input`, so capture it on the same `formValues` path.
-      root.addEventListener("zl-change", this.handleAtomChange as EventListener);
+      // Editing any control (or dismissing the alert) retires the current
+      // step error. `zl-change` covers <zl-checkbox>/<zl-select>, which
+      // don't emit `zl-input`; the clearing is imperative DOM surgery so
+      // the rendered step string stays byte-identical and the subtree
+      // (including any in-flight <zl-passkey>) is never rebuilt mid-edit.
+      root.addEventListener("zl-change", this.handleAtomEdited as EventListener);
+      root.addEventListener("zl-dismiss", this.handleAlertDismiss as EventListener);
       // <zl-button> dispatches `zl-submit` for both primary submits and
       // secondary actions; the orchestrator picks the right path based on
       // the button's `type` and `action`.
@@ -445,6 +449,8 @@ export class ZitadelLogin extends LitElement {
   }
 
   private applyResponse(wire: CreateFlow201): void {
+    // A fresh response carries fresh (or no) errors — un-dismiss.
+    this.stepErrorDismissed = false;
     this.response = wire;
     const { branding, issues } = validateBranding(wire.branding);
     this.branding = branding;
@@ -512,11 +518,26 @@ export class ZitadelLogin extends LitElement {
         ? this.branding.liquid_template
         : null;
 
-    const errors: FlowError[] = step.error
-      ? step.error.startsWith("error.")
-        ? [{ text_key: step.error }]
-        : [{ message: step.error }]
+    // `error.*` keys — the server's validation dialect
+    // (`error.<field>_<rule>`, one key per violation, "; "-joined) —
+    // localise via the catalog with generic per-rule fallbacks; anything
+    // else (outcome names, diagnostics) stays verbatim.
+    const rawErrors: FlowError[] = step.error
+      ? (localiseFlowErrorKeys(step.error, {
+          locale: this.resolveLocale(),
+          stepName: step.name ?? "",
+          // Inline-routed keys downgrade to a banner message when the
+          // step doesn't render their field — the inline outlet is the
+          // only place the template shows them.
+          fields: (step.fields ?? []).map((field) => field.name),
+        }) ?? [{ message: step.error }])
       : [];
+    // A dismissed step error must not flicker back on the `loading`
+    // re-render (the only step re-render while the user stays on this
+    // step — it rebuilds the subtree anyway). While idle the array must
+    // stay as-is: keystroke re-renders have to produce a byte-identical
+    // string, and the imperatively removed alert stays removed.
+    const errors: FlowError[] = this.loading && this.stepErrorDismissed ? [] : rawErrors;
 
     const fields = step.fields ?? [];
     const actions = step.actions ?? [];
@@ -648,28 +669,68 @@ export class ZitadelLogin extends LitElement {
     return fields;
   }
 
+  /**
+   * True once the user retired the current step error by editing a field or
+   * dismissing the alert. Deliberately NON-reactive: consulting reactive
+   * state in `renderStep` would change its output string on the first
+   * post-dismiss keystroke, and `unsafeHTML` would rebuild the whole step
+   * subtree — wiping typed values (`hydrateStepAfterRender` only re-applies
+   * them on response changes) and reconnecting atoms. Reset on every new
+   * response; consulted only by the `loading` re-render, which rebuilds
+   * anyway.
+   */
+  private stepErrorDismissed = false;
+
   private handleAtomInput = (event: CustomEvent<{ name: string; value: string }>): void => {
     if (!event.detail) return;
     const { name, value } = event.detail;
     if (!name) return;
     this.formValues = { ...this.formValues, [name]: value };
     this.syncFieldElementValue(name, value);
+    this.clearStaleErrors(name);
     emit(this, "zitadel-flow-input", { name, value });
   };
 
-  private handleAtomChange = (
-    event: CustomEvent<{ name: string; value: string; checked?: boolean }>,
-  ): void => {
-    const detail = event.detail;
-    if (!detail?.name) return;
-    const { name } = detail;
-    // <zl-checkbox> reports `checked`; its submitted value is the value token
-    // only when checked (matching a native checkbox), empty otherwise.
-    const value = detail.checked === undefined ? detail.value : detail.checked ? detail.value : "";
-    this.formValues = { ...this.formValues, [name]: value };
-    this.syncFieldElementValue(name, value);
-    emit(this, "zitadel-flow-input", { name, value });
+  /** `zl-change` from <zl-checkbox>/<zl-select>: only error clearing. */
+  private handleAtomEdited = (event: CustomEvent<{ name?: string }>): void => {
+    const name = event.detail?.name;
+    if (name) this.clearStaleErrors(name);
   };
+
+  /** Explicit dismiss of the step-error alert (it removes itself). */
+  private handleAlertDismiss = (event: Event): void => {
+    const target = event.target as Element | null;
+    if (target?.matches?.("zl-alert[data-zl-step-error]")) {
+      this.stepErrorDismissed = true;
+    }
+  };
+
+  /**
+   * Retire the current step error after the user edits `fieldName`:
+   * remove the form-level alert(s) and clear the edited field's inline
+   * error — other fields' inline errors stay until they are edited.
+   * Imperative on purpose; see {@link stepErrorDismissed}.
+   */
+  private clearStaleErrors(fieldName: string): void {
+    if (!this.response?.step.error) return;
+    const root = this.shadowRoot;
+    if (!root) return;
+    if (!this.stepErrorDismissed) {
+      this.stepErrorDismissed = true;
+      for (const alert of root.querySelectorAll("zl-alert[data-zl-step-error]")) {
+        alert.remove();
+      }
+    }
+    // Schema field names are free-form (dots, quotes, `x-…#…`), so match by
+    // attribute value instead of interpolating into a CSS selector.
+    for (const field of root.querySelectorAll<HTMLElement & { invalid?: boolean; error?: string }>(
+      "zl-field",
+    )) {
+      if (field.getAttribute("name") !== fieldName || !field.invalid) continue;
+      field.invalid = false;
+      field.error = "";
+    }
+  }
 
   /** Mirror a value onto the matching rendered atom (used after atom events). */
   private syncFieldElementValue(name: string, value: string): void {
@@ -741,19 +802,31 @@ export class ZitadelLogin extends LitElement {
    * cancel would trigger a second ceremony (the guard prevents a third).
    */
   private handlePasskeyError = (
-    event: CustomEvent<{ challenge_id: string; error: string; aborted: boolean }>,
+    event: CustomEvent<{
+      challenge_id: string;
+      error: string;
+      aborted: boolean;
+      timed_out?: boolean;
+    }>,
   ): void => {
     if (!this.response) return;
-    const { error: message, aborted } = event.detail;
-    const errorKey = aborted ? "error.passkey_cancelled" : "error.passkey_failed";
+    const { error: message, aborted, timed_out: timedOut } = event.detail;
+    const errorKey = timedOut
+      ? "error.passkey_timeout"
+      : aborted
+        ? "error.passkey_cancelled"
+        : "error.passkey_failed";
     if (this.response.step.error === errorKey) return;
+    // This path replaces the response without going through applyResponse;
+    // the fresh error must not start life dismissed.
+    this.stepErrorDismissed = false;
     const { challenge: _dropped, ...stepWithoutChallenge } = this.response.step;
     this.response = {
       ...this.response,
       step: { ...stepWithoutChallenge, error: errorKey },
     };
     console.warn(
-      `[zitadel-login] passkey ceremony ${aborted ? "cancelled" : "failed"}: ${message}`,
+      `[zitadel-login] passkey ceremony ${timedOut ? "timed out" : aborted ? "cancelled" : "failed"}: ${message}`,
     );
   };
 

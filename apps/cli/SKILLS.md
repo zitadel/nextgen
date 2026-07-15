@@ -43,11 +43,21 @@ Each invocation prints one JSON object:
 - `cli_version`, `command`, `source`: always present.
 - On success: `data` with the command-specific payload.
 - On a no-op: `reason` (e.g. `no-framework-detected`, `orphaned-config`).
-- On failure: `code` (e.g. `E_VALIDATION`, `E_NETWORK`, `E_CONFLICT`) and
-  `message`.
+- On failure: `code` (e.g. `E_VALIDATION`, `E_NETWORK`, `E_NOT_FOUND`,
+  `E_CONFLICT`) and `message`.
 - `next_commands`: the suggested follow-ups. Prefer these over free-text hints.
+- `plan` and `apply` also emit `data.changes`: one row per touched resource
+  (`{kind, action, file, id?, previous_id?}`, action ∈ create/update/revision/
+  delete). Plan rows preview; apply rows report, with the resulting platform
+  ids. Use it to verify an edit did what you intended — `apply`'s
+  `files_updated` lists only local write-backs, not platform changes.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime with
   `npx @zitadel/cli@alpha start`, then retry with `--server local`.
+- `E_NOT_FOUND`: an HTTP 404 from the target server. With the platform's
+  error envelope it names a missing resource (e.g. an unknown schema id);
+  without one the endpoint itself is missing — the `--server` value likely
+  points at something that is not a Zitadel platform API. Follow
+  `next_commands` (usually `start` + retry with `--server local`).
 - `E_PORT_IN_USE`: the requested local runtime port already has a listener.
   Stop that process, run `npx @zitadel/cli@alpha stop --all` for host-wide
   CLI-managed local runtimes, or choose another `start --port`.
@@ -57,9 +67,9 @@ UIs display both streams together, but the machine contract is one parseable
 JSON object on stdout; installer, audit, and package-manager progress belongs
 on stderr.
 
-Exit codes mirror the error class (3 = validation, 4 = network, 5 = conflict,
-1 = auth, 2 = not-implemented). An unknown command is handled by the CLI's help
-layer, not the envelope.
+Exit codes mirror the error class (3 = validation, 4 = network or not-found,
+5 = conflict, 1 = auth, 2 = not-implemented). An unknown command is handled by
+the CLI's help layer, not the envelope.
 
 ## Commands
 
@@ -160,7 +170,11 @@ Use host hooks such as `zitadel-field-email`, `zitadel-field-password`, and
 `zitadel-action-submit` when targeting the Lit atoms. Use native shadow-control
 hooks such as `zitadel-input-email`, `zitadel-input-password`, and
 `zitadel-action-submit-button` when filling or clicking the underlying input or
-button. For sign-out, open the user menu button if needed, then pierce to
+button. Hooks stay method-named even when the flow engine names a credential
+field `x-auth-methods#<method>`; only the `name` attribute carries that raw
+form key. Enter inside a field submits the step's primary action, but only for
+key events that carry `key: "Enter"` — drivers whose synthesized key events
+omit it (some CDP wrappers) should click `zitadel-action-submit` instead. For sign-out, open the user menu button if needed, then pierce to
 `.signout-btn`; Playwright-style locators may use `zitadel-logout .signout-btn`.
 The canonical component hook list lives in `packages/components/README.md`.
 
