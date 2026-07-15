@@ -31,7 +31,7 @@
       {% when 'checkbox' %}
         <zl-checkbox
           name="{{ f.name }}"
-          data-testid="zitadel-field-{{ f.name }}"
+          data-testid="zitadel-field-{{ f.name | testid }}"
           label="{{ f.text_key | t }}"
           value="true"
           {% if f.value %}checked{% endif %}
@@ -40,7 +40,7 @@
       {% when 'select' %}
         <zl-select
           name="{{ f.name }}"
-          data-testid="zitadel-field-{{ f.name }}"
+          data-testid="zitadel-field-{{ f.name | testid }}"
           label="{{ f.text_key | t }}"
           value="{{ f.value }}"
           options='{{ f.validation.enum | selectOptions | json }}'
@@ -58,7 +58,7 @@
         {% endif %}
         <zl-field
           name="{{ f.name }}"
-          data-testid="zitadel-field-{{ f.name }}"
+          data-testid="zitadel-field-{{ f.name | testid }}"
           label="{{ f.text_key | t }}"
           type="{{ f.type }}"
           value="{{ f.value }}"

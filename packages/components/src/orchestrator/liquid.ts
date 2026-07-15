@@ -17,6 +17,7 @@ import { Liquid } from "liquidjs";
 
 import type { FlowError } from "./template-context.js";
 import type { Locale } from "./locales/en.js";
+import { hookName } from "../internal/hook-name.js";
 import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
 import defaultTemplate from "./templates/default.liquid";
 
@@ -138,6 +139,14 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
     }
     return "";
   });
+
+  /**
+   * Automation-hook token for a field name: strips the
+   * `x-auth-methods#` credential prefix so testids stay method-named
+   * (`zitadel-field-password`), while the `name` attribute keeps the
+   * raw wire key. See hookName for the contract.
+   */
+  engine.registerFilter("testid", (fieldName: unknown) => hookName(stringify(fieldName)));
 
   /** True when the error should render as `<zl-alert>`, not on a field. */
   engine.registerFilter("formLevelError", (err: unknown) => {

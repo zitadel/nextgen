@@ -271,6 +271,52 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     expect(body.fields).toEqual({ email: "alice@acme.com", password: "hunter2" });
   });
 
+  it("submits the step's primary action on Enter inside a field", async () => {
+    // Covers the orchestrator half of Enter-to-submit: `<zl-field>`
+    // forwards Enter to `form.requestSubmit()` (zl-field.browser.spec),
+    // and `handleFormSubmit` falls back to the first primary action
+    // because Enter provides no submitter.
+    const element = await mount();
+    const root = element.shadowRoot!;
+    await fillNativeField(root, "email", "alice@acme.com");
+    await fillNativeField(root, "password", "hunter2");
+
+    const emailField = root.querySelector('[data-testid="zitadel-field-email"]') as
+      | (HTMLElement & { updateComplete: Promise<unknown> })
+      | null;
+    if (!emailField) {
+      throw new Error("Expected email field host hook to render");
+    }
+    await emailField.updateComplete;
+    const input = emailField.shadowRoot?.querySelector("input");
+    if (!input) {
+      throw new Error("Expected native input inside the email field");
+    }
+    input.focus();
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Enter",
+        bubbles: true,
+        composed: true,
+        cancelable: true,
+      }),
+    );
+
+    await waitFor(() => {
+      const title = element.shadowRoot?.querySelector(".zl-card-title");
+      return title?.textContent?.includes("Sign in faster") ? title : null;
+    });
+    // Exactly one step submission (calls[0] is the flow create), carrying
+    // the primary action and the typed values.
+    expect(stub.calls).toHaveLength(2);
+    const enterBody = JSON.parse(String(stub.calls[1]?.init?.body ?? "{}")) as {
+      action?: string;
+      fields?: Record<string, string>;
+    };
+    expect(enterBody.action).toBe("submit");
+    expect(enterBody.fields).toEqual({ email: "alice@acme.com", password: "hunter2" });
+  });
+
   it("does not submit stale values after a field is cleared", async () => {
     const element = await mount();
     const root = element.shadowRoot!;
