@@ -219,9 +219,10 @@ If an active signing key is compromised:
 1. Generate a new signing key pair and insert it with `active_from = now()`, which retires the
    compromised key at the same instant, so the replacement signs immediately.
 2. Delete the compromised key. It leaves the JWKS and isn't chosen for signing.
-3. Revoke the project's sessions and refresh tokens. These opaque tokens are encrypted under the DEK
-   and are independent of the signing key, so the compromise does not affect them. Revoking them is
-   a precaution against a broader breach, forcing re-authentication. PATs are out of scope in the
+3. Revoke the project's sessions and refresh tokens. These opaque tokens are signed by the same key
+   but also encrypted under the DEK, so a signing-key compromise alone cannot forge them: an
+   attacker would also need the DEK. Revoking them is a precaution against a broader breach, forcing
+   re-authentication. PATs are out of scope in the
    current MVP ([ADR 032](032-token-lifecycle.md#personal-access-tokens)), and their exposure depends
    on their eventual token format ([Open Question 5](#questions)).
 
@@ -237,8 +238,8 @@ If an active signing key is compromised:
 - The exposure from a compromised signing key is forged _self-contained_ tokens (access tokens).
   Deleting the key removes it from the JWKS immediately, but clients holding a cached copy keep
   honoring the `kid` until their cache expires, so forged tokens remain accepted for at most one
-  JWKS cache lifetime. Opaque tokens are unaffected by the key; revoking them (step 3) is a separate
-  precaution.
+  JWKS cache lifetime. Opaque tokens are signed by the key too but cannot be forged without the DEK,
+  so this compromise does not expose them; revoking them (step 3) is a separate precaution.
 
 ### 6. Encryption-at-Rest Key Rotation
 
