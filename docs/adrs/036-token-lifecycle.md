@@ -1,6 +1,6 @@
-# ADR 035: Token Lifecycle
+# ADR 036: Token Lifecycle
 
-> **Status:** Proposed
+> **Status:** Accepted
 > **Date:** 2026-06-30
 > **Context:** Evolution of session security
 
