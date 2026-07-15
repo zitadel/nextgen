@@ -137,6 +137,36 @@ describe("LiquidJS engine", () => {
     expect(result).toContain(mandatoryGatesMarkerComment);
   });
 
+  it("normalises auth-method credential names in testids but not in name", () => {
+    // The real flow engine names the credential field
+    // `x-auth-methods#password`; the documented hook is method-named.
+    const engine = createLiquidEngine({ locale });
+    const f = toArray({
+      "x-auth-methods#password": {
+        type: "password",
+        text_key: "password.field.password",
+        required: true,
+      },
+    });
+    const a = toArray({ submit: { text_key: "submit.continue", primary: true } });
+    const context = {
+      step: { name: "password", type: "password", texts: { title_key: "password.title" } },
+      fields: f,
+      actions: a,
+      branding: {},
+      loading: false,
+      errors: [],
+      gates: {},
+      sso_providers: [],
+      messages: [],
+      identity: null,
+    };
+    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    expect(result).toContain('data-testid="zitadel-field-password"');
+    expect(result).not.toContain('data-testid="zitadel-field-x-auth-methods#password"');
+    expect(result).toContain('name="x-auth-methods#password"');
+  });
+
   it("renders step title from locale via default template", () => {
     const engine = createLiquidEngine({ locale });
     const a = toArray({ submit: { text_key: "submit.continue", primary: true } });

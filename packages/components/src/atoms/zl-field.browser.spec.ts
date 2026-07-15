@@ -118,6 +118,17 @@ describe("<zl-field> form participation (chromium)", () => {
     expect(submitted).toBe(0);
   });
 
+  it("normalises the auth-method credential name in the input testid", async () => {
+    const { field } = mount(
+      `<form><zl-field name="x-auth-methods#password" type="password" data-testid="zitadel-field-password"></zl-field></form>`,
+    );
+    await field.updateComplete;
+    const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+    // The hook is method-named; the form key stays raw.
+    expect(input.getAttribute("data-testid")).toBe("zitadel-input-password");
+    expect(input.getAttribute("name")).toBe("x-auth-methods#password");
+  });
+
   it("delegates focus from the host to the inner input", async () => {
     const { field } = mount(`<form><zl-field name="email"></zl-field></form>`);
     await field.updateComplete;
