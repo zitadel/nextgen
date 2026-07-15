@@ -191,7 +191,9 @@ function injectedKeyFallback(locale: Locale, key: string): string | undefined {
  */
 function fieldLabelFallback(key: string): string | undefined {
   const marker = ".field.";
-  const index = key.indexOf(marker);
+  // Last occurrence: step names are tenant-chosen and may themselves
+  // contain ".field."; the property name always follows the final marker.
+  const index = key.lastIndexOf(marker);
   if (index === -1) return undefined;
   const field = key.slice(index + marker.length);
   if (field === "" || field.includes(".")) return undefined;

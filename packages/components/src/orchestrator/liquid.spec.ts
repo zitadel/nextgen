@@ -104,6 +104,16 @@ describe("LiquidJS engine", () => {
     expect(result).toBe("Team");
   });
 
+  it("splits on the last .field. for step names that contain the marker", () => {
+    // Step names are tenant-chosen: "signup.field.v2" is a legal step
+    // name, and the property name always follows the final ".field.".
+    const engine = createLiquidEngine({ locale });
+    const result = engine.parseAndRenderSync("{{ key | t }}", {
+      key: "signup.field.v2.field.department",
+    });
+    expect(result).toBe("Department");
+  });
+
   it("field sub-keys (placeholder/help) do not take the humanised fallback", () => {
     // `.placeholder`/`.help` resolve through their own filters, which stay
     // empty on a miss; `| t` keeps returning the raw key for them.
