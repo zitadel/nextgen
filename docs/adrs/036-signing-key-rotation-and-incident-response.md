@@ -77,8 +77,8 @@ The signing key, the JWKS contents, and each key's phase are all computed from `
   (`retired_at IS NULL` or `retired_at + grace_period > now()`). A key that never retires stays
   indefinitely.
 - **Purgeable:** once retired for at least the grace period (`retired_at + grace_period <= now()`),
-  every token it signed has expired (based on the configuration for self-contained tokens) and the
-  row can be deleted.
+  every self-contained token it signed has expired and the row can be deleted. Long-lived opaque
+  tokens signed by the same key are an open point (see [Question 1](#questions)).
 
 This rests on one invariant: `predecessor.retired_at = successor.active_from`. It is set when a
 successor is created, must be moved if the successor's `active_from` is later moved, and must be
@@ -252,11 +252,15 @@ has a recovery time bounded by third parties rather than by the platform.
 
 ## Questions
 
-1. Should a retired signing key pair be kept as audit evidence past the point it is purgeable
-   ([Section 1](#1-signing-key-lifecycle))? Section 1 already settles when a key becomes deletable:
-   once it leaves the JWKS after its grace period, every self-contained token it signed has expired,
-   so the row can be purged. The open question is only whether to retain the key pair beyond that as
-   rotation/audit evidence, and for how long.
+1. When is a retired signing key pair actually purgeable, and should it be kept past that point
+   ([Section 1](#1-signing-key-lifecycle))? Two open points:
+   - Section 1 derives the grace/purge window from the self-contained (access) token lifetime. But
+     opaque refresh tokens are long-lived (weeks, per [ADR 032](032-token-lifecycle.md)) and are also
+     signed by the same key. If validating them re-checks that signature against the stored key,
+     purging on the access-token clock removes a key still needed to verify unexpired refresh tokens.
+     Open: are opaque tokens verified by `jti` lookup alone, or must the purge window cover the
+     longest token lifetime?
+   - Whether to retain the key pair past purgeable as rotation/audit evidence, and for how long.
 
 2. **(Resolved)** Should the KEK be per project as well as the DEK
    ([Section 2](#2-encryption-at-rest-key-rotation))? A per-project KEK would contain even a KEK
