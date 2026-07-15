@@ -378,7 +378,7 @@ func (r *FlowStateMachineRuntime) resolveInputs(pc *processCtx) (FlowResolvedFie
 func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved FlowResolvedFields) (*FlowStepResult, error) {
 	if validationErr := r.fields.Validate(resolved, pc.in.Fields); validationErr != nil {
 		if errs, ok := errors.AsType[FlowFieldValidationErrors](validationErr); ok {
-			step := r.buildStep(pc.state, pc.currentStep, resolved, new(errs.Error()), nil, nil)
+			step := r.buildStep(pc.state, pc.currentStep, resolved, new(errs.StepError()), nil, nil)
 			pc.state.IssuedAt = r.now()
 			return &FlowStepResult{State: pc.state, Step: step}, nil
 		}
@@ -632,7 +632,9 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 				Plain:     value,
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
-				msg := "auth_attempt.password_invalid"
+				// Catalog key the client routes inline to the password
+				// field (fieldErrorKeys in liquid.ts).
+				msg := "error.invalid_credentials"
 				return flowDispatchResult{StepError: &msg}, nil
 			}
 			if err != nil {
@@ -744,7 +746,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
 				state.ClearPendingChallenge()
-				msg := "auth_attempt.passkey_registration_invalid"
+				msg := "error.passkey_registration_invalid"
 				rendered := r.buildStep(pc.state, pc.currentStep, resolved, &msg, nil, nil)
 				state.IssuedAt = r.now()
 				return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
@@ -777,7 +779,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
 				state.ClearPendingChallenge()
-				msg := "auth_attempt.passkey_invalid"
+				msg := "error.passkey_invalid"
 				rendered := r.buildStep(pc.state, pc.currentStep, resolved, &msg, nil, nil)
 				state.IssuedAt = r.now()
 				return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil

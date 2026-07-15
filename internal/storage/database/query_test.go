@@ -85,6 +85,19 @@ func TestQueryOptions(t *testing.T) {
 			},
 		},
 		{
+			// A dropped filter widens the result set across tenant boundaries,
+			// so stacked condition options must AND together, not overwrite.
+			name: "repeated condition options combine with AND",
+			options: []QueryOption{
+				WithCondition(NewBooleanCondition(NewColumn("table", "column"), true)),
+				WithCondition(NewNumberCondition(NewColumn("table", "other"), NumberOperationEqual, 123)),
+			},
+			want: want{
+				stmt: " WHERE (table.column = $1 AND table.other = $2)",
+				args: []any{true, 123},
+			},
+		},
+		{
 			name: "group by option",
 			options: []QueryOption{
 				WithGroupBy(NewColumn("table", "column")),
