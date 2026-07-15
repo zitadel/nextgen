@@ -1,6 +1,6 @@
 # ADR 035: Environment Releases for Configuration Resources
 
-> **Status:** Draft
+> **Status:** Accepted
 > **Date:** 2026-07-07
 > **Context:** Multi-environment lifecycle for source-controlled configuration
 
