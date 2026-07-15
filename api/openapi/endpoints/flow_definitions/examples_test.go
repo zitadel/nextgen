@@ -35,7 +35,9 @@ var exampleUserSchema = []byte(`{
     "givenName":   { "type": "string" },
     "familyName":  { "type": "string" },
     "phoneNumber": { "type": "string" },
-    "dateOfBirth": { "type": "string", "format": "date" }
+    "dateOfBirth": { "type": "string", "format": "date" },
+    "maritalStatus": { "type": "string", "enum": ["Single", "Married", "Divorced", "Widowed"] },
+    "newsletterOptIn": { "type": "boolean" }
   }
 }`)
 
