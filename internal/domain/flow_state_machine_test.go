@@ -2728,6 +2728,7 @@ func TestFlowStepErrorContract(t *testing.T) {
 		domain.FlowFieldChallengePasskey,
 		domain.FlowFieldChallengeMagicLink,
 		domain.FlowFieldChallengeSSO,
+		domain.FlowFieldChallengeOTP,
 	}
 	for _, challenge := range challenges {
 		for _, outcome := range domain.ImplicitOutcomesForChallenge(challenge) {

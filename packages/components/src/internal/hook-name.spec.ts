@@ -12,15 +12,23 @@ describe("hookName", () => {
     expect(hookName("givenName")).toBe("givenName");
   });
 
-  it("uses the after-hash token verbatim, without case changes", () => {
+  it("uses the after-prefix token verbatim, without case changes", () => {
     expect(hookName("x-auth-methods#magicLink")).toBe("magicLink");
   });
 
-  it("returns names with a trailing hash unchanged", () => {
-    expect(hookName("broken#")).toBe("broken#");
+  it("keeps hashes in tenant-authored property names", () => {
+    // Only the reserved prefix is dialect; any other `#` is part of the
+    // (arbitrary, tenant-authored) property name.
+    expect(hookName("a#b#c")).toBe("a#b#c");
+    expect(hookName("room#number")).toBe("room#number");
   });
 
-  it("takes the last hash segment when several appear", () => {
-    expect(hookName("a#b#c")).toBe("c");
+  it("returns a bare or degenerate prefix unchanged", () => {
+    expect(hookName("x-auth-methods#")).toBe("x-auth-methods#");
+    expect(hookName("x-auth-methods")).toBe("x-auth-methods");
+  });
+
+  it("strips only the leading prefix, keeping later hashes", () => {
+    expect(hookName("x-auth-methods#weird#method")).toBe("weird#method");
   });
 });

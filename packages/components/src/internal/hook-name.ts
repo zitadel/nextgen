@@ -1,4 +1,12 @@
 /**
+ * Reserved auth-method credential prefix of flow field names. Mirrors
+ * `AUTH_METHOD_PREFIX` in `@zitadel/config` (`src/validate.ts`), which
+ * owns the wire dialect; components has no dependency on that package,
+ * so the literal is repeated here.
+ */
+const AUTH_METHOD_PREFIX = "x-auth-methods#";
+
+/**
  * Normalises a flow field name into its automation-hook token.
  *
  * Auth-method credential fields arrive from the flow engine as
@@ -9,17 +17,15 @@
  * feeds both hook construction sites: the bundled template's `testid`
  * Liquid filter and `<zl-field>`'s native-input testid.
  *
- * Only the hook is normalised — the field's `name` attribute stays the
- * raw wire/form key. The after-`#` token is used verbatim (no case or
- * spacing changes). Testids are hooks, not identity: a step containing
- * both `x-auth-methods#password` and a schema field literally named
- * `password` would collide, which is theoretical and unhandled by
- * design.
+ * Only the reserved credential prefix is stripped — user-schema
+ * property names are tenant-authored arbitrary strings, so a `#`
+ * anywhere else is part of the name and stays in the hook. The
+ * after-prefix token is used verbatim (no case or spacing changes),
+ * and the field's `name` attribute always keeps the raw wire/form key.
  */
 export function hookName(field: string): string {
-  const hash = field.lastIndexOf("#");
-  if (hash === -1 || hash === field.length - 1) {
-    return field;
+  if (field.startsWith(AUTH_METHOD_PREFIX) && field.length > AUTH_METHOD_PREFIX.length) {
+    return field.slice(AUTH_METHOD_PREFIX.length);
   }
-  return field.slice(hash + 1);
+  return field;
 }
