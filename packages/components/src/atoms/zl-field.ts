@@ -9,6 +9,7 @@ import fieldHost from "@zitadel/shared-component-styles/lit/text-field-host.css?
 import fieldSurface from "@zitadel/shared-component-styles/text-field.css?inline";
 
 import { emit } from "../internal/emit.js";
+import { hookName } from "../internal/hook-name.js";
 import { nextUid } from "../internal/unique-id.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
@@ -329,8 +330,10 @@ export class ZlField extends LitElement {
   private nativeInputTestId(): string | undefined {
     if (this.name) {
       // Field host hooks use zitadel-field-*; native hooks can be name-first
-      // without colliding with the host, unlike action buttons.
-      return `zitadel-input-${this.name}`;
+      // without colliding with the host, unlike action buttons. The hook
+      // token is normalised (x-auth-methods#password → password) while
+      // `name` stays the raw form key.
+      return `zitadel-input-${hookName(this.name)}`;
     }
     if (this.testId) {
       return `${this.testId}-input`;

@@ -7,6 +7,7 @@ import { consola } from "consola";
 import { FLOWS_DIR } from "../flows";
 import { stableStringify } from "../json";
 import { validatePlannedFlows } from "./flow-validation.js";
+import type { PlanResourceChange } from "./plan-renderer.js";
 import { readState, removeFromState, updateState } from "./state.js";
 import type { ResourceEntry, ResourceSyncer, SyncAction } from "./types.js";
 
@@ -185,7 +186,7 @@ export async function buildSyncPlan(
   return actions;
 }
 
-/** Result of {@link runSyncLoop}: the local files the loop rewrote. */
+/** Result of {@link runSyncLoop}: what changed on the platform and locally. */
 export type SyncLoopResult = {
   /**
    * Project-relative paths of files updated from the server's canonical
@@ -193,6 +194,13 @@ export type SyncLoopResult = {
    * local rewrite is never silent.
    */
   filesUpdated: string[];
+  /**
+   * The platform resources this run touched, in execution order. Unlike a
+   * plan-time enumeration, `id` carries the resulting platform id (the
+   * created id, the newly published revision id, or the id updated or
+   * deleted). Feeds the `apply` `--json` `changes` array.
+   */
+  applied: PlanResourceChange[];
 };
 
 /**
@@ -223,6 +231,7 @@ export async function runSyncLoop(
     }
   }
   const filesUpdated: string[] = [];
+  const applied: PlanResourceChange[] = [];
   // Revisions published by this run: superseded id → new id. Update actions
   // carrying a `repin` patch their `user_schema` from here.
   const repinned = new Map<string, string>();
@@ -264,6 +273,7 @@ export async function runSyncLoop(
         consola.info(
           `Created a new ${action.syncer.kind} on Zitadel from ${action.path} (id ${id})`,
         );
+        applied.push({ kind: action.syncer.kind, action: "create", file: action.path, id });
         break;
       }
       case "revise": {
@@ -287,6 +297,13 @@ export async function runSyncLoop(
             consola.info(`Re-pinned user_schema in ${flowPath} to ${id}`);
           }
         }
+        applied.push({
+          kind: action.syncer.kind,
+          action: "revision",
+          file: action.path,
+          id,
+          previous_id: action.previousId,
+        });
         break;
       }
       case "update": {
@@ -312,6 +329,7 @@ export async function runSyncLoop(
           hash: await writeBack(action, canonical, fallbackHash),
         });
         consola.info(`Updated the ${action.syncer.kind} on Zitadel from ${action.path}`);
+        applied.push({ kind: action.syncer.kind, action: "update", file: action.path, id: action.id });
         break;
       }
       case "delete": {
@@ -320,6 +338,7 @@ export async function runSyncLoop(
         consola.info(
           `Deleted the ${action.syncer.kind} on Zitadel because ${action.path} was removed locally`,
         );
+        applied.push({ kind: action.syncer.kind, action: "delete", file: action.path, id: action.id });
         break;
       }
       case "skip": {
@@ -340,7 +359,7 @@ export async function runSyncLoop(
     }
   }
 
-  return { filesUpdated: [...new Set(filesUpdated)] };
+  return { filesUpdated: [...new Set(filesUpdated)], applied };
 }
 
 /**
