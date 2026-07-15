@@ -11246,10 +11246,12 @@ type SessionResponse struct {
 	UserID OptNilUserID `json:"user_id"`
 	// Human-readable name of the authenticated user, resolved from the
 	// conventional user-schema properties: `name` when defined, otherwise
-	// `given_name` and `family_name` joined. Only present on reads that
-	// hydrate the user's identity (`GET /sessions/me`) and only when the
-	// session has an authenticated user whose schema carries those
-	// properties; clients fall back to `email`, then `user_id`.
+	// the given and family name parts joined — `givenName`/`familyName`
+	// (the shipped presets' spelling) or `given_name`/`family_name`. Only
+	// present on reads that hydrate the user's identity
+	// (`GET /sessions/me`) and only when the session has an authenticated
+	// user whose schema carries those properties; clients fall back to
+	// `email`, then `user_id`.
 	Name OptString `json:"name"`
 	// Email address of the authenticated user, resolved from the
 	// conventional `email` user-schema property. Only present on reads

@@ -690,11 +690,12 @@ export class ZitadelLogin extends LitElement {
         alert.remove();
       }
     }
-    const escaped = fieldName.replace(/["\\]/g, "\\$&");
-    const field = root.querySelector<HTMLElement & { invalid?: boolean; error?: string }>(
-      `zl-field[name="${escaped}"]`,
-    );
-    if (field?.invalid) {
+    // Schema field names are free-form (dots, quotes, `x-…#…`), so match by
+    // attribute value instead of interpolating into a CSS selector.
+    for (const field of root.querySelectorAll<HTMLElement & { invalid?: boolean; error?: string }>(
+      "zl-field",
+    )) {
+      if (field.getAttribute("name") !== fieldName || !field.invalid) continue;
       field.invalid = false;
       field.error = "";
     }

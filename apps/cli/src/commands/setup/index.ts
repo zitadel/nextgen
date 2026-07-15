@@ -222,10 +222,13 @@ export default class Setup extends BaseCommand {
           issuer,
           {
             // Resolved values, not raw flags: the wizard may have picked the
-            // preset interactively, and the retry must reproduce that choice.
+            // preset or dev port interactively, and the retry must reproduce
+            // those choices — the issuer registered with the project derives
+            // from the port.
             ...retryOptionsFromFlags(flags),
             framework: framework.id,
             preset: answers.preset,
+            devPort: answers.devPort,
           },
         );
     consola.success(`Created project ${project.id}`);
