@@ -167,6 +167,40 @@ WHERE n.nspname = 'zitadel_nextgen'
 	require.Empty(t, cascades, "user/team graph must not use ON DELETE CASCADE: %v", cascades)
 }
 
+// Create with a stale membership team must not leave a partial user row.
+func TestUserRepository_Create_RollsBackWhenMembershipInsertFails(t *testing.T) {
+	skipIfSpanner(t)
+	tx, rollback := transactionForRollback(t)
+	defer rollback()
+	ctx := t.Context()
+
+	const (
+		pid       = "proj-lifecycle-create-atomic"
+		teamID    = "team-lifecycle-missing"
+		userID    = "usr-lifecycle-create-atomic"
+		schemaURL = "https://schemas.test/lifecycle-create-atomic/v1.json"
+	)
+
+	userRepo := repository.NewUserRepository()
+	ensureProject(t, tx, pid)
+	ensureJSONSchemaRow(t, tx, pid, schemaURL, []byte("{}"))
+
+	attr, err := domain.NewCreateAttribute("nickname", userID, domain.AttributeUniquenessUnspecified)
+	require.NoError(t, err)
+	missingTeam := teamID
+	err = userRepo.Create(ctx, tx, &domain.CreateUser{
+		ProjectID:               pid,
+		SchemaURL:               schemaURL,
+		ID:                      userID,
+		InitialMembershipTeamID: &missingTeam,
+		Attributes:              []*domain.CreateAttribute{attr},
+	})
+	require.Error(t, err)
+
+	_, getErr := userRepo.Get(ctx, tx, database.WithCondition(userRepo.PrimaryKeyCondition(pid, userID)))
+	require.Error(t, getErr)
+}
+
 func TestUserRepository_DeactivateRemovesMemberships(t *testing.T) {
 	skipIfSpanner(t)
 	tx, rollback := transactionForRollback(t)

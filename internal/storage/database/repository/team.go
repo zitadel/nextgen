@@ -117,49 +117,50 @@ func (r *TeamRepository) Get(ctx context.Context, client database.QueryExecutor,
 }
 
 func (r *TeamRepository) Deactivate(ctx context.Context, client database.QueryExecutor, projectID, id string) error {
-	t := r.meta.tableName
-	cond := database.And(
-		database.NewTextCondition(database.NewColumn(t, "project_id"), database.TextOperationEqual, projectID),
-		database.NewTextCondition(database.NewColumn(t, "id"), database.TextOperationEqual, id),
-	)
-	_, err := updateOne(ctx, client, r.meta, cond,
-		database.NewChange(database.NewColumn(t, "status"), domain.TeamStatusDeactivated.String()),
-		database.NewChange(r.meta.UpdatedAtColumn(), r.now),
-	)
-	if err != nil {
-		return err
-	}
-	membershipRemoved := domain.MembershipStatusRemoved.String()
-	userDeactivated := domain.UserStatusDeactivated.String()
+	return withTransaction(ctx, client, func(ctx context.Context, tx database.QueryExecutor) error {
+		t := r.meta.tableName
+		cond := database.And(
+			database.NewTextCondition(database.NewColumn(t, "project_id"), database.TextOperationEqual, projectID),
+			database.NewTextCondition(database.NewColumn(t, "id"), database.TextOperationEqual, id),
+		)
+		if _, err := updateOne(ctx, tx, r.meta, cond,
+			database.NewChange(database.NewColumn(t, "status"), domain.TeamStatusDeactivated.String()),
+			database.NewChange(r.meta.UpdatedAtColumn(), r.now),
+		); err != nil {
+			return err
+		}
+		membershipRemoved := domain.MembershipStatusRemoved.String()
+		userDeactivated := domain.UserStatusDeactivated.String()
 
-	mb := database.NewStatementBuilder("UPDATE ")
-	mb.WriteString(r.membershipsTable)
-	mb.WriteString(" SET status = ")
-	mb.WriteArg(membershipRemoved)
-	mb.WriteString(", updated_at = ")
-	mb.WriteArg(r.now)
-	mb.WriteString(" WHERE project_id = ")
-	mb.WriteArg(projectID)
-	mb.WriteString(" AND team_id = ")
-	mb.WriteArg(id)
-	mb.WriteString(" AND status <> ")
-	mb.WriteArg(membershipRemoved)
-	if _, err := client.Exec(ctx, mb.String(), mb.Args()...); err != nil {
-		return err
-	}
+		mb := database.NewStatementBuilder("UPDATE ")
+		mb.WriteString(r.membershipsTable)
+		mb.WriteString(" SET status = ")
+		mb.WriteArg(membershipRemoved)
+		mb.WriteString(", updated_at = ")
+		mb.WriteArg(r.now)
+		mb.WriteString(" WHERE project_id = ")
+		mb.WriteArg(projectID)
+		mb.WriteString(" AND team_id = ")
+		mb.WriteArg(id)
+		mb.WriteString(" AND status <> ")
+		mb.WriteArg(membershipRemoved)
+		if _, err := tx.Exec(ctx, mb.String(), mb.Args()...); err != nil {
+			return err
+		}
 
-	ub := database.NewStatementBuilder("UPDATE ")
-	ub.WriteString(r.usersTable)
-	ub.WriteString(" SET status = ")
-	ub.WriteArg(userDeactivated)
-	ub.WriteString(", updated_at = ")
-	ub.WriteArg(r.now)
-	ub.WriteString(" WHERE project_id = ")
-	ub.WriteArg(projectID)
-	ub.WriteString(" AND lifecycle_owner_team_id = ")
-	ub.WriteArg(id)
-	ub.WriteString(" AND status <> ")
-	ub.WriteArg(userDeactivated)
-	_, err = client.Exec(ctx, ub.String(), ub.Args()...)
-	return err
+		ub := database.NewStatementBuilder("UPDATE ")
+		ub.WriteString(r.usersTable)
+		ub.WriteString(" SET status = ")
+		ub.WriteArg(userDeactivated)
+		ub.WriteString(", updated_at = ")
+		ub.WriteArg(r.now)
+		ub.WriteString(" WHERE project_id = ")
+		ub.WriteArg(projectID)
+		ub.WriteString(" AND lifecycle_owner_team_id = ")
+		ub.WriteArg(id)
+		ub.WriteString(" AND status <> ")
+		ub.WriteArg(userDeactivated)
+		_, err := tx.Exec(ctx, ub.String(), ub.Args()...)
+		return err
+	})
 }

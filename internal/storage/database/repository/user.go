@@ -152,32 +152,23 @@ func WithUserScalarList(project string, filters []UserListScalarFilter, teamScop
 }
 
 func (r *UserRepository) Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error {
-	if beginner, ok := condition.(database.Beginner); ok {
-		tx, err := beginner.Begin(ctx, nil)
-		if err != nil {
-			return err
-		}
-		defer func() {
-			err = tx.End(ctx, err)
-		}()
-		client = tx
-	}
 	if err := checkPKOrUniqueKeyCondition(r, condition); err != nil {
 		return err
 	}
-	builder := database.NewStatementBuilder(
-		"DELETE FROM zitadel_nextgen.team_memberships WHERE (project_id, user_id) IN (SELECT project_id, id FROM ",
-	)
-	builder.WriteString(userTable)
-	builder.WriteString(" WHERE ")
-	condition.Write(builder)
-	builder.WriteString(")")
-	_, err := client.Exec(ctx, builder.String(), builder.Args()...)
-	if err != nil {
+	return withTransaction(ctx, client, func(ctx context.Context, tx database.QueryExecutor) error {
+		builder := database.NewStatementBuilder(
+			"DELETE FROM zitadel_nextgen.team_memberships WHERE (project_id, user_id) IN (SELECT project_id, id FROM ",
+		)
+		builder.WriteString(userTable)
+		builder.WriteString(" WHERE ")
+		condition.Write(builder)
+		builder.WriteString(")")
+		if _, err := tx.Exec(ctx, builder.String(), builder.Args()...); err != nil {
+			return err
+		}
+		_, err := deleteOne(ctx, tx, r, condition)
 		return err
-	}
-	_, err = deleteOne(ctx, client, r, condition)
-	return err
+	})
 }
 
 const userInsertSQL = `
@@ -248,23 +239,30 @@ func (r *UserRepository) Create(ctx context.Context, client database.QueryExecut
 		scopes[i] = uniquenessScopeLiteral(a.UniqueScope)
 	}
 
-	_, err := client.Exec(ctx, userInsertSQL,
-		user.ProjectID, user.SchemaURL, user.ID, user.LifecycleOwnerTeamID,
-		user.AttributeTeamScope(),
-		keys, values, hashes, scopes,
-	)
-	if err != nil {
-		return err
+	// Dialect selection for membership repo uses the outer client: nested Begin
+	// returns a savepoint that may not implement the dialect pooler marker.
+	var membershipRepo *TeamMembershipRepository
+	if user.InitialMembershipTeamID != nil && *user.InitialMembershipTeamID != "" {
+		membershipRepo = NewTeamMembershipRepository(client)
 	}
-	if user.InitialMembershipTeamID == nil || *user.InitialMembershipTeamID == "" {
-		return nil
-	}
-	membershipRepo := NewTeamMembershipRepository(client)
-	return membershipRepo.Create(ctx, client, &domain.TeamMembership{
-		ProjectID: user.ProjectID,
-		TeamID:    *user.InitialMembershipTeamID,
-		UserID:    user.ID,
-		Status:    domain.MembershipStatusActive,
+
+	return withTransaction(ctx, client, func(ctx context.Context, tx database.QueryExecutor) error {
+		if _, err := tx.Exec(ctx, userInsertSQL,
+			user.ProjectID, user.SchemaURL, user.ID, user.LifecycleOwnerTeamID,
+			user.AttributeTeamScope(),
+			keys, values, hashes, scopes,
+		); err != nil {
+			return err
+		}
+		if membershipRepo == nil {
+			return nil
+		}
+		return membershipRepo.Create(ctx, tx, &domain.TeamMembership{
+			ProjectID: user.ProjectID,
+			TeamID:    *user.InitialMembershipTeamID,
+			UserID:    user.ID,
+			Status:    domain.MembershipStatusActive,
+		})
 	})
 }
 
