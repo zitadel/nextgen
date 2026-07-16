@@ -5,6 +5,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -17,6 +19,11 @@ type queryExecutor interface {
 type statements struct {
 	projectStatements
 	flowDefinitionStatements
+}
+
+func (s statements) UpdateProject(ctx context.Context, entity *domain.Project) error {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (s statements) Statements() service.AllStatements {

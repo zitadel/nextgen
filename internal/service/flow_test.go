@@ -37,6 +37,11 @@ func (s testAllStatements) CreateProject(ctx context.Context, project *domain.Pr
 	return nil
 }
 
+func (testAllStatements) UpdateProject(ctx context.Context, entity *domain.Project) error {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (s testAllStatements) GetProjectByID(ctx context.Context, id string) (*domain.Project, error) {
 	if s.getProjectByID != nil {
 		return s.getProjectByID(ctx, id)
