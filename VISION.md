@@ -42,7 +42,7 @@ in as itself, a delegate acting on a user's behalf. Delegation, never
 impersonation: an audit trail that names the user when an agent acted is a
 lie, and the delegation chain keeps it honest. One agent is often all of
 these within a single task, so the primitives must compose — and every
-action, whoever took it, lands in the same identity-scoped events.
+action, whoever took it, should land in the same identity-scoped events.
 
 ## What this repository is
 
