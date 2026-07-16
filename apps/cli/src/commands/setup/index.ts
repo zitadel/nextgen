@@ -97,7 +97,7 @@ export default class Setup extends BaseCommand {
     try {
       await this.toMeta(flags);
     } catch (error) {
-      throw localSetupHint(error, flags.framework, this.config.version);
+      throw localSetupHint(error, retryOptionsFromFlags(flags), this.config.version);
     }
     const { cwd, nonInteractive, dryRun, force } = this.meta;
 
@@ -182,6 +182,7 @@ export default class Setup extends BaseCommand {
       intro("Zitadel setup");
       const promptCtx = {
         framework,
+        cwd,
         serverFlag: this.meta.serverFlag,
         devPortFromFlag: flags["dev-port"] !== undefined,
         presetFromFlag: flags.preset !== undefined,
@@ -220,7 +221,16 @@ export default class Setup extends BaseCommand {
           this.meta.cliVersion,
           projectName,
           issuer,
-          framework.id,
+          {
+            // Resolved values, not raw flags: the wizard may have picked the
+            // preset or dev port interactively, and the retry must reproduce
+            // those choices — the issuer registered with the project derives
+            // from the port.
+            ...retryOptionsFromFlags(flags),
+            framework: framework.id,
+            preset: answers.preset,
+            devPort: answers.devPort,
+          },
         );
     consola.success(`Created project ${project.id}`);
     this.recordTelemetry({ step: "project_created" });
@@ -401,13 +411,73 @@ function dryRunProject(issuer: string): CreateProject201 {
   };
 }
 
+/**
+ * The parts of a setup invocation that a retry suggestion must reproduce.
+ * Suggested retries are followed verbatim (especially by agents), so dropping
+ * a flag here silently changes what the retry scaffolds.
+ */
+type SetupRetryOptions = {
+  framework?: string;
+  preset?: SetupPreset;
+  renderer?: string;
+  devPort?: number;
+  nonInteractive?: boolean;
+};
+
+/**
+ * Reconstructs the flag list of the current invocation for retry guidance,
+ * ending in `--server local`. Flags whose resolved value equals the default
+ * are omitted — the retry reproduces the same outcome without them.
+ */
+function setupRetryFlags(opts: SetupRetryOptions): string {
+  const parts: string[] = [];
+  if (opts.framework) {
+    parts.push(`--framework ${opts.framework}`);
+  }
+  if (opts.preset && opts.preset !== DEFAULT_SETUP_PRESET) {
+    parts.push(`--preset ${opts.preset}`);
+  }
+  if (opts.renderer && opts.renderer !== "react") {
+    parts.push(`--renderer ${opts.renderer}`);
+  }
+  if (opts.devPort !== undefined) {
+    parts.push(`--dev-port ${opts.devPort}`);
+  }
+  if (opts.nonInteractive) {
+    parts.push("--non-interactive");
+  }
+  parts.push("--server local");
+  return parts.join(" ");
+}
+
+/**
+ * Retry options straight from parsed flags, for failures before the wizard
+ * resolves answers. `--non-interactive` is echoed only when explicitly passed
+ * — TTY/JSON-inferred non-interactivity re-infers itself on the retry.
+ */
+function retryOptionsFromFlags(flags: {
+  framework?: string;
+  preset?: string;
+  renderer?: string;
+  "dev-port"?: number;
+  "non-interactive"?: boolean;
+}): SetupRetryOptions {
+  return {
+    framework: flags.framework,
+    preset: flags.preset as SetupPreset | undefined,
+    renderer: flags.renderer,
+    devPort: flags["dev-port"],
+    nonInteractive: Boolean(flags["non-interactive"]),
+  };
+}
+
 async function createProjectWithLocalHint(
   client: ReturnType<typeof createZitadelClient>,
   server: string,
   cliVersion: string,
   projectName: string,
   issuer: string,
-  framework: string,
+  retry: SetupRetryOptions,
 ): Promise<CreateProject201> {
   try {
     // API contract requires a project name; generated TS models may lag
@@ -422,14 +492,15 @@ async function createProjectWithLocalHint(
     return await client.createProject(payload as Parameters<typeof client.createProject>[0]);
   } catch (error) {
     const normalized = toZitadelError(error);
+    const retryFlags = setupRetryFlags(retry);
     throw new ZitadelError(normalized.code, normalized.message, {
       hint:
         `${normalized.hint ? `${normalized.hint} ` : ""}` +
         "If you meant to use a local Zitadel server, start it first " +
-        `and retry setup with --framework ${framework} --server local.`,
+        `and retry setup with ${retryFlags}.`,
       nextCommands: [
         publicCliCommand("start", cliVersion),
-        publicCliCommand(`setup --framework ${framework} --server local`, cliVersion),
+        publicCliCommand(`setup ${retryFlags}`, cliVersion),
       ],
       details: {
         server,
@@ -444,15 +515,13 @@ function defaultProjectName(cwd: string, framework: string): string {
   return fromDirectory.length > 0 ? fromDirectory : `zitadel-${framework}-app`;
 }
 
-function localSetupHint(error: unknown, framework: string | undefined, cliVersion: string): unknown {
+function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: string): unknown {
   const normalized = toZitadelError(error);
   if (normalized.code !== "E_LOCAL_SERVER_NOT_RUNNING") {
     return error;
   }
 
-  const setupCommand = framework
-    ? `setup --framework ${framework} --server local`
-    : "setup --server local";
+  const setupCommand = `setup ${setupRetryFlags(retry)}`;
 
   return new ZitadelError(normalized.code, normalized.message, {
     hint:

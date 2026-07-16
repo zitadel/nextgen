@@ -151,10 +151,16 @@ function defaultSwapWarning(
   return {
     rule: "warn/default-flow-swap",
     message:
-      `applying this new active flow makes it the newest unscoped definition — ` +
-      `clients that do not pin a flow-name will get it as the default for ${purposes.join(", ")}. ` +
-      `Scope it via "audience" or set flow-name in the widget if that is not intended.`,
+      `once applied, this flow becomes the new default for ${humanList(purposes)}: ` +
+      `pages that do not explicitly set flow-name on <zitadel-login> will start rendering it. ` +
+      `If that is not intended, scope it with "audience" or set flow-name on the pages that should use it.`,
   };
+}
+
+/** ["login", "register"] → "login and register" (Oxford-free prose list). */
+function humanList(items: readonly string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
 /**

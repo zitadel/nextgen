@@ -166,13 +166,22 @@ export const en: Record<string, string> = {
   // --- SSO ---
   "sso.redirect.title": "Redirecting to your provider…",
 
+  // --- Passkey ceremony ---
+  "passkey.pending.status": "Waiting for your passkey…",
+
   // --- Passkey errors ---
-  "error.passkey_cancelled": "Passkey setup was cancelled",
+  // Covers both user dismissal and any close the browser reports as
+  // NotAllowedError — it fires for login and registration ceremonies alike.
+  "error.passkey_cancelled": "The passkey prompt was closed before completing.",
+  "error.passkey_timeout": "The passkey request timed out. Please try again.",
   "error.passkey_not_registered":
     "This passkey is not registered. Please sign in with your email and password.",
   "error.passkey_setup_failed": "Passkey registration did not complete. Please try again.",
   "error.passkey_unsupported": "This device does not support passkeys",
   "error.passkey_failed": "Something went wrong. Please try again.",
+  "error.passkey_invalid": "This passkey could not be verified. Please try again.",
+  "error.passkey_registration_invalid":
+    "The new passkey could not be verified. Please try registering it again.",
 
   // --- Field / form errors (Figma field annotations) ---
   "error.email_required": "Please enter an email address",
@@ -183,6 +192,15 @@ export const en: Record<string, string> = {
   /** Figma sign-in error `6602:180268` — inline on password field. */
   "error.invalid_credentials": "Wrong email or password.",
   "error.required": "This field is required.",
+
+  // --- Generic field-rule fallbacks ({0} = field label) ---
+  // Used by `localiseFlowErrorKeys` (liquid.ts) when no field-specific
+  // entry exists for a server-emitted `error.<field>_<rule>` key.
+  "error.field_required": "{0} is required.",
+  "error.field_format": "Please enter a valid {0}.",
+  "error.field_min_length": "{0} is too short.",
+  "error.field_max_length": "{0} is too long.",
+  "error.field_invalid": "Please check {0}.",
 
   // --- Sign-in form-level alert (Figma `6594:125237`, alert `6596:132779`) ---
   "error.sign_in_server.title": "We couldn't complete your sign in.",

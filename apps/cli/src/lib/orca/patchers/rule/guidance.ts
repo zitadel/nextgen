@@ -54,6 +54,13 @@ export function removeGuidanceSection(source: string): string {
 export function agentsGuidanceSection(ctx: PatchContext): string {
   const plan = publicCliCommand("plan", ctx.cliVersion);
   const apply = publicCliCommand("apply", ctx.cliVersion);
+  // WebAuthn ceremonies need an OS-level authenticator, so an agent driving
+  // an automated browser stalls on the primary action of a passkey-first
+  // flow unless told how to verify around it.
+  const passkeyVerifyNote =
+    ctx.preset === "passkey-first"
+      ? " Agents: automated browsers can't complete passkey ceremonies — verify the loop via the email/password fallback actions, or attach a CDP WebAuthn virtual authenticator."
+      : "";
   return `## Authentication (Zitadel)
 
 This app's login is managed by Zitadel. Local config is the source of truth; never change auth behavior by editing generated route files.
@@ -61,7 +68,7 @@ This app's login is managed by Zitadel. Local config is the source of truth; nev
 The golden path:
 
 1. Start the dev server and open ${ctx.issuer}/login — **exactly this origin, not 127.0.0.1**. Passkeys and the origin allowlist are bound to it. (Freshly scaffolded apps also redirect / there; pre-existing apps keep their homepage.)
-2. Prove the loop in a real browser: register a user → sign out → sign in → /profile shows signed in.
+2. Prove the loop in a real browser: register a user → sign out → sign in → /profile shows signed in.${passkeyVerifyNote}
 3. Customize by editing local config:
    - \`.zitadel/schemas/*.json\` — what a user is (fields, required, auth methods). See \`.zitadel/schemas/README.md\`.
    - \`.zitadel/flows/*.json\` — which screen collects which field/credential and how steps transition. See \`.zitadel/flows/README.md\`.

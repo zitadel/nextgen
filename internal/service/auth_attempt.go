@@ -515,8 +515,10 @@ func (s *authAttemptService) listUserPasskeys(ctx context.Context, projectID, us
 	return s.userPasskeys.List(
 		ctx,
 		s.pool,
-		database.WithCondition(s.userPasskeys.ProjectIDCondition(projectID)),
-		database.WithCondition(s.userPasskeys.UserIDCondition(userID)),
+		database.WithCondition(database.And(
+			s.userPasskeys.ProjectIDCondition(projectID),
+			s.userPasskeys.UserIDCondition(userID),
+		)),
 	)
 }
 

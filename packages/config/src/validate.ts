@@ -79,6 +79,14 @@ export const PURPOSE_FLIP_TARGETS: Readonly<Record<string, Readonly<Record<strin
   register: { user_already_exists: "login" },
 };
 
+/** Mirrors `flipOutcomeImpacts` in flow_definition_validator.go (verbatim). */
+const FLIP_OUTCOME_IMPACTS: Readonly<Record<string, string>> = {
+  user_not_found:
+    "someone without an account gets stuck at sign-in instead of being routed to registration",
+  user_already_exists:
+    "someone who already has an account gets stuck at registration instead of being routed to sign-in",
+};
+
 /** Action kinds a flow author may declare; `back` is engine-injected. */
 const DECLARABLE_ACTION_KINDS = new Set(["submit", "passkey", "passkey_register", "navigate"]);
 
@@ -511,7 +519,7 @@ function validateFlipTableCoverage(def: FlowDef): FlowValidationIssue[] {
         issues.push(
           error(
             "flip-table",
-            `step ${q(entry.name)}: entry step for purpose ${q(purpose)} must wire ${q(outcome)} transition because ${q(targetPurpose)} is also a purpose`,
+            `step ${q(entry.name)}: entry step for purpose ${q(purpose)} must wire ${q(outcome)} transition because ${q(targetPurpose)} is also a purpose: without it, ${FLIP_OUTCOME_IMPACTS[outcome]}`,
             entry.name,
           ),
         );

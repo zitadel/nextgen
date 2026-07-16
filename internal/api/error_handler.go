@@ -17,7 +17,7 @@ import (
 // the fallback so the response is always well-formed.
 //
 // Only Code, Message, and explicitly attached Details cross the wire.
-// Parent and Location are diagnostics for logs and must never be serialized
+// Parent and Origin metadata are diagnostics for logs and must never be serialized
 // into API responses (ADR 030).
 func domainErrorDetails(err error) api.ErrorDetails {
 	var domErr domain.Error

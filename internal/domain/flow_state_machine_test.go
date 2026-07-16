@@ -428,7 +428,7 @@ func TestFlowStateMachine_Process_LoginInvalidPassword(t *testing.T) {
 	require.NotNil(t, result.Step)
 	require.Equal(t, "credentials", result.Step.Name)
 	require.NotNil(t, result.Step.Error)
-	assert.Contains(t, *result.Step.Error, "password")
+	assert.Equal(t, domain.FlowStepErrorInvalidCredentials, *result.Step.Error)
 }
 
 func TestFlowStateMachine_Process_FieldValidationErrorKeepsStep(t *testing.T) {
@@ -461,7 +461,9 @@ func TestFlowStateMachine_Process_FieldValidationErrorKeepsStep(t *testing.T) {
 	require.NotNil(t, result.Step)
 	require.Equal(t, "credentials", result.Step.Name)
 	if assert.NotNil(t, result.Step.Error) {
-		assert.Contains(t, *result.Step.Error, "email")
+		// The wire dialect end to end: format violations surface as the
+		// `_invalid`-spelled text key, not a raw diagnostic string.
+		assert.Equal(t, "error.email_invalid", *result.Step.Error)
 	}
 }
 
@@ -704,7 +706,7 @@ func TestFlowStateMachine_Process_PasskeyProofRejectedKeepsStep(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NotNil(t, rejected.Step.Error)
-	assert.Equal(t, "auth_attempt.passkey_invalid", *rejected.Step.Error)
+	assert.Equal(t, domain.FlowStepErrorPasskeyInvalid, *rejected.Step.Error)
 	assert.Nil(t, rejected.State.PendingChallenge)
 	assert.Equal(t, "authenticate", rejected.State.CurrentStep)
 }
@@ -891,7 +893,7 @@ func TestFlowStateMachine_Process_PasskeyAfterRejectionRebindsIdentifier(t *test
 		},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "auth_attempt.passkey_invalid", gu.Value(rejected.Step.Error))
+	assert.Equal(t, domain.FlowStepErrorPasskeyInvalid, gu.Value(rejected.Step.Error))
 	assert.Nil(t, rejected.State.PendingChallenge, "rejection clears PendingChallenge")
 
 	// Attempt 2, issue leg: the user re-types user2's email (passkey-only)
@@ -1988,7 +1990,7 @@ func TestFlowStateMachine_Process_PasskeyRegisterRejectedKeepsStep(t *testing.T)
 	})
 	require.NoError(t, err)
 	require.NotNil(t, rejected.Step.Error)
-	assert.Equal(t, "auth_attempt.passkey_registration_invalid", *rejected.Step.Error)
+	assert.Equal(t, domain.FlowStepErrorPasskeyRegistrationInvalid, *rejected.Step.Error)
 	assert.Nil(t, rejected.State.PendingChallenge)
 	assert.Equal(t, "register", rejected.State.CurrentStep)
 }
@@ -2699,4 +2701,64 @@ func TestFlowStateMachine_Back_DropsPendingChallenge(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "step1", afterBack.Step.Name)
 	assert.Nil(t, afterBack.State.PendingChallenge, "back must drop the pending challenge")
+}
+
+// TestFlowStepErrorContract sweeps every value the engine can emit as
+// `step.Error` and pins the client contract: a localizable `error.*`
+// text key or a reserved outcome token. The scenario tests above prove
+// each value is emitted where expected; this gate is what fails when a
+// new emission value (a step-error const, an implicit outcome, a
+// validation rule) breaks the dialect /login localizes.
+func TestFlowStepErrorContract(t *testing.T) {
+	t.Parallel()
+
+	stepErrorConsts := []string{
+		domain.FlowStepErrorInvalidCredentials,
+		domain.FlowStepErrorPasskeyInvalid,
+		domain.FlowStepErrorPasskeyRegistrationInvalid,
+	}
+	for _, key := range stepErrorConsts {
+		assert.True(t, domain.FlowStepErrorAllowed(key), "step-error const %q must honor the contract", key)
+	}
+
+	challenges := []domain.FlowFieldChallenge{
+		domain.FlowFieldChallengeNone,
+		domain.FlowFieldChallengeIdentifier,
+		domain.FlowFieldChallengePassword,
+		domain.FlowFieldChallengePasskey,
+		domain.FlowFieldChallengeMagicLink,
+		domain.FlowFieldChallengeSSO,
+		domain.FlowFieldChallengeOTP,
+	}
+	for _, challenge := range challenges {
+		for _, outcome := range domain.ImplicitOutcomesForChallenge(challenge) {
+			// Unwired transitions surface the outcome token verbatim as
+			// step.Error, so every implicit outcome must stay reserved.
+			assert.True(t, domain.FlowStepErrorAllowed(outcome),
+				"implicit outcome %q of challenge %q must be a reserved token", outcome, challenge)
+		}
+	}
+	assert.True(t, domain.FlowStepErrorAllowed(domain.FlowImplicitOutcomeUserNotFound))
+	assert.True(t, domain.FlowStepErrorAllowed(domain.FlowImplicitOutcomeUserAlreadyExists))
+
+	rules := []domain.FlowFieldValidationRule{
+		domain.FlowFieldValidationRuleRequired,
+		domain.FlowFieldValidationRuleFormat,
+		domain.FlowFieldValidationRuleMinLength,
+		domain.FlowFieldValidationRuleMaxLength,
+		domain.FlowFieldValidationRuleUnknown,
+	}
+	// Field names are tenant-controlled and used verbatim in the key —
+	// the credential shape is the adversarial case.
+	for _, field := range []string{"email", "x-auth-methods#password"} {
+		for _, rule := range rules {
+			key := domain.FlowFieldValidationError{Field: field, Rule: rule}.TextKey()
+			assert.True(t, domain.FlowStepErrorAllowed(key),
+				"validation key %q (field %q, rule %q) must honor the contract", key, field, rule)
+		}
+	}
+
+	for _, key := range []string{"auth_attempt.password_invalid", "password_invalid", ""} {
+		assert.False(t, domain.FlowStepErrorAllowed(key), "%q must not pass the contract", key)
+	}
 }

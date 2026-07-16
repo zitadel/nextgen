@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/config",
-  "version": "0.1.0-alpha.15",
+  "version": "0.1.0-alpha.17",
   "description": "Versioned Zitadel local config schemas and defaults",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/config#readme",
   "bugs": {
@@ -72,7 +72,6 @@
     "ajv": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",
-    "vitest": "catalog:",
-    "ajv": "catalog:"
+    "vitest": "catalog:"
   }
 }

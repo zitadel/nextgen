@@ -38,6 +38,57 @@ export function collectPlanWarnings(
 }
 
 /**
+ * One entry of the `changes` array in the `plan` / `apply` `--json`
+ * payloads: which resource an action touches and how. `action` speaks the
+ * envelope's public vocabulary (`revision`, matching the `revisions`
+ * counter, not the internal `revise`). `id` is the platform id an
+ * update/delete targets; `previous_id` is the revision being superseded.
+ * The file path is the resource identity, mirroring {@link renderPlan}.
+ */
+export type PlanResourceChange = {
+  kind: ResourceSyncer["kind"];
+  action: "create" | "update" | "revision" | "delete";
+  file: string;
+  id?: string;
+  previous_id?: string;
+};
+
+/**
+ * Enumerate the non-`skip` actions of a {@link buildSyncPlan} result as
+ * envelope-ready {@link PlanResourceChange} rows. Pure; the structural
+ * counterpart of {@link summarizePlan} — counts and rows always agree.
+ */
+export function enumeratePlanResources(
+  actions: ReadonlyArray<SyncAction>,
+): PlanResourceChange[] {
+  const out: PlanResourceChange[] = [];
+  for (const action of actions) {
+    switch (action.kind) {
+      case "create":
+        out.push({ kind: action.syncer.kind, action: "create", file: action.path });
+        break;
+      case "update":
+        out.push({ kind: action.syncer.kind, action: "update", file: action.path, id: action.id });
+        break;
+      case "revise":
+        out.push({
+          kind: action.syncer.kind,
+          action: "revision",
+          file: action.path,
+          previous_id: action.previousId,
+        });
+        break;
+      case "delete":
+        out.push({ kind: action.syncer.kind, action: "delete", file: action.path, id: action.id });
+        break;
+      case "skip":
+        break;
+    }
+  }
+  return out;
+}
+
+/**
  * Render a {@link buildSyncPlan} result as a human-readable Terraform-style
  * plan. TTY-aware: colors and bold are emitted only when `tty` is true.
  * Returns the empty-state message when every action is `skip`.
