@@ -200,6 +200,80 @@ func TestSchemaFieldResolver_Validate_DeterministicOrder(t *testing.T) {
 	}
 }
 
+func TestSchemaFieldResolver_Validate_CheckboxConstMustBeTrue(t *testing.T) {
+	t.Parallel()
+	resolver := domain.NewSchemaFieldResolver()
+	fields := domain.FlowResolvedFields{
+		Fields: []domain.FlowField{
+			{
+				Name:       "acceptedTermsAndConditions",
+				Type:       domain.FlowFieldTypeCheckbox,
+				Validation: &domain.FlowFieldValidation{Const: true},
+			},
+		},
+	}
+
+	// An unchecked must-accept box submits false, which violates const: true.
+	err := resolver.Validate(fields, map[string]any{"acceptedTermsAndConditions": false})
+	if !hasValidationRule(t, err, "acceptedTermsAndConditions", domain.FlowFieldValidationRuleFormat) {
+		t.Fatalf("Validate err = %v, want format violation for unaccepted terms", err)
+	}
+
+	// Checked satisfies the const.
+	if err := resolver.Validate(fields, map[string]any{"acceptedTermsAndConditions": true}); err != nil {
+		t.Fatalf("Validate returned error for accepted terms: %v", err)
+	}
+}
+
+func TestSchemaFieldResolver_Validate_StringConst(t *testing.T) {
+	t.Parallel()
+	resolver := domain.NewSchemaFieldResolver()
+	fields := domain.FlowResolvedFields{
+		Fields: []domain.FlowField{
+			{Name: "tier", Type: domain.FlowFieldTypeText, Validation: &domain.FlowFieldValidation{Const: "free"}},
+		},
+	}
+
+	// A value differing from the pinned const is rejected.
+	err := resolver.Validate(fields, map[string]any{"tier": "premium"})
+	if !hasValidationRule(t, err, "tier", domain.FlowFieldValidationRuleFormat) {
+		t.Fatalf("Validate err = %v, want format violation for non-const string", err)
+	}
+
+	// The pinned value passes.
+	if err := resolver.Validate(fields, map[string]any{"tier": "free"}); err != nil {
+		t.Fatalf("Validate returned error for const-matching string: %v", err)
+	}
+}
+
+func TestSchemaFieldResolver_MissingRequired(t *testing.T) {
+	t.Parallel()
+	resolver := domain.NewSchemaFieldResolver()
+	fields := domain.FlowResolvedFields{
+		Fields: []domain.FlowField{
+			{
+				Name:       "maritalStatus",
+				Type:       domain.FlowFieldTypeSelect,
+				Required:   true,
+				Validation: &domain.FlowFieldValidation{Enum: []string{"Single", "Married"}},
+			},
+			{Name: "newsletterOptIn", Type: domain.FlowFieldTypeCheckbox},
+		},
+	}
+
+	// The client drops an unselected select entirely, so the required field
+	// is absent from the submission rather than submitted empty.
+	errs := resolver.MissingRequired(fields, map[string]any{})
+	if !hasValidationRule(t, errs, "maritalStatus", domain.FlowFieldValidationRuleRequired) {
+		t.Fatalf("MissingRequired = %v, want required violation for omitted maritalStatus", errs)
+	}
+
+	// A submitted required field, and any optional field, is not missing.
+	if errs := resolver.MissingRequired(fields, map[string]any{"maritalStatus": "Single"}); errs != nil {
+		t.Fatalf("MissingRequired = %v, want no violations when required field present", errs)
+	}
+}
+
 func hasValidationRule(t *testing.T, err error, field string, rule domain.FlowFieldValidationRule) bool {
 	t.Helper()
 	var errs domain.FlowFieldValidationErrors

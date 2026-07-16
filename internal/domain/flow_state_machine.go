@@ -361,7 +361,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	if err != nil {
 		return FlowStepResult{}, err
 	}
-	halt, err := r.validateAndMerge(pc, resolved)
+	halt, err := r.validateAndMerge(pc, resolved, actionKind)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
@@ -403,18 +403,27 @@ func (r *FlowStateMachineRuntime) resolveInputs(pc *processCtx) (FlowResolvedFie
 // them into CollectedData. Returns a rendered halt step on validation
 // failure.
 //
-// TODO: this rejects passkey submissions on steps that declare required
-// fields (e.g. "sign in with passkey" on the password step) because
-// in.Fields is empty. Validation should scope to fields the client
-// actually submitted, or to what the current action kind needs.
-func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved FlowResolvedFields) (*FlowStepResult, error) {
+// Every action validates the values it sent. Only the submit action —
+// which collects the step's fields — also requires the declared required
+// fields to be present; other kinds (passkey, challenge answers) may send
+// a subset or none.
+func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved FlowResolvedFields, actionKind FlowActionKind) (*FlowStepResult, error) {
+	var errs FlowFieldValidationErrors
 	if validationErr := r.fields.Validate(resolved, pc.in.Fields); validationErr != nil {
-		if errs, ok := errors.AsType[FlowFieldValidationErrors](validationErr); ok {
-			step := r.buildStep(pc.state, pc.currentStep, resolved, new(errs.StepError()), nil, nil)
-			pc.state.IssuedAt = r.now()
-			return &FlowStepResult{State: pc.state, Step: step}, nil
+		v, ok := errors.AsType[FlowFieldValidationErrors](validationErr)
+		if !ok {
+			return nil, fmt.Errorf("flow state machine: validate fields: %w", validationErr)
 		}
-		return nil, fmt.Errorf("flow state machine: validate fields: %w", validationErr)
+		errs = append(errs, v...)
+	}
+	if actionKind == FlowActionKindSubmit {
+		errs = append(errs, r.fields.MissingRequired(resolved, pc.in.Fields)...)
+	}
+	if len(errs) > 0 {
+		sortFlowFieldValidationErrors(errs)
+		step := r.buildStep(pc.state, pc.currentStep, resolved, new(errs.StepError()), nil, nil)
+		pc.state.IssuedAt = r.now()
+		return &FlowStepResult{State: pc.state, Step: step}, nil
 	}
 
 	if err := mergeCollected(pc.state, pc.in.Fields); err != nil {
