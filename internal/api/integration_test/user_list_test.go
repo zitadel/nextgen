@@ -34,7 +34,7 @@ func TestListUsers(t *testing.T) {
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	listIDs := func(t *testing.T, params api.ListUsersParams) []string {
 		t.Helper()
@@ -97,7 +97,7 @@ func TestListUsers(t *testing.T) {
 	require.NoError(t, err)
 	otherClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	otherClient.SetToken(other.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, other)
 	otherRes, err := otherClient.ListUsers(t.Context(), api.ListUsersParams{})
 	require.NoError(t, err)
 	otherItems, ok := otherRes.(*api.ListUsersOKApplicationJSON)

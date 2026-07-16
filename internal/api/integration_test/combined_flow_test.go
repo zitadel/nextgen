@@ -32,7 +32,7 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	server := harness.EnsureTestServer(t)
 	client, err := helpers.NewApiClient(server.URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),

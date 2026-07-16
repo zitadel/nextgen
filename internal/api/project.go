@@ -11,12 +11,26 @@ import (
 func (h *Handler) CreateProject(ctx context.Context, req *api.CreateProjectRequest) (api.CreateProjectRes, error) {
 	project, err := h.projectService.Create(ctx, req.PreviewOrigins, req.SeedDefaults.Or(true))
 	if err != nil {
-		return h.NewError(ctx, err), nil
+		return nil, err
 	}
+
+	projectSecretGenerator, err := h.projectSecretGeneratorCreator.Create(ctx, project.ID)
+	if err != nil {
+		return nil, err
+	}
+	projectSecret, err := project.ProjectSecret(projectSecretGenerator)
+	if err != nil {
+		return nil, err
+	}
+	previewSecret, err := project.PreviewSecret(projectSecretGenerator)
+	if err != nil {
+		return nil, err
+	}
+
 	return &api.CreateProjectResponse{
 		ID:             project.ID,
-		ProjectSecret:  project.ProjectSecret,
-		PreviewSecret:  project.PreviewSecret,
+		ProjectSecret:  projectSecret,
+		PreviewSecret:  previewSecret,
 		PreviewOrigins: project.PreviewOrigins,
 		CreatedAt:      project.CreatedAt,
 	}, nil

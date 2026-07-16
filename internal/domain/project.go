@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"context"
 	"time"
 )
 
@@ -14,36 +15,15 @@ type Project struct {
 	ID        string
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	// ProjectSecret is a bearer token that authenticates API calls for this project.
-	// Callers must set this field before the project is persisted; the storage
-	// layer does not generate it.
-	ProjectSecret string
-	// PreviewSecret is an origin-scoped bearer token for preview/testing.
-	// Callers must set this field before the project is persisted.
-	PreviewSecret string
 	// PreviewOrigins are the allowed origins for the preview secret.
 	// Callers must set this field before the project is persisted.
 	PreviewOrigins []string
 }
 
-func NewProject(previewOrigins []string, tokenGenerator TokenGenerator) (*Project, error) {
+func NewProject(ctx context.Context, previewOrigins []string) (*Project, error) {
 	id, err := NewID(PrefixProject)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to create project id")
-	}
-	projectSecret, err := tokenGenerator.Generate(&Token{
-		ProjectID: id,
-		Scope:     []string{"project.write", "project.read"},
-	})
-	if err != nil {
-		return nil, ErrInternal(err).WithMessage("failed to generate project secret")
-	}
-	previewSecret, err := tokenGenerator.Generate(&Token{
-		ProjectID: id,
-		Scope:     []string{"project.read"},
-	})
-	if err != nil {
-		return nil, ErrInternal(err).WithMessage("failed to generate preview secret")
 	}
 
 	if previewOrigins == nil {
@@ -52,10 +32,30 @@ func NewProject(previewOrigins []string, tokenGenerator TokenGenerator) (*Projec
 
 	return &Project{
 		ID:             id,
-		ProjectSecret:  projectSecret,
-		PreviewSecret:  previewSecret,
 		PreviewOrigins: previewOrigins,
 	}, nil
+}
+
+func (p *Project) ProjectSecret(generator TokenGenerator) (string, error) {
+	projectSecret, err := generator.Generate(&Token{
+		ProjectID: p.ID,
+		Scope:     []string{"project.write", "project.read"},
+	})
+	if err != nil {
+		return "", ErrInternal(err).WithMessage("failed to generate project secret")
+	}
+	return projectSecret, nil
+}
+
+func (p *Project) PreviewSecret(generator TokenGenerator) (string, error) {
+	projectSecret, err := generator.Generate(&Token{
+		ProjectID: p.ID,
+		Scope:     []string{"project.read"},
+	})
+	if err != nil {
+		return "", ErrInternal(err).WithMessage("failed to generate preview secret")
+	}
+	return projectSecret, nil
 }
 
 // ProjectField enumerates the fields of Project which can be used for ordering in list operations.

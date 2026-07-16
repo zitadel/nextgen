@@ -7,81 +7,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zitadel/nextgen/internal/domain/crypto"
 	"go.uber.org/mock/gomock"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // stubPool returns nil typed as database.Pool. The mock repository does not
 // invoke any methods on it, so the value is opaque — it only satisfies the
 // service constructor signature.
 func stubPool() database.Pool { return nil }
-
-func stubV2Pool() *service.DB { return nil }
-
-type testAllStatements struct {
-	createProject  func(context.Context, *domain.Project) error
-	getProjectByID func(context.Context, string) (*domain.Project, error)
-}
-
-func (testAllStatements) IsStatements() {}
-
-func (s testAllStatements) CreateProject(ctx context.Context, project *domain.Project) error {
-	if s.createProject != nil {
-		return s.createProject(ctx, project)
-	}
-	return nil
-}
-
-func (s testAllStatements) GetProjectByID(ctx context.Context, id string) (*domain.Project, error) {
-	if s.getProjectByID != nil {
-		return s.getProjectByID(ctx, id)
-	}
-	return nil, nil
-}
-
-func (testAllStatements) ListProjects(context.Context, *v2database.ListOptions[domain.ProjectField]) (*v2database.ListResult[*domain.Project], error) {
-	panic("unexpected call to ListProjects")
-}
-
-func (testAllStatements) DeleteProjectByID(context.Context, string) error {
-	panic("unexpected call to DeleteProjectByID")
-}
-
-func (testAllStatements) CreateFlowDefinition(context.Context, *domain.FlowDefinition) error {
-	panic("unexpected call to CreateFlowDefinition")
-}
-
-func (testAllStatements) GetFlowDefinitionByID(context.Context, string) (*domain.FlowDefinition, error) {
-	panic("unexpected call to GetFlowDefinitionByID")
-}
-
-func (testAllStatements) ListFlowDefinitions(context.Context, *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
-	panic("unexpected call to ListFlowDefinitions")
-}
-
-func (testAllStatements) DeleteFlowDefinitionByID(context.Context, string) error {
-	panic("unexpected call to DeleteFlowDefinitionByID")
-}
-
-func (s testAllStatements) GetActiveDEK(ctx context.Context, projectID string) (*crypto.DEK, error) {
-	panic("unexpected call to GetActiveDEK")
-}
-
-func (s testAllStatements) CreateDEK(ctx context.Context, dek *crypto.DEK) error {
-	panic("unexpected call to CreateDEK")
-}
-
-func (s testAllStatements) UpdateDEK(ctx context.Context, dek *crypto.DEK) error {
-	panic("unexpected call to UpdateDEK")
-}
-
-var _ service.AllStatements = testAllStatements{}
 
 type v2TestTx struct {
 	database.QueryExecutor

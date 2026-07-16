@@ -83,3 +83,31 @@ func (s *KeyService) GetProjectDEK(ctx context.Context, input GetProjectDEKInput
 	}
 	return dek, nil
 }
+
+func (s *KeyService) GetProjectDEKCrypter(ctx context.Context, input GetProjectDEKInput) (crypto2.Crypter, error) {
+	dek, err := s.GetProjectDEK(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	crypter, err := dek.Crypter(s.kek)
+	if err != nil {
+		return nil, err
+	}
+	return crypter, nil
+}
+
+type DEKCrypterCreator struct {
+	keys *KeyService
+}
+
+func NewDEKCrypterCreator(
+	keys *KeyService,
+) *DEKCrypterCreator {
+	return &DEKCrypterCreator{
+		keys: keys,
+	}
+}
+
+func (c *DEKCrypterCreator) Crypter(ctx context.Context, projectID string) (crypto2.Crypter, error) {
+	return c.keys.GetProjectDEKCrypter(ctx, GetProjectDEKInput{ProjectID: projectID})
+}

@@ -2,9 +2,12 @@ package helpers
 
 import (
 	"context"
+	"testing"
 
 	"github.com/ogen-go/ogen/ogenerrors"
+	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 type FakeSecuritySource struct {
@@ -85,4 +88,15 @@ func (c *ApiClient) SetRoles(roles []string) {
 }
 func (c *ApiClient) SetSessionToken(token string) {
 	c.securitySource.SessionToken = token
+}
+
+func (h *Harness) SetProjectSecretOnApiClient(t *testing.T, client *ApiClient, project *domain.Project) {
+	t.Helper()
+
+	secretGenerator, err := h.EnsureProjectSecretGeneratorCreator(t).Create(t.Context(), project.ID)
+	require.NoError(t, err)
+	secret, err := project.ProjectSecret(secretGenerator)
+	require.NoError(t, err)
+
+	client.SetToken(secret)
 }

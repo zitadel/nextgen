@@ -211,7 +211,7 @@ func (h *Handler) openState(raw string) (*domain.FlowState, error) {
 	if raw == "" {
 		return nil, errFlowCookieMissing
 	}
-	payload, err := h.crypter.Decrypt(raw)
+	payload, err := h.kek.Decrypt(raw)
 	if err != nil {
 		return nil, errFlowCookieInvalid
 	}
@@ -230,7 +230,7 @@ func (h *Handler) sealState(state *domain.FlowState) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("marshal flow state: %w", err)
 	}
-	return h.crypter.Encrypt(string(payload))
+	return h.kek.Encrypt(string(payload))
 }
 
 func flowSetCookie(value string, clear bool) string {

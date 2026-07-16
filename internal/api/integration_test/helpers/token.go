@@ -33,6 +33,16 @@ func (h *Harness) EnsureOpaqueTokenGenerator(t *testing.T) *tokengen.OpaqueToken
 	return h.OpaqueTokenGenerator
 }
 
+func (h *Harness) EnsureOpaqueTokenGeneratorCreator(t *testing.T) *tokengen.OpaqueTokenGeneratorCreator {
+	t.Helper()
+	if h.OpaqueTokenGeneratorCreator == nil {
+		h.OpaqueTokenGeneratorCreator = tokengen.NewOpaqueTokenGeneratorCreator(
+			h.EnsureKeyService(t),
+		)
+	}
+	return h.OpaqueTokenGeneratorCreator
+}
+
 func (h *Harness) EnsureAnyTokenVerifier(t *testing.T) *tokengen.AnyTokenTypeVerifier {
 	t.Helper()
 	if h.TokenVerifier == nil {

@@ -115,7 +115,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		return nil
 	})
 
-	crypter, err := buildCrypter(cfg.Server.EncryptionKey)
+	kek, err := buildCrypter(cfg.Server.EncryptionKey)
 	if err != nil {
 		return fmt.Errorf("failed to create Crypter: %w", err)
 	}
@@ -129,7 +129,8 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		return fmt.Errorf("failed to bootstrap users: %w", err)
 	}
 
-	opaqueTokenGenerator := tokengen.NewOpaqueTokenGenerator(crypter)
+	// TODO: remove, this uses the kek for token encryption instead of the dek
+	opaqueTokenGenerator := tokengen.NewOpaqueTokenGenerator(kek)
 
 	// ── Repositories ─────────────────
 	userRepo := repository.NewUserRepository()
@@ -167,6 +168,10 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 
 	// ── Services ─────────────────────
+	keys := service.NewKeyService(serviceDBPool, kek)
+
+	opaqueTokenGeneratorCreator := tokengen.NewOpaqueTokenGeneratorCreator(keys)
+
 	authAttemptSvc := service.NewAuthAttemptService(
 		pool,
 		attemptRepo,
@@ -181,13 +186,13 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		MaxTTL:     cfg.Session.MaxTTL,
 	})
 	projectService := service.NewProjectService(
-		pool,
 		serviceDBPool,
 		schemaRepo,
 		flowDefinitionRepo,
-		opaqueTokenGenerator,
+		opaqueTokenGeneratorCreator,
 		builtinPublicBase.String(),
 		schemaValidator,
+		kek,
 	)
 	schemaService := service.NewSchemaService(pool, schemaRepo, schemaResolverWithHTTP, schemaValidator)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
@@ -240,9 +245,10 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 
 	oasServer, err := oasapi.NewServer(
 		api.NewHandler(
-			crypter,
+			kek,
 			opaqueTokenGenerator,
-			opaqueTokenGenerator,
+			opaqueTokenGeneratorCreator,
+			opaqueTokenGeneratorCreator,
 			flowService,
 			authAttemptSvc,
 			sessionService,

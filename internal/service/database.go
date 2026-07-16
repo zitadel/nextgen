@@ -1,8 +1,19 @@
 package service
 
-import "context"
+import (
+	"context"
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/database.mock.go . Pool,Transactioner,Statementer
+	"github.com/zitadel/nextgen/internal/storage/database"
+)
+
+// StatementerWithQueryExecutor only exists to mock while we transition from storage
+// v1 to v2
+type StatementerWithQueryExecutor[S any] interface {
+	database.QueryExecutor
+	Statementer[S]
+}
+
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/database.mock.go . Pool,Transactioner,Statementer,StatementerWithQueryExecutor
 type Pool interface {
 	Transactioner[AllStatements]
 	Statementer[AllStatements]

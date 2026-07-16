@@ -29,7 +29,13 @@ func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionReques
 	if err != nil {
 		return nil, err
 	}
-	return sessionWithTokenToAPI(session, h.sessionTokenGenerator)
+
+	tokenCreator, err := h.sessionTokenGeneratorCreator.Create(ctx, string(req.ProjectID))
+	if err != nil {
+		return nil, err
+	}
+
+	return sessionWithTokenToAPI(session, tokenCreator)
 }
 
 func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, params api.ExchangeHandoffParams) (api.ExchangeHandoffRes, error) {
@@ -41,7 +47,13 @@ func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, 
 	if err != nil {
 		return nil, err
 	}
-	return sessionWithTokenToAPI(session, h.sessionTokenGenerator)
+
+	tokenCreator, err := h.sessionTokenGeneratorCreator.Create(ctx, string(params.ProjectID))
+	if err != nil {
+		return nil, err
+	}
+
+	return sessionWithTokenToAPI(session, tokenCreator)
 }
 
 func exchangeInputFromRequest(req *api.ExchangeRequest, params api.ExchangeHandoffParams) (service.ExchangeInput, error) {

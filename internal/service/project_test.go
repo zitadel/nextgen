@@ -8,293 +8,178 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/dbmock"
 	"go.uber.org/mock/gomock"
 )
 
+func createMockedProjectService(t *testing.T) (svc service.ProjectService,
+	mock *gomock.Controller,
+	db *service.DB,
+	schemaRepo *domainmock.MockJSONSchemaRepository,
+	flowDefinitionRepo *domainmock.MockFlowDefinitionRepository,
+	tokenGeneratorCreator *domainmock.MockTokenGeneratorCreator,
+	serverURL string,
+	schemaValidator *domain.SchemaValidator,
+	kek *cryptomock.MockCrypter,
+	pool *servicemocks.MockPool,
+	tokenGenerator *domainmock.MockTokenGenerator,
+	transaction *servicemocks.MockTransactioner[service.AllStatements],
+	statementer *servicemocks.MockStatementerWithQueryExecutor[service.AllStatements],
+	statements *servicemocks.MockAllStatements,
+) {
+	t.Helper()
+
+	mock = gomock.NewController(t)
+
+	pool = servicemocks.NewMockPool(mock)
+	schemaRepo = domainmock.NewMockJSONSchemaRepository(mock)
+	flowDefinitionRepo = domainmock.NewMockFlowDefinitionRepository(mock)
+	tokenGeneratorCreator = domainmock.NewMockTokenGeneratorCreator(mock)
+	kek = cryptomock.NewMockCrypter(mock)
+
+	tokenGenerator = domainmock.NewMockTokenGenerator(mock)
+	transaction = servicemocks.NewMockTransactioner[service.AllStatements](mock)
+	statementer = servicemocks.NewMockStatementerWithQueryExecutor[service.AllStatements](mock)
+	statements = servicemocks.NewMockAllStatements(mock)
+
+	tokenGeneratorCreator.EXPECT().Create(gomock.Any(), gomock.Any()).Return(tokenGenerator, nil).AnyTimes()
+	pool.EXPECT().Statements().Return(statements).AnyTimes()
+	pool.EXPECT().
+		Transaction(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, tx func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return tx(ctx, statementer)
+		}).
+		AnyTimes()
+	statementer.EXPECT().Statements().Return(statements).AnyTimes()
+
+	const baseURL = "https://example.com/api/schemas"
+
+	db = service.NewPool(pool)
+	schemaValidator, err := domain.NewSchemaValidator(baseURL)
+	require.NoError(t, err)
+
+	svc = service.NewProjectService(
+		db,
+		schemaRepo,
+		flowDefinitionRepo,
+		tokenGeneratorCreator,
+		baseURL,
+		schemaValidator,
+		kek,
+	)
+
+	return
+}
+
 func TestProjectService_Create(t *testing.T) {
-	tests := []struct {
-		name                    string
-		previewOrigins          []string
-		seedDefaults            bool
-		setupStatements         func(*domain.Project) testAllStatements
-		setupSchemaRepo         func(*domainmock.MockJSONSchemaRepository)
-		setupFlowDefinitionRepo func(*domainmock.MockFlowDefinitionRepository)
-		setupPool               func(*servicemocks.MockPool, *dbmock.MockTransaction, testAllStatements)
-		setupTokenGenerator     func(generator *domainmock.MockTokenGenerator)
-		wantErr                 bool
-		check                   func(t *testing.T, got *domain.Project)
-	}{
-		{
-			name:           "ok — no preview origins",
-			previewOrigins: nil,
-			seedDefaults:   true,
-			setupStatements: func(_ *domain.Project) testAllStatements {
-				return testAllStatements{
-					createProject: func(_ context.Context, _ *domain.Project) error {
-						return nil
-					},
-				}
+	t.Run("ok", func(t *testing.T) {
+		tcs := []struct {
+			name                   string
+			previewOrigins         []string
+			seedDefaults           bool
+			expectedPreviewOrigins []string
+		}{
+			{
+				name:                   "ok — no preview origins",
+				previewOrigins:         nil,
+				seedDefaults:           true,
+				expectedPreviewOrigins: make([]string, 0),
 			},
-			setupSchemaRepo: func(r *domainmock.MockJSONSchemaRepository) {
-				r.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any())
+			{
+				name:                   "ok — with preview origins",
+				previewOrigins:         []string{"*.vercel.app", "*.netlify.app"},
+				seedDefaults:           true,
+				expectedPreviewOrigins: []string{"*.vercel.app", "*.netlify.app"},
 			},
-			setupFlowDefinitionRepo: func(r *domainmock.MockFlowDefinitionRepository) {
-				r.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any())
-			},
-			setupPool: func(pool *servicemocks.MockPool, transaction *dbmock.MockTransaction, statements testAllStatements) {
-				pool.EXPECT().
-					Transaction(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
-						return fn(ctx, v2TestTx{
-							QueryExecutor: transaction,
-							stmts:         statements,
-						})
-					})
-			},
-			setupTokenGenerator: func(generator *domainmock.MockTokenGenerator) {
-				generator.EXPECT().
-					Generate(gomock.Any()).Return("token", nil).
-					Times(2)
-			},
-			check: func(t *testing.T, got *domain.Project) {
-				assert.NotNil(t, got)
-			},
-		},
-		{
-			name:           "ok — with preview origins",
-			previewOrigins: []string{"*.vercel.app", "*.netlify.app"},
-			seedDefaults:   true,
-			setupStatements: func(_ *domain.Project) testAllStatements {
-				return testAllStatements{
-					createProject: func(_ context.Context, project *domain.Project) error {
-						assert.Equal(t, []string{"*.vercel.app", "*.netlify.app"}, project.PreviewOrigins)
-						return nil
-					},
-				}
-			},
-			setupSchemaRepo: func(r *domainmock.MockJSONSchemaRepository) {
-				r.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any())
-			},
-			setupFlowDefinitionRepo: func(r *domainmock.MockFlowDefinitionRepository) {
-				r.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any())
-			},
-			setupPool: func(pool *servicemocks.MockPool, transaction *dbmock.MockTransaction, statements testAllStatements) {
-				pool.EXPECT().
-					Transaction(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
-						return fn(ctx, v2TestTx{
-							QueryExecutor: transaction,
-							stmts:         statements,
-						})
-					})
-			},
-			setupTokenGenerator: func(generator *domainmock.MockTokenGenerator) {
-				generator.EXPECT().
-					Generate(gomock.Any()).Return("token", nil).
-					Times(2)
-			},
-			check: func(t *testing.T, got *domain.Project) {
-				assert.Equal(t, []string{"*.vercel.app", "*.netlify.app"}, got.PreviewOrigins)
-			},
-		},
-		{
-			name:           "ok — skip fallback defaults",
-			previewOrigins: nil,
-			seedDefaults:   false,
-			setupStatements: func(_ *domain.Project) testAllStatements {
-				return testAllStatements{
-					createProject: func(_ context.Context, _ *domain.Project) error {
-						return nil
-					},
-				}
-			},
-			setupPool: func(pool *servicemocks.MockPool, transaction *dbmock.MockTransaction, statements testAllStatements) {
-				pool.EXPECT().
-					Transaction(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
-						return fn(ctx, v2TestTx{
-							QueryExecutor: transaction,
-							stmts:         statements,
-						})
-					})
-			},
-			setupTokenGenerator: func(generator *domainmock.MockTokenGenerator) {
-				generator.EXPECT().
-					Generate(gomock.Any()).Return("token", nil).
-					Times(2)
-			},
-			check: func(t *testing.T, got *domain.Project) {
-				assert.NotNil(t, got)
-			},
-		},
-		{
-			name:           "CreateProject error",
-			previewOrigins: nil,
-			seedDefaults:   true,
-			setupStatements: func(_ *domain.Project) testAllStatements {
-				return testAllStatements{
-					createProject: func(_ context.Context, _ *domain.Project) error {
-						return errors.New("db error")
-					},
-				}
-			},
-			setupPool: func(pool *servicemocks.MockPool, transaction *dbmock.MockTransaction, statements testAllStatements) {
-				pool.EXPECT().
-					Transaction(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
-						return fn(ctx, v2TestTx{
-							QueryExecutor: transaction,
-							stmts:         statements,
-						})
-					})
-			},
-			setupTokenGenerator: func(generator *domainmock.MockTokenGenerator) {
-				generator.EXPECT().
-					Generate(gomock.Any()).Return("token", nil).
-					Times(2)
-			},
-			wantErr: true,
-		},
-	}
+		}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			mockPool := servicemocks.NewMockPool(ctrl)
-			transaction := dbmock.NewMockTransaction(ctrl)
-			schemaRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
-			flowDefinitionRepo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-			const baseURL = "https://example.com/api/schemas"
-			schemaValidator, err := domain.NewSchemaValidator(baseURL)
-			require.NoError(t, err)
-			tokenGenerator := domainmock.NewMockTokenGenerator(ctrl)
+		for _, tc := range tcs {
+			t.Run(tc.name, func(t *testing.T) {
+				//svc, mock, db, schemaRepo, definitionRepo, creator, url, validator, kek, pool, tokenGenerator, transaction, statementer, statements := createMockedProjectService(t)
+				svc, _, _, schemaRepo, definitionRepo, _, _, _, kek, _, _, _, _, statements := createMockedProjectService(t)
 
-			statements := testAllStatements{}
-			if tc.setupStatements != nil {
-				statements = tc.setupStatements(nil)
-			}
-			if tc.setupSchemaRepo != nil {
-				tc.setupSchemaRepo(schemaRepo)
-			}
-			if tc.setupFlowDefinitionRepo != nil {
-				tc.setupFlowDefinitionRepo(flowDefinitionRepo)
-			}
-			if tc.setupPool != nil {
-				tc.setupPool(mockPool, transaction, statements)
-			}
-			if tc.setupTokenGenerator != nil {
-				tc.setupTokenGenerator(tokenGenerator)
-			}
+				kek.EXPECT().Encrypt(gomock.Any())
+				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any())
+				statements.EXPECT().CreateDEK(gomock.Any(), gomock.Any())
+				schemaRepo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any())
+				definitionRepo.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any())
 
-			svc := service.NewProjectService(
-				stubPool(),
-				service.NewPool(mockPool),
-				schemaRepo,
-				flowDefinitionRepo,
-				tokenGenerator,
-				baseURL,
-				schemaValidator,
-			)
-			got, err := svc.Create(context.Background(), tc.previewOrigins, tc.seedDefaults)
+				got, err := svc.Create(context.Background(), tc.previewOrigins, tc.seedDefaults)
 
-			if tc.wantErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-			if tc.check != nil {
-				tc.check(t, got)
-			}
+				assert.NoError(t, err)
+				if assert.NotNil(t, got) {
+					assert.Equal(t, tc.expectedPreviewOrigins, got.PreviewOrigins)
+				}
+			})
+		}
+
+		t.Run("ok — skip fallback defaults", func(t *testing.T) {
+			//svc, mock, db, schemaRepo, definitionRepo, creator, url, validator, kek, pool, tokenGenerator, transaction, statementer, statements := createMockedProjectService(t)
+			svc, _, _, schemaRepo, definitionRepo, _, _, _, kek, _, _, _, _, statements := createMockedProjectService(t)
+
+			kek.EXPECT().Encrypt(gomock.Any())
+			statements.EXPECT().CreateProject(gomock.Any(), gomock.Any())
+			statements.EXPECT().CreateDEK(gomock.Any(), gomock.Any())
+
+			schemaRepo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+			definitionRepo.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+			_, err := svc.Create(context.Background(), nil, false)
+			assert.NoError(t, err)
 		})
-	}
+	})
+
+	t.Run("error", func(t *testing.T) {
+		t.Run("project creation error should bubble up", func(t *testing.T) {
+			//svc, mock, db, schemaRepo, definitionRepo, creator, url, validator, kek, pool, tokenGenerator, transaction, statementer, statements := createMockedProjectService(t)
+			svc, _, _, _, _, _, _, _, kek, _, _, _, _, statements := createMockedProjectService(t)
+
+			kek.EXPECT().Encrypt(gomock.Any())
+			statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).Return(errors.New("db error"))
+
+			got, err := svc.Create(context.Background(), nil, false)
+
+			assert.Nil(t, got)
+			assert.Error(t, err)
+		})
+	})
 }
 
 func TestProjectService_Get(t *testing.T) {
-	now := time.Now().UTC().Truncate(time.Second)
+	t.Run("ok", func(t *testing.T) {
+		projectID := "proj_aaa"
+		project := &domain.Project{
+			ID:             projectID,
+			CreatedAt:      time.Now().UTC(),
+			UpdatedAt:      time.Now().UTC(),
+			PreviewOrigins: []string{"myapp.example.com"},
+		}
 
-	tests := []struct {
-		name            string
-		id              string
-		setupStatements func(string) testAllStatements
-		setupPool       func(*servicemocks.MockPool, testAllStatements)
-		wantErr         bool
-		check           func(t *testing.T, got *domain.Project)
-	}{
-		{
-			name: "ok",
-			id:   "proj_aaa",
-			setupStatements: func(id string) testAllStatements {
-				return testAllStatements{
-					getProjectByID: func(_ context.Context, gotID string) (*domain.Project, error) {
-						assert.Equal(t, id, gotID)
-						return &domain.Project{
-							ID:        "proj_aaa",
-							CreatedAt: now,
-							UpdatedAt: now,
-						}, nil
-					},
-				}
-			},
-			setupPool: func(pool *servicemocks.MockPool, statements testAllStatements) {
-				pool.EXPECT().Statements().Return(statements)
-			},
-			check: func(t *testing.T, got *domain.Project) {
-				assert.Equal(t, "proj_aaa", got.ID)
-				assert.False(t, got.CreatedAt.IsZero())
-			},
-		},
-		{
-			name: "not found",
-			id:   "proj_missing",
-			setupStatements: func(id string) testAllStatements {
-				return testAllStatements{
-					getProjectByID: func(_ context.Context, gotID string) (*domain.Project, error) {
-						assert.Equal(t, id, gotID)
-						return nil, database.NewNoRowFoundError(nil)
-					},
-				}
-			},
-			setupPool: func(pool *servicemocks.MockPool, statements testAllStatements) {
-				pool.EXPECT().Statements().Return(statements)
-			},
-			wantErr: true,
-		},
-	}
+		//svc, mock, db, schemaRepo, definitionRepo, creator, url, validator, kek, pool, tokenGenerator, transaction, statementer, statements := createMockedProjectService(t)
+		svc, _, _, _, _, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			mockPool := servicemocks.NewMockPool(ctrl)
-			schemaRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
-			flowDefinitionRepo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-			const baseURL = "https://example.com"
-			schemaValidator, err := domain.NewSchemaValidator(baseURL)
-			require.NoError(t, err)
-			tokenGenerator := domainmock.NewMockTokenGenerator(ctrl)
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(project, nil)
 
-			statements := tc.setupStatements(tc.id)
-			tc.setupPool(mockPool, statements)
+		got, err := svc.Get(context.Background(), projectID)
+		assert.NoError(t, err)
+		assert.Equal(t, got, project)
+	})
 
-			svc := service.NewProjectService(
-				stubPool(),
-				service.NewPool(mockPool),
-				schemaRepo,
-				flowDefinitionRepo,
-				tokenGenerator,
-				baseURL,
-				schemaValidator,
-			)
-			got, err := svc.Get(context.Background(), tc.id)
-			require.Equal(t, tc.wantErr, err != nil)
-			if tc.check != nil {
-				tc.check(t, got)
-			}
-		})
-	}
+	t.Run("not found", func(t *testing.T) {
+		projectID := "proj_aaa"
+
+		//svc, mock, db, schemaRepo, definitionRepo, creator, url, validator, kek, pool, tokenGenerator, transaction, statementer, statements := createMockedProjectService(t)
+		svc, _, _, _, _, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(nil, database.NewNoRowFoundError(nil))
+
+		got, err := svc.Get(context.Background(), projectID)
+		assert.Nil(t, got)
+		assert.Error(t, err)
+	})
 }

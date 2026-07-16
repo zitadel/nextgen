@@ -1,11 +1,13 @@
 package tokengen
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/pkg/errors"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 func NewOpaqueTokenGenerator(
@@ -47,4 +49,24 @@ func (g *OpaqueTokenGenerator) Verify(token string) (*domain.Token, error) {
 	}
 
 	return payload, nil
+}
+
+type OpaqueTokenGeneratorCreator struct {
+	keys *service.KeyService
+}
+
+func NewOpaqueTokenGeneratorCreator(
+	keys *service.KeyService,
+) *OpaqueTokenGeneratorCreator {
+	return &OpaqueTokenGeneratorCreator{
+		keys: keys,
+	}
+}
+
+func (c *OpaqueTokenGeneratorCreator) Create(ctx context.Context, projectID string) (domain.TokenGenerator, error) {
+	crypter, err := c.keys.GetProjectDEKCrypter(ctx, service.GetProjectDEKInput{ProjectID: projectID})
+	if err != nil {
+		return nil, err
+	}
+	return NewOpaqueTokenGenerator(crypter), nil
 }

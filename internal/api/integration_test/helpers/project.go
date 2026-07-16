@@ -3,6 +3,7 @@ package helpers
 import (
 	"testing"
 
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -10,14 +11,19 @@ func (h *Harness) EnsureProjectService(t *testing.T) service.ProjectService {
 	t.Helper()
 	if h.ProjectService == nil {
 		h.ProjectService = service.NewProjectService(
-			h.EnsureDBPool(t),
-			h.ServiceDB(t),
+			h.EnsureServiceDB(t),
 			h.EnsureSchemaRepo(t),
 			h.EnsureFlowDefinitionRepo(t),
-			h.EnsureOpaqueTokenGenerator(t),
+			h.EnsureProjectSecretGeneratorCreator(t),
 			BuiltinSchemaBaseURL,
 			h.EnsureSchemaValidator(t),
+			h.EnsureCrypter(t),
 		)
 	}
 	return h.ProjectService
+}
+
+func (h *Harness) EnsureProjectSecretGeneratorCreator(t *testing.T) domain.TokenGeneratorCreator {
+	t.Helper()
+	return h.EnsureOpaqueTokenGeneratorCreator(t)
 }

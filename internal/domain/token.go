@@ -18,10 +18,14 @@ type TokenVerifier interface {
 	Verify(token string) (payload *Token, err error)
 }
 
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/token_generator.mock.go . TokenGenerator
+//go:generate go tool mockgen -typed -package domainmock -destination ./mock/token_generator.mock.go . TokenGenerator,TokenGeneratorCreator
 
 type TokenGenerator interface {
 	Generate(token *Token) (string, error)
+}
+
+type TokenGeneratorCreator interface {
+	Create(ctx context.Context, projectID string) (TokenGenerator, error)
 }
 
 // Token is a persisted token record (access, session, PAT, etc.).

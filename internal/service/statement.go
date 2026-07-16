@@ -8,6 +8,8 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements
+
 type StatementPool interface {
 	Statementer[AllStatements]
 	Transactioner[AllStatements]

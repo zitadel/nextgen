@@ -31,7 +31,7 @@ func TestCreateUser(t *testing.T) {
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	params := api.CreateUserParams{
 		ProjectID: api.ProjectID(project.ID),
@@ -218,7 +218,7 @@ func TestSetUserPassword(t *testing.T) {
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()
@@ -320,7 +320,7 @@ func TestGetUser(t *testing.T) {
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	params := api.GetUserByIDParams{
 		ProjectID: api.ProjectID(project.ID),

@@ -45,7 +45,7 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 
 	client, err := helpers.NewApiClient(testServer.URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
@@ -196,7 +196,7 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 	server := harness.EnsureTestServer(t)
 	client, err := helpers.NewApiClient(server.URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),

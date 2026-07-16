@@ -39,7 +39,8 @@ func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 		h.Handler = api.NewHandler(
 			h.EnsureCrypter(t),
 			h.EnsureOpaqueTokenGenerator(t),
-			h.EnsureOpaqueTokenGenerator(t),
+			h.EnsureOpaqueTokenGeneratorCreator(t),
+			h.EnsureOpaqueTokenGeneratorCreator(t),
 			h.EnsureFlowService(t),
 			h.EnsureAuthAttemptService(t),
 			h.EnsureSessionService(t),

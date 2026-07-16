@@ -15,23 +15,25 @@ type Handler struct {
 	// responses for all endpoints, so only implemented methods need to be defined.
 	api.UnimplementedHandler
 
-	crypter               crypto.Crypter
-	sessionTokenVerifier  domain.TokenVerifier
-	sessionTokenGenerator domain.TokenGenerator
-	flowService           service.FlowService
-	authAttemptService    service.AuthAttemptService
-	sessionService        service.SessionService
-	projectService        service.ProjectService
-	userService           *service.UserService
-	schemaService         *service.SchemaService
-	flowDefinitionService service.FlowDefinitionService
-	teamService           *service.TeamService
+	kek                           crypto.Crypter
+	sessionTokenVerifier          domain.TokenVerifier
+	sessionTokenGeneratorCreator  domain.TokenGeneratorCreator
+	projectSecretGeneratorCreator domain.TokenGeneratorCreator
+	flowService                   service.FlowService
+	authAttemptService            service.AuthAttemptService
+	sessionService                service.SessionService
+	projectService                service.ProjectService
+	userService                   *service.UserService
+	schemaService                 *service.SchemaService
+	flowDefinitionService         service.FlowDefinitionService
+	teamService                   *service.TeamService
 }
 
 func NewHandler(
 	crypter crypto.Crypter,
 	sessionTokenVerifier domain.TokenVerifier,
-	sessionTokenGenerator domain.TokenGenerator,
+	sessionTokenGeneratorCreator domain.TokenGeneratorCreator,
+	projectSecretGeneratorCreator domain.TokenGeneratorCreator,
 	flowService service.FlowService,
 	authAttemptService service.AuthAttemptService,
 	sessionService service.SessionService,
@@ -42,17 +44,18 @@ func NewHandler(
 	teamService *service.TeamService,
 ) *Handler {
 	return &Handler{
-		crypter:               crypter,
-		sessionTokenVerifier:  sessionTokenVerifier,
-		sessionTokenGenerator: sessionTokenGenerator,
-		flowService:           flowService,
-		authAttemptService:    authAttemptService,
-		sessionService:        sessionService,
-		projectService:        projectService,
-		userService:           userService,
-		schemaService:         schemaService,
-		flowDefinitionService: flowDefinitionService,
-		teamService:           teamService,
+		kek:                           crypter,
+		sessionTokenVerifier:          sessionTokenVerifier,
+		sessionTokenGeneratorCreator:  sessionTokenGeneratorCreator,
+		projectSecretGeneratorCreator: projectSecretGeneratorCreator,
+		flowService:                   flowService,
+		authAttemptService:            authAttemptService,
+		sessionService:                sessionService,
+		projectService:                projectService,
+		userService:                   userService,
+		schemaService:                 schemaService,
+		flowDefinitionService:         flowDefinitionService,
+		teamService:                   teamService,
 	}
 }
 

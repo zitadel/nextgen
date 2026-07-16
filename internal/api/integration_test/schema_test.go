@@ -21,7 +21,7 @@ func TestCreateSchema(t *testing.T) {
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()
@@ -132,7 +132,7 @@ func TestCreateSchema(t *testing.T) {
 
 			client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 			require.NoError(t, err)
-			client.SetToken(project.ProjectSecret)
+			harness.SetProjectSecretOnApiClient(t, client, project)
 
 			req := api.CreateSchemaReq{
 				Type:       api.UserSchemaCreateSchemaReq,
@@ -158,7 +158,7 @@ func TestGetSchema(t *testing.T) {
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()
@@ -203,7 +203,7 @@ func TestSchemaRevisions(t *testing.T) {
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	testCases := []struct {
 		name            string

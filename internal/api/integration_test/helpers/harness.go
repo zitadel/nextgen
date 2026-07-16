@@ -21,17 +21,18 @@ type Harness struct {
 	EncryptionKey []byte
 	SigningKey    *rsa.PrivateKey
 
-	DBPool               database.Pool
-	DB                   *service.DB
-	HttpClient           *http.Client
-	TestServer           *httptest.Server
-	Hasher               *crypto.PasswapHasher
-	Crypter              crypto.Crypter
-	SecretGenerator      secrets.Generator
-	JWTGenerator         *tokengen.JWTGenerator
-	OpaqueTokenGenerator *tokengen.OpaqueTokenGenerator
-	TokenVerifier        *tokengen.AnyTokenTypeVerifier
-	JoseSigner           jose.Signer
+	DBPool                      database.Pool
+	DB                          *service.DB
+	HttpClient                  *http.Client
+	TestServer                  *httptest.Server
+	Hasher                      *crypto.PasswapHasher
+	Crypter                     crypto.Crypter
+	SecretGenerator             secrets.Generator
+	JWTGenerator                *tokengen.JWTGenerator
+	OpaqueTokenGenerator        *tokengen.OpaqueTokenGenerator
+	OpaqueTokenGeneratorCreator *tokengen.OpaqueTokenGeneratorCreator
+	TokenVerifier               *tokengen.AnyTokenTypeVerifier
+	JoseSigner                  jose.Signer
 
 	GeneratedServer *generated.Server
 	Handler         *api.Handler
@@ -46,6 +47,7 @@ type Harness struct {
 	UserService           *service.UserService
 	FlowStateMachine      *domain.FlowStateMachineRuntime
 	TeamService           *service.TeamService
+	keyService            *service.KeyService
 
 	SchemaRepo         domain.JSONSchemaRepository
 	SchemaResolver     *domain.JSONSchemaResolver

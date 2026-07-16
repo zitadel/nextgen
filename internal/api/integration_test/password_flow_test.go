@@ -67,7 +67,7 @@ func TestPasswordLoginFlow(t *testing.T) {
 	server := harness.EnsureTestServer(t)
 	client, err := helpers.NewApiClient(server.URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
@@ -136,7 +136,7 @@ func TestPasswordLoginFlow_UnknownEmail(t *testing.T) {
 	server := harness.EnsureTestServer(t)
 	client, err := helpers.NewApiClient(server.URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
@@ -187,7 +187,7 @@ func TestPasswordRegisterFlow(t *testing.T) {
 	server := harness.EnsureTestServer(t)
 	client, err := helpers.NewApiClient(server.URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
@@ -280,7 +280,7 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 	server := harness.EnsureTestServer(t)
 	client, err := helpers.NewApiClient(server.URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
