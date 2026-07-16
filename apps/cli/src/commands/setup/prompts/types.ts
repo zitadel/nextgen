@@ -1,3 +1,5 @@
+import type { SetupPreset } from "@zitadel/config/defaults";
+
 import type { FrameworkFacts } from "../../../lib/orca";
 
 /**
@@ -13,11 +15,19 @@ import type { FrameworkFacts } from "../../../lib/orca";
 export type SetupAnswers = {
   server: string;
   devPort: number;
+  /** Schema+flow bundle to scaffold; see `SETUP_PRESETS` in @zitadel/config. */
+  preset: SetupPreset;
 };
 
-/** Read-only facts a prompt may need (today only the resolved framework). */
+/** Read-only facts a prompt may need. */
 export type PromptContext = {
   readonly framework: FrameworkFacts;
+  /**
+   * The app directory setup runs in. {@link import("./server").ServerPrompt}
+   * reads the local runtime metadata (`.zitadel/local/runtime.json`) under it
+   * to detect a managed local server started here.
+   */
+  readonly cwd: string;
   /**
    * The raw `--server` flag value as the user passed it, or `undefined`
    * when not provided. Prompts use this to skip themselves when the flag
@@ -34,6 +44,12 @@ export type PromptContext = {
    * an interactive answer can't override a scripted/flagged port.
    */
   readonly devPortFromFlag?: boolean;
+  /**
+   * Whether `--preset` was passed explicitly. When set, the flag is
+   * authoritative and {@link import("./sign-in-preset").SignInPresetPrompt}
+   * skips itself.
+   */
+  readonly presetFromFlag?: boolean;
 };
 
 /**

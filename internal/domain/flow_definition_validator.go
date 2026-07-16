@@ -19,6 +19,12 @@ type PivotingTarget struct {
 	Transition string
 }
 
+// ValidateFlowDefinition is ported (rules and message strings) to
+// packages/config/src/validate.ts for CLI plan-time validation — keep
+// rule changes in sync; a drift-audit test over this file guards the
+// function names and shared literals. The sync burden is interim: the
+// validate-only bundle endpoint (zitadel/nextgen#449) supersedes the
+// port, and the TS side is deleted when it lands.
 func ValidateFlowDefinition(userSchema *jsonschema.Schema, flowDefinition FlowDefinition) ([]PivotingTarget, error) {
 	// 1. validate purpose and initial steps
 	if err := validateDefinition(flowDefinition); err != nil {
@@ -33,6 +39,12 @@ func ValidateFlowDefinition(userSchema *jsonschema.Schema, flowDefinition FlowDe
 	// 3. resolve each step's fields against the user schema.
 	resolvedByStep, err := resolveAllStepFields(userSchema, flowDefinition.Steps)
 	if err != nil {
+		return nil, err
+	}
+
+	// 3b. passkey is action-shaped, not field-shaped, so the per-field
+	// enabled-method cross-check above never sees it.
+	if err := validatePasskeyActionsEnabled(newSchemaReader(userSchema), flowDefinition.Steps); err != nil {
 		return nil, err
 	}
 
@@ -132,6 +144,39 @@ func resolveAllStepFields(schema *jsonschema.Schema, steps []FlowDefinitionStep)
 	return out, nil
 }
 
+// validatePasskeyActionsEnabled rejects any step declaring a `passkey`
+// or `passkey_register` action when the user schema's `x-auth-methods`
+// does not enable passkey — the action-shaped counterpart of the
+// enabled-method check [resolveAllStepFields] applies to the
+// `x-auth-methods#password` field. An absent keyword counts as
+// disabled, matching [xAuthMethodsReader.IsEnabled].
+//
+// Definition time is the only enforcement point, like every rule in
+// this file: a flow pins its schema revision by URL (schema edits mint
+// a new revision; repinning a flow re-validates it), so a validated
+// flow's verdict cannot change at runtime and the state machine trusts
+// it. Flows applied before this rule surface the violation on their
+// next plan/apply.
+func validatePasskeyActionsEnabled(sr schemaReader, steps []FlowDefinitionStep) error {
+	authMethods, err := sr.AuthMethods()
+	if err != nil {
+		return ErrFlowDefinitionInvalid(fmt.Sprintf("user schema: %v", err), nil)
+	}
+	if authMethods.IsEnabled("passkey") {
+		return nil
+	}
+	for _, step := range steps {
+		for _, a := range step.Actions {
+			if a.Kind == FlowActionKindPasskey || a.Kind == FlowActionKindPasskeyRegister {
+				return ErrFlowDefinitionInvalid(fmt.Sprintf(
+					`step %q: action %q offers passkey but "passkey" is not an enabled authentication method`,
+					step.Name, a.Name), nil)
+			}
+		}
+	}
+	return nil
+}
+
 // validateRequiredUserSchemaFields checks that all required fields in the
 // user schema are present in the flow definition.
 func validateRequiredUserSchemaFields(required map[string]struct{}, steps []FlowDefinitionStep) error {
@@ -191,13 +236,17 @@ func validateSteps(steps []FlowDefinitionStep) error {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
 					"step %q: duplicate action %q", step.Name, a.Name), nil)
 			}
-			if !a.Kind.IsAFlowActionKind() {
+			if a.Kind == FlowActionKindUnset || !a.Kind.IsAFlowActionKind() {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
 					"step %q: action %q has no kind", step.Name, a.Name), nil)
 			}
 			if a.Kind == FlowActionKindBack {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
 					"step %q: action %q has kind=back, which is engine-injected and cannot be declared", step.Name, a.Name), nil)
+			}
+			if a.Name == flowBackActionName {
+				return ErrFlowDefinitionInvalid(fmt.Sprintf(
+					"step %q: action name %q is reserved for engine-injected back navigation", step.Name, a.Name), nil)
 			}
 			actionNames[a.Name] = struct{}{}
 		}
@@ -425,8 +474,8 @@ func validateFlipTableCoverage(def FlowDefinition) error {
 			}
 			if _, ok := entry.Transitions[outcome]; !ok {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
-					"step %q: entry step for purpose %q must wire %q transition because %q is also a purpose",
-					entry.Name, purpose, outcome, targetPurpose), nil)
+					"step %q: entry step for purpose %q must wire %q transition because %q is also a purpose: without it, %s",
+					entry.Name, purpose, outcome, targetPurpose, flipOutcomeImpacts[outcome]), nil)
 			}
 		}
 	}
@@ -442,6 +491,15 @@ var purposeFlipTargets = map[FlowDefinitionPurpose]map[string]FlowDefinitionPurp
 	FlowDefinitionPurposeRegister: {
 		FlowImplicitOutcomeUserAlreadyExists: FlowDefinitionPurposeLogin,
 	},
+}
+
+// flipOutcomeImpacts spells out, per implicit outcome, who gets stuck
+// where when the entry step leaves it unwired — the flip-table violation
+// explains the user impact, not just the graph rule. Mirrored verbatim
+// in packages/config/src/validate.ts (drift-audited there).
+var flipOutcomeImpacts = map[string]string{
+	FlowImplicitOutcomeUserNotFound:      "someone without an account gets stuck at sign-in instead of being routed to registration",
+	FlowImplicitOutcomeUserAlreadyExists: "someone who already has an account gets stuck at registration instead of being routed to sign-in",
 }
 
 // validateOnSuccessManifests verifies that every kind in each step's

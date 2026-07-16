@@ -74,6 +74,16 @@ describe("ZitadelLogin", () => {
     expect(el!.proxyPath).toBe("/__nextgen");
   });
 
+  it("forwards locales and lang to the widget", async () => {
+    const locales = { en: { "identifier.title": "Welcome back" } };
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    await render(host, <ZitadelLogin project={project} locales={locales} lang="de" />);
+    const el = host.querySelector<ZitadelLoginElement>("zitadel-login");
+    expect(el!.locales).toEqual(locales);
+    expect(el!.lang).toBe("de");
+  });
+
   it.each(Object.entries(ZITADEL_LOGIN_EVENT_HANDLERS))(
     "forwards %s to its callback",
     async (eventName, handlerProp) => {

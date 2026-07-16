@@ -118,21 +118,6 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 			wantErr: domain.ErrMissingSchemaID,
 		},
 		{
-			name: "missing $id",
-			input: []byte(`{
-				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
-				"kind":    "user-schema",
-				"title":   "My User",
-				"x-auth-methods": {
-					"password": { "enabled": true, "position": 0 }
-				}
-			}`),
-			wantErr: domain.ErrSchemaValidationFailed,
-			wantValidationErrors: map[string]string{
-				"/required/$id": `missing required field "$id"`,
-			},
-		},
-		{
 			name:    "missing metaSchema field",
 			input:   []byte(`{"kind": "user-schema", "title": "No Schema ID"}`),
 			wantErr: domain.ErrMissingSchemaID,

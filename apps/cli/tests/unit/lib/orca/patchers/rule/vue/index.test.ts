@@ -37,7 +37,10 @@ describe("VuePatcher.plan", () => {
   it("writes the managed App.vue and merges the Vite config", () => {
     const plan = new VuePatcher().plan(ctx());
     expect(writeContents(plan, "src/App.vue")).toContain(MANAGED_MARKER);
-    const edit = plan.ops.find((op): op is Extract<FileOp, { kind: "edit" }> => op.kind === "edit");
+    const edit = plan.ops.find(
+      (op): op is Extract<FileOp, { kind: "edit" }> =>
+        op.kind === "edit" && String(op.path).includes("vite.config"),
+    );
     expect(edit?.path).toContain("vite.config.ts");
   });
 

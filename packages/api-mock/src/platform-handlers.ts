@@ -45,14 +45,20 @@ import {
   GetProjectResponse,
   GetSchemaByIdParams,
   GetSchemaByIdQueryParams,
-  GetSchemaByIdResponse,
   ListFlowDefinitionsQueryParams,
   ListFlowDefinitionsResponse,
+  ListUsersQueryParams,
   UpdateFlowDefinitionBody,
   UpdateFlowDefinitionParams,
   UpdateFlowDefinitionQueryParams,
   UpdateFlowDefinitionResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { validateFlowDefinition } from "@zitadel/config/validate";
+import {
+  DEFAULT_FLOW_SCHEMA_URI,
+  getDefaultHumanUserSchema,
+  getDefaultLoginFlow,
+} from "@zitadel/config/defaults";
 import { http, HttpResponse } from "msw";
 import type { z } from "zod";
 
@@ -137,6 +143,7 @@ function queryRecord(request: Request): Record<string, string> {
  */
 type ProjectRecord = {
   id: string;
+  name: string;
   projectSecret: string;
   previewSecret: string;
   previewOrigins: string[];
@@ -159,9 +166,22 @@ type FlowDefinitionRecord = {
   body: Record<string, unknown>;
 };
 
+/**
+ * Server-side metadata wrapped around the schema body so the mock can answer
+ * `POST /schemas` (returns id), `GET /schemas/:id` (returns body), and
+ * `GET /schemas` (list — id + createdAt, filterable by object_type).
+ */
+type SchemaRecord = {
+  id: string;
+  projectId: string;
+  objectType?: string;
+  createdAt: string;
+  body: GetSchemaById200;
+};
+
 type Store = {
   projects: Map<string, ProjectRecord>;
-  schemas: Map<string, GetSchemaById200>;
+  schemas: Map<string, SchemaRecord>;
   flowDefinitions: Map<string, FlowDefinitionRecord>;
 };
 
@@ -173,12 +193,12 @@ function makeStore(): Store {
   };
 }
 
-const DEFAULT_SCHEMA_URI =
-  "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/components/flows/flow-definition.yaml";
-
 /**
  * Build a `flow-definition-detail-response` envelope around a stored body, as
  * specified by `api/openapi/components/flows/flow-definition-detail-response.yaml`.
+ * The Go server unconditionally echoes an `audience` (empty `{}` when the
+ * stored flow has none — `internal/api/flow_definition.go`); mirror that so
+ * consumers exercise the same wire shape the live server produces.
  */
 function flowDetailResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
   return {
@@ -186,7 +206,10 @@ function flowDetailResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
     project_id: r.projectId,
     schema_uri: r.schemaUri,
     status: r.status,
-    flow_definition: r.body as unknown as GetFlowDefinition200['flow_definition'],
+    flow_definition: {
+      audience: {},
+      ...(r.body as Record<string, unknown>),
+    } as unknown as GetFlowDefinition200['flow_definition'],
     created_at: r.createdAt,
     updated_at: r.updatedAt,
   } as unknown as GetFlowDefinition200;
@@ -204,11 +227,121 @@ function flowListItemResponse(r: FlowDefinitionRecord): ListFlowDefinitions200Fl
   };
 }
 
+function defaultHumanUserSchema(): GetSchemaById200 {
+  return getDefaultHumanUserSchema() as unknown as GetSchemaById200;
+}
+
+function seedDefaultProjectResources(projectID: string, createdAt: string): void {
+  const schemaId = `sch_${shortId()}`;
+  const body = defaultHumanUserSchema();
+  store.schemas.set(schemaId, {
+    id: schemaId,
+    projectId: projectID,
+    objectType: schemaObjectType(body),
+    createdAt,
+    body,
+  });
+  const id = `flow_${shortId()}`;
+  store.flowDefinitions.set(id, {
+    id,
+    name: "default-login",
+    projectId: projectID,
+    schemaUri: DEFAULT_FLOW_SCHEMA_URI,
+    status: "active",
+    createdAt,
+    updatedAt: createdAt,
+    body: getDefaultLoginFlow({ userSchemaUrl: schemaId }) as unknown as Record<string, unknown>,
+  });
+}
+
+function schemaObjectType(body: GetSchemaById200): string | undefined {
+  const value = (body as unknown as { objectType?: unknown }).objectType;
+  return typeof value === "string" ? value : undefined;
+}
+
+function requiredProjectID(
+  request: Request,
+): { ok: true; data: string } | { ok: false; response: HttpResponse<ErrorBody> } {
+  const projectID = new URL(request.url).searchParams.get("project_id");
+  if (projectID) {
+    return { ok: true, data: projectID };
+  }
+  return {
+    ok: false,
+    response: HttpResponse.json(errorBody("invalid_query", "project_id is required"), {
+      status: 400,
+    }),
+  };
+}
+
+function schemaID(id: string): string {
+  try {
+    return decodeURIComponent(id);
+  } catch {
+    return id;
+  }
+}
+
 let store: Store = makeStore();
 
 /** Reset all in-memory state between tests. */
 export function resetPlatformStore(): void {
   store = makeStore();
+}
+
+export type PlatformStoreSnapshot = {
+  projects: number;
+  schemas: number;
+  flowDefinitions: number;
+  projectIds: string[];
+  schemaIds: string[];
+  flowDefinitionIds: string[];
+};
+
+export function snapshotPlatformStore(): PlatformStoreSnapshot {
+  return {
+    projects: store.projects.size,
+    schemas: store.schemas.size,
+    flowDefinitions: store.flowDefinitions.size,
+    projectIds: [...store.projects.keys()],
+    schemaIds: [...store.schemas.keys()],
+    flowDefinitionIds: [...store.flowDefinitions.keys()],
+  };
+}
+
+/**
+ * Mirror of the server's definition-time validation
+ * (`internal/domain/flow_definition_validator.go`, ported to
+ * `@zitadel/config/validate`): same rules, same fail-fast single-detail
+ * `flowdef.invalid` envelope. Divergence kept deliberately lenient: the
+ * schema-dependent subset runs only when the pinned `user_schema` resolves
+ * in the mock store — the real server would fail such a flow with
+ * `schema_fetch_failed`, but fixtures here may pin external URLs.
+ * Returns null when the definition is valid.
+ */
+function invalidFlowDefinitionResponse(
+  flowDefinition: Record<string, unknown>,
+): Response | null {
+  const ref = flowDefinition.user_schema;
+  const schema = typeof ref === "string" ? store.schemas.get(ref)?.body : undefined;
+  const firstError = validateFlowDefinition(
+    flowDefinition,
+    schema as object | undefined,
+  ).find((issue) => issue.severity === "error");
+  if (!firstError) {
+    return null;
+  }
+  // `details` is a bare string here — mirroring what the Go server actually
+  // emits for ErrFlowDefinitionInvalid (its Details field is `any`), which
+  // the CLI's pickDetailString handles alongside the spec's object shape.
+  return HttpResponse.json(
+    {
+      code: "flowdef.invalid",
+      message: "flow definition: invalid",
+      details: firstError.message,
+    },
+    { status: 400 },
+  );
 }
 
 export function setupPlatformHandlers() {
@@ -227,6 +360,7 @@ export function setupPlatformHandlers() {
       const createdAt = nowIso();
       const project: ProjectRecord = {
         id,
+        name: body.data.name,
         projectSecret: `sk_proj_${id.replaceAll("-", "")}_full`,
         previewSecret: `sk_proj_${id.replaceAll("-", "")}_preview`,
         previewOrigins: body.data.previewOrigins ?? [],
@@ -234,8 +368,12 @@ export function setupPlatformHandlers() {
         updatedAt: createdAt,
       };
       store.projects.set(id, project);
+      if (body.data.seedDefaults ?? true) {
+        seedDefaultProjectResources(project.id, createdAt);
+      }
       const responseBody: CreateProject201 = {
         id: project.id,
+        name: project.name,
         projectSecret: project.projectSecret,
         previewSecret: project.previewSecret,
         previewOrigins: project.previewOrigins,
@@ -256,6 +394,7 @@ export function setupPlatformHandlers() {
       }
       const responseBody: GetProject200 = {
         id: project.id,
+        name: project.name,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
       };
@@ -264,6 +403,31 @@ export function setupPlatformHandlers() {
         return out.response;
       }
       return HttpResponse.json(out.data);
+    }),
+
+    // Users exist only through real sign-ups, which the platform mock has no
+    // endpoint for — the list is always empty. That is exactly the state a
+    // freshly set-up project is in, and what `status` keys its journey-staged
+    // guidance on. Auth mirrors the real server: the project secret is the
+    // bearer and scopes the (empty) result.
+    http.get("*/users", ({ request }) => {
+      // Both spec'd query params (offset, limit) are numeric, but URLs carry
+      // strings and the generated zod does not coerce — convert before parsing.
+      const raw = Object.fromEntries(
+        Object.entries(queryRecord(request)).map(([key, value]) => [key, Number(value)]),
+      );
+      const query = parse(ListUsersQueryParams, raw, "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const token = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+      const project = [...store.projects.values()].find((p) => p.projectSecret === token);
+      if (!project) {
+        return HttpResponse.json(errorBody("unauthenticated", "missing or invalid credentials"), {
+          status: 401,
+        });
+      }
+      return HttpResponse.json([]);
     }),
 
     http.post("*/schemas", async ({ request }) => {
@@ -281,10 +445,35 @@ export function setupPlatformHandlers() {
         return body.response;
       }
 
-      const id = `schema_${shortId()}`;
-      store.schemas.set(id, body.data as unknown as GetSchemaById200);
+      const schemaBody = raw as unknown as GetSchemaById200;
+      const id = `sch_${shortId()}`;
+      store.schemas.set(id, {
+        id,
+        projectId: query.data.project_id,
+        objectType: schemaObjectType(schemaBody),
+        createdAt: nowIso(),
+        body: schemaBody,
+      });
       const responseBody: CreateSchema201 = { id };
       return HttpResponse.json(responseBody, { status: 201 });
+    }),
+
+    http.get("*/schemas", ({ request }) => {
+      const url = new URL(request.url);
+      const projectId = url.searchParams.get("project_id");
+      if (!projectId) {
+        return HttpResponse.json(errorBody("invalid_query", "project_id is required"), {
+          status: 400,
+        });
+      }
+      const objectTypeFilter = url.searchParams.get("object_type") ?? undefined;
+      const records = [...store.schemas.values()]
+        .filter((r) => r.projectId === projectId)
+        .filter((r) => !objectTypeFilter || r.objectType === objectTypeFilter)
+        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+      return HttpResponse.json(
+        records.map((r) => ({ id: r.id, createdAt: r.createdAt })),
+      );
     }),
 
     http.get("*/schemas/:id", ({ params, request }) => {
@@ -297,15 +486,13 @@ export function setupPlatformHandlers() {
         return query.response;
       }
 
-      const schema = store.schemas.get(path.data.id);
-      if (!schema) {
+      // Scoped by (project_id, id) like the real repository (GetByID takes
+      // both); a schema belonging to another project reads as absent.
+      const record = store.schemas.get(schemaID(path.data.id));
+      if (!record || record.projectId !== query.data.project_id) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
-      const out = parse(GetSchemaByIdResponse, schema, "mock_response_invalid");
-      if (!out.ok) {
-        return out.response;
-      }
-      return HttpResponse.json(out.data);
+      return HttpResponse.json(record.body);
     }),
 
     http.delete("*/schemas/:id", ({ params, request }) => {
@@ -318,10 +505,13 @@ export function setupPlatformHandlers() {
         return query.response;
       }
 
-      const existed = store.schemas.delete(path.data.id);
-      if (!existed) {
+      // Same project scoping as GET: never delete another project's schema.
+      const key = schemaID(path.data.id);
+      const record = store.schemas.get(key);
+      if (!record || record.projectId !== query.data.project_id) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
+      store.schemas.delete(key);
       return new HttpResponse(null, { status: 204 });
     }),
 
@@ -334,6 +524,12 @@ export function setupPlatformHandlers() {
       if (!body.ok) {
         return body.response;
       }
+      const invalid = invalidFlowDefinitionResponse(
+        body.data.flow_definition as Record<string, unknown>,
+      );
+      if (invalid) {
+        return invalid;
+      }
 
       const id = `flow_${shortId()}`;
       const now = nowIso();
@@ -342,7 +538,7 @@ export function setupPlatformHandlers() {
         id,
         name: flowDef.name as string,
         projectId: body.data.project_id,
-        schemaUri: body.data.schema_uri ?? DEFAULT_SCHEMA_URI,
+        schemaUri: body.data.schema_uri ?? DEFAULT_FLOW_SCHEMA_URI,
         status: "active",
         createdAt: now,
         updatedAt: now,
@@ -364,7 +560,9 @@ export function setupPlatformHandlers() {
       }
 
       const responseBody: ListFlowDefinitions200 = {
-        flow_definitions: [...store.flowDefinitions.values()].map(flowListItemResponse),
+        flow_definitions: [...store.flowDefinitions.values()]
+          .filter((record) => record.projectId === query.data.project_id)
+          .map(flowListItemResponse),
         next_page_token: null,
       };
       const out = parse(ListFlowDefinitionsResponse, responseBody, "mock_response_invalid");
@@ -374,14 +572,18 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data);
     }),
 
-    http.get("*/flow_definitions/:id", ({ params }) => {
+    http.get("*/flow_definitions/:id", ({ params, request }) => {
       const path = parse(GetFlowDefinitionParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
       }
+      const query = requiredProjectID(request);
+      if (!query.ok) {
+        return query.response;
+      }
 
       const record = store.flowDefinitions.get(path.data.id);
-      if (!record) {
+      if (!record || record.projectId !== query.data) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
       const responseBody: GetFlowDefinition200 = flowDetailResponse(record);
@@ -407,7 +609,7 @@ export function setupPlatformHandlers() {
       }
 
       const record = store.flowDefinitions.get(path.data.id);
-      if (!record) {
+      if (!record || record.projectId !== query.data.project_id) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
       const raw = await readJson(request);
@@ -418,8 +620,19 @@ export function setupPlatformHandlers() {
       if (!body.ok) {
         return body.response;
       }
+      const invalid = invalidFlowDefinitionResponse(
+        body.data.flow_definition as unknown as Record<string, unknown>,
+      );
+      if (invalid) {
+        return invalid;
+      }
 
-      record.body = { ...record.body, ...(body.data as unknown as Record<string, unknown>) };
+      const flowDefinition = body.data.flow_definition as unknown as Record<string, unknown>;
+      record.body = flowDefinition;
+      record.name = typeof flowDefinition.name === "string" ? flowDefinition.name : record.name;
+      record.schemaUri = body.data.schema_uri ?? record.schemaUri;
+      record.status =
+        typeof flowDefinition.status === "string" ? flowDefinition.status : record.status;
       record.updatedAt = nowIso();
       const responseBody: UpdateFlowDefinition200 = flowDetailResponse(record);
       const out = parse(UpdateFlowDefinitionResponse, responseBody, "mock_response_invalid");
@@ -429,12 +642,20 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data, { status: 200 });
     }),
 
-    http.delete("*/flow_definitions/:id", ({ params }) => {
+    http.delete("*/flow_definitions/:id", ({ params, request }) => {
       const path = parse(DeleteFlowDefinitionParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
       }
+      const query = requiredProjectID(request);
+      if (!query.ok) {
+        return query.response;
+      }
 
+      const record = store.flowDefinitions.get(path.data.id);
+      if (!record || record.projectId !== query.data) {
+        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
+      }
       const existed = store.flowDefinitions.delete(path.data.id);
       if (!existed) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });

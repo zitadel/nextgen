@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/server-linux-arm64",
-  "version": "0.1.0-alpha.13",
+  "version": "0.1.0-alpha.17",
   "description": "Linux arm64 Zitadel server binary.",
   "homepage": "https://github.com/zitadel/nextgen#readme",
   "bugs": {

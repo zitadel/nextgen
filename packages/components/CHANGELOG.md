@@ -1,5 +1,128 @@
 # @zitadel/components
 
+## 0.1.0-alpha.17
+
+### Patch Changes
+
+- [#544](https://github.com/zitadel/nextgen/pull/544) [`79d4179`](https://github.com/zitadel/nextgen/commit/79d417924518c9ea272136db1f46aaf237497999) Thanks [@fforootd](https://github.com/fforootd)! - Fixes from alpha.16 community feedback:
+  - Custom schema fields now render a readable label. A property with no
+    catalog entry (e.g. `department`, `dateOfBirth`) falls back to a
+    humanised name ("Department", "Date of birth") on the form instead of
+    leaking the raw `<step>.field.<name>` text key. A catalogued key still
+    wins, so localised labels are unaffected.
+  - The scaffolded `.zitadel/flows/README.md` no longer contains the
+    "Presets" section twice.
+  - The `warn/default-flow-swap` plan warning now leads with the impact in
+    plain language: the new flow becomes the default for its purposes, and
+    every page that does not explicitly set `flow-name` on
+    `<zitadel-login>` will start rendering it — scope it via `audience`
+    or pin `flow-name` to opt out.
+  - The flip-table validation error (login/register entry step missing its
+    `user_not_found`/`user_already_exists` transition) now explains who
+    gets stuck where: someone without an account would be stuck at
+    sign-in instead of being routed to registration, and vice versa. Plan,
+    apply, and the server report the same wording.
+
+- [#525](https://github.com/zitadel/nextgen/pull/525) [`363482e`](https://github.com/zitadel/nextgen/commit/363482e27c88ac96c9a2b48c880e5caa5a4dcf65) Thanks [@fforootd](https://github.com/fforootd)! - Every engine-emitted step error is now a localizable `error.*` catalog
+  key — no `auth_attempt.*` literals leak into the login UI anymore.
+  Rejected passkey proofs emit `error.passkey_invalid` (assertion) and
+  `error.passkey_registration_invalid` (attestation), translated in every
+  builtin locale; rejected password submissions emit the existing
+  `error.invalid_credentials`, which the login component routes inline to
+  the password field. The `step.error` contract docs now describe the
+  `error.*` catalog plus verbatim outcome tokens (e.g. `user_not_found`)
+  instead of citing `auth_attempt.*` diagnostics.
+
+- [#543](https://github.com/zitadel/nextgen/pull/543) [`a0b39a1`](https://github.com/zitadel/nextgen/commit/a0b39a119408a6fa02e8e1e45ebd5dd14b96c01b) Thanks [@fforootd](https://github.com/fforootd)! - Automation hooks for auth-method credential fields are now method-named,
+  matching what the docs have always promised: a flow field named
+  `x-auth-methods#password` renders `data-testid="zitadel-field-password"`
+  and `zitadel-input-password` instead of leaking the raw field name into
+  the hooks. The `name` attribute (the wire/form key) is unchanged.
+  Scripts that targeted the raw `zitadel-field-x-auth-methods#password`
+  form must switch to the documented method-named hooks.
+
+## 0.1.0-alpha.16
+
+### Patch Changes
+
+- [#495](https://github.com/zitadel/nextgen/pull/495) [`e4d55d2`](https://github.com/zitadel/nextgen/commit/e4d55d22c64d28a19597718417af6447a66a5852) Thanks [@fforootd](https://github.com/fforootd)! - Fix the duplicate "Continue with passkey" button: flow responses no longer embed a stale copy of the default login template. The login widget renders the up-to-date template bundled with `@zitadel/components`, which also brings checkbox/select field rendering and the empty-subtitle guard to real flows. A tenant-provided `branding.liquid_template` still takes precedence.
+
+- [#524](https://github.com/zitadel/nextgen/pull/524) [`e73d55f`](https://github.com/zitadel/nextgen/commit/e73d55f57e86db53464ac112f8a362a3da327a19) Thanks [@fforootd](https://github.com/fforootd)! - Flow field validation errors now travel as localisation keys instead of
+  developer strings: `step.error` carries `error.<field>_<rule>` per violation
+  ("; "-joined, format spelled `_invalid` to match the catalog), and the login
+  components localise them — catalog-known keys render inline on their field,
+  unknown fields resolve through new generic `error.field_<rule>` fallbacks
+  interpolated with the step's field label (en/de/it). A key routed inline whose
+  field is not on the step downgrades to a visible banner message instead of
+  disappearing. Users see "Please enter a valid email" instead of
+  "flow field email: format".
+
+- [#514](https://github.com/zitadel/nextgen/pull/514) [`1eec59e`](https://github.com/zitadel/nextgen/commit/1eec59ee924cc2b12df11f5541d6a2eef8caa6c2) Thanks [@fforootd](https://github.com/fforootd)! - Select a flow definition by name. `<zitadel-login>` gains a `flow-name`
+  attribute (`flowName` prop on every framework wrapper) that sends
+  `flow_definition_name` on flow start, so a project with several synced
+  flows can run a specific one instead of the audience-resolved default.
+  An unknown name or a purpose mismatch surfaces as a clear startup error
+  naming the attribute. Audience selection itself is now honored and
+  deterministic: hinted app beats hinted team beats the newest unscoped
+  flow, and a flow scoped to an app/team no longer captures the project
+  default. The flows README and plan/apply docs explain how to add and
+  select a second flow.
+
+  Because newest-unscoped-wins means a new flow can silently take over the
+  default login, `plan` warns on any create of an active, unscoped flow in
+  a project that already has flows (`warn/default-flow-swap`, a
+  non-blocking `# warning:` line and a `--json` warnings entry) — scope
+  the flow via `audience` or pin `flow-name` in the widget to opt out.
+  The offline dialect gains the committed `auth-methods`/`auth-method`
+  meta-schema copies that `user-schema.json` references, so editors
+  resolve the full dialect without network access.
+
+- [#496](https://github.com/zitadel/nextgen/pull/496) [`754c7f6`](https://github.com/zitadel/nextgen/commit/754c7f6d8b970438a5ffa2c5c57ef72a2b5ed657) Thanks [@fforootd](https://github.com/fforootd)! - Custom flow steps no longer render a raw `<step>.action.back` key on the back
+  button: the `| t` filter now falls back to a generic `action.back` entry
+  (shipped in en/de/it) when a step-specific key is missing. Step-specific keys
+  still win when defined.
+
+- [#497](https://github.com/zitadel/nextgen/pull/497) [`e9593cd`](https://github.com/zitadel/nextgen/commit/e9593cd4f74f5ebc010150a2ed8a3ae03b7d5d87) Thanks [@fforootd](https://github.com/fforootd)! - The passkey origin-allowlist rejection now names the allowed origins (e.g. `origin "http://127.0.0.1:3000" is not allowed for this project (allowed: http://localhost:3000)`), and `<zitadel-login>` surfaces the server's error message instead of a generic "returned 400". `@zitadel/api` exports the new `apiErrorMessage` helper for extracting the server error envelope from an `ApiError`.
+
+- [#524](https://github.com/zitadel/nextgen/pull/524) [`e73d55f`](https://github.com/zitadel/nextgen/commit/e73d55f57e86db53464ac112f8a362a3da327a19) Thanks [@fforootd](https://github.com/fforootd)! - The login form now shows a "Waiting for your passkey…" status with a Cancel
+  button while a WebAuthn ceremony is in flight; cancelling aborts the ceremony
+  and returns to the step with the fallback actions usable. Ceremony timeouts get
+  their own copy (`error.passkey_timeout`) instead of reading as cancellations,
+  and the cancelled copy no longer says "setup" for login ceremonies.
+  `<zl-passkey>` emits a new `zl-passkey-started` event and accepts
+  `pending-label`, `cancel-label`, and `silent` attributes. Step error banners
+  are dismissible and clear as soon as the user edits a field (the edited
+  field's inline error clears too); errors reappear only if the server
+  re-reports them.
+
+- [#500](https://github.com/zitadel/nextgen/pull/500) [`69b6b6a`](https://github.com/zitadel/nextgen/commit/69b6b6a0fa934cbbd81deba46192b3b1346612a8) Thanks [@fforootd](https://github.com/fforootd)! - `zitadel setup` now asks "How should users sign in?" and scaffolds the
+  matching schema+flow preset: `password-first` (today's default) or
+  `passkey-first` (a one-tap passkey on the login entry step with an
+  email → password fallback path, passkey-primary registration, and email
+  kept required so the fallback always works). Non-interactive and scripted
+  runs use `--preset`; the choice is recorded in `zitadel.json`. Presets are
+  named bundles under `@zitadel/config` (the mechanism behind app-type
+  selection, [#448](https://github.com/zitadel/nextgen/issues/448)) and are hygiene-tested: every bundle must pass the flow
+  validator and resolve every text key in every builtin locale.
+
+## 0.1.0-alpha.15
+
+### Patch Changes
+
+- [#486](https://github.com/zitadel/nextgen/pull/486) [`f45d47c`](https://github.com/zitadel/nextgen/commit/f45d47c5850edc83a55b5ad7364a59ffac4fd37c) Thanks [@fforootd](https://github.com/fforootd)! - Fix the default login template rendering two passkey buttons when the flow marks the passkey action as primary.
+
+## 0.1.0-alpha.14
+
+### Minor Changes
+
+- [#443](https://github.com/zitadel/nextgen/pull/443) [`ea193dc`](https://github.com/zitadel/nextgen/commit/ea193dc0fabdf3c49fa9c3e3bae4cf242001d630) Thanks [@bastionstack](https://github.com/bastionstack)! - Add a post-sign-in `<zitadel-session>` "signed in as" card: a dedicated element exposed through every SPA SDK and re-exported from sdk-next. CLI scaffolds now render it as the post-sign-in `/profile` page (with a Logout action) across all frameworks. Identity is read from `GET /sessions/me`, preferring `name` then `email` then `user_id`.
+
+  `<zitadel-logout>` now sources its identity from the same `getMySession` operation instead of the `__nextgen_display` cookie, so both signed-in surfaces work against the real backend. Both components route their `getMySession`/`revokeMySession` calls through the shared `api-client` wrappers that enforce `credentials: "include"`.
+
+### Patch Changes
+
+- [#453](https://github.com/zitadel/nextgen/pull/453) [`54dcc87`](https://github.com/zitadel/nextgen/commit/54dcc87084dd2d2b8314d08221354683bae64c6b) Thanks [@vitorbari](https://github.com/vitorbari)! - Add back navigation to interactive flows. The engine injects a `back` action on rendered step responses when there's a step to return to, and clears the back stack past irreversible mutations (user creation, passkey registration) and at flow termination.
+
 ## 0.1.0-alpha.13
 
 ### Patch Changes
