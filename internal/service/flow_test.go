@@ -44,6 +44,10 @@ func (s testAllStatements) GetProjectByID(ctx context.Context, id string) (*doma
 	return nil, nil
 }
 
+func (testAllStatements) UpdateProject(context.Context, *domain.Project) error {
+	panic("unexpected call to UpdateProject")
+}
+
 func (testAllStatements) ListProjects(context.Context, *v2database.ListOptions[domain.ProjectField]) (*v2database.ListResult[*domain.Project], error) {
 	panic("unexpected call to ListProjects")
 }
