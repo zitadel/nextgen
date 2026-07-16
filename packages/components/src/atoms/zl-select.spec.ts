@@ -179,4 +179,23 @@ describe("<zl-select> markup", () => {
     // willUpdate forces a disabled select closed.
     expect(el.open).toBe(false);
   });
+
+  it("shows an inline error, marks the control invalid, and wires aria-describedby", async () => {
+    const el = await mount({ name: "country" });
+    let error = el.shadowRoot?.querySelector(".zr-select__error");
+    // No error → the message node is hidden and the control is valid.
+    expect(error?.hasAttribute("hidden")).toBe(true);
+    expect(native(el).getAttribute("aria-invalid")).toBe("false");
+
+    el.error = "Country is required.";
+    await el.updateComplete;
+    error = el.shadowRoot?.querySelector(".zr-select__error");
+    expect(error?.hasAttribute("hidden")).toBe(false);
+    expect(error?.textContent?.trim()).toBe("Country is required.");
+    expect(el.shadowRoot?.querySelector(".zr-select")?.classList.contains("zr-select--invalid")).toBe(
+      true,
+    );
+    expect(native(el).getAttribute("aria-invalid")).toBe("true");
+    expect(native(el).getAttribute("aria-describedby")).toBe(error?.id);
+  });
 });

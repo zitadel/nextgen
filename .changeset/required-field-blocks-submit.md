@@ -21,3 +21,13 @@ seen) and, when one is empty, surfaces the error through the server's own
 inline/banner routing, so the client-side required message is styled and
 localised exactly like a backend rejection — no native browser validation
 bubble.
+
+Field errors now render inline under every control type, not just email and
+password. `<zl-select>` and `<zl-checkbox>` gained an `error`/`invalid`
+contract mirroring `<zl-field>` (with React `Select`/`Checkbox` parity), and the
+error router tags each localised error with the field it targets: a
+`error.<field>_<rule>` error whose field the step renders now shows inline on
+that control instead of in the form-level banner. Errors with no field (engine
+errors) or whose field the step omits still fall back to the banner. Selected
+dropdown values and checkbox states also survive an error re-render, so a
+validation failure no longer resets them.

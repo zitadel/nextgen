@@ -148,6 +148,19 @@
   color: var(--zl-color-text-disabled, #686883);
 }
 
+/* Invalid — red edge, matching the text field's error box. Holds on focus too. */
+.zr-select--invalid .zr-select__trigger,
+.zr-select--invalid .zr-select__field:focus-within .zr-select__trigger {
+  border-color: var(--zl-color-text-error, #ea4f70);
+}
+
+/* Inline error message under the field (mirrors .zr-field__error). */
+.zr-select__error {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--zl-color-text-error, #ea4f70);
+}
+
 .zr-select__listbox {
   position: absolute;
   top: calc(100% + var(--zl-spacing-02, 0.5rem));

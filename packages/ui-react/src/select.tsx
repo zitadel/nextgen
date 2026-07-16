@@ -45,6 +45,10 @@ export interface SelectProps {
   placeholder?: string;
   name?: string;
   required?: boolean;
+  /** Inline validation message shown under the control (empty = none). */
+  error?: ReactNode;
+  /** Force the invalid (red-edge) treatment without an `error` string. */
+  invalid?: boolean;
   disabled?: boolean;
   className?: string;
   "aria-label"?: string;
@@ -62,6 +66,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
     placeholder = "Select…",
     name,
     required = false,
+    error,
+    invalid = false,
     disabled = false,
     className,
     "aria-label": ariaLabel,
@@ -72,6 +78,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
 ) {
   const baseId = useId();
   const labelId = `${baseId}-label`;
+  const errorId = `${baseId}-error`;
+  const showError = Boolean(error);
   const rootRef = useRef<HTMLDivElement>(null);
   const internalNativeRef = useRef<HTMLSelectElement | null>(null);
 
@@ -122,6 +130,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
       className={cx(
         "zr-select",
         open && "zr-select--open",
+        (invalid || showError) && "zr-select--invalid",
         disabled && "zr-select--disabled",
         className,
       )}
@@ -149,6 +158,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
           name={name}
           aria-labelledby={label !== undefined ? labelId : undefined}
           aria-label={label !== undefined ? undefined : ariaLabel}
+          aria-invalid={invalid || showError ? "true" : "false"}
+          aria-describedby={showError ? errorId : undefined}
           data-testid={name ? `zitadel-select-${name}` : testId ? `${testId}-native` : undefined}
           disabled={disabled}
           required={required}
@@ -195,6 +206,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
             </li>
           ))}
         </ul>
+      </div>
+      <div className="zr-select__error" id={errorId} role="alert" hidden={!showError}>
+        {error}
       </div>
     </div>
   );

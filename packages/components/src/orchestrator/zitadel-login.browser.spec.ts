@@ -387,8 +387,8 @@ describe("<zitadel-login> form + focus (chromium)", () => {
   // like a required <zl-field>. The submit-type <zl-button> delegates to
   // form.requestSubmit() (no parallel `zl-submit`), and the orchestrator
   // blocks the empty required field, surfacing a styled, localised error
-  // through the server's own `error.<field>_required` dialect — not a native
-  // browser bubble.
+  // inline on the control through the server's own `error.<field>_required`
+  // dialect — not a native browser bubble and not a form-level banner.
   const registerSelectStep: CreateFlow201 = {
     id: "flow_1",
     session_id: "sess_1",
@@ -422,7 +422,7 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     return element;
   }
 
-  it("blocks submit and shows a styled required error when a select is empty", async () => {
+  it("blocks submit and shows a styled required error inline on the select", async () => {
     const element = await mountRegisterSelect();
     const root = element.shadowRoot!;
     const submit = root.querySelector('zl-button[action="submit"]') as HTMLElement & {
@@ -435,10 +435,15 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     // Only the initial flow-create call happened; the submit was blocked by
     // the client-side required check on the empty select.
     expect(stub.calls).toHaveLength(1);
-    // The error is surfaced through our own <zl-alert>, localised via the
-    // `error.field_required` fallback — not a native browser validation bubble.
-    const alert = await waitFor(() => root.querySelector("zl-alert[severity='error']"));
-    expect(alert?.textContent ?? "").toContain("required");
+    // The error routes inline onto the select (localised via the
+    // `error.field_required` fallback), not a form-level <zl-alert> banner and
+    // not a native browser validation bubble.
+    const select = await waitFor(() => {
+      const el = root.querySelector('zl-select[name="favoriteColor"]');
+      return el?.getAttribute("error") ? el : null;
+    });
+    expect(select?.getAttribute("error") ?? "").toContain("required");
+    expect(root.querySelector("zl-alert[severity='error']")).toBeNull();
   });
 
   it("submits once a required select has a chosen value", async () => {

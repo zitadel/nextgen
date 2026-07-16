@@ -949,7 +949,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(element.shadowRoot?.textContent).not.toContain("error.email_invalid");
   });
 
-  it("splits '; '-joined violation keys into an inline error plus a generic banner", async () => {
+  it("splits '; '-joined violation keys into one inline error per rendered field", async () => {
     const element = await mount(host);
 
     server.use(
@@ -984,16 +984,18 @@ describe("<zitadel-login> against the typed Flow API", () => {
       new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
     );
 
-    // Email violation → inline (catalog-known error.email_invalid key);
-    // error.password_min_length has no catalog entry → localised generic
-    // banner with the step's field label.
-    const alert = await waitFor(() => {
-      const candidate = element.shadowRoot?.querySelector("zl-alert");
-      return candidate?.textContent?.includes("Password is too short.") ? candidate : null;
+    // Both fields are rendered, so both violations route inline to their
+    // control: email via the catalog-known `error.email_invalid` key, password
+    // via the localised generic fallback for `error.password_min_length`. No
+    // form-level banner renders.
+    const password = await waitFor(() => {
+      const candidate = element.shadowRoot?.querySelector('zl-field[name="password"][invalid]');
+      return candidate?.getAttribute("error") ? candidate : null;
     });
-    expect(alert).toBeTruthy();
-    const field = element.shadowRoot?.querySelector('zl-field[name="email"][invalid]');
-    expect(field?.getAttribute("error")).toBe("Please enter a valid email");
+    expect(password.getAttribute("error")).toBe("Password is too short.");
+    const email = element.shadowRoot?.querySelector('zl-field[name="email"][invalid]');
+    expect(email?.getAttribute("error")).toBe("Please enter a valid email");
+    expect(element.shadowRoot?.querySelector("zl-alert")).toBeNull();
   });
 
   it("surfaces an inline-routed key as a banner when the step lacks its field", async () => {

@@ -98,6 +98,15 @@ export class ZlSelect extends LitElement {
   })
   accessor options: ZlSelectOption[] = [];
   @property({ type: Boolean }) accessor required = false;
+  /**
+   * Inline validation message shown under the control (empty = none). Set by
+   * the orchestrator's template when the flow re-renders with a field error;
+   * display-only — submission gating lives in `<zitadel-login>`, mirroring
+   * `<zl-field>`'s `error` contract so the router treats every field type the
+   * same way.
+   */
+  @property() accessor error = "";
+  @property({ type: Boolean, reflect: true }) accessor invalid = false;
   @property({ type: Boolean, reflect: true }) accessor disabled = false;
   @property({ type: Boolean, reflect: true }) accessor open = false;
   @property({ attribute: "aria-label" }) accessor ariaLabelText: string | undefined = undefined;
@@ -179,11 +188,14 @@ export class ZlSelect extends LitElement {
 
   override render() {
     const labelId = `${this.baseId}-label`;
+    const errorId = `${this.baseId}-error`;
+    const showError = Boolean(this.error);
     const selected =
       this.value === "" ? undefined : this.options.find((option) => option.value === this.value);
     const rootClass = classMap({
       "zr-select": true,
       "zr-select--open": this.open,
+      "zr-select--invalid": this.invalid || showError,
       "zr-select--disabled": this.disabled,
     });
 
@@ -198,6 +210,8 @@ export class ZlSelect extends LitElement {
             data-testid=${ifDefined(this.nativeTestId())}
             aria-labelledby=${this.label ? labelId : nothing}
             aria-label=${ifDefined(this.label ? undefined : this.ariaLabelText)}
+            aria-invalid=${this.invalid || showError ? "true" : "false"}
+            aria-describedby=${showError ? errorId : nothing}
             ?disabled=${this.disabled}
             ?required=${this.required}
             @change=${this.handleNativeChange}
@@ -230,6 +244,15 @@ export class ZlSelect extends LitElement {
           <ul class="zr-select__listbox" part="listbox" aria-hidden="true" ?hidden=${!this.open}>
             ${this.listOptions.map((option) => this.renderOption(option))}
           </ul>
+        </div>
+        <div
+          class="zr-select__error"
+          part="error"
+          id=${errorId}
+          role="alert"
+          ?hidden=${!showError}
+        >
+          ${this.error}
         </div>
       </div>
     `;
@@ -361,12 +384,14 @@ export const zlSelectManifest: AtomManifest = {
     "placeholder",
     "options",
     "required",
+    "error",
+    "invalid",
     "disabled",
     "open",
     "aria-label",
     "data-testid",
   ],
-  parts: ["root", "label", "field", "native", "trigger", "listbox", "option"],
+  parts: ["root", "label", "field", "native", "trigger", "listbox", "option", "error"],
   slots: [],
   events: ["zl-change"],
 } as const;

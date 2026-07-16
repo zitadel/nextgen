@@ -730,10 +730,24 @@ export class ZitadelLogin extends LitElement {
     emit(this, "zitadel-flow-input", { name, value });
   };
 
-  /** `zl-change` from <zl-checkbox>/<zl-select>: only error clearing. */
+  /**
+   * `zl-change` from <zl-checkbox>/<zl-select>. Persist the atom's value into
+   * `formValues` — mirroring `handleAtomInput` for text fields — so a later
+   * step re-render (a validation error re-parses the template via `unsafeHTML`
+   * and rebuilds the atoms) restores the selection/checked state through
+   * `applyValuesToFields` instead of dropping back to the template default.
+   * Reads the live `formValue` off the atom rather than the event's `value`
+   * token, because an unchecked checkbox reports "" there but keeps its token
+   * in the detail. Also clears stale errors on the edited field.
+   */
   private handleAtomEdited = (event: CustomEvent<{ name?: string }>): void => {
     const name = event.detail?.name;
-    if (name) this.clearStaleErrors(name);
+    if (!name) return;
+    const atom = event.target;
+    if (atom instanceof HTMLElement && isFieldAtom(atom)) {
+      this.formValues = { ...this.formValues, [name]: atom.formValue };
+    }
+    this.clearStaleErrors(name);
   };
 
   /** Explicit dismiss of the step-error alert (it removes itself). */
