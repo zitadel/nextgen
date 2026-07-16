@@ -375,7 +375,10 @@ func TestGetMyUser(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		sessionToken, err := session.Token(harness.EnsureOpaqueTokenGenerator(t))
+		keyService := harness.EnsureKeyService(t)
+		projectDEK, err := keyService.GetProjectDEKCrypter(t.Context(), service.GetProjectDEKInput{ProjectID: project.ID})
+		require.NoError(t, err)
+		sessionToken, err := session.Token(projectDEK)
 		require.NoError(t, err)
 
 		// GET USER USING TOKEN

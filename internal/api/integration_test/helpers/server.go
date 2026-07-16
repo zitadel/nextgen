@@ -38,9 +38,6 @@ func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 	if h.Handler == nil {
 		h.Handler = api.NewHandler(
 			h.EnsureCrypter(t),
-			h.EnsureOpaqueTokenGenerator(t),
-			h.EnsureOpaqueTokenGeneratorCreator(t),
-			h.EnsureOpaqueTokenGeneratorCreator(t),
 			h.EnsureFlowService(t),
 			h.EnsureAuthAttemptService(t),
 			h.EnsureSessionService(t),
@@ -49,6 +46,8 @@ func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 			h.EnsureSchemaService(t),
 			h.EnsureFlowDefinitionService(t),
 			h.EnsureTeamService(t),
+			h.EnsureTokenService(t),
+			h.EnsureKeyService(t),
 		)
 	}
 	return h.Handler
@@ -58,7 +57,7 @@ func (h *Harness) EnsureSecurityHandler(t *testing.T) *api.SecurityHandler {
 	t.Helper()
 	if h.SecurityHandler == nil {
 		h.SecurityHandler = api.NewSecurityHandler(
-			h.EnsureAnyTokenVerifier(t),
+			h.EnsureTokenService(t),
 		)
 	}
 	return h.SecurityHandler

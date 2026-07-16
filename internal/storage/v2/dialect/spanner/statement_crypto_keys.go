@@ -5,23 +5,24 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain/crypto"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 type cryptoKeyStatements struct{ statement }
 
-// CreateDEK implements [service.CryptoKeyStatements].
-func (s cryptoKeyStatements) CreateDEK(ctx context.Context, dek *crypto.DEK) error {
-	panic("unimplemented")
+// CreateEncryptionKey implements [service.CryptoKeyStatements].
+func (s cryptoKeyStatements) CreateEncryptionKey(ctx context.Context, dek *crypto.EncryptionKey) error {
+	panic("not implemented")
 }
 
-// UpdateDEK implements [service.CryptoKeyStatements].
-func (s cryptoKeyStatements) UpdateDEK(ctx context.Context, dek *crypto.DEK) error {
-	panic("unimplemented")
+// UpdateEncryptionKey implements [service.CryptoKeyStatements].
+func (s cryptoKeyStatements) UpdateEncryptionKey(ctx context.Context, dek *crypto.EncryptionKey) error {
+	panic("not implemented")
 }
 
-// GetActiveDEK implements [service.CryptoKeyStatements].
-func (s cryptoKeyStatements) GetActiveDEK(ctx context.Context, projectID string) (*crypto.DEK, error) {
-	panic("unimplemented")
+// GetEncryptionKey implements [service.CryptoKeyStatements].
+func (s cryptoKeyStatements) GetEncryptionKey(ctx context.Context, filter database.Filter[crypto.EncryptionKeyField]) (*crypto.EncryptionKey, error) {
+	panic("not implemented")
 }
 
 // IsStatements implements [service.CryptoKeyStatements].

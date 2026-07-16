@@ -9,10 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-jose/go-jose/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain/crypto"
 	legacydb "github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // This is a storage-level test for the v2 postgres crypto-key (DEK) statements.
@@ -38,13 +40,14 @@ func testKey() []byte {
 }
 
 // newTestDEK builds a persistable DEK in the given state referencing projectID.
-func newTestDEK(id, projectID string, state crypto.KeyState) *crypto.DEK {
-	return &crypto.DEK{
+func newTestDEK(id, projectID string, state crypto.KeyState) *crypto.EncryptionKey {
+	return &crypto.EncryptionKey{
 		Id:        id,
 		ProjectID: projectID,
 		Key:       testKey(),
-		Algorithm: crypto.DEKAlgorithmAESGCM,
+		Algorithm: jose.A256GCM,
 		State:     state,
+		Purpose:   crypto.EncryptionKeyPurposeDEK,
 	}
 }
 
@@ -57,21 +60,25 @@ func withProject(t *testing.T) string {
 	return project.ID
 }
 
-func TestCryptoKeyStatements_CreateDEK(t *testing.T) {
+func TestCryptoKeyStatements_CreateEncryptionKey(t *testing.T) {
+	t.Parallel()
+
 	t.Run("creates dek and created_at is set", func(t *testing.T) {
+		t.Parallel()
+
 		projectID := withProject(t)
 		dek := newTestDEK(uniqueDEKID(t), projectID, crypto.KeyStateActive)
 
-		require.NoError(t, testPool.CreateDEK(t.Context(), dek))
+		require.NoError(t, testPool.CreateEncryptionKey(t.Context(), dek))
 		assert.False(t, dek.CreatedAt.IsZero())
 		assert.WithinDuration(t, time.Now(), dek.CreatedAt, 5*time.Second)
 
-		stored, err := testPool.GetActiveDEK(t.Context(), projectID)
+		stored, err := testPool.GetEncryptionKey(t.Context(), database.Equal(database.Col(crypto.EncryptionKeyFieldProjectID), projectID))
 		require.NoError(t, err)
 		assert.Equal(t, dek.Id, stored.Id)
 		assert.Equal(t, projectID, stored.ProjectID)
 		assert.Equal(t, testKey(), stored.Key)
-		assert.Equal(t, crypto.DEKAlgorithmAESGCM, stored.Algorithm)
+		assert.Equal(t, jose.A256GCM, stored.Algorithm)
 		assert.EqualValues(t, crypto.KeyStateActive, stored.State)
 		assert.False(t, stored.CreatedAt.IsZero())
 		assert.Nil(t, stored.ActivatedAt)
@@ -79,81 +86,111 @@ func TestCryptoKeyStatements_CreateDEK(t *testing.T) {
 	})
 
 	t.Run("duplicate ID returns error", func(t *testing.T) {
+		t.Parallel()
+
 		projectID := withProject(t)
 		dek := newTestDEK(uniqueDEKID(t), projectID, crypto.KeyStateActive)
-		require.NoError(t, testPool.CreateDEK(t.Context(), dek))
+		require.NoError(t, testPool.CreateEncryptionKey(t.Context(), dek))
 
-		err := testPool.CreateDEK(t.Context(), newTestDEK(dek.Id, projectID, crypto.KeyStateActive))
+		err := testPool.CreateEncryptionKey(t.Context(), newTestDEK(dek.Id, projectID, crypto.KeyStateActive))
 		assert.Error(t, err)
 	})
 
 	t.Run("unknown project returns error", func(t *testing.T) {
+		t.Parallel()
+
 		dek := newTestDEK(uniqueDEKID(t), uniqueProjectID(t), crypto.KeyStateActive)
-		err := testPool.CreateDEK(t.Context(), dek)
+		err := testPool.CreateEncryptionKey(t.Context(), dek)
 		assert.Error(t, err)
 	})
 
 	t.Run("second active dek for the same project is rejected", func(t *testing.T) {
+		t.Parallel()
+
 		projectID := withProject(t)
-		require.NoError(t, testPool.CreateDEK(t.Context(), newTestDEK(uniqueDEKID(t)+"-a", projectID, crypto.KeyStateActive)))
+		require.NoError(t, testPool.CreateEncryptionKey(t.Context(), newTestDEK(uniqueDEKID(t)+"-a", projectID, crypto.KeyStateActive)))
 
 		// The partial unique index permits only one active DEK per project.
-		err := testPool.CreateDEK(t.Context(), newTestDEK(uniqueDEKID(t)+"-b", projectID, crypto.KeyStateActive))
+		err := testPool.CreateEncryptionKey(t.Context(), newTestDEK(uniqueDEKID(t)+"-b", projectID, crypto.KeyStateActive))
 		assert.Error(t, err)
 	})
 }
 
-func TestCryptoKeyStatements_GetActiveDEK(t *testing.T) {
-	t.Run("returns only the active dek", func(t *testing.T) {
+func TestCryptoKeyStatements_GetEncryptionKey(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns only filtered result", func(t *testing.T) {
+		t.Parallel()
+
 		projectID := withProject(t)
 
 		expired := newTestDEK(uniqueDEKID(t)+"-old", projectID, crypto.KeyStateExpired)
-		require.NoError(t, testPool.CreateDEK(t.Context(), expired))
+		require.NoError(t, testPool.CreateEncryptionKey(t.Context(), expired))
 		active := newTestDEK(uniqueDEKID(t)+"-new", projectID, crypto.KeyStateActive)
-		require.NoError(t, testPool.CreateDEK(t.Context(), active))
+		require.NoError(t, testPool.CreateEncryptionKey(t.Context(), active))
 
-		stored, err := testPool.GetActiveDEK(t.Context(), projectID)
+		stored, err := testPool.GetEncryptionKey(t.Context(),
+			database.And(
+				database.Equal(database.Col(crypto.EncryptionKeyFieldProjectID), projectID),
+				database.Equal(database.Col(crypto.EncryptionKeyFieldState), crypto.KeyStateActive),
+			))
 		require.NoError(t, err)
 		assert.Equal(t, active.Id, stored.Id)
 		assert.EqualValues(t, crypto.KeyStateActive, stored.State)
 	})
 
-	t.Run("no active dek returns NoRowFoundError", func(t *testing.T) {
+	t.Run("no results return no row found error", func(t *testing.T) {
+		t.Parallel()
+
 		projectID := withProject(t)
 		// Only a not-yet-active key exists.
-		require.NoError(t, testPool.CreateDEK(t.Context(), newTestDEK(uniqueDEKID(t), projectID, crypto.KeyStateNotActiveYet)))
+		require.NoError(t, testPool.CreateEncryptionKey(t.Context(), newTestDEK(uniqueDEKID(t), projectID, crypto.KeyStateNotActiveYet)))
 
-		_, err := testPool.GetActiveDEK(t.Context(), projectID)
+		_, err := testPool.GetEncryptionKey(t.Context(),
+			database.And(
+				database.Equal(database.Col(crypto.EncryptionKeyFieldProjectID), projectID),
+				database.Equal(database.Col(crypto.EncryptionKeyFieldState), crypto.KeyStateActive),
+			))
 		assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 	})
 
 	t.Run("unknown project returns NoRowFoundError", func(t *testing.T) {
-		_, err := testPool.GetActiveDEK(t.Context(), uniqueProjectID(t))
+		t.Parallel()
+
+		_, err := testPool.GetEncryptionKey(t.Context(), database.Equal(database.Col(crypto.EncryptionKeyFieldProjectID), uniqueProjectID(t)))
 		assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 	})
 }
 
-func TestCryptoKeyStatements_UpdateDEK(t *testing.T) {
+func TestCryptoKeyStatements_UpdateEncryptionKey(t *testing.T) {
+	t.Parallel()
+
 	t.Run("persists state transition", func(t *testing.T) {
 		projectID := withProject(t)
 		dek := newTestDEK(uniqueDEKID(t), projectID, crypto.KeyStateActive)
-		require.NoError(t, testPool.CreateDEK(t.Context(), dek))
+		require.NoError(t, testPool.CreateEncryptionKey(t.Context(), dek))
 
 		// Retire the key: flip state and stamp retired_at.
 		retiredAt := time.Now().UTC().Truncate(time.Millisecond)
 		dek.State = crypto.KeyStateExpired
 		dek.RetiredAt = &retiredAt
-		require.NoError(t, testPool.UpdateDEK(t.Context(), dek))
+		require.NoError(t, testPool.UpdateEncryptionKey(t.Context(), dek))
 
 		// It is no longer returned as the active key.
-		_, err := testPool.GetActiveDEK(t.Context(), projectID)
+		_, err := testPool.GetEncryptionKey(t.Context(),
+			database.And(
+				database.Equal(database.Col(crypto.EncryptionKeyFieldProjectID), projectID),
+				database.Equal(database.Col(crypto.EncryptionKeyFieldState), crypto.KeyStateActive),
+			))
 		assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 	})
 
 	t.Run("update of missing dek affects no rows and does not error", func(t *testing.T) {
+		t.Parallel()
+
 		projectID := withProject(t)
 		dek := newTestDEK(uniqueDEKID(t), projectID, crypto.KeyStateActive)
 		// Never created, so the UPDATE matches nothing.
-		assert.NoError(t, testPool.UpdateDEK(t.Context(), dek))
+		assert.NoError(t, testPool.UpdateEncryptionKey(t.Context(), dek))
 	})
 }

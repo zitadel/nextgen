@@ -3,53 +3,16 @@ package helpers
 import (
 	"testing"
 
-	"github.com/go-jose/go-jose/v4"
-	"github.com/zitadel/nextgen/internal/domain/tokengen"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Harness) EnsureJWTGenerator(t *testing.T) *tokengen.JWTGenerator {
+func (h *Harness) EnsureTokenService(t *testing.T) service.TokenService {
 	t.Helper()
-	if h.JWTGenerator == nil {
-		h.JWTGenerator = tokengen.NewJWTGenerator(
-			h.EnsureJoseSigner(t),
-			[]jose.SignatureAlgorithm{jose.RS256},
-			jose.JSONWebKey{
-				Key:       h.EnsureSigningKey(t),
-				Algorithm: string(jose.RS256),
-				Use:       "sig",
-			},
-		)
-	}
-	return h.JWTGenerator
-}
-
-func (h *Harness) EnsureOpaqueTokenGenerator(t *testing.T) *tokengen.OpaqueTokenGenerator {
-	t.Helper()
-	if h.OpaqueTokenGenerator == nil {
-		h.OpaqueTokenGenerator = tokengen.NewOpaqueTokenGenerator(
+	if h.TokenService == nil {
+		h.TokenService = service.NewTokenService(
+			h.EnsureKeyService(t),
 			h.EnsureCrypter(t),
 		)
 	}
-	return h.OpaqueTokenGenerator
-}
-
-func (h *Harness) EnsureOpaqueTokenGeneratorCreator(t *testing.T) *tokengen.OpaqueTokenGeneratorCreator {
-	t.Helper()
-	if h.OpaqueTokenGeneratorCreator == nil {
-		h.OpaqueTokenGeneratorCreator = tokengen.NewOpaqueTokenGeneratorCreator(
-			h.EnsureKeyService(t),
-		)
-	}
-	return h.OpaqueTokenGeneratorCreator
-}
-
-func (h *Harness) EnsureAnyTokenVerifier(t *testing.T) *tokengen.AnyTokenTypeVerifier {
-	t.Helper()
-	if h.TokenVerifier == nil {
-		h.TokenVerifier = tokengen.NewAnyTokenTypeVerifier(
-			h.EnsureJWTGenerator(t),
-			h.EnsureOpaqueTokenGenerator(t),
-		)
-	}
-	return h.TokenVerifier
+	return h.TokenService
 }

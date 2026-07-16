@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 
+	"github.com/go-jose/go-jose/v4"
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
@@ -32,42 +33,39 @@ func NewProjectService(
 	v2Pool *DB,
 	schemaRepo domain.JSONSchemaRepository,
 	flowDefinitionRepo domain.FlowDefinitionRepository,
-	tokenGeneratorCreator domain.TokenGeneratorCreator,
 	serverURL string,
 	schemaValidator *domain.SchemaValidator,
 	kek crypto2.Crypter,
 ) ProjectService {
 	return &projectService{
-		v2Pool:                v2Pool,
-		schemaRepo:            schemaRepo,
-		flowDefinitionRepo:    flowDefinitionRepo,
-		tokenGeneratorCreator: tokenGeneratorCreator,
-		serverURL:             serverURL,
-		schemaValidator:       schemaValidator,
-		kek:                   kek,
+		v2Pool:             v2Pool,
+		schemaRepo:         schemaRepo,
+		flowDefinitionRepo: flowDefinitionRepo,
+		serverURL:          serverURL,
+		schemaValidator:    schemaValidator,
+		kek:                kek,
 	}
 }
 
 type projectService struct {
-	pool                  database.Pool
-	v2Pool                *DB
-	schemaRepo            domain.JSONSchemaRepository
-	flowDefinitionRepo    domain.FlowDefinitionRepository
-	tokenGeneratorCreator domain.TokenGeneratorCreator
-	serverURL             string
-	schemaValidator       *domain.SchemaValidator
-	kek                   crypto2.Crypter
+	pool               database.Pool
+	v2Pool             *DB
+	schemaRepo         domain.JSONSchemaRepository
+	flowDefinitionRepo domain.FlowDefinitionRepository
+	serverURL          string
+	schemaValidator    *domain.SchemaValidator
+	kek                crypto2.Crypter
 }
 
 var _ ProjectService = (*projectService)(nil)
 
 func (s *projectService) Create(ctx context.Context, previewOrigins []string, seedDefaults bool) (_ *domain.Project, err error) {
-	project, err := domain.NewProject(ctx, previewOrigins)
+	project, err := domain.NewProject(previewOrigins)
 	if err != nil {
 		return nil, err
 	}
 
-	dek, err := crypto.NewDEK(project.ID, crypto.DEKAlgorithmAESGCM, s.kek)
+	dek, err := crypto.NewDEK(project.ID, jose.A256GCM, s.kek)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to create project encryption key")
 	}
@@ -78,7 +76,7 @@ func (s *projectService) Create(ctx context.Context, previewOrigins []string, se
 			return domain.ErrInternal(err).WithMessage("failed to create project in the database")
 		}
 
-		if err := tx.Statements().CreateDEK(ctx, dek); err != nil {
+		if err := tx.Statements().CreateEncryptionKey(ctx, dek); err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to create project encryption key in the database")
 		}
 

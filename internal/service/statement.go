@@ -56,7 +56,7 @@ type FlowDefinitionStatements interface {
 
 type CryptoKeyStatements interface {
 	Statements
-	GetActiveDEK(ctx context.Context, projectID string) (*crypto.DEK, error)
-	CreateDEK(ctx context.Context, dek *crypto.DEK) error
-	UpdateDEK(ctx context.Context, dek *crypto.DEK) error
+	GetEncryptionKey(ctx context.Context, filter database.Filter[crypto.EncryptionKeyField]) (*crypto.EncryptionKey, error)
+	CreateEncryptionKey(ctx context.Context, dek *crypto.EncryptionKey) error
+	UpdateEncryptionKey(ctx context.Context, dek *crypto.EncryptionKey) error
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/go-jose/go-jose/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/crypto"
@@ -28,7 +29,7 @@ func TestNewDEK(t *testing.T) {
 		kek := &crypto.InverseCrypter{}
 
 		projectID := "proj-1"
-		alg := DEKAlgorithmAESGCM
+		alg := jose.A256GCM
 
 		dek, err := NewDEK(projectID, alg, kek)
 		require.NoError(t, err)
@@ -50,9 +51,9 @@ func TestNewDEK(t *testing.T) {
 
 	t.Run("two DEKs get distinct random keys", func(t *testing.T) {
 		kek := &crypto.InverseCrypter{}
-		a, err := NewDEK("proj", DEKAlgorithmAESGCM, kek)
+		a, err := NewDEK("proj", jose.A256GCM, kek)
 		require.NoError(t, err)
-		b, err := NewDEK("proj", DEKAlgorithmAESGCM, kek)
+		b, err := NewDEK("proj", jose.A256GCM, kek)
 		require.NoError(t, err)
 		assert.NotEqual(t, a.Key, b.Key)
 		assert.NotEqual(t, a.Id, b.Id)
@@ -63,7 +64,7 @@ func TestNewDEK(t *testing.T) {
 		kek := cryptomock.NewMockCrypter(gomock.NewController(t))
 		kek.EXPECT().Encrypt(gomock.Any()).Return("", sentinel)
 
-		_, err := NewDEK("proj", DEKAlgorithmAESGCM, kek)
+		_, err := NewDEK("proj", jose.A256GCM, kek)
 		require.Error(t, err)
 		var de domain.Error
 		require.ErrorAs(t, err, &de)
@@ -73,7 +74,7 @@ func TestNewDEK(t *testing.T) {
 
 func TestDEK_Activate(t *testing.T) {
 	t.Run("no current key", func(t *testing.T) {
-		k := &DEK{State: KeyStateNotActiveYet}
+		k := &EncryptionKey{State: KeyStateNotActiveYet}
 		k.Activate(nil)
 
 		assert.Equal(t, KeyState(KeyStateActive), k.State)
@@ -81,8 +82,8 @@ func TestDEK_Activate(t *testing.T) {
 	})
 
 	t.Run("expires the current key", func(t *testing.T) {
-		current := &DEK{State: KeyStateActive}
-		k := &DEK{State: KeyStateNotActiveYet}
+		current := &EncryptionKey{State: KeyStateActive}
+		k := &EncryptionKey{State: KeyStateNotActiveYet}
 
 		k.Activate(current)
 
@@ -95,15 +96,15 @@ func TestDEK_Activate(t *testing.T) {
 
 func TestDEK_Expire(t *testing.T) {
 	t.Run("nil replacement", func(t *testing.T) {
-		k := &DEK{State: KeyStateActive}
+		k := &EncryptionKey{State: KeyStateActive}
 		err := k.Expire(nil)
 		require.Error(t, err)
-		assertDomainErrorCode(t, err, ErrNoReplacementDEK().Code)
+		assertDomainErrorCode(t, err, ErrNoReplacementKey().Code)
 	})
 
 	t.Run("with replacement", func(t *testing.T) {
-		replacement := &DEK{State: KeyStateActive}
-		k := &DEK{State: KeyStateNotActiveYet}
+		replacement := &EncryptionKey{State: KeyStateActive}
+		k := &EncryptionKey{State: KeyStateNotActiveYet}
 
 		err := k.Expire(replacement)
 		require.NoError(t, err)
@@ -118,15 +119,15 @@ func TestDEK_Expire(t *testing.T) {
 
 func TestDEK_Remove(t *testing.T) {
 	t.Run("nil replacement", func(t *testing.T) {
-		k := &DEK{State: KeyStateActive}
+		k := &EncryptionKey{State: KeyStateActive}
 		err := k.Remove(nil)
 		require.Error(t, err)
-		assertDomainErrorCode(t, err, ErrNoReplacementDEK().Code)
+		assertDomainErrorCode(t, err, ErrNoReplacementKey().Code)
 	})
 
 	t.Run("with replacement", func(t *testing.T) {
-		replacement := &DEK{State: KeyStateActive}
-		k := &DEK{State: KeyStateNotActiveYet}
+		replacement := &EncryptionKey{State: KeyStateActive}
+		k := &EncryptionKey{State: KeyStateNotActiveYet}
 
 		err := k.Remove(replacement)
 		require.NoError(t, err)
@@ -145,7 +146,7 @@ func TestDEK_DecryptedKey(t *testing.T) {
 		encrypted, err := kek.Encrypt(want)
 		require.NoError(t, err)
 
-		k := &DEK{Key: []byte(encrypted)}
+		k := &EncryptionKey{Key: []byte(encrypted)}
 
 		got, err := k.DecryptedKey(kek)
 		require.NoError(t, err)
@@ -157,7 +158,7 @@ func TestDEK_DecryptedKey(t *testing.T) {
 		kek := cryptomock.NewMockCrypter(gomock.NewController(t))
 		kek.EXPECT().Decrypt(gomock.Any()).Return("", sentinel)
 
-		k := &DEK{Key: []byte("whatever")}
+		k := &EncryptionKey{Key: []byte("whatever")}
 		got, err := k.DecryptedKey(kek)
 		require.Error(t, err)
 		assertDomainErrorCode(t, err, ErrDecryptionFailed(nil).Code)
@@ -172,7 +173,7 @@ func TestDEK_Crypter(t *testing.T) {
 		encrypted, err := kek.Encrypt(key)
 		require.NoError(t, err)
 
-		dek := &DEK{Id: "dek_1", Key: []byte(encrypted), Algorithm: DEKAlgorithmAESGCM}
+		dek := &EncryptionKey{Id: "dek_1", Key: []byte(encrypted), Algorithm: jose.A256GCM}
 		crypter, err := dek.Crypter(kek)
 		require.NoError(t, err)
 		require.NotNil(t, crypter)
@@ -191,10 +192,10 @@ func TestDEK_Crypter(t *testing.T) {
 		encrypted, err := kek.Encrypt(key)
 		require.NoError(t, err)
 
-		dek := &DEK{Key: []byte(encrypted), Algorithm: "rot13"}
+		dek := &EncryptionKey{Key: []byte(encrypted), Algorithm: "rot13"}
 		_, err = dek.Crypter(kek)
 		require.Error(t, err)
-		assertDomainErrorCode(t, err, ErrUnknownDEKAlgorithm("rot13").Code)
+		assertDomainErrorCode(t, err, ErrSupportedEncryptionAlgorithm("rot13").Code)
 	})
 
 	t.Run("decrypt error is propagated", func(t *testing.T) {
@@ -202,7 +203,7 @@ func TestDEK_Crypter(t *testing.T) {
 		kek := cryptomock.NewMockCrypter(gomock.NewController(t))
 		kek.EXPECT().Decrypt(gomock.Any()).Return("", sentinel)
 
-		dek := &DEK{Key: []byte("x"), Algorithm: DEKAlgorithmAESGCM}
+		dek := &EncryptionKey{Key: []byte("x"), Algorithm: jose.A256GCM}
 		_, err := dek.Crypter(kek)
 		require.Error(t, err)
 		assertDomainErrorCode(t, err, ErrDecryptionFailed(nil).Code)

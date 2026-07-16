@@ -1,8 +1,9 @@
 package domain
 
 import (
-	"context"
 	"time"
+
+	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
 const (
@@ -20,7 +21,7 @@ type Project struct {
 	PreviewOrigins []string
 }
 
-func NewProject(ctx context.Context, previewOrigins []string) (*Project, error) {
+func NewProject(previewOrigins []string) (*Project, error) {
 	id, err := NewID(PrefixProject)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to create project id")
@@ -36,26 +37,26 @@ func NewProject(ctx context.Context, previewOrigins []string) (*Project, error) 
 	}, nil
 }
 
-func (p *Project) ProjectSecret(generator TokenGenerator) (string, error) {
-	projectSecret, err := generator.Generate(&Token{
+func (p *Project) ProjectSecret(encrypter op.Encrypter) (string, error) {
+	projectSecret, err := (&Token{
 		ProjectID: p.ID,
 		Scope:     []string{"project.write", "project.read"},
-	})
+	}).JWE(encrypter)
 	if err != nil {
 		return "", ErrInternal(err).WithMessage("failed to generate project secret")
 	}
 	return projectSecret, nil
 }
 
-func (p *Project) PreviewSecret(generator TokenGenerator) (string, error) {
-	projectSecret, err := generator.Generate(&Token{
+func (p *Project) PreviewSecret(encrypter op.Encrypter) (string, error) {
+	previewSecret, err := (&Token{
 		ProjectID: p.ID,
 		Scope:     []string{"project.read"},
-	})
+	}).JWE(encrypter)
 	if err != nil {
 		return "", ErrInternal(err).WithMessage("failed to generate preview secret")
 	}
-	return projectSecret, nil
+	return previewSecret, nil
 }
 
 // ProjectField enumerates the fields of Project which can be used for ordering in list operations.
@@ -66,7 +67,5 @@ const (
 	ProjectFieldID
 	ProjectFieldCreatedAt
 	ProjectFieldUpdatedAt
-	ProjectFieldProjectSecret
-	ProjectFieldPreviewSecret
 	ProjectFieldPreviewOrigins
 )

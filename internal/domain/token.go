@@ -2,30 +2,26 @@ package domain
 
 import (
 	"context"
-	"errors"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/go-jose/go-jose/v4"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
+var TokenPrefix ResourcePrefix = "tkn"
+
 // ErrInvalidTokenIdentifiers is returned when session identifier fields do not match [Token.Type].
-var ErrInvalidTokenIdentifiers = errors.New("token identifiers do not match token type")
-
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/token_verifier.mock.go . TokenVerifier
-
-type TokenVerifier interface {
-	Verify(token string) (payload *Token, err error)
+func ErrInvalidTokenIdentifiers() Error {
+	return NewError(TokenPrefix.ErrorCodePrefix("invalid_tknid"), "token identifiers do not match token type", nil, nil)
 }
 
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/token_generator.mock.go . TokenGenerator,TokenGeneratorCreator
-
-type TokenGenerator interface {
-	Generate(token *Token) (string, error)
-}
-
-type TokenGeneratorCreator interface {
-	Create(ctx context.Context, projectID string) (TokenGenerator, error)
+func ErrInvalidToken() Error {
+	return NewError(TokenPrefix.ErrorCodePrefix("invalid"), "the token is not valid", nil, nil)
 }
 
 // Token is a persisted token record (access, session, PAT, etc.).
@@ -57,25 +53,25 @@ func (t *Token) ValidatePersisted() error {
 			return err
 		}
 		if t.OIDCSessionID != nil || t.SAMLSessionID != nil {
-			return ErrInvalidTokenIdentifiers
+			return ErrInvalidTokenIdentifiers()
 		}
 	case TokenTypeOIDCAccessToken:
 		if err := requireNonEmptyID(t.OIDCSessionID, "oidc_session_id"); err != nil {
 			return err
 		}
 		if t.SessionID != nil || t.SAMLSessionID != nil {
-			return ErrInvalidTokenIdentifiers
+			return ErrInvalidTokenIdentifiers()
 		}
 	case TokenTypeSAMLAssertion:
 		if err := requireNonEmptyID(t.SAMLSessionID, "saml_session_id"); err != nil {
 			return err
 		}
 		if t.SessionID != nil || t.OIDCSessionID != nil {
-			return ErrInvalidTokenIdentifiers
+			return ErrInvalidTokenIdentifiers()
 		}
 	case TokenTypePersonalAccessToken:
 		if t.SessionID != nil || t.OIDCSessionID != nil || t.SAMLSessionID != nil {
-			return ErrInvalidTokenIdentifiers
+			return ErrInvalidTokenIdentifiers()
 		}
 	case TokenTypeUnspecified:
 		return ErrInvalidTokenType
@@ -89,9 +85,74 @@ func (t *Token) ValidatePersisted() error {
 	return nil
 }
 
+func (t *Token) JWE(encrypter op.Encrypter) (string, error) {
+	payload, err := json.Marshal(t)
+	if err != nil {
+		return "", ErrInternal(err).WithMessage("failed to serialize token payload")
+	}
+
+	token, err := encrypter.Encrypt(string(payload))
+	if err != nil {
+		return "", ErrInternal(err).WithMessage("failed to encrypt token payload")
+	}
+
+	return token, nil
+}
+
+func ParseAndValidateToken(ctx context.Context,
+	token string,
+	decrypter func(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (op.Decrypter, error),
+) (*Token, error) {
+	header, err := decodeJWEHeader(token)
+	if err != nil {
+		return nil, err
+	}
+
+	crypt, err := decrypter(ctx, header.KeyID, header.EncryptionAlgorithm)
+	if err != nil {
+		return nil, err
+	}
+
+	decrypted, err := crypt.Decrypt(token)
+	if err != nil {
+		return nil, ErrInvalidToken().WithDetails("failed to decrypt")
+	}
+
+	payload := new(Token)
+	err = json.Unmarshal([]byte(decrypted), payload)
+	if err != nil {
+		return nil, ErrInvalidToken().WithDetails("failed to decrypt")
+	}
+
+	return payload, nil
+}
+
+type jweHeader struct {
+	KeyID               string                 `json:"kid"`
+	EncryptionAlgorithm jose.ContentEncryption `json:"enc"`
+}
+
+func decodeJWEHeader(token string) (*jweHeader, error) {
+	headerSeparatorIndex := strings.IndexRune(token, '.')
+	if headerSeparatorIndex < 1 {
+		return nil, ErrInvalidToken().WithDetails("invalid separator count")
+	}
+	headerB64 := token[:headerSeparatorIndex]
+	headerBs, err := base64.URLEncoding.DecodeString(headerB64)
+	if err != nil {
+		return nil, ErrInvalidToken().WithDetails("invalid base64 header")
+	}
+	header := &jweHeader{}
+	err = json.Unmarshal(headerBs, header)
+	if err != nil {
+		return nil, ErrInvalidToken().WithDetails("invalid json header")
+	}
+	return header, nil
+}
+
 func requireNonEmptyID(id *string, name string) error {
 	if id == nil || *id == "" {
-		return fmt.Errorf("%w: %s is required", ErrInvalidTokenIdentifiers, name)
+		return fmt.Errorf("%w: %s is required", ErrInvalidTokenIdentifiers(), name)
 	}
 	return nil
 }

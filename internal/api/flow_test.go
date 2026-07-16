@@ -12,14 +12,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/zitadel/nextgen/internal/domain/tokengen"
-	"github.com/zitadel/oidc/v3/pkg/op"
-
+	"github.com/stretchr/testify/require"
 	gen "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/service/mocks"
+	"github.com/zitadel/oidc/v3/pkg/op"
+	"go.uber.org/mock/gomock"
 )
 
 // fakeFlowSvc lets handler tests exercise cookie + HTTP plumbing without
@@ -103,18 +104,20 @@ type testServer struct {
 
 func newTestServer(t *testing.T) *testServer {
 	t.Helper()
+
 	crypter := op.NewAES256GCMCrypto(fixedKey, "")
-	opaqueTokenGenerator := tokengen.NewOpaqueTokenGenerator(crypter)
+
+	mock := gomock.NewController(t)
+	tokenService := mocks.NewMockTokenService(mock)
+
 	fake := &fakeFlowSvc{}
-	handler := api.NewHandler(crypter, nil, nil, nil, fake, stubAuthAttempt{}, nil, nil, nil, nil, nil, nil)
+	handler := api.NewHandler(crypter, fake, stubAuthAttempt{}, nil, nil, nil, nil, nil, nil, nil, nil)
 	oas, err := gen.NewServer(
 		handler,
-		api.NewSecurityHandler(opaqueTokenGenerator),
+		api.NewSecurityHandler(tokenService),
 		gen.WithErrorHandler(api.OgenErrorHandler),
 	)
-	if err != nil {
-		t.Fatalf("NewServer: %v", err)
-	}
+	require.NoError(t, err)
 	srv := httptest.NewServer(oas)
 	t.Cleanup(srv.Close)
 	return &testServer{srv: srv, crypter: crypter, fake: fake}
@@ -124,13 +127,9 @@ func newTestServer(t *testing.T) *testServer {
 func (ts *testServer) sealCookie(t *testing.T, state *domain.FlowState) string {
 	t.Helper()
 	payload, err := json.Marshal(state)
-	if err != nil {
-		t.Fatalf("marshal state: %v", err)
-	}
+	require.NoError(t, err)
 	value, err := ts.crypter.Encrypt(string(payload))
-	if err != nil {
-		t.Fatalf("encrypt: %v", err)
-	}
+	require.NoError(t, err)
 	return value
 }
 
@@ -139,15 +138,11 @@ func doRequest(t *testing.T, method, url string, body any, cookieValue string) (
 	var rdr io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
-		if err != nil {
-			t.Fatalf("marshal body: %v", err)
-		}
+		require.NoError(t, err)
 		rdr = bytes.NewReader(b)
 	}
 	req, err := http.NewRequest(method, url, rdr)
-	if err != nil {
-		t.Fatalf("NewRequest: %v", err)
-	}
+	require.NoError(t, err)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -155,9 +150,7 @@ func doRequest(t *testing.T, method, url string, body any, cookieValue string) (
 		req.AddCookie(&http.Cookie{Name: "_zflow", Value: cookieValue})
 	}
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("Do: %v", err)
-	}
+	require.NoError(t, err)
 	defer resp.Body.Close()
 	data, _ := io.ReadAll(resp.Body)
 	return resp, data

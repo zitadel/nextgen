@@ -20,14 +20,15 @@ func newCryptoKeyStatements(client queryExecutor) cryptoKeyStatements {
 }
 
 const createDEKStmt = `
-	INSERT INTO zitadel_nextgen.deks (id, project_id, key, algorithm, state, activated_at, retired_at)
-	VALUES ($1, $2, $3, $4, $5, $6, $7)
+	INSERT INTO zitadel_nextgen.deks (id, project_id, key, algorithm, state, activated_at, retired_at, purpose)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	RETURNING id, created_at
 `
 
-func (s cryptoKeyStatements) CreateDEK(ctx context.Context, dek *crypto.DEK) error {
-	return s.client.QueryRow(ctx, createDEKStmt, dek.Id, dek.ProjectID, dek.Key, dek.Algorithm, dek.State, dek.ActivatedAt, dek.RetiredAt).
-		Scan(&dek.Id, &dek.CreatedAt)
+func (s cryptoKeyStatements) CreateEncryptionKey(ctx context.Context, key *crypto.EncryptionKey) error {
+	return s.client.QueryRow(ctx, createDEKStmt,
+		key.Id, key.ProjectID, key.Key, key.Algorithm, key.State, key.ActivatedAt, key.RetiredAt, key.Purpose,
+	).Scan(&key.Id, &key.CreatedAt)
 }
 
 const updateDEKStmt = `
@@ -36,24 +37,24 @@ const updateDEKStmt = `
 	WHERE project_id = $5 AND id = $6
 `
 
-func (s cryptoKeyStatements) UpdateDEK(ctx context.Context, dek *crypto.DEK) error {
+func (s cryptoKeyStatements) UpdateEncryptionKey(ctx context.Context, dek *crypto.EncryptionKey) error {
 	_, err := s.client.Exec(ctx, updateDEKStmt, dek.State, dek.CreatedAt, dek.ActivatedAt, dek.RetiredAt, dek.ProjectID, dek.Id)
 	return err
 }
 
-const dekQuery = `
-	SELECT id, project_id, key, algorithm, state, created_at, activated_at, retired_at
+const encryptionKeyQuery = `
+	SELECT id, project_id, key, algorithm, state, created_at, activated_at, retired_at, purpose
 	FROM zitadel_nextgen.deks
 `
 
-func (s cryptoKeyStatements) GetActiveDEK(ctx context.Context, projectID string) (*crypto.DEK, error) {
+func (s cryptoKeyStatements) GetEncryptionKey(ctx context.Context, filter database.Filter[crypto.EncryptionKeyField]) (*crypto.EncryptionKey, error) {
 	var compiler statementCompiler
-	err := compileRead(&compiler, dekQuery, &database.ListOptions[crypto.DEKField]{
-		Filter: database.And(
-			database.Equal(database.Col(crypto.DEKFieldProjectID), projectID),
-			database.Equal(database.Col(crypto.DEKFieldState), crypto.KeyStateActive),
-		),
-	}, dekSchema)
+	err := compileRead(
+		&compiler,
+		encryptionKeyQuery,
+		&database.ListOptions[crypto.EncryptionKeyField]{Filter: filter},
+		dekSchema,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -62,63 +63,67 @@ func (s cryptoKeyStatements) GetActiveDEK(ctx context.Context, projectID string)
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	dek, err := pgx.CollectExactlyOneRow(rows, s.scanDEK)
+	dek, err := pgx.CollectExactlyOneRow(rows, s.scanEncryptionKey)
 	if err != nil {
 		return nil, wrapError(err)
 	}
 	return dek, nil
 }
 
-func (s cryptoKeyStatements) scanDEK(row pgx.CollectableRow) (*crypto.DEK, error) {
-	dek := new(crypto.DEK)
-	err := row.Scan(&dek.Id, &dek.ProjectID, &dek.Key, &dek.Algorithm, &dek.State, &dek.CreatedAt, &dek.ActivatedAt, &dek.RetiredAt)
+func (s cryptoKeyStatements) scanEncryptionKey(row pgx.CollectableRow) (*crypto.EncryptionKey, error) {
+	key := new(crypto.EncryptionKey)
+	err := row.Scan(&key.Id, &key.ProjectID, &key.Key, &key.Algorithm, &key.State, &key.CreatedAt, &key.ActivatedAt, &key.RetiredAt, &key.Purpose)
 	if err != nil {
 		return nil, err
 	}
-	return dek, nil
+	return key, nil
 }
 
 var _ service.CryptoKeyStatements = (*cryptoKeyStatements)(nil)
 
-var dekSchema = database.NewSchema(map[crypto.DEKField]database.FieldBinding[crypto.DEK]{
-	crypto.DEKFieldID: {
+var dekSchema = database.NewSchema(map[crypto.EncryptionKeyField]database.FieldBinding[crypto.EncryptionKey]{
+	crypto.EncryptionKeyFieldID: {
 		SQLName:  "id",
-		Accessor: func(k *crypto.DEK) any { return k.Id },
+		Accessor: func(k *crypto.EncryptionKey) any { return k.Id },
 		Coerce:   database.CoerceString,
 	},
-	crypto.DEKFieldProjectID: {
+	crypto.EncryptionKeyFieldProjectID: {
 		SQLName:  "project_id",
-		Accessor: func(k *crypto.DEK) any { return k.ProjectID },
+		Accessor: func(k *crypto.EncryptionKey) any { return k.ProjectID },
 		Coerce:   database.CoerceString,
 	},
-	crypto.DEKFieldKey: {
+	crypto.EncryptionKeyFieldKey: {
 		SQLName:  "key",
-		Accessor: func(k *crypto.DEK) any { return k.Key },
+		Accessor: func(k *crypto.EncryptionKey) any { return k.Key },
 		Coerce:   database.CoerceBytes,
 	},
-	crypto.DEKFieldAlgorithm: {
+	crypto.EncryptionKeyFieldAlgorithm: {
 		SQLName:  "algorithm",
-		Accessor: func(k *crypto.DEK) any { return k.Algorithm },
+		Accessor: func(k *crypto.EncryptionKey) any { return k.Algorithm },
 		Coerce:   database.CoerceString,
 	},
-	crypto.DEKFieldState: {
+	crypto.EncryptionKeyFieldState: {
 		SQLName:  "state",
-		Accessor: func(k *crypto.DEK) any { return k.State },
+		Accessor: func(k *crypto.EncryptionKey) any { return k.State },
 		Coerce:   database.CoerceString,
 	},
-	crypto.DEKFieldCreatedAt: {
+	crypto.EncryptionKeyFieldCreatedAt: {
 		SQLName:  "created_at",
-		Accessor: func(k *crypto.DEK) any { return k.CreatedAt },
+		Accessor: func(k *crypto.EncryptionKey) any { return k.CreatedAt },
 		Coerce:   database.CoerceTime,
 	},
-	crypto.DEKFieldActivatedAt: {
+	crypto.EncryptionKeyFieldActivatedAt: {
 		SQLName:  "activated_at",
-		Accessor: func(k *crypto.DEK) any { return k.ActivatedAt },
+		Accessor: func(k *crypto.EncryptionKey) any { return k.ActivatedAt },
 		Coerce:   database.CoerceTime,
 	},
-	crypto.DEKFieldRetiredAt: {
+	crypto.EncryptionKeyFieldRetiredAt: {
 		SQLName:  "retired_at",
-		Accessor: func(k *crypto.DEK) any { return k.RetiredAt },
+		Accessor: func(k *crypto.EncryptionKey) any { return k.RetiredAt },
 		Coerce:   database.CoerceTime,
+	},
+	crypto.EncryptionKeyFieldPurpose: {
+		SQLName:  "purpose",
+		Accessor: func(k *crypto.EncryptionKey) any { return k.Purpose },
 	},
 })

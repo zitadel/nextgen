@@ -27,7 +27,6 @@ import (
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
-	"github.com/zitadel/nextgen/internal/domain/tokengen"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
@@ -129,9 +128,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		return fmt.Errorf("failed to bootstrap users: %w", err)
 	}
 
-	// TODO: remove, this uses the kek for token encryption instead of the dek
-	opaqueTokenGenerator := tokengen.NewOpaqueTokenGenerator(kek)
-
 	// ── Repositories ─────────────────
 	userRepo := repository.NewUserRepository()
 	userPasswordRepo := repository.NewUserPasswordRepository()
@@ -168,9 +164,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 
 	// ── Services ─────────────────────
-	keys := service.NewKeyService(serviceDBPool, kek)
-
-	opaqueTokenGeneratorCreator := tokengen.NewOpaqueTokenGeneratorCreator(keys)
+	keyService := service.NewKeyService(serviceDBPool, kek)
 
 	authAttemptSvc := service.NewAuthAttemptService(
 		pool,
@@ -189,7 +183,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		serviceDBPool,
 		schemaRepo,
 		flowDefinitionRepo,
-		opaqueTokenGeneratorCreator,
 		builtinPublicBase.String(),
 		schemaValidator,
 		kek,
@@ -237,6 +230,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	)
 
 	flowService := service.NewFlowService(pool, flowDefinitionRepo, stateMachine, ids)
+	tokenService := service.NewTokenService(keyService, kek)
 
 	// ── HTTP Server ─────────────────
 
@@ -246,9 +240,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	oasServer, err := oasapi.NewServer(
 		api.NewHandler(
 			kek,
-			opaqueTokenGenerator,
-			opaqueTokenGeneratorCreator,
-			opaqueTokenGeneratorCreator,
 			flowService,
 			authAttemptSvc,
 			sessionService,
@@ -257,8 +248,10 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			schemaService,
 			flowDefinitionSvc,
 			teamService,
+			tokenService,
+			keyService,
 		),
-		api.NewSecurityHandler(opaqueTokenGenerator),
+		api.NewSecurityHandler(tokenService),
 		oasapi.WithMiddleware(
 			middleware.AddOperationIdToContext(),
 			// logging is done at net/http level

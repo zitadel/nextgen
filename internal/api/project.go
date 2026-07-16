@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -14,15 +15,16 @@ func (h *Handler) CreateProject(ctx context.Context, req *api.CreateProjectReque
 		return nil, err
 	}
 
-	projectSecretGenerator, err := h.projectSecretGeneratorCreator.Create(ctx, project.ID)
+	dek, err := h.keyService.GetProjectDEKCrypter(ctx, service.GetProjectDEKInput{ProjectID: project.ID})
 	if err != nil {
 		return nil, err
 	}
-	projectSecret, err := project.ProjectSecret(projectSecretGenerator)
+
+	projectSecret, err := project.ProjectSecret(dek)
 	if err != nil {
 		return nil, err
 	}
-	previewSecret, err := project.PreviewSecret(projectSecretGenerator)
+	previewSecret, err := project.PreviewSecret(dek)
 	if err != nil {
 		return nil, err
 	}

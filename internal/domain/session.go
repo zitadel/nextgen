@@ -6,6 +6,7 @@ import (
 
 	"github.com/muhlemmer/gu"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
 const (
@@ -117,8 +118,8 @@ func (s *Session) State() SessionState {
 	return SessionStateActive
 }
 
-func (s *Session) Token(generator TokenGenerator) (string, error) {
-	token, err := generator.Generate(&Token{
+func (s *Session) Token(encrypter op.Encrypter) (string, error) {
+	token, err := (&Token{
 		ProjectID: s.ProjectID,
 		TokenID:   s.TokenID,
 		UserID:    gu.Value(s.UserID),
@@ -126,25 +127,21 @@ func (s *Session) Token(generator TokenGenerator) (string, error) {
 		SessionID: new(s.ID),
 		CreatedAt: s.CreatedAt,
 		ExpiresAt: new(s.ExpiresAt),
-	})
+	}).JWE(encrypter)
 	if err != nil {
 		return "", ErrSessionTokenCreationFailed()
 	}
 	return token, nil
 }
 
-func DecryptSessionTokenString(tokenString string, verifier TokenVerifier) (*Token, error) {
-	payload, err := verifier.Verify(tokenString)
-	if err != nil {
-		return nil, ErrSessionTokenInvalid()
+func ValidateSessionToken(token *Token) error {
+	if token.Type != TokenTypeSessionToken {
+		return ErrSessionTokenInvalid()
 	}
-	if payload.Type != TokenTypeSessionToken {
-		return nil, ErrSessionTokenInvalid()
+	if token.SessionID == nil {
+		return ErrSessionTokenInvalid()
 	}
-	if payload.SessionID == nil {
-		return nil, ErrSessionTokenInvalid()
-	}
-	return payload, nil
+	return nil
 }
 
 type SessionState uint8

@@ -6,7 +6,6 @@ import (
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/crypto"
-	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -15,25 +14,21 @@ type Handler struct {
 	// responses for all endpoints, so only implemented methods need to be defined.
 	api.UnimplementedHandler
 
-	kek                           crypto.Crypter
-	sessionTokenVerifier          domain.TokenVerifier
-	sessionTokenGeneratorCreator  domain.TokenGeneratorCreator
-	projectSecretGeneratorCreator domain.TokenGeneratorCreator
-	flowService                   service.FlowService
-	authAttemptService            service.AuthAttemptService
-	sessionService                service.SessionService
-	projectService                service.ProjectService
-	userService                   *service.UserService
-	schemaService                 *service.SchemaService
-	flowDefinitionService         service.FlowDefinitionService
-	teamService                   *service.TeamService
+	kek                   crypto.Crypter
+	flowService           service.FlowService
+	authAttemptService    service.AuthAttemptService
+	sessionService        service.SessionService
+	projectService        service.ProjectService
+	userService           *service.UserService
+	schemaService         *service.SchemaService
+	flowDefinitionService service.FlowDefinitionService
+	teamService           *service.TeamService
+	tokenService          service.TokenService
+	keyService            service.KeyService
 }
 
 func NewHandler(
 	crypter crypto.Crypter,
-	sessionTokenVerifier domain.TokenVerifier,
-	sessionTokenGeneratorCreator domain.TokenGeneratorCreator,
-	projectSecretGeneratorCreator domain.TokenGeneratorCreator,
 	flowService service.FlowService,
 	authAttemptService service.AuthAttemptService,
 	sessionService service.SessionService,
@@ -42,20 +37,21 @@ func NewHandler(
 	schemaService *service.SchemaService,
 	flowDefinitionService service.FlowDefinitionService,
 	teamService *service.TeamService,
+	tokenService service.TokenService,
+	keyService service.KeyService,
 ) *Handler {
 	return &Handler{
-		kek:                           crypter,
-		sessionTokenVerifier:          sessionTokenVerifier,
-		sessionTokenGeneratorCreator:  sessionTokenGeneratorCreator,
-		projectSecretGeneratorCreator: projectSecretGeneratorCreator,
-		flowService:                   flowService,
-		authAttemptService:            authAttemptService,
-		sessionService:                sessionService,
-		projectService:                projectService,
-		userService:                   userService,
-		schemaService:                 schemaService,
-		flowDefinitionService:         flowDefinitionService,
-		teamService:                   teamService,
+		kek:                   crypter,
+		flowService:           flowService,
+		authAttemptService:    authAttemptService,
+		sessionService:        sessionService,
+		projectService:        projectService,
+		userService:           userService,
+		schemaService:         schemaService,
+		flowDefinitionService: flowDefinitionService,
+		teamService:           teamService,
+		tokenService:          tokenService,
+		keyService:            keyService,
 	}
 }
 

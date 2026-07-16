@@ -97,10 +97,11 @@ func TestListUsers(t *testing.T) {
 	require.NoError(t, err)
 	otherClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	harness.SetProjectSecretOnApiClient(t, client, other)
+	harness.SetProjectSecretOnApiClient(t, otherClient, other)
 	otherRes, err := otherClient.ListUsers(t.Context(), api.ListUsersParams{})
 	require.NoError(t, err)
-	otherItems, ok := otherRes.(*api.ListUsersOKApplicationJSON)
-	require.True(t, ok, "unexpected response type %T", otherRes)
-	assert.Empty(t, *otherItems)
+	if assert.IsType(t, &api.ListUsersOKApplicationJSON{}, otherRes, helpers.MustMarshal(t, otherRes)) {
+		otherItems := otherRes.(*api.ListUsersOKApplicationJSON)
+		assert.Empty(t, *otherItems)
+	}
 }
