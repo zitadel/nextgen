@@ -18,6 +18,4 @@ strings, and let optional selects clear back to no value.
   required fields get an explicit prompt row that `required` blocks until
   a real choice is made, mirroring native `<select>` semantics.
 - The API default Liquid template renders `select`/`checkbox` field types
-  as `<zl-select>` / `<zl-checkbox>`, and `maritalStatus` /
-  `newsletterOptIn` label and placeholder keys were added to the en, de,
-  and it locales.
+  as `<zl-select>` / `<zl-checkbox>`.
