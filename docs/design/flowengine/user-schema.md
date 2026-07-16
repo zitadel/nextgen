@@ -13,6 +13,7 @@ What matters here is the contract: which schema annotations exist, how the flow 
 |---|---|---|---|
 | `x-identifier: true` | Field | Flow Engine | Field used for user resolution in the identifier step |
 | `x-mfa: "sms"` | Field | Policy Engine | Field can be used for OTP delivery |
+| `x-sensitive: true` | Field | Flow Engine | Value redacted in API / flow payloads (non-audit) |
 | `x-audit: true` | Field | Audit emitter | Field value may appear in audit event payloads (allowlist; deny-by-default) |
 | `x-editable: true` | Field | Flow Engine | Field appears in profiling / self-service flows |
 | `x-unique: "project"` | Field | Flow Engine | Server validates uniqueness on form submit (per-project scope) |
@@ -21,8 +22,10 @@ What matters here is the contract: which schema annotations exist, how the flow 
 
 Audit event payloads use a **deny-by-default** PII policy: user attribute values
 are omitted unless a field is explicitly marked with `x-audit`. See
-[ADR 029](../../adrs/029-wide-events-internal-audit-primitive.md) §8. The older
-`x-sensitive` annotation is not used for audit redaction.
+[ADR 029](../../adrs/029-wide-events-internal-audit-primitive.md) §8.
+`x-sensitive` remains in the OpenAPI user-property schema and CLI presets
+(e.g. phone/password); it is **deprecated only for audit redaction**. Audit
+uses deny-by-default + `x-audit`, not `x-sensitive`.
 
 ## How the Flow Engine and Policy Engine Consume Schemas
 
@@ -74,6 +77,7 @@ The following is an example user schema showing the annotations that the flow en
       "type": "string",
       "title": "Phone number",
       "x-mfa": "sms",
+      "x-sensitive": true,
       "x-editable": true
     },
     "given_name": {

@@ -61,6 +61,9 @@ CREATE TABLE zitadel_nextgen.events (
     , category          TEXT        NOT NULL       -- 'request', 'auth', 'session', 'admin', 'entity', 'signal'
     , created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 
+    -- Authorization scope captured at emit time (immutable)
+    , team_id           TEXT                    -- NULL = project-scoped; set for team-scoped credential context
+
     -- WHO
     , actor_id          TEXT
     , actor_type        TEXT                    -- 'human', 'service', 'system'
@@ -74,10 +77,10 @@ CREATE TABLE zitadel_nextgen.events (
     , token_id          TEXT        NOT NULL DEFAULT ''
     , delegation_type   TEXT        NOT NULL DEFAULT ''   -- 'direct', 'delegated', 'pat_shared', 'exchanged'
 
-    -- WHERE (device context)
+    -- WHERE (device context; server-authoritative when set)
     , fingerprint       TEXT        NOT NULL DEFAULT ''
 
-    -- WHEN (correlation scopes)
+    -- WHEN (correlation scopes; server-authoritative)
     , request_id        TEXT
     , session_id        TEXT
     , flow_id           TEXT
@@ -90,27 +93,44 @@ CREATE TABLE zitadel_nextgen.events (
 );
 ```
 
+At emit time, capture `project_id` and optional `team_id` from the resolved
+credential scope (`ScopeContext` per
+[url-architecture.md](../design/api/url-architecture.md)). Team-scoped list/get
+filters use the **stored** `team_id`, not recomputed membership. See
+[ADR 030](030-events-api-retention-export.md) for API authorization rules.
+
+Also register each event in the global `resource_scope_index`
+(`resource_kind = event`, `project_id`, optional `team_id`) so
+`GET /events/{id}` can resolve scope before loading the row.
+
 Per-sink export delivery is tracked in a separate `event_deliveries` table; see
 [ADR 030 §3](030-events-api-retention-export.md).
 
-**Indexes** (define when query paths are concrete):
+**Indexes:**
 
-- `(project_id, created_at, id)` — keyset list pagination ([ADR 027](027-cursor-based-pagination.md))
-- Partial indexes on high-cardinality filter columns: `category`, `actor_id`,
-  `client_id`, `session_id`, `request_id`, `event_type`, `entity_type`
+- **Required now:** `(project_id, created_at, id)` for list/export keyset
+  pagination ([ADR 027](027-cursor-based-pagination.md)). The keyset predicate
+  is `WHERE (created_at, id) > ($1, $2) ORDER BY created_at, id`. Including
+  `id` is required: many events share the same `created_at` (same millisecond),
+  and without the tie-breaker column cursors are unstable and the planner cannot
+  satisfy the tuple predicate as an efficient index range scan.
+- **Deferred:** Additional indexes when concrete query paths and predicates are
+  measured. Avoid speculative partial indexes on `NOT NULL DEFAULT ''` columns
+  unless predicates exclude empty strings.
 
-**Ordering:** List and export use keyset pagination on `(created_at, id)` per
-[ADR 027](027-cursor-based-pagination.md). The `id` identity column provides
-stable tie-breaking without a per-project sequence counter.
+**Ordering:** List and export use keyset pagination on `(created_at, id)` within
+`project_id` per [ADR 027](027-cursor-based-pagination.md). The `id` identity
+column provides stable tie-breaking without a per-project sequence counter.
 
 ### 2. Six orthogonal correlation scopes
 
 Every event participates in up to six independent grouping dimensions plus
-tenancy:
+tenancy. Primary correlation columns are **server-authoritative** (see §4).
 
 | Scope | Column | Groups |
 |-------|--------|--------|
 | **Tenancy** | `project_id` | All events within a project |
+| **Team** | `team_id` | Events emitted under a team-scoped credential |
 | **Request** | `request_id` | All events from a single HTTP request |
 | **Session** | `session_id` | All events from a user session |
 | **Flow** | `flow_id` | All events from a login flow |
@@ -124,17 +144,22 @@ Admin and forensic queries use these scopes directly:
 -- What did the AI agent do?
 SELECT * FROM events
 WHERE project_id = $1 AND client_id = 'agent_copilot'
-ORDER BY created_at;
+ORDER BY created_at, id;
 
 -- All delegated access for user X
 SELECT * FROM events
-WHERE project_id = $1 AND actor_id = 'user_123' AND delegation_type != 'direct';
+WHERE project_id = $1 AND actor_id = 'user_123' AND delegation_type != 'direct'
+ORDER BY created_at, id;
 
 -- Everything in this login flow
 SELECT * FROM events
 WHERE project_id = $1 AND flow_id = 'flow_xyz'
-ORDER BY created_at;
+ORDER BY created_at, id;
 ```
+
+Client-supplied correlation hints (if accepted at all) live in
+`metadata.client_hints` and are marked **untrusted**. They are not primary
+audit filter dimensions and are not indexed for forensic queries.
 
 ### 3. Event categories
 
@@ -167,7 +192,7 @@ flowchart TB
     EntitySQL[Entity INSERT UPDATE DELETE]
     EventSQL[events INSERT]
   end
-  MW -->|"category=request authenticated calls"| EventSQL
+  MW -->|"category=request sync INSERT before response"| EventSQL
   Auth --> MW
   Auth --> Stmt
   Stmt --> EntitySQL
@@ -181,19 +206,30 @@ Extend the existing request-ID middleware
 into a **RequestContext** middleware:
 
 - Extract or generate `request_id` (W3C traceparent-compatible 128-bit hex).
-- Stash optional `session_id`, `flow_id`, and `fingerprint` from request headers
-  into context.
+- Resolve correlation fields from **server state**, not client headers:
+  - `session_id` — authenticated token / server session record
+  - `flow_id` — active auth attempt or flow engine context
+  - `fingerprint` — server-derived device binding when available; otherwise omit
+    (empty string)
 - Optional `X-SDK-Name` and `X-SDK-Version` headers may be read for operational
   logging ([`zlog`](../../internal/instrumentation/zlog/)) and OTEL Tier 3
   export — they are **not persisted** on audit event rows.
+- Client headers named `session_id`, `flow_id`, or `fingerprint`, if accepted at
+  all, go into `metadata.client_hints` as untrusted hints only.
 - After the handler completes, if the request was **authenticated**, insert one
   `category=request` wide event containing: `operation_id`, HTTP method, route
   template, status code, duration, and actor/delegation dimensions from context.
 - Response header `X-Request-Id` echoes the assigned `request_id`.
 
-Request events use a **separate INSERT** outside the handler's entity
-transaction (fire-and-forget after response). Domain mutations co-locate their
-event with entity SQL (Path B).
+**Durability:** Request-wide events are inserted **synchronously** before the
+HTTP response is flushed to the client. The insert uses a **separate DB
+connection / short transaction** (not the handler's entity TX) so it does not
+extend entity commit latency, but it **is** awaited. Insert failure is logged
+and surfaced (server error and/or metric); it is not silently dropped.
+In-memory batching remains acceptable for `zlog` only — not for audit. A durable
+outbox + worker is a future optimization, not v1.
+
+Domain mutations co-locate their event with entity SQL (Path B).
 
 #### Path B — Domain events on v2 statement mutations
 
@@ -243,12 +279,13 @@ into request context:
 | `actor_id` | Token record (`tokens.user_id`) | Guaranteed by token issuance |
 | `token_id` | Token record | Guaranteed by token issuance |
 | `delegation_type` | Inferred from token structure | Automatic |
+| `project_id`, `team_id` | Resolved credential `ScopeContext` | Guaranteed by auth middleware |
 
 The SDK's `X-Client-Id` header is **ignored** — the server resolves `client_id`
 from the token itself to prevent spoofing.
 
-`InsertEvent` and request middleware read delegation dimensions from context — no
-per-handler duplication.
+`InsertEvent` and request middleware read delegation and scope dimensions from
+context — no per-handler duplication.
 
 **Delegation models** (same semantics as oxidel):
 
@@ -289,6 +326,28 @@ statements:
 No generic auto-diff of `user_attributes` JSON. Attribute values appear in event
 payloads only when explicitly allowlisted (see §8).
 
+#### Failure events and aborted transactions
+
+A uniqueness violation aborts the current PostgreSQL transaction until rollback;
+Spanner has no savepoints. Emitting `user.create.failed` therefore requires a
+**dialect-specific** path:
+
+| Dialect | Failure-event emission after unique violation |
+|---------|-----------------------------------------------|
+| **PostgreSQL** | Prefer **SAVEPOINT** before registry insert; on unique violation, `ROLLBACK TO SAVEPOINT`, then `InsertEvent` in the remainder of the same TX, then commit. |
+| **Spanner** | No savepoints. On unique violation, abort/rollback the create TX, then emit `user.create.failed` in a **new short transaction**. |
+
+SAVEPOINT is preferred on Postgres because it keeps a single connection and
+commit for the request, and `ROLLBACK TO SAVEPOINT` is cheaper than aborting
+the whole TX and starting a new one.
+
+Optional **preflight** uniqueness checks reduce how often the conflict path
+runs (happy path stays one TX), but races still need the dialect-specific path
+above.
+
+**Not supported:** emitting a failure event inside an aborted transaction
+without a savepoint (Postgres), or after Spanner abort without a new TX.
+
 ### 8. PII policy — deny-by-default
 
 Opt-in blocklists (`x-sensitive: true` on every field) do not scale. Event
@@ -302,8 +361,9 @@ payloads use a **deny-by-default** model:
 3. **Go enforcement:** typed event payload structs and an `audit.Marshal` helper
    at emit time apply schema allowlist rules for user-derived data. Handlers
    cannot accidentally dump a full user object into an event.
-4. **Supersedes `x-sensitive`:** the `x-sensitive` annotation in user schemas
-   is deprecated for audit purposes. See
+4. **`x-sensitive` and audit:** the `x-sensitive` annotation remains for
+   non-audit redaction (API/flow payloads) but is **not** the audit allowlist
+   mechanism. Audit uses deny-by-default + `x-audit`. See
    [user-schema.md](../design/flowengine/user-schema.md).
 
 Secrets, passwords, challenge material, and token values are **never** included
@@ -351,18 +411,25 @@ When exporting to OTEL, the projector maps: `request_id → trace_id`,
 - Spanner-safe: no triggers; Go-defined emission on v2 statements.
 - Deny-by-default PII policy scales without per-field opt-out annotations.
 - No per-project sequence counter — parallel event inserts within a project.
+- Immutable `team_id` at emit time avoids leaking historical events across team
+  membership changes.
+- Server-authoritative correlation fields prevent forged forensic timelines.
 
 ### Negative / Risks
 
 - **Volume:** one `request` event per authenticated API call adds write
-  amplification. Mitigate with async batching for request events if needed;
-  domain events stay in-TX.
+  amplification. Domain events stay in-TX; request events add a short awaited
+  insert before response flush.
+- **Latency:** synchronous request-event insert adds DB round-trip latency on
+  every authenticated API call.
 - **Migration gap:** entities still on v1 repositories have no event emission
   until ported — document coverage gaps during transition.
 - **Pre-claim blind spot:** forensic history starts at claim; operators must
   accept this or adjust product policy.
-- **Request vs domain correlation:** request events are outside entity
-  transactions; cross-correlate via `request_id` when investigating.
+- **Request vs domain correlation:** request events use a separate short TX
+  from entity mutations; cross-correlate via `request_id` when investigating.
+- **Dialect divergence:** failure-event emission uses SAVEPOINT on Postgres and
+  a new TX on Spanner — statement helpers must abstract this.
 
 ## Related ADRs
 

@@ -39,6 +39,7 @@ GET /events?project_id=…
          &fingerprint=…
          &entity_type=…
          &entity_id=…
+         &team_id=…
          &created_after=…
          &created_before=…
          &page_token=…
@@ -61,6 +62,7 @@ GET /events/{id}
 | `fingerprint` | string | Device correlation |
 | `entity_type` | string | Resource type affected |
 | `entity_id` | string | Resource ID affected |
+| `team_id` | string | Filter by emit-time team scope |
 | `created_after` | RFC 3339 timestamp | Inclusive lower bound |
 | `created_before` | RFC 3339 timestamp | Exclusive upper bound |
 | `page_token` | opaque string | [ADR 027](027-cursor-based-pagination.md) cursor |
@@ -71,6 +73,7 @@ GET /events/{id}
 {
   "id": "123456789",
   "project_id": "proj_abc",
+  "team_id": "team_xyz",
   "event_type": "auth.token.issued",
   "category": "auth",
   "created_at": "2026-07-03T12:00:00Z",
@@ -109,12 +112,38 @@ GET /events/{id}
 
 **Pagination:** Keyset cursor on `(created_at, id)` within `project_id`,
 consistent with [ADR 027](027-cursor-based-pagination.md) and v2 storage list
-options.
+options. Index: `(project_id, created_at, id)`.
 
-**Permissions:** Callers require an `events.read` permission (exact RBAC shape
-TBD — reference platform authz when specified). Team-scoped credentials may
-restrict list results to events where `actor_id` or affected resources belong
-to the credential's team.
+**Permissions and scope:**
+
+- Callers require an `events.read` permission (exact RBAC shape TBD — reference
+  platform authz when specified).
+- Authorization uses the **immutable emit-time scope** stored on the event
+  (`project_id`, optional `team_id` from [ADR 029](029-wide-events-internal-audit-primitive.md)),
+  not recomputed actor/resource membership.
+- **Project-scoped** credentials see all events in the project (subject to
+  `events.read`).
+- **Team-scoped** credentials see only events where `events.team_id` equals the
+  credential's team. Events are visible within the scope that created them
+  unless a future admin override is defined.
+- Filtering by current `actor_id` membership or resource team is **rejected** —
+  users and resources can move teams; that must not leak or hide historical
+  events.
+
+**`GET /events/{id}` scope resolution:**
+
+Event primary key is `(project_id, id)`. Path-only `{id}` cannot authorize
+before lookup. Align with
+[url-architecture.md](../design/api/url-architecture.md) **resource-scope
+index**:
+
+1. At emit time, register the event in `resource_scope_index`
+   (`resource_kind = event`, `project_id`, optional `team_id`).
+2. Middleware resolves scope from the index **before** loading the event row.
+3. Auth check runs on the resolved scope; miss returns **404** (no existence or
+   timing leak across scopes).
+
+Authorize-after-fetch is explicitly rejected.
 
 **OpenAPI:** A design sketch may live under `docs/design/api/` until the
 endpoint is added to `api/openapi/`. Implementation is out of scope for this ADR.
@@ -132,36 +161,39 @@ Events are append-only within their retention window.
   code during normal operation.
 - `INSERT` on `event_deliveries` — shipper only.
 - The retention background job uses a dedicated role with `DELETE` permission on
-  `events` and `event_deliveries`.
+  `events` (and relies on FK cascade for `event_deliveries`).
 
 **Retention policy:**
 
 - Configurable per deployment via server config (suggested default: **30 days**).
-- Background job deletes event rows only when **every enabled sink** has a
-  delivery record and the retention window has elapsed:
+- Background job deletes eligible `events` rows; matching `event_deliveries`
+  rows are removed by `ON DELETE CASCADE` (see §3).
+- An event is eligible only when **every enabled sink** has a delivery record
+  and the retention window has elapsed.
+
+Executable retention pattern (Postgres; `$2` = enabled sink ID array from
+server config at job start — not a database table):
 
 ```sql
+-- $1 = project_id, $2 = TEXT[] of currently enabled sink IDs
 DELETE FROM zitadel_nextgen.events e
 WHERE e.project_id = $1
   AND e.created_at < now() - $retention_interval
-  AND NOT EXISTS (
-    SELECT 1 FROM configured_sinks s
-    WHERE NOT EXISTS (
-      SELECT 1 FROM zitadel_nextgen.event_deliveries d
-      WHERE d.project_id = e.project_id
-        AND d.event_id = e.id
-        AND d.sink_id = s.id
-    )
+  AND (
+    SELECT count(*) FROM unnest($2::text[]) AS s(sink_id)
+  ) = (
+    SELECT count(*) FROM zitadel_nextgen.event_deliveries d
+    WHERE d.project_id = e.project_id
+      AND d.event_id = e.id
+      AND d.sink_id = ANY($2::text[])
   );
 ```
 
-(`configured_sinks` is the in-memory set of enabled sink IDs from server config;
-disabled or removed sinks do not block retention.)
-
-- Events missing delivery to any enabled sink are **never purged** — this
-  prevents data loss when a shipper is down or a sink is misconfigured.
-- Long-term compliance archive is the **operator's responsibility** once events
-  are exported to SIEM, object storage, or another durable sink.
+Disabled or removed sinks are omitted from `$2` and do not block retention.
+Events missing delivery to any **enabled** sink are **never purged** — this
+prevents data loss when a shipper is down or a sink is misconfigured.
+Long-term compliance archive is the **operator's responsibility** once events
+are exported to SIEM, object storage, or another durable sink.
 
 **Immutability scope:** Event content is immutable for the duration rows remain
 in the database. Retention purge is an explicit, scheduled operation — not an
@@ -185,8 +217,12 @@ CREATE TABLE zitadel_nextgen.event_deliveries (
     , PRIMARY KEY (project_id, event_id, sink_id)
     , FOREIGN KEY (project_id, event_id)
         REFERENCES zitadel_nextgen.events (project_id, id)
+        ON DELETE CASCADE
 );
 ```
+
+Retention deletes from `events`; child `event_deliveries` rows are removed by
+cascade. Do not require a separate delete of delivery rows before purge.
 
 ```mermaid
 flowchart LR
@@ -267,7 +303,9 @@ projects. No retroactive backfill.
 - Per-sink `event_deliveries` supports multiple subscribers without a single
   `shipped_at` timestamp.
 - Retention gated on all enabled sinks prevents premature purge while any
-  subscriber is behind.
+  subscriber is behind; `ON DELETE CASCADE` keeps purge implementable.
+- Emit-time `team_id` + resource-scope index make list/get authorization safe
+  under membership changes.
 - Category filter maps directly to compliance use cases (auth vs admin vs
   entity).
 
@@ -285,12 +323,14 @@ projects. No retroactive backfill.
 - **Retention SQL complexity:** purge must account for the current enabled-sink
   set; removing a sink from config should not strand undeliverable events
   indefinitely (implementation should treat removed sinks as non-blocking).
+- **Scope-index write amplification:** every event also writes
+  `resource_scope_index` for flat-by-ID get authorization.
 
 ## Related ADRs
 
 | ADR | Relationship |
 |-----|--------------|
-| [029 Wide Events Internal Model](029-wide-events-internal-audit-primitive.md) | Table schema, categories, emission, PII |
+| [029 Wide Events Internal Model](029-wide-events-internal-audit-primitive.md) | Table schema, categories, emission, PII, emit-time scope |
 | [027 Cursor-Based Pagination](027-cursor-based-pagination.md) | List pagination contract |
 | [024 User/Team Lifecycle](024-user-team-lifecycle-ownership.md) | Lifecycle purge vs event retention |
 | [028 Storage v2 Statements](028-storage-v2-statements-and-dialects.md) | v2 port required before events exist for an entity |
