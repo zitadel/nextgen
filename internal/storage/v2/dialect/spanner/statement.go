@@ -1,8 +1,6 @@
 package spanner
 
-import (
-	"github.com/zitadel/nextgen/internal/service"
-)
+import "github.com/zitadel/nextgen/internal/service"
 
 type queryExecutor any
 

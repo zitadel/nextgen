@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"cloud.google.com/go/spanner"
-
 	dbold "github.com/zitadel/nextgen/internal/storage/database"
 )
 
