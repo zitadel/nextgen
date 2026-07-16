@@ -298,6 +298,162 @@ func TestResolve_ResolveByAudience_RepoErrorPropagates(t *testing.T) {
 	}
 }
 
+func TestResolve_ResolveByAudience_AppHintOutranksTeamAndDefault(t *testing.T) {
+	byApp := newDef("by-app", "1.0.0", domain.FlowDefinitionAudience{AppIDs: []string{"app-1"}}, domain.FlowDefinitionPurposeLogin)
+	byTeam := newDef("by-team", "1.0.0", domain.FlowDefinitionAudience{TeamIDs: []string{"team-1"}}, domain.FlowDefinitionPurposeLogin)
+	fallback := newDef("default", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{fallback, byTeam, byApp})
+
+	got, err := service.NewFlowService(stubPool(), repo, nil, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+		ProjectID: "proj",
+		Purpose:   domain.FlowDefinitionPurposeLogin,
+		Hint:      service.ResolveFlowHint{AppID: ptr("app-1"), TeamID: ptr("team-1")},
+	})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+	if got != byApp {
+		t.Fatalf("Resolve = %v, want the app-scoped definition", got.Name)
+	}
+}
+
+func TestResolve_ResolveByAudience_TeamHintOutranksDefault(t *testing.T) {
+	byTeam := newDef("by-team", "1.0.0", domain.FlowDefinitionAudience{TeamIDs: []string{"team-1"}}, domain.FlowDefinitionPurposeLogin)
+	fallback := newDef("default", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{fallback, byTeam})
+
+	got, err := service.NewFlowService(stubPool(), repo, nil, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+		ProjectID: "proj",
+		Purpose:   domain.FlowDefinitionPurposeLogin,
+		Hint:      service.ResolveFlowHint{TeamID: ptr("team-1")},
+	})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+	if got != byTeam {
+		t.Fatalf("Resolve = %v, want the team-scoped definition", got.Name)
+	}
+}
+
+// A definition scoped to an app must not capture unhinted requests just by
+// being newer — the unscoped project default outranks it.
+func TestResolve_ResolveByAudience_ScopedFlowDoesNotCaptureDefault(t *testing.T) {
+	fallback := newDef("default", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	fallback.CreatedAt = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	scoped := newDef("kiosk", "1.0.0", domain.FlowDefinitionAudience{AppIDs: []string{"app-1"}}, domain.FlowDefinitionPurposeLogin)
+	scoped.CreatedAt = time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{scoped, fallback})
+
+	got, err := service.NewFlowService(stubPool(), repo, nil, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+		ProjectID: "proj",
+		Purpose:   domain.FlowDefinitionPurposeLogin,
+	})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+	if got != fallback {
+		t.Fatalf("Resolve = %v, want the unscoped default", got.Name)
+	}
+}
+
+// Hints are routing suggestions, not a security boundary: when only scoped
+// definitions exist and none matches the hint, resolution still succeeds
+// rather than failing the login.
+func TestResolve_ResolveByAudience_UnmatchedHintFallsBackToScoped(t *testing.T) {
+	scoped := newDef("kiosk", "1.0.0", domain.FlowDefinitionAudience{AppIDs: []string{"app-1"}}, domain.FlowDefinitionPurposeLogin)
+	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{scoped})
+
+	got, err := service.NewFlowService(stubPool(), repo, nil, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+		ProjectID: "proj",
+		Purpose:   domain.FlowDefinitionPurposeLogin,
+		Hint:      service.ResolveFlowHint{AppID: ptr("app-2")},
+	})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+	if got != scoped {
+		t.Fatalf("Resolve = %v, want the only remaining definition", got.Name)
+	}
+}
+
+func TestResolve_ResolveByAudience_UserSchemaHintFilters(t *testing.T) {
+	human := newDef("human", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	human.UserSchema = "https://tenant.com/schemas/human.json"
+	human.CreatedAt = time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	machine := newDef("machine", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	machine.UserSchema = "https://tenant.com/schemas/machine.json"
+	machine.CreatedAt = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{human, machine})
+
+	svc := service.NewFlowService(stubPool(), repo, nil, nil)
+	got, err := svc.Resolve(t.Context(), service.ResolveFlowRequest{
+		ProjectID: "proj",
+		Purpose:   domain.FlowDefinitionPurposeLogin,
+		Hint:      service.ResolveFlowHint{UserSchemaID: ptr("https://tenant.com/schemas/machine.json")},
+	})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+	if got != machine {
+		t.Fatalf("Resolve = %v, want the machine-schema definition despite being older", got.Name)
+	}
+
+	_, err = svc.Resolve(t.Context(), service.ResolveFlowRequest{
+		ProjectID: "proj",
+		Purpose:   domain.FlowDefinitionPurposeLogin,
+		Hint:      service.ResolveFlowHint{UserSchemaID: ptr("https://tenant.com/schemas/unknown.json")},
+	})
+	if !errors.Is(err, domain.ErrFlowDefinitionNotFound()) {
+		t.Fatalf("Resolve err = %v, want ErrFlowDefinitionNotFound for unmatched schema hint", err)
+	}
+}
+
+func TestResolve_ResolveByAudience_NoHintPicksNewestDeterministically(t *testing.T) {
+	older := newDef("older", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	older.CreatedAt = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	newer := newDef("newer", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	newer.CreatedAt = time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+
+	// Both list orders yield the same pick — the newest definition.
+	for _, defs := range [][]*domain.FlowDefinition{{older, newer}, {newer, older}} {
+		repo := stubListFlowDefinitions(t, defs)
+		got, err := service.NewFlowService(stubPool(), repo, nil, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+			ProjectID: "proj",
+			Purpose:   domain.FlowDefinitionPurposeLogin,
+		})
+		if err != nil {
+			t.Fatalf("Resolve returned error: %v", err)
+		}
+		if got != newer {
+			t.Fatalf("Resolve = %v, want the newest definition", got.Name)
+		}
+	}
+}
+
+// Colliding created_at timestamps (one bulk apply writing several flows)
+// still yield a stable pick: the higher id wins.
+func TestResolve_ResolveByAudience_TimestampCollisionBreaksOnID(t *testing.T) {
+	at := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	a := newDef("aaa", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	a.CreatedAt = at
+	b := newDef("bbb", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	b.CreatedAt = at
+
+	for _, defs := range [][]*domain.FlowDefinition{{a, b}, {b, a}} {
+		repo := stubListFlowDefinitions(t, defs)
+		got, err := service.NewFlowService(stubPool(), repo, nil, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+			ProjectID: "proj",
+			Purpose:   domain.FlowDefinitionPurposeLogin,
+		})
+		if err != nil {
+			t.Fatalf("Resolve returned error: %v", err)
+		}
+		if got != b {
+			t.Fatalf("Resolve = %v, want the definition with the higher id", got.Name)
+		}
+	}
+}
+
 // fakeStateMachine captures inputs and returns pre-loaded results.
 type fakeStateMachine struct {
 	startResult   domain.FlowStepResult

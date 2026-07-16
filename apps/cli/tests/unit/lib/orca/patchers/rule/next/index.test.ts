@@ -52,18 +52,17 @@ describe("NextPatcher.plan", () => {
     expect(writeContents(plan, "zitadel.json")).toContain('"project": "proj-1"');
     expect(editContents(plan, "app/page.tsx")).toBeUndefined();
     expect(writeContents(plan, "app/login/page.tsx")).toContain(MANAGED_MARKER);
-    expect(writeContents(plan, "app/login/page.tsx")).toContain('href="/register"');
+    expect(writeContents(plan, "app/login/page.tsx")).not.toContain('href="/register"');
+    expect(writeContents(plan, "app/login/page.tsx")).not.toContain("next/link");
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('href="/profile"');
     expect(writeContents(plan, "app/login/page.tsx")).toContain('background: "#0f0f11"');
-    expect(writeContents(plan, "app/login/page.tsx")).toContain('color: "#f4f4f6"');
     expect(writeContents(plan, "app/login/page.tsx")).toContain('colorScheme: "dark"');
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('alignItems: "center"');
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('padding: "48px 24px"');
     expect(writeContents(plan, "app/register/page.tsx")).toContain(MANAGED_MARKER);
-    expect(writeContents(plan, "app/register/page.tsx")).toContain('href="/login"');
+    expect(writeContents(plan, "app/register/page.tsx")).not.toContain('href="/login"');
     expect(writeContents(plan, "app/register/page.tsx")).not.toContain('href="/profile"');
     expect(writeContents(plan, "app/register/page.tsx")).toContain('background: "#0f0f11"');
-    expect(writeContents(plan, "app/register/page.tsx")).toContain('color: "#f4f4f6"');
     expect(writeContents(plan, "app/register/page.tsx")).toContain('colorScheme: "dark"');
     expect(writeContents(plan, "middleware.ts")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "middleware.ts")).toContain("export function middleware(");
@@ -75,10 +74,8 @@ describe("NextPatcher.plan", () => {
     const homePage = editContents(plan, "app/page.tsx", "starter");
 
     expect(homePage).toContain(MANAGED_MARKER);
-    expect(homePage).toContain('href="/login"');
-    expect(homePage).toContain('href="/register"');
-    expect(homePage).toContain('href="/profile"');
-    expect(homePage).toContain('colorScheme: "dark"');
+    expect(homePage).toContain('redirect("/login")');
+    expect(homePage).not.toContain("Sign in, create an account");
   });
 
   it("emits proxy.ts for Next 16 projects", () => {
@@ -96,7 +93,7 @@ describe("NextPatcher.plan", () => {
     expect(dep).toMatchObject({ name: "@zitadel/sdk-next", version: "0.1.0-alpha.0" });
   });
 
-  it("does not scaffold the user schema or flow (server-provisioned)", () => {
+  it("leaves schema and flow files for setup's resource materializer", () => {
     const plan = new NextPatcher().plan(ctxFor("app"));
     expect(writeContents(plan, ".zitadel/schemas/user.json")).toBeUndefined();
     expect(writeContents(plan, ".zitadel/flows/default.json")).toBeUndefined();

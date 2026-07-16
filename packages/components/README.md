@@ -177,7 +177,10 @@ Automation can use the stable host and native shadow-root hooks that the default
 template emits. Host atoms expose hooks such as `zitadel-field-email`,
 `zitadel-field-password`, and `zitadel-action-submit`; their native shadow
 controls expose hooks such as `zitadel-input-email`, `zitadel-input-password`,
-and `zitadel-action-submit-button`.
+and `zitadel-action-submit-button`. Hooks are method-named even when the flow
+engine names a credential field `x-auth-methods#<method>` — the `name`
+attribute keeps that raw form key, only the `data-testid` hooks are normalised
+(`hookName` in `src/internal/hook-name.ts`).
 
 A tenant Liquid template can already be supplied through the branding
 payload's `liquid_template` field; a dedicated declarative `template`
@@ -191,6 +194,7 @@ renders the bundled `default.liquid`. Tracked as a follow-up.
 | Property | Type | Notes |
 | --- | --- | --- |
 | `purpose` | `'login' \| 'register' \| 'reset_password' \| string` | Which flow purpose to drive |
+| `flowName` / `flow-name` | `string` | Run the flow definition with this `name` instead of the project default |
 | `project` | `ZitadelProject` | SDK handle from `configureZitadel()`. Object property (not an attribute). When unset, the element falls back to the global handle from `getZitadelConfig()` |
 | `lang` | `string` | BCP 47 tag (e.g. `"de"`, `"en-US"`). Resolves to a built-in dictionary; falls back to `<html lang>` / `navigator.language` |
 | `locales` | `Record<string, Locale>` | Custom locale dictionaries keyed by language code; spread over the built-in dictionary so partial overrides work |

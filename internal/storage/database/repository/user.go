@@ -422,6 +422,18 @@ FROM zitadel_nextgen.users%s`,
 		args := slices.Clone(wherePart.Args())
 		args = append(args, attrKeysAny, ext.WithAuthMethods)
 
+		// Honor WithLimit/WithOffset (GET /users pagination). The order is
+		// pinned — a window over an unordered scan would be meaningless.
+		stmt += "\nORDER BY zitadel_nextgen.users.created_at, zitadel_nextgen.users.id"
+		if queryOpts.Limit > 0 {
+			args = append(args, queryOpts.Limit)
+			stmt += " LIMIT $" + strconv.Itoa(len(args))
+		}
+		if queryOpts.Offset > 0 {
+			args = append(args, queryOpts.Offset)
+			stmt += " OFFSET $" + strconv.Itoa(len(args))
+		}
+
 		return collectUserRows(ctx, client, stmt, args, ext.WithAuthMethods)
 	}
 

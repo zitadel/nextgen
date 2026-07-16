@@ -153,7 +153,11 @@ const (
 )
 
 // FlowFieldValidationRule names a schema-derived validation rule the
-// resolver enforces.
+// resolver enforces. Each rule doubles as the key suffix of the wire
+// dialect (see [FlowFieldValidationError.TextKey]), so a new rule also
+// needs a generic `error.field_<rule>` catalog entry and a suffix
+// mapping in the client's `localiseFlowErrorKeys`
+// (packages/components/src/orchestrator/liquid.ts).
 type FlowFieldValidationRule string
 
 const (
@@ -175,6 +179,23 @@ func (e FlowFieldValidationError) Error() string {
 	return "flow field " + e.Field + ": " + string(e.Rule)
 }
 
+// TextKey returns the client-facing localisation key for the violation:
+// `error.<field>_<rule>`, with the format rule aliased to `_invalid` —
+// the text catalog's existing spelling (`error.email_invalid`). Field
+// names are used verbatim, credential shape included
+// (`error.x-auth-methods#password_required`): tenant schemas keep field
+// naming open, so clients resolve unknown keys through generic
+// `error.field_<rule>` fallbacks instead of a closed catalog — see
+// `localiseFlowErrorKeys` in
+// packages/components/src/orchestrator/liquid.ts.
+func (e FlowFieldValidationError) TextKey() string {
+	suffix := string(e.Rule)
+	if e.Rule == FlowFieldValidationRuleFormat {
+		suffix = "invalid"
+	}
+	return "error." + e.Field + "_" + suffix
+}
+
 // FlowFieldValidationErrors collects rule violations. Returned as
 // `error` by [FlowFieldResolver.Validate].
 type FlowFieldValidationErrors []FlowFieldValidationError
@@ -183,6 +204,19 @@ func (e FlowFieldValidationErrors) Error() string {
 	parts := make([]string, len(e))
 	for i, err := range e {
 		parts[i] = err.Error()
+	}
+	return strings.Join(parts, "; ")
+}
+
+// StepError renders the violations for the wire `step.error` field: one
+// [FlowFieldValidationError.TextKey] per violation, joined with "; ".
+// Clients split on the joiner and localise each key. Error() stays the
+// Go-side diagnostic ("flow field email: required") for logs and
+// wrapped errors.
+func (e FlowFieldValidationErrors) StepError() string {
+	parts := make([]string, len(e))
+	for i, err := range e {
+		parts[i] = err.TextKey()
 	}
 	return strings.Join(parts, "; ")
 }

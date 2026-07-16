@@ -111,6 +111,66 @@ func TestSchemaFieldResolver_Validate_NonStringValueReportsFormat(t *testing.T) 
 	}
 }
 
+// TestFlowFieldValidationError_TextKey pins the wire dialect for
+// `step.error`: `error.<field>_<rule>`, with the format rule aliased to
+// the catalog's `_invalid` spelling and field names used verbatim
+// (credential shape included). The client's `localiseFlowErrorKeys`
+// (packages/components/src/orchestrator/liquid.ts) parses exactly this.
+func TestFlowFieldValidationError_TextKey(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		field string
+		rule  domain.FlowFieldValidationRule
+		want  string
+	}{
+		{"email", domain.FlowFieldValidationRuleRequired, "error.email_required"},
+		{"email", domain.FlowFieldValidationRuleFormat, "error.email_invalid"},
+		{"username", domain.FlowFieldValidationRuleMinLength, "error.username_min_length"},
+		{"username", domain.FlowFieldValidationRuleMaxLength, "error.username_max_length"},
+		{"nickname", domain.FlowFieldValidationRuleUnknown, "error.nickname_unknown_field"},
+		{"x-auth-methods#password", domain.FlowFieldValidationRuleRequired, "error.x-auth-methods#password_required"},
+	}
+	for _, tc := range cases {
+		err := domain.FlowFieldValidationError{Field: tc.field, Rule: tc.rule}
+		if got := err.TextKey(); got != tc.want {
+			t.Errorf("TextKey(%s, %s) = %q, want %q", tc.field, tc.rule, got, tc.want)
+		}
+	}
+}
+
+func TestFlowFieldValidationErrors_StepErrorJoinsKeys(t *testing.T) {
+	t.Parallel()
+	errs := domain.FlowFieldValidationErrors{
+		{Field: "email", Rule: domain.FlowFieldValidationRuleFormat},
+		{Field: "username", Rule: domain.FlowFieldValidationRuleMinLength},
+	}
+	want := "error.email_invalid; error.username_min_length"
+	if got := errs.StepError(); got != want {
+		t.Errorf("StepError() = %q, want %q", got, want)
+	}
+}
+
+// Validate iterates the submitted values map, so without sorting the
+// violation order (and thus the wire string) would differ per run.
+func TestSchemaFieldResolver_Validate_DeterministicOrder(t *testing.T) {
+	t.Parallel()
+	resolver := domain.NewSchemaFieldResolver()
+	fields := resolveDefaultFields(t)
+
+	err := resolver.Validate(fields, map[string]any{
+		"username": "a",
+		"email":    "not-an-email",
+	})
+	var errs domain.FlowFieldValidationErrors
+	if !errors.As(err, &errs) {
+		t.Fatalf("Validate err = %v, want FlowFieldValidationErrors", err)
+	}
+	want := "error.email_invalid; error.username_min_length"
+	if got := errs.StepError(); got != want {
+		t.Errorf("StepError() = %q, want %q", got, want)
+	}
+}
+
 func hasValidationRule(t *testing.T, err error, field string, rule domain.FlowFieldValidationRule) bool {
 	t.Helper()
 	var errs domain.FlowFieldValidationErrors

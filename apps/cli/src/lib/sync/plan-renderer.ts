@@ -1,4 +1,5 @@
-import type { SyncAction, SyncPlanSummary } from "./types.js";
+import { stableStringify } from "../json";
+import type { ResourceSyncer, SyncAction, SyncPlanSummary } from "./types.js";
 
 /**
  * Count the non-`skip` actions in a {@link buildSyncPlan} result. Pure; the
@@ -10,9 +11,81 @@ export function summarizePlan(actions: ReadonlyArray<SyncAction>): SyncPlanSumma
   return {
     creates: active.filter((a) => a.kind === "create").length,
     updates: active.filter((a) => a.kind === "update").length,
+    revisions: active.filter((a) => a.kind === "revise").length,
     deletes: active.filter((a) => a.kind === "delete").length,
     total: active.length,
   };
+}
+
+/**
+ * Collect the plan-time validation warnings across all actions, tagged
+ * with the file they belong to. Feeds the `plan` / `apply --dry-run`
+ * `--json` payload so agents can read warnings structurally.
+ */
+export function collectPlanWarnings(
+  actions: ReadonlyArray<SyncAction>,
+): Array<{ path: string; rule: string; message: string }> {
+  const out: Array<{ path: string; rule: string; message: string }> = [];
+  for (const action of actions) {
+    if (action.kind !== "create" && action.kind !== "update") {
+      continue;
+    }
+    for (const warning of action.warnings ?? []) {
+      out.push({ path: action.path, rule: warning.rule, message: warning.message });
+    }
+  }
+  return out;
+}
+
+/**
+ * One entry of the `changes` array in the `plan` / `apply` `--json`
+ * payloads: which resource an action touches and how. `action` speaks the
+ * envelope's public vocabulary (`revision`, matching the `revisions`
+ * counter, not the internal `revise`). `id` is the platform id an
+ * update/delete targets; `previous_id` is the revision being superseded.
+ * The file path is the resource identity, mirroring {@link renderPlan}.
+ */
+export type PlanResourceChange = {
+  kind: ResourceSyncer["kind"];
+  action: "create" | "update" | "revision" | "delete";
+  file: string;
+  id?: string;
+  previous_id?: string;
+};
+
+/**
+ * Enumerate the non-`skip` actions of a {@link buildSyncPlan} result as
+ * envelope-ready {@link PlanResourceChange} rows. Pure; the structural
+ * counterpart of {@link summarizePlan} — counts and rows always agree.
+ */
+export function enumeratePlanResources(
+  actions: ReadonlyArray<SyncAction>,
+): PlanResourceChange[] {
+  const out: PlanResourceChange[] = [];
+  for (const action of actions) {
+    switch (action.kind) {
+      case "create":
+        out.push({ kind: action.syncer.kind, action: "create", file: action.path });
+        break;
+      case "update":
+        out.push({ kind: action.syncer.kind, action: "update", file: action.path, id: action.id });
+        break;
+      case "revise":
+        out.push({
+          kind: action.syncer.kind,
+          action: "revision",
+          file: action.path,
+          previous_id: action.previousId,
+        });
+        break;
+      case "delete":
+        out.push({ kind: action.syncer.kind, action: "delete", file: action.path, id: action.id });
+        break;
+      case "skip":
+        break;
+    }
+  }
+  return out;
 }
 
 /**
@@ -45,7 +118,7 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
 
   out.push("");
 
-  const { creates, updates, deletes } = summarizePlan(actions);
+  const { creates, updates, revisions, deletes } = summarizePlan(actions);
 
   const parts: string[] = [];
   if (creates > 0) {
@@ -54,11 +127,33 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
   if (updates > 0) {
     parts.push(`${updates} to change`);
   }
+  if (revisions > 0) {
+    parts.push(`${revisions} new revision${revisions === 1 ? "" : "s"}`);
+  }
   if (deletes > 0) {
     parts.push(`${deletes} to destroy`);
   }
 
   out.push(paint(`Plan: ${parts.join(", ")}.`, A.bold, tty));
+
+  const warningCount = active.reduce(
+    (count, action) =>
+      count +
+      ((action.kind === "create" || action.kind === "update") && action.warnings
+        ? action.warnings.length
+        : 0),
+    0,
+  );
+  if (warningCount > 0) {
+    out.push(
+      paint(
+        `Warnings: ${warningCount} (non-blocking — see the # warning lines above).`,
+        A.yellow,
+        tty,
+      ),
+    );
+  }
+
   return out.join("\n");
 }
 
@@ -283,7 +378,10 @@ function renderDiff(
         lines.push(col(`${pad}~ ${pk} = ${fmtPrimitive(oldVal)} -> ${fmtPrimitive(newVal)}`));
       }
     } else if (Array.isArray(oldVal) && Array.isArray(newVal)) {
-      if (JSON.stringify(oldVal) === JSON.stringify(newVal)) {
+      // Key-order-insensitive equality: the server echoes objects in its own
+      // field order while local files are stably sorted — that difference is
+      // not a change.
+      if (stableStringify(oldVal) === stableStringify(newVal)) {
         if (newVal.length === 0) {
           lines.push(`${pad}  ${pk} = []`);
         } else {
@@ -356,6 +454,18 @@ function resourceName(path: string): string {
 }
 
 /**
+ * Diff both sides in the syncer's canonical form so server-echoed noise
+ * (empty `audience`, spelled-out meta-schema defaults) never renders as a
+ * change the author didn't make. Rendering only — upload payloads stay raw.
+ */
+function normalized(
+  syncer: Pick<ResourceSyncer, "normalize">,
+  content: object,
+): Record<string, unknown> {
+  return (syncer.normalize?.(content) ?? content) as Record<string, unknown>;
+}
+
+/**
  * Renders one Terraform-style resource block for a single `SyncAction`.
  *
  * Per-case notes:
@@ -385,8 +495,14 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
         id: KNOWN_AFTER_APPLY,
         ...(action.content as Record<string, unknown>),
       };
+      if (action.repin) {
+        // The executor POSTs this flow with the new revision id, not the
+        // stale pin still in the file — render what will actually be sent.
+        display.user_schema = action.repin.newId ?? KNOWN_AFTER_APPLY;
+      }
       renderFields(display, "+", FIELD_COL, { tty, deleteMode: false }, lines);
       lines.push(`${closePad}}`);
+      renderWarnings(action.warnings, blkPad, tty, lines);
       break;
     }
 
@@ -410,18 +526,31 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
     }
 
     case "update": {
-      const header = `${blkPad}# ${action.path} will be updated in-place`;
+      const headerSuffix = action.repin ? " (re-pin user_schema)" : "";
+      const header = `${blkPad}# ${action.path} will be updated in-place${headerSuffix}`;
       const opening = `${blkPad}~ resource "${action.syncer.kind}" "${resourceName(action.path)}" {`;
       lines.push(paint(header, A.bold, tty));
       lines.push(paint(opening, A.yellow, tty));
 
+      // A repin update ships with `user_schema` rewritten to the revision id
+      // the revise mints (or already minted, for crash recovery) — render the
+      // content the executor will actually PUT.
+      const newContent = action.repin
+        ? {
+            ...normalized(action.syncer, action.content),
+            user_schema: action.repin.newId ?? KNOWN_AFTER_APPLY,
+          }
+        : normalized(action.syncer, action.content);
+
       if (action.oldContent) {
-        renderDiff(
-          action.oldContent as Record<string, unknown>,
-          action.content as Record<string, unknown>,
-          FIELD_COL,
-          tty,
-          lines,
+        renderDiff(normalized(action.syncer, action.oldContent), newContent, FIELD_COL, tty, lines);
+      } else if (action.repin) {
+        lines.push(
+          paint(
+            `${" ".repeat(FIELD_COL)}~ user_schema = "${action.repin.previousId}" -> ${action.repin.newId ? `"${action.repin.newId}"` : KNOWN_AFTER_APPLY}`,
+            A.yellow,
+            tty,
+          ),
         );
       } else {
         lines.push(
@@ -429,6 +558,44 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
         );
       }
       lines.push(`${closePad}}`);
+      renderWarnings(action.warnings, blkPad, tty, lines);
+      break;
+    }
+
+    case "revise": {
+      const header = `${blkPad}# ${action.path} will publish a new revision`;
+      const opening = `${blkPad}~ resource "${action.syncer.kind}" "${resourceName(action.path)}" {`;
+      lines.push(paint(header, A.bold, tty));
+      lines.push(paint(opening, A.yellow, tty));
+
+      if (action.oldContent) {
+        const oldWithId: Record<string, unknown> = {
+          id: action.previousId,
+          ...normalized(action.syncer, action.oldContent),
+        };
+        const newWithId: Record<string, unknown> = {
+          id: KNOWN_AFTER_APPLY,
+          ...normalized(action.syncer, action.content),
+        };
+        renderDiff(oldWithId, newWithId, FIELD_COL, tty, lines);
+      } else {
+        lines.push(
+          `${" ".repeat(FIELD_COL)}  # (field diff unavailable — no read endpoint for ${action.syncer.kind})`,
+        );
+      }
+      lines.push(`${closePad}}`);
+      if (action.affectedPaths.length > 0) {
+        lines.push(
+          paint(
+            `${blkPad}# user_schema will be re-pinned to the new revision ${KNOWN_AFTER_APPLY} in:`,
+            A.yellow,
+            tty,
+          ),
+        );
+        for (const path of action.affectedPaths) {
+          lines.push(paint(`${blkPad}#   - ${path}`, A.yellow, tty));
+        }
+      }
       break;
     }
 
@@ -437,4 +604,20 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
   }
 
   return lines;
+}
+
+/**
+ * Emit one yellow `# warning:` comment line per plan-time validation
+ * warning, below the action's closing brace (same channel as the revise
+ * re-pin announcement). Warnings never block the plan.
+ */
+function renderWarnings(
+  warnings: ReadonlyArray<{ message: string }> | undefined,
+  blkPad: string,
+  tty: boolean,
+  lines: string[],
+): void {
+  for (const warning of warnings ?? []) {
+    lines.push(paint(`${blkPad}# warning: ${warning.message}`, A.yellow, tty));
+  }
 }

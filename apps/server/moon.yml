@@ -87,7 +87,6 @@ tasks:
     command: "go"
     args:
       - "test"
-      - "-json"
       - "-v"
       - "-tags"
       - "postgres_integration"
@@ -98,7 +97,11 @@ tasks:
       - "@group(serverInputs)"
     options:
       runFromWorkspaceRoot: true
-      runInCI: false
+      # Invoked explicitly by the CI "Run Go integration tests (postgres)" step.
+      # runInCI must be true, otherwise moon hides the task from `moon run` in CI
+      # ("No tasks found"). It is not pulled into `moon ci :...:test` because that
+      # selects the `test` task by name, not `test-postgres`.
+      runInCI: true
 
   test-spanner:
     command: "go"

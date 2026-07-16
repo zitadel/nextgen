@@ -10,9 +10,8 @@ get:
     against the same `session_id`) to restore a dropped assurance level.
   tags:
     - Sessions
-  parameters:
-    - $ref: ../../../components/parameters/session-cookie.yaml
-  security: []
+  security:
+    - nextgenSession: []
   responses:
     '200':
       description: Session state.
@@ -33,11 +32,7 @@ get:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      description: Unexpected error.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
+      $ref: getMySession-error-response.yaml
 
 delete:
   operationId: revokeMySession
@@ -49,9 +44,8 @@ delete:
     After revocation, any tokens derived from this session are invalidated including the cookie itself, which is cleared in the response.
   tags:
     - Sessions
-  parameters:
-    - $ref: ../../../components/parameters/session-cookie.yaml
-  security: []
+  security:
+    - nextgenSession: []
   responses:
     '204':
       description: Session revoked successfully.

@@ -28,6 +28,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/domain/tokengen"
+	"github.com/zitadel/nextgen/internal/errreport"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
@@ -176,7 +177,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		userPasskeyRepo,
 		passwordHasher,
 	)
-	sessionService := service.NewSessionService(pool, sessionRepo, service.SessionConfig{
+	sessionService := service.NewSessionService(pool, sessionRepo, userRepo, service.SessionConfig{
 		DefaultTTL: cfg.Session.DefaultTTL,
 		MaxTTL:     cfg.Session.MaxTTL,
 	})
@@ -204,7 +205,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		userPasswordRepo,
 		schemaRepo,
 		passwordHasher,
-		opaqueTokenGenerator,
 	)
 
 	// ── Flow engine ──────────────────
@@ -321,10 +321,32 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("server.console_path", "/ui/console")
 	v.SetDefault("server.login_enabled", true)
 	v.SetDefault("server.login_path", "/ui/login")
-	v.SetDefault("password_hasher.hasher.algorithm", crypto.HashNameBcrypt)
-	v.SetDefault("password_hasher.hasher.cost", 10)
+	// Default to argon2id (per ADR 029). Params follow the RFC 9106 second
+	// recommended option (t=3, m=64 MiB, p=4), a good balance for servers.
+	v.SetDefault("password_hasher.hasher.algorithm", crypto.HashNameArgon2id)
+	v.SetDefault("password_hasher.hasher.time", 3)
+	v.SetDefault("password_hasher.hasher.memory", 64*1024)
+	v.SetDefault("password_hasher.hasher.threads", 4)
+	// Keep bcrypt and legacy verifiers registered so pre-existing hashes still
+	// validate and transparently rehash to argon2id on the next successful login.
+	v.SetDefault("password_hasher.verifiers", []crypto.HashName{
+		crypto.HashNameArgon2,
+		crypto.HashNameBcrypt,
+		crypto.HashNameScrypt,
+		crypto.HashNamePBKDF2,
+		crypto.HashNameSha2,
+		crypto.HashNameMd5,
+		crypto.HashNameMd5Salted,
+		crypto.HashNamePHPass,
+		crypto.HashNameDrupal7,
+	})
 	v.SetDefault("password_hasher.limits", crypto.HashLimitsConfig{
 		Bcrypt: crypto.BcryptLimitsConfig{MinCost: 10, MaxCost: 16},
+		Argon2: crypto.Argon2LimitsConfig{
+			MinTime: 1, MaxTime: 10,
+			MinMemory: 8 * 1024, MaxMemory: 512 * 1024,
+			MinThreads: 1, MaxThreads: 16,
+		},
 	})
 	v.SetDefault("schema.lru_cache_size", 1000)                                   // todo: temp, review
 	v.SetDefault("schema.builtin_public_base", "https://nextgen.com/api/schemas") // todo: temp, review
@@ -505,6 +527,10 @@ func buildCrypter(hexKey string) (crypto.Crypter, error) {
 // ----------------------------- INSTRUMENTATION --------------------------------------
 
 func setUpLogging(cfg instrumentation.LogConfig, otelProvider log.LoggerProvider) {
+	errreport.EnableLocation(cfg.Errors.ReportLocation)
+	errreport.EnableStack(cfg.Errors.StackTrace)
+	errreport.GCPReporting(cfg.Format == instrumentation.LogFormatGCPErrorReporting)
+
 	otelHandler := otelslog.NewHandler(
 		Name,
 		otelslog.WithLoggerProvider(otelProvider),

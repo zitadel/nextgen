@@ -6,6 +6,7 @@ import type {
   SubmitFlowStepBody,
   SubmitFlowStepBodyChallengeResponse,
 } from "@zitadel/api/generated/model";
+import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
@@ -25,7 +26,7 @@ import { validateBranding } from "./branding-validator.js";
 import { applyDefaultFont, applyFontUrl } from "./font-loader.js";
 import { emit } from "../internal/emit.js";
 import { escapeHtml } from "../internal/escape-html.js";
-import { createLiquidEngine } from "./liquid.js";
+import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
 import { TEMPLATE_NAMES } from "./template-names.js";
 import { en, builtinLocales, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
@@ -88,6 +89,13 @@ export class ZitadelLogin extends LitElement {
   `;
 
   @property({ type: String }) accessor purpose: CreateFlowBodyPurpose = "login";
+
+  /**
+   * Name of the flow definition to run, matching the `name` in its flow
+   * file. When set, the server resolves that definition directly instead
+   * of picking one by audience. Omit to run the project's default flow.
+   */
+  @property({ type: String, attribute: "flow-name" }) accessor flowName = "";
 
   /**
    * SDK project handle returned by `configureZitadel()`. Set from JS (or a
@@ -190,6 +198,13 @@ export class ZitadelLogin extends LitElement {
       sheet.replaceSync(layoutChromeCss);
       root.adoptedStyleSheets = [...existing, sheet];
       root.addEventListener("zl-input", this.handleAtomInput as EventListener);
+      // Editing any control (or dismissing the alert) retires the current
+      // step error. `zl-change` covers <zl-checkbox>/<zl-select>, which
+      // don't emit `zl-input`; the clearing is imperative DOM surgery so
+      // the rendered step string stays byte-identical and the subtree
+      // (including any in-flight <zl-passkey>) is never rebuilt mid-edit.
+      root.addEventListener("zl-change", this.handleAtomEdited as EventListener);
+      root.addEventListener("zl-dismiss", this.handleAlertDismiss as EventListener);
       // <zl-button> dispatches `zl-submit` for both primary submits and
       // secondary actions; the orchestrator picks the right path based on
       // the button's `type` and `action`.
@@ -375,17 +390,51 @@ export class ZitadelLogin extends LitElement {
               "`configureZitadel({ projectId })`, or a `project` handle) to start a flow.",
           );
         }
-        wire = await apiStartFlow(api, { project_id: cfg.projectId, purpose: this.purpose });
+        wire = await apiStartFlow(api, {
+          project_id: cfg.projectId,
+          purpose: this.purpose,
+          ...(this.flowName ? { flow_definition_name: this.flowName } : {}),
+        });
       }
       this.applyResponse(wire);
     } catch (error) {
-      this.handleTransportError(error);
+      this.handleTransportError(this.describeFlowSelectionError(error));
     } finally {
       this.loading = false;
     }
   }
 
+  /**
+   * When a `flow-name` lookup fails, the server's envelope only says
+   * "not found" / "purpose mismatch" — it cannot know the name came from
+   * an attribute. Rewrap those two codes with the attribute and the fix;
+   * every other error passes through untouched.
+   */
+  private describeFlowSelectionError(error: unknown): unknown {
+    if (!this.flowName || !(error instanceof ApiError)) return error;
+    const code =
+      typeof error.body === "object" && error.body !== null && "code" in error.body
+        ? String((error.body as { code: unknown }).code)
+        : "";
+    if (code === "flowdef.not_found") {
+      return new Error(
+        `<zitadel-login> flow-name="${this.flowName}" does not match any active flow ` +
+          `definition in this project. Check the \`name\` in your flow file and that ` +
+          `it has been applied (\`zitadel apply\`).`,
+      );
+    }
+    if (code === "flowdef.purpose_mismatch") {
+      return new Error(
+        `<zitadel-login> flow-name="${this.flowName}" matched a flow definition that ` +
+          `does not serve purpose "${this.purpose}".`,
+      );
+    }
+    return error;
+  }
+
   private applyResponse(wire: CreateFlow201): void {
+    // A fresh response carries fresh (or no) errors — un-dismiss.
+    this.stepErrorDismissed = false;
     this.response = wire;
     const { branding, issues } = validateBranding(wire.branding);
     this.branding = branding;
@@ -453,11 +502,26 @@ export class ZitadelLogin extends LitElement {
         ? this.branding.liquid_template
         : null;
 
-    const errors: FlowError[] = step.error
-      ? step.error.startsWith("error.")
-        ? [{ text_key: step.error }]
-        : [{ message: step.error }]
+    // `error.*` keys — the server's validation dialect
+    // (`error.<field>_<rule>`, one key per violation, "; "-joined) —
+    // localise via the catalog with generic per-rule fallbacks; anything
+    // else (outcome names, diagnostics) stays verbatim.
+    const rawErrors: FlowError[] = step.error
+      ? (localiseFlowErrorKeys(step.error, {
+          locale: this.resolveLocale(),
+          stepName: step.name ?? "",
+          // Inline-routed keys downgrade to a banner message when the
+          // step doesn't render their field — the inline outlet is the
+          // only place the template shows them.
+          fields: (step.fields ?? []).map((field) => field.name),
+        }) ?? [{ message: step.error }])
       : [];
+    // A dismissed step error must not flicker back on the `loading`
+    // re-render (the only step re-render while the user stays on this
+    // step — it rebuilds the subtree anyway). While idle the array must
+    // stay as-is: keystroke re-renders have to produce a byte-identical
+    // string, and the imperatively removed alert stays removed.
+    const errors: FlowError[] = this.loading && this.stepErrorDismissed ? [] : rawErrors;
 
     const fields = step.fields ?? [];
     const actions = step.actions ?? [];
@@ -574,14 +638,68 @@ export class ZitadelLogin extends LitElement {
     return typeof field.value === "string" ? field.value : undefined;
   }
 
+  /**
+   * True once the user retired the current step error by editing a field or
+   * dismissing the alert. Deliberately NON-reactive: consulting reactive
+   * state in `renderStep` would change its output string on the first
+   * post-dismiss keystroke, and `unsafeHTML` would rebuild the whole step
+   * subtree — wiping typed values (`hydrateStepAfterRender` only re-applies
+   * them on response changes) and reconnecting atoms. Reset on every new
+   * response; consulted only by the `loading` re-render, which rebuilds
+   * anyway.
+   */
+  private stepErrorDismissed = false;
+
   private handleAtomInput = (event: CustomEvent<{ name: string; value: string }>): void => {
     if (!event.detail) return;
     const { name, value } = event.detail;
     if (!name) return;
     this.formValues = { ...this.formValues, [name]: value };
     this.syncFieldElementValue(name, value);
+    this.clearStaleErrors(name);
     emit(this, "zitadel-flow-input", { name, value });
   };
+
+  /** `zl-change` from <zl-checkbox>/<zl-select>: only error clearing. */
+  private handleAtomEdited = (event: CustomEvent<{ name?: string }>): void => {
+    const name = event.detail?.name;
+    if (name) this.clearStaleErrors(name);
+  };
+
+  /** Explicit dismiss of the step-error alert (it removes itself). */
+  private handleAlertDismiss = (event: Event): void => {
+    const target = event.target as Element | null;
+    if (target?.matches?.("zl-alert[data-zl-step-error]")) {
+      this.stepErrorDismissed = true;
+    }
+  };
+
+  /**
+   * Retire the current step error after the user edits `fieldName`:
+   * remove the form-level alert(s) and clear the edited field's inline
+   * error — other fields' inline errors stay until they are edited.
+   * Imperative on purpose; see {@link stepErrorDismissed}.
+   */
+  private clearStaleErrors(fieldName: string): void {
+    if (!this.response?.step.error) return;
+    const root = this.shadowRoot;
+    if (!root) return;
+    if (!this.stepErrorDismissed) {
+      this.stepErrorDismissed = true;
+      for (const alert of root.querySelectorAll("zl-alert[data-zl-step-error]")) {
+        alert.remove();
+      }
+    }
+    // Schema field names are free-form (dots, quotes, `x-…#…`), so match by
+    // attribute value instead of interpolating into a CSS selector.
+    for (const field of root.querySelectorAll<HTMLElement & { invalid?: boolean; error?: string }>(
+      "zl-field",
+    )) {
+      if (field.getAttribute("name") !== fieldName || !field.invalid) continue;
+      field.invalid = false;
+      field.error = "";
+    }
+  }
 
   private syncFieldElementValue(name: string, value: string): void {
     const root = this.shadowRoot;
@@ -660,19 +778,31 @@ export class ZitadelLogin extends LitElement {
    * cancel would trigger a second ceremony (the guard prevents a third).
    */
   private handlePasskeyError = (
-    event: CustomEvent<{ challenge_id: string; error: string; aborted: boolean }>,
+    event: CustomEvent<{
+      challenge_id: string;
+      error: string;
+      aborted: boolean;
+      timed_out?: boolean;
+    }>,
   ): void => {
     if (!this.response) return;
-    const { error: message, aborted } = event.detail;
-    const errorKey = aborted ? "error.passkey_cancelled" : "error.passkey_failed";
+    const { error: message, aborted, timed_out: timedOut } = event.detail;
+    const errorKey = timedOut
+      ? "error.passkey_timeout"
+      : aborted
+        ? "error.passkey_cancelled"
+        : "error.passkey_failed";
     if (this.response.step.error === errorKey) return;
+    // This path replaces the response without going through applyResponse;
+    // the fresh error must not start life dismissed.
+    this.stepErrorDismissed = false;
     const { challenge: _dropped, ...stepWithoutChallenge } = this.response.step;
     this.response = {
       ...this.response,
       step: { ...stepWithoutChallenge, error: errorKey },
     };
     console.warn(
-      `[zitadel-login] passkey ceremony ${aborted ? "cancelled" : "failed"}: ${message}`,
+      `[zitadel-login] passkey ceremony ${timedOut ? "timed out" : aborted ? "cancelled" : "failed"}: ${message}`,
     );
   };
 
@@ -731,8 +861,14 @@ export class ZitadelLogin extends LitElement {
   }
 
   private handleTransportError(error: unknown): void {
+    // For API rejections, prefer the server's error-envelope message (e.g.
+    // which origins a project allows) over the generic "POST … returned N".
     const message =
-      error instanceof Error ? error.message : "Unexpected error contacting the Flow API.";
+      error instanceof ApiError
+        ? apiErrorMessage(error)
+        : error instanceof Error
+          ? error.message
+          : "Unexpected error contacting the Flow API.";
     this.startupError = message;
     console.error("[zitadel-login]", error);
     emit(this, "zitadel-flow-error", { message });

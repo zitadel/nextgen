@@ -22,7 +22,6 @@ func newAuthAttemptServiceForIntegration(pool database.Pool) service.AuthAttempt
 		pool,
 		repository.NewAuthAttemptRepository(pool),
 		repository.NewSessionRepository(pool),
-		repository.NewProjectRepository(pool),
 		repository.NewUserRepository(),
 		repository.NewUserPasswordRepository(),
 		repository.NewUserPasskeyRepository(),

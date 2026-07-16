@@ -1,5 +1,30 @@
 # @zitadel/server-linux-arm64
 
+## 0.1.0-alpha.17
+
+## 0.1.0-alpha.16
+
+### Patch Changes
+
+- [#526](https://github.com/zitadel/nextgen/pull/526) [`62a7982`](https://github.com/zitadel/nextgen/commit/62a79824e9574eaad1f478ef3b6d51badb4d1355) Thanks [@wim07101993](https://github.com/wim07101993)! - Default password/secret hashing is now `argon2id` (RFC 9106 second recommended
+  option: `time=3`, `memory=64 MiB`, `threads=4`) instead of bcrypt, per ADR 029.
+  Bcrypt and legacy algorithms (scrypt, pbkdf2, sha2, md5, md5salted, phpass,
+  drupal7, argon2) stay registered as verifiers, so pre-existing hashes keep
+  validating and are transparently rehashed to argon2id on the next successful
+  verification. Configure `password_hasher.hasher.algorithm` (and
+  `password_hasher.verifiers`) to override — e.g. set `bcrypt` with `cost: 10` to
+  keep the previous behavior.
+
+## 0.1.0-alpha.15
+
+## 0.1.0-alpha.14
+
+### Patch Changes
+
+- [#434](https://github.com/zitadel/nextgen/pull/434) [`ddc0c13`](https://github.com/zitadel/nextgen/commit/ddc0c1323ac7eac7332344931fe7c077857f70dc) Thanks [@vitorbari](https://github.com/vitorbari)! - Fix passkey signup silently dropping every collected user attribute except the identifier. The passkey-register now routes user creation through `UserService`.
+
+- [#453](https://github.com/zitadel/nextgen/pull/453) [`54dcc87`](https://github.com/zitadel/nextgen/commit/54dcc87084dd2d2b8314d08221354683bae64c6b) Thanks [@vitorbari](https://github.com/vitorbari)! - Add back navigation to interactive flows. The engine injects a `back` action on rendered step responses when there's a step to return to, and clears the back stack past irreversible mutations (user creation, passkey registration) and at flow termination.
+
 ## 0.1.0-alpha.13
 
 ### Patch Changes

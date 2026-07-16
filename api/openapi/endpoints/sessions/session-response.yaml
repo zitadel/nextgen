@@ -39,6 +39,27 @@ properties:
     oneOf:
       - $ref: ../../components/schemas/user-id.yaml
       - type: 'null'
+  name:
+    type: string
+    description: |
+      Human-readable name of the authenticated user, resolved from the
+      conventional user-schema properties: `name` when defined, otherwise
+      the given and family name parts joined — `givenName`/`familyName`
+      (the shipped presets' spelling) or `given_name`/`family_name`. Only
+      present on reads that hydrate the user's identity
+      (`GET /sessions/me`) and only when the session has an authenticated
+      user whose schema carries those properties; clients fall back to
+      `email`, then `user_id`.
+    example: Ada Lovelace
+  email:
+    type: string
+    description: |
+      Email address of the authenticated user, resolved from the
+      conventional `email` user-schema property. Only present on reads
+      that hydrate the user's identity (`GET /sessions/me`) and only when
+      the session has an authenticated user whose schema carries that
+      property.
+    example: ada@example.com
   factors:
     type: array
     description: |
