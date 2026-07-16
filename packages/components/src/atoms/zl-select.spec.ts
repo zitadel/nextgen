@@ -84,6 +84,20 @@ describe("<zl-select> markup", () => {
     expect(options[3]?.disabled).toBe(true);
   });
 
+  it("keeps a single leading empty option when the enum itself lists an empty member", async () => {
+    // A schema enum may explicitly list "" as an allowed value; the leading
+    // placeholder row must not produce a second, duplicate empty option.
+    const el = await mount({
+      name: "country",
+      placeholder: "Pick one",
+      options: [{ value: "", label: "Unspecified" }, ...OPTIONS],
+    });
+    const options = native(el).querySelectorAll("option");
+    const empties = [...options].filter((o) => o.value === "");
+    expect(empties.length).toBe(1);
+    expect(empties[0]?.textContent?.trim()).toBe("Pick one");
+  });
+
   it("reflects the chosen value onto the native control", async () => {
     const el = await mount({ name: "country", value: "de" });
     expect(native(el).value).toBe("de");

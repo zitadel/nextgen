@@ -91,9 +91,17 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
 
   // Leading empty row (labelled with the placeholder) so the user can return to
   // "no selection"; for a required field it's the prompt that keeps native
-  // validation blocking submit until a real choice is made.
-  const listOptions: SelectOption[] = [{ value: "", label: placeholder }, ...options];
-  const selected = options.find((option) => option.value === currentValue);
+  // validation blocking submit until a real choice is made. Any empty-valued
+  // member the caller passed is dropped first, so a schema enum that lists ""
+  // doesn't render a second, duplicate empty option (and duplicate React key).
+  const listOptions: SelectOption[] = [
+    { value: "", label: placeholder },
+    ...options.filter((option) => option.value !== ""),
+  ];
+  // Empty value is "no selection", so the trigger stays on the placeholder even
+  // if the caller's options include an empty member.
+  const selected =
+    currentValue === "" ? undefined : options.find((option) => option.value === currentValue);
 
   const setNativeRef = useCallback(
     (node: HTMLSelectElement | null) => {

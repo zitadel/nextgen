@@ -180,10 +180,12 @@ export class ZlSelect extends LitElement {
    * placeholder) so the user can return to "no selection". For a `required`
    * field this empty row is the prompt — choosing it leaves the value empty,
    * so `required` validation still blocks submit (native `<select>`
-   * semantics). The public `options` property stays the caller's list.
+   * semantics). Any empty-valued member of the caller's list is dropped first,
+   * so a schema enum that lists "" doesn't render a second, duplicate empty
+   * option. The public `options` property stays the caller's list.
    */
   private get listOptions(): ZlSelectOption[] {
-    return [{ value: "", label: this.placeholder }, ...this.options];
+    return [{ value: "", label: this.placeholder }, ...this.options.filter((o) => o.value !== "")];
   }
 
   override render() {
