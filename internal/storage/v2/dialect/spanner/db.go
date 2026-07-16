@@ -34,7 +34,9 @@ func (c client) Update(ctx context.Context, stmt spanner.Statement) (rowCount in
 }
 
 func (c client) ReadRow(ctx context.Context, table string, key spanner.Key, columns []string) (*spanner.Row, error) {
-	row, err := c.client.Single().ReadRow(ctx, table, key, columns)
+	tx := c.client.Single()
+	defer tx.Close()
+	row, err := tx.ReadRow(ctx, table, key, columns)
 	return row, wrapError(err)
 }
 

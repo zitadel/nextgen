@@ -84,7 +84,7 @@ func TestCompileReadFilterAndOrderBy(t *testing.T) {
 	assert.Equal(t, wantSQL, sql)
 	require.Len(t, args, 2)
 	assert.Equal(t, "proj_1", args[0])
-	assert.Equal(t, uint32(10), args[1])
+	assert.Equal(t, int64(10), args[1])
 }
 
 func TestCompileReadCompareGreater(t *testing.T) {
@@ -134,7 +134,7 @@ func TestCompileReadKeysetCursorAsc(t *testing.T) {
 	require.Len(t, args, 3)
 	assert.Equal(t, createdAt, args[0])
 	assert.Equal(t, "proj_1", args[1])
-	assert.Equal(t, uint32(5), args[2])
+	assert.Equal(t, int64(5), args[2])
 }
 
 func TestCompileReadStringContains(t *testing.T) {
@@ -686,7 +686,7 @@ func TestCompileLimit(t *testing.T) {
 		sql, args := compileLimitOnly(t, 25)
 		assert.Equal(t, " LIMIT @p1", sql)
 		require.Len(t, args, 1)
-		assert.Equal(t, uint32(25), args[0])
+		assert.Equal(t, int64(25), args[0])
 	})
 }
 

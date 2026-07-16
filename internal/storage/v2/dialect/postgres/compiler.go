@@ -6,6 +6,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pattern"
 )
 
 type statementCompiler struct {
@@ -184,7 +185,7 @@ func compileStringFilter[F ~uint8, T any](c *statementCompiler, filter *database
 			c.WriteString(col)
 		}
 		c.WriteString(" LIKE ")
-		compileLikePattern(c, filter.Match, value)
+		pattern.CompileLikePattern(c, filter.Match, value)
 	default:
 		panic("unknown string match")
 	}
@@ -210,6 +211,14 @@ func compileLimit(c *statementCompiler, limit uint32) {
 		c.WriteString(" LIMIT ")
 		writeArg(c, limit)
 	}
+}
+
+func (c *statementCompiler) WriteString(s string) {
+	_, _ = c.Builder.WriteString(s)
+}
+
+func (c *statementCompiler) WriteArg(arg any) {
+	writeArg(c, arg)
 }
 
 func writeArg(c *statementCompiler, arg any) {

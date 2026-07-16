@@ -34,6 +34,10 @@ func (c Client) Ping(ctx context.Context) error {
 }
 
 // Transaction implements [service.Transactioner].
+//
+// Spanner ReadWriteTransaction automatically retries aborted transactions.
+// Callers should set a deadline on ctx to bound total retry time; without a
+// deadline a conflict loop can run indefinitely.
 func (c Client) Transaction(ctx context.Context, fn func(ctx context.Context, tx service.Statementer[service.AllStatements]) error) error {
 	_, err := c.client.ReadWriteTransaction(ctx, func(ctx context.Context, rwt *spanner.ReadWriteTransaction) error {
 		tx := newTransaction(rwt)
