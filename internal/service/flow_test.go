@@ -37,16 +37,15 @@ func (s testAllStatements) CreateProject(ctx context.Context, project *domain.Pr
 	return nil
 }
 
-func (testAllStatements) UpdateProject(ctx context.Context, entity *domain.Project) error {
-	//TODO implement me
-	panic("implement me")
-}
-
 func (s testAllStatements) GetProjectByID(ctx context.Context, id string) (*domain.Project, error) {
 	if s.getProjectByID != nil {
 		return s.getProjectByID(ctx, id)
 	}
 	return nil, nil
+}
+
+func (testAllStatements) UpdateProject(context.Context, *domain.Project) error {
+	panic("unexpected call to UpdateProject")
 }
 
 func (testAllStatements) ListProjects(context.Context, *v2database.ListOptions[domain.ProjectField]) (*v2database.ListResult[*domain.Project], error) {

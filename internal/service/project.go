@@ -61,7 +61,7 @@ var _ ProjectService = (*projectService)(nil)
 
 func (s *projectService) Create(ctx context.Context, previewOrigins []string, seedDefaults bool) (_ *domain.Project, err error) {
 	// TODO: pass project name
-	project, err := domain.NewProject("", previewOrigins, s.tokenGenerator)
+	project, err := domain.NewProject("temp", previewOrigins, s.tokenGenerator)
 	if err != nil {
 		return nil, err
 	}
