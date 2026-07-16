@@ -8,8 +8,9 @@ Both get the same promise:
 
 Registration, login, and every screen around them live in your app — your
 code, your brand, your framework. What must never live in your app stays in
-Zitadel: credentials, sessions, tokens, and policy, kept with the durability
-and security discipline of a dedicated identity service. Most identity
+Zitadel: credentials, sessions, and tokens, held with the durability and
+security discipline of a dedicated identity service. Policy spans the two on
+purpose: you define it, as code, and Zitadel enforces it. Most identity
 products force a choice between a hosted UI you don't control and hand-rolled
 auth where every mistake is yours. This platform is built so you never have
 to make that choice.
@@ -65,6 +66,16 @@ Everything Zitadel can do is defined once and reachable everywhere: HTTP API,
 CLI, MCP, and console UI expose the same operations with the same semantics
 and the same permissions. A human clicks what a script pipes and an agent
 calls — nothing is dashboard-only.
+
+One contract does not mean one workflow. Resources that define the system —
+schemas, flows, policies, applications, roles — are configuration: declared
+as code in a repository, reviewed, planned, and applied. Resources the system
+accumulates by being used — registered users, sessions, tokens, events — are
+data: reachable through the same CLI and APIs, operated on rather than
+declared. The boundary is intent versus record. A bootstrap admin or a
+service account expresses intent and belongs in code; the users who register
+through your app are the record of its success, and no repository should try
+to hold them.
 
 **Today:** the OpenAPI 3.1 sources under [api/openapi/](api/openapi/) are the
 contract of record. Every CLI command runs with `--non-interactive --json`
