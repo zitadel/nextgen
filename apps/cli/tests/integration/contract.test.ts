@@ -2,9 +2,20 @@ import { mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../helpers/run-cli";
+
+// `status` probes GET /users on configured projects to stage its guidance.
+// Answer with a network error instead of letting the probe hit real DNS for
+// the fixtures' fictional hosts — the probe degrades to "unknown" (today's
+// lifecycle-only output) without depending on resolver timing.
+const server = setupServer(http.get("*/users", () => HttpResponse.error()));
+
+beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
+afterAll(() => server.close());
 
 async function scaffoldNextProject(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-contract-"));

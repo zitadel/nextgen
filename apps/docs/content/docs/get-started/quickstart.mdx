@@ -42,6 +42,8 @@ npx @zitadel/cli@alpha setup --server local
 
 In a fresh directory, setup asks which framework to scaffold. Scripted runs should pass `--framework next`, `--framework nuxt`, `--framework react`, `--framework vue`, or `--framework angular`.
 
+Setup also asks how users should sign in and scaffolds the matching schema and login flow: `--preset password-first` (the default: email + password, passkey optional during registration) or `--preset passkey-first` (a one-tap passkey up front, with an email + password fallback). The preset only picks the starting point — everything under `.zitadel/` stays editable.
+
 Setup writes the app files, `.env.local`, `zitadel.json`, and `.zitadel/**`, then installs dependencies with the detected package manager unless `--skip-install` is passed.
 
 ## Prove the browser flow
@@ -52,13 +54,24 @@ Start the generated app:
 npm run dev
 ```
 
-Then open the dev server URL, usually `http://localhost:3000/login`, and complete the browser proof:
+Then open the dev server URL, usually `http://localhost:3000/login` — **use exactly the origin setup registered** (`localhost`, not `127.0.0.1`): the origin allowlist and passkeys are bound to it, and a passkey registered under one hostname can never assert under another. Complete the browser proof:
 
 ```text
 register a user -> log out -> log in with the same user -> profile shows signed in
 ```
 
 Do not treat a rendered login form as completion. The useful proof is a full register, logout, and login loop in a real browser.
+
+## Customize the login
+
+Setup scaffolded editable copies of your user schema and login flow into `.zitadel/schemas/` and `.zitadel/flows/` — each folder has a README explaining what you can change. Edit the files, then preview and publish:
+
+```sh
+npx @zitadel/cli@alpha plan
+npx @zitadel/cli@alpha apply
+```
+
+See [Plan and apply](/docs/cli/plan-apply) for a walkthrough that adds a `company` field to registration.
 
 ## Stop or reset
 

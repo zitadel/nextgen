@@ -35,7 +35,6 @@ tasks:
       node ../../scripts/release-clean.mjs local-dist
       corepack pnpm run build
     deps:
-      - "build"
       - "generate"
     outputs:
       - "dist/**/*"

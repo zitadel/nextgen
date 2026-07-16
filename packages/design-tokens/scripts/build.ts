@@ -29,6 +29,9 @@ type Hex = string;
 type Px = number;
 type PrimitiveRef = { primitive: string };
 type SemanticValue = Hex | PrimitiveRef;
+/** A semantic colour that resolves differently per theme mode. */
+type ModeValue = { dark: SemanticValue; light?: SemanticValue };
+type ColorToken = SemanticValue | ModeValue;
 
 interface FigmaTokensFile {
   $source: Record<string, unknown>;
@@ -37,8 +40,10 @@ interface FigmaTokensFile {
     spacing: Record<string, Px>;
     cornerRadius: Record<string, Px>;
   };
+  /** Grid/layout primitives (columns, gutter, margin) owned by Figma's `layout/*` collection. */
+  layout?: Record<string, number>;
   tokens: {
-    color: Record<string, Record<string, SemanticValue>>;
+    color: Record<string, Record<string, ColorToken>>;
   };
 }
 
@@ -69,6 +74,10 @@ function resolveSemantic(value: SemanticValue): Hex {
   return typeof value === "string" ? value : resolvePrimitive(value);
 }
 
+function isModeValue(value: ColorToken): value is ModeValue {
+  return typeof value === "object" && value !== null && "dark" in value;
+}
+
 /** Convert a Figma slash path into the `--zl-*` CSS variable name. */
 function cssVarName(category: string, ...segments: string[]): string {
   const parts = [category, ...segments]
@@ -94,23 +103,33 @@ interface BuildResult {
 }
 
 function build(): BuildResult {
-  /** [zl-var-name, resolved CSS value] tuples, gathered in emit order. */
+  /** [zl-var-name, resolved CSS value] tuples for `:root` (dark), in emit order. */
   const cssVars: Array<[string, string]> = [];
-  /** Mirror structure for the typed TS `tokens` export (resolved values). */
-  const tsTree: Record<string, unknown> = { color: {}, spacing: {}, radius: {}, font: {}, motion: {}, focus: {}, breakpoint: {}, container: {} };
+  /** [zl-var-name, resolved CSS value] tuples that differ under `[data-theme="light"]`. */
+  const lightVars: Array<[string, string]> = [];
+  /** Mirror structure for the typed TS `tokens` export (resolved dark values). */
+  const tsTree: Record<string, unknown> = { color: {}, spacing: {}, radius: {}, font: {}, motion: {}, focus: {}, breakpoint: {}, container: {}, layout: {} };
   /** Mirror structure for the `cssVars` export — `var(--zl-…)` strings consumers compose into styles. */
-  const refTree: Record<string, unknown> = { color: {}, spacing: {}, radius: {}, font: {}, motion: {}, focus: {}, breakpoint: {}, container: {} };
+  const refTree: Record<string, unknown> = { color: {}, spacing: {}, radius: {}, font: {}, motion: {}, focus: {}, breakpoint: {}, container: {}, layout: {} };
 
-  const push = (cssVar: string, value: string, valuePath: string[]): void => {
+  const push = (cssVar: string, value: string, valuePath: string[], light?: string): void => {
     cssVars.push([cssVar, value]);
+    if (light !== undefined && light !== value) lightVars.push([cssVar, light]);
     setDeep(tsTree, valuePath, value);
     setDeep(refTree, valuePath, `var(${cssVar})`);
   };
 
-  // ---- semantic colours ----
+  // ---- semantic colours (mode-aware: single value = mode-independent, {dark,light} = themed) ----
   for (const [group, members] of Object.entries(figma.tokens.color)) {
     for (const [name, raw] of Object.entries(members)) {
-      push(cssVarName("color", group, name), resolveSemantic(raw), ["color", toCamel(group), toCamel(name)]);
+      const cssVar = cssVarName("color", group, name);
+      const path = ["color", toCamel(group), toCamel(name)];
+      if (isModeValue(raw)) {
+        const light = raw.light !== undefined ? resolveSemantic(raw.light) : undefined;
+        push(cssVar, resolveSemantic(raw.dark), path, light);
+      } else {
+        push(cssVar, resolveSemantic(raw), path);
+      }
     }
   }
 
@@ -159,7 +178,13 @@ function build(): BuildResult {
     push(cssVarName("container", kebab(name)), value, ["container", name]);
   }
 
-  const css = emitCss(cssVars);
+  // ---- layout: grid columns / gutter / margin (columns unitless, spacing in rem) ----
+  for (const [name, value] of Object.entries(figma.layout ?? {})) {
+    const cssValue = name === "columns" ? String(value) : pxToRem(value);
+    push(cssVarName("layout", name), cssValue, ["layout", name]);
+  }
+
+  const css = emitCss(cssVars, lightVars);
   return {
     css,
     ts: emitTs(tsTree, refTree, css),
@@ -197,10 +222,15 @@ function resolveFocusColor(): Hex {
   return resolveSemantic(raw);
 }
 
-function emitCss(vars: Array<[string, string]>): string {
+function emitCss(vars: Array<[string, string]>, lightVars: Array<[string, string]>): string {
   const body = vars.map(([k, v]) => `  ${k}: ${v};`).join("\n");
   const root = `:root,\n[data-theme="dark"] {\n${body}\n}\n`;
-  const light = `\n[data-theme="light"] {\n  /* Reserved. Light mode lands when the Figma design system publishes\n     a light variable mode; the next sync will populate this block. */\n}\n`;
+  // Light mode only overrides the tokens that actually differ; everything
+  // else inherits the dark `:root` values through the cascade.
+  const lightBody = lightVars.map(([k, v]) => `  ${k}: ${v};`).join("\n");
+  const light = lightVars.length
+    ? `\n[data-theme="light"] {\n${lightBody}\n}\n`
+    : `\n[data-theme="light"] {\n}\n`;
   return `${BANNER}${root}${light}`;
 }
 

@@ -52,6 +52,10 @@ export default class SchemasList extends BaseCommand {
       object_type: objectType,
     });
 
+    // Envelope rows are snake_case like every other command's data; the
+    // orval model's `createdAt` is not spread verbatim.
+    const revisionRows = revisions.map((r) => ({ id: r.id, created_at: r.createdAt }));
+
     if (revisions.length === 0) {
       const message = `No revisions found for objectType "${objectType}".`;
       consola.warn(message);
@@ -68,7 +72,7 @@ export default class SchemasList extends BaseCommand {
         status: "ok",
         data: {
           object_type: objectType,
-          revisions,
+          revisions: revisionRows,
           count: revisions.length,
         },
         pretty: renderTable(objectType, revisions),
@@ -86,7 +90,7 @@ export default class SchemasList extends BaseCommand {
       cancel("No revision selected.");
       return this.emit({
         status: "ok",
-        data: { object_type: objectType, revisions, count: revisions.length },
+        data: { object_type: objectType, revisions: revisionRows, count: revisions.length },
         pretty: "",
       });
     }
@@ -102,7 +106,7 @@ export default class SchemasList extends BaseCommand {
       status: "ok",
       data: {
         object_type: objectType,
-        revisions,
+        revisions: revisionRows,
         selected: { id: picked, body },
         count: revisions.length,
       },

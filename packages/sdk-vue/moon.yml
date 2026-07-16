@@ -36,7 +36,6 @@ tasks:
       node ../../scripts/release-clean.mjs local-dist
       corepack pnpm run build
     deps:
-      - "build"
       - "api:build-release"
       - "components:build-release"
       - "sdk-core:build-release"

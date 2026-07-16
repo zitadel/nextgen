@@ -1,8 +1,11 @@
-import { LitElement } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { html, LitElement, nothing } from "lit";
+import { customElement, property, state } from "lit/decorators.js";
 
 import { bufferToBase64Url, base64UrlToBuffer } from "../internal/base64url.js";
 import type { AtomManifest } from "../manifest.js";
+
+import "./zl-alert.js";
+import "./zl-button.js";
 
 /**
  * Detail shape emitted by the `zl-passkey-result` event.
@@ -30,20 +33,51 @@ export type ZlPasskeyResultDetail = {
 
 /**
  * Detail shape emitted by the `zl-passkey-error` event.
+ *
+ * `aborted` covers both programmatic aborts and the browser's
+ * `NotAllowedError` (user dismissed the prompt — or the ceremony timed
+ * out, which browsers report identically). `timed_out` refines that:
+ * true when the rejection arrived at/after the server's `options.timeout`,
+ * so callers can show timeout copy instead of "cancelled".
  */
 export type ZlPasskeyErrorDetail = {
   challenge_id: string;
   error: string;
   aborted: boolean;
+  timed_out: boolean;
 };
 
 /**
- * Atom: `<zl-passkey>` — invisible WebAuthn ceremony handler.
+ * Detail shape emitted by the `zl-passkey-started` event, fired when the
+ * WebAuthn ceremony actually begins (after the support/options guards).
+ */
+export type ZlPasskeyStartedDetail = {
+  challenge_id: string;
+  method: string;
+};
+
+/**
+ * Slack subtracted from `options.timeout` when classifying a
+ * `NotAllowedError` as a timeout: browsers clamp and fire the deadline
+ * slightly early, so an exact comparison would label real timeouts as
+ * user cancellations.
+ */
+const TIMEOUT_GRACE_MS = 1000;
+
+/**
+ * Atom: `<zl-passkey>` — WebAuthn ceremony handler.
  *
- * This component is intentionally invisible. It is mounted by the Liquid
- * template when `step.challenge.type === "passkey"`. On mount, it reads
- * the challenge options from attributes, triggers the appropriate
- * `navigator.credentials` ceremony, and emits the result.
+ * It is mounted by the Liquid template when
+ * `step.challenge.type === "passkey"`. On mount, it reads the challenge
+ * options from attributes, triggers the appropriate `navigator.credentials`
+ * ceremony, and emits the result.
+ *
+ * While the ceremony is in flight it renders a small pending UI (status
+ * line + cancel button) into its light DOM — light DOM so the markup the
+ * orchestrator renders through `unsafeHTML` stays byte-identical and the
+ * step subtree is never rebuilt mid-ceremony (a rebuild would reconnect
+ * this atom and restart the ceremony). Set `silent` to suppress the
+ * pending UI entirely.
  *
  * The orchestrator listens for `zl-passkey-result` to auto-submit the
  * proof via `challenge_response` on the flow submit body.
@@ -112,7 +146,22 @@ export class ZlPasskey extends LitElement {
    */
   @property({ type: Boolean }) accessor manual = false;
 
+  /** Status line shown while the ceremony is in flight. Template-owned copy. */
+  @property({ attribute: "pending-label" }) accessor pendingLabel = "Waiting for your passkey…";
+
+  /** Label of the cancel button shown while the ceremony is in flight. */
+  @property({ attribute: "cancel-label" }) accessor cancelLabel = "Cancel";
+
+  /** Suppresses the built-in pending UI (headless / custom-template use). */
+  @property({ type: Boolean }) accessor silent = false;
+
+  /** True from ceremony start until it resolves, rejects, or is aborted. */
+  @state() accessor pending = false;
+
   private abortController: AbortController | null = null;
+
+  /** `Date.now()` at ceremony start, for timeout classification on reject. */
+  private startedAt = 0;
 
   override connectedCallback(): void {
     super.connectedCallback();
@@ -128,11 +177,14 @@ export class ZlPasskey extends LitElement {
 
   /**
    * Abort any in-flight WebAuthn ceremony. Called automatically when the
-   * component disconnects (step change, page navigation).
+   * component disconnects (step change, page navigation) and by the
+   * pending UI's cancel button. Clears `pending` immediately — the
+   * ceremony's own `finally` no longer owns it (its controller is gone).
    */
   abort(): void {
     this.abortController?.abort();
     this.abortController = null;
+    this.pending = false;
   }
 
   /**
@@ -151,7 +203,11 @@ export class ZlPasskey extends LitElement {
     }
 
     this.abort();
-    this.abortController = new AbortController();
+    const controller = new AbortController();
+    this.abortController = controller;
+    this.pending = true;
+    this.startedAt = Date.now();
+    this.emitStarted();
 
     try {
       const credential =
@@ -170,12 +226,55 @@ export class ZlPasskey extends LitElement {
       const aborted =
         error instanceof DOMException &&
         (error.name === "AbortError" || error.name === "NotAllowedError");
+      // Browsers report a ceremony timeout as `NotAllowedError`, identical
+      // to a user dismissal. Only elapsed time tells them apart; a
+      // programmatic `AbortError` is never a timeout.
+      const timeoutMs = typeof this.options?.timeout === "number" ? this.options.timeout : null;
+      const timedOut =
+        error instanceof DOMException &&
+        error.name === "NotAllowedError" &&
+        timeoutMs !== null &&
+        Date.now() - this.startedAt >= timeoutMs - TIMEOUT_GRACE_MS;
 
       this.emitError(
         error instanceof Error ? error.message : "WebAuthn ceremony failed.",
         aborted,
+        timedOut,
       );
+    } finally {
+      // A restarted ceremony (manual `startCeremony()` while one is in
+      // flight) aborts the old run; its late `finally` must not clear the
+      // new run's pending state.
+      if (this.abortController === controller) {
+        this.pending = false;
+      }
     }
+  }
+
+  private handleCancelSubmit = (event: Event): void => {
+    // The cancel button's `zl-submit` must not reach the orchestrator's
+    // shadow-root listener — it would be treated as a step submission.
+    event.stopPropagation();
+    this.abort();
+  };
+
+  override render() {
+    if (!this.pending || this.silent) {
+      return nothing;
+    }
+    return html`
+      <div class="zl-passkey-pending" data-testid="zitadel-passkey-pending">
+        <zl-alert severity="info">${this.pendingLabel}</zl-alert>
+        <zl-button
+          hierarchy="secondary"
+          type="button"
+          block
+          data-testid="zitadel-passkey-cancel"
+          label=${this.cancelLabel}
+          @zl-submit=${this.handleCancelSubmit}
+        ></zl-button>
+      </div>
+    `;
   }
 
   /**
@@ -324,11 +423,12 @@ export class ZlPasskey extends LitElement {
     );
   }
 
-  private emitError(message: string, aborted: boolean): void {
+  private emitError(message: string, aborted: boolean, timedOut = false): void {
     const detail: ZlPasskeyErrorDetail = {
       challenge_id: this.challengeId,
       error: message,
       aborted,
+      timed_out: timedOut,
     };
     this.dispatchEvent(
       new CustomEvent("zl-passkey-error", {
@@ -339,7 +439,26 @@ export class ZlPasskey extends LitElement {
     );
   }
 
-  /** Invisible component — no shadow DOM rendering needed. */
+  private emitStarted(): void {
+    const detail: ZlPasskeyStartedDetail = {
+      challenge_id: this.challengeId,
+      method: this.method,
+    };
+    this.dispatchEvent(
+      new CustomEvent("zl-passkey-started", {
+        bubbles: true,
+        composed: true,
+        detail,
+      }),
+    );
+  }
+
+  /**
+   * Light DOM on purpose: the pending UI must land inside the
+   * orchestrator's shadow root (where the step's adopted styles apply)
+   * without altering the `unsafeHTML` step markup — runtime children don't
+   * participate in its string comparison, so the ceremony never restarts.
+   */
   override createRenderRoot(): this {
     return this;
   }
@@ -348,10 +467,19 @@ export class ZlPasskey extends LitElement {
 export const zlPasskeyManifest: AtomManifest = {
   tag: "zl-passkey",
   consumes: {},
-  attrs: ["ceremony", "method", "challenge-id", "options", "manual"],
+  attrs: [
+    "ceremony",
+    "method",
+    "challenge-id",
+    "options",
+    "manual",
+    "pending-label",
+    "cancel-label",
+    "silent",
+  ],
   parts: [],
   slots: [],
-  events: ["zl-passkey-result", "zl-passkey-error"],
+  events: ["zl-passkey-result", "zl-passkey-error", "zl-passkey-started"],
 } as const;
 
 declare global {

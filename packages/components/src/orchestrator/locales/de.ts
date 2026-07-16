@@ -137,6 +137,12 @@ export const de: Locale = {
   // --- Passkey-Anmeldung ---
   "passkey-login.title": "Mit Passkey anmelden",
 
+  // --- Step: passkey-first (Einstiegsschritt des Passkey-first-Presets) ---
+  "passkey-first.title": "Anmelden",
+  "passkey-first.description": "Verwende deinen Passkey, um fortzufahren",
+  "passkey-first.action.passkey": "Weiter mit Passkey",
+  "passkey-first.action.email_fallback": "Stattdessen E-Mail verwenden",
+
   // --- Passwort-Wiederherstellung ---
   "recover.title": "E-Mail prüfen",
   "recover.description":
@@ -148,18 +154,30 @@ export const de: Locale = {
   "submit.signin": "Anmelden",
   "action.forgot_password": "Passwort vergessen?",
   "action.cancel": "Abbrechen",
+  // Generische Rückfalloption für den von der Engine injizierten
+  // `<step>.action.back`-Schlüssel (siehe INJECTED_KEY_FALLBACKS in liquid.ts).
+  "action.back": "Zurück",
 
   // --- SSO ---
   "sso.redirect.title": "Weiterleitung zum Anbieter…",
 
+  // --- Passkey-Vorgang ---
+  "passkey.pending.status": "Warten auf deinen Passkey…",
+
   // --- Passkey-Fehler ---
-  "error.passkey_cancelled": "Passkey-Einrichtung wurde abgebrochen",
+  "error.passkey_cancelled": "Die Passkey-Abfrage wurde vorzeitig geschlossen.",
+  "error.passkey_timeout":
+    "Die Passkey-Anfrage hat zu lange gedauert. Bitte versuche es erneut.",
   "error.passkey_not_registered":
     "Dieser Passkey ist nicht registriert. Bitte melde dich mit E-Mail und Passwort an.",
   "error.passkey_setup_failed":
     "Passkey-Registrierung wurde nicht abgeschlossen. Bitte versuche es erneut.",
   "error.passkey_unsupported": "Dieses Gerät unterstützt keine Passkeys",
   "error.passkey_failed": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+  "error.passkey_invalid":
+    "Dieser Passkey konnte nicht bestätigt werden. Bitte versuche es erneut.",
+  "error.passkey_registration_invalid":
+    "Der neue Passkey konnte nicht bestätigt werden. Bitte registriere ihn erneut.",
 
   // --- Feld- / Formularfehler ---
   "error.email_required": "Bitte gib eine E-Mail-Adresse ein",
@@ -169,6 +187,13 @@ export const de: Locale = {
   "error.email_exists": "Ein Konto mit dieser E-Mail-Adresse existiert bereits.",
   "error.invalid_credentials": "Falsche E-Mail oder falsches Passwort.",
   "error.required": "Dieses Feld ist erforderlich.",
+
+  // --- Generische Feldregel-Fallbacks ({0} = Feldbezeichnung) ---
+  "error.field_required": "{0} ist erforderlich.",
+  "error.field_format": "Bitte gib einen gültigen Wert für {0} ein.",
+  "error.field_min_length": "{0} ist zu kurz.",
+  "error.field_max_length": "{0} ist zu lang.",
+  "error.field_invalid": "Bitte überprüfe {0}.",
 
   // --- Formular-Alerts ---
   "error.sign_in_server.title": "Anmeldung konnte nicht abgeschlossen werden.",

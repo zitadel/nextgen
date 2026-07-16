@@ -37,7 +37,10 @@ describe("QwikPatcher.plan", () => {
   it("writes the managed app.tsx and merges the Vite config", () => {
     const plan = new QwikPatcher().plan(ctx());
     expect(writeContents(plan, "src/app.tsx")).toContain(MANAGED_MARKER);
-    const edit = plan.ops.find((op): op is Extract<FileOp, { kind: "edit" }> => op.kind === "edit");
+    const edit = plan.ops.find(
+      (op): op is Extract<FileOp, { kind: "edit" }> =>
+        op.kind === "edit" && String(op.path).includes("vite.config"),
+    );
     expect(edit?.path).toContain("vite.config.ts");
   });
 

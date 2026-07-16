@@ -23,7 +23,7 @@
     "oxlint": "catalog:",
     "sharp": "catalog:",
     "typescript": "catalog:",
-    "verdaccio": "6.2.2",
+    "verdaccio": "6.7.4",
     "vite": "catalog:",
     "vitest": "catalog:"
   },
@@ -47,7 +47,9 @@
       ]
     },
     "overrides": {
-      "@types/react": "^19.2.14"
+      "@types/react": "^19.2.14",
+      "launch-editor": "2.14.1",
+      "qs": "6.15.3"
     }
   }
 }

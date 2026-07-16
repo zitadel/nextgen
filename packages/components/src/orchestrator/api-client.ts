@@ -35,15 +35,12 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 const apiRequestInit: RequestInit = { credentials: "include" };
 
 /**
- * The signed-in session as the orchestrator renders it. `name` and `email` are
- * not yet in the generated `GetMySession200` schema — the server returns only
- * `user_id` today — so they are read speculatively and light up automatically
- * once the backend includes them on `GET /sessions/me`.
+ * The signed-in session as the orchestrator renders it. `GET /sessions/me`
+ * hydrates the user's conventional identity attributes, so the generated
+ * schema carries optional `name` and `email` alongside `user_id`; both stay
+ * absent for anonymous sessions and schemas without those properties.
  */
-export type SessionIdentity = GetMySession200 & {
-  readonly name?: string;
-  readonly email?: string;
-};
+export type SessionIdentity = GetMySession200;
 
 export async function startFlow(api: ZitadelApi, input: CreateFlowBody): Promise<CreateFlow201> {
   return api.createFlow(input, apiRequestInit);
@@ -96,7 +93,7 @@ export async function exchangeSession(
  * orchestrator's signed-in surfaces to render the user's identity.
  */
 export async function getSession(api: ZitadelApi): Promise<SessionIdentity> {
-  return (await api.getMySession(apiRequestInit)) as SessionIdentity;
+  return api.getMySession(apiRequestInit);
 }
 
 /**

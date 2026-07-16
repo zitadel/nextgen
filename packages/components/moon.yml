@@ -5,6 +5,7 @@ stack: "frontend"
 dependsOn:
   - "api"
   - "api-mock"
+  - "config"
   - "design-tokens"
   - "shared-component-styles"
 
@@ -20,6 +21,7 @@ tasks:
     command: "corepack pnpm exec tsc --noEmit -p tsconfig.json"
     deps:
       - "api:build"
+      - "config:build"
       - "design-tokens:build"
       - "shared-component-styles:build"
 
@@ -37,7 +39,6 @@ tasks:
       node ../../scripts/release-clean.mjs local-dist
       corepack pnpm run build
     deps:
-      - "build"
       - "api:build-release"
       - "design-tokens:build"
       - "shared-component-styles:build"
@@ -55,6 +56,7 @@ tasks:
     deps:
       - "api:build"
       - "api-mock:build"
+      - "config:build"
       - "design-tokens:build"
       - "shared-component-styles:build"
 
