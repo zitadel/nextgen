@@ -29,6 +29,36 @@ Those are the same properties that make a platform pleasant for people, which
 is why this vision never separates the two audiences. What serves the agent
 serves the developer.
 
+## Still a customer identity platform
+
+Agent-native does not change what Zitadel is for. This is customer identity
+and access management (CIAM): the people who register through your app —
+consumers in a B2C product, organizations and their members in a B2B one —
+remain the center of gravity. Agents do not replace them. They arrive
+alongside them, as a class of actor that needs the same rigor humans already
+get.
+
+"Agent" also means more than one thing to an identity platform, and the
+pillars below serve every meaning:
+
+- **The builder** scaffolds working auth into an app (pillar 1).
+- **The operator** inspects and manages resources through the same contract
+  humans use (pillar 2).
+- **The principal** holds an identity of its own, with access rights and a
+  lifecycle: provisioned, rotated, revoked, retired (pillar 4).
+- **The client** authenticates as itself to use a product, the way a coding
+  agent signs into an API (pillar 4).
+- **The delegate** acts on a user's behalf with explicitly granted,
+  attributable authority (pillar 4) — delegation, never impersonation. An
+  audit trail that names the user when an agent acted is a lie; the
+  delegation chain keeps it honest.
+
+One agent is often several of these within a single task — client in one
+call, delegate in the next. Classic IAM assumes a principal with a stable
+role; agents are polymorphic principals, and the primitives that serve them
+have to compose. The run-time roles share pillar 4's status: long-term goal,
+target design.
+
 ## What this repository is
 
 This preview rebuilds Zitadel's storage core and API surface — work that cuts
@@ -111,11 +141,12 @@ agents, no black box between them.
 Products now ship with agents inside, and the companies building them — B2C
 or B2B — inherit a question network operators answered for humans long ago
 with AAA: authentication, authorization, and accounting. Agents need the same
-treatment. Give an agent an identity of its own, record the delegation chain
-— which user granted which scope to which agent — and account for every
-action the agent takes on someone's behalf. Any product with agents in it
-must be able to answer: who authorized this agent to do what, and did it stay
-within scope?
+treatment in every run-time role they take — principal, client, delegate.
+Give an agent an identity of its own, let it authenticate as itself, record
+the delegation chain — which user granted which scope to which agent — and
+account for every action it takes on someone's behalf. Any product with
+agents in it must be able to answer: who authorized this agent to do what,
+and did it stay within scope?
 
 This is the platform's long-term goal. It is target design, not shipped
 capability: the standards underneath (token exchange, actor claims, MCP
