@@ -503,6 +503,62 @@ func TestFlowStateMachine_Process_OmittedRequiredFieldKeepsStep(t *testing.T) {
 	}
 }
 
+// The passkey-register issue leg collects the step's fields, so an omitted
+// required field must halt instead of minting a challenge that only fails
+// later at create_user.
+func TestFlowStateMachine_Process_PasskeyRegisterOmittedRequiredFieldKeepsStep(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	show := domain.FlowStepCompleteShow
+	def := &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-passkey-reg-required",
+		UserSchema: defaultSchemaURL,
+		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeRegister: "register"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "register",
+				Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionPasskeyRegister, Kind: domain.FlowActionKindPasskeyRegister, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionPasskeyRegister: {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	// No IssuePasskeyRegistrationChallenge expectation: the missing required
+	// field must halt before any challenge is minted.
+
+	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskeyRegister,
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result.Step)
+	assert.Equal(t, "register", result.Step.Name)
+	assert.Nil(t, result.Step.Challenge, "no challenge may be issued when a required field is missing")
+	if assert.NotNil(t, result.Step.Error) {
+		assert.Equal(t, "error.email_required", *result.Step.Error)
+	}
+}
+
 func TestFlowStateMachine_Process_IntegrityOnMissingTargetStep(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)

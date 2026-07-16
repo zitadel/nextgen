@@ -403,10 +403,9 @@ func (r *FlowStateMachineRuntime) resolveInputs(pc *processCtx) (FlowResolvedFie
 // them into CollectedData. Returns a rendered halt step on validation
 // failure.
 //
-// Every action validates the values it sent. Only the submit action —
-// which collects the step's fields — also requires the declared required
-// fields to be present; other kinds (passkey, challenge answers) may send
-// a subset or none.
+// Every action validates the values it sent; field-collecting actions
+// (see [collectsStepFields]) additionally require declared required fields
+// to be present.
 func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved FlowResolvedFields, actionKind FlowActionKind) (*FlowStepResult, error) {
 	var errs FlowFieldValidationErrors
 	if validationErr := r.fields.Validate(resolved, pc.in.Fields); validationErr != nil {
@@ -416,7 +415,7 @@ func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved Flow
 		}
 		errs = append(errs, v...)
 	}
-	if actionKind == FlowActionKindSubmit {
+	if collectsStepFields(actionKind, pc.in) {
 		errs = append(errs, r.fields.MissingRequired(resolved, pc.in.Fields)...)
 	}
 	if len(errs) > 0 {
@@ -1168,6 +1167,17 @@ func (r *FlowStateMachineRuntime) buildStep(state *FlowState, step *FlowDefiniti
 		Actions:      actions,
 		SSOProviders: nil,
 	}
+}
+
+// collectsStepFields reports whether a submission commits the step's
+// fields to user creation: the submit action, or the passkey-register
+// issue leg (no proof yet). These enforce required-field presence; passkey
+// login legs and challenge-verify legs send a subset or none.
+func collectsStepFields(kind FlowActionKind, in FlowSubmitInput) bool {
+	if kind == FlowActionKindSubmit {
+		return true
+	}
+	return kind == FlowActionKindPasskeyRegister && in.ChallengeResponse == nil
 }
 
 // stepHasActionKind reports whether the step declares any action of the

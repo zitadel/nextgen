@@ -30,8 +30,9 @@ type FlowFieldResolver interface {
 	Validate(fields FlowResolvedFields, values map[string]any) error
 
 	// MissingRequired reports the required fields absent from values.
-	// Applied only on the field-collecting submit action; other actions
-	// legitimately submit a subset of fields or none.
+	// Applied only on field-collecting actions (the submit action and the
+	// passkey-register issue leg); other actions legitimately submit a
+	// subset of fields or none.
 	MissingRequired(fields FlowResolvedFields, values map[string]any) FlowFieldValidationErrors
 }
 

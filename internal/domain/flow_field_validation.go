@@ -78,8 +78,8 @@ func (r *SchemaFieldResolver) Validate(fields FlowResolvedFields, values map[str
 // MissingRequired reports a required violation for every declared
 // required field absent from values — the unset controls clients omit
 // (e.g. an unselected select) that [SchemaFieldResolver.Validate] never
-// sees. Apply on the submit action, which collects the step's fields;
-// skip it where actions send a subset or none. Returns nil when none
+// sees. Apply on field-collecting actions (submit, passkey-register issue
+// leg); skip it where actions send a subset or none. Returns nil when none
 // are missing.
 func (r *SchemaFieldResolver) MissingRequired(fields FlowResolvedFields, values map[string]any) FlowFieldValidationErrors {
 	var errs FlowFieldValidationErrors
