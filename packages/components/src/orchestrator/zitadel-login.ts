@@ -625,6 +625,45 @@ export class ZitadelLogin extends LitElement {
   }
 
   /**
+   * Names of the current step's `required` fields whose captured value is
+   * empty. Reads each atom's live `formValue` (the getter reflects the native
+   * control, so autofill that skipped `input` events is still seen), so this
+   * is browser-independent and does not rely on native constraint validation.
+   */
+  private missingRequiredFields(): string[] {
+    const values = new Map<string, string>();
+    for (const atom of this.fieldAtoms()) {
+      const name = atom.getAttribute("name");
+      if (name) values.set(name, atom.formValue);
+    }
+    const missing: string[] = [];
+    for (const field of this.response?.step.fields ?? []) {
+      if (field.required && (values.get(field.name) ?? "") === "") {
+        missing.push(field.name);
+      }
+    }
+    return missing;
+  }
+
+  /**
+   * Surface a client-side required-field error using the server's own
+   * validation dialect (`error.<field>_required`, "; "-joined), so it flows
+   * through the same localisation and inline/banner routing as a real
+   * backend rejection — no native browser bubble. Idempotent: re-running with
+   * the same keys (both submit entry points fire on one click) is a no-op.
+   */
+  private reportRequiredErrors(fields: readonly string[]): void {
+    if (!this.response) return;
+    const errorKey = fields.map((name) => `error.${name}_required`).join("; ");
+    if (this.response.step.error === errorKey) return;
+    this.stepErrorDismissed = false;
+    this.response = {
+      ...this.response,
+      step: { ...this.response.step, error: errorKey },
+    };
+  }
+
+  /**
    * Snapshot the current step's field values straight from the rendered input
    * atoms through their uniform `formValue` contract. Tag-agnostic: every
    * form-participating atom is read the same way, so a new field type needs no
@@ -761,6 +800,18 @@ export class ZitadelLogin extends LitElement {
     // navigate to whatever `action` URL the form has (none) and lose state.
     event.preventDefault();
     if (this.loading) return;
+    // This is the sole submit path for the primary action (submit-type
+    // <zl-button> and Enter both drive `form.requestSubmit()`; the button no
+    // longer emits a parallel `zl-submit`). Enforce the step's required fields
+    // here and surface a styled, localised error instead of submitting an
+    // empty required value for the server to reject. Secondary actions (back,
+    // skip, passkey…) arrive via `zl-submit` → `handleAtomSubmit`, so they are
+    // never gated.
+    const missing = this.missingRequiredFields();
+    if (missing.length > 0) {
+      this.reportRequiredErrors(missing);
+      return;
+    }
     // `submitter` is the button that triggered the submit. When the user
     // pressed Enter inside a `<zl-field>`, the field calls
     // `form.requestSubmit()` with no submitter, so we fall back to the first

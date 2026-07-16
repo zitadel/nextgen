@@ -317,17 +317,14 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     expect(enterBody.fields).toEqual({ email: "alice@acme.com", password: "hunter2" });
   });
 
-  it("does not submit stale values after a field is cleared", async () => {
+  it("submits the current field value, not a stale cached one", async () => {
     const element = await mount();
     const root = element.shadowRoot!;
     await fillNativeField(root, "email", "alice@acme.com");
     await fillNativeField(root, "password", "hunter2");
-    const passwordField = root.querySelector('zl-field[name="password"]') as HTMLElement & {
-      value: string;
-      updateComplete: Promise<unknown>;
-    };
-    passwordField.value = "";
-    await passwordField.updateComplete;
+    // Re-type the password: the submit must carry the live value read from the
+    // atom at submit time, not the first value cached in `formValues`.
+    await fillNativeField(root, "password", "hunter3");
     const submit = root.querySelector('zl-button[action="submit"]') as HTMLElement & {
       updateComplete: Promise<unknown>;
     };
@@ -341,7 +338,7 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     const body = JSON.parse(String(stub.calls[1]?.init?.body ?? "{}")) as {
       fields?: Record<string, string>;
     };
-    expect(body.fields).toEqual({ email: "alice@acme.com", password: "" });
+    expect(body.fields).toEqual({ email: "alice@acme.com", password: "hunter3" });
   });
 
   it("ignores a duplicate submit while the first request is in-flight", async () => {
@@ -384,6 +381,89 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     expect(primary).toBeTruthy();
     await waitFor(() => (element.shadowRoot?.activeElement === primary ? primary : null));
     expect(element.shadowRoot?.activeElement).toBe(primary);
+  });
+
+  // Regression: a required <zl-select> must gate submission client-side just
+  // like a required <zl-field>. The submit-type <zl-button> delegates to
+  // form.requestSubmit() (no parallel `zl-submit`), and the orchestrator
+  // blocks the empty required field, surfacing a styled, localised error
+  // through the server's own `error.<field>_required` dialect — not a native
+  // browser bubble.
+  const registerSelectStep: CreateFlow201 = {
+    id: "flow_1",
+    session_id: "sess_1",
+    session_token: "tok_1",
+    step: {
+      name: "register",
+      texts: { title_key: "register.title" },
+      fields: [
+        {
+          name: "favoriteColor",
+          type: "select",
+          text_key: "register.field.favoriteColor",
+          required: true,
+          validation: { enum: ["Red", "Green", "Blue"] },
+        },
+      ],
+      actions: [{ name: "submit", text_key: "submit.register", primary: true }],
+      gates: {},
+    },
+  };
+
+  async function mountRegisterSelect(): Promise<ZitadelLogin> {
+    stub.restore();
+    stub = installFlowFetchStub([registerSelectStep, passkeyUpsellStep]);
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "register";
+    element.project = testProject;
+    host.appendChild(element);
+    await waitFor(() => (element.shadowRoot?.querySelector("zl-select") ? element : null));
+    await waitFor(() => (element.getAttribute("aria-busy") === "false" ? element : null));
+    return element;
+  }
+
+  it("blocks submit and shows a styled required error when a select is empty", async () => {
+    const element = await mountRegisterSelect();
+    const root = element.shadowRoot!;
+    const submit = root.querySelector('zl-button[action="submit"]') as HTMLElement & {
+      updateComplete: Promise<unknown>;
+    };
+    await submit.updateComplete;
+    submit.shadowRoot?.querySelector("button")?.click();
+    // Give any (unwanted) async submit a chance to fire.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    // Only the initial flow-create call happened; the submit was blocked by
+    // the client-side required check on the empty select.
+    expect(stub.calls).toHaveLength(1);
+    // The error is surfaced through our own <zl-alert>, localised via the
+    // `error.field_required` fallback — not a native browser validation bubble.
+    const alert = await waitFor(() => root.querySelector("zl-alert[severity='error']"));
+    expect(alert?.textContent ?? "").toContain("required");
+  });
+
+  it("submits once a required select has a chosen value", async () => {
+    const element = await mountRegisterSelect();
+    const root = element.shadowRoot!;
+    const select = root.querySelector('zl-select[name="favoriteColor"]') as HTMLElement & {
+      updateComplete: Promise<unknown>;
+    };
+    await select.updateComplete;
+    const native = select.shadowRoot?.querySelector("select") as HTMLSelectElement;
+    native.value = "Green";
+    native.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+    await select.updateComplete;
+
+    const submit = root.querySelector('zl-button[action="submit"]') as HTMLElement & {
+      updateComplete: Promise<unknown>;
+    };
+    await submit.updateComplete;
+    submit.shadowRoot?.querySelector("button")?.click();
+
+    await waitFor(() => (stub.calls.length > 1 ? stub.calls : null));
+    const body = JSON.parse(String(stub.calls[1]?.init?.body ?? "{}")) as {
+      fields?: Record<string, string>;
+    };
+    expect(body.fields).toEqual({ favoriteColor: "Green" });
   });
 
   // Regression: frameworks like @lit/react attach the element first and
