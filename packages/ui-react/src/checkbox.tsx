@@ -1,4 +1,4 @@
-import { forwardRef, type InputHTMLAttributes, type ReactNode } from "react";
+import { forwardRef, type InputHTMLAttributes, type ReactNode, useId } from "react";
 
 import { Icon } from "./icon.js";
 import { cx } from "./utils.js";
@@ -31,7 +31,10 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Che
 ) {
   const isDisabled = disabled === true;
   const showError = Boolean(error);
-  const errorId = id ? `${id}-error` : undefined;
+  // Fall back to a generated id so the error stays wired to the input via
+  // aria-describedby even when the caller doesn't pass one (matches Select).
+  const reactId = useId();
+  const errorId = `${id ?? reactId}-error`;
   return (
     <div className="zr-checkbox-field">
       <label
