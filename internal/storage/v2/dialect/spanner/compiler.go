@@ -214,7 +214,7 @@ func compileLimit(c *statementCompiler, limit uint32) {
 }
 
 func (c *statementCompiler) WriteString(s string) {
-	_, _ = c.Builder.WriteString(s)
+	c.Builder.WriteString(s)
 }
 
 func (c *statementCompiler) WriteArg(arg any) {

@@ -14,7 +14,7 @@ type testCompiler struct {
 }
 
 func (c *testCompiler) WriteString(s string) {
-	_, _ = c.Builder.WriteString(s)
+	c.Builder.WriteString(s)
 }
 
 func (c *testCompiler) WriteArg(arg any) {
