@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 // TestGetMySession_Identity drives the HTTP path a signed-in app takes after
@@ -24,6 +25,11 @@ func TestGetMySession_Identity(t *testing.T) {
 	testServer := harness.EnsureTestServer(t)
 
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	require.NoError(t, err)
+
+	dek, err := harness.EnsureKeyService(t).GetProjectDEKCrypter(t.Context(), service.GetProjectDEKInput{ProjectID: project.ID})
+	require.NoError(t, err)
+	projectSecret, err := project.ProjectSecret(dek)
 	require.NoError(t, err)
 
 	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
@@ -74,7 +80,8 @@ func TestGetMySession_Identity(t *testing.T) {
 		testServer.URL+"/sessions/exchange?project_id="+project.ID, bytes.NewReader(exchangeBody))
 	require.NoError(t, err)
 	exchangeReq.Header.Set("Content-Type", "application/json")
-	exchangeReq.Header.Set("Authorization", "Bearer "+project.ProjectSecret)
+
+	exchangeReq.Header.Set("Authorization", "Bearer "+projectSecret)
 
 	exchangeResp, err := testServer.Client().Do(exchangeReq)
 	require.NoError(t, err)
