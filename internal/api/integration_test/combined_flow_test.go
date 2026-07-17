@@ -73,13 +73,12 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	require.Equal(t, "register-identifier", flipOK.Response.Step.Name, "user_not_found must flip to register-identifier")
 	zflow = mustExtractZflow(t, flipOK.SetCookie.Value)
 
-	// Complete the register-identifier step with additional profile fields.
+	// Complete the register-identifier step. The default schema collects only
+	// email (the minimal use case), so that is all the register step carries.
 	idResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
-			"email":      jx.Raw(`"` + newEmail + `"`),
-			"givenName":  jx.Raw(`"Flip"`),
-			"familyName": jx.Raw(`"User"`),
+			"email": jx.Raw(`"` + newEmail + `"`),
 		}),
 	}, api.SubmitFlowStepParams{
 		ID:    flowID,
@@ -161,7 +160,7 @@ func combinedPasswordFlowDefinition(userSchema string) api.FlowDefinition {
 			},
 			{
 				Name:   "register-identifier",
-				Fields: []string{"email", "givenName", "familyName"},
+				Fields: []string{"email"},
 				Actions: []api.StepAction{
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 					{Name: "login", Kind: api.StepActionKindSubmit},
