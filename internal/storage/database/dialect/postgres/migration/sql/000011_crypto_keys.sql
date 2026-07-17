@@ -1,5 +1,5 @@
 -- +goose Up
-CREATE TABLE zitadel_nextgen.deks
+CREATE TABLE zitadel_nextgen.encryption_keys
 (
     project_id   TEXT COLLATE "C" NOT NULL
         REFERENCES zitadel_nextgen.projects (id)
@@ -18,8 +18,8 @@ CREATE TABLE zitadel_nextgen.deks
 -- A project has at most one active DEK. This partial unique index enforces that
 -- invariant and backs the GetActiveDEK lookup (project_id + state = 'active').
 CREATE UNIQUE INDEX uq_deks_active_per_project
-    ON zitadel_nextgen.deks (project_id) WHERE state = 'active' AND purpose = 'dek';
+    ON zitadel_nextgen.encryption_keys (project_id) WHERE state = 'active' AND purpose = 'dek';
 
 -- +goose Down
 DROP INDEX IF EXISTS zitadel_nextgen.uq_deks_active_per_project;
-DROP TABLE IF EXISTS zitadel_nextgen.deks;
+DROP TABLE IF EXISTS zitadel_nextgen.encryption_keys;

@@ -35,7 +35,7 @@ func TestNewDEK(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, dek)
 
-		assert.NotEmpty(t, dek.Id)
+		assert.NotEmpty(t, dek.ID)
 		assert.Equal(t, projectID, dek.ProjectID)
 		assert.Equal(t, alg, dek.Algorithm)
 		assert.Equal(t, KeyStateNotActiveYet, dek.State)
@@ -56,7 +56,7 @@ func TestNewDEK(t *testing.T) {
 		b, err := NewDEK("proj", jose.A256GCM, kek)
 		require.NoError(t, err)
 		assert.NotEqual(t, a.Key, b.Key)
-		assert.NotEqual(t, a.Id, b.Id)
+		assert.NotEqual(t, a.ID, b.ID)
 	})
 
 	t.Run("encrypt error is propagated", func(t *testing.T) {
@@ -89,51 +89,6 @@ func TestDEK_Activate(t *testing.T) {
 
 		assert.Equal(t, KeyState(KeyStateExpired), current.State)
 		require.NotNil(t, current.RetiredAt)
-		assert.Equal(t, KeyState(KeyStateActive), k.State)
-		require.NotNil(t, k.ActivatedAt)
-	})
-}
-
-func TestDEK_Expire(t *testing.T) {
-	t.Run("nil replacement", func(t *testing.T) {
-		k := &EncryptionKey{State: KeyStateActive}
-		err := k.Expire(nil)
-		require.Error(t, err)
-		assertDomainErrorCode(t, err, ErrNoReplacementKey().Code)
-	})
-
-	t.Run("with replacement", func(t *testing.T) {
-		replacement := &EncryptionKey{State: KeyStateActive}
-		k := &EncryptionKey{State: KeyStateNotActiveYet}
-
-		err := k.Expire(replacement)
-		require.NoError(t, err)
-
-		assert.Equal(t, KeyState(KeyStateExpired), replacement.State)
-		require.NotNil(t, replacement.RetiredAt)
-		assert.Equal(t, KeyState(KeyStateActive), k.State)
-		require.NotNil(t, k.ActivatedAt)
-		assert.Equal(t, *replacement.RetiredAt, *k.ActivatedAt)
-	})
-}
-
-func TestDEK_Remove(t *testing.T) {
-	t.Run("nil replacement", func(t *testing.T) {
-		k := &EncryptionKey{State: KeyStateActive}
-		err := k.Remove(nil)
-		require.Error(t, err)
-		assertDomainErrorCode(t, err, ErrNoReplacementKey().Code)
-	})
-
-	t.Run("with replacement", func(t *testing.T) {
-		replacement := &EncryptionKey{State: KeyStateActive}
-		k := &EncryptionKey{State: KeyStateNotActiveYet}
-
-		err := k.Remove(replacement)
-		require.NoError(t, err)
-
-		assert.Equal(t, KeyState(KeyStateRemoved), replacement.State)
-		require.NotNil(t, replacement.RetiredAt)
 		assert.Equal(t, KeyState(KeyStateActive), k.State)
 		require.NotNil(t, k.ActivatedAt)
 	})
@@ -173,7 +128,7 @@ func TestDEK_Crypter(t *testing.T) {
 		encrypted, err := kek.Encrypt(key)
 		require.NoError(t, err)
 
-		dek := &EncryptionKey{Id: "dek_1", Key: encrypted, Algorithm: jose.A256GCM}
+		dek := &EncryptionKey{ID: "dek_1", Key: encrypted, Algorithm: jose.A256GCM}
 		crypter, err := dek.Crypter(kek)
 		require.NoError(t, err)
 		require.NotNil(t, crypter)

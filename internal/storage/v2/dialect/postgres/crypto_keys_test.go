@@ -32,7 +32,7 @@ func uniqueKeyID(t *testing.T) string {
 // newTestKey builds a persistable DEK in the given state referencing projectID.
 func newTestKey(id, projectID string, state crypto.KeyState) *crypto.EncryptionKey {
 	return &crypto.EncryptionKey{
-		Id:        id,
+		ID:        id,
 		ProjectID: projectID,
 		Key:       "this is normally an encrypted key",
 		Algorithm: jose.A256GCM,
@@ -65,7 +65,7 @@ func TestCryptoKeyStatements_CreateEncryptionKey(t *testing.T) {
 
 		stored, err := testPool.GetEncryptionKey(t.Context(), database.Equal(database.Col(crypto.EncryptionKeyFieldProjectID), projectID))
 		require.NoError(t, err)
-		assert.Equal(t, key.Id, stored.Id)
+		assert.Equal(t, key.ID, stored.ID)
 		assert.Equal(t, projectID, stored.ProjectID)
 		assert.Equal(t, key.Key, stored.Key)
 		assert.Equal(t, jose.A256GCM, stored.Algorithm)
@@ -82,7 +82,7 @@ func TestCryptoKeyStatements_CreateEncryptionKey(t *testing.T) {
 		dek := newTestKey(uniqueKeyID(t), projectID, crypto.KeyStateActive)
 		require.NoError(t, testPool.CreateEncryptionKey(t.Context(), dek))
 
-		err := testPool.CreateEncryptionKey(t.Context(), newTestKey(dek.Id, projectID, crypto.KeyStateActive))
+		err := testPool.CreateEncryptionKey(t.Context(), newTestKey(dek.ID, projectID, crypto.KeyStateActive))
 		assert.Error(t, err)
 	})
 
@@ -125,7 +125,7 @@ func TestCryptoKeyStatements_GetEncryptionKey(t *testing.T) {
 				database.Equal(database.Col(crypto.EncryptionKeyFieldState), crypto.KeyStateActive),
 			))
 		require.NoError(t, err)
-		assert.Equal(t, active.Id, stored.Id)
+		assert.Equal(t, active.ID, stored.ID)
 		assert.EqualValues(t, crypto.KeyStateActive, stored.State)
 	})
 

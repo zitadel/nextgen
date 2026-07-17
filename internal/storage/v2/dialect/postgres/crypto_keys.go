@@ -19,21 +19,21 @@ func newCryptoKeyStatements(client queryExecutor) cryptoKeyStatements {
 	}
 }
 
-const createDEKStmt = `
-	INSERT INTO zitadel_nextgen.deks (id, project_id, key, algorithm, state, activated_at, retired_at, purpose)
+const createKeyStmt = `
+	INSERT INTO zitadel_nextgen.encryption_keys (id, project_id, key, algorithm, state, activated_at, retired_at, purpose)
 	VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	RETURNING id, created_at
 `
 
 func (s cryptoKeyStatements) CreateEncryptionKey(ctx context.Context, key *crypto.EncryptionKey) error {
-	return s.client.QueryRow(ctx, createDEKStmt,
-		key.Id, key.ProjectID, key.Key, key.Algorithm, key.State, key.ActivatedAt, key.RetiredAt, key.Purpose,
-	).Scan(&key.Id, &key.CreatedAt)
+	return s.client.QueryRow(ctx, createKeyStmt,
+		key.ID, key.ProjectID, key.Key, key.Algorithm, key.State, key.ActivatedAt, key.RetiredAt, key.Purpose,
+	).Scan(&key.ID, &key.CreatedAt)
 }
 
 const encryptionKeyQuery = `
 	SELECT id, project_id, key, algorithm, state, created_at, activated_at, retired_at, purpose
-	FROM zitadel_nextgen.deks
+	FROM zitadel_nextgen.encryption_keys
 `
 
 func (s cryptoKeyStatements) GetEncryptionKey(ctx context.Context, filter database.Filter[crypto.EncryptionKeyField]) (*crypto.EncryptionKey, error) {
@@ -42,7 +42,7 @@ func (s cryptoKeyStatements) GetEncryptionKey(ctx context.Context, filter databa
 		&compiler,
 		encryptionKeyQuery,
 		&database.ListOptions[crypto.EncryptionKeyField]{Filter: filter},
-		dekSchema,
+		encryptionKeySchema,
 	)
 	if err != nil {
 		return nil, err
@@ -52,16 +52,16 @@ func (s cryptoKeyStatements) GetEncryptionKey(ctx context.Context, filter databa
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	dek, err := pgx.CollectExactlyOneRow(rows, s.scanEncryptionKey)
+	key, err := pgx.CollectExactlyOneRow(rows, s.scanEncryptionKey)
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	return dek, nil
+	return key, nil
 }
 
 func (s cryptoKeyStatements) scanEncryptionKey(row pgx.CollectableRow) (*crypto.EncryptionKey, error) {
 	key := new(crypto.EncryptionKey)
-	err := row.Scan(&key.Id, &key.ProjectID, &key.Key, &key.Algorithm, &key.State, &key.CreatedAt, &key.ActivatedAt, &key.RetiredAt, &key.Purpose)
+	err := row.Scan(&key.ID, &key.ProjectID, &key.Key, &key.Algorithm, &key.State, &key.CreatedAt, &key.ActivatedAt, &key.RetiredAt, &key.Purpose)
 	if err != nil {
 		return nil, err
 	}
@@ -70,10 +70,10 @@ func (s cryptoKeyStatements) scanEncryptionKey(row pgx.CollectableRow) (*crypto.
 
 var _ service.CryptoKeyStatements = (*cryptoKeyStatements)(nil)
 
-var dekSchema = database.NewSchema(map[crypto.EncryptionKeyField]database.FieldBinding[crypto.EncryptionKey]{
+var encryptionKeySchema = database.NewSchema(map[crypto.EncryptionKeyField]database.FieldBinding[crypto.EncryptionKey]{
 	crypto.EncryptionKeyFieldID: {
 		SQLName:  "id",
-		Accessor: func(k *crypto.EncryptionKey) any { return k.Id },
+		Accessor: func(k *crypto.EncryptionKey) any { return k.ID },
 		Coerce:   database.CoerceString,
 	},
 	crypto.EncryptionKeyFieldProjectID: {

@@ -64,11 +64,7 @@ func (s *keyService) GetCrypter(ctx context.Context, keyID string, algorithm jos
 	if err != nil {
 		return nil, err
 	}
-	kek, err := s.getKekCrypter(ctx, key)
-	if err != nil {
-		return nil, err
-	}
-	return key.Crypter(kek)
+	return s.getCrypterOfKey(ctx, key)
 }
 
 func (s *keyService) GetProjectDEK(ctx context.Context, projectID string) (*crypto.EncryptionKey, error) {
@@ -91,14 +87,10 @@ func (s *keyService) GetProjectDEKCrypter(ctx context.Context, projectID string)
 	if err != nil {
 		return nil, err
 	}
-	kek, err := s.getKekCrypter(ctx, dek)
-	if err != nil {
-		return nil, err
-	}
-	return dek.Crypter(kek)
+	return s.getCrypterOfKey(ctx, dek)
 }
 
-func (s *keyService) getKekCrypter(ctx context.Context, key *crypto.EncryptionKey) (op.Crypto, error) {
+func (s *keyService) getCrypterOfKey(ctx context.Context, key *crypto.EncryptionKey) (op.Crypto, error) {
 	jweHeader, err := domain.DecodeJWEHeader(key.Key)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to decode decryption key")
@@ -106,7 +98,7 @@ func (s *keyService) getKekCrypter(ctx context.Context, key *crypto.EncryptionKe
 
 	// TODO match the key id with the key id from one fo the keks once they are implemented
 	if jweHeader.KeyID == "" && jweHeader.EncryptionAlgorithm == jose.A256GCM {
-		return s.kek, nil
+		return key.Crypter(s.kek)
 	}
 
 	kek, err := s.GetCrypter(ctx, jweHeader.KeyID, jweHeader.EncryptionAlgorithm)

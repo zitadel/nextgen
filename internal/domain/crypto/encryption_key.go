@@ -34,9 +34,9 @@ type KeyState string
 
 const (
 	KeyStateNotActiveYet KeyState = "not_active_yet"
-	KeyStateActive                = "active"
-	KeyStateExpired               = "expired"
-	KeyStateRemoved               = "removed"
+	KeyStateActive       KeyState = "active"
+	KeyStateExpired      KeyState = "expired"
+	KeyStateRemoved      KeyState = "removed"
 )
 
 type EncryptionKeyPurpose string
@@ -46,7 +46,7 @@ const (
 )
 
 type EncryptionKey struct {
-	Id          string
+	ID          string
 	ProjectID   string
 	Purpose     EncryptionKeyPurpose
 	Key         string
@@ -76,7 +76,7 @@ func NewDEK(projectID string, algorithm jose.ContentEncryption, kek crypto.Crypt
 
 	// createdAt is set by db
 	return &EncryptionKey{
-		Id:        id,
+		ID:        id,
 		ProjectID: projectID,
 		Key:       encryptedKey,
 		Algorithm: algorithm,
@@ -95,30 +95,6 @@ func (k *EncryptionKey) Activate(currentDEK *EncryptionKey) {
 	k.ActivatedAt = new(now)
 }
 
-func (k *EncryptionKey) Expire(replacement *EncryptionKey) error {
-	if replacement == nil {
-		return ErrNoReplacementKey()
-	}
-	now := new(time.Now().UTC())
-	replacement.State = KeyStateExpired
-	replacement.RetiredAt = now
-	k.State = KeyStateActive
-	k.ActivatedAt = now
-	return nil
-}
-
-func (k *EncryptionKey) Remove(replacement *EncryptionKey) error {
-	if replacement == nil {
-		return ErrNoReplacementKey()
-	}
-	now := new(time.Now().UTC())
-	replacement.State = KeyStateRemoved
-	replacement.RetiredAt = now
-	k.State = KeyStateActive
-	k.ActivatedAt = now
-	return nil
-}
-
 func (k *EncryptionKey) IsActive() bool {
 	return k.State == KeyStateActive
 }
@@ -127,12 +103,16 @@ func (k *EncryptionKey) IsRemoved() bool {
 }
 
 func (k *EncryptionKey) DecryptedKey(kek crypto.Decrypter) ([32]byte, error) {
-	decrypted, err := kek.Decrypt(string(k.Key))
+	decrypted, err := kek.Decrypt(k.Key)
 	if err != nil {
 		return [32]byte{}, ErrDecryptionFailed(err)
 	}
 
-	return [32]byte([]byte(decrypted)), nil
+	decryptedBs := []byte(decrypted)
+	if len(decryptedBs) != 32 {
+		return [32]byte{}, ErrDecryptionFailed(err).WithDetails("key length is not 32 bytes")
+	}
+	return [32]byte(decryptedBs), nil
 }
 
 func (k *EncryptionKey) Crypter(kek crypto.Crypter) (crypto.Crypter, error) {
@@ -142,7 +122,7 @@ func (k *EncryptionKey) Crypter(kek crypto.Crypter) (crypto.Crypter, error) {
 	}
 	switch k.Algorithm {
 	case jose.A256GCM:
-		return op.NewAES256GCMCrypto(key, k.Id), nil
+		return op.NewAES256GCMCrypto(key, k.ID), nil
 	default:
 		return nil, ErrSupportedEncryptionAlgorithm(k.Algorithm)
 	}

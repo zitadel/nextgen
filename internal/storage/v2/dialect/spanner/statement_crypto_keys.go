@@ -11,7 +11,7 @@ import (
 type cryptoKeyStatements struct{ statement }
 
 // CreateEncryptionKey implements [service.CryptoKeyStatements].
-func (s cryptoKeyStatements) CreateEncryptionKey(ctx context.Context, dek *crypto.EncryptionKey) error {
+func (s cryptoKeyStatements) CreateEncryptionKey(ctx context.Context, key *crypto.EncryptionKey) error {
 	panic("not implemented")
 }
 
