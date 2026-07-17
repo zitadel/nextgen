@@ -17,18 +17,24 @@ export class UseCasePrompt implements SetupPrompt {
     if (ctx.useCaseFromFlag) {
       return answers;
     }
-    // Lead with the audience and keep the wording generic: the use case is
-    // recorded in `zitadel.json` and may inform guidance/status beyond the
-    // schema field set, so the labels describe who signs in, not the fields.
-    const labels: Record<SetupUseCase, string> = {
-      minimal: "Just me or a small group",
-      consumer: "Consumers",
-      business: "Business",
+    // Audience-first labels (the use case is recorded in `zitadel.json` and may
+    // inform guidance/status beyond the schema, so it stays generic), with the
+    // collected fields as a dimmed per-option hint. The message notes the fields
+    // stay editable after setup — the scaffolded schema/flow are the source of
+    // truth.
+    const options: Record<SetupUseCase, { label: string; hint: string }> = {
+      minimal: { label: "Just me or a small group", hint: "collects email" },
+      consumer: { label: "Consumers", hint: "collects email, given & family name" },
+      business: { label: "Business", hint: "collects email, given & family name, company" },
     };
     const value = await select({
-      message: "Who will sign in to your app?",
+      message: "Who will sign in to your app? Collected fields stay editable after setup.",
       initialValue: answers.useCase,
-      options: SETUP_USE_CASES.map((useCase) => ({ value: useCase, label: labels[useCase] })),
+      options: SETUP_USE_CASES.map((useCase) => ({
+        value: useCase,
+        label: options[useCase].label,
+        hint: options[useCase].hint,
+      })),
     });
     bail(value);
     return { ...answers, useCase: value as SetupUseCase };
