@@ -6,7 +6,6 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/crypto"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	database2 "github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/oidc/v3/pkg/op"
@@ -17,9 +16,9 @@ import (
 // ---- Interface -------------------------------------------------------------
 
 type KeyService interface {
-	GetEncryptionKey(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (*crypto.EncryptionKey, error)
+	GetEncryptionKey(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (*domain.EncryptionKey, error)
 	GetCrypter(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (op.Crypto, error)
-	GetProjectDEK(ctx context.Context, projectID string) (*crypto.EncryptionKey, error)
+	GetProjectDEK(ctx context.Context, projectID string) (*domain.EncryptionKey, error)
 	GetProjectDEKCrypter(ctx context.Context, projectID string) (op.Crypto, error)
 }
 
@@ -40,14 +39,14 @@ func NewKeyService(
 	}
 }
 
-func (s *keyService) GetEncryptionKey(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (*crypto.EncryptionKey, error) {
+func (s *keyService) GetEncryptionKey(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (*domain.EncryptionKey, error) {
 	key, err := s.db.Statements().GetEncryptionKey(ctx, database2.And(
-		database2.Equal(database2.Col(crypto.EncryptionKeyFieldID), keyID),
-		database2.Equal(database2.Col(crypto.EncryptionKeyFieldAlgorithm), algorithm),
+		database2.Equal(database2.Col(domain.EncryptionKeyFieldID), keyID),
+		database2.Equal(database2.Col(domain.EncryptionKeyFieldAlgorithm), algorithm),
 	))
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return nil, crypto.ErrEncryptionKeyNotFound()
+			return nil, domain.ErrEncryptionKeyNotFound()
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get DEK from the database")
 	}
@@ -67,15 +66,15 @@ func (s *keyService) GetCrypter(ctx context.Context, keyID string, algorithm jos
 	return s.getCrypterOfKey(ctx, key)
 }
 
-func (s *keyService) GetProjectDEK(ctx context.Context, projectID string) (*crypto.EncryptionKey, error) {
+func (s *keyService) GetProjectDEK(ctx context.Context, projectID string) (*domain.EncryptionKey, error) {
 	dek, err := s.db.Statements().GetEncryptionKey(ctx, database2.And(
-		database2.Equal(database2.Col(crypto.EncryptionKeyFieldProjectID), projectID),
-		database2.Equal(database2.Col(crypto.EncryptionKeyFieldState), crypto.KeyStateActive),
-		database2.Equal(database2.Col(crypto.EncryptionKeyFieldPurpose), crypto.EncryptionKeyPurposeDEK),
+		database2.Equal(database2.Col(domain.EncryptionKeyFieldProjectID), projectID),
+		database2.Equal(database2.Col(domain.EncryptionKeyFieldState), domain.KeyStateActive),
+		database2.Equal(database2.Col(domain.EncryptionKeyFieldPurpose), domain.EncryptionKeyPurposeDEK),
 	))
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return nil, crypto.ErrEncryptionKeyNotFound()
+			return nil, domain.ErrEncryptionKeyNotFound()
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get DEK from the database")
 	}
@@ -90,7 +89,7 @@ func (s *keyService) GetProjectDEKCrypter(ctx context.Context, projectID string)
 	return s.getCrypterOfKey(ctx, dek)
 }
 
-func (s *keyService) getCrypterOfKey(ctx context.Context, key *crypto.EncryptionKey) (op.Crypto, error) {
+func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.EncryptionKey) (op.Crypto, error) {
 	jweHeader, err := domain.DecodeJWEHeader(key.Key)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to decode decryption key")

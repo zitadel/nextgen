@@ -14,7 +14,6 @@ import (
 	reflect "reflect"
 
 	domain "github.com/zitadel/nextgen/internal/domain"
-	crypto "github.com/zitadel/nextgen/internal/domain/crypto"
 	service "github.com/zitadel/nextgen/internal/service"
 	database "github.com/zitadel/nextgen/internal/storage/v2/database"
 	gomock "go.uber.org/mock/gomock"
@@ -205,7 +204,7 @@ func (m *MockAllStatements) EXPECT() *MockAllStatementsMockRecorder {
 }
 
 // CreateEncryptionKey mocks base method.
-func (m *MockAllStatements) CreateEncryptionKey(ctx context.Context, dek *crypto.EncryptionKey) error {
+func (m *MockAllStatements) CreateEncryptionKey(ctx context.Context, dek *domain.EncryptionKey) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateEncryptionKey", ctx, dek)
 	ret0, _ := ret[0].(error)
@@ -231,13 +230,13 @@ func (c *MockAllStatementsCreateEncryptionKeyCall) Return(arg0 error) *MockAllSt
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsCreateEncryptionKeyCall) Do(f func(context.Context, *crypto.EncryptionKey) error) *MockAllStatementsCreateEncryptionKeyCall {
+func (c *MockAllStatementsCreateEncryptionKeyCall) Do(f func(context.Context, *domain.EncryptionKey) error) *MockAllStatementsCreateEncryptionKeyCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsCreateEncryptionKeyCall) DoAndReturn(f func(context.Context, *crypto.EncryptionKey) error) *MockAllStatementsCreateEncryptionKeyCall {
+func (c *MockAllStatementsCreateEncryptionKeyCall) DoAndReturn(f func(context.Context, *domain.EncryptionKey) error) *MockAllStatementsCreateEncryptionKeyCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -395,10 +394,10 @@ func (c *MockAllStatementsDeleteProjectByIDCall) DoAndReturn(f func(context.Cont
 }
 
 // GetEncryptionKey mocks base method.
-func (m *MockAllStatements) GetEncryptionKey(ctx context.Context, filter database.Filter[crypto.EncryptionKeyField]) (*crypto.EncryptionKey, error) {
+func (m *MockAllStatements) GetEncryptionKey(ctx context.Context, filter database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetEncryptionKey", ctx, filter)
-	ret0, _ := ret[0].(*crypto.EncryptionKey)
+	ret0, _ := ret[0].(*domain.EncryptionKey)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -416,19 +415,19 @@ type MockAllStatementsGetEncryptionKeyCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsGetEncryptionKeyCall) Return(arg0 *crypto.EncryptionKey, arg1 error) *MockAllStatementsGetEncryptionKeyCall {
+func (c *MockAllStatementsGetEncryptionKeyCall) Return(arg0 *domain.EncryptionKey, arg1 error) *MockAllStatementsGetEncryptionKeyCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsGetEncryptionKeyCall) Do(f func(context.Context, database.Filter[crypto.EncryptionKeyField]) (*crypto.EncryptionKey, error)) *MockAllStatementsGetEncryptionKeyCall {
+func (c *MockAllStatementsGetEncryptionKeyCall) Do(f func(context.Context, database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error)) *MockAllStatementsGetEncryptionKeyCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsGetEncryptionKeyCall) DoAndReturn(f func(context.Context, database.Filter[crypto.EncryptionKeyField]) (*crypto.EncryptionKey, error)) *MockAllStatementsGetEncryptionKeyCall {
+func (c *MockAllStatementsGetEncryptionKeyCall) DoAndReturn(f func(context.Context, database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error)) *MockAllStatementsGetEncryptionKeyCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1154,7 +1153,7 @@ func (m *MockCryptoKeyStatements) EXPECT() *MockCryptoKeyStatementsMockRecorder 
 }
 
 // CreateEncryptionKey mocks base method.
-func (m *MockCryptoKeyStatements) CreateEncryptionKey(ctx context.Context, dek *crypto.EncryptionKey) error {
+func (m *MockCryptoKeyStatements) CreateEncryptionKey(ctx context.Context, dek *domain.EncryptionKey) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateEncryptionKey", ctx, dek)
 	ret0, _ := ret[0].(error)
@@ -1180,22 +1179,22 @@ func (c *MockCryptoKeyStatementsCreateEncryptionKeyCall) Return(arg0 error) *Moc
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockCryptoKeyStatementsCreateEncryptionKeyCall) Do(f func(context.Context, *crypto.EncryptionKey) error) *MockCryptoKeyStatementsCreateEncryptionKeyCall {
+func (c *MockCryptoKeyStatementsCreateEncryptionKeyCall) Do(f func(context.Context, *domain.EncryptionKey) error) *MockCryptoKeyStatementsCreateEncryptionKeyCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockCryptoKeyStatementsCreateEncryptionKeyCall) DoAndReturn(f func(context.Context, *crypto.EncryptionKey) error) *MockCryptoKeyStatementsCreateEncryptionKeyCall {
+func (c *MockCryptoKeyStatementsCreateEncryptionKeyCall) DoAndReturn(f func(context.Context, *domain.EncryptionKey) error) *MockCryptoKeyStatementsCreateEncryptionKeyCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // GetEncryptionKey mocks base method.
-func (m *MockCryptoKeyStatements) GetEncryptionKey(ctx context.Context, filter database.Filter[crypto.EncryptionKeyField]) (*crypto.EncryptionKey, error) {
+func (m *MockCryptoKeyStatements) GetEncryptionKey(ctx context.Context, filter database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetEncryptionKey", ctx, filter)
-	ret0, _ := ret[0].(*crypto.EncryptionKey)
+	ret0, _ := ret[0].(*domain.EncryptionKey)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1213,19 +1212,19 @@ type MockCryptoKeyStatementsGetEncryptionKeyCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockCryptoKeyStatementsGetEncryptionKeyCall) Return(arg0 *crypto.EncryptionKey, arg1 error) *MockCryptoKeyStatementsGetEncryptionKeyCall {
+func (c *MockCryptoKeyStatementsGetEncryptionKeyCall) Return(arg0 *domain.EncryptionKey, arg1 error) *MockCryptoKeyStatementsGetEncryptionKeyCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockCryptoKeyStatementsGetEncryptionKeyCall) Do(f func(context.Context, database.Filter[crypto.EncryptionKeyField]) (*crypto.EncryptionKey, error)) *MockCryptoKeyStatementsGetEncryptionKeyCall {
+func (c *MockCryptoKeyStatementsGetEncryptionKeyCall) Do(f func(context.Context, database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error)) *MockCryptoKeyStatementsGetEncryptionKeyCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockCryptoKeyStatementsGetEncryptionKeyCall) DoAndReturn(f func(context.Context, database.Filter[crypto.EncryptionKeyField]) (*crypto.EncryptionKey, error)) *MockCryptoKeyStatementsGetEncryptionKeyCall {
+func (c *MockCryptoKeyStatementsGetEncryptionKeyCall) DoAndReturn(f func(context.Context, database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error)) *MockCryptoKeyStatementsGetEncryptionKeyCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

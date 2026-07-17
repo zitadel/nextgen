@@ -31,7 +31,7 @@ type Team struct {
 }
 
 func NewTeam(projectID string) (*Team, error) {
-	id, err := NewID(PrefixTeam)
+	id, err := newID(PrefixTeam)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to create team id")
 	}

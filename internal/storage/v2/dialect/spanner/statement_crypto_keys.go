@@ -3,7 +3,7 @@ package spanner
 import (
 	"context"
 
-	"github.com/zitadel/nextgen/internal/domain/crypto"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
@@ -11,12 +11,12 @@ import (
 type cryptoKeyStatements struct{ statement }
 
 // CreateEncryptionKey implements [service.CryptoKeyStatements].
-func (s cryptoKeyStatements) CreateEncryptionKey(ctx context.Context, key *crypto.EncryptionKey) error {
+func (s cryptoKeyStatements) CreateEncryptionKey(ctx context.Context, key *domain.EncryptionKey) error {
 	panic("not implemented")
 }
 
 // GetEncryptionKey implements [service.CryptoKeyStatements].
-func (s cryptoKeyStatements) GetEncryptionKey(ctx context.Context, filter database.Filter[crypto.EncryptionKeyField]) (*crypto.EncryptionKey, error) {
+func (s cryptoKeyStatements) GetEncryptionKey(ctx context.Context, filter database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error) {
 	panic("not implemented")
 }
 

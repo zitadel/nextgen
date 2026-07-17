@@ -16,8 +16,8 @@ func (p ResourcePrefix) ErrorCodePrefix(code string) string {
 
 var defaultGenerator idgen.Generator = idgen.NewULID()
 
-// NewID generates a new domain ID with the given prefix.
-func NewID(prefix ResourcePrefix) (string, error) {
+// newID generates a new domain ID with the given prefix.
+func newID(prefix ResourcePrefix) (string, error) {
 	id, err := defaultGenerator.New(string(prefix))
 	if err != nil {
 		return "", ErrInternal(err).WithMessage("failed to generate ID")

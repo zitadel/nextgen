@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/zitadel/nextgen/internal/domain/crypto"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
@@ -25,7 +25,7 @@ const createKeyStmt = `
 	RETURNING id, created_at
 `
 
-func (s cryptoKeyStatements) CreateEncryptionKey(ctx context.Context, key *crypto.EncryptionKey) error {
+func (s cryptoKeyStatements) CreateEncryptionKey(ctx context.Context, key *domain.EncryptionKey) error {
 	return s.client.QueryRow(ctx, createKeyStmt,
 		key.ID, key.ProjectID, key.Key, key.Algorithm, key.State, key.ActivatedAt, key.RetiredAt, key.Purpose,
 	).Scan(&key.ID, &key.CreatedAt)
@@ -36,12 +36,12 @@ const encryptionKeyQuery = `
 	FROM zitadel_nextgen.encryption_keys
 `
 
-func (s cryptoKeyStatements) GetEncryptionKey(ctx context.Context, filter database.Filter[crypto.EncryptionKeyField]) (*crypto.EncryptionKey, error) {
+func (s cryptoKeyStatements) GetEncryptionKey(ctx context.Context, filter database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error) {
 	var compiler statementCompiler
 	err := compileRead(
 		&compiler,
 		encryptionKeyQuery,
-		&database.ListOptions[crypto.EncryptionKeyField]{Filter: filter},
+		&database.ListOptions[domain.EncryptionKeyField]{Filter: filter},
 		encryptionKeySchema,
 	)
 	if err != nil {
@@ -59,8 +59,8 @@ func (s cryptoKeyStatements) GetEncryptionKey(ctx context.Context, filter databa
 	return key, nil
 }
 
-func (s cryptoKeyStatements) scanEncryptionKey(row pgx.CollectableRow) (*crypto.EncryptionKey, error) {
-	key := new(crypto.EncryptionKey)
+func (s cryptoKeyStatements) scanEncryptionKey(row pgx.CollectableRow) (*domain.EncryptionKey, error) {
+	key := new(domain.EncryptionKey)
 	err := row.Scan(&key.ID, &key.ProjectID, &key.Key, &key.Algorithm, &key.State, &key.CreatedAt, &key.ActivatedAt, &key.RetiredAt, &key.Purpose)
 	if err != nil {
 		return nil, err
@@ -70,50 +70,50 @@ func (s cryptoKeyStatements) scanEncryptionKey(row pgx.CollectableRow) (*crypto.
 
 var _ service.CryptoKeyStatements = (*cryptoKeyStatements)(nil)
 
-var encryptionKeySchema = database.NewSchema(map[crypto.EncryptionKeyField]database.FieldBinding[crypto.EncryptionKey]{
-	crypto.EncryptionKeyFieldID: {
+var encryptionKeySchema = database.NewSchema(map[domain.EncryptionKeyField]database.FieldBinding[domain.EncryptionKey]{
+	domain.EncryptionKeyFieldID: {
 		SQLName:  "id",
-		Accessor: func(k *crypto.EncryptionKey) any { return k.ID },
+		Accessor: func(k *domain.EncryptionKey) any { return k.ID },
 		Coerce:   database.CoerceString,
 	},
-	crypto.EncryptionKeyFieldProjectID: {
+	domain.EncryptionKeyFieldProjectID: {
 		SQLName:  "project_id",
-		Accessor: func(k *crypto.EncryptionKey) any { return k.ProjectID },
+		Accessor: func(k *domain.EncryptionKey) any { return k.ProjectID },
 		Coerce:   database.CoerceString,
 	},
-	crypto.EncryptionKeyFieldKey: {
+	domain.EncryptionKeyFieldKey: {
 		SQLName:  "key",
-		Accessor: func(k *crypto.EncryptionKey) any { return k.Key },
+		Accessor: func(k *domain.EncryptionKey) any { return k.Key },
 		Coerce:   database.CoerceString,
 	},
-	crypto.EncryptionKeyFieldAlgorithm: {
+	domain.EncryptionKeyFieldAlgorithm: {
 		SQLName:  "algorithm",
-		Accessor: func(k *crypto.EncryptionKey) any { return k.Algorithm },
+		Accessor: func(k *domain.EncryptionKey) any { return k.Algorithm },
 		Coerce:   database.CoerceString,
 	},
-	crypto.EncryptionKeyFieldState: {
+	domain.EncryptionKeyFieldState: {
 		SQLName:  "state",
-		Accessor: func(k *crypto.EncryptionKey) any { return k.State },
+		Accessor: func(k *domain.EncryptionKey) any { return k.State },
 		Coerce:   database.CoerceString,
 	},
-	crypto.EncryptionKeyFieldCreatedAt: {
+	domain.EncryptionKeyFieldCreatedAt: {
 		SQLName:  "created_at",
-		Accessor: func(k *crypto.EncryptionKey) any { return k.CreatedAt },
+		Accessor: func(k *domain.EncryptionKey) any { return k.CreatedAt },
 		Coerce:   database.CoerceTime,
 	},
-	crypto.EncryptionKeyFieldActivatedAt: {
+	domain.EncryptionKeyFieldActivatedAt: {
 		SQLName:  "activated_at",
-		Accessor: func(k *crypto.EncryptionKey) any { return k.ActivatedAt },
+		Accessor: func(k *domain.EncryptionKey) any { return k.ActivatedAt },
 		Coerce:   database.CoerceTime,
 	},
-	crypto.EncryptionKeyFieldRetiredAt: {
+	domain.EncryptionKeyFieldRetiredAt: {
 		SQLName:  "retired_at",
-		Accessor: func(k *crypto.EncryptionKey) any { return k.RetiredAt },
+		Accessor: func(k *domain.EncryptionKey) any { return k.RetiredAt },
 		Coerce:   database.CoerceTime,
 	},
-	crypto.EncryptionKeyFieldPurpose: {
+	domain.EncryptionKeyFieldPurpose: {
 		SQLName:  "purpose",
-		Accessor: func(k *crypto.EncryptionKey) any { return k.Purpose },
+		Accessor: func(k *domain.EncryptionKey) any { return k.Purpose },
 		Coerce:   database.CoerceString,
 	},
 })

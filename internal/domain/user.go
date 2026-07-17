@@ -147,7 +147,7 @@ func NewCreateUser(projectID string, teamID *string, id string, schemabs []byte,
 	}
 
 	if id == "" {
-		id, err = NewID(PrefixUser)
+		id, err = newID(PrefixUser)
 		if err != nil {
 			return nil, ErrInternal(err).WithMessage("failed to create user id")
 		}

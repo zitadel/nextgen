@@ -57,7 +57,7 @@ type EncryptionKey struct {
 }
 
 func NewDEK(projectID string, algorithm jose.ContentEncryption, kek crypto.Crypter) (*EncryptionKey, error) {
-	id, err := NewID(PrefixDEK)
+	id, err := newID(PrefixDEK)
 	if err != nil {
 		return nil, err
 	}

@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 	nextgencrypto "github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
-	domaincrypto "github.com/zitadel/nextgen/internal/domain/crypto"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	storagedb "github.com/zitadel/nextgen/internal/storage/database"
@@ -36,27 +35,27 @@ func newMockedKeyService(t *testing.T) (
 	return svc, statements, kek
 }
 
-func newActiveDEK(t *testing.T, projectID string, kek op.Crypto) *domaincrypto.EncryptionKey {
+func newActiveDEK(t *testing.T, projectID string, kek op.Crypto) *domain.EncryptionKey {
 	t.Helper()
-	dek, err := domaincrypto.NewDEK(projectID, jose.A256GCM, kek)
+	dek, err := domain.NewDEK(projectID, jose.A256GCM, kek)
 	require.NoError(t, err)
 	dek.Activate(nil)
 	return dek
 }
 
-func newTokenEncryptionKey(t *testing.T, id, projectID string, encrypter nextgencrypto.Encrypter) *domaincrypto.EncryptionKey {
+func newTokenEncryptionKey(t *testing.T, id, projectID string, encrypter nextgencrypto.Encrypter) *domain.EncryptionKey {
 	t.Helper()
 	var raw [32]byte
 	_, err := rand.Read(raw[:])
 	require.NoError(t, err)
 	encryptedKey, err := encrypter.Encrypt(string(raw[:]))
 	require.NoError(t, err)
-	return &domaincrypto.EncryptionKey{
+	return &domain.EncryptionKey{
 		ID:        id,
 		ProjectID: projectID,
 		Key:       encryptedKey,
 		Algorithm: jose.A256GCM,
-		State:     domaincrypto.KeyStateActive,
+		State:     domain.KeyStateActive,
 		Purpose:   "token encryption", // TODO: using a free text purpose now, but this needs to change in the future
 	}
 }
@@ -73,7 +72,7 @@ func TestKeyService_GetCrypter(t *testing.T) {
 			// ARRANGE
 			svc, statements, kek := newMockedKeyService(t)
 
-			dek, err := domaincrypto.NewDEK("project-1", jose.A256GCM, kek)
+			dek, err := domain.NewDEK("project-1", jose.A256GCM, kek)
 			require.NoError(t, err)
 			dekCrypter, err := dek.Crypter(kek)
 			require.NoError(t, err)
@@ -149,7 +148,7 @@ func TestKeyService_GetCrypter(t *testing.T) {
 			// ASSERT
 			var de domain.Error
 			require.ErrorAs(t, err, &de)
-			assert.Equal(t, domaincrypto.ErrEncryptionKeyNotFound().Code, de.Code)
+			assert.Equal(t, domain.ErrEncryptionKeyNotFound().Code, de.Code)
 		})
 	})
 }
@@ -203,7 +202,7 @@ func TestKeyService_GetProjectDEKCrypter(t *testing.T) {
 			// ASSERT
 			var de domain.Error
 			require.ErrorAs(t, err, &de)
-			assert.Equal(t, domaincrypto.ErrEncryptionKeyNotFound().Code, de.Code)
+			assert.Equal(t, domain.ErrEncryptionKeyNotFound().Code, de.Code)
 		})
 
 		t.Run("internal", func(t *testing.T) {

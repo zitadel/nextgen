@@ -142,7 +142,7 @@ func NewFlowDefinition(
 ) (_ *FlowDefinition, err error) {
 
 	if flowDefID == "" {
-		flowDefID, err = NewID(FlowDefinitionPrefix)
+		flowDefID, err = newID(FlowDefinitionPrefix)
 		if err != nil {
 			return nil, ErrInternal(err).WithMessage("failed to generate flow-definition id")
 		}

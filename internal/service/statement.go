@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/crypto"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -57,6 +56,6 @@ type FlowDefinitionStatements interface {
 
 type CryptoKeyStatements interface {
 	Statements
-	GetEncryptionKey(ctx context.Context, filter database.Filter[crypto.EncryptionKeyField]) (*crypto.EncryptionKey, error)
-	CreateEncryptionKey(ctx context.Context, dek *crypto.EncryptionKey) error
+	GetEncryptionKey(ctx context.Context, filter database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error)
+	CreateEncryptionKey(ctx context.Context, dek *domain.EncryptionKey) error
 }

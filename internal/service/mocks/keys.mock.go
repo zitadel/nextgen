@@ -14,7 +14,7 @@ import (
 	reflect "reflect"
 
 	jose "github.com/go-jose/go-jose/v4"
-	crypto "github.com/zitadel/nextgen/internal/domain/crypto"
+	domain "github.com/zitadel/nextgen/internal/domain"
 	op "github.com/zitadel/oidc/v3/pkg/op"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -83,10 +83,10 @@ func (c *MockKeyServiceGetCrypterCall) DoAndReturn(f func(context.Context, strin
 }
 
 // GetEncryptionKey mocks base method.
-func (m *MockKeyService) GetEncryptionKey(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (*crypto.EncryptionKey, error) {
+func (m *MockKeyService) GetEncryptionKey(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (*domain.EncryptionKey, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetEncryptionKey", ctx, keyID, algorithm)
-	ret0, _ := ret[0].(*crypto.EncryptionKey)
+	ret0, _ := ret[0].(*domain.EncryptionKey)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -104,28 +104,28 @@ type MockKeyServiceGetEncryptionKeyCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockKeyServiceGetEncryptionKeyCall) Return(arg0 *crypto.EncryptionKey, arg1 error) *MockKeyServiceGetEncryptionKeyCall {
+func (c *MockKeyServiceGetEncryptionKeyCall) Return(arg0 *domain.EncryptionKey, arg1 error) *MockKeyServiceGetEncryptionKeyCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockKeyServiceGetEncryptionKeyCall) Do(f func(context.Context, string, jose.ContentEncryption) (*crypto.EncryptionKey, error)) *MockKeyServiceGetEncryptionKeyCall {
+func (c *MockKeyServiceGetEncryptionKeyCall) Do(f func(context.Context, string, jose.ContentEncryption) (*domain.EncryptionKey, error)) *MockKeyServiceGetEncryptionKeyCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockKeyServiceGetEncryptionKeyCall) DoAndReturn(f func(context.Context, string, jose.ContentEncryption) (*crypto.EncryptionKey, error)) *MockKeyServiceGetEncryptionKeyCall {
+func (c *MockKeyServiceGetEncryptionKeyCall) DoAndReturn(f func(context.Context, string, jose.ContentEncryption) (*domain.EncryptionKey, error)) *MockKeyServiceGetEncryptionKeyCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // GetProjectDEK mocks base method.
-func (m *MockKeyService) GetProjectDEK(ctx context.Context, projectID string) (*crypto.EncryptionKey, error) {
+func (m *MockKeyService) GetProjectDEK(ctx context.Context, projectID string) (*domain.EncryptionKey, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetProjectDEK", ctx, projectID)
-	ret0, _ := ret[0].(*crypto.EncryptionKey)
+	ret0, _ := ret[0].(*domain.EncryptionKey)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -143,19 +143,19 @@ type MockKeyServiceGetProjectDEKCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockKeyServiceGetProjectDEKCall) Return(arg0 *crypto.EncryptionKey, arg1 error) *MockKeyServiceGetProjectDEKCall {
+func (c *MockKeyServiceGetProjectDEKCall) Return(arg0 *domain.EncryptionKey, arg1 error) *MockKeyServiceGetProjectDEKCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockKeyServiceGetProjectDEKCall) Do(f func(context.Context, string) (*crypto.EncryptionKey, error)) *MockKeyServiceGetProjectDEKCall {
+func (c *MockKeyServiceGetProjectDEKCall) Do(f func(context.Context, string) (*domain.EncryptionKey, error)) *MockKeyServiceGetProjectDEKCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockKeyServiceGetProjectDEKCall) DoAndReturn(f func(context.Context, string) (*crypto.EncryptionKey, error)) *MockKeyServiceGetProjectDEKCall {
+func (c *MockKeyServiceGetProjectDEKCall) DoAndReturn(f func(context.Context, string) (*domain.EncryptionKey, error)) *MockKeyServiceGetProjectDEKCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

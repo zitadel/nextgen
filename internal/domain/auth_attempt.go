@@ -108,7 +108,7 @@ func WithSession(sessionID *string, authFactors ...AuthFactor) AuthAttemptOption
 }
 
 func NewAuthAttempt(projectID string, requiredChecks []AuthCheckType, opts ...AuthAttemptOption) (*AuthAttempt, error) {
-	id, err := NewID(PrefixAuthAttempt)
+	id, err := newID(PrefixAuthAttempt)
 	if err != nil {
 		return nil, err
 	}

@@ -12,7 +12,6 @@ import (
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	crypto2 "github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/crypto"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -67,7 +66,7 @@ func (s *projectService) Create(ctx context.Context, previewOrigins []string, se
 		return nil, err
 	}
 
-	dek, err := crypto.NewDEK(project.ID, jose.A256GCM, s.kek)
+	dek, err := domain.NewDEK(project.ID, jose.A256GCM, s.kek)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to create project encryption key")
 	}
