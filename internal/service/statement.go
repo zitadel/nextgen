@@ -32,6 +32,7 @@ type ProjectStatements interface {
 	Statements
 	CreateProject(ctx context.Context, entity *domain.Project) error
 	GetProjectByID(ctx context.Context, id string) (*domain.Project, error)
+	UpdateProject(ctx context.Context, entity *domain.Project) error
 	ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
 	DeleteProjectByID(ctx context.Context, id string) error
 }

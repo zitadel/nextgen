@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/ianlancetaylor/jsonschema"
+
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -59,7 +60,8 @@ type projectService struct {
 var _ ProjectService = (*projectService)(nil)
 
 func (s *projectService) Create(ctx context.Context, previewOrigins []string, seedDefaults bool) (_ *domain.Project, err error) {
-	project, err := domain.NewProject(previewOrigins, s.tokenGenerator)
+	// TODO: pass project name
+	project, err := domain.NewProject("temp", previewOrigins, s.tokenGenerator)
 	if err != nil {
 		return nil, err
 	}
