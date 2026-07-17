@@ -23,28 +23,18 @@ import (
 // project, so each test creates a throwaway project and relies on the ON DELETE
 // CASCADE from projects to clean up its DEKs.
 
-// uniqueDEKID returns a collision-free DEK ID scoped to the running (sub)test.
-func uniqueDEKID(t *testing.T) string {
+// uniqueKeyID returns a collision-free DEK ID scoped to the running (sub)test.
+func uniqueKeyID(t *testing.T) string {
 	t.Helper()
 	return "dek-" + strings.ReplaceAll(t.Name(), "/", "_") + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 }
 
-// testKey is a deterministic 32-byte key. The bytes span 0x00..0x1f to prove the
-// value round-trips through the BYTEA column untouched.
-func testKey() []byte {
-	k := make([]byte, 32)
-	for i := range k {
-		k[i] = byte(i)
-	}
-	return k
-}
-
-// newTestDEK builds a persistable DEK in the given state referencing projectID.
-func newTestDEK(id, projectID string, state crypto.KeyState) *crypto.EncryptionKey {
+// newTestKey builds a persistable DEK in the given state referencing projectID.
+func newTestKey(id, projectID string, state crypto.KeyState) *crypto.EncryptionKey {
 	return &crypto.EncryptionKey{
 		Id:        id,
 		ProjectID: projectID,
-		Key:       testKey(),
+		Key:       "this is normally an encrypted key",
 		Algorithm: jose.A256GCM,
 		State:     state,
 		Purpose:   crypto.EncryptionKeyPurposeDEK,
@@ -67,17 +57,17 @@ func TestCryptoKeyStatements_CreateEncryptionKey(t *testing.T) {
 		t.Parallel()
 
 		projectID := withProject(t)
-		dek := newTestDEK(uniqueDEKID(t), projectID, crypto.KeyStateActive)
+		key := newTestKey(uniqueKeyID(t), projectID, crypto.KeyStateActive)
 
-		require.NoError(t, testPool.CreateEncryptionKey(t.Context(), dek))
-		assert.False(t, dek.CreatedAt.IsZero())
-		assert.WithinDuration(t, time.Now(), dek.CreatedAt, 5*time.Second)
+		require.NoError(t, testPool.CreateEncryptionKey(t.Context(), key))
+		assert.False(t, key.CreatedAt.IsZero())
+		assert.WithinDuration(t, time.Now(), key.CreatedAt, 5*time.Second)
 
 		stored, err := testPool.GetEncryptionKey(t.Context(), database.Equal(database.Col(crypto.EncryptionKeyFieldProjectID), projectID))
 		require.NoError(t, err)
-		assert.Equal(t, dek.Id, stored.Id)
+		assert.Equal(t, key.Id, stored.Id)
 		assert.Equal(t, projectID, stored.ProjectID)
-		assert.Equal(t, testKey(), stored.Key)
+		assert.Equal(t, key.Key, stored.Key)
 		assert.Equal(t, jose.A256GCM, stored.Algorithm)
 		assert.EqualValues(t, crypto.KeyStateActive, stored.State)
 		assert.False(t, stored.CreatedAt.IsZero())
@@ -89,17 +79,17 @@ func TestCryptoKeyStatements_CreateEncryptionKey(t *testing.T) {
 		t.Parallel()
 
 		projectID := withProject(t)
-		dek := newTestDEK(uniqueDEKID(t), projectID, crypto.KeyStateActive)
+		dek := newTestKey(uniqueKeyID(t), projectID, crypto.KeyStateActive)
 		require.NoError(t, testPool.CreateEncryptionKey(t.Context(), dek))
 
-		err := testPool.CreateEncryptionKey(t.Context(), newTestDEK(dek.Id, projectID, crypto.KeyStateActive))
+		err := testPool.CreateEncryptionKey(t.Context(), newTestKey(dek.Id, projectID, crypto.KeyStateActive))
 		assert.Error(t, err)
 	})
 
 	t.Run("unknown project returns error", func(t *testing.T) {
 		t.Parallel()
 
-		dek := newTestDEK(uniqueDEKID(t), uniqueProjectID(t), crypto.KeyStateActive)
+		dek := newTestKey(uniqueKeyID(t), uniqueProjectID(t), crypto.KeyStateActive)
 		err := testPool.CreateEncryptionKey(t.Context(), dek)
 		assert.Error(t, err)
 	})
@@ -108,10 +98,10 @@ func TestCryptoKeyStatements_CreateEncryptionKey(t *testing.T) {
 		t.Parallel()
 
 		projectID := withProject(t)
-		require.NoError(t, testPool.CreateEncryptionKey(t.Context(), newTestDEK(uniqueDEKID(t)+"-a", projectID, crypto.KeyStateActive)))
+		require.NoError(t, testPool.CreateEncryptionKey(t.Context(), newTestKey(uniqueKeyID(t)+"-a", projectID, crypto.KeyStateActive)))
 
 		// The partial unique index permits only one active DEK per project.
-		err := testPool.CreateEncryptionKey(t.Context(), newTestDEK(uniqueDEKID(t)+"-b", projectID, crypto.KeyStateActive))
+		err := testPool.CreateEncryptionKey(t.Context(), newTestKey(uniqueKeyID(t)+"-b", projectID, crypto.KeyStateActive))
 		assert.Error(t, err)
 	})
 }
@@ -124,9 +114,9 @@ func TestCryptoKeyStatements_GetEncryptionKey(t *testing.T) {
 
 		projectID := withProject(t)
 
-		expired := newTestDEK(uniqueDEKID(t)+"-old", projectID, crypto.KeyStateExpired)
+		expired := newTestKey(uniqueKeyID(t)+"-old", projectID, crypto.KeyStateExpired)
 		require.NoError(t, testPool.CreateEncryptionKey(t.Context(), expired))
-		active := newTestDEK(uniqueDEKID(t)+"-new", projectID, crypto.KeyStateActive)
+		active := newTestKey(uniqueKeyID(t)+"-new", projectID, crypto.KeyStateActive)
 		require.NoError(t, testPool.CreateEncryptionKey(t.Context(), active))
 
 		stored, err := testPool.GetEncryptionKey(t.Context(),
@@ -144,7 +134,7 @@ func TestCryptoKeyStatements_GetEncryptionKey(t *testing.T) {
 
 		projectID := withProject(t)
 		// Only a not-yet-active key exists.
-		require.NoError(t, testPool.CreateEncryptionKey(t.Context(), newTestDEK(uniqueDEKID(t), projectID, crypto.KeyStateNotActiveYet)))
+		require.NoError(t, testPool.CreateEncryptionKey(t.Context(), newTestKey(uniqueKeyID(t), projectID, crypto.KeyStateNotActiveYet)))
 
 		_, err := testPool.GetEncryptionKey(t.Context(),
 			database.And(
@@ -167,7 +157,7 @@ func TestCryptoKeyStatements_UpdateEncryptionKey(t *testing.T) {
 
 	t.Run("persists state transition", func(t *testing.T) {
 		projectID := withProject(t)
-		dek := newTestDEK(uniqueDEKID(t), projectID, crypto.KeyStateActive)
+		dek := newTestKey(uniqueKeyID(t), projectID, crypto.KeyStateActive)
 		require.NoError(t, testPool.CreateEncryptionKey(t.Context(), dek))
 
 		// Retire the key: flip state and stamp retired_at.
@@ -189,7 +179,7 @@ func TestCryptoKeyStatements_UpdateEncryptionKey(t *testing.T) {
 		t.Parallel()
 
 		projectID := withProject(t)
-		dek := newTestDEK(uniqueDEKID(t), projectID, crypto.KeyStateActive)
+		dek := newTestKey(uniqueKeyID(t), projectID, crypto.KeyStateActive)
 		// Never created, so the UPDATE matches nothing.
 		assert.NoError(t, testPool.UpdateEncryptionKey(t.Context(), dek))
 	})

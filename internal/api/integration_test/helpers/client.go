@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
 )
 
 type FakeSecuritySource struct {
@@ -94,7 +93,7 @@ func (c *ApiClient) SetSessionToken(token string) {
 func (h *Harness) SetProjectSecretOnApiClient(t *testing.T, client *ApiClient, project *domain.Project) {
 	t.Helper()
 
-	dek, err := h.EnsureKeyService(t).GetProjectDEKCrypter(t.Context(), service.GetProjectDEKInput{ProjectID: project.ID})
+	dek, err := h.EnsureKeyService(t).GetProjectDEKCrypter(t.Context(), project.ID)
 	require.NoError(t, err)
 	secret, err := project.ProjectSecret(dek)
 	require.NoError(t, err)

@@ -5,7 +5,7 @@ CREATE TABLE zitadel_nextgen.deks
         REFERENCES zitadel_nextgen.projects (id)
             ON DELETE CASCADE,
     id           TEXT COLLATE "C" NOT NULL CHECK (id <> ''),
-    key          BYTEA            NOT NULL,
+    key          TEXT             NOT NULL CHECK (key <> ''),
     algorithm    TEXT             NOT NULL CHECK (algorithm <> ''),
     state        TEXT             NOT NULL CHECK (state <> ''),
     created_at   TIMESTAMPTZ      NOT NULL DEFAULT now(),

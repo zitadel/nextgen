@@ -31,7 +31,7 @@ func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionReques
 		return nil, err
 	}
 
-	dek, err := h.keyService.GetProjectDEKCrypter(ctx, service.GetProjectDEKInput{ProjectID: string(req.ProjectID)})
+	dek, err := h.keyService.GetProjectDEKCrypter(ctx, string(req.ProjectID))
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, 
 		return nil, err
 	}
 
-	dek, err := h.keyService.GetProjectDEKCrypter(ctx, service.GetProjectDEKInput{ProjectID: string(params.ProjectID)})
+	dek, err := h.keyService.GetProjectDEKCrypter(ctx, string(params.ProjectID))
 	if err != nil {
 		return nil, err
 	}

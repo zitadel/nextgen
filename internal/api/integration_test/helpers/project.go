@@ -15,7 +15,7 @@ func (h *Harness) EnsureProjectService(t *testing.T) service.ProjectService {
 			h.EnsureFlowDefinitionRepo(t),
 			BuiltinSchemaBaseURL,
 			h.EnsureSchemaValidator(t),
-			h.EnsureCrypter(t),
+			h.EnsureKekCrypter(t),
 		)
 	}
 	return h.ProjectService

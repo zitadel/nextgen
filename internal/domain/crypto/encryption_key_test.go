@@ -146,7 +146,7 @@ func TestDEK_DecryptedKey(t *testing.T) {
 		encrypted, err := kek.Encrypt(want)
 		require.NoError(t, err)
 
-		k := &EncryptionKey{Key: []byte(encrypted)}
+		k := &EncryptionKey{Key: encrypted}
 
 		got, err := k.DecryptedKey(kek)
 		require.NoError(t, err)
@@ -158,7 +158,7 @@ func TestDEK_DecryptedKey(t *testing.T) {
 		kek := cryptomock.NewMockCrypter(gomock.NewController(t))
 		kek.EXPECT().Decrypt(gomock.Any()).Return("", sentinel)
 
-		k := &EncryptionKey{Key: []byte("whatever")}
+		k := &EncryptionKey{Key: "whatever"}
 		got, err := k.DecryptedKey(kek)
 		require.Error(t, err)
 		assertDomainErrorCode(t, err, ErrDecryptionFailed(nil).Code)
@@ -173,7 +173,7 @@ func TestDEK_Crypter(t *testing.T) {
 		encrypted, err := kek.Encrypt(key)
 		require.NoError(t, err)
 
-		dek := &EncryptionKey{Id: "dek_1", Key: []byte(encrypted), Algorithm: jose.A256GCM}
+		dek := &EncryptionKey{Id: "dek_1", Key: encrypted, Algorithm: jose.A256GCM}
 		crypter, err := dek.Crypter(kek)
 		require.NoError(t, err)
 		require.NotNil(t, crypter)
@@ -192,7 +192,7 @@ func TestDEK_Crypter(t *testing.T) {
 		encrypted, err := kek.Encrypt(key)
 		require.NoError(t, err)
 
-		dek := &EncryptionKey{Key: []byte(encrypted), Algorithm: "rot13"}
+		dek := &EncryptionKey{Key: encrypted, Algorithm: "rot13"}
 		_, err = dek.Crypter(kek)
 		require.Error(t, err)
 		assertDomainErrorCode(t, err, ErrSupportedEncryptionAlgorithm("rot13").Code)
@@ -203,7 +203,7 @@ func TestDEK_Crypter(t *testing.T) {
 		kek := cryptomock.NewMockCrypter(gomock.NewController(t))
 		kek.EXPECT().Decrypt(gomock.Any()).Return("", sentinel)
 
-		dek := &EncryptionKey{Key: []byte("x"), Algorithm: jose.A256GCM}
+		dek := &EncryptionKey{Key: "x", Algorithm: jose.A256GCM}
 		_, err := dek.Crypter(kek)
 		require.Error(t, err)
 		assertDomainErrorCode(t, err, ErrDecryptionFailed(nil).Code)

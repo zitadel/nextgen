@@ -13,9 +13,9 @@ import (
 	context "context"
 	reflect "reflect"
 
-	crypto "github.com/zitadel/nextgen/internal/crypto"
-	crypto0 "github.com/zitadel/nextgen/internal/domain/crypto"
-	service "github.com/zitadel/nextgen/internal/service"
+	jose "github.com/go-jose/go-jose/v4"
+	crypto "github.com/zitadel/nextgen/internal/domain/crypto"
+	op "github.com/zitadel/oidc/v3/pkg/op"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -43,58 +43,97 @@ func (m *MockKeyService) EXPECT() *MockKeyServiceMockRecorder {
 	return m.recorder
 }
 
-// GetEncryptionKeyByID mocks base method.
-func (m *MockKeyService) GetEncryptionKeyByID(ctx context.Context, input service.GetDEKByIDAndAlgorithmInput) (*crypto0.EncryptionKey, error) {
+// GetCrypter mocks base method.
+func (m *MockKeyService) GetCrypter(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (op.Crypto, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetEncryptionKeyByID", ctx, input)
-	ret0, _ := ret[0].(*crypto0.EncryptionKey)
+	ret := m.ctrl.Call(m, "GetCrypter", ctx, keyID, algorithm)
+	ret0, _ := ret[0].(op.Crypto)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetEncryptionKeyByID indicates an expected call of GetEncryptionKeyByID.
-func (mr *MockKeyServiceMockRecorder) GetEncryptionKeyByID(ctx, input any) *MockKeyServiceGetEncryptionKeyByIDCall {
+// GetCrypter indicates an expected call of GetCrypter.
+func (mr *MockKeyServiceMockRecorder) GetCrypter(ctx, keyID, algorithm any) *MockKeyServiceGetCrypterCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEncryptionKeyByID", reflect.TypeOf((*MockKeyService)(nil).GetEncryptionKeyByID), ctx, input)
-	return &MockKeyServiceGetEncryptionKeyByIDCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCrypter", reflect.TypeOf((*MockKeyService)(nil).GetCrypter), ctx, keyID, algorithm)
+	return &MockKeyServiceGetCrypterCall{Call: call}
 }
 
-// MockKeyServiceGetEncryptionKeyByIDCall wrap *gomock.Call
-type MockKeyServiceGetEncryptionKeyByIDCall struct {
+// MockKeyServiceGetCrypterCall wrap *gomock.Call
+type MockKeyServiceGetCrypterCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockKeyServiceGetEncryptionKeyByIDCall) Return(arg0 *crypto0.EncryptionKey, arg1 error) *MockKeyServiceGetEncryptionKeyByIDCall {
+func (c *MockKeyServiceGetCrypterCall) Return(arg0 op.Crypto, arg1 error) *MockKeyServiceGetCrypterCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockKeyServiceGetEncryptionKeyByIDCall) Do(f func(context.Context, service.GetDEKByIDAndAlgorithmInput) (*crypto0.EncryptionKey, error)) *MockKeyServiceGetEncryptionKeyByIDCall {
+func (c *MockKeyServiceGetCrypterCall) Do(f func(context.Context, string, jose.ContentEncryption) (op.Crypto, error)) *MockKeyServiceGetCrypterCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockKeyServiceGetEncryptionKeyByIDCall) DoAndReturn(f func(context.Context, service.GetDEKByIDAndAlgorithmInput) (*crypto0.EncryptionKey, error)) *MockKeyServiceGetEncryptionKeyByIDCall {
+func (c *MockKeyServiceGetCrypterCall) DoAndReturn(f func(context.Context, string, jose.ContentEncryption) (op.Crypto, error)) *MockKeyServiceGetCrypterCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetEncryptionKey mocks base method.
+func (m *MockKeyService) GetEncryptionKey(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (*crypto.EncryptionKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEncryptionKey", ctx, keyID, algorithm)
+	ret0, _ := ret[0].(*crypto.EncryptionKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetEncryptionKey indicates an expected call of GetEncryptionKey.
+func (mr *MockKeyServiceMockRecorder) GetEncryptionKey(ctx, keyID, algorithm any) *MockKeyServiceGetEncryptionKeyCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEncryptionKey", reflect.TypeOf((*MockKeyService)(nil).GetEncryptionKey), ctx, keyID, algorithm)
+	return &MockKeyServiceGetEncryptionKeyCall{Call: call}
+}
+
+// MockKeyServiceGetEncryptionKeyCall wrap *gomock.Call
+type MockKeyServiceGetEncryptionKeyCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockKeyServiceGetEncryptionKeyCall) Return(arg0 *crypto.EncryptionKey, arg1 error) *MockKeyServiceGetEncryptionKeyCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockKeyServiceGetEncryptionKeyCall) Do(f func(context.Context, string, jose.ContentEncryption) (*crypto.EncryptionKey, error)) *MockKeyServiceGetEncryptionKeyCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockKeyServiceGetEncryptionKeyCall) DoAndReturn(f func(context.Context, string, jose.ContentEncryption) (*crypto.EncryptionKey, error)) *MockKeyServiceGetEncryptionKeyCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // GetProjectDEK mocks base method.
-func (m *MockKeyService) GetProjectDEK(ctx context.Context, input service.GetProjectDEKInput) (*crypto0.EncryptionKey, error) {
+func (m *MockKeyService) GetProjectDEK(ctx context.Context, projectID string) (*crypto.EncryptionKey, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetProjectDEK", ctx, input)
-	ret0, _ := ret[0].(*crypto0.EncryptionKey)
+	ret := m.ctrl.Call(m, "GetProjectDEK", ctx, projectID)
+	ret0, _ := ret[0].(*crypto.EncryptionKey)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetProjectDEK indicates an expected call of GetProjectDEK.
-func (mr *MockKeyServiceMockRecorder) GetProjectDEK(ctx, input any) *MockKeyServiceGetProjectDEKCall {
+func (mr *MockKeyServiceMockRecorder) GetProjectDEK(ctx, projectID any) *MockKeyServiceGetProjectDEKCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectDEK", reflect.TypeOf((*MockKeyService)(nil).GetProjectDEK), ctx, input)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectDEK", reflect.TypeOf((*MockKeyService)(nil).GetProjectDEK), ctx, projectID)
 	return &MockKeyServiceGetProjectDEKCall{Call: call}
 }
 
@@ -104,36 +143,36 @@ type MockKeyServiceGetProjectDEKCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockKeyServiceGetProjectDEKCall) Return(arg0 *crypto0.EncryptionKey, arg1 error) *MockKeyServiceGetProjectDEKCall {
+func (c *MockKeyServiceGetProjectDEKCall) Return(arg0 *crypto.EncryptionKey, arg1 error) *MockKeyServiceGetProjectDEKCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockKeyServiceGetProjectDEKCall) Do(f func(context.Context, service.GetProjectDEKInput) (*crypto0.EncryptionKey, error)) *MockKeyServiceGetProjectDEKCall {
+func (c *MockKeyServiceGetProjectDEKCall) Do(f func(context.Context, string) (*crypto.EncryptionKey, error)) *MockKeyServiceGetProjectDEKCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockKeyServiceGetProjectDEKCall) DoAndReturn(f func(context.Context, service.GetProjectDEKInput) (*crypto0.EncryptionKey, error)) *MockKeyServiceGetProjectDEKCall {
+func (c *MockKeyServiceGetProjectDEKCall) DoAndReturn(f func(context.Context, string) (*crypto.EncryptionKey, error)) *MockKeyServiceGetProjectDEKCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // GetProjectDEKCrypter mocks base method.
-func (m *MockKeyService) GetProjectDEKCrypter(ctx context.Context, input service.GetProjectDEKInput) (crypto.Crypter, error) {
+func (m *MockKeyService) GetProjectDEKCrypter(ctx context.Context, projectID string) (op.Crypto, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetProjectDEKCrypter", ctx, input)
-	ret0, _ := ret[0].(crypto.Crypter)
+	ret := m.ctrl.Call(m, "GetProjectDEKCrypter", ctx, projectID)
+	ret0, _ := ret[0].(op.Crypto)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetProjectDEKCrypter indicates an expected call of GetProjectDEKCrypter.
-func (mr *MockKeyServiceMockRecorder) GetProjectDEKCrypter(ctx, input any) *MockKeyServiceGetProjectDEKCrypterCall {
+func (mr *MockKeyServiceMockRecorder) GetProjectDEKCrypter(ctx, projectID any) *MockKeyServiceGetProjectDEKCrypterCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectDEKCrypter", reflect.TypeOf((*MockKeyService)(nil).GetProjectDEKCrypter), ctx, input)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectDEKCrypter", reflect.TypeOf((*MockKeyService)(nil).GetProjectDEKCrypter), ctx, projectID)
 	return &MockKeyServiceGetProjectDEKCrypterCall{Call: call}
 }
 
@@ -143,35 +182,35 @@ type MockKeyServiceGetProjectDEKCrypterCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockKeyServiceGetProjectDEKCrypterCall) Return(arg0 crypto.Crypter, arg1 error) *MockKeyServiceGetProjectDEKCrypterCall {
+func (c *MockKeyServiceGetProjectDEKCrypterCall) Return(arg0 op.Crypto, arg1 error) *MockKeyServiceGetProjectDEKCrypterCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockKeyServiceGetProjectDEKCrypterCall) Do(f func(context.Context, service.GetProjectDEKInput) (crypto.Crypter, error)) *MockKeyServiceGetProjectDEKCrypterCall {
+func (c *MockKeyServiceGetProjectDEKCrypterCall) Do(f func(context.Context, string) (op.Crypto, error)) *MockKeyServiceGetProjectDEKCrypterCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockKeyServiceGetProjectDEKCrypterCall) DoAndReturn(f func(context.Context, service.GetProjectDEKInput) (crypto.Crypter, error)) *MockKeyServiceGetProjectDEKCrypterCall {
+func (c *MockKeyServiceGetProjectDEKCrypterCall) DoAndReturn(f func(context.Context, string) (op.Crypto, error)) *MockKeyServiceGetProjectDEKCrypterCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // RotateDEK mocks base method.
-func (m *MockKeyService) RotateDEK(ctx context.Context, input service.RotateDEKInput) error {
+func (m *MockKeyService) RotateDEK(ctx context.Context, projectID string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RotateDEK", ctx, input)
+	ret := m.ctrl.Call(m, "RotateDEK", ctx, projectID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // RotateDEK indicates an expected call of RotateDEK.
-func (mr *MockKeyServiceMockRecorder) RotateDEK(ctx, input any) *MockKeyServiceRotateDEKCall {
+func (mr *MockKeyServiceMockRecorder) RotateDEK(ctx, projectID any) *MockKeyServiceRotateDEKCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RotateDEK", reflect.TypeOf((*MockKeyService)(nil).RotateDEK), ctx, input)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RotateDEK", reflect.TypeOf((*MockKeyService)(nil).RotateDEK), ctx, projectID)
 	return &MockKeyServiceRotateDEKCall{Call: call}
 }
 
@@ -187,13 +226,13 @@ func (c *MockKeyServiceRotateDEKCall) Return(arg0 error) *MockKeyServiceRotateDE
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockKeyServiceRotateDEKCall) Do(f func(context.Context, service.RotateDEKInput) error) *MockKeyServiceRotateDEKCall {
+func (c *MockKeyServiceRotateDEKCall) Do(f func(context.Context, string) error) *MockKeyServiceRotateDEKCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockKeyServiceRotateDEKCall) DoAndReturn(f func(context.Context, service.RotateDEKInput) error) *MockKeyServiceRotateDEKCall {
+func (c *MockKeyServiceRotateDEKCall) DoAndReturn(f func(context.Context, string) error) *MockKeyServiceRotateDEKCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

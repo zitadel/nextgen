@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/go-jose/go-jose/v4"
-	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
@@ -22,21 +21,18 @@ type TokenService interface {
 
 type tokenService struct {
 	keys KeyService
-	kek  crypto.Crypter
 }
 
 func NewTokenService(
 	keys KeyService,
-	kek crypto.Crypter,
 ) TokenService {
 	return &tokenService{
 		keys: keys,
-		kek:  kek,
 	}
 }
 
 func (s *tokenService) GenerateJWE(ctx context.Context, data *domain.Token) (string, error) {
-	dek, err := s.keys.GetProjectDEKCrypter(ctx, GetProjectDEKInput{data.ProjectID})
+	dek, err := s.keys.GetProjectDEKCrypter(ctx, data.ProjectID)
 	if err != nil {
 		return "", err
 	}
@@ -46,11 +42,7 @@ func (s *tokenService) GenerateJWE(ctx context.Context, data *domain.Token) (str
 func (s *tokenService) VerifyToken(ctx context.Context, token string) (*domain.Token, error) {
 	return domain.ParseAndValidateToken(ctx, token,
 		func(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (op.Decrypter, error) {
-			dek, err := s.keys.GetEncryptionKeyByID(ctx, GetDEKByIDAndAlgorithmInput{KeyID: keyID, Algorithm: algorithm})
-			if err != nil {
-				return nil, err
-			}
-			return dek.Crypter(s.kek)
+			return s.keys.GetCrypter(ctx, keyID, algorithm)
 		},
 	)
 }

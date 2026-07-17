@@ -49,7 +49,7 @@ type EncryptionKey struct {
 	Id          string
 	ProjectID   string
 	Purpose     EncryptionKeyPurpose
-	Key         []byte
+	Key         string
 	Algorithm   jose.ContentEncryption
 	State       KeyState
 	CreatedAt   time.Time
@@ -78,7 +78,7 @@ func NewDEK(projectID string, algorithm jose.ContentEncryption, kek crypto.Crypt
 	return &EncryptionKey{
 		Id:        id,
 		ProjectID: projectID,
-		Key:       []byte(encryptedKey),
+		Key:       encryptedKey,
 		Algorithm: algorithm,
 		State:     KeyStateNotActiveYet,
 		Purpose:   EncryptionKeyPurposeDEK,

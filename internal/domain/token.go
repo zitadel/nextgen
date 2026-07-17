@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-jose/go-jose/v4"
+	crypto2 "github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
@@ -99,11 +100,8 @@ func (t *Token) JWE(encrypter op.Encrypter) (string, error) {
 	return token, nil
 }
 
-func ParseAndValidateToken(ctx context.Context,
-	token string,
-	decrypter func(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (op.Decrypter, error),
-) (*Token, error) {
-	header, err := decodeJWEHeader(token)
+func ParseAndValidateToken(ctx context.Context, token string, decrypter crypto2.DecrypterFunc) (*Token, error) {
+	header, err := DecodeJWEHeader(token)
 	if err != nil {
 		return nil, err
 	}
@@ -127,12 +125,12 @@ func ParseAndValidateToken(ctx context.Context,
 	return payload, nil
 }
 
-type jweHeader struct {
+type JWEHeader struct {
 	KeyID               string                 `json:"kid"`
 	EncryptionAlgorithm jose.ContentEncryption `json:"enc"`
 }
 
-func decodeJWEHeader(token string) (*jweHeader, error) {
+func DecodeJWEHeader(token string) (*JWEHeader, error) {
 	headerSeparatorIndex := strings.IndexRune(token, '.')
 	if headerSeparatorIndex < 1 {
 		return nil, ErrInvalidToken().WithDetails("invalid separator count")
@@ -142,7 +140,7 @@ func decodeJWEHeader(token string) (*jweHeader, error) {
 	if err != nil {
 		return nil, ErrInvalidToken().WithDetails("invalid base64 header")
 	}
-	header := &jweHeader{}
+	header := &JWEHeader{}
 	err = json.Unmarshal(headerBs, header)
 	if err != nil {
 		return nil, ErrInvalidToken().WithDetails("invalid json header")

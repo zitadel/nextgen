@@ -12,7 +12,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
 )
 
 // TestGetMySession_Identity drives the HTTP path a signed-in app takes after
@@ -27,7 +26,7 @@ func TestGetMySession_Identity(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 	require.NoError(t, err)
 
-	dek, err := harness.EnsureKeyService(t).GetProjectDEKCrypter(t.Context(), service.GetProjectDEKInput{ProjectID: project.ID})
+	dek, err := harness.EnsureKeyService(t).GetProjectDEKCrypter(t.Context(), project.ID)
 	require.NoError(t, err)
 	projectSecret, err := project.ProjectSecret(dek)
 	require.NoError(t, err)

@@ -231,7 +231,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	)
 
 	flowService := service.NewFlowService(pool, flowDefinitionRepo, stateMachine, ids)
-	tokenService := service.NewTokenService(keyService, kek)
+	tokenService := service.NewTokenService(keyService)
 
 	// ── HTTP Server ─────────────────
 
@@ -519,7 +519,7 @@ func buildCrypter(hexKey string) (crypto.Crypter, error) {
 	if len(key) != 32 {
 		return nil, fmt.Errorf("server: encryption_key must decode to %d bytes, got %d", 32, len(key))
 	}
-	crypter := op.NewAES256GCMCrypto([32]byte(key), "")
+	crypter := op.NewAES256GCMCrypto([32]byte(key), "") // TODO: key id must be empty to match kek for now
 	return crypter, nil
 }
 

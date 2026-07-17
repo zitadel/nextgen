@@ -5,11 +5,11 @@ import (
 	"errors"
 
 	"github.com/go-jose/go-jose/v4"
-	crypto2 "github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/crypto"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	database2 "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
 //go:generate go tool mockgen -typed -package mocks -destination ./mocks/keys.mock.go . KeyService
@@ -17,37 +17,23 @@ import (
 // ---- Interface -------------------------------------------------------------
 
 type KeyService interface {
-	RotateDEK(ctx context.Context, input RotateDEKInput) error
-	GetEncryptionKeyByID(ctx context.Context, input GetDEKByIDAndAlgorithmInput) (*crypto.EncryptionKey, error)
-	GetProjectDEK(ctx context.Context, input GetProjectDEKInput) (*crypto.EncryptionKey, error)
-	GetProjectDEKCrypter(ctx context.Context, input GetProjectDEKInput) (crypto2.Crypter, error)
-}
-
-// ---- Input types -------------------------------------------------------------
-
-type RotateDEKInput struct {
-	ProjectID string
-}
-
-type GetProjectDEKInput struct {
-	ProjectID string
-}
-
-type GetDEKByIDAndAlgorithmInput struct {
-	KeyID     string
-	Algorithm jose.ContentEncryption
+	RotateDEK(ctx context.Context, projectID string) error
+	GetEncryptionKey(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (*crypto.EncryptionKey, error)
+	GetCrypter(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (op.Crypto, error)
+	GetProjectDEK(ctx context.Context, projectID string) (*crypto.EncryptionKey, error)
+	GetProjectDEKCrypter(ctx context.Context, projectID string) (op.Crypto, error)
 }
 
 // ---- Implementation -------------------------------------------------------------
 
 type keyService struct {
 	db  *DB
-	kek crypto2.Crypter
+	kek op.Crypto
 }
 
 func NewKeyService(
 	db *DB,
-	kek crypto2.Crypter,
+	kek op.Crypto,
 ) KeyService {
 	return &keyService{
 		db:  db,
@@ -55,9 +41,9 @@ func NewKeyService(
 	}
 }
 
-func (s *keyService) RotateDEK(ctx context.Context, input RotateDEKInput) error {
+func (s *keyService) RotateDEK(ctx context.Context, projectID string) error {
 	err := s.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		oldDEK, err := s.GetProjectDEK(ctx, GetProjectDEKInput{ProjectID: input.ProjectID})
+		oldDEK, err := s.GetProjectDEK(ctx, projectID)
 		if err != nil {
 			// not found errors might occur if no DEK exists, don't error on that
 			// just create a new one.
@@ -66,7 +52,7 @@ func (s *keyService) RotateDEK(ctx context.Context, input RotateDEKInput) error 
 			}
 		}
 
-		newDEK, err := crypto.NewDEK(input.ProjectID, jose.A256GCM, s.kek)
+		newDEK, err := crypto.NewDEK(projectID, jose.A256GCM, s.kek)
 		if err != nil {
 			return err
 		}
@@ -91,10 +77,10 @@ func (s *keyService) RotateDEK(ctx context.Context, input RotateDEKInput) error 
 	return nil
 }
 
-func (s *keyService) GetEncryptionKeyByID(ctx context.Context, input GetDEKByIDAndAlgorithmInput) (*crypto.EncryptionKey, error) {
-	dek, err := s.db.Statements().GetEncryptionKey(ctx, database2.And(
-		database2.Equal(database2.Col(crypto.EncryptionKeyFieldID), input.KeyID),
-		database2.Equal(database2.Col(crypto.EncryptionKeyFieldAlgorithm), input.Algorithm),
+func (s *keyService) GetEncryptionKey(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (*crypto.EncryptionKey, error) {
+	key, err := s.db.Statements().GetEncryptionKey(ctx, database2.And(
+		database2.Equal(database2.Col(crypto.EncryptionKeyFieldID), keyID),
+		database2.Equal(database2.Col(crypto.EncryptionKeyFieldAlgorithm), algorithm),
 	))
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -102,12 +88,26 @@ func (s *keyService) GetEncryptionKeyByID(ctx context.Context, input GetDEKByIDA
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get DEK from the database")
 	}
-	return dek, nil
+	return key, nil
 }
 
-func (s *keyService) GetProjectDEK(ctx context.Context, input GetProjectDEKInput) (*crypto.EncryptionKey, error) {
+// GetCrypter fetches the encryption key for the given ID from the database,
+// decrypts it and creates an op.Crypto from it.
+//
+// If the encryption key to decrypt the requested key exists in the database,
+// it is recursively fetched.
+func (s *keyService) GetCrypter(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (op.Crypto, error) {
+	key, err := s.GetEncryptionKey(ctx, keyID, algorithm)
+	if err != nil {
+		return nil, err
+	}
+	kek, err := s.getKekCrypter(ctx, key)
+	return key.Crypter(kek)
+}
+
+func (s *keyService) GetProjectDEK(ctx context.Context, projectID string) (*crypto.EncryptionKey, error) {
 	dek, err := s.db.Statements().GetEncryptionKey(ctx, database2.And(
-		database2.Equal(database2.Col(crypto.EncryptionKeyFieldProjectID), input.ProjectID),
+		database2.Equal(database2.Col(crypto.EncryptionKeyFieldProjectID), projectID),
 		database2.Equal(database2.Col(crypto.EncryptionKeyFieldState), crypto.KeyStateActive),
 		database2.Equal(database2.Col(crypto.EncryptionKeyFieldPurpose), crypto.EncryptionKeyPurposeDEK),
 	))
@@ -120,14 +120,32 @@ func (s *keyService) GetProjectDEK(ctx context.Context, input GetProjectDEKInput
 	return dek, nil
 }
 
-func (s *keyService) GetProjectDEKCrypter(ctx context.Context, input GetProjectDEKInput) (crypto2.Crypter, error) {
-	dek, err := s.GetProjectDEK(ctx, input)
+func (s *keyService) GetProjectDEKCrypter(ctx context.Context, projectID string) (op.Crypto, error) {
+	dek, err := s.GetProjectDEK(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
-	crypter, err := dek.Crypter(s.kek)
+	kek, err := s.getKekCrypter(ctx, dek)
 	if err != nil {
 		return nil, err
 	}
-	return crypter, nil
+	return dek.Crypter(kek)
+}
+
+func (s *keyService) getKekCrypter(ctx context.Context, key *crypto.EncryptionKey) (op.Crypto, error) {
+	jweHeader, err := domain.DecodeJWEHeader(key.Key)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to decode decryption key")
+	}
+
+	// TODO match the key id with the key id from one fo the keks once they are implemented
+	if jweHeader.KeyID == "" && jweHeader.EncryptionAlgorithm == jose.A256GCM {
+		return s.kek, nil
+	}
+
+	kek, err := s.GetCrypter(ctx, jweHeader.KeyID, jweHeader.EncryptionAlgorithm)
+	if err != nil {
+		return nil, err
+	}
+	return key.Crypter(kek)
 }
