@@ -15,11 +15,6 @@ func (s cryptoKeyStatements) CreateEncryptionKey(ctx context.Context, dek *crypt
 	panic("not implemented")
 }
 
-// UpdateEncryptionKey implements [service.CryptoKeyStatements].
-func (s cryptoKeyStatements) UpdateEncryptionKey(ctx context.Context, dek *crypto.EncryptionKey) error {
-	panic("not implemented")
-}
-
 // GetEncryptionKey implements [service.CryptoKeyStatements].
 func (s cryptoKeyStatements) GetEncryptionKey(ctx context.Context, filter database.Filter[crypto.EncryptionKeyField]) (*crypto.EncryptionKey, error) {
 	panic("not implemented")

@@ -31,17 +31,6 @@ func (s cryptoKeyStatements) CreateEncryptionKey(ctx context.Context, key *crypt
 	).Scan(&key.Id, &key.CreatedAt)
 }
 
-const updateDEKStmt = `
-	UPDATE zitadel_nextgen.deks 
-	SET state = $1, created_at = $2, activated_at = $3, retired_at = $4
-	WHERE project_id = $5 AND id = $6
-`
-
-func (s cryptoKeyStatements) UpdateEncryptionKey(ctx context.Context, dek *crypto.EncryptionKey) error {
-	_, err := s.client.Exec(ctx, updateDEKStmt, dek.State, dek.CreatedAt, dek.ActivatedAt, dek.RetiredAt, dek.ProjectID, dek.Id)
-	return err
-}
-
 const encryptionKeyQuery = `
 	SELECT id, project_id, key, algorithm, state, created_at, activated_at, retired_at, purpose
 	FROM zitadel_nextgen.deks

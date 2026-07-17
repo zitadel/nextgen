@@ -151,36 +151,3 @@ func TestCryptoKeyStatements_GetEncryptionKey(t *testing.T) {
 		assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 	})
 }
-
-func TestCryptoKeyStatements_UpdateEncryptionKey(t *testing.T) {
-	t.Parallel()
-
-	t.Run("persists state transition", func(t *testing.T) {
-		projectID := withProject(t)
-		dek := newTestKey(uniqueKeyID(t), projectID, crypto.KeyStateActive)
-		require.NoError(t, testPool.CreateEncryptionKey(t.Context(), dek))
-
-		// Retire the key: flip state and stamp retired_at.
-		retiredAt := time.Now().UTC().Truncate(time.Millisecond)
-		dek.State = crypto.KeyStateExpired
-		dek.RetiredAt = &retiredAt
-		require.NoError(t, testPool.UpdateEncryptionKey(t.Context(), dek))
-
-		// It is no longer returned as the active key.
-		_, err := testPool.GetEncryptionKey(t.Context(),
-			database.And(
-				database.Equal(database.Col(crypto.EncryptionKeyFieldProjectID), projectID),
-				database.Equal(database.Col(crypto.EncryptionKeyFieldState), crypto.KeyStateActive),
-			))
-		assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
-	})
-
-	t.Run("update of missing dek affects no rows and does not error", func(t *testing.T) {
-		t.Parallel()
-
-		projectID := withProject(t)
-		dek := newTestKey(uniqueKeyID(t), projectID, crypto.KeyStateActive)
-		// Never created, so the UPDATE matches nothing.
-		assert.NoError(t, testPool.UpdateEncryptionKey(t.Context(), dek))
-	})
-}

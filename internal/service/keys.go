@@ -17,7 +17,6 @@ import (
 // ---- Interface -------------------------------------------------------------
 
 type KeyService interface {
-	RotateDEK(ctx context.Context, projectID string) error
 	GetEncryptionKey(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (*crypto.EncryptionKey, error)
 	GetCrypter(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (op.Crypto, error)
 	GetProjectDEK(ctx context.Context, projectID string) (*crypto.EncryptionKey, error)
@@ -39,42 +38,6 @@ func NewKeyService(
 		db:  db,
 		kek: kek,
 	}
-}
-
-func (s *keyService) RotateDEK(ctx context.Context, projectID string) error {
-	err := s.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		oldDEK, err := s.GetProjectDEK(ctx, projectID)
-		if err != nil {
-			// not found errors might occur if no DEK exists, don't error on that
-			// just create a new one.
-			if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
-				return domain.ErrInternal(err).WithMessage("failed to get current DEK from the database")
-			}
-		}
-
-		newDEK, err := crypto.NewDEK(projectID, jose.A256GCM, s.kek)
-		if err != nil {
-			return err
-		}
-		newDEK.Activate(oldDEK)
-
-		err = tx.Statements().CreateEncryptionKey(ctx, newDEK)
-		if err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to create DEK")
-		}
-
-		err = tx.Statements().UpdateEncryptionKey(ctx, oldDEK)
-		if err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to expire DEK")
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return domain.ErrInternal(err).WithMessage("failed to commit transaction")
-	}
-	return nil
 }
 
 func (s *keyService) GetEncryptionKey(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (*crypto.EncryptionKey, error) {
@@ -102,6 +65,9 @@ func (s *keyService) GetCrypter(ctx context.Context, keyID string, algorithm jos
 		return nil, err
 	}
 	kek, err := s.getKekCrypter(ctx, key)
+	if err != nil {
+		return nil, err
+	}
 	return key.Crypter(kek)
 }
 

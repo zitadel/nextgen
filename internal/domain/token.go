@@ -136,7 +136,7 @@ func DecodeJWEHeader(token string) (*JWEHeader, error) {
 		return nil, ErrInvalidToken().WithDetails("invalid separator count")
 	}
 	headerB64 := token[:headerSeparatorIndex]
-	headerBs, err := base64.URLEncoding.DecodeString(headerB64)
+	headerBs, err := base64.RawURLEncoding.DecodeString(headerB64)
 	if err != nil {
 		return nil, ErrInvalidToken().WithDetails("invalid base64 header")
 	}

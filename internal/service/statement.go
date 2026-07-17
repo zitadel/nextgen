@@ -58,5 +58,4 @@ type CryptoKeyStatements interface {
 	Statements
 	GetEncryptionKey(ctx context.Context, filter database.Filter[crypto.EncryptionKeyField]) (*crypto.EncryptionKey, error)
 	CreateEncryptionKey(ctx context.Context, dek *crypto.EncryptionKey) error
-	UpdateEncryptionKey(ctx context.Context, dek *crypto.EncryptionKey) error
 }
