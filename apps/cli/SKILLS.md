@@ -90,7 +90,11 @@ the CLI's help layer, not the envelope.
   experience the scaffold starts from: `password-first` is the default —
   email + password with passkey optional during registration; `passkey-first`
   enters login on a one-tap passkey step with an email + password fallback;
-  recorded in `zitadel.json`), `--skip-install`.
+  recorded in `zitadel.json`), `--use-case minimal|consumer|business` (which
+  profile fields the scaffolded schema collects: `minimal` is the default —
+  email only; `consumer` adds given and family name; `business` also adds a
+  `companyName` attribute; asked before `--preset` and recorded in
+  `zitadel.json`), `--skip-install`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
 - `schemas list` — inspect the revision history of a user-schema, filtered by
