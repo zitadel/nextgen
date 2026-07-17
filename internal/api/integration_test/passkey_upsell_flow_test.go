@@ -28,7 +28,7 @@ import (
 func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	testServer := harness.EnsureTestServer(t)
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
@@ -188,7 +188,7 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 // the upsell still terminates cleanly: after create_user, action=skip
 // transitions to `done` without enrolling a passkey.
 func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)

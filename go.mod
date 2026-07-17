@@ -6,6 +6,7 @@ require (
 	cloud.google.com/go/spanner v1.91.0
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.53.0
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.33.0
+	github.com/brianvoe/gofakeit/v6 v6.28.0
 	github.com/descope/virtualwebauthn v1.0.5
 	github.com/fergusstrange/embedded-postgres v1.34.0
 	github.com/georgysavva/scany/v2 v2.1.4
