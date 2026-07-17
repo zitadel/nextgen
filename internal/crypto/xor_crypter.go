@@ -8,7 +8,7 @@ type InverseCrypter struct {
 func (*InverseCrypter) xor(s string) string {
 	bs := []byte(s)
 	for i := range bs {
-		bs[i] ^= 0xAA
+		bs[i] ^= 0xFF
 	}
 	return string(bs)
 }
