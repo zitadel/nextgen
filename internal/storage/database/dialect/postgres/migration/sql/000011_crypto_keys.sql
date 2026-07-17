@@ -17,7 +17,7 @@ CREATE TABLE zitadel_nextgen.encryption_keys
 
 -- A project has at most one active DEK. This partial unique index enforces that
 -- invariant and backs the GetActiveDEK lookup (project_id + state = 'active').
-CREATE UNIQUE INDEX uq_deks_active_per_project
+CREATE UNIQUE INDEX zitadel_nextgen.uq_deks_active_per_project
     ON zitadel_nextgen.encryption_keys (project_id) WHERE state = 'active' AND purpose = 'dek';
 
 -- +goose Down

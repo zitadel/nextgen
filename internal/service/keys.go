@@ -96,7 +96,7 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *crypto.Encryption
 		return nil, domain.ErrInternal(err).WithMessage("failed to decode decryption key")
 	}
 
-	// TODO match the key id with the key id from one fo the keks once they are implemented
+	// TODO match the key id with the key id from one of the keks once they are implemented
 	if jweHeader.KeyID == "" && jweHeader.EncryptionAlgorithm == jose.A256GCM {
 		return key.Crypter(s.kek)
 	}

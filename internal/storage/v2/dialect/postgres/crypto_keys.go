@@ -84,7 +84,7 @@ var encryptionKeySchema = database.NewSchema(map[crypto.EncryptionKeyField]datab
 	crypto.EncryptionKeyFieldKey: {
 		SQLName:  "key",
 		Accessor: func(k *crypto.EncryptionKey) any { return k.Key },
-		Coerce:   database.CoerceBytes,
+		Coerce:   database.CoerceString,
 	},
 	crypto.EncryptionKeyFieldAlgorithm: {
 		SQLName:  "algorithm",
@@ -114,5 +114,6 @@ var encryptionKeySchema = database.NewSchema(map[crypto.EncryptionKeyField]datab
 	crypto.EncryptionKeyFieldPurpose: {
 		SQLName:  "purpose",
 		Accessor: func(k *crypto.EncryptionKey) any { return k.Purpose },
+		Coerce:   database.CoerceString,
 	},
 })
