@@ -406,6 +406,13 @@ func (r *FlowStateMachineRuntime) resolveInputs(pc *processCtx) (FlowResolvedFie
 // Every action validates the values it sent; field-collecting actions
 // (see [collectsStepFields]) additionally require declared required fields
 // to be present.
+//
+// TODO: Validate rejects an empty required field the client did submit,
+// on every action. So "sign in with passkey" on a step with a required
+// password fails, because the client sends password="" with it. The check
+// should depend on the action — but an empty identifier on a passkey leg
+// can be a valid rejection, so we can't just skip it everywhere.
+// Pre-existing; add a password-step test when fixed.
 func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved FlowResolvedFields, actionKind FlowActionKind) (*FlowStepResult, error) {
 	var errs FlowFieldValidationErrors
 	if validationErr := r.fields.Validate(resolved, pc.in.Fields); validationErr != nil {
