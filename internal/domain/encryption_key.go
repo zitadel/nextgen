@@ -1,4 +1,4 @@
-package crypto
+package domain
 
 import (
 	"crypto/rand"
@@ -6,28 +6,27 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/zitadel/nextgen/internal/crypto"
-	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
 const (
-	PrefixDEK domain.ResourcePrefix = "dek"
+	PrefixDEK ResourcePrefix = "dek"
 )
 
-func ErrSupportedEncryptionAlgorithm(alg jose.ContentEncryption) domain.Error {
-	return domain.NewError(PrefixDEK.ErrorCodePrefix("unknown_alg"), "unsupported encryption algorithm", map[string]any{"algorithm": alg}, nil)
+func ErrSupportedEncryptionAlgorithm(alg jose.ContentEncryption) Error {
+	return newError(PrefixDEK.ErrorCodePrefix("unknown_alg"), "unsupported encryption algorithm", map[string]any{"algorithm": alg}, nil)
 }
 
-func ErrNoReplacementKey() domain.Error {
-	return domain.NewError(PrefixDEK.ErrorCodePrefix("no_replacement_key"), "no replacement key was provided while retiring the current one", nil, nil)
+func ErrNoReplacementKey() Error {
+	return newError(PrefixDEK.ErrorCodePrefix("no_replacement_key"), "no replacement key was provided while retiring the current one", nil, nil)
 }
 
-func ErrEncryptionKeyNotFound() domain.Error {
-	return domain.NewError(PrefixDEK.ErrorCodePrefix("not_found"), "encryption key not found", nil, nil)
+func ErrEncryptionKeyNotFound() Error {
+	return newError(PrefixDEK.ErrorCodePrefix("not_found"), "encryption key not found", nil, nil)
 }
 
-func ErrDecryptionFailed(parent error) domain.Error {
-	return domain.NewError(PrefixDEK.ErrorCodePrefix("decrypt_failed"), "failed to decrypt key", nil, parent)
+func ErrDecryptionFailed(parent error) Error {
+	return newError(PrefixDEK.ErrorCodePrefix("decrypt_failed"), "failed to decrypt key", nil, parent)
 }
 
 type KeyState string
@@ -58,7 +57,7 @@ type EncryptionKey struct {
 }
 
 func NewDEK(projectID string, algorithm jose.ContentEncryption, kek crypto.Crypter) (*EncryptionKey, error) {
-	id, err := domain.NewID(PrefixDEK)
+	id, err := NewID(PrefixDEK)
 	if err != nil {
 		return nil, err
 	}
@@ -66,12 +65,12 @@ func NewDEK(projectID string, algorithm jose.ContentEncryption, kek crypto.Crypt
 	var key [32]byte
 	_, err = rand.Read(key[:])
 	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to generate new DEK key")
+		return nil, ErrInternal(err).WithMessage("failed to generate new DEK key")
 	}
 
 	encryptedKey, err := kek.Encrypt(string(key[:]))
 	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to encrypt dek")
+		return nil, ErrInternal(err).WithMessage("failed to encrypt dek")
 	}
 
 	// createdAt is set by db

@@ -10,7 +10,7 @@ import (
 const PrefixPasskeyRegistration ResourcePrefix = "pkreg"
 
 func ErrPasskeyRegistrationNotFound() Error {
-	return NewError(PrefixPasskeyRegistration.ErrorCodePrefix("not_found"), "passkey registration session not found or expired", nil, nil)
+	return newError(PrefixPasskeyRegistration.ErrorCodePrefix("not_found"), "passkey registration session not found or expired", nil, nil)
 }
 
 // PasskeyRegistration is a pending WebAuthn registration session. It is

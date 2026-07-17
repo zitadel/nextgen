@@ -9,7 +9,7 @@ import (
 )
 
 func ErrUserPasswordInvalid() Error {
-	return NewError("user.password_invalid", "The password provided is invalid.", nil, nil)
+	return newError("user.password_invalid", "The password provided is invalid.", nil, nil)
 }
 
 func HashPassword(password string, hasher crypto.Hasher) (string, error) {

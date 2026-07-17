@@ -15,27 +15,27 @@ const (
 )
 
 func ErrSessionNotFound() Error {
-	return NewError("sess.not_found", "The session was not found", nil, nil)
+	return newError("sess.not_found", "The session was not found", nil, nil)
 }
 
 func ErrSessionInvalidHandoffToken() Error {
-	return NewError("sess.invalid_handoff_token", "The handoff token is invalid. Either the token does not exists, was already consumed or has expired", nil, nil)
+	return newError("sess.invalid_handoff_token", "The handoff token is invalid. Either the token does not exists, was already consumed or has expired", nil, nil)
 }
 
 func ErrSessionExchangeConflict() Error {
-	return NewError("sess.exchange_conflict", "The exchange resulted in a conflict. Either the target session was revoked or verified factors could not be promoted consistently.", nil, nil)
+	return newError("sess.exchange_conflict", "The exchange resulted in a conflict. Either the target session was revoked or verified factors could not be promoted consistently.", nil, nil)
 }
 
 func ErrSessionTokenCreationFailed() Error {
-	return NewError("sess.token_creation_failed", "The session token could not be created", nil, nil)
+	return newError("sess.token_creation_failed", "The session token could not be created", nil, nil)
 }
 
 func ErrSessionTokenInvalid() Error {
-	return NewError("sess.token_invalid", "The session token is invalid (either malformed or expired).", nil, nil)
+	return newError("sess.token_invalid", "The session token is invalid (either malformed or expired).", nil, nil)
 }
 
 func ErrSessionInvalidTTL() Error {
-	return NewError("sess.invalid_ttl", "The session TTL is invalid. It must be positive and not exceed the configured maximum.", nil, nil)
+	return newError("sess.invalid_ttl", "The session TTL is invalid. It must be positive and not exceed the configured maximum.", nil, nil)
 }
 
 type SessionInvalidTTLDetails struct {

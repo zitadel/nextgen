@@ -27,15 +27,15 @@ const (
 )
 
 func ErrJSONSchemaNotFound() Error {
-	return NewError(PrefixJSONSchema.ErrorCodePrefix("not_found"), "schema not found", nil, nil)
+	return newError(PrefixJSONSchema.ErrorCodePrefix("not_found"), "schema not found", nil, nil)
 }
 
 func ErrJSONSchemaInvalid() Error {
-	return NewError(PrefixJSONSchema.ErrorCodePrefix("invalid_request"), "invalid request", nil, nil)
+	return newError(PrefixJSONSchema.ErrorCodePrefix("invalid_request"), "invalid request", nil, nil)
 }
 
 func ErrJSONSchemaAlreadyExists() Error {
-	return NewError(PrefixJSONSchema.ErrorCodePrefix("already_exists"), "a schema with the given id already exists", nil, nil)
+	return newError(PrefixJSONSchema.ErrorCodePrefix("already_exists"), "a schema with the given id already exists", nil, nil)
 }
 
 var absoluteScheme = regexp.MustCompile(`^https?://`)

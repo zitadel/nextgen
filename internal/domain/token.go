@@ -18,11 +18,11 @@ var TokenPrefix ResourcePrefix = "tkn"
 
 // ErrInvalidTokenIdentifiers is returned when session identifier fields do not match [Token.Type].
 func ErrInvalidTokenIdentifiers() Error {
-	return NewError(TokenPrefix.ErrorCodePrefix("invalid_tknid"), "token identifiers do not match token type", nil, nil)
+	return newError(TokenPrefix.ErrorCodePrefix("invalid_tknid"), "token identifiers do not match token type", nil, nil)
 }
 
 func ErrInvalidToken() Error {
-	return NewError(TokenPrefix.ErrorCodePrefix("invalid"), "the token is not valid", nil, nil)
+	return newError(TokenPrefix.ErrorCodePrefix("invalid"), "the token is not valid", nil, nil)
 }
 
 // Token is a persisted token record (access, session, PAT, etc.).

@@ -90,7 +90,7 @@ func (e Error) WithParent(parent error) Error {
 	return e
 }
 
-func NewError(code string, message string, details any, parent error) Error {
+func newError(code string, message string, details any, parent error) Error {
 	// Details is client-facing and only ever what a caller attaches explicitly;
 	// Parent stays a log-only diagnostic and must not fall back into Details (ADR 030).
 	if details == "" {
@@ -106,17 +106,17 @@ func NewError(code string, message string, details any, parent error) Error {
 }
 
 func ErrNotImplemented() Error {
-	return NewError("not_implemented", "This feature is not implemented yet.", nil, nil)
+	return newError("not_implemented", "This feature is not implemented yet.", nil, nil)
 }
 
 // ErrInternal is the catch-all for unexpected errors that have no specific domain code.
 func ErrInternal(err error) Error {
-	return NewError("internal", "An unexpected error occurred.", nil, err)
+	return newError("internal", "An unexpected error occurred.", nil, err)
 }
 
 // ErrRequestInvalid is returned when an incoming HTTP request fails structural
 // validation (missing required fields, wrong types, failed regex, etc.)
 // before it reaches domain logic.
 func ErrRequestInvalid() Error {
-	return NewError("req.invalid", "The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.", nil, nil)
+	return newError("req.invalid", "The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.", nil, nil)
 }

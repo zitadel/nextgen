@@ -1,4 +1,4 @@
-package crypto
+package domain
 
 import (
 	"errors"
@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/crypto"
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
-	"github.com/zitadel/nextgen/internal/domain"
 	"go.uber.org/mock/gomock"
 )
 
@@ -19,7 +18,7 @@ import (
 // domain.Error does not implement Unwrap.
 func assertDomainErrorCode(t *testing.T, err error, want string) {
 	t.Helper()
-	var de domain.Error
+	var de Error
 	require.ErrorAs(t, err, &de)
 	assert.Equal(t, want, de.Code)
 }
@@ -66,7 +65,7 @@ func TestNewDEK(t *testing.T) {
 
 		_, err := NewDEK("proj", jose.A256GCM, kek)
 		require.Error(t, err)
-		var de domain.Error
+		var de Error
 		require.ErrorAs(t, err, &de)
 		assert.ErrorIs(t, de.Parent, sentinel)
 	})

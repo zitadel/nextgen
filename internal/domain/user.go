@@ -24,15 +24,15 @@ const (
 )
 
 func ErrUserInvalid() Error {
-	return NewError(PrefixUser.ErrorCodePrefix("invalid"), "user invalid", nil, nil)
+	return newError(PrefixUser.ErrorCodePrefix("invalid"), "user invalid", nil, nil)
 }
 
 func ErrUserNotFound() Error {
-	return NewError(PrefixUser.ErrorCodePrefix("not_found"), "user not found", nil, nil)
+	return newError(PrefixUser.ErrorCodePrefix("not_found"), "user not found", nil, nil)
 }
 
 func ErrUserAlreadyExists() Error {
-	return NewError(PrefixUser.ErrorCodePrefix("already_exists"), "a user already exists with the given unique attributes", nil, nil)
+	return newError(PrefixUser.ErrorCodePrefix("already_exists"), "a user already exists with the given unique attributes", nil, nil)
 }
 
 // User is a hydrated user projection (header + optional EAV joins).
