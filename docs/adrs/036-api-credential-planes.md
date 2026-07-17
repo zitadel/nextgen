@@ -1,4 +1,4 @@
-# ADR 037: API Credential Planes — Public, App, and Operator
+# ADR 036: API Credential Planes — Public, App, and Operator
 
 > **Status:** Proposed
 > **Date:** 2026-07-17
@@ -61,7 +61,7 @@ public-plane.
 |---|---|---|---|
 | **Public** (browser) | The human / their session | Publishable key (+ session cookie for me-ops) | flow ops, `exchangeHandoff` (see below), me-ops, OIDC authorize/jwks/well-known, health probes |
 | **App** (deployment) | The running server-side app | Project secret | auth_attempts, challenges, `createHandoff`, `createSession`, `exchangeHandoff`, introspection |
-| **Operator** (CLI/CI/console) | The operator or automation | Project secret today; PATs/service users with the specced resource scopes later (ADR 036) | schemas, flow definitions, project patch/query, users, teams, releases/deployments (ADR 035) |
+| **Operator** (CLI/CI/console) | The operator or automation | Project secret today; PATs/service users with the specced resource scopes later (token lifecycle ADR, PR #450) | schemas, flow definitions, project patch/query, users, teams, releases/deployments (ADR 035) |
 
 App and operator planes share the project secret today; they are named
 separately because their credential trajectories diverge.
@@ -145,7 +145,7 @@ CORS and first-party cookies:
 ## Out of scope
 
 - Per-app OAuth client credentials for the app plane; operator PATs/service
-  users (ADR 036 token lifecycle).
+  users (token lifecycle ADR, PR #450).
 - Per-environment publishable keys before ADR 035 environments are
   implemented.
 - Per-operation scope enforcement in `HandleOAuth2` (#207).
