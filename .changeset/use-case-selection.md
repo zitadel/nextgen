@@ -4,9 +4,13 @@
 ---
 
 `zitadel setup` now asks "Who will sign in to your app?" and scaffolds the
-matching schema fields: `minimal` (email only, today's default), `consumer`
-(email, given and family name), or `business` (adds a `companyName` attribute).
-This is a second axis alongside the sign-in preset (#448): the use case owns
+matching schema fields: `minimal` (email only), `consumer` (email, given and
+family name), or `business` (adds a `companyName` attribute). `minimal` is the
+default, so the no-flag scaffold now collects **email only** — a deliberate
+slim-down from today's output: given/family name move to `consumer`/`business`,
+and `dateOfBirth` is no longer scaffolded by any use case (the Go server-fallback
+default template is unchanged). This is a second axis alongside the sign-in
+preset (#448): the use case owns
 the schema field set, the sign-in preset owns the flow, and the login flow's
 register step is derived from the chosen fields instead of a hard-coded list —
 so the two compose instead of multiplying into a bundle per pair. The
