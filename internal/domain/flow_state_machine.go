@@ -361,7 +361,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	if err != nil {
 		return FlowStepResult{}, err
 	}
-	halt, err := r.validateAndMerge(pc, resolved)
+	halt, err := r.validateAndMerge(pc, resolved, actionKind)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
@@ -403,18 +403,33 @@ func (r *FlowStateMachineRuntime) resolveInputs(pc *processCtx) (FlowResolvedFie
 // them into CollectedData. Returns a rendered halt step on validation
 // failure.
 //
-// TODO: this rejects passkey submissions on steps that declare required
-// fields (e.g. "sign in with passkey" on the password step) because
-// in.Fields is empty. Validation should scope to fields the client
-// actually submitted, or to what the current action kind needs.
-func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved FlowResolvedFields) (*FlowStepResult, error) {
+// Every action validates the values it sent; field-collecting actions
+// (see [collectsStepFields]) additionally require declared required fields
+// to be present.
+//
+// TODO: Validate rejects an empty required field the client did submit,
+// on every action. So "sign in with passkey" on a step with a required
+// password fails, because the client sends password="" with it. The check
+// should depend on the action — but an empty identifier on a passkey leg
+// can be a valid rejection, so we can't just skip it everywhere.
+// Pre-existing; add a password-step test when fixed.
+func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved FlowResolvedFields, actionKind FlowActionKind) (*FlowStepResult, error) {
+	var errs FlowFieldValidationErrors
 	if validationErr := r.fields.Validate(resolved, pc.in.Fields); validationErr != nil {
-		if errs, ok := errors.AsType[FlowFieldValidationErrors](validationErr); ok {
-			step := r.buildStep(pc.state, pc.currentStep, resolved, new(errs.StepError()), nil, nil)
-			pc.state.IssuedAt = r.now()
-			return &FlowStepResult{State: pc.state, Step: step}, nil
+		v, ok := errors.AsType[FlowFieldValidationErrors](validationErr)
+		if !ok {
+			return nil, fmt.Errorf("flow state machine: validate fields: %w", validationErr)
 		}
-		return nil, fmt.Errorf("flow state machine: validate fields: %w", validationErr)
+		errs = append(errs, v...)
+	}
+	if collectsStepFields(actionKind, pc.in) {
+		errs = append(errs, r.fields.MissingRequired(resolved, pc.in.Fields)...)
+	}
+	if len(errs) > 0 {
+		sortFlowFieldValidationErrors(errs)
+		step := r.buildStep(pc.state, pc.currentStep, resolved, new(errs.StepError()), nil, nil)
+		pc.state.IssuedAt = r.now()
+		return &FlowStepResult{State: pc.state, Step: step}, nil
 	}
 
 	if err := mergeCollected(pc.state, pc.in.Fields); err != nil {
@@ -1159,6 +1174,17 @@ func (r *FlowStateMachineRuntime) buildStep(state *FlowState, step *FlowDefiniti
 		Actions:      actions,
 		SSOProviders: nil,
 	}
+}
+
+// collectsStepFields reports whether a submission commits the step's
+// fields to user creation: the submit action, or the passkey-register
+// issue leg (no proof yet). These enforce required-field presence; passkey
+// login legs and challenge-verify legs send a subset or none.
+func collectsStepFields(kind FlowActionKind, in FlowSubmitInput) bool {
+	if kind == FlowActionKindSubmit {
+		return true
+	}
+	return kind == FlowActionKindPasskeyRegister && in.ChallengeResponse == nil
 }
 
 // stepHasActionKind reports whether the step declares any action of the
