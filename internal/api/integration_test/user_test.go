@@ -141,20 +141,16 @@ func TestCreateUser(t *testing.T) {
 				userjson string
 			}{
 				{
+					// The email-only default schema still enforces `required`,
+					// so a user missing email is rejected. (A value-constraint
+					// case like maxLength lived on `givenName`, which the
+					// minimal default no longer defines; that enforcement is
+					// covered at the domain layer in
+					// flow_field_validation_test.go.)
 					name: "missing required email property",
 					userjson: helpers.MustMarshal(t, map[string]any{
 						"$schema":    "https://test.example.schemas.com/schemas/default-human-user.json",
 						"givenName":  "John",
-						"familyName": "Doe",
-						"password":   "my-strong-password",
-					}),
-				},
-				{
-					name: "given name too long",
-					userjson: helpers.MustMarshal(t, map[string]any{
-						"$schema":    "https://test.example.schemas.com/schemas/default-human-user.json",
-						"email":      "john.withawaytolongname@example.com",
-						"givenName":  "john doe with a waaaaaaaaaaaaaaaaaaaaaaaaaaaaay too long name",
 						"familyName": "Doe",
 						"password":   "my-strong-password",
 					}),
