@@ -10,10 +10,15 @@ const (
 	PrefixProject ResourcePrefix = "proj"
 )
 
+func ErrProjectNameInvalid() Error {
+	return NewError(PrefixProject.ErrorCodePrefix("name_invalid"), "The project name is invalid. Expected a non-empty string.", nil, nil)
+}
+
 // Project is a minimal representation of the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#projects)
 // It is hardly ever modified but read a lot therefore it should be stored in global tables.
 type Project struct {
 	ID        string
+	Name      string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	// PreviewOrigins are the allowed origins for the preview secret.
@@ -21,10 +26,14 @@ type Project struct {
 	PreviewOrigins []string
 }
 
-func NewProject(previewOrigins []string) (*Project, error) {
+func NewProject(name string, previewOrigins []string) (*Project, error) {
 	id, err := NewID(PrefixProject)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to create project id")
+	}
+
+	if name == "" {
+		return nil, ErrProjectNameInvalid()
 	}
 
 	if previewOrigins == nil {
@@ -33,6 +42,7 @@ func NewProject(previewOrigins []string) (*Project, error) {
 
 	return &Project{
 		ID:             id,
+		Name:           name,
 		PreviewOrigins: previewOrigins,
 	}, nil
 }
@@ -65,6 +75,7 @@ type ProjectField uint8
 const (
 	ProjectFieldUnspecified ProjectField = iota
 	ProjectFieldID
+	ProjectFieldName
 	ProjectFieldCreatedAt
 	ProjectFieldUpdatedAt
 	ProjectFieldPreviewOrigins

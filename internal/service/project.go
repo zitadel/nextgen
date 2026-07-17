@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/ianlancetaylor/jsonschema"
+
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	crypto2 "github.com/zitadel/nextgen/internal/crypto"
@@ -60,7 +61,8 @@ type projectService struct {
 var _ ProjectService = (*projectService)(nil)
 
 func (s *projectService) Create(ctx context.Context, previewOrigins []string, seedDefaults bool) (_ *domain.Project, err error) {
-	project, err := domain.NewProject(previewOrigins)
+	// TODO: pass project name
+	project, err := domain.NewProject("tmp", previewOrigins)
 	if err != nil {
 		return nil, err
 	}

@@ -64,5 +64,3 @@ tasks:
     command: "corepack pnpm run test:browser"
     deps:
       - "build"
-    options:
-      runInCI: false
