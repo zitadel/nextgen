@@ -105,7 +105,7 @@ func uniqueProjectID(t *testing.T) string {
 // newTestProject builds a persistable project. PreviewOrigins is a non-nil empty
 // slice because the projects table declares preview_origins NOT NULL.
 func newTestProject(id string) *domain.Project {
-	return &domain.Project{ID: id, PreviewOrigins: []string{}}
+	return &domain.Project{ID: id, Name: id + "-name", PreviewOrigins: []string{}}
 }
 
 func TestProjectStatements_Create(t *testing.T) {
@@ -122,6 +122,7 @@ func TestProjectStatements_Create(t *testing.T) {
 		stored, err := testPool.GetProjectByID(t.Context(), project.ID)
 		require.NoError(t, err)
 		assert.Equal(t, project.ID, stored.ID)
+		assert.Equal(t, project.Name, stored.Name)
 		assert.False(t, stored.CreatedAt.IsZero())
 		assert.False(t, stored.UpdatedAt.IsZero())
 	})
@@ -145,6 +146,7 @@ func TestProjectStatements_Get(t *testing.T) {
 		stored, err := testPool.GetProjectByID(t.Context(), project.ID)
 		require.NoError(t, err)
 		assert.Equal(t, project.ID, stored.ID)
+		assert.Equal(t, project.Name, stored.Name)
 		assert.False(t, stored.CreatedAt.IsZero())
 		assert.False(t, stored.UpdatedAt.IsZero())
 	})
