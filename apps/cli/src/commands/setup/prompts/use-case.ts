@@ -19,8 +19,8 @@ export class UseCasePrompt implements SetupPrompt {
     }
     const labels: Record<SetupUseCase, string> = {
       minimal: "Just me or a small group — email only",
-      consumer: "Consumers — email, first and last name",
-      business: "Business users — email, first and last name, company",
+      consumer: "Consumers — email, given and family name",
+      business: "Business users — email, given and family name, company",
     };
     const value = await select({
       message: "Who will sign in to your app?",

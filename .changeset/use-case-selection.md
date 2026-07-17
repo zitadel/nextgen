@@ -5,7 +5,7 @@
 
 `zitadel setup` now asks "Who will sign in to your app?" and scaffolds the
 matching schema fields: `minimal` (email only, today's default), `consumer`
-(email, first and last name), or `business` (adds a `companyName` attribute).
+(email, given and family name), or `business` (adds a `companyName` attribute).
 This is a second axis alongside the sign-in preset (#448): the use case owns
 the schema field set, the sign-in preset owns the flow, and the login flow's
 register step is derived from the chosen fields instead of a hard-coded list —
