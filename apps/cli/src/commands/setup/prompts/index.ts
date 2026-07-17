@@ -25,12 +25,7 @@ export { SignInPresetPrompt } from "./sign-in-preset";
 export { UseCasePrompt } from "./use-case";
 export { PickFrameworkPrompt } from "./pick-framework";
 
-/**
- * Every question the main setup wizard asks, in ask order. The use case
- * (what a user *is*) is asked before the sign-in preset (*how* they sign
- * in) — the two axes are independent, and field choices read more
- * naturally before flow choices.
- */
+/** Every question the main setup wizard asks, in ask order. */
 export const SETUP_PROMPTS: ReadonlyArray<SetupPrompt> = [
   new FrameworkConfirmPrompt(),
   new ServerPrompt(),

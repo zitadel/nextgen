@@ -61,13 +61,6 @@ export function agentsGuidanceSection(ctx: PatchContext): string {
     ctx.preset === "passkey-first"
       ? " Agents: automated browsers can't complete passkey ceremonies — verify the loop via the email/password fallback actions, or attach a CDP WebAuthn virtual authenticator."
       : "";
-  // Guidance-only read of the stored use case (never behavior): the business
-  // field set collects `companyName` as a plain user attribute — there is no
-  // org/team/tenant model behind it yet. Say so, so nobody assumes one.
-  const businessNote =
-    ctx.useCase === "business"
-      ? "\n\nThis project scaffolded the **business** field set: `companyName` is stored as a user attribute today — there is no organization, invite, or tenant model set up yet. Model teams in your app until that lands."
-      : "";
   return `## Authentication (Zitadel)
 
 This app's login is managed by Zitadel. Local config is the source of truth; never change auth behavior by editing generated route files.
@@ -90,7 +83,7 @@ Machine-readable dialect (read these before authoring flow or schema edits):
 - \`.zitadel/meta/user-schema.json\` (with its companions \`user-property.json\`, \`auth-methods.json\`, \`auth-method.json\`) specifies the user-schema dialect (\`x-auth-methods\`, \`x-unique\`, property constraints).
 - Worked flow examples: https://github.com/zitadel/nextgen/tree/main/api/openapi/endpoints/flow_definitions/examples
 
-Never edit \`.zitadel/state.json\` (sync bookkeeping) or \`.zitadel/secret\` (credentials, git-ignored). Keep \`.zitadel/local/\` out of source control.${businessNote}`;
+Never edit \`.zitadel/state.json\` (sync bookkeeping) or \`.zitadel/secret\` (credentials, git-ignored). Keep \`.zitadel/local/\` out of source control.`;
 }
 
 /** The human-facing summary appended to the app `README.md`. */

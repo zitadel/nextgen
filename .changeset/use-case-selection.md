@@ -14,7 +14,7 @@ question is asked before the sign-in preset; non-interactive and scripted
 runs use `--use-case` (defaults to `minimal`, never blocks); the choice is
 recorded in `zitadel.json` for guidance/status only, never behavior. `business`
 is a field set only for now — `companyName` is a plain user attribute with no
-org/team model behind it yet — and the scaffolded `AGENTS.md` says so. Every
-(use case × sign-in preset) pair is hygiene-tested against the flow validator.
+org/team model behind it yet. Every (use case × sign-in preset) pair is
+hygiene-tested against the flow validator.
 The unused, divergent `buildUserSchema`/`fieldPreset` helpers are removed in
 favor of a single source of field defaults.
