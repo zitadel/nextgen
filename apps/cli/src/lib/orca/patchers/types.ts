@@ -34,6 +34,13 @@ export type PatchContext = PatchView &
      * the project's starting point; absent means password-first.
      */
     preset?: string;
+    /**
+     * Use case the scaffold starts from (`SETUP_USE_CASES` in @zitadel/config).
+     * Recorded in `zitadel.json` for guidance/status only — behavior comes
+     * entirely from the generated schema/flow files, never from this value.
+     * Absent means minimal.
+     */
+    useCase?: string;
   }>;
 
 /** Where and how a patch is applied. Family-neutral (no file-op coupling). */
