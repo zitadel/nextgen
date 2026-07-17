@@ -100,7 +100,6 @@ func TestProjectService_Create(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 
-				//svc, mock, db, schemaRepo, definitionRepo, creator, url, validator, kek, pool, tokenGenerator, transaction, statementer, statements := createMockedProjectService(t)
 				svc, _, _, schemaRepo, definitionRepo, _, _, kek, _, _, _, statements := createMockedProjectService(t)
 
 				kek.EXPECT().Encrypt(gomock.Any())
@@ -121,7 +120,6 @@ func TestProjectService_Create(t *testing.T) {
 		t.Run("ok — skip fallback defaults", func(t *testing.T) {
 			t.Parallel()
 
-			//svc, mock, db, schemaRepo, definitionRepo, creator, url, validator, kek, pool, tokenGenerator, transaction, statementer, statements := createMockedProjectService(t)
 			svc, _, _, schemaRepo, definitionRepo, _, _, kek, _, _, _, statements := createMockedProjectService(t)
 
 			kek.EXPECT().Encrypt(gomock.Any())
@@ -142,7 +140,6 @@ func TestProjectService_Create(t *testing.T) {
 		t.Run("project creation error should bubble up", func(t *testing.T) {
 			t.Parallel()
 
-			//svc, mock, db, schemaRepo, definitionRepo, creator, url, validator, kek, pool, tokenGenerator, transaction, statementer, statements := createMockedProjectService(t)
 			svc, _, _, _, _, _, _, kek, _, _, _, statements := createMockedProjectService(t)
 
 			kek.EXPECT().Encrypt(gomock.Any())
@@ -170,7 +167,6 @@ func TestProjectService_Get(t *testing.T) {
 			PreviewOrigins: []string{"myapp.example.com"},
 		}
 
-		//svc, mock, db, schemaRepo, definitionRepo, creator, url, validator, kek, pool, tokenGenerator, transaction, statementer, statements := createMockedProjectService(t)
 		svc, _, _, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 
 		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(project, nil)
@@ -188,7 +184,6 @@ func TestProjectService_Get(t *testing.T) {
 
 			projectID := "proj_aaa"
 
-			//svc, mock, db, schemaRepo, definitionRepo, creator, url, validator, kek, pool, tokenGenerator, transaction, statementer, statements := createMockedProjectService(t)
 			svc, _, _, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 
 			statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(nil, database.NewNoRowFoundError(nil))

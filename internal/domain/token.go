@@ -119,7 +119,7 @@ func ParseAndValidateToken(ctx context.Context, token string, decrypter crypto2.
 	payload := new(Token)
 	err = json.Unmarshal([]byte(decrypted), payload)
 	if err != nil {
-		return nil, ErrInvalidToken().WithDetails("failed to decrypt")
+		return nil, ErrInvalidToken().WithDetails("failed to unmarshal token payload")
 	}
 
 	return payload, nil
