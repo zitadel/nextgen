@@ -1,0 +1,80 @@
+{
+  "id": "flow_01H8Z",
+  "session_id": "sess_01H8Y",
+  "step": {
+    "name": "login",
+    "texts": {
+      "title_key": "login.title",
+      "description_key": "login.description"
+    },
+    "fields": [
+      {
+        "name": "email",
+        "type": "email",
+        "text_key": "login.field.email",
+        "required": true,
+        "validation": {
+          "format": "email",
+          "max_length": 254
+        }
+      },
+      {
+        "name": "password",
+        "type": "password",
+        "text_key": "login.field.password",
+        "required": true,
+        "validation": {
+          "min_length": 8
+        }
+      },
+      {
+        "name": "country",
+        "type": "select",
+        "text_key": "login.field.country",
+        "value": "CH",
+        "validation": {
+          "enum": ["CH", "DE", "IT"]
+        }
+      }
+    ],
+    "actions": [
+      {
+        "name": "submit",
+        "kind": "submit",
+        "text_key": "login.action.submit",
+        "primary": true
+      },
+      {
+        "name": "register",
+        "kind": "navigate",
+        "text_key": "login.action.register"
+      },
+      {
+        "name": "recover",
+        "kind": "navigate",
+        "text_key": "login.action.recover"
+      }
+    ],
+    "gates": {
+      "captcha": {
+        "kind": "captcha",
+        "provider": "altcha",
+        "config": {
+          "algorithm": "SHA-256",
+          "challenge": "abc123",
+          "salt": "xyz789",
+          "max_number": 100000
+        }
+      }
+    },
+    "sso_providers": [
+      { "id": "google-1", "name": "Google", "template": "google" },
+      { "id": "entra-1", "name": "Microsoft", "template": "entraid" }
+    ]
+  },
+  "branding": {
+    "layout": "centered",
+    "liquid_template": "<h1>{{ step.texts.title_key | t }}</h1>",
+    "logo_url": "https://cdn.example.com/logo.svg"
+  }
+}

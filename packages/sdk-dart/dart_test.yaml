@@ -1,0 +1,6 @@
+tags:
+  # Contract tests drive a live mock server (apps/mock-zitadel on :8080)
+  # and skip themselves when it is not reachable. Run explicitly with:
+  #   corepack pnpm --filter @zitadel/mock-zitadel dev &
+  #   dart test --tags contract
+  contract:

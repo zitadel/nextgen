@@ -1,0 +1,42 @@
+id: "sdk-flutter"
+# Moon has no Dart toolchain; tasks run as system commands and expect the
+# Flutter SDK on PATH (CI installs it via subosito/flutter-action).
+language: "dart"
+layer: "library"
+stack: "frontend"
+dependsOn:
+  - "sdk-dart"
+
+tasks:
+  # `flutter pub get` first: pins the formatter style via the package
+  # config (see packages/sdk-dart/moon.yml).
+  lint:
+    script: "flutter pub get && flutter pub get --directory example && dart format --output=none --set-exit-if-changed lib test example/lib"
+    inputs:
+      - "lib/**/*"
+      - "test/**/*"
+      - "example/**/*"
+      - "pubspec.yaml"
+      - "analysis_options.yaml"
+
+  typecheck:
+    # The example app resolves separately (its own pubspec) but is
+    # analyzed as part of the package root, so both need `pub get` first.
+    script: "flutter pub get && flutter pub get --directory example && flutter analyze"
+    deps:
+      - "sdk-dart:typecheck"
+    inputs:
+      - "lib/**/*"
+      - "test/**/*"
+      - "example/**/*"
+      - "pubspec.yaml"
+      - "analysis_options.yaml"
+
+  test:
+    script: "flutter pub get && flutter test"
+    deps:
+      - "sdk-dart:test"
+    inputs:
+      - "lib/**/*"
+      - "test/**/*"
+      - "pubspec.yaml"

@@ -1,0 +1,6 @@
+# Monorepo linkage: resolve the sibling package from source during
+# development. `dart pub publish` ignores this file, so the published
+# package depends on the pub.dev release declared in pubspec.yaml.
+dependency_overrides:
+  zitadel_client:
+    path: ../sdk-dart

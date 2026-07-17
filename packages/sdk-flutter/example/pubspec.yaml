@@ -1,0 +1,19 @@
+name: zitadel_flutter_example
+description: Minimal example app for the zitadel_flutter package.
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  zitadel_flutter:
+    path: ../
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

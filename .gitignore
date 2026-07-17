@@ -117,3 +117,14 @@ packages/api-mock/tsconfig.tsbuildinfo
 .nx/
 # Root TS incremental build info (generated)
 tsconfig.tsbuildinfo
+
+# Dart / Flutter (packages/sdk-dart, packages/sdk-flutter, apps/demo-flutter)
+.dart_tool/
+.flutter-plugins-dependencies
+# Library packages don't commit lockfiles (pub convention); the demo app does.
+packages/sdk-dart/pubspec.lock
+packages/sdk-flutter/pubspec.lock
+packages/sdk-flutter/example/pubspec.lock
+packages/sdk-flutter/build/
+packages/sdk-flutter/example/build/
+apps/demo-flutter/build/

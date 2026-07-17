@@ -1,0 +1,6 @@
+# Monorepo linkage: zitadel_flutter's pubspec declares its sibling as a
+# pub.dev dependency (overrides only apply to the root package), so the
+# demo re-points it at the in-repo source.
+dependency_overrides:
+  zitadel_client:
+    path: ../../packages/sdk-dart

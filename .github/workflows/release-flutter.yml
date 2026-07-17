@@ -1,0 +1,122 @@
+name: release-flutter
+
+# Publishes the Dart/Flutter SDK (packages/sdk-dart → zitadel_client,
+# packages/sdk-flutter → zitadel_flutter) to pub.dev. The Dart packages
+# version independently of the npm lockstep train (see
+# docs/design/sdk-flutter/PLAN.md), so this is a manual dispatch rather
+# than a changesets-driven push: bump both pubspec versions + CHANGELOGs
+# in a PR, merge, then dispatch this workflow.
+#
+# Authentication uses pub.dev's GitHub Actions automated publishing
+# (OIDC via id-token: write) — configure it once per package under
+# pub.dev → Admin → Automated publishing, restricted to this repository
+# and workflow. No long-lived secret exists.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: validate both packages with pub publish --dry-run only. Uncheck to publish to pub.dev."
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: release-flutter
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: depot-ubuntu-24.04-4
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.35.3
+          cache: true
+
+      - name: Analyze and test zitadel_client
+        working-directory: packages/sdk-dart
+        run: |
+          dart pub get
+          dart format --output=none --set-exit-if-changed .
+          dart analyze --fatal-infos
+          dart test
+
+      - name: Analyze and test zitadel_flutter
+        working-directory: packages/sdk-flutter
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+
+      - name: Check version lockstep
+        run: |
+          client_version="$(grep '^version:' packages/sdk-dart/pubspec.yaml | awk '{print $2}')"
+          flutter_version="$(grep '^version:' packages/sdk-flutter/pubspec.yaml | awk '{print $2}')"
+          declared="$(grep 'zitadel_client:' packages/sdk-flutter/pubspec.yaml | awk '{print $2}')"
+          echo "zitadel_client=$client_version zitadel_flutter=$flutter_version declared=$declared"
+          if [ "$client_version" != "$flutter_version" ]; then
+            echo "::error::The two Dart packages version in lockstep; bump both pubspecs." && exit 1
+          fi
+          if [ "$declared" != "^$client_version" ]; then
+            echo "::error::zitadel_flutter must depend on zitadel_client ^$client_version (found $declared)." && exit 1
+          fi
+
+      - name: Dry-run publish zitadel_client
+        working-directory: packages/sdk-dart
+        run: dart pub publish --dry-run
+
+      # `flutter pub` (not `dart pub`): the package depends on the Flutter
+      # SDK. The path override stays in place here — before zitadel_client
+      # is live on pub.dev the consumer graph cannot resolve — and shows up
+      # as a non-fatal hint; the real publish below removes it.
+      - name: Dry-run publish zitadel_flutter
+        working-directory: packages/sdk-flutter
+        run: flutter pub publish --dry-run
+
+      - name: Publish zitadel_client
+        if: ${{ ! inputs.dry_run }}
+        working-directory: packages/sdk-dart
+        run: dart pub publish --force
+
+      # zitadel_flutter's pub.dev dependency on zitadel_client must be
+      # resolvable before its own publish; pub.dev indexing is eventually
+      # consistent, so poll until the fresh version resolves in a clean
+      # project (bounded at ~5 minutes).
+      - name: Wait for zitadel_client to resolve on pub.dev
+        if: ${{ ! inputs.dry_run }}
+        run: |
+          version="$(grep '^version:' packages/sdk-dart/pubspec.yaml | awk '{print $2}')"
+          tmp="$(mktemp -d)"
+          cd "$tmp"
+          cat > pubspec.yaml <<PUBSPEC
+          name: resolve_probe
+          environment:
+            sdk: ^3.4.0
+          dependencies:
+            zitadel_client: $version
+          PUBSPEC
+          for attempt in $(seq 1 30); do
+            if dart pub get --no-precompile; then
+              echo "zitadel_client $version resolvable after $attempt attempt(s)."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::zitadel_client $version did not become resolvable." && exit 1
+
+      - name: Publish zitadel_flutter
+        if: ${{ ! inputs.dry_run }}
+        working-directory: packages/sdk-flutter
+        run: |
+          rm pubspec_overrides.yaml example/pubspec_overrides.yaml
+          flutter pub get
+          flutter pub publish --force

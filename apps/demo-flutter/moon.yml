@@ -1,0 +1,44 @@
+id: "demo-flutter"
+# Moon has no Dart toolchain; tasks run as system commands and expect the
+# Flutter SDK on PATH (CI installs it via subosito/flutter-action).
+language: "dart"
+layer: "application"
+stack: "frontend"
+dependsOn:
+  - "sdk-flutter"
+
+tasks:
+  # `flutter pub get` first: pins the formatter style via the package
+  # config (see packages/sdk-dart/moon.yml).
+  lint:
+    script: "flutter pub get && dart format --output=none --set-exit-if-changed lib test"
+    inputs:
+      - "lib/**/*"
+      - "pubspec.yaml"
+      - "analysis_options.yaml"
+
+  typecheck:
+    script: "flutter pub get && flutter analyze"
+    deps:
+      - "sdk-flutter:typecheck"
+    inputs:
+      - "lib/**/*"
+      - "pubspec.yaml"
+      - "analysis_options.yaml"
+
+  test:
+    script: "flutter pub get && flutter test"
+    deps:
+      - "sdk-flutter:test"
+    inputs:
+      - "lib/**/*"
+      - "test/**/*"
+      - "pubspec.yaml"
+
+  # Local development only: `moon run demo-flutter:dev` (pick a device
+  # with -d). Not part of the CI graph.
+  dev:
+    command: "flutter run"
+    options:
+      persistent: true
+      runInCI: false

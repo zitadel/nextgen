@@ -12,6 +12,15 @@ The public `@zitadel/*` packages are the `fixed` group in
 
 `packages/config/` publishes `@zitadel/config` and is part of that fixed group.
 
+The Dart/Flutter SDK (`packages/sdk-dart`, `packages/sdk-flutter`,
+`apps/demo-flutter`) publishes to **pub.dev, not npm**, and is invisible to
+Changesets (no `package.json`). Its versions live in the two `pubspec.yaml`
+files, its changelogs are hand-maintained, and publishing runs through the
+manual [`release-flutter`](../.github/workflows/release-flutter.yml) workflow.
+A PR that only touches those directories never needs a changeset — but a
+server/API change that also updates the Dart SDK still needs one for the
+npm-side release intent, as usual.
+
 ## When a change needs a changeset
 
 A change needs a changeset if it changes what the shipped product does —
