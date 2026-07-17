@@ -204,13 +204,14 @@ export class ZlButton extends LitElement {
     const form = this.internals.form;
     if (type === "submit" && form) {
       // Mirror native <button type="submit"> through the shadow boundary:
-      // delegate to the host <form> so its constraint validation runs and an
-      // invalid required field (e.g. an empty <zl-select>) blocks submission.
-      // The form's own `submit` event is the orchestration signal, so we must
-      // NOT also emit `zl-submit` — that parallel path bypasses validation and
-      // would submit anyway (the Enter-to-submit path in <zl-field> likewise
-      // relies on the form `submit` event alone). Non-submit and form-less
-      // buttons still emit `zl-submit` below for SPA/orchestrator listeners.
+      // delegate to the host <form> so its `submit` event is the single
+      // submission signal. On a generic form this runs native constraint
+      // validation; inside <zitadel-login> the form is `novalidate`, so the
+      // orchestrator's `missingRequiredFields` gate enforces instead. Emitting
+      // `zl-submit` too would bypass the form handler, so we don't (the
+      // Enter-to-submit path in <zl-field> likewise relies on the form `submit`
+      // event alone). Non-submit and form-less buttons still emit `zl-submit`
+      // below for SPA/orchestrator listeners.
       event.preventDefault();
       form.requestSubmit();
       return;

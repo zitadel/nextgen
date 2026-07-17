@@ -35,7 +35,6 @@
           label="{{ f.text_key | t }}"
           value="true"
           {% if f.value %}checked{% endif %}
-          {% if f.required %}required{% endif %}
           {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
         ></zl-checkbox>
       {% when 'select' %}

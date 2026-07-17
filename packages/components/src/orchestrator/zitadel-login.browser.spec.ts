@@ -471,6 +471,54 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     expect(body.fields).toEqual({ favoriteColor: "Green" });
   });
 
+  // A required checkbox must NOT gate submission: it always has a value
+  // (`false` when unticked), so it submits real `false` rather than blocking.
+  // A must-accept boolean is a schema concern (`const: true`), not this gate.
+  const registerCheckboxStep: CreateFlow201 = {
+    id: "flow_1",
+    session_id: "sess_1",
+    session_token: "tok_1",
+    step: {
+      name: "register",
+      texts: { title_key: "register.title" },
+      fields: [
+        {
+          name: "terms",
+          type: "checkbox",
+          text_key: "register.field.terms",
+          required: true,
+        },
+      ],
+      actions: [{ name: "submit", text_key: "submit.register", primary: true }],
+      gates: {},
+    },
+  };
+
+  it("submits a required, unticked checkbox as false instead of blocking", async () => {
+    stub.restore();
+    stub = installFlowFetchStub([registerCheckboxStep, passkeyUpsellStep]);
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "register";
+    element.project = testProject;
+    host.appendChild(element);
+    const root = element.shadowRoot!;
+    await waitFor(() => (root.querySelector("zl-checkbox") ? element : null));
+    await waitFor(() => (element.getAttribute("aria-busy") === "false" ? element : null));
+
+    const submit = root.querySelector('zl-button[action="submit"]') as HTMLElement & {
+      updateComplete: Promise<unknown>;
+    };
+    await submit.updateComplete;
+    submit.shadowRoot?.querySelector("button")?.click();
+
+    await waitFor(() => (stub.calls.length > 1 ? stub.calls : null));
+    const body = JSON.parse(String(stub.calls[1]?.init?.body ?? "{}")) as {
+      fields?: Record<string, unknown>;
+    };
+    expect(body.fields).toEqual({ terms: false });
+    expect(root.querySelector('zl-checkbox[name="terms"]')?.getAttribute("error")).toBeFalsy();
+  });
+
   // Regression: frameworks like @lit/react attach the element first and
   // assign object properties (`branding`, `locale`) afterwards. The
   // orchestrator must defer flow-start until properties have been applied.

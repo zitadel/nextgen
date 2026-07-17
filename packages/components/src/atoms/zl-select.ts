@@ -132,11 +132,13 @@ export class ZlSelect extends LitElement {
     this.defaultValue = this.getAttribute("value") ?? "";
     this.syncFormState();
     document.addEventListener("pointerdown", this.handleDocumentPointerDown, true);
+    document.addEventListener("keydown", this.handleDocumentKeydown, true);
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     document.removeEventListener("pointerdown", this.handleDocumentPointerDown, true);
+    document.removeEventListener("keydown", this.handleDocumentKeydown, true);
   }
 
   override willUpdate(changed: PropertyValues<this>): void {
@@ -335,6 +337,18 @@ export class ZlSelect extends LitElement {
   private handleDocumentPointerDown = (event: Event): void => {
     if (this.open && !event.composedPath().includes(this)) {
       this.open = false;
+    }
+  };
+
+  /**
+   * Escape closes the styled popup and stops propagation so it doesn't also
+   * dismiss an enclosing dialog.
+   */
+  private handleDocumentKeydown = (event: KeyboardEvent): void => {
+    if (this.open && event.key === "Escape") {
+      event.stopPropagation();
+      this.open = false;
+      this.nativeEl?.focus();
     }
   };
 

@@ -20,6 +20,8 @@ Login flow: render and submit `select` and `checkbox` user-schema fields.
   the server's enum check.
 - The leading placeholder row drops any empty-valued member the schema enum
   itself lists, so no duplicate empty option is rendered.
+- The styled popup closes on `Escape` for pointer users (keyboard users already
+  get this from the native `<select>`).
 - The `{% mandatory_gates %}` safety net recognises `<zl-select>` /
   `<zl-checkbox>`, so a required select or checkbox no longer gets a duplicate
   generic text field appended.

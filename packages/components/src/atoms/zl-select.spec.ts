@@ -184,6 +184,15 @@ describe("<zl-select> markup", () => {
     expect(el.open).toBe(true);
   });
 
+  it("closes the open styled popup on Escape", async () => {
+    const el = await mount({ name: "country" });
+    el.open = true;
+    await el.updateComplete;
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    await el.updateComplete;
+    expect(el.open).toBe(false);
+  });
+
   it("reflects disabled and open to host attributes", async () => {
     const el = await mount({ name: "country" });
     el.disabled = true;

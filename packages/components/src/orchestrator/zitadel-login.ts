@@ -638,6 +638,10 @@ export class ZitadelLogin extends LitElement {
     }
     const missing: string[] = [];
     for (const field of this.response?.step.fields ?? []) {
+      // A checkbox always submits a real boolean (`false` when unticked), so it
+      // is never "missing"; a must-accept boolean is enforced by the schema
+      // (`const: true`), not this gate.
+      if (field.type === "checkbox") continue;
       if (field.required && (values.get(field.name) ?? "") === "") {
         missing.push(field.name);
       }

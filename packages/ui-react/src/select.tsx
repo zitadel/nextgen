@@ -128,8 +128,21 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         setOpen(false);
       }
     };
+    // Escape closes the styled popup; stop propagation so it doesn't also
+    // dismiss an enclosing dialog.
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        setOpen(false);
+        internalNativeRef.current?.focus();
+      }
+    };
     document.addEventListener("pointerdown", onPointerDown, true);
-    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown, true);
+    };
   }, [open]);
 
   return (
