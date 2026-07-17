@@ -20,6 +20,7 @@ type KeyService interface {
 	GetCrypter(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (op.Crypto, error)
 	GetProjectDEK(ctx context.Context, projectID string) (*domain.EncryptionKey, error)
 	GetProjectDEKCrypter(ctx context.Context, projectID string) (op.Crypto, error)
+	GetKekCrypter(ctx context.Context) (op.Crypto, error)
 }
 
 // ---- Implementation -------------------------------------------------------------
@@ -105,4 +106,8 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.Encryption
 		return nil, err
 	}
 	return key.Crypter(kek)
+}
+
+func (s *keyService) GetKekCrypter(ctx context.Context) (op.Crypto, error) {
+	return s.kek, nil
 }

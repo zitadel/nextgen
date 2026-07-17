@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 
 	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -14,7 +13,6 @@ type Handler struct {
 	// responses for all endpoints, so only implemented methods need to be defined.
 	api.UnimplementedHandler
 
-	kek                   crypto.Crypter
 	flowService           service.FlowService
 	authAttemptService    service.AuthAttemptService
 	sessionService        service.SessionService
@@ -28,7 +26,6 @@ type Handler struct {
 }
 
 func NewHandler(
-	crypter crypto.Crypter,
 	flowService service.FlowService,
 	authAttemptService service.AuthAttemptService,
 	sessionService service.SessionService,
@@ -41,7 +38,6 @@ func NewHandler(
 	keyService service.KeyService,
 ) *Handler {
 	return &Handler{
-		kek:                   crypter,
 		flowService:           flowService,
 		authAttemptService:    authAttemptService,
 		sessionService:        sessionService,

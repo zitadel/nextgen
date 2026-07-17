@@ -186,7 +186,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		flowDefinitionRepo,
 		builtinPublicBase.String(),
 		schemaValidator,
-		kek,
+		keyService,
 	)
 	schemaService := service.NewSchemaService(pool, schemaRepo, schemaResolverWithHTTP, schemaValidator)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
@@ -240,7 +240,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 
 	oasServer, err := oasapi.NewServer(
 		api.NewHandler(
-			kek,
 			flowService,
 			authAttemptSvc,
 			sessionService,

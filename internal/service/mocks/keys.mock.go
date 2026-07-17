@@ -121,6 +121,45 @@ func (c *MockKeyServiceGetEncryptionKeyCall) DoAndReturn(f func(context.Context,
 	return c
 }
 
+// GetKekCrypter mocks base method.
+func (m *MockKeyService) GetKekCrypter(ctx context.Context) (op.Crypto, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetKekCrypter", ctx)
+	ret0, _ := ret[0].(op.Crypto)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetKekCrypter indicates an expected call of GetKekCrypter.
+func (mr *MockKeyServiceMockRecorder) GetKekCrypter(ctx any) *MockKeyServiceGetKekCrypterCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetKekCrypter", reflect.TypeOf((*MockKeyService)(nil).GetKekCrypter), ctx)
+	return &MockKeyServiceGetKekCrypterCall{Call: call}
+}
+
+// MockKeyServiceGetKekCrypterCall wrap *gomock.Call
+type MockKeyServiceGetKekCrypterCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockKeyServiceGetKekCrypterCall) Return(arg0 op.Crypto, arg1 error) *MockKeyServiceGetKekCrypterCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockKeyServiceGetKekCrypterCall) Do(f func(context.Context) (op.Crypto, error)) *MockKeyServiceGetKekCrypterCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockKeyServiceGetKekCrypterCall) DoAndReturn(f func(context.Context) (op.Crypto, error)) *MockKeyServiceGetKekCrypterCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetProjectDEK mocks base method.
 func (m *MockKeyService) GetProjectDEK(ctx context.Context, projectID string) (*domain.EncryptionKey, error) {
 	m.ctrl.T.Helper()

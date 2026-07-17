@@ -79,7 +79,7 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 		return mapFlowErrorStatus(err), nil
 	}
 
-	cookieValue, err := h.sealState(result.State)
+	cookieValue, err := h.sealState(ctx, result.State)
 	if err != nil {
 		return internalErrorResponse(err), nil
 	}
@@ -92,7 +92,7 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 }
 
 func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest, params api.SubmitFlowStepParams) (api.SubmitFlowStepRes, error) {
-	state, err := h.openState(params.Zflow)
+	state, err := h.openState(ctx, params.Zflow)
 	if err != nil {
 		return mapFlowErrorStatus(err), nil
 	}
@@ -164,7 +164,7 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		return mapFlowErrorStatus(err), nil
 	}
 
-	cookieValue, err := h.sealState(result.State)
+	cookieValue, err := h.sealState(ctx, result.State)
 	if err != nil {
 		return internalErrorResponse(err), nil
 	}
@@ -187,7 +187,7 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 }
 
 func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams) (api.GetFlowStepRes, error) {
-	state, err := h.openState(params.Zflow)
+	state, err := h.openState(ctx, params.Zflow)
 	if err != nil {
 		return mapFlowGetError(err), nil
 	}
@@ -207,11 +207,22 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 	return &resp, nil
 }
 
-func (h *Handler) openState(raw string) (*domain.FlowState, error) {
+func (h *Handler) openState(ctx context.Context, raw string) (*domain.FlowState, error) {
 	if raw == "" {
 		return nil, errFlowCookieMissing
 	}
-	payload, err := h.kek.Decrypt(raw)
+
+	header, err := domain.DecodeJWEHeader(raw)
+	if err != nil {
+		return nil, errFlowCookieInvalid
+	}
+
+	decrypter, err := h.keyService.GetCrypter(ctx, header.KeyID, header.EncryptionAlgorithm)
+	if err != nil {
+		return nil, err
+	}
+
+	payload, err := decrypter.Decrypt(raw)
 	if err != nil {
 		return nil, errFlowCookieInvalid
 	}
@@ -225,12 +236,16 @@ func (h *Handler) openState(raw string) (*domain.FlowState, error) {
 	return &state, nil
 }
 
-func (h *Handler) sealState(state *domain.FlowState) (string, error) {
+func (h *Handler) sealState(ctx context.Context, state *domain.FlowState) (string, error) {
 	payload, err := json.Marshal(state)
 	if err != nil {
 		return "", fmt.Errorf("marshal flow state: %w", err)
 	}
-	return h.kek.Encrypt(string(payload))
+	dek, err := h.keyService.GetProjectDEKCrypter(ctx, state.ProjectID)
+	if err != nil {
+		return "", err
+	}
+	return dek.Encrypt(string(payload))
 }
 
 func flowSetCookie(value string, clear bool) string {

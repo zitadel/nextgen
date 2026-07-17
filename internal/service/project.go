@@ -10,7 +10,6 @@ import (
 
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
-	crypto2 "github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -35,7 +34,7 @@ func NewProjectService(
 	flowDefinitionRepo domain.FlowDefinitionRepository,
 	serverURL string,
 	schemaValidator *domain.SchemaValidator,
-	kek crypto2.Crypter,
+	keyService KeyService,
 ) ProjectService {
 	return &projectService{
 		v2Pool:             v2Pool,
@@ -43,7 +42,7 @@ func NewProjectService(
 		flowDefinitionRepo: flowDefinitionRepo,
 		serverURL:          serverURL,
 		schemaValidator:    schemaValidator,
-		kek:                kek,
+		keyService:         keyService,
 	}
 }
 
@@ -54,7 +53,7 @@ type projectService struct {
 	flowDefinitionRepo domain.FlowDefinitionRepository
 	serverURL          string
 	schemaValidator    *domain.SchemaValidator
-	kek                crypto2.Crypter
+	keyService         KeyService
 }
 
 var _ ProjectService = (*projectService)(nil)
@@ -66,7 +65,12 @@ func (s *projectService) Create(ctx context.Context, previewOrigins []string, se
 		return nil, err
 	}
 
-	dek, err := domain.NewDEK(project.ID, jose.A256GCM, s.kek)
+	kek, err := s.keyService.GetKekCrypter(ctx)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to get kek")
+	}
+
+	dek, err := domain.NewDEK(project.ID, jose.A256GCM, kek)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to create project encryption key")
 	}

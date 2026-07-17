@@ -39,6 +39,9 @@ func createMockedProjectService(t *testing.T) (svc service.ProjectService,
 	flowDefinitionRepo = domainmock.NewMockFlowDefinitionRepository(mock)
 	kek = cryptomock.NewMockCrypter(mock)
 
+	keyService := servicemocks.NewMockKeyService(mock)
+	keyService.EXPECT().GetKekCrypter(gomock.Any()).Return(kek, nil).AnyTimes()
+
 	transaction = servicemocks.NewMockTransactioner[service.AllStatements](mock)
 	statementer = servicemocks.NewMockStatementerWithQueryExecutor[service.AllStatements](mock)
 	statements = servicemocks.NewMockAllStatements(mock)
@@ -64,7 +67,7 @@ func createMockedProjectService(t *testing.T) (svc service.ProjectService,
 		flowDefinitionRepo,
 		baseURL,
 		schemaValidator,
-		kek,
+		keyService,
 	)
 
 	return
