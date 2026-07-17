@@ -17,13 +17,13 @@ export class UseCasePrompt implements SetupPrompt {
     if (ctx.useCaseFromFlag) {
       return answers;
     }
-    // Lead with the field set (what the axis actually controls); the audience
-    // is the flavor. A consumer app that wants email-only should still read
-    // "minimal" as the right pick.
+    // Lead with the audience and keep the wording generic: the use case is
+    // recorded in `zitadel.json` and may inform guidance/status beyond the
+    // schema field set, so the labels describe who signs in, not the fields.
     const labels: Record<SetupUseCase, string> = {
-      minimal: "Email only — just me or a small group",
-      consumer: "Email, given and family name — consumer apps",
-      business: "Email, given and family name, company — business apps",
+      minimal: "Just me or a small group",
+      consumer: "Consumers",
+      business: "Business",
     };
     const value = await select({
       message: "Who will sign in to your app?",
