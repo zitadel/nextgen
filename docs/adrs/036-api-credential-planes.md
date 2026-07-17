@@ -23,9 +23,10 @@ been named, and one operation contradicts it:
   handoff token into a session — requires a project service key. It is the only
   secret-requiring operation in the SPA browser path.
 
-Because of that one operation, the framework scaffolds proxy `/__nextgen/*` and
-stamp `ZITADEL_PROJECT_SECRET` onto **every** proxied request (#310; previously
-they sent a placeholder bearer synthesized from the public project id). In
+Because of that one operation, every framework scaffold proxies `/__nextgen/*`
+and stamps `ZITADEL_PROJECT_SECRET` onto **every** proxied request (#310;
+previously the scaffolds sent a placeholder bearer synthesized from the public
+project id). In
 production this forces secret-holding edge compute on every hosting platform
 (PR #56), because a static rewrite cannot inject a header from a secret store.
 
@@ -44,14 +45,16 @@ quarantined under a preview/testing label.
 
 ## Decision
 
-Every operation is assigned to exactly one **credential plane**, encoded in the
-OpenAPI spec via its security scheme. The invariant:
+Every operation declares which **credential planes** may call it, encoded in
+the OpenAPI spec via its security schemes. Most operations accept exactly one
+plane; `exchangeHandoff` is deliberately dual-plane (see below). The invariant:
 
 > A **public-plane** operation authenticates the request's *human* — or is in
 > the process of establishing who that human is — and never the calling
 > software. App identity on the public plane is attribution and scoping, so its
-> credential must be safe to publish. **Confidential-plane** operations
-> authenticate the calling *software* as the principal.
+> credential must be safe to publish. **Confidential-plane** operations — those
+> on the app and operator planes — authenticate the calling *software* as the
+> principal.
 
 Litmus test for new endpoints: *if this credential leaked into a browser
 bundle, is anything lost?* If the answer must be "no", the operation is
