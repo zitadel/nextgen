@@ -219,7 +219,7 @@ func (h *Handler) openState(ctx context.Context, raw string) (*domain.FlowState,
 
 	decrypter, err := h.keyService.GetCrypter(ctx, header.KeyID, header.EncryptionAlgorithm)
 	if err != nil {
-		return nil, err
+		return nil, errFlowCookieInvalid
 	}
 
 	payload, err := decrypter.Decrypt(raw)
