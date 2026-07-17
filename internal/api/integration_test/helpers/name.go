@@ -2,17 +2,11 @@ package helpers
 
 import (
 	"math/rand"
-
-	"github.com/brianvoe/gofakeit/v6"
 )
 
-// appName private function to add a random string to the gofakeit.AppName function
-func appName() string {
-	return gofakeit.AppName() + "-" + RandString(5)
-}
-
+// ProjectName returns a unique project name for integration tests.
 func ProjectName() string {
-	return appName()
+	return "project-" + RandString(8)
 }
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
