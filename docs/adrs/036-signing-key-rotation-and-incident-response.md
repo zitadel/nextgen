@@ -185,6 +185,12 @@ four classes of material: signing keys, opaque tokens, third-party secrets, and 
 secrets (TOTP shared secrets). Passwords and recovery codes are hashed and passkeys store only
 public keys, so those are not exposed by a DEK compromise.
 
+Encrypting opaque tokens under the DEK reflects the current single-DEK decision in
+[ADR 029](029-cryptography-secrets-and-key-lifecycle.md#signingencryption-keys). 
+Because opaque tokens leave the system, a dedicated token-encryption key stored under
+the DEK could keep token-key rotation from re-encrypting everything else the DEK protects. That is a
+possible future amendment to ADR 029 and is out of scope here.
+
 ##### When a KEK is compromised
 
 As the DEKs are stored in the database, when only the KEK is compromised, the DEKs are unaffected.
