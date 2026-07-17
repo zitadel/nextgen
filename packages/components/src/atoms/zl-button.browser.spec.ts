@@ -48,13 +48,9 @@ describe("<zl-button> form participation (chromium)", () => {
     await button.updateComplete;
 
     let submitted = 0;
-    let detail: { action: string | null } | undefined;
     form.addEventListener("submit", (event) => {
       event.preventDefault();
       submitted += 1;
-    });
-    button.addEventListener("zl-submit", (event) => {
-      detail = (event as CustomEvent<{ action: string | null }>).detail;
     });
 
     const native = button.shadowRoot?.querySelector("button");
@@ -62,7 +58,6 @@ describe("<zl-button> form participation (chromium)", () => {
     native?.click();
 
     expect(submitted).toBe(1);
-    expect(detail).toEqual({ action: "go" });
   });
 
   it("submits when automation dispatches the click on the custom-element host", async () => {
@@ -72,19 +67,64 @@ describe("<zl-button> form participation (chromium)", () => {
     await button.updateComplete;
 
     let submitted = 0;
-    let detail: { action: string | null } | undefined;
     form.addEventListener("submit", (event) => {
       event.preventDefault();
       submitted += 1;
-    });
-    button.addEventListener("zl-submit", (event) => {
-      detail = (event as CustomEvent<{ action: string | null }>).detail;
     });
 
     button.click();
 
     expect(submitted).toBe(1);
-    expect(detail).toEqual({ action: "go" });
+  });
+
+  it("does not emit zl-submit when a submit-type button delegates to the form", async () => {
+    // A submit button hands off to form.requestSubmit() so native constraint
+    // validation runs; emitting zl-submit too would let the orchestrator
+    // submit even when a required field is invalid. The form `submit` event is
+    // the single submission signal for submit-type buttons.
+    host.innerHTML = `<form><zl-button type="submit" action="go" label="Go"></zl-button></form>`;
+    const form = host.querySelector("form") as HTMLFormElement;
+    const button = host.querySelector("zl-button") as ZlButton;
+    await button.updateComplete;
+
+    let submitted = 0;
+    let zlSubmits = 0;
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      submitted += 1;
+    });
+    button.addEventListener("zl-submit", () => {
+      zlSubmits += 1;
+    });
+
+    button.shadowRoot?.querySelector("button")?.click();
+
+    expect(submitted).toBe(1);
+    expect(zlSubmits).toBe(0);
+  });
+
+  it("blocks submission when a required field is empty", async () => {
+    // The whole point of delegating to the form: an invalid required control
+    // must stop the submit (and no zl-submit escape hatch fires).
+    host.innerHTML = `<form><input name="x" required /><zl-button type="submit" action="go" label="Go"></zl-button></form>`;
+    const form = host.querySelector("form") as HTMLFormElement;
+    const button = host.querySelector("zl-button") as ZlButton;
+    await button.updateComplete;
+
+    let submitted = 0;
+    let zlSubmits = 0;
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      submitted += 1;
+    });
+    button.addEventListener("zl-submit", () => {
+      zlSubmits += 1;
+    });
+
+    button.shadowRoot?.querySelector("button")?.click();
+
+    expect(submitted).toBe(0);
+    expect(zlSubmits).toBe(0);
   });
 
   it("resets the owning form when type=reset is clicked", async () => {

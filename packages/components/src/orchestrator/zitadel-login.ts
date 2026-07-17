@@ -2,9 +2,11 @@ import { type ZitadelProject } from "@zitadel/api/config";
 import type {
   CreateFlow201,
   CreateFlow201Step,
+  CreateFlow201StepFieldsItem,
   CreateFlowBodyPurpose,
   SubmitFlowStepBody,
   SubmitFlowStepBodyChallengeResponse,
+  SubmitFlowStepBodyFields,
 } from "@zitadel/api/generated/model";
 import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { css, html, LitElement, type PropertyValues } from "lit";
@@ -35,6 +37,20 @@ import { createSanitiser } from "./sanitiser.js";
 import type { FlowError, FlowIdentity, LiquidContext } from "./template-context.js";
 import layoutChromeCss from "./templates/layout-chrome.css?inline";
 import { ThemeController } from "./theme-controller.js";
+
+/**
+ * The uniform value contract every input atom exposes (`<zl-field>`,
+ * `<zl-select>`, `<zl-checkbox>`, and any future field atom). The orchestrator
+ * reads and restores field values exclusively through `formValue`, so it never
+ * has to know an atom's tag or internal shape — a new field type works with no
+ * change here.
+ */
+type FieldAtom = HTMLElement & { formValue: string };
+
+/** Narrow a rendered named element to the `formValue` field-atom contract. */
+function isFieldAtom(el: Element): el is FieldAtom {
+  return typeof (el as Partial<FieldAtom>).formValue === "string";
+}
 
 /**
  * `<zitadel-login>` — the auth-UI orchestrator.
@@ -590,52 +606,110 @@ export class ZitadelLogin extends LitElement {
     };
   }
 
+  /** All rendered input atoms exposing the `formValue` contract. */
+  private fieldAtoms(): FieldAtom[] {
+    const root = this.shadowRoot;
+    if (!root) return [];
+    return Array.from(root.querySelectorAll<HTMLElement>("[name]")).filter(isFieldAtom);
+  }
+
   private applyValuesToFields(): void {
-    const root = this.shadowRoot;
-    if (!root) return;
-    const fields = root.querySelectorAll<HTMLElement & { value?: string }>("zl-field");
-    if (fields.length === 0) return;
-    for (const field of fields) {
-      const name = field.getAttribute("name");
-      if (!name || !(name in this.formValues)) continue;
+    for (const atom of this.fieldAtoms()) {
+      const name = atom.getAttribute("name");
+      if (!name) continue;
       const next = this.formValues[name];
-      if (field.value !== next) {
-        field.value = next;
+      if (next !== undefined && atom.formValue !== next) {
+        atom.formValue = next;
       }
     }
   }
 
-  private captureValuesFromFields(): Record<string, string> {
-    const root = this.shadowRoot;
-    if (!root) return this.formValues;
-    const fields = root.querySelectorAll<HTMLElement & { value?: string }>("zl-field");
-    if (fields.length === 0) return this.formValues;
-    const next = { ...this.formValues };
-    let changed = false;
-    for (const field of fields) {
-      const name = field.getAttribute("name");
-      const value = this.currentFieldValue(field);
-      if (!name || value === undefined) continue;
-      if (field.value !== value) {
-        field.value = value;
-      }
-      if (next[name] !== value) {
-        next[name] = value;
-        changed = true;
+  /**
+   * Names of the current step's `required` fields whose captured value is
+   * empty. Reads each atom's live `formValue` (the getter reflects the native
+   * control, so autofill that skipped `input` events is still seen), so this
+   * is browser-independent and does not rely on native constraint validation.
+   */
+  private missingRequiredFields(): string[] {
+    const values = new Map<string, string>();
+    for (const atom of this.fieldAtoms()) {
+      const name = atom.getAttribute("name");
+      if (name) values.set(name, atom.formValue);
+    }
+    const missing: string[] = [];
+    for (const field of this.response?.step.fields ?? []) {
+      // A checkbox always submits a real boolean (`false` when unticked), so it
+      // is never "missing"; a must-accept boolean is enforced by the schema
+      // (`const: true`), not this gate.
+      if (field.type === "checkbox") continue;
+      if (field.required && (values.get(field.name) ?? "") === "") {
+        missing.push(field.name);
       }
     }
-    if (changed) {
-      this.formValues = next;
-    }
-    return next;
+    return missing;
   }
 
-  private currentFieldValue(field: HTMLElement & { value?: string }): string | undefined {
-    const native = field.shadowRoot?.querySelector<HTMLInputElement>("input");
-    if (native && native.value !== field.value) {
-      return native.value;
+  /**
+   * Surface a client-side required-field error using the server's own
+   * validation dialect (`error.<field>_required`, "; "-joined), so it flows
+   * through the same localisation and inline/banner routing as a real
+   * backend rejection — no native browser bubble. Idempotent: re-running with
+   * the same keys (both submit entry points fire on one click) is a no-op.
+   */
+  private reportRequiredErrors(fields: readonly string[]): void {
+    if (!this.response) return;
+    const errorKey = fields.map((name) => `error.${name}_required`).join("; ");
+    if (this.response.step.error === errorKey) return;
+    this.stepErrorDismissed = false;
+    this.response = {
+      ...this.response,
+      step: { ...this.response.step, error: errorKey },
+    };
+  }
+
+  /**
+   * Snapshot the current step's field values straight from the rendered input
+   * atoms through their uniform `formValue` contract. Tag-agnostic: every
+   * form-participating atom is read the same way, so a new field type needs no
+   * change here. Declared fields default to "" so the backend still runs its
+   * required-checks and challenge dispatch instead of silently advancing on a
+   * field-less payload. Captured values are folded into `formValues` for
+   * cross-step identity (the signed-in greeting) and post-error restoration.
+   */
+  private collectSubmitFields(): SubmitFlowStepBodyFields {
+    const current = new Map<string, string>();
+    for (const atom of this.fieldAtoms()) {
+      const name = atom.getAttribute("name");
+      if (name) current.set(name, atom.formValue);
     }
-    return typeof field.value === "string" ? field.value : undefined;
+    if (current.size > 0) {
+      this.formValues = { ...this.formValues, ...Object.fromEntries(current) };
+    }
+    const fields: SubmitFlowStepBodyFields = {};
+    for (const f of this.response?.step.fields ?? []) {
+      const value = current.get(f.name) ?? "";
+      // A `checkbox` maps to a JSON `boolean` schema property. The atom carries
+      // its value token when checked and "" when unchecked (native-checkbox
+      // semantics), but the server validates the property as a real boolean and
+      // rejects a string, so submit `true`/`false` rather than the token.
+      if (f.type === "checkbox") {
+        fields[f.name] = value !== "";
+        continue;
+      }
+      // A `select` renders a closed `enum`. Its leading placeholder option
+      // submits "" when the user picks nothing, but "" is not a member of the
+      // enum, so sending it fails the server's enum validation (e.g.
+      // create_user rejects with "no enum value matched"). Omit the field
+      // unless the value is an actual enum member the schema allows — which
+      // includes "" only when the schema explicitly lists it, so an
+      // intentionally-allowed empty option is still sent. An omitted required
+      // select still fails the server's required-check, surfacing a clearer
+      // "required" error instead of an enum mismatch. Other fields keep the ""
+      // default so required-checks and challenge dispatch still run.
+      if (f.type === "select" && !isAllowedSelectValue(f, value)) continue;
+      fields[f.name] = value;
+    }
+    return fields;
   }
 
   /**
@@ -660,10 +734,24 @@ export class ZitadelLogin extends LitElement {
     emit(this, "zitadel-flow-input", { name, value });
   };
 
-  /** `zl-change` from <zl-checkbox>/<zl-select>: only error clearing. */
+  /**
+   * `zl-change` from <zl-checkbox>/<zl-select>. Persist the atom's value into
+   * `formValues` — mirroring `handleAtomInput` for text fields — so a later
+   * step re-render (a validation error re-parses the template via `unsafeHTML`
+   * and rebuilds the atoms) restores the selection/checked state through
+   * `applyValuesToFields` instead of dropping back to the template default.
+   * Reads the live `formValue` off the atom rather than the event's `value`
+   * token, because an unchecked checkbox reports "" there but keeps its token
+   * in the detail. Also clears stale errors on the edited field.
+   */
   private handleAtomEdited = (event: CustomEvent<{ name?: string }>): void => {
     const name = event.detail?.name;
-    if (name) this.clearStaleErrors(name);
+    if (!name) return;
+    const atom = event.target;
+    if (atom instanceof HTMLElement && isFieldAtom(atom)) {
+      this.formValues = { ...this.formValues, [name]: atom.formValue };
+    }
+    this.clearStaleErrors(name);
   };
 
   /** Explicit dismiss of the step-error alert (it removes itself). */
@@ -701,18 +789,11 @@ export class ZitadelLogin extends LitElement {
     }
   }
 
+  /** Mirror a value onto the matching rendered atom (used after atom events). */
   private syncFieldElementValue(name: string, value: string): void {
-    const root = this.shadowRoot;
-    if (!root) return;
-    const fields = root.querySelectorAll<HTMLElement & { value?: string }>("zl-field");
-    for (const field of fields) {
-      if (field.getAttribute("name") !== name) continue;
-      if (field.value !== value) {
-        field.value = value;
-      }
-      const native = field.shadowRoot?.querySelector<HTMLInputElement>("input");
-      if (native && native.value !== value) {
-        native.value = value;
+    for (const atom of this.fieldAtoms()) {
+      if (atom.getAttribute("name") === name && atom.formValue !== value) {
+        atom.formValue = value;
       }
     }
   }
@@ -737,6 +818,18 @@ export class ZitadelLogin extends LitElement {
     // navigate to whatever `action` URL the form has (none) and lose state.
     event.preventDefault();
     if (this.loading) return;
+    // This is the sole submit path for the primary action (submit-type
+    // <zl-button> and Enter both drive `form.requestSubmit()`; the button no
+    // longer emits a parallel `zl-submit`). Enforce the step's required fields
+    // here and surface a styled, localised error instead of submitting an
+    // empty required value for the server to reject. Secondary actions (back,
+    // skip, passkey…) arrive via `zl-submit` → `handleAtomSubmit`, so they are
+    // never gated.
+    const missing = this.missingRequiredFields();
+    if (missing.length > 0) {
+      this.reportRequiredErrors(missing);
+      return;
+    }
     // `submitter` is the button that triggered the submit. When the user
     // pressed Enter inside a `<zl-field>`, the field calls
     // `form.requestSubmit()` with no submitter, so we fall back to the first
@@ -831,18 +924,11 @@ export class ZitadelLogin extends LitElement {
     const { id, session_token } = this.response;
     this.loading = true;
     try {
-      // Only send field values that the current step defines. `formValues`
-      // carries state across steps (e.g. email for the signed-in greeting)
-      // but steps without fields should not leak prior values onto the wire.
-      const formValues = this.captureValuesFromFields();
-      const stepFields = this.response.step.fields ?? [];
-      const fields: Record<string, string> = {};
-      for (const f of stepFields) {
-        const value = formValues[f.name];
-        if (value !== undefined) {
-          fields[f.name] = value;
-        }
-      }
+      // Only send field values the current step defines. `formValues` carries
+      // state across steps (e.g. email for the signed-in greeting), but
+      // collectSubmitFields keys off the step's declared fields, so a step
+      // without fields yields an empty map and never leaks prior values.
+      const fields = this.collectSubmitFields();
       const body: SubmitFlowStepBody = {
         session_token,
         action: action ?? "submit",
@@ -873,6 +959,17 @@ export class ZitadelLogin extends LitElement {
     console.error("[zitadel-login]", error);
     emit(this, "zitadel-flow-error", { message });
   }
+}
+
+/**
+ * Whether `value` is a member of a select field's closed `enum`. A select
+ * with no explicit enum has no submittable value, so this returns `false`
+ * and the caller omits the field. Because the enum never contains "" unless
+ * the schema deliberately lists it, an untouched placeholder ("") is omitted
+ * rather than sent and rejected by the server's enum validation.
+ */
+function isAllowedSelectValue(field: CreateFlow201StepFieldsItem, value: string): boolean {
+  return field.validation?.enum?.includes(value) ?? false;
 }
 
 function collectInitialValues(step: CreateFlow201Step): Record<string, string> {

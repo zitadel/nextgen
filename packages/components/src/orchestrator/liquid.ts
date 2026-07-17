@@ -36,11 +36,15 @@ export type CreateLiquidOptions = {
 };
 
 /**
- * Maps `error.*` text keys to a field name (Figma inline-error
- * annotations). Shared by the template filters (`fieldError` routes these
- * inline, `formLevelError` suppresses their banner) and by
- * {@link localiseFlowErrorKeys}, which must downgrade them to a banner
- * message when the step doesn't render the mapped field.
+ * Maps catalog `error.*` keys with no `_<rule>` suffix (so
+ * {@link localiseFlowErrorKeys} can't derive the field from the key itself)
+ * to their field name — the credential errors with bespoke catalog copy
+ * (`error.email_exists`, `error.invalid_credentials`, …). Rule-suffixed keys
+ * (`error.<field>_<rule>`) derive their field from the key. Consumed only by
+ * {@link localiseFlowErrorKeys}, which stamps the resolved `field` onto the
+ * error; the template filters (`fieldError` / `formLevelError`) then route by
+ * that `field`, and an error whose field the step omits is downgraded to a
+ * fieldless banner message.
  */
 const fieldErrorKeys: Record<string, string> = {
   "error.email_required": "email",
@@ -135,10 +139,10 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
     if (!Array.isArray(errors)) return "";
     for (const item of errors) {
       const err = item as FlowError;
-      const key = err.text_key ?? "";
-      if (fieldErrorKeys[key] === name) {
-        return options.locale[key] ?? key;
-      }
+      if (err.field !== name) continue;
+      // A catalog key localises through the active dictionary; a pre-localised
+      // generic field error (no catalog entry) carries its `message` verbatim.
+      return err.text_key ? (options.locale[err.text_key] ?? err.text_key) : (err.message ?? "");
     }
     return "";
   });
@@ -151,10 +155,15 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
    */
   engine.registerFilter("testid", (fieldName: unknown) => hookName(stringify(fieldName)));
 
-  /** True when the error should render as `<zl-alert>`, not on a field. */
+  /**
+   * True when the error should render as `<zl-alert>`, not on a field. A
+   * field-scoped error (`field` set by {@link localiseFlowErrorKeys} when the
+   * step renders that field) routes inline instead; everything else — engine
+   * errors, and orphaned field errors already downgraded to a fieldless
+   * message — falls to the banner.
+   */
   engine.registerFilter("formLevelError", (err: unknown) => {
-    const key = (err as FlowError)?.text_key ?? "";
-    return key === "" || !(key in fieldErrorKeys);
+    return !(err as FlowError)?.field;
   });
 
   // `{% mandatory_gates %}` — emits a unique marker comment that the
@@ -278,7 +287,11 @@ function localiseFlowErrorKey(key: string, ctx: FlowErrorKeyContext): FlowError 
   const orphanedInline =
     inlineField !== undefined && ctx.fields !== undefined && !ctx.fields.includes(inlineField);
   if (!orphanedInline && ctx.locale[key] !== undefined) {
-    return { text_key: key };
+    // Catalog-known key. A field-mapped one (email/password) routes inline to
+    // its field; an unmapped one (e.g. `error.sign_in_server`) stays
+    // form-level, localising through its `.title`/`.body` sub-keys in the
+    // alert filters.
+    return inlineField !== undefined ? { field: inlineField, text_key: key } : { text_key: key };
   }
   for (const { suffix, generic } of FLOW_ERROR_RULE_FALLBACKS) {
     if (!key.endsWith(suffix)) continue;
@@ -286,8 +299,12 @@ function localiseFlowErrorKey(key: string, ctx: FlowErrorKeyContext): FlowError 
     if (field === "") break;
     const template =
       ctx.locale[generic] ?? ctx.locale[FLOW_ERROR_CATCH_ALL_KEY] ?? "Please check {0}.";
-    const message = interpolate(template, [fieldLabel(ctx, field)]);
-    return { message: capitaliseFirst(message) };
+    const message = capitaliseFirst(interpolate(template, [fieldLabel(ctx, field)]));
+    // Route inline when the step renders this field (the inline outlet exists);
+    // otherwise keep it a banner message so it can never silently vanish. A
+    // fields-less pure lookup can't confirm the outlet, so it stays a banner.
+    const rendered = ctx.fields !== undefined && ctx.fields.includes(field);
+    return rendered ? { field, message } : { message };
   }
   // Orphaned inline key without a recognised rule suffix (e.g.
   // `error.email_exists`): surface its catalog copy as a banner message.
