@@ -43,5 +43,8 @@ function validateHandle(value: unknown, source: string): InstanceHandle {
       throw new Error(`handshake file ${source} is missing "${field}"`);
     }
   }
+  if (!URL.canParse(handle.baseUrl as string)) {
+    throw new Error(`handshake file ${source} has a malformed "baseUrl": ${handle.baseUrl}`);
+  }
   return handle as InstanceHandle;
 }

@@ -8,6 +8,8 @@ export interface FakeCliBehavior {
   startStderr?: string;
   stopExitCode?: number;
   stopStdout?: string;
+  /** Fail the first N stop invocations with exit 1, then succeed. */
+  stopFailuresBeforeSuccess?: number;
 }
 
 export interface FakeCli {
@@ -68,6 +70,13 @@ if (command === "start") {
   process.exit(${JSON.stringify(behavior.startExitCode ?? 0)});
 }
 if (command === "stop") {
+  const stopCalls = fs.readFileSync(${JSON.stringify(recordPath)}, "utf8")
+    .split("\\n")
+    .filter((line) => line.startsWith('["stop"')).length;
+  if (stopCalls <= ${JSON.stringify(behavior.stopFailuresBeforeSuccess ?? 0)}) {
+    process.stderr.write("fake cli: transient stop failure " + stopCalls);
+    process.exit(1);
+  }
   process.stdout.write(${JSON.stringify(
     behavior.stopStdout ?? '{"status":"ok","command":"stop","data":{"title":"stopped"}}',
   )});

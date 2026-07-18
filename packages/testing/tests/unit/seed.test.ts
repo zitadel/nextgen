@@ -83,6 +83,21 @@ describe("seedUser via connectZitadel", () => {
     });
   });
 
+  it("never lets attributes override reserved fields", async () => {
+    const zitadel = connectZitadel(handle);
+    const user = await zitadel.seedUser({
+      email: "real@acme.com",
+      attributes: { email: "evil@acme.com", $schema: "sch_evil", firstName: "Mallory" },
+    });
+
+    expect(user.email).toBe("real@acme.com");
+    expect(captured.userBody).toMatchObject({
+      $schema: "sch_1",
+      email: "real@acme.com",
+      firstName: "Mallory",
+    });
+  });
+
   it("propagates unique-email conflicts", async () => {
     server.use(
       http.post(`${BASE}/users`, () =>

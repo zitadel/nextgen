@@ -138,15 +138,41 @@ mutate project-wide state; revisit with warm-dir reuse if that need appears.
   `ZITADEL_SERVER_BINARY`; the npm platform packages carry no binary in-repo.
 - macOS/Linux only (the CLI's port preflight uses `lsof`).
 
-## Future work
+## Roadmap
 
-- Passkey seeding (needs server support for pre-registered WebAuthn
-  credentials) and email/OTP capture for verification flows.
-- Session-mint seed-op (create an authenticated session/token for a seeded
-  user) — makes backend/API tests browser-free and gives the vitest surface
-  real value.
-- Remote-instance mode (seed + cleanup against a shared dev instance).
-- Publishing: peer-dep story for `@zitadel/cli` and `@playwright/test`,
-  entries in the release manifest / changeset `fixed` set, Windows support.
-- Extract `apps/cli/src/lib/local-server` into a shared package and swap the
-  lifecycle shell-out for imports.
+This package is deliberately the **local runtime core** — "Testcontainers for
+Zitadel" when the app under test and Playwright share one machine. The layers
+on top, in intended order:
+
+1. **Registration fixtures.** `zitadel.identity()` (mint an unused identity
+   *without* creating the user) plus a spec that drives the real registration
+   UI and verifies the created user through the API. Until then,
+   `cli-journey-e2e` keeps covering registration.
+2. **Email/OTP capture.** `zitadel.email.waitForCode(address)` for
+   verification flows. Blocked on a server-side story (dev SMTP sink or
+   API-exposed codes); password-only flows don't hit this.
+3. **`withZitadel(config)` orchestration.** A Playwright-config adapter that
+   owns the boot supervisor, handshake, app-env injection, and teardown so
+   consumers stop writing webServer wrapper scripts — plus framework-neutral
+   `appEnv` naming with per-SDK adapters (today's names are Next-shaped), and
+   a session-mint seed-op (authenticated session/token for a seeded user) so
+   backend tests can skip the browser and a vitest surface earns its keep.
+4. **Remote mode: ephemeral project on a persistent instance.** For app
+   deployments that cannot reach a local process (preview environments).
+   `bootstrapProject({ baseUrl })` + `connectZitadel(handle)` already compose
+   into this today; formalizing it means cleanup semantics and docs.
+5. **Vercel Sandbox runtime.** A publicly reachable ephemeral instance per
+   preview deployment (e.g. `@zitadel/testing/vercel`), returning the same
+   `InstanceHandle` so fixtures don't change. Gated on a spike: embedded
+   Postgres on the Sandbox image, forwarded proto/host handling, secure
+   cookies + issuer + handoff verification through `sandbox.domain()`,
+   registering the preview URL as an allowed origin post-deploy
+   (`PATCH /projects`), and cleanup that survives failed runs.
+6. **Publishing.** Peer-dep story for `@zitadel/cli` and `@playwright/test`,
+   entries in the release manifest and the changeset `fixed` train, Windows
+   support (the CLI port preflight shells `lsof`), and the semver commitment
+   — after the API has survived a second in-repo consumer.
+
+Parked until server support exists: passkey seeding (pre-registered WebAuthn
+credentials). Independent refactor: extract `apps/cli/src/lib/local-server`
+into a shared package and swap the lifecycle shell-out for imports.

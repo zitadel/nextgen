@@ -67,12 +67,7 @@ export async function bootLocalServer(options: BootServerOptions = {}): Promise<
   }
 
   const { runtime, urls } = envelope.data;
-  let stopped = false;
-  const stop = async (): Promise<void> => {
-    if (stopped) {
-      return;
-    }
-    stopped = true;
+  const runStop = async (): Promise<void> => {
     const stopResult = await runCli({
       args: ["stop", "--non-interactive", "--json", "-c", dir],
       bin: options.cliBin,
@@ -90,6 +85,17 @@ export async function bootLocalServer(options: BootServerOptions = {}): Promise<
     if (ownsDir && !options.keep) {
       await rm(dir, { recursive: true, force: true });
     }
+  };
+  // Memoize the in-flight stop so concurrent callers await the same cleanup,
+  // and reset on failure so a failed stop can be retried instead of silently
+  // leaving the server and embedded Postgres behind.
+  let stopPromise: Promise<void> | undefined;
+  const stop = (): Promise<void> => {
+    stopPromise ??= runStop().catch((error: unknown) => {
+      stopPromise = undefined;
+      throw error;
+    });
+    return stopPromise;
   };
 
   return {

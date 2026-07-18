@@ -47,7 +47,7 @@ export interface LocalZitadelRuntime {
   logPath: string;
 }
 
-export interface LocalZitadel extends ConnectedZitadel {
+export interface LocalZitadel extends ConnectedZitadel, AsyncDisposable {
   runtime: LocalZitadelRuntime;
   stop(): Promise<void>;
 }

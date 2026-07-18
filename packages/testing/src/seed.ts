@@ -25,11 +25,14 @@ export async function seedUser(
 ): Promise<SeededUser> {
   const email = input.email ?? `e2e-${randomUUID().slice(0, 8)}@example.com`;
   const password = input.password ?? `Pw!${randomUUID()}`;
+  // Reserved fields win over attributes: the returned SeededUser must never
+  // disagree with what was actually created (a silently overridden email or
+  // $schema would yield credentials that cannot log in).
   const user = (await client.createUser(
     {
+      ...input.attributes,
       $schema: context.schemaId,
       email,
-      ...input.attributes,
     } as Parameters<ZitadelClient["createUser"]>[0],
     { project_id: context.projectId },
   )) as Record<string, unknown>;

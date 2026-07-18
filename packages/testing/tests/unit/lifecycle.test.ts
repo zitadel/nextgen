@@ -115,4 +115,26 @@ describe("bootLocalServer", () => {
     const calls = await fake.calls();
     expect(calls.filter((args) => args[0] === "stop")).toHaveLength(1);
   });
+
+  it("retries stop after a failure", async () => {
+    const fake = await fakeCliBin({ stopFailuresBeforeSuccess: 1 });
+    const server = await bootLocalServer({ cliBin: fake.binPath });
+
+    await expect(server.stop()).rejects.toThrow(/zitadel stop exited with code 1/);
+    await expect(exists(server.runtime.dir)).resolves.toBe(true);
+
+    await server.stop();
+
+    const calls = await fake.calls();
+    expect(calls.filter((args) => args[0] === "stop")).toHaveLength(2);
+    await expect(exists(server.runtime.dir)).resolves.toBe(false);
+  });
+
+  it("shares one CLI invocation across concurrent stop calls", async () => {
+    const fake = await fakeCliBin();
+    const server = await bootLocalServer({ cliBin: fake.binPath });
+    await Promise.all([server.stop(), server.stop(), server.stop()]);
+    const calls = await fake.calls();
+    expect(calls.filter((args) => args[0] === "stop")).toHaveLength(1);
+  });
 });

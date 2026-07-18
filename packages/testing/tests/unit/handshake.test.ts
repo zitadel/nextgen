@@ -30,6 +30,13 @@ describe("handshake", () => {
     expect(() => readHandshakeSync(path)).toThrow(/missing "projectId"/);
   });
 
+  it("rejects handles with a malformed baseUrl", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
+    const path = join(dir, "handshake.json");
+    await writeFile(path, JSON.stringify({ ...handle, baseUrl: "not a url" }));
+    expect(() => readHandshakeSync(path)).toThrow(/malformed "baseUrl"/);
+  });
+
   it("waitForHandshake resolves once the file appears", async () => {
     const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
     const path = join(dir, "handshake.json");

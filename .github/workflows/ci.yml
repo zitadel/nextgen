@@ -102,6 +102,13 @@ jobs:
             --work-dir "${RUNNER_TEMP}/ci-journey-passkey-first" \
             --tarballs-dir "dist/release/${version}/npm"
 
+      # Gates the test-kit's central promise: boot a real seeded instance,
+      # then drive the real browser login with per-test users. Reuses the Go
+      # build cache and Playwright Chromium installed above.
+      - name: Run @zitadel/testing real-instance suites
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: env -u CI -u GITHUB_ACTIONS moon run testing:test-integration demo-next-e2e:e2e-real
+
       - name: Validate version PR
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
         run: env -u CI -u GITHUB_ACTIONS moon run release:version
