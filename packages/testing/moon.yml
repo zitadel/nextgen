@@ -1,0 +1,51 @@
+id: "testing"
+language: "typescript"
+# Tool, not library: the layer must sit between the e2e suites (automation)
+# that consume this package and the CLI (tool) it drives — automation may not
+# depend on automation, and library may not depend on tool.
+layer: "tool"
+stack: "frontend"
+dependsOn:
+  - "api"
+  - "config"
+  - "cli"
+
+tasks:
+  lint:
+    command: "corepack pnpm run lint"
+    deps:
+      - "api:build"
+      - "config:build"
+
+  typecheck:
+    command: "corepack pnpm run typecheck"
+    deps:
+      - "api:build"
+      - "config:build"
+
+  build:
+    command: "corepack pnpm run build"
+    deps:
+      - "api:build"
+      - "config:build"
+    outputs:
+      - "dist/**/*"
+
+  test:
+    command: "corepack pnpm run test"
+    deps:
+      - "build"
+
+  # Boots a real local server (binary runtime + embedded Postgres). Kept out
+  # of CI and the cache: it spawns OS processes and takes ~30s per boot.
+  test-integration:
+    command: "corepack pnpm run test:integration"
+    deps:
+      - "build"
+      - "cli:build"
+      - "server:build"
+    env:
+      ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
+    options:
+      cache: false
+      runInCI: false

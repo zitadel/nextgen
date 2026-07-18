@@ -5,6 +5,7 @@ stack: "frontend"
 dependsOn:
   - "api-mock"
   - "demo-next"
+  - "testing"
 
 tasks:
   lint:
@@ -16,5 +17,20 @@ tasks:
       - "api-mock:build"
       - "demo-next:build"
     options:
+      runInCI: false
+
+  # Same sign-in journey against a real ephemeral instance seeded via
+  # @zitadel/testing instead of api-mock. Boots a server + embedded Postgres.
+  e2e-real:
+    command: "corepack pnpm exec playwright test --config playwright.real.config.mts"
+    deps:
+      - "testing:build"
+      - "cli:build"
+      - "server:build"
+      - "demo-next:build"
+    env:
+      ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
+    options:
+      cache: false
       runInCI: false
 
