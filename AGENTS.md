@@ -287,8 +287,8 @@ The changeset decision — including when a Go-only change needs one — lives i
 verify with `corepack pnpm exec changeset status --since origin/main`.
 
 - npm packages under `apps/cli/` and `packages/*` must stay MIT-licensed.
-- Server npm packages under `apps/server*` and console application paths are
-  AGPL-3.0-only by default.
+- Server npm packages under `apps/server/` and `apps/server-*/` and console
+  application paths are AGPL-3.0-only by default.
 - Keep local secrets, private keys, tokens, and `.zitadel/secret`-style files out
   of source control and browser-safe runtime metadata.
 
