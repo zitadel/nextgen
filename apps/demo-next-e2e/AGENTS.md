@@ -25,8 +25,7 @@ This project covers the boundary that Vitest cannot reach:
 - Mock handler logic, RS256 token contract, JWKS shape
   → `packages/api-mock` Vitest projects.
 - Visual regression / accessibility audits
-  → not yet wired; route through `chrome-devtools` MCP per
-  [`browser-verification`](../../.cursor/rules/browser-verification.mdc).
+  → not yet wired.
 
 If a property can be proven without booting Next, it does not belong in
 this project.
@@ -39,7 +38,7 @@ moon run demo-next-e2e:e2e
 ```
 
 Moon rebuilds `@zitadel/components` first through task dependencies, then
-Playwright boots `api-mock` (`:4000`) and `demo-next` (`:3002`) through
+Playwright boots `api-mock` (`:8080`) and `demo-next` (`:3002`) through
 direct `pnpm --filter` commands.
 
 ## When Adding A Spec
