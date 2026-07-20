@@ -57,6 +57,20 @@ schema repin machinery applies. Table: `zitadel_nextgen.branding`, PK
 extensions proposed in [branding/schema.md](../design/branding/schema.md)
 (palette, typography, theme) without migrations.
 
+**Access model: managing templates and rendering them are different
+planes.** The login path never calls the Branding API — templates reach
+the widget inline on flow responses. The management API is therefore
+uniformly strict: every operation requires a token bound to the
+requested project (foreign projects answer exactly like nonexistent
+ones), writes require an operator-grade scope (`project.write` |
+`branding.write`) and reads `project.write` | `branding.read`. The
+browser-grade preview secret (`project.read` only, shipped to visitors'
+browsers by design) gets no management access at all — before this
+gate, a leaked preview token could publish login templates. The
+`branding.*` scope names declared in the OpenAPI contract become
+mintable with [ADR 036](036-api-credential-planes.md)'s credential
+planes; until then the legacy `project.write` implies them.
+
 ### 2. Resolution: latest revision, resolved per response
 
 Every flow response (`create`, `submit`, `get step`) resolves the

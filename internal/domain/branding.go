@@ -21,6 +21,10 @@ func ErrBrandingMissingProjectID() Error {
 	return newError(PrefixBranding.ErrorCodePrefix("missing_project_id"), "branding: missing project id", nil, nil)
 }
 
+func ErrBrandingPermissionDenied() Error {
+	return newError(PrefixBranding.ErrorCodePrefix("permission_denied"), "branding: the branding management API requires the project secret", nil, nil)
+}
+
 // Branding layout presets understood by the bundled login template. The wire
 // enum is defined in api/openapi/components/flows/branding.yaml; richer
 // designs are delivered as Liquid templates, not new enum values (ADR 037).

@@ -76,6 +76,70 @@ func TestBranding(t *testing.T) {
 		assert.Equal(t, api.ErrorCode("brnd.invalid"), errResp.Code)
 	})
 
+	t.Run("management API is bound to the token's project", func(t *testing.T) {
+		// A second, real project: its secret must not manage the first
+		// project's branding, and the answers must not reveal that the
+		// foreign project exists (identical to the nonexistent-project
+		// responses).
+		other, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+		require.NoError(t, err)
+		foreign, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		foreign.SetToken(other.ProjectSecret)
+
+		createResp, err := foreign.CreateBranding(t.Context(), &api.Branding{
+			LiquidTemplate: api.NewOptString(templateRev1),
+		}, params)
+		require.NoError(t, err)
+		createErr, ok := createResp.(*api.ErrorDetails)
+		require.True(t, ok, "cross-project create: %+v", createResp)
+		assert.Equal(t, api.ErrorCode("brnd.invalid"), createErr.Code)
+
+		getResp, err := foreign.GetBrandingById(t.Context(), api.GetBrandingByIdParams{
+			ID:        "brnd_irrelevant",
+			ProjectID: api.ProjectID(project.ID),
+		})
+		require.NoError(t, err)
+		getErr, ok := getResp.(*api.ErrorDetails)
+		require.True(t, ok, "cross-project get: %+v", getResp)
+		assert.Equal(t, api.ErrorCode("brnd.not_found"), getErr.Code)
+
+		listResp, err := foreign.ListBranding(t.Context(), api.ListBrandingParams{
+			ProjectID: api.ProjectID(project.ID),
+		})
+		require.NoError(t, err)
+		listErr, ok := listResp.(*api.ErrorDetailsStatusCode)
+		require.True(t, ok, "cross-project list: %+v", listResp)
+		assert.Equal(t, 404, listErr.StatusCode)
+	})
+
+	t.Run("preview secret cannot touch the management API", func(t *testing.T) {
+		// The preview secret is a login-plane credential that ships to
+		// visitors' browsers; templates reach the login inline on flow
+		// responses, so the management API rejects it entirely — including
+		// on its own project.
+		preview, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		preview.SetToken(project.PreviewSecret)
+
+		createResp, err := preview.CreateBranding(t.Context(), &api.Branding{
+			LiquidTemplate: api.NewOptString(templateRev1),
+		}, params)
+		require.NoError(t, err)
+		createErr, ok := createResp.(*api.ErrorDetailsStatusCode)
+		require.True(t, ok, "preview create: %+v", createResp)
+		assert.Equal(t, 403, createErr.StatusCode)
+		assert.Equal(t, api.ErrorCode("brnd.permission_denied"), createErr.Response.Code)
+
+		listResp, err := preview.ListBranding(t.Context(), api.ListBrandingParams{
+			ProjectID: api.ProjectID(project.ID),
+		})
+		require.NoError(t, err)
+		listErr, ok := listResp.(*api.ErrorDetailsStatusCode)
+		require.True(t, ok, "preview list: %+v", listResp)
+		assert.Equal(t, 403, listErr.StatusCode)
+	})
+
 	t.Run("unknown project is a 400, not a 500", func(t *testing.T) {
 		resp, err := client.CreateBranding(t.Context(), &api.Branding{
 			LiquidTemplate: api.NewOptString(templateRev1),
