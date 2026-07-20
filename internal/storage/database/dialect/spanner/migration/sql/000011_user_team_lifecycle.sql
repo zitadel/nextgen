@@ -27,7 +27,7 @@ CREATE TABLE team_memberships (
     CONSTRAINT fk_team_memberships_user
         FOREIGN KEY (project_id, user_id)
         REFERENCES users (project_id, id)
-        ON DELETE NO ACTION,
+        ON DELETE NO ACTION
 ) PRIMARY KEY (project_id, team_id, user_id)
 -- +goose StatementEnd
 -- +goose StatementBegin

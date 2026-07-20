@@ -67,13 +67,17 @@ func (r *UserRepository) LifecycleOwnerTeamIDCondition(teamID string) database.C
 type membershipTeamMatch struct{ teamID string }
 
 func (c membershipTeamMatch) Write(b *database.StatementBuilder) {
-	b.WriteString("EXISTS (SELECT 1 FROM zitadel_nextgen.team_memberships m WHERE m.project_id = ")
+	b.WriteString("EXISTS (SELECT 1 FROM ")
+	b.WriteString(pgTableMemberships)
+	b.WriteString(" m WHERE m.project_id = ")
 	colUserProjectID.WriteQualified(b)
 	b.WriteString(" AND m.user_id = ")
 	colUserID.WriteQualified(b)
 	b.WriteString(" AND m.team_id = ")
 	b.WriteArg(c.teamID)
-	b.WriteString(" AND m.status = 'active')")
+	b.WriteString(" AND m.status = ")
+	b.WriteArg(domain.MembershipStatusActive.String())
+	b.WriteString(")")
 }
 
 func (c membershipTeamMatch) Matches(x any) bool {
@@ -156,9 +160,9 @@ func (r *UserRepository) Delete(ctx context.Context, client database.QueryExecut
 		return err
 	}
 	return withTransaction(ctx, client, func(ctx context.Context, tx database.QueryExecutor) error {
-		builder := database.NewStatementBuilder(
-			"DELETE FROM zitadel_nextgen.team_memberships WHERE (project_id, user_id) IN (SELECT project_id, id FROM ",
-		)
+		builder := database.NewStatementBuilder("DELETE FROM ")
+		builder.WriteString(pgTableMemberships)
+		builder.WriteString(" WHERE (project_id, user_id) IN (SELECT project_id, id FROM ")
 		builder.WriteString(userTable)
 		builder.WriteString(" WHERE ")
 		condition.Write(builder)
@@ -301,11 +305,21 @@ func (r *UserRepository) Deactivate(ctx context.Context, client database.QueryEx
 	if err != nil {
 		return err
 	}
-	_, err = client.Exec(ctx,
-		`UPDATE zitadel_nextgen.team_memberships SET status = $3, updated_at = NOW()`+
-			` WHERE project_id = $1 AND user_id = $2 AND status <> $3`,
-		projectID, userID, domain.MembershipStatusRemoved.String(),
-	)
+
+	mb := database.NewStatementBuilder("UPDATE ")
+	mb.WriteString(pgTableMemberships)
+	mb.WriteString(" SET status = ")
+	mb.WriteArg(domain.MembershipStatusRemoved.String())
+	mb.WriteString(", updated_at = ")
+	mb.WriteArg(database.NowInstruction)
+	mb.WriteString(" WHERE project_id = ")
+	mb.WriteArg(projectID)
+	mb.WriteString(" AND user_id = ")
+	mb.WriteArg(userID)
+	mb.WriteString(" AND status <> ")
+	mb.WriteArg(domain.MembershipStatusRemoved.String())
+	_, err = client.Exec(ctx, mb.String(), mb.Args()...)
+
 	return err
 }
 
