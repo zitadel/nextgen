@@ -293,20 +293,21 @@ func userHydrationExpressions(rowQualifier, attrKeysPlaceholder, authPlaceholder
 }
 
 func (r *UserRepository) Deactivate(ctx context.Context, client database.QueryExecutor, projectID, userID string) error {
-	cond := r.PrimaryKeyCondition(projectID, userID)
-	_, err := updateOne(ctx, client, r, cond,
-		r.SetStatus(domain.UserStatusDeactivated),
-		database.NewChange(colUserUpdatedAt, database.NowInstruction),
-	)
-	if err != nil {
+	return withTransaction(ctx, client, func(ctx context.Context, tx database.QueryExecutor) error {
+		cond := r.PrimaryKeyCondition(projectID, userID)
+		if _, err := updateOne(ctx, tx, r, cond,
+			r.SetStatus(domain.UserStatusDeactivated),
+			database.NewChange(colUserUpdatedAt, database.NowInstruction),
+		); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx,
+			`UPDATE zitadel_nextgen.team_memberships SET status = $3, updated_at = NOW()`+
+				` WHERE project_id = $1 AND user_id = $2 AND status <> $3`,
+			projectID, userID, domain.MembershipStatusRemoved.String(),
+		)
 		return err
-	}
-	_, err = client.Exec(ctx,
-		`UPDATE zitadel_nextgen.team_memberships SET status = $3, updated_at = NOW()`+
-			` WHERE project_id = $1 AND user_id = $2 AND status <> $3`,
-		projectID, userID, domain.MembershipStatusRemoved.String(),
-	)
-	return err
+	})
 }
 
 func (r *UserRepository) GetByID(ctx context.Context, client database.QueryExecutor, projectID string, membershipTeamID *string, userID string) (*domain.User, error) {

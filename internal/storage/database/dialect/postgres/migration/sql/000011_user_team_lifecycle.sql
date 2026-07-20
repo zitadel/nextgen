@@ -8,6 +8,10 @@ ALTER TABLE zitadel_nextgen.users
     ADD COLUMN status TEXT NOT NULL DEFAULT 'active'
         CHECK (status IN ('active', 'suspended', 'deactivated', 'pending_purge'));
 
+-- Conservative alpha default: map legacy users.team_id to lifecycle_owner_team_id.
+-- Old schema required a team context for every user, so we cannot distinguish
+-- self-serve vs enterprise provenance. Post-migration creates use
+-- InitialMembershipTeamID only (self-owned) unless LifecycleOwnerTeamID is set.
 UPDATE zitadel_nextgen.users
 SET lifecycle_owner_team_id = team_id
 WHERE team_id IS NOT NULL AND team_id <> '';
