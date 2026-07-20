@@ -66,9 +66,9 @@ function SummaryCard({
   className?: string;
 }) {
   return (
-    <div className={`rounded-zl-l border border-zl-border-subtle bg-zl-surface-raised p-5 ${className}`}>
-      <p className="text-2xl font-semibold text-zl-text-primary">{value.toLocaleString()}</p>
-      <p className="mt-1 text-sm text-zl-text-secondary">{label}</p>
+    <div className={`rounded-xl border border-border bg-card p-5 ${className}`}>
+      <p className="text-2xl font-semibold text-foreground">{value.toLocaleString()}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{label}</p>
     </div>
   );
 }

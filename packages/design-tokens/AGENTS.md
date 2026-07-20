@@ -24,14 +24,37 @@ add it to `overrides.ts` with a doc comment explaining why.
 - **Figma plugin push:** branch `design-tokens/figma-sync`, token path
   `packages/design-tokens/figma-export/`. CI triggers on `push` to that branch
   (`figma-export/**` only).
-- `:sync-export` (`scripts/sync-from-export.ts`) — reads DTCG JSON in
-  `figma-export/` (`primitives.json`, `semantic---light-dark.json`, `layout.json`)
-  and merges into `figma.tokens.json`. Preserves legacy login tokens for keys
-  not present in the export.
+- `:sync-export` (`scripts/sync-from-export.ts`) — a **generic, file-name
+  agnostic** DTCG resolver. It reads *every* `*.json` under `figma-export/`,
+  builds one cross-collection registry, resolves every `{alias}` (including
+  per-mode Light/Dark chains) to a concrete value, and writes the resolved
+  shadcn surface to `src/generated/figma.tokens.json`. It **fails loud** on any
+  unresolved reference or an empty colour surface — never filter exports by file
+  name, and never downgrade a resolution failure to a warning.
 - `:sync` (`scripts/sync-from-figma.ts`) — Figma REST / Enterprise. Does not
   fetch variables on standard plans.
 
 After any sync, run `:generate` and review the snapshot diff.
+
+## Coexistence: legacy vs shadcn
+
+Two colour systems ship at once so consumers migrate incrementally:
+
+- **Legacy** (`--zl-color-surface-*`, `--zl-color-text-*`, `--zl-color-gray-*`,
+  spacing, radius) is frozen in `src/legacy.tokens.json` and emitted verbatim by
+  `build.ts`. Do not change its values or names — that is the migration's stable
+  floor. In the typed export it stays under `tokens.color.*`.
+- **shadcn** (`--zl-background`, `--zl-foreground`, `--zl-primary`, `--zl-card`,
+  `--zl-border`, `--zl-sidebar-*`, `--zl-chart-*`) comes from the designer export
+  and lives under `tokens.theme.*`. This is the target surface.
+
+When migrating a consumer, replace legacy `--zl-color-*` references with the new
+`--zl-*` names (or `bg-zl-*` / `text-zl-*` Tailwind utilities) and verify light +
+dark in the browser. Retire legacy names only once no consumer references them.
+
+**Console exception:** `apps/console` imports `css/shadcn.css` and authors the
+**unprefixed** shadcn contract (`bg-background`, `text-muted-foreground`). Do
+not reintroduce `bg-zl-*` there — the bridge file owns the mapping.
 
 ## Surfaces you can change
 
@@ -54,20 +77,24 @@ After any sync, run `:generate` and review the snapshot diff.
   `:sync-export`.
 - `src/generated/tokens.css`, `tokens.ts`, `tailwind.css` —
   overwritten by `:generate`.
+- `src/legacy.tokens.json` — frozen legacy colour source. Only touch it to
+  deliberately retire a legacy token once no consumer references it.
 - `figma-tokens.lock` — only bumped as part of a sync PR.
 
 ## Output ordering
 
-`scripts/build.ts` walks categories in a fixed order (color → spacing
-→ radius → font → motion → focus → breakpoint → container). Spacing
-keys are numeric-sorted. Keep new categories appended at the end so
-existing diffs stay small.
+`scripts/build.ts` emits legacy semantic colours, then the new shadcn colours
+(`theme.*`), then the remaining categories in a fixed order (spacing → radius →
+font → motion → focus → breakpoint → container → layout). Spacing keys are
+numeric-sorted. Keep new categories appended at the end so existing diffs stay
+small.
 
 ## Tests
 
-Single Vitest project, Node mode. Just the snapshot for now. If you
-add a token category, extend `src/tokens.snapshot.spec.ts` to cover
-its keys so it can't silently disappear.
+Single Vitest project, Node mode: `tokens.snapshot.spec.ts` (public-name guard,
+both surfaces) and `sync-from-export.spec.ts` (resolver logic + real-export
+regression). If you add a token category, extend the snapshot to cover its keys
+so it can't silently disappear.
 
 ## Branding overrides at runtime
 
@@ -86,6 +113,5 @@ the orchestrator's own shadow root. Do not introduce a separate
 - Don't hand-edit anything under `src/generated/`. If the generated
   output is wrong, fix the input (lock, json, or overrides) and re-run
   `:generate`.
-- Don't add a `light` mode override before Figma publishes a light
-  variable mode. The `[data-theme="light"]` selector in `tokens.css`
-  is intentionally empty until then.
+- Don't re-couple `:sync-export` to specific export file names. The designer
+  reorganises collections freely; the resolver must stay shape-driven.

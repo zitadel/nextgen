@@ -12,6 +12,9 @@
  *   tailwind.css    — Tailwind v4 `@theme` block aliasing `--color-zl-*`,
  *                     `--spacing-zl-*` etc. so React consumers can write
  *                     `text-zl-text-primary` and `bg-zl-surface-black`.
+ *   shadcn.css      — Tailwind v4 `@theme inline` mapping the standard shadcn
+ *                     utility names (`bg-background`, `rounded-md`, `font-serif`)
+ *                     onto `--zl-*`, so shadcn/ui components drop into the console.
  *
  * Run: `moon run design-tokens:generate`
  *
@@ -22,7 +25,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import figmaTokens from "../src/generated/figma.tokens.json" with { type: "json" };
+import shadcnTokens from "../src/generated/figma.tokens.json" with { type: "json" };
+import legacyTokens from "../src/legacy.tokens.json" with { type: "json" };
 import { overrides } from "../src/overrides.ts";
 
 type Hex = string;
@@ -33,7 +37,12 @@ type SemanticValue = Hex | PrimitiveRef;
 type ModeValue = { dark: SemanticValue; light?: SemanticValue };
 type ColorToken = SemanticValue | ModeValue;
 
-interface FigmaTokensFile {
+/**
+ * Frozen legacy source (`--zl-color-surface-*`, `--zl-color-text-*`, spacing,
+ * radius, gray ramp). Kept verbatim so existing consumers keep working while
+ * the new shadcn surface is migrated in — see design-tokens/README.md.
+ */
+interface LegacyTokensFile {
   $source: Record<string, unknown>;
   primitives: {
     color: Record<string, Hex | Record<string, Hex>>;
@@ -47,7 +56,23 @@ interface FigmaTokensFile {
   };
 }
 
-const figma = figmaTokens as unknown as FigmaTokensFile;
+/**
+ * The new themed surface produced by `scripts/sync-from-export.ts` from the
+ * designer's DTCG exports. Colours are shadcn-style semantic names, each with a
+ * resolved `dark` and `light` hex.
+ */
+interface ShadcnTokensFile {
+  $source: Record<string, unknown>;
+  color: Record<string, { dark: Hex; light: Hex }>;
+  radius: Record<string, Px>;
+  text: Record<string, unknown>;
+  fontFamily: Record<string, string>;
+  fontWeight: Record<string, number>;
+  typography: Record<string, Record<string, unknown>>;
+}
+
+const figma = legacyTokens as unknown as LegacyTokensFile;
+const shadcn = shadcnTokens as unknown as ShadcnTokensFile;
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = resolve(ROOT, "../src/generated");
 
@@ -100,6 +125,7 @@ interface BuildResult {
   css: string;
   ts: string;
   tailwind: string;
+  shadcn: string;
 }
 
 function build(): BuildResult {
@@ -107,10 +133,13 @@ function build(): BuildResult {
   const cssVars: Array<[string, string]> = [];
   /** [zl-var-name, resolved CSS value] tuples that differ under `[data-theme="light"]`. */
   const lightVars: Array<[string, string]> = [];
+  // `theme.*` holds the new shadcn semantic colours; `color.*` stays the legacy
+  // grouped surface so the two never collide (e.g. legacy `color.border.*`
+  // group vs the new flat `theme.border`).
   /** Mirror structure for the typed TS `tokens` export (resolved dark values). */
-  const tsTree: Record<string, unknown> = { color: {}, spacing: {}, radius: {}, font: {}, motion: {}, focus: {}, breakpoint: {}, container: {}, layout: {} };
+  const tsTree: Record<string, unknown> = { color: {}, theme: {}, spacing: {}, radius: {}, font: {}, motion: {}, focus: {}, breakpoint: {}, container: {}, layout: {} };
   /** Mirror structure for the `cssVars` export — `var(--zl-…)` strings consumers compose into styles. */
-  const refTree: Record<string, unknown> = { color: {}, spacing: {}, radius: {}, font: {}, motion: {}, focus: {}, breakpoint: {}, container: {}, layout: {} };
+  const refTree: Record<string, unknown> = { color: {}, theme: {}, spacing: {}, radius: {}, font: {}, motion: {}, focus: {}, breakpoint: {}, container: {}, layout: {} };
 
   const push = (cssVar: string, value: string, valuePath: string[], light?: string): void => {
     cssVars.push([cssVar, value]);
@@ -119,7 +148,10 @@ function build(): BuildResult {
     setDeep(refTree, valuePath, `var(${cssVar})`);
   };
 
-  // ---- semantic colours (mode-aware: single value = mode-independent, {dark,light} = themed) ----
+  /** `--zl-<shadcn-name>` vars, tracked separately so Tailwind can alias them as colours. */
+  const shadcnColorVars: string[] = [];
+
+  // ---- legacy semantic colours (mode-aware: single value = mode-independent, {dark,light} = themed) ----
   for (const [group, members] of Object.entries(figma.tokens.color)) {
     for (const [name, raw] of Object.entries(members)) {
       const cssVar = cssVarName("color", group, name);
@@ -131,6 +163,15 @@ function build(): BuildResult {
         push(cssVar, resolveSemantic(raw), path);
       }
     }
+  }
+
+  // ---- new shadcn semantic colours (themed; `:root`/dark = dark, `[data-theme="light"]` = light) ----
+  // Emitted as `--zl-<name>` so they never collide with the legacy `--zl-color-*`
+  // namespace, letting both token systems coexist during migration.
+  for (const [name, { dark, light }] of Object.entries(shadcn.color)) {
+    const cssVar = `--zl-${name}`;
+    shadcnColorVars.push(cssVar);
+    push(cssVar, dark, ["theme", toCamel(name)], light);
   }
 
   // ---- primitive colours (re-exposed for atoms that need the raw shade) ----
@@ -188,7 +229,8 @@ function build(): BuildResult {
   return {
     css,
     ts: emitTs(tsTree, refTree, css),
-    tailwind: emitTailwind(cssVars),
+    tailwind: emitTailwind(cssVars, shadcnColorVars),
+    shadcn: emitShadcn(shadcnColorVars),
   };
 }
 
@@ -256,13 +298,19 @@ function emitTs(values: Record<string, unknown>, refs: Record<string, unknown>, 
  * code reviewer can tell which classes come from the design system at a
  * glance (`bg-zl-surface-black` vs `bg-slate-900`).
  */
-function emitTailwind(vars: Array<[string, string]>): string {
+function emitTailwind(vars: Array<[string, string]>, shadcnColorVars: string[]): string {
   const lines: string[] = [];
   for (const [cssVar] of vars) {
     const utilityName = cssVar.replace(/^--zl-/, "");
     const mapped = mapToTailwindNamespace(utilityName);
     if (!mapped) continue;
     lines.push(`  --${mapped.prefix}-zl-${mapped.suffix}: var(${cssVar});`);
+  }
+  // New shadcn colours: `--zl-background` -> `--color-zl-background`, so
+  // consumers can write `bg-zl-background`, `text-zl-foreground`, `border-zl-border`.
+  for (const cssVar of shadcnColorVars) {
+    const suffix = cssVar.replace(/^--zl-/, "");
+    lines.push(`  --color-zl-${suffix}: var(${cssVar});`);
   }
   return `${BANNER}@import "./tokens.css";\n\n@theme {\n${lines.join("\n")}\n}\n`;
 }
@@ -290,6 +338,28 @@ function mapToTailwindNamespace(utilityName: string): { prefix: string; suffix: 
   return null;
 }
 
+/**
+ * The shadcn-flavoured view of the tokens. Maps the standard shadcn/ui utility
+ * names (`bg-background`, `text-muted-foreground`, `border-border`, `rounded-md`,
+ * `font-serif`) onto our canonical `--zl-*` variables via `@theme inline`, so
+ * shadcn/ui registry components drop into `apps/console` unchanged and still
+ * flip with `data-theme`. `--zl-*` stays the source of truth; this is a view.
+ */
+function emitShadcn(shadcnColorVars: string[]): string {
+  const colors = shadcnColorVars.map((cssVar) => {
+    const name = cssVar.replace(/^--zl-/, "");
+    return `  --color-${name}: var(${cssVar});`;
+  });
+  const radii = Object.entries(shadcn.radius).map(([name, px]) => `  --radius-${name}: ${pxToRem(px)};`);
+  const fonts = [
+    "  --font-sans: var(--zl-font-family-sans);",
+    "  --font-serif: var(--zl-font-family-heading);",
+    "  --font-mono: var(--zl-font-family-mono);",
+  ];
+  const body = [...colors, "", ...radii, "", ...fonts].join("\n");
+  return `${BANNER}@import "./tokens.css";\n\n@theme inline {\n${body}\n}\n`;
+}
+
 function toCamel(s: string): string {
   return s.replace(/[-_/](.)/g, (_, ch) => ch.toUpperCase());
 }
@@ -307,9 +377,10 @@ async function main(): Promise<void> {
     writeFile(resolve(OUT_DIR, "tokens.css"), result.css),
     writeFile(resolve(OUT_DIR, "tokens.ts"), result.ts),
     writeFile(resolve(OUT_DIR, "tailwind.css"), result.tailwind),
+    writeFile(resolve(OUT_DIR, "shadcn.css"), result.shadcn),
   ]);
   // eslint-disable-next-line no-console
-  console.log(`design-tokens: wrote tokens.css, tokens.ts, tailwind.css to ${OUT_DIR}`);
+  console.log(`design-tokens: wrote tokens.css, tokens.ts, tailwind.css, shadcn.css to ${OUT_DIR}`);
 }
 
 main().catch((err) => {

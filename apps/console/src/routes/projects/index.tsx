@@ -1,13 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Alert } from "@zitadel/ui-react";
-import { LayoutGrid } from "lucide-react";
+import { Boxes } from "lucide-react";
 
 import { api, projectId } from "../../api/zitadel";
 import { Page } from "../../components/layout";
 import { KeyValueTable, PageHeader } from "../../components/resource-page";
 
 export const Route = createFileRoute("/projects/")({
-  staticData: { nav: { label: "Projects", order: 1, icon: LayoutGrid, count: "10,000" } },
+  staticData: { nav: { label: "Projects", order: 1, icon: Boxes } },
   loader: () => api.getProject(projectId),
   component: ProjectView,
 });

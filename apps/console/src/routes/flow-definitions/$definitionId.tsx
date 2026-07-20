@@ -16,7 +16,7 @@ function FlowDefinitionDetail() {
     <Page>
       <PageHeader title="Flow definition" description={definition.id} />
       {/* prettier-ignore */}
-      <pre className="overflow-auto rounded-zl-l border border-zl-border-subtle bg-zl-surface-raised p-4 text-xs text-zl-text-secondary">{JSON.stringify(definition, null, 2)}</pre>
+      <pre className="overflow-auto rounded-xl border border-border bg-card p-4 text-xs text-muted-foreground">{JSON.stringify(definition, null, 2)}</pre>
     </Page>
   );
 }

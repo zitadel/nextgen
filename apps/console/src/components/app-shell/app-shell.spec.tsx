@@ -7,7 +7,7 @@ import { THEME_STORAGE_KEY } from "../../theme";
 import { createAppRouter } from "../../router";
 
 /**
- * The sidebar reproduces the Figma admin mock: a single flat list of 11 items.
+ * The sidebar reproduces the Figma `Sidebar 08.` mock: a flat list of 7 items.
  * Built screens come from `staticData.nav` on the route tree (Console ADR 0001)
  * and render as links; the remaining design-only entries (screens not built yet)
  * come from `DESIGN_ONLY_NAV` and render as non-navigable items so the sidebar
@@ -15,19 +15,15 @@ import { createAppRouter } from "../../router";
  * `data-theme` + persisting the preference.
  */
 const NAV_ORDER = [
-  "Get started",
   "Projects",
   "Users",
   "App groups",
   "Applications",
-  "Actions",
-  "Role assignments",
   "Analytics",
   "Sessions",
   "Activity Log",
-  "Manage team",
 ];
-const BUILT_ITEMS = ["Get started", "Projects", "Users", "Sessions"];
+const BUILT_ITEMS = ["Projects", "Users", "Sessions"];
 
 function renderShell() {
   const router = createAppRouter({ history: createMemoryHistory({ initialEntries: ["/"] }) });
@@ -35,20 +31,21 @@ function renderShell() {
 }
 
 describe("app shell navigation", () => {
-  it("renders all 11 design items in order, linking only the built screens", async () => {
+  it("renders the 7 design items in order, linking only the built screens", async () => {
     renderShell();
-    await screen.findByRole("link", { name: "Get started" });
+    await screen.findByRole("link", { name: /^Projects/ });
     const nav = within(screen.getByRole("navigation", { name: "Primary" }));
 
-    const labels = nav
-      .getAllByRole("listitem")
-      .map((li) => li.textContent?.replace(/[\d,]/g, "").trim());
-    expect(labels).toEqual(NAV_ORDER);
+    const items = nav.getAllByRole("listitem");
+    expect(items.map((li) => li.textContent?.trim())).toEqual(NAV_ORDER);
 
     for (const label of BUILT_ITEMS) {
       expect(nav.getByRole("link", { name: new RegExp(`^${label}`) })).toBeInTheDocument();
     }
-    expect(nav.getAllByRole("link")).toHaveLength(BUILT_ITEMS.length);
+    // Built rows are links; design-only rows are non-navigable (the logo is a
+    // separate Home link outside the list).
+    const linkedRows = items.filter((li) => within(li).queryByRole("link"));
+    expect(linkedRows).toHaveLength(BUILT_ITEMS.length);
   });
 });
 
@@ -61,7 +58,7 @@ describe("theme toggle", () => {
 
   it("switches data-theme and persists the preference", async () => {
     renderShell();
-    await screen.findByRole("link", { name: "Get started" });
+    await screen.findByRole("link", { name: /^Projects/ });
 
     await userEvent.click(screen.getByRole("radio", { name: "Light" }));
     expect(document.documentElement.getAttribute("data-theme")).toBe("light");

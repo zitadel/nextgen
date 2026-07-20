@@ -1,7 +1,7 @@
 import { useRouter } from "@tanstack/react-router";
 import { createFileRoute } from "@tanstack/react-router";
 import { Button, Pill } from "@zitadel/ui-react";
-import { UserRoundKey } from "lucide-react";
+import { KeyRound } from "lucide-react";
 import { useState } from "react";
 
 import { api, projectId } from "../../api/zitadel";
@@ -9,7 +9,7 @@ import { Page } from "../../components/layout";
 import { DataTable, PageHeader } from "../../components/resource-page";
 
 export const Route = createFileRoute("/sessions/")({
-  staticData: { nav: { label: "Sessions", order: 8, icon: UserRoundKey } },
+  staticData: { nav: { label: "Sessions", order: 6, icon: KeyRound } },
   loader: () => api.listSessions({ project_id: projectId }),
   component: SessionsList,
 });

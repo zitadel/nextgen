@@ -1,26 +1,23 @@
 # console
 
 Pre-release Vite + React shell for the internal Zitadel console — where users
-will manage their account and settings. Built with `@zitadel/ui-react` atoms
-and design tokens, and embedded into the Go server under `/ui/console/`.
+will manage their account and settings. Built with **shadcn/ui** and
+`@zitadel/design-tokens` (`css/shadcn.css`), and embedded into the Go server
+under `/ui/console/`.
 
 Architecture decisions for this app are recorded in the repo-wide
 [`docs/adrs/`](../../docs/adrs/README.md) index.
 
-Component development and review (atoms, paired React, and the
-`<zitadel-login>` orchestrator) live in
+Login / shared atom development lives in
 [`apps/storybook`](../storybook/README.md), not in this app.
 
 ## Styling
 
-Design tokens are the source of truth; Tailwind is the convenience layer that
-exposes them as utilities (`bg-zl-surface-base`, `text-zl-text-primary`, …). The
-approach is decided by **where the file lives**, not by guessing future reuse:
-everything under `apps/console/**` uses Tailwind utilities and never a bespoke
-CSS file, while the shared design-system primitives in `packages/components` /
-`packages/ui-react` (e.g. `Button`) use the shared token CSS, because utilities
-can't reach a custom element's shadow DOM. Full rules, the current token
-taxonomy, the theming model, and the 12-column grid: [`docs/styling.md`](docs/styling.md).
+The console is a **shadcn/ui** app. Components are installed into
+`src/components/ui/` via `components.json`. Colours, type, and radius come from
+`@zitadel/design-tokens/css/shadcn.css`, which maps standard shadcn utility names
+(`bg-background`, `text-muted-foreground`, …) onto `--zl-*` variables. Full
+rules and the Figma → code flow: [`docs/styling.md`](docs/styling.md).
 
 ## Theming
 
@@ -33,114 +30,50 @@ pre-paint script in [`index.html`](index.html).
 
 ## Screen coverage (built vs. designed)
 
-Only one screen is designed in Figma so far — the **General / dashboard**
-(`Dashboard general layout`). Its sidebar component enumerates the full intended
-IA, but the other destinations have **no screen design and, mostly, no API**.
-Because this is an iterative build, we ship **only what is actually built** and
-do not scaffold placeholder screens for things we cannot yet design or fetch.
+The Figma handoff (`j3qqriDab6WQfrlgLujf4Y`, Vega) currently designs the
+**Users** screen (desktop + mobile) and the **Sidebar 08. / Sidebar 07.** chrome.
+Other destinations have no screen design and, mostly, no API yet.
 
 **Built and in the sidebar:**
 
-- **Get started** — the designed dashboard, real API data (project, users,
-  sessions, health).
-- **Users**, **Sessions** — real API list pages (inherited from #451, restyled
-  with the design tokens). No dedicated Figma design yet; their layout
-  extrapolates the dashboard's patterns (page hero + cards + table).
-- **Projects** — partial: the API exposes only the scoped project (no
-  multi-project list), so it renders that single project.
-
-**Built but not in the sidebar:**
-
-- **Login flows** (list + detail), **User detail**, **Schema detail** — real API
-  data, reached contextually (dashboard Browse-all, table row links) rather than
-  from the sidebar.
-- **Schemas** (list) and **System** — pre-existing #451 placeholders/utility
-  pages, reachable by URL only.
+- **Users** — Figma Users screen (shadcn `Table` / `Tabs` / …), static mock data
+  until the user-management API lands. Desktop + mobile (`Dashboard xs`) layouts.
+- **Sessions**, **Projects** — list pages still on shared `resource-page`
+  helpers; migrating to shadcn as designs land.
+- **Home** (`/`) — static General mock, reached via the sidebar logo (no nav
+  row). Being replaced when a home design ships.
 
 **Designed sidebar IA not yet built (backlog):** App groups, Applications,
-Actions, Role assignments, Analytics, Activity Log, Manage team. These appear in
-the Figma sidebar but have no screen design and no backing endpoint, so they are
-intentionally **not** scaffolded as routes. Add each one when its design and API
-exist — attaching `staticData.nav` to the new route re-lists it in the sidebar
-automatically.
+Analytics, Activity Log (shown as disabled rows). Add each when its design and
+API exist — attaching `staticData.nav` to the new route re-lists it.
+
+## Shell
+
+`AppShell` is shadcn's `Sidebar` block (`collapsible="icon"`):
+
+- Desktop expanded = Sidebar 08. (256px)
+- Desktop collapsed / mobile = Sidebar 07. icon rail (48px), with a Sheet
+  overlay available for the expanded label view
+- Context bar: org/project `Popover` switchers + theme toggle
 
 ## API access and auth
 
 The console holds **no long-lived credential in the browser bundle**. It calls a
 same-origin API base (`/api` by default), and a server-side proxy attaches the
-`Authorization: Bearer` token before forwarding to the API, so no secret reaches
-the browser. Attaching the bearer is the console proxy's responsibility,
-mirroring the Zitadel client SDKs.
+`Authorization: Bearer` token before forwarding to the API. See the Vite proxy
+config and environment variables below.
 
-The bearer is currently a **project secret**, injected by the Vite dev proxy from
-a Node-only env var (see [Environment variables](#environment-variables)). A user
-login flow will replace it: after authentication the console forwards the session
-cookie as the bearer and the project secret is retired. The production proxy
-runtime and the permissions model are defined in a future ADR.
+## Environment variables
 
-### Environment variables
+| Variable | Where | Purpose |
+| --- | --- | --- |
+| `ZITADEL_URL` | Node (dev proxy) | Upstream API origin |
+| `ZITADEL_PROJECT_SECRET` | Node (dev proxy) | Bearer for the proxy; never shipped to the browser |
 
-| Variable                  | Scope            | Purpose                                                                 |
-| ------------------------- | ---------------- | ----------------------------------------------------------------------- |
-| `VITE_CONSOLE_PROJECT_ID` | public (browser) | Non-secret project id; scopes list/detail calls that need `project_id`. |
-| `VITE_CONSOLE_API_BASE`   | public (browser) | Same-origin API base path. Defaults to `/api`.                          |
-| `CONSOLE_PROJECT_SECRET`  | **Node only**    | Interim project-secret bearer injected by the dev proxy. Not `VITE_`-prefixed, so it never reaches the browser bundle. |
-| `CONSOLE_BACKEND_URL`     | **Node only**    | Go server URL the dev proxy forwards to. Not `VITE_`-prefixed, so it never reaches the browser bundle. Defaults to `http://localhost:8080`. |
+## Commands
 
-## Run against the Go server
-
-Start a Go server from source (repo root, after `corepack pnpm install`) — it
-builds and embeds the console, boots embedded Postgres, and listens on `:8080`:
-
-```bash
-moon run workspace:server
-```
-
-Create a project to get an id and bearer secret (`POST /projects` is
-unauthenticated):
-
-```bash
-curl -sS -X POST http://localhost:8080/projects \
-  -H 'Content-Type: application/json' \
-  -d '{"previewOrigins":["http://localhost:5174"]}'
-# → { "id": "proj_…", "projectSecret": "…", … }
-```
-
-### Frontend dev — Vite with HMR (port 5174)
-
-The day-to-day frontend loop: hot reload, with the dev proxy injecting the
-secret so list/detail pages hit the live Go API.
-
-```bash
-export VITE_CONSOLE_PROJECT_ID=<id>
-export CONSOLE_PROJECT_SECRET=<projectSecret>
+```sh
 moon run console:dev
-```
-
-Open [http://localhost:5174](http://localhost:5174).
-
-### Full build — the binary (port 8080)
-
-The Go binary embeds and serves the console SPA. `moon run workspace:server`
-rebuilds and embeds the console, so the full build is simply that command — then
-open the embedded path:
-
-[http://localhost:8080/ui/console/](http://localhost:8080/ui/console/)
-
-> **Live data is not available from the binary.** The binary serves the console
-> shell and routing, but `/api` calls from `:8080/ui/console` carry no bearer —
-> that requires the server-side proxy, which only the Vite dev server provides.
-> Resource pages therefore hit the error boundary; use the dev server above for
-> live data. The production proxy runtime is defined in a future ADR (see
-> [API access and auth](#api-access-and-auth)).
->
-> A fresh project also has no data, so list pages show their empty state until
-> you create users/sessions/flow-definitions against that project.
-
-## Other tasks
-
-```bash
-moon run console:typecheck
 moon run console:test
-moon run console:build
+moon run console:typecheck
 ```

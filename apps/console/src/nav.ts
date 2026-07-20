@@ -8,9 +8,9 @@
  * shell can render the full, pixel-accurate mock while marking un-built
  * destinations as non-navigable.
  */
-import { Activity, ChartLine, Folder, LayoutGrid, Settings, Zap } from "lucide-react";
+import { Activity, AppWindow, BarChart3, Folder } from "lucide-react";
 
-import { type NavIcon, UserRoundArrowLeft } from "./components/app-shell/icons";
+import type { NavIcon } from "./components/app-shell/icons";
 
 export interface NavMeta {
   /** Sidebar label. */
@@ -19,11 +19,6 @@ export interface NavMeta {
   order: number;
   /** Sidebar glyph (matches the design system's Lucide icon set). */
   icon: NavIcon;
-  /**
-   * Optional right-aligned count badge. In the mock these are the designed
-   * placeholder totals; real screens can override with a live count later.
-   */
-  count?: string;
 }
 
 /**
@@ -32,13 +27,10 @@ export interface NavMeta {
  * pixel-for-pixel) but without a route, so they are not navigable.
  */
 export const DESIGN_ONLY_NAV: NavMeta[] = [
-  { label: "App groups", order: 3, icon: Folder, count: "10,000" },
-  { label: "Applications", order: 4, icon: LayoutGrid, count: "10,000" },
-  { label: "Actions", order: 5, icon: Zap },
-  { label: "Role assignments", order: 6, icon: UserRoundArrowLeft },
-  { label: "Analytics", order: 7, icon: ChartLine },
-  { label: "Activity Log", order: 9, icon: Activity },
-  { label: "Manage team", order: 10, icon: Settings },
+  { label: "App groups", order: 3, icon: Folder },
+  { label: "Applications", order: 4, icon: AppWindow },
+  { label: "Analytics", order: 5, icon: BarChart3 },
+  { label: "Activity Log", order: 7, icon: Activity },
 ];
 
 declare module "@tanstack/react-router" {

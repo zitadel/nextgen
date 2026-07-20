@@ -1,18 +1,25 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-@import "@zitadel/design-tokens/css/tokens.css";
-@import "@zitadel/design-tokens/css/tailwind.css";
-@import "@zitadel/ui-react/styles.css";
+/* Design tokens as the shadcn/ui contract: `shadcn.css` pulls in the `--zl-*`
+   variables (dark `:root` + light `[data-theme="light"]`) and maps the standard
+   shadcn utility names (`bg-background`, `text-muted-foreground`, `rounded-md`,
+   `font-serif`) onto them via `@theme inline`. The console is authored against
+   those standard names so shadcn/ui components drop in unchanged. */
+@import "@zitadel/design-tokens/css/shadcn.css";
 
-/* Self-hosted Arimo — the design's body typeface. Weights map to the utilities
-   used across the console: 400 (body), 500 (medium), 600 (semibold), 700 (bold). */
+/* Self-hosted Arimo — the design's body typeface (`font-sans`). */
 @import "@fontsource/arimo/400.css";
 @import "@fontsource/arimo/500.css";
 @import "@fontsource/arimo/600.css";
 @import "@fontsource/arimo/700.css";
 
-/* APK Futural — the brand display typeface used for headings (font-zl-heading).
-   Licensed webfont, matching zitadel.com; Regular (400) is the only weight. */
+/* `dark:` utilities key off the same `data-theme` attribute the tokens flip on,
+   though components should prefer semantic tokens (which re-theme for free). */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* APK Futural — the brand display typeface used for headings (`font-serif`).
+   Licensed webfont matching zitadel.com; Regular (400) is the only weight. */
 @font-face {
   font-family: "APK Futural";
   font-style: normal;
@@ -23,8 +30,8 @@
     url("./fonts/apk-futural/APK-Futural-Regular.woff") format("woff");
 }
 
-/* Point the heading token at APK Futural. Overriding the token here (rather than
-   editing generated tokens.css) keeps the brand display font scoped to the app. */
+/* Point the heading/serif token at APK Futural. Overriding here (rather than in
+   generated CSS) keeps the brand display font scoped to the app. */
 :root,
 [data-theme="dark"],
 [data-theme="light"] {
@@ -32,10 +39,8 @@
 }
 
 /* Global page theming only. Component styles live in Tailwind utilities on the
-   components themselves (see apps/console/docs/styling.md); do not add
-   component-scoped rules here. `data-theme` on <html> selects the token mode
-   (dark :root vs light override); `color-scheme` keeps native form controls and
-   scrollbars in step. */
+   components themselves. `data-theme` on <html> selects the token mode (dark
+   `:root` vs light override); `color-scheme` keeps native controls in step. */
 html {
   color-scheme: dark light;
 }
@@ -43,15 +48,12 @@ html {
 body {
   margin: 0;
   font-family: var(--zl-font-family-sans, system-ui, sans-serif);
-  background: var(--zl-color-surface-base);
-  color: var(--zl-color-text-primary);
+  background: var(--zl-background);
+  color: var(--zl-foreground);
 }
 
-/* Interactive affordance. Tailwind v4's Preflight no longer forces
-   `cursor: pointer` on <button>, so native buttons/links render the default
-   arrow and read as inert. Restore the pointer for genuinely interactive
-   controls; elements explicitly marked disabled keep the default cursor. This
-   is a global affordance default, not component styling. */
+/* Tailwind v4 Preflight no longer forces `cursor: pointer` on interactive
+   controls; restore it for genuinely interactive elements. */
 button:not(:disabled):not([aria-disabled="true"]),
 [role="button"]:not([aria-disabled="true"]),
 [role="radio"]:not([aria-disabled="true"]),

@@ -16,30 +16,6 @@ type IconProps = {
   className?: string;
 } & SVGProps<SVGSVGElement>;
 
-/**
- * `lucide/user-round-arrow-left` — the Figma sidebar's "Role assignments" glyph.
- * It is not exported by the pinned `lucide-react`, so it is inlined verbatim from
- * the design (16px grid, stroke weight tuned to sit next to the lucide icons).
- */
-export function UserRoundArrowLeft({ size = 16, className, ...props }: IconProps) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.33}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      {...props}
-    >
-      <path d="M12.6667 14.6667L10.6667 12.6667L12.6667 10.6667M10.6667 12.6667H14.6667M1.33333 14C1.33331 13.0191 1.60381 12.0571 2.11509 11.22C2.62637 10.3829 3.35862 9.70294 4.2313 9.25502C5.10399 8.8071 6.08331 8.60853 7.06154 8.68116C8.03977 8.75378 8.97903 9.09479 9.776 9.66667M10 5.33333C10 7.17428 8.50762 8.66667 6.66667 8.66667C4.82572 8.66667 3.33333 7.17428 3.33333 5.33333C3.33333 3.49238 4.82572 2 6.66667 2C8.50762 2 10 3.49238 10 5.33333Z" />
-    </svg>
-  );
-}
-
 /** Zitadel logo mark used at the top of the sidebar (fills with currentColor). */
 export function ZitadelMark({ size = 24, className, ...props }: IconProps) {
   return (
