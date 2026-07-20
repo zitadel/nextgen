@@ -39,4 +39,30 @@ export const brandingConfigSchema = CreateBrandingBody.extend({
         "font_url is not writable yet (tenant font delivery needs a safe design, see ADR 037); load fonts from the embedding page instead.",
     });
   }
+  // Mirror the server's https-only asset gate (validateBrandingAssetURL in
+  // internal/domain/branding_validator.go) so plan rejects what apply would —
+  // apply mutates schemas and flows before branding, so a late 400 here
+  // would leave a half-applied run.
+  requireHttpsUrl(value.logo_url, "logo_url", ctx);
+  requireHttpsUrl(value.hero_url, "hero_url", ctx);
 });
+
+function requireHttpsUrl(
+  value: string | undefined,
+  field: "logo_url" | "hero_url",
+  ctx: z.RefinementCtx,
+): void {
+  if (value === undefined || value === "") {
+    return;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    ctx.addIssue({ code: "custom", message: `${field} is not a valid URL.` });
+    return;
+  }
+  if (parsed.protocol !== "https:" || parsed.host === "") {
+    ctx.addIssue({ code: "custom", message: `${field} must be an absolute https URL.` });
+  }
+}

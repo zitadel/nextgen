@@ -33,11 +33,13 @@
     "logo_url": {
       "type": "string",
       "format": "uri",
+      "pattern": "^https://",
       "description": "Logo URL (https required)."
     },
     "hero_url": {
       "type": "string",
       "format": "uri",
+      "pattern": "^https://",
       "description": "Hero/background image URL (https required), used by split designs."
     }
   },

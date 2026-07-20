@@ -367,6 +367,22 @@ describe("BrandingSyncer", () => {
     ).toThrow(ZitadelError);
   });
 
+  it("validate throws E_VALIDATION on non-https asset URLs (server parity)", async () => {
+    const cwd = await makeBrandingProject();
+    const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    // apply mutates schemas and flows before branding, so plan must reject
+    // exactly what the server's https-only gate would reject.
+    const attempt = (): void =>
+      branding.validate({ ...descriptor, logo_url: "http://cdn.example.com/logo.svg" });
+    expect(attempt).toThrow(ZitadelError);
+    try {
+      attempt();
+    } catch (error) {
+      expect(JSON.stringify((error as ZitadelError).details)).toContain("https");
+    }
+  });
+
   it("validate throws E_VALIDATION on font_url (read-only in v1)", async () => {
     const cwd = await makeBrandingProject();
     const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
