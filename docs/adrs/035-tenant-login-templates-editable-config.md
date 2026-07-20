@@ -105,6 +105,12 @@ edits become `revise` entries, no update/delete).
 
 ### 5. Authoring entry points: eject + design catalog
 
+Vocabulary (canonical rows in
+[`../design/glossary.md` § 6](../design/glossary.md#6-config-terms)):
+**branding** is the resource, a **template** is the Liquid artifact you
+edit, a **design** is a named catalog starting point that produces a
+template, and **layout** is the wire degrade enum.
+
 `zitadel branding eject [--design <name>]` scaffolds the local files from
 a shipped design; `zitadel setup --design <name>` does the same during
 project setup and uploads revision 1. Designs

@@ -95,7 +95,7 @@ How a permission check is framed and resolved. Long-form in [ADR 032](../adrs/03
 
 ## 6. Config terms
 
-From the configuration surface and flow engine. Long-form in [`platform/configuration-surface.md`](platform/configuration-surface.md) and [`flowengine/flow-engine-guide.md`](flowengine/flow-engine-guide.md).
+From the configuration surface, flow engine, and branding. Long-form in [`platform/configuration-surface.md`](platform/configuration-surface.md), [`flowengine/flow-engine-guide.md`](flowengine/flow-engine-guide.md), and [`branding/README.md`](branding/README.md).
 
 | Term | Meaning |
 |---|---|
@@ -107,6 +107,10 @@ From the configuration surface and flow engine. Long-form in [`platform/configur
 | **audience** | The resolution hierarchy for flow definitions: `app > team > schema > project default`. |
 | **environment** | A config-version slot: `development`, `preview`, `production`. Governs origin wildcard rules (see [`api/security-and-origins.md`](api/security-and-origins.md)). |
 | **drift** | Divergence between the repo's `zitadel.json` and server-side state. Resolves silently in favor of repo. |
+| **branding** | The per-project login-appearance resource: layout, asset URLs, and the Liquid template, published as immutable revisions via the Branding API / `zitadel apply`. Flow responses resolve the newest revision. Decisions in [ADR 035](../adrs/035-tenant-login-templates-editable-config.md). |
+| **template** (branding) | The LiquidJS artifact the login component renders per step — the `branding.liquid_template` wire field, authored locally as `login.liquid`. What you edit after ejecting; security rules in [`flowengine/template-security.md`](flowengine/template-security.md). Distinct from the `renderer` enum value above. |
+| **design** | A named starting point from the shipped catalog (`centered`, `split`, `split-right`, `minimal`) that `zitadel branding eject --design` scaffolds. A design *produces* a template; once edited, what you own is a template, no longer a design. Same relationship as sign-in **preset** : flow definition. |
+| **layout** | The `branding.layout` wire enum (`centered \| split`) the bundled default template branches on, and the degrade target when a custom template is rejected. Deliberately small — richer looks ship as designs (templates), not new enum values. |
 
 ---
 
