@@ -29,6 +29,11 @@ tasks:
     command: "corepack pnpm run build"
     deps:
       - "api:build"
+      # The standalone bundle inlines @zitadel/config/template (see
+      # tsdown.config.ts); without this edge the two builds race in the moon
+      # graph and rolldown silently leaves the unresolvable import external —
+      # a broken (and cached!) standalone.mjs.
+      - "config:build"
       - "design-tokens:build"
       - "shared-component-styles:build"
     outputs:
@@ -59,6 +64,9 @@ tasks:
       - "config:build"
       - "design-tokens:build"
       - "shared-component-styles:build"
+      # standalone-artifact.spec.ts reads dist/standalone.mjs — the unit suite
+      # guards the built artifact, so the dev build must run first.
+      - "build"
 
   test-browser:
     command: "corepack pnpm run test:browser"
