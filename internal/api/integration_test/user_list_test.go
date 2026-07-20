@@ -64,11 +64,11 @@ func TestListUsers(t *testing.T) {
 			"email", fmt.Sprintf("list-%d@example.com", i), domain.AttributeUniquenessProject)
 		require.NoError(t, err)
 		require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
-			ProjectID:  project.ID,
-			SchemaURL:  schemaURL,
-			ID:         id,
-			TeamID:     &team.ID,
-			Attributes: []*domain.CreateAttribute{emailAttr},
+			ProjectID:               project.ID,
+			SchemaURL:               schemaURL,
+			ID:                      id,
+			InitialMembershipTeamID: &team.ID,
+			Attributes:              []*domain.CreateAttribute{emailAttr},
 		}))
 	}
 

@@ -44,11 +44,11 @@ moon run demo-nuxt-e2e:e2e
 ```
 
 Moon rebuilds `@zitadel/components` first through task dependencies, then
-Playwright boots `api-mock` (`:4001`) and `demo-nuxt` (`:3001`) through
+Playwright boots `api-mock` (`:8081`) and `demo-nuxt` (`:3001`) through
 direct `pnpm --filter` commands.
 
-The api-mock listens on `:4001` here (not the default `:4000`) so this
-project can run in parallel with `apps/demo-next-e2e/` under
+The api-mock listens on `:8081` here (not the default `:8080` used by
+`apps/demo-next-e2e/`) so this project can run in parallel with it under
 `moon run demo-next-e2e:e2e demo-nuxt-e2e:e2e` without `EADDRINUSE`. The `PORT` override is
 plumbed through via Playwright's `webServer.env` and matched by the
 `ZITADEL_URL` passed to the Nuxt dev server. Both knobs are

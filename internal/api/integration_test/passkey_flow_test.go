@@ -89,11 +89,11 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	decoyEmailAttr, err := domain.NewCreateAttribute("email", "pk-flow-test@example.com", domain.AttributeUniquenessUnspecified)
 	require.NoError(t, err)
 	require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
-		ProjectID:  decoyProject.ID,
-		SchemaURL:  userSchemaURL,
-		ID:         userID,
-		TeamID:     &decoyTeam.ID,
-		Attributes: []*domain.CreateAttribute{decoyEmailAttr},
+		ProjectID:               decoyProject.ID,
+		SchemaURL:               userSchemaURL,
+		ID:                      userID,
+		InitialMembershipTeamID: &decoyTeam.ID,
+		Attributes:              []*domain.CreateAttribute{decoyEmailAttr},
 	}))
 	decoyCred := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
 	require.NoError(t, passkeyRepo.Create(t.Context(), db, &domain.CreateUserPasskey{
@@ -110,11 +110,11 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
-		ProjectID:  project.ID,
-		SchemaURL:  userSchemaURL,
-		ID:         userID,
-		TeamID:     &team.ID,
-		Attributes: []*domain.CreateAttribute{emailAttr},
+		ProjectID:               project.ID,
+		SchemaURL:               userSchemaURL,
+		ID:                      userID,
+		InitialMembershipTeamID: &team.ID,
+		Attributes:              []*domain.CreateAttribute{emailAttr},
 	}))
 
 	require.NoError(t, passkeyRepo.Create(t.Context(), db, &domain.CreateUserPasskey{
