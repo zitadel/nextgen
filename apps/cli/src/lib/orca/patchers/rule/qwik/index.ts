@@ -18,8 +18,9 @@ const SDK_DEPENDENCY = "@zitadel/sdk-qwik";
  * The create-vite Qwik template uses a lowercase `src/app.tsx` exporting a named
  * `App` (mounted by `main.tsx`), so this patcher writes that exact entry. Unlike
  * Next.js — whose middleware runs the proxy server-side — a SPA has no server,
- * so the dev proxy stands in for `@zitadel/edge-proxy` locally. Production
- * deployments still need that proxy.
+ * so the dev proxy provides the same-origin `/__nextgen` path locally. In
+ * production that path comes from a platform rewrite or minimal worker
+ * (ADR 036); CLI scaffolding for it is tracked in issue #560.
  */
 export class QwikPatcher extends AbstractRulePatcher implements ViteSupport {
   canPatch(framework: string): boolean {
