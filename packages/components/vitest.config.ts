@@ -38,6 +38,9 @@ export default defineConfig({
           name: "unit",
           globals: true,
           environment: "jsdom",
+          // jsdom 29 lacks `crypto.subtle`; the setup file backs it with
+          // Node's WebCrypto for the captcha-gate solve/mint paths.
+          setupFiles: ["./vitest.setup.unit.ts"],
           include: ["src/**/*.spec.ts"],
           exclude: ["src/**/*.browser.spec.ts"],
         },

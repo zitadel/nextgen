@@ -1,5 +1,11 @@
 export { ZlAlert, zlAlertManifest } from "./zl-alert.js";
 export { ZlButton, zlButtonManifest } from "./zl-button.js";
+export {
+  ZlCaptcha,
+  zlCaptchaManifest,
+  type ZlCaptchaResultDetail,
+  type ZlCaptchaErrorDetail,
+} from "./zl-captcha.js";
 export { ZlCard, zlCardManifest } from "./zl-card.js";
 export { ZlCheckbox, zlCheckboxManifest, type ZlCheckboxChangeDetail } from "./zl-checkbox.js";
 export { ZlField, zlFieldManifest, type ZlFieldType } from "./zl-field.js";

@@ -12,6 +12,7 @@ describe("atom event contract", () => {
   const expectations: Record<string, readonly string[]> = {
     "zl-alert": ["zl-dismiss"],
     "zl-button": ["zl-submit"],
+    "zl-captcha": ["zl-captcha-result", "zl-captcha-error"],
     "zl-card": [],
     "zl-checkbox": ["zl-change"],
     "zl-field": ["zl-input"],

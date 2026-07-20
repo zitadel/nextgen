@@ -130,6 +130,18 @@ describe("<zl-passkey>", () => {
     expect(credentials.get).not.toHaveBeenCalled();
   });
 
+  it("stays idle when mounted without options, then auto-starts when they arrive", async () => {
+    const el = create();
+    host.appendChild(el);
+    await el.updateComplete;
+    expect(credentials.get).not.toHaveBeenCalled();
+
+    const detail = nextEvent(el, "zl-passkey-result");
+    el.options = { challenge: "AAAA" };
+    await detail;
+    expect(credentials.get).toHaveBeenCalledTimes(1);
+  });
+
   it("auto-starts on connect and serialises the assertion into base64url proof", async () => {
     const el = create({
       ceremony: "authenticate",
@@ -276,6 +288,9 @@ describe("<zl-passkey>", () => {
     });
     const done = nextEvent(el, "zl-passkey-result");
     host.appendChild(el);
+    // Two cycles: the first update triggers the auto-start (which flips
+    // `pending`), the second renders the pending UI.
+    await el.updateComplete;
     await el.updateComplete;
 
     const pendingUi = el.querySelector('[data-testid="zitadel-passkey-pending"]');
@@ -312,6 +327,9 @@ describe("<zl-passkey>", () => {
     const el = create({ ceremony: "authenticate", options: { challenge: "AAAA" } });
     const errored = nextEvent<{ aborted: boolean; timed_out: boolean }>(el, "zl-passkey-error");
     host.appendChild(el);
+    // Two cycles: the first update triggers the auto-start (which flips
+    // `pending`), the second renders the pending UI.
+    await el.updateComplete;
     await el.updateComplete;
 
     const cancel = el.querySelector<HTMLElement>('[data-testid="zitadel-passkey-cancel"]');
@@ -339,6 +357,9 @@ describe("<zl-passkey>", () => {
       });
       const errored = nextEvent<{ aborted: boolean; timed_out: boolean }>(el, "zl-passkey-error");
       host.appendChild(el);
+      // The auto-start runs on the first update cycle (a microtask, so
+      // unaffected by the fake timers); await it so `rejectGet` is bound.
+      await el.updateComplete;
 
       vi.advanceTimersByTime(60_000);
       rejectGet(new DOMException("timed out", "NotAllowedError"));
@@ -361,7 +382,7 @@ describe("<zl-passkey>", () => {
     });
     const errored = nextEvent<{ aborted: boolean; timed_out: boolean }>(el, "zl-passkey-error");
     host.appendChild(el);
-    await Promise.resolve();
+    await el.updateComplete;
     rejectGet(new DOMException("dismissed", "NotAllowedError"));
     const result = await errored;
     expect(result.aborted).toBe(true);
@@ -378,6 +399,7 @@ describe("<zl-passkey>", () => {
       const el = create({ ceremony: "authenticate", options: { challenge: "AAAA" } });
       const errored = nextEvent<{ timed_out: boolean }>(el, "zl-passkey-error");
       host.appendChild(el);
+      await el.updateComplete;
       vi.advanceTimersByTime(600_000);
       rejectGet(new DOMException("dismissed", "NotAllowedError"));
       const result = await errored;

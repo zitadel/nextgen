@@ -331,7 +331,12 @@ export function createMockApp(options: { issuer: string }): express.Express {
     res.status(204).end();
   });
 
-  app.use(createMiddleware(...setupMockHandlers({ iss }).handlers, ...setupPlatformHandlers()));
+  // The standalone dev server verifies gate proofs so the browser-facing
+  // golden path exercises the full challenge → solve → verify loop; unit
+  // tests keep the default (off) and drive steps directly.
+  app.use(
+    createMiddleware(...setupMockHandlers({ iss, verifyGates: true }).handlers, ...setupPlatformHandlers()),
+  );
 
   return app;
 }

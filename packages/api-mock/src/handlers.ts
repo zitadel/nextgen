@@ -29,6 +29,7 @@ import type {
 } from "@zitadel/api/generated/model";
 import type { RequestHandler } from "msw";
 
+import { verifyAltchaProof, type AltchaChallenge } from "./altcha.js";
 import { withBranding } from "./branding.js";
 import { startFlowActor, type FlowActor, type FlowStepName } from "./flow-machine.js";
 import { AuthnStore, type PasskeyProof } from "./lib/authn/index.js";
@@ -77,17 +78,41 @@ const FLOW_ID = "flow_mock";
  * @param options.iss - Issuer URL embedded in the handoff token (default:
  *   `"http://localhost:4000"`). Pass the server's own origin so that
  *   `verifyHandoffToken` can enforce issuer consistency.
+ * @param options.verifyGates - When true, submits on gated steps are
+ *   rejected (re-rendered with `error.gate_failed` and a fresh challenge)
+ *   unless `gate_proofs` carries a valid solution for every issued
+ *   challenge. Off by default so unit tests that drive steps directly
+ *   don't have to solve captchas; the standalone dev server opts in.
  */
-export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
+export function setupMockHandlers(options: { iss?: string; verifyGates?: boolean } = {}): MockHandle {
   const iss = options.iss ?? "http://localhost:8080";
+  const verifyGates = options.verifyGates ?? false;
   let actor: FlowActor = startFlowActor();
   let captured: CapturedRequest[] = [];
   const authn = new AuthnStore();
+  /** Altcha challenges minted by the last rendered step, keyed by gate name. */
+  const issuedChallenges = new Map<string, AltchaChallenge>();
 
   function reset(): void {
     actor = startFlowActor();
     captured = [];
     authn.clear();
+    issuedChallenges.clear();
+  }
+
+  /**
+   * Record the Altcha challenges a response hands out so the next submit
+   * can be verified against exactly what was issued (a re-render replaces
+   * the tracked challenge, mirroring the engine's fresh-challenge-per-render
+   * behaviour in ADR 019).
+   */
+  function trackChallenges(response: CreateFlow201): CreateFlow201 {
+    for (const [name, gate] of Object.entries(response.step.gates ?? {})) {
+      if (gate.kind === "captcha" && gate.provider === "altcha" && gate.config) {
+        issuedChallenges.set(name, gate.config as AltchaChallenge);
+      }
+    }
+    return response;
   }
 
   function registerCredential(userHandle: string, credentialId: string): void {
@@ -136,7 +161,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
       case "done":
         return withBranding(await doneStep(input));
       default:
-        return withBranding(identifierStep(input));
+        return trackChallenges(withBranding(await identifierStep(input)));
     }
   }
 
@@ -163,6 +188,24 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         iss,
       };
 
+      // Gate verification (ADR 019): a gated step's submit must carry a
+      // valid proof for every challenge issued with that step's render.
+      // Only the identifier step carries a gate in these fixtures; failed
+      // verification re-renders it with a fresh challenge, like the engine.
+      if (verifyGates && before === "identifier" && body.action === "submit" && issuedChallenges.size > 0) {
+        for (const [name, challenge] of issuedChallenges) {
+          const proof = body.gate_proofs?.[name];
+          const valid = proof ? await verifyAltchaProof(challenge, proof) : false;
+          if (!valid) {
+            console.warn(`❌ [api-mock] gate "${name}" proof ${proof ? "INVALID" : "MISSING"}`);
+            const base = withBranding(await identifierStep(fixtureInput));
+            return trackChallenges({ ...base, step: { ...base.step, error: "error.gate_failed" } });
+          }
+          console.info(`✅ [api-mock] gate "${name}" proof VALID`);
+        }
+        issuedChallenges.clear();
+      }
+
       const registrationErrorKey = before === "register" && body.action === "submit" && email
         ? authn.registrationError(email)
         : null;
@@ -175,8 +218,8 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         ? authn.loginError(email)
         : null;
       if (loginErrorKey) {
-        const base = withBranding(identifierStep(fixtureInput));
-        return { ...base, step: { ...base.step, error: loginErrorKey } };
+        const base = withBranding(await identifierStep(fixtureInput));
+        return trackChallenges({ ...base, step: { ...base.step, error: loginErrorKey } });
       }
 
       const contextEmail = snapshot.context.capturedFields.email;

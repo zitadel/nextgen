@@ -1,4 +1,4 @@
-import { html, LitElement, nothing } from "lit";
+import { html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import { bufferToBase64Url, base64UrlToBuffer } from "../internal/base64url.js";
@@ -163,9 +163,18 @@ export class ZlPasskey extends LitElement {
   /** `Date.now()` at ceremony start, for timeout classification on reject. */
   private startedAt = 0;
 
-  override connectedCallback(): void {
-    super.connectedCallback();
-    if (!this.manual && this.options) {
+  private autoStartDone = false;
+
+  /**
+   * Auto-start from `updated()` rather than `connectedCallback`: the atom
+   * is null-safe — it may be mounted before the step carries challenge
+   * data — and options that arrive late (property set after mount) should
+   * start the ceremony too. `autoStartDone` keeps this one-shot per
+   * element; a step re-render mounts a fresh element anyway.
+   */
+  override updated(changed: PropertyValues): void {
+    if (changed.has("options") && !this.manual && this.options && !this.autoStartDone) {
+      this.autoStartDone = true;
       void this.startCeremony();
     }
   }

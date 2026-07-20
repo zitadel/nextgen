@@ -96,6 +96,60 @@ describe("patchMandatoryGates", () => {
     expect(out).toContain('<zl-button hierarchy="primary"');
   });
 
+  it("injects a zl-captcha for a gate with no consumer in the template", () => {
+    const gatedStep: CreateFlow201Step = {
+      ...step,
+      gates: {
+        bot_check: {
+          kind: "captcha",
+          provider: "altcha",
+          config: { algorithm: "SHA-256", challenge: "abc", salt: "xyz", max_number: 1000 },
+        },
+      },
+    };
+    const html = `<zl-field name="email"></zl-field>${mandatoryGatesMarkerComment}`;
+    const out = patchMandatoryGates(html, gatedStep, locale);
+
+    const parsed = new DOMParser().parseFromString(out, "text/html");
+    const captcha = parsed.querySelector("zl-captcha");
+    expect(captcha).not.toBeNull();
+    expect(captcha?.getAttribute("gate-name")).toBe("bot_check");
+    expect(captcha?.getAttribute("kind")).toBe("captcha");
+    expect(captcha?.getAttribute("provider")).toBe("altcha");
+    expect(JSON.parse(captcha?.getAttribute("config") ?? "null")).toEqual({
+      algorithm: "SHA-256",
+      challenge: "abc",
+      salt: "xyz",
+      max_number: 1000,
+    });
+  });
+
+  it("does not duplicate a zl-captcha the template already provides", () => {
+    const gatedStep: CreateFlow201Step = {
+      ...step,
+      gates: { bot_check: { kind: "captcha", provider: "altcha" } },
+    };
+    const html =
+      `<zl-captcha gate-name="bot_check"></zl-captcha>` +
+      `<zl-field name="email"></zl-field>` +
+      `<zl-button hierarchy="primary" type="submit" action="submit"></zl-button>` +
+      `${mandatoryGatesMarkerComment}`;
+    const out = patchMandatoryGates(html, gatedStep, locale);
+    expect(out.match(/<zl-captcha/g) ?? []).toHaveLength(1);
+  });
+
+  it("injects gates ahead of missing fields so solving starts immediately", () => {
+    const gatedStep: CreateFlow201Step = {
+      ...step,
+      gates: { bot_check: { kind: "captcha", provider: "altcha" } },
+    };
+    const out = patchMandatoryGates(mandatoryGatesMarkerComment, gatedStep, locale);
+    const captchaIndex = out.indexOf("<zl-captcha");
+    const fieldIndex = out.indexOf("<zl-field");
+    expect(captchaIndex).toBeGreaterThanOrEqual(0);
+    expect(fieldIndex).toBeGreaterThan(captchaIndex);
+  });
+
   it("escapes attribute values in injected fields so the payload can't break out", () => {
     const malicious: CreateFlow201Step = {
       ...step,

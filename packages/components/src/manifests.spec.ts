@@ -8,6 +8,7 @@ describe("manifest registry", () => {
       [
         "zl-alert",
         "zl-button",
+        "zl-captcha",
         "zl-card",
         "zl-checkbox",
         "zl-field",
@@ -89,6 +90,20 @@ describe("manifest registry", () => {
         "cancel-label",
         "silent",
       ]),
+    );
+  });
+
+  it("declares zl-captcha as the captcha gate consumer", () => {
+    // The mandatory-gates patcher injects <zl-captcha gate-name kind provider
+    // config> for any step gate without a consumer; the manifest keeps the
+    // validator and the sanitiser's attribute allowlist honest.
+    const captcha = findManifest("zl-captcha");
+    expect(captcha?.satisfies_gate).toBe("captcha");
+    expect(captcha?.attrs).toEqual(
+      expect.arrayContaining(["kind", "provider", "gate-name", "config", "manual"]),
+    );
+    expect(captcha?.events).toEqual(
+      expect.arrayContaining(["zl-captcha-result", "zl-captcha-error"]),
     );
   });
 
