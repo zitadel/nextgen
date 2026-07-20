@@ -1,4 +1,4 @@
-import type { SetupPreset } from "@zitadel/config/defaults";
+import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
 
 import type { FrameworkFacts } from "../../../lib/orca";
 
@@ -15,8 +15,10 @@ import type { FrameworkFacts } from "../../../lib/orca";
 export type SetupAnswers = {
   server: string;
   devPort: number;
-  /** Schema+flow bundle to scaffold; see `SETUP_PRESETS` in @zitadel/config. */
+  /** Sign-in preset (flow + auth methods); see `SETUP_PRESETS` in @zitadel/config. */
   preset: SetupPreset;
+  /** Use case (schema field set); see `SETUP_USE_CASES` in @zitadel/config. */
+  useCase: SetupUseCase;
 };
 
 /** Read-only facts a prompt may need. */
@@ -50,6 +52,11 @@ export type PromptContext = {
    * skips itself.
    */
   readonly presetFromFlag?: boolean;
+  /**
+   * Whether `--use-case` was passed explicitly. When set, the flag is
+   * authoritative and {@link import("./use-case").UseCasePrompt} skips itself.
+   */
+  readonly useCaseFromFlag?: boolean;
 };
 
 /**

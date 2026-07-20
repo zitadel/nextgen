@@ -5,7 +5,6 @@ import {
   useId,
   useRef,
   useState,
-  type KeyboardEvent,
   type ReactNode,
 } from "react";
 
@@ -22,9 +21,16 @@ export interface SelectOption {
 /**
  * Paired React implementation of `<zl-select>`.
  * Visual spec: Figma Dropdown `4397:4816` / Items `4397:4098` in
- * `8UjCXw8yemgljmbkWGrSfE`. Follows the WAI-ARIA select-only combobox pattern:
- * focus stays on the trigger and `aria-activedescendant` tracks the active
- * option. Shares the `.zr-select` surface with the Lit atom.
+ * `8UjCXw8yemgljmbkWGrSfE`. Shares the `.zr-select` surface with the Lit atom.
+ *
+ * Agent-first contract (mirrors `<zl-select>`): the operable, accessible,
+ * form-associated, and automatable control is a real native `<select>` carrying
+ * `data-testid="zitadel-select-${name}"`. The Figma-styled trigger + popup are a
+ * pointer-only visual layer (`aria-hidden`, never in the tab order), so they
+ * don't duplicate the native control in the accessibility tree. Mouse users see
+ * the styled popup; keyboard, screen-reader, and automation users drive the
+ * native `<select>` and its native popup. Both paths converge on `value` and
+ * `onChange`.
  */
 export interface SelectProps {
   /** Visible label; when omitted, pass `aria-label` for an accessible name. */
@@ -39,6 +45,10 @@ export interface SelectProps {
   placeholder?: string;
   name?: string;
   required?: boolean;
+  /** Inline validation message shown under the control (empty = none). */
+  error?: ReactNode;
+  /** Force the invalid (red-edge) treatment without an `error` string. */
+  invalid?: boolean;
   disabled?: boolean;
   className?: string;
   "aria-label"?: string;
@@ -46,7 +56,7 @@ export interface SelectProps {
   onChange?: (value: string) => void;
 }
 
-export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select(
+export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
   {
     label,
     options,
@@ -56,6 +66,8 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
     placeholder = "Select…",
     name,
     required = false,
+    error,
+    invalid = false,
     disabled = false,
     className,
     "aria-label": ariaLabel,
@@ -66,79 +78,47 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
 ) {
   const baseId = useId();
   const labelId = `${baseId}-label`;
-  const listboxId = `${baseId}-listbox`;
+  const errorId = `${baseId}-error`;
+  const showError = Boolean(error);
   const rootRef = useRef<HTMLDivElement>(null);
-  const internalTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const internalNativeRef = useRef<HTMLSelectElement | null>(null);
 
   const isControlled = value !== undefined;
   const [internalValue, setInternalValue] = useState(defaultValue ?? "");
   const currentValue = isControlled ? value : internalValue;
 
   const [open, setOpen] = useState(defaultOpen);
-  // No active cursor until the user navigates — matches the Lit atom's forced-open
-  // preview, so a pre-selected row shows its solid "selected" fill rather than the
-  // keyboard-active wash.
-  const [activeIndex, setActiveIndex] = useState(-1);
 
-  const selected = options.find((option) => option.value === currentValue);
-  const optionId = (index: number) => `${baseId}-option-${index}`;
+  // Leading empty row (labelled with the placeholder) so the user can return to
+  // "no selection"; for a required field it's the prompt that keeps native
+  // validation blocking submit until a real choice is made. Any empty-valued
+  // member the caller passed is dropped first, so a schema enum that lists ""
+  // doesn't render a second, duplicate empty option (and duplicate React key).
+  const listOptions: SelectOption[] = [
+    { value: "", label: placeholder },
+    ...options.filter((option) => option.value !== ""),
+  ];
+  // Empty value is "no selection", so the trigger stays on the placeholder even
+  // if the caller's options include an empty member.
+  const selected =
+    currentValue === "" ? undefined : options.find((option) => option.value === currentValue);
 
-  const setTriggerRef = useCallback(
-    (node: HTMLButtonElement | null) => {
-      internalTriggerRef.current = node;
+  const setNativeRef = useCallback(
+    (node: HTMLSelectElement | null) => {
+      internalNativeRef.current = node;
       if (typeof ref === "function") ref(node);
       else if (ref) ref.current = node;
     },
     [ref],
   );
 
-  const firstEnabledIndex = useCallback(
-    () => options.findIndex((option) => !option.disabled),
-    [options],
-  );
-
-  const close = useCallback(() => {
-    setOpen(false);
-    setActiveIndex(-1);
-    internalTriggerRef.current?.focus();
-  }, []);
-
-  const openMenu = useCallback(() => {
-    if (options.length === 0) return;
-    setOpen(true);
-    const selectedIndex = options.findIndex((option) => option.value === currentValue);
-    setActiveIndex(selectedIndex >= 0 ? selectedIndex : firstEnabledIndex());
-  }, [options, currentValue, firstEnabledIndex]);
-
-  const commit = useCallback(
-    (index: number) => {
-      const option = options[index];
-      if (!option || option.disabled) return;
-      if (option.value !== currentValue) {
-        if (!isControlled) setInternalValue(option.value);
-        onChange?.(option.value);
-      }
-      setOpen(false);
-      setActiveIndex(-1);
-      internalTriggerRef.current?.focus();
+  const commitValue = useCallback(
+    (next: string) => {
+      if (next === currentValue) return;
+      if (!isControlled) setInternalValue(next);
+      onChange?.(next);
     },
-    [options, currentValue, isControlled, onChange],
-  );
-
-  const moveActive = useCallback(
-    (delta: number) => {
-      const count = options.length;
-      if (count === 0) return;
-      setActiveIndex((current) => {
-        let next = current;
-        for (let step = 0; step < count; step += 1) {
-          next = (next + delta + count) % count;
-          if (!options[next]?.disabled) return next;
-        }
-        return current;
-      });
-    },
-    [options],
+    [currentValue, isControlled, onChange],
   );
 
   useEffect(() => {
@@ -146,61 +126,24 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
     const onPointerDown = (event: PointerEvent) => {
       if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
         setOpen(false);
-        setActiveIndex(-1);
+      }
+    };
+    // Escape closes the styled popup; stop propagation so it doesn't also
+    // dismiss an enclosing dialog.
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        setOpen(false);
+        internalNativeRef.current?.focus();
       }
     };
     document.addEventListener("pointerdown", onPointerDown, true);
-    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown, true);
+    };
   }, [open]);
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    if (disabled) return;
-    switch (event.key) {
-      case "ArrowDown":
-      case "ArrowUp":
-        event.preventDefault();
-        if (!open) openMenu();
-        else moveActive(event.key === "ArrowDown" ? 1 : -1);
-        break;
-      case "Home":
-        if (open) {
-          event.preventDefault();
-          setActiveIndex(firstEnabledIndex());
-        }
-        break;
-      case "End":
-        if (open) {
-          event.preventDefault();
-          for (let index = options.length - 1; index >= 0; index -= 1) {
-            if (!options[index]?.disabled) {
-              setActiveIndex(index);
-              break;
-            }
-          }
-        }
-        break;
-      case "Enter":
-      case " ":
-        event.preventDefault();
-        if (open) commit(activeIndex);
-        else openMenu();
-        break;
-      case "Escape":
-        if (open) {
-          event.preventDefault();
-          close();
-        }
-        break;
-      case "Tab":
-        if (open) {
-          setOpen(false);
-          setActiveIndex(-1);
-        }
-        break;
-      default:
-        break;
-    }
-  };
 
   return (
     <div
@@ -208,6 +151,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
       className={cx(
         "zr-select",
         open && "zr-select--open",
+        (invalid || showError) && "zr-select--invalid",
         disabled && "zr-select--disabled",
         className,
       )}
@@ -216,7 +160,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
         <label
           className="zr-select__label"
           id={labelId}
-          onClick={() => !disabled && internalTriggerRef.current?.focus()}
+          onClick={() => !disabled && internalNativeRef.current?.focus()}
         >
           <span>{label}</span>
           {required && (
@@ -226,26 +170,35 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
           )}
         </label>
       )}
-      {name !== undefined && currentValue !== "" && (
-        <input type="hidden" name={name} value={currentValue} />
-      )}
       <div className="zr-select__field">
-        <button
-          ref={setTriggerRef}
-          type="button"
-          className="zr-select__trigger"
-          id={`${baseId}-trigger`}
-          role="combobox"
-          aria-haspopup="listbox"
-          aria-expanded={open}
-          aria-controls={listboxId}
+        <select
+          ref={setNativeRef}
+          className="zr-select__native"
+          id={`${baseId}-native`}
+          value={currentValue}
+          name={name}
           aria-labelledby={label !== undefined ? labelId : undefined}
           aria-label={label !== undefined ? undefined : ariaLabel}
-          aria-activedescendant={open && activeIndex >= 0 ? optionId(activeIndex) : undefined}
-          data-testid={name ? `zitadel-select-${name}` : testId ? `${testId}-trigger` : undefined}
+          aria-invalid={invalid || showError ? "true" : "false"}
+          aria-describedby={showError ? errorId : undefined}
+          data-testid={name ? `zitadel-select-${name}` : testId ? `${testId}-native` : undefined}
           disabled={disabled}
-          onClick={() => (open ? close() : openMenu())}
-          onKeyDown={handleKeyDown}
+          required={required}
+          onChange={(event) => {
+            setOpen(false);
+            commitValue(event.target.value);
+          }}
+        >
+          {listOptions.map((option) => (
+            <option key={option.value || "__empty"} value={option.value} disabled={option.disabled}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <div
+          className="zr-select__trigger"
+          aria-hidden="true"
+          onClick={() => !disabled && setOpen((current) => !current)}
         >
           <span
             className={cx("zr-select__value", !selected && "zr-select__value--placeholder")}
@@ -253,28 +206,20 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
             {selected ? selected.label : placeholder}
           </span>
           <Icon className="zr-select__icon" name="chevron-down" size="16" decorative />
-        </button>
-        <ul
-          className="zr-select__listbox"
-          id={listboxId}
-          role="listbox"
-          tabIndex={-1}
-          aria-labelledby={label !== undefined ? labelId : undefined}
-          hidden={!open}
-        >
-          {options.map((option, index) => (
+        </div>
+        <ul className="zr-select__listbox" aria-hidden="true" hidden={!open}>
+          {listOptions.map((option) => (
             <li
-              key={option.value}
+              key={option.value || "__empty"}
               className="zr-select__option"
-              id={optionId(index)}
-              role="option"
-              aria-selected={option.value === currentValue}
-              aria-disabled={option.disabled || undefined}
-              data-active={open && index === activeIndex ? "true" : undefined}
               data-value={option.value}
-              onClick={() => commit(index)}
-              onPointerMove={() => {
-                if (!option.disabled && index !== activeIndex) setActiveIndex(index);
+              data-selected={option.value === currentValue || undefined}
+              data-disabled={option.disabled || undefined}
+              onClick={() => {
+                if (option.disabled) return;
+                setOpen(false);
+                commitValue(option.value);
+                internalNativeRef.current?.focus();
               }}
             >
               <span className="zr-select__option-label">{option.label}</span>
@@ -282,6 +227,9 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
             </li>
           ))}
         </ul>
+      </div>
+      <div className="zr-select__error" id={errorId} role="alert" hidden={!showError}>
+        {error}
       </div>
     </div>
   );

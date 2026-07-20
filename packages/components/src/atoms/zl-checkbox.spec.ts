@@ -70,4 +70,45 @@ describe("<zl-checkbox> markup", () => {
     const root = checkbox.shadowRoot?.querySelector(".zr-checkbox");
     expect(root?.getAttribute("data-state")).toBe("hovered");
   });
+
+  it("exposes formValue as the value token only when checked", async () => {
+    const checkbox = mount(`<zl-checkbox name="opt" value="true"></zl-checkbox>`);
+    await checkbox.updateComplete;
+    expect(checkbox.formValue).toBe("");
+    checkbox.checked = true;
+    expect(checkbox.formValue).toBe("true");
+  });
+
+  it("restores the checked state when formValue is assigned", async () => {
+    const checkbox = mount(`<zl-checkbox name="opt" value="true"></zl-checkbox>`);
+    await checkbox.updateComplete;
+    checkbox.formValue = "true";
+    expect(checkbox.checked).toBe(true);
+    checkbox.formValue = "";
+    expect(checkbox.checked).toBe(false);
+  });
+
+  it("shows an inline error, marks the control invalid, and wires aria-describedby", async () => {
+    const checkbox = mount(
+      `<zl-checkbox name="terms" label="Accept" error="You must accept the terms."></zl-checkbox>`,
+    );
+    await checkbox.updateComplete;
+    const input = checkbox.shadowRoot?.querySelector("input") as HTMLInputElement;
+    const error = checkbox.shadowRoot?.querySelector(".zr-checkbox__error");
+    expect(error?.hasAttribute("hidden")).toBe(false);
+    expect(error?.textContent?.trim()).toBe("You must accept the terms.");
+    expect(checkbox.shadowRoot?.querySelector(".zr-checkbox--invalid")).not.toBeNull();
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.getAttribute("aria-describedby")).toBe(error?.id);
+  });
+
+  it("hides the error node and stays valid without an error", async () => {
+    const checkbox = mount(`<zl-checkbox name="terms" label="Accept"></zl-checkbox>`);
+    await checkbox.updateComplete;
+    const input = checkbox.shadowRoot?.querySelector("input") as HTMLInputElement;
+    expect(checkbox.shadowRoot?.querySelector(".zr-checkbox__error")?.hasAttribute("hidden")).toBe(
+      true,
+    );
+    expect(input.getAttribute("aria-invalid")).toBe("false");
+  });
 });

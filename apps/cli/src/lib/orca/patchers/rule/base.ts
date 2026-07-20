@@ -195,6 +195,7 @@ function projectConfig(ctx: PatchContext): Record<string, unknown> {
     branding: { renderer: ctx.rendererId, attribution: "visible" },
     environments,
     ...(ctx.preset === undefined ? {} : { preset: ctx.preset }),
+    ...(ctx.useCase === undefined ? {} : { useCase: ctx.useCase }),
   };
 }
 
