@@ -4,17 +4,22 @@ PREPARE insert_user (
     TEXT, -- $1 project_id
     TEXT, -- $2 schema_url
     TEXT, -- $3 id
-    TEXT, -- $4 team_id (nullable)
+    TEXT, -- $4 attribute team scope (nullable; seeds membership + team-scoped uniqueness)
     zitadel_nextgen.incoming_user_attribute[] -- $5 Typed Array
 ) AS
 */
 
 WITH _user_header AS (
     INSERT INTO zitadel_nextgen.users (
-        project_id, schema_url, id, team_id
+        project_id, schema_url, id, lifecycle_owner_team_id, status
     )
-    VALUES ($1, $2, $3, $4)
-    RETURNING project_id, id, team_id, schema_url, created_at, updated_at
+    VALUES ($1, $2, $3, NULL, 'active')
+    RETURNING project_id, id, lifecycle_owner_team_id, status, schema_url, created_at, updated_at
+),
+_membership AS (
+    INSERT INTO zitadel_nextgen.team_memberships (project_id, team_id, user_id, status)
+    SELECT $1, $4, $3, 'active'
+    WHERE $4 IS NOT NULL AND $4 <> ''
 ),
 _input_data AS (
     SELECT key, value, value_hash, unique_scope
@@ -37,7 +42,7 @@ _attributes AS (
     FROM _input_data
 )
 SELECT
-    u.schema_url, u.id, u.team_id, u.created_at, u.updated_at,
+    u.schema_url, u.id, u.lifecycle_owner_team_id, u.status, u.created_at, u.updated_at,
     (
         SELECT array_agg(ROW(i.key, i.value))
         FROM _input_data i
