@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 
 	"github.com/ianlancetaylor/jsonschema"
@@ -88,6 +89,12 @@ func (s *projectService) Create(ctx context.Context, previewOrigins []string, se
 	})
 
 	if err != nil {
+		// Callback failures are already domain errors (create/schema/flow). Only
+		// wrap unexpected commit/infrastructure failures as commit errors.
+		var de domain.Error
+		if errors.As(err, &de) {
+			return nil, de
+		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to commit transaction")
 	}
 	return project, nil
