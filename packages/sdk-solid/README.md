@@ -34,7 +34,9 @@ server, so in production the path comes from your hosting platform — a
 worker — with no secrets on the platform, per
 [ADR 036](https://github.com/zitadel/nextgen/blob/main/docs/adrs/036-api-credential-planes.md).
 CLI scaffolding for these configs is tracked in
-[zitadel/nextgen#560](https://github.com/zitadel/nextgen/issues/560).
+[zitadel/nextgen#560](https://github.com/zitadel/nextgen/issues/560). **Until
+that work lands, production SPA deployment is not yet supported** — the CLI dev
+proxy covers local development.
 
 For local development you can skip the proxy and point `proxyPath` straight at the
 backend (cross-origin), e.g. `proxyPath: "http://localhost:4000"`.

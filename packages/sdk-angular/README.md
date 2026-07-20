@@ -39,6 +39,7 @@ The widgets call `${proxyPath}/…` same-origin (default `/__nextgen`). In produ
 that path comes from your hosting platform — a `vercel.json` rewrite, a
 `netlify.toml` redirect, or a minimal Cloudflare worker — per
 [ADR 036](https://github.com/zitadel/nextgen/blob/main/docs/adrs/036-api-credential-planes.md)
-(scaffolding tracked in [zitadel/nextgen#560](https://github.com/zitadel/nextgen/issues/560)).
+(scaffolding tracked in [zitadel/nextgen#560](https://github.com/zitadel/nextgen/issues/560);
+**until that work lands, production SPA deployment is not yet supported**).
 Locally you can point `proxyPath` straight at the backend (cross-origin), e.g.
 `proxyPath: "http://localhost:4000"`.
