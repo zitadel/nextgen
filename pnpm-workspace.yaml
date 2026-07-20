@@ -4,14 +4,15 @@ packages:
   - "packages/*"
 
 catalog:
-  "@fumapress/ai": ^0.6.2
   "@clack/prompts": ^1.2.0
   "@eslint/js": ^9.0.0
   "@eslint/json": ^0.11.0
   "@eslint/markdown": ^6.0.0
   "@faker-js/faker": ^10.4.0
-  "@mswjs/http-middleware": ^0.10.3
+  '@fontsource/arimo': ^5.2.8
+  "@fumapress/ai": ^0.6.2
   "@moonrepo/cli": ^2.3.3
+  "@mswjs/http-middleware": ^0.10.3
   '@oclif/core': ^4.11.4
   '@oclif/plugin-autocomplete': ^3.2.50
   '@oclif/plugin-commands': ^4.1.55
@@ -21,6 +22,10 @@ catalog:
   '@oclif/plugin-version': ^2.2.46
   '@oclif/plugin-which': ^3.2.55
   "@playwright/test": ^1.60.0
+  "@scalar/api-client-react": ^2.0.26
+  "@storybook/addon-a11y": ^10.3.6
+  "@storybook/addon-vitest": ^10.3.6
+  "@storybook/web-components-vite": ^10.3.6
   "@tailwindcss/vite": ^4.2.4
   "@tanstack/devtools-vite": ^0.6.0
   "@tanstack/eslint-plugin-router": ^1.161.6
@@ -68,6 +73,7 @@ catalog:
   lucide: ^1.16.0
   lucide-react: ^1.16.0
   msw: ^2.14.6
+  msw-storybook-addon: ^2.0.7
   oclif: ^4.17.46
   orval: ^8.10.0
   oxfmt: ^0.46.0
@@ -78,14 +84,9 @@ catalog:
   react-dom: ^19.2.5
   react-server-dom-webpack: 19.2.5
   safe-stable-stringify: ^2.5.0
-  "@scalar/api-client-react": ^2.0.26
   sharp: ^0.34.5
   shiki: ^4.2.0
   storybook: ^10.3.6
-  "@storybook/web-components-vite": ^10.3.6
-  "@storybook/addon-a11y": ^10.3.6
-  "@storybook/addon-vitest": ^10.3.6
-  msw-storybook-addon: ^2.0.7
   tailwindcss: ^4.2.4
   ts-lit-plugin: ^2.0.2
   tsdown: ^0.21.10
@@ -103,6 +104,8 @@ catalog:
   xstate: ^5.31.1
   zod: ^4.3.6
 
+catalogMode: strict
+
 # Named catalog for the client SDK toolchain. Pinned to Vite 7 / Vitest 3
 # (not the root catalog's Vite 8) because Qwik 1.x peers `vite >=5 <8`, so the
 # SDK family that includes @zitadel/sdk-qwik must build on Vite 7.
@@ -110,5 +113,3 @@ catalogs:
   sdk:
     vite: ^7.3.5
     vitest: ^3.0.0
-
-catalogMode: strict

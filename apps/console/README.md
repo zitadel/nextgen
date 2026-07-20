@@ -15,13 +15,55 @@ Component development and review (atoms, paired React, and the
 ## Styling
 
 Design tokens are the source of truth; Tailwind is the convenience layer that
-exposes them as utilities (`bg-zl-surface-default-black`, …). The approach is
-decided by **where the file lives**, not by guessing future reuse: everything
-under `apps/console/**` uses Tailwind utilities and never a bespoke CSS file,
-while the shared design-system primitives in `packages/components` /
+exposes them as utilities (`bg-zl-surface-base`, `text-zl-text-primary`, …). The
+approach is decided by **where the file lives**, not by guessing future reuse:
+everything under `apps/console/**` uses Tailwind utilities and never a bespoke
+CSS file, while the shared design-system primitives in `packages/components` /
 `packages/ui-react` (e.g. `Button`) use the shared token CSS, because utilities
-can't reach a custom element's shadow DOM. Full rules and the decision tree:
-[`docs/styling.md`](docs/styling.md).
+can't reach a custom element's shadow DOM. Full rules, the current token
+taxonomy, the theming model, and the 12-column grid: [`docs/styling.md`](docs/styling.md).
+
+## Theming
+
+The console follows the OS colour scheme by default and offers a Light / Dark /
+System toggle in the context bar (persisted in `localStorage`). Theming is
+driven by `data-theme` on `<html>`: the design tokens ship a dark `:root` and a
+light `[data-theme="light"]` override, so components only reference semantic
+tokens and re-theme automatically. See [`src/theme.ts`](src/theme.ts) and the
+pre-paint script in [`index.html`](index.html).
+
+## Screen coverage (built vs. designed)
+
+Only one screen is designed in Figma so far — the **General / dashboard**
+(`Dashboard general layout`). Its sidebar component enumerates the full intended
+IA, but the other destinations have **no screen design and, mostly, no API**.
+Because this is an iterative build, we ship **only what is actually built** and
+do not scaffold placeholder screens for things we cannot yet design or fetch.
+
+**Built and in the sidebar:**
+
+- **Get started** — the designed dashboard, real API data (project, users,
+  sessions, health).
+- **Users**, **Sessions** — real API list pages (inherited from #451, restyled
+  with the design tokens). No dedicated Figma design yet; their layout
+  extrapolates the dashboard's patterns (page hero + cards + table).
+- **Projects** — partial: the API exposes only the scoped project (no
+  multi-project list), so it renders that single project.
+
+**Built but not in the sidebar:**
+
+- **Login flows** (list + detail), **User detail**, **Schema detail** — real API
+  data, reached contextually (dashboard Browse-all, table row links) rather than
+  from the sidebar.
+- **Schemas** (list) and **System** — pre-existing #451 placeholders/utility
+  pages, reachable by URL only.
+
+**Designed sidebar IA not yet built (backlog):** App groups, Applications,
+Actions, Role assignments, Analytics, Activity Log, Manage team. These appear in
+the Figma sidebar but have no screen design and no backing endpoint, so they are
+intentionally **not** scaffolded as routes. Add each one when its design and API
+exist — attaching `staticData.nav` to the new route re-lists it in the sidebar
+automatically.
 
 ## API access and auth
 

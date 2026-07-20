@@ -1,13 +1,15 @@
 import { useRouter } from "@tanstack/react-router";
 import { createFileRoute } from "@tanstack/react-router";
 import { Button, Pill } from "@zitadel/ui-react";
+import { UserRoundKey } from "lucide-react";
 import { useState } from "react";
 
 import { api, projectId } from "../../api/zitadel";
+import { Page } from "../../components/layout";
 import { DataTable, PageHeader } from "../../components/resource-page";
 
 export const Route = createFileRoute("/sessions/")({
-  staticData: { nav: { group: "Identity", label: "Sessions", order: 3 } },
+  staticData: { nav: { label: "Sessions", order: 8, icon: UserRoundKey } },
   loader: () => api.listSessions({ project_id: projectId }),
   component: SessionsList,
 });
@@ -30,7 +32,7 @@ function SessionsList() {
   }
 
   return (
-    <>
+    <Page>
       <PageHeader title="Sessions" />
       <DataTable
         rows={sessions}
@@ -62,6 +64,6 @@ function SessionsList() {
           },
         ]}
       />
-    </>
+    </Page>
   );
 }

@@ -10,12 +10,14 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fontsource/arimo": "catalog:",
     "@tanstack/react-devtools": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-router-devtools": "catalog:",
     "@zitadel/api": "workspace:*",
     "@zitadel/design-tokens": "workspace:*",
     "@zitadel/ui-react": "workspace:*",
+    "lucide-react": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "tailwindcss": "catalog:"

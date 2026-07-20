@@ -1,96 +1,224 @@
 import { Link } from "@tanstack/react-router";
-import { Icon } from "@zitadel/ui-react";
-import { type ReactNode, useState } from "react";
+import { ChevronUp, Monitor, Moon, PanelLeft, Search, Sun } from "lucide-react";
+import { type ReactNode, useEffect, useState } from "react";
 
-import { useNavSections } from "./use-nav-items";
+import { type ThemePreference, useTheme } from "../../theme";
+import { Tag } from "../tag";
+import { ContextSwitcher } from "./ContextSwitcher";
+import { ZitadelMark } from "./icons";
+import { useNavItems } from "./use-nav-items";
+
+const COLLAPSE_STORAGE_KEY = "zl-console-nav-collapsed";
 
 /**
- * Console app shell (issue #440): persistent left sidebar, top header, and a
- * routed main content area. The sidebar collapses on small screens behind a
- * toggle. Colours come from `@zitadel/design-tokens` via Tailwind theme
- * utilities (`*-zl-*`); see apps/console/docs/styling.md.
+ * Console shell matching the Figma admin mock. The sidebar is a 72px icon rail by
+ * default (xs–xl, as designed at `lg`) and expands to the full 264px list only at
+ * `2xl`, where a `panel-left` toggle can collapse it back to the rail. The context
+ * bar (org/project switchers + server icon + theme toggle) sits at the top of the
+ * content column. Colours come from `@zitadel/design-tokens` via the `zl-*`
+ * Tailwind theme and re-theme with `data-theme` (see apps/console/docs/styling.md).
  */
 export function AppShell({ children }: { children: ReactNode }) {
-  const [navOpen, setNavOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => readCollapsed());
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(COLLAPSE_STORAGE_KEY, collapsed ? "1" : "0");
+    } catch {
+      /* ignore persistence failures */
+    }
+  }, [collapsed]);
 
   return (
-    <div className="group/shell flex h-screen flex-col" data-nav-open={navOpen}>
-      <Header navOpen={navOpen} onToggleNav={() => setNavOpen((open) => !open)} />
-      <div className="flex min-h-0 flex-1">
-        <Sidebar onNavigate={() => setNavOpen(false)} />
-        <main className="flex-1 overflow-y-auto px-8 py-6">{children}</main>
+    <div
+      className="group/shell flex h-screen bg-zl-surface-base text-zl-text-primary"
+      data-collapsed={collapsed}
+    >
+      <Sidebar collapsed={collapsed} onToggleCollapse={() => setCollapsed((value) => !value)} />
+      <main className="min-h-0 flex-1 overflow-y-auto">
+        <ContextBar />
+        {children}
+      </main>
+    </div>
+  );
+}
+
+function readCollapsed(): boolean {
+  try {
+    return localStorage.getItem(COLLAPSE_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+// The sidebar is a rail everywhere except an un-collapsed 2xl viewport, gated on
+// the `2xl:group-data-[collapsed=false]/shell:` variant. These class strings must
+// be written out in full (no concatenation) so Tailwind's source scanner sees the
+// complete candidate and emits the rule.
+const SIDEBAR =
+  "flex h-full w-[72px] shrink-0 flex-col justify-between border-r border-zl-border-subtle bg-zl-surface-base px-3 pb-6 pt-8 transition-[width,padding] 2xl:group-data-[collapsed=false]/shell:w-[264px] 2xl:group-data-[collapsed=false]/shell:px-6 2xl:group-data-[collapsed=false]/shell:pt-[46px]";
+const RAIL_HIDE = "hidden 2xl:group-data-[collapsed=false]/shell:block";
+const RAIL_CENTER = "justify-center 2xl:group-data-[collapsed=false]/shell:justify-start";
+
+function Sidebar({
+  collapsed,
+  onToggleCollapse,
+}: {
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+}) {
+  return (
+    <nav id="console-sidebar" aria-label="Primary" className={SIDEBAR}>
+      <div className="flex min-h-0 flex-1 flex-col gap-8">
+        <div className="flex flex-col items-center gap-4 2xl:group-data-[collapsed=false]/shell:flex-row 2xl:group-data-[collapsed=false]/shell:justify-between 2xl:group-data-[collapsed=false]/shell:gap-0 2xl:group-data-[collapsed=false]/shell:px-2">
+
+          <ZitadelMark size={22} className="text-zl-text-primary" aria-hidden />
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="hidden h-6 w-6 items-center justify-center rounded-zl-s text-zl-text-secondary hover:bg-zl-surface-subtle hover:text-zl-text-primary 2xl:inline-flex"
+          >
+            <PanelLeft size={16} />
+          </button>
+        </div>
+
+        <SidebarNav />
+      </div>
+
+      <ProfileRow />
+    </nav>
+  );
+}
+
+const NAV_BASE =
+  "flex h-10 items-center gap-3 rounded-md px-2 py-2 text-sm text-zl-text-secondary transition-colors";
+const NAV_LINK = `${NAV_BASE} hover:bg-zl-surface-subtle hover:text-zl-text-primary ${RAIL_CENTER}`;
+const NAV_LINK_ACTIVE = "bg-zl-surface-selected text-zl-text-primary";
+const NAV_INERT = `${NAV_BASE} cursor-default ${RAIL_CENTER}`;
+
+function SidebarNav() {
+  const items = useNavItems();
+
+  return (
+    <ul className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+      {items.map((item) => {
+        const Icon = item.nav.icon;
+        const content = (
+          <>
+            <Icon size={16} className="shrink-0" aria-hidden />
+            <span className={`flex-1 truncate ${RAIL_HIDE}`}>{item.nav.label}</span>
+            {item.nav.count && (
+              <span className={RAIL_HIDE}>
+                <Tag tone="secondary">{item.nav.count}</Tag>
+              </span>
+            )}
+          </>
+        );
+        return (
+          <li key={item.nav.label}>
+            {item.to ? (
+              <Link
+                to={item.to}
+                className={NAV_LINK}
+                activeProps={{ className: NAV_LINK_ACTIVE }}
+                activeOptions={{ exact: item.to === "/" }}
+                title={item.nav.label}
+              >
+                {content}
+              </Link>
+            ) : (
+              <span
+                className={NAV_INERT}
+                aria-disabled="true"
+                title={`${item.nav.label} — not available yet`}
+              >
+                {content}
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function ProfileRow() {
+  return (
+    <button
+      type="button"
+      className="flex w-full items-center justify-center rounded-full py-2 pl-1.5 pr-3 text-left hover:bg-zl-surface-subtle 2xl:group-data-[collapsed=false]/shell:justify-between"
+    >
+      <span className="flex min-w-0 items-center gap-2">
+        <span
+          aria-hidden
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-zl-surface-subtle text-xs text-zl-text-primary"
+        >
+          F
+        </span>
+        <span className={`truncate text-sm text-zl-text-primary ${RAIL_HIDE}`}>flo@domain.com</span>
+      </span>
+      <ChevronUp size={14} className={`shrink-0 text-zl-text-tertiary ${RAIL_HIDE}`} aria-hidden />
+    </button>
+  );
+}
+
+const CONTENT_PADDING = "mx-auto w-full max-w-[120rem] px-6 lg:px-10 2xl:px-16";
+
+function ContextBar() {
+  return (
+    <div className={`${CONTENT_PADDING} flex items-start justify-between gap-4 pt-8`}>
+      <ContextSwitcher />
+      <div className="hidden shrink-0 items-center gap-2 sm:flex">
+        <button
+          type="button"
+          aria-label="Search"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-zl-s text-zl-text-secondary hover:bg-zl-surface-subtle hover:text-zl-text-primary"
+        >
+          <Search size={16} />
+        </button>
+        <ThemeToggle />
       </div>
     </div>
   );
 }
 
-function Header({ navOpen, onToggleNav }: { navOpen: boolean; onToggleNav: () => void }) {
-  return (
-    <header className="flex h-14 items-center gap-3 border-b border-zl-border-default-gray-100 bg-zl-surface-default-primary-gray px-6">
-      <button
-        type="button"
-        className="flex h-9 w-9 cursor-pointer flex-col justify-center gap-1 rounded-lg border border-zl-border-default-gray-200 bg-transparent md:hidden"
-        aria-label="Toggle navigation"
-        aria-expanded={navOpen}
-        aria-controls="console-sidebar"
-        onClick={onToggleNav}
-      >
-        <span className="mx-auto block h-0.5 w-[18px] bg-zl-text-primary-white" />
-        <span className="mx-auto block h-0.5 w-[18px] bg-zl-text-primary-white" />
-        <span className="mx-auto block h-0.5 w-[18px] bg-zl-text-primary-white" />
-      </button>
-      <div className="text-base font-semibold">Zitadel Console</div>
-      <div className="flex-1" />
-      {/* User menu / auth lands later (issue #440 non-goal). */}
-      <span
-        className="inline-flex items-center gap-1.5 text-sm text-zl-text-secondary-gray"
-        aria-disabled="true"
-      >
-        <Icon name="user" size="16" decorative />
-        Account
-      </span>
-    </header>
-  );
-}
+const THEME_OPTIONS: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "System", icon: Monitor },
+];
 
-const NAV_LINK =
-  "block rounded-lg px-3 py-2 text-sm text-zl-text-secondary-gray hover:bg-zl-surface-default-secondary-gray hover:text-zl-text-primary-white";
-const NAV_LINK_ACTIVE =
-  "bg-zl-surface-default-secondary-gray font-semibold text-zl-text-primary-white";
-
-function Sidebar({ onNavigate }: { onNavigate: () => void }) {
-  const sections = useNavSections();
+function ThemeToggle() {
+  const { preference, setPreference } = useTheme();
 
   return (
-    <nav
-      id="console-sidebar"
-      aria-label="Primary"
-      className="fixed bottom-0 left-0 top-14 z-20 flex w-60 -translate-x-full flex-col gap-5 overflow-y-auto border-r border-zl-border-default-gray-100 bg-zl-surface-default-primary-gray px-3 py-4 transition-transform group-data-[nav-open=true]/shell:translate-x-0 md:static md:top-auto md:z-auto md:translate-x-0"
+    <div
+      role="radiogroup"
+      aria-label="Theme"
+      className="inline-flex items-center gap-0.5 rounded-zl-s border border-zl-border-subtle p-0.5"
     >
-      {sections.map((section) => (
-        <div key={section.group ?? "_top"}>
-          {section.group && (
-            <p className="mb-1.5 ml-2 text-xs font-semibold uppercase tracking-wider text-zl-text-secondary-gray">
-              {section.group}
-            </p>
-          )}
-          <ul className="flex flex-col gap-0.5">
-            {section.items.map((item) => (
-              <li key={item.to}>
-                <Link
-                  to={item.to}
-                  className={NAV_LINK}
-                  activeProps={{ className: NAV_LINK_ACTIVE }}
-                  activeOptions={{ exact: item.to === "/" }}
-                  onClick={onNavigate}
-                >
-                  {item.nav.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
-    </nav>
+      {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
+        const active = preference === value;
+        return (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            aria-label={label}
+            title={label}
+            onClick={() => setPreference(value)}
+            className={`inline-flex h-7 w-7 items-center justify-center rounded-zl-xs ${
+              active
+                ? "bg-zl-surface-subtle text-zl-text-primary"
+                : "text-zl-text-tertiary hover:text-zl-text-primary"
+            }`}
+          >
+            <Icon size={15} aria-hidden />
+          </button>
+        );
+      })}
+    </div>
   );
 }

@@ -1,16 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { UserRound } from "lucide-react";
 
 import { api } from "../../api/zitadel";
-import {
-  CreateButtonStub,
-  DataTable,
-  PageHeader,
-  TableLink,
-} from "../../components/resource-page";
+import { Page } from "../../components/layout";
+import { DataTable, PageHeader, TableLink } from "../../components/resource-page";
 import { field } from "../../lib/record";
 
 export const Route = createFileRoute("/users/")({
-  staticData: { nav: { group: "Identity", label: "Users", order: 1 } },
+  staticData: { nav: { label: "Users", order: 2, icon: UserRound, count: "1,000,000" } },
   loader: () => api.listUsers(),
   component: UsersList,
 });
@@ -19,8 +16,9 @@ function UsersList() {
   const users = Route.useLoaderData();
 
   return (
-    <>
-      <PageHeader title="Users" action={<CreateButtonStub label="Create user" />} />
+    <Page>
+      {/* action parked: "Create user" is a disabled stub with no backing form. */}
+      <PageHeader title="Users" />
       <DataTable
         rows={users}
         getRowKey={(user, index) => field(user, "id") ?? `user-${index}`}
@@ -44,6 +42,6 @@ function UsersList() {
           { header: "Created", cell: (user) => field(user, "created_at") ?? "—" },
         ]}
       />
-    </>
+    </Page>
   );
 }

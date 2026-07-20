@@ -4,16 +4,57 @@
 @import "@zitadel/design-tokens/css/tailwind.css";
 @import "@zitadel/ui-react/styles.css";
 
-/*
- * Console styling model (see apps/console/docs/styling.md):
- *   - Colours/spacing/etc. live in @zitadel/design-tokens and are exposed as
- *     Tailwind theme utilities (e.g. bg-zl-surface-default-black).
- *   - React-only components style themselves with Tailwind utilities.
- *   - This file holds ONLY the Tailwind entry, token imports, and genuinely
- *     global page theming. Do not add component-scoped class rules here.
- */
+/* Self-hosted Arimo — the design's body typeface. Weights map to the utilities
+   used across the console: 400 (body), 500 (medium), 600 (semibold), 700 (bold). */
+@import "@fontsource/arimo/400.css";
+@import "@fontsource/arimo/500.css";
+@import "@fontsource/arimo/600.css";
+@import "@fontsource/arimo/700.css";
+
+/* APK Futural — the brand display typeface used for headings (font-zl-heading).
+   Licensed webfont, matching zitadel.com; Regular (400) is the only weight. */
+@font-face {
+  font-family: "APK Futural";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src:
+    url("./fonts/apk-futural/APK-Futural-Regular.woff2") format("woff2"),
+    url("./fonts/apk-futural/APK-Futural-Regular.woff") format("woff");
+}
+
+/* Point the heading token at APK Futural. Overriding the token here (rather than
+   editing generated tokens.css) keeps the brand display font scoped to the app. */
+:root,
+[data-theme="dark"],
+[data-theme="light"] {
+  --zl-font-family-heading: "APK Futural", "Arimo", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+/* Global page theming only. Component styles live in Tailwind utilities on the
+   components themselves (see apps/console/docs/styling.md); do not add
+   component-scoped rules here. `data-theme` on <html> selects the token mode
+   (dark :root vs light override); `color-scheme` keeps native form controls and
+   scrollbars in step. */
+html {
+  color-scheme: dark light;
+}
+
 body {
+  margin: 0;
   font-family: var(--zl-font-family-sans, system-ui, sans-serif);
-  background: var(--zl-color-surface-default-black);
-  color: var(--zl-color-text-primary-white);
+  background: var(--zl-color-surface-base);
+  color: var(--zl-color-text-primary);
+}
+
+/* Interactive affordance. Tailwind v4's Preflight no longer forces
+   `cursor: pointer` on <button>, so native buttons/links render the default
+   arrow and read as inert. Restore the pointer for genuinely interactive
+   controls; elements explicitly marked disabled keep the default cursor. This
+   is a global affordance default, not component styling. */
+button:not(:disabled):not([aria-disabled="true"]),
+[role="button"]:not([aria-disabled="true"]),
+[role="radio"]:not([aria-disabled="true"]),
+a[href] {
+  cursor: pointer;
 }

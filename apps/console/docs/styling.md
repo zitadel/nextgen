@@ -8,8 +8,11 @@ How we style the console. Read this before adding a component or a CSS rule.
   colour, spacing step, radius, font, etc.
 - **Tailwind is the convenience layer, not a parallel design system.** The token
   package generates a Tailwind `@theme` from the tokens, so the tokens show up as
-  utilities (e.g. `bg-zl-surface-default-black`). Using a `zl-*` utility and using
-  the underlying CSS variable are the same value.
+  utilities (e.g. `bg-zl-surface-base`, `text-zl-text-primary`). Using a `zl-*`
+  utility and using the underlying CSS variable are the same value.
+- **Theme-aware by default.** Semantic tokens flip between dark and light via
+  `data-theme` on `<html>`; write components against semantic tokens and they
+  re-theme for free (see [Theming](#theming-dark--light)).
 - **The styling approach is decided by *where the component lives*, not by a
   prediction about future reuse:**
   - Anything under **`apps/console/**` → Tailwind utilities.**
@@ -70,24 +73,80 @@ Default to building in `apps/console`. You only leave it when the login /
 web-component surface needs the *same* primitive, which makes it a paired atom in
 the design-system packages.
 
+> **The paired atoms are not theme-portable yet.** Every pair's surface CSS in
+> `packages/shared-component-styles/src/*.css` still uses the **legacy dark-only
+> login tokens** (`--zl-color-surface-default-*`, `--zl-color-text-button-*`,
+> `--zl-color-gray-*`), which don't flip with `data-theme` (login is dark-only
+> for v1, ADR-014 §5). Composing one into the light/dark console renders the
+> login treatment in both themes — wrong in light. So until those stylesheets
+> migrate to the current semantic taxonomy, **build console screens
+> console-local even where a pair nominally exists** (e.g. a button, a select),
+> using theme-flipping `zl-*` utilities, and swap to the pair after it migrates.
+> `Icon` is the exception: it renders a glyph with `currentColor` and is
+> theme-safe, so compose it freely.
+
 ## Token utilities
 
 The token `@theme` (`@zitadel/design-tokens/css/tailwind.css`) exposes these
 namespaces. **Always use these for design-meaningful properties — never raw hex,
 and never Tailwind's default colour palette (`bg-gray-800`, etc.).**
 
-| Token namespace      | Example variable                       | Example utility                         |
-| -------------------- | -------------------------------------- | --------------------------------------- |
-| Colour (surface)     | `--zl-color-surface-default-black`     | `bg-zl-surface-default-black`           |
-| Colour (text)        | `--zl-color-text-secondary-gray`       | `text-zl-text-secondary-gray`           |
-| Colour (border)      | `--zl-color-border-default-gray-100`   | `border-zl-border-default-gray-100`     |
-| Radius               | `--zl-radius-m`                         | `rounded-zl-m`                          |
-| Font family          | `--zl-font-family-sans`                 | `font-zl-sans`                          |
+The console uses the **current Figma taxonomy** (theme-aware surface/text/border
+plus accent/status). The legacy `*-default-black` / `*-primary-white` tokens
+still exist for the login component but should not be used in new console code.
+
+| Token namespace      | Example variable            | Example utility            |
+| -------------------- | --------------------------- | -------------------------- |
+| Surface              | `--zl-color-surface-base`   | `bg-zl-surface-base`       |
+| Surface (raised)     | `--zl-color-surface-raised` | `bg-zl-surface-raised`     |
+| Surface (hover/fill) | `--zl-color-surface-subtle` | `bg-zl-surface-subtle`     |
+| Text                 | `--zl-color-text-primary`   | `text-zl-text-primary`     |
+| Text (muted)         | `--zl-color-text-secondary` / `--zl-color-text-tertiary` | `text-zl-text-secondary` |
+| Border               | `--zl-color-border-subtle` / `--zl-color-border-default` | `border-zl-border-subtle` |
+| Accent               | `--zl-color-accent-subtle-dark` | `bg-zl-accent-subtle-dark` |
+| Status               | `--zl-color-status-positive` | `text-zl-status-positive` |
+| Radius               | `--zl-radius-m`             | `rounded-zl-m`             |
+| Font family          | `--zl-font-family-sans`     | `font-zl-sans`             |
 
 For **layout spacing** (`p-*`, `gap-*`, `w-*`, flex/grid), use Tailwind's default
 numeric scale — it is finer-grained and idiomatic. Spacing is layout glue, not a
 brand decision, so it does not need a token. (Token spacing utilities such as
 `p-zl-04` exist if you want to pin to the scale, but they are not required.)
+
+## Theming (dark / light)
+
+The console re-themes via `data-theme` on `<html>`. The tokens ship a dark
+`:root` and a light `[data-theme="light"]` override, so **using the semantic
+utilities above is all you need — do not branch on the theme in component code.**
+
+- Default is the OS `prefers-color-scheme`; the context-bar toggle sets an
+  explicit Light / Dark / System preference, persisted in `localStorage`
+  (`src/theme.ts`).
+- `index.html` applies the resolved theme before paint to avoid a flash.
+- Only reference *semantic* tokens (`surface-*`, `text-*`, `border-*`). A raw
+  primitive like `bg-zl-color-gray-900` won't flip between themes.
+
+## Layout: the 12-column grid
+
+Page content uses the Figma 12-column grid, exposed as the design-system
+`layout/*` tokens (`--zl-layout-columns`, `--zl-layout-gutter`,
+`--zl-layout-margin`). Use the primitives in `src/components/layout.tsx`:
+
+- `<Page>` — centres content and applies the horizontal margin + vertical rhythm.
+  Every routed page renders inside one (the shell's `<main>` is padding-free).
+- `<ContentGrid>` — a responsive grid whose gutter is `--zl-layout-gutter`. It is
+  a single column below `md` and 12 columns (the `layout/columns` value) at `md`
+  and up; children place themselves with standard `col-span-*` utilities
+  (e.g. `md:col-span-6 lg:col-span-3` for a 4-up stat row). The column count is
+  `grid-cols-12` rather than the token because CSS forbids a `var()` as the
+  `repeat()` count.
+
+## Responsive breakpoints
+
+Mobile-first: default classes target small screens, `md:` and up target desktop.
+The shell sidebar is off-canvas below `md` (48rem), a 264px rail at `md`+, and
+collapses to a 72px icon rail via the sidebar toggle. Breakpoints match the
+`--zl-breakpoint-*` tokens.
 
 ## Conventions
 
