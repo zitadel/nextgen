@@ -297,30 +297,29 @@ func userHydrationExpressions(rowQualifier, attrKeysPlaceholder, authPlaceholder
 }
 
 func (r *UserRepository) Deactivate(ctx context.Context, client database.QueryExecutor, projectID, userID string) error {
-	cond := r.PrimaryKeyCondition(projectID, userID)
-	_, err := updateOne(ctx, client, r, cond,
-		r.SetStatus(domain.UserStatusDeactivated),
-		database.NewChange(colUserUpdatedAt, database.NowInstruction),
-	)
-	if err != nil {
+	return withTransaction(ctx, client, func(ctx context.Context, tx database.QueryExecutor) error {
+		cond := r.PrimaryKeyCondition(projectID, userID)
+		if _, err := updateOne(ctx, tx, r, cond,
+			r.SetStatus(domain.UserStatusDeactivated),
+			database.NewChange(colUserUpdatedAt, database.NowInstruction),
+		); err != nil {
+			return err
+		}
+		mb := database.NewStatementBuilder("UPDATE ")
+		mb.WriteString(pgTableMemberships)
+		mb.WriteString(" SET status = ")
+		mb.WriteArg(domain.MembershipStatusRemoved.String())
+		mb.WriteString(", updated_at = ")
+		mb.WriteArg(database.NowInstruction)
+		mb.WriteString(" WHERE project_id = ")
+		mb.WriteArg(projectID)
+		mb.WriteString(" AND user_id = ")
+		mb.WriteArg(userID)
+		mb.WriteString(" AND status <> ")
+		mb.WriteArg(domain.MembershipStatusRemoved.String())
+		_, err := tx.Exec(ctx, mb.String(), mb.Args()...)
 		return err
-	}
-
-	mb := database.NewStatementBuilder("UPDATE ")
-	mb.WriteString(pgTableMemberships)
-	mb.WriteString(" SET status = ")
-	mb.WriteArg(domain.MembershipStatusRemoved.String())
-	mb.WriteString(", updated_at = ")
-	mb.WriteArg(database.NowInstruction)
-	mb.WriteString(" WHERE project_id = ")
-	mb.WriteArg(projectID)
-	mb.WriteString(" AND user_id = ")
-	mb.WriteArg(userID)
-	mb.WriteString(" AND status <> ")
-	mb.WriteArg(domain.MembershipStatusRemoved.String())
-	_, err = client.Exec(ctx, mb.String(), mb.Args()...)
-
-	return err
+	})
 }
 
 func (r *UserRepository) GetByID(ctx context.Context, client database.QueryExecutor, projectID string, membershipTeamID *string, userID string) (*domain.User, error) {

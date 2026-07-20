@@ -261,4 +261,33 @@ describe("setup command", () => {
     expect(json.hint).toContain("Run without --json/--non-interactive");
     expect(json.hint).not.toContain("next");
   });
+
+  it("reproduces a non-default --use-case in the retry guidance when project creation fails", async () => {
+    const cwd = await makeNextProject();
+
+    // Force the project-create call to fail so the command surfaces its retry
+    // guidance — the retry must reproduce the chosen use case verbatim, since
+    // agents follow the suggested `setup ...` command literally.
+    server.use(
+      http.post("*/projects", () =>
+        HttpResponse.json({ code: "E_INTERNAL", message: "boom" }, { status: 500 }),
+      ),
+    );
+
+    const res = await setup(cwd, [
+      "--non-interactive",
+      "--skip-install",
+      "--framework",
+      "next",
+      "--use-case",
+      "business",
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { status: string };
+    expect(json.status).toBe("error");
+    // `--use-case business` only appears in the reconstructed retry flags, so
+    // its presence proves the non-default use case survived into the guidance.
+    expect(res.stdout).toContain("--use-case business");
+  });
 });

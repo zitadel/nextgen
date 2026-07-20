@@ -37,6 +37,7 @@ import {
   PickFrameworkPrompt,
   ServerPrompt,
   SignInPresetPrompt,
+  UseCasePrompt,
   type PromptContext,
   type SetupAnswers,
 } from "../../../../src/commands/setup/prompts";
@@ -49,7 +50,7 @@ const FRAMEWORK = {
 };
 
 function baseAnswers(over: Partial<SetupAnswers> = {}): SetupAnswers {
-  return { server: "https://api.zitadel.cloud", devPort: 3000, ...over };
+  return { server: "https://api.zitadel.cloud", devPort: 3000, useCase: "minimal", ...over };
 }
 
 const ctx: PromptContext = { framework: FRAMEWORK, cwd: "/tmp/app" };
@@ -214,6 +215,36 @@ describe("PickFrameworkPrompt", () => {
 
     await expect(
       new PickFrameworkPrompt().ask([{ id: "next", displayName: "Next.js" }]),
+    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+  });
+});
+
+describe("UseCasePrompt", () => {
+  it("writes the selected use case into the answers", async () => {
+    vi.mocked(select).mockResolvedValueOnce("business" as never);
+
+    const answers = await new UseCasePrompt().ask(baseAnswers({ useCase: "minimal" }), ctx);
+
+    expect(answers.useCase).toBe("business");
+    expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({ initialValue: "minimal" });
+  });
+
+  it("skips and keeps the flagged use case when --use-case was passed", async () => {
+    const answers = await new UseCasePrompt().ask(baseAnswers({ useCase: "consumer" }), {
+      ...ctx,
+      useCaseFromFlag: true,
+    });
+
+    expect(answers.useCase).toBe("consumer");
+    expect(select).not.toHaveBeenCalled();
+  });
+
+  it("throws E_VALIDATION on Ctrl-C", async () => {
+    vi.mocked(select).mockResolvedValueOnce(Symbol("cancel") as never);
+    vi.mocked(isCancel).mockReturnValueOnce(true);
+
+    await expect(
+      new UseCasePrompt().ask(baseAnswers({ useCase: "minimal" }), ctx),
     ).rejects.toMatchObject({ code: "E_VALIDATION" });
   });
 });

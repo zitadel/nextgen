@@ -132,6 +132,7 @@ func (r *TeamRepository) Deactivate(ctx context.Context, client database.QueryEx
 		membershipRemoved := domain.MembershipStatusRemoved.String()
 		userDeactivated := domain.UserStatusDeactivated.String()
 
+		// Remove roster access to this team for all participants (self-owned and team-owned).
 		mb := database.NewStatementBuilder("UPDATE ")
 		mb.WriteString(r.membershipsTable)
 		mb.WriteString(" SET status = ")
@@ -148,6 +149,7 @@ func (r *TeamRepository) Deactivate(ctx context.Context, client database.QueryEx
 			return err
 		}
 
+		// Deactivate users lifecycle-owned by this team (ADR 024).
 		ub := database.NewStatementBuilder("UPDATE ")
 		ub.WriteString(r.usersTable)
 		ub.WriteString(" SET status = ")
@@ -160,7 +162,30 @@ func (r *TeamRepository) Deactivate(ctx context.Context, client database.QueryEx
 		ub.WriteArg(id)
 		ub.WriteString(" AND status <> ")
 		ub.WriteArg(userDeactivated)
-		_, err := tx.Exec(ctx, ub.String(), ub.Args()...)
+		if _, err := tx.Exec(ctx, ub.String(), ub.Args()...); err != nil {
+			return err
+		}
+
+		// Match UserRepository.Deactivate: deprovisioned users lose all memberships/access,
+		// including roster rows on other teams.
+		ob := database.NewStatementBuilder("UPDATE ")
+		ob.WriteString(r.membershipsTable)
+		ob.WriteString(" SET status = ")
+		ob.WriteArg(membershipRemoved)
+		ob.WriteString(", updated_at = ")
+		ob.WriteArg(r.now)
+		ob.WriteString(" WHERE project_id = ")
+		ob.WriteArg(projectID)
+		ob.WriteString(" AND status <> ")
+		ob.WriteArg(membershipRemoved)
+		ob.WriteString(" AND user_id IN (SELECT id FROM ")
+		ob.WriteString(r.usersTable)
+		ob.WriteString(" WHERE project_id = ")
+		ob.WriteArg(projectID)
+		ob.WriteString(" AND lifecycle_owner_team_id = ")
+		ob.WriteArg(id)
+		ob.WriteString(")")
+		_, err := tx.Exec(ctx, ob.String(), ob.Args()...)
 		return err
 	})
 }

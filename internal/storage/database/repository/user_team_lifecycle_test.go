@@ -107,6 +107,51 @@ func TestUserTeamLifecycle_TeamOwnedUserDeactivatedOnTeamDeactivation(t *testing
 	require.Equal(t, domain.UserStatusDeactivated, got.Status)
 }
 
+// Team-owned users deactivated via TeamRepository.Deactivate lose memberships on all teams
+// (same roster policy as UserRepository.Deactivate / ADR 024).
+func TestUserTeamLifecycle_TeamOwnedUserLosesAllMembershipsOnOwningTeamDeactivation(t *testing.T) {
+	skipIfSpanner(t)
+	tx, rollback := transactionForRollback(t)
+	defer rollback()
+	ctx := t.Context()
+
+	const (
+		pid         = "proj-lifecycle-cross-team"
+		ownerTeamID = "team-lifecycle-owner"
+		otherTeamID = "team-lifecycle-other"
+		userID      = "usr-lifecycle-cross"
+		schemaURL   = "https://schemas.test/lifecycle-cross/v1.json"
+	)
+
+	teamRepo, userRepo := setupLifecycleFixture(t, tx, pid)
+	createTeam(t, tx, teamRepo, pid, ownerTeamID)
+	createTeam(t, tx, teamRepo, pid, otherTeamID)
+
+	owner := ownerTeamID
+	participation := ownerTeamID
+	createLifecycleUser(t, tx, userRepo, pid, schemaURL, userID, &owner, &participation)
+
+	membershipRepo := repository.NewTeamMembershipRepository(tx)
+	require.NoError(t, membershipRepo.Create(ctx, tx, &domain.TeamMembership{
+		ProjectID: pid,
+		TeamID:    otherTeamID,
+		UserID:    userID,
+		Status:    domain.MembershipStatusActive,
+	}))
+
+	require.NoError(t, teamRepo.Deactivate(ctx, tx, pid, ownerTeamID))
+
+	got, err := userRepo.Get(ctx, tx, database.WithCondition(userRepo.PrimaryKeyCondition(pid, userID)))
+	require.NoError(t, err)
+	require.Equal(t, domain.UserStatusDeactivated, got.Status)
+
+	for _, teamID := range []string{ownerTeamID, otherTeamID} {
+		membership, err := membershipRepo.Get(ctx, tx, pid, teamID, userID)
+		require.NoError(t, err)
+		require.Equal(t, domain.MembershipStatusRemoved, membership.Status, "team %s", teamID)
+	}
+}
+
 // Acceptance signal 3: deleting a user does not cascade-delete teams they participate in.
 func TestUserTeamLifecycle_UserDeleteDoesNotRemoveTeams(t *testing.T) {
 	skipIfSpanner(t)

@@ -10,6 +10,10 @@ ALTER TABLE users ADD COLUMN lifecycle_owner_team_id STRING(MAX)
 ALTER TABLE users ADD COLUMN status STRING(MAX) NOT NULL DEFAULT ('active')
 -- +goose StatementEnd
 -- +goose StatementBegin
+-- Conservative alpha default: map legacy users.team_id to lifecycle_owner_team_id.
+-- Old schema required a team context for every user, so we cannot distinguish
+-- self-serve vs enterprise provenance. Post-migration creates use
+-- InitialMembershipTeamID only (self-owned) unless LifecycleOwnerTeamID is set.
 UPDATE users SET lifecycle_owner_team_id = team_id WHERE team_id IS NOT NULL AND team_id != ''
 -- +goose StatementEnd
 -- +goose StatementBegin
@@ -81,6 +85,7 @@ SET team_id = COALESCE(u.lifecycle_owner_team_id, (
     WHERE m.project_id = u.project_id AND m.user_id = u.id
     LIMIT 1
 ))
+WHERE TRUE
 -- +goose StatementEnd
 -- +goose StatementBegin
 ALTER TABLE users ADD CONSTRAINT fk_users_team
