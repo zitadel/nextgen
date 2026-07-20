@@ -188,9 +188,9 @@ func marshalBrandingDefinition(b *domain.Branding) ([]byte, error) {
 }
 
 type brandingRow struct {
-	ProjectID  string                    `db:"project_id"`
-	ID         string                    `db:"id"`
-	CreatedAt  time.Time                 `db:"created_at"`
+	ProjectID  string                   `db:"project_id"`
+	ID         string                   `db:"id"`
+	CreatedAt  time.Time                `db:"created_at"`
 	Definition JSON[brandingDefinition] `db:"definition"`
 }
 

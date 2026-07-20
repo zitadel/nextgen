@@ -43,8 +43,10 @@ func TestValidateBranding(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:   "liquid assignment that looks like a handler is fine",
-			mutate: func(b *Branding) { b.LiquidTemplate = `{% assign online = true %}{% if online %}<p>hi</p>{% endif %}{% mandatory_gates %}` },
+			name: "liquid assignment that looks like a handler is fine",
+			mutate: func(b *Branding) {
+				b.LiquidTemplate = `{% assign online = true %}{% if online %}<p>hi</p>{% endif %}{% mandatory_gates %}`
+			},
 		},
 		{
 			name:    "javascript url",
