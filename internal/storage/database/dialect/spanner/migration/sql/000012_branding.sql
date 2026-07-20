@@ -15,7 +15,7 @@ CREATE TABLE branding (
 
 -- +goose StatementBegin
 CREATE INDEX idx_branding_project_created_at
-    ON branding (project_id, created_at DESC)
+    ON branding (project_id, created_at DESC, id DESC)
 -- +goose StatementEnd
 
 -- +goose Down

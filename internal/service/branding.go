@@ -48,6 +48,12 @@ func (s *BrandingService) Create(ctx context.Context, input CreateBrandingInput)
 		return nil, err
 	}
 	if err := s.brandingRepo.Create(ctx, s.pool, branding); err != nil {
+		// The only integrity constraint reachable from user input is the FK to
+		// projects (the ULID primary key cannot realistically collide), so a
+		// violation means the referenced project does not exist.
+		if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
+			return nil, domain.ErrBrandingInvalid("project does not exist", err)
+		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to create branding revision in database")
 	}
 	return branding, nil

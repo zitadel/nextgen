@@ -7,6 +7,7 @@ import (
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -57,7 +58,18 @@ func (h *Handler) resolveBranding(ctx context.Context, projectID string) api.Bra
 		return defaultBranding()
 	}
 	branding, err := h.brandingService.GetLatest(ctx, projectID)
-	if err != nil || branding == nil {
+	if err != nil {
+		// Deliberate degrade, but never a silent one: without this line a
+		// flaky lookup presents as "my branding intermittently disappears"
+		// with nothing to grep for.
+		zlog.GetLoggingContext(ctx).Warn(
+			"branding resolution failed; serving default branding",
+			"project_id", projectID,
+			"err", err,
+		)
+		return defaultBranding()
+	}
+	if branding == nil {
 		return defaultBranding()
 	}
 	return toAPIBranding(branding)

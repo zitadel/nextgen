@@ -51,6 +51,10 @@ describe("validateLoginTemplate", () => {
     );
   });
 
+  it("rejects slash-separated inline handlers (HTML treats / as whitespace)", () => {
+    expect(rules(`<img/onerror=alert(1)>{% mandatory_gates %}`)).toContain("no-inline-handlers");
+  });
+
   it("does not flag liquid assignments that resemble handlers", () => {
     expect(rules(`{% assign online = true %}{% mandatory_gates %}`)).toEqual([]);
   });

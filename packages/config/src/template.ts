@@ -69,7 +69,8 @@ type BannedPattern = {
 /**
  * Lexical bans, identical to the Go gate. The inline-handler pattern only
  * matches inside an open tag so Liquid like `{% assign online = true %}`
- * doesn't false-positive.
+ * doesn't false-positive; its separator class includes `/` because HTML
+ * treats a slash between attributes as whitespace (`<img/onerror=…>`).
  */
 export const BANNED_TEMPLATE_PATTERNS: readonly BannedPattern[] = [
   {
@@ -84,7 +85,7 @@ export const BANNED_TEMPLATE_PATTERNS: readonly BannedPattern[] = [
   },
   {
     rule: "no-inline-handlers",
-    pattern: /<[a-z][^>]*\son[a-z]+\s*=/i,
+    pattern: /<[a-z][^>]*[\s/]on[a-z]+\s*=/i,
     message: "Templates must not contain inline event handlers (on*= attributes).",
   },
   {

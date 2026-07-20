@@ -43,6 +43,13 @@ func TestValidateBranding(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			// HTML treats `/` between attributes as whitespace, so this parses
+			// as a handler even though it contains no literal whitespace.
+			name:    "inline event handler with slash separator",
+			mutate:  func(b *Branding) { b.LiquidTemplate = `<img/onerror=alert(1)>` },
+			wantErr: true,
+		},
+		{
 			name: "liquid assignment that looks like a handler is fine",
 			mutate: func(b *Branding) {
 				b.LiquidTemplate = `{% assign online = true %}{% if online %}<p>hi</p>{% endif %}{% mandatory_gates %}`

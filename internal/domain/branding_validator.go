@@ -28,8 +28,10 @@ var (
 	brandingScriptTag = regexp.MustCompile(`(?i)<\s*script\b`)
 	brandingStyleTag  = regexp.MustCompile(`(?i)<\s*style\b`)
 	// Inline event handlers, matched only inside an open tag so Liquid
-	// variables like `{% assign online = … %}` don't false-positive.
-	brandingInlineHandler = regexp.MustCompile(`(?i)<[a-z][^>]*\son[a-z]+\s*=`)
+	// variables like `{% assign online = … %}` don't false-positive. The
+	// separator class includes `/` because HTML treats a slash between
+	// attributes as whitespace (`<img/onerror=…>` parses as a handler).
+	brandingInlineHandler = regexp.MustCompile(`(?i)<[a-z][^>]*[\s/]on[a-z]+\s*=`)
 	// javascript: URLs in attribute values.
 	brandingJavascriptURL = regexp.MustCompile(`(?i)javascript\s*:`)
 	// The | raw Liquid filter (neutered at render, rejected here anyway).

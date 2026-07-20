@@ -57,6 +57,26 @@ func TestBrandingServiceCreateRejectsInvalidTemplate(t *testing.T) {
 	assert.Equal(t, domain.ErrBrandingInvalid(nil, nil).Code, domErr.Code)
 }
 
+func TestBrandingServiceCreateMapsIntegrityViolation(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	repo := domainmock.NewMockBrandingRepository(ctrl)
+	svc := service.NewBrandingService(nil, repo)
+
+	// The only integrity constraint user input can trip is the FK to
+	// projects, so a violation must surface as brnd.invalid, not a 500.
+	repo.EXPECT().
+		Create(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(database.NewForeignKeyError("branding", "fk_branding_project", nil))
+
+	_, err := svc.Create(t.Context(), service.CreateBrandingInput{
+		ProjectID: "proj_missing",
+	})
+	require.Error(t, err)
+	var domErr domain.Error
+	require.True(t, errors.As(err, &domErr))
+	assert.Equal(t, domain.ErrBrandingInvalid(nil, nil).Code, domErr.Code)
+}
+
 func TestBrandingServiceGetLatest(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	repo := domainmock.NewMockBrandingRepository(ctrl)

@@ -76,6 +76,16 @@ func TestBranding(t *testing.T) {
 		assert.Equal(t, api.ErrorCode("brnd.invalid"), errResp.Code)
 	})
 
+	t.Run("unknown project is a 400, not a 500", func(t *testing.T) {
+		resp, err := client.CreateBranding(t.Context(), &api.Branding{
+			LiquidTemplate: api.NewOptString(templateRev1),
+		}, api.CreateBrandingParams{ProjectID: api.ProjectID("proj_does_not_exist")})
+		require.NoError(t, err)
+		errResp, ok := resp.(*api.ErrorDetails)
+		require.True(t, ok, "create branding: %+v", resp)
+		assert.Equal(t, api.ErrorCode("brnd.invalid"), errResp.Code)
+	})
+
 	t.Run("font_url is read-only in v1", func(t *testing.T) {
 		fontURL, err := url.Parse("https://fonts.example.com/css2?family=Arimo")
 		require.NoError(t, err)
