@@ -26,6 +26,7 @@ type Handler struct {
 	schemaService         *service.SchemaService
 	flowDefinitionService service.FlowDefinitionService
 	teamService           *service.TeamService
+	brandingService       *service.BrandingService
 }
 
 func NewHandler(
@@ -40,6 +41,7 @@ func NewHandler(
 	schemaService *service.SchemaService,
 	flowDefinitionService service.FlowDefinitionService,
 	teamService *service.TeamService,
+	brandingService *service.BrandingService,
 ) *Handler {
 	return &Handler{
 		crypter:               crypter,
@@ -53,6 +55,7 @@ func NewHandler(
 		schemaService:         schemaService,
 		flowDefinitionService: flowDefinitionService,
 		teamService:           teamService,
+		brandingService:       brandingService,
 	}
 }
 

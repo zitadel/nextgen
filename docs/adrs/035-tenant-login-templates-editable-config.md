@@ -1,0 +1,152 @@
+# ADR 035: Tenant Login Templates as Editable Config
+
+> **Status:** Proposed
+> **Date:** 2026-07-20
+> **Context:** How tenant-authored LiquidJS login templates ("branding") are stored, validated, delivered to the login component, and edited through the CLI. Completes the write path for the read-only `Branding` projection already defined in [`flow-api` components](../../api/openapi/components/flows/branding.yaml) and consumed by `@zitadel/components`.
+
+## Introduction
+
+The `<zitadel-login>` component renders each flow step through a LiquidJS
+template. A default template ships inside `@zitadel/components`; the flow
+response may carry a tenant-supplied override in
+`branding.liquid_template`, which the component already renders through
+its security pipeline ([template-security](../design/flowengine/template-security.md)).
+What is missing is everything upstream of that field: there is no storage,
+no write API, and no authoring workflow. This ADR defines that upstream
+path as an **editable-config resource**, the same shape user schemas and
+flow definitions already have: local files under `.zitadel/`, validated at
+plan time, uploaded by `zitadel apply`.
+
+## Context
+
+- The client-side render pipeline is already hardened independently of
+  what the server stores: `{{ }}` output is escaped, the `| raw` filter is
+  neutered inside the engine, DOMPurify strips non-allowlisted markup, and
+  `{% mandatory_gates %}` patches missing required UI at runtime. A
+  malicious stored template therefore cannot escalate past chrome
+  vandalism of the tenant's own login page when rendered by the official
+  component.
+- The server is Go; the template dialect is LiquidJS. Go Liquid parsers
+  implement a different dialect, so a server-side "parse the AST on save"
+  gate would validate the wrong language.
+- User schemas established the immutability precedent: no update path,
+  every edit publishes a new immutable revision, referrers pin revisions
+  (see the schema syncer in `apps/cli/src/lib/sync/syncers.ts` and
+  `internal/domain/json_schema.go`). Flow definitions are the mutable
+  counter-example (PUT full replace).
+- The `Branding` wire object is deliberately a **resolved projection**:
+  the component receives one template string per step response and does
+  not care how it was stored or selected.
+
+## Decision
+
+### 1. Storage: immutable per-project branding revisions
+
+A new project-scoped resource `branding` stores the five baseline fields
+(`layout`, `liquid_template`, `logo_url`, `font_url`, `hero_url`) as an
+**immutable revision row**: `POST /branding` creates a revision, there is
+no update or delete. This mirrors the schema model rather than the flow
+model. Rationale: templates are content, not identity — an audit trail and
+trivial rollback (re-apply an old revision) fall out of immutability for
+free, and the absence of in-place mutation means a revision id is always a
+stable reference if a future consumer wants to pin one.
+
+Unlike schemas, nothing references branding revisions, so none of the
+schema repin machinery applies. Table: `zitadel_nextgen.branding`, PK
+`(project_id, id)`, payload as JSON to leave room for the structured
+extensions proposed in [branding/schema.md](../design/branding/schema.md)
+(palette, typography, theme) without migrations.
+
+### 2. Resolution: latest revision, resolved per response
+
+Every flow response (`create`, `submit`, `get step`) resolves the
+**latest branding revision for the project** at response-build time and
+falls back to the built-in default (`layout: centered`, no template) when
+none exists. Templates are chrome, not data: a mid-flow template change
+re-skins the next step but cannot reshape in-flight flow state, so live
+pickup is harmless and gets fixes out immediately. This supersedes the
+earlier "inherited at flow creation time" wording in the wire doc.
+
+The wire shape is unchanged: one resolved template string per response.
+Storage-side evolution (per-step template maps, app/team audience
+overrides on the `app → team → project` ladder) changes only the
+resolution rule, never the component contract.
+
+### 3. Validation: authoritative in the CLI, lexical gate on the server
+
+| Layer | Where | What |
+|---|---|---|
+| Authoring (authoritative) | `@zitadel/config` template validator, run by `zitadel plan`/`apply` | Real LiquidJS parse; `{% mandatory_gates %}` presence; `\| raw` usage; `<script>`/`<style>`/inline `on*=` handlers; issue list in the same shape as the flow validator |
+| Save (gate) | Go domain validator on `POST /branding` | Size cap, UTF-8, banned lexical patterns, https-only asset URLs, layout enum |
+| Render (safety net) | `@zitadel/components` (unchanged) | Escaping, `raw` neutered, DOMPurify, CSP, `{% mandatory_gates %}` |
+
+The TS validator is authoritative because it runs the same engine that
+will render the template; the Go gate is deliberately lexical because a
+faithful dialect check is impossible there and the render pipeline does
+not depend on it. Caveat recorded in
+[template-security](../design/flowengine/template-security.md): the API
+returns raw template strings, and consumers that render outside the
+official component own their own sanitisation.
+
+### 4. Local config dialect: JSON descriptor + sibling `.liquid` file
+
+```
+.zitadel/branding/branding.json   # layout, asset URLs, liquid_template_file ref
+.zitadel/branding/login.liquid    # the template, edited as real Liquid
+.zitadel/meta/branding.json       # config dialect meta-schema ($schema target)
+```
+
+`branding.json` references the template via `liquid_template_file`; the
+CLI inlines the file content into the wire `liquid_template` on upload and
+splits it back on write-back. Authors edit Liquid with syntax
+highlighting, never JSON-escaped strings. The sync engine treats branding
+as a third `ResourceSyncer` with schema-style semantics (`revisioned`,
+edits become `revise` entries, no update/delete).
+
+### 5. Authoring entry points: eject + design catalog
+
+`zitadel branding eject [--design <name>]` scaffolds the local files from
+a shipped design; `zitadel setup --design <name>` does the same during
+project setup and uploads revision 1. Designs
+(`centered`, `split`, `split-right`, `minimal`) are full template files in
+`@zitadel/config` defaults — the catalog documented in
+[branding/templates.md](../design/branding/templates.md). The wire
+`layout` enum stays `centered | split`: richer designs are delivered *as
+templates* (the escape hatch templates.md reserves), with the descriptor's
+`layout` set to the nearest built-in so a template that fails component
+validation degrades to something sane. Every shipped design must pass the
+authoritative validator and a component-level render test.
+
+## Consequences
+
+- The dormant client capability (tenant template precedence over the
+  bundled default) becomes reachable end to end: eject → edit → plan →
+  apply → rendered.
+- `@zitadel/config` becomes the single home for the template contract
+  (custom tag names, validator); `@zitadel/components` imports those
+  constants rather than redefining them.
+- Old revisions accumulate; acceptable at template sizes, and a retention
+  sweep can arrive later without API changes.
+- The Go gate can reject a template the TS validator would accept (or
+  vice versa) only in the lexical band; divergence is bounded because the
+  banned-pattern list is defined once in `@zitadel/config` and mirrored in
+  the Go validator with a drift-audited test, like the flow validator
+  port.
+
+## Rejected alternatives
+
+- **Mutable branding singleton (PUT upsert).** Simpler bookkeeping, but
+  loses the audit/rollback properties and breaks the repo-wide rule that
+  content resources are immutable revisions; a singleton also leaves no
+  stable id for future pinning consumers.
+- **Server-side Liquid AST validation in Go.** Wrong dialect; would
+  reject valid templates and pass invalid ones relative to the engine
+  that actually renders.
+- **Pinning branding into `FlowState` at flow start.** Faithful to the
+  old wire wording but bloats persisted state with template bytes (or
+  reintroduces revision references the runtime doesn't need); chrome
+  changes mid-flow are not a correctness hazard.
+- **Custom CSS / `advanced.custom_css` as the customization surface.**
+  Already rejected in [branding/schema.md](../design/branding/schema.md);
+  the override ladder (tokens → inline vars → `::part()` → eject) covers
+  CSS needs without a second sandboxing surface.

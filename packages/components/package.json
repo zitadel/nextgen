@@ -59,6 +59,7 @@
     "test:all": "vitest run"
   },
   "dependencies": {
+    "@zitadel/config": "workspace:*",
     "dompurify": "catalog:",
     "liquidjs": "catalog:",
     "lit": "catalog:",

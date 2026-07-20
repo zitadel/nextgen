@@ -106,7 +106,7 @@ func newTestServer(t *testing.T) *testServer {
 	crypter := op.NewAES256GCMCrypto(fixedKey, "")
 	opaqueTokenGenerator := tokengen.NewOpaqueTokenGenerator(crypter)
 	fake := &fakeFlowSvc{}
-	handler := api.NewHandler(crypter, nil, nil, fake, stubAuthAttempt{}, nil, nil, nil, nil, nil, nil)
+	handler := api.NewHandler(crypter, nil, nil, fake, stubAuthAttempt{}, nil, nil, nil, nil, nil, nil, nil)
 	oas, err := gen.NewServer(
 		handler,
 		api.NewSecurityHandler(opaqueTokenGenerator),

@@ -23,7 +23,7 @@ Branding:
     hero_url: { type: string, format: uri }
 ```
 
-**Read-only projection** at flow creation (app / org / instance merge, most specific wins). Widget must accept the five-field shape as-is.
+**Read-only projection**, resolved per step response as the **latest branding revision for the project** (falling back to built-in defaults). Written via the Branding API / `zitadel apply`, never via the Flow API; audience overrides on the app → team → project ladder are a later resolution-rule evolution ([ADR 035](../../adrs/035-tenant-login-templates-editable-config.md)). Widget must accept the five-field shape as-is.
 
 ```mermaid
 flowchart TB
@@ -107,7 +107,7 @@ Master Liquid branches on this; ejected templates may ignore it. Default `center
 
 #### `liquid_template` (string)
 
-The LiquidJS template string for the current step. When present, the orchestrator uses it instead of the bundled default. Must pass the security validator in [`../flowengine/template-security.md`](../flowengine/template-security.md) and the structural validator in [`validator.md`](validator.md).
+The LiquidJS template string for the current step. When present, the orchestrator uses it instead of the bundled default. Validated at authoring time by the `@zitadel/config` validator and gated lexically on save ([`../flowengine/template-security.md`](../flowengine/template-security.md)); the structural contract lives in [`validator.md`](validator.md). Authored locally as a sibling `.liquid` file that the CLI inlines on upload ([`templates.md`](templates.md) § Authoring workflow).
 
 #### `logo_url`, `font_url`, `hero_url` (URIs, optional)
 

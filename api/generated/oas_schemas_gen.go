@@ -690,14 +690,19 @@ type AuthorizeGetFound struct{}
 
 func (*AuthorizeGetFound) authorizeGetRes() {}
 
-// Resolved branding configuration. Inherited from the app → team → project
-// hierarchy at flow creation time (most specific wins). Read-only projection —
-// branding is configured via the Team/App Branding API, not the Flow API.
+// Branding configuration. Appears in two places with one shape:
+// - On flow responses as a read-only projection: the server resolves the
+// latest branding revision for the project per step response (falling
+// back to built-in defaults when none is stored). Branding is configured
+// via the Branding API / `zitadel apply`, not the Flow API.
+// - As the request body of `POST /branding`, which publishes the same
+// shape as a new immutable revision (see ADR 035).
 // Ref: #
 type Branding struct {
 	// Layout preset selector. The default.liquid master template uses this
 	// to branch into layout variants. Customers who eject the template
-	// can ignore this field entirely.
+	// can ignore this field entirely; it also serves as the degrade target
+	// when a custom template fails component-side validation.
 	Layout OptBrandingLayout `json:"layout"`
 	// The LiquidJS template string for rendering this step. The orchestrator
 	// parses this template, injects the capability dictionaries as context,
@@ -763,7 +768,8 @@ func (s *Branding) SetHeroURL(val OptURI) {
 
 // Layout preset selector. The default.liquid master template uses this
 // to branch into layout variants. Customers who eject the template
-// can ignore this field entirely.
+// can ignore this field entirely; it also serves as the degrade target
+// when a custom template fails component-side validation.
 type BrandingLayout string
 
 const (
@@ -804,6 +810,51 @@ func (s *BrandingLayout) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
+
+// A stored branding revision. `branding` echoes the canonical stored
+// configuration so clients (e.g. the CLI sync engine) can reconcile local
+// files with the server's stored state.
+// Ref: #
+type BrandingRevisionResponse struct {
+	// The unique identifier of this branding revision.
+	ID string `json:"id"`
+	// When this revision was published.
+	CreatedAt time.Time `json:"created_at"`
+	Branding  Branding  `json:"branding"`
+}
+
+// GetID returns the value of ID.
+func (s *BrandingRevisionResponse) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *BrandingRevisionResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetBranding returns the value of Branding.
+func (s *BrandingRevisionResponse) GetBranding() Branding {
+	return s.Branding
+}
+
+// SetID sets the value of ID.
+func (s *BrandingRevisionResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *BrandingRevisionResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetBranding sets the value of Branding.
+func (s *BrandingRevisionResponse) SetBranding(val Branding) {
+	s.Branding = val
+}
+
+func (*BrandingRevisionResponse) createBrandingRes()  {}
+func (*BrandingRevisionResponse) getBrandingByIdRes() {}
 
 type ChallengeID string
 
@@ -2263,11 +2314,13 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 func (*ErrorDetails) activateFlowDefinitionRes() {}
 func (*ErrorDetails) authorizeDeviceRes()        {}
 func (*ErrorDetails) authorizeGetRes()           {}
+func (*ErrorDetails) createBrandingRes()         {}
 func (*ErrorDetails) createFlowRes()             {}
 func (*ErrorDetails) createProjectRes()          {}
 func (*ErrorDetails) createSessionRes()          {}
 func (*ErrorDetails) deleteFlowDefinitionRes()   {}
 func (*ErrorDetails) endSessionRes()             {}
+func (*ErrorDetails) getBrandingByIdRes()        {}
 func (*ErrorDetails) getMyUserRes()              {}
 func (*ErrorDetails) introspectRes()             {}
 func (*ErrorDetails) listFlowDefinitionsRes()    {}
@@ -2314,6 +2367,7 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 func (*ErrorDetailsStatusCode) activateFlowDefinitionRes()   {}
 func (*ErrorDetailsStatusCode) authorizeDeviceRes()          {}
 func (*ErrorDetailsStatusCode) authorizeGetRes()             {}
+func (*ErrorDetailsStatusCode) createBrandingRes()           {}
 func (*ErrorDetailsStatusCode) createFlowDefinitionRes()     {}
 func (*ErrorDetailsStatusCode) createFlowRes()               {}
 func (*ErrorDetailsStatusCode) createProjectRes()            {}
@@ -2325,6 +2379,7 @@ func (*ErrorDetailsStatusCode) deactivateFlowDefinitionRes() {}
 func (*ErrorDetailsStatusCode) deleteFlowDefinitionRes()     {}
 func (*ErrorDetailsStatusCode) endSessionRes()               {}
 func (*ErrorDetailsStatusCode) exchangeHandoffRes()          {}
+func (*ErrorDetailsStatusCode) getBrandingByIdRes()          {}
 func (*ErrorDetailsStatusCode) getFlowDefinitionRes()        {}
 func (*ErrorDetailsStatusCode) getFlowStepRes()              {}
 func (*ErrorDetailsStatusCode) getHealthRes()                {}
@@ -2340,6 +2395,7 @@ func (*ErrorDetailsStatusCode) getTokenRes()                 {}
 func (*ErrorDetailsStatusCode) getUserByIDRes()              {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()              {}
 func (*ErrorDetailsStatusCode) introspectRes()               {}
+func (*ErrorDetailsStatusCode) listBrandingRes()             {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()      {}
 func (*ErrorDetailsStatusCode) listSchemasRes()              {}
 func (*ErrorDetailsStatusCode) listSessionsRes()             {}
@@ -6084,6 +6140,37 @@ func (s *KeysResponseKeysItem) SetX5tS256(val OptString) {
 }
 
 type Limit int
+
+type ListBrandingResponse []ListBrandingResponseItem
+
+func (*ListBrandingResponse) listBrandingRes() {}
+
+type ListBrandingResponseItem struct {
+	// The unique identifier of this branding revision.
+	ID string `json:"id"`
+	// When this revision was published.
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetID returns the value of ID.
+func (s *ListBrandingResponseItem) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ListBrandingResponseItem) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetID sets the value of ID.
+func (s *ListBrandingResponseItem) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ListBrandingResponseItem) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
 
 type ListFlowDefinitionsPurpose string
 

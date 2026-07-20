@@ -1,0 +1,35 @@
+get:
+  operationId: getBrandingById
+  summary: Get a branding revision by ID
+  description: Retrieves a single branding revision, including its stored configuration.
+  tags:
+    - Branding
+  security:
+    - oauth2:
+        - branding.read
+  parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    - $ref: ../../../components/parameters/project-id.yaml
+  responses:
+    '200':
+      description: The branding revision was retrieved successfully.
+      content:
+        application/json:
+          schema:
+            $ref: ../branding-revision-response.yaml
+    '404':
+      description: No branding revision was found with the given id.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml

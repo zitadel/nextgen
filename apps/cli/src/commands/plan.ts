@@ -48,6 +48,7 @@ export default class Plan extends BaseCommand {
       client,
       projectId: secret.project_id,
       env,
+      cwd,
     });
 
     consola.start("Building plan");

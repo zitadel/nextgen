@@ -54,6 +54,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return sessionErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixJSONSchema.ErrorCodePrefix("")):
 		return schemaErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixBranding.ErrorCodePrefix("")):
+		return brandingErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixUser.ErrorCodePrefix("")):
 		return userErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixTeam.ErrorCodePrefix("")):

@@ -1034,6 +1034,12 @@ importers:
       '@zitadel/api':
         specifier: workspace:*
         version: link:../api
+      liquidjs:
+        specifier: 'catalog:'
+        version: 10.27.0
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
     devDependencies:
       ajv:
         specifier: 'catalog:'

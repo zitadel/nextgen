@@ -84,7 +84,7 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 		return internalErrorResponse(err), nil
 	}
 
-	resp := h.buildFlowResponse(result, false)
+	resp := h.buildFlowResponse(ctx, result, false)
 	return &api.FlowResponseHeaders{
 		SetCookie: api.NewOptString(flowSetCookie(cookieValue, false)),
 		Response:  resp,
@@ -170,7 +170,7 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	}
 
 	terminal := result.Step != nil && result.Step.Complete != nil
-	flowResp := h.buildFlowResponse(result, terminal)
+	flowResp := h.buildFlowResponse(ctx, result, terminal)
 
 	// Validation error: state machine keeps the user on the step with Error set.
 	if result.Step != nil && result.Step.Error != nil {
@@ -203,7 +203,7 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 		return mapFlowGetError(errFlowCompleted), nil
 	}
 
-	resp := h.buildFlowResponse(result, false)
+	resp := h.buildFlowResponse(ctx, result, false)
 	return &resp, nil
 }
 
@@ -254,12 +254,15 @@ func flowSetCookie(value string, clear bool) string {
 	return c.String()
 }
 
-func (h *Handler) buildFlowResponse(result domain.FlowStepResult, terminal bool) api.FlowResponse {
+// buildFlowResponse assembles the wire response for a flow step. Branding is
+// resolved per response (latest revision for the project, ADR 035) so a
+// published template change reaches in-flight flows on their next step.
+func (h *Handler) buildFlowResponse(ctx context.Context, result domain.FlowStepResult, terminal bool) api.FlowResponse {
 	resp := api.FlowResponse{
 		ID:        result.State.ID,
 		SessionID: result.State.SessionID,
 		Step:      toFlowStep(result.Step),
-		Branding:  api.NewOptBranding(defaultBranding()),
+		Branding:  api.NewOptBranding(h.resolveBranding(ctx, result.State.ProjectID)),
 	}
 	if terminal && result.State.RedirectURI != nil {
 		if u, err := parseURI(*result.State.RedirectURI); err == nil {

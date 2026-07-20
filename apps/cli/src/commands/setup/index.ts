@@ -6,6 +6,7 @@ import { Flags } from "@oclif/core";
 import { createZitadelClient } from "@zitadel/api/client";
 import type { CreateProject201 } from "@zitadel/api/generated/model";
 import {
+  BRANDING_DESIGNS,
   DEFAULT_SETUP_PRESET,
   SETUP_PRESETS,
   type SetupPreset,
@@ -89,6 +90,11 @@ export default class Setup extends BaseCommand {
       description:
         "Sign-in preset for the scaffolded schema and login flow (default: password-first).",
       options: [...SETUP_PRESETS],
+    }),
+    design: Flags.string({
+      description:
+        "Login design to eject into .zitadel/branding/ and publish as branding revision 1. When omitted, the login uses the built-in template; run the `branding eject` command later to customize.",
+      options: [...BRANDING_DESIGNS],
     }),
   };
 
@@ -263,6 +269,7 @@ export default class Setup extends BaseCommand {
             projectId: project.id,
             force,
             preset: answers.preset,
+            design: flags.design,
           });
     } catch (error) {
       // Setup is not atomic: the patcher already wrote `zitadel.json` (the
@@ -418,6 +425,7 @@ function dryRunProject(issuer: string): CreateProject201 {
 type SetupRetryOptions = {
   framework?: string;
   preset?: SetupPreset;
+  design?: string;
   renderer?: string;
   devPort?: number;
   nonInteractive?: boolean;
@@ -435,6 +443,9 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
   }
   if (opts.preset && opts.preset !== DEFAULT_SETUP_PRESET) {
     parts.push(`--preset ${opts.preset}`);
+  }
+  if (opts.design) {
+    parts.push(`--design ${opts.design}`);
   }
   if (opts.renderer && opts.renderer !== "react") {
     parts.push(`--renderer ${opts.renderer}`);
@@ -457,6 +468,7 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
 function retryOptionsFromFlags(flags: {
   framework?: string;
   preset?: string;
+  design?: string;
   renderer?: string;
   "dev-port"?: number;
   "non-interactive"?: boolean;
@@ -464,6 +476,7 @@ function retryOptionsFromFlags(flags: {
   return {
     framework: flags.framework,
     preset: flags.preset as SetupPreset | undefined,
+    design: flags.design,
     renderer: flags.renderer,
     devPort: flags["dev-port"],
     nonInteractive: Boolean(flags["non-interactive"]),
