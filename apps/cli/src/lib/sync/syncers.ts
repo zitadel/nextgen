@@ -247,6 +247,8 @@ class BrandingSyncer implements ResourceSyncer {
   readonly directory = BRANDING_DIR;
   readonly mutable = false;
   readonly revisioned = true;
+  /** One project, one branding descriptor — extra .json files fail the scan. */
+  readonly singletonFile = "branding.json";
 
   constructor(
     private readonly client: ZitadelClient,

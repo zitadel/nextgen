@@ -65,6 +65,28 @@ describe("buildSyncPlan", () => {
     }
   });
 
+  it("fails the scan when a singleton directory contains extra descriptors", async () => {
+    const cwd = makeCwd();
+    try {
+      await writeState(cwd, { framework: "next", resources: {} });
+      await writeResource(cwd, ".zitadel/branding", "branding.json", { layout: "centered" });
+      await writeResource(cwd, ".zitadel/branding", "branding.backup.json", { layout: "split" });
+
+      const syncer = makeSyncer({
+        kind: "branding",
+        directory: ".zitadel/branding",
+        singletonFile: "branding.json",
+      });
+
+      await expect(buildSyncPlan(cwd, [syncer])).rejects.toThrow(/branding\.backup\.json/);
+      // The scan fails before any descriptor is validated or planned — the
+      // stray copy must never reach a publish.
+      expect(syncer.validate).not.toHaveBeenCalled();
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("returns skip(no-change) when an unchanged file already has an id in state", async () => {
     const cwd = makeCwd();
     try {

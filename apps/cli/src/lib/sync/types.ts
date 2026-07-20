@@ -41,6 +41,14 @@ export interface ResourceSyncer {
   readonly mutable: boolean;
   readonly revisioned: boolean;
   /**
+   * When set, this syncer owns exactly one descriptor file with this
+   * basename inside `directory`, and the scan fails (`E_VALIDATION`) on any
+   * other `*.json` found there. For a revisioned singleton like branding, a
+   * stray descriptor copy would otherwise be treated as one more resource
+   * and published as its own revision — last upload wins the live slot.
+   */
+  readonly singletonFile?: string;
+  /**
    * Assert that a single on-disk file body is valid for this resource.
    * Throws `E_VALIDATION` (a `ZitadelError`) on the first invalid input.
    * The sync engine calls this for every file it reads, so a malformed

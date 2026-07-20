@@ -323,6 +323,7 @@ describe("BrandingSyncer", () => {
     expect(branding.directory).toBe(".zitadel/branding");
     expect(branding.mutable).toBe(false);
     expect(branding.revisioned).toBe(true);
+    expect(branding.singletonFile).toBe("branding.json");
   });
 
   it("validate accepts a descriptor whose referenced template is valid", async () => {
