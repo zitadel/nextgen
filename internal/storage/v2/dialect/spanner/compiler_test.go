@@ -15,6 +15,20 @@ const testProjectQuery = "SELECT id, created_at, updated_at, project_secret, pre
 
 const testFlowDefinitionQuery = "SELECT project_id, id, name FROM flow_definitions"
 
+func TestStatementCompilerReset(t *testing.T) {
+	t.Parallel()
+
+	var compiler statementCompiler
+	compiler.WriteString("SELECT 1")
+	writeArg(&compiler, "x")
+	require.NotEmpty(t, compiler.String())
+	require.NotEmpty(t, compiler.args)
+
+	compiler.Reset()
+	assert.Empty(t, compiler.String())
+	assert.Nil(t, compiler.args)
+}
+
 func compileFilterOnly[F ~uint8, T any](t *testing.T, filter database.Filter[F], schema database.Schema[F, T]) (string, []any) {
 	t.Helper()
 

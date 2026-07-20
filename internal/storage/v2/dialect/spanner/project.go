@@ -39,10 +39,12 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 		return wrapError(err)
 	}
 	stmt := buildStatement(createProjectStmt, project.ID, project.ProjectSecret, project.PreviewSecret, previewOrigins).statement()
-	_, err = collectOneRow(ps.db.Query(ctx, stmt), func(row *spanner.Row) (struct{}, error) {
-		return struct{}{}, row.Columns(&project.ID, &project.CreatedAt, &project.UpdatedAt)
+	return ps.db.Query(ctx, stmt, func(iter *spanner.RowIterator) error {
+		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
+			return struct{}{}, row.Columns(&project.ID, &project.CreatedAt, &project.UpdatedAt)
+		})
+		return err
 	})
-	return err
 }
 
 // DeleteProjectByID implements [service.ProjectStatements].
@@ -68,7 +70,12 @@ func (ps projectStatements) ListProjects(ctx context.Context, filter *database.L
 		return nil, err
 	}
 
-	projects, err := collectRows(ps.db.Query(ctx, compiler.statement()), ps.scanProject)
+	var projects []*domain.Project
+	err := ps.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		projects, err = collectRows(iter, ps.scanProject)
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
