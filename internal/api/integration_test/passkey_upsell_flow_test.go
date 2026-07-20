@@ -74,8 +74,7 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	regResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
-			"email":     jx.Raw(`"` + newEmail + `"`),
-			"givenName": jx.Raw(`"Upsell"`),
+			"email": jx.Raw(`"` + newEmail + `"`),
 		}),
 	}, api.SubmitFlowStepParams{
 		ID:    flowID,
@@ -223,8 +222,7 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 	regResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
-			"email":     jx.Raw(`"` + newEmail + `"`),
-			"givenName": jx.Raw(`"Skip"`),
+			"email": jx.Raw(`"` + newEmail + `"`),
 		}),
 	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
 	require.NoError(t, err)
@@ -267,7 +265,7 @@ func passkeyUpsellFlowDefinition(userSchemaURL string) api.FlowDefinition {
 		Steps: []api.FlowDefinitionStep{
 			{
 				Name:   "register",
-				Fields: []string{"email", "givenName"},
+				Fields: []string{"email"},
 				Actions: []api.StepAction{
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},

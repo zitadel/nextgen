@@ -492,7 +492,7 @@ describe("LiquidJS engine", () => {
       actions: a,
       branding: {},
       loading: false,
-      errors: [{ text_key: "error.invalid_credentials" }],
+      errors: [{ field: "password", text_key: "error.invalid_credentials" }],
       gates: {},
       sso_providers: [],
       messages: [],
@@ -552,7 +552,7 @@ describe("LiquidJS engine", () => {
       actions: a,
       branding: {},
       loading: false,
-      errors: [{ text_key: "error.email_exists" }],
+      errors: [{ field: "email", text_key: "error.email_exists" }],
       gates: {},
       sso_providers: [],
       messages: [],
@@ -605,17 +605,17 @@ describe("LiquidJS engine", () => {
 describe("localiseFlowErrorKeys", () => {
   const ctx = { locale: fullLocale, stepName: "register" };
 
-  it("passes catalog-known field-specific keys through as text keys", () => {
+  it("passes catalog-known field-specific keys through as text keys, tagged with their field", () => {
     expect(localiseFlowErrorKeys("error.email_required", ctx)).toEqual([
-      { text_key: "error.email_required" },
+      { field: "email", text_key: "error.email_required" },
     ]);
     // The server spells format violations `_invalid` — the catalog's
     // existing convention, which fieldErrorKeys routes inline.
     expect(localiseFlowErrorKeys("error.email_invalid", ctx)).toEqual([
-      { text_key: "error.email_invalid" },
+      { field: "email", text_key: "error.email_invalid" },
     ]);
     expect(localiseFlowErrorKeys("error.password_required", ctx)).toEqual([
-      { text_key: "error.password_required" },
+      { field: "password", text_key: "error.password_required" },
     ]);
   });
 
@@ -656,7 +656,7 @@ describe("localiseFlowErrorKeys", () => {
       stepName: "register",
     });
     expect(result).toEqual([
-      { text_key: "error.email_invalid" },
+      { field: "email", text_key: "error.email_invalid" },
       { message: "Password is too short." },
     ]);
   });
@@ -672,9 +672,10 @@ describe("localiseFlowErrorKeys", () => {
   it("localises the engine's credential rejections via the catalog", () => {
     // SubmitPassword / SubmitPasskey rejections re-render the step with
     // these catalog keys (flow_state_machine.go) — invalid_credentials
-    // routes inline to the password field via fieldErrorKeys.
+    // routes inline to the password field via fieldErrorKeys; passkey_invalid
+    // has no field mapping, so it stays a form-level (banner) text key.
     expect(localiseFlowErrorKeys("error.invalid_credentials", ctx)).toEqual([
-      { text_key: "error.invalid_credentials" },
+      { field: "password", text_key: "error.invalid_credentials" },
     ]);
     expect(localiseFlowErrorKeys("error.passkey_invalid", ctx)).toEqual([
       { text_key: "error.passkey_invalid" },
@@ -717,10 +718,34 @@ describe("localiseFlowErrorKeys", () => {
   it("keeps inline routing when the step carries the field", () => {
     expect(
       localiseFlowErrorKeys("error.email_required", { ...ctx, fields: ["email", "password"] }),
-    ).toEqual([{ text_key: "error.email_required" }]);
+    ).toEqual([{ field: "email", text_key: "error.email_required" }]);
     // Without a fields list (pure lookups) the check is skipped entirely.
     expect(localiseFlowErrorKeys("error.email_required", ctx)).toEqual([
-      { text_key: "error.email_required" },
+      { field: "email", text_key: "error.email_required" },
     ]);
+  });
+
+  it("routes a generic (non-catalog) field error inline when the step renders that field", () => {
+    // `error.<field>_<rule>` for a schema field the step shows: the pre-localised
+    // message is tagged with its field so the template renders it inline under
+    // the control (the select/checkbox/text field) instead of the banner.
+    expect(
+      localiseFlowErrorKeys("error.country_required", {
+        ...ctx,
+        fields: ["email", "country"],
+      }),
+    ).toEqual([{ field: "country", message: "Country is required." }]);
+    // A rule-suffixed key without a catalog entry, label from the step catalog.
+    expect(
+      localiseFlowErrorKeys("error.email_min_length", {
+        locale: { ...fullLocale, "register.field.email": "Work email" },
+        stepName: "register",
+        fields: ["email"],
+      }),
+    ).toEqual([{ field: "email", message: "Work email is too short." }]);
+    // The same key with the field absent stays a fieldless banner message.
+    expect(
+      localiseFlowErrorKeys("error.country_required", { ...ctx, fields: ["email"] }),
+    ).toEqual([{ message: "Country is required." }]);
   });
 });

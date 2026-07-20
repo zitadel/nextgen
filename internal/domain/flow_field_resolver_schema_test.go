@@ -301,6 +301,50 @@ func TestSchemaFieldResolver_Resolve(t *testing.T) {
 			},
 		},
 		{
+			name: "boolean const: true surfaces Const on the checkbox",
+			schema: `{
+				"type": "object",
+				"properties": {
+					"acceptedTermsAndConditions": { "type": "boolean", "const": true }
+				}
+			}`,
+			step:   "step",
+			fields: []domain.Field{"acceptedTermsAndConditions"},
+			want: domain.FlowResolvedFields{
+				Fields: []domain.FlowField{
+					{
+						Name:       "acceptedTermsAndConditions",
+						TextKey:    "step.field.acceptedTermsAndConditions",
+						Type:       domain.FlowFieldTypeCheckbox,
+						Validation: &domain.FlowFieldValidation{Const: true},
+					},
+				},
+				ImplicitOutcomes: map[string][]string{},
+			},
+		},
+		{
+			name: "string const surfaces Const on a text field",
+			schema: `{
+				"type": "object",
+				"properties": {
+					"tier": { "type": "string", "const": "free" }
+				}
+			}`,
+			step:   "step",
+			fields: []domain.Field{"tier"},
+			want: domain.FlowResolvedFields{
+				Fields: []domain.FlowField{
+					{
+						Name:       "tier",
+						TextKey:    "step.field.tier",
+						Type:       domain.FlowFieldTypeText,
+						Validation: &domain.FlowFieldValidation{Const: "free"},
+					},
+				},
+				ImplicitOutcomes: map[string][]string{},
+			},
+		},
+		{
 			name: "nullable boolean union [null, boolean] reduces to checkbox",
 			schema: `{
 				"type": "object",
