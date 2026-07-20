@@ -337,8 +337,11 @@ type Invoker interface {
 	IssueChallenge(ctx context.Context, request *IssueChallengeRequest, params IssueChallengeParams) (IssueChallengeRes, error)
 	// ListBranding invokes listBranding operation.
 	//
-	// Lists branding revisions for the project, newest first. The first entry
-	// is the revision flow responses currently resolve.
+	// Lists all branding revisions for the project, newest first. The first
+	// entry is the revision flow responses currently resolve. Deliberately
+	// unpaginated in v1 — list endpoints gain a real query mechanism together
+	// (ADR 031); advertising pagination parameters the server ignores would
+	// be worse than none.
 	//
 	// GET /branding
 	ListBranding(ctx context.Context, params ListBrandingParams) (ListBrandingRes, error)
@@ -5445,8 +5448,11 @@ func (c *Client) sendIssueChallenge(ctx context.Context, request *IssueChallenge
 
 // ListBranding invokes listBranding operation.
 //
-// Lists branding revisions for the project, newest first. The first entry
-// is the revision flow responses currently resolve.
+// Lists all branding revisions for the project, newest first. The first
+// entry is the revision flow responses currently resolve. Deliberately
+// unpaginated in v1 — list endpoints gain a real query mechanism together
+// (ADR 031); advertising pagination parameters the server ignores would
+// be worse than none.
 //
 // GET /branding
 func (c *Client) ListBranding(ctx context.Context, params ListBrandingParams) (ListBrandingRes, error) {
@@ -5508,43 +5514,6 @@ func (c *Client) sendListBranding(ctx context.Context, params ListBrandingParams
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if unwrapped := string(params.ProjectID); true {
 				return e.EncodeValue(conv.StringToString(unwrapped))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	{
-		// Encode "offset" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "offset",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.Offset.Get(); ok {
-				return e.EncodeValue(conv.IntToString(val))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	{
-		// Encode "page_token" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "page_token",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.PageToken.Get(); ok {
-				if unwrapped := string(val); true {
-					return e.EncodeValue(conv.StringToString(unwrapped))
-				}
-				return nil
 			}
 			return nil
 		}); err != nil {

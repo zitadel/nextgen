@@ -6697,8 +6697,11 @@ func (s *Server) handleIssueChallengeRequest(args [1]string, argsEscaped bool, w
 
 // handleListBrandingRequest handles listBranding operation.
 //
-// Lists branding revisions for the project, newest first. The first entry
-// is the revision flow responses currently resolve.
+// Lists all branding revisions for the project, newest first. The first
+// entry is the revision flow responses currently resolve. Deliberately
+// unpaginated in v1 — list endpoints gain a real query mechanism together
+// (ADR 031); advertising pagination parameters the server ignores would
+// be worse than none.
 //
 // GET /branding
 func (s *Server) handleListBrandingRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -6843,14 +6846,6 @@ func (s *Server) handleListBrandingRequest(args [0]string, argsEscaped bool, w h
 					Name: "project_id",
 					In:   "query",
 				}: params.ProjectID,
-				{
-					Name: "offset",
-					In:   "query",
-				}: params.Offset,
-				{
-					Name: "page_token",
-					In:   "query",
-				}: params.PageToken,
 			},
 			Raw: r,
 		}

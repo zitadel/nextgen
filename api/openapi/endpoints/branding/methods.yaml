@@ -48,14 +48,15 @@ get:
   operationId: listBranding
   summary: List branding revisions
   description: |
-    Lists branding revisions for the project, newest first. The first entry
-    is the revision flow responses currently resolve.
+    Lists all branding revisions for the project, newest first. The first
+    entry is the revision flow responses currently resolve. Deliberately
+    unpaginated in v1 — list endpoints gain a real query mechanism together
+    (ADR 031); advertising pagination parameters the server ignores would
+    be worse than none.
   tags:
     - Branding
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
-    - $ref: ../../components/parameters/offset.yaml
-    - $ref: ../../components/parameters/page-token.yaml
   security:
     - oauth2:
         - branding.read
