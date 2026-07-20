@@ -177,7 +177,10 @@ Automation can use the stable host and native shadow-root hooks that the default
 template emits. Host atoms expose hooks such as `zitadel-field-email`,
 `zitadel-field-password`, and `zitadel-action-submit`; their native shadow
 controls expose hooks such as `zitadel-input-email`, `zitadel-input-password`,
-and `zitadel-action-submit-button`.
+and `zitadel-action-submit-button`. Hooks are method-named even when the flow
+engine names a credential field `x-auth-methods#<method>` — the `name`
+attribute keeps that raw form key, only the `data-testid` hooks are normalised
+(`hookName` in `src/internal/hook-name.ts`).
 
 A tenant Liquid template can already be supplied through the branding
 payload's `liquid_template` field; a dedicated declarative `template`

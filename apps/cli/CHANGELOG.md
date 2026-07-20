@@ -1,5 +1,50 @@
 # @zitadel/cli
 
+## 0.1.0-alpha.17
+
+### Patch Changes
+
+- [#544](https://github.com/zitadel/nextgen/pull/544) [`79d4179`](https://github.com/zitadel/nextgen/commit/79d417924518c9ea272136db1f46aaf237497999) Thanks [@fforootd](https://github.com/fforootd)! - Fixes from alpha.16 community feedback:
+  - Custom schema fields now render a readable label. A property with no
+    catalog entry (e.g. `department`, `dateOfBirth`) falls back to a
+    humanised name ("Department", "Date of birth") on the form instead of
+    leaking the raw `<step>.field.<name>` text key. A catalogued key still
+    wins, so localised labels are unaffected.
+  - The scaffolded `.zitadel/flows/README.md` no longer contains the
+    "Presets" section twice.
+  - The `warn/default-flow-swap` plan warning now leads with the impact in
+    plain language: the new flow becomes the default for its purposes, and
+    every page that does not explicitly set `flow-name` on
+    `<zitadel-login>` will start rendering it — scope it via `audience`
+    or pin `flow-name` to opt out.
+  - The flip-table validation error (login/register entry step missing its
+    `user_not_found`/`user_already_exists` transition) now explains who
+    gets stuck where: someone without an account would be stuck at
+    sign-in instead of being routed to registration, and vice versa. Plan,
+    apply, and the server report the same wording.
+
+- [#543](https://github.com/zitadel/nextgen/pull/543) [`a0b39a1`](https://github.com/zitadel/nextgen/commit/a0b39a119408a6fa02e8e1e45ebd5dd14b96c01b) Thanks [@fforootd](https://github.com/fforootd)! - `plan --json` and `apply --json` now enumerate what they touch: a
+  `data.changes` array with one `{kind, action, file, id?, previous_id?}`
+  row per resource (action ∈ create/update/revision/delete). Plan rows
+  preview the pending sync; apply rows report what happened, carrying the
+  resulting platform ids (created ids, newly published revision ids), so
+  agents can verify an edit did what they intended without re-applying.
+  `apply` also gains `next_actions`/`next_commands` ("changes are live" +
+  a versioned `plan` follow-up), and `schemas list` emits `created_at` in
+  snake_case like every other envelope field. Counters and
+  `files_updated` (local write-backs only) are unchanged.
+
+- [#546](https://github.com/zitadel/nextgen/pull/546) [`c7fffef`](https://github.com/zitadel/nextgen/commit/c7fffefe1ee966ba7d8e34a18bfffbdd1cef5b8a) Thanks [@fforootd](https://github.com/fforootd)! - The interactive `setup` wizard now detects a running local Zitadel server the
+  same way `start` and `doctor` do — via the runtime metadata written by
+  `zitadel start` plus a `/healthz` probe on the default port — and preselects
+  it in the server choice. Previously it scanned localhost ports for an OIDC
+  discovery document the server does not serve, so it always reported "No local
+  OIDC servers found" even with a healthy server running.
+- Updated dependencies [[`79d4179`](https://github.com/zitadel/nextgen/commit/79d417924518c9ea272136db1f46aaf237497999), [`363482e`](https://github.com/zitadel/nextgen/commit/363482e27c88ac96c9a2b48c880e5caa5a4dcf65)]:
+  - @zitadel/config@0.1.0-alpha.17
+  - @zitadel/server@0.1.0-alpha.17
+  - @zitadel/api@0.1.0-alpha.17
+
 ## 0.1.0-alpha.16
 
 ### Patch Changes

@@ -26,21 +26,6 @@
       "format": "email",
       "x-unique": "project",
       "description": "The user's email address."
-    },
-    "givenName": {
-      "type": "string",
-      "maxLength": 50,
-      "description": "The user's given (first) name."
-    },
-    "familyName": {
-      "type": "string",
-      "maxLength": 50,
-      "description": "The user's family (last) name."
-    },
-    "dateOfBirth": {
-      "type": "string",
-      "format": "date",
-      "description": "The user's date of birth (ISO 8601, YYYY-MM-DD)."
     }
   }
 }

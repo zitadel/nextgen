@@ -9,6 +9,7 @@ import fieldHost from "@zitadel/shared-component-styles/lit/text-field-host.css?
 import fieldSurface from "@zitadel/shared-component-styles/text-field.css?inline";
 
 import { emit } from "../internal/emit.js";
+import { hookName } from "../internal/hook-name.js";
 import { nextUid } from "../internal/unique-id.js";
 import type { AtomManifest } from "../manifest.js";
 import { baseHostStyles, surfaceStyles } from "../styles/index.js";
@@ -121,6 +122,27 @@ export class ZlField extends LitElement {
 
   override focus(options?: FocusOptions): void {
     this.inputEl?.focus(options);
+  }
+
+  /**
+   * The string this control contributes to form submission — the uniform
+   * read/write contract `<zitadel-login>` uses to capture and restore field
+   * values without knowing each atom's internal shape. The getter reads the
+   * live `<input>` so browser/password-manager autofill that writes the native
+   * control directly (bypassing the `value` property and its `input` event) is
+   * still captured.
+   */
+  get formValue(): string {
+    const native = this.inputEl ?? this.shadowRoot?.querySelector<HTMLInputElement>("input");
+    return native ? native.value : this.value;
+  }
+
+  set formValue(value: string) {
+    this.value = value;
+    const native = this.inputEl ?? this.shadowRoot?.querySelector<HTMLInputElement>("input");
+    if (native && native.value !== value) {
+      native.value = value;
+    }
   }
 
   override render() {
@@ -329,8 +351,10 @@ export class ZlField extends LitElement {
   private nativeInputTestId(): string | undefined {
     if (this.name) {
       // Field host hooks use zitadel-field-*; native hooks can be name-first
-      // without colliding with the host, unlike action buttons.
-      return `zitadel-input-${this.name}`;
+      // without colliding with the host, unlike action buttons. The hook
+      // token is normalised (x-auth-methods#password → password) while
+      // `name` stays the raw form key.
+      return `zitadel-input-${hookName(this.name)}`;
     }
     if (this.testId) {
       return `${this.testId}-input`;
