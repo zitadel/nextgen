@@ -1,4 +1,4 @@
-# ADR 035: Tenant Login Templates as Editable Config
+# ADR 037: Tenant Login Templates as Editable Config
 
 > **Status:** Proposed
 > **Date:** 2026-07-20
@@ -133,6 +133,10 @@ authoritative validator and a component-level render test.
   constants rather than redefining them.
 - Old revisions accumulate; acceptable at template sizes, and a retention
   sweep can arrive later without API changes.
+- Composes with [ADR 035](035-configuration-environments.md): an immutable
+  branding revision id is exactly the kind of stable reference a
+  configuration release can pin, and the v1 latest-revision resolution
+  rule is what a deployed-release pointer would later replace.
 - The Go gate can reject a template the TS validator would accept (or
   vice versa) only in the lexical band; divergence is bounded because the
   banned-pattern list is defined once in `@zitadel/config` and mirrored in

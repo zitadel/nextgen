@@ -817,7 +817,7 @@ func (s *Server) handleCreateAuthAttemptRequest(args [0]string, argsEscaped bool
 // Publishes a new immutable branding revision for the project. Branding
 // revisions cannot be updated or deleted; every edit publishes a new
 // revision, and flow responses resolve the latest revision per project
-// (see ADR 035).
+// (see ADR 037).
 // The `liquid_template` is validated lexically on save (size, encoding,
 // banned patterns such as `<script>` tags, inline event handlers, and the
 // `| raw` filter). Authoritative LiquidJS validation runs at authoring

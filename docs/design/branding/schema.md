@@ -23,7 +23,7 @@ Branding:
     hero_url: { type: string, format: uri }
 ```
 
-**Read-only projection**, resolved per step response as the **latest branding revision for the project** (falling back to built-in defaults). Written via the Branding API / `zitadel apply`, never via the Flow API; audience overrides on the app → team → project ladder are a later resolution-rule evolution ([ADR 035](../../adrs/035-tenant-login-templates-editable-config.md)). Widget must accept the five-field shape as-is.
+**Read-only projection**, resolved per step response as the **latest branding revision for the project** (falling back to built-in defaults). Written via the Branding API / `zitadel apply`, never via the Flow API; audience overrides on the app → team → project ladder are a later resolution-rule evolution ([ADR 037](../../adrs/037-tenant-login-templates-editable-config.md)). Widget must accept the five-field shape as-is.
 
 ```mermaid
 flowchart TB

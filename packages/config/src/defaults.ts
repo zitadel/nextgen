@@ -69,7 +69,7 @@ function presetTemplates(preset: string): { schema: unknown; flow: unknown } {
  * `zitadel setup --design <name>`) scaffold into `.zitadel/branding/`. A
  * design is a full Liquid template plus the descriptor `layout` it degrades
  * to — the wire `layout` enum stays `centered | split`, richer designs are
- * delivered as templates (ADR 035).
+ * delivered as templates (ADR 037).
  */
 export const BRANDING_DESIGNS = ["centered", "split", "split-right", "minimal"] as const;
 

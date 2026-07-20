@@ -1,5 +1,5 @@
 /**
- * The authoritative login-template validator (ADR 035).
+ * The authoritative login-template validator (ADR 037).
  *
  * Runs where authoring happens — `zitadel plan`/`apply`, and later editors —
  * against the same LiquidJS dialect `@zitadel/components` renders. The Go

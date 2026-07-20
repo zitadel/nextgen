@@ -1,6 +1,6 @@
 # Templates
 
-**Status:** Draft. Storage, validation, and authoring workflow decided in [ADR 035](../../adrs/035-tenant-login-templates-editable-config.md); grouping settled below. **Parent:** [`README.md`](README.md). **See also:** [`../flowengine/template-security.md`](../flowengine/template-security.md) (escape, CSP, banned filters); [`../glossary.md`](../glossary.md#6-config-terms) (branding / template / design / layout vocabulary).
+**Status:** Draft. Storage, validation, and authoring workflow decided in [ADR 037](../../adrs/037-tenant-login-templates-editable-config.md); grouping settled below. **Parent:** [`README.md`](README.md). **See also:** [`../flowengine/template-security.md`](../flowengine/template-security.md) (escape, CSP, banned filters); [`../glossary.md`](../glossary.md#6-config-terms) (branding / template / design / layout vocabulary).
 
 A template is a Liquid string the component evaluates against the flow payload. It composes `<zl-*>` atoms in a chosen order and grouping, resolves labels through the i18n filter, and calls `{% mandatory_gates %}` as the safety net. Nothing more.
 
@@ -134,7 +134,7 @@ zitadel plan                            # authoritative validation + diff (revis
 zitadel apply                           # publishes an immutable branding revision
 ```
 
-`branding.json` references the template via `liquid_template_file`; the CLI inlines it into the wire `liquid_template` on upload. Flow responses resolve the latest revision per project — see [ADR 035](../../adrs/035-tenant-login-templates-editable-config.md).
+`branding.json` references the template via `liquid_template_file`; the CLI inlines it into the wire `liquid_template` on upload. Flow responses resolve the latest revision per project — see [ADR 037](../../adrs/037-tenant-login-templates-editable-config.md).
 
 ## Contract every template must satisfy
 

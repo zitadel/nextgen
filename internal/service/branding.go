@@ -20,7 +20,7 @@ type CreateBrandingInput struct {
 }
 
 // BrandingService publishes and resolves immutable branding revisions
-// (ADR 035). Revisions are create-only; flow responses resolve the latest
+// (ADR 037). Revisions are create-only; flow responses resolve the latest
 // revision per project.
 type BrandingService struct {
 	pool         database.Pool

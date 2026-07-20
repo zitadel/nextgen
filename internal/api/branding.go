@@ -49,7 +49,7 @@ func (h *Handler) ListBranding(ctx context.Context, params api.ListBrandingParam
 }
 
 // resolveBranding resolves the branding a flow response should carry: the
-// latest stored revision for the project, or the built-in default (ADR 035).
+// latest stored revision for the project, or the built-in default (ADR 037).
 // Resolution failures degrade to the default on purpose — a broken branding
 // lookup must never take the login down.
 func (h *Handler) resolveBranding(ctx context.Context, projectID string) api.Branding {

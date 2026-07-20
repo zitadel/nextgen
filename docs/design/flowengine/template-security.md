@@ -125,5 +125,5 @@ LiquidJS provides a `| raw` filter that disables auto-escaping:
 guarantees above hold for rendering through `@zitadel/components`; a
 consumer that renders templates with its own engine owns its own
 escaping, sanitisation, and CSP. See
-[ADR 035](../../adrs/035-tenant-login-templates-editable-config.md) for
+[ADR 037](../../adrs/037-tenant-login-templates-editable-config.md) for
 the storage/validation split.

@@ -696,7 +696,7 @@ func (*AuthorizeGetFound) authorizeGetRes() {}
 // back to built-in defaults when none is stored). Branding is configured
 // via the Branding API / `zitadel apply`, not the Flow API.
 // - As the request body of `POST /branding`, which publishes the same
-// shape as a new immutable revision (see ADR 035).
+// shape as a new immutable revision (see ADR 037).
 // Ref: #
 type Branding struct {
 	// Layout preset selector. The default.liquid master template uses this

@@ -1,6 +1,6 @@
 /**
  * Contract tests for the ejectable design catalog in `@zitadel/config`
- * (ADR 035): every shipped design must render through the real pipeline —
+ * (ADR 037): every shipped design must render through the real pipeline —
  * LiquidJS engine → DOMPurify sanitiser → `patchMandatoryGates` — and keep
  * the atoms a step needs. The authoring-side validation of the same files
  * lives in `packages/config/src/template.test.ts`.

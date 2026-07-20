@@ -13,7 +13,7 @@ import (
 )
 
 // TestBranding exercises the branding revision API and its projection onto
-// flow responses (ADR 035): publish → echoed on flow creation; publish again
+// flow responses (ADR 037): publish → echoed on flow creation; publish again
 // → the newer revision wins; invalid templates are rejected by the lexical
 // gate; projects without branding fall back to the built-in default.
 func TestBranding(t *testing.T) {

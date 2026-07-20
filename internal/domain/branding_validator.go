@@ -18,7 +18,7 @@ const MaxBrandingTemplateBytes = 131072 // 128 KiB
 // validate the wrong language. The authoritative LiquidJS validation runs at
 // authoring time (`zitadel plan`/`apply`, @zitadel/config); the render
 // pipeline in @zitadel/components is safe against stored templates regardless
-// (escaping, neutered `raw`, DOMPurify, CSP). See ADR 035 and
+// (escaping, neutered `raw`, DOMPurify, CSP). See ADR 037 and
 // docs/design/flowengine/template-security.md. The banned patterns below
 // mirror BANNED_TEMPLATE_PATTERNS in packages/config/src/template.ts; keep the
 // two lists in sync.
