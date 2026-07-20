@@ -63,6 +63,11 @@ func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*dom
 	return ps.scanProject(row)
 }
 
+// UpdateProject implements [service.ProjectStatements].
+func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.Project) error {
+	panic("unimplemented")
+}
+
 // ListProjects implements [service.ProjectStatements].
 func (ps projectStatements) ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
 	var compiler statementCompiler

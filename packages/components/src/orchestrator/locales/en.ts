@@ -123,6 +123,7 @@ export const en: Record<string, string> = {
   "register.field.password": "Password",
   "register.field.givenName": "Given name",
   "register.field.familyName": "Family name",
+  "register.field.companyName": "Company name",
   // Native <input type="date"> localizes its own display format to the user's
   // locale and submits ISO YYYY-MM-DD — no placeholder/help format hint needed.
   "register.field.dateOfBirth": "Date of birth",

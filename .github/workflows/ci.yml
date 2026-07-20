@@ -48,9 +48,20 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: moon run server:check-generate
 
+      - name: Cache Playwright browsers
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright Chromium
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: corepack pnpm --filter @zitadel/components exec playwright install chromium
+
       - name: Run Moon build and test graph
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: moon ci :lint :typecheck :build :test
+        run: moon ci :lint :typecheck :build :test :test-browser
 
       - name: Run Go tests
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}

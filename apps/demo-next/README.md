@@ -24,7 +24,7 @@ Or pass them inline when starting the dev server (step 2).
 
 | Variable                          | Default                 | Description                                        |
 | --------------------------------- | ----------------------- | -------------------------------------------------- |
-| `ZITADEL_URL`                      | `http://localhost:4000` | URL of the Zitadel auth server                     |
+| `ZITADEL_URL`                      | `http://localhost:8080` | URL of the Zitadel auth server                     |
 | `NEXT_PUBLIC_ZITADEL_PROJECT_ID`  | `demo`                  | Project ID passed to `<zitadel-login project-id>`  |
 
 ### 2. Start
@@ -32,7 +32,7 @@ Or pass them inline when starting the dev server (step 2).
 Two terminals:
 
 ```bash
-# Terminal 1 — mock auth server on port 4000
+# Terminal 1 — mock auth server on port 8080 (set PORT to override)
 moon run api-mock:start
 
 # Terminal 2 — Next.js on port 3002

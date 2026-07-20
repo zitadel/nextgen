@@ -118,6 +118,44 @@ func (c *MockUserRepositoryCreateCall) DoAndReturn(f func(context.Context, datab
 	return c
 }
 
+// Deactivate mocks base method.
+func (m *MockUserRepository) Deactivate(ctx context.Context, client database.QueryExecutor, projectID, userID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Deactivate", ctx, client, projectID, userID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Deactivate indicates an expected call of Deactivate.
+func (mr *MockUserRepositoryMockRecorder) Deactivate(ctx, client, projectID, userID any) *MockUserRepositoryDeactivateCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Deactivate", reflect.TypeOf((*MockUserRepository)(nil).Deactivate), ctx, client, projectID, userID)
+	return &MockUserRepositoryDeactivateCall{Call: call}
+}
+
+// MockUserRepositoryDeactivateCall wrap *gomock.Call
+type MockUserRepositoryDeactivateCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockUserRepositoryDeactivateCall) Return(arg0 error) *MockUserRepositoryDeactivateCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockUserRepositoryDeactivateCall) Do(f func(context.Context, database.QueryExecutor, string, string) error) *MockUserRepositoryDeactivateCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockUserRepositoryDeactivateCall) DoAndReturn(f func(context.Context, database.QueryExecutor, string, string) error) *MockUserRepositoryDeactivateCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // Delete mocks base method.
 func (m *MockUserRepository) Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error {
 	m.ctrl.T.Helper()
@@ -239,18 +277,18 @@ func (c *MockUserRepositoryGetCall) DoAndReturn(f func(context.Context, database
 }
 
 // GetByID mocks base method.
-func (m *MockUserRepository) GetByID(ctx context.Context, client database.QueryExecutor, projectID string, teamID *string, userID string) (*domain.User, error) {
+func (m *MockUserRepository) GetByID(ctx context.Context, client database.QueryExecutor, projectID string, membershipTeamID *string, userID string) (*domain.User, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetByID", ctx, client, projectID, teamID, userID)
+	ret := m.ctrl.Call(m, "GetByID", ctx, client, projectID, membershipTeamID, userID)
 	ret0, _ := ret[0].(*domain.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetByID indicates an expected call of GetByID.
-func (mr *MockUserRepositoryMockRecorder) GetByID(ctx, client, projectID, teamID, userID any) *MockUserRepositoryGetByIDCall {
+func (mr *MockUserRepositoryMockRecorder) GetByID(ctx, client, projectID, membershipTeamID, userID any) *MockUserRepositoryGetByIDCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockUserRepository)(nil).GetByID), ctx, client, projectID, teamID, userID)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockUserRepository)(nil).GetByID), ctx, client, projectID, membershipTeamID, userID)
 	return &MockUserRepositoryGetByIDCall{Call: call}
 }
 
@@ -315,6 +353,44 @@ func (c *MockUserRepositoryIDConditionCall) DoAndReturn(f func(string) database.
 	return c
 }
 
+// LifecycleOwnerTeamIDCondition mocks base method.
+func (m *MockUserRepository) LifecycleOwnerTeamIDCondition(teamID string) database.Condition {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LifecycleOwnerTeamIDCondition", teamID)
+	ret0, _ := ret[0].(database.Condition)
+	return ret0
+}
+
+// LifecycleOwnerTeamIDCondition indicates an expected call of LifecycleOwnerTeamIDCondition.
+func (mr *MockUserRepositoryMockRecorder) LifecycleOwnerTeamIDCondition(teamID any) *MockUserRepositoryLifecycleOwnerTeamIDConditionCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LifecycleOwnerTeamIDCondition", reflect.TypeOf((*MockUserRepository)(nil).LifecycleOwnerTeamIDCondition), teamID)
+	return &MockUserRepositoryLifecycleOwnerTeamIDConditionCall{Call: call}
+}
+
+// MockUserRepositoryLifecycleOwnerTeamIDConditionCall wrap *gomock.Call
+type MockUserRepositoryLifecycleOwnerTeamIDConditionCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockUserRepositoryLifecycleOwnerTeamIDConditionCall) Return(arg0 database.Condition) *MockUserRepositoryLifecycleOwnerTeamIDConditionCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockUserRepositoryLifecycleOwnerTeamIDConditionCall) Do(f func(string) database.Condition) *MockUserRepositoryLifecycleOwnerTeamIDConditionCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockUserRepositoryLifecycleOwnerTeamIDConditionCall) DoAndReturn(f func(string) database.Condition) *MockUserRepositoryLifecycleOwnerTeamIDConditionCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // List mocks base method.
 func (m *MockUserRepository) List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*domain.User, error) {
 	m.ctrl.T.Helper()
@@ -355,6 +431,44 @@ func (c *MockUserRepositoryListCall) Do(f func(context.Context, database.QueryEx
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockUserRepositoryListCall) DoAndReturn(f func(context.Context, database.QueryExecutor, ...database.QueryOption) ([]*domain.User, error)) *MockUserRepositoryListCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// MembershipTeamCondition mocks base method.
+func (m *MockUserRepository) MembershipTeamCondition(teamID string) database.Condition {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MembershipTeamCondition", teamID)
+	ret0, _ := ret[0].(database.Condition)
+	return ret0
+}
+
+// MembershipTeamCondition indicates an expected call of MembershipTeamCondition.
+func (mr *MockUserRepositoryMockRecorder) MembershipTeamCondition(teamID any) *MockUserRepositoryMembershipTeamConditionCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MembershipTeamCondition", reflect.TypeOf((*MockUserRepository)(nil).MembershipTeamCondition), teamID)
+	return &MockUserRepositoryMembershipTeamConditionCall{Call: call}
+}
+
+// MockUserRepositoryMembershipTeamConditionCall wrap *gomock.Call
+type MockUserRepositoryMembershipTeamConditionCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockUserRepositoryMembershipTeamConditionCall) Return(arg0 database.Condition) *MockUserRepositoryMembershipTeamConditionCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockUserRepositoryMembershipTeamConditionCall) Do(f func(string) database.Condition) *MockUserRepositoryMembershipTeamConditionCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockUserRepositoryMembershipTeamConditionCall) DoAndReturn(f func(string) database.Condition) *MockUserRepositoryMembershipTeamConditionCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -511,78 +625,78 @@ func (c *MockUserRepositorySetAttributeCall) DoAndReturn(f func(domain.CreateAtt
 	return c
 }
 
-// SetTeam mocks base method.
-func (m *MockUserRepository) SetTeam(teamID *string) database.Change {
+// SetLifecycleOwnerTeamID mocks base method.
+func (m *MockUserRepository) SetLifecycleOwnerTeamID(teamID *string) database.Change {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetTeam", teamID)
+	ret := m.ctrl.Call(m, "SetLifecycleOwnerTeamID", teamID)
 	ret0, _ := ret[0].(database.Change)
 	return ret0
 }
 
-// SetTeam indicates an expected call of SetTeam.
-func (mr *MockUserRepositoryMockRecorder) SetTeam(teamID any) *MockUserRepositorySetTeamCall {
+// SetLifecycleOwnerTeamID indicates an expected call of SetLifecycleOwnerTeamID.
+func (mr *MockUserRepositoryMockRecorder) SetLifecycleOwnerTeamID(teamID any) *MockUserRepositorySetLifecycleOwnerTeamIDCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTeam", reflect.TypeOf((*MockUserRepository)(nil).SetTeam), teamID)
-	return &MockUserRepositorySetTeamCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLifecycleOwnerTeamID", reflect.TypeOf((*MockUserRepository)(nil).SetLifecycleOwnerTeamID), teamID)
+	return &MockUserRepositorySetLifecycleOwnerTeamIDCall{Call: call}
 }
 
-// MockUserRepositorySetTeamCall wrap *gomock.Call
-type MockUserRepositorySetTeamCall struct {
+// MockUserRepositorySetLifecycleOwnerTeamIDCall wrap *gomock.Call
+type MockUserRepositorySetLifecycleOwnerTeamIDCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockUserRepositorySetTeamCall) Return(arg0 database.Change) *MockUserRepositorySetTeamCall {
+func (c *MockUserRepositorySetLifecycleOwnerTeamIDCall) Return(arg0 database.Change) *MockUserRepositorySetLifecycleOwnerTeamIDCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockUserRepositorySetTeamCall) Do(f func(*string) database.Change) *MockUserRepositorySetTeamCall {
+func (c *MockUserRepositorySetLifecycleOwnerTeamIDCall) Do(f func(*string) database.Change) *MockUserRepositorySetLifecycleOwnerTeamIDCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserRepositorySetTeamCall) DoAndReturn(f func(*string) database.Change) *MockUserRepositorySetTeamCall {
+func (c *MockUserRepositorySetLifecycleOwnerTeamIDCall) DoAndReturn(f func(*string) database.Change) *MockUserRepositorySetLifecycleOwnerTeamIDCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
-// TeamIDCondition mocks base method.
-func (m *MockUserRepository) TeamIDCondition(teamID string) database.Condition {
+// SetStatus mocks base method.
+func (m *MockUserRepository) SetStatus(status domain.UserStatus) database.Change {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "TeamIDCondition", teamID)
-	ret0, _ := ret[0].(database.Condition)
+	ret := m.ctrl.Call(m, "SetStatus", status)
+	ret0, _ := ret[0].(database.Change)
 	return ret0
 }
 
-// TeamIDCondition indicates an expected call of TeamIDCondition.
-func (mr *MockUserRepositoryMockRecorder) TeamIDCondition(teamID any) *MockUserRepositoryTeamIDConditionCall {
+// SetStatus indicates an expected call of SetStatus.
+func (mr *MockUserRepositoryMockRecorder) SetStatus(status any) *MockUserRepositorySetStatusCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TeamIDCondition", reflect.TypeOf((*MockUserRepository)(nil).TeamIDCondition), teamID)
-	return &MockUserRepositoryTeamIDConditionCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetStatus", reflect.TypeOf((*MockUserRepository)(nil).SetStatus), status)
+	return &MockUserRepositorySetStatusCall{Call: call}
 }
 
-// MockUserRepositoryTeamIDConditionCall wrap *gomock.Call
-type MockUserRepositoryTeamIDConditionCall struct {
+// MockUserRepositorySetStatusCall wrap *gomock.Call
+type MockUserRepositorySetStatusCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockUserRepositoryTeamIDConditionCall) Return(arg0 database.Condition) *MockUserRepositoryTeamIDConditionCall {
+func (c *MockUserRepositorySetStatusCall) Return(arg0 database.Change) *MockUserRepositorySetStatusCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockUserRepositoryTeamIDConditionCall) Do(f func(string) database.Condition) *MockUserRepositoryTeamIDConditionCall {
+func (c *MockUserRepositorySetStatusCall) Do(f func(domain.UserStatus) database.Change) *MockUserRepositorySetStatusCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserRepositoryTeamIDConditionCall) DoAndReturn(f func(string) database.Condition) *MockUserRepositoryTeamIDConditionCall {
+func (c *MockUserRepositorySetStatusCall) DoAndReturn(f func(domain.UserStatus) database.Change) *MockUserRepositorySetStatusCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
