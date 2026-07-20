@@ -38,21 +38,22 @@
         {% when 'checkbox' %}
           <zl-checkbox
             name="{{ f.name }}"
-            data-testid="zitadel-field-{{ f.name }}"
+            data-testid="zitadel-field-{{ f.name | testid }}"
             label="{{ f.text_key | t }}"
             value="true"
             {% if f.value %}checked{% endif %}
-            {% if f.required %}required{% endif %}
+            {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
           ></zl-checkbox>
         {% when 'select' %}
           <zl-select
             name="{{ f.name }}"
-            data-testid="zitadel-field-{{ f.name }}"
+            data-testid="zitadel-field-{{ f.name | testid }}"
             label="{{ f.text_key | t }}"
             value="{{ f.value }}"
             options='{{ f.validation.enum | selectOptions | json }}'
             {% if f.required %}required{% endif %}
             {% if field_placeholder != "" %}placeholder="{{ field_placeholder }}"{% endif %}
+          {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
           ></zl-select>
         {% else %}
           {% assign autocomplete_val = '' %}
@@ -65,7 +66,7 @@
           {% endif %}
           <zl-field
             name="{{ f.name }}"
-            data-testid="zitadel-field-{{ f.name }}"
+            data-testid="zitadel-field-{{ f.name | testid }}"
             label="{{ f.text_key | t }}"
             type="{{ f.type }}"
             value="{{ f.value }}"
