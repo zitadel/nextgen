@@ -43,8 +43,15 @@ tasks:
     script: |
       node ../../scripts/release-clean.mjs local-dist
       corepack pnpm run build
+      node scripts/check-standalone-artifact.mjs
     deps:
       - "api:build-release"
+      # Same edge as the dev build: the standalone bundle inlines
+      # @zitadel/config/template, and without ordering the release builds
+      # race — rolldown leaves the unresolvable import external and the
+      # published standalone.mjs breaks in the browser. The check script
+      # above fails the build if that ever regresses.
+      - "config:build-release"
       - "design-tokens:build"
       - "shared-component-styles:build"
     outputs:
