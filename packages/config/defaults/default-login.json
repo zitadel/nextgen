@@ -70,10 +70,7 @@
     {
       "name": "register",
       "fields": [
-        "email",
-        "givenName",
-        "familyName",
-        "dateOfBirth"
+        "email"
       ],
       "actions": [
         {

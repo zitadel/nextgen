@@ -28,6 +28,12 @@ type FlowFieldResolver interface {
 	// Validate checks submitted values against the rules carried by a
 	// previously resolved field set.
 	Validate(fields FlowResolvedFields, values map[string]any) error
+
+	// MissingRequired reports the required fields absent from values.
+	// Applied only on field-collecting actions (the submit action and the
+	// passkey-register issue leg); other actions legitimately submit a
+	// subset of fields or none.
+	MissingRequired(fields FlowResolvedFields, values map[string]any) FlowFieldValidationErrors
 }
 
 // FlowResolvedFields is the output of [FlowFieldResolver.Resolve].
@@ -123,6 +129,7 @@ const (
 //   - MinLength ↔ `minLength`
 //   - MaxLength ↔ `maxLength`
 //   - Enum      ↔ `enum` (closed set of allowed string values)
+//   - Const     ↔ `const` (property pinned to a fixed value)
 //
 // Zero values mean "no rule". JSON Schema's `pattern` keyword is not
 // part of the user meta-schema and is intentionally not surfaced.
@@ -131,6 +138,12 @@ type FlowFieldValidation struct {
 	MinLength int
 	MaxLength int
 	Enum      []string
+
+	// Const, when non-nil, pins the property to a fixed value (JSON
+	// Schema `const`) of any type — e.g. a must-accept checkbox uses
+	// `const: true`. A differing submission is reported as
+	// [FlowFieldValidationRuleFormat].
+	Const any
 }
 
 // FlowFieldType names the input kind the client should render. Mirrors

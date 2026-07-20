@@ -124,6 +124,27 @@ export class ZlField extends LitElement {
     this.inputEl?.focus(options);
   }
 
+  /**
+   * The string this control contributes to form submission — the uniform
+   * read/write contract `<zitadel-login>` uses to capture and restore field
+   * values without knowing each atom's internal shape. The getter reads the
+   * live `<input>` so browser/password-manager autofill that writes the native
+   * control directly (bypassing the `value` property and its `input` event) is
+   * still captured.
+   */
+  get formValue(): string {
+    const native = this.inputEl ?? this.shadowRoot?.querySelector<HTMLInputElement>("input");
+    return native ? native.value : this.value;
+  }
+
+  set formValue(value: string) {
+    this.value = value;
+    const native = this.inputEl ?? this.shadowRoot?.querySelector<HTMLInputElement>("input");
+    if (native && native.value !== value) {
+      native.value = value;
+    }
+  }
+
   override render() {
     const labelId = `${this.inputId}-label`;
     const errorId = `${this.inputId}-error`;

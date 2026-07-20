@@ -72,6 +72,14 @@ export class ZlCheckbox extends LitElement {
   @property({ type: Boolean, reflect: true }) accessor checked = false;
   @property({ type: Boolean, reflect: true }) accessor disabled = false;
   @property({ type: Boolean }) accessor required = false;
+  /**
+   * Inline validation message shown under the control (empty = none). Set by
+   * the orchestrator's template on a field error; display-only, mirroring
+   * `<zl-field>` / `<zl-select>` so the flow router routes every field type
+   * the same way. Submission gating lives in `<zitadel-login>`.
+   */
+  @property() accessor error = "";
+  @property({ type: Boolean, reflect: true }) accessor invalid = false;
   @property({ attribute: "aria-label" }) accessor ariaLabelText: string | undefined = undefined;
   @property({ attribute: "data-testid" }) accessor testId: string | undefined = undefined;
 
@@ -117,37 +125,68 @@ export class ZlCheckbox extends LitElement {
     this.inputEl?.focus(options);
   }
 
+  /**
+   * The string this control contributes to form submission — the uniform
+   * read/write contract `<zitadel-login>` uses to capture and restore field
+   * values without knowing each atom's internal shape. Like a native checkbox
+   * this is the value token only when checked, empty otherwise; assigning it
+   * back restores the checked state.
+   */
+  get formValue(): string {
+    return this.checked ? this.value : "";
+  }
+
+  set formValue(value: string) {
+    this.checked = value !== "";
+  }
+
   override render() {
+    const errorId = `${this.inputId}-error`;
+    const showError = Boolean(this.error);
     const rootClass = classMap({
       "zr-checkbox": true,
+      "zr-checkbox--invalid": this.invalid || showError,
       "zr-checkbox--disabled": this.disabled,
     });
     const labelText = this.label;
     return html`
-      <label class=${rootClass} part="root" data-state=${this.forcedState ?? nothing}>
-        <input
-          class="zr-checkbox__input"
-          part="input"
-          id=${this.inputId}
-          type="checkbox"
-          name=${this.name || nothing}
-          .checked=${live(this.checked)}
-          value=${this.value}
-          ?required=${this.required}
-          ?disabled=${this.disabled}
-          aria-label=${ifDefined(labelText ? undefined : this.ariaLabelText)}
-          data-testid=${ifDefined(this.nativeInputTestId())}
-          @change=${this.handleChange}
-        />
-        <span class="zr-checkbox__box" part="box">
-          <span class="zr-checkbox__face" part="face">
-            <zl-icon class="zr-checkbox__check" part="check" name="check" size="16" decorative></zl-icon>
+      <div class="zr-checkbox-field" part="field">
+        <label class=${rootClass} part="root" data-state=${this.forcedState ?? nothing}>
+          <input
+            class="zr-checkbox__input"
+            part="input"
+            id=${this.inputId}
+            type="checkbox"
+            name=${this.name || nothing}
+            .checked=${live(this.checked)}
+            value=${this.value}
+            ?required=${this.required}
+            ?disabled=${this.disabled}
+            aria-label=${ifDefined(labelText ? undefined : this.ariaLabelText)}
+            aria-invalid=${this.invalid || showError ? "true" : "false"}
+            aria-describedby=${showError ? errorId : nothing}
+            data-testid=${ifDefined(this.nativeInputTestId())}
+            @change=${this.handleChange}
+          />
+          <span class="zr-checkbox__box" part="box">
+            <span class="zr-checkbox__face" part="face">
+              <zl-icon class="zr-checkbox__check" part="check" name="check" size="16" decorative></zl-icon>
+            </span>
           </span>
-        </span>
-        ${labelText
-          ? html`<span class="zr-checkbox__label" part="label">${labelText}</span>`
-          : html`<slot></slot>`}
-      </label>
+          ${labelText
+            ? html`<span class="zr-checkbox__label" part="label">${labelText}</span>`
+            : html`<slot></slot>`}
+        </label>
+        <div
+          class="zr-checkbox__error"
+          part="error"
+          id=${errorId}
+          role="alert"
+          ?hidden=${!showError}
+        >
+          ${this.error}
+        </div>
+      </div>
     `;
   }
 
@@ -193,10 +232,12 @@ export const zlCheckboxManifest: AtomManifest = {
     "checked",
     "disabled",
     "required",
+    "error",
+    "invalid",
     "aria-label",
     "data-testid",
   ],
-  parts: ["root", "input", "box", "face", "check", "label"],
+  parts: ["field", "root", "input", "box", "face", "check", "label", "error"],
   slots: [""],
   events: ["zl-change"],
 } as const;

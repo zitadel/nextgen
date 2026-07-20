@@ -435,6 +435,8 @@ USAGE
     [--dry-run] [--verbose] [--debug] [--telemetry] [--framework
     next|nuxt|react|vue|solid|svelte|qwik|angular] [--renderer
     react|web-component] [--dev-port <value>] [--skip-install]
+    [--preset password-first|passkey-first] [--use-case
+    minimal|consumer|business]
 
 FLAGS
   -c, --cwd=<value>         Project directory to operate on.
@@ -451,12 +453,18 @@ FLAGS
       --framework=<option>  Framework to target.
                             <options:
                             next|nuxt|react|vue|solid|svelte|qwik|angular>
+      --preset=<option>     Sign-in preset for the scaffolded schema and login
+                            flow (default: password-first).
+                            <options: password-first|passkey-first>
       --renderer=<option>   Renderer (default: react).
                             <options: react|web-component>
       --skip-install        Do not install dependencies after setup updates
                             package.json.
       --[no-]telemetry      Send anonymous usage analytics. Disable with
                             --no-telemetry.
+      --use-case=<option>   Use case for the scaffolded schema fields: who
+                            signs in to the app (default: minimal).
+                            <options: minimal|consumer|business>
       --verbose             Verbose logging.
 
 GLOBAL FLAGS
