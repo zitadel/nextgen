@@ -1,4 +1,10 @@
 {
   "title": "CLI",
-  "pages": ["index", "local-runtime", "plan-apply", "troubleshooting"]
+  "pages": [
+    "index",
+    "local-runtime",
+    "plan-apply",
+    "customize-copy",
+    "troubleshooting"
+  ]
 }

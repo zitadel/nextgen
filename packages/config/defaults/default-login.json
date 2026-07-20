@@ -1,4 +1,5 @@
 {
+  "$schema": "../meta/flow-definition.json",
   "name": "default-login",
   "status": "active",
   "user_schema": "${USER_SCHEMA_URL}",
@@ -69,10 +70,7 @@
     {
       "name": "register",
       "fields": [
-        "email",
-        "givenName",
-        "familyName",
-        "dateOfBirth"
+        "email"
       ],
       "actions": [
         {

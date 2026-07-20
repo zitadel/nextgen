@@ -4,9 +4,8 @@ Pre-release Vite + React shell for the internal Zitadel console — where users
 will manage their account and settings. Built with `@zitadel/ui-react` atoms
 and design tokens, and embedded into the Go server under `/ui/console/`.
 
-Architecture decisions for this app are recorded in
-[`docs/adrs/`](docs/adrs/README.md): routing ([ADR 0001](docs/adrs/0001-console-routing.md))
-and API access ([ADR 0002](docs/adrs/0002-console-api-access.md)).
+Architecture decisions for this app are recorded in the repo-wide
+[`docs/adrs/`](../../docs/adrs/README.md) index.
 
 Component development and review (atoms, paired React, and the
 `<zitadel-login>` orchestrator) live in
@@ -70,8 +69,8 @@ automatically.
 The console holds **no long-lived credential in the browser bundle**. It calls a
 same-origin API base (`/api` by default), and a server-side proxy attaches the
 `Authorization: Bearer` token before forwarding to the API, so no secret reaches
-the browser (see [ADR 0002](docs/adrs/0002-console-api-access.md)). Attaching the
-bearer is the console proxy's responsibility, mirroring the Zitadel client SDKs.
+the browser. Attaching the bearer is the console proxy's responsibility,
+mirroring the Zitadel client SDKs.
 
 The bearer is currently a **project secret**, injected by the Vite dev proxy from
 a Node-only env var (see [Environment variables](#environment-variables)). A user

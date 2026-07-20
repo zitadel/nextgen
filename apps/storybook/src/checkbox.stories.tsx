@@ -14,6 +14,8 @@ interface CheckboxArgs {
   checked: boolean;
   disabled: boolean;
   required: boolean;
+  /** Inline validation message shown under the row (empty = none). */
+  error: string;
   /** Preview-only knob: paints a Figma interaction state (hover/focus/pressed). */
   previewState: "" | "hovered" | "focused" | "pressed";
 }
@@ -31,12 +33,13 @@ interface CheckboxArgs {
 const meta: Meta<CheckboxArgs> = {
   title: "Atoms/Checkbox",
   tags: ["autodocs"],
-  args: { label: "Label", checked: false, disabled: false, required: false, previewState: "" },
+  args: { label: "Label", checked: false, disabled: false, required: false, error: "", previewState: "" },
   argTypes: {
     label: { control: "text" },
     checked: { control: "boolean" },
     disabled: { control: "boolean" },
     required: { control: "boolean" },
+    error: { control: "text" },
     previewState: {
       control: "inline-radio",
       options: ["", "hovered", "focused", "pressed"],
@@ -50,23 +53,25 @@ type Story = StoryObj<CheckboxArgs>;
 
 // Shared render builders so the Lit, React, and Parity stories all drive the
 // same surface (see apps/storybook/AGENTS.md "Mirror pairs in one file").
-const litCheckbox = ({ label, checked, disabled, required, previewState }: CheckboxArgs) => html`
+const litCheckbox = ({ label, checked, disabled, required, error, previewState }: CheckboxArgs) => html`
   <zl-checkbox
     label=${label || nothing}
     aria-label=${label ? nothing : "Accept terms"}
     ?checked=${checked}
     ?disabled=${disabled}
     ?required=${required}
+    error=${error || nothing}
     data-state=${previewState || nothing}
   ></zl-checkbox>
 `;
 
-const reactCheckbox = ({ label, checked, disabled, required, previewState }: CheckboxArgs) => (
+const reactCheckbox = ({ label, checked, disabled, required, error, previewState }: CheckboxArgs) => (
   <Checkbox
     label={label || undefined}
     defaultChecked={checked}
     disabled={disabled}
     required={required}
+    error={error || undefined}
     previewState={previewState || undefined}
     aria-label={label ? undefined : "Accept terms"}
   />
@@ -106,7 +111,7 @@ export const React: Story = {
  * checkboxes on one page is a test rig (the Lit/React stories carry the a11y gate).
  */
 export const Parity: Story = {
-  args: { checked: true },
+  args: { checked: true, error: "You must accept the terms." },
   parameters: { a11y: { test: "off" }, chromatic: { disableSnapshot: true } },
   decorators: [(story) => html`<div style="display: flex; gap: 2rem;">${story()}</div>`],
   render: (args) => html`
@@ -132,6 +137,7 @@ export const Parity: Story = {
       ".zr-checkbox__box",
       ".zr-checkbox__face",
       ".zr-checkbox__label",
+      ".zr-checkbox__error",
     ]);
   },
 };

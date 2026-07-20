@@ -7,7 +7,7 @@ import { forwardedArgs, isDirectRun } from "./dev-process.mjs";
 
 const ADR_FILENAME_PATTERN = /^(\d{3})-[a-z0-9-]+\.md$/;
 const ADR_HEADING_PATTERN = /^#\s*ADR\s+(\d{3}):\s*(.+)\s*$/;
-const README_ROW_PATTERN = /^\|\s*\[(\d{3})\]\(([^)]+)\)\s*\|\s*([^|]+)\|\s*([^|]+)\|\s*$/;
+const README_ROW_PATTERN = /^\|\s*\[(\d{3})\]\(([^)]+)\)\s*\|\s*([^|]+)\|\s*([^|]+)\|\s*([^|]+)\|\s*$/;
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const defaultAdrsDir = join(repoRoot, "docs", "adrs");
@@ -90,7 +90,8 @@ export function parseReadmeIndex(markdown) {
       number: Number.parseInt(match[1], 10),
       filename: match[2].trim(),
       title: match[3].trim(),
-      summary: match[4].trim(),
+      status: match[4].trim(),
+      summary: match[5].trim(),
     });
   }
 

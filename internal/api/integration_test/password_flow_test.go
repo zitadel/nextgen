@@ -46,11 +46,11 @@ func TestPasswordLoginFlow(t *testing.T) {
 
 	userRepo := harness.EnsureUserRepo(t)
 	require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
-		ProjectID:  project.ID,
-		SchemaURL:  schemaURL,
-		ID:         userID,
-		TeamID:     &team.ID,
-		Attributes: []*domain.CreateAttribute{emailAttr},
+		ProjectID:               project.ID,
+		SchemaURL:               schemaURL,
+		ID:                      userID,
+		InitialMembershipTeamID: &team.ID,
+		Attributes:              []*domain.CreateAttribute{emailAttr},
 	}))
 
 	hasher := harness.EnsureHasher(t)
@@ -270,11 +270,11 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 	emailAttr, err := domain.NewCreateAttribute("email", conflictEmail, domain.AttributeUniquenessProject)
 	require.NoError(t, err)
 	require.NoError(t, harness.EnsureUserRepo(t).Create(t.Context(), harness.EnsureDBPool(t), &domain.CreateUser{
-		ProjectID:  project.ID,
-		SchemaURL:  schemaURL,
-		ID:         "pwregister-conflict-seed",
-		TeamID:     &team.ID,
-		Attributes: []*domain.CreateAttribute{emailAttr},
+		ProjectID:               project.ID,
+		SchemaURL:               schemaURL,
+		ID:                      "pwregister-conflict-seed",
+		InitialMembershipTeamID: &team.ID,
+		Attributes:              []*domain.CreateAttribute{emailAttr},
 	}))
 
 	server := harness.EnsureTestServer(t)

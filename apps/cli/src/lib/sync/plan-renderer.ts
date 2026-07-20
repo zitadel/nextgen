@@ -18,6 +18,77 @@ export function summarizePlan(actions: ReadonlyArray<SyncAction>): SyncPlanSumma
 }
 
 /**
+ * Collect the plan-time validation warnings across all actions, tagged
+ * with the file they belong to. Feeds the `plan` / `apply --dry-run`
+ * `--json` payload so agents can read warnings structurally.
+ */
+export function collectPlanWarnings(
+  actions: ReadonlyArray<SyncAction>,
+): Array<{ path: string; rule: string; message: string }> {
+  const out: Array<{ path: string; rule: string; message: string }> = [];
+  for (const action of actions) {
+    if (action.kind !== "create" && action.kind !== "update") {
+      continue;
+    }
+    for (const warning of action.warnings ?? []) {
+      out.push({ path: action.path, rule: warning.rule, message: warning.message });
+    }
+  }
+  return out;
+}
+
+/**
+ * One entry of the `changes` array in the `plan` / `apply` `--json`
+ * payloads: which resource an action touches and how. `action` speaks the
+ * envelope's public vocabulary (`revision`, matching the `revisions`
+ * counter, not the internal `revise`). `id` is the platform id an
+ * update/delete targets; `previous_id` is the revision being superseded.
+ * The file path is the resource identity, mirroring {@link renderPlan}.
+ */
+export type PlanResourceChange = {
+  kind: ResourceSyncer["kind"];
+  action: "create" | "update" | "revision" | "delete";
+  file: string;
+  id?: string;
+  previous_id?: string;
+};
+
+/**
+ * Enumerate the non-`skip` actions of a {@link buildSyncPlan} result as
+ * envelope-ready {@link PlanResourceChange} rows. Pure; the structural
+ * counterpart of {@link summarizePlan} — counts and rows always agree.
+ */
+export function enumeratePlanResources(
+  actions: ReadonlyArray<SyncAction>,
+): PlanResourceChange[] {
+  const out: PlanResourceChange[] = [];
+  for (const action of actions) {
+    switch (action.kind) {
+      case "create":
+        out.push({ kind: action.syncer.kind, action: "create", file: action.path });
+        break;
+      case "update":
+        out.push({ kind: action.syncer.kind, action: "update", file: action.path, id: action.id });
+        break;
+      case "revise":
+        out.push({
+          kind: action.syncer.kind,
+          action: "revision",
+          file: action.path,
+          previous_id: action.previousId,
+        });
+        break;
+      case "delete":
+        out.push({ kind: action.syncer.kind, action: "delete", file: action.path, id: action.id });
+        break;
+      case "skip":
+        break;
+    }
+  }
+  return out;
+}
+
+/**
  * Render a {@link buildSyncPlan} result as a human-readable Terraform-style
  * plan. TTY-aware: colors and bold are emitted only when `tty` is true.
  * Returns the empty-state message when every action is `skip`.
@@ -64,6 +135,25 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
   }
 
   out.push(paint(`Plan: ${parts.join(", ")}.`, A.bold, tty));
+
+  const warningCount = active.reduce(
+    (count, action) =>
+      count +
+      ((action.kind === "create" || action.kind === "update") && action.warnings
+        ? action.warnings.length
+        : 0),
+    0,
+  );
+  if (warningCount > 0) {
+    out.push(
+      paint(
+        `Warnings: ${warningCount} (non-blocking — see the # warning lines above).`,
+        A.yellow,
+        tty,
+      ),
+    );
+  }
+
   return out.join("\n");
 }
 
@@ -412,6 +502,7 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
       }
       renderFields(display, "+", FIELD_COL, { tty, deleteMode: false }, lines);
       lines.push(`${closePad}}`);
+      renderWarnings(action.warnings, blkPad, tty, lines);
       break;
     }
 
@@ -467,6 +558,7 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
         );
       }
       lines.push(`${closePad}}`);
+      renderWarnings(action.warnings, blkPad, tty, lines);
       break;
     }
 
@@ -512,4 +604,20 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
   }
 
   return lines;
+}
+
+/**
+ * Emit one yellow `# warning:` comment line per plan-time validation
+ * warning, below the action's closing brace (same channel as the revise
+ * re-pin announcement). Warnings never block the plan.
+ */
+function renderWarnings(
+  warnings: ReadonlyArray<{ message: string }> | undefined,
+  blkPad: string,
+  tty: boolean,
+  lines: string[],
+): void {
+  for (const warning of warnings ?? []) {
+    lines.push(paint(`${blkPad}# warning: ${warning.message}`, A.yellow, tty));
+  }
 }

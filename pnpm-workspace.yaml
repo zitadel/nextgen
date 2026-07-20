@@ -1,5 +1,4 @@
 packages:
-  - frontend/*
   - "apps/*"
   - "packages/*"
 
@@ -46,8 +45,8 @@ catalog:
   "@types/react-dom": ^19.2.3
   "@typescript/native-preview": 7.0.0-dev.20260421.2
   "@vitejs/plugin-react": ^6.0.1
-  "@vitest/browser": ^4.1.7
-  "@vitest/browser-playwright": ^4.1.7
+  "@vitest/browser": ^4.1.9
+  "@vitest/browser-playwright": ^4.1.9
   ajv: ^8.20.0
   cookie-parser: ^1.4.7
   dompurify: ^3.2.6
@@ -98,7 +97,7 @@ catalog:
   vite: ^8.0.14
   vite-plugin-dts: ^4.5.0
   vite-plugin-web-components-hmr: ^0.1.3
-  vitest: ^4.1.7
+  vitest: ^4.1.9
   vue-tsc: ^3.2.8
   waku: ^1.0.0-beta.3
   xstate: ^5.31.1

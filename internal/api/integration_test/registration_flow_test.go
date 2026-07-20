@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/descope/virtualwebauthn"
 	"github.com/stretchr/testify/require"
@@ -42,7 +43,11 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 	require.NoError(t, err)
 	rpIDStr := rpOriginURL.Hostname()
 
-	const userID = "pkreg-flow-test-user"
+	// Suffix user and credential IDs per run so the test stays re-runnable
+	// against a persistent database (ZITADEL_TEST_POSTGRES_URL): earlier runs
+	// leave their rows behind, and fixed IDs would collide with them.
+	suffix := time.Now().Format("150405.000000")
+	userID := "pkreg-flow-test-user-" + suffix
 	rp := virtualwebauthn.RelyingParty{ID: rpIDStr, Name: rpIDStr, Origin: rpOriginStr}
 
 	// Existing authenticator used for the auth step (to identify the user).
@@ -50,7 +55,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 		UserHandle: []byte(userID),
 	})
 	credExisting := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
-	credExisting.ID = []byte("pkreg-existing-cred-01")
+	credExisting.ID = []byte("pkreg-existing-cred-" + suffix)
 	credExisting.Counter = 1
 	authExisting.AddCredential(credExisting)
 
@@ -73,11 +78,11 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 
 	userRepo := harness.EnsureUserRepo(t)
 	require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
-		ProjectID:  project.ID,
-		SchemaURL:  userSchemaURL,
-		ID:         userID,
-		TeamID:     &team.ID,
-		Attributes: []*domain.CreateAttribute{emailAttr},
+		ProjectID:               project.ID,
+		SchemaURL:               userSchemaURL,
+		ID:                      userID,
+		InitialMembershipTeamID: &team.ID,
+		Attributes:              []*domain.CreateAttribute{emailAttr},
 	}))
 
 	passkeyRepo := harness.EnsureUserPasskeyRepo(t)

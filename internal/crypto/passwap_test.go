@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -458,6 +459,57 @@ func TestPasswordHashConfig_PasswordHasher(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPasswordHasher_Argon2idRehashesBcrypt verifies the ADR 029 default:
+// new passwords hash with argon2id, while pre-existing bcrypt hashes still
+// verify and are transparently rehashed to argon2id on the next verification.
+func TestPasswordHasher_Argon2idRehashesBcrypt(t *testing.T) {
+	const password = "Passw0rd!"
+
+	// A hasher configured with argon2id as the target hasher and bcrypt as a legacy verifier.
+	cfg := &HashConfig{
+		Verifiers: []HashName{HashNameBcrypt},
+		Hasher: HasherConfig{
+			Algorithm: HashNameArgon2id,
+			Params: map[string]any{
+				"time":    3,
+				"memory":  64 * 1024,
+				"threads": 4,
+			},
+		},
+		Limits: HashLimitsConfig{
+			Bcrypt: BcryptLimitsConfig{MinCost: 10, MaxCost: 16},
+		},
+	}
+	hasher, err := cfg.NewHasher()
+	require.NoError(t, err)
+
+	// New passwords are hashed with argon2id.
+	fresh, err := hasher.Hash(password)
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(fresh, argon2.Prefix), "new hash should use argon2id, got %q", fresh)
+
+	// Simulate a pre-existing bcrypt hash (e.g. migrated from a bcrypt default).
+	legacy, err := bcrypt.New(10, nil).Hash(password)
+	require.NoError(t, err)
+	require.True(t, strings.HasPrefix(legacy, bcrypt.Prefix))
+
+	// The legacy bcrypt hash still verifies...
+	updated, err := hasher.Verify(legacy, password)
+	require.NoError(t, err)
+	// ...and passwap returns a rehashed argon2id encoding to persist.
+	require.NotEmpty(t, updated, "expected a rehash to be returned for a legacy bcrypt hash")
+	assert.True(t, strings.HasPrefix(updated, argon2.Prefix), "rehash should be argon2id, got %q", updated)
+
+	// A wrong password against the legacy hash still fails.
+	_, err = hasher.Verify(legacy, "wrong")
+	assert.Error(t, err)
+
+	// Verifying an already-argon2id hash needs no rehash.
+	updated, err = hasher.Verify(fresh, password)
+	require.NoError(t, err)
+	assert.Empty(t, updated, "argon2id hash at target params should not be rehashed")
 }
 
 func TestHasher_ValidateEncodedHash(t *testing.T) {

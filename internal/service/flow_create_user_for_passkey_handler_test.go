@@ -45,7 +45,7 @@ func newPasskeyHandlerFixture(t *testing.T) *passkeyHandlerFixture {
 	pool := dbmock.NewMockPool(ctrl)
 	tx := dbmock.NewMockTransaction(ctrl)
 
-	userService := service.NewUserService(pool, userRepo, passwordRepo, schemaRepo, nil, nil)
+	userService := service.NewUserService(pool, userRepo, passwordRepo, schemaRepo, nil)
 	handler := service.NewFlowCreateUserForPasskeyHandler(userRepo, userService, schemaRepo)
 
 	return &passkeyHandlerFixture{

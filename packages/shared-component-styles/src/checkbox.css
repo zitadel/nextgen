@@ -9,6 +9,20 @@
  * preview-only so the playground/stories can paint the full Figma matrix
  * statically (they are not product API). Disabled is the `--disabled` modifier.
  */
+/*
+ * Column wrapper: the checkbox row plus an optional inline error stacked below
+ * (mirrors `.zr-field`'s root → error layout). Kept out of the parity gate's
+ * selector list: as a flex item of the Lit `:host { display: inline-flex }` its
+ * `display` blockifies to `flex`, while the React copy (child of a plain div)
+ * stays `inline-flex` — the same host-model divergence noted for `.zr-checkbox`.
+ */
+.zr-checkbox-field {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--zl-spacing-01, 0.25rem);
+}
+
 .zr-checkbox {
   display: inline-flex;
   align-items: center;
@@ -33,7 +47,9 @@
  * React DOM has no host to anchor that, so each `.zr-checkbox__*` element would
  * default to `content-box` and drift. Pin it for the whole subtree once.
  */
+.zr-checkbox-field,
 .zr-checkbox,
+.zr-checkbox-field *,
 .zr-checkbox *,
 .zr-checkbox *::before,
 .zr-checkbox *::after {
@@ -169,4 +185,16 @@
 }
 .zr-checkbox--disabled .zr-checkbox__label {
   color: var(--zl-color-text-disabled, #686883);
+}
+
+/* Invalid — red box edge (unchecked) so the error is visible on the control. */
+.zr-checkbox--invalid .zr-checkbox__input:not(:checked) + .zr-checkbox__box .zr-checkbox__face {
+  border-color: var(--zl-color-text-error, #ea4f70);
+}
+
+/* Inline error message under the checkbox row (mirrors .zr-field__error). */
+.zr-checkbox__error {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--zl-color-text-error, #ea4f70);
 }

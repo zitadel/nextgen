@@ -16,7 +16,7 @@
         {% if err | formLevelError %}
           {% assign alert_heading = err.text_key | alertHeading %}
           {% assign alert_body = err.text_key | alertBody %}
-          <zl-alert severity="error"{% if alert_heading != "" %} heading="{{ alert_heading | t }}"{% endif %}>
+          <zl-alert severity="error" dismissible data-zl-step-error{% if alert_heading != "" %} heading="{{ alert_heading | t }}"{% endif %}>
             {% if alert_body != "" %}{{ alert_body | t }}{% elsif err.text_key %}{{ err.text_key | t }}{% else %}{{ err.message }}{% endif %}
           </zl-alert>
         {% endif %}
@@ -31,21 +31,22 @@
       {% when 'checkbox' %}
         <zl-checkbox
           name="{{ f.name }}"
-          data-testid="zitadel-field-{{ f.name }}"
+          data-testid="zitadel-field-{{ f.name | testid }}"
           label="{{ f.text_key | t }}"
           value="true"
           {% if f.value %}checked{% endif %}
-          {% if f.required %}required{% endif %}
+          {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
         ></zl-checkbox>
       {% when 'select' %}
         <zl-select
           name="{{ f.name }}"
-          data-testid="zitadel-field-{{ f.name }}"
+          data-testid="zitadel-field-{{ f.name | testid }}"
           label="{{ f.text_key | t }}"
           value="{{ f.value }}"
           options='{{ f.validation.enum | selectOptions | json }}'
           {% if f.required %}required{% endif %}
           {% if field_placeholder != "" %}placeholder="{{ field_placeholder }}"{% endif %}
+          {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
         ></zl-select>
       {% else %}
         {% assign autocomplete_val = '' %}
@@ -58,7 +59,7 @@
         {% endif %}
         <zl-field
           name="{{ f.name }}"
-          data-testid="zitadel-field-{{ f.name }}"
+          data-testid="zitadel-field-{{ f.name | testid }}"
           label="{{ f.text_key | t }}"
           type="{{ f.type }}"
           value="{{ f.value }}"
@@ -152,6 +153,8 @@
           method="{{ submit_method }}"
           challenge-id="{{ challenge.challenge_id }}"
           options='{{ challenge.options | json }}'
+          pending-label="{{ 'passkey.pending.status' | t }}"
+          cancel-label="{{ 'action.cancel' | t }}"
         ></zl-passkey>
       {% endif %}
     {% endif %}

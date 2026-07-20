@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 
-import { renderPlan, summarizePlan } from "../../../../src/lib/sync/plan-renderer";
+import {
+  enumeratePlanResources,
+  renderPlan,
+  summarizePlan,
+} from "../../../../src/lib/sync/plan-renderer";
 import type { ResourceSyncer, SyncAction } from "../../../../src/lib/sync/types";
 
 function makeSyncer(
@@ -68,6 +72,63 @@ describe("summarizePlan", () => {
       deletes: 0,
       total: 0,
     });
+  });
+});
+
+describe("enumeratePlanResources", () => {
+  it("maps every non-skip action to an envelope row, in plan order", () => {
+    const actions: SyncAction[] = [
+      { kind: "create", path: ".zitadel/schemas/user.json", syncer: schema, content: {}, hash: "h" },
+      {
+        kind: "update",
+        path: ".zitadel/flows/login.json",
+        syncer: flow,
+        id: "flow_1",
+        content: {},
+        hash: "h",
+        oldContent: null,
+      },
+      {
+        kind: "revise",
+        path: ".zitadel/schemas/user.json",
+        syncer: schema,
+        content: {},
+        hash: "h",
+        previousId: "sch_1",
+        oldContent: null,
+        affectedPaths: [".zitadel/flows/login.json"],
+      },
+      { kind: "delete", path: ".zitadel/flows/old.json", syncer: flow, id: "flow_0", oldContent: null },
+      { kind: "skip", path: ".zitadel/schemas/other.json", reason: "no-change" },
+    ];
+
+    // `revise` speaks the envelope's public vocabulary: `revision`,
+    // matching the `revisions` counter.
+    expect(enumeratePlanResources(actions)).toEqual([
+      { kind: "schema", action: "create", file: ".zitadel/schemas/user.json" },
+      { kind: "flow", action: "update", file: ".zitadel/flows/login.json", id: "flow_1" },
+      {
+        kind: "schema",
+        action: "revision",
+        file: ".zitadel/schemas/user.json",
+        previous_id: "sch_1",
+      },
+      { kind: "flow", action: "delete", file: ".zitadel/flows/old.json", id: "flow_0" },
+    ]);
+  });
+
+  it("agrees with summarizePlan on what counts", () => {
+    const actions: SyncAction[] = [
+      { kind: "create", path: "a", syncer: schema, content: {}, hash: "h" },
+      { kind: "skip", path: "b", reason: "immutable" },
+      { kind: "delete", path: "c", syncer: flow, id: "1", oldContent: null },
+    ];
+    expect(enumeratePlanResources(actions)).toHaveLength(summarizePlan(actions).total);
+  });
+
+  it("returns an empty array for an empty or skip-only plan", () => {
+    expect(enumeratePlanResources([])).toEqual([]);
+    expect(enumeratePlanResources([{ kind: "skip", path: "a", reason: "no-change" }])).toEqual([]);
   });
 });
 
@@ -461,5 +522,54 @@ describe("renderPlan — re-pin messaging", () => {
 
     const out = renderPlan(actions, false);
     expect(out).toContain('~ user_schema = "sch_A" -> "sch_B"');
+  });
+});
+
+describe("renderPlan — validation warnings", () => {
+  const warning = {
+    rule: "warn/password-without-identifier",
+    message:
+      'step "start" collects x-auth-methods#password on the login path but no upstream step collects an identifier field — the engine cannot resolve which user to challenge',
+  };
+
+  it("renders a # warning comment line under a create block", () => {
+    const actions: SyncAction[] = [
+      {
+        kind: "create",
+        path: ".zitadel/flows/default.json",
+        syncer: flow,
+        content: { name: "login" },
+        hash: "h",
+        warnings: [warning],
+      },
+    ];
+
+    const out = renderPlan(actions, false);
+    expect(out).toContain(`# warning: ${warning.message}`);
+    expect(out).toContain("Warnings: 1 (non-blocking");
+  });
+
+  it("renders warnings under an update block", () => {
+    const actions: SyncAction[] = [
+      {
+        kind: "update",
+        path: ".zitadel/flows/default.json",
+        syncer: flow,
+        id: "flow-001",
+        content: { name: "login" },
+        hash: "h",
+        oldContent: { name: "login" },
+        warnings: [warning],
+      },
+    ];
+
+    expect(renderPlan(actions, false)).toContain(`# warning: ${warning.message}`);
+  });
+
+  it("emits no warning summary when the plan is warning-free", () => {
+    const actions: SyncAction[] = [
+      { kind: "create", path: "a", syncer: flow, content: {}, hash: "h" },
+    ];
+    expect(renderPlan(actions, false)).not.toContain("Warnings:");
   });
 });

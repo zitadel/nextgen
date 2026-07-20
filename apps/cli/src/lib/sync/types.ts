@@ -112,6 +112,14 @@ export type SyncPlanSummary = {
  */
 export type FlowRepin = { previousId: string; schemaPath: string; newId?: string };
 
+/**
+ * A non-blocking finding from plan-time flow validation (severity
+ * `warning` in `@zitadel/config/validate`). Rendered as `# warning:`
+ * comment lines in the plan and `consola.warn`ed during apply; never
+ * fails the run.
+ */
+export type SyncActionWarning = { rule: string; message: string };
+
 export type SyncAction =
   | {
       kind: "create";
@@ -120,6 +128,7 @@ export type SyncAction =
       content: object;
       hash: string;
       repin?: FlowRepin;
+      warnings?: ReadonlyArray<SyncActionWarning>;
     }
   | {
       kind: "update";
@@ -130,6 +139,7 @@ export type SyncAction =
       hash: string;
       oldContent: object | null;
       repin?: FlowRepin;
+      warnings?: ReadonlyArray<SyncActionWarning>;
     }
   | {
       kind: "revise";

@@ -40,7 +40,41 @@ Typical edits:
   different next step, or use `action: switch` / `pivot` to jump to
   another flow.
 - **Add another flow** — drop a new JSON file with its own `purposes`
-  and `audience` (e.g. a per-team login).
+  and a distinct `name` (e.g. a per-team login). See
+  [Multiple flows](#multiple-flows) for how it gets selected at runtime.
+
+## Multiple flows
+
+All files in this folder sync on `apply`, but the widget runs exactly
+one flow per sign-in. Which one:
+
+- **By name** — give the flow a distinct `name` and pass it as
+  `flowName` on `ZitadelLogin` (the `flow-name` attribute on
+  `<zitadel-login>`). The platform resolves that definition directly;
+  an unknown name or wrong purpose surfaces as a startup error in the
+  widget.
+- **By audience** — omit `flowName` and scope the flow with
+  `audience.app_ids` / `audience.team_ids`. A start request hinting one
+  of those ids gets the scoped flow (app match beats team match); all
+  other requests get the newest flow without an `audience`.
+
+A flow scoped to an app or team never captures the project default —
+requests that don't identify that audience fall back to the unscoped
+flow.
+
+The flip side: a **new active flow without an `audience` becomes the
+newest unscoped definition, i.e. the default**, the moment it applies.
+`plan` calls this out with a `# warning:` line on the create so an
+experiment can't silently take over `/login` — scope it or pin
+`flow-name` in the widget if that isn't the intent.
+
+## Presets
+
+`zitadel setup` scaffolds this folder from a preset (`--preset
+password-first` or `--preset passkey-first`). The passkey-first flow
+enters login on a fields-less passkey step with an email → password
+fallback path. The preset only decides the starting point — edit
+anything here afterwards.
 
 ## Schema revisions
 

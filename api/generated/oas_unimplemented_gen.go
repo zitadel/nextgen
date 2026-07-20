@@ -286,7 +286,7 @@ func (UnimplementedHandler) GetLive(ctx context.Context) (r GetLiveRes, _ error)
 // against the same `session_id`) to restore a dropped assurance level.
 //
 // GET /sessions/me
-func (UnimplementedHandler) GetMySession(ctx context.Context, params GetMySessionParams) (r GetMySessionRes, _ error) {
+func (UnimplementedHandler) GetMySession(ctx context.Context) (r GetMySessionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -295,7 +295,7 @@ func (UnimplementedHandler) GetMySession(ctx context.Context, params GetMySessio
 // Get my user information.
 //
 // GET /users/me
-func (UnimplementedHandler) GetMyUser(ctx context.Context, params GetMyUserParams) (r GetMyUserRes, _ error) {
+func (UnimplementedHandler) GetMyUser(ctx context.Context) (r GetMyUserRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -445,6 +445,24 @@ func (UnimplementedHandler) ListUsers(ctx context.Context, params ListUsersParam
 	return r, ht.ErrNotImplemented
 }
 
+// PatchProject implements patchProject operation.
+//
+// Updates the state of a project.
+//
+// PATCH /projects/{project_id}
+func (UnimplementedHandler) PatchProject(ctx context.Context, req *PatchProjectRequest, params PatchProjectParams) (r PatchProjectRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// QueryProjects implements queryProjects operation.
+//
+// Query projects.
+//
+// POST /projects/query
+func (UnimplementedHandler) QueryProjects(ctx context.Context, req *QueryProjectsRequest) (r QueryProjectsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // RevokeMySession implements revokeMySession operation.
 //
 // Revokes the session immediately (`state: revoked`). This is the logout operation.
@@ -454,7 +472,7 @@ func (UnimplementedHandler) ListUsers(ctx context.Context, params ListUsersParam
 //	which is cleared in the response.
 //
 // DELETE /sessions/me
-func (UnimplementedHandler) RevokeMySession(ctx context.Context, params RevokeMySessionParams) (r RevokeMySessionRes, _ error) {
+func (UnimplementedHandler) RevokeMySession(ctx context.Context) (r RevokeMySessionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

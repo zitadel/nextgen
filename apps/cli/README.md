@@ -38,8 +38,8 @@ starting a local runtime. Use `--runtime docker`, `--image`, or
 framework to scaffold when the directory is fresh, writes the Next.js app into
 the current directory, scaffolds `app/login`, `app/register`, `app/profile`, and
 `proxy.ts` for Next 16+ or `middleware.ts` for older Next versions. Fresh
-scaffolds also replace the starter `app/page.tsx` with links to sign in, create
-an account, and profile. Setup writes `.env.local` and `.zitadel/`, and installs
+scaffolds also replace the starter `app/page.tsx` with a redirect to `/login`.
+Setup writes `.env.local` and `.zitadel/`, and installs
 dependencies with the detected package manager. Pass `--skip-install` to install
 them yourself. The project's default user schema and login flow are provisioned
 from versioned local defaults; setup writes editable copies into
@@ -435,6 +435,8 @@ USAGE
     [--dry-run] [--verbose] [--debug] [--telemetry] [--framework
     next|nuxt|react|vue|solid|svelte|qwik|angular] [--renderer
     react|web-component] [--dev-port <value>] [--skip-install]
+    [--preset password-first|passkey-first] [--use-case
+    minimal|consumer|business]
 
 FLAGS
   -c, --cwd=<value>         Project directory to operate on.
@@ -451,12 +453,18 @@ FLAGS
       --framework=<option>  Framework to target.
                             <options:
                             next|nuxt|react|vue|solid|svelte|qwik|angular>
+      --preset=<option>     Sign-in preset for the scaffolded schema and login
+                            flow (default: password-first).
+                            <options: password-first|passkey-first>
       --renderer=<option>   Renderer (default: react).
                             <options: react|web-component>
       --skip-install        Do not install dependencies after setup updates
                             package.json.
       --[no-]telemetry      Send anonymous usage analytics. Disable with
                             --no-telemetry.
+      --use-case=<option>   Use case for the scaffolded schema fields: who
+                            signs in to the app (default: minimal).
+                            <options: minimal|consumer|business>
       --verbose             Verbose logging.
 
 GLOBAL FLAGS
