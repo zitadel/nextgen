@@ -147,6 +147,48 @@ describe("materializeSetupResources", () => {
     );
   });
 
+  it("scaffolds the business use case's companyName into the written schema and register step", async () => {
+    const client = {
+      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
+      createFlowDefinition: vi.fn().mockImplementation(async (body: {
+        flow_definition: Record<string, unknown>;
+      }) => ({
+        id: "flow_01KWHG",
+        status: "active",
+        flow_definition: body.flow_definition,
+      })),
+    } as unknown as ZitadelClient;
+
+    await materializeSetupResources({
+      cwd,
+      client,
+      projectId: "project_123",
+      force: false,
+      useCase: "business",
+    });
+
+    // The composed schema field set reaches the uploaded body and the written
+    // file — this is the one seam the config-package matrix can't cover.
+    const schemaBody = vi.mocked(client.createSchema).mock.calls[0]?.[0] as {
+      properties: Record<string, unknown>;
+      required: string[];
+    };
+    expect(schemaBody.properties).toHaveProperty("companyName");
+    expect(schemaBody.required).toEqual(["email"]);
+
+    const schemaFile = JSON.parse(
+      await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8"),
+    ) as { properties: Record<string, unknown> };
+    expect(schemaFile.properties).toHaveProperty("companyName");
+
+    // The register step's fields are derived from the same use case.
+    const flowFile = JSON.parse(
+      await readFile(join(cwd, DEFAULT_FLOW_CONFIG_PATH), "utf8"),
+    ) as { steps: Array<{ name: string; fields?: string[] }> };
+    const register = flowFile.steps.find((step) => step.name === "register");
+    expect(register?.fields).toEqual(["email", "givenName", "familyName", "companyName"]);
+  });
+
   it("writes schemas and flows READMEs the first time", async () => {
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),

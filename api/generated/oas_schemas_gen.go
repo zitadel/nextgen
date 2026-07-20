@@ -4073,9 +4073,11 @@ type FlowStep struct {
 	// (e.g. `error.email_required`; the `format` rule is spelled
 	// `error.<field>_invalid`), multiple violations joined with `"; "`.
 	// Field names appear verbatim, so clients localise unknown keys via
-	// the generic `error.field_<rule>` catalog entries. Other failures
-	// carry a verbatim diagnostic token instead (e.g. `user_not_found`,
-	// `auth_attempt.password_invalid`).
+	// the generic `error.field_<rule>` catalog entries. Other engine
+	// failures carry `error.*` catalog keys as well (e.g.
+	// `error.invalid_credentials`, `error.passkey_invalid`); a
+	// non-`error.` payload is an outcome token (e.g. `user_not_found`)
+	// that clients keep verbatim.
 	Error OptNilString `json:"error"`
 	// Present only on terminal steps. Tells the frontend what to do:
 	// - redirect: navigate to redirect_uri immediately (OIDC/SAML done)

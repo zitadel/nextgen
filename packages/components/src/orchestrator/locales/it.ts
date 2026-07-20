@@ -115,6 +115,7 @@ export const it: Locale = {
   "register.field.password": "Password",
   "register.field.givenName": "Nome",
   "register.field.familyName": "Cognome",
+  "register.field.companyName": "Nome azienda",
   // L'<input type="date"> nativo localizza il proprio formato di visualizzazione in base
   // alla lingua dell'utente e invia ISO YYYY-MM-DD — nessun segnaposto/suggerimento di formato necessario.
   "register.field.dateOfBirth": "Data di nascita",
@@ -171,6 +172,9 @@ export const it: Locale = {
     "La registrazione della passkey non è stata completata. Riprova.",
   "error.passkey_unsupported": "Questo dispositivo non supporta le passkey",
   "error.passkey_failed": "Qualcosa è andato storto. Riprova.",
+  "error.passkey_invalid": "Non è stato possibile verificare questa passkey. Riprova.",
+  "error.passkey_registration_invalid":
+    "Non è stato possibile verificare la nuova passkey. Riprova a registrarla.",
 
   // --- Errori campo / modulo ---
   "error.email_required": "Inserisci un indirizzo e-mail",

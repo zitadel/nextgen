@@ -8,12 +8,14 @@ import { environmentSchema } from "../lib/environment";
 import {
   buildSyncPlan,
   collectPlanWarnings,
+  enumeratePlanResources,
   makeSyncers,
   renderPlan,
   runSyncLoop,
   summarizePlan,
 } from "../lib/sync";
 import { readZitadelSecret } from "../lib/project";
+import { publicCliCommand } from "../lib/public-cli";
 
 /**
  * `zitadel apply` — validate and upload repo config to the platform.
@@ -55,9 +57,26 @@ export default class Apply extends BaseCommand {
 
     if (!dryRun) {
       consola.start("Syncing schemas and flows to Zitadel");
-      const { filesUpdated } = await runSyncLoop(cwd, syncers);
+      const { filesUpdated, applied } = await runSyncLoop(cwd, syncers);
       consola.success("Sync complete");
-      return this.emit({ status: "ok", data: { synced: true, files_updated: filesUpdated } });
+      return this.emit({
+        status: "ok",
+        data: {
+          synced: true,
+          // Platform resources this run touched (with resulting ids);
+          // `files_updated` stays the local write-backs only.
+          changes: applied,
+          files_updated: filesUpdated,
+          next_actions:
+            applied.length === 0
+              ? ["Everything is already in sync — no changes were applied."]
+              : [
+                  "Changes are live — reload your app to see them.",
+                  "Re-run plan to confirm local config and platform are in sync.",
+                ],
+          next_commands: [publicCliCommand("plan", this.meta.cliVersion)],
+        },
+      });
     }
 
     consola.start("Building plan (dry run)");
@@ -78,7 +97,11 @@ export default class Apply extends BaseCommand {
     );
     return this.emit({
       status: "ok",
-      data: { ...summary, warnings: collectPlanWarnings(plan) },
+      data: {
+        ...summary,
+        changes: enumeratePlanResources(plan),
+        warnings: collectPlanWarnings(plan),
+      },
       pretty: renderPlan(plan, isTTY),
     });
   }

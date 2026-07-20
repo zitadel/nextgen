@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
@@ -83,23 +84,35 @@ func ensureUser(t *testing.T, client database.QueryExecutor, projectID, teamID, 
 	var err error
 	if isSpannerDB {
 		_, err = client.Exec(ctx,
-			`INSERT OR IGNORE INTO users (project_id, schema_url, id, team_id, created_at, updated_at) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`,
-			projectID, schemaURL, userID, teamID,
+			`INSERT OR IGNORE INTO users (project_id, schema_url, id, lifecycle_owner_team_id, status, created_at, updated_at) VALUES ($1, $2, $3, NULL, $4, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`,
+			projectID, schemaURL, userID, domain.UserStatusActive.String(),
 		)
 	} else {
 		_, err = client.Exec(ctx,
-			`INSERT INTO zitadel_nextgen.users (project_id, schema_url, id, team_id) VALUES ($1, $2, $3, $4) ON CONFLICT (project_id, id) DO NOTHING`,
-			projectID, schemaURL, userID, teamID,
+			`INSERT INTO zitadel_nextgen.users (project_id, schema_url, id, lifecycle_owner_team_id, status) VALUES ($1, $2, $3, NULL, $4) ON CONFLICT (project_id, id) DO NOTHING`,
+			projectID, schemaURL, userID, domain.UserStatusActive.String(),
 		)
 	}
 	require.NoError(t, err)
+	if teamID == "" {
+		return
+	}
+	membershipRepo := repository.NewTeamMembershipRepository(client)
+	require.NoError(t, membershipRepo.Create(ctx, client, &domain.TeamMembership{
+		ProjectID: projectID,
+		TeamID:    teamID,
+		UserID:    userID,
+		Status:    domain.MembershipStatusActive,
+	}))
 }
 
 func deleteUser(t *testing.T, client database.QueryExecutor, projectID, userID string) {
 	t.Helper()
 	ctx := t.Context()
 	if isSpannerDB {
-		_, err := client.Exec(ctx, `DELETE FROM users WHERE project_id = $1 AND id = $2`, projectID, userID)
+		_, err := client.Exec(ctx, `DELETE FROM team_memberships WHERE project_id = $1 AND user_id = $2`, projectID, userID)
+		require.NoError(t, err)
+		_, err = client.Exec(ctx, `DELETE FROM users WHERE project_id = $1 AND id = $2`, projectID, userID)
 		require.NoError(t, err)
 		return
 	}

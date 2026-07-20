@@ -46,6 +46,11 @@ Each invocation prints one JSON object:
 - On failure: `code` (e.g. `E_VALIDATION`, `E_NETWORK`, `E_NOT_FOUND`,
   `E_CONFLICT`) and `message`.
 - `next_commands`: the suggested follow-ups. Prefer these over free-text hints.
+- `plan` and `apply` also emit `data.changes`: one row per touched resource
+  (`{kind, action, file, id?, previous_id?}`, action ∈ create/update/revision/
+  delete). Plan rows preview; apply rows report, with the resulting platform
+  ids. Use it to verify an edit did what you intended — `apply`'s
+  `files_updated` lists only local write-backs, not platform changes.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime with
   `npx @zitadel/cli@alpha start`, then retry with `--server local`.
 - `E_NOT_FOUND`: an HTTP 404 from the target server. With the platform's
@@ -85,7 +90,11 @@ the CLI's help layer, not the envelope.
   experience the scaffold starts from: `password-first` is the default —
   email + password with passkey optional during registration; `passkey-first`
   enters login on a one-tap passkey step with an email + password fallback;
-  recorded in `zitadel.json`), `--skip-install`.
+  recorded in `zitadel.json`), `--use-case minimal|consumer|business` (which
+  profile fields the scaffolded schema collects: `minimal` is the default —
+  email only; `consumer` adds given and family name; `business` also adds a
+  `companyName` attribute; asked before `--preset` and recorded in
+  `zitadel.json`), `--skip-install`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
 - `schemas list` — inspect the revision history of a user-schema, filtered by
@@ -165,7 +174,11 @@ Use host hooks such as `zitadel-field-email`, `zitadel-field-password`, and
 `zitadel-action-submit` when targeting the Lit atoms. Use native shadow-control
 hooks such as `zitadel-input-email`, `zitadel-input-password`, and
 `zitadel-action-submit-button` when filling or clicking the underlying input or
-button. For sign-out, open the user menu button if needed, then pierce to
+button. Hooks stay method-named even when the flow engine names a credential
+field `x-auth-methods#<method>`; only the `name` attribute carries that raw
+form key. Enter inside a field submits the step's primary action, but only for
+key events that carry `key: "Enter"` — drivers whose synthesized key events
+omit it (some CDP wrappers) should click `zitadel-action-submit` instead. For sign-out, open the user menu button if needed, then pierce to
 `.signout-btn`; Playwright-style locators may use `zitadel-logout .signout-btn`.
 The canonical component hook list lives in `packages/components/README.md`.
 

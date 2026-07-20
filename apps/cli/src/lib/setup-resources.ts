@@ -18,6 +18,7 @@ import {
   DEFAULT_FLOW_SCHEMA_URI,
   DEFAULT_SCHEMA_CONFIG_PATH,
   DEFAULT_SETUP_PRESET,
+  DEFAULT_SETUP_USE_CASE,
   brandingReadmeContent,
   flowsReadmeContent,
   getDefaultBrandingConfig,
@@ -25,6 +26,7 @@ import {
   getDefaultLoginFlow,
   schemasReadmeContent,
   type SetupPreset,
+  type SetupUseCase,
 } from "@zitadel/config/defaults";
 import { BRANDING_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
 
@@ -58,8 +60,10 @@ export async function materializeSetupResources(opts: {
   client: ZitadelClient;
   projectId: string;
   force: boolean;
-  /** Which schema+flow bundle to scaffold; defaults to password-first. */
+  /** Sign-in preset (flow + auth methods) to scaffold; defaults to password-first. */
   preset?: SetupPreset;
+  /** Use case (schema field set) to scaffold; defaults to minimal. */
+  useCase?: SetupUseCase;
   /**
    * Login design to eject into `.zitadel/branding/` and publish as branding
    * revision 1. When absent, no branding files are scaffolded and the login
@@ -72,8 +76,9 @@ export async function materializeSetupResources(opts: {
 
   const filesWritten: string[] = [];
   const preset = opts.preset ?? DEFAULT_SETUP_PRESET;
+  const useCase = opts.useCase ?? DEFAULT_SETUP_USE_CASE;
 
-  const { $id: _templateId, ...schemaBody } = getDefaultHumanUserSchema({ preset }) as {
+  const { $id: _templateId, ...schemaBody } = getDefaultHumanUserSchema({ preset, useCase }) as {
     $id?: string;
   } & Record<string, unknown>;
   void _templateId;
@@ -115,7 +120,7 @@ export async function materializeSetupResources(opts: {
     hash: schemaHash,
   });
 
-  const flowBody = getDefaultLoginFlow({ userSchemaUrl: schemaId, preset });
+  const flowBody = getDefaultLoginFlow({ userSchemaUrl: schemaId, preset, useCase });
 
   const flowWritten = await writeResourceFile(
     opts.cwd,

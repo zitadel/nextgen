@@ -24,6 +24,9 @@ import type { Locale } from "./locales/en.js";
 
 export const MANDATORY_GATES_MARKER = "ZL_MANDATORY_GATES";
 
+/** Every atom tag that participates as a named form field. */
+const FIELD_ATOM_TAGS = "zl-field, zl-select, zl-checkbox";
+
 export const mandatoryGatesMarkerComment = `<!--${MANDATORY_GATES_MARKER}-->`;
 
 export function patchMandatoryGates(
@@ -84,10 +87,17 @@ function hasPrimaryButton(fragment: DocumentFragment): boolean {
 }
 
 function hasFieldFor(fragment: DocumentFragment, name: string): boolean {
-  // We avoid a CSS attribute selector here so we don't have to worry about
-  // escaping arbitrary characters in `name` (which comes from the step JSON).
-  // Walking the small set of <zl-field> nodes is fine.
-  for (const field of fragment.querySelectorAll("zl-field")) {
+  // A field renders as one of several form-participating atoms depending on
+  // its type: <zl-field> (text/email/password), <zl-select> (enum), or
+  // <zl-checkbox> (boolean). Match on the shared `name` attribute across all
+  // of them — checking only <zl-field> made required <zl-select>/<zl-checkbox>
+  // fields look "missing", so the safety net appended a duplicate generic text
+  // field at the bottom of the form.
+  //
+  // We avoid a CSS attribute selector for `name` so we don't have to worry
+  // about escaping arbitrary characters in it (it comes from the step JSON);
+  // walking the small set of field-atom nodes is fine.
+  for (const field of fragment.querySelectorAll(FIELD_ATOM_TAGS)) {
     if (field.getAttribute("name") === name) return true;
   }
   return false;

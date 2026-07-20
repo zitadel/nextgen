@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5"
+
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
@@ -56,6 +57,11 @@ func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*dom
 		return nil, wrapError(err)
 	}
 	return project, nil
+}
+
+// UpdateProject implements [service.ProjectStatements].
+func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.Project) error {
+	panic("unimplemented")
 }
 
 // ListProjects implements [service.ProjectStatements].

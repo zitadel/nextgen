@@ -123,6 +123,7 @@ export const en: Record<string, string> = {
   "register.field.password": "Password",
   "register.field.givenName": "Given name",
   "register.field.familyName": "Family name",
+  "register.field.companyName": "Company name",
   // Native <input type="date"> localizes its own display format to the user's
   // locale and submits ISO YYYY-MM-DD — no placeholder/help format hint needed.
   "register.field.dateOfBirth": "Date of birth",
@@ -179,6 +180,9 @@ export const en: Record<string, string> = {
   "error.passkey_setup_failed": "Passkey registration did not complete. Please try again.",
   "error.passkey_unsupported": "This device does not support passkeys",
   "error.passkey_failed": "Something went wrong. Please try again.",
+  "error.passkey_invalid": "This passkey could not be verified. Please try again.",
+  "error.passkey_registration_invalid":
+    "The new passkey could not be verified. Please try registering it again.",
 
   // --- Field / form errors (Figma field annotations) ---
   "error.email_required": "Please enter an email address",

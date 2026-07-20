@@ -8,8 +8,11 @@ import type { CreateProject201 } from "@zitadel/api/generated/model";
 import {
   BRANDING_DESIGNS,
   DEFAULT_SETUP_PRESET,
+  DEFAULT_SETUP_USE_CASE,
   SETUP_PRESETS,
+  SETUP_USE_CASES,
   type SetupPreset,
+  type SetupUseCase,
 } from "@zitadel/config/defaults";
 import { consola } from "consola";
 
@@ -91,6 +94,11 @@ export default class Setup extends BaseCommand {
         "Sign-in preset for the scaffolded schema and login flow (default: password-first).",
       options: [...SETUP_PRESETS],
     }),
+    "use-case": Flags.string({
+      description:
+        "Use case for the scaffolded schema fields: who signs in to the app (default: minimal).",
+      options: [...SETUP_USE_CASES],
+    }),
     design: Flags.string({
       description:
         "Login design to eject into .zitadel/branding/ and publish as branding revision 1. When omitted, the login uses the built-in template; run the `branding eject` command later to customize.",
@@ -154,6 +162,7 @@ export default class Setup extends BaseCommand {
       skip_install: Boolean(flags["skip-install"]),
       dev_port_explicit: flags["dev-port"] !== undefined,
       preset: flags.preset ?? DEFAULT_SETUP_PRESET,
+      use_case: flags["use-case"] ?? DEFAULT_SETUP_USE_CASE,
       step: "framework_resolved",
     });
 
@@ -182,15 +191,18 @@ export default class Setup extends BaseCommand {
       server: this.meta.source,
       devPort: framework.devPort,
       preset: (flags.preset as SetupPreset | undefined) ?? DEFAULT_SETUP_PRESET,
+      useCase: (flags["use-case"] as SetupUseCase | undefined) ?? DEFAULT_SETUP_USE_CASE,
     };
 
     if (!nonInteractive && !dryRun) {
       intro("Zitadel setup");
       const promptCtx = {
         framework,
+        cwd,
         serverFlag: this.meta.serverFlag,
         devPortFromFlag: flags["dev-port"] !== undefined,
         presetFromFlag: flags.preset !== undefined,
+        useCaseFromFlag: flags["use-case"] !== undefined,
       };
       for (const prompt of SETUP_PROMPTS) {
         answers = await prompt.ask(answers, promptCtx);
@@ -198,10 +210,10 @@ export default class Setup extends BaseCommand {
       outro("Configuration captured");
     }
 
-    // The interactive prompt can override the flag/default preset recorded at
-    // framework_resolved — re-record so telemetry carries the preset that
-    // actually scaffolds.
-    this.recordTelemetry({ preset: answers.preset });
+    // The interactive prompts can override the flag/default preset and use
+    // case recorded at framework_resolved — re-record so telemetry carries
+    // the values that actually scaffold.
+    this.recordTelemetry({ preset: answers.preset, use_case: answers.useCase });
 
     const issuer = issuerFromPort(answers.devPort);
     // The DevPortPrompt can change the port interactively, so fold the answer
@@ -234,6 +246,7 @@ export default class Setup extends BaseCommand {
             ...retryOptionsFromFlags(flags),
             framework: framework.id,
             preset: answers.preset,
+            useCase: answers.useCase,
             devPort: answers.devPort,
           },
         );
@@ -249,6 +262,7 @@ export default class Setup extends BaseCommand {
       cliVersion: this.meta.cliVersion,
       scaffoldedFramework,
       preset: answers.preset,
+      useCase: answers.useCase,
     };
     consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
     const result = await orca.patcherFor(framework.id).patch(ctx, { cwd, dryRun, force });
@@ -269,6 +283,7 @@ export default class Setup extends BaseCommand {
             projectId: project.id,
             force,
             preset: answers.preset,
+            useCase: answers.useCase,
             design: flags.design,
           });
     } catch (error) {
@@ -425,6 +440,7 @@ function dryRunProject(issuer: string): CreateProject201 {
 type SetupRetryOptions = {
   framework?: string;
   preset?: SetupPreset;
+  useCase?: SetupUseCase;
   design?: string;
   renderer?: string;
   devPort?: number;
@@ -443,6 +459,9 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
   }
   if (opts.preset && opts.preset !== DEFAULT_SETUP_PRESET) {
     parts.push(`--preset ${opts.preset}`);
+  }
+  if (opts.useCase && opts.useCase !== DEFAULT_SETUP_USE_CASE) {
+    parts.push(`--use-case ${opts.useCase}`);
   }
   if (opts.design) {
     parts.push(`--design ${opts.design}`);
@@ -468,6 +487,7 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
 function retryOptionsFromFlags(flags: {
   framework?: string;
   preset?: string;
+  "use-case"?: string;
   design?: string;
   renderer?: string;
   "dev-port"?: number;
@@ -476,6 +496,7 @@ function retryOptionsFromFlags(flags: {
   return {
     framework: flags.framework,
     preset: flags.preset as SetupPreset | undefined,
+    useCase: flags["use-case"] as SetupUseCase | undefined,
     design: flags.design,
     renderer: flags.renderer,
     devPort: flags["dev-port"],

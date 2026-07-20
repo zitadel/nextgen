@@ -5,7 +5,8 @@ PREPARE get_user (TEXT, TEXT) AS
 SELECT
     u.schema_url,
     u.id,
-    u.team_id,
+    u.lifecycle_owner_team_id,
+    u.status,
     u.created_at,
     u.updated_at,
     (

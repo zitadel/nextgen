@@ -95,13 +95,19 @@ describe("plan command", () => {
       };
     };
     expect(json.status).toBe("ok");
-    // The user schema and the default flow are both new → two creates.
+    // The user schema and the default flow are both new → two creates,
+    // enumerated per resource in `changes` so agents can verify what a
+    // plan will touch without applying.
     expect(json.data).toEqual({
       creates: 2,
       updates: 0,
       revisions: 0,
       deletes: 0,
       total: 2,
+      changes: [
+        { kind: "schema", action: "create", file: ".zitadel/schemas/user.json" },
+        { kind: "flow", action: "create", file: ".zitadel/flows/default.json" },
+      ],
       warnings: [],
     });
   });

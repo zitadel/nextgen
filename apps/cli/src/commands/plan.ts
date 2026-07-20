@@ -8,6 +8,7 @@ import { environmentSchema } from "../lib/environment";
 import {
   buildSyncPlan,
   collectPlanWarnings,
+  enumeratePlanResources,
   makeSyncers,
   renderPlan,
   summarizePlan,
@@ -70,7 +71,11 @@ export default class Plan extends BaseCommand {
     );
     return this.emit({
       status: "ok",
-      data: { ...summary, warnings: collectPlanWarnings(plan) },
+      data: {
+        ...summary,
+        changes: enumeratePlanResources(plan),
+        warnings: collectPlanWarnings(plan),
+      },
       pretty: renderPlan(plan, isTTY),
     });
   }

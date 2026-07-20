@@ -1254,7 +1254,9 @@ describe("plan-time flow validation", () => {
       expect(created?.kind).toBe("create");
       if (created?.kind === "create") {
         expect(created.warnings?.map((w) => w.rule)).toContain("warn/default-flow-swap");
-        expect(created.warnings?.at(-1)?.message).toContain("newest unscoped definition");
+        expect(created.warnings?.at(-1)?.message).toContain(
+          "becomes the new default for login and register",
+        );
       }
       expect(actions.find((a) => a.path === FLOW_PATH)?.kind).toBe("skip");
     } finally {
