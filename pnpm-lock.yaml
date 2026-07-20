@@ -970,6 +970,9 @@ importers:
 
   packages/components:
     dependencies:
+      '@zitadel/config':
+        specifier: workspace:*
+        version: link:../config
       dompurify:
         specifier: 'catalog:'
         version: 3.4.1
@@ -998,9 +1001,6 @@ importers:
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
-      '@zitadel/config':
-        specifier: workspace:*
-        version: link:../config
       '@zitadel/design-tokens':
         specifier: workspace:*
         version: link:../design-tokens
