@@ -1,4 +1,4 @@
-# ADR 035: User Credential Migration and Recovery
+# ADR 037: User Credential Migration and Recovery
 
 > **Status:** Proposed
 > **Date:** 2026-07-11
