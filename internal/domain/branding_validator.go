@@ -49,9 +49,17 @@ func ValidateBranding(b *Branding) error {
 	if err := validateBrandingTemplate(b.LiquidTemplate); err != nil {
 		return err
 	}
+	// font_url stays read-only in v1: the component must load the tenant font
+	// stylesheet at document level (shadow-scoped @font-face rules never
+	// register faces), so accepting an arbitrary URL here would hand
+	// branding.write document-level CSS control over every page embedding the
+	// login — bypassing the template sandbox. Safe delivery (FontFace API
+	// against font binaries, or an allowlist) is a follow-up in ADR 037.
+	if b.FontURL != "" {
+		return ErrBrandingInvalid("font_url is not writable yet: tenant font delivery needs a safe design (ADR 037); load fonts from the embedding page instead", nil)
+	}
 	for _, u := range []struct{ name, value string }{
 		{"logo_url", b.LogoURL},
-		{"font_url", b.FontURL},
 		{"hero_url", b.HeroURL},
 	} {
 		if err := validateBrandingAssetURL(u.name, u.value); err != nil {

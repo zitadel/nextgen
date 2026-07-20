@@ -366,6 +366,20 @@ describe("BrandingSyncer", () => {
     ).toThrow(ZitadelError);
   });
 
+  it("validate throws E_VALIDATION on font_url (read-only in v1)", async () => {
+    const cwd = await makeBrandingProject();
+    const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    const attempt = (): void =>
+      branding.validate({ ...descriptor, font_url: "https://fonts.example.com/css2" });
+    expect(attempt).toThrow(ZitadelError);
+    try {
+      attempt();
+    } catch (error) {
+      expect(JSON.stringify((error as ZitadelError).details)).toContain("font_url");
+    }
+  });
+
   it("normalize inlines the template file so a .liquid edit changes the hash", async () => {
     const { writeFile } = await import("node:fs/promises");
     const { join } = await import("node:path");

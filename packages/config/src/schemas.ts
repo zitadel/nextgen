@@ -28,4 +28,15 @@ export const brandingConfigSchema = CreateBrandingBody.extend({
       message: "Use either liquid_template_file or an inline liquid_template, not both.",
     });
   }
+  // font_url is read-only in v1: the login component loads it as a
+  // document-level stylesheet (shadow-scoped @font-face never registers
+  // faces), which would give branding.write arbitrary CSS over the embedding
+  // page. The server rejects it too; safe delivery is an ADR 037 follow-up.
+  if (value.font_url !== undefined) {
+    ctx.addIssue({
+      code: "custom",
+      message:
+        "font_url is not writable yet (tenant font delivery needs a safe design, see ADR 037); load fonts from the embedding page instead.",
+    });
+  }
 });

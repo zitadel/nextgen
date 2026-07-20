@@ -88,6 +88,20 @@ not depend on it. Caveat recorded in
 returns raw template strings, and consumers that render outside the
 official component own their own sanitisation.
 
+**`font_url` is read-only in v1.** The component must load the tenant
+font stylesheet at *document* level (shadow-scoped `@font-face` rules
+never register faces — see `font-loader.ts`), so accepting an arbitrary
+URL on `POST /branding` would hand `branding.write` document-level CSS
+control over every page that embeds the login — precisely the boundary
+the template sandbox exists to hold. The field stays on the wire shape
+(the read projection and a future hierarchy still need it), but the save
+gate rejects a non-empty value and the config dialect omits it. Safe
+delivery options for a follow-up: the CSS Font Loading API against font
+*binaries* (registers faces without executing stylesheet CSS, at the
+cost of the Google-Fonts-CSS convenience) or an origin allowlist limited
+to pure font-CSS providers. Until then, tenant fonts load from the
+embedding page, which already owns document-level CSS.
+
 ### 4. Local config dialect: JSON descriptor + sibling `.liquid` file
 
 ```

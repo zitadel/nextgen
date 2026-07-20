@@ -32,7 +32,14 @@ properties:
   font_url:
     type: string
     format: uri
-    description: Custom font URL (e.g., Google Fonts CSS).
+    description: |
+      Custom font stylesheet URL (e.g., Google Fonts CSS). Read-only in
+      v1: `POST /branding` rejects a non-empty value, because the login
+      component loads this stylesheet at document level (shadow-scoped
+      `@font-face` rules never register faces) and an arbitrary URL would
+      grant `branding.write` page-wide CSS control over the embedding
+      application. Safe tenant font delivery is an ADR 037 follow-up;
+      until then, load fonts from the embedding page.
   hero_url:
     type: string
     format: uri

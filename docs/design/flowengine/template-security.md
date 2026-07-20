@@ -118,6 +118,7 @@ LiquidJS provides a `| raw` filter that disables auto-escaping:
 | Ejected template XSS | CLI validation at plan time (Layer 4a) | Server lexical gate + CSP + DOMPurify |
 | Translation dictionary HTML | LiquidJS auto-escaping (via `{{ }}`) | DOMPurify |
 | `| raw` filter abuse | Engine neuters `raw` at render | Rejected by Layers 4a/4b |
+| `font_url` document-level CSS injection | Field is read-only in v1: `POST /branding` rejects it (the font stylesheet must load at document level, outside every layer above) | Safe delivery design tracked in ADR 037 |
 
 **The strongest single mitigation is CSP.** A strict `script-src 'self'` header on the Hosted Login page makes all inline script vectors completely inert regardless of whether the HTML was sanitized. Combined with LiquidJS auto-escaping and DOMPurify, this creates three independent layers that an attacker must defeat simultaneously.
 

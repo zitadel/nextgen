@@ -710,7 +710,13 @@ type Branding struct {
 	LiquidTemplate OptString `json:"liquid_template"`
 	// Team logo URL.
 	LogoURL OptURI `json:"logo_url"`
-	// Custom font URL (e.g., Google Fonts CSS).
+	// Custom font stylesheet URL (e.g., Google Fonts CSS). Read-only in
+	// v1: `POST /branding` rejects a non-empty value, because the login
+	// component loads this stylesheet at document level (shadow-scoped
+	// `@font-face` rules never register faces) and an arbitrary URL would
+	// grant `branding.write` page-wide CSS control over the embedding
+	// application. Safe tenant font delivery is an ADR 037 follow-up;
+	// until then, load fonts from the embedding page.
 	FontURL OptURI `json:"font_url"`
 	// Hero/background image URL (used by split layout).
 	HeroURL OptURI `json:"hero_url"`

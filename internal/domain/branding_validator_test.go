@@ -80,7 +80,13 @@ func TestValidateBranding(t *testing.T) {
 			mutate:  func(b *Branding) { b.HeroURL = "/hero.png" },
 			wantErr: true,
 		},
-		{name: "https font url", mutate: func(b *Branding) { b.FontURL = "https://fonts.example.com/css2" }},
+		{
+			// Read-only in v1: even a well-formed https value is rejected —
+			// the field would load an arbitrary stylesheet at document level.
+			name:    "font url rejected even when https",
+			mutate:  func(b *Branding) { b.FontURL = "https://fonts.example.com/css2" },
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

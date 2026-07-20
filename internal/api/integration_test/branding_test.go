@@ -3,6 +3,7 @@
 package integration_test
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -68,6 +69,18 @@ func TestBranding(t *testing.T) {
 	t.Run("lexical gate rejects a hostile template", func(t *testing.T) {
 		resp, err := client.CreateBranding(t.Context(), &api.Branding{
 			LiquidTemplate: api.NewOptString(`<img src=x onerror="alert(1)">`),
+		}, params)
+		require.NoError(t, err)
+		errResp, ok := resp.(*api.ErrorDetails)
+		require.True(t, ok, "create branding: %+v", resp)
+		assert.Equal(t, api.ErrorCode("brnd.invalid"), errResp.Code)
+	})
+
+	t.Run("font_url is read-only in v1", func(t *testing.T) {
+		fontURL, err := url.Parse("https://fonts.example.com/css2?family=Arimo")
+		require.NoError(t, err)
+		resp, err := client.CreateBranding(t.Context(), &api.Branding{
+			FontURL: api.NewOptURI(*fontURL),
 		}, params)
 		require.NoError(t, err)
 		errResp, ok := resp.(*api.ErrorDetails)

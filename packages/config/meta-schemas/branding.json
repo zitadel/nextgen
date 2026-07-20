@@ -35,11 +35,6 @@
       "format": "uri",
       "description": "Logo URL (https required)."
     },
-    "font_url": {
-      "type": "string",
-      "format": "uri",
-      "description": "Custom font stylesheet URL (https required), e.g. Google Fonts CSS."
-    },
     "hero_url": {
       "type": "string",
       "format": "uri",
