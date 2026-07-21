@@ -31,7 +31,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	testServer := harness.EnsureTestServer(t)
 
 	// --- Seed project ---------------------------------------------------------
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	// Create the user schema so the resolver can look it up from the DB.  The
@@ -79,7 +79,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	// with an unscoped lookup the decoy row (seeded first, so surfaced first)
 	// would win the credential-id match and the assertion signature would
 	// fail against its foreign public key.
-	decoyProject, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	decoyProject, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 	harness.CreateUserSchema(t, decoyProject, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 	decoyTeam, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
