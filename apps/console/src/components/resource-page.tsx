@@ -3,6 +3,8 @@ import type { LucideIcon } from "lucide-react";
 import { Construction } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { cn } from "@/lib/utils";
+
 /**
  * Page hero: title + optional sub-headline on the left, optional trailing
  * action on the right. For filter tabs use shadcn `Tabs` (see Users).
@@ -30,8 +32,16 @@ export function PageHeader({
 }
 
 /** Underlined in-table link to a detail route. */
-export function TableLink(props: LinkProps & { children: ReactNode }) {
-  return <Link {...props} className="text-foreground underline underline-offset-2" />;
+export function TableLink({
+  className,
+  children,
+  ...props
+}: LinkProps & { children: ReactNode; className?: string }) {
+  return (
+    <Link {...props} className={cn("text-foreground underline underline-offset-2", className)}>
+      {children}
+    </Link>
+  );
 }
 
 /**

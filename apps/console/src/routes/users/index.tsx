@@ -178,7 +178,7 @@ function UsersScreen() {
           </div>
           <Button className="w-full lg:w-auto">
             Add
-            <Plus />
+            <Plus aria-hidden />
           </Button>
         </div>
       </div>
@@ -323,7 +323,7 @@ function RowActions({ name }: { name: string }) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" aria-label={`Actions for ${name}`}>
-          <MoreVertical />
+          <MoreVertical aria-hidden />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-40">
