@@ -273,6 +273,34 @@ func (e *UnknownError) Unwrap() error {
 	return e.original
 }
 
+// UnimplementedError is returned when a storage operation is not implemented
+// for the active dialect (for example interim Spanner statement stubs).
+type UnimplementedError struct {
+	original error
+}
+
+func NewUnimplementedError(original error) error {
+	return &UnimplementedError{
+		original: original,
+	}
+}
+
+func (e *UnimplementedError) Error() string {
+	if e.original != nil {
+		return fmt.Sprintf("unimplemented: %v", e.original)
+	}
+	return "unimplemented"
+}
+
+func (e *UnimplementedError) Is(target error) bool {
+	_, ok := target.(*UnimplementedError)
+	return ok
+}
+
+func (e *UnimplementedError) Unwrap() error {
+	return e.original
+}
+
 type PermissionError struct {
 	original error
 }

@@ -28,7 +28,9 @@ func (c *Client) Close(ctx context.Context) error {
 
 // Ping implements [database.Pool].
 func (c Client) Ping(ctx context.Context) error {
-	iter := c.client.Single().Query(ctx, spanner.Statement{SQL: "SELECT 1"})
+	tx := c.client.Single()
+	defer tx.Close()
+	iter := tx.Query(ctx, spanner.Statement{SQL: "SELECT 1"})
 	defer iter.Stop()
 	return wrapError(iter.Do(func(*spanner.Row) error { return nil }))
 }

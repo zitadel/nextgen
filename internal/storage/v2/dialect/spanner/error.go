@@ -7,6 +7,7 @@ import (
 	"cloud.google.com/go/spanner"
 	"google.golang.org/grpc/codes"
 
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -15,6 +16,14 @@ var errTooManyRows = errors.New("spanner: multiple rows in result set")
 func wrapError(err error) error {
 	if err == nil {
 		return nil
+	}
+	var de domain.Error
+	if errors.As(err, &de) {
+		return de
+	}
+	var unimplemented *database.UnimplementedError
+	if errors.As(err, &unimplemented) {
+		return unimplemented
 	}
 	if errors.Is(err, spanner.ErrRowNotFound) {
 		return database.NewNoRowFoundError(err)

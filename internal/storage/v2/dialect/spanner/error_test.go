@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -55,6 +56,16 @@ func TestWrapError(t *testing.T) {
 			name: "unknown error",
 			err:  errors.New("driver exploded"),
 			want: new(database.UnknownError),
+		},
+		{
+			name: "preserves domain error",
+			err:  domain.ErrNotImplemented(),
+			want: domain.ErrNotImplemented(),
+		},
+		{
+			name: "preserves unimplemented error",
+			err:  database.NewUnimplementedError(nil),
+			want: new(database.UnimplementedError),
 		},
 	}
 

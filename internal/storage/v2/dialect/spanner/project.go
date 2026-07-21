@@ -7,6 +7,7 @@ import (
 	"cloud.google.com/go/spanner"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	storagedb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 )
@@ -65,7 +66,7 @@ func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*dom
 
 // UpdateProject implements [service.ProjectStatements].
 func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.Project) error {
-	panic("unimplemented")
+	return storagedb.NewUnimplementedError(nil)
 }
 
 // ListProjects implements [service.ProjectStatements].
@@ -87,11 +88,11 @@ func (ps projectStatements) ListProjects(ctx context.Context, filter *database.L
 
 	var nextCursor []byte
 	if filter.Pagination.Limit > 0 && len(projects) == int(filter.Pagination.Limit) {
-		curser := &pagination.Cursor[domain.ProjectField]{
+		cursor := &pagination.Cursor[domain.ProjectField]{
 			Columns: filter.Pagination.OrderBy.Columns,
 			Values:  projectSchema.ValuesFrom(projects[len(projects)-1], filter.Pagination.OrderBy.Columns),
 		}
-		nextCursor = curser.Marshal()
+		nextCursor = cursor.Marshal()
 	}
 
 	return &database.ListResult[*domain.Project]{
