@@ -20,11 +20,11 @@ There are two problems with implementing that literally.
 ### Problem 1 — the only credential today is a project secret, and it must not reach the browser
 
 The API authenticates **every** request with an OAuth2 bearer that is the
-project secret (`sk_proj_...`). See
+project secret (labelled `sk_proj_...` when minted). See
 [`internal/api/security.go`](../../../../internal/api/security.go): the
-security handler accepts a token, strips the `sk_` prefix, and reads the
-`proj_...` id from it. There is **no console-user session** yet — #440 lists
-console authentication, RBAC, and a user menu as explicit non-goals.
+security handler passes the bearer to the token verifier, which decrypts it
+and yields the project id. There is **no console-user session** yet — #440
+lists console authentication, RBAC, and a user menu as explicit non-goals.
 
 Putting that secret in the browser bundle (env-inlined at build time, or
 fetched into client memory) directly violates
@@ -99,7 +99,7 @@ instead of writing its own fetch wrapper:
 import { configureZitadel, getApi } from "@zitadel/api/config";
 
 const project = configureZitadel({
-  proxyPath: import.meta.env.VITE_CONSOLE_API_BASE ?? "/", // same-origin in prod
+  proxyPath: import.meta.env.VITE_CONSOLE_API_BASE ?? "/api", // same-origin API base
   projectId: import.meta.env.VITE_CONSOLE_PROJECT_ID ?? "",
 });
 
@@ -132,28 +132,27 @@ there is no console-user credential to manage yet.
 
 ### 4. Dev story keeps the same shape as production
 
-In production the console and API are same-origin, so a relative base
-(`/`) reaches the API directly and the shim injects the secret. In dev the
-console runs on `:5174` (Vite) and the API on `:8080`; to keep request shape
-identical the console talks to a **same-origin path that the Vite dev server
-proxies** to the Go server, rather than calling the API host directly with a
-browser-held token:
+In production the console and API are same-origin, so a relative API base
+(`/api` by default) reaches the console API shim, which injects the secret
+before the ogen handler. In dev the console runs on `:5174` (Vite) and the
+API on `:8080`; to keep request shape identical the console talks to a
+**same-origin `/api` path that the Vite dev server proxies** to the Go
+server, rather than calling the API host directly with a browser-held token:
 
 ```ts
 // vite.config.mts (dev only) — illustrative
 server: {
   proxy: {
-    // forward console API calls to the Go server, which injects the secret
+    // Vite proxy injects the project-secret bearer, then forwards to the Go API
     "/api": { target: "http://localhost:8080", changeOrigin: true },
   },
 },
 ```
 
 So dev and prod differ only in *where* the proxy lives (Vite dev server vs Go
-server), never in whether the browser holds a secret — it never does. The
-exact base path (`/api` vs another prefix) is settled by the implementation PR
-together with the Go shim, but the rule is fixed: **same-origin, no
-browser-held credential, in every environment.**
+shim), never in whether the browser holds a secret — it never does. The
+default API base is `/api` (overridable via `VITE_CONSOLE_API_BASE`); the rule
+is fixed: **same-origin, no browser-held credential, in every environment.**
 
 ### 5. Forward-looking slot for console-user auth
 
