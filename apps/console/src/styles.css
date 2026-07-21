@@ -40,9 +40,15 @@
 
 /* Global page theming only. Component styles live in Tailwind utilities on the
    components themselves. `data-theme` on <html> selects the token mode (dark
-   `:root` vs light override); `color-scheme` keeps native controls in step. */
-html {
-  color-scheme: dark light;
+   `:root` vs light override); `color-scheme` keeps native form controls aligned
+   with the *resolved* theme (not just the OS preference). */
+html,
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
 }
 
 body {

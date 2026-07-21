@@ -42,10 +42,14 @@ describe("app shell navigation", () => {
     for (const label of BUILT_ITEMS) {
       expect(nav.getByRole("link", { name: new RegExp(`^${label}`) })).toBeInTheDocument();
     }
-    // Built rows are links; design-only rows are non-navigable (the logo is a
-    // separate Home link outside the list).
+    // Built rows are links; design-only rows are focusable buttons marked
+    // aria-disabled (the logo is a separate Home link outside the list).
     const linkedRows = items.filter((li) => within(li).queryByRole("link"));
     expect(linkedRows).toHaveLength(BUILT_ITEMS.length);
+    const designOnly = NAV_ORDER.filter((label) => !BUILT_ITEMS.includes(label));
+    for (const label of designOnly) {
+      expect(nav.getByRole("button", { name: label })).toHaveAttribute("aria-disabled", "true");
+    }
   });
 });
 

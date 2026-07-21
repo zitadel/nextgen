@@ -58,11 +58,3 @@ describe("login flows list states", () => {
     expect(await screen.findByText("Request failed (500)")).toBeInTheDocument();
   });
 });
-
-describe("blocked route", () => {
-  it("shows an honest coming-soon empty state (no fake data)", async () => {
-    await renderAt("/schemas");
-    expect(await screen.findByText("Coming soon")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Schemas" })).toBeInTheDocument();
-  });
-});

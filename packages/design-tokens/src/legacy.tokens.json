@@ -2,7 +2,7 @@
   "$source": {
     "fileKey": "8UjCXw8yemgljmbkWGrSfE",
     "libraryName": "Zitadel - Design System - External",
-    "fetchedVia": "MCP get_variable_defs and search_design_system (seed; replace with scripts/sync-from-figma.ts output)",
+    "fetchedVia": "Frozen snapshot of the pre-shadcn console token set from the Zitadel Design System library",
     "modeId": "default",
     "modeName": "Default (dark)"
   },

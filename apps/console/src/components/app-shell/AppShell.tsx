@@ -79,18 +79,14 @@ function AppSidebar() {
                 return (
                   <SidebarMenuItem key={label}>
                     <SidebarMenuButton
-                      asChild
                       tooltip={label}
-                      className="font-serif"
+                      className="cursor-default font-serif"
+                      aria-disabled="true"
+                      title={`${label} — not available yet`}
+                      onClick={(event) => event.preventDefault()}
                     >
-                      <span
-                        aria-disabled="true"
-                        title={`${label} — not available yet`}
-                        className="cursor-default"
-                      >
-                        <Icon aria-hidden />
-                        <span>{label}</span>
-                      </span>
+                      <Icon aria-hidden />
+                      <span>{label}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );

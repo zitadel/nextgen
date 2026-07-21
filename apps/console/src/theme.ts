@@ -44,6 +44,16 @@ function apply(theme: ResolvedTheme): void {
   document.documentElement.setAttribute("data-theme", theme);
 }
 
+/** Subscribe to a MediaQueryList with the legacy addListener fallback. */
+function subscribeMedia(mql: MediaQueryList, onChange: () => void): () => void {
+  if (typeof mql.addEventListener === "function") {
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }
+  mql.addListener(onChange);
+  return () => mql.removeListener(onChange);
+}
+
 export interface UseThemeResult {
   preference: ThemePreference;
   resolved: ResolvedTheme;
@@ -70,8 +80,7 @@ export function useTheme(): UseThemeResult {
       setResolved(system);
       apply(system);
     };
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
+    return subscribeMedia(media, onChange);
   }, [preference]);
 
   const setPreference = useCallback((next: ThemePreference) => {

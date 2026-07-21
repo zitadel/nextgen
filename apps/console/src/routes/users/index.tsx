@@ -82,19 +82,41 @@ const TABS: { value: string; label: string }[] = [
   { value: "Machine", label: "Machine" },
 ];
 
+/** Platform-correct modifier for the search shortcut hint (⌘ on Apple, Ctrl elsewhere). */
+function searchShortcutLabel(): string {
+  if (typeof navigator === "undefined") return "Ctrl+F";
+  const apple =
+    /Mac|iPhone|iPad|iPod/.test(navigator.platform) ||
+    /Mac OS|iPhone|iPad|iPod/.test(navigator.userAgent);
+  return apple ? "⌘F" : "Ctrl+F";
+}
+
 function UsersScreen() {
   const [tab, setTab] = useState("all");
   const [query, setQuery] = useState("");
   const [sortAsc, setSortAsc] = useState<boolean | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // ⌘F / Ctrl+F focuses the table search instead of the browser find bar.
+  // ⌘F / Ctrl+F focuses the table search instead of the browser find bar —
+  // only when the event isn't already targeting an editable field.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
-        event.preventDefault();
-        searchRef.current?.focus();
+      if (event.altKey) return;
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "f") return;
+      const target = event.target;
+      if (target instanceof HTMLElement) {
+        const tag = target.tagName;
+        if (
+          tag === "INPUT" ||
+          tag === "TEXTAREA" ||
+          tag === "SELECT" ||
+          target.isContentEditable
+        ) {
+          return;
+        }
       }
+      event.preventDefault();
+      searchRef.current?.focus();
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
@@ -151,7 +173,7 @@ function UsersScreen() {
               className="pl-9 pr-14"
             />
             <kbd className="pointer-events-none absolute right-2 top-1/2 flex h-5 -translate-y-1/2 items-center gap-0.5 rounded-sm bg-muted px-1.5 font-sans text-[10px] font-medium text-muted-foreground">
-              ⌘F
+              {searchShortcutLabel()}
             </kbd>
           </div>
           <Button className="w-full lg:w-auto">
