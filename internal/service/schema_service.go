@@ -81,13 +81,19 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 		return nil, domain.ErrInternal(err).WithMessage("failed to create schema in database")
 	}
 
-	_, err = s.schemaResolver.Resolve(ctx, tx, input.ProjectID, model.URL, nil)
+	// Pass the just-created payload so Resolve does not re-load (or HTTP-refetch
+	// and re-insert) the same URL inside this transaction — Spanner can surface
+	// the duplicate as a commit-time AlreadyExists otherwise.
+	_, err = s.schemaResolver.Resolve(ctx, tx, input.ProjectID, model.URL, model.Schema)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
 	}
 
 	err = tx.Commit(ctx)
 	if err != nil {
+		if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
+			return nil, domain.ErrJSONSchemaAlreadyExists().WithParent(err)
+		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to commit transaction")
 	}
 

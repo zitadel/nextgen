@@ -90,6 +90,9 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().CreateProject(ctx, project); err != nil {
+			if mapped := mapStorageError(err); mapped != err {
+				return mapped
+			}
 			return domain.ErrInternal(err).WithMessage("failed to create project in the database")
 		}
 
@@ -110,6 +113,13 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 	})
 
 	if err != nil {
+		err = mapStorageError(err)
+		// Callback failures are already domain errors (create/schema/flow). Only
+		// wrap unexpected commit/infrastructure failures as commit errors.
+		var de domain.Error
+		if errors.As(err, &de) {
+			return nil, de
+		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to commit transaction")
 	}
 	return project, nil
@@ -156,7 +166,8 @@ func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, 
 func (s *projectService) Get(ctx context.Context, id string) (*domain.Project, error) {
 	logger := getLoggingContext(ctx, "project")
 	logger.Info("getting project", slog.String("project_id", id))
-	return s.v2Pool.Statements().GetProjectByID(ctx, id)
+	project, err := s.v2Pool.Statements().GetProjectByID(ctx, id)
+	return project, mapStorageError(err)
 }
 
 func (s *projectService) Update(ctx context.Context, id, name string) (*domain.Project, error) {
