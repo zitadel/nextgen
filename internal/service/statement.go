@@ -7,7 +7,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,PasskeyRegistrationStatements
 
 type StatementPool interface {
 	Statementer[AllStatements]
@@ -22,6 +22,7 @@ type AllStatements interface {
 	ProjectStatements
 	FlowDefinitionStatements
 	CryptoKeyStatements
+	PasskeyRegistrationStatements
 	Statements
 }
 
@@ -58,4 +59,17 @@ type CryptoKeyStatements interface {
 	Statements
 	GetEncryptionKey(ctx context.Context, filter database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error)
 	CreateEncryptionKey(ctx context.Context, dek *domain.EncryptionKey) error
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type PasskeyRegistrationPool interface {
+// 	Statementer[PasskeyRegistrationStatements]
+// 	Transactioner[PasskeyRegistrationStatements]
+// }
+
+type PasskeyRegistrationStatements interface {
+	Statements
+	CreatePasskeyRegistration(ctx context.Context, reg *domain.CreatePasskeyRegistration) error
+	GetPasskeyRegistration(ctx context.Context, projectID, id string) (*domain.PasskeyRegistration, error)
+	DeletePasskeyRegistration(ctx context.Context, projectID, id string) error
 }
