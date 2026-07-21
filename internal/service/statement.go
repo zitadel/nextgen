@@ -49,9 +49,10 @@ type ProjectStatements interface {
 type FlowDefinitionStatements interface {
 	Statements
 	CreateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error
-	GetFlowDefinitionByID(ctx context.Context, id string) (*domain.FlowDefinition, error)
+	GetFlowDefinitionByID(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error)
+	UpdateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error
 	ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error)
-	DeleteFlowDefinitionByID(ctx context.Context, id string) error
+	DeleteFlowDefinitionByID(ctx context.Context, projectID, id string) error
 }
 
 type CryptoKeyStatements interface {

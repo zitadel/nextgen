@@ -21,7 +21,6 @@ func createMockedProjectService(t *testing.T) (svc service.ProjectService,
 	mock *gomock.Controller,
 	db *service.DB,
 	schemaRepo *domainmock.MockJSONSchemaRepository,
-	flowDefinitionRepo *domainmock.MockFlowDefinitionRepository,
 	serverURL string,
 	schemaValidator *domain.SchemaValidator,
 	kek *cryptomock.MockCrypter,
@@ -36,7 +35,6 @@ func createMockedProjectService(t *testing.T) (svc service.ProjectService,
 
 	pool = servicemocks.NewMockPool(mock)
 	schemaRepo = domainmock.NewMockJSONSchemaRepository(mock)
-	flowDefinitionRepo = domainmock.NewMockFlowDefinitionRepository(mock)
 	kek = cryptomock.NewMockCrypter(mock)
 
 	keyService := servicemocks.NewMockKeyService(mock)
@@ -64,7 +62,6 @@ func createMockedProjectService(t *testing.T) (svc service.ProjectService,
 	svc = service.NewProjectService(
 		db,
 		schemaRepo,
-		flowDefinitionRepo,
 		baseURL,
 		schemaValidator,
 		keyService,
@@ -106,13 +103,13 @@ func TestProjectService_Create(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 
-				svc, _, _, schemaRepo, definitionRepo, _, _, kek, _, _, _, statements := createMockedProjectService(t)
+				svc, _, _, schemaRepo, _, _, kek, _, _, _, statements := createMockedProjectService(t)
 
 				kek.EXPECT().Encrypt(gomock.Any())
 				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any())
 				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any())
 				schemaRepo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any())
-				definitionRepo.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any())
+				statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
 
 				got, err := svc.Create(context.Background(), tc.projectName, tc.previewOrigins, tc.seedDefaults)
 
@@ -126,14 +123,14 @@ func TestProjectService_Create(t *testing.T) {
 		t.Run("ok — skip fallback defaults", func(t *testing.T) {
 			t.Parallel()
 
-			svc, _, _, schemaRepo, definitionRepo, _, _, kek, _, _, _, statements := createMockedProjectService(t)
+			svc, _, _, schemaRepo, _, _, kek, _, _, _, statements := createMockedProjectService(t)
 
 			kek.EXPECT().Encrypt(gomock.Any())
 			statements.EXPECT().CreateProject(gomock.Any(), gomock.Any())
 			statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any())
 
 			schemaRepo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-			definitionRepo.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+			statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any()).Times(0)
 
 			_, err := svc.Create(context.Background(), "test", nil, false)
 			assert.NoError(t, err)
@@ -146,7 +143,7 @@ func TestProjectService_Create(t *testing.T) {
 		t.Run("project creation error should bubble up", func(t *testing.T) {
 			t.Parallel()
 
-			svc, _, _, _, _, _, _, kek, _, _, _, statements := createMockedProjectService(t)
+			svc, _, _, _, _, _, kek, _, _, _, statements := createMockedProjectService(t)
 
 			kek.EXPECT().Encrypt(gomock.Any())
 			statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).Return(errors.New("db error"))
@@ -160,7 +157,7 @@ func TestProjectService_Create(t *testing.T) {
 		t.Run("missing project name", func(t *testing.T) {
 			t.Parallel()
 
-			svc, _, _, _, _, _, _, _, _, _, _, _ := createMockedProjectService(t)
+			svc, _, _, _, _, _, _, _, _, _, _ := createMockedProjectService(t)
 
 			got, err := svc.Create(context.Background(), "", nil, false)
 
@@ -185,7 +182,7 @@ func TestProjectService_Get(t *testing.T) {
 			PreviewOrigins: []string{"myapp.example.com"},
 		}
 
-		svc, _, _, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+		svc, _, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 
 		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(project, nil)
 
@@ -202,7 +199,7 @@ func TestProjectService_Get(t *testing.T) {
 
 			projectID := "proj_aaa"
 
-			svc, _, _, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+			svc, _, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 
 			statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(nil, database.NewNoRowFoundError(nil))
 

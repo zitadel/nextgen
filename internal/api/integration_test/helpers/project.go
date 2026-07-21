@@ -12,7 +12,6 @@ func (h *Harness) EnsureProjectService(t *testing.T) service.ProjectService {
 		h.ProjectService = service.NewProjectService(
 			h.EnsureServiceDB(t),
 			h.EnsureSchemaRepo(t),
-			h.EnsureFlowDefinitionRepo(t),
 			BuiltinSchemaBaseURL,
 			h.EnsureSchemaValidator(t),
 			h.EnsureKeyService(t),
