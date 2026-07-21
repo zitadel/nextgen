@@ -19,7 +19,7 @@ type ProjectService interface {
 	// If seedDefaults is true, server fallback schema and flow resources are
 	// created with the project for non-CLI creation paths.
 	// Returns the stored project including timestamps.
-	Create(ctx context.Context, previewOrigins []string, seedDefaults bool) (*domain.Project, error)
+	Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error)
 
 	// Get retrieves a project by ID.
 	// Returns [database.NoRowFoundError] when no project with the given ID exists.
@@ -59,9 +59,8 @@ type projectService struct {
 
 var _ ProjectService = (*projectService)(nil)
 
-func (s *projectService) Create(ctx context.Context, previewOrigins []string, seedDefaults bool) (_ *domain.Project, err error) {
-	// TODO: pass project name
-	project, err := domain.NewProject("temp", previewOrigins, s.tokenGenerator)
+func (s *projectService) Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (_ *domain.Project, err error) {
+	project, err := domain.NewProject(name, previewOrigins, s.tokenGenerator)
 	if err != nil {
 		return nil, err
 	}
