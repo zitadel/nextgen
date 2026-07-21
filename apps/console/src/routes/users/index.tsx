@@ -258,10 +258,10 @@ function UsersScreen() {
           <Button variant="outline" size="icon" aria-label="Previous page" disabled>
             <ChevronLeft />
           </Button>
-          <Button variant="outline" size="icon" aria-label="Next page">
+          <Button variant="outline" size="icon" aria-label="Next page" disabled>
             <ChevronRight />
           </Button>
-          <Button variant="outline" size="icon" aria-label="Last page">
+          <Button variant="outline" size="icon" aria-label="Last page" disabled>
             <ChevronsRight />
           </Button>
         </div>

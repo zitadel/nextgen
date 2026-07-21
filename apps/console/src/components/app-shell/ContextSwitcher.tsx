@@ -117,7 +117,7 @@ function Switcher({
           />
         </div>
 
-        <ul id={listId} role="listbox" aria-label={ariaLabel} className="flex flex-col">
+        <ul id={listId} aria-label={ariaLabel} className="flex flex-col">
           {rows.length === 0 ? (
             <li className="px-3 py-2.5 text-sm text-muted-foreground">No results</li>
           ) : (
@@ -125,8 +125,7 @@ function Switcher({
               <li key={option.id}>
                 <button
                   type="button"
-                  role="option"
-                  aria-selected={option.label === label}
+                  aria-pressed={option.label === label}
                   onClick={() => setOpen(false)}
                   className="flex w-full items-center gap-3 rounded-sm px-3 py-2.5 text-left hover:bg-accent"
                 >
