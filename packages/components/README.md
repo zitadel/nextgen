@@ -131,8 +131,8 @@ fixtures:
 | Surface | Moon command | What it gives you |
 | --- | --- | --- |
 | **Storybook** | `moon run storybook:dev` ([:6006](http://localhost:6006)) | The workbench for both the Lit atoms and the paired React components, plus the `<zitadel-login>` orchestrator (MSW via `msw-storybook-addon`, flow/branding as controls). |
-| **demo-next** | `moon run api-mock:start` + `ZITADEL_URL=http://localhost:4000 moon run demo-next:dev` | Next.js SDK, middleware, cookies, built `dist/` ([:3002/login](http://localhost:3002/login)). See [`apps/demo-next`](../../apps/demo-next/README.md). |
-| **demo-nuxt** | mock on `:4000`, then `ZITADEL_URL=http://localhost:4000 moon run demo-nuxt:dev` | Nuxt SDK, middleware, cookies, built `dist/` ([:3001/login](http://localhost:3001/login)). See [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md). |
+| **demo-next** | `moon run api-mock:start` + `moon run demo-next:dev` | Next.js SDK, middleware, cookies, built `dist/` ([:3002/login](http://localhost:3002/login)). See [`apps/demo-next`](../../apps/demo-next/README.md). |
+| **demo-nuxt** | mock on `:8080`, then `moon run demo-nuxt:dev` | Nuxt SDK, middleware, cookies, built `dist/` ([:3001/login](http://localhost:3001/login)). See [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md). |
 
 Storybook consumes the built `@zitadel/components` / `@zitadel/ui-react`
 artifacts, so rebuild after source changes (`moon run components:build`) or
@@ -311,9 +311,9 @@ moon run storybook:dev
 # → http://localhost:6006
 
 # Framework demos (TCP mock + SDK) — see apps/demo-*/README.md
-# moon run api-mock:start   # → http://localhost:4000
-# ZITADEL_URL=http://localhost:4000 moon run demo-next:dev  # → :3002
-# ZITADEL_URL=http://localhost:4000 moon run demo-nuxt:dev  # → :3001
+# moon run api-mock:start   # → http://localhost:8080
+# moon run demo-next:dev    # → :3002 (ZITADEL_URL defaults to :8080)
+# moon run demo-nuxt:dev    # → :3001 (ZITADEL_URL defaults to :8080)
 
 # --- Package checks ---
 

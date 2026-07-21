@@ -11,6 +11,17 @@ const (
 	PrefixTeam ResourcePrefix = "team"
 )
 
+// TeamStatus is the lifecycle state of a team within a project.
+type TeamStatus string
+
+const (
+	TeamStatusActive       TeamStatus = "active"
+	TeamStatusDeactivated  TeamStatus = "deactivated"
+	TeamStatusPendingPurge TeamStatus = "pending_purge"
+)
+
+func (s TeamStatus) String() string { return string(s) }
+
 func ErrTeamNotFound() Error {
 	return newError(PrefixTeam.ErrorCodePrefix("team_not_found"), "team not found", nil, nil)
 }
@@ -26,6 +37,7 @@ type Team struct {
 	ProjectID string
 	// ID is the unique identifier for the team within the project.
 	ID        string
+	Status    TeamStatus
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -57,4 +69,7 @@ type TeamRepository interface {
 	// Get retrieves a team by its composite primary key (project_id, id).
 	// Returns a [database.NoRowFoundError] when no team with the given keys exists.
 	Get(ctx context.Context, client database.QueryExecutor, projectID, id string) (*Team, error)
+
+	// Deactivate tombstones the team and applies lifecycle policy to memberships and team-owned users.
+	Deactivate(ctx context.Context, client database.QueryExecutor, projectID, id string) error
 }

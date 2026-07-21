@@ -18,6 +18,22 @@ func writeCondition(
 	condition.Write(builder)
 }
 
+// withTransaction runs fn inside a transaction when q implements [database.Beginner].
+// If q is already a transaction, Begin starts a nested transaction/savepoint.
+// If q does not implement Beginner, fn runs against q directly.
+func withTransaction(ctx context.Context, q database.QueryExecutor, fn func(ctx context.Context, tx database.QueryExecutor) error) error {
+	beginner, ok := q.(database.Beginner)
+	if !ok {
+		return fn(ctx, q)
+	}
+	tx, err := beginner.Begin(ctx, nil)
+	if err != nil {
+		return err
+	}
+	err = fn(ctx, tx)
+	return tx.End(ctx, err)
+}
+
 func checkRestrictingColumns(
 	condition database.Condition,
 	requiredColumns ...database.Column,

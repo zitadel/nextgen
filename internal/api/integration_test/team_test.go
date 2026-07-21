@@ -15,7 +15,7 @@ import (
 func TestCreateTeam(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
@@ -56,7 +56,7 @@ func TestCreateTeam(t *testing.T) {
 func TestGetTeam(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
