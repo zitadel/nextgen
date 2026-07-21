@@ -39,13 +39,12 @@ type passkeyHandlerFixture struct {
 func newPasskeyHandlerFixture(t *testing.T) *passkeyHandlerFixture {
 	t.Helper()
 	ctrl := gomock.NewController(t)
-	passwordRepo := domainmock.NewMockUserPasswordRepository(ctrl)
 	schemaRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
 	pool := dbmock.NewMockPool(ctrl)
 	v2Pool := servicemocks.NewMockPool(ctrl)
 	stmts := testAllStatements{}
 
-	userService := service.NewUserService(pool, service.NewPool(v2Pool), passwordRepo, schemaRepo, nil)
+	userService := service.NewUserService(pool, service.NewPool(v2Pool), schemaRepo, nil)
 	handler := service.NewFlowCreateUserForPasskeyHandler(userService, schemaRepo)
 
 	return &passkeyHandlerFixture{

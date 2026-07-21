@@ -126,7 +126,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 
 	// ── Repositories ─────────────────
-	userPasswordRepo := repository.NewUserPasswordRepository()
 	userPasskeyRepo := repository.NewUserPasskeyRepository()
 	passkeyRegRepo := repository.NewPasskeyRegistrationRepository()
 	sessionRepo := repository.NewSessionRepository(pool)
@@ -175,7 +174,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		attemptRepo,
 		sessionRepo,
 		userLookup,
-		userPasswordRepo,
+		service.UserPasswordStatementsLookup{Pool: serviceDBPool},
 		userPasskeyRepo,
 		passwordHasher,
 	)
@@ -204,7 +203,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	userService := service.NewUserService(
 		pool,
 		serviceDBPool,
-		userPasswordRepo,
 		schemaRepo,
 		passwordHasher,
 	)
@@ -214,7 +212,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	fields := domain.NewSchemaFieldResolver()
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
 	createUserHandler := service.NewFlowCreateUserHandler(
-		userPasswordRepo,
 		passwordHasher,
 		userService,
 		schemaRepo,

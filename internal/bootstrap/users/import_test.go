@@ -17,7 +17,6 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
 	pgold "github.com/zitadel/nextgen/internal/storage/database/dialect/postgres"
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/embedded"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 	v2postgres "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres"
 )
 
@@ -77,10 +76,7 @@ func TestImport_loadAndSkip(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "usr_import_1", got.ID)
 
-	pwRepo := repository.NewUserPasswordRepository()
-	pw, err := pwRepo.Get(ctx, testPool,
-		database.WithCondition(pwRepo.UniqueCondition("proj_demo", "usr_import_1")),
-	)
+	pw, err := v2Pool.Statements().GetUserPasswordByUserID(ctx, "proj_demo", "usr_import_1")
 	require.NoError(t, err)
 	require.NotEmpty(t, pw.EncodedHash)
 

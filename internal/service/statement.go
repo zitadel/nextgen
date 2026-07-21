@@ -23,6 +23,7 @@ type AllStatements interface {
 	FlowDefinitionStatements
 	CryptoKeyStatements
 	UserStatements
+	UserPasswordStatements
 	Statements
 }
 
@@ -84,3 +85,19 @@ type UserStatements interface {
 	DeactivateUser(ctx context.Context, projectID, userID string) error
 	DeleteUserByID(ctx context.Context, projectID, userID string) error
 }
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type UserPasswordPool interface {
+// 	Statementer[UserPasswordStatements]
+// 	Transactioner[UserPasswordStatements]
+// }
+
+// UserPasswordStatements is the storage v2 surface for the user_passwords table.
+type UserPasswordStatements interface {
+	Statements
+	SetUserPassword(ctx context.Context, pw *domain.SetUserPassword) error
+	GetUserPasswordByUserID(ctx context.Context, projectID, userID string) (*domain.UserPassword, error)
+	ListUserPasswords(ctx context.Context, filter *database.ListOptions[domain.UserPasswordField]) (*database.ListResult[*domain.UserPassword], error)
+	DeleteUserPasswordByUserID(ctx context.Context, projectID, userID string) error
+}
+

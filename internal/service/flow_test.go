@@ -112,6 +112,23 @@ func (testAllStatements) DeleteUserByID(context.Context, string, string) error {
 	panic("unexpected call to DeleteUserByID")
 }
 
+
+func (testAllStatements) SetUserPassword(context.Context, *domain.SetUserPassword) error {
+	panic("unexpected call to SetUserPassword")
+}
+
+func (testAllStatements) GetUserPasswordByUserID(context.Context, string, string) (*domain.UserPassword, error) {
+	panic("unexpected call to GetUserPasswordByUserID")
+}
+
+func (testAllStatements) ListUserPasswords(context.Context, *v2database.ListOptions[domain.UserPasswordField]) (*v2database.ListResult[*domain.UserPassword], error) {
+	panic("unexpected call to ListUserPasswords")
+}
+
+func (testAllStatements) DeleteUserPasswordByUserID(context.Context, string, string) error {
+	panic("unexpected call to DeleteUserPasswordByUserID")
+}
+
 var _ service.AllStatements = testAllStatements{}
 
 type v2TestTx struct {

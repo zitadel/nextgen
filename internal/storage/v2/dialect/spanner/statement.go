@@ -9,6 +9,7 @@ type statements struct {
 	flowDefinitionStatements
 	cryptoKeyStatements
 	userStatements
+	userPasswordStatements
 }
 
 func (s statements) Statements() service.AllStatements {
@@ -24,6 +25,7 @@ func newStatements(db queryExecutor) statements {
 		flowDefinitionStatements: newFlowDefinitionStatements(db),
 		cryptoKeyStatements:      newCryptoKeyStatements(db),
 		userStatements:           newUserStatements(db),
+		userPasswordStatements:   newUserPasswordStatements(db),
 	}
 }
 

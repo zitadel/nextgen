@@ -11,7 +11,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
 // Import loads bootstrap users from JSON files into the database.
@@ -24,10 +23,9 @@ func Import(ctx context.Context, pool database.Pool, v2Pool service.StatementPoo
 		return err
 	}
 
-	passwordRepo := repository.NewUserPasswordRepository()
 
 	for _, path := range paths {
-		if err := importFile(ctx, pool, v2Pool, hashValidator, passwordRepo, path); err != nil {
+		if err := importFile(ctx, pool, v2Pool, hashValidator, path); err != nil {
 			return fmt.Errorf("user file %q: %w", path, err)
 		}
 	}
@@ -39,7 +37,6 @@ func importFile(
 	pool database.Pool,
 	v2Pool service.StatementPool,
 	hashValidator crypto.HashValidator,
-	passwordRepo *repository.UserPasswordRepository,
 	path string,
 ) error {
 	doc, err := ParseFile(path)
@@ -88,11 +85,7 @@ func importFile(
 		}); err != nil {
 			return fmt.Errorf("create user: %w", err)
 		}
-		db, ok := tx.(database.QueryExecutor)
-		if !ok {
-			return fmt.Errorf("set password: transaction does not support password repository writes")
-		}
-		if err := passwordRepo.Set(ctx, db, &domain.SetUserPassword{
+		if err := tx.Statements().SetUserPassword(ctx, &domain.SetUserPassword{
 			ProjectID:      doc.Header.ProjectID,
 			UserID:         doc.Header.ID,
 			EncodedHash:    pw.EncodedHash,

@@ -179,9 +179,7 @@ type UserLookup interface {
 }
 
 type UserPasswords interface {
-	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserPassword, error)
-	UserIDCondition(userID string) database.Condition
-	ProjectIDCondition(pid string) database.Condition
+	GetByUserID(ctx context.Context, projectID, userID string) (*domain.UserPassword, error)
 }
 
 type UserPasskeys interface {
@@ -422,14 +420,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return nil, nil, err
 		}
-		password, err := s.userPasswords.Get(
-			ctx,
-			s.pool,
-			database.WithCondition(database.And(
-				s.userPasswords.ProjectIDCondition(attempt.ProjectID),
-				s.userPasswords.UserIDCondition(userFactor.UserID),
-			)),
-		)
+		password, err := s.userPasswords.GetByUserID(ctx, attempt.ProjectID, userFactor.UserID)
 		if err != nil {
 			return passwordChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
 		}

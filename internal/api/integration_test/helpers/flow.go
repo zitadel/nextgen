@@ -13,7 +13,6 @@ import (
 func (h *Harness) EnsureCreateUserHandler(t *testing.T) *service.FlowCreateUserWithPasswordHandler {
 	t.Helper()
 	return service.NewFlowCreateUserHandler(
-		h.EnsureUserPasswordRepo(t),
 		h.EnsureHasher(t),
 		h.EnsureUserService(t),
 		h.EnsureSchemaRepo(t),

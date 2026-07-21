@@ -16,7 +16,6 @@ func (h *Harness) EnsureUserService(t *testing.T) *service.UserService {
 		h.UserService = service.NewUserService(
 			h.EnsureDBPool(t),
 			h.ServiceDB(t),
-			h.EnsureUserPasswordRepo(t),
 			h.EnsureSchemaRepo(t),
 			h.EnsureHasher(t),
 		)
@@ -46,6 +45,14 @@ func (f UserFixture) GetByID(ctx context.Context, projectID, userID string) (*do
 
 func (f UserFixture) GetByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute) (*domain.User, error) {
 	return f.Pool.Statements().GetUserByAttributes(ctx, projectID, attrs, service.UserReadOptions{})
+}
+
+func (f UserFixture) SetPassword(ctx context.Context, pw *domain.SetUserPassword) error {
+	return f.Pool.Statements().SetUserPassword(ctx, pw)
+}
+
+func (f UserFixture) GetPasswordByUserID(ctx context.Context, projectID, userID string) (*domain.UserPassword, error) {
+	return f.Pool.Statements().GetUserPasswordByUserID(ctx, projectID, userID)
 }
 
 func CreateSessionUsingPassword(t *testing.T,

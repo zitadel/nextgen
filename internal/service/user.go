@@ -56,26 +56,23 @@ type GetMyUserInput struct {
 // ---- Implementation -------------------------------------------------------------
 
 type UserService struct {
-	pool         database.Pool
-	v2Pool       StatementPool
-	passwordRepo domain.UserPasswordRepository
-	schemaRepo   domain.JSONSchemaRepository
-	hasher       crypto.Hasher
+	pool       database.Pool
+	v2Pool     StatementPool
+	schemaRepo domain.JSONSchemaRepository
+	hasher     crypto.Hasher
 }
 
 func NewUserService(
 	pool database.Pool,
 	v2Pool StatementPool,
-	passwordRepo domain.UserPasswordRepository,
 	schemaRepo domain.JSONSchemaRepository,
 	hasher crypto.Hasher,
 ) *UserService {
 	return &UserService{
-		pool:         pool,
-		v2Pool:       v2Pool,
-		passwordRepo: passwordRepo,
-		schemaRepo:   schemaRepo,
-		hasher:       hasher,
+		pool:       pool,
+		v2Pool:     v2Pool,
+		schemaRepo: schemaRepo,
+		hasher:     hasher,
 	}
 }
 
@@ -178,7 +175,7 @@ func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[
 }
 
 func (s *UserService) SetPassword(ctx context.Context, input SetPasswordInput) (err error) {
-	action := NewSetUserPasswordAction(input, s.hasher, s.passwordRepo)
+	action := NewSetUserPasswordAction(input, s.hasher)
 	return s.ApplyActions(ctx, action)
 }
 
@@ -264,17 +261,15 @@ func (o *CreateUserAction) Apply(ctx context.Context, tx Statementer[AllStatemen
 type SetPasswordUserAction struct {
 	SetPasswordInput
 
-	hasher       crypto.Hasher
-	passwordRepo domain.UserPasswordRepository
+	hasher crypto.Hasher
 
 	hash string
 }
 
-func NewSetUserPasswordAction(input SetPasswordInput, hasher crypto.Hasher, passwordRepo domain.UserPasswordRepository) *SetPasswordUserAction {
+func NewSetUserPasswordAction(input SetPasswordInput, hasher crypto.Hasher) *SetPasswordUserAction {
 	return &SetPasswordUserAction{
 		SetPasswordInput: input,
 		hasher:           hasher,
-		passwordRepo:     passwordRepo,
 	}
 }
 
@@ -284,11 +279,7 @@ func (o *SetPasswordUserAction) Prepare(_ context.Context, _ database.QueryExecu
 }
 
 func (o *SetPasswordUserAction) Apply(ctx context.Context, tx Statementer[AllStatements]) error {
-	db, ok := tx.(database.QueryExecutor)
-	if !ok {
-		return domain.ErrInternal(nil).WithMessage("transaction does not support password repository writes")
-	}
-	err := o.passwordRepo.Set(ctx, db, &domain.SetUserPassword{
+	err := tx.Statements().SetUserPassword(ctx, &domain.SetUserPassword{
 		ProjectID:      o.ProjectID,
 		UserID:         o.UserID,
 		EncodedHash:    o.hash,
@@ -374,4 +365,14 @@ func (r UserStatementsIdentityReader) GetIdentity(ctx context.Context, projectID
 	return r.Pool.Statements().GetUserByID(ctx, projectID, nil, userID, UserReadOptions{
 		AttributeKeys: attributeKeys,
 	})
+}
+
+// UserPasswordStatementsLookup adapts [UserPasswordStatements] to [UserPasswords]
+// for AuthAttemptService password verification.
+type UserPasswordStatementsLookup struct {
+	Pool StatementPool
+}
+
+func (l UserPasswordStatementsLookup) GetByUserID(ctx context.Context, projectID, userID string) (*domain.UserPassword, error) {
+	return l.Pool.Statements().GetUserPasswordByUserID(ctx, projectID, userID)
 }
