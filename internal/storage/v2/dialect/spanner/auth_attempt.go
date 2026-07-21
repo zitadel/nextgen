@@ -216,14 +216,8 @@ func (as authAttemptStatements) scan(iter *spanner.RowIterator, attempt *domain.
 		if !checkType.Valid {
 			return nil
 		}
-		challengeRaw, err := nullJSONBytes(challenge)
-		if err != nil {
-			return err
-		}
-		factorRaw, err := nullJSONBytes(factor)
-		if err != nil {
-			return err
-		}
+		challengeRaw := json.RawMessage(nullJSONBytes(challenge))
+		factorRaw := json.RawMessage(nullJSONBytes(factor))
 		var (
 			lastChallengedAtV time.Time
 			lastFailedAtV     time.Time
@@ -263,17 +257,6 @@ func (as authAttemptStatements) scan(iter *spanner.RowIterator, attempt *domain.
 		return domain.ErrAuthAttemptNotFound()
 	}
 	return nil
-}
-
-func nullJSONBytes(v spanner.NullJSON) (json.RawMessage, error) {
-	if !v.Valid || v.Value == nil {
-		return nil, nil
-	}
-	b, err := json.Marshal(v.Value)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal JSON column: %w", err)
-	}
-	return b, nil
 }
 
 // DeleteAuthAttemptByID implements [service.AuthAttemptStatements].
