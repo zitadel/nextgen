@@ -131,13 +131,7 @@ func TestUserTeamLifecycle_TeamOwnedUserLosesAllMembershipsOnOwningTeamDeactivat
 	participation := ownerTeamID
 	createLifecycleUser(t, tx, userRepo, pid, schemaURL, userID, &owner, &participation)
 
-	membershipRepo := repository.NewTeamMembershipRepository(tx)
-	require.NoError(t, membershipRepo.Create(ctx, tx, &domain.TeamMembership{
-		ProjectID: pid,
-		TeamID:    otherTeamID,
-		UserID:    userID,
-		Status:    domain.MembershipStatusActive,
-	}))
+	createTeamMembership(t, tx, pid, otherTeamID, userID, domain.MembershipStatusActive)
 
 	require.NoError(t, teamRepo.Deactivate(ctx, tx, pid, ownerTeamID))
 
@@ -146,9 +140,8 @@ func TestUserTeamLifecycle_TeamOwnedUserLosesAllMembershipsOnOwningTeamDeactivat
 	require.Equal(t, domain.UserStatusDeactivated, got.Status)
 
 	for _, teamID := range []string{ownerTeamID, otherTeamID} {
-		membership, err := membershipRepo.Get(ctx, tx, pid, teamID, userID)
-		require.NoError(t, err)
-		require.Equal(t, domain.MembershipStatusRemoved, membership.Status, "team %s", teamID)
+		status := getTeamMembershipStatus(t, tx, pid, teamID, userID)
+		require.Equal(t, domain.MembershipStatusRemoved, status, "team %s", teamID)
 	}
 }
 
@@ -271,10 +264,8 @@ func TestUserRepository_DeactivateRemovesMemberships(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, domain.UserStatusDeactivated, got.Status)
 
-	membershipRepo := repository.NewTeamMembershipRepository(tx)
-	membership, err := membershipRepo.Get(ctx, tx, pid, teamID, userID)
-	require.NoError(t, err)
-	require.Equal(t, domain.MembershipStatusRemoved, membership.Status)
+	status := getTeamMembershipStatus(t, tx, pid, teamID, userID)
+	require.Equal(t, domain.MembershipStatusRemoved, status)
 
 	_, err = teamRepo.Get(ctx, tx, pid, teamID)
 	require.NoError(t, err, fmt.Sprintf("team %s should still exist after user deactivation", teamID))

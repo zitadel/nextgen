@@ -7,7 +7,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,TeamMembershipStatements
 
 type StatementPool interface {
 	Statementer[AllStatements]
@@ -22,6 +22,7 @@ type AllStatements interface {
 	ProjectStatements
 	FlowDefinitionStatements
 	CryptoKeyStatements
+	TeamMembershipStatements
 	Statements
 }
 
@@ -58,4 +59,19 @@ type CryptoKeyStatements interface {
 	Statements
 	GetEncryptionKey(ctx context.Context, filter database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error)
 	CreateEncryptionKey(ctx context.Context, dek *domain.EncryptionKey) error
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type TeamMembershipPool interface {
+// 	Statementer[TeamMembershipStatements]
+// 	Transactioner[TeamMembershipStatements]
+// }
+
+type TeamMembershipStatements interface {
+	Statements
+	CreateTeamMembership(ctx context.Context, membership *domain.TeamMembership) error
+	GetTeamMembership(ctx context.Context, projectID, teamID, userID string) (*domain.TeamMembership, error)
+	ListTeamMembershipsByUser(ctx context.Context, projectID, userID string) ([]*domain.TeamMembership, error)
+	ListTeamMembershipsByTeam(ctx context.Context, projectID, teamID string) ([]*domain.TeamMembership, error)
+	UpdateTeamMembershipStatus(ctx context.Context, projectID, teamID, userID string, status domain.MembershipStatus) error
 }

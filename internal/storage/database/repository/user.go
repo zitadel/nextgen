@@ -243,13 +243,6 @@ func (r *UserRepository) Create(ctx context.Context, client database.QueryExecut
 		scopes[i] = uniquenessScopeLiteral(a.UniqueScope)
 	}
 
-	// Dialect selection for membership repo uses the outer client: nested Begin
-	// returns a savepoint that may not implement the dialect pooler marker.
-	var membershipRepo *TeamMembershipRepository
-	if user.InitialMembershipTeamID != nil && *user.InitialMembershipTeamID != "" {
-		membershipRepo = NewTeamMembershipRepository(client)
-	}
-
 	return withTransaction(ctx, client, func(ctx context.Context, tx database.QueryExecutor) error {
 		if _, err := tx.Exec(ctx, userInsertSQL,
 			user.ProjectID, user.SchemaURL, user.ID, user.LifecycleOwnerTeamID,
@@ -258,15 +251,17 @@ func (r *UserRepository) Create(ctx context.Context, client database.QueryExecut
 		); err != nil {
 			return err
 		}
-		if membershipRepo == nil {
+		// Initial roster row stays inline until User moves to statements.
+		if user.InitialMembershipTeamID == nil || *user.InitialMembershipTeamID == "" {
 			return nil
 		}
-		return membershipRepo.Create(ctx, tx, &domain.TeamMembership{
-			ProjectID: user.ProjectID,
-			TeamID:    *user.InitialMembershipTeamID,
-			UserID:    user.ID,
-			Status:    domain.MembershipStatusActive,
-		})
+		b := database.NewStatementBuilder("INSERT INTO ")
+		b.WriteString(pgTableMemberships)
+		b.WriteString(" (project_id, team_id, user_id, status) VALUES (")
+		b.WriteArgs(user.ProjectID, *user.InitialMembershipTeamID, user.ID, domain.MembershipStatusActive.String())
+		b.WriteString(")")
+		_, err := tx.Exec(ctx, b.String(), b.Args()...)
+		return err
 	})
 }
 
