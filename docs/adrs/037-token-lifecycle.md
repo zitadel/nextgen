@@ -1,4 +1,4 @@
-# ADR 036: Token Lifecycle
+# ADR 037: Token Lifecycle
 
 > **Status:** Accepted
 > **Date:** 2026-06-30
