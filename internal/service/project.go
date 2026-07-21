@@ -35,8 +35,8 @@ type ProjectService interface {
 	Get(ctx context.Context, id string) (*domain.Project, error)
 
 	// Update updates the name of a project.
-	// Returns the updated project if successful.
-	// Returns domain.ErrProjectNotFound or domain.ErrInternal when the update fails.
+	// Returns domain.ErrMissingProjectID or domain.ErrProjectNameInvalid for validation failures.
+	// Returns domain.ErrProjectNotFound when no project with the given ID exists; other failures return domain.ErrInternal.
 	Update(ctx context.Context, id, name string) (*domain.Project, error)
 
 	// List returns projects matching the request, ordered and paginated with an
