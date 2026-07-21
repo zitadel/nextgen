@@ -147,7 +147,7 @@ function UsersScreen() {
       {/* Mobile (`Dashboard xs`): tabs → search → full-width Add. Desktop: one row. */}
       <div className="mt-6 flex flex-col gap-4 lg:h-10 lg:flex-row lg:items-center lg:justify-between">
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList>
+          <TabsList aria-label="User type">
             {TABS.map((item) => (
               <TabsTrigger key={item.value} value={item.value}>
                 {item.label}
@@ -198,6 +198,9 @@ function UsersScreen() {
             <TableRow className="border-b border-border hover:bg-transparent">
               <HeadCell
                 sortable
+                ariaSort={
+                  sortAsc === null ? "none" : sortAsc ? "ascending" : "descending"
+                }
                 onSort={() => setSortAsc((value) => (value === null ? true : !value))}
               >
                 Name
@@ -270,10 +273,13 @@ function UsersScreen() {
 function HeadCell({
   children,
   sortable = false,
+  ariaSort,
   onSort,
 }: {
   children: ReactNode;
   sortable?: boolean;
+  /** Current sort state for assistive tech; only set on sortable columns. */
+  ariaSort?: "none" | "ascending" | "descending";
   onSort?: () => void;
 }) {
   // Figma header labels use the display face (`font-serif` → APK Futural),
@@ -285,7 +291,7 @@ function HeadCell({
     </span>
   );
   return (
-    <TableHead className="h-14 px-2 align-middle">
+    <TableHead className="h-14 px-2 align-middle" aria-sort={sortable ? ariaSort : undefined}>
       {sortable ? (
         <button type="button" onClick={onSort} className="hover:[&>span]:text-foreground">
           {label}

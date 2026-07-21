@@ -104,6 +104,7 @@ describe("syncTokens against real figma-export/", () => {
   const exportDir = fileURLToPath(new URL("../figma-export", import.meta.url));
   const files = readdirSync(exportDir)
     .filter((n) => n.endsWith(".json"))
+    .sort()
     .map((name) => ({ name, data: JSON.parse(readFileSync(`${exportDir}/${name}`, "utf8")) as unknown }));
 
   it("resolves the designer's exports into the full shadcn colour surface", () => {
