@@ -51,8 +51,8 @@ are `#ffffff`. Dark canvas is `#050505`; cards are `#121212`.
    library (`HToNyqKwShDmqVurU7Xbld`), not by inventing markup from a screenshot.
 3. Install missing components with the shadcn CLI / MCP; keep them under
    `src/components/ui/`.
-4. Verify light + dark with a full-frame pixel diff (see
-   `.agents/skills/implement-figma-component/SKILL.md`).
+4. Verify light + dark with a full-frame pixel diff in a real browser
+   (chrome-devtools), matching the Figma screen frame — not a content-only crop.
 
 Canonical examples:
 
