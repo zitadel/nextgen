@@ -243,10 +243,11 @@ func TestProjectService_Get(t *testing.T) {
 					getProjectByID: func(_ context.Context, gotID string) (*domain.Project, error) {
 						assert.Equal(t, id, gotID)
 						return &domain.Project{
-							ID:        "proj_aaa",
-							Name:      "project aaa",
-							CreatedAt: now,
-							UpdatedAt: now,
+							ID:             "proj_aaa",
+							Name:           "project aaa",
+							PreviewOrigins: []string{"*.vercel.app"},
+							CreatedAt:      now,
+							UpdatedAt:      now,
 						}, nil
 					},
 				}
@@ -257,6 +258,7 @@ func TestProjectService_Get(t *testing.T) {
 			check: func(t *testing.T, got *domain.Project) {
 				assert.Equal(t, "project aaa", got.Name)
 				assert.Equal(t, "proj_aaa", got.ID)
+				assert.Equal(t, []string{"*.vercel.app"}, got.PreviewOrigins)
 				assert.False(t, got.CreatedAt.IsZero())
 			},
 		},
