@@ -1,4 +1,4 @@
-# ADR 038: Signing Key Rotation and Incident Response
+# ADR 039: Signing Key Rotation and Incident Response
 
 > **Status:** Proposed
 > **Date:** 2026-07-15

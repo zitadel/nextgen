@@ -1,7 +1,7 @@
-# ADR 037: User Credential Migration and Recovery
+# ADR 038: User Credential Migration and Recovery
 
 > **Status:** Proposed
-> **Date:** 2026-07-11
+> **Date:** 2026-07-15
 > **Context:** credential migration and account recovery flows
 
 ## Context
