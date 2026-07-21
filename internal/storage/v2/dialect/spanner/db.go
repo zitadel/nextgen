@@ -10,8 +10,16 @@ import (
 )
 
 type queryExecutor interface {
+	// Query reads data from the database and calls the consume callback with a RowIterator to process the results.
+	// It must not be used for writing data.
 	Query(ctx context.Context, stmt spanner.Statement, consume func(*spanner.RowIterator) error) error
+	// Write executes a write operation on the database and calls the consume callback with a RowIterator to process the results.
+	// It should be used to write data and read the results back in a single transaction. Use [client.Query] is not suitable for reading data without writing.
+	Write(ctx context.Context, stmt spanner.Statement, consume func(*spanner.RowIterator) error) error
+	// Update executes a write operation on the database and returns the number of rows affected.
+	// It must not be used for reading data.
 	Update(ctx context.Context, stmt spanner.Statement) (int64, error)
+	// ReadRow reads a single row from the database and returns it. It must not be used for writing data.
 	ReadRow(ctx context.Context, table string, key spanner.Key, columns []string) (*spanner.Row, error)
 }
 
@@ -23,13 +31,26 @@ func newClientDB(c *spanner.Client) queryExecutor {
 	return client{client: c}
 }
 
+// Query implements [queryExecutor].
 func (c client) Query(ctx context.Context, stmt spanner.Statement, consume func(*spanner.RowIterator) error) error {
-	_, err := c.client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
-		return consume(txn.Query(ctx, stmt))
+	tx := c.client.Single()
+	defer tx.Close()
+	iter := tx.Query(ctx, stmt)
+	defer iter.Stop()
+	return consume(iter)
+}
+
+// Write implements [queryExecutor].
+func (c client) Write(ctx context.Context, stmt spanner.Statement, consume func(*spanner.RowIterator) error) error {
+	_, err := c.client.ReadWriteTransaction(ctx, func(ctx context.Context, rwt *spanner.ReadWriteTransaction) error {
+		iter := rwt.Query(ctx, stmt)
+		defer iter.Stop()
+		return consume(iter)
 	})
 	return returnQueryError(err)
 }
 
+// Update implements [queryExecutor].
 func (c client) Update(ctx context.Context, stmt spanner.Statement) (rowCount int64, _ error) {
 	_, err := c.client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 		n, err := txn.Update(ctx, stmt)
@@ -43,7 +64,7 @@ func (c client) ReadRow(ctx context.Context, table string, key spanner.Key, colu
 	tx := c.client.Single()
 	defer tx.Close()
 	row, err := tx.ReadRow(ctx, table, key, columns)
-	return row, wrapError(err)
+	return row, returnQueryError(err)
 }
 
 type tx struct {
@@ -54,18 +75,28 @@ func newTxnDB(txn *spanner.ReadWriteTransaction) queryExecutor {
 	return tx{txn: txn}
 }
 
+// Query implements [queryExecutor].
 func (t tx) Query(ctx context.Context, stmt spanner.Statement, consume func(*spanner.RowIterator) error) error {
-	return consume(t.txn.Query(ctx, stmt))
+	return returnQueryError(consume(t.txn.Query(ctx, stmt)))
 }
 
+// Write implements [queryExecutor].
+func (t tx) Write(ctx context.Context, stmt spanner.Statement, consume func(*spanner.RowIterator) error) error {
+	iter := t.txn.Query(ctx, stmt)
+	defer iter.Stop()
+	return returnQueryError(consume(iter))
+}
+
+// Update implements [queryExecutor].
 func (t tx) Update(ctx context.Context, stmt spanner.Statement) (int64, error) {
 	n, err := t.txn.Update(ctx, stmt)
 	return n, wrapError(err)
 }
 
+// ReadRow implements [queryExecutor].
 func (t tx) ReadRow(ctx context.Context, table string, key spanner.Key, columns []string) (*spanner.Row, error) {
 	row, err := t.txn.ReadRow(ctx, table, key, columns)
-	return row, wrapError(err)
+	return row, returnQueryError(err)
 }
 
 func (s spannerStatement) statement() spanner.Statement {

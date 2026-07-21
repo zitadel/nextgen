@@ -40,7 +40,7 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 		return wrapError(err)
 	}
 	stmt := buildStatement(createProjectStmt, project.ID, project.ProjectSecret, project.PreviewSecret, previewOrigins).statement()
-	return ps.db.Query(ctx, stmt, func(iter *spanner.RowIterator) error {
+	return ps.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 			return struct{}{}, row.Columns(&project.ID, &project.CreatedAt, &project.UpdatedAt)
 		})
