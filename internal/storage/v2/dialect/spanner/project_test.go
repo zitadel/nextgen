@@ -3,8 +3,11 @@
 package spanner
 
 import (
+	"context"
 	"database/sql"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,13 +42,16 @@ func TestProjectStatements_CRUD(t *testing.T) {
 
 	stmts := pool.(*Client).Statements()
 
+	// Unique per run: the database may be shared with other test packages and
+	// persist across runs, so a fixed ID would collide.
 	project := &domain.Project{
-		ID:             "proj_v2_crud",
+		ID:             "proj_v2_crud_" + strconv.FormatInt(time.Now().UnixNano(), 10),
 		ProjectSecret:  "project-secret",
 		PreviewSecret:  "preview-secret",
 		PreviewOrigins: []string{"*.example.com", "localhost:3000"},
 	}
 	require.NoError(t, stmts.CreateProject(ctx, project))
+	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
 	assert.False(t, project.CreatedAt.IsZero())
 	assert.False(t, project.UpdatedAt.IsZero())
 
@@ -59,6 +65,9 @@ func TestProjectStatements_CRUD(t *testing.T) {
 	assert.Equal(t, project.UpdatedAt.UTC(), got.UpdatedAt.UTC())
 
 	listed, err := stmts.ListProjects(ctx, &v2database.ListOptions[domain.ProjectField]{
+		// Filter to this test's row: foreign projects from other packages
+		// sharing the database must not affect the count.
+		Filter: v2database.Equal(v2database.Col(domain.ProjectFieldID), project.ID),
 		Pagination: v2database.Page[domain.ProjectField]{
 			Limit: 10,
 			OrderBy: v2database.OrderBy[domain.ProjectField]{
