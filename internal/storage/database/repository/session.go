@@ -79,7 +79,7 @@ func NewSessionRepository(pool database.QueryExecutor) *SessionRepository {
 			AuthAttemptsTable: spannerTableAuthAttempts,
 			tokenRepo:         NewTokenRepository(pool),
 			now:               database.CurrentTimestampInstruction,
-			encodeUserAgent:   func(b []byte) any { return string(b) },
+			encodeUserAgent:   encodeSpannerJSON,
 			isSpanner:         true,
 			pool:              pool,
 		}
