@@ -1,4 +1,4 @@
-package postgres
+package spanner
 
 import (
 	"strconv"
@@ -209,7 +209,7 @@ func compileOrderBy[F ~uint8, T any](c *statementCompiler, orderBy database.Orde
 func compileLimit(c *statementCompiler, limit uint32) {
 	if limit > 0 {
 		c.WriteString(" LIMIT ")
-		writeArg(c, limit)
+		writeArg(c, int64(limit))
 	}
 }
 
@@ -223,6 +223,30 @@ func (c *statementCompiler) WriteArg(arg any) {
 
 func writeArg(c *statementCompiler, arg any) {
 	c.args = append(c.args, arg)
-	c.WriteString("$")
+	c.WriteString("@p")
 	c.WriteString(strconv.Itoa(len(c.args)))
+}
+
+func buildStatement(sql string, args ...any) spannerStatement {
+	params := make(map[string]any, len(args))
+	for i, arg := range args {
+		params[paramName(i+1)] = arg
+	}
+	return spannerStatement{SQL: sql, Params: params}
+}
+
+// buildStatementFromPostgresSQL builds a Spanner statement from a PostgreSQL-style SQL string and its arguments.
+// This function is used for backwards compatibility with existing code in the old database package.
+// TODO(adlerhurst): remove this function once the old database package is removed.
+func buildStatementFromPostgresSQL(sql string, args ...any) spannerStatement {
+	return buildStatement(convertPlaceholders(sql), args...)
+}
+
+func paramName(index int) string {
+	return "p" + strconv.Itoa(index)
+}
+
+type spannerStatement struct {
+	SQL    string
+	Params map[string]any
 }

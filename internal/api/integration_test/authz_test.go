@@ -30,9 +30,9 @@ import (
 func TestManagementAuthz(t *testing.T) {
 	t.Parallel()
 
-	victim, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	victim, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	other, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	// foreign holds a real, valid project secret — for the wrong project.
