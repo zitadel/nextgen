@@ -6,7 +6,7 @@
 "@zitadel/cli": minor
 ---
 
-Tenant-customizable login templates land end to end (ADR 037): eject a
+Tenant-customizable login templates land end to end (ADR 040): eject a
 design, edit real Liquid, `plan`/`apply` publishes it, and the login
 renders it.
 

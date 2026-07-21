@@ -27,7 +27,7 @@ func ErrBrandingPermissionDenied() Error {
 
 // Branding layout presets understood by the bundled login template. The wire
 // enum is defined in api/openapi/components/flows/branding.yaml; richer
-// designs are delivered as Liquid templates, not new enum values (ADR 037).
+// designs are delivered as Liquid templates, not new enum values (ADR 040).
 const (
 	BrandingLayoutCentered = "centered"
 	BrandingLayoutSplit    = "split"
@@ -35,7 +35,7 @@ const (
 
 // Branding is one immutable branding revision for a project. Revisions are
 // never updated or deleted; every edit publishes a new revision and flow
-// responses resolve the newest one per project (ADR 037).
+// responses resolve the newest one per project (ADR 040).
 type Branding struct {
 	ProjectID      string
 	ID             string

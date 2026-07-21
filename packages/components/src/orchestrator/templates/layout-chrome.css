@@ -114,7 +114,7 @@
   outline: var(--zl-focus-width, 2px) solid var(--zl-focus-color, #f4f4f6);
   outline-offset: var(--zl-focus-offset, 2px);
 }
-/* Split-design chrome (ADR 037 design catalog: `split` / `split-right`).
+/* Split-design chrome (ADR 040 design catalog: `split` / `split-right`).
    Consumed by the ejectable templates in @zitadel/config under
    defaults/branding/ — a brand pane beside the form pane, collapsing to
    form-only on narrow viewports. */

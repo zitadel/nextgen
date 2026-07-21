@@ -100,7 +100,7 @@ func brandingScopeAllowed(scopes []string, write bool) bool {
 }
 
 // resolveBranding resolves the branding a flow response should carry: the
-// latest stored revision for the project, or the built-in default (ADR 037).
+// latest stored revision for the project, or the built-in default (ADR 040).
 // Resolution failures degrade to the default on purpose — a broken branding
 // lookup must never take the login down.
 func (h *Handler) resolveBranding(ctx context.Context, projectID string) api.Branding {

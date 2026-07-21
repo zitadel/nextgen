@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Branding",
-  "description": "Local branding descriptor for the login UI. Carries the layout preset, asset URLs, and the LiquidJS template (by file reference or inline). `zitadel apply` publishes this as an immutable branding revision; flow responses resolve the latest revision per project (ADR 037). This schema describes the local configuration shape only.",
+  "description": "Local branding descriptor for the login UI. Carries the layout preset, asset URLs, and the LiquidJS template (by file reference or inline). `zitadel apply` publishes this as an immutable branding revision; flow responses resolve the latest revision per project (ADR 040). This schema describes the local configuration shape only.",
   "type": "object",
   "additionalProperties": false,
   "properties": {

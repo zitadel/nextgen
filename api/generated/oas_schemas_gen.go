@@ -696,7 +696,7 @@ func (*AuthorizeGetFound) authorizeGetRes() {}
 // back to built-in defaults when none is stored). Branding is configured
 // via the Branding API / `zitadel apply`, not the Flow API.
 // - As the request body of `POST /branding`, which publishes the same
-// shape as a new immutable revision (see ADR 037).
+// shape as a new immutable revision (see ADR 040).
 // Ref: #
 type Branding struct {
 	// Layout preset selector. The default.liquid master template uses this
@@ -715,7 +715,7 @@ type Branding struct {
 	// component loads this stylesheet at document level (shadow-scoped
 	// `@font-face` rules never register faces) and an arbitrary URL would
 	// grant `branding.write` page-wide CSS control over the embedding
-	// application. Safe tenant font delivery is an ADR 037 follow-up;
+	// application. Safe tenant font delivery is an ADR 040 follow-up;
 	// until then, load fonts from the embedding page.
 	FontURL OptURI `json:"font_url"`
 	// Hero/background image URL (used by split layout).

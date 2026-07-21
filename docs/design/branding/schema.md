@@ -23,7 +23,7 @@ Branding:
     hero_url: { type: string, format: uri }
 ```
 
-**Read-only projection**, resolved per step response as the **latest branding revision for the project** (falling back to built-in defaults). Written via the Branding API / `zitadel apply`, never via the Flow API; audience overrides on the app → team → project ladder are a later resolution-rule evolution ([ADR 037](../../adrs/037-tenant-login-templates-editable-config.md)). Widget must accept the five-field shape as-is.
+**Read-only projection**, resolved per step response as the **latest branding revision for the project** (falling back to built-in defaults). Written via the Branding API / `zitadel apply`, never via the Flow API; audience overrides on the app → team → project ladder are a later resolution-rule evolution ([ADR 040](../../adrs/040-tenant-login-templates-editable-config.md)). Widget must accept the five-field shape as-is.
 
 ```mermaid
 flowchart TB
@@ -113,7 +113,7 @@ The LiquidJS template string for the current step. When present, the orchestrato
 
 Asset URLs. Must be https. `font_url` is injected as a `<link rel="stylesheet">` before the widget paints. `hero_url` is consumed by the `split` layout.
 
-`font_url` is **read-only in v1**: because the component must inject it at document level (shadow-scoped `@font-face` never registers faces), a writable value would give `branding.write` page-wide CSS control over the embedding application. `POST /branding` rejects it and the local config dialect omits it; safe delivery is an [ADR 037](../../adrs/037-tenant-login-templates-editable-config.md) follow-up. Until then, load fonts from the embedding page.
+`font_url` is **read-only in v1**: because the component must inject it at document level (shadow-scoped `@font-face` never registers faces), a writable value would give `branding.write` page-wide CSS control over the embedding application. `POST /branding` rejects it and the local config dialect omits it; safe delivery is an [ADR 040](../../adrs/040-tenant-login-templates-editable-config.md) follow-up. Until then, load fonts from the embedding page.
 
 ### Proposed extensions
 

@@ -64,7 +64,7 @@ type Invoker interface {
 	// Publishes a new immutable branding revision for the project. Branding
 	// revisions cannot be updated or deleted; every edit publishes a new
 	// revision, and flow responses resolve the latest revision per project
-	// (see ADR 037).
+	// (see ADR 040).
 	// The `liquid_template` is validated lexically on save (size, encoding,
 	// banned patterns such as `<script>` tags, inline event handlers, and the
 	// `| raw` filter). Authoritative LiquidJS validation runs at authoring
@@ -1273,7 +1273,7 @@ func (c *Client) sendCreateAuthAttempt(ctx context.Context, request *CreateAuthA
 // Publishes a new immutable branding revision for the project. Branding
 // revisions cannot be updated or deleted; every edit publishes a new
 // revision, and flow responses resolve the latest revision per project
-// (see ADR 037).
+// (see ADR 040).
 // The `liquid_template` is validated lexically on save (size, encoding,
 // banned patterns such as `<script>` tags, inline event handlers, and the
 // `| raw` filter). Authoritative LiquidJS validation runs at authoring

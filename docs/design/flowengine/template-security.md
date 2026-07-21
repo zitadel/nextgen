@@ -118,7 +118,7 @@ LiquidJS provides a `| raw` filter that disables auto-escaping:
 | Ejected template XSS | CLI validation at plan time (Layer 4a) | Server lexical gate + CSP + DOMPurify |
 | Translation dictionary HTML | LiquidJS auto-escaping (via `{{ }}`) | DOMPurify |
 | `| raw` filter abuse | Engine neuters `raw` at render | Rejected by Layers 4a/4b |
-| `font_url` document-level CSS injection | Field is read-only in v1: `POST /branding` rejects it (the font stylesheet must load at document level, outside every layer above) | Safe delivery design tracked in ADR 037 |
+| `font_url` document-level CSS injection | Field is read-only in v1: `POST /branding` rejects it (the font stylesheet must load at document level, outside every layer above) | Safe delivery design tracked in ADR 040 |
 | Template publishing with a leaked browser-plane token, or into a foreign project | The Branding management API requires a project-bound operator-grade token (`project.write` \| `branding.write`); the preview secret has no management access, and foreign projects answer like nonexistent ones | ADR 036 credential planes (mintable `branding.*` scopes) |
 
 **The strongest single mitigation is CSP.** A strict `script-src 'self'` header on the Hosted Login page makes all inline script vectors completely inert regardless of whether the HTML was sanitized. Combined with LiquidJS auto-escaping and DOMPurify, this creates three independent layers that an attacker must defeat simultaneously.
@@ -127,5 +127,5 @@ LiquidJS provides a `| raw` filter that disables auto-escaping:
 guarantees above hold for rendering through `@zitadel/components`; a
 consumer that renders templates with its own engine owns its own
 escaping, sanitisation, and CSP. See
-[ADR 037](../../adrs/037-tenant-login-templates-editable-config.md) for
+[ADR 040](../../adrs/040-tenant-login-templates-editable-config.md) for
 the storage/validation split.

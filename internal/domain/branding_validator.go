@@ -18,7 +18,7 @@ const MaxBrandingTemplateBytes = 131072 // 128 KiB
 // validate the wrong language. The authoritative LiquidJS validation runs at
 // authoring time (`zitadel plan`/`apply`, @zitadel/config); the render
 // pipeline in @zitadel/components is safe against stored templates regardless
-// (escaping, neutered `raw`, DOMPurify, CSP). See ADR 037 and
+// (escaping, neutered `raw`, DOMPurify, CSP). See ADR 040 and
 // docs/design/flowengine/template-security.md. The banned patterns below
 // mirror BANNED_TEMPLATE_PATTERNS in packages/config/src/template.ts; keep the
 // two lists in sync.
@@ -56,9 +56,9 @@ func ValidateBranding(b *Branding) error {
 	// register faces), so accepting an arbitrary URL here would hand
 	// branding.write document-level CSS control over every page embedding the
 	// login — bypassing the template sandbox. Safe delivery (FontFace API
-	// against font binaries, or an allowlist) is a follow-up in ADR 037.
+	// against font binaries, or an allowlist) is a follow-up in ADR 040.
 	if b.FontURL != "" {
-		return ErrBrandingInvalid("font_url is not writable yet: tenant font delivery needs a safe design (ADR 037); load fonts from the embedding page instead", nil)
+		return ErrBrandingInvalid("font_url is not writable yet: tenant font delivery needs a safe design (ADR 040); load fonts from the embedding page instead", nil)
 	}
 	for _, u := range []struct{ name, value string }{
 		{"logo_url", b.LogoURL},

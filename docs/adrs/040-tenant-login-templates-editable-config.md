@@ -1,4 +1,4 @@
-# ADR 037: Tenant Login Templates as Editable Config
+# ADR 040: Tenant Login Templates as Editable Config
 
 > **Status:** Proposed
 > **Date:** 2026-07-20

@@ -235,7 +235,7 @@ class FlowDefinitionSyncer implements ResourceSyncer {
 }
 
 /**
- * Branding revisions (ADR 037): schema-style immutable semantics — every
+ * Branding revisions (ADR 040): schema-style immutable semantics — every
  * edit publishes a new revision via `POST /branding`, no update or delete.
  * Unlike schemas, nothing references branding revisions, so a revise never
  * triggers re-pinning. The descriptor keeps the template in a sibling
@@ -267,7 +267,7 @@ class BrandingSyncer implements ResourceSyncer {
   /**
    * Zod shape + env refs, then the authoritative template validation from
    * `@zitadel/config/template` — the LiquidJS-dialect check the Go server
-   * cannot run (its save gate is lexical; see ADR 037).
+   * cannot run (its save gate is lexical; see ADR 040).
    */
   validate(data: object): void {
     const result = brandingConfigSchema.safeParse(data);
