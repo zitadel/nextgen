@@ -9,7 +9,7 @@ import (
 )
 
 func (h *Handler) CreateProject(ctx context.Context, req *api.CreateProjectRequest) (api.CreateProjectRes, error) {
-	project, err := h.projectService.Create(ctx, req.PreviewOrigins, req.SeedDefaults.Or(true))
+	project, err := h.projectService.Create(ctx, req.Name, req.PreviewOrigins, req.SeedDefaults.Or(true))
 	if err != nil {
 		return h.NewError(ctx, err), nil
 	}
