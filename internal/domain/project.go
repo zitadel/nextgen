@@ -12,6 +12,10 @@ func ErrProjectNameInvalid() Error {
 	return newError(PrefixProject.ErrorCodePrefix("name_invalid"), "The project name is invalid. Expected a non-empty string.", nil, nil)
 }
 
+func ErrProjectNotFound() Error {
+	return newError(PrefixProject.ErrorCodePrefix("not_found"), "project not found", nil, nil)
+}
+
 // Project is a minimal representation of the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#projects)
 // It is hardly ever modified but read a lot therefore it should be stored in global tables.
 type Project struct {

@@ -308,3 +308,121 @@ func TestProjectService_Get(t *testing.T) {
 		})
 	}
 }
+
+func TestProjectService_Update(t *testing.T) {
+	createdAt := time.Now().UTC().Truncate(time.Second)
+	updatedAt := time.Now().UTC().Truncate(time.Second).Add(time.Second)
+	tests := []struct {
+		name            string
+		id              string
+		projectName     string
+		setupStatements func(string) testAllStatements
+		setupPool       func(*servicemocks.MockPool, testAllStatements)
+		wantErr         error
+		check           func(t *testing.T, got *domain.Project)
+	}{
+		{
+			name:    "missing project id",
+			wantErr: domain.ErrMissingProjectID(),
+		},
+		{
+			name:    "missing project name",
+			id:      "proj_aaa",
+			wantErr: domain.ErrProjectNameInvalid(),
+		},
+		{
+			name:        "updated, ok",
+			id:          "proj_aaa",
+			projectName: "updated project name",
+			setupStatements: func(s string) testAllStatements {
+				return testAllStatements{
+					updateProject: func(ctx context.Context, project *domain.Project) error {
+						project.CreatedAt = createdAt
+						project.UpdatedAt = updatedAt
+						return nil
+					},
+				}
+			},
+			setupPool: func(pool *servicemocks.MockPool, statements testAllStatements) {
+				pool.EXPECT().Statements().Return(statements)
+			},
+			check: func(t *testing.T, got *domain.Project) {
+				assert.Equal(t, "proj_aaa", got.ID)
+				assert.Equal(t, "updated project name", got.Name)
+				assert.Equal(t, createdAt, got.CreatedAt)
+				assert.Equal(t, updatedAt, got.UpdatedAt)
+			},
+		},
+		{
+			name:        "not found",
+			id:          "proj_missing",
+			projectName: "updated project name",
+			setupStatements: func(id string) testAllStatements {
+				return testAllStatements{
+					updateProject: func(_ context.Context, _ *domain.Project) error {
+						return database.NewNoRowFoundError(nil)
+					},
+				}
+			},
+			setupPool: func(pool *servicemocks.MockPool, statements testAllStatements) {
+				pool.EXPECT().Statements().Return(statements)
+			},
+			check: func(t *testing.T, got *domain.Project) {
+				assert.Nil(t, got)
+			},
+			wantErr: domain.ErrProjectNotFound(),
+		},
+		{
+			name:        "update error",
+			id:          "proj_aaa",
+			projectName: "updated project name",
+			setupStatements: func(s string) testAllStatements {
+				return testAllStatements{
+					updateProject: func(_ context.Context, _ *domain.Project) error {
+						return assert.AnError
+					},
+				}
+			},
+			setupPool: func(pool *servicemocks.MockPool, statements testAllStatements) {
+				pool.EXPECT().Statements().Return(statements)
+			},
+			wantErr: domain.ErrInternal(assert.AnError),
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mockPool := servicemocks.NewMockPool(ctrl)
+			schemaRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
+			flowDefinitionRepo := domainmock.NewMockFlowDefinitionRepository(ctrl)
+			const baseURL = "https://example.com"
+			schemaValidator, err := domain.NewSchemaValidator(baseURL)
+			require.NoError(t, err)
+			tokenGenerator := domainmock.NewMockTokenGenerator(ctrl)
+
+			if tc.setupStatements != nil {
+				statements := tc.setupStatements(tc.id)
+				tc.setupPool(mockPool, statements)
+			}
+
+			svc := service.NewProjectService(
+				stubPool(),
+				service.NewPool(mockPool),
+				schemaRepo,
+				flowDefinitionRepo,
+				tokenGenerator,
+				baseURL,
+				schemaValidator,
+			)
+			got, err := svc.Update(context.Background(), tc.id, tc.projectName)
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			if tc.check != nil {
+				tc.check(t, got)
+			}
+		})
+	}
+}

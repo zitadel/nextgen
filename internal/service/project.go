@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 
 	"github.com/ianlancetaylor/jsonschema"
@@ -24,6 +25,11 @@ type ProjectService interface {
 	// Get retrieves a project by ID.
 	// Returns [database.NoRowFoundError] when no project with the given ID exists.
 	Get(ctx context.Context, id string) (*domain.Project, error)
+
+	// Update updates the name of a project.
+	// Returns the updated project if successful.
+	// Returns domain.ErrProjectNotFound or domain.ErrInternal when the update fails.
+	Update(ctx context.Context, id, name string) (*domain.Project, error)
 }
 
 // NewProjectService returns a [ProjectService] backed by the given repository.
@@ -134,4 +140,24 @@ func (s *projectService) Get(ctx context.Context, id string) (*domain.Project, e
 	logger := getLoggingContext(ctx, "project")
 	logger.Info("getting project", slog.String("project_id", id))
 	return s.v2Pool.Statements().GetProjectByID(ctx, id)
+}
+
+func (s *projectService) Update(ctx context.Context, id, name string) (*domain.Project, error) {
+	if id == "" {
+		return nil, domain.ErrMissingProjectID()
+	}
+	if name == "" {
+		return nil, domain.ErrProjectNameInvalid()
+	}
+	project := &domain.Project{
+		ID:   id,
+		Name: name,
+	}
+	if err := s.v2Pool.Statements().UpdateProject(ctx, project); err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil, domain.ErrProjectNotFound()
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to update project")
+	}
+	return project, nil
 }

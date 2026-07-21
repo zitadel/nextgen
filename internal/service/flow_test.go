@@ -26,6 +26,7 @@ func stubV2Pool() *service.DB { return nil }
 type testAllStatements struct {
 	createProject  func(context.Context, *domain.Project) error
 	getProjectByID func(context.Context, string) (*domain.Project, error)
+	updateProject  func(context.Context, *domain.Project) error
 }
 
 func (testAllStatements) IsStatements() {}
@@ -44,8 +45,11 @@ func (s testAllStatements) GetProjectByID(ctx context.Context, id string) (*doma
 	return nil, nil
 }
 
-func (testAllStatements) UpdateProject(context.Context, *domain.Project) error {
-	panic("unexpected call to UpdateProject")
+func (s testAllStatements) UpdateProject(ctx context.Context, project *domain.Project) error {
+	if s.updateProject != nil {
+		return s.updateProject(ctx, project)
+	}
+	return nil
 }
 
 func (testAllStatements) ListProjects(context.Context, *v2database.ListOptions[domain.ProjectField]) (*v2database.ListResult[*domain.Project], error) {
