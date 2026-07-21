@@ -1,9 +1,9 @@
 import type { ComponentType, SVGProps } from "react";
 
 /**
- * Icon component shape shared by the sidebar. Lucide icons satisfy this, and the
- * two custom glyphs below (a lucide icon missing from our installed version, and
- * the Zitadel logo mark) match it so they drop into the nav interchangeably.
+ * Icon component shape shared by the sidebar. Lucide icons satisfy this, and
+ * the custom Zitadel logo mark below matches it so they drop into the nav
+ * interchangeably.
  */
 export type NavIcon = ComponentType<{
   size?: number | string;

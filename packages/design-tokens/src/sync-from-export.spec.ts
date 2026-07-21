@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { syncTokens } from "../scripts/sync-from-export.ts";
+import { syncTokens } from "../scripts/sync-from-export.js";
 
 const leaf = (value: unknown, type = "color"): unknown => ({ $type: type, $value: value });
 
