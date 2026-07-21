@@ -19,9 +19,22 @@ export const brandingWireSchema = CreateBrandingBody;
  * `liquid_template` when publishing. Exactly one of the two template carriers
  * may be present (the meta-schema `branding.json` mirrors this).
  */
-export const brandingConfigSchema = CreateBrandingBody.extend({
-  liquid_template_file: z.string().min(1).optional(),
-}).superRefine((value, ctx) => {
+export const brandingConfigSchema = z
+  .strictObject({
+    // Strict, unlike the generated wire schema: a typo like `hero_urll`
+    // must fail plan, not silently pass, get ignored by the server, and
+    // vanish on canonical write-back. The editor meta-schema already
+    // rejects unknown keys; the CLI gate has to agree.
+    ...CreateBrandingBody.shape,
+    // Raw strings instead of the generated uri fields: those trim and
+    // normalize before refinement runs, hiding exactly the forms the wire
+    // body still carries verbatim and Go's url.Parse rejects.
+    logo_url: z.string().optional(),
+    hero_url: z.string().optional(),
+    $schema: z.string().optional(),
+    liquid_template_file: z.string().min(1).optional(),
+  })
+  .superRefine((value, ctx) => {
   if (value.liquid_template !== undefined && value.liquid_template_file !== undefined) {
     ctx.addIssue({
       code: "custom",
@@ -53,6 +66,19 @@ function requireHttpsUrl(
   ctx: z.RefinementCtx,
 ): void {
   if (value === undefined || value === "") {
+    return;
+  }
+  // Stricter-or-equal than the Go gate (validateBrandingAssetURL): the WHATWG
+  // parser forgives what Go's url.Parse rejects — `https:example.com`,
+  // backslashes, and whitespace all get silently normalized. plan must never
+  // accept what apply would reject (the reverse is harmless), so reject the
+  // raw forms before parsing.
+  if (/[\s\\]/.test(value)) {
+    ctx.addIssue({ code: "custom", message: `${field} is not a valid URL.` });
+    return;
+  }
+  if (!/^https:\/\//i.test(value)) {
+    ctx.addIssue({ code: "custom", message: `${field} must be an absolute https URL.` });
     return;
   }
   let parsed: URL;

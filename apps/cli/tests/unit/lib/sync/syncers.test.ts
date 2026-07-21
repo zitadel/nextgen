@@ -383,6 +383,36 @@ describe("BrandingSyncer", () => {
     }
   });
 
+  it("validate rejects URLs the WHATWG parser forgives but Go's url.Parse rejects", async () => {
+    const cwd = await makeBrandingProject();
+    const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    // new URL() normalizes all of these into valid https URLs; the server's
+    // Go parser rejects them — plan must be stricter-or-equal, never looser.
+    for (const hostile of [
+      "https:example.com",
+      String.raw`https:\\cdn.example.com\logo.svg`,
+      "https://cdn.example.com/logo .svg",
+      " https://cdn.example.com/logo.svg",
+    ]) {
+      expect(
+        () => branding.validate({ ...descriptor, logo_url: hostile }),
+        `should reject ${JSON.stringify(hostile)}`,
+      ).toThrow(ZitadelError);
+    }
+  });
+
+  it("validate throws E_VALIDATION on unknown descriptor keys", async () => {
+    const cwd = await makeBrandingProject();
+    const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    // A typo like hero_urll would otherwise pass plan, be ignored by the
+    // server, and vanish on canonical write-back.
+    expect(() =>
+      branding.validate({ ...descriptor, hero_urll: "https://cdn.example.com/hero.png" }),
+    ).toThrow(ZitadelError);
+  });
+
   it("validate throws E_VALIDATION on font_url (read-only in v1)", async () => {
     const cwd = await makeBrandingProject();
     const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });

@@ -101,6 +101,17 @@ Latest-revision then survives only for projects not yet under release
 management. The switch touches the resolution rule alone; storage and
 wire shape are already release-ready.
 
+The inner loop must stay ceremony-free through that switch (ADR 035
+leaves inner-loop semantics open; templates are the resource that
+decides it). Two shapes keep iteration at zero ceremony without
+puncturing the release boundary: a **local preview loop** — the CLI
+already owns the full render pipeline, so `.liquid` edits can render
+against fixture flow payloads with hot reload and no server round-trip —
+and **release-per-save on dev-class environments** (035's
+content-idempotent releases make this cheap), which preserves a single
+resolution rule and means the release promoted to prod is the exact one
+seen in dev.
+
 ### 3. Validation: authoritative in the CLI, lexical gate on the server
 
 | Layer | Where | What |

@@ -9,7 +9,7 @@ CREATE TABLE branding (
     CONSTRAINT fk_branding_project
         FOREIGN KEY (project_id)
         REFERENCES projects (id)
-        ON DELETE CASCADE,
+        ON DELETE CASCADE
 ) PRIMARY KEY (project_id, id)
 -- +goose StatementEnd
 
