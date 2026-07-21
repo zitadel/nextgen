@@ -13,6 +13,7 @@ import (
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/dbmock"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 	"go.uber.org/mock/gomock"
 )
 
@@ -423,6 +424,237 @@ func TestProjectService_Update(t *testing.T) {
 			if tc.check != nil {
 				tc.check(t, got)
 			}
+		})
+	}
+}
+
+func TestProjectService_List(t *testing.T) {
+	createdAt := time.Now().UTC().Truncate(time.Second)
+
+	tests := []struct {
+		name         string
+		req          service.ListProjectsRequest
+		result       *v2database.ListResult[*domain.Project]
+		statementErr error
+		wantErr      error
+		checkOpts    func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField])
+		checkResp    func(t *testing.T, resp *service.ListProjectsResponse)
+	}{
+		{
+			name: "defaults",
+			req:  service.ListProjectsRequest{},
+			result: &v2database.ListResult[*domain.Project]{
+				Items:      []*domain.Project{{ID: "proj_a"}, {ID: "proj_b"}},
+				NextCursor: []byte("next"),
+			},
+			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, uint32(20), opts.Pagination.Limit)
+				assert.Nil(t, opts.Pagination.Cursor)
+				assert.Equal(t, v2database.OrderAsc, opts.Pagination.OrderBy.Direction)
+				assert.Equal(t, []v2database.Column[domain.ProjectField]{
+					v2database.Col(domain.ProjectFieldCreatedAt),
+					v2database.Col(domain.ProjectFieldID),
+				}, opts.Pagination.OrderBy.Columns)
+				assert.Equal(t, v2database.And[domain.ProjectField](), opts.Filter)
+			},
+			checkResp: func(t *testing.T, resp *service.ListProjectsResponse) {
+				assert.Len(t, resp.Projects, 2)
+				assert.Equal(t, "next", resp.NextPageToken)
+			},
+		},
+		{
+			name:   "limit clamped to max",
+			req:    service.ListProjectsRequest{Limit: 500},
+			result: &v2database.ListResult[*domain.Project]{},
+			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, uint32(100), opts.Pagination.Limit)
+			},
+		},
+		{
+			name:   "negative limit uses default",
+			req:    service.ListProjectsRequest{Limit: -5},
+			result: &v2database.ListResult[*domain.Project]{},
+			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, uint32(20), opts.Pagination.Limit)
+			},
+		},
+		{
+			name: "sort by name desc",
+			req: service.ListProjectsRequest{
+				Sorting: &service.Sorting{Field: "name", Direction: "desc"},
+			},
+			result: &v2database.ListResult[*domain.Project]{},
+			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, v2database.OrderDesc, opts.Pagination.OrderBy.Direction)
+				assert.Equal(t, []v2database.Column[domain.ProjectField]{
+					v2database.Col(domain.ProjectFieldName),
+					v2database.Col(domain.ProjectFieldID),
+				}, opts.Pagination.OrderBy.Columns)
+			},
+		},
+		{
+			name: "filter equals name",
+			req: service.ListProjectsRequest{
+				Filters: []service.Filter{{Field: "name", Operation: "equals", Value: "acme"}},
+			},
+			result: &v2database.ListResult[*domain.Project]{},
+			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, v2database.And[domain.ProjectField](
+					v2database.StringEqual(v2database.Col(domain.ProjectFieldName), "acme"),
+				), opts.Filter)
+			},
+		},
+		{
+			name: "filter greater_than createdAt parses RFC3339",
+			req: service.ListProjectsRequest{
+				Filters: []service.Filter{{Field: "createdAt", Operation: "greater_than", Value: createdAt.Format(time.RFC3339)}},
+			},
+			result: &v2database.ListResult[*domain.Project]{},
+			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, v2database.And[domain.ProjectField](
+					v2database.GreaterThan(v2database.Col(domain.ProjectFieldCreatedAt), createdAt),
+				), opts.Filter)
+			},
+		},
+		{
+			name:   "page token passed through as cursor",
+			req:    service.ListProjectsRequest{PageToken: "tok"},
+			result: &v2database.ListResult[*domain.Project]{},
+			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, []byte("tok"), opts.Pagination.Cursor)
+			},
+		},
+		{
+			name:         "statement error is wrapped",
+			req:          service.ListProjectsRequest{},
+			statementErr: assert.AnError,
+			wantErr:      domain.ErrInternal(assert.AnError),
+		},
+		{
+			name:         "invalid cursor maps to request invalid",
+			req:          service.ListProjectsRequest{PageToken: "bad"},
+			statementErr: v2database.ErrInvalidCursor(),
+			wantErr:      domain.ErrRequestInvalid(),
+		},
+		{
+			name:         "cursor order mismatch maps to request invalid",
+			req:          service.ListProjectsRequest{PageToken: "bad"},
+			statementErr: v2database.ErrCursorOrderMismatch(),
+			wantErr:      domain.ErrRequestInvalid(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mockPool := servicemocks.NewMockPool(ctrl)
+			schemaRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
+			flowDefinitionRepo := domainmock.NewMockFlowDefinitionRepository(ctrl)
+			const baseURL = "https://example.com"
+			schemaValidator, err := domain.NewSchemaValidator(baseURL)
+			require.NoError(t, err)
+			tokenGenerator := domainmock.NewMockTokenGenerator(ctrl)
+
+			var gotOpts *v2database.ListOptions[domain.ProjectField]
+			mockPool.EXPECT().Statements().Return(testAllStatements{
+				listProjects: func(_ context.Context, opts *v2database.ListOptions[domain.ProjectField]) (*v2database.ListResult[*domain.Project], error) {
+					gotOpts = opts
+					return tc.result, tc.statementErr
+				},
+			})
+
+			svc := service.NewProjectService(
+				stubPool(),
+				service.NewPool(mockPool),
+				schemaRepo,
+				flowDefinitionRepo,
+				tokenGenerator,
+				baseURL,
+				schemaValidator,
+			)
+
+			resp, err := svc.List(context.Background(), tc.req)
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			if tc.checkOpts != nil {
+				tc.checkOpts(t, gotOpts)
+			}
+			if tc.checkResp != nil {
+				tc.checkResp(t, resp)
+			}
+		})
+	}
+}
+
+func TestProjectService_List_ValidationErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		req     service.ListProjectsRequest
+		wantErr error
+	}{
+		{
+			name: "unsupported operation not implemented",
+			req: service.ListProjectsRequest{
+				Filters: []service.Filter{{Field: "name", Operation: "not_equals", Value: "acme"}},
+			},
+			wantErr: domain.ErrNotImplemented(),
+		},
+		{
+			name: "unknown field is invalid",
+			req: service.ListProjectsRequest{
+				Filters: []service.Filter{{Field: "bogus", Operation: "equals", Value: "x"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "unknown sort direction is invalid",
+			req: service.ListProjectsRequest{
+				Sorting: &service.Sorting{Field: "name", Direction: "sideways"},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "non-string name value is invalid",
+			req: service.ListProjectsRequest{
+				Filters: []service.Filter{{Field: "name", Operation: "equals", Value: 42}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "unparseable createdAt value is invalid",
+			req: service.ListProjectsRequest{
+				Filters: []service.Filter{{Field: "createdAt", Operation: "equals", Value: "not-a-time"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mockPool := servicemocks.NewMockPool(ctrl)
+			schemaRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
+			flowDefinitionRepo := domainmock.NewMockFlowDefinitionRepository(ctrl)
+			const baseURL = "https://example.com"
+			schemaValidator, err := domain.NewSchemaValidator(baseURL)
+			require.NoError(t, err)
+			tokenGenerator := domainmock.NewMockTokenGenerator(ctrl)
+
+			svc := service.NewProjectService(
+				stubPool(),
+				service.NewPool(mockPool),
+				schemaRepo,
+				flowDefinitionRepo,
+				tokenGenerator,
+				baseURL,
+				schemaValidator,
+			)
+
+			_, err = svc.List(context.Background(), tc.req)
+			require.ErrorIs(t, err, tc.wantErr)
 		})
 	}
 }
