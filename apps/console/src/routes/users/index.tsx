@@ -219,7 +219,7 @@ function UsersScreen() {
                 <TableCell className="h-11 truncate px-4 py-0">
                   <div className="flex items-center gap-2">
                     <Avatar size="sm">
-                      <AvatarFallback className="text-[8px]!">{initials(user.name)}</AvatarFallback>
+                      <AvatarFallback>{initials(user.name)}</AvatarFallback>
                     </Avatar>
                     <span className="truncate font-medium text-foreground">{user.name}</span>
                   </div>

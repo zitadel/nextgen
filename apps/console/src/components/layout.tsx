@@ -18,11 +18,11 @@ export function Page({ children }: { children: ReactNode }) {
 }
 
 /**
- * 12-column content grid matching the Figma `layout/*` spec. The gutter comes
- * straight from the `--zl-layout-gutter` token; the column count is the Figma
- * `layout/columns` value (12) — hard-coded as `grid-cols-12` because CSS does
- * not allow a `var()` as the `repeat()` count. Collapses to a single column
- * below `md`; children place themselves with standard `col-span-*` utilities.
+ * 12-column content grid matching the Figma `layout/*` spec. Prefer
+ * `--zl-layout-gutter` when the token pipeline emits it; fall back to 24px
+ * (`1.5rem`, spacing-6) until Figma publishes that layout token. Column count
+ * is hard-coded as `grid-cols-12` because CSS does not allow a `var()` as the
+ * `repeat()` count. Collapses to a single column below `md`.
  */
 export function ContentGrid({
   children,
@@ -32,7 +32,9 @@ export function ContentGrid({
   className?: string;
 }) {
   return (
-    <div className={`grid grid-cols-1 gap-[var(--zl-layout-gutter)] md:grid-cols-12 ${className}`}>
+    <div
+      className={`grid grid-cols-1 gap-[var(--zl-layout-gutter,1.5rem)] md:grid-cols-12 ${className}`}
+    >
       {children}
     </div>
   );
