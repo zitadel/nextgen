@@ -51,7 +51,6 @@ type Harness struct {
 	SchemaValidator    *domain.SchemaValidator
 	FlowDefinitionRepo domain.FlowDefinitionRepository
 	AuthAttemptRepo    domain.AuthAttemptRepository
-	SessionRepo        domain.SessionRepository
 	UserRepo           domain.UserRepository
 	UserPasswordRepo   domain.UserPasswordRepository
 	UserPasskeyRepo    domain.UserPasskeyRepository

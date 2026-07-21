@@ -134,7 +134,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	userPasswordRepo := repository.NewUserPasswordRepository()
 	userPasskeyRepo := repository.NewUserPasskeyRepository()
 	passkeyRegRepo := repository.NewPasskeyRegistrationRepository()
-	sessionRepo := repository.NewSessionRepository(pool)
 	flowDefinitionRepo := repository.NewFlowDefinitionRepository(pool)
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
 	schemaRepo := repository.NewJSONSchemaRepository(pool)
@@ -142,6 +141,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	brandingRepo := repository.NewBrandingRepository(pool)
 
 	serviceDBPool := service.NewPool(v2Pool.(service.Pool))
+	sessionResolver := service.SessionStatementsResolver{Pool: serviceDBPool}
 
 	// ── Schema Stuff ─────────────────
 	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](cfg.Schema.LRUCacheSize)
@@ -171,13 +171,13 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	authAttemptSvc := service.NewAuthAttemptService(
 		pool,
 		attemptRepo,
-		sessionRepo,
+		sessionResolver,
 		userRepo,
 		userPasswordRepo,
 		userPasskeyRepo,
 		passwordHasher,
 	)
-	sessionService := service.NewSessionService(pool, sessionRepo, userRepo, service.SessionConfig{
+	sessionService := service.NewSessionService(pool, serviceDBPool, userRepo, service.SessionConfig{
 		DefaultTTL: cfg.Session.DefaultTTL,
 		MaxTTL:     cfg.Session.MaxTTL,
 	})

@@ -59,11 +59,12 @@ type DeleteSessionInput struct {
 	ProjectID string
 	SessionID string
 }
+
 type sessionService struct {
-	pool  database.Pool
-	repo  domain.SessionRepository
-	users UserIdentityReader
-	cfg   SessionConfig
+	pool   database.Pool
+	v2Pool StatementPool
+	users  UserIdentityReader
+	cfg    SessionConfig
 }
 
 func (s *sessionService) Create(ctx context.Context, input CreateSessionInput) (*domain.Session, error) {
@@ -71,7 +72,9 @@ func (s *sessionService) Create(ctx context.Context, input CreateSessionInput) (
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("Failed to create the session.")
 	}
-	err = s.repo.Create(ctx, s.pool, session)
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		return tx.Statements().CreateSession(ctx, session)
+	})
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("Failed to create the session.")
 	}
@@ -83,7 +86,12 @@ func (s *sessionService) Exchange(ctx context.Context, input ExchangeInput) (*do
 	if err != nil {
 		return nil, err
 	}
-	session, err := s.repo.Exchange(ctx, s.pool, input.ProjectID, input.HandoffToken, input.IdempotencyKey, ttl)
+	var session *domain.Session
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		var txErr error
+		session, txErr = tx.Statements().ExchangeSession(ctx, input.ProjectID, input.HandoffToken, input.IdempotencyKey, ttl)
+		return txErr
+	})
 	if err != nil {
 		if errors.Is(err, domain.ErrSessionExchangeConflict()) || errors.Is(err, domain.ErrSessionInvalidHandoffToken()) {
 			return nil, err
@@ -94,7 +102,7 @@ func (s *sessionService) Exchange(ctx context.Context, input ExchangeInput) (*do
 }
 
 func (s *sessionService) Get(ctx context.Context, input GetSessionInput) (*domain.Session, error) {
-	session, err := s.repo.Get(ctx, s.pool, input.ProjectID, input.SessionID)
+	session, err := s.v2Pool.Statements().GetSessionByID(ctx, input.ProjectID, input.SessionID)
 	if err != nil {
 		if errors.Is(err, domain.ErrSessionNotFound()) {
 			return nil, err
@@ -125,7 +133,7 @@ func (s *sessionService) List(ctx context.Context, input ListSessionInput) ([]*d
 }
 
 func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) error {
-	err := s.repo.Delete(ctx, s.pool, input.ProjectID, input.SessionID)
+	err := s.v2Pool.Statements().DeleteSessionByID(ctx, input.ProjectID, input.SessionID)
 	if err != nil {
 		if errors.Is(err, domain.ErrSessionNotFound()) { // TODO: ?
 			return nil
@@ -135,11 +143,21 @@ func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) e
 	return nil
 }
 
-func NewSessionService(pool database.Pool, repo domain.SessionRepository, users UserIdentityReader, cfg SessionConfig) SessionService {
+func NewSessionService(pool database.Pool, v2Pool StatementPool, users UserIdentityReader, cfg SessionConfig) SessionService {
 	return &sessionService{
-		pool:  pool,
-		repo:  repo,
-		users: users,
-		cfg:   cfg,
+		pool:   pool,
+		v2Pool: v2Pool,
+		users:  users,
+		cfg:    cfg,
 	}
+}
+
+// SessionStatementsResolver adapts [StatementPool] to [SessionResolver] for
+// AuthAttemptService step-up lookups.
+type SessionStatementsResolver struct {
+	Pool StatementPool
+}
+
+func (r SessionStatementsResolver) Get(ctx context.Context, _ database.QueryExecutor, projectID, sessionID string) (*domain.Session, error) {
+	return r.Pool.Statements().GetSessionByID(ctx, projectID, sessionID)
 }

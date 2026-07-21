@@ -12,39 +12,42 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-type sessionRepoStub struct {
-	createFunc   func(context.Context, database.QueryExecutor, *domain.Session) error
-	exchangeFunc func(context.Context, database.QueryExecutor, string, string, *string, time.Duration) (*domain.Session, error)
-	getFunc      func(context.Context, database.QueryExecutor, string, string) (*domain.Session, error)
+type sessionStmtsStub struct {
+	testAllStatements
+	createFunc   func(context.Context, *domain.Session) error
+	exchangeFunc func(context.Context, string, string, *string, time.Duration) (*domain.Session, error)
+	getFunc      func(context.Context, string, string) (*domain.Session, error)
 }
 
-func (s *sessionRepoStub) Create(ctx context.Context, q database.QueryExecutor, session *domain.Session) error {
+func (s *sessionStmtsStub) CreateSession(ctx context.Context, session *domain.Session) error {
 	if s.createFunc == nil {
-		panic("unexpected Create call")
+		panic("unexpected CreateSession call")
 	}
-	return s.createFunc(ctx, q, session)
+	return s.createFunc(ctx, session)
 }
 
-func (s *sessionRepoStub) Exchange(ctx context.Context, q database.QueryExecutor, projectID, handoffToken string, idempotencyKey *string, ttl time.Duration) (*domain.Session, error) {
+func (s *sessionStmtsStub) ExchangeSession(ctx context.Context, projectID, handoffToken string, idempotencyKey *string, ttl time.Duration) (*domain.Session, error) {
 	if s.exchangeFunc == nil {
-		panic("unexpected Exchange call")
+		panic("unexpected ExchangeSession call")
 	}
-	return s.exchangeFunc(ctx, q, projectID, handoffToken, idempotencyKey, ttl)
+	return s.exchangeFunc(ctx, projectID, handoffToken, idempotencyKey, ttl)
 }
 
-func (s *sessionRepoStub) Get(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) (*domain.Session, error) {
+func (s *sessionStmtsStub) GetSessionByID(ctx context.Context, projectID, sessionID string) (*domain.Session, error) {
 	if s.getFunc == nil {
-		panic("unexpected Get call")
+		panic("unexpected GetSessionByID call")
 	}
-	return s.getFunc(ctx, q, projectID, sessionID)
+	return s.getFunc(ctx, projectID, sessionID)
 }
 
-func (s *sessionRepoStub) List(context.Context, database.QueryExecutor, string) ([]*domain.Session, error) {
-	panic("unexpected List call")
+type sessionStatementPool struct {
+	stmts service.AllStatements
 }
 
-func (s *sessionRepoStub) Delete(context.Context, database.QueryExecutor, string, string) error {
-	panic("unexpected Delete call")
+func (s sessionStatementPool) Statements() service.AllStatements { return s.stmts }
+
+func (s sessionStatementPool) Transaction(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+	return fn(ctx, s)
 }
 
 // userReaderStub implements service.UserIdentityReader and records the
@@ -112,11 +115,8 @@ func TestSessionService_Create(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := &sessionRepoStub{
-				createFunc: func(_ context.Context, q database.QueryExecutor, gotSession *domain.Session) error {
-					if q != stubPool() {
-						t.Fatalf("Create q = %v, want service pool", q)
-					}
+			stmts := &sessionStmtsStub{
+				createFunc: func(_ context.Context, gotSession *domain.Session) error {
 					if gotSession.ProjectID != tt.input.ProjectID {
 						t.Fatalf("Create session.ProjectID = %q, want %q", gotSession.ProjectID, tt.input.ProjectID)
 					}
@@ -131,7 +131,7 @@ func TestSessionService_Create(t *testing.T) {
 				},
 			}
 
-			got, err := service.NewSessionService(stubPool(), repo, &userReaderStub{}, sessionConfigForTest()).Create(t.Context(), tt.input)
+			got, err := service.NewSessionService(stubPool(), sessionStatementPool{stmts: stmts}, &userReaderStub{}, sessionConfigForTest()).Create(t.Context(), tt.input)
 			if tt.wantErr != nil {
 				assertSessionResult(t, "Create", got, err, nil, tt.wantErr)
 				return
@@ -235,11 +235,8 @@ func TestSessionService_Exchange(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := &sessionRepoStub{
-				exchangeFunc: func(_ context.Context, q database.QueryExecutor, projectID, handoffToken string, gotIdempotencyKey *string, gotTTL time.Duration) (*domain.Session, error) {
-					if q != stubPool() {
-						t.Fatalf("Exchange q = %v, want service pool", q)
-					}
+			stmts := &sessionStmtsStub{
+				exchangeFunc: func(_ context.Context, projectID, handoffToken string, gotIdempotencyKey *string, gotTTL time.Duration) (*domain.Session, error) {
 					if projectID != tt.input.ProjectID {
 						t.Fatalf("Exchange projectID = %q, want %q", projectID, tt.input.ProjectID)
 					}
@@ -256,7 +253,7 @@ func TestSessionService_Exchange(t *testing.T) {
 				},
 			}
 
-			got, err := service.NewSessionService(stubPool(), repo, &userReaderStub{}, cfg).Exchange(t.Context(), tt.input)
+			got, err := service.NewSessionService(stubPool(), sessionStatementPool{stmts: stmts}, &userReaderStub{}, cfg).Exchange(t.Context(), tt.input)
 			assertSessionResult(t, "Exchange", got, err, tt.want, tt.wantErr)
 		})
 	}
@@ -302,11 +299,8 @@ func TestSessionService_Get(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := &sessionRepoStub{
-				getFunc: func(_ context.Context, q database.QueryExecutor, projectID, sessionID string) (*domain.Session, error) {
-					if q != stubPool() {
-						t.Fatalf("Get q = %v, want service pool", q)
-					}
+			stmts := &sessionStmtsStub{
+				getFunc: func(_ context.Context, projectID, sessionID string) (*domain.Session, error) {
 					if projectID != tt.input.ProjectID {
 						t.Fatalf("Get projectID = %q, want %q", projectID, tt.input.ProjectID)
 					}
@@ -317,7 +311,7 @@ func TestSessionService_Get(t *testing.T) {
 				},
 			}
 
-			got, err := service.NewSessionService(stubPool(), repo, &userReaderStub{}, sessionConfigForTest()).Get(t.Context(), tt.input)
+			got, err := service.NewSessionService(stubPool(), sessionStatementPool{stmts: stmts}, &userReaderStub{}, sessionConfigForTest()).Get(t.Context(), tt.input)
 			assertSessionResult(t, "Get", got, err, tt.want, tt.wantErr)
 		})
 	}
@@ -365,8 +359,8 @@ func TestSessionService_Get_UserIdentity(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := &sessionRepoStub{
-				getFunc: func(context.Context, database.QueryExecutor, string, string) (*domain.Session, error) {
+			stmts := &sessionStmtsStub{
+				getFunc: func(context.Context, string, string) (*domain.Session, error) {
 					return &domain.Session{ProjectID: "proj", ID: "sess", UserID: tt.sessionUserID}, nil
 				},
 			}
@@ -381,7 +375,7 @@ func TestSessionService_Get_UserIdentity(t *testing.T) {
 			}
 
 			input := service.GetSessionInput{ProjectID: "proj", SessionID: "sess", WithUserIdentity: true}
-			got, err := service.NewSessionService(stubPool(), repo, users, sessionConfigForTest()).Get(t.Context(), input)
+			got, err := service.NewSessionService(stubPool(), sessionStatementPool{stmts: stmts}, users, sessionConfigForTest()).Get(t.Context(), input)
 			if tt.wantErr != nil {
 				if !errors.Is(err, tt.wantErr) {
 					t.Fatalf("Get err = %v, want %v", err, tt.wantErr)
