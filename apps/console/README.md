@@ -67,8 +67,10 @@ config and environment variables below.
 
 | Variable | Where | Purpose |
 | --- | --- | --- |
-| `ZITADEL_URL` | Node (dev proxy) | Upstream API origin |
-| `ZITADEL_PROJECT_SECRET` | Node (dev proxy) | Bearer for the proxy; never shipped to the browser |
+| `CONSOLE_BACKEND_URL` | Node (dev proxy) | Upstream API origin (defaults in `vite.config.mts`) |
+| `CONSOLE_PROJECT_SECRET` | Node (dev proxy) | Bearer attached by the proxy; never shipped to the browser |
+| `VITE_CONSOLE_API_BASE` | Client | Same-origin API base the SDK calls (default `/api`) |
+| `VITE_CONSOLE_PROJECT_ID` | Client | Project id sent with API requests (optional) |
 
 ## Commands
 

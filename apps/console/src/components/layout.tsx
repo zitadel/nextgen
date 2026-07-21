@@ -13,7 +13,7 @@ import type { ReactNode } from "react";
  */
 export function Page({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto w-full max-w-[120rem] px-6 py-8 lg:px-10 2xl:px-16">{children}</div>
+    <div className="mx-auto w-full max-w-[120rem] px-6 py-8 2xl:px-8">{children}</div>
   );
 }
 

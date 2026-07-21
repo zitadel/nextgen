@@ -75,7 +75,7 @@ not reintroduce `bg-zl-*` there — the bridge file owns the mapping.
 
 - `src/generated/figma.tokens.json` — overwritten by `:sync` /
   `:sync-export`.
-- `src/generated/tokens.css`, `tokens.ts`, `tailwind.css` —
+- `src/generated/tokens.css`, `tokens.ts`, `tailwind.css`, `shadcn.css` —
   overwritten by `:generate`.
 - `src/legacy.tokens.json` — frozen legacy colour source. Only touch it to
   deliberately retire a legacy token once no consumer references it.

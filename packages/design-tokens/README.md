@@ -120,7 +120,8 @@ packages/design-tokens/
 │       ├── figma.tokens.json         ← resolved shadcn surface (written by :sync-export)
 │       ├── tokens.css
 │       ├── tokens.ts
-│       └── tailwind.css
+│       ├── tailwind.css
+│       └── shadcn.css                ← shadcn utility bridge for apps/console
 └── dist/                             ← gitignored; built by tsdown for npm
 ```
 
@@ -136,8 +137,8 @@ export files freely.
    have a committed export under `figma-export/`).
 3. Run `moon run design-tokens:generate` and `moon run design-tokens:test`.
    Update the snapshot if the new name is intentional.
-4. Commit `figma.tokens.json`, `tokens.{css,ts}`, and `tailwind.css` together
-   in the sync PR.
+4. Commit `figma.tokens.json`, `tokens.{css,ts}`, `tailwind.css`, and
+   `shadcn.css` together in the sync PR.
 
 For Enterprise REST sync instead: bump `figma-tokens.lock.version`, run
 `:sync`, then `:generate` and `:test`.
