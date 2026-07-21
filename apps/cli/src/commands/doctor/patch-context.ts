@@ -9,8 +9,8 @@ import { readDevelopmentIssuer, readRendererId, readZitadelConfig, readZitadelSe
  * Reconstructs a {@link PatchContext} from the on-disk project (config, secret)
  * plus fresh framework detection, so a patcher repair can rebuild its plan.
  * Used by the dependency check's `fix`, which reclaims the framework-specific
- * SDK package via `patcher.repair`. The user schema and flow definition are
- * server-owned and no longer scaffolded locally, so nothing here reads them.
+ * SDK package via `patcher.repair`. Schema and flow config are user-editable
+ * sync resources, not patcher inputs, so nothing here reads them.
  */
 export async function loadPatchContext(
   cwd: string,

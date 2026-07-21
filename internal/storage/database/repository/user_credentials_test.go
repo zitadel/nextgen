@@ -27,8 +27,8 @@ func insertProjectTeamSchemaUser(t *testing.T, tx database.Transaction, pid, tid
 	)
 	require.NoError(t, err)
 	_, err = tx.Exec(ctx,
-		fmt.Sprintf(`INSERT INTO %s (project_id, schema_url, id, team_id) VALUES ($1,$2,$3,$4)`, dbTable("users")),
-		pid, schemaURL, userID, tid,
+		fmt.Sprintf(`INSERT INTO %s (project_id, schema_url, id, lifecycle_owner_team_id, status) VALUES ($1,$2,$3,$4,$5)`, dbTable("users")),
+		pid, schemaURL, userID, tid, domain.UserStatusActive.String(),
 	)
 	require.NoError(t, err)
 }

@@ -26,18 +26,30 @@ contract is one rebuild away, never a copy-paste.
 
 ## How a sync works
 
-`figma-tokens.lock` pins the Figma published library version that
-`src/generated/figma.tokens.json` was built from. The lockfile is the
-only knob that controls what gets pulled.
+### Figma plugin push (default)
+
+A Figma Community sync plugin pushes DTCG JSON to GitHub. Plugin settings:
+
+| Field | Value |
+| --- | --- |
+| Name (repo) | `nextgen` |
+| Branch | `design-tokens/figma-sync` |
+| Token path | `packages/design-tokens/figma-export` |
+
+CI ([`.github/workflows/sync-design-tokens.yml`](../../.github/workflows/sync-design-tokens.yml))
+runs on push to that branch under `figma-export/**` → `:sync-export` →
+`:generate` → `:test` → opens or **updates one PR**.
+
+### Engineering path (Enterprise only)
+
+REST sync via `workflow_dispatch` with `figma-rest`, or locally:
 
 ```sh
 FIGMA_TOKEN=... moon run design-tokens:sync
 moon run design-tokens:generate
-moon run design-tokens:test       # snapshot guard
+moon run design-tokens:test
 ```
 
-In CI, [`.github/workflows/sync-design-tokens.yml`](../../.github/workflows/sync-design-tokens.yml)
-runs the same sequence on a manual trigger and opens a PR with the diff.
 Sync **never** commits to `main` directly.
 
 ## Safety guarantees
@@ -58,7 +70,9 @@ Sync **never** commits to `main` directly.
 ```
 packages/design-tokens/
 ├── figma-tokens.lock                 ← pinned library version (committed)
+├── figma-export/                     ← DTCG JSON from Figma plugin push
 ├── scripts/
+│   ├── sync-from-export.ts           ← figma-export/*.json → figma.tokens.json
 │   ├── sync-from-figma.ts            ← Figma REST → figma.tokens.json
 │   └── build.ts                      ← figma.tokens.json + overrides → outputs
 ├── src/
@@ -73,15 +87,20 @@ packages/design-tokens/
 └── dist/                             ← gitignored; built by tsdown for npm
 ```
 
+Export files: `primitives.json`, `semantic---light-dark.json`, `layout.json`.
+
 ## Adding a new token
 
-1. Add the variable in Figma → publish the library → bump
-   `figma-tokens.lock.version`.
-2. Run `moon run design-tokens:sync`, `moon run design-tokens:generate`, and
-   `moon run design-tokens:test`. Update the snapshot if the new
-   name is intentional; otherwise fix the input.
-3. Commit the resulting `figma.tokens.json`, `tokens.{css,ts}`, and
-   `tailwind.css` together with the lockfile bump.
+1. Add the variable in Figma → publish the library.
+2. Push from the Community sync plugin (or run `:sync-export` locally if you
+   have a committed export under `figma-export/`).
+3. Run `moon run design-tokens:generate` and `moon run design-tokens:test`.
+   Update the snapshot if the new name is intentional.
+4. Commit `figma.tokens.json`, `tokens.{css,ts}`, and `tailwind.css` together
+   in the sync PR.
+
+For Enterprise REST sync instead: bump `figma-tokens.lock.version`, run
+`:sync`, then `:generate` and `:test`.
 
 For values Figma doesn't own (typography stacks, motion, etc.), edit
 `src/overrides.ts` and re-run `:generate`.

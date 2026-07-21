@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { ApiError } from "@zitadel/api/runtime/fetch";
+
 import { EXIT_CODES, ZitadelError, toZitadelError } from "../../../src/lib/errors";
 
 describe("EXIT_CODES", () => {
@@ -10,6 +12,7 @@ describe("EXIT_CODES", () => {
       E_UNSUPPORTED_PROJECT_SHAPE: 3,
       E_NETWORK: 4,
       E_LOCAL_SERVER_NOT_RUNNING: 4,
+      E_NOT_FOUND: 4,
       E_AUTH: 1,
       E_CONFLICT: 5,
       E_PORT_IN_USE: 5,
@@ -154,5 +157,69 @@ describe("toZitadelError", () => {
     expect(result.code).toBe("E_VALIDATION");
     expect(result.message).toBe("Unknown error");
     expect(result.details).toBe("just a string");
+  });
+
+  it("surfaces the server's message + nested details.details on ApiError 400", () => {
+    const err = new ApiError(
+      400,
+      "http://mock/flow_definitions/flow_1?project_id=proj_1",
+      {
+        code: "flowdef.invalid",
+        message: "flow definition: invalid",
+        details: { details: "required fields [company] in user schema are missing in the flow definition steps" },
+      },
+      "PUT http://mock/flow_definitions/flow_1?project_id=proj_1 returned 400",
+    );
+    const result = toZitadelError(err);
+    expect(result.code).toBe("E_VALIDATION");
+    expect(result.message).toBe(
+      "flow definition: invalid: required fields [company] in user schema are missing in the flow definition steps",
+    );
+  });
+
+  it("uses the server's message when details is a plain string", () => {
+    const err = new ApiError(
+      404,
+      "http://mock/schemas/sch_x?project_id=proj_1",
+      { code: "schema.notfound", message: "schema not found", details: "sch_x" },
+      "GET http://mock/schemas/sch_x?project_id=proj_1 returned 404",
+    );
+    const result = toZitadelError(err);
+    // Enveloped 404 = a real platform API reporting a missing resource:
+    // E_NOT_FOUND, but no wrong-server suffix on the message.
+    expect(result.code).toBe("E_NOT_FOUND");
+    expect(result.message).toBe("schema not found: sch_x");
+  });
+
+  it("flags a non-enveloped 404 as a likely wrong server", () => {
+    const err = new ApiError(
+      404,
+      "https://api.zitadel.cloud/projects",
+      { message: "not found" },
+      "POST https://api.zitadel.cloud/projects returned 404",
+    );
+    const result = toZitadelError(err);
+    expect(result.code).toBe("E_NOT_FOUND");
+    expect(result.exitCode).toBe(4);
+    expect(result.message).toBe(
+      "not found — https://api.zitadel.cloud/projects has no such endpoint; is this a Zitadel platform API?",
+    );
+  });
+
+  it("falls back to the fetch-layer message when the body is not an envelope", () => {
+    const err = new ApiError(
+      502,
+      "http://mock/anything",
+      { raw: "<html>Bad Gateway</html>" },
+      "GET http://mock/anything returned 502",
+    );
+    expect(toZitadelError(err).message).toBe("GET http://mock/anything returned 502");
+  });
+
+  it("classifies 401/403 as E_AUTH and 5xx as E_NETWORK", () => {
+    const auth = new ApiError(401, "http://mock/x", { message: "bad token" }, "GET returned 401");
+    const server = new ApiError(500, "http://mock/x", { message: "boom" }, "GET returned 500");
+    expect(toZitadelError(auth).code).toBe("E_AUTH");
+    expect(toZitadelError(server).code).toBe("E_NETWORK");
   });
 });

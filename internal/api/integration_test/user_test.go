@@ -5,6 +5,8 @@
 package integration_test
 
 import (
+	"io"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,7 +21,7 @@ import (
 func TestCreateUser(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
@@ -139,20 +141,16 @@ func TestCreateUser(t *testing.T) {
 				userjson string
 			}{
 				{
+					// The email-only default schema still enforces `required`,
+					// so a user missing email is rejected. (A value-constraint
+					// case like maxLength lived on `givenName`, which the
+					// minimal default no longer defines; that enforcement is
+					// covered at the domain layer in
+					// flow_field_validation_test.go.)
 					name: "missing required email property",
 					userjson: helpers.MustMarshal(t, map[string]any{
 						"$schema":    "https://test.example.schemas.com/schemas/default-human-user.json",
 						"givenName":  "John",
-						"familyName": "Doe",
-						"password":   "my-strong-password",
-					}),
-				},
-				{
-					name: "given name too long",
-					userjson: helpers.MustMarshal(t, map[string]any{
-						"$schema":    "https://test.example.schemas.com/schemas/default-human-user.json",
-						"email":      "john.withawaytolongname@example.com",
-						"givenName":  "john doe with a waaaaaaaaaaaaaaaaaaaaaaaaaaaaay too long name",
 						"familyName": "Doe",
 						"password":   "my-strong-password",
 					}),
@@ -198,7 +196,7 @@ func TestCreateUser(t *testing.T) {
 func TestSetUserPassword(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
@@ -285,7 +283,7 @@ func TestSetUserPassword(t *testing.T) {
 		t.Run("user not found", func(t *testing.T) {
 			t.Parallel()
 
-			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+			project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 			require.NoError(t, err)
 
 			request := &api.SetUserPasswordRequest{
@@ -307,7 +305,7 @@ func TestSetUserPassword(t *testing.T) {
 func TestGetUser(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
@@ -337,7 +335,7 @@ func TestGetMyUser(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()
 
-		project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+		project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 		require.NoError(t, err)
 		client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
@@ -378,12 +376,32 @@ func TestGetMyUser(t *testing.T) {
 
 		// GET USER USING TOKEN
 
-		params := api.GetMyUserParams{
-			NextgenSession: sessionToken,
-		}
-		resp, err := client.GetMyUser(t.Context(), params)
+		client.SetSessionToken(sessionToken)
+		resp, err := client.GetMyUser(t.Context())
 		assert.NoError(t, err)
 
 		assert.IsType(t, &api.GetMyUserOK{}, resp, helpers.MustMarshal(t, resp))
+	})
+
+	t.Run("missing session cookie", func(t *testing.T) {
+		t.Parallel()
+
+		// The generated client refuses to send an unauthenticated request, so
+		// exercise the server's missing-credential path with a raw request.
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, harness.EnsureTestServer(t).URL+"/users/me", nil)
+		require.NoError(t, err)
+
+		resp, err := harness.EnsureHttpClient(t).Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+		assert.JSONEq(t,
+			`{"code":"auth.unauthorized","message":"Missing or invalid session token."}`,
+			string(body),
+		)
 	})
 }

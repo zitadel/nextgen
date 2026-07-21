@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/ianlancetaylor/jsonschema"
+
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -15,8 +16,10 @@ import (
 // ProjectService is the project use-case surface.
 type ProjectService interface {
 	// Create generates a new project with server-minted secrets and persists it.
+	// If seedDefaults is true, server fallback schema and flow resources are
+	// created with the project for non-CLI creation paths.
 	// Returns the stored project including timestamps.
-	Create(ctx context.Context, previewOrigins []string) (*domain.Project, error)
+	Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error)
 
 	// Get retrieves a project by ID.
 	// Returns [database.NoRowFoundError] when no project with the given ID exists.
@@ -56,8 +59,8 @@ type projectService struct {
 
 var _ ProjectService = (*projectService)(nil)
 
-func (s *projectService) Create(ctx context.Context, previewOrigins []string) (_ *domain.Project, err error) {
-	project, err := domain.NewProject(previewOrigins, s.tokenGenerator)
+func (s *projectService) Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (_ *domain.Project, err error) {
+	project, err := domain.NewProject(name, previewOrigins, s.tokenGenerator)
 	if err != nil {
 		return nil, err
 	}
@@ -65,6 +68,10 @@ func (s *projectService) Create(ctx context.Context, previewOrigins []string) (_
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().CreateProject(ctx, project); err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to create project in the database")
+		}
+
+		if !seedDefaults {
+			return nil
 		}
 
 		userschema, err := s.createDefaultUserSchemas(ctx, tx.(database.QueryExecutor), project.ID)

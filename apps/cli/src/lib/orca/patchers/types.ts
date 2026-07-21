@@ -17,10 +17,9 @@ export type PatchView = Readonly<{
  * {@link PatchView} with the resolved project, issuer, and server it points
  * at, which fill file contents. Readonly: a patcher never mutates its input.
  *
- * Note: the user schema and flow definition are NOT here. The server
- * provisions those defaults when the project is created, so the patcher no
- * longer scaffolds them locally. The builders (`lib/user-schema`, `lib/flows`)
- * and sync engine (`lib/sync`) remain for the future pull-based workflow.
+ * Note: the user schema and flow definition are NOT here. Setup scaffolds and
+ * uploads those editable resource files after the patcher has created the base
+ * `.zitadel/` directories and sync state.
  */
 export type PatchContext = PatchView &
   Readonly<{
@@ -29,6 +28,19 @@ export type PatchContext = PatchView &
     server: string;
     cliVersion: string;
     scaffoldedFramework?: boolean;
+    /**
+     * Sign-in preset the scaffold starts from (`SETUP_PRESETS` in
+     * @zitadel/config). Recorded in `zitadel.json` so later tooling knows
+     * the project's starting point; absent means password-first.
+     */
+    preset?: string;
+    /**
+     * Use case the scaffold starts from (`SETUP_USE_CASES` in @zitadel/config).
+     * Recorded in `zitadel.json` for guidance/status only — behavior comes
+     * entirely from the generated schema/flow files, never from this value.
+     * Absent means minimal.
+     */
+    useCase?: string;
   }>;
 
 /** Where and how a patch is applied. Family-neutral (no file-op coupling). */
@@ -69,6 +81,10 @@ export type PatchResult = Readonly<{
  *   op (e.g. `vite.config.ts`, `angular.json`, `nuxt.config.ts`). `eject` cannot
  *   reverse an in-place merge, so it surfaces these as manual cleanup steps
  *   rather than deleting the whole file.
+ * - `guidanceFiles` — user-owned docs (`README.md`, `AGENTS.md`) carrying a
+ *   marker-fenced managed guidance section. `eject` strips just the section
+ *   (content outside the markers is preserved); the whole file is deleted only
+ *   when nothing but the scaffold-created header would remain.
  */
 export type EjectActions = Readonly<{
   markedFiles: ReadonlyArray<string>;
@@ -77,6 +93,7 @@ export type EjectActions = Readonly<{
   envBackups: ReadonlyArray<string>;
   dependencies: ReadonlyArray<string>;
   configEdits: ReadonlyArray<string>;
+  guidanceFiles: ReadonlyArray<string>;
 }>;
 
 /**

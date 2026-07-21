@@ -5,6 +5,7 @@ stack: "frontend"
 dependsOn:
   - "api"
   - "api-mock"
+  - "config"
   - "design-tokens"
   - "shared-component-styles"
 
@@ -20,6 +21,7 @@ tasks:
     command: "corepack pnpm exec tsc --noEmit -p tsconfig.json"
     deps:
       - "api:build"
+      - "config:build"
       - "design-tokens:build"
       - "shared-component-styles:build"
 
@@ -33,7 +35,9 @@ tasks:
       - "dist/**/*"
 
   build-release:
-    command: "corepack pnpm run build"
+    script: |
+      node ../../scripts/release-clean.mjs local-dist
+      corepack pnpm run build
     deps:
       - "api:build-release"
       - "design-tokens:build"
@@ -42,12 +46,17 @@ tasks:
       - "dist/**/*"
     options:
       cache: false
+      # Release builds remove stale package output and rebuild dist in one
+      # task. They stay out of `moon ci`; release:snapshot invokes them in
+      # the later release step instead of the normal build/test graph.
+      runInCI: false
 
   test:
     command: "corepack pnpm run test"
     deps:
       - "api:build"
       - "api-mock:build"
+      - "config:build"
       - "design-tokens:build"
       - "shared-component-styles:build"
 
@@ -55,5 +64,3 @@ tasks:
     command: "corepack pnpm run test:browser"
     deps:
       - "build"
-    options:
-      runInCI: false

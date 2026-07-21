@@ -11,6 +11,8 @@ const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 export async function main(args = forwardedArgs()) {
   const command = args[0];
   switch (command) {
+    case "local-dist":
+      return await cleanLocalDistArtifacts();
     case "public-package-dist":
       return await cleanPublicPackageDistArtifacts();
     default:
@@ -26,12 +28,16 @@ export async function cleanPublicPackageDistArtifacts(root = repoRoot) {
   );
 }
 
+export async function cleanLocalDistArtifacts(root = process.cwd()) {
+  await rm(join(root, "dist"), { recursive: true, force: true });
+}
+
 function usage(error) {
   if (error) {
     console.error(error);
     console.error("");
   }
-  console.log("usage: node scripts/release-clean.mjs public-package-dist");
+  console.log("usage: node scripts/release-clean.mjs <local-dist|public-package-dist>");
   process.exit(error ? 1 : 0);
 }
 

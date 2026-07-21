@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/descope/virtualwebauthn"
 	"github.com/stretchr/testify/require"
@@ -30,22 +31,23 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 
 	testServer := harness.EnsureTestServer(t)
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
-	userSchemaURL, err := url.Parse(
-		"https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml",
-	)
-	require.NoError(t, err)
+	userSchemaURL := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 
 	rpOriginStr := testServer.URL
 	rpOriginURL, err := url.Parse(rpOriginStr)
 	require.NoError(t, err)
 	rpIDStr := rpOriginURL.Hostname()
 
-	const userID = "pkreg-flow-test-user"
+	// Suffix user and credential IDs per run so the test stays re-runnable
+	// against a persistent database (ZITADEL_TEST_POSTGRES_URL): earlier runs
+	// leave their rows behind, and fixed IDs would collide with them.
+	suffix := time.Now().Format("150405.000000")
+	userID := "pkreg-flow-test-user-" + suffix
 	rp := virtualwebauthn.RelyingParty{ID: rpIDStr, Name: rpIDStr, Origin: rpOriginStr}
 
 	// Existing authenticator used for the auth step (to identify the user).
@@ -53,7 +55,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 		UserHandle: []byte(userID),
 	})
 	credExisting := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
-	credExisting.ID = []byte("pkreg-existing-cred-01")
+	credExisting.ID = []byte("pkreg-existing-cred-" + suffix)
 	credExisting.Counter = 1
 	authExisting.AddCredential(credExisting)
 
@@ -76,11 +78,11 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 
 	userRepo := harness.EnsureUserRepo(t)
 	require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
-		ProjectID:  project.ID,
-		SchemaURL:  userSchemaURL.String(),
-		ID:         userID,
-		TeamID:     &team.ID,
-		Attributes: []*domain.CreateAttribute{emailAttr},
+		ProjectID:               project.ID,
+		SchemaURL:               userSchemaURL,
+		ID:                      userID,
+		InitialMembershipTeamID: &team.ID,
+		Attributes:              []*domain.CreateAttribute{emailAttr},
 	}))
 
 	passkeyRepo := harness.EnsureUserPasskeyRepo(t)
@@ -104,7 +106,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 		FlowDefinition: api.FlowDefinition{
 			Name:       "passkey-auth-then-register",
 			Status:     "active",
-			UserSchema: *userSchemaURL,
+			UserSchema: userSchemaURL,
 			Purposes:   api.FlowDefinitionPurposes{"login": "auth-step"},
 			Steps: []api.FlowDefinitionStep{
 				{

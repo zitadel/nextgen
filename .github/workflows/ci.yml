@@ -48,13 +48,32 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: moon run server:check-generate
 
+      - name: Cache Playwright browsers
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright Chromium
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: corepack pnpm --filter @zitadel/components exec playwright install chromium
+
       - name: Run Moon build and test graph
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: moon ci :lint :typecheck :build :test
+        run: moon ci :lint :typecheck :build :test :test-browser
 
       - name: Run Go tests
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: moon run server:test
+
+      - name: Run Go integration tests (postgres)
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: moon run server:test-postgres
+
+      # Spanner integration tests are not run in CI yet: the v2 spanner statement
+      # layer is unimplemented (see zitadel/nextgen#457). Re-enable via
+      # `moon run server:test-spanner` once that lands.
 
       - name: Build release snapshot without container
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
@@ -68,6 +87,19 @@ jobs:
             --runtime binary \
             --concurrency 5 \
             --work-dir "${RUNNER_TEMP}/ci-journey" \
+            --tarballs-dir "dist/release/${version}/npm"
+
+      # One framework is enough here: the preset decides the scaffolded
+      # flow shape, not the SDK — the matrix above already covers SDKs.
+      - name: Run passkey-first preset journey
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: |
+          version="$(node -p "require('./apps/server/package.json').version")"
+          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- \
+            --runtime binary \
+            --framework next \
+            --preset passkey-first \
+            --work-dir "${RUNNER_TEMP}/ci-journey-passkey-first" \
             --tarballs-dir "dist/release/${version}/npm"
 
       - name: Validate version PR
@@ -98,6 +130,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: journey-diagnostics
-          path: ${{ runner.temp }}/ci-journey/diagnostics
+          path: |
+            ${{ runner.temp }}/ci-journey/diagnostics
+            ${{ runner.temp }}/ci-journey-passkey-first/diagnostics
           if-no-files-found: ignore
           retention-days: 7

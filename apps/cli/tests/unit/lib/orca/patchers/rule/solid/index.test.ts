@@ -37,7 +37,10 @@ describe("SolidPatcher.plan", () => {
   it("writes the managed App.tsx and merges the Vite config", () => {
     const plan = new SolidPatcher().plan(ctx());
     expect(writeContents(plan, "src/App.tsx")).toContain(MANAGED_MARKER);
-    const edit = plan.ops.find((op): op is Extract<FileOp, { kind: "edit" }> => op.kind === "edit");
+    const edit = plan.ops.find(
+      (op): op is Extract<FileOp, { kind: "edit" }> =>
+        op.kind === "edit" && String(op.path).includes("vite.config"),
+    );
     expect(edit?.path).toContain("vite.config.ts");
   });
 

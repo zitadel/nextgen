@@ -18,8 +18,10 @@ type FlowDefinitionRepository interface {
 	// including its purposes, audience, steps, and transitions.
 	GetFlowDefinition(ctx context.Context, client database.QueryExecutor, projectID, id string) (*FlowDefinition, error)
 
-	// ListFlowDefinitions returns the top-level metadata for all definitions
-	// belonging to the given instance. Child records are not populated.
+	// ListFlowDefinitions returns the full definitions (including purposes,
+	// audience, and steps — the content lives in one JSONB column) for all
+	// definitions belonging to the given project, newest first
+	// (created_at DESC, id DESC).
 	ListFlowDefinitions(ctx context.Context, client database.QueryExecutor, projectID string, opts ...FlowDefinitionListOption) ([]*FlowDefinition, error)
 
 	// UpdateFlowDefinition updates a definition and all its child records.
