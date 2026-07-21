@@ -441,8 +441,30 @@ func (a *AuthAttempt) SetCheck(check AuthCheck) {
 	a.Checks = append(a.Checks, check)
 }
 
+// AuthAttemptField enumerates the fields of AuthAttempt which can be used for
+// filtering and ordering in list operations.
+type AuthAttemptField uint8
+
+const (
+	AuthAttemptFieldUnspecified AuthAttemptField = iota
+	AuthAttemptFieldProjectID
+	AuthAttemptFieldID
+	AuthAttemptFieldHandoffToken
+	AuthAttemptFieldHandedOffAt
+	AuthAttemptFieldSessionID
+	AuthAttemptFieldRequiredChecks
+	AuthAttemptFieldCreatedAt
+	AuthAttemptFieldTimeToLive
+)
+
 //go:generate go tool mockgen -typed -package domainmock -destination ./mock/auth_attempt.mock.go . AuthAttemptRepository
 
+// AuthAttemptRepository is the v1 storage port for auth attempts.
+//
+// Hybrid state: AuthAttemptService uses service.AuthAttemptStatements (v2).
+// SessionRepository.exchange still depends on this v1 interface via
+// NewAuthAttemptRepository until Session is migrated. Do not delete the v1
+// repository until Session no longer needs GetByHandoffToken / attempt lifecycle.
 type AuthAttemptRepository interface {
 	// GetByID retrieves a single AuthAttempt by its ID and project ID.
 	GetByID(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) (*AuthAttempt, error)

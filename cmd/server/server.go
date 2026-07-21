@@ -135,7 +135,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	userPasskeyRepo := repository.NewUserPasskeyRepository()
 	passkeyRegRepo := repository.NewPasskeyRegistrationRepository()
 	flowDefinitionRepo := repository.NewFlowDefinitionRepository(pool)
-	attemptRepo := repository.NewAuthAttemptRepository(pool)
 	schemaRepo := repository.NewJSONSchemaRepository(pool)
 	teamRepo := repository.NewTeamRepository(pool)
 	brandingRepo := repository.NewBrandingRepository(pool)
@@ -170,7 +169,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 
 	authAttemptSvc := service.NewAuthAttemptService(
 		pool,
-		attemptRepo,
+		serviceDBPool,
 		sessionResolver,
 		userRepo,
 		userPasswordRepo,

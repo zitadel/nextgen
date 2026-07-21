@@ -24,8 +24,15 @@ func stubPool() database.Pool { return nil }
 func stubV2Pool() *service.DB { return nil }
 
 type testAllStatements struct {
-	createProject  func(context.Context, *domain.Project) error
-	getProjectByID func(context.Context, string) (*domain.Project, error)
+	createProject                 func(context.Context, *domain.Project) error
+	getProjectByID                func(context.Context, string) (*domain.Project, error)
+	createAuthAttempt             func(context.Context, *domain.AuthAttempt) error
+	getAuthAttemptByID            func(context.Context, string, string) (*domain.AuthAttempt, error)
+	getAuthAttemptByHandoffToken  func(context.Context, string, []byte) (*domain.AuthAttempt, error)
+	handoffAuthAttempt            func(context.Context, *domain.AuthAttempt) error
+	setAuthAttemptChallenge       func(context.Context, string, string, domain.AuthChallenge) error
+	authAttemptChallengeSucceeded func(context.Context, string, string, domain.AuthFactor, string) error
+	authAttemptChallengeFailed    func(context.Context, string, string, domain.AuthChallenge) error
 }
 
 func (testAllStatements) IsStatements() {}
@@ -114,6 +121,59 @@ func (testAllStatements) ListSessions(context.Context, *v2database.ListOptions[d
 
 func (testAllStatements) DeleteSessionByID(context.Context, string, string) error {
 	panic("unexpected call to DeleteSessionByID")
+}
+
+func (s testAllStatements) CreateAuthAttempt(ctx context.Context, attempt *domain.AuthAttempt) error {
+	if s.createAuthAttempt != nil {
+		return s.createAuthAttempt(ctx, attempt)
+	}
+	panic("unexpected call to CreateAuthAttempt")
+}
+
+func (s testAllStatements) GetAuthAttemptByID(ctx context.Context, projectID, authAttemptID string) (*domain.AuthAttempt, error) {
+	if s.getAuthAttemptByID != nil {
+		return s.getAuthAttemptByID(ctx, projectID, authAttemptID)
+	}
+	panic("unexpected call to GetAuthAttemptByID")
+}
+
+func (s testAllStatements) GetAuthAttemptByHandoffToken(ctx context.Context, projectID string, handoffToken []byte) (*domain.AuthAttempt, error) {
+	if s.getAuthAttemptByHandoffToken != nil {
+		return s.getAuthAttemptByHandoffToken(ctx, projectID, handoffToken)
+	}
+	panic("unexpected call to GetAuthAttemptByHandoffToken")
+}
+
+func (testAllStatements) DeleteAuthAttemptByID(context.Context, string, string) error {
+	panic("unexpected call to DeleteAuthAttemptByID")
+}
+
+func (s testAllStatements) HandoffAuthAttempt(ctx context.Context, attempt *domain.AuthAttempt) error {
+	if s.handoffAuthAttempt != nil {
+		return s.handoffAuthAttempt(ctx, attempt)
+	}
+	panic("unexpected call to HandoffAuthAttempt")
+}
+
+func (s testAllStatements) SetAuthAttemptChallenge(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error {
+	if s.setAuthAttemptChallenge != nil {
+		return s.setAuthAttemptChallenge(ctx, projectID, authAttemptID, challenge)
+	}
+	panic("unexpected call to SetAuthAttemptChallenge")
+}
+
+func (s testAllStatements) AuthAttemptChallengeSucceeded(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor, challengeID string) error {
+	if s.authAttemptChallengeSucceeded != nil {
+		return s.authAttemptChallengeSucceeded(ctx, projectID, authAttemptID, factor, challengeID)
+	}
+	panic("unexpected call to AuthAttemptChallengeSucceeded")
+}
+
+func (s testAllStatements) AuthAttemptChallengeFailed(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error {
+	if s.authAttemptChallengeFailed != nil {
+		return s.authAttemptChallengeFailed(ctx, projectID, authAttemptID, challenge)
+	}
+	panic("unexpected call to AuthAttemptChallengeFailed")
 }
 
 var _ service.AllStatements = testAllStatements{}

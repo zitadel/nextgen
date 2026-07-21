@@ -18,6 +18,9 @@ import (
 )
 
 // NewAuthAttemptRepository returns a dialect-specific implementation of [domain.AuthAttemptRepository].
+//
+// Hybrid state: AuthAttemptService uses v2 AuthAttemptStatements. This v1
+// constructor remains for SessionRepository.exchange until Session migrates.
 func NewAuthAttemptRepository(pool database.QueryExecutor) domain.AuthAttemptRepository {
 	switch pool.(type) {
 	case spanner.SpannerPooler:
