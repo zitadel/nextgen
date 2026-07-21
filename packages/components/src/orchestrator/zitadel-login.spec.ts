@@ -949,7 +949,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(element.shadowRoot?.textContent).not.toContain("error.email_invalid");
   });
 
-  it("splits '; '-joined violation keys into an inline error plus a generic banner", async () => {
+  it("splits '; '-joined violation keys into one inline error per rendered field", async () => {
     const element = await mount(host);
 
     server.use(
@@ -984,16 +984,18 @@ describe("<zitadel-login> against the typed Flow API", () => {
       new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
     );
 
-    // Email violation → inline (catalog-known error.email_invalid key);
-    // error.password_min_length has no catalog entry → localised generic
-    // banner with the step's field label.
-    const alert = await waitFor(() => {
-      const candidate = element.shadowRoot?.querySelector("zl-alert");
-      return candidate?.textContent?.includes("Password is too short.") ? candidate : null;
+    // Both fields are rendered, so both violations route inline to their
+    // control: email via the catalog-known `error.email_invalid` key, password
+    // via the localised generic fallback for `error.password_min_length`. No
+    // form-level banner renders.
+    const password = await waitFor(() => {
+      const candidate = element.shadowRoot?.querySelector('zl-field[name="password"][invalid]');
+      return candidate?.getAttribute("error") ? candidate : null;
     });
-    expect(alert).toBeTruthy();
-    const field = element.shadowRoot?.querySelector('zl-field[name="email"][invalid]');
-    expect(field?.getAttribute("error")).toBe("Please enter a valid email");
+    expect(password.getAttribute("error")).toBe("Password is too short.");
+    const email = element.shadowRoot?.querySelector('zl-field[name="email"][invalid]');
+    expect(email?.getAttribute("error")).toBe("Please enter a valid email");
+    expect(element.shadowRoot?.querySelector("zl-alert")).toBeNull();
   });
 
   it("surfaces an inline-routed key as a banner when the step lacks its field", async () => {
@@ -1299,5 +1301,216 @@ describe("<zitadel-login> against the typed Flow API", () => {
           req.kind === "submitFlowStep",
       );
     expect(submits[0]?.body.fields).toEqual({ email: "", password: "" });
+  });
+
+  it("captures <zl-select> and <zl-checkbox> values on submit", async () => {
+    // A step whose only inputs are the non-text atoms. Regression: the
+    // orchestrator used to read `.value` from `<zl-field>` only, so a chosen
+    // select option and a ticked checkbox were submitted as empty strings.
+    server.use(
+      http.post("*/flow", () =>
+        HttpResponse.json(
+          {
+            id: "flow_test",
+            session_token: "st_test",
+            step: {
+              name: "register",
+              texts: { title_key: "register.title" },
+              fields: [
+                {
+                  name: "maritalStatus",
+                  type: "select",
+                  text_key: "register.field.maritalStatus",
+                  required: false,
+                  validation: { enum: ["Single", "Married", "Divorced", "Widowed"] },
+                },
+                {
+                  name: "newsletterOptIn",
+                  type: "checkbox",
+                  text_key: "register.field.newsletterOptIn",
+                  required: false,
+                },
+              ],
+              actions: [{ name: "submit", text_key: "submit.register", primary: true }],
+              gates: {},
+            },
+            branding: {},
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+
+    let submittedFields: Record<string, unknown> | undefined;
+    server.use(
+      http.post("*/flow/*/submit", async ({ request }) => {
+        const body = (await request.json()) as { fields: Record<string, unknown> };
+        submittedFields = body.fields;
+        return HttpResponse.json({
+          id: "flow_test",
+          session_token: "st_test",
+          step: { name: "done", texts: { title_key: "done.title" }, fields: [], actions: [], gates: {} },
+          branding: {},
+        });
+      }),
+    );
+
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.project = testProject;
+    host.appendChild(element);
+
+    const select = await waitFor(() =>
+      element.shadowRoot?.querySelector<HTMLElement & { value?: string }>('zl-select[name="maritalStatus"]'),
+    );
+    const checkbox = await waitFor(() =>
+      element.shadowRoot?.querySelector<HTMLElement & { checked?: boolean }>(
+        'zl-checkbox[name="newsletterOptIn"]',
+      ),
+    );
+
+    select.value = "Married";
+    checkbox.checked = true;
+
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+    );
+
+    // A checkbox maps to a JSON boolean property, so a ticked box submits the
+    // real boolean `true` (not the "true"/"on" value token) to satisfy the
+    // server's schema-type validation on create_user.
+    await waitFor(() => submittedFields ?? null);
+    expect(submittedFields).toEqual({ maritalStatus: "Married", newsletterOptIn: true });
+  });
+
+  it("submits an unticked checkbox as boolean false", async () => {
+    // An untouched optional checkbox must submit real `false`, not "" — the
+    // schema validates the property as a boolean and rejects an empty string.
+    server.use(
+      http.post("*/flow", () =>
+        HttpResponse.json(
+          {
+            id: "flow_test",
+            session_token: "st_test",
+            step: {
+              name: "register",
+              texts: { title_key: "register.title" },
+              fields: [
+                {
+                  name: "newsletterOptIn",
+                  type: "checkbox",
+                  text_key: "register.field.newsletterOptIn",
+                  required: false,
+                },
+              ],
+              actions: [{ name: "submit", text_key: "submit.register", primary: true }],
+              gates: {},
+            },
+            branding: {},
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+
+    let submittedFields: Record<string, unknown> | undefined;
+    server.use(
+      http.post("*/flow/*/submit", async ({ request }) => {
+        const body = (await request.json()) as { fields: Record<string, unknown> };
+        submittedFields = body.fields;
+        return HttpResponse.json({
+          id: "flow_test",
+          session_token: "st_test",
+          step: { name: "done", texts: { title_key: "done.title" }, fields: [], actions: [], gates: {} },
+          branding: {},
+        });
+      }),
+    );
+
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.project = testProject;
+    host.appendChild(element);
+
+    await waitFor(() =>
+      element.shadowRoot?.querySelector<HTMLElement>('zl-checkbox[name="newsletterOptIn"]'),
+    );
+
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+    );
+
+    await waitFor(() => submittedFields ?? null);
+    expect(submittedFields).toEqual({ newsletterOptIn: false });
+  });
+
+  it("omits an untouched enum select instead of submitting an empty string", async () => {
+    // An optional select renders a leading empty placeholder option, so an
+    // untouched field holds "". "" is not a member of the enum, so sending it
+    // would fail the server's enum validation (create_user: "no enum value
+    // matched"). The orchestrator must omit the field entirely. A text field
+    // in the same step still submits its "" default so required-checks run.
+    server.use(
+      http.post("*/flow", () =>
+        HttpResponse.json(
+          {
+            id: "flow_test",
+            session_token: "st_test",
+            step: {
+              name: "register",
+              texts: { title_key: "register.title" },
+              fields: [
+                {
+                  name: "email",
+                  type: "email",
+                  text_key: "register.field.email",
+                  required: true,
+                },
+                {
+                  name: "maritalStatus",
+                  type: "select",
+                  text_key: "register.field.maritalStatus",
+                  required: false,
+                  validation: { enum: ["Single", "Married", "Divorced", "Widowed"] },
+                },
+              ],
+              actions: [{ name: "submit", text_key: "submit.register", primary: true }],
+              gates: {},
+            },
+            branding: {},
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+
+    let submittedFields: Record<string, string> | undefined;
+    server.use(
+      http.post("*/flow/*/submit", async ({ request }) => {
+        const body = (await request.json()) as { fields: Record<string, string> };
+        submittedFields = body.fields;
+        return HttpResponse.json({
+          id: "flow_test",
+          session_token: "st_test",
+          step: { name: "done", texts: { title_key: "done.title" }, fields: [], actions: [], gates: {} },
+          branding: {},
+        });
+      }),
+    );
+
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.project = testProject;
+    host.appendChild(element);
+
+    // Wait for the select to render, then submit without choosing an option.
+    await waitFor(() =>
+      element.shadowRoot?.querySelector<HTMLElement>('zl-select[name="maritalStatus"]'),
+    );
+
+    element.shadowRoot?.dispatchEvent(
+      new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action: "submit" } }),
+    );
+
+    await waitFor(() => submittedFields ?? null);
+    expect(submittedFields).toEqual({ email: "" });
+    expect(submittedFields).not.toHaveProperty("maritalStatus");
   });
 });

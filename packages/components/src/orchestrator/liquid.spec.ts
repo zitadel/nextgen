@@ -78,6 +78,52 @@ describe("LiquidJS engine", () => {
     expect(fullLocale["action.back"]).toBe("Back");
   });
 
+  it("the | t filter humanises uncatalogued field-label keys", () => {
+    // Custom schema properties (`department`, `dateOfBirth`) produce
+    // `<step>.field.<name>` label keys no catalog can enumerate — the
+    // form must not render the raw key.
+    const engine = createLiquidEngine({ locale });
+    expect(
+      engine.parseAndRenderSync("{{ key | t }}", { key: "register.field.department" }),
+    ).toBe("Department");
+    expect(
+      engine.parseAndRenderSync("{{ key | t }}", { key: "register.field.dateOfBirth" }),
+    ).toBe("Date of birth");
+    expect(
+      engine.parseAndRenderSync("{{ key | t }}", { key: "register.field.emergency_contact" }),
+    ).toBe("Emergency contact");
+  });
+
+  it("a catalogued field-label key wins over the humanised fallback", () => {
+    const engine = createLiquidEngine({
+      locale: { ...locale, "register.field.department": "Team" },
+    });
+    const result = engine.parseAndRenderSync("{{ key | t }}", {
+      key: "register.field.department",
+    });
+    expect(result).toBe("Team");
+  });
+
+  it("splits on the last .field. for step names that contain the marker", () => {
+    // Step names are tenant-chosen: "signup.field.v2" is a legal step
+    // name, and the property name always follows the final ".field.".
+    const engine = createLiquidEngine({ locale });
+    const result = engine.parseAndRenderSync("{{ key | t }}", {
+      key: "signup.field.v2.field.department",
+    });
+    expect(result).toBe("Department");
+  });
+
+  it("field sub-keys (placeholder/help) do not take the humanised fallback", () => {
+    // `.placeholder`/`.help` resolve through their own filters, which stay
+    // empty on a miss; `| t` keeps returning the raw key for them.
+    const engine = createLiquidEngine({ locale });
+    const result = engine.parseAndRenderSync("{{ key | t }}", {
+      key: "register.field.department.placeholder",
+    });
+    expect(result).toBe("register.field.department.placeholder");
+  });
+
   it("fieldPlaceholder resolves sibling keys", () => {
     const engine = createLiquidEngine({ locale });
     const result = engine.parseAndRenderSync(
@@ -135,6 +181,36 @@ describe("LiquidJS engine", () => {
     expect(result).toContain('data-testid="zitadel-action-submit"');
     expect(result).toContain('hierarchy="primary"');
     expect(result).toContain(mandatoryGatesMarkerComment);
+  });
+
+  it("normalises auth-method credential names in testids but not in name", () => {
+    // The real flow engine names the credential field
+    // `x-auth-methods#password`; the documented hook is method-named.
+    const engine = createLiquidEngine({ locale });
+    const f = toArray({
+      "x-auth-methods#password": {
+        type: "password",
+        text_key: "password.field.password",
+        required: true,
+      },
+    });
+    const a = toArray({ submit: { text_key: "submit.continue", primary: true } });
+    const context = {
+      step: { name: "password", type: "password", texts: { title_key: "password.title" } },
+      fields: f,
+      actions: a,
+      branding: {},
+      loading: false,
+      errors: [],
+      gates: {},
+      sso_providers: [],
+      messages: [],
+      identity: null,
+    };
+    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    expect(result).toContain('data-testid="zitadel-field-password"');
+    expect(result).not.toContain('data-testid="zitadel-field-x-auth-methods#password"');
+    expect(result).toContain('name="x-auth-methods#password"');
   });
 
   it("renders step title from locale via default template", () => {
@@ -416,7 +492,7 @@ describe("LiquidJS engine", () => {
       actions: a,
       branding: {},
       loading: false,
-      errors: [{ text_key: "error.invalid_credentials" }],
+      errors: [{ field: "password", text_key: "error.invalid_credentials" }],
       gates: {},
       sso_providers: [],
       messages: [],
@@ -476,7 +552,7 @@ describe("LiquidJS engine", () => {
       actions: a,
       branding: {},
       loading: false,
-      errors: [{ text_key: "error.email_exists" }],
+      errors: [{ field: "email", text_key: "error.email_exists" }],
       gates: {},
       sso_providers: [],
       messages: [],
@@ -529,17 +605,17 @@ describe("LiquidJS engine", () => {
 describe("localiseFlowErrorKeys", () => {
   const ctx = { locale: fullLocale, stepName: "register" };
 
-  it("passes catalog-known field-specific keys through as text keys", () => {
+  it("passes catalog-known field-specific keys through as text keys, tagged with their field", () => {
     expect(localiseFlowErrorKeys("error.email_required", ctx)).toEqual([
-      { text_key: "error.email_required" },
+      { field: "email", text_key: "error.email_required" },
     ]);
     // The server spells format violations `_invalid` — the catalog's
     // existing convention, which fieldErrorKeys routes inline.
     expect(localiseFlowErrorKeys("error.email_invalid", ctx)).toEqual([
-      { text_key: "error.email_invalid" },
+      { field: "email", text_key: "error.email_invalid" },
     ]);
     expect(localiseFlowErrorKeys("error.password_required", ctx)).toEqual([
-      { text_key: "error.password_required" },
+      { field: "password", text_key: "error.password_required" },
     ]);
   });
 
@@ -580,7 +656,7 @@ describe("localiseFlowErrorKeys", () => {
       stepName: "register",
     });
     expect(result).toEqual([
-      { text_key: "error.email_invalid" },
+      { field: "email", text_key: "error.email_invalid" },
       { message: "Password is too short." },
     ]);
   });
@@ -596,9 +672,10 @@ describe("localiseFlowErrorKeys", () => {
   it("localises the engine's credential rejections via the catalog", () => {
     // SubmitPassword / SubmitPasskey rejections re-render the step with
     // these catalog keys (flow_state_machine.go) — invalid_credentials
-    // routes inline to the password field via fieldErrorKeys.
+    // routes inline to the password field via fieldErrorKeys; passkey_invalid
+    // has no field mapping, so it stays a form-level (banner) text key.
     expect(localiseFlowErrorKeys("error.invalid_credentials", ctx)).toEqual([
-      { text_key: "error.invalid_credentials" },
+      { field: "password", text_key: "error.invalid_credentials" },
     ]);
     expect(localiseFlowErrorKeys("error.passkey_invalid", ctx)).toEqual([
       { text_key: "error.passkey_invalid" },
@@ -641,10 +718,34 @@ describe("localiseFlowErrorKeys", () => {
   it("keeps inline routing when the step carries the field", () => {
     expect(
       localiseFlowErrorKeys("error.email_required", { ...ctx, fields: ["email", "password"] }),
-    ).toEqual([{ text_key: "error.email_required" }]);
+    ).toEqual([{ field: "email", text_key: "error.email_required" }]);
     // Without a fields list (pure lookups) the check is skipped entirely.
     expect(localiseFlowErrorKeys("error.email_required", ctx)).toEqual([
-      { text_key: "error.email_required" },
+      { field: "email", text_key: "error.email_required" },
     ]);
+  });
+
+  it("routes a generic (non-catalog) field error inline when the step renders that field", () => {
+    // `error.<field>_<rule>` for a schema field the step shows: the pre-localised
+    // message is tagged with its field so the template renders it inline under
+    // the control (the select/checkbox/text field) instead of the banner.
+    expect(
+      localiseFlowErrorKeys("error.country_required", {
+        ...ctx,
+        fields: ["email", "country"],
+      }),
+    ).toEqual([{ field: "country", message: "Country is required." }]);
+    // A rule-suffixed key without a catalog entry, label from the step catalog.
+    expect(
+      localiseFlowErrorKeys("error.email_min_length", {
+        locale: { ...fullLocale, "register.field.email": "Work email" },
+        stepName: "register",
+        fields: ["email"],
+      }),
+    ).toEqual([{ field: "email", message: "Work email is too short." }]);
+    // The same key with the field absent stays a fieldless banner message.
+    expect(
+      localiseFlowErrorKeys("error.country_required", { ...ctx, fields: ["email"] }),
+    ).toEqual([{ message: "Country is required." }]);
   });
 });

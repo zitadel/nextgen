@@ -15,6 +15,11 @@ func (p projectStatements) CreateProject(ctx context.Context, entity *domain.Pro
 	panic("unimplemented")
 }
 
+// UpdateProject implements [service.ProjectStatements].
+func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.Project) error {
+	panic("unimplemented")
+}
+
 // DeleteProjectByID implements [service.ProjectStatements].
 func (p projectStatements) DeleteProjectByID(ctx context.Context, id string) error {
 	panic("unimplemented")

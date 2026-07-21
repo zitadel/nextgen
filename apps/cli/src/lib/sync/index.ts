@@ -24,4 +24,10 @@ export {
   runSyncLoop,
   writeBackResource,
 } from "./loop";
-export { collectPlanWarnings, renderPlan, summarizePlan } from "./plan-renderer";
+export {
+  collectPlanWarnings,
+  enumeratePlanResources,
+  renderPlan,
+  summarizePlan,
+  type PlanResourceChange,
+} from "./plan-renderer";

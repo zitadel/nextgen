@@ -290,7 +290,7 @@ describe("graph / cycles / flip-table", () => {
     delete step(def, "identifier").transitions.user_not_found;
     const issues = validateFlowDefinition(def, schema);
     expect(messages(issues)).toContain(
-      'step "identifier": entry step for purpose "login" must wire "user_not_found" transition because "register" is also a purpose',
+      'step "identifier": entry step for purpose "login" must wire "user_not_found" transition because "register" is also a purpose: without it, someone without an account gets stuck at sign-in instead of being routed to registration',
     );
     expect(issues.find((i) => i.rule === "flip-table")).toBeDefined();
   });
@@ -299,7 +299,7 @@ describe("graph / cycles / flip-table", () => {
     const def = flow();
     delete step(def, "register").transitions.user_already_exists;
     expect(messages(validateFlowDefinition(def))).toContain(
-      'step "register": entry step for purpose "register" must wire "user_already_exists" transition because "login" is also a purpose',
+      'step "register": entry step for purpose "register" must wire "user_already_exists" transition because "login" is also a purpose: without it, someone who already has an account gets stuck at registration instead of being routed to sign-in',
     );
   });
 });
@@ -555,6 +555,13 @@ describe("drift audit (Go validator)", () => {
     // The passkey-action rule's message must stay verbatim-identical.
     expect(source).toContain(
       'offers passkey but "passkey" is not an enabled authentication method',
+    );
+    // The flip-table impact suffixes must stay verbatim-identical.
+    expect(source).toContain(
+      "someone without an account gets stuck at sign-in instead of being routed to registration",
+    );
+    expect(source).toContain(
+      "someone who already has an account gets stuck at registration instead of being routed to sign-in",
     );
     // purposeFlipTargets: login→user_not_found→register, register→user_already_exists→login.
     expect(source).toContain("FlowDefinitionPurposeLogin: {");

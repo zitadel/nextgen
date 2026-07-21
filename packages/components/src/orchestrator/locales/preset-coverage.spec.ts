@@ -1,4 +1,8 @@
-import { getDefaultLoginFlow, SETUP_PRESETS } from "@zitadel/config/defaults";
+import {
+  getDefaultLoginFlow,
+  SETUP_PRESETS,
+  SETUP_USE_CASES,
+} from "@zitadel/config/defaults";
 import { describe, expect, it } from "vitest";
 
 import { builtinLocales } from "./index.js";
@@ -17,16 +21,20 @@ type PresetFlow = {
 
 /**
  * Every text key a shipped preset flow can produce must resolve in every
- * builtin locale — otherwise a fresh `zitadel setup --preset …` renders raw
- * keys in the login UI. Key derivation mirrors the engine
+ * builtin locale — otherwise a fresh `zitadel setup --preset … --use-case …`
+ * renders raw keys in the login UI. The register step's fields vary by use
+ * case (e.g. `business` adds `companyName`), so the matrix iterates every
+ * (use case × preset) pair. Key derivation mirrors the engine
  * (`flow_state_machine.go` buildStep + the field resolver): step titles and
  * descriptions, action labels (explicit `text_key` or
  * `<step>.action.<name>`), field labels (`<step>.field.<field>`, auth-method
  * tokens labelled by method), and the injected back action (step-specific
  * key or the generic `action.back` fallback).
  */
-describe.each([...SETUP_PRESETS])("preset %s locale coverage", (preset) => {
-  const flow = getDefaultLoginFlow({ preset, userSchemaUrl: "sch_TEST" }) as PresetFlow;
+describe.each(
+  SETUP_USE_CASES.flatMap((useCase) => SETUP_PRESETS.map((preset) => ({ useCase, preset }))),
+)("use case $useCase, preset $preset locale coverage", ({ useCase, preset }) => {
+  const flow = getDefaultLoginFlow({ preset, useCase, userSchemaUrl: "sch_TEST" }) as PresetFlow;
   const steps = flow.steps ?? [];
 
   describe.each(Object.entries(builtinLocales))("locale %s", (_lang, locale) => {

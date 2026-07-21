@@ -474,8 +474,8 @@ func validateFlipTableCoverage(def FlowDefinition) error {
 			}
 			if _, ok := entry.Transitions[outcome]; !ok {
 				return ErrFlowDefinitionInvalid(fmt.Sprintf(
-					"step %q: entry step for purpose %q must wire %q transition because %q is also a purpose",
-					entry.Name, purpose, outcome, targetPurpose), nil)
+					"step %q: entry step for purpose %q must wire %q transition because %q is also a purpose: without it, %s",
+					entry.Name, purpose, outcome, targetPurpose, flipOutcomeImpacts[outcome]), nil)
 			}
 		}
 	}
@@ -491,6 +491,15 @@ var purposeFlipTargets = map[FlowDefinitionPurpose]map[string]FlowDefinitionPurp
 	FlowDefinitionPurposeRegister: {
 		FlowImplicitOutcomeUserAlreadyExists: FlowDefinitionPurposeLogin,
 	},
+}
+
+// flipOutcomeImpacts spells out, per implicit outcome, who gets stuck
+// where when the entry step leaves it unwired — the flip-table violation
+// explains the user impact, not just the graph rule. Mirrored verbatim
+// in packages/config/src/validate.ts (drift-audited there).
+var flipOutcomeImpacts = map[string]string{
+	FlowImplicitOutcomeUserNotFound:      "someone without an account gets stuck at sign-in instead of being routed to registration",
+	FlowImplicitOutcomeUserAlreadyExists: "someone who already has an account gets stuck at registration instead of being routed to sign-in",
 }
 
 // validateOnSuccessManifests verifies that every kind in each step's
