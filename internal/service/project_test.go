@@ -2,7 +2,6 @@ package service_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -20,6 +19,7 @@ import (
 func TestProjectService_Create(t *testing.T) {
 	tests := []struct {
 		name                    string
+		projectName             string
 		previewOrigins          []string
 		seedDefaults            bool
 		setupStatements         func(*domain.Project) testAllStatements
@@ -27,11 +27,16 @@ func TestProjectService_Create(t *testing.T) {
 		setupFlowDefinitionRepo func(*domainmock.MockFlowDefinitionRepository)
 		setupPool               func(*servicemocks.MockPool, *dbmock.MockTransaction, testAllStatements)
 		setupTokenGenerator     func(generator *domainmock.MockTokenGenerator)
-		wantErr                 bool
+		wantErr                 error
 		check                   func(t *testing.T, got *domain.Project)
 	}{
 		{
+			name:    "missing project name",
+			wantErr: domain.ErrProjectNameInvalid(),
+		},
+		{
 			name:           "ok — no preview origins",
+			projectName:    "test",
 			previewOrigins: nil,
 			seedDefaults:   true,
 			setupStatements: func(_ *domain.Project) testAllStatements {
@@ -68,6 +73,7 @@ func TestProjectService_Create(t *testing.T) {
 		},
 		{
 			name:           "ok — with preview origins",
+			projectName:    "test",
 			previewOrigins: []string{"*.vercel.app", "*.netlify.app"},
 			seedDefaults:   true,
 			setupStatements: func(_ *domain.Project) testAllStatements {
@@ -105,6 +111,7 @@ func TestProjectService_Create(t *testing.T) {
 		},
 		{
 			name:           "ok — skip fallback defaults",
+			projectName:    "test",
 			previewOrigins: nil,
 			seedDefaults:   false,
 			setupStatements: func(_ *domain.Project) testAllStatements {
@@ -135,12 +142,13 @@ func TestProjectService_Create(t *testing.T) {
 		},
 		{
 			name:           "CreateProject error",
+			projectName:    "test",
 			previewOrigins: nil,
 			seedDefaults:   true,
 			setupStatements: func(_ *domain.Project) testAllStatements {
 				return testAllStatements{
 					createProject: func(_ context.Context, _ *domain.Project) error {
-						return errors.New("db error")
+						return assert.AnError
 					},
 				}
 			},
@@ -159,7 +167,7 @@ func TestProjectService_Create(t *testing.T) {
 					Generate(gomock.Any()).Return("token", nil).
 					Times(2)
 			},
-			wantErr: true,
+			wantErr: domain.ErrInternal(assert.AnError),
 		},
 	}
 
@@ -201,10 +209,10 @@ func TestProjectService_Create(t *testing.T) {
 				baseURL,
 				schemaValidator,
 			)
-			got, err := svc.Create(context.Background(), tc.previewOrigins, tc.seedDefaults)
+			got, err := svc.Create(context.Background(), tc.projectName, tc.previewOrigins, tc.seedDefaults)
 
-			if tc.wantErr {
-				require.Error(t, err)
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
 			} else {
 				require.NoError(t, err)
 			}
@@ -235,6 +243,7 @@ func TestProjectService_Get(t *testing.T) {
 						assert.Equal(t, id, gotID)
 						return &domain.Project{
 							ID:        "proj_aaa",
+							Name:      "project aaa",
 							CreatedAt: now,
 							UpdatedAt: now,
 						}, nil
@@ -245,6 +254,7 @@ func TestProjectService_Get(t *testing.T) {
 				pool.EXPECT().Statements().Return(statements)
 			},
 			check: func(t *testing.T, got *domain.Project) {
+				assert.Equal(t, "project aaa", got.Name)
 				assert.Equal(t, "proj_aaa", got.ID)
 				assert.False(t, got.CreatedAt.IsZero())
 			},

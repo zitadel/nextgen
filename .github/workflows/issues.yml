@@ -1,4 +1,4 @@
-name: Add new issues to product management project
+name: Add new issues and PRs to kanban project
 
 on:
   issues:

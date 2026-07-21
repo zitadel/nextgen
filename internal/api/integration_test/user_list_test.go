@@ -24,7 +24,7 @@ import (
 func TestListUsers(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
@@ -93,7 +93,7 @@ func TestListUsers(t *testing.T) {
 	}))
 
 	// Another project's bearer sees nothing: scope comes from the token.
-	other, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 	otherClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
