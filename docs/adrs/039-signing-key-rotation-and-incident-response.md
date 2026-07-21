@@ -128,7 +128,7 @@ If an active signing key is compromised:
    the same key but also encrypted under the DEK, so a signing-key compromise alone cannot forge them: an
    attacker would also need the DEK. Revoking them is a precaution against a broader breach, forcing
    re-authentication. PATs are out of scope in the
-   current MVP ([ADR 032](032-token-lifecycle.md#personal-access-tokens)), and their exposure depends
+   current MVP ([ADR 037](037-token-lifecycle.md#personal-access-tokens)), and their exposure depends
    on their eventual token format ([Open Question 4](#questions)).
 
 **Notes on key deletion:**
@@ -222,7 +222,7 @@ does nothing for the secrets themselves. They must be rotated, not re-wrapped.
 5. **Authenticator secrets.** Every TOTP shared secret is exposed, so an attacker holding the
    database can compute valid codes. Invalidate all TOTP secrets and require affected users to
    re-enroll. Until they do, users fall back to their other factors, or to account recovery
-   ([ADR 035, Section 4](035-user-credential-migration-and-recovery.md#4-account-recovery)) if TOTP
+   ([ADR 038, Section 4](038-user-credential-migration-and-recovery.md#4-account-recovery)) if TOTP
    was their only second factor.
 6. Once secrets in steps 4 and 5 are re-encrypted, remove the compromised KEK from configuration and
    destroy it at its source (for example, through the cert-manager or equivalent tooling that
@@ -261,7 +261,7 @@ has a recovery time bounded by third parties rather than by the platform.
 1. When is a retired signing key pair actually purgeable, and should it be kept past that point
    ([Section 1](#1-signing-key-lifecycle))? Two open points:
    - Section 1 derives the grace/purge window from the self-contained (access) token lifetime. But
-     opaque refresh tokens are long-lived (weeks, per [ADR 032](032-token-lifecycle.md)) and are also
+     opaque refresh tokens are long-lived (weeks, per [ADR 037](037-token-lifecycle.md)) and are also
      signed by the same key. If validating them re-checks that signature against the stored key,
      purging on the access-token clock removes a key still needed to verify unexpired refresh tokens.
      Open: are opaque tokens verified by `jti` lookup alone, or must the purge window cover the
@@ -293,7 +293,7 @@ has a recovery time bounded by third parties rather than by the platform.
    rotate keys and purge expired ones. Whether to add the column is open.
 
 4. How does a compromised or rotated signing key interact with PATs once they come into scope
-   ([ADR 032](032-token-lifecycle.md#personal-access-tokens) defers them)? If opaque, the DEK
+   ([ADR 037](037-token-lifecycle.md#personal-access-tokens) defers them)? If opaque, the DEK
    protects them like a session or refresh token; if self-contained, a signing-key compromise can
    forge them. If PATs can live indefinitely, what is the policy for retiring the keys that signed
    them, and do we need a max cap (product decision)?
