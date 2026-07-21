@@ -101,7 +101,9 @@ export const BANNED_TEMPLATE_PATTERNS: readonly BannedPattern[] = [
   },
 ] as const;
 
-const MANDATORY_GATES_PATTERN = /\{%-?\s*mandatory_gates\s*-?%\}/;
+// Derived from the exported tag name so a rename cannot silently diverge
+// the validator from the renderer contract.
+const MANDATORY_GATES_PATTERN = new RegExp(`\\{%-?\\s*${MANDATORY_GATES_TAG}\\s*-?%\\}`);
 
 let parseEngine: Liquid | undefined;
 

@@ -86,6 +86,21 @@ Storage-side evolution (per-step template maps, app/team audience
 overrides on the `app → team → project` ladder) changes only the
 resolution rule, never the component contract.
 
+**Latest-revision is the pre-releases interim, not the destination.**
+[ADR 035](035-configuration-environments.md) already names branding a
+release-pinned resource (its manifest example carries a
+`(kind: branding, handle, revision_id)` row), and none of that machinery
+exists in code yet — flow definitions resolve live by name/audience
+under the same interim today. When ADR 035's deployments land, flow
+responses resolve branding through the **environment's active release**:
+the release pins one immutable revision id (which is why this ADR chose
+revisioned-immutable storage — the id is the pinnable reference), a
+`POST /branding` alone changes nothing at runtime until a release
+containing it is deployed, and environments can run different branding.
+Latest-revision then survives only for projects not yet under release
+management. The switch touches the resolution rule alone; storage and
+wire shape are already release-ready.
+
 ### 3. Validation: authoritative in the CLI, lexical gate on the server
 
 | Layer | Where | What |

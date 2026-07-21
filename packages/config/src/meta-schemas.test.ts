@@ -129,9 +129,11 @@ describe("meta-schemas", () => {
     // Unknown keys are dialect errors, like the flow dialect.
     expect(check({ not_a_branding_key: true })).toBe(false);
     // Asset URLs must be https at the dialect level too — editors flag what
-    // the server's save gate would reject.
+    // the server's save gate would reject. Scheme matching is
+    // case-insensitive, like the zod and Go validators.
     expect(check({ logo_url: "http://cdn.example.com/logo.svg" })).toBe(false);
     expect(check({ hero_url: "https://cdn.example.com/hero.png" })).toBe(true);
+    expect(check({ hero_url: "HTTPS://cdn.example.com/hero.png" })).toBe(true);
   });
 
   it("the branding $schema ref resolves from .zitadel/branding/ into the meta dir", () => {
