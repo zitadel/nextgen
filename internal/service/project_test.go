@@ -428,6 +428,84 @@ func TestProjectService_Update(t *testing.T) {
 	}
 }
 
+func TestProjectService_Delete(t *testing.T) {
+	tests := []struct {
+		name            string
+		id              string
+		setupStatements func() testAllStatements
+		setupPool       func(*servicemocks.MockPool, testAllStatements)
+		wantErr         error
+	}{
+		{
+			name:    "missing project id",
+			wantErr: domain.ErrMissingProjectID(),
+		},
+		{
+			name: "deleted, ok",
+			id:   "proj_aaa",
+			setupStatements: func() testAllStatements {
+				return testAllStatements{
+					deleteProject: func(_ context.Context, id string) error {
+						assert.Equal(t, "proj_aaa", id)
+						return nil
+					},
+				}
+			},
+			setupPool: func(pool *servicemocks.MockPool, statements testAllStatements) {
+				pool.EXPECT().Statements().Return(statements)
+			},
+		},
+		{
+			name: "delete failed",
+			id:   "proj_aaa",
+			setupStatements: func() testAllStatements {
+				return testAllStatements{
+					deleteProject: func(_ context.Context, _ string) error {
+						return assert.AnError
+					},
+				}
+			},
+			setupPool: func(pool *servicemocks.MockPool, statements testAllStatements) {
+				pool.EXPECT().Statements().Return(statements)
+			},
+			wantErr: domain.ErrInternal(assert.AnError),
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mockPool := servicemocks.NewMockPool(ctrl)
+			schemaRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
+			flowDefinitionRepo := domainmock.NewMockFlowDefinitionRepository(ctrl)
+			const baseURL = "https://example.com"
+			schemaValidator, err := domain.NewSchemaValidator(baseURL)
+			require.NoError(t, err)
+			tokenGenerator := domainmock.NewMockTokenGenerator(ctrl)
+
+			if tc.setupStatements != nil {
+				statements := tc.setupStatements()
+				tc.setupPool(mockPool, statements)
+			}
+
+			svc := service.NewProjectService(
+				stubPool(),
+				service.NewPool(mockPool),
+				schemaRepo,
+				flowDefinitionRepo,
+				tokenGenerator,
+				baseURL,
+				schemaValidator,
+			)
+			err = svc.Delete(context.Background(), tc.id)
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestProjectService_List(t *testing.T) {
 	createdAt := time.Now().UTC().Truncate(time.Second)
 

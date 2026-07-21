@@ -43,6 +43,10 @@ type ProjectService interface {
 	// opaque cursor token. The returned NextPageToken is empty when the last page
 	// has been reached.
 	List(ctx context.Context, req ListProjectsRequest) (*ListProjectsResponse, error)
+
+	// Delete hard-deletes a project, cascading to its child resources through the
+	// storage delete. Deleting a project that does not exist is a no-op.
+	Delete(ctx context.Context, id string) error
 }
 
 // NewProjectService returns a [ProjectService] backed by the given repository.
@@ -304,4 +308,14 @@ func projectField(field string) (domain.ProjectField, error) {
 	default:
 		return domain.ProjectFieldUnspecified, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", field))
 	}
+}
+
+func (s *projectService) Delete(ctx context.Context, id string) error {
+	if id == "" {
+		return domain.ErrMissingProjectID()
+	}
+	if err := s.v2Pool.Statements().DeleteProjectByID(ctx, id); err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to delete project")
+	}
+	return nil
 }

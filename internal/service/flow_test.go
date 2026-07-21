@@ -28,6 +28,7 @@ type testAllStatements struct {
 	getProjectByID func(context.Context, string) (*domain.Project, error)
 	updateProject  func(context.Context, *domain.Project) error
 	listProjects   func(context.Context, *v2database.ListOptions[domain.ProjectField]) (*v2database.ListResult[*domain.Project], error)
+	deleteProject  func(context.Context, string) error
 }
 
 func (testAllStatements) IsStatements() {}
@@ -60,8 +61,11 @@ func (s testAllStatements) ListProjects(ctx context.Context, opts *v2database.Li
 	return nil, nil
 }
 
-func (testAllStatements) DeleteProjectByID(context.Context, string) error {
-	panic("unexpected call to DeleteProjectByID")
+func (s testAllStatements) DeleteProjectByID(ctx context.Context, id string) error {
+	if s.deleteProject != nil {
+		return s.deleteProject(ctx, id)
+	}
+	return nil
 }
 
 func (testAllStatements) CreateFlowDefinition(context.Context, *domain.FlowDefinition) error {
