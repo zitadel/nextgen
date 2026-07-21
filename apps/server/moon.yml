@@ -117,7 +117,11 @@ tasks:
       - "@group(serverInputs)"
     options:
       runFromWorkspaceRoot: true
-      runInCI: false
+      # Invoked explicitly by the CI "Run Go integration tests (spanner)" step.
+      # runInCI must be true, otherwise moon hides the task from `moon run` in CI
+      # ("No tasks found"). It is not pulled into `moon ci :...:test` because that
+      # selects the `test` task by name, not `test-spanner`.
+      runInCI: true
 
   build:
     command: "go build -trimpath -o dist/server/nextgen ."

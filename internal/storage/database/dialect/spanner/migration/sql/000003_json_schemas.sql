@@ -4,7 +4,7 @@
 CREATE TABLE json_schemas (
     project_id  STRING(MAX) NOT NULL,
     url         STRING(MAX) NOT NULL,
-    object_type STRING(MAX),
+    object_type STRING(256),
     created_at  TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     payload     JSON        NOT NULL,
     CONSTRAINT fk_json_schemas_project

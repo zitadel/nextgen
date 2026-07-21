@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	spannerdialect "github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
+	spannerv2 "github.com/zitadel/nextgen/internal/storage/v2/dialect/spanner"
 )
 
 var Connector database.Connector
@@ -23,11 +25,17 @@ func (h *Harness) EnsureDBPool(t *testing.T) database.Pool {
 	return h.DBPool
 }
 
-// ServiceDB satisfies the shared harness helpers (EnsureProjectService needs
-// it to build the server), but storage v2 has no spanner statements yet
-// (zitadel/nextgen#457), so every test that reaches it skips.
 func (h *Harness) ServiceDB(t *testing.T) *service.DB {
 	t.Helper()
-	t.Skip("storage v2 has no spanner statements yet (zitadel/nextgen#457)")
-	return nil
+
+	if h.DB == nil {
+		cfg, ok := Connector.(*spannerdialect.Config)
+		require.True(t, ok)
+		dialect, err := spannerv2.DecodeConfig(cfg.DSN)
+		require.NoError(t, err)
+		pool, err := dialect.Connect(t.Context())
+		require.NoError(t, err)
+		h.DB = service.NewPool(pool.(service.Pool))
+	}
+	return h.DB
 }
