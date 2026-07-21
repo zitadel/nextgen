@@ -113,9 +113,10 @@ var projectAccess = resourceAccess{
 func requireProjectAccess(ctx context.Context, projectID string, res resourceAccess, op accessOp) error {
 	scope, ok := GetScopeContext(ctx)
 	if !ok || scope.ProjectID == "" || scope.ProjectID != projectID {
-		// Deletes miss like reads — "nothing there" — matching what deleting
-		// an unknown id inside your own project answers; only creation-style
-		// writes answer with the invalid-project shape.
+		// opWrite ops (create, update, set-password — every mutation except
+		// delete) answer with the resource's invalid-project shape; reads and
+		// deletes answer "nothing there", matching what a read or delete of
+		// an unknown id inside your own project returns.
 		if op == opWrite {
 			return res.writeMiss()
 		}

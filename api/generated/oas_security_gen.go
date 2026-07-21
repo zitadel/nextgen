@@ -110,7 +110,7 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"flow_definitions.read",
 	},
 	GetProjectOperation: []string{
-		"project.read",
+		"project.write",
 	},
 	GetSchemaByIdOperation: []string{
 		"schema.read",
