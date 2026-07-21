@@ -10,6 +10,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 const passkeyRegistrationTTL = 5 * time.Minute
@@ -20,21 +21,21 @@ const passkeyRegistrationDefaultUsername = "Passkey account"
 // [FlowPasskeyRegistrationAdapter] for the flow engine.
 type PasskeyRegistrationService struct {
 	pool          database.Pool
+	v2Pool        StatementPool
 	registrations domain.PasskeyRegistrationRepository
-	passkeys      domain.UserPasskeyRepository
 	ids           idgen.Generator
 }
 
 func NewPasskeyRegistrationService(
 	pool database.Pool,
+	v2Pool StatementPool,
 	registrations domain.PasskeyRegistrationRepository,
-	passkeys domain.UserPasskeyRepository,
 	ids idgen.Generator,
 ) *PasskeyRegistrationService {
 	return &PasskeyRegistrationService{
 		pool:          pool,
+		v2Pool:        v2Pool,
 		registrations: registrations,
-		passkeys:      passkeys,
 		ids:           ids,
 	}
 }
@@ -131,9 +132,8 @@ func (s *PasskeyRegistrationService) Finish(ctx context.Context, in FinishRegist
 	return s.FinishWith(ctx, s.pool, in)
 }
 
-// FinishWith is like [Finish] but uses the given QueryExecutor instead of the pool.
-// Used by [FlowPasskeyRegistrationAdapter] to run the credential write inside the
-// flow engine's transaction so the passkey save is atomic with user creation.
+// FinishWith is like [Finish] but uses the given QueryExecutor for the registration
+// session Get/Delete. The credential write uses UserPasskeyStatements on the v2 pool.
 func (s *PasskeyRegistrationService) FinishWith(ctx context.Context, client database.QueryExecutor, in FinishRegistrationInput) error {
 	reg, err := s.registrations.Get(ctx, client, in.ProjectID, in.RegistrationID)
 	if err != nil {
@@ -147,7 +147,7 @@ func (s *PasskeyRegistrationService) FinishWith(ctx context.Context, client data
 	newPasskey.ProjectID = in.ProjectID
 	newPasskey.UserID = reg.UserID
 
-	if err := s.passkeys.Create(ctx, client, newPasskey); err != nil {
+	if err := s.v2Pool.Statements().CreateUserPasskey(ctx, newPasskey); err != nil {
 		return fmt.Errorf("passkey registration: store credential: %w", err)
 	}
 
@@ -157,14 +157,16 @@ func (s *PasskeyRegistrationService) FinishWith(ctx context.Context, client data
 }
 
 func (s *PasskeyRegistrationService) listPasskeys(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error) {
-	return s.passkeys.List(
-		ctx,
-		s.pool,
-		database.WithCondition(database.And(
-			s.passkeys.ProjectIDCondition(projectID),
-			s.passkeys.UserIDCondition(userID),
-		)),
-	)
+	result, err := s.v2Pool.Statements().ListUserPasskeys(ctx, &v2database.ListOptions[domain.UserPasskeyField]{
+		Filter: v2database.And(
+			v2database.Equal(v2database.Col(domain.UserPasskeyFieldProjectID), projectID),
+			v2database.Equal(v2database.Col(domain.UserPasskeyFieldUserID), userID),
+		),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result.Items, nil
 }
 
 func parseOrigins(raw []string) ([]url.URL, error) {

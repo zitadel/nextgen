@@ -53,7 +53,6 @@ type Harness struct {
 	AuthAttemptRepo    domain.AuthAttemptRepository
 	SessionRepo        domain.SessionRepository
 	UserPasswordRepo   domain.UserPasswordRepository
-	UserPasskeyRepo    domain.UserPasskeyRepository
 	TeamRepo           domain.TeamRepository
 	BrandingRepo       domain.BrandingRepository
 

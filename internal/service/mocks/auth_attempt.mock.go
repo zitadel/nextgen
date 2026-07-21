@@ -12,7 +12,6 @@ package mocks
 import (
 	context "context"
 	reflect "reflect"
-	time "time"
 
 	domain "github.com/zitadel/nextgen/internal/domain"
 	database "github.com/zitadel/nextgen/internal/storage/database"
@@ -377,23 +376,18 @@ func (m *MockUserPasskeys) EXPECT() *MockUserPasskeysMockRecorder {
 }
 
 // Get mocks base method.
-func (m *MockUserPasskeys) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserPasskey, error) {
+func (m *MockUserPasskeys) Get(ctx context.Context, projectID, userID, credentialID string) (*domain.UserPasskey, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, client}
-	for _, a := range opts {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "Get", varargs...)
+	ret := m.ctrl.Call(m, "Get", ctx, projectID, userID, credentialID)
 	ret0, _ := ret[0].(*domain.UserPasskey)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Get indicates an expected call of Get.
-func (mr *MockUserPasskeysMockRecorder) Get(ctx, client any, opts ...any) *MockUserPasskeysGetCall {
+func (mr *MockUserPasskeysMockRecorder) Get(ctx, projectID, userID, credentialID any) *MockUserPasskeysGetCall {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, client}, opts...)
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockUserPasskeys)(nil).Get), varargs...)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockUserPasskeys)(nil).Get), ctx, projectID, userID, credentialID)
 	return &MockUserPasskeysGetCall{Call: call}
 }
 
@@ -409,268 +403,68 @@ func (c *MockUserPasskeysGetCall) Return(arg0 *domain.UserPasskey, arg1 error) *
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockUserPasskeysGetCall) Do(f func(context.Context, database.QueryExecutor, ...database.QueryOption) (*domain.UserPasskey, error)) *MockUserPasskeysGetCall {
+func (c *MockUserPasskeysGetCall) Do(f func(context.Context, string, string, string) (*domain.UserPasskey, error)) *MockUserPasskeysGetCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserPasskeysGetCall) DoAndReturn(f func(context.Context, database.QueryExecutor, ...database.QueryOption) (*domain.UserPasskey, error)) *MockUserPasskeysGetCall {
+func (c *MockUserPasskeysGetCall) DoAndReturn(f func(context.Context, string, string, string) (*domain.UserPasskey, error)) *MockUserPasskeysGetCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
-// List mocks base method.
-func (m *MockUserPasskeys) List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*domain.UserPasskey, error) {
+// ListByUser mocks base method.
+func (m *MockUserPasskeys) ListByUser(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, client}
-	for _, a := range opts {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "List", varargs...)
+	ret := m.ctrl.Call(m, "ListByUser", ctx, projectID, userID)
 	ret0, _ := ret[0].([]*domain.UserPasskey)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// List indicates an expected call of List.
-func (mr *MockUserPasskeysMockRecorder) List(ctx, client any, opts ...any) *MockUserPasskeysListCall {
+// ListByUser indicates an expected call of ListByUser.
+func (mr *MockUserPasskeysMockRecorder) ListByUser(ctx, projectID, userID any) *MockUserPasskeysListByUserCall {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, client}, opts...)
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockUserPasskeys)(nil).List), varargs...)
-	return &MockUserPasskeysListCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListByUser", reflect.TypeOf((*MockUserPasskeys)(nil).ListByUser), ctx, projectID, userID)
+	return &MockUserPasskeysListByUserCall{Call: call}
 }
 
-// MockUserPasskeysListCall wrap *gomock.Call
-type MockUserPasskeysListCall struct {
+// MockUserPasskeysListByUserCall wrap *gomock.Call
+type MockUserPasskeysListByUserCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockUserPasskeysListCall) Return(arg0 []*domain.UserPasskey, arg1 error) *MockUserPasskeysListCall {
+func (c *MockUserPasskeysListByUserCall) Return(arg0 []*domain.UserPasskey, arg1 error) *MockUserPasskeysListByUserCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockUserPasskeysListCall) Do(f func(context.Context, database.QueryExecutor, ...database.QueryOption) ([]*domain.UserPasskey, error)) *MockUserPasskeysListCall {
+func (c *MockUserPasskeysListByUserCall) Do(f func(context.Context, string, string) ([]*domain.UserPasskey, error)) *MockUserPasskeysListByUserCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserPasskeysListCall) DoAndReturn(f func(context.Context, database.QueryExecutor, ...database.QueryOption) ([]*domain.UserPasskey, error)) *MockUserPasskeysListCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// ProjectIDCondition mocks base method.
-func (m *MockUserPasskeys) ProjectIDCondition(pid string) database.Condition {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ProjectIDCondition", pid)
-	ret0, _ := ret[0].(database.Condition)
-	return ret0
-}
-
-// ProjectIDCondition indicates an expected call of ProjectIDCondition.
-func (mr *MockUserPasskeysMockRecorder) ProjectIDCondition(pid any) *MockUserPasskeysProjectIDConditionCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProjectIDCondition", reflect.TypeOf((*MockUserPasskeys)(nil).ProjectIDCondition), pid)
-	return &MockUserPasskeysProjectIDConditionCall{Call: call}
-}
-
-// MockUserPasskeysProjectIDConditionCall wrap *gomock.Call
-type MockUserPasskeysProjectIDConditionCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockUserPasskeysProjectIDConditionCall) Return(arg0 database.Condition) *MockUserPasskeysProjectIDConditionCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockUserPasskeysProjectIDConditionCall) Do(f func(string) database.Condition) *MockUserPasskeysProjectIDConditionCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserPasskeysProjectIDConditionCall) DoAndReturn(f func(string) database.Condition) *MockUserPasskeysProjectIDConditionCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// SetBackupState mocks base method.
-func (m *MockUserPasskeys) SetBackupState(arg0 bool) database.Change {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetBackupState", arg0)
-	ret0, _ := ret[0].(database.Change)
-	return ret0
-}
-
-// SetBackupState indicates an expected call of SetBackupState.
-func (mr *MockUserPasskeysMockRecorder) SetBackupState(arg0 any) *MockUserPasskeysSetBackupStateCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBackupState", reflect.TypeOf((*MockUserPasskeys)(nil).SetBackupState), arg0)
-	return &MockUserPasskeysSetBackupStateCall{Call: call}
-}
-
-// MockUserPasskeysSetBackupStateCall wrap *gomock.Call
-type MockUserPasskeysSetBackupStateCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockUserPasskeysSetBackupStateCall) Return(arg0 database.Change) *MockUserPasskeysSetBackupStateCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockUserPasskeysSetBackupStateCall) Do(f func(bool) database.Change) *MockUserPasskeysSetBackupStateCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserPasskeysSetBackupStateCall) DoAndReturn(f func(bool) database.Change) *MockUserPasskeysSetBackupStateCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// SetLastUsedAt mocks base method.
-func (m *MockUserPasskeys) SetLastUsedAt(arg0 time.Time) database.Change {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetLastUsedAt", arg0)
-	ret0, _ := ret[0].(database.Change)
-	return ret0
-}
-
-// SetLastUsedAt indicates an expected call of SetLastUsedAt.
-func (mr *MockUserPasskeysMockRecorder) SetLastUsedAt(arg0 any) *MockUserPasskeysSetLastUsedAtCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastUsedAt", reflect.TypeOf((*MockUserPasskeys)(nil).SetLastUsedAt), arg0)
-	return &MockUserPasskeysSetLastUsedAtCall{Call: call}
-}
-
-// MockUserPasskeysSetLastUsedAtCall wrap *gomock.Call
-type MockUserPasskeysSetLastUsedAtCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockUserPasskeysSetLastUsedAtCall) Return(arg0 database.Change) *MockUserPasskeysSetLastUsedAtCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockUserPasskeysSetLastUsedAtCall) Do(f func(time.Time) database.Change) *MockUserPasskeysSetLastUsedAtCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserPasskeysSetLastUsedAtCall) DoAndReturn(f func(time.Time) database.Change) *MockUserPasskeysSetLastUsedAtCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// SetSignCount mocks base method.
-func (m *MockUserPasskeys) SetSignCount(arg0 int64) database.Change {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetSignCount", arg0)
-	ret0, _ := ret[0].(database.Change)
-	return ret0
-}
-
-// SetSignCount indicates an expected call of SetSignCount.
-func (mr *MockUserPasskeysMockRecorder) SetSignCount(arg0 any) *MockUserPasskeysSetSignCountCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSignCount", reflect.TypeOf((*MockUserPasskeys)(nil).SetSignCount), arg0)
-	return &MockUserPasskeysSetSignCountCall{Call: call}
-}
-
-// MockUserPasskeysSetSignCountCall wrap *gomock.Call
-type MockUserPasskeysSetSignCountCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockUserPasskeysSetSignCountCall) Return(arg0 database.Change) *MockUserPasskeysSetSignCountCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockUserPasskeysSetSignCountCall) Do(f func(int64) database.Change) *MockUserPasskeysSetSignCountCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserPasskeysSetSignCountCall) DoAndReturn(f func(int64) database.Change) *MockUserPasskeysSetSignCountCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// UniqueCondition mocks base method.
-func (m *MockUserPasskeys) UniqueCondition(projectID, userID, credentialID string) database.Condition {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UniqueCondition", projectID, userID, credentialID)
-	ret0, _ := ret[0].(database.Condition)
-	return ret0
-}
-
-// UniqueCondition indicates an expected call of UniqueCondition.
-func (mr *MockUserPasskeysMockRecorder) UniqueCondition(projectID, userID, credentialID any) *MockUserPasskeysUniqueConditionCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UniqueCondition", reflect.TypeOf((*MockUserPasskeys)(nil).UniqueCondition), projectID, userID, credentialID)
-	return &MockUserPasskeysUniqueConditionCall{Call: call}
-}
-
-// MockUserPasskeysUniqueConditionCall wrap *gomock.Call
-type MockUserPasskeysUniqueConditionCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockUserPasskeysUniqueConditionCall) Return(arg0 database.Condition) *MockUserPasskeysUniqueConditionCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockUserPasskeysUniqueConditionCall) Do(f func(string, string, string) database.Condition) *MockUserPasskeysUniqueConditionCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserPasskeysUniqueConditionCall) DoAndReturn(f func(string, string, string) database.Condition) *MockUserPasskeysUniqueConditionCall {
+func (c *MockUserPasskeysListByUserCall) DoAndReturn(f func(context.Context, string, string) ([]*domain.UserPasskey, error)) *MockUserPasskeysListByUserCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // Update mocks base method.
-func (m *MockUserPasskeys) Update(ctx context.Context, client database.QueryExecutor, condition database.Condition, changes ...database.Change) error {
+func (m *MockUserPasskeys) Update(ctx context.Context, passkey *domain.UserPasskey) error {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, client, condition}
-	for _, a := range changes {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "Update", varargs...)
+	ret := m.ctrl.Call(m, "Update", ctx, passkey)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Update indicates an expected call of Update.
-func (mr *MockUserPasskeysMockRecorder) Update(ctx, client, condition any, changes ...any) *MockUserPasskeysUpdateCall {
+func (mr *MockUserPasskeysMockRecorder) Update(ctx, passkey any) *MockUserPasskeysUpdateCall {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, client, condition}, changes...)
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockUserPasskeys)(nil).Update), varargs...)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockUserPasskeys)(nil).Update), ctx, passkey)
 	return &MockUserPasskeysUpdateCall{Call: call}
 }
 
@@ -686,51 +480,13 @@ func (c *MockUserPasskeysUpdateCall) Return(arg0 error) *MockUserPasskeysUpdateC
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockUserPasskeysUpdateCall) Do(f func(context.Context, database.QueryExecutor, database.Condition, ...database.Change) error) *MockUserPasskeysUpdateCall {
+func (c *MockUserPasskeysUpdateCall) Do(f func(context.Context, *domain.UserPasskey) error) *MockUserPasskeysUpdateCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserPasskeysUpdateCall) DoAndReturn(f func(context.Context, database.QueryExecutor, database.Condition, ...database.Change) error) *MockUserPasskeysUpdateCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// UserIDCondition mocks base method.
-func (m *MockUserPasskeys) UserIDCondition(userID string) database.Condition {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UserIDCondition", userID)
-	ret0, _ := ret[0].(database.Condition)
-	return ret0
-}
-
-// UserIDCondition indicates an expected call of UserIDCondition.
-func (mr *MockUserPasskeysMockRecorder) UserIDCondition(userID any) *MockUserPasskeysUserIDConditionCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserIDCondition", reflect.TypeOf((*MockUserPasskeys)(nil).UserIDCondition), userID)
-	return &MockUserPasskeysUserIDConditionCall{Call: call}
-}
-
-// MockUserPasskeysUserIDConditionCall wrap *gomock.Call
-type MockUserPasskeysUserIDConditionCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockUserPasskeysUserIDConditionCall) Return(arg0 database.Condition) *MockUserPasskeysUserIDConditionCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockUserPasskeysUserIDConditionCall) Do(f func(string) database.Condition) *MockUserPasskeysUserIDConditionCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserPasskeysUserIDConditionCall) DoAndReturn(f func(string) database.Condition) *MockUserPasskeysUserIDConditionCall {
+func (c *MockUserPasskeysUpdateCall) DoAndReturn(f func(context.Context, *domain.UserPasskey) error) *MockUserPasskeysUpdateCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

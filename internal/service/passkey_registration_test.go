@@ -12,6 +12,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // --- fakes ---
@@ -57,57 +58,41 @@ func (f *fakePasskeyRegRepo) Delete(_ context.Context, _ database.QueryExecutor,
 	return nil
 }
 
-type fakePasskeyRepo struct {
+type fakePasskeyStatements struct {
+	testAllStatements
 	created []*domain.CreateUserPasskey
 	listed  []*domain.UserPasskey
 }
 
-func (f *fakePasskeyRepo) Get(_ context.Context, _ database.QueryExecutor, _ ...database.QueryOption) (*domain.UserPasskey, error) {
-	return nil, nil
-}
-func (f *fakePasskeyRepo) List(_ context.Context, _ database.QueryExecutor, _ ...database.QueryOption) ([]*domain.UserPasskey, error) {
-	return f.listed, nil
-}
-func (f *fakePasskeyRepo) Create(_ context.Context, _ database.QueryExecutor, p *domain.CreateUserPasskey) error {
+func (f *fakePasskeyStatements) CreateUserPasskey(_ context.Context, p *domain.CreateUserPasskey) error {
 	f.created = append(f.created, p)
 	return nil
 }
-func (f *fakePasskeyRepo) Update(_ context.Context, _ database.QueryExecutor, _ database.Condition, _ ...database.Change) error {
-	return nil
-}
-func (f *fakePasskeyRepo) Delete(_ context.Context, _ database.QueryExecutor, _ database.Condition) error {
-	return nil
-}
-func (f *fakePasskeyRepo) ProjectIDCondition(pid string) database.Condition {
-	return database.NewTextCondition(database.NewColumn("t", "project_id"), database.TextOperationEqual, pid)
-}
-func (f *fakePasskeyRepo) UserIDCondition(uid string) database.Condition {
-	return database.NewTextCondition(database.NewColumn("t", "user_id"), database.TextOperationEqual, uid)
-}
-func (f *fakePasskeyRepo) CredentialIDCondition(cid string) database.Condition {
-	return database.NewTextCondition(database.NewColumn("t", "credential_id"), database.TextOperationEqual, cid)
-}
-func (f *fakePasskeyRepo) PrimaryKeyCondition(id int64) database.Condition {
-	return database.NewNumberCondition(database.NewColumn("t", "id"), database.NumberOperationEqual, id)
-}
-func (f *fakePasskeyRepo) UniqueCondition(pid, uid, cid string) database.Condition {
-	return database.And(f.ProjectIDCondition(pid), f.UserIDCondition(uid), f.CredentialIDCondition(cid))
-}
-func (f *fakePasskeyRepo) SetAttestationType(string) database.Change { return nil }
-func (f *fakePasskeyRepo) SetTransports([]string) database.Change    { return nil }
-func (f *fakePasskeyRepo) SetSignCount(int64) database.Change        { return nil }
-func (f *fakePasskeyRepo) IncrementSignCount(int64) database.Change  { return nil }
-func (f *fakePasskeyRepo) SetBackupEligible(bool) database.Change    { return nil }
-func (f *fakePasskeyRepo) SetBackupState(bool) database.Change       { return nil }
-func (f *fakePasskeyRepo) SetVerifiedAt(time.Time) database.Change   { return nil }
-func (f *fakePasskeyRepo) SetLastUsedAt(time.Time) database.Change   { return nil }
 
-func (f *fakePasskeyRepo) PrimaryKeyColumns() []database.Column { return nil }
-func (f *fakePasskeyRepo) UniqueKeyColumns() []database.Column  { return nil }
-func (f *fakePasskeyRepo) UpdatedAtColumn() database.Column {
-	return database.NewColumn("t", "updated_at")
+func (f *fakePasskeyStatements) ListUserPasskeys(_ context.Context, _ *v2database.ListOptions[domain.UserPasskeyField]) (*v2database.ListResult[*domain.UserPasskey], error) {
+	return &v2database.ListResult[*domain.UserPasskey]{Items: f.listed}, nil
 }
-func (f *fakePasskeyRepo) qualifiedTableName() string { return "t" }
+
+func (f *fakePasskeyStatements) GetUserPasskey(context.Context, string, string, string) (*domain.UserPasskey, error) {
+	panic("unexpected call to GetUserPasskey")
+}
+
+func (f *fakePasskeyStatements) UpdateUserPasskey(context.Context, *domain.UserPasskey) error {
+	panic("unexpected call to UpdateUserPasskey")
+}
+
+func (f *fakePasskeyStatements) DeleteUserPasskey(context.Context, string, string, string) error {
+	panic("unexpected call to DeleteUserPasskey")
+}
+
+type fakePasskeyV2Pool struct {
+	stmts *fakePasskeyStatements
+}
+
+func (p fakePasskeyV2Pool) Statements() service.AllStatements { return p.stmts }
+func (p fakePasskeyV2Pool) Transaction(context.Context, func(context.Context, service.Statementer[service.AllStatements]) error) error {
+	panic("unexpected transaction")
+}
 
 type fakeIDGen struct{ next string }
 
@@ -115,16 +100,16 @@ func (f *fakeIDGen) New(_ string) (string, error) { return f.next, nil }
 
 // --- helpers ---
 
-func buildTestRegistrationSvc(regRepo *fakePasskeyRegRepo, pkRepo *fakePasskeyRepo) *service.PasskeyRegistrationService {
-	return service.NewPasskeyRegistrationService(nil, regRepo, pkRepo, &fakeIDGen{next: "pkreg_test01"})
+func buildTestRegistrationSvc(regRepo *fakePasskeyRegRepo, stmts *fakePasskeyStatements) *service.PasskeyRegistrationService {
+	return service.NewPasskeyRegistrationService(nil, fakePasskeyV2Pool{stmts: stmts}, regRepo, &fakeIDGen{next: "pkreg_test01"})
 }
 
 // --- tests ---
 
 func TestPasskeyRegistrationService_Begin_StoresSession(t *testing.T) {
 	regRepo := &fakePasskeyRegRepo{}
-	pkRepo := &fakePasskeyRepo{}
-	svc := buildTestRegistrationSvc(regRepo, pkRepo)
+	stmts := &fakePasskeyStatements{}
+	svc := buildTestRegistrationSvc(regRepo, stmts)
 
 	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
 		ProjectID:   "proj-1",
@@ -160,8 +145,8 @@ func TestPasskeyRegistrationService_Begin_StoresSession(t *testing.T) {
 
 func TestPasskeyRegistrationService_Begin_UsesNeutralLabelWithoutUsername(t *testing.T) {
 	regRepo := &fakePasskeyRegRepo{}
-	pkRepo := &fakePasskeyRepo{}
-	svc := buildTestRegistrationSvc(regRepo, pkRepo)
+	stmts := &fakePasskeyStatements{}
+	svc := buildTestRegistrationSvc(regRepo, stmts)
 
 	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
 		ProjectID: "proj-1",
@@ -184,8 +169,8 @@ func TestPasskeyRegistrationService_Begin_UsesNeutralLabelWithoutUsername(t *tes
 
 func TestPasskeyRegistrationService_Begin_RequestsDiscoverableCredential(t *testing.T) {
 	regRepo := &fakePasskeyRegRepo{}
-	pkRepo := &fakePasskeyRepo{}
-	svc := buildTestRegistrationSvc(regRepo, pkRepo)
+	stmts := &fakePasskeyStatements{}
+	svc := buildTestRegistrationSvc(regRepo, stmts)
 
 	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
 		ProjectID: "proj-1",
@@ -205,8 +190,8 @@ func TestPasskeyRegistrationService_Begin_RequestsDiscoverableCredential(t *test
 
 func TestPasskeyRegistrationService_Finish_NotFoundReturnsError(t *testing.T) {
 	regRepo := &fakePasskeyRegRepo{}
-	pkRepo := &fakePasskeyRepo{}
-	svc := buildTestRegistrationSvc(regRepo, pkRepo)
+	stmts := &fakePasskeyStatements{}
+	svc := buildTestRegistrationSvc(regRepo, stmts)
 
 	err := svc.Finish(context.Background(), service.FinishRegistrationInput{
 		ProjectID:      "proj-1",
@@ -218,8 +203,8 @@ func TestPasskeyRegistrationService_Finish_NotFoundReturnsError(t *testing.T) {
 
 func TestPasskeyRegistrationService_Finish_InvalidAttestationReturnsProofRejected(t *testing.T) {
 	regRepo := &fakePasskeyRegRepo{}
-	pkRepo := &fakePasskeyRepo{}
-	svc := buildTestRegistrationSvc(regRepo, pkRepo)
+	stmts := &fakePasskeyStatements{}
+	svc := buildTestRegistrationSvc(regRepo, stmts)
 
 	// First begin a ceremony to create the session.
 	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{

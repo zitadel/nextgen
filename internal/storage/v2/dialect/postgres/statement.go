@@ -19,6 +19,7 @@ type statements struct {
 	flowDefinitionStatements
 	cryptoKeyStatements
 	userStatements
+	userPasskeyStatements
 }
 
 func (s statements) Statements() service.AllStatements {
@@ -34,6 +35,7 @@ func newStatements(client queryExecutor) statements {
 		flowDefinitionStatements: newFlowDefinitionStatements(client),
 		cryptoKeyStatements:      newCryptoKeyStatements(client),
 		userStatements:           newUserStatements(client),
+		userPasskeyStatements:    newUserPasskeyStatements(client),
 	}
 }
 

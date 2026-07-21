@@ -19,14 +19,10 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-// newUserPasskeysMock returns a mock that resolves a passkey List lookup to the given keys.
-// The project/user condition builders are exercised by listUserPasskeys, so they are stubbed
-// to accept any number of calls.
+// newUserPasskeysMock returns a mock that resolves a passkey ListByUser lookup to the given keys.
 func newUserPasskeysMock(ctrl *gomock.Controller, keys []*domain.UserPasskey) *mocks.MockUserPasskeys {
 	m := mocks.NewMockUserPasskeys(ctrl)
-	m.EXPECT().ProjectIDCondition(gomock.Any()).Return(nil).AnyTimes()
-	m.EXPECT().UserIDCondition(gomock.Any()).Return(nil).AnyTimes()
-	m.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any()).Return(keys, nil)
+	m.EXPECT().ListByUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(keys, nil)
 	return m
 }
 
@@ -570,14 +566,11 @@ func TestAuthAttemptService_VerifyPasskeyProof(t *testing.T) {
 		// A successful assertion must persist the authenticator's advanced sign count and backup
 		// state. gomock enforces that Update is called exactly once.
 		var persistedSignCount int64
-		passkeys.EXPECT().UniqueCondition("proj", passkeyUserID, domain.EncodePasskeyCredentialID(f.cred.ID)).Return(nil)
-		passkeys.EXPECT().SetSignCount(gomock.Any()).DoAndReturn(func(c int64) database.Change {
-			persistedSignCount = c
+		passkeys.EXPECT().Get(gomock.Any(), "proj", passkeyUserID, domain.EncodePasskeyCredentialID(f.cred.ID)).Return(f.passkey, nil)
+		passkeys.EXPECT().Update(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, pk *domain.UserPasskey) error {
+			persistedSignCount = pk.SignCount
 			return nil
 		})
-		passkeys.EXPECT().SetBackupState(gomock.Any()).Return(nil)
-		passkeys.EXPECT().SetLastUsedAt(gomock.Any()).Return(nil)
-		passkeys.EXPECT().Update(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 		svc := service.NewAuthAttemptService(nil, repo, nil, nil, nil, passkeys, nil)
 		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{

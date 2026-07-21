@@ -9,6 +9,7 @@ import (
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // ---- Service interface -------------------------------------------------------
@@ -184,21 +185,37 @@ type UserPasswords interface {
 	ProjectIDCondition(pid string) database.Condition
 }
 
+// UserPasskeys is the auth-attempt port over stored WebAuthn credentials.
 type UserPasskeys interface {
-	userPasskeyConditions
-
-	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserPasskey, error)
-	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*domain.UserPasskey, error)
-	Update(ctx context.Context, client database.QueryExecutor, condition database.Condition, changes ...database.Change) error
+	ListByUser(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error)
+	Get(ctx context.Context, projectID, userID, credentialID string) (*domain.UserPasskey, error)
+	Update(ctx context.Context, passkey *domain.UserPasskey) error
 }
 
-type userPasskeyConditions interface {
-	UserIDCondition(userID string) database.Condition
-	ProjectIDCondition(pid string) database.Condition
-	UniqueCondition(projectID, userID, credentialID string) database.Condition
-	SetSignCount(int64) database.Change
-	SetBackupState(bool) database.Change
-	SetLastUsedAt(time.Time) database.Change
+// UserPasskeyStatementsStore adapts [UserPasskeyStatements] to [UserPasskeys].
+type UserPasskeyStatementsStore struct {
+	Pool StatementPool
+}
+
+func (s UserPasskeyStatementsStore) ListByUser(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error) {
+	result, err := s.Pool.Statements().ListUserPasskeys(ctx, &v2database.ListOptions[domain.UserPasskeyField]{
+		Filter: v2database.And(
+			v2database.Equal(v2database.Col(domain.UserPasskeyFieldProjectID), projectID),
+			v2database.Equal(v2database.Col(domain.UserPasskeyFieldUserID), userID),
+		),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result.Items, nil
+}
+
+func (s UserPasskeyStatementsStore) Get(ctx context.Context, projectID, userID, credentialID string) (*domain.UserPasskey, error) {
+	return s.Pool.Statements().GetUserPasskey(ctx, projectID, userID, credentialID)
+}
+
+func (s UserPasskeyStatementsStore) Update(ctx context.Context, passkey *domain.UserPasskey) error {
+	return s.Pool.Statements().UpdateUserPasskey(ctx, passkey)
 }
 
 // ---- Implementation ----------------------------------------------------------
@@ -491,25 +508,20 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 // errors as proof rejections), and the stored sign count is a clone-detection signal rather
 // than an auth gate.
 func (s *authAttemptService) recordPasskeyUsage(ctx context.Context, projectID string, v *domain.PasskeyVerification) {
-	_ = s.userPasskeys.Update(
-		ctx,
-		s.pool,
-		s.userPasskeys.UniqueCondition(projectID, v.UserID, domain.EncodePasskeyCredentialID(v.CredentialID)),
-		s.userPasskeys.SetSignCount(int64(v.SignCount)),
-		s.userPasskeys.SetBackupState(v.BackupState),
-		s.userPasskeys.SetLastUsedAt(time.Now()),
-	)
+	credID := domain.EncodePasskeyCredentialID(v.CredentialID)
+	pk, err := s.userPasskeys.Get(ctx, projectID, v.UserID, credID)
+	if err != nil {
+		return
+	}
+	pk.SignCount = int64(v.SignCount)
+	pk.BackupState = v.BackupState
+	now := time.Now()
+	pk.LastUsedAt = &now
+	_ = s.userPasskeys.Update(ctx, pk)
 }
 
 func (s *authAttemptService) listUserPasskeys(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error) {
-	return s.userPasskeys.List(
-		ctx,
-		s.pool,
-		database.WithCondition(database.And(
-			s.userPasskeys.ProjectIDCondition(projectID),
-			s.userPasskeys.UserIDCondition(userID),
-		)),
-	)
+	return s.userPasskeys.ListByUser(ctx, projectID, userID)
 }
 
 var _ AuthAttemptService = (*authAttemptService)(nil)

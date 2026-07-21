@@ -23,6 +23,7 @@ type AllStatements interface {
 	FlowDefinitionStatements
 	CryptoKeyStatements
 	UserStatements
+	UserPasskeyStatements
 	Statements
 }
 
@@ -83,4 +84,19 @@ type UserStatements interface {
 	ListUsersByAttributes(ctx context.Context, projectID string, teamScope *string, attrs []domain.Attribute, opts UserReadOptions) (*database.ListResult[*domain.User], error)
 	DeactivateUser(ctx context.Context, projectID, userID string) error
 	DeleteUserByID(ctx context.Context, projectID, userID string) error
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type UserPasskeyPool interface {
+// 	Statementer[UserPasskeyStatements]
+// 	Transactioner[UserPasskeyStatements]
+// }
+
+type UserPasskeyStatements interface {
+	Statements
+	CreateUserPasskey(ctx context.Context, passkey *domain.CreateUserPasskey) error
+	GetUserPasskey(ctx context.Context, projectID, userID, credentialID string) (*domain.UserPasskey, error)
+	ListUserPasskeys(ctx context.Context, filter *database.ListOptions[domain.UserPasskeyField]) (*database.ListResult[*domain.UserPasskey], error)
+	UpdateUserPasskey(ctx context.Context, passkey *domain.UserPasskey) error
+	DeleteUserPasskey(ctx context.Context, projectID, userID, credentialID string) error
 }

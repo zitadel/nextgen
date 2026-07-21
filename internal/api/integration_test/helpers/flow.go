@@ -48,8 +48,8 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 		authAdapter := service.NewFlowAuthAttemptAdapter(h.EnsureAuthAttemptService(t))
 		passkeyRegSvc := service.NewPasskeyRegistrationService(
 			h.EnsureDBPool(t),
+			h.ServiceDB(t),
 			repository.NewPasskeyRegistrationRepository(),
-			h.EnsureUserPasskeyRepo(t),
 			idgen.NewULID(),
 		)
 		passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
