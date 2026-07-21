@@ -536,6 +536,7 @@ function SidebarMenuButton({
       data-size={size}
       data-active={isActive}
       className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
+      {...(!asChild ? { type: "button" as const } : {})}
       {...props}
     />
   )

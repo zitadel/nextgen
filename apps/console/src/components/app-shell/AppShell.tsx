@@ -7,7 +7,7 @@ import {
   Search,
   Sun,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { type KeyboardEvent, type ReactNode, useRef } from "react";
 
 import {
   Sidebar,
@@ -168,6 +168,39 @@ const THEME_OPTIONS: { value: ThemePreference; label: string; icon: typeof Sun }
 
 function ThemeToggle() {
   const { preference, setPreference } = useTheme();
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const selectIndex = (index: number) => {
+    const next = THEME_OPTIONS[index];
+    if (!next) return;
+    setPreference(next.value);
+    optionRefs.current[index]?.focus();
+  };
+
+  const onOptionKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const last = THEME_OPTIONS.length - 1;
+    let nextIndex: number | null = null;
+    switch (event.key) {
+      case "ArrowRight":
+      case "ArrowDown":
+        nextIndex = index === last ? 0 : index + 1;
+        break;
+      case "ArrowLeft":
+      case "ArrowUp":
+        nextIndex = index === 0 ? last : index - 1;
+        break;
+      case "Home":
+        nextIndex = 0;
+        break;
+      case "End":
+        nextIndex = last;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    selectIndex(nextIndex);
+  };
 
   return (
     <div
@@ -175,17 +208,22 @@ function ThemeToggle() {
       aria-label="Theme"
       className="hidden shrink-0 items-center gap-0.5 rounded-md border border-border p-0.5 sm:inline-flex"
     >
-      {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
+      {THEME_OPTIONS.map(({ value, label, icon: Icon }, index) => {
         const active = preference === value;
         return (
           <button
             key={value}
+            ref={(node) => {
+              optionRefs.current[index] = node;
+            }}
             type="button"
             role="radio"
             aria-checked={active}
             aria-label={label}
             title={label}
+            tabIndex={active ? 0 : -1}
             onClick={() => setPreference(value)}
+            onKeyDown={(event) => onOptionKeyDown(event, index)}
             className={`inline-flex size-7 items-center justify-center rounded-sm ${
               active ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground"
             }`}

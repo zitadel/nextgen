@@ -56,7 +56,7 @@ export function EmptyState({
         <Icon size={22} aria-hidden />
       </span>
       <h2 className="text-base font-medium text-foreground">{title}</h2>
-      <p className="max-w-md text-sm text-muted-foreground">{description}</p>
+      <div className="max-w-md text-sm text-muted-foreground">{description}</div>
       {action && <div className="mt-1">{action}</div>}
     </div>
   );
