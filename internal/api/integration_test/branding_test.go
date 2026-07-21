@@ -20,7 +20,7 @@ import (
 func TestBranding(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
@@ -81,7 +81,7 @@ func TestBranding(t *testing.T) {
 		// project's branding, and the answers must not reveal that the
 		// foreign project exists (identical to the nonexistent-project
 		// responses).
-		other, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+		other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 		require.NoError(t, err)
 		foreign, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
@@ -204,7 +204,7 @@ func TestBranding(t *testing.T) {
 	})
 
 	t.Run("projects without branding fall back to the default", func(t *testing.T) {
-		bare, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+		bare, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 		require.NoError(t, err)
 
 		bareClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
