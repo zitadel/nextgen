@@ -88,6 +88,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateSessionOperation: []string{
 		"sessions.write",
 	},
+	CreateTeamOperation: []string{
+		"team.write",
+	},
 	CreateUserOperation: []string{
 		"user.write",
 	},
@@ -116,10 +119,10 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"session.read",
 	},
 	GetTeamOperation: []string{
-		"teams.read",
+		"team.read",
 	},
 	GetUserByIDOperation: []string{
-		"users.read",
+		"user.read",
 	},
 	GetUserInfoOperation: []string{},
 	IntrospectOperation:  []string{},

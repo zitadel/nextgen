@@ -767,7 +767,6 @@ func TestListFlowDefinitions(t *testing.T) {
 	flowDef1, ok := resp1.(*api.FlowDefinitionDetailResponse)
 	require.True(t, ok)
 
-	client.SetToken(project2.ProjectSecret)
 	resp2, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID: api.ProjectID(project1.ID),
 		FlowDefinition: api.FlowDefinition{
@@ -811,11 +810,13 @@ func TestListFlowDefinitions(t *testing.T) {
 
 	tests := []struct {
 		name     string
+		secret   string
 		req      api.ListFlowDefinitionsParams
 		wantResp api.ListFlowDefinitionsRes
 	}{
 		{
-			name: "list all flow definitions in a project",
+			name:   "list all flow definitions in a project",
+			secret: project1.ProjectSecret,
 			req: api.ListFlowDefinitionsParams{
 				ProjectID: api.ProjectID(project1.ID),
 			},
@@ -845,7 +846,8 @@ func TestListFlowDefinitions(t *testing.T) {
 			},
 		},
 		{
-			name: "list all flow definitions in project 2",
+			name:   "list all flow definitions in project 2",
+			secret: project2.ProjectSecret,
 			req: api.ListFlowDefinitionsParams{
 				ProjectID: api.ProjectID(project2.ID),
 			},
@@ -867,7 +869,8 @@ func TestListFlowDefinitions(t *testing.T) {
 			},
 		},
 		{
-			name: "list all flow definitions by purpose register",
+			name:   "list all flow definitions by purpose register",
+			secret: project1.ProjectSecret,
 			req: api.ListFlowDefinitionsParams{
 				ProjectID: api.ProjectID(project1.ID),
 				Purpose: api.OptListFlowDefinitionsPurpose{
@@ -889,7 +892,8 @@ func TestListFlowDefinitions(t *testing.T) {
 			},
 		},
 		{
-			name: "list all flow definitions by purpose login",
+			name:   "list all flow definitions by purpose login",
+			secret: project1.ProjectSecret,
 			req: api.ListFlowDefinitionsParams{
 				ProjectID: api.ProjectID(project1.ID),
 				Purpose: api.OptListFlowDefinitionsPurpose{
@@ -915,7 +919,8 @@ func TestListFlowDefinitions(t *testing.T) {
 			},
 		},
 		{
-			name: "only default flow definition",
+			name:   "only default flow definition",
+			secret: project3.ProjectSecret,
 			req: api.ListFlowDefinitionsParams{
 				ProjectID: api.ProjectID(project3.ID),
 			},
@@ -932,7 +937,12 @@ func TestListFlowDefinitions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			client.SetToken(project1.ProjectSecret)
+			// Fresh client per subtest: the management API is bound to the
+			// token's project, and mutating a shared client's token inside
+			// parallel subtests would race.
+			client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+			require.NoError(t, err)
+			client.SetToken(tt.secret)
 
 			resp, err := client.ListFlowDefinitions(t.Context(), tt.req)
 			assert.NoError(t, err)
@@ -1045,12 +1055,21 @@ func TestDeleteFlowDefinition(t *testing.T) {
 			wantResp: &api.DeleteFlowDefinitionNoContent{},
 		},
 		{
+			// A project the token is not bound to — existing or not — answers
+			// like a nonexistent flow definition (anti-oracle), instead of the
+			// blind 204 the unguarded handler used to return.
 			name: "invalid project id",
 			req: api.DeleteFlowDefinitionParams{
 				ID:        "non-existing-id",
 				ProjectID: "invalid-project-id",
 			},
-			wantResp: &api.DeleteFlowDefinitionNoContent{},
+			wantResp: &api.ErrorDetailsStatusCode{
+				StatusCode: http.StatusNotFound,
+				Response: api.ErrorDetails{
+					Code:    "flowdef.not_found",
+					Message: "flow definition: not found",
+				},
+			},
 		},
 	}
 	for _, tt := range tests {

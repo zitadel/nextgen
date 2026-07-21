@@ -283,8 +283,15 @@ func TestSetUserPassword(t *testing.T) {
 		t.Run("user not found", func(t *testing.T) {
 			t.Parallel()
 
+			// A fresh project guarantees the user id cannot exist; the call
+			// must carry that project's own secret now that the management
+			// API binds every operation to the token's project.
 			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
 			require.NoError(t, err)
+
+			projClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+			require.NoError(t, err)
+			projClient.SetToken(project.ProjectSecret)
 
 			request := &api.SetUserPasswordRequest{
 				Password: "fake-password",
@@ -294,7 +301,7 @@ func TestSetUserPassword(t *testing.T) {
 				UserID:    api.UserID("user_does-not-exist"),
 			}
 
-			resp, err := client.SetUserPassword(t.Context(), request, params)
+			resp, err := projClient.SetUserPassword(t.Context(), request, params)
 			assert.NoError(t, err)
 
 			assert.IsType(t, &api.SetUserPasswordNotFound{}, resp, helpers.MustMarshal(t, resp))
