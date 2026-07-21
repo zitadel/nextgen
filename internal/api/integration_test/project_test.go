@@ -128,9 +128,8 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
-	schema, err := harness.EnsureSchemaRepo(t).GetByID(
+	schema, err := harness.EnsureSchemaStore(t).GetByID(
 		t.Context(),
-		harness.EnsureDBPool(t),
 		project.ID,
 		schemaURL,
 	)
@@ -197,9 +196,8 @@ func TestCreateProjectSkipsDefaultLoginFlow(t *testing.T) {
 	projectID := resp.(*api.CreateProjectResponse).ID
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
-	_, err = harness.EnsureSchemaRepo(t).GetByID(
+	_, err = harness.EnsureSchemaStore(t).GetByID(
 		t.Context(),
-		harness.EnsureDBPool(t),
 		projectID,
 		schemaURL,
 	)

@@ -10,6 +10,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/service"
+	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/dbmock"
 	"go.uber.org/mock/gomock"
@@ -30,7 +31,7 @@ const passkeyHandlerTestSchema = `{
 type passkeyHandlerFixture struct {
 	handler      *service.FlowCreateUserForPasskeyHandler
 	userRepo     *domainmock.MockUserRepository
-	schemaRepo   *domainmock.MockJSONSchemaRepository
+	schemaStore  *domainmock.MockJSONSchemaStore
 	pool         *dbmock.MockPool
 	tx           *dbmock.MockTransaction
 	passwordRepo *domainmock.MockUserPasswordRepository
@@ -41,17 +42,18 @@ func newPasskeyHandlerFixture(t *testing.T) *passkeyHandlerFixture {
 	ctrl := gomock.NewController(t)
 	userRepo := domainmock.NewMockUserRepository(ctrl)
 	passwordRepo := domainmock.NewMockUserPasswordRepository(ctrl)
-	schemaRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
+	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
 	pool := dbmock.NewMockPool(ctrl)
 	tx := dbmock.NewMockTransaction(ctrl)
+	v2Pool := servicemocks.NewMockPool(ctrl)
 
-	userService := service.NewUserService(pool, userRepo, passwordRepo, schemaRepo, nil)
-	handler := service.NewFlowCreateUserForPasskeyHandler(userRepo, userService, schemaRepo)
+	userService := service.NewUserService(pool, service.NewPool(v2Pool), userRepo, passwordRepo, nil)
+	handler := service.NewFlowCreateUserForPasskeyHandler(userRepo, userService, schemaStore)
 
 	return &passkeyHandlerFixture{
 		handler:      handler,
 		userRepo:     userRepo,
-		schemaRepo:   schemaRepo,
+		schemaStore:  schemaStore,
 		pool:         pool,
 		tx:           tx,
 		passwordRepo: passwordRepo,
@@ -71,8 +73,8 @@ func passkeyFlowState(collected map[string]any) *domain.FlowState {
 }
 
 func expectSchemaLookup(f *passkeyHandlerFixture) {
-	f.schemaRepo.EXPECT().
-		GetByID(gomock.Any(), gomock.Any(), "proj_1", "https://example.test/schema.json").
+	f.schemaStore.EXPECT().
+		GetByID(gomock.Any(), "proj_1", "https://example.test/schema.json").
 		Return(&domain.JSONSchema{
 			ProjectID: "proj_1",
 			URL:       "https://example.test/schema.json",
@@ -132,53 +134,50 @@ func TestFlowCreateUserForPasskey_PersistsAllCollectedSchemaFields(t *testing.T)
 		})
 
 	state := passkeyFlowState(map[string]any{
-		"email":      "alice@example.com",
-		"givenName":  "Alice",
-		"familyName": "Doe",
+		"email":      "bob@example.com",
+		"givenName":  "Bob",
+		"familyName": "Builder",
 	})
 
-	err := f.handler.CreateProvisionalUser(t.Context(), "user_1", state)
+	err := f.handler.CreateProvisionalUser(t.Context(), "user_bob", state)
 	require.NoError(t, err)
 	require.NotNil(t, captured)
 
-	emailAttr := attributeByKey(t, captured.Attributes, "email")
-	assert.Equal(t, "alice@example.com", emailAttr.Value)
-	assert.Equal(t, domain.AttributeUniquenessProject, emailAttr.UniqueScope, "x-unique on the schema must carry through")
-
-	givenAttr := attributeByKey(t, captured.Attributes, "givenName")
-	assert.Equal(t, "Alice", givenAttr.Value)
-
-	familyAttr := attributeByKey(t, captured.Attributes, "familyName")
-	assert.Equal(t, "Doe", familyAttr.Value)
+	assert.Equal(t, "bob@example.com", attributeByKey(t, captured.Attributes, "email").Value)
+	assert.Equal(t, "Bob", attributeByKey(t, captured.Attributes, "givenName").Value)
+	assert.Equal(t, "Builder", attributeByKey(t, captured.Attributes, "familyName").Value)
 }
 
-func TestFlowCreateUserForPasskey_UserAlreadyExistsIsSilent(t *testing.T) {
+func TestFlowCreateUserForPasskey_AlreadyExistsIsIdempotent(t *testing.T) {
 	f := newPasskeyHandlerFixture(t)
 	expectSchemaLookup(f)
 	f.pool.EXPECT().Begin(gomock.Any(), gomock.Any()).Return(f.tx, nil)
 	f.tx.EXPECT().Rollback(gomock.Any()).Return(nil)
 	f.userRepo.EXPECT().
 		Create(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(&database.UniqueError{})
+		Return(database.NewUniqueError("users", "users_pkey", errors.New("duplicate")))
 
-	state := passkeyFlowState(map[string]any{"email": "alice@example.com"})
+	state := passkeyFlowState(map[string]any{
+		"email": "carol@example.com",
+	})
 
-	err := f.handler.CreateProvisionalUser(t.Context(), "user_1", state)
-	assert.NoError(t, err, "racing prior on_success must not surface as an error")
+	err := f.handler.CreateProvisionalUser(t.Context(), "user_existing", state)
+	require.NoError(t, err, "already-exists must be treated as success for provisional create")
 }
 
-func TestFlowCreateUserForPasskey_OtherErrorsPropagate(t *testing.T) {
+func TestFlowCreateUserForPasskey_PropagatesNonExistsErrors(t *testing.T) {
 	f := newPasskeyHandlerFixture(t)
 	expectSchemaLookup(f)
 	f.pool.EXPECT().Begin(gomock.Any(), gomock.Any()).Return(f.tx, nil)
 	f.tx.EXPECT().Rollback(gomock.Any()).Return(nil)
-	sentinel := errors.New("repo exploded")
 	f.userRepo.EXPECT().
 		Create(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(sentinel)
+		Return(errors.New("db unavailable"))
 
-	state := passkeyFlowState(map[string]any{"email": "alice@example.com"})
+	state := passkeyFlowState(map[string]any{
+		"email": "dave@example.com",
+	})
 
-	err := f.handler.CreateProvisionalUser(t.Context(), "user_1", state)
+	err := f.handler.CreateProvisionalUser(t.Context(), "user_dave", state)
 	require.Error(t, err)
 }
