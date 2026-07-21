@@ -49,7 +49,7 @@ func TestCreateFlowDefinitionUnauthenticated(t *testing.T) {
 func TestCreateFlowDefinition(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
@@ -300,7 +300,7 @@ func TestUpdateFlowDefinitionUnauthenticated(t *testing.T) {
 func TestUpdateFlowDefinition(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
@@ -639,7 +639,7 @@ func TestGetFlowDefinitionUnauthenticated(t *testing.T) {
 func TestGetFlowDefinition(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
@@ -730,15 +730,15 @@ func TestListFlowDefinitionsUnauthenticated(t *testing.T) {
 func TestListFlowDefinitions(t *testing.T) {
 	t.Parallel()
 
-	project1, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project1, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 	harness.CreateUserSchema(t, project1, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
-	project2, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project2, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 	harness.CreateUserSchema(t, project2, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 
-	project3, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project3, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	userSchemaURI := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
@@ -993,7 +993,7 @@ func TestDeleteFlowDefinition(t *testing.T) {
 	client, err := helpers.NewApiClient(server.URL)
 	require.NoError(t, err)
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	client.SetToken(project.ProjectSecret)
