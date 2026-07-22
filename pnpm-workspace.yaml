@@ -86,7 +86,7 @@ catalog:
   react-dom: ^19.2.5
   react-server-dom-webpack: 19.2.5
   safe-stable-stringify: ^2.5.0
-  sharp: ^0.35.3
+  sharp: ^0.35.0
   shiki: ^4.2.0
   storybook: ^10.3.6
   tailwind-merge: ^3.6.0
