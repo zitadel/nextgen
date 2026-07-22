@@ -2,7 +2,7 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 import { Alert, Icon } from "@zitadel/ui-react";
 import type { ErrorComponentProps } from "@tanstack/react-router";
 
-const STATE_ROW = "flex items-center gap-2 text-zl-text-secondary-gray";
+const STATE_ROW = "flex items-center gap-2 text-muted-foreground";
 
 /** Shared pending boundary (Console ADR 0001). */
 export function PendingState() {
