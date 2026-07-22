@@ -104,12 +104,29 @@ jobs:
       - name: Regenerate token artifacts
         run: moon run design-tokens:generate
 
+      # workflow_dispatch loads this YAML from the selected ref, but checkout
+      # above uses design-tokens/figma-sync for the export path — so the helper
+      # script may be missing until main is merged into that branch. Restore it
+      # from the commit that owns this workflow run.
+      - name: Ensure open-PR helper script
+        run: |
+          set -euo pipefail
+          script=.github/scripts/design-tokens-open-sync-pr.sh
+          if [[ -f "$script" ]]; then
+            echo "Using $script from checked-out ref"
+            exit 0
+          fi
+          echo "Restoring $script from workflow commit ${{ github.sha }}"
+          git fetch --depth=1 origin "${{ github.sha }}"
+          git checkout "${{ github.sha }}" -- "$script"
+          test -f "$script"
+
       # Commit/push before the snapshot gate so a legitimate rename still lands
       # a reviewable PR. The snapshot step then fails the workflow check when
       # public token names drift. Zero-token syncs never reach here —
       # sync-export throws (fail-loud) and the job stops above.
-      # Keep ${{ }} out of the run script body — nested &&/||/format expressions
-      # there fail workflow parsing ("An expression was expected").
+      # Keep ${{ }} out of the open-PR script body — nested &&/||/format
+      # expressions inside run: fail workflow parsing ("An expression was expected").
       - name: Commit generated artifacts and open PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
