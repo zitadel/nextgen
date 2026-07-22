@@ -3,7 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@zitadel/ui-react dev</title>
+    <title>Zitadel Console</title>
+    <script>
+      // Apply the stored/system theme before paint to avoid a flash of the
+      // wrong theme. Kept in sync afterwards by src/theme.ts.
+      (function () {
+        try {
+          var pref = localStorage.getItem("zl-console-theme") || "system";
+          var resolved =
+            pref === "system"
+              ? window.matchMedia("(prefers-color-scheme: light)").matches
+                ? "light"
+                : "dark"
+              : pref;
+          document.documentElement.setAttribute("data-theme", resolved);
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "dark");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>

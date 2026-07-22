@@ -40,7 +40,11 @@ export default defineConfig(({ command, mode, isPreview }) => ({
   // Resolve workspace `@zitadel/*` packages straight from `.ts`
   // source for hot dev iteration. Production builds pick up pre-built
   // `dist/*.mjs` via the default `import` condition instead.
-  resolve: { conditions: ["@zitadel/source"] },
+  // `@/*` → `src/*` is the shadcn/ui convention used across the console.
+  resolve: {
+    conditions: ["@zitadel/source"],
+    alias: { "@": resolve(import.meta.dirname, "src") },
+  },
   plugins: [
     tailwindcss(),
     devtools(),
