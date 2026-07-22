@@ -595,7 +595,7 @@ func TestFlowStateMachine_Process_IntegrityOnMissingTargetStep(t *testing.T) {
 			"x-auth-methods#password": "correct-horse-battery-staple",
 		},
 	})
-	require.ErrorIs(t, err, domain.ErrIntegrity)
+	require.ErrorIs(t, err, domain.ErrFlowIntegrity())
 }
 
 func TestFlowStateMachine_Process_InvalidActionRejected(t *testing.T) {
@@ -632,7 +632,7 @@ func TestFlowStateMachine_Process_InvalidActionRejected(t *testing.T) {
 			"x-auth-methods#password": "correct-horse-battery-staple",
 		},
 	})
-	require.ErrorIs(t, err, domain.ErrInvalidAction)
+	require.ErrorIs(t, err, domain.ErrFlowInvalidAction())
 }
 
 func TestFlowStateMachine_Process_SSOSubmissionUnsupported(t *testing.T) {
@@ -658,7 +658,7 @@ func TestFlowStateMachine_Process_SSOSubmissionUnsupported(t *testing.T) {
 		Action:      domain.FlowActionSubmit,
 		SSOProvider: &domain.FlowSSOProviderRef{ID: "google"},
 	})
-	require.ErrorIs(t, err, domain.ErrUnsupported)
+	require.ErrorIs(t, err, domain.ErrFlowUnsupported())
 }
 
 // passkeyLoginDefinition builds a single-step passkey login: an
@@ -2520,7 +2520,7 @@ func TestFlowStateMachine_Back_EmptyBackStackRejected(t *testing.T) {
 	// Client-synthesized back on the initial step must be rejected.
 	_, err = w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{Action: "back"})
 	require.Error(t, err)
-	assert.ErrorIs(t, err, domain.ErrInvalidAction)
+	assert.ErrorIs(t, err, domain.ErrFlowInvalidAction())
 }
 
 // loginRegisterFlipDefinition mirrors the shape of the default flow:

@@ -48,6 +48,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 	switch {
 	case strings.HasPrefix(e.Code, domain.PrefixAuthAttempt.ErrorCodePrefix("")):
 		return authAttemptErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixFlow.ErrorCodePrefix("")):
+		return flowErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixFlowDefinition.ErrorCodePrefix("")):
 		return flowDefinitionErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixSession.ErrorCodePrefix("")):
@@ -97,9 +99,9 @@ func OgenErrorHandler(_ context.Context, w http.ResponseWriter, _ *http.Request,
 
 	case isDecodeError(err):
 		status = http.StatusBadRequest
-		d := domainErrorDetails(domain.ErrRequestInvalid())
-		d.Message = err.Error()
-		details = d
+		// Use the stable domain message — do not echo ogen/framework
+		// decode text into the client envelope (ADR 030).
+		details = domainErrorDetails(domain.ErrRequestInvalid())
 
 	default:
 		resp := errorResponse(err)

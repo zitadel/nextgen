@@ -100,10 +100,11 @@ jobs:
       - name: Regenerate token artifacts
         run: moon run design-tokens:generate
 
-      - name: Run snapshot test
-        run: moon run design-tokens:test
-        continue-on-error: true
-
+      # The PR is opened before the snapshot test so a legitimate rename still
+      # surfaces the diff for review. The snapshot step then runs as a hard gate
+      # (no continue-on-error): a name change turns this workflow's check red on
+      # the PR instead of merging silently. Zero-token syncs never reach here —
+      # sync-export throws (fail-loud) and the job stops above.
       - name: Open or update PR
         uses: peter-evans/create-pull-request@v7
         with:
@@ -119,7 +120,8 @@ jobs:
 
             **Before merging:**
             1. Review `packages/design-tokens/figma-export/` and `src/generated/`.
-            2. If the snapshot test failed, update consumers or the snapshot intentionally.
+            2. If the snapshot check is red, a token name changed — update consumers
+               and the snapshot intentionally, or roll the sync back.
             3. Spot-check console light + dark in `apps/console`.
 
             Repeat syncs before merge append commits to this PR instead of opening a new one.
@@ -130,3 +132,7 @@ jobs:
             packages/design-tokens/src/generated/tokens.css
             packages/design-tokens/src/generated/tokens.ts
             packages/design-tokens/src/generated/tailwind.css
+            packages/design-tokens/src/generated/shadcn.css
+
+      - name: Run snapshot test (hard gate)
+        run: moon run design-tokens:test

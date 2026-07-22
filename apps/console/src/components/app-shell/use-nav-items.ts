@@ -1,29 +1,24 @@
 import type { AnyRoute } from "@tanstack/react-router";
 import { useRouter } from "@tanstack/react-router";
 
-import type { NavGroup, NavMeta } from "../../nav";
-import { NAV_GROUP_ORDER } from "../../nav";
+import { DESIGN_ONLY_NAV, type NavMeta } from "../../nav";
 
 export interface NavItem {
-  to: string;
+  /** Route path, or `undefined` for design-only entries that are not built yet. */
+  to: string | undefined;
   nav: NavMeta;
 }
 
-export interface NavSection {
-  /** `null` for the ungrouped, top-of-sidebar items (e.g. Dashboard). */
-  group: NavGroup | null;
-  items: NavItem[];
-}
-
 /**
- * Builds the sidebar sections by reading `staticData.nav` off the route tree
- * (Console ADR 0001). Routes without nav metadata are ignored, so adding a
- * navigable route is all it takes to add a sidebar entry.
+ * Builds the flat sidebar list: built routes come from `staticData.nav` on the
+ * route tree (Console ADR 0001), merged with the design-only entries that appear
+ * in the Figma mock but have no route yet. The result is sorted by `nav.order`
+ * so the sidebar matches the design regardless of route registration order.
  */
-export function useNavSections(): NavSection[] {
+export function useNavItems(): NavItem[] {
   const router = useRouter();
 
-  const items: NavItem[] = (Object.values(router.routesById) as AnyRoute[])
+  const routed = (Object.values(router.routesById) as AnyRoute[])
     .map((route) => {
       const nav = route.options.staticData?.nav;
       if (!nav) return undefined;
@@ -31,18 +26,9 @@ export function useNavSections(): NavSection[] {
       const to = fullPath === "/" ? "/" : fullPath.replace(/\/$/, "");
       return { to, nav } satisfies NavItem;
     })
-    .filter((item): item is NavItem => item !== undefined)
-    .sort((a, b) => a.nav.order - b.nav.order);
+    .filter((item): item is NavItem => item !== undefined);
 
-  const sections: NavSection[] = [];
+  const designOnly: NavItem[] = DESIGN_ONLY_NAV.map((nav) => ({ to: undefined, nav }));
 
-  const ungrouped = items.filter((item) => !item.nav.group);
-  if (ungrouped.length > 0) sections.push({ group: null, items: ungrouped });
-
-  for (const group of NAV_GROUP_ORDER) {
-    const groupItems = items.filter((item) => item.nav.group === group);
-    if (groupItems.length > 0) sections.push({ group, items: groupItems });
-  }
-
-  return sections;
+  return [...routed, ...designOnly].sort((a, b) => a.nav.order - b.nav.order);
 }

@@ -1,23 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-
-// Point the SDK at an absolute base so requests parse under jsdom/undici and
-// MSW can intercept them. Must run before the router/zitadel module is
-// imported, hence the dynamic import in `renderUsers`.
-vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
-
-const USERS_URL = "http://localhost/api/users";
-
-const server = setupServer();
-
-beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
-afterEach(() => server.resetHandlers());
-afterAll(() => {
-  server.close();
-  vi.unstubAllEnvs();
-});
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it } from "vitest";
 
 async function renderUsers() {
   const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
@@ -31,33 +14,27 @@ async function renderUsers() {
   return router;
 }
 
-describe("users list states", () => {
-  it("shows the empty state when the API returns no users", async () => {
-    server.use(http.get(USERS_URL, () => HttpResponse.json([])));
+describe("users screen", () => {
+  it("renders the page heading and a user row", async () => {
     await renderUsers();
-    expect(await screen.findByText("No users yet.")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
+    expect(await screen.findByText("Maya Patel")).toBeInTheDocument();
+    expect(screen.getByText("maya.patel@acme.com")).toBeInTheDocument();
   });
 
-  it("renders a row per user", async () => {
-    server.use(
-      http.get(USERS_URL, () =>
-        HttpResponse.json([
-          { id: "user_1", username: "alice", email: "alice@example.com", created_at: "2026-01-01" },
-        ]),
-      ),
-    );
+  it("shows a status pill for a blocked user", async () => {
     await renderUsers();
-    expect(await screen.findByRole("link", { name: "alice" })).toBeInTheDocument();
-    expect(screen.getByText("alice@example.com")).toBeInTheDocument();
+    expect(await screen.findByText("Blocked")).toBeInTheDocument();
   });
 
-  it("renders the error boundary when the request fails", async () => {
-    server.use(
-      http.get(USERS_URL, () =>
-        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
-      ),
-    );
+  it("filters the table by the user-type tabs", async () => {
     await renderUsers();
-    expect(await screen.findByText("Request failed (500)")).toBeInTheDocument();
+    expect(await screen.findByText("Maya Patel")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("tab", { name: "Agent" }));
+
+    // Sasha Kim (Agent) remains; Maya Patel (Human) is filtered out.
+    expect(await screen.findByText("Sasha Kim")).toBeInTheDocument();
+    expect(screen.queryByText("Maya Patel")).not.toBeInTheDocument();
   });
 });

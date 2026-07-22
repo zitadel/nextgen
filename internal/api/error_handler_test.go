@@ -88,7 +88,10 @@ func TestOgenErrorHandlerNonCredentialCookieDecodeStays400(t *testing.T) {
 	srv.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusBadRequest, rec.Code)
-	require.Contains(t, rec.Body.String(), `"code":"req.invalid"`)
+	require.JSONEq(t,
+		`{"code":"req.invalid","message":"The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information."}`,
+		rec.Body.String(),
+	)
 }
 
 func TestOgenErrorHandlerSecurityErrorNormalizedMessage(t *testing.T) {
