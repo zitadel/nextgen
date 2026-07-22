@@ -14,7 +14,7 @@ func (h *Harness) EnsureAuthAttemptService(t *testing.T) service.AuthAttemptServ
 		h.AuthAttemptService = service.NewAuthAttemptService(
 			h.EnsureDBPool(t),
 			h.EnsureAuthAttemptRepo(t),
-			service.SessionStatementsResolver{Pool: h.ServiceDB(t)},
+			service.SessionStatementsResolver{Pool: h.EnsureServiceDB(t)},
 			h.EnsureUserRepo(t),
 			h.EnsureUserPasswordRepo(t),
 			h.EnsureUserPasskeyRepo(t),
