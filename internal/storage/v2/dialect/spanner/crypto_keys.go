@@ -41,9 +41,6 @@ func (s cryptoKeyStatements) CreateEncryptionKey(ctx context.Context, key *domai
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 			return struct{}{}, row.Columns(&key.ID, &key.CreatedAt)
 		})
-		if err != nil {
-			panic(err)
-		}
 		return err
 	})
 }
