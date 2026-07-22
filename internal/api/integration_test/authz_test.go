@@ -43,7 +43,7 @@ func TestManagementAuthz(t *testing.T) {
 	// preview holds the victim's own browser-plane preview secret.
 	preview, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	harness.SetPreviewSecretOnApiClient(t, preview, other)
+	harness.SetPreviewSecretOnApiClient(t, preview, victim)
 
 	victimID := api.ProjectID(victim.ID)
 
@@ -232,7 +232,7 @@ func TestManagementAuthz(t *testing.T) {
 
 			ownClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 			require.NoError(t, err)
-			harness.SetProjectSecretOnApiClient(t, ownClient, other)
+			harness.SetProjectSecretOnApiClient(t, ownClient, victim)
 
 			missingResp, err := ownClient.GetProject(t.Context(), api.GetProjectParams{ProjectID: api.ProjectID("proj_does_not_exist")})
 			require.NoError(t, err)
