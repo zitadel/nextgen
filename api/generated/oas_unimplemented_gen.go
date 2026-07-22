@@ -56,6 +56,22 @@ func (UnimplementedHandler) CreateAuthAttempt(ctx context.Context, req *CreateAu
 	return r, ht.ErrNotImplemented
 }
 
+// CreateBranding implements createBranding operation.
+//
+// Publishes a new immutable branding revision for the project. Branding
+// revisions cannot be updated or deleted; every edit publishes a new
+// revision, and flow responses resolve the latest revision per project
+// (see ADR 040).
+// The `liquid_template` is validated lexically on save (size, encoding,
+// banned patterns such as `<script>` tags, inline event handlers, and the
+// `| raw` filter). Authoritative LiquidJS validation runs at authoring
+// time via `zitadel plan` / `zitadel apply`.
+//
+// POST /branding
+func (UnimplementedHandler) CreateBranding(ctx context.Context, req *Branding, params CreateBrandingParams) (r CreateBrandingRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CreateFlow implements createFlow operation.
 //
 // Resolves a flow definition based on purpose + audience context and returns
@@ -231,6 +247,15 @@ func (UnimplementedHandler) GetAuthAttempt(ctx context.Context, params GetAuthAt
 	return r, ht.ErrNotImplemented
 }
 
+// GetBrandingById implements getBrandingById operation.
+//
+// Retrieves a single branding revision, including its stored configuration.
+//
+// GET /branding/{id}
+func (UnimplementedHandler) GetBrandingById(ctx context.Context, params GetBrandingByIdParams) (r GetBrandingByIdRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetFlowDefinition implements getFlowDefinition operation.
 //
 // Get a flow definition by id.
@@ -403,6 +428,19 @@ func (UnimplementedHandler) Introspect(ctx context.Context, req *IntrospectReque
 //
 // POST /auth_attempts/{attempt_id}/challenges
 func (UnimplementedHandler) IssueChallenge(ctx context.Context, req *IssueChallengeRequest, params IssueChallengeParams) (r IssueChallengeRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListBranding implements listBranding operation.
+//
+// Lists branding revisions for the project, newest first, capped at the
+// 100 most recent. The first entry is the revision flow responses
+// currently resolve. Deliberately unpaginated in v1 — list endpoints
+// gain a real query mechanism together (ADR 031); advertising pagination
+// parameters the server ignores would be worse than none.
+//
+// GET /branding
+func (UnimplementedHandler) ListBranding(ctx context.Context, params ListBrandingParams) (r ListBrandingRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

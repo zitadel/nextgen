@@ -39,6 +39,19 @@ type Handler interface {
 	//
 	// POST /auth_attempts
 	CreateAuthAttempt(ctx context.Context, req *CreateAuthAttemptRequest) (CreateAuthAttemptRes, error)
+	// CreateBranding implements createBranding operation.
+	//
+	// Publishes a new immutable branding revision for the project. Branding
+	// revisions cannot be updated or deleted; every edit publishes a new
+	// revision, and flow responses resolve the latest revision per project
+	// (see ADR 040).
+	// The `liquid_template` is validated lexically on save (size, encoding,
+	// banned patterns such as `<script>` tags, inline event handlers, and the
+	// `| raw` filter). Authoritative LiquidJS validation runs at authoring
+	// time via `zitadel plan` / `zitadel apply`.
+	//
+	// POST /branding
+	CreateBranding(ctx context.Context, req *Branding, params CreateBrandingParams) (CreateBrandingRes, error)
 	// CreateFlow implements createFlow operation.
 	//
 	// Resolves a flow definition based on purpose + audience context and returns
@@ -175,6 +188,12 @@ type Handler interface {
 	//
 	// GET /auth_attempts/{attempt_id}
 	GetAuthAttempt(ctx context.Context, params GetAuthAttemptParams) (GetAuthAttemptRes, error)
+	// GetBrandingById implements getBrandingById operation.
+	//
+	// Retrieves a single branding revision, including its stored configuration.
+	//
+	// GET /branding/{id}
+	GetBrandingById(ctx context.Context, params GetBrandingByIdParams) (GetBrandingByIdRes, error)
 	// GetFlowDefinition implements getFlowDefinition operation.
 	//
 	// Get a flow definition by id.
@@ -296,6 +315,16 @@ type Handler interface {
 	//
 	// POST /auth_attempts/{attempt_id}/challenges
 	IssueChallenge(ctx context.Context, req *IssueChallengeRequest, params IssueChallengeParams) (IssueChallengeRes, error)
+	// ListBranding implements listBranding operation.
+	//
+	// Lists branding revisions for the project, newest first, capped at the
+	// 100 most recent. The first entry is the revision flow responses
+	// currently resolve. Deliberately unpaginated in v1 — list endpoints
+	// gain a real query mechanism together (ADR 031); advertising pagination
+	// parameters the server ignores would be worse than none.
+	//
+	// GET /branding
+	ListBranding(ctx context.Context, params ListBrandingParams) (ListBrandingRes, error)
 	// ListFlowDefinitions implements listFlowDefinitions operation.
 	//
 	// Retrieves a list of all flow definitions.

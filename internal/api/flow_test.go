@@ -114,7 +114,7 @@ func newTestServer(t *testing.T) *testServer {
 	keyService.EXPECT().GetProjectDEKCrypter(gomock.Any(), gomock.Any()).Return(crypter, nil).AnyTimes()
 
 	fake := &fakeFlowSvc{}
-	handler := api.NewHandler(fake, stubAuthAttempt{}, nil, nil, nil, nil, nil, nil, tokenService, keyService)
+	handler := api.NewHandler(fake, stubAuthAttempt{}, nil, nil, nil, nil, nil, nil, nil, tokenService, keyService)
 	oas, err := gen.NewServer(
 		handler,
 		api.NewSecurityHandler(tokenService),

@@ -15,6 +15,9 @@ import authMethodMetaSchema from "../meta-schemas/auth-method.json" with {
 import authMethodsMetaSchema from "../meta-schemas/auth-methods.json" with {
   type: "json",
 };
+import brandingMetaSchema from "../meta-schemas/branding.json" with {
+  type: "json",
+};
 import flowDefinitionMetaSchema from "../meta-schemas/flow-definition.json" with {
   type: "json",
 };
@@ -34,6 +37,12 @@ export const META_SCHEMA_DIR = ".zitadel/meta";
  */
 export const FLOW_FILE_SCHEMA_REF = "../meta/flow-definition.json";
 
+/**
+ * The `$schema` value scaffolded branding files carry, relative to
+ * `.zitadel/branding/` — resolves to `{@link META_SCHEMA_DIR}/branding.json`.
+ */
+export const BRANDING_FILE_SCHEMA_REF = "../meta/branding.json";
+
 export type MetaSchemaFile = { name: string; body: object };
 
 /**
@@ -48,5 +57,6 @@ export function metaSchemaFiles(): ReadonlyArray<MetaSchemaFile> {
     { name: "user-property.json", body: userPropertyMetaSchema as object },
     { name: "auth-methods.json", body: authMethodsMetaSchema as object },
     { name: "auth-method.json", body: authMethodMetaSchema as object },
+    { name: "branding.json", body: brandingMetaSchema as object },
   ];
 }

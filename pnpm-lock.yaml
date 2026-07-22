@@ -1012,6 +1012,9 @@ importers:
 
   packages/components:
     dependencies:
+      '@zitadel/config':
+        specifier: workspace:*
+        version: link:../config
       dompurify:
         specifier: 'catalog:'
         version: 3.4.1
@@ -1040,9 +1043,6 @@ importers:
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
-      '@zitadel/config':
-        specifier: workspace:*
-        version: link:../config
       '@zitadel/design-tokens':
         specifier: workspace:*
         version: link:../design-tokens
@@ -1076,6 +1076,12 @@ importers:
       '@zitadel/api':
         specifier: workspace:*
         version: link:../api
+      liquidjs:
+        specifier: 'catalog:'
+        version: 10.27.0
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
     devDependencies:
       ajv:
         specifier: 'catalog:'
