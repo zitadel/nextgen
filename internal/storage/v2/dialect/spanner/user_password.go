@@ -51,27 +51,29 @@ func newUserPasswordStatements(db queryExecutor) userPasswordStatements {
 
 // SetUserPassword implements [service.UserPasswordStatements].
 func (ps userPasswordStatements) SetUserPassword(ctx context.Context, pw *domain.SetUserPassword) error {
-	n, err := ps.db.Update(ctx, buildStatement(updateUserPasswordStmt,
-		pw.ProjectID,
-		pw.UserID,
-		pw.EncodedHash,
-		pw.ChangeRequired,
-		verificationIDArg(pw.VerificationID),
-	).statement())
-	if err != nil {
+	return withTransaction(ctx, ps.db, func(ctx context.Context, tx queryExecutor) error {
+		n, err := tx.Update(ctx, buildStatement(updateUserPasswordStmt,
+			pw.ProjectID,
+			pw.UserID,
+			pw.EncodedHash,
+			pw.ChangeRequired,
+			verificationIDArg(pw.VerificationID),
+		).statement())
+		if err != nil {
+			return wrapError(err)
+		}
+		if n > 0 {
+			return nil
+		}
+		_, err = tx.Update(ctx, buildStatement(insertUserPasswordStmt,
+			pw.ProjectID,
+			pw.UserID,
+			pw.EncodedHash,
+			pw.ChangeRequired,
+			verificationIDArg(pw.VerificationID),
+		).statement())
 		return wrapError(err)
-	}
-	if n > 0 {
-		return nil
-	}
-	_, err = ps.db.Update(ctx, buildStatement(insertUserPasswordStmt,
-		pw.ProjectID,
-		pw.UserID,
-		pw.EncodedHash,
-		pw.ChangeRequired,
-		verificationIDArg(pw.VerificationID),
-	).statement())
-	return wrapError(err)
+	})
 }
 
 // GetUserPasswordByUserID implements [service.UserPasswordStatements].
