@@ -44,8 +44,6 @@ func TestTeamStatements_CRUD(t *testing.T) {
 
 	project := &domain.Project{
 		ID:             "proj_v2_team",
-		ProjectSecret:  "project-secret",
-		PreviewSecret:  "preview-secret",
 		PreviewOrigins: []string{},
 	}
 	require.NoError(t, stmts.CreateProject(ctx, project))
