@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	tokensTable         = "tokens"
-	createTokenStmt     = `INSERT INTO tokens (
+	tokensTable     = "tokens"
+	createTokenStmt = `INSERT INTO tokens (
 	project_id, user_id, token_type,
 	session_id, oidc_session_id, saml_session_id,
 	scope, expires_at
@@ -63,19 +63,32 @@ func (ts tokenStatements) CreateToken(ctx context.Context, token *domain.Token) 
 		scope = []string{}
 	}
 
+	sessionID, err := tokenSessionIDArg(token.SessionID)
+	if err != nil {
+		return err
+	}
+	oidcSessionID, err := tokenSessionIDArg(token.OIDCSessionID)
+	if err != nil {
+		return err
+	}
+	samlSessionID, err := tokenSessionIDArg(token.SAMLSessionID)
+	if err != nil {
+		return err
+	}
+
 	stmt := buildStatement(createTokenStmt,
 		token.ProjectID,
 		tokenUserIDArg(token.UserID, token.Type),
 		token.Type.String(),
-		tokenSessionIDArg(token.SessionID),
-		tokenSessionIDArg(token.OIDCSessionID),
-		tokenSessionIDArg(token.SAMLSessionID),
+		sessionID,
+		oidcSessionID,
+		samlSessionID,
 		scope,
-		tokenExpiresAtArg(token.ExpiresAt),
+		token.ExpiresAt,
 	).statement()
 
 	var tokenID storagedb.Identity
-	err := ts.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+	err = ts.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 			return struct{}{}, row.Columns(&tokenID)
 		})
@@ -217,22 +230,15 @@ func tokenUserIDArg(userID string, tokenType domain.TokenType) any {
 	return userID
 }
 
-func tokenSessionIDArg(sessionID *string) any {
+func tokenSessionIDArg(sessionID *string) (any, error) {
 	if sessionID == nil || *sessionID == "" {
-		return nil
+		return nil, nil
 	}
 	id, err := strconv.ParseInt(*sessionID, 10, 64)
 	if err != nil {
-		return *sessionID
+		return nil, fmt.Errorf("invalid session id %q: %w", *sessionID, err)
 	}
-	return id
-}
-
-func tokenExpiresAtArg(expiresAt *time.Time) any {
-	if expiresAt == nil {
-		return nil
-	}
-	return *expiresAt
+	return id, nil
 }
 
 func coerceTokenType(v any) (any, error) {
@@ -267,15 +273,6 @@ func coerceTokenIdentity(v any) (any, error) {
 	}
 }
 
-func tokenOptionalIdentityAccessor(get func(*domain.Token) *string) func(*domain.Token) any {
-	return func(t *domain.Token) any {
-		if v := get(t); v != nil {
-			return storagedb.Identity(*v)
-		}
-		return storagedb.Identity("")
-	}
-}
-
 var _ service.TokenStatements = (*tokenStatements)(nil)
 
 var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding[domain.Token]{
@@ -300,19 +297,34 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 		Coerce:   coerceTokenType,
 	},
 	domain.TokenFieldSessionID: {
-		SQLName:  "session_id",
-		Accessor: tokenOptionalIdentityAccessor(func(t *domain.Token) *string { return t.SessionID }),
-		Coerce:   coerceTokenIdentity,
+		SQLName: "session_id",
+		Accessor: func(t *domain.Token) any {
+			if t.SessionID == nil {
+				return storagedb.Identity("")
+			}
+			return storagedb.Identity(*t.SessionID)
+		},
+		Coerce: coerceTokenIdentity,
 	},
 	domain.TokenFieldOIDCSessionID: {
-		SQLName:  "oidc_session_id",
-		Accessor: tokenOptionalIdentityAccessor(func(t *domain.Token) *string { return t.OIDCSessionID }),
-		Coerce:   coerceTokenIdentity,
+		SQLName: "oidc_session_id",
+		Accessor: func(t *domain.Token) any {
+			if t.OIDCSessionID == nil {
+				return storagedb.Identity("")
+			}
+			return storagedb.Identity(*t.OIDCSessionID)
+		},
+		Coerce: coerceTokenIdentity,
 	},
 	domain.TokenFieldSAMLSessionID: {
-		SQLName:  "saml_session_id",
-		Accessor: tokenOptionalIdentityAccessor(func(t *domain.Token) *string { return t.SAMLSessionID }),
-		Coerce:   coerceTokenIdentity,
+		SQLName: "saml_session_id",
+		Accessor: func(t *domain.Token) any {
+			if t.SAMLSessionID == nil {
+				return storagedb.Identity("")
+			}
+			return storagedb.Identity(*t.SAMLSessionID)
+		},
+		Coerce: coerceTokenIdentity,
 	},
 	domain.TokenFieldScope: {
 		SQLName:  "scope",
