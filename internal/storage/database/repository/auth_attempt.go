@@ -2,8 +2,6 @@ package repository
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -446,24 +444,6 @@ func (a *spannerAuthAttempt) scan(rows database.Rows, attempt *domain.AuthAttemp
 	return nil
 }
 
-// spannerRandomID returns a random positive INT64 for columns whose identity
-// would otherwise be database-generated. Supplying the id keeps the INSERT
-// deterministic: go-sql-spanner retries aborted transactions by replaying
-// their statements and comparing results, and a THEN RETURN of a fresh
-// IDENTITY draw diverges on replay, failing the whole transaction with
-// ErrAbortedDueToConcurrentModification.
-func spannerRandomID() (int64, error) {
-	var b [8]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return 0, fmt.Errorf("failed to generate id: %w", err)
-	}
-	id := int64(binary.BigEndian.Uint64(b[:]) &^ (1 << 63))
-	if id == 0 {
-		id = 1
-	}
-	return id, nil
-}
-
 func (a *spannerAuthAttempt) Create(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt) error {
 	now := time.Now().UTC()
 
@@ -476,7 +456,9 @@ func (a *spannerAuthAttempt) Create(ctx context.Context, client database.QueryEx
 		ttlNanos = new(attempt.TimeToLive.Nanoseconds())
 	}
 
-	attemptID, err := spannerRandomID()
+	// Dialect-generated id: a database identity read back via THEN RETURN
+	// diverges on transaction replay (see spanner.NewEphemeralID).
+	attemptID, err := spanner.NewEphemeralID()
 	if err != nil {
 		return err
 	}
@@ -521,7 +503,7 @@ func (a *spannerAuthAttempt) Create(ctx context.Context, client database.QueryEx
 			}
 		}
 
-		checkID, err := spannerRandomID()
+		checkID, err := spanner.NewEphemeralID()
 		if err != nil {
 			return err
 		}
@@ -573,7 +555,7 @@ func (a *spannerAuthAttempt) SetChallenge(ctx context.Context, client database.Q
 
 	// The generated id only lands on the insert arm; on conflict the row keeps
 	// its id and THEN RETURN reports it. Both arms replay deterministically.
-	newID, err := spannerRandomID()
+	newID, err := spanner.NewEphemeralID()
 	if err != nil {
 		return err
 	}

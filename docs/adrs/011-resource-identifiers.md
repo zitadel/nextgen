@@ -106,6 +106,24 @@ Migrations under `internal/storage/database/dialect/spanner/` use GoogleSQL type
 - `BIT_REVERSED_POSITIVE` on `IDENTITY` spreads writes across the key space.
 - UUID defaults (`gen_random_uuid()`) are Spanner’s usual recommendation for new string-key apps but are **rejected here** so ephemeral ids stay **integer-aligned with PostgreSQL** and share one Go scanning path.
 
+**Amendment (2026-07-22) — Spanner writes supply the id client-side.** The
+`IDENTITY` DDL stays, but Spanner repositories generate the value themselves
+via the dialect-owned
+[`spanner.NewEphemeralID`](../../internal/storage/database/dialect/spanner/ephemeral_id.go)
+(uniform random positive `INT64`) and insert it explicitly instead of reading a
+database draw back through `THEN RETURN`:
+[go-sql-spanner](https://github.com/googleapis/go-sql-spanner) retries aborted
+read-write transactions by replaying their statements and comparing results,
+and a replayed identity draw yields a different value, failing the whole
+transaction with `ErrAbortedDueToConcurrentModification`. Uniform randomness
+preserves the bit-reversed spread; uniqueness becomes probabilistic
+(~2⁻⁶³ per insert). **Collision plan:** a collision surfaces as a key-conflict
+error and fails the operation — retrying inside the same transaction would be
+non-deterministic on replay again, so retries stay at the flow level, where
+authentication operations are already retryable. Ownership of the strategy is
+per [ADR 028](028-storage-v2-statements-and-dialects.md) (dialect layer, not `idgen`).
+PostgreSQL is unaffected and keeps reading `RETURNING id`.
+
 Managed resources (unchanged):
 
 ```sql
