@@ -1,4 +1,12 @@
-name: sync-design-tokens
+name: Sync design tokens
+# workflow_dispatch otherwise titles the run as the file path
+# (.github/workflows/sync-design-tokens.yml). Push keeps the plugin commit subject.
+run-name: >-
+  ${{
+    github.event_name == 'workflow_dispatch'
+    && format('Sync design tokens ({0})', inputs.source)
+    || github.event.head_commit.message
+  }}
 
 # Regenerates @zitadel/design-tokens from Figma and opens (or updates) a review PR.
 #
