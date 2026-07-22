@@ -208,14 +208,14 @@ func (h *Handler) openState(ctx context.Context, raw string) (*domain.FlowState,
 
 	header, err := domain.DecodeJWEHeader(raw)
 	if err != nil {
-		return nil, errFlowCookieInvalid
+		return nil, domain.ErrFlowCookieInvalid()
 	}
 
 	decrypter, err := h.keyService.GetCrypter(ctx, header.KeyID, header.EncryptionAlgorithm)
 	if err != nil {
 		var domainError domain.Error
 		if errors.As(err, &domainError) && domainError.Code != domain.ErrInternal(nil).Code {
-			return nil, errFlowCookieInvalid
+			return nil, domain.ErrFlowCookieInvalid()
 		}
 		return nil, err
 	}
