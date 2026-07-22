@@ -25,7 +25,7 @@ func (h *Harness) EnsureDBPool(t *testing.T) database.Pool {
 	return h.DBPool
 }
 
-func (h *Harness) ServiceDB(t *testing.T) *service.DB {
+func (h *Harness) EnsureServiceDB(t *testing.T) *service.DB {
 	t.Helper()
 
 	if h.DB == nil {
