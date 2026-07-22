@@ -57,7 +57,6 @@ func TestListUsers(t *testing.T) {
 	assert.Empty(t, listIDs(t, api.ListUsersParams{}))
 
 	// Seed two users in creation order.
-	db := harness.EnsureDBPool(t)
 	users := harness.EnsureUserFixture(t)
 	for i, id := range []string{"list-user-01", "list-user-02"} {
 		emailAttr, err := domain.NewCreateAttribute(

@@ -11,7 +11,6 @@ import (
 	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // TestCombinedFlowLoginFlipToRegister exercises example 05 (combined password
@@ -111,7 +110,6 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	require.NotEmpty(t, handoffToken)
 
 	// User row landed in the DB with the flipped-into email.
-	db := harness.EnsureDBPool(t)
 	users := harness.EnsureUserFixture(t)
 	_, err = users.GetByAttributes(t.Context(), project.ID, []domain.Attribute{{Key: "email", Value: newEmail}})
 	require.NoError(t, err, "flip-into-register must persist exactly one user")
