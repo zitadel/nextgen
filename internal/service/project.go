@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 
+	"github.com/go-jose/go-jose/v4"
 	"github.com/ianlancetaylor/jsonschema"
 
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
@@ -29,22 +30,20 @@ type ProjectService interface {
 
 // NewProjectService returns a [ProjectService] backed by the given repository.
 func NewProjectService(
-	pool database.Pool,
 	v2Pool *DB,
 	schemaRepo domain.JSONSchemaRepository,
 	flowDefinitionRepo domain.FlowDefinitionRepository,
-	tokenGenerator domain.TokenGenerator,
 	serverURL string,
 	schemaValidator *domain.SchemaValidator,
+	keyService KeyService,
 ) ProjectService {
 	return &projectService{
-		pool:               pool,
 		v2Pool:             v2Pool,
 		schemaRepo:         schemaRepo,
 		flowDefinitionRepo: flowDefinitionRepo,
-		tokenGenerator:     tokenGenerator,
 		serverURL:          serverURL,
 		schemaValidator:    schemaValidator,
+		keyService:         keyService,
 	}
 }
 
@@ -53,18 +52,29 @@ type projectService struct {
 	v2Pool             *DB
 	schemaRepo         domain.JSONSchemaRepository
 	flowDefinitionRepo domain.FlowDefinitionRepository
-	tokenGenerator     domain.TokenGenerator
 	serverURL          string
 	schemaValidator    *domain.SchemaValidator
+	keyService         KeyService
 }
 
 var _ ProjectService = (*projectService)(nil)
 
 func (s *projectService) Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (_ *domain.Project, err error) {
-	project, err := domain.NewProject(name, previewOrigins, s.tokenGenerator)
+	project, err := domain.NewProject(name, previewOrigins)
 	if err != nil {
 		return nil, err
 	}
+
+	kek, err := s.keyService.GetKekCrypter(ctx)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to get kek")
+	}
+
+	dek, err := domain.NewDEK(project.ID, jose.A256GCM, kek)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to create project encryption key")
+	}
+	dek.Activate(nil)
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().CreateProject(ctx, project); err != nil {
@@ -72,6 +82,10 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 				return mapped
 			}
 			return domain.ErrInternal(err).WithMessage("failed to create project in the database")
+		}
+
+		if err := tx.Statements().CreateEncryptionKey(ctx, dek); err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to create project encryption key in the database")
 		}
 
 		if !seedDefaults {

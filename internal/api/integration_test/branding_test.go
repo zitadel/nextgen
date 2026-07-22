@@ -25,7 +25,7 @@ func TestBranding(t *testing.T) {
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	params := api.CreateBrandingParams{ProjectID: api.ProjectID(project.ID)}
 
@@ -85,7 +85,7 @@ func TestBranding(t *testing.T) {
 		require.NoError(t, err)
 		foreign, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
-		foreign.SetToken(other.ProjectSecret)
+		harness.SetProjectSecretOnApiClient(t, foreign, other)
 
 		createResp, err := foreign.CreateBranding(t.Context(), &api.Branding{
 			LiquidTemplate: api.NewOptString(templateRev1),
@@ -120,7 +120,7 @@ func TestBranding(t *testing.T) {
 		// on its own project.
 		preview, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
-		preview.SetToken(project.PreviewSecret)
+		harness.SetPreviewSecretOnApiClient(t, preview, project)
 
 		createResp, err := preview.CreateBranding(t.Context(), &api.Branding{
 			LiquidTemplate: api.NewOptString(templateRev1),
@@ -209,7 +209,7 @@ func TestBranding(t *testing.T) {
 
 		bareClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
-		bareClient.SetToken(bare.ProjectSecret)
+		harness.SetProjectSecretOnApiClient(t, bareClient, bare)
 
 		schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 		defResp, err := bareClient.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
