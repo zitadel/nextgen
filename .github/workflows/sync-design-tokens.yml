@@ -46,6 +46,14 @@ concurrency:
 jobs:
   sync:
     runs-on: depot-ubuntu-24.04-4
+    # Quiet git init / advice noise from actions/checkout (otherwise logs a
+    # long "hint: Using 'master' as the name for the initial branch" block).
+    env:
+      GIT_CONFIG_COUNT: 2
+      GIT_CONFIG_KEY_0: init.defaultBranch
+      GIT_CONFIG_VALUE_0: main
+      GIT_CONFIG_KEY_1: advice.defaultBranchName
+      GIT_CONFIG_VALUE_1: "false"
     steps:
       - uses: actions/checkout@v6
         with:
@@ -56,7 +64,9 @@ jobs:
               && 'design-tokens/figma-sync'
               || github.ref
             }}
-          fetch-depth: 0
+          # Do not use fetch-depth: 0 — that fetches every remote branch and
+          # floods the log. Refresh step pulls only main + the sync branch.
+          fetch-depth: 1
 
       # Keep the long-lived sync branch from going stale: plugin pushes land on
       # design-tokens/figma-sync, so merge main before generating so workflow
@@ -72,13 +82,19 @@ jobs:
           GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
         run: |
           set -euo pipefail
-          git fetch origin main
+          # Only the two refs we need — not refs/heads/* (avoids listing every branch).
+          git fetch --no-tags --prune origin \
+            +refs/heads/main:refs/remotes/origin/main \
+            +refs/heads/design-tokens/figma-sync:refs/remotes/origin/design-tokens/figma-sync
+          # Replace the shallow tip from actions/checkout with the full sync ref
+          # so merge-base / merge can see ancestors.
+          git reset --hard origin/design-tokens/figma-sync
           if git merge-base --is-ancestor origin/main HEAD; then
             echo "design-tokens/figma-sync already contains origin/main"
             exit 0
           fi
-          git merge --no-edit origin/main
-          git push origin HEAD:design-tokens/figma-sync
+          git merge --no-edit --no-ff origin/main
+          git push -q origin HEAD:design-tokens/figma-sync
 
       - uses: moonrepo/setup-toolchain@v0
 
@@ -94,7 +110,12 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: corepack pnpm install --frozen-lockfile
+        # Filter to design-tokens (+ deps). --loglevel error hides monorepo
+        # "Unsupported platform" / optional-bin WARNs from unrelated packages.
+        run: >-
+          corepack pnpm install --frozen-lockfile
+          --filter @zitadel/design-tokens...
+          --loglevel error
 
       - name: Pin requested Figma library version
         if: >-

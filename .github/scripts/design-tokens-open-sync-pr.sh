@@ -69,17 +69,17 @@ fi
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 if [[ "$CURRENT_BRANCH" == "$SYNC_BRANCH" ]]; then
   # Plugin / export path: append on top of existing figma-export commits.
-  run git push origin "HEAD:$SYNC_BRANCH"
+  run git push -q origin "HEAD:$SYNC_BRANCH"
 elif [[ "$committed" == "1" ]]; then
   # REST path checks out main; replace the sync branch tip with this result.
   # Fetch first so --force-with-lease can compare against the current remote tip
   # (without a tracking ref it is an unprotected force).
   if [[ "$DRY_RUN" == "1" ]]; then
-    run git fetch origin "refs/heads/$SYNC_BRANCH:refs/remotes/origin/$SYNC_BRANCH"
+    run git fetch -q origin "refs/heads/$SYNC_BRANCH:refs/remotes/origin/$SYNC_BRANCH"
   else
-    git fetch origin "refs/heads/$SYNC_BRANCH:refs/remotes/origin/$SYNC_BRANCH" || true
+    git fetch -q origin "refs/heads/$SYNC_BRANCH:refs/remotes/origin/$SYNC_BRANCH" || true
   fi
-  run git push --force-with-lease origin "HEAD:$SYNC_BRANCH"
+  run git push -q --force-with-lease origin "HEAD:$SYNC_BRANCH"
 else
   echo "REST sync produced no changes; leaving $SYNC_BRANCH untouched."
   exit 0
@@ -94,7 +94,9 @@ if [[ "$DRY_RUN" == "1" ]]; then
   exit 0
 fi
 
-git fetch origin main "$SYNC_BRANCH"
+git fetch -q --no-tags origin \
+  +refs/heads/main:refs/remotes/origin/main \
+  "+refs/heads/$SYNC_BRANCH:refs/remotes/origin/$SYNC_BRANCH"
 if git diff --quiet "origin/main...origin/$SYNC_BRANCH"; then
   echo "No diff vs main; skipping PR."
   exit 0
