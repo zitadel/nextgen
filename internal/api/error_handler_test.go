@@ -10,14 +10,17 @@ import (
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/service/mocks"
+	"go.uber.org/mock/gomock"
 )
 
 // newErrorHandlerTestServer builds the generated server around a zero-value
 // Handler. Every request in these tests fails before reaching a handler
 // method (security check or parameter decode), so no services are needed.
-func newErrorHandlerTestServer(t *testing.T, verifier domain.TokenVerifier) *api.Server {
+func newErrorHandlerTestServer(t *testing.T, tokenService service.TokenService) *api.Server {
 	t.Helper()
-	srv, err := api.NewServer(&Handler{}, NewSecurityHandler(verifier), api.WithErrorHandler(OgenErrorHandler))
+	srv, err := api.NewServer(&Handler{}, NewSecurityHandler(tokenService), api.WithErrorHandler(OgenErrorHandler))
 	require.NoError(t, err)
 	return srv
 }
@@ -55,7 +58,11 @@ func TestOgenErrorHandlerMissingSessionCookie(t *testing.T) {
 
 func TestOgenErrorHandlerInvalidSessionCookie(t *testing.T) {
 	t.Parallel()
-	srv := newErrorHandlerTestServer(t, stubTokenVerifier{err: errors.New("bad token")})
+	mock := gomock.NewController(t)
+	tokenService := mocks.NewMockTokenService(mock)
+	tokenService.EXPECT().VerifyToken(gomock.Any(), gomock.Any()).Return(nil, errors.New("bad token"))
+
+	srv := newErrorHandlerTestServer(t, tokenService)
 
 	req := httptest.NewRequest(http.MethodGet, "/sessions/me", nil)
 	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "garbage"})
@@ -81,7 +88,10 @@ func TestOgenErrorHandlerNonCredentialCookieDecodeStays400(t *testing.T) {
 	srv.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusBadRequest, rec.Code)
-	require.Contains(t, rec.Body.String(), `"code":"req.invalid"`)
+	require.JSONEq(t,
+		`{"code":"req.invalid","message":"The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information."}`,
+		rec.Body.String(),
+	)
 }
 
 func TestOgenErrorHandlerSecurityErrorNormalizedMessage(t *testing.T) {

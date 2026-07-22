@@ -7,17 +7,18 @@ import (
 	"github.com/ogen-go/ogen/ogenerrors"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 type SecurityHandler struct {
-	tokenVerifier domain.TokenVerifier
+	tokenService service.TokenService
 }
 
 func NewSecurityHandler(
-	tokenVerifier domain.TokenVerifier,
+	tokenService service.TokenService,
 ) *SecurityHandler {
 	return &SecurityHandler{
-		tokenVerifier: tokenVerifier,
+		tokenService: tokenService,
 	}
 }
 
@@ -31,13 +32,14 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
 
-	payload, err := s.tokenVerifier.Verify(t.Token)
+	payload, err := s.tokenService.VerifyToken(ctx, t.Token)
 	if err != nil {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
 
 	scope := ScopeContext{
 		ProjectID: payload.ProjectID,
+		Scope:     payload.Scope,
 	}
 
 	ctx = WithScopeContext(ctx, scope)
@@ -50,7 +52,11 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 // It verifies that the cookie value decrypts to a session token and stashes
 // the parsed token in the context for the handlers.
 func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName api.OperationName, t api.NextgenSession) (context.Context, error) {
-	token, err := domain.DecryptSessionTokenString(t.APIKey, s.tokenVerifier)
+	token, err := s.tokenService.VerifyToken(ctx, t.APIKey)
+	if err != nil {
+		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+	}
+	err = domain.ValidateSessionToken(token)
 	if err != nil {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
@@ -122,6 +128,11 @@ func requestOriginFromContext(ctx context.Context) (string, bool) {
 
 type ScopeContext struct {
 	ProjectID string
+	// Scope carries the token's minted scopes verbatim (domain.Token.Scope):
+	// project secrets hold project.write + project.read, preview secrets hold
+	// project.read only. Handlers that gate management operations check this
+	// list; blanket per-operation scope enforcement is ADR 036 territory.
+	Scope []string
 }
 
 func WithScopeContext(ctx context.Context, scopeCtx ScopeContext) context.Context {

@@ -13,6 +13,9 @@ import (
 )
 
 func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDefinitionRequest) (api.CreateFlowDefinitionRes, error) {
+	if err := requireProjectAccess(ctx, string(req.GetProjectID()), flowDefinitionAccess, opWrite); err != nil {
+		return nil, err
+	}
 	svcReq, err := mapCreateRequestToService(req)
 	if err != nil {
 		return nil, err
@@ -27,6 +30,9 @@ func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDe
 }
 
 func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefinitionParams) (api.GetFlowDefinitionRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opRead); err != nil {
+		return nil, err
+	}
 	definition, err := h.flowDefinitionService.Get(ctx, string(params.ProjectID), params.ID)
 	if err != nil {
 		return nil, err
@@ -35,6 +41,9 @@ func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefini
 }
 
 func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDefinitionsParams) (api.ListFlowDefinitionsRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opRead); err != nil {
+		return nil, err
+	}
 	svcReq := mapListRequestToService(params)
 
 	definitions, err := h.flowDefinitionService.List(ctx, svcReq)
@@ -49,6 +58,9 @@ func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDef
 }
 
 func (h Handler) UpdateFlowDefinition(ctx context.Context, req *api.FlowDefinitionUpdateRequest, params api.UpdateFlowDefinitionParams) (api.UpdateFlowDefinitionRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opWrite); err != nil {
+		return nil, err
+	}
 	svcReq, err := mapUpdateRequestToService(params, req)
 	if err != nil {
 		return nil, err
@@ -64,6 +76,9 @@ func (h Handler) UpdateFlowDefinition(ctx context.Context, req *api.FlowDefiniti
 }
 
 func (h Handler) DeleteFlowDefinition(ctx context.Context, params api.DeleteFlowDefinitionParams) (api.DeleteFlowDefinitionRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opDelete); err != nil {
+		return nil, err
+	}
 	err := h.flowDefinitionService.Delete(ctx, string(params.ProjectID), params.ID)
 	if err != nil {
 		return nil, err

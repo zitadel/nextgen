@@ -48,8 +48,6 @@ func TestProjectStatements_CRUD(t *testing.T) {
 	// uniqueness from resting on clock resolution alone.
 	project := &domain.Project{
 		ID:             "proj_v2_crud_" + strings.ReplaceAll(t.Name(), "/", "_") + "_" + strconv.FormatInt(time.Now().UnixNano(), 10),
-		ProjectSecret:  "project-secret",
-		PreviewSecret:  "preview-secret",
 		PreviewOrigins: []string{"*.example.com", "localhost:3000"},
 	}
 	require.NoError(t, stmts.CreateProject(ctx, project))
@@ -60,8 +58,6 @@ func TestProjectStatements_CRUD(t *testing.T) {
 	got, err := stmts.GetProjectByID(ctx, project.ID)
 	require.NoError(t, err)
 	assert.Equal(t, project.ID, got.ID)
-	assert.Equal(t, project.ProjectSecret, got.ProjectSecret)
-	assert.Equal(t, project.PreviewSecret, got.PreviewSecret)
 	assert.Equal(t, project.PreviewOrigins, got.PreviewOrigins)
 	assert.Equal(t, project.CreatedAt.UTC(), got.CreatedAt.UTC())
 	assert.Equal(t, project.UpdatedAt.UTC(), got.UpdatedAt.UTC())

@@ -31,7 +31,7 @@ func TestCreateUser(t *testing.T) {
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	params := api.CreateUserParams{
 		ProjectID: api.ProjectID(project.ID),
@@ -199,28 +199,34 @@ func TestSetUserPassword(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
-	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
-		ProjectID: project.ID,
-		User:      harness.TestData.Generator.GenerateUser(t, "testsetuserpassword@example.com"),
-	})
-	require.NoError(t, err)
-	userID := user["id"].(string)
-	userEmail := user["email"].(string)
-
-	params := api.SetUserPasswordParams{
-		ProjectID: api.ProjectID(project.ID),
-		UserID:    api.UserID(userID),
-	}
-
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	// Each subtest gets its own user: the subtests run in parallel and the
+	// password upsert is last-writer-wins on (project_id, user_id), so with a
+	// shared user a sibling's SetUserPassword can land between this subtest's
+	// write and its proof check and reject the proof.
+	createUser := func(t *testing.T, email string) (api.SetUserPasswordParams, string) {
+		t.Helper()
+		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+			ProjectID: project.ID,
+			User:      harness.TestData.Generator.GenerateUser(t, email),
+		})
+		require.NoError(t, err)
+		return api.SetUserPasswordParams{
+			ProjectID: api.ProjectID(project.ID),
+			UserID:    api.UserID(user["id"].(string)),
+		}, user["email"].(string)
+	}
 
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()
 
 		t.Run("create initial password", func(t *testing.T) {
 			t.Parallel()
+
+			params, userEmail := createUser(t, "testsetuserpassword.initial@example.com")
 
 			const password = "fake-password"
 			request := &api.SetUserPasswordRequest{
@@ -241,6 +247,8 @@ func TestSetUserPassword(t *testing.T) {
 
 		t.Run("update password", func(t *testing.T) {
 			t.Parallel()
+
+			params, userEmail := createUser(t, "testsetuserpassword.update@example.com")
 
 			const originalPassword = "fake-password"
 			request := &api.SetUserPasswordRequest{
@@ -283,8 +291,15 @@ func TestSetUserPassword(t *testing.T) {
 		t.Run("user not found", func(t *testing.T) {
 			t.Parallel()
 
+			// A fresh project guarantees the user id cannot exist; the call
+			// must carry that project's own secret now that the management
+			// API binds every operation to the token's project.
 			project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 			require.NoError(t, err)
+
+			projClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+			require.NoError(t, err)
+			harness.SetProjectSecretOnApiClient(t, projClient, project)
 
 			request := &api.SetUserPasswordRequest{
 				Password: "fake-password",
@@ -294,7 +309,7 @@ func TestSetUserPassword(t *testing.T) {
 				UserID:    api.UserID("user_does-not-exist"),
 			}
 
-			resp, err := client.SetUserPassword(t.Context(), request, params)
+			resp, err := projClient.SetUserPassword(t.Context(), request, params)
 			assert.NoError(t, err)
 
 			assert.IsType(t, &api.SetUserPasswordNotFound{}, resp, helpers.MustMarshal(t, resp))
@@ -316,7 +331,7 @@ func TestGetUser(t *testing.T) {
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	params := api.GetUserByIDParams{
 		ProjectID: api.ProjectID(project.ID),
@@ -371,7 +386,10 @@ func TestGetMyUser(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		sessionToken, err := session.Token(harness.EnsureOpaqueTokenGenerator(t))
+		keyService := harness.EnsureKeyService(t)
+		projectDEK, err := keyService.GetProjectDEKCrypter(t.Context(), project.ID)
+		require.NoError(t, err)
+		sessionToken, err := session.Token(projectDEK)
 		require.NoError(t, err)
 
 		// GET USER USING TOKEN
