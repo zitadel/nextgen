@@ -312,5 +312,9 @@ function renderTemplate(value: unknown, replacements: Record<string, string>): u
 }
 
 function trimTrailingSlash(value: string): string {
-  return value.replace(/\/+$/u, "");
+  let trimmed = value;
+  while (trimmed.endsWith("/")) {
+    trimmed = trimmed.slice(0, -1);
+  }
+  return trimmed;
 }
