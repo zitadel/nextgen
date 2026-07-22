@@ -87,6 +87,14 @@ export async function bootLocalServer(options: BootServerOptions = {}): Promise<
       );
     }
   } catch (error) {
+    const startError = new Error(
+      `zitadel start produced unusable output.\n` +
+        `reason: ${error instanceof Error ? error.message : String(error)}\n` +
+        `stdout: ${tail(result.stdout) || "(empty)"}\n` +
+        `stderr: ${tail(result.stderr) || "(empty)"}\n` +
+        `state dir kept for inspection: ${dir}`,
+      { cause: error },
+    );
     // start exited 0, so a server may well be running despite the unusable
     // output — stop it instead of orphaning it and its embedded Postgres.
     try {
@@ -96,11 +104,13 @@ export async function bootLocalServer(options: BootServerOptions = {}): Promise<
       // below cannot model.
       // oxlint-disable-next-line preserve-caught-error
       throw new AggregateError(
-        [error, stopError],
-        `zitadel start produced unusable output and stopping the instance also failed; state dir kept: ${dir}`,
+        [startError, stopError],
+        `${startError.message}\nStopping the possibly-running instance also failed: ${
+          stopError instanceof Error ? stopError.message : String(stopError)
+        }`,
       );
     }
-    throw error;
+    throw startError;
   }
 
   const { runtime, urls } = envelope.data;

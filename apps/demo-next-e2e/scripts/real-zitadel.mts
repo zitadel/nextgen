@@ -27,6 +27,8 @@ await access(serverBinary).catch(() => {
   process.exit(1);
 });
 
+// Signal handlers close over this binding before the asynchronous boot assigns it.
+// oxlint-disable-next-line prefer-const
 let zitadel: LocalZitadel | undefined;
 let signalled = false;
 let finishing: Promise<void> | undefined;

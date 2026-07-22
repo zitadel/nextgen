@@ -28,9 +28,7 @@ describe.skipIf(!serverBinary)("startLocalZitadel (real instance)", () => {
       expect(alice.id).not.toBe(bob.id);
       expect(alice.email).not.toBe(bob.email);
 
-      const users = (await zitadel.api.listUsers({
-        project_id: zitadel.handle.projectId,
-      } as never)) as Array<{ id?: string }>;
+      const users = await zitadel.api.listUsers();
       const ids = users.map((user) => user.id);
       expect(ids).toContain(alice.id);
       expect(ids).toContain(bob.id);

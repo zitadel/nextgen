@@ -16,7 +16,16 @@ export async function writeHandshake(path: string, handle: InstanceHandle): Prom
 }
 
 export function readHandshakeSync(path: string): InstanceHandle {
-  return validateHandle(JSON.parse(readFileSync(path, "utf8")), path);
+  const contents = readFileSync(path, "utf8");
+  let value: unknown;
+  try {
+    value = JSON.parse(contents);
+  } catch (error) {
+    throw new Error(`handshake file ${path} contains invalid JSON: ${(error as Error).message}`, {
+      cause: error,
+    });
+  }
+  return validateHandle(value, path);
 }
 
 export async function waitForHandshake(path: string, timeoutMs = 60_000): Promise<InstanceHandle> {
