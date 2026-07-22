@@ -15,7 +15,7 @@ func (h *Harness) EnsureUserService(t *testing.T) *service.UserService {
 	if h.UserService == nil {
 		h.UserService = service.NewUserService(
 			h.EnsureDBPool(t),
-			h.ServiceDB(t),
+			h.EnsureServiceDB(t),
 			h.EnsureSchemaRepo(t),
 			h.EnsureHasher(t),
 		)
@@ -30,7 +30,7 @@ type UserFixture struct {
 
 func (h *Harness) EnsureUserFixture(t *testing.T) UserFixture {
 	t.Helper()
-	return UserFixture{Pool: h.ServiceDB(t)}
+	return UserFixture{Pool: h.EnsureServiceDB(t)}
 }
 
 func (f UserFixture) Create(ctx context.Context, user *domain.CreateUser) error {
