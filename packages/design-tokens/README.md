@@ -55,7 +55,9 @@ A Figma Community sync plugin pushes DTCG JSON to GitHub. Plugin settings:
 
 CI ([`.github/workflows/sync-design-tokens.yml`](../../.github/workflows/sync-design-tokens.yml))
 runs on push to that branch under `figma-export/**` → `:sync-export` →
-`:generate` → opens or **updates one PR** → `:test` as a **hard gate**. The
+`:generate` → commits generated artifacts **on top of** the plugin's
+`figma-export` commits (no rebase/force-push) → opens or **updates one PR**
+titled `chore: sync tokens from Figma` → `:test` as a **hard gate**. The
 snapshot test runs after the PR is opened (so a legitimate rename still surfaces
 its diff for review) but is no longer `continue-on-error`, so a name change turns
 the PR check red instead of merging silently.
