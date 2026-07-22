@@ -5,10 +5,10 @@ package spanner
 import (
 	"context"
 	"database/sql"
-	"strconv"
+	"strings"
 	"testing"
-	"time"
 
+	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -45,7 +45,7 @@ func TestProjectStatements_CRUD(t *testing.T) {
 	// Unique per run: the database may be shared with other test packages and
 	// persist across runs, so a fixed ID would collide.
 	project := &domain.Project{
-		ID:             "proj_v2_crud_" + strconv.FormatInt(time.Now().UnixNano(), 10),
+		ID:             "proj_v2_crud_" + strings.ReplaceAll(t.Name(), "/", "_") + "_" + ulid.Make().String(),
 		ProjectSecret:  "project-secret",
 		PreviewSecret:  "preview-secret",
 		PreviewOrigins: []string{"*.example.com", "localhost:3000"},
