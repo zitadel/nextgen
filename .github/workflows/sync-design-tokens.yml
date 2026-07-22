@@ -52,7 +52,11 @@ permissions:
 
 concurrency:
   group: design-tokens-sync
-  cancel-in-progress: false
+  # The Figma plugin pushes one commit per token file (a burst of pushes per
+  # sync). Coalesce them: cancel a superseded run so only the latest push
+  # regenerates + opens the PR + dispatches full-pr, instead of N serial runs.
+  # Safe because each run re-checks-out and regenerates from scratch.
+  cancel-in-progress: true
 
 jobs:
   sync:
