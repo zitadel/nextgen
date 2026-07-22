@@ -16,6 +16,10 @@ func ErrProjectNotFound() Error {
 	return newError(PrefixProject.ErrorCodePrefix("not_found"), "project not found", nil, nil)
 }
 
+func ErrProjectPermissionDenied() Error {
+	return newError(PrefixProject.ErrorCodePrefix("permission_denied"), "the project management API requires the project secret", nil, nil)
+}
+
 // Project is a minimal representation of the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#projects)
 // It is hardly ever modified but read a lot therefore it should be stored in global tables.
 type Project struct {

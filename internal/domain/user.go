@@ -47,6 +47,10 @@ func ErrUserAlreadyExists() Error {
 	return newError(PrefixUser.ErrorCodePrefix("already_exists"), "a user already exists with the given unique attributes", nil, nil)
 }
 
+func ErrUserPermissionDenied() Error {
+	return newError(PrefixUser.ErrorCodePrefix("permission_denied"), "the user management API requires the project secret", nil, nil)
+}
+
 // User is a hydrated user projection (header + optional EAV joins).
 type User struct {
 	ProjectID string
