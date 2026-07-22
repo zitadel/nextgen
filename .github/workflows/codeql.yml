@@ -1,0 +1,67 @@
+name: CodeQL
+
+# Advanced CodeQL setup. Replaces GitHub's default code-scanning setup so we
+# can add a concurrency group: default setup runs a fresh scan on every push
+# to an open PR and cannot be coalesced, so a burst of pushes (e.g. the Figma
+# design-token plugin commits one file at a time) spawns N parallel scans.
+#
+# IMPORTANT: default code scanning setup must be DISABLED before this workflow
+# is merged (Settings → Code security → CodeQL analysis → Default → disable),
+# otherwise both configurations run and the advanced runs fail with
+# "default setup is enabled".
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "27 3 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  # Keyed by ref → unique per PR (refs/pull/N/merge) and per branch. Cancels
+  # only superseded runs of the SAME PR/branch, never another PR's. Mirrors
+  # ci.yml. cancel-in-progress is scoped to pull_request so main and scheduled
+  # scans always run to completion.
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: actions
+            build-mode: none
+          - language: go
+            build-mode: autobuild
+          - language: javascript-typescript
+            build-mode: none
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - name: Autobuild
+        if: matrix.build-mode == 'autobuild'
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
