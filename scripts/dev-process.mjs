@@ -95,10 +95,16 @@ export function formatCommand(command, args = []) {
 // but in-flight workers are awaited (their child processes cannot be
 // abandoned safely); the first error is rethrown once all lanes settle.
 export async function mapWithConcurrency(items, limit, worker) {
+  if (!Number.isInteger(limit) || limit < 1) {
+    throw new Error(`mapWithConcurrency requires a positive integer limit, got ${limit}`);
+  }
   const entries = [...items];
+  if (entries.length === 0) {
+    return [];
+  }
   const results = new Array(entries.length);
   const errors = [];
-  const width = Math.max(1, Math.min(limit, entries.length));
+  const width = Math.min(limit, entries.length);
   let next = 0;
   let failed = false;
 

@@ -83,4 +83,16 @@ describe("mapWithConcurrency", () => {
       mapWithConcurrency(["a", "b"], 16, async (item, index) => `${item}${index}`),
     ).resolves.toEqual(["a0", "b1"]);
   });
+
+  it("rejects limits that are not positive integers instead of silently no-oping", async () => {
+    const { mapWithConcurrency } = await loadModule();
+
+    // A NaN limit previously produced zero worker lanes: the call returned
+    // an all-undefined result array without running any work.
+    for (const limit of [Number.NaN, 0, -1, 2.5, Number.POSITIVE_INFINITY]) {
+      await expect(mapWithConcurrency(["a"], limit, async (item) => item)).rejects.toThrow(
+        "positive integer limit",
+      );
+    }
+  });
 });
