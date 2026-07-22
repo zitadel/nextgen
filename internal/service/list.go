@@ -90,6 +90,7 @@ func compareFilter[F ~uint8](op string, col v2database.Column[F], value any) (v2
 	case filterOpGreaterThan:
 		return v2database.GreaterThan(col, value), nil
 	case filterOpNotEquals, filterOpNotContains, filterOpLessThanOrEqual, filterOpGreaterThanOrEqual:
+		// todo (grvijayan): update when these operations are supported
 		return nil, domain.ErrNotImplemented().WithDetails(fmt.Sprintf("operation %q is not supported", op))
 	default:
 		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown operation %q", op))
@@ -109,6 +110,7 @@ func stringFilter[F ~uint8](op string, col v2database.Column[F], value string) (
 	case filterOpGreaterThan:
 		return v2database.GreaterThan(col, value), nil
 	case filterOpNotEquals, filterOpNotContains, filterOpLessThanOrEqual, filterOpGreaterThanOrEqual:
+		// todo (grvijayan): update when these operations are supported
 		return nil, domain.ErrNotImplemented().WithDetails(fmt.Sprintf("operation %q is not supported", op))
 	default:
 		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown operation %q", op))

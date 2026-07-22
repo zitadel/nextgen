@@ -18,6 +18,7 @@ import (
 )
 
 func TestProjectService_Create(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name                    string
 		projectName             string
@@ -174,6 +175,7 @@ func TestProjectService_Create(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			ctrl := gomock.NewController(t)
 			mockPool := servicemocks.NewMockPool(ctrl)
 			transaction := dbmock.NewMockTransaction(ctrl)
@@ -225,6 +227,7 @@ func TestProjectService_Create(t *testing.T) {
 }
 
 func TestProjectService_Get(t *testing.T) {
+	t.Parallel()
 	now := time.Now().UTC().Truncate(time.Second)
 
 	tests := []struct {
@@ -282,6 +285,7 @@ func TestProjectService_Get(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			ctrl := gomock.NewController(t)
 			mockPool := servicemocks.NewMockPool(ctrl)
 			schemaRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
@@ -313,6 +317,7 @@ func TestProjectService_Get(t *testing.T) {
 }
 
 func TestProjectService_Update(t *testing.T) {
+	t.Parallel()
 	createdAt := time.Now().UTC().Truncate(time.Second)
 	updatedAt := time.Now().UTC().Truncate(time.Second).Add(time.Second)
 	tests := []struct {
@@ -394,6 +399,7 @@ func TestProjectService_Update(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			ctrl := gomock.NewController(t)
 			mockPool := servicemocks.NewMockPool(ctrl)
 			schemaRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
@@ -431,6 +437,7 @@ func TestProjectService_Update(t *testing.T) {
 }
 
 func TestProjectService_Delete(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name            string
 		id              string
@@ -475,6 +482,7 @@ func TestProjectService_Delete(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			ctrl := gomock.NewController(t)
 			mockPool := servicemocks.NewMockPool(ctrl)
 			schemaRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
@@ -509,6 +517,7 @@ func TestProjectService_Delete(t *testing.T) {
 }
 
 func TestProjectService_List(t *testing.T) {
+	t.Parallel()
 	createdAt := time.Now().UTC().Truncate(time.Second)
 
 	tests := []struct {
@@ -626,6 +635,7 @@ func TestProjectService_List(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			ctrl := gomock.NewController(t)
 			mockPool := servicemocks.NewMockPool(ctrl)
 			schemaRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
@@ -670,6 +680,7 @@ func TestProjectService_List(t *testing.T) {
 }
 
 func TestProjectService_List_ValidationErrors(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		req     service.ListProjectsRequest
@@ -714,6 +725,7 @@ func TestProjectService_List_ValidationErrors(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			ctrl := gomock.NewController(t)
 			mockPool := servicemocks.NewMockPool(ctrl)
 			schemaRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
