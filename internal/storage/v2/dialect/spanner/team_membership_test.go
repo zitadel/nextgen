@@ -47,8 +47,6 @@ func TestTeamMembershipStatements_CRUD(t *testing.T) {
 
 	require.NoError(t, stmts.CreateProject(ctx, &domain.Project{
 		ID:             projectID,
-		ProjectSecret:  "project-secret",
-		PreviewSecret:  "preview-secret",
 		PreviewOrigins: []string{},
 	}))
 	t.Cleanup(func() { _ = stmts.DeleteProjectByID(ctx, projectID) })
