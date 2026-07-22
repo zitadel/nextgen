@@ -16,7 +16,7 @@ func withTransaction(ctx context.Context, db queryExecutor, fn func(ctx context.
 		_, err := c.client.ReadWriteTransaction(ctx, func(ctx context.Context, rwt *spanner.ReadWriteTransaction) error {
 			return fn(ctx, newTxnDB(rwt))
 		})
-		return wrapError(err)
+		return returnQueryError(err)
 	default:
 		return fn(ctx, db)
 	}

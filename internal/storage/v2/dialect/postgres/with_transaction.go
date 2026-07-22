@@ -22,6 +22,10 @@ func withTransaction(ctx context.Context, client queryExecutor, fn func(ctx cont
 		return err
 	}
 	defer func() {
+		if p := recover(); p != nil {
+			_ = tx.Rollback(ctx)
+			panic(p)
+		}
 		if err != nil {
 			err = errors.Join(err, tx.Rollback(ctx))
 			return
