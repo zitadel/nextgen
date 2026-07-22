@@ -588,7 +588,7 @@ func TestProjectService_List(t *testing.T) {
 			},
 			result: &v2database.ListResult[*domain.Project]{},
 			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
-				assert.Equal(t, v2database.And[domain.ProjectField](
+				assert.Equal(t, v2database.And(
 					v2database.StringEqual(v2database.Col(domain.ProjectFieldName), "acme"),
 				), opts.Filter)
 			},
@@ -600,7 +600,7 @@ func TestProjectService_List(t *testing.T) {
 			},
 			result: &v2database.ListResult[*domain.Project]{},
 			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
-				assert.Equal(t, v2database.And[domain.ProjectField](
+				assert.Equal(t, v2database.And(
 					v2database.GreaterThan(v2database.Col(domain.ProjectFieldCreatedAt), createdAt),
 				), opts.Filter)
 			},
