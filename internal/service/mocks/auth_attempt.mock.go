@@ -232,41 +232,41 @@ func (m *MockUserPasswords) EXPECT() *MockUserPasswordsMockRecorder {
 	return m.recorder
 }
 
-// GetByUserID mocks base method.
-func (m *MockUserPasswords) GetByUserID(ctx context.Context, projectID, userID string) (*domain.UserPassword, error) {
+// GetUserPasswordByUserID mocks base method.
+func (m *MockUserPasswords) GetUserPasswordByUserID(ctx context.Context, projectID, userID string) (*domain.UserPassword, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetByUserID", ctx, projectID, userID)
+	ret := m.ctrl.Call(m, "GetUserPasswordByUserID", ctx, projectID, userID)
 	ret0, _ := ret[0].(*domain.UserPassword)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetByUserID indicates an expected call of GetByUserID.
-func (mr *MockUserPasswordsMockRecorder) GetByUserID(ctx, projectID, userID any) *MockUserPasswordsGetByUserIDCall {
+// GetUserPasswordByUserID indicates an expected call of GetUserPasswordByUserID.
+func (mr *MockUserPasswordsMockRecorder) GetUserPasswordByUserID(ctx, projectID, userID any) *MockUserPasswordsGetUserPasswordByUserIDCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByUserID", reflect.TypeOf((*MockUserPasswords)(nil).GetByUserID), ctx, projectID, userID)
-	return &MockUserPasswordsGetByUserIDCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserPasswordByUserID", reflect.TypeOf((*MockUserPasswords)(nil).GetUserPasswordByUserID), ctx, projectID, userID)
+	return &MockUserPasswordsGetUserPasswordByUserIDCall{Call: call}
 }
 
-// MockUserPasswordsGetByUserIDCall wrap *gomock.Call
-type MockUserPasswordsGetByUserIDCall struct {
+// MockUserPasswordsGetUserPasswordByUserIDCall wrap *gomock.Call
+type MockUserPasswordsGetUserPasswordByUserIDCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockUserPasswordsGetByUserIDCall) Return(arg0 *domain.UserPassword, arg1 error) *MockUserPasswordsGetByUserIDCall {
+func (c *MockUserPasswordsGetUserPasswordByUserIDCall) Return(arg0 *domain.UserPassword, arg1 error) *MockUserPasswordsGetUserPasswordByUserIDCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockUserPasswordsGetByUserIDCall) Do(f func(context.Context, string, string) (*domain.UserPassword, error)) *MockUserPasswordsGetByUserIDCall {
+func (c *MockUserPasswordsGetUserPasswordByUserIDCall) Do(f func(context.Context, string, string) (*domain.UserPassword, error)) *MockUserPasswordsGetUserPasswordByUserIDCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserPasswordsGetByUserIDCall) DoAndReturn(f func(context.Context, string, string) (*domain.UserPassword, error)) *MockUserPasswordsGetByUserIDCall {
+func (c *MockUserPasswordsGetUserPasswordByUserIDCall) DoAndReturn(f func(context.Context, string, string) (*domain.UserPassword, error)) *MockUserPasswordsGetUserPasswordByUserIDCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

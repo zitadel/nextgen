@@ -179,7 +179,7 @@ type UserLookup interface {
 }
 
 type UserPasswords interface {
-	GetByUserID(ctx context.Context, projectID, userID string) (*domain.UserPassword, error)
+	GetUserPasswordByUserID(ctx context.Context, projectID, userID string) (*domain.UserPassword, error)
 }
 
 type UserPasskeys interface {
@@ -420,7 +420,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return nil, nil, err
 		}
-		password, err := s.userPasswords.GetByUserID(ctx, attempt.ProjectID, userFactor.UserID)
+		password, err := s.userPasswords.GetUserPasswordByUserID(ctx, attempt.ProjectID, userFactor.UserID)
 		if err != nil {
 			return passwordChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
 		}

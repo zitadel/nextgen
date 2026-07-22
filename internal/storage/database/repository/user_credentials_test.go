@@ -33,7 +33,6 @@ func insertProjectTeamSchemaUser(t *testing.T, tx database.Transaction, pid, tid
 	require.NoError(t, err)
 }
 
-
 func TestUserTOTPRepository_CRUD(t *testing.T) {
 	skipIfSpanner(t)
 	repo := repository.NewUserTOTPRepository()

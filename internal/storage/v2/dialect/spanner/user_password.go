@@ -167,15 +167,6 @@ func verificationIDArg(id *string) any {
 	return *id
 }
 
-func coerceUserPasswordBool(v any) (any, error) {
-	switch b := v.(type) {
-	case bool:
-		return b, nil
-	default:
-		return nil, database.ErrCoerceExpectedType("bool", v)
-	}
-}
-
 var _ service.UserPasswordStatements = (*userPasswordStatements)(nil)
 
 var userPasswordSchema = database.NewSchema(map[domain.UserPasswordField]database.FieldBinding[domain.UserPassword]{
@@ -202,7 +193,7 @@ var userPasswordSchema = database.NewSchema(map[domain.UserPasswordField]databas
 	domain.UserPasswordFieldChangeRequired: {
 		SQLName:  "change_required",
 		Accessor: func(p *domain.UserPassword) any { return p.ChangeRequired },
-		Coerce:   coerceUserPasswordBool,
+		Coerce:   database.CoerceBool,
 	},
 	domain.UserPasswordFieldChangedAt: {
 		SQLName:  "changed_at",

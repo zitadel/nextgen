@@ -23,6 +23,21 @@ func CoerceString(v any) (any, error) {
 	return CoerceStringValue(v)
 }
 
+// CoerceBoolValue coerces a JSON-decoded value into a bool.
+func CoerceBoolValue(v any) (bool, error) {
+	switch b := v.(type) {
+	case bool:
+		return b, nil
+	default:
+		return false, ErrCoerceExpectedType("bool", v)
+	}
+}
+
+// CoerceBool coerces a JSON-decoded value into a bool for SQL binding.
+func CoerceBool(v any) (any, error) {
+	return CoerceBoolValue(v)
+}
+
 // CoerceTimeValue coerces a JSON-decoded value into a time.Time.
 func CoerceTimeValue(v any) (time.Time, error) {
 	switch t := v.(type) {

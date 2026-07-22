@@ -112,7 +112,6 @@ func (testAllStatements) DeleteUserByID(context.Context, string, string) error {
 	panic("unexpected call to DeleteUserByID")
 }
 
-
 func (testAllStatements) SetUserPassword(context.Context, *domain.SetUserPassword) error {
 	panic("unexpected call to SetUserPassword")
 }

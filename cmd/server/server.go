@@ -174,7 +174,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		attemptRepo,
 		sessionRepo,
 		userLookup,
-		service.UserPasswordStatementsLookup{Pool: serviceDBPool},
+		serviceDBPool.Statements(),
 		userPasskeyRepo,
 		passwordHasher,
 	)

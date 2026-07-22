@@ -23,7 +23,7 @@ func newAuthAttemptServiceForIntegration(pool database.Pool, v2Pool service.Stat
 		repository.NewAuthAttemptRepository(pool),
 		repository.NewSessionRepository(pool),
 		service.UserStatementsLookup{Pool: v2Pool},
-		service.UserPasswordStatementsLookup{Pool: v2Pool},
+		v2Pool.Statements(),
 		repository.NewUserPasskeyRepository(),
 		nil,
 	)

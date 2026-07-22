@@ -23,7 +23,6 @@ func Import(ctx context.Context, pool database.Pool, v2Pool service.StatementPoo
 		return err
 	}
 
-
 	for _, path := range paths {
 		if err := importFile(ctx, pool, v2Pool, hashValidator, path); err != nil {
 			return fmt.Errorf("user file %q: %w", path, err)

@@ -366,13 +366,3 @@ func (r UserStatementsIdentityReader) GetIdentity(ctx context.Context, projectID
 		AttributeKeys: attributeKeys,
 	})
 }
-
-// UserPasswordStatementsLookup adapts [UserPasswordStatements] to [UserPasswords]
-// for AuthAttemptService password verification.
-type UserPasswordStatementsLookup struct {
-	Pool StatementPool
-}
-
-func (l UserPasswordStatementsLookup) GetByUserID(ctx context.Context, projectID, userID string) (*domain.UserPassword, error) {
-	return l.Pool.Statements().GetUserPasswordByUserID(ctx, projectID, userID)
-}

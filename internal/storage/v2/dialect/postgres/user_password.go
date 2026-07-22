@@ -86,7 +86,9 @@ func (ps userPasswordStatements) ListUserPasswords(ctx context.Context, filter *
 		return nil, wrapError(err)
 	}
 
-	passwords, err := pgx.CollectRows(rows, ps.scanUserPassword)
+	passwords, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (*domain.UserPassword, error) {
+		return ps.scanUserPasswordRow(row)
+	})
 	if err != nil {
 		return nil, wrapError(err)
 	}
@@ -104,10 +106,6 @@ func (ps userPasswordStatements) ListUserPasswords(ctx context.Context, filter *
 		Items:      passwords,
 		NextCursor: nextCursor,
 	}, nil
-}
-
-func (ps userPasswordStatements) scanUserPassword(row pgx.CollectableRow) (*domain.UserPassword, error) {
-	return ps.scanUserPasswordRow(row)
 }
 
 type scannable interface {
@@ -145,15 +143,6 @@ func (ps userPasswordStatements) scanUserPasswordRow(row scannable) (*domain.Use
 	return pw, nil
 }
 
-func coerceUserPasswordBool(v any) (any, error) {
-	switch b := v.(type) {
-	case bool:
-		return b, nil
-	default:
-		return nil, database.ErrCoerceExpectedType("bool", v)
-	}
-}
-
 var _ service.UserPasswordStatements = (*userPasswordStatements)(nil)
 
 var userPasswordSchema = database.NewSchema(map[domain.UserPasswordField]database.FieldBinding[domain.UserPassword]{
@@ -180,7 +169,7 @@ var userPasswordSchema = database.NewSchema(map[domain.UserPasswordField]databas
 	domain.UserPasswordFieldChangeRequired: {
 		SQLName:  "change_required",
 		Accessor: func(p *domain.UserPassword) any { return p.ChangeRequired },
-		Coerce:   coerceUserPasswordBool,
+		Coerce:   database.CoerceBool,
 	},
 	domain.UserPasswordFieldChangedAt: {
 		SQLName:  "changed_at",
