@@ -7,7 +7,11 @@ name: sync-design-tokens
 #   - workflow_dispatch — manual re-run or Enterprise REST sync
 #
 # Never auto-merges. Push trigger is scoped to figma-export/** only so commits
-# from create-pull-request (generated CSS/TS) do not re-trigger this workflow.
+# that only touch generated CSS/TS do not re-trigger this workflow.
+#
+# Do not use peter-evans/create-pull-request against design-tokens/figma-sync:
+# that action rebases onto main and force-pushes, which drops the plugin's
+# figma-export commits. Commit + push + gh pr create preserves them.
 
 on:
   push:
@@ -100,39 +104,83 @@ jobs:
       - name: Regenerate token artifacts
         run: moon run design-tokens:generate
 
-      # The PR is opened before the snapshot test so a legitimate rename still
-      # surfaces the diff for review. The snapshot step then runs as a hard gate
-      # (no continue-on-error): a name change turns this workflow's check red on
-      # the PR instead of merging silently. Zero-token syncs never reach here —
+      # Commit/push before the snapshot gate so a legitimate rename still lands
+      # a reviewable PR. The snapshot step then fails the workflow check when
+      # public token names drift. Zero-token syncs never reach here —
       # sync-export throws (fail-loud) and the job stops above.
-      - name: Open or update PR
-        uses: peter-evans/create-pull-request@v7
-        with:
-          branch: design-tokens/figma-sync
-          base: main
-          delete-branch: false
-          title: "chore(design-tokens): sync from Figma"
-          commit-message: "chore(design-tokens): sync from Figma"
-          body: |
-            Automated design-token sync from the Zitadel Design System.
+      - name: Commit generated artifacts and open PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Attribute the commit to the actor who triggered the sync (plugin
+          # pusher or workflow_dispatch user); committer stays the Actions bot.
+          GIT_AUTHOR_NAME: ${{ github.actor }}
+          GIT_AUTHOR_EMAIL: ${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          set -euo pipefail
+          SYNC_BRANCH=design-tokens/figma-sync
+          # Scope omitted: design-tokens is not in .github/semantic.yml.
+          TITLE='chore: sync tokens from Figma'
+          # ${{ }} is expanded by Actions before bash runs (even inside <<'EOF').
+          BODY=$(cat <<'EOF'
+          Automated design-token sync from the Zitadel Design System.
 
-            **Trigger:** ${{ github.event_name }}${{ github.event_name == 'push' && format(' (push by {0})', github.actor) || '' }}
+          **Trigger:** ${{ github.event_name }}${{ github.event_name == 'push' && format(' (push by {0})', github.actor) || '' }}
 
-            **Before merging:**
-            1. Review `packages/design-tokens/figma-export/` and `src/generated/`.
-            2. If the snapshot check is red, a token name changed — update consumers
-               and the snapshot intentionally, or roll the sync back.
-            3. Spot-check console light + dark in `apps/console`.
+          **Before merging:**
+          1. Review `packages/design-tokens/figma-export/` and `src/generated/`.
+          2. If the snapshot check is red, a token name changed — update consumers
+             and the snapshot intentionally, or roll the sync back.
+          3. Spot-check console light + dark in `apps/console`.
 
-            Repeat syncs before merge append commits to this PR instead of opening a new one.
-          add-paths: |
-            packages/design-tokens/figma-export/**
-            packages/design-tokens/figma-tokens.lock
-            packages/design-tokens/src/generated/figma.tokens.json
-            packages/design-tokens/src/generated/tokens.css
-            packages/design-tokens/src/generated/tokens.ts
-            packages/design-tokens/src/generated/tailwind.css
+          Repeat syncs before merge append commits to this PR instead of opening a new one.
+          EOF
+          )
+          BODY=$(printf '%s\n' "$BODY" | sed 's/^          //')
+
+          git add \
+            packages/design-tokens/figma-export \
+            packages/design-tokens/figma-tokens.lock \
+            packages/design-tokens/src/generated/figma.tokens.json \
+            packages/design-tokens/src/generated/tokens.css \
+            packages/design-tokens/src/generated/tokens.ts \
+            packages/design-tokens/src/generated/tailwind.css \
             packages/design-tokens/src/generated/shadcn.css
+
+          committed=0
+          if ! git diff --cached --quiet; then
+            git commit -m "$TITLE"
+            committed=1
+          else
+            echo "No generated artifact changes to commit."
+          fi
+
+          CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          if [[ "$CURRENT_BRANCH" == "$SYNC_BRANCH" ]]; then
+            # Plugin / export path: append on top of existing figma-export commits.
+            git push origin "HEAD:$SYNC_BRANCH"
+          elif [[ "$committed" == "1" ]]; then
+            # REST path checks out main; replace the sync branch tip with this result.
+            git push --force-with-lease origin "HEAD:$SYNC_BRANCH"
+          else
+            echo "REST sync produced no changes; leaving $SYNC_BRANCH untouched."
+            exit 0
+          fi
+
+          git fetch origin main "$SYNC_BRANCH"
+          if git diff --quiet "origin/main...origin/$SYNC_BRANCH"; then
+            echo "No diff vs main; skipping PR."
+            exit 0
+          fi
+
+          PR_NUMBER=$(gh pr list --base main --head "$SYNC_BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [[ -n "$PR_NUMBER" ]]; then
+            gh pr edit "$PR_NUMBER" --title "$TITLE" --body "$BODY"
+            echo "Updated PR #$PR_NUMBER"
+          else
+            gh pr create --base main --head "$SYNC_BRANCH" --title "$TITLE" --body "$BODY"
+          fi
 
       - name: Run snapshot test (hard gate)
         run: moon run design-tokens:test
