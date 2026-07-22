@@ -38,8 +38,8 @@ starting a local runtime. Use `--runtime docker`, `--image`, or
 framework to scaffold when the directory is fresh, writes the Next.js app into
 the current directory, scaffolds `app/login`, `app/register`, `app/profile`, and
 `proxy.ts` for Next 16+ or `middleware.ts` for older Next versions. Fresh
-scaffolds also replace the starter `app/page.tsx` with links to sign in, create
-an account, and profile. Setup writes `.env.local` and `.zitadel/`, and installs
+scaffolds also replace the starter `app/page.tsx` with a redirect to `/login`.
+Setup writes `.env.local` and `.zitadel/`, and installs
 dependencies with the detected package manager. Pass `--skip-install` to install
 them yourself. The project's default user schema and login flow are provisioned
 from versioned local defaults; setup writes editable copies into
@@ -64,12 +64,15 @@ Users who skip passkey setup can still sign in with password; users who add a
 passkey can sign in with either credential.
 
 Repo config is authoritative: edit `zitadel.json`, `.zitadel/schemas/*.json`,
-or `.zitadel/flows/*.json`, then re-run `zitadel plan` and `zitadel apply`.
-Server-provisioned defaults remain a fallback for non-CLI project creation, but
-CLI-created projects are authored from local files first.
-Templates are not supported until the server exposes template storage and APIs.
-Flow create, read, list, update, and delete are available; the server enforces
-flow lifecycle rules such as draft-only edits.
+`.zitadel/flows/*.json`, or `.zitadel/branding/` (a `branding.json` descriptor
+plus a `login.liquid` LiquidJS template), then re-run `zitadel plan` and
+`zitadel apply`. Server-provisioned defaults remain a fallback for non-CLI
+project creation, but CLI-created projects are authored from local files first.
+Login templates are supported: scaffold them with the `branding eject` command
+(`--design centered|split|split-right|minimal`) or `setup --design <name>`;
+every edit publishes a new immutable branding revision and the login serves
+the newest one. Flow create, read, list, update, and delete are available; the
+server enforces flow lifecycle rules such as draft-only edits.
 
 For agent scripts, pass `--non-interactive --json` and capture stdout and stderr
 separately. The CLI contract is one parseable JSON object on stdout; terminals
@@ -435,6 +438,8 @@ USAGE
     [--dry-run] [--verbose] [--debug] [--telemetry] [--framework
     next|nuxt|react|vue|solid|svelte|qwik|angular] [--renderer
     react|web-component] [--dev-port <value>] [--skip-install]
+    [--preset password-first|passkey-first] [--use-case
+    minimal|consumer|business]
 
 FLAGS
   -c, --cwd=<value>         Project directory to operate on.
@@ -451,12 +456,18 @@ FLAGS
       --framework=<option>  Framework to target.
                             <options:
                             next|nuxt|react|vue|solid|svelte|qwik|angular>
+      --preset=<option>     Sign-in preset for the scaffolded schema and login
+                            flow (default: password-first).
+                            <options: password-first|passkey-first>
       --renderer=<option>   Renderer (default: react).
                             <options: react|web-component>
       --skip-install        Do not install dependencies after setup updates
                             package.json.
       --[no-]telemetry      Send anonymous usage analytics. Disable with
                             --no-telemetry.
+      --use-case=<option>   Use case for the scaffolded schema fields: who
+                            signs in to the app (default: minimal).
+                            <options: minimal|consumer|business>
       --verbose             Verbose logging.
 
 GLOBAL FLAGS

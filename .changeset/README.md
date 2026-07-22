@@ -89,8 +89,8 @@ it publishes the npm packages, pushes the server container, and updates the draf
 GitHub Release for `v<version>`. Re-run with `recover_version=<version>` to
 backfill a missing artifact; `changeset publish` skips versions already on npm.
 Full steps: [release runbook](../docs/runbooks/manual-release.md). Ownership and
-rationale: [ADR 002](../docs/adrs/002-multi-package-release-strategy.md) and
-[ADR 023](../docs/adrs/023-lockstep-alpha-release-train.md).
+rationale: [ADR 002](../docs/adrs/002-multi-package-release-strategy.md)
+(supersedes [ADR 023](../docs/adrs/023-lockstep-alpha-release-train.md)).
 
 Publishing uses **npm trusted publishing (OIDC)** — there is no `NPM_TOKEN`. Once
 per public package, a maintainer adds a trusted publisher on npmjs.com (Settings →

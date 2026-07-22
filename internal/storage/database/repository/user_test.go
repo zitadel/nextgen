@@ -48,11 +48,11 @@ func TestUserRepository_CreateGetListDelete(t *testing.T) {
 
 	teamCopy := tid
 	create := &domain.CreateUser{
-		ProjectID:  pid,
-		SchemaURL:  schemaURL,
-		ID:         userID,
-		TeamID:     &teamCopy,
-		Attributes: []*domain.CreateAttribute{attr1, attr2, attrEmptyArray, attrEmptyObj},
+		ProjectID:               pid,
+		SchemaURL:               schemaURL,
+		ID:                      userID,
+		InitialMembershipTeamID: &teamCopy,
+		Attributes:              []*domain.CreateAttribute{attr1, attr2, attrEmptyArray, attrEmptyObj},
 	}
 	require.NoError(t, repo.Create(ctx, tx, create))
 
@@ -64,9 +64,14 @@ func TestUserRepository_CreateGetListDelete(t *testing.T) {
 	require.Equal(t, pid, got.ProjectID)
 	require.Equal(t, userID, got.ID)
 	require.Equal(t, schemaURL, got.SchemaURL)
-	require.NotNil(t, got.TeamID)
-	require.Equal(t, tid, *got.TeamID)
+	require.True(t, got.IsSelfOwned())
+	require.Equal(t, domain.UserStatusActive, got.Status)
 	require.Len(t, got.Attributes, 4)
+
+	membershipRepo := repository.NewTeamMembershipRepository(tx)
+	membership, err := membershipRepo.Get(ctx, tx, pid, tid, userID)
+	require.NoError(t, err)
+	require.Equal(t, domain.MembershipStatusActive, membership.Status)
 
 	countryLit, err := json.Marshal("CH")
 	require.NoError(t, err)
@@ -134,7 +139,7 @@ func TestUserRepository_CreateWithoutTeam(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.Equal(t, userID, got.ID)
-	require.Nil(t, got.TeamID)
+	require.True(t, got.IsSelfOwned())
 	require.Len(t, got.Attributes, 2)
 }
 
@@ -169,11 +174,11 @@ func TestUserRepository_AttributesCondition(t *testing.T) {
 		require.NoError(t, err)
 		teamCopy := tid
 		require.NoError(t, repo.Create(ctx, tx, &domain.CreateUser{
-			ProjectID:  pid,
-			SchemaURL:  schemaURL,
-			ID:         id,
-			TeamID:     &teamCopy,
-			Attributes: []*domain.CreateAttribute{a1, a2},
+			ProjectID:               pid,
+			SchemaURL:               schemaURL,
+			ID:                      id,
+			InitialMembershipTeamID: &teamCopy,
+			Attributes:              []*domain.CreateAttribute{a1, a2},
 		}))
 	}
 	mkUser("u1", "CH", "alice")

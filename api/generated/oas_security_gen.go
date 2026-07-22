@@ -13,6 +13,11 @@ import (
 
 // SecurityHandler is handler for security parameters.
 type SecurityHandler interface {
+	// HandleNextgenSession handles nextgenSession security.
+	// The __nextgen_session cookie issued at session creation or superseding handoff exchange.
+	// A missing or invalid cookie yields `401` with code `auth.unauthorized` and the message
+	// `Missing or invalid session token.`.
+	HandleNextgenSession(ctx context.Context, operationName OperationName, t NextgenSession) (context.Context, error)
 	// HandleOAuth2 handles oauth2 security.
 	HandleOAuth2(ctx context.Context, operationName OperationName, t OAuth2) (context.Context, error)
 	// HandleUsernamePassword handles usernamePassword security.
@@ -35,6 +40,34 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 	return "", false
 }
 
+// operationRolesNextgenSession is a private map storing roles per operation.
+var operationRolesNextgenSession = map[string][]string{
+	GetMySessionOperation:    []string{},
+	GetMyUserOperation:       []string{},
+	RevokeMySessionOperation: []string{},
+}
+
+// GetRolesForNextgenSession returns the required roles for the given operation.
+//
+// This is useful for authorization scenarios where you need to know which roles
+// are required for an operation.
+//
+// Example:
+//
+//	requiredRoles := GetRolesForNextgenSession(AddPetOperation)
+//
+// Returns nil if the operation has no role requirements or if the operation is unknown.
+func GetRolesForNextgenSession(operation string) []string {
+	roles, ok := operationRolesNextgenSession[operation]
+	if !ok {
+		return nil
+	}
+	// Return a copy to prevent external modification
+	result := make([]string, len(roles))
+	copy(result, roles)
+	return result
+}
+
 // oauth2ScopesOAuth2 is a private map storing OAuth2 scopes per operation.
 var oauth2ScopesOAuth2 = map[string][]string{
 	ActivateFlowDefinitionOperation: []string{
@@ -42,6 +75,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	CreateAuthAttemptOperation: []string{
 		"auth_attempts.write",
+	},
+	CreateBrandingOperation: []string{
+		"branding.write",
 	},
 	CreateFlowDefinitionOperation: []string{
 		"flow_definitions.write",
@@ -54,6 +90,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	CreateSessionOperation: []string{
 		"sessions.write",
+	},
+	CreateTeamOperation: []string{
+		"team.write",
 	},
 	CreateUserOperation: []string{
 		"user.write",
@@ -70,11 +109,14 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetAuthAttemptOperation: []string{
 		"auth_attempts.read",
 	},
+	GetBrandingByIdOperation: []string{
+		"branding.read",
+	},
 	GetFlowDefinitionOperation: []string{
 		"flow_definitions.read",
 	},
 	GetProjectOperation: []string{
-		"projects.read",
+		"project.write",
 	},
 	GetSchemaByIdOperation: []string{
 		"schema.read",
@@ -83,15 +125,18 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"session.read",
 	},
 	GetTeamOperation: []string{
-		"teams.read",
+		"team.read",
 	},
 	GetUserByIDOperation: []string{
-		"users.read",
+		"user.read",
 	},
 	GetUserInfoOperation: []string{},
 	IntrospectOperation:  []string{},
 	IssueChallengeOperation: []string{
 		"auth_attempts.write",
+	},
+	ListBrandingOperation: []string{
+		"branding.read",
 	},
 	ListFlowDefinitionsOperation: []string{
 		"flow_definitions.read",
@@ -104,6 +149,12 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	ListUsersOperation: []string{
 		"user.read",
+	},
+	PatchProjectOperation: []string{
+		"project.write",
+	},
+	QueryProjectsOperation: []string{
+		"project.read",
 	},
 	RevokeSessionOperation: []string{
 		"session.delete",
@@ -170,6 +221,29 @@ func GetRolesForUsernamePassword(operation string) []string {
 	return result
 }
 
+func (s *Server) securityNextgenSession(ctx context.Context, operationName OperationName, req *http.Request) (context.Context, bool, error) {
+	var t NextgenSession
+	const parameterName = "__nextgen_session"
+	var value string
+	switch cookie, err := req.Cookie(parameterName); {
+	case err == nil: // if NO error
+		value = cookie.Value
+	case errors.Is(err, http.ErrNoCookie):
+		return ctx, false, nil
+	default:
+		return nil, false, errors.Wrap(err, "get cookie value")
+	}
+	t.APIKey = value
+	t.Roles = operationRolesNextgenSession[operationName]
+	rctx, err := s.sec.HandleNextgenSession(ctx, operationName, t)
+	if errors.Is(err, ogenerrors.ErrSkipServerSecurity) {
+		return nil, false, nil
+	} else if err != nil {
+		return nil, false, err
+	}
+	return rctx, true, err
+}
+
 func (s *Server) securityOAuth2(ctx context.Context, operationName OperationName, req *http.Request) (context.Context, bool, error) {
 	var t OAuth2
 	token, ok := findAuthorization(req.Header, "Bearer")
@@ -210,6 +284,11 @@ func (s *Server) securityUsernamePassword(ctx context.Context, operationName Ope
 
 // SecuritySource is provider of security values (tokens, passwords, etc.).
 type SecuritySource interface {
+	// NextgenSession provides nextgenSession security value.
+	// The __nextgen_session cookie issued at session creation or superseding handoff exchange.
+	// A missing or invalid cookie yields `401` with code `auth.unauthorized` and the message
+	// `Missing or invalid session token.`.
+	NextgenSession(ctx context.Context, operationName OperationName) (NextgenSession, error)
 	// OAuth2 provides oauth2 security value.
 	OAuth2(ctx context.Context, operationName OperationName) (OAuth2, error)
 	// UsernamePassword provides usernamePassword security value.
@@ -217,6 +296,17 @@ type SecuritySource interface {
 	UsernamePassword(ctx context.Context, operationName OperationName) (UsernamePassword, error)
 }
 
+func (s *Client) securityNextgenSession(ctx context.Context, operationName OperationName, req *http.Request) error {
+	t, err := s.sec.NextgenSession(ctx, operationName)
+	if err != nil {
+		return errors.Wrap(err, "security source \"NextgenSession\"")
+	}
+	req.AddCookie(&http.Cookie{
+		Name:  "__nextgen_session",
+		Value: t.APIKey,
+	})
+	return nil
+}
 func (s *Client) securityOAuth2(ctx context.Context, operationName OperationName, req *http.Request) error {
 	t, err := s.sec.OAuth2(ctx, operationName)
 	if err != nil {

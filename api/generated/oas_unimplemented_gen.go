@@ -56,6 +56,22 @@ func (UnimplementedHandler) CreateAuthAttempt(ctx context.Context, req *CreateAu
 	return r, ht.ErrNotImplemented
 }
 
+// CreateBranding implements createBranding operation.
+//
+// Publishes a new immutable branding revision for the project. Branding
+// revisions cannot be updated or deleted; every edit publishes a new
+// revision, and flow responses resolve the latest revision per project
+// (see ADR 040).
+// The `liquid_template` is validated lexically on save (size, encoding,
+// banned patterns such as `<script>` tags, inline event handlers, and the
+// `| raw` filter). Authoritative LiquidJS validation runs at authoring
+// time via `zitadel plan` / `zitadel apply`.
+//
+// POST /branding
+func (UnimplementedHandler) CreateBranding(ctx context.Context, req *Branding, params CreateBrandingParams) (r CreateBrandingRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CreateFlow implements createFlow operation.
 //
 // Resolves a flow definition based on purpose + audience context and returns
@@ -231,6 +247,15 @@ func (UnimplementedHandler) GetAuthAttempt(ctx context.Context, params GetAuthAt
 	return r, ht.ErrNotImplemented
 }
 
+// GetBrandingById implements getBrandingById operation.
+//
+// Retrieves a single branding revision, including its stored configuration.
+//
+// GET /branding/{id}
+func (UnimplementedHandler) GetBrandingById(ctx context.Context, params GetBrandingByIdParams) (r GetBrandingByIdRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetFlowDefinition implements getFlowDefinition operation.
 //
 // Get a flow definition by id.
@@ -286,7 +311,7 @@ func (UnimplementedHandler) GetLive(ctx context.Context) (r GetLiveRes, _ error)
 // against the same `session_id`) to restore a dropped assurance level.
 //
 // GET /sessions/me
-func (UnimplementedHandler) GetMySession(ctx context.Context, params GetMySessionParams) (r GetMySessionRes, _ error) {
+func (UnimplementedHandler) GetMySession(ctx context.Context) (r GetMySessionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -295,7 +320,7 @@ func (UnimplementedHandler) GetMySession(ctx context.Context, params GetMySessio
 // Get my user information.
 //
 // GET /users/me
-func (UnimplementedHandler) GetMyUser(ctx context.Context, params GetMyUserParams) (r GetMyUserRes, _ error) {
+func (UnimplementedHandler) GetMyUser(ctx context.Context) (r GetMyUserRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -406,6 +431,19 @@ func (UnimplementedHandler) IssueChallenge(ctx context.Context, req *IssueChalle
 	return r, ht.ErrNotImplemented
 }
 
+// ListBranding implements listBranding operation.
+//
+// Lists branding revisions for the project, newest first, capped at the
+// 100 most recent. The first entry is the revision flow responses
+// currently resolve. Deliberately unpaginated in v1 — list endpoints
+// gain a real query mechanism together (ADR 031); advertising pagination
+// parameters the server ignores would be worse than none.
+//
+// GET /branding
+func (UnimplementedHandler) ListBranding(ctx context.Context, params ListBrandingParams) (r ListBrandingRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListFlowDefinitions implements listFlowDefinitions operation.
 //
 // Retrieves a list of all flow definitions.
@@ -445,6 +483,24 @@ func (UnimplementedHandler) ListUsers(ctx context.Context, params ListUsersParam
 	return r, ht.ErrNotImplemented
 }
 
+// PatchProject implements patchProject operation.
+//
+// Updates the state of a project.
+//
+// PATCH /projects/{project_id}
+func (UnimplementedHandler) PatchProject(ctx context.Context, req *PatchProjectRequest, params PatchProjectParams) (r PatchProjectRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// QueryProjects implements queryProjects operation.
+//
+// Query projects.
+//
+// POST /projects/query
+func (UnimplementedHandler) QueryProjects(ctx context.Context, req *QueryProjectsRequest) (r QueryProjectsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // RevokeMySession implements revokeMySession operation.
 //
 // Revokes the session immediately (`state: revoked`). This is the logout operation.
@@ -454,7 +510,7 @@ func (UnimplementedHandler) ListUsers(ctx context.Context, params ListUsersParam
 //	which is cleared in the response.
 //
 // DELETE /sessions/me
-func (UnimplementedHandler) RevokeMySession(ctx context.Context, params RevokeMySessionParams) (r RevokeMySessionRes, _ error) {
+func (UnimplementedHandler) RevokeMySession(ctx context.Context) (r RevokeMySessionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

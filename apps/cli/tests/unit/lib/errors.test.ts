@@ -12,6 +12,7 @@ describe("EXIT_CODES", () => {
       E_UNSUPPORTED_PROJECT_SHAPE: 3,
       E_NETWORK: 4,
       E_LOCAL_SERVER_NOT_RUNNING: 4,
+      E_NOT_FOUND: 4,
       E_AUTH: 1,
       E_CONFLICT: 5,
       E_PORT_IN_USE: 5,
@@ -183,7 +184,26 @@ describe("toZitadelError", () => {
       { code: "schema.notfound", message: "schema not found", details: "sch_x" },
       "GET http://mock/schemas/sch_x?project_id=proj_1 returned 404",
     );
-    expect(toZitadelError(err).message).toBe("schema not found: sch_x");
+    const result = toZitadelError(err);
+    // Enveloped 404 = a real platform API reporting a missing resource:
+    // E_NOT_FOUND, but no wrong-server suffix on the message.
+    expect(result.code).toBe("E_NOT_FOUND");
+    expect(result.message).toBe("schema not found: sch_x");
+  });
+
+  it("flags a non-enveloped 404 as a likely wrong server", () => {
+    const err = new ApiError(
+      404,
+      "https://api.zitadel.cloud/projects",
+      { message: "not found" },
+      "POST https://api.zitadel.cloud/projects returned 404",
+    );
+    const result = toZitadelError(err);
+    expect(result.code).toBe("E_NOT_FOUND");
+    expect(result.exitCode).toBe(4);
+    expect(result.message).toBe(
+      "not found — https://api.zitadel.cloud/projects has no such endpoint; is this a Zitadel platform API?",
+    );
   });
 
   it("falls back to the fetch-layer message when the body is not an envelope", () => {

@@ -2,11 +2,21 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import {
+  resetPlatformStore,
+  setupPlatformHandlers,
+} from "@zitadel/api-mock/platform";
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
 const tempDirs: string[] = [];
+const server = setupServer(...setupPlatformHandlers());
+
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+afterAll(() => server.close());
 
 function setup(cwd: string, extra: string[] = []) {
   return runCliForTest([
@@ -114,6 +124,8 @@ const FRAMEWORK_FIXTURES = [
 ] as const;
 
 afterEach(async () => {
+  server.resetHandlers();
+  resetPlatformStore();
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop();
     if (dir) {
@@ -169,7 +181,8 @@ describe("setup command", () => {
       reason: "dry-run",
       command: "npm install",
     });
-    expect(json.data.next_commands).toEqual(["npm install", "npm run dev"]);
+    expect(json.data.next_commands.slice(0, 2)).toEqual(["npm install", "npm run dev"]);
+    expect(json.data.next_commands[2]).toMatch(/^npx @zitadel\/cli@\S+ plan$/);
   });
 
   it.each(FRAMEWORK_FIXTURES)(
@@ -193,9 +206,47 @@ describe("setup command", () => {
       expect(json.data.framework).toBe(framework);
       expect(json.data.install).toMatchObject({ status: "skipped", reason: "dry-run" });
       expect(json.data.files_written).toContain(expectedFile);
-      expect(json.data.next_commands).toEqual(["npm install", "npm run dev"]);
+      expect(json.data.next_commands.slice(0, 2)).toEqual(["npm install", "npm run dev"]);
+      expect(json.data.next_commands[2]).toMatch(/^npx @zitadel\/cli@\S+ plan$/);
     },
   );
+
+  it("creates CLI-managed projects with a name and without server default seeding", async () => {
+    const cwd = await makeNextProject();
+    let createProjectBody: unknown;
+
+    server.use(
+      http.post("*/projects", async ({ request }) => {
+        createProjectBody = await request.json();
+        return HttpResponse.json(
+          {
+            id: "proj-test",
+            name: "demo",
+            projectSecret: "sk_proj_test_full",
+            previewSecret: "sk_proj_test_preview",
+            previewOrigins: ["http://localhost:3000"],
+            createdAt: "2026-04-21T14:03:11.000Z",
+          },
+          { status: 201 },
+        );
+      }),
+    );
+
+    const res = await setup(cwd, ["--non-interactive", "--skip-install", "--framework", "next"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(createProjectBody).toMatchObject({
+      name: expect.any(String),
+      previewOrigins: expect.arrayContaining(["http://localhost:3000"]),
+      seedDefaults: false,
+    });
+    const projectName = (createProjectBody as { name?: unknown }).name;
+    expect(typeof projectName).toBe("string");
+    if (typeof projectName !== "string") {
+      throw new Error("expected create-project payload name to be a string");
+    }
+    expect(projectName.trim().length).toBeGreaterThan(0);
+  });
 
   it("errors in a non-interactive empty directory without --framework", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-empty-"));
@@ -209,5 +260,34 @@ describe("setup command", () => {
     expect(json.code).toBe("E_FRAMEWORK_NOT_DETECTED");
     expect(json.hint).toContain("Run without --json/--non-interactive");
     expect(json.hint).not.toContain("next");
+  });
+
+  it("reproduces a non-default --use-case in the retry guidance when project creation fails", async () => {
+    const cwd = await makeNextProject();
+
+    // Force the project-create call to fail so the command surfaces its retry
+    // guidance — the retry must reproduce the chosen use case verbatim, since
+    // agents follow the suggested `setup ...` command literally.
+    server.use(
+      http.post("*/projects", () =>
+        HttpResponse.json({ code: "E_INTERNAL", message: "boom" }, { status: 500 }),
+      ),
+    );
+
+    const res = await setup(cwd, [
+      "--non-interactive",
+      "--skip-install",
+      "--framework",
+      "next",
+      "--use-case",
+      "business",
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { status: string };
+    expect(json.status).toBe("error");
+    // `--use-case business` only appears in the reconstructed retry flags, so
+    // its presence proves the non-default use case survived into the guidance.
+    expect(res.stdout).toContain("--use-case business");
   });
 });

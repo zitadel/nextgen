@@ -25,10 +25,7 @@ on:
         type: boolean
 
 permissions:
-  contents: write
-  packages: write
-  id-token: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: release-publish
@@ -97,6 +94,8 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || needs.changesets.outputs.publish_should_run == 'true' }}
     runs-on: depot-ubuntu-24.04-16
     timeout-minutes: 60
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v6
         with:
@@ -140,6 +139,10 @@ jobs:
     needs: build
     runs-on: depot-ubuntu-24.04-4
     timeout-minutes: 30
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@v6
         with:

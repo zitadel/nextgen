@@ -12,9 +12,21 @@ import (
 type SessionService interface {
 	Create(ctx context.Context, input CreateSessionInput) (*domain.Session, error)
 	Exchange(ctx context.Context, input ExchangeInput) (*domain.Session, error)
+	// Get retrieves a session by ID within a project. When the input sets
+	// WithUserIdentity, the linked user's identity attributes are hydrated
+	// onto Session.User (absent users degrade to a session without identity).
+	// errors: domain.ErrSessionNotFound, domain.ErrInternal
 	Get(ctx context.Context, input GetSessionInput) (*domain.Session, error)
 	List(ctx context.Context, input ListSessionInput) ([]*domain.Session, error)
 	Delete(ctx context.Context, input DeleteSessionInput) error
+}
+
+// UserIdentityReader is the secondary port Get uses to hydrate the identity
+// attributes of a session's linked user. *repository.UserRepository satisfies it.
+type UserIdentityReader interface {
+	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.User, error)
+	PrimaryKeyCondition(projectID, id string) database.Condition
+	WithAttributes(filterKeys ...string) database.QueryOption
 }
 
 type CreateSessionInput struct {
@@ -33,6 +45,10 @@ type ExchangeInput struct {
 type GetSessionInput struct {
 	ProjectID string
 	SessionID string
+	// WithUserIdentity hydrates the linked user's identity attributes
+	// (domain.IdentityAttributeKeys) onto Session.User. Set by reads that
+	// render the signed-in identity (GET /sessions/me).
+	WithUserIdentity bool
 }
 
 type ListSessionInput struct {
@@ -44,9 +60,10 @@ type DeleteSessionInput struct {
 	SessionID string
 }
 type sessionService struct {
-	pool database.Pool
-	repo domain.SessionRepository
-	cfg  SessionConfig
+	pool  database.Pool
+	repo  domain.SessionRepository
+	users UserIdentityReader
+	cfg   SessionConfig
 }
 
 func (s *sessionService) Create(ctx context.Context, input CreateSessionInput) (*domain.Session, error) {
@@ -84,6 +101,21 @@ func (s *sessionService) Get(ctx context.Context, input GetSessionInput) (*domai
 		}
 		return nil, domain.ErrInternal(err).WithMessage("Failed to get the session.")
 	}
+	if !input.WithUserIdentity || session.UserID == nil {
+		return session, nil
+	}
+	user, err := s.users.Get(ctx, s.pool,
+		database.WithCondition(s.users.PrimaryKeyCondition(input.ProjectID, *session.UserID)),
+		s.users.WithAttributes(domain.IdentityAttributeKeys...),
+	)
+	if err != nil {
+		// A session may outlive its user; render it without an identity then.
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return session, nil
+		}
+		return nil, domain.ErrInternal(err).WithMessage("Failed to load the session user.")
+	}
+	session.User = user
 	return session, nil
 }
 
@@ -103,10 +135,11 @@ func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) e
 	return nil
 }
 
-func NewSessionService(pool database.Pool, repo domain.SessionRepository, cfg SessionConfig) SessionService {
+func NewSessionService(pool database.Pool, repo domain.SessionRepository, users UserIdentityReader, cfg SessionConfig) SessionService {
 	return &sessionService{
-		pool: pool,
-		repo: repo,
-		cfg:  cfg,
+		pool:  pool,
+		repo:  repo,
+		users: users,
+		cfg:   cfg,
 	}
 }

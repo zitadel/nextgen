@@ -43,11 +43,21 @@ Each invocation prints one JSON object:
 - `cli_version`, `command`, `source`: always present.
 - On success: `data` with the command-specific payload.
 - On a no-op: `reason` (e.g. `no-framework-detected`, `orphaned-config`).
-- On failure: `code` (e.g. `E_VALIDATION`, `E_NETWORK`, `E_CONFLICT`) and
-  `message`.
+- On failure: `code` (e.g. `E_VALIDATION`, `E_NETWORK`, `E_NOT_FOUND`,
+  `E_CONFLICT`) and `message`.
 - `next_commands`: the suggested follow-ups. Prefer these over free-text hints.
+- `plan` and `apply` also emit `data.changes`: one row per touched resource
+  (`{kind, action, file, id?, previous_id?}`, action ∈ create/update/revision/
+  delete). Plan rows preview; apply rows report, with the resulting platform
+  ids. Use it to verify an edit did what you intended — `apply`'s
+  `files_updated` lists only local write-backs, not platform changes.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime with
   `npx @zitadel/cli@alpha start`, then retry with `--server local`.
+- `E_NOT_FOUND`: an HTTP 404 from the target server. With the platform's
+  error envelope it names a missing resource (e.g. an unknown schema id);
+  without one the endpoint itself is missing — the `--server` value likely
+  points at something that is not a Zitadel platform API. Follow
+  `next_commands` (usually `start` + retry with `--server local`).
 - `E_PORT_IN_USE`: the requested local runtime port already has a listener.
   Stop that process, run `npx @zitadel/cli@alpha stop --all` for host-wide
   CLI-managed local runtimes, or choose another `start --port`.
@@ -57,9 +67,9 @@ UIs display both streams together, but the machine contract is one parseable
 JSON object on stdout; installer, audit, and package-manager progress belongs
 on stderr.
 
-Exit codes mirror the error class (3 = validation, 4 = network, 5 = conflict,
-1 = auth, 2 = not-implemented). An unknown command is handled by the CLI's help
-layer, not the envelope.
+Exit codes mirror the error class (3 = validation, 4 = network or not-found,
+5 = conflict, 1 = auth, 2 = not-implemented). An unknown command is handled by
+the CLI's help layer, not the envelope.
 
 ## Commands
 
@@ -76,7 +86,15 @@ layer, not the envelope.
   framework and recorded in `zitadel.json` branding, but only Next varies its
   generated templates by it), `--dev-port` (dev-server port, also the issuer
   origin registered with Zitadel — use distinct ports to run several scaffolded
-  apps side by side), `--skip-install`.
+  apps side by side), `--preset password-first|passkey-first` (the sign-in
+  experience the scaffold starts from: `password-first` is the default —
+  email + password with passkey optional during registration; `passkey-first`
+  enters login on a one-tap passkey step with an email + password fallback;
+  recorded in `zitadel.json`), `--use-case minimal|consumer|business` (which
+  profile fields the scaffolded schema collects: `minimal` is the default —
+  email only; `consumer` adds given and family name; `business` also adds a
+  `companyName` attribute; asked before `--preset` and recorded in
+  `zitadel.json`), `--skip-install`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
 - `schemas list` — inspect the revision history of a user-schema, filtered by
@@ -156,7 +174,11 @@ Use host hooks such as `zitadel-field-email`, `zitadel-field-password`, and
 `zitadel-action-submit` when targeting the Lit atoms. Use native shadow-control
 hooks such as `zitadel-input-email`, `zitadel-input-password`, and
 `zitadel-action-submit-button` when filling or clicking the underlying input or
-button. For sign-out, open the user menu button if needed, then pierce to
+button. Hooks stay method-named even when the flow engine names a credential
+field `x-auth-methods#<method>`; only the `name` attribute carries that raw
+form key. Enter inside a field submits the step's primary action, but only for
+key events that carry `key: "Enter"` — drivers whose synthesized key events
+omit it (some CDP wrappers) should click `zitadel-action-submit` instead. For sign-out, open the user menu button if needed, then pierce to
 `.signout-btn`; Playwright-style locators may use `zitadel-logout .signout-btn`.
 The canonical component hook list lives in `packages/components/README.md`.
 
@@ -166,10 +188,23 @@ supported frameworks.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `plan` and `apply`. Schema and flow files are synced from
-`.zitadel/schemas/*.json` and `.zitadel/flows/*.json`; templates are not
-supported until the server exposes template storage and APIs. Server-provisioned
-defaults remain a fallback for non-CLI project creation, but CLI-created
-projects are authored from local files first. Flow create, read, list, and
+`.zitadel/schemas/*.json` and `.zitadel/flows/*.json`. Login templates
+(branding) are synced from `.zitadel/branding/`: a single `branding.json`
+descriptor (layout, asset URLs) plus a sibling `login.liquid` LiquidJS
+template referenced via `liquid_template_file`. Scaffold them with the
+`branding eject` command (`--design centered|split|split-right|minimal`,
+interactive picker on a TTY) or at project creation with
+`setup --design <name>`, which also publishes revision 1. Branding is
+revisioned and immutable: every edit — including a `.liquid`-only edit —
+plans as a `revise` and `apply` publishes a new revision; the login serves
+the newest one. `plan` validates templates with the authoritative LiquidJS
+validator (`E_VALIDATION` lists rule ids such as `no-script-tag` and
+`mandatory-gates`; every template must keep a trailing
+`{% mandatory_gates %}` tag). `font_url` is not writable yet; asset URLs
+must be absolute `https://`. Keep exactly one descriptor in
+`.zitadel/branding/` — extra `*.json` files there fail the scan.
+Server-provisioned defaults remain a fallback for non-CLI project
+creation, but CLI-created projects are authored from local files first. Flow create, read, list, and
 update are available, while the server enforces lifecycle rules such as
 draft-only edits. Managed files carry a marker comment; `eject` removes only
 files that still carry it, preserving anything the user replaced. For app-local

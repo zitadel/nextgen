@@ -111,7 +111,7 @@ describe("release artifact helpers", () => {
     await expect(
       containerImageExists({
         reference: "ghcr.io/zitadel/nextgen:0.1.0-alpha.14",
-        runCapture: async () => ({ stdout: "manifest data" }),
+        runCapture: async () => ({ stdout: `Digest: sha256:${"a".repeat(64)}\n` }),
       }),
     ).resolves.toBe(true);
 
@@ -138,7 +138,7 @@ describe("release artifact helpers", () => {
     ).rejects.toThrow("failed to check");
   });
 
-  it("re-points only missing secondary tags at the published version", async () => {
+  it("re-points missing or stale secondary tags at the published version", async () => {
     const { ensureContainerTags } = (await loadModule()) as unknown as {
       ensureContainerTags: (options: {
         primary: string;
@@ -162,7 +162,7 @@ describe("release artifact helpers", () => {
             stderr: "manifest unknown",
           });
         }
-        return { stdout: "manifest data" };
+        return { stdout: `Digest: sha256:${"a".repeat(64)}\n` };
       },
     });
 
@@ -177,6 +177,44 @@ describe("release artifact helpers", () => {
         "ghcr.io/zitadel/nextgen:1.2.3",
       ],
     ]);
+
+    created.length = 0;
+    await ensureContainerTags({
+      primary: "ghcr.io/zitadel/nextgen:1.2.3",
+      tags: ["ghcr.io/zitadel/nextgen:1.2.3", "ghcr.io/zitadel/nextgen:latest"],
+      run: async (_command, args) => {
+        created.push(args);
+      },
+      runCapture: async (_command, args) => {
+        const reference = args.at(-1) ?? "";
+        const digest = reference.endsWith(":latest") ? "b" : "a";
+        return { stdout: `Digest: sha256:${digest.repeat(64)}\n` };
+      },
+    });
+
+    expect(created).toEqual([
+      [
+        "buildx",
+        "imagetools",
+        "create",
+        "-t",
+        "ghcr.io/zitadel/nextgen:latest",
+        "ghcr.io/zitadel/nextgen:1.2.3",
+      ],
+    ]);
+
+    created.length = 0;
+    const unchanged = await ensureContainerTags({
+      primary: "ghcr.io/zitadel/nextgen:1.2.3",
+      tags: ["ghcr.io/zitadel/nextgen:1.2.3", "ghcr.io/zitadel/nextgen:latest"],
+      run: async (_command, args) => {
+        created.push(args);
+      },
+      runCapture: async () => ({ stdout: `Digest: sha256:${"a".repeat(64)}\n` }),
+    });
+
+    expect(unchanged).toEqual([]);
+    expect(created).toEqual([]);
   });
 
   it("stages built server binaries into platform npm packages", async () => {

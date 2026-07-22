@@ -7,6 +7,8 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements
+
 type StatementPool interface {
 	Statementer[AllStatements]
 	Transactioner[AllStatements]
@@ -19,6 +21,7 @@ type Statements interface {
 type AllStatements interface {
 	ProjectStatements
 	FlowDefinitionStatements
+	CryptoKeyStatements
 	Statements
 }
 
@@ -32,6 +35,7 @@ type ProjectStatements interface {
 	Statements
 	CreateProject(ctx context.Context, entity *domain.Project) error
 	GetProjectByID(ctx context.Context, id string) (*domain.Project, error)
+	UpdateProject(ctx context.Context, entity *domain.Project) error
 	ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
 	DeleteProjectByID(ctx context.Context, id string) error
 }
@@ -48,4 +52,10 @@ type FlowDefinitionStatements interface {
 	GetFlowDefinitionByID(ctx context.Context, id string) (*domain.FlowDefinition, error)
 	ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error)
 	DeleteFlowDefinitionByID(ctx context.Context, id string) error
+}
+
+type CryptoKeyStatements interface {
+	Statements
+	GetEncryptionKey(ctx context.Context, filter database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error)
+	CreateEncryptionKey(ctx context.Context, dek *domain.EncryptionKey) error
 }

@@ -208,7 +208,10 @@ func buildValidation(prop schemaReader) *FlowFieldValidation {
 		MaxLength: prop.Int("maxLength"),
 		Enum:      prop.StringEnum(),
 	}
-	if v.Format == "" && v.MinLength == 0 && v.MaxLength == 0 && len(v.Enum) == 0 {
+	if c, ok := prop.Const(); ok {
+		v.Const = c
+	}
+	if v.Format == "" && v.MinLength == 0 && v.MaxLength == 0 && len(v.Enum) == 0 && v.Const == nil {
 		return nil
 	}
 	return &v
@@ -307,6 +310,20 @@ func (r schemaReader) String(keyword string) string {
 		}
 	}
 	return ""
+}
+
+// Const returns the property's `const` value and true when present. The
+// value keeps its JSON-decoded type (bool, string, float64, ...).
+func (r schemaReader) Const() (any, bool) {
+	v, ok := r.s.LookupKeyword("const")
+	if !ok {
+		return nil, false
+	}
+	part, ok := v.(types.PartAny)
+	if !ok {
+		return nil, false
+	}
+	return part.V, true
 }
 
 // Int returns the int value of the given keyword, or 0 when absent.

@@ -188,6 +188,19 @@ describe("doctor command", () => {
     const occupiedPort = Number(new URL(occupiedUrl).port);
 
     const fake = await fakeDocker();
+    // The port probe shells out to `lsof` and degrades to "no listeners" on
+    // ANY failure by contract (ports.ts), so asserting through the real
+    // system lsof makes this test environment-dependent — the listener
+    // silently vanished on CI runners. Fake lsof on the PATH the test
+    // already owns so the occupied port is always visible.
+    const lsofPath = join(fake.binDir, "lsof");
+    await writeFile(
+      lsofPath,
+      `#!/usr/bin/env node
+console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].join("\\n"));
+`,
+    );
+    await chmod(lsofPath, 0o755);
     const res = await runCliForTest(
       [
         "doctor",
@@ -202,6 +215,7 @@ describe("doctor command", () => {
       {
         PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
         DOCKER_LOG: fake.logPath,
+        LSOF_FIXTURE_PORT: String(occupiedPort),
       },
     );
 

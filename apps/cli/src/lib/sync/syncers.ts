@@ -1,14 +1,32 @@
+import { writeFileSync } from "node:fs";
+
 import type {
+  CreateBranding201,
+  CreateBrandingBody,
+  CreateFlowDefinition201,
   CreateFlowDefinitionBodyFlowDefinition,
+  GetBrandingById200,
+  UpdateFlowDefinition200,
   UpdateFlowDefinitionBodyFlowDefinition,
   CreateSchemaBody,
   GetSchemaById200,
   GetFlowDefinition200,
 } from "@zitadel/api/generated/model";
+import { consola } from "consola";
+
 import type { ZitadelClient } from "@zitadel/api/client";
 import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
-import { flowConfigSchema, schemaConfigSchema } from "@zitadel/config/schemas";
+import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
+import { brandingConfigSchema, flowConfigSchema, schemaConfigSchema } from "@zitadel/config/schemas";
+import { validateLoginTemplate } from "@zitadel/config/template";
 
+import {
+  BRANDING_DIR,
+  readDescriptorTemplate,
+  resolveTemplatePath,
+  toBrandingWireBody,
+  toLocalBrandingBody,
+} from "../branding";
 import { FLOWS_DIR, flowEnvRefs } from "../flows";
 import { SCHEMAS_DIR } from "../user-schema";
 import { ZitadelError } from "../errors";
@@ -29,10 +47,16 @@ export function makeSyncers(opts: {
   client: ZitadelClient;
   projectId: string;
   env: EnvLookup;
+  /**
+   * Project root. The branding syncer resolves `liquid_template_file`
+   * references against it when inlining templates for hashing and upload.
+   */
+  cwd: string;
 }): ReadonlyArray<ResourceSyncer> {
   return [
     new SchemaSyncer(opts.client, opts.projectId, opts.env),
     new FlowDefinitionSyncer(opts.client, opts.projectId, opts.env),
+    new BrandingSyncer(opts.client, opts.projectId, opts.env, opts.cwd),
   ];
 }
 
@@ -54,6 +78,11 @@ class SchemaSyncer implements ResourceSyncer {
   readonly directory = SCHEMAS_DIR;
   readonly mutable = false;
   readonly revisioned = true;
+  readonly normalize = normalizeSchemaBody;
+  // Deliberately no `normalizeWrite`: the server stores schema bytes
+  // verbatim, so stripping spelled-out x-* defaults from the local file
+  // would drop them from the next published revision. Canonical schema
+  // bodies are written back as-is; `normalize` is comparison-only.
 
   constructor(
     private readonly client: ZitadelClient,
@@ -80,12 +109,20 @@ class SchemaSyncer implements ResourceSyncer {
   /**
    * `POST /schemas` mints a new immutable row. The server allocates the
    * opaque id; the CLI records it in state and re-pins flows against it.
+   * The create response carries only the id, so the canonical stored body
+   * comes from a follow-up fetch; a fetch failure degrades to no
+   * write-back rather than failing the create.
    */
-  async create(data: object): Promise<string> {
+  async create(data: object): Promise<{ id: string; canonical?: object }> {
     const result = await this.client.createSchema(data as CreateSchemaBody, {
       project_id: this.projectId,
     });
-    return result.id;
+    try {
+      return { id: result.id, canonical: await this.fetch(result.id) };
+    } catch (err) {
+      consola.debug(`fetch created schema ${result.id} failed:`, err);
+      return { id: result.id };
+    }
   }
 
   /**
@@ -94,7 +131,7 @@ class SchemaSyncer implements ResourceSyncer {
    * mutating an existing row. Kept as a required interface member; throws
    * loudly if a caller reaches it.
    */
-  async update(_id: string, _data: object): Promise<void> {
+  async update(_id: string, _data: object): Promise<{ canonical?: object }> {
     throw new ZitadelError("E_NOT_IMPLEMENTED", "schemas are revisioned — edit publishes a new revision, not an update");
   }
 
@@ -121,6 +158,10 @@ class FlowDefinitionSyncer implements ResourceSyncer {
   readonly directory = FLOWS_DIR;
   readonly mutable = true;
   readonly revisioned = false;
+  readonly normalize = normalizeFlowBody;
+  // For flows the comparison form doubles as the file form: everything it
+  // strips (envelope keys, the empty `audience` echo) is transport noise.
+  readonly normalizeWrite = normalizeFlowBody;
 
   constructor(
     private readonly client: ZitadelClient,
@@ -149,13 +190,13 @@ class FlowDefinitionSyncer implements ResourceSyncer {
    * only the wire request carries `project_id` and the surrounding
    * envelope.
    */
-  async create(data: object): Promise<string> {
-    const result = await this.client.createFlowDefinition({
+  async create(data: object): Promise<{ id: string; canonical?: object }> {
+    const result = (await this.client.createFlowDefinition({
       project_id: this.projectId,
       schema_uri: DEFAULT_FLOW_SCHEMA_URI,
       flow_definition: data as CreateFlowDefinitionBodyFlowDefinition,
-    });
-    return result.id;
+    })) as CreateFlowDefinition201;
+    return { id: result.id, canonical: result.flow_definition as object };
   }
 
   /**
@@ -165,12 +206,13 @@ class FlowDefinitionSyncer implements ResourceSyncer {
    * carries `project_id` as a query parameter; the file on disk stays bare so
    * it is human-editable.
    */
-  async update(id: string, data: object): Promise<void> {
-    await this.client.updateFlowDefinition(
+  async update(id: string, data: object): Promise<{ canonical?: object }> {
+    const result = (await this.client.updateFlowDefinition(
       id,
       { flow_definition: data as UpdateFlowDefinitionBodyFlowDefinition },
       { project_id: this.projectId },
-    );
+    )) as UpdateFlowDefinition200;
+    return { canonical: result.flow_definition as object };
   }
 
   async delete(id: string): Promise<void> {
@@ -189,5 +231,111 @@ class FlowDefinitionSyncer implements ResourceSyncer {
     )) as GetFlowDefinition200;
 
     return envelope.flow_definition as object;
+  }
+}
+
+/**
+ * Branding revisions (ADR 040): schema-style immutable semantics — every
+ * edit publishes a new revision via `POST /branding`, no update or delete.
+ * Unlike schemas, nothing references branding revisions, so a revise never
+ * triggers re-pinning. The descriptor keeps the template in a sibling
+ * `.liquid` file (`liquid_template_file`); this syncer inlines it for
+ * hashing and upload and splits it back out on write-back.
+ */
+class BrandingSyncer implements ResourceSyncer {
+  readonly kind = "branding";
+  readonly directory = BRANDING_DIR;
+  readonly mutable = false;
+  readonly revisioned = true;
+  /** One project, one branding descriptor — extra .json files fail the scan. */
+  readonly singletonFile = "branding.json";
+
+  constructor(
+    private readonly client: ZitadelClient,
+    private readonly projectId: string,
+    private readonly env: EnvLookup,
+    private readonly cwd: string,
+  ) {}
+
+  /**
+   * The comparison form is the wire body with the template inlined, so an
+   * edit to the referenced `.liquid` file changes the state hash and plans
+   * a `revise` even though the descriptor JSON is untouched.
+   */
+  readonly normalize = (data: object): object => toBrandingWireBody(this.cwd, data);
+
+  /**
+   * Zod shape + env refs, then the authoritative template validation from
+   * `@zitadel/config/template` — the LiquidJS-dialect check the Go server
+   * cannot run (its save gate is lexical; see ADR 040).
+   */
+  validate(data: object): void {
+    const result = brandingConfigSchema.safeParse(data);
+    if (!result.success) {
+      throw new ZitadelError("E_VALIDATION", "Branding file is not a valid branding descriptor", {
+        details: { issues: result.error.issues },
+      });
+    }
+    assertEnvRefs(data, this.env);
+    const template = readDescriptorTemplate(this.cwd, data);
+    if (template === undefined) {
+      return;
+    }
+    const issues = validateLoginTemplate(template).filter((issue) => issue.severity === "error");
+    if (issues.length > 0) {
+      throw new ZitadelError("E_VALIDATION", "Login template failed validation", {
+        details: { issues },
+        hint: "Fix the template issues; the rules live in docs/design/flowengine/template-security.md.",
+      });
+    }
+  }
+
+  /**
+   * `POST /branding` publishes a new immutable revision. The canonical body
+   * is converted back to descriptor form: the stored template is written to
+   * the referenced `.liquid` file (when it differs) and the JSON keeps the
+   * file reference, so `writeBackResource` stays pure-JSON.
+   */
+  async create(data: object): Promise<{ id: string; canonical?: object }> {
+    const wire = toBrandingWireBody(this.cwd, data) as CreateBrandingBody;
+    const result = (await this.client.createBranding(wire, {
+      project_id: this.projectId,
+    })) as CreateBranding201;
+    return { id: result.id, canonical: this.canonicalToLocal(result.branding as object, data) };
+  }
+
+  async update(_id: string, _data: object): Promise<{ canonical?: object }> {
+    throw new ZitadelError(
+      "E_NOT_IMPLEMENTED",
+      "branding is revisioned — edit publishes a new revision, not an update",
+    );
+  }
+
+  async delete(id: string): Promise<void> {
+    // Branding revisions are immutable on the platform; removing the local
+    // descriptor does not retire them. The newest revision keeps being
+    // served — publish a new revision to change what users see.
+    throw new ZitadelError("E_NOT_IMPLEMENTED", `branding delete is not supported (${id})`);
+  }
+
+  /** Wire form (template inlined); diffs compare in the normalized form. */
+  async fetch(id: string): Promise<object> {
+    const envelope = (await this.client.getBrandingById(id, {
+      project_id: this.projectId,
+    })) as GetBrandingById200;
+    return envelope.branding as object;
+  }
+
+  private canonicalToLocal(canonicalWire: object, localData: object): object {
+    const local = localData as { liquid_template_file?: unknown };
+    const template = (canonicalWire as { liquid_template?: unknown }).liquid_template;
+    if (typeof local.liquid_template_file === "string" && typeof template === "string") {
+      const path = resolveTemplatePath(this.cwd, local.liquid_template_file);
+      if (readDescriptorTemplate(this.cwd, localData) !== template) {
+        writeFileSync(path, template);
+        consola.info(`Updated ${local.liquid_template_file} from the server's canonical response`);
+      }
+    }
+    return toLocalBrandingBody(canonicalWire, localData);
   }
 }

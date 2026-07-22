@@ -27,7 +27,7 @@ import (
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
-	"github.com/zitadel/nextgen/internal/domain/tokengen"
+	"github.com/zitadel/nextgen/internal/errreport"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
@@ -115,7 +115,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		return nil
 	})
 
-	crypter, err := buildCrypter(cfg.Server.EncryptionKey)
+	kek, err := buildCrypter(cfg.Server.EncryptionKey)
 	if err != nil {
 		return fmt.Errorf("failed to create Crypter: %w", err)
 	}
@@ -129,8 +129,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		return fmt.Errorf("failed to bootstrap users: %w", err)
 	}
 
-	opaqueTokenGenerator := tokengen.NewOpaqueTokenGenerator(crypter)
-
 	// ── Repositories ─────────────────
 	userRepo := repository.NewUserRepository()
 	userPasswordRepo := repository.NewUserPasswordRepository()
@@ -141,6 +139,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
 	schemaRepo := repository.NewJSONSchemaRepository(pool)
 	teamRepo := repository.NewTeamRepository(pool)
+	brandingRepo := repository.NewBrandingRepository(pool)
 
 	serviceDBPool := service.NewPool(v2Pool.(service.Pool))
 
@@ -167,6 +166,8 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 
 	// ── Services ─────────────────────
+	keyService := service.NewKeyService(serviceDBPool, kek)
+
 	authAttemptSvc := service.NewAuthAttemptService(
 		pool,
 		attemptRepo,
@@ -176,18 +177,17 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		userPasskeyRepo,
 		passwordHasher,
 	)
-	sessionService := service.NewSessionService(pool, sessionRepo, service.SessionConfig{
+	sessionService := service.NewSessionService(pool, sessionRepo, userRepo, service.SessionConfig{
 		DefaultTTL: cfg.Session.DefaultTTL,
 		MaxTTL:     cfg.Session.MaxTTL,
 	})
 	projectService := service.NewProjectService(
-		pool,
 		serviceDBPool,
 		schemaRepo,
 		flowDefinitionRepo,
-		opaqueTokenGenerator,
 		builtinPublicBase.String(),
 		schemaValidator,
+		keyService,
 	)
 	schemaService := service.NewSchemaService(pool, schemaRepo, schemaResolverWithHTTP, schemaValidator)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
@@ -198,13 +198,13 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		flowDefinitionRepo,
 	)
 	teamService := service.NewTeamService(pool, teamRepo)
+	brandingService := service.NewBrandingService(pool, brandingRepo)
 	userService := service.NewUserService(
 		pool,
 		userRepo,
 		userPasswordRepo,
 		schemaRepo,
 		passwordHasher,
-		opaqueTokenGenerator,
 	)
 
 	// ── Flow engine ──────────────────
@@ -233,6 +233,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	)
 
 	flowService := service.NewFlowService(pool, flowDefinitionRepo, stateMachine, ids)
+	tokenService := service.NewTokenService(keyService)
 
 	// ── HTTP Server ─────────────────
 
@@ -241,9 +242,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 
 	oasServer, err := oasapi.NewServer(
 		api.NewHandler(
-			crypter,
-			opaqueTokenGenerator,
-			opaqueTokenGenerator,
 			flowService,
 			authAttemptSvc,
 			sessionService,
@@ -252,8 +250,11 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			schemaService,
 			flowDefinitionSvc,
 			teamService,
+			brandingService,
+			tokenService,
+			keyService,
 		),
-		api.NewSecurityHandler(opaqueTokenGenerator),
+		api.NewSecurityHandler(tokenService),
 		oasapi.WithMiddleware(
 			middleware.AddOperationIdToContext(),
 			// logging is done at net/http level
@@ -321,10 +322,32 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("server.console_path", "/ui/console")
 	v.SetDefault("server.login_enabled", true)
 	v.SetDefault("server.login_path", "/ui/login")
-	v.SetDefault("password_hasher.hasher.algorithm", crypto.HashNameBcrypt)
-	v.SetDefault("password_hasher.hasher.cost", 10)
+	// Default to argon2id (per ADR 029). Params follow the RFC 9106 second
+	// recommended option (t=3, m=64 MiB, p=4), a good balance for servers.
+	v.SetDefault("password_hasher.hasher.algorithm", crypto.HashNameArgon2id)
+	v.SetDefault("password_hasher.hasher.time", 3)
+	v.SetDefault("password_hasher.hasher.memory", 64*1024)
+	v.SetDefault("password_hasher.hasher.threads", 4)
+	// Keep bcrypt and legacy verifiers registered so pre-existing hashes still
+	// validate and transparently rehash to argon2id on the next successful login.
+	v.SetDefault("password_hasher.verifiers", []crypto.HashName{
+		crypto.HashNameArgon2,
+		crypto.HashNameBcrypt,
+		crypto.HashNameScrypt,
+		crypto.HashNamePBKDF2,
+		crypto.HashNameSha2,
+		crypto.HashNameMd5,
+		crypto.HashNameMd5Salted,
+		crypto.HashNamePHPass,
+		crypto.HashNameDrupal7,
+	})
 	v.SetDefault("password_hasher.limits", crypto.HashLimitsConfig{
 		Bcrypt: crypto.BcryptLimitsConfig{MinCost: 10, MaxCost: 16},
+		Argon2: crypto.Argon2LimitsConfig{
+			MinTime: 1, MaxTime: 10,
+			MinMemory: 8 * 1024, MaxMemory: 512 * 1024,
+			MinThreads: 1, MaxThreads: 16,
+		},
 	})
 	v.SetDefault("schema.lru_cache_size", 1000)                                   // todo: temp, review
 	v.SetDefault("schema.builtin_public_base", "https://nextgen.com/api/schemas") // todo: temp, review
@@ -498,13 +521,17 @@ func buildCrypter(hexKey string) (crypto.Crypter, error) {
 	if len(key) != 32 {
 		return nil, fmt.Errorf("server: encryption_key must decode to %d bytes, got %d", 32, len(key))
 	}
-	crypter := op.NewAES256GCMCrypto([32]byte(key), "")
+	crypter := op.NewAES256GCMCrypto([32]byte(key), "") // TODO: key id must be empty to match kek for now
 	return crypter, nil
 }
 
 // ----------------------------- INSTRUMENTATION --------------------------------------
 
 func setUpLogging(cfg instrumentation.LogConfig, otelProvider log.LoggerProvider) {
+	errreport.EnableLocation(cfg.Errors.ReportLocation)
+	errreport.EnableStack(cfg.Errors.StackTrace)
+	errreport.GCPReporting(cfg.Format == instrumentation.LogFormatGCPErrorReporting)
+
 	otelHandler := otelslog.NewHandler(
 		Name,
 		otelslog.WithLoggerProvider(otelProvider),

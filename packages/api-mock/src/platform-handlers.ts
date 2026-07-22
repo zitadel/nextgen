@@ -47,11 +47,13 @@ import {
   GetSchemaByIdQueryParams,
   ListFlowDefinitionsQueryParams,
   ListFlowDefinitionsResponse,
+  ListUsersQueryParams,
   UpdateFlowDefinitionBody,
   UpdateFlowDefinitionParams,
   UpdateFlowDefinitionQueryParams,
   UpdateFlowDefinitionResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { validateFlowDefinition } from "@zitadel/config/validate";
 import {
   DEFAULT_FLOW_SCHEMA_URI,
   getDefaultHumanUserSchema,
@@ -141,6 +143,7 @@ function queryRecord(request: Request): Record<string, string> {
  */
 type ProjectRecord = {
   id: string;
+  name: string;
   projectSecret: string;
   previewSecret: string;
   previewOrigins: string[];
@@ -193,6 +196,9 @@ function makeStore(): Store {
 /**
  * Build a `flow-definition-detail-response` envelope around a stored body, as
  * specified by `api/openapi/components/flows/flow-definition-detail-response.yaml`.
+ * The Go server unconditionally echoes an `audience` (empty `{}` when the
+ * stored flow has none — `internal/api/flow_definition.go`); mirror that so
+ * consumers exercise the same wire shape the live server produces.
  */
 function flowDetailResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
   return {
@@ -200,7 +206,10 @@ function flowDetailResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
     project_id: r.projectId,
     schema_uri: r.schemaUri,
     status: r.status,
-    flow_definition: r.body as unknown as GetFlowDefinition200['flow_definition'],
+    flow_definition: {
+      audience: {},
+      ...(r.body as Record<string, unknown>),
+    } as unknown as GetFlowDefinition200['flow_definition'],
     created_at: r.createdAt,
     updated_at: r.updatedAt,
   } as unknown as GetFlowDefinition200;
@@ -300,6 +309,41 @@ export function snapshotPlatformStore(): PlatformStoreSnapshot {
   };
 }
 
+/**
+ * Mirror of the server's definition-time validation
+ * (`internal/domain/flow_definition_validator.go`, ported to
+ * `@zitadel/config/validate`): same rules, same fail-fast single-detail
+ * `flowdef.invalid` envelope. Divergence kept deliberately lenient: the
+ * schema-dependent subset runs only when the pinned `user_schema` resolves
+ * in the mock store — the real server would fail such a flow with
+ * `schema_fetch_failed`, but fixtures here may pin external URLs.
+ * Returns null when the definition is valid.
+ */
+function invalidFlowDefinitionResponse(
+  flowDefinition: Record<string, unknown>,
+): Response | null {
+  const ref = flowDefinition.user_schema;
+  const schema = typeof ref === "string" ? store.schemas.get(ref)?.body : undefined;
+  const firstError = validateFlowDefinition(
+    flowDefinition,
+    schema as object | undefined,
+  ).find((issue) => issue.severity === "error");
+  if (!firstError) {
+    return null;
+  }
+  // `details` is a bare string here — mirroring what the Go server actually
+  // emits for ErrFlowDefinitionInvalid (its Details field is `any`), which
+  // the CLI's pickDetailString handles alongside the spec's object shape.
+  return HttpResponse.json(
+    {
+      code: "flowdef.invalid",
+      message: "flow definition: invalid",
+      details: firstError.message,
+    },
+    { status: 400 },
+  );
+}
+
 export function setupPlatformHandlers() {
   return [
     http.post("*/projects", async ({ request }) => {
@@ -316,6 +360,7 @@ export function setupPlatformHandlers() {
       const createdAt = nowIso();
       const project: ProjectRecord = {
         id,
+        name: body.data.name,
         projectSecret: `sk_proj_${id.replaceAll("-", "")}_full`,
         previewSecret: `sk_proj_${id.replaceAll("-", "")}_preview`,
         previewOrigins: body.data.previewOrigins ?? [],
@@ -328,6 +373,7 @@ export function setupPlatformHandlers() {
       }
       const responseBody: CreateProject201 = {
         id: project.id,
+        name: project.name,
         projectSecret: project.projectSecret,
         previewSecret: project.previewSecret,
         previewOrigins: project.previewOrigins,
@@ -348,6 +394,7 @@ export function setupPlatformHandlers() {
       }
       const responseBody: GetProject200 = {
         id: project.id,
+        name: project.name,
         createdAt: project.createdAt,
         updatedAt: project.updatedAt,
       };
@@ -356,6 +403,31 @@ export function setupPlatformHandlers() {
         return out.response;
       }
       return HttpResponse.json(out.data);
+    }),
+
+    // Users exist only through real sign-ups, which the platform mock has no
+    // endpoint for — the list is always empty. That is exactly the state a
+    // freshly set-up project is in, and what `status` keys its journey-staged
+    // guidance on. Auth mirrors the real server: the project secret is the
+    // bearer and scopes the (empty) result.
+    http.get("*/users", ({ request }) => {
+      // Both spec'd query params (offset, limit) are numeric, but URLs carry
+      // strings and the generated zod does not coerce — convert before parsing.
+      const raw = Object.fromEntries(
+        Object.entries(queryRecord(request)).map(([key, value]) => [key, Number(value)]),
+      );
+      const query = parse(ListUsersQueryParams, raw, "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const token = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+      const project = [...store.projects.values()].find((p) => p.projectSecret === token);
+      if (!project) {
+        return HttpResponse.json(errorBody("unauthenticated", "missing or invalid credentials"), {
+          status: 401,
+        });
+      }
+      return HttpResponse.json([]);
     }),
 
     http.post("*/schemas", async ({ request }) => {
@@ -452,6 +524,12 @@ export function setupPlatformHandlers() {
       if (!body.ok) {
         return body.response;
       }
+      const invalid = invalidFlowDefinitionResponse(
+        body.data.flow_definition as Record<string, unknown>,
+      );
+      if (invalid) {
+        return invalid;
+      }
 
       const id = `flow_${shortId()}`;
       const now = nowIso();
@@ -541,6 +619,12 @@ export function setupPlatformHandlers() {
       const body = parse(UpdateFlowDefinitionBody, raw, "invalid_request");
       if (!body.ok) {
         return body.response;
+      }
+      const invalid = invalidFlowDefinitionResponse(
+        body.data.flow_definition as unknown as Record<string, unknown>,
+      );
+      if (invalid) {
+        return invalid;
       }
 
       const flowDefinition = body.data.flow_definition as unknown as Record<string, unknown>;

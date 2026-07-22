@@ -291,7 +291,7 @@ export async function main(args = forwardedArgs()) {
 
 Deploys the built release image through the documented deployment surface
 (docs/operations/docker-compose.yaml) and smoke-tests it: /healthz, /livez,
-/readyz, bootstrap-user write path against Postgres, and a structured 401
+/readyz, bootstrap-user write path against Postgres, and a structured rejection
 from the unauthenticated API. Without --image, builds a host-platform image
 from the docker context that release:build produced.
 `);

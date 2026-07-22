@@ -690,14 +690,19 @@ type AuthorizeGetFound struct{}
 
 func (*AuthorizeGetFound) authorizeGetRes() {}
 
-// Resolved branding configuration. Inherited from the app → team → project
-// hierarchy at flow creation time (most specific wins). Read-only projection —
-// branding is configured via the Team/App Branding API, not the Flow API.
+// Branding configuration. Appears in two places with one shape:
+// - On flow responses as a read-only projection: the server resolves the
+// latest branding revision for the project per step response (falling
+// back to built-in defaults when none is stored). Branding is configured
+// via the Branding API / `zitadel apply`, not the Flow API.
+// - As the request body of `POST /branding`, which publishes the same
+// shape as a new immutable revision (see ADR 040).
 // Ref: #
 type Branding struct {
 	// Layout preset selector. The default.liquid master template uses this
 	// to branch into layout variants. Customers who eject the template
-	// can ignore this field entirely.
+	// can ignore this field entirely; it also serves as the degrade target
+	// when a custom template fails component-side validation.
 	Layout OptBrandingLayout `json:"layout"`
 	// The LiquidJS template string for rendering this step. The orchestrator
 	// parses this template, injects the capability dictionaries as context,
@@ -705,7 +710,13 @@ type Branding struct {
 	LiquidTemplate OptString `json:"liquid_template"`
 	// Team logo URL.
 	LogoURL OptURI `json:"logo_url"`
-	// Custom font URL (e.g., Google Fonts CSS).
+	// Custom font stylesheet URL (e.g., Google Fonts CSS). Read-only in
+	// v1: `POST /branding` rejects a non-empty value, because the login
+	// component loads this stylesheet at document level (shadow-scoped
+	// `@font-face` rules never register faces) and an arbitrary URL would
+	// grant `branding.write` page-wide CSS control over the embedding
+	// application. Safe tenant font delivery is an ADR 040 follow-up;
+	// until then, load fonts from the embedding page.
 	FontURL OptURI `json:"font_url"`
 	// Hero/background image URL (used by split layout).
 	HeroURL OptURI `json:"hero_url"`
@@ -763,7 +774,8 @@ func (s *Branding) SetHeroURL(val OptURI) {
 
 // Layout preset selector. The default.liquid master template uses this
 // to branch into layout variants. Customers who eject the template
-// can ignore this field entirely.
+// can ignore this field entirely; it also serves as the degrade target
+// when a custom template fails component-side validation.
 type BrandingLayout string
 
 const (
@@ -804,6 +816,51 @@ func (s *BrandingLayout) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
+
+// A stored branding revision. `branding` echoes the canonical stored
+// configuration so clients (e.g. the CLI sync engine) can reconcile local
+// files with the server's stored state.
+// Ref: #
+type BrandingRevisionResponse struct {
+	// The unique identifier of this branding revision.
+	ID string `json:"id"`
+	// When this revision was published.
+	CreatedAt time.Time `json:"created_at"`
+	Branding  Branding  `json:"branding"`
+}
+
+// GetID returns the value of ID.
+func (s *BrandingRevisionResponse) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *BrandingRevisionResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetBranding returns the value of Branding.
+func (s *BrandingRevisionResponse) GetBranding() Branding {
+	return s.Branding
+}
+
+// SetID sets the value of ID.
+func (s *BrandingRevisionResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *BrandingRevisionResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetBranding sets the value of Branding.
+func (s *BrandingRevisionResponse) SetBranding(val Branding) {
+	s.Branding = val
+}
+
+func (*BrandingRevisionResponse) createBrandingRes()  {}
+func (*BrandingRevisionResponse) getBrandingByIdRes() {}
 
 type ChallengeID string
 
@@ -1726,12 +1783,19 @@ func (*CreateHandoffErrorResponseStatusCode) createHandoffRes() {}
 
 // Ref: #
 type CreateProjectRequest struct {
+	// The name of the project.
+	Name string `json:"name"`
 	// Origins which are allowed for previewing and testing the project.
 	PreviewOrigins []string `json:"previewOrigins"`
 	// Whether the server should provision fallback default user schema and flow
 	// resources for the project. CLI-managed projects set this to false and
 	// upload their local .zitadel config files through the schema and flow APIs.
 	SeedDefaults OptBool `json:"seedDefaults"`
+}
+
+// GetName returns the value of Name.
+func (s *CreateProjectRequest) GetName() string {
+	return s.Name
 }
 
 // GetPreviewOrigins returns the value of PreviewOrigins.
@@ -1742,6 +1806,11 @@ func (s *CreateProjectRequest) GetPreviewOrigins() []string {
 // GetSeedDefaults returns the value of SeedDefaults.
 func (s *CreateProjectRequest) GetSeedDefaults() OptBool {
 	return s.SeedDefaults
+}
+
+// SetName sets the value of Name.
+func (s *CreateProjectRequest) SetName(val string) {
+	s.Name = val
 }
 
 // SetPreviewOrigins sets the value of PreviewOrigins.
@@ -1758,6 +1827,8 @@ func (s *CreateProjectRequest) SetSeedDefaults(val OptBool) {
 type CreateProjectResponse struct {
 	// The unique identifier of the project.
 	ID string `json:"id"`
+	// The name of the project.
+	Name string `json:"name"`
 	// Secret which can be used for authentication when modifying the project.
 	ProjectSecret string `json:"projectSecret"`
 	// Secret which can be used for previewing and testing the project.
@@ -1771,6 +1842,11 @@ type CreateProjectResponse struct {
 // GetID returns the value of ID.
 func (s *CreateProjectResponse) GetID() string {
 	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *CreateProjectResponse) GetName() string {
+	return s.Name
 }
 
 // GetProjectSecret returns the value of ProjectSecret.
@@ -1796,6 +1872,11 @@ func (s *CreateProjectResponse) GetCreatedAt() time.Time {
 // SetID sets the value of ID.
 func (s *CreateProjectResponse) SetID(val string) {
 	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *CreateProjectResponse) SetName(val string) {
+	s.Name = val
 }
 
 // SetProjectSecret sets the value of ProjectSecret.
@@ -2033,6 +2114,10 @@ type CreateTeamTooManyRequests ErrorDetails
 
 func (*CreateTeamTooManyRequests) createTeamRes() {}
 
+type CreateTeamUnauthorized ErrorDetails
+
+func (*CreateTeamUnauthorized) createTeamRes() {}
+
 type CreateUserBadRequest ErrorDetails
 
 func (*CreateUserBadRequest) createUserRes() {}
@@ -2239,11 +2324,13 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 func (*ErrorDetails) activateFlowDefinitionRes() {}
 func (*ErrorDetails) authorizeDeviceRes()        {}
 func (*ErrorDetails) authorizeGetRes()           {}
+func (*ErrorDetails) createBrandingRes()         {}
 func (*ErrorDetails) createFlowRes()             {}
 func (*ErrorDetails) createProjectRes()          {}
 func (*ErrorDetails) createSessionRes()          {}
 func (*ErrorDetails) deleteFlowDefinitionRes()   {}
 func (*ErrorDetails) endSessionRes()             {}
+func (*ErrorDetails) getBrandingByIdRes()        {}
 func (*ErrorDetails) getMyUserRes()              {}
 func (*ErrorDetails) introspectRes()             {}
 func (*ErrorDetails) listFlowDefinitionsRes()    {}
@@ -2290,6 +2377,7 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 func (*ErrorDetailsStatusCode) activateFlowDefinitionRes()   {}
 func (*ErrorDetailsStatusCode) authorizeDeviceRes()          {}
 func (*ErrorDetailsStatusCode) authorizeGetRes()             {}
+func (*ErrorDetailsStatusCode) createBrandingRes()           {}
 func (*ErrorDetailsStatusCode) createFlowDefinitionRes()     {}
 func (*ErrorDetailsStatusCode) createFlowRes()               {}
 func (*ErrorDetailsStatusCode) createProjectRes()            {}
@@ -2301,27 +2389,29 @@ func (*ErrorDetailsStatusCode) deactivateFlowDefinitionRes() {}
 func (*ErrorDetailsStatusCode) deleteFlowDefinitionRes()     {}
 func (*ErrorDetailsStatusCode) endSessionRes()               {}
 func (*ErrorDetailsStatusCode) exchangeHandoffRes()          {}
+func (*ErrorDetailsStatusCode) getBrandingByIdRes()          {}
 func (*ErrorDetailsStatusCode) getFlowDefinitionRes()        {}
 func (*ErrorDetailsStatusCode) getFlowStepRes()              {}
 func (*ErrorDetailsStatusCode) getHealthRes()                {}
 func (*ErrorDetailsStatusCode) getKeysRes()                  {}
 func (*ErrorDetailsStatusCode) getLiveRes()                  {}
-func (*ErrorDetailsStatusCode) getMySessionRes()             {}
 func (*ErrorDetailsStatusCode) getMyUserRes()                {}
 func (*ErrorDetailsStatusCode) getOpenIDConfigurationRes()   {}
 func (*ErrorDetailsStatusCode) getProjectRes()               {}
 func (*ErrorDetailsStatusCode) getReadyRes()                 {}
 func (*ErrorDetailsStatusCode) getSchemaByIdRes()            {}
-func (*ErrorDetailsStatusCode) getSessionRes()               {}
 func (*ErrorDetailsStatusCode) getTeamRes()                  {}
 func (*ErrorDetailsStatusCode) getTokenRes()                 {}
 func (*ErrorDetailsStatusCode) getUserByIDRes()              {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()              {}
 func (*ErrorDetailsStatusCode) introspectRes()               {}
+func (*ErrorDetailsStatusCode) listBrandingRes()             {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()      {}
 func (*ErrorDetailsStatusCode) listSchemasRes()              {}
 func (*ErrorDetailsStatusCode) listSessionsRes()             {}
 func (*ErrorDetailsStatusCode) listUsersRes()                {}
+func (*ErrorDetailsStatusCode) patchProjectRes()             {}
+func (*ErrorDetailsStatusCode) queryProjectsRes()            {}
 func (*ErrorDetailsStatusCode) revokeMySessionRes()          {}
 func (*ErrorDetailsStatusCode) revokeSessionRes()            {}
 func (*ErrorDetailsStatusCode) revokeTokenRes()              {}
@@ -2738,6 +2828,254 @@ func (s *FieldValidationFormat) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// Ref: #
+type FilterField string
+
+const (
+	FilterFieldName      FilterField = "name"
+	FilterFieldCreatedAt FilterField = "createdAt"
+)
+
+// AllValues returns all FilterField values.
+func (FilterField) AllValues() []FilterField {
+	return []FilterField{
+		FilterFieldName,
+		FilterFieldCreatedAt,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FilterField) MarshalText() ([]byte, error) {
+	switch s {
+	case FilterFieldName:
+		return []byte(s), nil
+	case FilterFieldCreatedAt:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FilterField) UnmarshalText(data []byte) error {
+	switch FilterField(data) {
+	case FilterFieldName:
+		*s = FilterFieldName
+		return nil
+	case FilterFieldCreatedAt:
+		*s = FilterFieldCreatedAt
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Filter operation defines the operations which can be used when filtering on a
+// query endpoint.
+// Ref: #
+type FilterOperation string
+
+const (
+	FilterOperationEquals             FilterOperation = "equals"
+	FilterOperationNotEquals          FilterOperation = "not_equals"
+	FilterOperationContains           FilterOperation = "contains"
+	FilterOperationNotContains        FilterOperation = "not_contains"
+	FilterOperationLessThan           FilterOperation = "less_than"
+	FilterOperationLessThanOrEqual    FilterOperation = "less_than_or_equal"
+	FilterOperationGreaterThan        FilterOperation = "greater_than"
+	FilterOperationGreaterThanOrEqual FilterOperation = "greater_than_or_equal"
+)
+
+// AllValues returns all FilterOperation values.
+func (FilterOperation) AllValues() []FilterOperation {
+	return []FilterOperation{
+		FilterOperationEquals,
+		FilterOperationNotEquals,
+		FilterOperationContains,
+		FilterOperationNotContains,
+		FilterOperationLessThan,
+		FilterOperationLessThanOrEqual,
+		FilterOperationGreaterThan,
+		FilterOperationGreaterThanOrEqual,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FilterOperation) MarshalText() ([]byte, error) {
+	switch s {
+	case FilterOperationEquals:
+		return []byte(s), nil
+	case FilterOperationNotEquals:
+		return []byte(s), nil
+	case FilterOperationContains:
+		return []byte(s), nil
+	case FilterOperationNotContains:
+		return []byte(s), nil
+	case FilterOperationLessThan:
+		return []byte(s), nil
+	case FilterOperationLessThanOrEqual:
+		return []byte(s), nil
+	case FilterOperationGreaterThan:
+		return []byte(s), nil
+	case FilterOperationGreaterThanOrEqual:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FilterOperation) UnmarshalText(data []byte) error {
+	switch FilterOperation(data) {
+	case FilterOperationEquals:
+		*s = FilterOperationEquals
+		return nil
+	case FilterOperationNotEquals:
+		*s = FilterOperationNotEquals
+		return nil
+	case FilterOperationContains:
+		*s = FilterOperationContains
+		return nil
+	case FilterOperationNotContains:
+		*s = FilterOperationNotContains
+		return nil
+	case FilterOperationLessThan:
+		*s = FilterOperationLessThan
+		return nil
+	case FilterOperationLessThanOrEqual:
+		*s = FilterOperationLessThanOrEqual
+		return nil
+	case FilterOperationGreaterThan:
+		*s = FilterOperationGreaterThan
+		return nil
+	case FilterOperationGreaterThanOrEqual:
+		*s = FilterOperationGreaterThanOrEqual
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Filter-value specifies which values can be filtered by a query endpoint. This
+// is a union of types. When a value is specified which is not assignable to the
+// field which is being filtered, a 400 error will be returned.
+// Ref: #
+// FilterValue represents sum type.
+type FilterValue struct {
+	Type    FilterValueType // switch on this field
+	String  string
+	Float64 float64
+	Bool    bool
+	Null    struct{}
+}
+
+// FilterValueType is oneOf type of FilterValue.
+type FilterValueType string
+
+// Possible values for FilterValueType.
+const (
+	StringFilterValue  FilterValueType = "string"
+	Float64FilterValue FilterValueType = "float64"
+	BoolFilterValue    FilterValueType = "bool"
+	NullFilterValue    FilterValueType = "struct{}"
+)
+
+// IsString reports whether FilterValue is string.
+func (s FilterValue) IsString() bool { return s.Type == StringFilterValue }
+
+// IsFloat64 reports whether FilterValue is float64.
+func (s FilterValue) IsFloat64() bool { return s.Type == Float64FilterValue }
+
+// IsBool reports whether FilterValue is bool.
+func (s FilterValue) IsBool() bool { return s.Type == BoolFilterValue }
+
+// IsNull reports whether FilterValue is struct{}.
+func (s FilterValue) IsNull() bool { return s.Type == NullFilterValue }
+
+// SetString sets FilterValue to string.
+func (s *FilterValue) SetString(v string) {
+	s.Type = StringFilterValue
+	s.String = v
+}
+
+// GetString returns string and true boolean if FilterValue is string.
+func (s FilterValue) GetString() (v string, ok bool) {
+	if !s.IsString() {
+		return v, false
+	}
+	return s.String, true
+}
+
+// NewStringFilterValue returns new FilterValue from string.
+func NewStringFilterValue(v string) FilterValue {
+	var s FilterValue
+	s.SetString(v)
+	return s
+}
+
+// SetFloat64 sets FilterValue to float64.
+func (s *FilterValue) SetFloat64(v float64) {
+	s.Type = Float64FilterValue
+	s.Float64 = v
+}
+
+// GetFloat64 returns float64 and true boolean if FilterValue is float64.
+func (s FilterValue) GetFloat64() (v float64, ok bool) {
+	if !s.IsFloat64() {
+		return v, false
+	}
+	return s.Float64, true
+}
+
+// NewFloat64FilterValue returns new FilterValue from float64.
+func NewFloat64FilterValue(v float64) FilterValue {
+	var s FilterValue
+	s.SetFloat64(v)
+	return s
+}
+
+// SetBool sets FilterValue to bool.
+func (s *FilterValue) SetBool(v bool) {
+	s.Type = BoolFilterValue
+	s.Bool = v
+}
+
+// GetBool returns bool and true boolean if FilterValue is bool.
+func (s FilterValue) GetBool() (v bool, ok bool) {
+	if !s.IsBool() {
+		return v, false
+	}
+	return s.Bool, true
+}
+
+// NewBoolFilterValue returns new FilterValue from bool.
+func NewBoolFilterValue(v bool) FilterValue {
+	var s FilterValue
+	s.SetBool(v)
+	return s
+}
+
+// SetNull sets FilterValue to struct{}.
+func (s *FilterValue) SetNull(v struct{}) {
+	s.Type = NullFilterValue
+	s.Null = v
+}
+
+// GetNull returns struct{} and true boolean if FilterValue is struct{}.
+func (s FilterValue) GetNull() (v struct{}, ok bool) {
+	if !s.IsNull() {
+		return v, false
+	}
+	return s.Null, true
+}
+
+// NewNullFilterValue returns new FilterValue from struct{}.
+func NewNullFilterValue(v struct{}) FilterValue {
+	var s FilterValue
+	s.SetNull(v)
+	return s
 }
 
 // Scopes which teams or apps this flow definition applies to. Empty or
@@ -3740,7 +4078,16 @@ type FlowStep struct {
 	// Step name from the flow definition.
 	Name  string       `json:"name"`
 	Texts OptStepTexts `json:"texts"`
-	// Error message from a previous failed submission.
+	// Error from a previous failed submission. Field-validation failures
+	// carry localisation text keys: `error.<field>_<rule>` per violation
+	// (e.g. `error.email_required`; the `format` rule is spelled
+	// `error.<field>_invalid`), multiple violations joined with `"; "`.
+	// Field names appear verbatim, so clients localise unknown keys via
+	// the generic `error.field_<rule>` catalog entries. Other engine
+	// failures carry `error.*` catalog keys as well (e.g.
+	// `error.invalid_credentials`, `error.passkey_invalid`); a
+	// non-`error.` payload is an outcome token (e.g. `user_not_found`)
+	// that clients keep verbatim.
 	Error OptNilString `json:"error"`
 	// Present only on terminal steps. Tells the frontend what to do:
 	// - redirect: navigate to redirect_uri immediately (OIDC/SAML done)
@@ -4433,6 +4780,102 @@ func (s GetLiveOK) Read(p []byte) (n int, err error) {
 
 func (*GetLiveOK) getLiveRes() {}
 
+// GetMySessionErrorResponse represents sum type.
+type GetMySessionErrorResponse struct {
+	Type         GetMySessionErrorResponseType // switch on this field
+	SessNotFound SessNotFound
+	Internal     Internal
+}
+
+// GetMySessionErrorResponseType is oneOf type of GetMySessionErrorResponse.
+type GetMySessionErrorResponseType string
+
+// Possible values for GetMySessionErrorResponseType.
+const (
+	SessNotFoundGetMySessionErrorResponse GetMySessionErrorResponseType = "sess.not_found"
+	InternalGetMySessionErrorResponse     GetMySessionErrorResponseType = "internal"
+)
+
+// IsSessNotFound reports whether GetMySessionErrorResponse is SessNotFound.
+func (s GetMySessionErrorResponse) IsSessNotFound() bool {
+	return s.Type == SessNotFoundGetMySessionErrorResponse
+}
+
+// IsInternal reports whether GetMySessionErrorResponse is Internal.
+func (s GetMySessionErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetMySessionErrorResponse
+}
+
+// SetSessNotFound sets GetMySessionErrorResponse to SessNotFound.
+func (s *GetMySessionErrorResponse) SetSessNotFound(v SessNotFound) {
+	s.Type = SessNotFoundGetMySessionErrorResponse
+	s.SessNotFound = v
+}
+
+// GetSessNotFound returns SessNotFound and true boolean if GetMySessionErrorResponse is SessNotFound.
+func (s GetMySessionErrorResponse) GetSessNotFound() (v SessNotFound, ok bool) {
+	if !s.IsSessNotFound() {
+		return v, false
+	}
+	return s.SessNotFound, true
+}
+
+// NewSessNotFoundGetMySessionErrorResponse returns new GetMySessionErrorResponse from SessNotFound.
+func NewSessNotFoundGetMySessionErrorResponse(v SessNotFound) GetMySessionErrorResponse {
+	var s GetMySessionErrorResponse
+	s.SetSessNotFound(v)
+	return s
+}
+
+// SetInternal sets GetMySessionErrorResponse to Internal.
+func (s *GetMySessionErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetMySessionErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetMySessionErrorResponse is Internal.
+func (s GetMySessionErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetMySessionErrorResponse returns new GetMySessionErrorResponse from Internal.
+func NewInternalGetMySessionErrorResponse(v Internal) GetMySessionErrorResponse {
+	var s GetMySessionErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// GetMySessionErrorResponseStatusCode wraps GetMySessionErrorResponse with StatusCode.
+type GetMySessionErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetMySessionErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetMySessionErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetMySessionErrorResponseStatusCode) GetResponse() GetMySessionErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetMySessionErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetMySessionErrorResponseStatusCode) SetResponse(val GetMySessionErrorResponse) {
+	s.Response = val
+}
+
+func (*GetMySessionErrorResponseStatusCode) getMySessionRes() {}
+
 type GetMySessionNotFound ErrorDetails
 
 func (*GetMySessionNotFound) getMySessionRes() {}
@@ -4463,6 +4906,10 @@ func (*GetProjectNotFound) getProjectRes() {}
 type GetProjectResponse struct {
 	// The unique identifier of the project.
 	ID string `json:"id"`
+	// The name of the project.
+	Name string `json:"name"`
+	// Origins which are allowed for previewing and testing the project.
+	PreviewOrigins []string `json:"previewOrigins"`
 	// The time when the project was created.
 	CreatedAt time.Time `json:"createdAt"`
 	// The time when the project was last updated.
@@ -4472,6 +4919,16 @@ type GetProjectResponse struct {
 // GetID returns the value of ID.
 func (s *GetProjectResponse) GetID() string {
 	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *GetProjectResponse) GetName() string {
+	return s.Name
+}
+
+// GetPreviewOrigins returns the value of PreviewOrigins.
+func (s *GetProjectResponse) GetPreviewOrigins() []string {
+	return s.PreviewOrigins
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -4489,6 +4946,16 @@ func (s *GetProjectResponse) SetID(val string) {
 	s.ID = val
 }
 
+// SetName sets the value of Name.
+func (s *GetProjectResponse) SetName(val string) {
+	s.Name = val
+}
+
+// SetPreviewOrigins sets the value of PreviewOrigins.
+func (s *GetProjectResponse) SetPreviewOrigins(val []string) {
+	s.PreviewOrigins = val
+}
+
 // SetCreatedAt sets the value of CreatedAt.
 func (s *GetProjectResponse) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
@@ -4499,7 +4966,8 @@ func (s *GetProjectResponse) SetUpdatedAt(val time.Time) {
 	s.UpdatedAt = val
 }
 
-func (*GetProjectResponse) getProjectRes() {}
+func (*GetProjectResponse) getProjectRes()   {}
+func (*GetProjectResponse) patchProjectRes() {}
 
 type GetProjectUnauthorized ErrorDetails
 
@@ -4568,6 +5036,100 @@ func NewUserSchemaGetSchemaByIdOK(v UserSchema) GetSchemaByIdOK {
 }
 
 func (*GetSchemaByIdOK) getSchemaByIdRes() {}
+
+// GetSessionErrorResponse represents sum type.
+type GetSessionErrorResponse struct {
+	Type         GetSessionErrorResponseType // switch on this field
+	SessNotFound SessNotFound
+	Internal     Internal
+}
+
+// GetSessionErrorResponseType is oneOf type of GetSessionErrorResponse.
+type GetSessionErrorResponseType string
+
+// Possible values for GetSessionErrorResponseType.
+const (
+	SessNotFoundGetSessionErrorResponse GetSessionErrorResponseType = "sess.not_found"
+	InternalGetSessionErrorResponse     GetSessionErrorResponseType = "internal"
+)
+
+// IsSessNotFound reports whether GetSessionErrorResponse is SessNotFound.
+func (s GetSessionErrorResponse) IsSessNotFound() bool {
+	return s.Type == SessNotFoundGetSessionErrorResponse
+}
+
+// IsInternal reports whether GetSessionErrorResponse is Internal.
+func (s GetSessionErrorResponse) IsInternal() bool { return s.Type == InternalGetSessionErrorResponse }
+
+// SetSessNotFound sets GetSessionErrorResponse to SessNotFound.
+func (s *GetSessionErrorResponse) SetSessNotFound(v SessNotFound) {
+	s.Type = SessNotFoundGetSessionErrorResponse
+	s.SessNotFound = v
+}
+
+// GetSessNotFound returns SessNotFound and true boolean if GetSessionErrorResponse is SessNotFound.
+func (s GetSessionErrorResponse) GetSessNotFound() (v SessNotFound, ok bool) {
+	if !s.IsSessNotFound() {
+		return v, false
+	}
+	return s.SessNotFound, true
+}
+
+// NewSessNotFoundGetSessionErrorResponse returns new GetSessionErrorResponse from SessNotFound.
+func NewSessNotFoundGetSessionErrorResponse(v SessNotFound) GetSessionErrorResponse {
+	var s GetSessionErrorResponse
+	s.SetSessNotFound(v)
+	return s
+}
+
+// SetInternal sets GetSessionErrorResponse to Internal.
+func (s *GetSessionErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetSessionErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetSessionErrorResponse is Internal.
+func (s GetSessionErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetSessionErrorResponse returns new GetSessionErrorResponse from Internal.
+func NewInternalGetSessionErrorResponse(v Internal) GetSessionErrorResponse {
+	var s GetSessionErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// GetSessionErrorResponseStatusCode wraps GetSessionErrorResponse with StatusCode.
+type GetSessionErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetSessionErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetSessionErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetSessionErrorResponseStatusCode) GetResponse() GetSessionErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetSessionErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetSessionErrorResponseStatusCode) SetResponse(val GetSessionErrorResponse) {
+	s.Response = val
+}
+
+func (*GetSessionErrorResponseStatusCode) getSessionRes() {}
 
 type GetSessionNotFound ErrorDetails
 
@@ -5589,6 +6151,39 @@ func (s *KeysResponseKeysItem) SetX5tS256(val OptString) {
 	s.X5tS256 = val
 }
 
+type Limit int
+
+type ListBrandingResponse []ListBrandingResponseItem
+
+func (*ListBrandingResponse) listBrandingRes() {}
+
+type ListBrandingResponseItem struct {
+	// The unique identifier of this branding revision.
+	ID string `json:"id"`
+	// When this revision was published.
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetID returns the value of ID.
+func (s *ListBrandingResponseItem) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ListBrandingResponseItem) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetID sets the value of ID.
+func (s *ListBrandingResponseItem) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ListBrandingResponseItem) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
 type ListFlowDefinitionsPurpose string
 
 const (
@@ -5776,6 +6371,31 @@ func (s *ListUsersOKItem) init() ListUsersOKItem {
 		*s = m
 	}
 	return m
+}
+
+type NextgenSession struct {
+	APIKey string
+	Roles  []string
+}
+
+// GetAPIKey returns the value of APIKey.
+func (s *NextgenSession) GetAPIKey() string {
+	return s.APIKey
+}
+
+// GetRoles returns the value of Roles.
+func (s *NextgenSession) GetRoles() []string {
+	return s.Roles
+}
+
+// SetAPIKey sets the value of APIKey.
+func (s *NextgenSession) SetAPIKey(val string) {
+	s.APIKey = val
+}
+
+// SetRoles sets the value of Roles.
+func (s *NextgenSession) SetRoles(val []string) {
+	s.Roles = val
 }
 
 type OAuth2 struct {
@@ -7378,6 +7998,52 @@ func (o OptFieldValidationFormat) Or(d FieldValidationFormat) FieldValidationFor
 	return d
 }
 
+// NewOptFilterValue returns new OptFilterValue with value set to v.
+func NewOptFilterValue(v FilterValue) OptFilterValue {
+	return OptFilterValue{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFilterValue is optional FilterValue.
+type OptFilterValue struct {
+	Value FilterValue
+	Set   bool
+}
+
+// IsSet returns true if OptFilterValue was set.
+func (o OptFilterValue) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFilterValue) Reset() {
+	var v FilterValue
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFilterValue) SetTo(v FilterValue) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFilterValue) Get() (v FilterValue, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFilterValue) Or(d FilterValue) FilterValue {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptFlowAudience returns new OptFlowAudience with value set to v.
 func NewOptFlowAudience(v FlowAudience) OptFlowAudience {
 	return OptFlowAudience{
@@ -8298,6 +8964,52 @@ func (o OptIssueChallengeRequestPasskeyOptionsUserVerification) Or(d IssueChalle
 	return d
 }
 
+// NewOptLimit returns new OptLimit with value set to v.
+func NewOptLimit(v Limit) OptLimit {
+	return OptLimit{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptLimit is optional Limit.
+type OptLimit struct {
+	Value Limit
+	Set   bool
+}
+
+// IsSet returns true if OptLimit was set.
+func (o OptLimit) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptLimit) Reset() {
+	var v Limit
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptLimit) SetTo(v Limit) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptLimit) Get() (v Limit, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptLimit) Or(d Limit) Limit {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptListFlowDefinitionsPurpose returns new OptListFlowDefinitionsPurpose with value set to v.
 func NewOptListFlowDefinitionsPurpose(v ListFlowDefinitionsPurpose) OptListFlowDefinitionsPurpose {
 	return OptListFlowDefinitionsPurpose{
@@ -9141,6 +9853,52 @@ func (o OptPostTokenRequestGrantType) Or(d PostTokenRequestGrantType) PostTokenR
 	return d
 }
 
+// NewOptQueryProjectsRequestSorting returns new OptQueryProjectsRequestSorting with value set to v.
+func NewOptQueryProjectsRequestSorting(v QueryProjectsRequestSorting) OptQueryProjectsRequestSorting {
+	return OptQueryProjectsRequestSorting{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptQueryProjectsRequestSorting is optional QueryProjectsRequestSorting.
+type OptQueryProjectsRequestSorting struct {
+	Value QueryProjectsRequestSorting
+	Set   bool
+}
+
+// IsSet returns true if OptQueryProjectsRequestSorting was set.
+func (o OptQueryProjectsRequestSorting) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptQueryProjectsRequestSorting) Reset() {
+	var v QueryProjectsRequestSorting
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptQueryProjectsRequestSorting) SetTo(v QueryProjectsRequestSorting) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptQueryProjectsRequestSorting) Get() (v QueryProjectsRequestSorting, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptQueryProjectsRequestSorting) Or(d QueryProjectsRequestSorting) QueryProjectsRequestSorting {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptSchemaURI returns new OptSchemaURI with value set to v.
 func NewOptSchemaURI(v SchemaURI) OptSchemaURI {
 	return OptSchemaURI{
@@ -9181,6 +9939,52 @@ func (o OptSchemaURI) Get() (v SchemaURI, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptSchemaURI) Or(d SchemaURI) SchemaURI {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSessNotFoundDetails returns new OptSessNotFoundDetails with value set to v.
+func NewOptSessNotFoundDetails(v SessNotFoundDetails) OptSessNotFoundDetails {
+	return OptSessNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSessNotFoundDetails is optional SessNotFoundDetails.
+type OptSessNotFoundDetails struct {
+	Value SessNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSessNotFoundDetails was set.
+func (o OptSessNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSessNotFoundDetails) Reset() {
+	var v SessNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSessNotFoundDetails) SetTo(v SessNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSessNotFoundDetails) Get() (v SessNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSessNotFoundDetails) Or(d SessNotFoundDetails) SessNotFoundDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -9914,6 +10718,34 @@ func (s *PasswordProof) SetPassword(val string) {
 	s.Password = val
 }
 
+type PatchProjectBadRequest ErrorDetails
+
+func (*PatchProjectBadRequest) patchProjectRes() {}
+
+type PatchProjectNotFound ErrorDetails
+
+func (*PatchProjectNotFound) patchProjectRes() {}
+
+// Ref: #
+type PatchProjectRequest struct {
+	// The name of the project.
+	Name OptNilString `json:"name"`
+}
+
+// GetName returns the value of Name.
+func (s *PatchProjectRequest) GetName() OptNilString {
+	return s.Name
+}
+
+// SetName sets the value of Name.
+func (s *PatchProjectRequest) SetName(val OptNilString) {
+	s.Name = val
+}
+
+type PatchProjectUnauthorized ErrorDetails
+
+func (*PatchProjectUnauthorized) patchProjectRes() {}
+
 // Ref: #
 type PostTokenRequest struct {
 	// The authorization code received from the authorization server. Required
@@ -10077,6 +10909,168 @@ func (s *PostTokenRequestGrantType) UnmarshalText(data []byte) error {
 }
 
 type ProjectID string
+
+type QueryProjectsBadRequest ErrorDetails
+
+func (*QueryProjectsBadRequest) queryProjectsRes() {}
+
+type QueryProjectsForbidden ErrorDetails
+
+func (*QueryProjectsForbidden) queryProjectsRes() {}
+
+// Request to query projects.
+// Ref: #
+type QueryProjectsRequest struct {
+	Limit OptLimit `json:"limit"`
+	// Token to retrieve the next page of results.
+	PageToken OptNilPageToken                `json:"page_token"`
+	Sorting   OptQueryProjectsRequestSorting `json:"sorting"`
+	// Filter criteria for querying projects.
+	Filter []QueryProjectsRequestFilterItem `json:"filter"`
+}
+
+// GetLimit returns the value of Limit.
+func (s *QueryProjectsRequest) GetLimit() OptLimit {
+	return s.Limit
+}
+
+// GetPageToken returns the value of PageToken.
+func (s *QueryProjectsRequest) GetPageToken() OptNilPageToken {
+	return s.PageToken
+}
+
+// GetSorting returns the value of Sorting.
+func (s *QueryProjectsRequest) GetSorting() OptQueryProjectsRequestSorting {
+	return s.Sorting
+}
+
+// GetFilter returns the value of Filter.
+func (s *QueryProjectsRequest) GetFilter() []QueryProjectsRequestFilterItem {
+	return s.Filter
+}
+
+// SetLimit sets the value of Limit.
+func (s *QueryProjectsRequest) SetLimit(val OptLimit) {
+	s.Limit = val
+}
+
+// SetPageToken sets the value of PageToken.
+func (s *QueryProjectsRequest) SetPageToken(val OptNilPageToken) {
+	s.PageToken = val
+}
+
+// SetSorting sets the value of Sorting.
+func (s *QueryProjectsRequest) SetSorting(val OptQueryProjectsRequestSorting) {
+	s.Sorting = val
+}
+
+// SetFilter sets the value of Filter.
+func (s *QueryProjectsRequest) SetFilter(val []QueryProjectsRequestFilterItem) {
+	s.Filter = val
+}
+
+type QueryProjectsRequestFilterItem struct {
+	// The field to filter by.
+	Field     FilterField     `json:"field"`
+	Value     OptFilterValue  `json:"value"`
+	Operation FilterOperation `json:"operation"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryProjectsRequestFilterItem) GetField() FilterField {
+	return s.Field
+}
+
+// GetValue returns the value of Value.
+func (s *QueryProjectsRequestFilterItem) GetValue() OptFilterValue {
+	return s.Value
+}
+
+// GetOperation returns the value of Operation.
+func (s *QueryProjectsRequestFilterItem) GetOperation() FilterOperation {
+	return s.Operation
+}
+
+// SetField sets the value of Field.
+func (s *QueryProjectsRequestFilterItem) SetField(val FilterField) {
+	s.Field = val
+}
+
+// SetValue sets the value of Value.
+func (s *QueryProjectsRequestFilterItem) SetValue(val OptFilterValue) {
+	s.Value = val
+}
+
+// SetOperation sets the value of Operation.
+func (s *QueryProjectsRequestFilterItem) SetOperation(val FilterOperation) {
+	s.Operation = val
+}
+
+type QueryProjectsRequestSorting struct {
+	// The field to sort by.
+	Field FilterField `json:"field"`
+	// The direction to sort by.
+	Direction SortDirection `json:"direction"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryProjectsRequestSorting) GetField() FilterField {
+	return s.Field
+}
+
+// GetDirection returns the value of Direction.
+func (s *QueryProjectsRequestSorting) GetDirection() SortDirection {
+	return s.Direction
+}
+
+// SetField sets the value of Field.
+func (s *QueryProjectsRequestSorting) SetField(val FilterField) {
+	s.Field = val
+}
+
+// SetDirection sets the value of Direction.
+func (s *QueryProjectsRequestSorting) SetDirection(val SortDirection) {
+	s.Direction = val
+}
+
+// Paginated list of projects.
+// Ref: #
+type QueryProjectsResponse struct {
+	Projects []GetProjectResponse `json:"projects"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetProjects returns the value of Projects.
+func (s *QueryProjectsResponse) GetProjects() []GetProjectResponse {
+	return s.Projects
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *QueryProjectsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetProjects sets the value of Projects.
+func (s *QueryProjectsResponse) SetProjects(val []GetProjectResponse) {
+	s.Projects = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *QueryProjectsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*QueryProjectsResponse) queryProjectsRes() {}
+
+type QueryProjectsTooManyRequests ErrorDetails
+
+func (*QueryProjectsTooManyRequests) queryProjectsRes() {}
+
+type QueryProjectsUnauthorized ErrorDetails
+
+func (*QueryProjectsUnauthorized) queryProjectsRes() {}
 
 type RevokeMySessionConflict ErrorDetails
 
@@ -10242,6 +11236,59 @@ func (s *SchemaURL) SetURL(val url.URL) {
 	s.URL = val
 }
 
+// Merged schema.
+// Ref: #
+type SessNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSessNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SessNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SessNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SessNotFound) GetDetails() OptSessNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SessNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SessNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SessNotFound) SetDetails(val OptSessNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SessNotFoundDetails map[string]jx.Raw
+
+func (s *SessNotFoundDetails) init() SessNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 type SessionID string
 
 // Paginated list of sessions.
@@ -10294,6 +11341,21 @@ type SessionResponse struct {
 	// The authenticated user. Null for anonymous sessions and until the `user`
 	// factor has been verified through an `auth_attempt`.
 	UserID OptNilUserID `json:"user_id"`
+	// Human-readable name of the authenticated user, resolved from the
+	// conventional user-schema properties: `name` when defined, otherwise
+	// the given and family name parts joined — `givenName`/`familyName`
+	// (the shipped presets' spelling) or `given_name`/`family_name`. Only
+	// present on reads that hydrate the user's identity
+	// (`GET /sessions/me`) and only when the session has an authenticated
+	// user whose schema carries those properties; clients fall back to
+	// `email`, then `user_id`.
+	Name OptString `json:"name"`
+	// Email address of the authenticated user, resolved from the
+	// conventional `email` user-schema property. Only present on reads
+	// that hydrate the user's identity (`GET /sessions/me`) and only when
+	// the session has an authenticated user whose schema carries that
+	// property.
+	Email OptString `json:"email"`
 	// Verified authentication factors accumulated by this session.
 	// Each key is a factor type (e.g. `password`, `totp`, `passkey`).
 	// Each value is a factor event object with at least `verified_at` and
@@ -10333,6 +11395,16 @@ func (s *SessionResponse) GetState() SessionResponseState {
 // GetUserID returns the value of UserID.
 func (s *SessionResponse) GetUserID() OptNilUserID {
 	return s.UserID
+}
+
+// GetName returns the value of Name.
+func (s *SessionResponse) GetName() OptString {
+	return s.Name
+}
+
+// GetEmail returns the value of Email.
+func (s *SessionResponse) GetEmail() OptString {
+	return s.Email
 }
 
 // GetFactors returns the value of Factors.
@@ -10383,6 +11455,16 @@ func (s *SessionResponse) SetState(val SessionResponseState) {
 // SetUserID sets the value of UserID.
 func (s *SessionResponse) SetUserID(val OptNilUserID) {
 	s.UserID = val
+}
+
+// SetName sets the value of Name.
+func (s *SessionResponse) SetName(val OptString) {
+	s.Name = val
+}
+
+// SetEmail sets the value of Email.
+func (s *SessionResponse) SetEmail(val OptString) {
+	s.Email = val
 }
 
 // SetFactors sets the value of Factors.
@@ -10644,6 +11726,48 @@ func (s *SetUserPasswordRequest) SetPassword(val string) {
 // SetIsChangeRequired sets the value of IsChangeRequired.
 func (s *SetUserPasswordRequest) SetIsChangeRequired(val OptBool) {
 	s.IsChangeRequired = val
+}
+
+// Ref: #
+type SortDirection string
+
+const (
+	SortDirectionAsc  SortDirection = "asc"
+	SortDirectionDesc SortDirection = "desc"
+)
+
+// AllValues returns all SortDirection values.
+func (SortDirection) AllValues() []SortDirection {
+	return []SortDirection{
+		SortDirectionAsc,
+		SortDirectionDesc,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s SortDirection) MarshalText() ([]byte, error) {
+	switch s {
+	case SortDirectionAsc:
+		return []byte(s), nil
+	case SortDirectionDesc:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *SortDirection) UnmarshalText(data []byte) error {
+	switch SortDirection(data) {
+	case SortDirectionAsc:
+		*s = SortDirectionAsc
+		return nil
+	case SortDirectionDesc:
+		*s = SortDirectionDesc
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Configuration for a user-invokable action on a step. The `name` is sent

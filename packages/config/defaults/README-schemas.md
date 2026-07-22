@@ -27,10 +27,10 @@ Here's a simplified example:
   "required": [
     "firstName"
   ],
-  "x-auth-methods": [
-    "password",
-    "passkey"
-  ]
+  "x-auth-methods": {
+    "password": { "enabled": true, "position": 1 },
+    "passkey": { "enabled": true, "position": 2 }
+  }
 }
 ```
 
@@ -118,11 +118,17 @@ Remove it from `required`.
 
 ## Enable passkeys
 
-Update `x-auth-methods`.
+Set `"passkey": { "enabled": true }` in `x-auth-methods`.
 
 ## Create another user type
 
 Create another JSON file in this directory.
+
+## Start from a different preset
+
+`zitadel setup` scaffolds this folder from a preset (`--preset
+password-first` or `--preset passkey-first`). The preset only decides the
+starting point — everything in it is editable afterwards.
 
 ------------------------------------------------------------------------
 

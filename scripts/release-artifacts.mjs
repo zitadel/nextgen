@@ -5,7 +5,7 @@ import { chmod, copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { run, runCapture } from "./dev-process.mjs";
+import { mapWithConcurrency, run, runCapture } from "./dev-process.mjs";
 import {
   PUBLIC_PACKAGE_DIRS,
   PUBLIC_RELEASE_PACKAGES,
@@ -93,7 +93,9 @@ export async function buildServerBinaries(options = {}) {
   const runFn = options.run ?? run;
   const baseEnv = { ...process.env, ...(options.env ?? {}) };
 
-  for (const platform of platforms) {
+  // The per-platform builds are independent and the Go build cache is safe
+  // under concurrency, so cross-compile all platforms at once.
+  await mapWithConcurrency(platforms, platforms.length, async (platform) => {
     const dir = platformDir(outDir, platform);
     const output = join(dir, binaryName(platform.goos));
     await mkdir(dir, { recursive: true });
@@ -123,7 +125,7 @@ export async function buildServerBinaries(options = {}) {
         },
       },
     );
-  }
+  });
 
   return { outDir, platforms, version, gitInfo: info };
 }
@@ -227,7 +229,10 @@ export async function packPublicPackages(options = {}) {
   await rm(tarballsDir, { recursive: true, force: true });
   await mkdir(tarballsDir, { recursive: true });
 
-  for (const dir of PUBLIC_PACKAGE_DIRS) {
+  // Packs are independent (distinct package dirs, distinct tarball names in a
+  // shared destination); cap concurrency so the cli prepack rebuild and the
+  // larger packages do not stampede the runner.
+  await mapWithConcurrency(PUBLIC_PACKAGE_DIRS, 8, async (dir) => {
     const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
     await assertPublishDirectoryReady({ repoRoot, dir, manifest });
     // `pnpm pack` runs the package's `prepack`, which for @zitadel/cli rebuilds
@@ -242,7 +247,7 @@ export async function packPublicPackages(options = {}) {
       cwd: repoRoot,
       env,
     });
-  }
+  });
 
   return tarballsDir;
 }
@@ -312,19 +317,28 @@ export function hostLinuxPlatform() {
   return { goos: "linux", goarch: arch };
 }
 
-// Version tags are immutable release coordinates: once <image>:<version>
-// exists on the registry, a re-run must not rebuild or re-push it. A missing
-// manifest is the only "does not exist" signal; auth or network errors must
-// surface instead of being treated as absence.
-export async function containerImageExists(options = {}) {
+// Returns the registry manifest digest for an image, or null when the manifest
+// is absent. Auth, network, and malformed-response errors must surface instead
+// of being treated as absence.
+export async function containerImageDigest(options = {}) {
   const runCaptureFn = options.runCapture ?? runCapture;
   try {
-    await runCaptureFn("docker", ["buildx", "imagetools", "inspect", options.reference]);
-    return true;
+    const result = await runCaptureFn("docker", [
+      "buildx",
+      "imagetools",
+      "inspect",
+      options.reference,
+    ]);
+    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+    const digest = output.match(/^Digest:\s*(\S+)\s*$/m)?.[1];
+    if (!digest) {
+      throw new Error(`docker inspect returned no manifest digest for ${options.reference}`);
+    }
+    return digest;
   } catch (error) {
     const output = `${error?.stdout ?? ""}${error?.stderr ?? ""}${error?.message ?? ""}`;
     if (/not found|manifest unknown|MANIFEST_UNKNOWN|no such manifest/i.test(output)) {
-      return false;
+      return null;
     }
     throw new Error(
       `failed to check ${options.reference} on the registry: ${error?.message ?? error}`,
@@ -332,18 +346,37 @@ export async function containerImageExists(options = {}) {
   }
 }
 
-// Re-points secondary tags (e.g. :latest on stable releases) at an already
-// published version manifest without rebuilding.
+// Version tags are immutable release coordinates: once <image>:<version>
+// exists on the registry, a re-run must not rebuild or re-push it. A missing
+// manifest is the only "does not exist" signal.
+export async function containerImageExists(options = {}) {
+  return (await containerImageDigest(options)) !== null;
+}
+
+// Converges secondary tags (e.g. :latest on stable releases) on the published
+// version manifest without rebuilding. Existing-but-stale tags must be
+// re-pointed; existence alone is not enough.
 export async function ensureContainerTags(options = {}) {
   const runFn = options.run ?? run;
   const runCaptureFn = options.runCapture ?? runCapture;
   const primary = options.primary;
+  const primaryDigest = await containerImageDigest({
+    reference: primary,
+    runCapture: runCaptureFn,
+  });
+  if (!primaryDigest) {
+    throw new Error(`cannot ensure secondary tags: primary image ${primary} is missing`);
+  }
   const created = [];
   for (const tag of options.tags ?? []) {
     if (tag === primary) {
       continue;
     }
-    if (await containerImageExists({ reference: tag, runCapture: runCaptureFn })) {
+    const currentDigest = await containerImageDigest({
+      reference: tag,
+      runCapture: runCaptureFn,
+    });
+    if (currentDigest === primaryDigest) {
       continue;
     }
     await runFn("docker", ["buildx", "imagetools", "create", "-t", tag, primary]);

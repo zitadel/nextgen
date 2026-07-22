@@ -1,10 +1,19 @@
 import { rm } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 import { intro, outro } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 import { createZitadelClient } from "@zitadel/api/client";
 import type { CreateProject201 } from "@zitadel/api/generated/model";
+import {
+  BRANDING_DESIGNS,
+  DEFAULT_SETUP_PRESET,
+  DEFAULT_SETUP_USE_CASE,
+  SETUP_PRESETS,
+  SETUP_USE_CASES,
+  type SetupPreset,
+  type SetupUseCase,
+} from "@zitadel/config/defaults";
 import { consola } from "consola";
 
 import { toZitadelError, ZitadelError } from "../../lib/errors";
@@ -80,6 +89,21 @@ export default class Setup extends BaseCommand {
     "skip-install": Flags.boolean({
       description: "Do not install dependencies after setup updates package.json.",
     }),
+    preset: Flags.string({
+      description:
+        "Sign-in preset for the scaffolded schema and login flow (default: password-first).",
+      options: [...SETUP_PRESETS],
+    }),
+    "use-case": Flags.string({
+      description:
+        "Use case for the scaffolded schema fields: who signs in to the app (default: minimal).",
+      options: [...SETUP_USE_CASES],
+    }),
+    design: Flags.string({
+      description:
+        "Login design to eject into .zitadel/branding/ and publish as branding revision 1. When omitted, the login uses the built-in template; run the `branding eject` command later to customize.",
+      options: [...BRANDING_DESIGNS],
+    }),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -87,7 +111,7 @@ export default class Setup extends BaseCommand {
     try {
       await this.toMeta(flags);
     } catch (error) {
-      throw localSetupHint(error, flags.framework, this.config.version);
+      throw localSetupHint(error, retryOptionsFromFlags(flags), this.config.version);
     }
     const { cwd, nonInteractive, dryRun, force } = this.meta;
 
@@ -137,6 +161,8 @@ export default class Setup extends BaseCommand {
       scaffolded_skeleton: scaffoldedFramework,
       skip_install: Boolean(flags["skip-install"]),
       dev_port_explicit: flags["dev-port"] !== undefined,
+      preset: flags.preset ?? DEFAULT_SETUP_PRESET,
+      use_case: flags["use-case"] ?? DEFAULT_SETUP_USE_CASE,
       step: "framework_resolved",
     });
 
@@ -164,20 +190,30 @@ export default class Setup extends BaseCommand {
     let answers: SetupAnswers = {
       server: this.meta.source,
       devPort: framework.devPort,
+      preset: (flags.preset as SetupPreset | undefined) ?? DEFAULT_SETUP_PRESET,
+      useCase: (flags["use-case"] as SetupUseCase | undefined) ?? DEFAULT_SETUP_USE_CASE,
     };
 
     if (!nonInteractive && !dryRun) {
       intro("Zitadel setup");
       const promptCtx = {
         framework,
+        cwd,
         serverFlag: this.meta.serverFlag,
         devPortFromFlag: flags["dev-port"] !== undefined,
+        presetFromFlag: flags.preset !== undefined,
+        useCaseFromFlag: flags["use-case"] !== undefined,
       };
       for (const prompt of SETUP_PROMPTS) {
         answers = await prompt.ask(answers, promptCtx);
       }
       outro("Configuration captured");
     }
+
+    // The interactive prompts can override the flag/default preset and use
+    // case recorded at framework_resolved — re-record so telemetry carries
+    // the values that actually scaffold.
+    this.recordTelemetry({ preset: answers.preset, use_case: answers.useCase });
 
     const issuer = issuerFromPort(answers.devPort);
     // The DevPortPrompt can change the port interactively, so fold the answer
@@ -191,6 +227,7 @@ export default class Setup extends BaseCommand {
     // flow files through the typed resource APIs and records the returned IDs.
     consola.start(`Creating project on ${answers.server}${dryRun ? " (dry run)" : ""}`);
     const unauthClient = createZitadelClient({ baseUrl: answers.server });
+    const projectName = defaultProjectName(cwd, framework.id);
     // Register the app's own origin so the backend's origin check allows
     // requests the dev proxy forwards from it.
     const project = dryRun
@@ -199,8 +236,19 @@ export default class Setup extends BaseCommand {
           unauthClient,
           answers.server,
           this.meta.cliVersion,
+          projectName,
           issuer,
-          framework.id,
+          {
+            // Resolved values, not raw flags: the wizard may have picked the
+            // preset or dev port interactively, and the retry must reproduce
+            // those choices — the issuer registered with the project derives
+            // from the port.
+            ...retryOptionsFromFlags(flags),
+            framework: framework.id,
+            preset: answers.preset,
+            useCase: answers.useCase,
+            devPort: answers.devPort,
+          },
         );
     consola.success(`Created project ${project.id}`);
     this.recordTelemetry({ step: "project_created" });
@@ -213,6 +261,8 @@ export default class Setup extends BaseCommand {
       server: answers.server,
       cliVersion: this.meta.cliVersion,
       scaffoldedFramework,
+      preset: answers.preset,
+      useCase: answers.useCase,
     };
     consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
     const result = await orca.patcherFor(framework.id).patch(ctx, { cwd, dryRun, force });
@@ -232,6 +282,9 @@ export default class Setup extends BaseCommand {
             client: createZitadelClient({ baseUrl: answers.server, token: project.projectSecret }),
             projectId: project.id,
             force,
+            preset: answers.preset,
+            useCase: answers.useCase,
+            design: flags.design,
           });
     } catch (error) {
       // Setup is not atomic: the patcher already wrote `zitadel.json` (the
@@ -267,6 +320,7 @@ export default class Setup extends BaseCommand {
     });
 
     const installOutcome = await installDependenciesForSetup({
+      cliVersion: this.meta.cliVersion,
       cwd,
       depsAdded: result.depsAdded,
       dryRun,
@@ -302,7 +356,7 @@ export default class Setup extends BaseCommand {
       // pre-coloured rows (path/url/id helpers) survive intact.
       consola.box({
         title: "Zitadel is ready",
-        message: [renderSummary(sections), "", installOutcome.nextActions.join("\n")].join("\n"),
+        message: [renderSummary(sections), "", installOutcome.boxActions.join("\n")].join("\n"),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
     }
@@ -378,27 +432,108 @@ function dryRunProject(issuer: string): CreateProject201 {
   };
 }
 
+/**
+ * The parts of a setup invocation that a retry suggestion must reproduce.
+ * Suggested retries are followed verbatim (especially by agents), so dropping
+ * a flag here silently changes what the retry scaffolds.
+ */
+type SetupRetryOptions = {
+  framework?: string;
+  preset?: SetupPreset;
+  useCase?: SetupUseCase;
+  design?: string;
+  renderer?: string;
+  devPort?: number;
+  nonInteractive?: boolean;
+};
+
+/**
+ * Reconstructs the flag list of the current invocation for retry guidance,
+ * ending in `--server local`. Flags whose resolved value equals the default
+ * are omitted — the retry reproduces the same outcome without them.
+ */
+function setupRetryFlags(opts: SetupRetryOptions): string {
+  const parts: string[] = [];
+  if (opts.framework) {
+    parts.push(`--framework ${opts.framework}`);
+  }
+  if (opts.preset && opts.preset !== DEFAULT_SETUP_PRESET) {
+    parts.push(`--preset ${opts.preset}`);
+  }
+  if (opts.useCase && opts.useCase !== DEFAULT_SETUP_USE_CASE) {
+    parts.push(`--use-case ${opts.useCase}`);
+  }
+  if (opts.design) {
+    parts.push(`--design ${opts.design}`);
+  }
+  if (opts.renderer && opts.renderer !== "react") {
+    parts.push(`--renderer ${opts.renderer}`);
+  }
+  if (opts.devPort !== undefined) {
+    parts.push(`--dev-port ${opts.devPort}`);
+  }
+  if (opts.nonInteractive) {
+    parts.push("--non-interactive");
+  }
+  parts.push("--server local");
+  return parts.join(" ");
+}
+
+/**
+ * Retry options straight from parsed flags, for failures before the wizard
+ * resolves answers. `--non-interactive` is echoed only when explicitly passed
+ * — TTY/JSON-inferred non-interactivity re-infers itself on the retry.
+ */
+function retryOptionsFromFlags(flags: {
+  framework?: string;
+  preset?: string;
+  "use-case"?: string;
+  design?: string;
+  renderer?: string;
+  "dev-port"?: number;
+  "non-interactive"?: boolean;
+}): SetupRetryOptions {
+  return {
+    framework: flags.framework,
+    preset: flags.preset as SetupPreset | undefined,
+    useCase: flags["use-case"] as SetupUseCase | undefined,
+    design: flags.design,
+    renderer: flags.renderer,
+    devPort: flags["dev-port"],
+    nonInteractive: Boolean(flags["non-interactive"]),
+  };
+}
+
 async function createProjectWithLocalHint(
   client: ReturnType<typeof createZitadelClient>,
   server: string,
   cliVersion: string,
+  projectName: string,
   issuer: string,
-  framework: string,
+  retry: SetupRetryOptions,
 ): Promise<CreateProject201> {
   try {
+    // API contract requires a project name; generated TS models may lag
+    // briefly until `packages/api` regeneration catches up.
+    const payload = { name: projectName, previewOrigins: [issuer], seedDefaults: false } as {
+      name: string;
+      previewOrigins: string[];
+      seedDefaults: false;
+    };
     // Register the app's own origin so the backend's origin check allows the
     // requests the dev proxy forwards from it.
-    return await client.createProject({ previewOrigins: [issuer], seedDefaults: false });
+    return await client.createProject(payload as Parameters<typeof client.createProject>[0]);
   } catch (error) {
     const normalized = toZitadelError(error);
+    const retryFlags = setupRetryFlags(retry);
     throw new ZitadelError(normalized.code, normalized.message, {
       hint:
         `${normalized.hint ? `${normalized.hint} ` : ""}` +
         "If you meant to use a local Zitadel server, start it first " +
-        `and retry setup with --framework ${framework} --server local.`,
+        `and retry setup with ${retryFlags}.`,
       nextCommands: [
         publicCliCommand("start", cliVersion),
-        publicCliCommand(`setup --framework ${framework} --server local`, cliVersion),
+        publicCliCommand(`setup ${retryFlags}`, cliVersion),
       ],
       details: {
         server,
@@ -408,15 +543,18 @@ async function createProjectWithLocalHint(
   }
 }
 
-function localSetupHint(error: unknown, framework: string | undefined, cliVersion: string): unknown {
+function defaultProjectName(cwd: string, framework: string): string {
+  const fromDirectory = basename(cwd).trim();
+  return fromDirectory.length > 0 ? fromDirectory : `zitadel-${framework}-app`;
+}
+
+function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: string): unknown {
   const normalized = toZitadelError(error);
   if (normalized.code !== "E_LOCAL_SERVER_NOT_RUNNING") {
     return error;
   }
 
-  const setupCommand = framework
-    ? `setup --framework ${framework} --server local`
-    : "setup --server local";
+  const setupCommand = `setup ${setupRetryFlags(retry)}`;
 
   return new ZitadelError(normalized.code, normalized.message, {
     hint:
@@ -471,7 +609,12 @@ function describeWrittenFile(relPath: string, dryRun: boolean): string | null {
   // Mkdir ops surface in `filesWritten` alongside actual file writes.
   // They're noise at the per-step layer (the files inside them get
   // narrated on their own lines), so swallow them here.
-  if (relPath === ".zitadel" || relPath === ".zitadel/flows" || relPath === ".zitadel/schemas") {
+  if (
+    relPath === ".zitadel" ||
+    relPath === ".zitadel/flows" ||
+    relPath === ".zitadel/schemas" ||
+    relPath === ".zitadel/meta"
+  ) {
     return null;
   }
   const verb = dryRun ? "Would write" : "Wrote";
@@ -501,7 +644,12 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
     subject: "the editable default human user schema",
   },
   ".zitadel/schemas/README.md": { subject: "the schemas folder README" },
-  "app/page.tsx": { subject: "the auth home page" },
+  ".zitadel/meta/flow-definition.json": { subject: "the flow dialect spec (editor $schema)" },
+  ".zitadel/meta/user-schema.json": { subject: "the user-schema dialect spec" },
+  ".zitadel/meta/user-property.json": { subject: "the user-property dialect spec" },
+  "AGENTS.md": { subject: "the agent guidance (golden journey + config dialect)" },
+  "README.md": { subject: "the README's Zitadel section" },
+  "app/page.tsx": { subject: "the home page redirect" },
   "app/login/page.tsx": { subject: "the login page" },
   "app/register/page.tsx": { subject: "the registration page" },
   "app/profile/page.tsx": { subject: "the profile page" },
@@ -538,7 +686,7 @@ function buildSummary(opts: {
     });
   }
   for (const [label, suffix] of [
-    ["Home page", "app/page.tsx"],
+    ["Home redirect", "app/page.tsx"],
     ["Login page", "app/login/page.tsx"],
     ["Register page", "app/register/page.tsx"],
     ["Profile page", "app/profile/page.tsx"],

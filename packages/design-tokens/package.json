@@ -23,10 +23,12 @@
       "import": "./dist/tokens.mjs"
     },
     "./css/tokens.css": "./src/generated/tokens.css",
-    "./css/tailwind.css": "./src/generated/tailwind.css"
+    "./css/tailwind.css": "./src/generated/tailwind.css",
+    "./css/shadcn.css": "./src/generated/shadcn.css"
   },
   "scripts": {
     "sync": "tsx scripts/sync-from-figma.ts",
+    "sync:export": "tsx scripts/sync-from-export.ts",
     "generate": "tsx scripts/build.ts",
     "build": "tsdown",
     "test": "vitest run"
