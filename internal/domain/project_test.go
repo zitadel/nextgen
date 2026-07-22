@@ -5,18 +5,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
-
 	"github.com/zitadel/nextgen/internal/domain"
-	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 )
 
 func TestNewProject(t *testing.T) {
 	t.Parallel()
 	type args struct {
-		name                string
-		previewOrigins      []string
-		setupTokenGenerator func(generator *domainmock.MockTokenGenerator)
+		name           string
+		previewOrigins []string
 	}
 	tests := []struct {
 		name    string
@@ -28,11 +24,6 @@ func TestNewProject(t *testing.T) {
 			name: "project with name",
 			args: args{
 				name: "my-project",
-				setupTokenGenerator: func(generator *domainmock.MockTokenGenerator) {
-					generator.EXPECT().
-						Generate(gomock.Any()).Return("proj_secret", nil).
-						Times(2)
-				},
 			},
 			check: func(t *testing.T, got *domain.Project) {
 				assert.Equal(t, "my-project", got.Name)
@@ -51,14 +42,7 @@ func TestNewProject(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			ctrl := gomock.NewController(t)
-			tokenGenerator := domainmock.NewMockTokenGenerator(ctrl)
-
-			if tt.args.setupTokenGenerator != nil {
-				tt.args.setupTokenGenerator(tokenGenerator)
-			}
-
-			got, err := domain.NewProject(tt.args.name, tt.args.previewOrigins, tokenGenerator)
+			got, err := domain.NewProject(tt.args.name, tt.args.previewOrigins)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 				assert.Nil(t, got)

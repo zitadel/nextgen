@@ -98,7 +98,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 
 	client, err := helpers.NewApiClient(testServer.URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	// Two-step flow: passkey auth → passkey_register → done.
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{

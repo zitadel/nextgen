@@ -46,6 +46,9 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # Dispatch ci.yml on the sync branch so full-pr runs unattended (a PR opened
+  # by GITHUB_TOKEN otherwise leaves pull_request checks approval-required).
+  actions: write
 
 concurrency:
   group: design-tokens-sync
@@ -65,12 +68,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          # export/push land on the long-lived sync branch; figma-rest always
+          # generates from main (the script asserts CURRENT_BRANCH == main
+          # before force-pushing) so a dispatch from a feature branch cannot
+          # push the wrong source into the sync branch.
           ref: >-
             ${{
               (github.event_name == 'push'
               || (github.event_name == 'workflow_dispatch' && inputs.source == 'export'))
               && 'design-tokens/figma-sync'
-              || github.ref
+              || 'main'
             }}
           # Shallow tip only — refresh step replaces the remote.fetch refspec
           # and unshallows just main + the sync branch (fetch-depth: 0 would
