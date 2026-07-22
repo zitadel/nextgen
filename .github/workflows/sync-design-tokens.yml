@@ -161,7 +161,10 @@ jobs:
             # Plugin / export path: append on top of existing figma-export commits.
             git push origin "HEAD:$SYNC_BRANCH"
           elif [[ "$committed" == "1" ]]; then
-            # REST path checks out main; replace the sync branch tip with this result.
+            # REST path checks out main; replace the sync branch tip with this
+            # result. Fetch first so --force-with-lease can compare against the
+            # current remote tip (without a tracking ref it is an unprotected force).
+            git fetch origin "refs/heads/$SYNC_BRANCH:refs/remotes/origin/$SYNC_BRANCH" || true
             git push --force-with-lease origin "HEAD:$SYNC_BRANCH"
           else
             echo "REST sync produced no changes; leaving $SYNC_BRANCH untouched."
