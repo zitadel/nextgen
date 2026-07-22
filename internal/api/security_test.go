@@ -1,51 +1,51 @@
 package api
 
 import (
+	"errors"
 	"testing"
 
-	"github.com/go-faster/errors"
 	"github.com/ogen-go/ogen/ogenerrors"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service/mocks"
+	"go.uber.org/mock/gomock"
 )
-
-type stubTokenVerifier struct {
-	token *domain.Token
-	err   error
-}
-
-func (s stubTokenVerifier) Verify(string) (*domain.Token, error) {
-	return s.token, s.err
-}
 
 func TestHandleNextgenSession(t *testing.T) {
 	t.Parallel()
 
-	sessionID := "session-1"
-	valid := &domain.Token{
-		ProjectID: "project-1",
-		TokenID:   "token-1",
-		Type:      domain.TokenTypeSessionToken,
-		SessionID: &sessionID,
-	}
-
 	t.Run("valid token is stashed in context", func(t *testing.T) {
 		t.Parallel()
 
-		handler := NewSecurityHandler(stubTokenVerifier{token: valid})
+		token := &domain.Token{
+			ProjectID: "project-1",
+			TokenID:   "token-1",
+			Type:      domain.TokenTypeSessionToken,
+			SessionID: new("session-1"),
+		}
+
+		mock := gomock.NewController(t)
+		tokenService := mocks.NewMockTokenService(mock)
+		tokenService.EXPECT().VerifyToken(gomock.Any(), gomock.Any()).Return(token, nil)
+
+		handler := NewSecurityHandler(tokenService)
 		ctx, err := handler.HandleNextgenSession(t.Context(), api.GetMySessionOperation, api.NextgenSession{APIKey: "raw-cookie"})
 		require.NoError(t, err)
 
-		token, ok := sessionTokenFromContext(ctx)
+		got, ok := sessionTokenFromContext(ctx)
 		require.True(t, ok)
-		require.Equal(t, valid, token)
+		require.Equal(t, token, got)
 	})
 
 	t.Run("invalid token is an unsatisfied requirement", func(t *testing.T) {
 		t.Parallel()
 
-		handler := NewSecurityHandler(stubTokenVerifier{err: errors.New("bad token")})
+		mock := gomock.NewController(t)
+		tokenService := mocks.NewMockTokenService(mock)
+		tokenService.EXPECT().VerifyToken(gomock.Any(), gomock.Any()).Return(nil, errors.New("bad token"))
+
+		handler := NewSecurityHandler(tokenService)
 		_, err := handler.HandleNextgenSession(t.Context(), api.GetMySessionOperation, api.NextgenSession{APIKey: "garbage"})
 		require.ErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
 	})
@@ -53,7 +53,13 @@ func TestHandleNextgenSession(t *testing.T) {
 	t.Run("non-session token type is rejected", func(t *testing.T) {
 		t.Parallel()
 
-		handler := NewSecurityHandler(stubTokenVerifier{token: &domain.Token{Type: domain.TokenTypeOIDCAccessToken}})
+		token := &domain.Token{Type: domain.TokenTypeOIDCAccessToken}
+
+		mock := gomock.NewController(t)
+		tokenService := mocks.NewMockTokenService(mock)
+		tokenService.EXPECT().VerifyToken(gomock.Any(), gomock.Any()).Return(token, nil)
+
+		handler := NewSecurityHandler(tokenService)
 		_, err := handler.HandleNextgenSession(t.Context(), api.GetMySessionOperation, api.NextgenSession{APIKey: "raw-cookie"})
 		require.ErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
 	})
