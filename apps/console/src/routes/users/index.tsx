@@ -1,19 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  MoreVertical,
-  Plus,
-  Search,
-  Users,
-} from "lucide-react";
+import { ArrowUpDown, MoreVertical, Plus, Search, Users } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -31,7 +20,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { api } from "../../api/zitadel";
 import { field } from "../../lib/record";
@@ -42,26 +30,11 @@ export const Route = createFileRoute("/users/")({
   component: UsersScreen,
 });
 
-type UserType = "Human" | "Agent" | "Machine" | "—";
-type UserStatus = "Active" | "Invited" | "Blocked" | "—";
-
 interface UserRow {
   id: string;
   name: string;
   email: string;
-  role: string;
-  type: UserType;
-  status: UserStatus;
-  team: string;
-  lastLogin: string;
 }
-
-const TABS: { value: string; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "Human", label: "Human" },
-  { value: "Agent", label: "Agent" },
-  { value: "Machine", label: "Machine" },
-];
 
 /** Platform-correct modifier for the search shortcut hint (⌘ on Apple, Ctrl elsewhere). */
 function searchShortcutLabel(): string {
@@ -74,7 +47,6 @@ function searchShortcutLabel(): string {
 
 function UsersScreen() {
   const users = Route.useLoaderData();
-  const [tab, setTab] = useState("all");
   const [query, setQuery] = useState("");
   const [sortAsc, setSortAsc] = useState<boolean | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -102,12 +74,12 @@ function UsersScreen() {
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
     let next = users.map(toUserRow).filter((user) => {
-      const matchesTab = tab === "all" || user.type === tab;
-      const matchesQuery =
+      return (
         needle === "" ||
         user.name.toLowerCase().includes(needle) ||
-        user.email.toLowerCase().includes(needle);
-      return matchesTab && matchesQuery;
+        user.email.toLowerCase().includes(needle) ||
+        user.id.toLowerCase().includes(needle)
+      );
     });
     if (sortAsc !== null) {
       next = [...next].sort((a, b) =>
@@ -115,24 +87,13 @@ function UsersScreen() {
       );
     }
     return next;
-  }, [users, tab, query, sortAsc]);
+  }, [users, query, sortAsc]);
 
   return (
     <div className="px-4 pb-8 pt-9 sm:px-8">
       <h1 className="font-serif text-2xl leading-6 tracking-tight text-foreground">Users</h1>
 
-      {/* Mobile (`Dashboard xs`): tabs → search → full-width Add. Desktop: one row. */}
-      <div className="mt-6 flex flex-col gap-4 lg:h-10 lg:flex-row lg:items-center lg:justify-between">
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList aria-label="User type">
-            {TABS.map((item) => (
-              <TabsTrigger key={item.value} value={item.value}>
-                {item.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-
+      <div className="mt-6 flex flex-col gap-4 lg:h-10 lg:flex-row lg:items-center lg:justify-end">
         <div className="flex w-full flex-col gap-2.5 lg:w-auto lg:flex-row lg:items-center lg:gap-3">
           <div className="relative w-full lg:w-[373px]">
             <Search
@@ -163,12 +124,9 @@ function UsersScreen() {
       <div className="mt-6 overflow-hidden rounded-2xl border border-sidebar-border bg-card">
         <Table className="table-fixed text-xs">
           <colgroup>
-            <col className="w-[177px]" />
-            <col className="w-[179px]" />
-            <col className="w-[120px]" />
-            <col className="w-[80px]" />
-            <col className="w-[177px]" />
-            <col className="w-[168px]" />
+            <col className="w-[240px]" />
+            <col className="w-[280px]" />
+            <col className="w-[280px]" />
             <col className="w-[60px]" />
           </colgroup>
           <TableHeader>
@@ -181,17 +139,14 @@ function UsersScreen() {
                 Name
               </HeadCell>
               <HeadCell>Email</HeadCell>
-              <HeadCell>Role</HeadCell>
-              <HeadCell>Status</HeadCell>
-              <HeadCell>Team</HeadCell>
-              <HeadCell>Last login</HeadCell>
+              <HeadCell>ID</HeadCell>
               <TableHead className="h-14 px-2" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
               <TableRow className="border-0 hover:bg-transparent">
-                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
                   {users.length === 0 ? "No users yet." : "No users match the current filters."}
                 </TableCell>
               </TableRow>
@@ -215,17 +170,8 @@ function UsersScreen() {
                   <TableCell className="h-11 truncate px-2 py-0 text-muted-foreground">
                     {user.email}
                   </TableCell>
-                  <TableCell className="h-11 px-2 py-0">
-                    <Badge variant="outline">{user.role}</Badge>
-                  </TableCell>
-                  <TableCell className="h-11 px-2 py-0">
-                    <StatusPill status={user.status} />
-                  </TableCell>
                   <TableCell className="h-11 truncate px-2 py-0 text-foreground">
-                    {user.team}
-                  </TableCell>
-                  <TableCell className="h-11 truncate px-2 py-0 text-foreground">
-                    {user.lastLogin}
+                    {user.id}
                   </TableCell>
                   <TableCell className="h-11 px-2 py-0">
                     <RowActions name={user.name} />
@@ -236,26 +182,6 @@ function UsersScreen() {
           </TableBody>
         </Table>
       </div>
-
-      {/* The endpoint currently returns an unpaginated array. Keep the Figma
-          controls disabled until cursor metadata is available. */}
-      <div className="mt-4 flex items-center justify-end gap-4 pr-1">
-        <span className="text-xs text-muted-foreground tabular-nums">1/1</span>
-        <div className="flex items-center gap-1">
-          <Button variant="outline" size="icon" aria-label="First page" disabled>
-            <ChevronsLeft />
-          </Button>
-          <Button variant="outline" size="icon" aria-label="Previous page" disabled>
-            <ChevronLeft />
-          </Button>
-          <Button variant="outline" size="icon" aria-label="Next page" disabled>
-            <ChevronRight />
-          </Button>
-          <Button variant="outline" size="icon" aria-label="Last page" disabled>
-            <ChevronsRight />
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -263,25 +189,11 @@ function UsersScreen() {
 function toUserRow(user: Record<string, unknown>, index: number): UserRow {
   const id = field(user, "id") ?? `unknown-user-${index}`;
   const email = field(user, "email") ?? "—";
-  const type = userType(field(user, "type") ?? field(user, "user_type"));
   return {
     id,
     name: field(user, "username") ?? (email === "—" ? id : email),
     email,
-    role: field(user, "role") ?? "—",
-    type,
-    status: userStatus(field(user, "status")),
-    team: field(user, "team") ?? field(user, "team_id") ?? "—",
-    lastLogin: field(user, "last_login") ?? "—",
   };
-}
-
-function userType(value: string | undefined): UserType {
-  return value === "Human" || value === "Agent" || value === "Machine" ? value : "—";
-}
-
-function userStatus(value: string | undefined): UserStatus {
-  return value === "Active" || value === "Invited" || value === "Blocked" ? value : "—";
 }
 
 function HeadCell({
@@ -315,21 +227,6 @@ function HeadCell({
       )}
     </TableHead>
   );
-}
-
-function StatusPill({ status }: { status: UserStatus }) {
-  // In Figma every status is a Badge (px-2 py-0.5) — Active/Invited are the
-  // transparent "ghost" variant, Blocked is destructive. Keeping the same
-  // padding for all three keeps the text left-aligned across rows.
-  const base = "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium";
-  if (status === "Blocked") {
-    return (
-      <span className={`${base} bg-destructive/10 text-destructive dark:bg-destructive/20`}>
-        Blocked
-      </span>
-    );
-  }
-  return <span className={`${base} text-foreground`}>{status}</span>;
 }
 
 function RowActions({ name }: { name: string }) {

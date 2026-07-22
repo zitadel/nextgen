@@ -41,33 +41,32 @@ describe("users screen", () => {
     expect(screen.getByText("maya.patel@acme.com")).toBeInTheDocument();
   });
 
-  it("shows a status pill for a blocked user", async () => {
+  it("uses schema-defined email as the display name and shows the user id", async () => {
     server.use(
       http.get(USERS_URL, () =>
-        HttpResponse.json([
-          { id: "user_1", username: "Kenji Okafor", email: "kenji@acme.com", status: "Blocked" },
-        ]),
+        HttpResponse.json([{ id: "user_1", email: "kenji@acme.com", status: "Blocked" }]),
       ),
     );
     await renderUsers();
-    expect(await screen.findByText("Blocked")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "kenji@acme.com" })).toBeInTheDocument();
+    expect(screen.getByText("user_1")).toBeInTheDocument();
+    expect(screen.queryByText("Blocked")).not.toBeInTheDocument();
   });
 
-  it("filters the table by the user-type tabs", async () => {
+  it("filters live users by name, email, or id", async () => {
     server.use(
       http.get(USERS_URL, () =>
         HttpResponse.json([
-          { id: "user_1", username: "Maya Patel", email: "maya@acme.com", type: "Human" },
-          { id: "user_2", username: "Sasha Kim", email: "sasha@acme.com", type: "Agent" },
+          { id: "user_1", username: "Maya Patel", email: "maya@acme.com" },
+          { id: "user_2", username: "Sasha Kim", email: "sasha@acme.com" },
         ]),
       ),
     );
     await renderUsers();
     expect(await screen.findByText("Maya Patel")).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("tab", { name: "Agent" }));
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search users" }), "user_2");
 
-    // Sasha Kim (Agent) remains; Maya Patel (Human) is filtered out.
     expect(await screen.findByText("Sasha Kim")).toBeInTheDocument();
     expect(screen.queryByText("Maya Patel")).not.toBeInTheDocument();
   });
