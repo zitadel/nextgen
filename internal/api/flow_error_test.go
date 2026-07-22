@@ -21,7 +21,7 @@ func TestDecodeFlowFields_sanitizedCause(t *testing.T) {
 		"email": jx.Raw(`{"secret":`),
 	})
 	require.Error(t, err)
-	assert.Equal(t, `invalid JSON for field "email"`, err.Error())
+	assert.Equal(t, `invalid value for field "email"`, err.Error())
 
 	var syntax *json.SyntaxError
 	require.ErrorAs(t, err, &syntax, "Unwrap must preserve the json.Unmarshal cause")
@@ -36,10 +36,29 @@ func TestDecodeFlowFields_sanitizedCause(t *testing.T) {
 		got[a.Key] = a.Value.String()
 	}
 	assert.Equal(t, map[string]string{
-		"kind":  "json_decode",
+		"kind":  "field_value",
 		"field": "email",
 	}, got)
 	assert.NotContains(t, fmt.Sprint(attrs), "secret")
+}
+
+func TestDecodeFlowFields_outOfRangeNumber(t *testing.T) {
+	t.Parallel()
+
+	// ogen RawAppend accepts 1e1000 as syntactically valid JSON; encoding/json
+	// cannot represent it as float64, so decodeFlowFields must fail with a
+	// field-value message (not "invalid JSON").
+	_, err := decodeFlowFields(map[string]jx.Raw{
+		"score": jx.Raw(`1e1000`),
+	})
+	require.Error(t, err)
+	assert.Equal(t, `invalid value for field "score"`, err.Error())
+	assert.NotContains(t, err.Error(), "JSON")
+
+	var decodeErr *flowFieldDecodeError
+	require.ErrorAs(t, err, &decodeErr)
+	assert.Equal(t, "score", decodeErr.field)
+	require.Error(t, decodeErr.err)
 }
 
 func TestSubmitFlowFieldsDecode_attachesLogSafeParent(t *testing.T) {
@@ -50,7 +69,7 @@ func TestSubmitFlowFieldsDecode_attachesLogSafeParent(t *testing.T) {
 		err:   errors.New(`invalid character '{' looking for beginning of object key string in {"password":"hunter2"}`),
 	}
 	dom := domain.ErrRequestInvalid().WithMessage(cause.Error()).WithParent(cause)
-	assert.Equal(t, `invalid JSON for field "phone"`, dom.Message)
+	assert.Equal(t, `invalid value for field "phone"`, dom.Message)
 	assert.Equal(t, cause, dom.Parent)
 
 	// Parent LogValue must not surface the unmarshal / payload fragment.
