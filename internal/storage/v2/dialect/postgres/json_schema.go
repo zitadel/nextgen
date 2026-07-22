@@ -134,14 +134,14 @@ var jsonSchemaSchema = database.NewSchema(map[domain.JSONSchemaField]database.Fi
 		Coerce:   database.CoerceString,
 	},
 	domain.JSONSchemaFieldObjectType: {
-		SQLName:  "object_type",
+		SQLName: "object_type",
 		Accessor: func(s *domain.JSONSchema) any {
 			if s.ObjectType == nil {
 				return nil
 			}
 			return *s.ObjectType
 		},
-		Coerce:   database.CoerceString,
+		Coerce: database.CoerceString,
 	},
 	domain.JSONSchemaFieldCreatedAt: {
 		SQLName:  "created_at",
