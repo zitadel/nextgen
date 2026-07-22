@@ -48,6 +48,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 	switch {
 	case strings.HasPrefix(e.Code, domain.PrefixAuthAttempt.ErrorCodePrefix("")):
 		return authAttemptErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixFlow.ErrorCodePrefix("")):
+		return flowErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixFlowDefinition.ErrorCodePrefix("")):
 		return flowDefinitionErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixSession.ErrorCodePrefix("")):
@@ -60,6 +62,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return userErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixTeam.ErrorCodePrefix("")):
 		return teamErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixProject.ErrorCodePrefix("")):
+		return projectErrorResponse(e)
 	case e.Code == domain.ErrNotImplemented().Code:
 		return errorResponseWithStatusCode(http.StatusNotImplemented, e)
 	default:

@@ -104,7 +104,7 @@ var (
 		"GET":    "Authorization",
 	}
 	rn20AllowedHeaders = map[string]string{
-		"POST": "Content-Type",
+		"POST": "Authorization,Content-Type",
 	}
 	rn44AllowedHeaders = map[string]string{
 		"GET": "Authorization",

@@ -30,6 +30,10 @@ func ErrTeamProjectNotFound() Error {
 	return newError(PrefixTeam.ErrorCodePrefix("project_not_found"), "project not found", nil, nil)
 }
 
+func ErrTeamPermissionDenied() Error {
+	return newError(PrefixTeam.ErrorCodePrefix("permission_denied"), "the team management API requires the project secret", nil, nil)
+}
+
 // Team represents the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#teams)
 // It is hardly ever modified but read a lot therefore it should be stored in global tables.
 type Team struct {

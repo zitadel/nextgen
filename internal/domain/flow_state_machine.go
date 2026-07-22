@@ -71,7 +71,7 @@ type FlowStartInput struct {
 // FlowSubmitInput carries a single client submission.
 //
 // GateProofs and SSOProvider are reserved; the state machine returns
-// [ErrUnsupported] for any flow that exercises them today.
+// [ErrFlowUnsupported] for any flow that exercises them today.
 type FlowSubmitInput struct {
 	Action      string
 	Fields      map[string]any
@@ -190,7 +190,7 @@ const FlowChallengeMethodPasskeyRegister = "passkey_register"
 const flowPasskeyDefaultUserVerification = "preferred"
 
 // FlowSessionRef pins the session row this flow runs on top of. A
-// version mismatch surfaces as [ErrSessionConflict].
+// version mismatch surfaces as [ErrFlowSessionConflict].
 type FlowSessionRef struct {
 	ID      string
 	Version int64
@@ -202,13 +202,6 @@ type FlowAuthRequestRef struct {
 	ID           string
 	RequestedACR *string
 }
-
-var (
-	ErrInvalidAction   = errors.New("flow state machine: action not allowed on current step")
-	ErrSessionConflict = errors.New("flow state machine: session version conflict")
-	ErrIntegrity       = errors.New("flow state machine: integrity violation")
-	ErrUnsupported     = errors.New("flow state machine: feature not supported in MVP")
-)
 
 // FlowStateMachineRuntime is the production [FlowStateMachine].
 type FlowStateMachineRuntime struct {
@@ -253,11 +246,11 @@ var _ FlowStateMachine = (*FlowStateMachineRuntime)(nil)
 
 func (r *FlowStateMachineRuntime) Start(ctx context.Context, client database.QueryExecutor, in FlowStartInput) (FlowStepResult, error) {
 	if in.Definition == nil {
-		return FlowStepResult{}, fmt.Errorf("%w: start without definition", ErrIntegrity)
+		return FlowStepResult{}, fmt.Errorf("%w: start without definition", ErrFlowIntegrity())
 	}
 	initialStepName, ok := in.Definition.InitialStepFor(in.Purpose)
 	if !ok {
-		return FlowStepResult{}, fmt.Errorf("%w: definition %q does not serve purpose %s", ErrIntegrity, in.Definition.ID, in.Purpose)
+		return FlowStepResult{}, fmt.Errorf("%w: definition %q does not serve purpose %s", ErrFlowIntegrity(), in.Definition.ID, in.Purpose)
 	}
 
 	state := &FlowState{
@@ -284,7 +277,7 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, client database.Que
 	}
 
 	if r.authAttempts == nil {
-		return FlowStepResult{}, fmt.Errorf("%w: auth-attempt service not wired", ErrIntegrity)
+		return FlowStepResult{}, fmt.Errorf("%w: auth-attempt service not wired", ErrFlowIntegrity())
 	}
 	attemptID, err := r.authAttempts.Start(ctx, FlowCreateAttemptInput{ProjectID: state.ProjectID})
 	if err != nil {
@@ -303,7 +296,7 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, client database.Que
 // so the cookie max-age window slides while the user is on the step.
 func (r *FlowStateMachineRuntime) Render(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState) (FlowStepResult, error) {
 	if def == nil || state == nil {
-		return FlowStepResult{}, fmt.Errorf("%w: render without definition or state", ErrIntegrity)
+		return FlowStepResult{}, fmt.Errorf("%w: render without definition or state", ErrFlowIntegrity())
 	}
 	step, err := r.renderStep(ctx, client, def, state)
 	if err != nil {
@@ -330,18 +323,18 @@ type processCtx struct {
 // the handler for its action kind.
 func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, in FlowSubmitInput) (FlowStepResult, error) {
 	if def == nil || state == nil {
-		return FlowStepResult{}, fmt.Errorf("%w: process without definition or state", ErrIntegrity)
+		return FlowStepResult{}, fmt.Errorf("%w: process without definition or state", ErrFlowIntegrity())
 	}
 	if in.SSOProvider != nil {
-		return FlowStepResult{}, fmt.Errorf("%w: sso submissions", ErrUnsupported)
+		return FlowStepResult{}, fmt.Errorf("%w: sso submissions", ErrFlowUnsupported())
 	}
 	if len(in.GateProofs) > 0 {
-		return FlowStepResult{}, fmt.Errorf("%w: gate proofs", ErrUnsupported)
+		return FlowStepResult{}, fmt.Errorf("%w: gate proofs", ErrFlowUnsupported())
 	}
 
 	currentStep, ok := def.FindStep(state.CurrentStep)
 	if !ok {
-		return FlowStepResult{}, fmt.Errorf("%w: current step %q missing from definition", ErrIntegrity, state.CurrentStep)
+		return FlowStepResult{}, fmt.Errorf("%w: current step %q missing from definition", ErrFlowIntegrity(), state.CurrentStep)
 	}
 
 	pc := &processCtx{ctx: ctx, client: client, def: def, state: state, currentStep: currentStep, in: in}
@@ -452,7 +445,7 @@ func (r *FlowStateMachineRuntime) renderStepError(pc *processCtx, resolved FlowR
 // renders (or terminates on a terminal step). When outcome differs
 // from the user-submitted action it came from a handler diversion
 // (e.g. user_not_found); a missing transition in that case degrades
-// to a step error instead of ErrInvalidAction. If irreversible,
+// to a step error instead of ErrFlowInvalidAction. If irreversible,
 // BackStack is dropped after advance.
 func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowResolvedFields, outcome string, irreversible bool) (FlowStepResult, error) {
 	transition, ok := pc.currentStep.Transitions[outcome]
@@ -461,15 +454,15 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 			msg := outcome
 			return r.renderStepError(pc, resolved, &msg), nil
 		}
-		return FlowStepResult{}, fmt.Errorf("%w: %q on step %q", ErrInvalidAction, pc.in.Action, pc.currentStep.Name)
+		return FlowStepResult{}, fmt.Errorf("%w: %q on step %q", ErrFlowInvalidAction(), pc.in.Action, pc.currentStep.Name)
 	}
 	if transition.Action != nil {
-		return FlowStepResult{}, fmt.Errorf("%w: cross-flow transitions", ErrUnsupported)
+		return FlowStepResult{}, fmt.Errorf("%w: cross-flow transitions", ErrFlowUnsupported())
 	}
 
 	nextStep, ok := pc.def.FindStep(transition.Target)
 	if !ok {
-		return FlowStepResult{}, fmt.Errorf("%w: transition target %q missing from definition", ErrIntegrity, transition.Target)
+		return FlowStepResult{}, fmt.Errorf("%w: transition target %q missing from definition", ErrFlowIntegrity(), transition.Target)
 	}
 
 	// Snapshot purpose before the flip so back can restore it.
@@ -842,7 +835,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 			return passkeyPhaseResult{}, nil
 		}
 		if in.PasskeyRP == nil {
-			return passkeyPhaseResult{}, fmt.Errorf("%w: passkey relying-party params missing", ErrIntegrity)
+			return passkeyPhaseResult{}, fmt.Errorf("%w: passkey relying-party params missing", ErrFlowIntegrity())
 		}
 		out, err := r.authAttempts.IssuePasskeyChallenge(ctx, FlowIssuePasskeyChallengeInput{
 			ProjectID:        state.ProjectID,
@@ -870,10 +863,10 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 			return passkeyPhaseResult{}, nil
 		}
 		if in.PasskeyRP == nil {
-			return passkeyPhaseResult{}, fmt.Errorf("%w: passkey relying-party params missing", ErrIntegrity)
+			return passkeyPhaseResult{}, fmt.Errorf("%w: passkey relying-party params missing", ErrFlowIntegrity())
 		}
 		if r.passkeyRegistration == nil {
-			return passkeyPhaseResult{}, fmt.Errorf("%w: passkey registration service not wired", ErrIntegrity)
+			return passkeyPhaseResult{}, fmt.Errorf("%w: passkey registration service not wired", ErrFlowIntegrity())
 		}
 		userID := state.CollectedData.UserID
 		if userID == "" {
@@ -984,7 +977,7 @@ func (r *FlowStateMachineRuntime) runOnSuccess(pc *processCtx, resolved FlowReso
 			ResolvedFlow:  pc.def,
 		})
 	default:
-		return FlowOnSuccessResult{}, fmt.Errorf("%w: on_success %s not wired", ErrIntegrity, *pc.currentStep.OnSuccess)
+		return FlowOnSuccessResult{}, fmt.Errorf("%w: on_success %s not wired", ErrFlowIntegrity(), *pc.currentStep.OnSuccess)
 	}
 }
 
@@ -1004,10 +997,10 @@ func (r *FlowStateMachineRuntime) advance(state *FlowState, prev *FlowDefinition
 func (r *FlowStateMachineRuntime) processBack(pc *processCtx) (FlowStepResult, error) {
 	prev, ok := pc.state.PeekBackStack()
 	if !ok {
-		return FlowStepResult{}, fmt.Errorf("%w: back submitted with empty back stack on step %q", ErrInvalidAction, pc.state.CurrentStep)
+		return FlowStepResult{}, fmt.Errorf("%w: back submitted with empty back stack on step %q", ErrFlowInvalidAction(), pc.state.CurrentStep)
 	}
 	if _, ok := pc.def.FindStep(prev.StepName); !ok {
-		return FlowStepResult{}, fmt.Errorf("%w: back-stack step %q missing from definition", ErrIntegrity, prev.StepName)
+		return FlowStepResult{}, fmt.Errorf("%w: back-stack step %q missing from definition", ErrFlowIntegrity(), prev.StepName)
 	}
 	pc.state.PopBackStack()
 	pc.state.CurrentStep = prev.StepName
@@ -1048,7 +1041,7 @@ func (r *FlowStateMachineRuntime) terminate(pc *processCtx, step *FlowDefinition
 	}
 
 	if pc.state.AuthAttemptID == "" {
-		return FlowStepResult{}, fmt.Errorf("%w: terminate without auth attempt id", ErrIntegrity)
+		return FlowStepResult{}, fmt.Errorf("%w: terminate without auth attempt id", ErrFlowIntegrity())
 	}
 	handoff, err := r.authAttempts.Handoff(pc.ctx, FlowHandoffInput{
 		ProjectID: pc.state.ProjectID,
@@ -1071,7 +1064,7 @@ func (r *FlowStateMachineRuntime) terminate(pc *processCtx, step *FlowDefinition
 func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState) (*FlowStep, error) {
 	step, ok := def.FindStep(state.CurrentStep)
 	if !ok {
-		return nil, fmt.Errorf("%w: render unknown step %q", ErrIntegrity, state.CurrentStep)
+		return nil, fmt.Errorf("%w: render unknown step %q", ErrFlowIntegrity(), state.CurrentStep)
 	}
 	resolved, err := r.resolveStepFields(ctx, client, state, step)
 	if err != nil {

@@ -2114,6 +2114,10 @@ type CreateTeamTooManyRequests ErrorDetails
 
 func (*CreateTeamTooManyRequests) createTeamRes() {}
 
+type CreateTeamUnauthorized ErrorDetails
+
+func (*CreateTeamUnauthorized) createTeamRes() {}
+
 type CreateUserBadRequest ErrorDetails
 
 func (*CreateUserBadRequest) createUserRes() {}

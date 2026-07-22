@@ -29,7 +29,7 @@ func NewJSONSchemaRepository(client database.QueryExecutor) *JSONSchemaRepositor
 
 	switch client.(type) {
 	case spanner.SpannerPooler:
-		return newJSONSchemaRepository(spannerTable, database.CurrentTimestampInstruction, func(b []byte) any { return string(b) })
+		return newJSONSchemaRepository(spannerTable, database.CurrentTimestampInstruction, encodeSpannerJSON)
 	case postgres.PostgresPooler:
 		return newJSONSchemaRepository(pgTable, database.NowInstruction, func(b []byte) any { return b })
 	}

@@ -20,6 +20,10 @@ type Config struct {
 	DSN string
 }
 
+func init() {
+	database.MustRegisterDialect(Name, DecodeConfig)
+}
+
 func (c *Config) Connect(ctx context.Context) (database.Pool, error) {
 	db, err := sql.Open("spanner", c.DSN)
 	if err != nil {

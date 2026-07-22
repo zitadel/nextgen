@@ -1,19 +1,12 @@
 package spanner
 
-import "github.com/zitadel/nextgen/internal/service"
-
-type queryExecutor any
+import (
+	"github.com/zitadel/nextgen/internal/service"
+)
 
 type statements struct {
 	projectStatements
 	flowDefinitionStatements
-}
-
-func newStatements(client queryExecutor) statements {
-	return statements{
-		projectStatements:        newProjectStatements(client),
-		flowDefinitionStatements: newFlowDefinitionStatements(client),
-	}
 }
 
 func (s statements) Statements() service.AllStatements {
@@ -23,10 +16,17 @@ func (s statements) Statements() service.AllStatements {
 // IsStatements implements [service.Statements].
 func (s statements) IsStatements() {}
 
+func newStatements(db queryExecutor) statements {
+	return statements{
+		projectStatements:        newProjectStatements(db),
+		flowDefinitionStatements: newFlowDefinitionStatements(db),
+	}
+}
+
 var _ service.AllStatements = (*statements)(nil)
 
 type statement struct {
-	client queryExecutor
+	db queryExecutor
 }
 
 // IsStatements implements [service.Statements].

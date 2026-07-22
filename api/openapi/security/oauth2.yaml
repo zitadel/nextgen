@@ -1,20 +1,25 @@
 type: oauth2
-flows: 
-  authorizationCode: 
+flows:
+  authorizationCode:
     authorizationUrl: https://acc.nextgen.zitadel.com/oauth/authorize
     tokenUrl: https://acc.nextgen.zitadel.com/oauth/token
-    scopes: 
+    scopes:
       openid: OpenID Connect scope
       profile: Access to the user's profile information
       email: Access to the user's email address
       schema.read: Permission to read schemas
       schema.write: Permission to create and manage schemas
-      user.write: Permission to create users
+      user.write: Permission to create and manage users
       user.read: Permission to read users
+      team.read: Permission to read teams
+      team.write: Permission to create and manage teams
+      flow_definitions.read: Permission to read flow definitions
+      flow_definitions.write: Permission to create and manage flow definitions
+      flow_definitions.delete: Permission to delete flow definitions
       project.read: Permission to read projects
       project.write: Permission to create and manage projects
-      branding.read: Permission to read branding revisions via the management API (the operator-grade project.write scope implies it until ADR 036 credential planes mint finer scopes)
-      branding.write: Permission to publish branding revisions (the operator-grade project.write scope implies it until ADR 036 credential planes mint finer scopes)
+      branding.read: Permission to read branding revisions
+      branding.write: Permission to publish branding revisions
   clientCredentials:
     tokenUrl: https://acc.nextgen.zitadel.com/oauth/token
     scopes:
@@ -22,8 +27,13 @@ flows:
       schema.read: Permission to read schemas
       schema.write: Permission to create and manage schemas
       user.read: Permission to read users
-      user.create: Permission to create users
+      user.write: Permission to create and manage users
+      team.read: Permission to read teams
+      team.write: Permission to create and manage teams
+      flow_definitions.read: Permission to read flow definitions
+      flow_definitions.write: Permission to create and manage flow definitions
+      flow_definitions.delete: Permission to delete flow definitions
       project.read: Permission to read projects
       project.write: Permission to create and manage projects
-      branding.read: Permission to read branding revisions via the management API (the operator-grade project.write scope implies it until ADR 036 credential planes mint finer scopes)
-      branding.write: Permission to publish branding revisions (the operator-grade project.write scope implies it until ADR 036 credential planes mint finer scopes)
+      branding.read: Permission to read branding revisions
+      branding.write: Permission to publish branding revisions
