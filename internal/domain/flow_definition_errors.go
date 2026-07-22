@@ -37,3 +37,7 @@ func ErrMissingProjectID() Error {
 func ErrFlowDefinitionUpdateConflict(details any) Error {
 	return newError(PrefixFlowDefinition.ErrorCodePrefix("update_conflict"), "flow definition: update conflict", details, nil)
 }
+
+func ErrFlowDefinitionPermissionDenied() Error {
+	return newError(PrefixFlowDefinition.ErrorCodePrefix("permission_denied"), "flow definition: the flow definition management API requires the project secret", nil, nil)
+}
