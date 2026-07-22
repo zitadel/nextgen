@@ -4,13 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/go-faster/jx"
 	"github.com/muhlemmer/gu"
 	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/api/ogenx"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -281,41 +279,5 @@ func sessionCookie(token string, maxAge int) string {
 }
 
 func sessionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
-	if err.Code == domain.ErrSessionInvalidTTL().Code {
-		return sessionInvalidTTLResponse(err)
-	}
 	return domainErrorResponse(err)
-}
-
-func sessionInvalidTTLResponse(err domain.Error) *api.ErrorDetailsStatusCode {
-	apiErr := &api.ErrorDetailsStatusCode{
-		StatusCode: http.StatusBadRequest,
-	}
-
-	ttlDetails, ok := err.Details.(domain.SessionInvalidTTLDetails)
-	if !ok {
-		apiErr.Response = domainErrorDetails(err)
-		return apiErr
-	}
-
-	apiErr.Response = api.ErrorDetails{
-		Code:    api.ErrorCode(err.Code),
-		Message: err.Message,
-		Details: marshalSessionInvalidTTLDetails(ttlDetails),
-	}
-	return apiErr
-}
-
-func marshalSessionInvalidTTLDetails(details domain.SessionInvalidTTLDetails) api.OptErrorDetailsDetails {
-	encoder := jx.GetEncoder()
-	defer jx.PutEncoder(encoder)
-
-	encoder.ObjStart()
-	encoder.Field("ttl", ogenx.ISODuration(details.TTL).Encode)
-	encoder.Field("max_ttl", ogenx.ISODuration(details.MaxTTL).Encode)
-	encoder.ObjEnd()
-
-	return api.NewOptErrorDetailsDetails(api.ErrorDetailsDetails{
-		"details": jx.Raw(encoder.Bytes()),
-	})
 }

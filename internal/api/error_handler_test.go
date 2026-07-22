@@ -6,10 +6,12 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/isoduration"
 )
 
 // newErrorHandlerTestServer builds the generated server around a zero-value
@@ -122,4 +124,16 @@ func TestDomainErrorDetails_structuredFieldDetails(t *testing.T) {
 
 	require.True(t, details.Details.Set)
 	require.JSONEq(t, `{"field":"score"}`, string(details.Details.Value["details"]))
+}
+
+func TestDomainErrorDetails_sessionInvalidTTLOmitsNanoseconds(t *testing.T) {
+	t.Parallel()
+
+	details := domainErrorDetails(domain.ErrSessionInvalidTTL().WithDetails(domain.SessionInvalidTTLDetails{
+		TTL:    isoduration.From(0),
+		MaxTTL: isoduration.From(24 * time.Hour),
+	}))
+
+	require.True(t, details.Details.Set)
+	require.JSONEq(t, `{"ttl":"PT0S","max_ttl":"P1D"}`, string(details.Details.Value["details"]))
 }

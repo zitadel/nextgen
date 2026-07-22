@@ -1,7 +1,6 @@
 package domain_test
 
 import (
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -65,14 +64,8 @@ func assertSessionInvalidTTLDetails(t *testing.T, err error, wantTTL, wantMax ti
 	t.Helper()
 	var domErr domain.Error
 	require.ErrorAs(t, err, &domErr)
-	require.NotNil(t, domErr.Details)
-	b, err := json.Marshal(domErr.Details)
-	require.NoError(t, err)
-	var got struct {
-		TTL    time.Duration `json:"ttl"`
-		MaxTTL time.Duration `json:"max_ttl"`
-	}
-	require.NoError(t, json.Unmarshal(b, &got))
-	assert.Equal(t, wantTTL, got.TTL)
-	assert.Equal(t, wantMax, got.MaxTTL)
+	details, ok := domErr.Details.(domain.SessionInvalidTTLDetails)
+	require.True(t, ok)
+	assert.Equal(t, wantTTL, details.TTL.Std())
+	assert.Equal(t, wantMax, details.MaxTTL.Std())
 }

@@ -23,13 +23,13 @@
 
 ## Wire shape
 
-The API nests producer payloads under `details.details` (legacy shape). Use [`marshalErrorDetails`](../../../internal/api/error_handler.go) or typed helpers — do not hand-build divergent encodings unless JSON marshalling cannot represent the type (for example ISO-8601 durations on session TTL).
+The API nests producer payloads under `details.details` (legacy shape). Use [`marshalErrorDetails`](../../../internal/api/error_handler.go) for generic encoding; typed detail structs carry their own JSON rules (for example [`isoduration.Duration`](../../../internal/isoduration/duration.go) for ISO-8601 durations).
 
 ## Reference producers
 
 ### Session TTL — `SessionInvalidTTLDetails`
 
-[`internal/domain/session.go`](../../../internal/domain/session.go) attaches `{ttl,max_ttl}` as ISO-8601 durations. Encoded by [`marshalSessionInvalidTTLDetails`](../../../internal/api/session.go).
+[`internal/domain/session.go`](../../../internal/domain/session.go) attaches `{ttl,max_ttl}` as [`isoduration.Duration`](../../../internal/isoduration/duration.go) values. Generic `json.Marshal` emits ISO-8601 strings on the wire (same format as exchange request `ttl`).
 
 ### Request field validation — `RequestInvalidFieldDetails`
 

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/muhlemmer/gu"
+	"github.com/zitadel/nextgen/internal/isoduration"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -38,14 +39,14 @@ func ErrSessionInvalidTTL() Error {
 }
 
 type SessionInvalidTTLDetails struct {
-	TTL    time.Duration `json:"ttl"`
-	MaxTTL time.Duration `json:"max_ttl"`
+	TTL    isoduration.Duration `json:"ttl"`
+	MaxTTL isoduration.Duration `json:"max_ttl"`
 }
 
 func sessionInvalidTTLErr(requested, maxTTL time.Duration) Error {
 	return ErrSessionInvalidTTL().WithDetails(SessionInvalidTTLDetails{
-		TTL:    requested,
-		MaxTTL: maxTTL,
+		TTL:    isoduration.From(requested),
+		MaxTTL: isoduration.From(maxTTL),
 	})
 }
 
