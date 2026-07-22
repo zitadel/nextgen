@@ -114,3 +114,59 @@
   outline: var(--zl-focus-width, 2px) solid var(--zl-focus-color, #f4f4f6);
   outline-offset: var(--zl-focus-offset, 2px);
 }
+/* Split-design chrome (ADR 040 design catalog: `split` / `split-right`).
+   Consumed by the ejectable templates in @zitadel/config under
+   defaults/branding/ — a brand pane beside the form pane, collapsing to
+   form-only on narrow viewports. */
+.zl-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  min-height: 100%;
+  gap: var(--zl-spacing-05, 2rem);
+}
+.zl-split__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--zl-spacing-04, 1.5rem);
+  padding: 52px 16px;
+}
+.zl-split__logo {
+  max-width: min(16rem, 60%);
+}
+.zl-split__hero {
+  max-width: 100%;
+  border-radius: var(--zl-radius-m, 0.75rem);
+  object-fit: cover;
+}
+.zl-split__form {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.zl-split--right .zl-split__brand {
+  order: 2;
+}
+.zl-split--right .zl-split__form {
+  order: 1;
+}
+@media (max-width: 48rem) {
+  .zl-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .zl-split__brand {
+    display: none;
+  }
+}
+/* Minimal-design chrome (`minimal`): fields straight on the page, no card. */
+.zl-minimal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-04, 1.5rem);
+  width: min(24rem, 100%);
+  margin-inline: auto;
+  padding: 52px 16px;
+}
