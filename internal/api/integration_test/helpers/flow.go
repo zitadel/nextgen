@@ -68,4 +68,3 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 	}
 	return h.FlowStateMachine
 }
-

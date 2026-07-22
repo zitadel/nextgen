@@ -9,6 +9,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
+	"github.com/zitadel/nextgen/internal/storage/v2/flowdefinition"
 )
 
 const testProjectQuery = "SELECT id, created_at, updated_at, project_secret, preview_secret, preview_origins FROM projects"
@@ -617,7 +618,7 @@ func TestCompileStringFilter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			sql, args := compileFilterOnly(t, tt.filter, flowDefinitionSchema)
+			sql, args := compileFilterOnly(t, tt.filter, flowdefinition.Schema)
 			assert.Equal(t, tt.wantSQL, sql)
 			require.Len(t, args, 1)
 			assert.Equal(t, tt.wantArg, args[0])
@@ -717,7 +718,7 @@ func compileFlowDefinitionRead(t *testing.T, opts *database.ListOptions[domain.F
 	t.Helper()
 
 	var compiler statementCompiler
-	err := compileRead(&compiler, testFlowDefinitionQuery, opts, flowDefinitionSchema)
+	err := compileRead(&compiler, testFlowDefinitionQuery, opts, flowdefinition.Schema)
 	require.NoError(t, err)
 	return compiler.String(), compiler.args
 }

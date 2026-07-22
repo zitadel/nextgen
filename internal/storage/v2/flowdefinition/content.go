@@ -12,10 +12,10 @@ import (
 
 // Content is the structure stored inside the definition JSON/JSONB column.
 type Content struct {
-	UserSchema string             `json:"user_schema"`
-	Purposes   map[string]string  `json:"purposes"`
-	Audience   AudienceJSON       `json:"audience"`
-	Steps      []StepJSON         `json:"steps"`
+	UserSchema string            `json:"user_schema"`
+	Purposes   map[string]string `json:"purposes"`
+	Audience   AudienceJSON      `json:"audience"`
+	Steps      []StepJSON        `json:"steps"`
 }
 
 type AudienceJSON struct {
@@ -66,78 +66,78 @@ func Marshal(def *domain.FlowDefinition) ([]byte, error) {
 		purposes[p.String()] = initialStep
 	}
 
-	audience := AudienceJSON{
-		AppIDs:  def.Audience.AppIDs,
-		TeamIDs: def.Audience.TeamIDs,
-	}
-
 	steps := make([]StepJSON, len(def.Steps))
 	for i, s := range def.Steps {
-		var transitions map[string]TransitionJSON
-		if len(s.Transitions) > 0 {
-			transitions = make(map[string]TransitionJSON, len(s.Transitions))
-			for name, t := range s.Transitions {
-				tr := TransitionJSON{Target: t.Target}
-				if t.Action != nil {
-					action := t.Action.String()
-					tr.Action = &action
-				}
-				transitions[name] = tr
-			}
-		}
-		stepJSON := StepJSON{
-			Name:        s.Name,
-			Fields:      domain.FieldsToStrings(s.Fields),
-			Transitions: transitions,
-		}
-		if len(s.Actions) > 0 {
-			stepJSON.Actions = make([]ActionJSON, 0, len(s.Actions))
-			for _, a := range s.Actions {
-				stepJSON.Actions = append(stepJSON.Actions, ActionJSON{
-					Name:    a.Name,
-					Kind:    a.Kind.String(),
-					TextKey: a.TextKey,
-					Primary: a.Primary,
-				})
-			}
-		}
-		if len(s.Gates) > 0 {
-			stepJSON.Gates = make(map[string]GateJSON, len(s.Gates))
-			for name, g := range s.Gates {
-				stepJSON.Gates[name] = GateJSON{
-					Kind:     g.Kind.String(),
-					Provider: g.Provider,
-					Config:   g.Config,
-				}
-			}
-		}
-		if len(s.SSOProviders) > 0 {
-			stepJSON.SSOProviders = make([]SSOProviderJSON, len(s.SSOProviders))
-			for j, p := range s.SSOProviders {
-				stepJSON.SSOProviders[j] = SSOProviderJSON{
-					ID:       p.ID,
-					Name:     p.Name,
-					Template: p.Template,
-				}
-			}
-		}
-		if s.OnSuccess != nil {
-			onSuccess := s.OnSuccess.String()
-			stepJSON.OnSuccess = &onSuccess
-		}
-		if s.Complete != nil {
-			complete := s.Complete.String()
-			stepJSON.Complete = &complete
-		}
-		steps[i] = stepJSON
+		steps[i] = marshalStep(s)
 	}
 
 	return json.Marshal(Content{
 		UserSchema: def.UserSchema,
 		Purposes:   purposes,
-		Audience:   audience,
-		Steps:      steps,
+		Audience: AudienceJSON{
+			AppIDs:  def.Audience.AppIDs,
+			TeamIDs: def.Audience.TeamIDs,
+		},
+		Steps: steps,
 	})
+}
+
+func marshalStep(s domain.FlowDefinitionStep) StepJSON {
+	out := StepJSON{
+		Name:   s.Name,
+		Fields: domain.FieldsToStrings(s.Fields),
+	}
+	if len(s.Transitions) > 0 {
+		out.Transitions = make(map[string]TransitionJSON, len(s.Transitions))
+		for name, t := range s.Transitions {
+			tr := TransitionJSON{Target: t.Target}
+			if t.Action != nil {
+				action := t.Action.String()
+				tr.Action = &action
+			}
+			out.Transitions[name] = tr
+		}
+	}
+	if len(s.Actions) > 0 {
+		out.Actions = make([]ActionJSON, 0, len(s.Actions))
+		for _, a := range s.Actions {
+			out.Actions = append(out.Actions, ActionJSON{
+				Name:    a.Name,
+				Kind:    a.Kind.String(),
+				TextKey: a.TextKey,
+				Primary: a.Primary,
+			})
+		}
+	}
+	if len(s.Gates) > 0 {
+		out.Gates = make(map[string]GateJSON, len(s.Gates))
+		for name, g := range s.Gates {
+			out.Gates[name] = GateJSON{
+				Kind:     g.Kind.String(),
+				Provider: g.Provider,
+				Config:   g.Config,
+			}
+		}
+	}
+	if len(s.SSOProviders) > 0 {
+		out.SSOProviders = make([]SSOProviderJSON, len(s.SSOProviders))
+		for j, p := range s.SSOProviders {
+			out.SSOProviders[j] = SSOProviderJSON{
+				ID:       p.ID,
+				Name:     p.Name,
+				Template: p.Template,
+			}
+		}
+	}
+	if s.OnSuccess != nil {
+		onSuccess := s.OnSuccess.String()
+		out.OnSuccess = &onSuccess
+	}
+	if s.Complete != nil {
+		complete := s.Complete.String()
+		out.Complete = &complete
+	}
+	return out
 }
 
 // PurposeStrings returns the denormalized purposes array column values.
@@ -185,78 +185,9 @@ func contentToDomain(
 
 	steps := make([]domain.FlowDefinitionStep, len(content.Steps))
 	for i, s := range content.Steps {
-		var transitions map[string]domain.FlowStepTransition
-		if len(s.Transitions) > 0 {
-			transitions = make(map[string]domain.FlowStepTransition, len(s.Transitions))
-			for name, t := range s.Transitions {
-				tr := domain.FlowStepTransition{Target: t.Target}
-				if t.Action != nil {
-					action, err := domain.FlowDefinitionTransitionActionString(*t.Action)
-					if err != nil {
-						return nil, err
-					}
-					tr.Action = &action
-				}
-				transitions[name] = tr
-			}
-		}
-		step := domain.FlowDefinitionStep{
-			Name:        s.Name,
-			Fields:      domain.FieldsFromStrings(s.Fields),
-			Transitions: transitions,
-		}
-		if len(s.Actions) > 0 {
-			step.Actions = make([]domain.FlowStepAction, 0, len(s.Actions))
-			for _, a := range s.Actions {
-				kind, err := domain.FlowActionKindString(a.Kind)
-				if err != nil {
-					return nil, fmt.Errorf("step %q: action %q has invalid kind %q: %w", s.Name, a.Name, a.Kind, err)
-				}
-				step.Actions = append(step.Actions, domain.FlowStepAction{
-					Name:    a.Name,
-					Kind:    kind,
-					TextKey: a.TextKey,
-					Primary: a.Primary,
-				})
-			}
-		}
-		if len(s.Gates) > 0 {
-			step.Gates = make(map[string]domain.FlowStepGate, len(s.Gates))
-			for name, g := range s.Gates {
-				gateKind, err := domain.FlowGateKindString(g.Kind)
-				if err != nil {
-					return nil, err
-				}
-				step.Gates[name] = domain.FlowStepGate{
-					Kind:     gateKind,
-					Provider: g.Provider,
-					Config:   g.Config,
-				}
-			}
-		}
-		if len(s.SSOProviders) > 0 {
-			step.SSOProviders = make([]domain.FlowSSOProvider, len(s.SSOProviders))
-			for j, p := range s.SSOProviders {
-				step.SSOProviders[j] = domain.FlowSSOProvider{
-					ID:       p.ID,
-					Name:     p.Name,
-					Template: p.Template,
-				}
-			}
-		}
-		if s.OnSuccess != nil {
-			onSuccess, err := domain.FlowOnSuccessString(*s.OnSuccess)
-			if err != nil {
-				return nil, err
-			}
-			step.OnSuccess = &onSuccess
-		}
-		if s.Complete != nil {
-			complete, err := domain.FlowStepCompleteString(*s.Complete)
-			if err != nil {
-				return nil, err
-			}
-			step.Complete = &complete
+		step, err := unmarshalStep(s)
+		if err != nil {
+			return nil, err
 		}
 		steps[i] = step
 	}
@@ -278,4 +209,79 @@ func contentToDomain(
 		},
 		Steps: steps,
 	}, nil
+}
+
+func unmarshalStep(s StepJSON) (domain.FlowDefinitionStep, error) {
+	step := domain.FlowDefinitionStep{
+		Name:   s.Name,
+		Fields: domain.FieldsFromStrings(s.Fields),
+	}
+	if len(s.Transitions) > 0 {
+		step.Transitions = make(map[string]domain.FlowStepTransition, len(s.Transitions))
+		for name, t := range s.Transitions {
+			tr := domain.FlowStepTransition{Target: t.Target}
+			if t.Action != nil {
+				action, err := domain.FlowDefinitionTransitionActionString(*t.Action)
+				if err != nil {
+					return step, err
+				}
+				tr.Action = &action
+			}
+			step.Transitions[name] = tr
+		}
+	}
+	if len(s.Actions) > 0 {
+		step.Actions = make([]domain.FlowStepAction, 0, len(s.Actions))
+		for _, a := range s.Actions {
+			kind, err := domain.FlowActionKindString(a.Kind)
+			if err != nil {
+				return step, fmt.Errorf("step %q: action %q has invalid kind %q: %w", s.Name, a.Name, a.Kind, err)
+			}
+			step.Actions = append(step.Actions, domain.FlowStepAction{
+				Name:    a.Name,
+				Kind:    kind,
+				TextKey: a.TextKey,
+				Primary: a.Primary,
+			})
+		}
+	}
+	if len(s.Gates) > 0 {
+		step.Gates = make(map[string]domain.FlowStepGate, len(s.Gates))
+		for name, g := range s.Gates {
+			gateKind, err := domain.FlowGateKindString(g.Kind)
+			if err != nil {
+				return step, err
+			}
+			step.Gates[name] = domain.FlowStepGate{
+				Kind:     gateKind,
+				Provider: g.Provider,
+				Config:   g.Config,
+			}
+		}
+	}
+	if len(s.SSOProviders) > 0 {
+		step.SSOProviders = make([]domain.FlowSSOProvider, len(s.SSOProviders))
+		for j, p := range s.SSOProviders {
+			step.SSOProviders[j] = domain.FlowSSOProvider{
+				ID:       p.ID,
+				Name:     p.Name,
+				Template: p.Template,
+			}
+		}
+	}
+	if s.OnSuccess != nil {
+		onSuccess, err := domain.FlowOnSuccessString(*s.OnSuccess)
+		if err != nil {
+			return step, err
+		}
+		step.OnSuccess = &onSuccess
+	}
+	if s.Complete != nil {
+		complete, err := domain.FlowStepCompleteString(*s.Complete)
+		if err != nil {
+			return step, err
+		}
+		step.Complete = &complete
+	}
+	return step, nil
 }

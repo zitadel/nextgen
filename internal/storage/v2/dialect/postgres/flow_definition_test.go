@@ -44,7 +44,7 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 					{Name: "submit", Kind: domain.FlowActionKindSubmit, TextKey: "identifier.submit", Primary: true},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					"submit": {Target: "done"},
+					"submit":   {Target: "done"},
 					"register": {Action: &pivotAction, Target: "register-flow"},
 				},
 			},
@@ -151,4 +151,31 @@ func TestFlowDefinitionStatements_ListByPurpose(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, listed.Items, 1)
 	assert.Equal(t, login.ID, listed.Items[0].ID)
+}
+
+func TestFlowDefinitionStatements_ListByStatus(t *testing.T) {
+	projectID := uniqueProjectID(t)
+	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
+	require.NoError(t, testPool.CreateProject(t.Context(), newTestProject(projectID)))
+
+	draft := sampleFlowDefinition(projectID, uniqueFlowDefinitionID(t)+"-draft")
+	active := sampleFlowDefinition(projectID, uniqueFlowDefinitionID(t)+"-active")
+	active.Name = "Active Login"
+	active.Status = domain.FlowDefinitionStatusActive
+	t.Cleanup(func() {
+		_ = testPool.DeleteFlowDefinitionByID(context.Background(), projectID, draft.ID)
+		_ = testPool.DeleteFlowDefinitionByID(context.Background(), projectID, active.ID)
+	})
+	require.NoError(t, testPool.CreateFlowDefinition(t.Context(), draft))
+	require.NoError(t, testPool.CreateFlowDefinition(t.Context(), active))
+
+	listed, err := testPool.ListFlowDefinitions(t.Context(), &database.ListOptions[domain.FlowDefinitionField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
+			database.Equal(database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
+		),
+	})
+	require.NoError(t, err)
+	require.Len(t, listed.Items, 1)
+	assert.Equal(t, active.ID, listed.Items[0].ID)
 }

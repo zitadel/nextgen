@@ -3,7 +3,6 @@ package spanner
 import (
 	"context"
 	"encoding/json"
-	"strconv"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -115,7 +114,7 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 		}
 	}
 
-	purposeValue, remaining := extractPurposeContains(opts.Filter)
+	purposeValue, remaining := flowdefinition.ExtractPurposeContains(opts.Filter)
 	opts.Filter = remaining
 
 	var compiler statementCompiler
@@ -137,7 +136,7 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 	if opts.Pagination.Limit > 0 && len(defs) == int(opts.Pagination.Limit) {
 		cursor := &pagination.Cursor[domain.FlowDefinitionField]{
 			Columns: opts.Pagination.OrderBy.Columns,
-			Values:  flowDefinitionSchema.ValuesFrom(defs[len(defs)-1], opts.Pagination.OrderBy.Columns),
+			Values:  flowdefinition.Schema.ValuesFrom(defs[len(defs)-1], opts.Pagination.OrderBy.Columns),
 		}
 		nextCursor = cursor.Marshal()
 	}
@@ -160,7 +159,7 @@ func compileFlowDefinitionList(c *statementCompiler, opt *database.ListOptions[d
 		if !cursor.MatchesOrderBy(opt.Pagination.OrderBy.Columns) {
 			return database.ErrCursorOrderMismatch()
 		}
-		values, err := flowDefinitionSchema.CoerceCursorValues(cursor.Columns, cursor.Values)
+		values, err := flowdefinition.Schema.CoerceCursorValues(cursor.Columns, cursor.Values)
 		if err != nil {
 			return database.ErrInvalidCursor().WithParent(err)
 		}
@@ -175,7 +174,7 @@ func compileFlowDefinitionList(c *statementCompiler, opt *database.ListOptions[d
 	if filter != nil || purposeValue != "" {
 		c.WriteString(" WHERE ")
 		if filter != nil {
-			compileFilter(c, filter, flowDefinitionSchema)
+			compileFilter(c, filter, flowdefinition.Schema)
 			if purposeValue != "" {
 				c.WriteString(" AND ")
 			}
@@ -186,7 +185,7 @@ func compileFlowDefinitionList(c *statementCompiler, opt *database.ListOptions[d
 		}
 	}
 
-	compileOrderBy(c, opt.Pagination.OrderBy, flowDefinitionSchema)
+	compileOrderBy(c, opt.Pagination.OrderBy, flowdefinition.Schema)
 	compileLimit(c, opt.Pagination.Limit)
 	return nil
 }
@@ -224,7 +223,7 @@ func encodeFlowDefinitionJSON(b []byte) (spanner.NullJSON, error) {
 	}
 	var v any
 	if err := json.Unmarshal(b, &v); err != nil {
-		return spanner.NullJSON{Value: string(b), Valid: true}, nil
+		return spanner.NullJSON{}, err
 	}
 	return spanner.NullJSON{Value: v, Valid: true}, nil
 }
@@ -236,124 +235,6 @@ func decodeFlowDefinitionJSON(v spanner.NullJSON) ([]byte, error) {
 	return json.Marshal(v.Value)
 }
 
-func extractPurposeContains(filter database.Filter[domain.FlowDefinitionField]) (purpose string, remaining database.Filter[domain.FlowDefinitionField]) {
-	if filter == nil {
-		return "", nil
-	}
-	switch f := filter.(type) {
-	case database.AndFilter[domain.FlowDefinitionField]:
-		kept := make([]database.Filter[domain.FlowDefinitionField], 0, len(f.Filters))
-		for _, child := range f.Filters {
-			p, rest := extractPurposeContains(child)
-			if p != "" {
-				purpose = p
-			}
-			if rest != nil {
-				kept = append(kept, rest)
-			}
-		}
-		if len(kept) == 0 {
-			return purpose, nil
-		}
-		if len(kept) == 1 {
-			return purpose, kept[0]
-		}
-		return purpose, database.And(kept...)
-	case *database.CompareFilter[domain.FlowDefinitionField]:
-		if f.Op == database.OpEqual && len(f.Terms) == 1 && f.Terms[0].Column.Field() == domain.FlowDefinitionFieldPurposes {
-			return purposeFilterValue(f.Terms[0].Value), nil
-		}
-		return "", f
-	default:
-		return "", filter
-	}
-}
-
-func purposeFilterValue(v any) string {
-	switch p := v.(type) {
-	case string:
-		return p
-	case domain.FlowDefinitionPurpose:
-		return p.String()
-	case *domain.FlowDefinitionPurpose:
-		if p == nil {
-			return ""
-		}
-		return p.String()
-	default:
-		return ""
-	}
-}
-
 func (f flowDefinitionStatements) IsStatements() {}
 
 var _ service.FlowDefinitionStatements = (*flowDefinitionStatements)(nil)
-
-func parseFlowDefinitionPurposeKey(s string) (domain.FlowDefinitionPurpose, error) {
-	if purpose, err := domain.FlowDefinitionPurposeString(s); err == nil {
-		return purpose, nil
-	}
-	n, err := strconv.ParseUint(s, 10, 8)
-	if err != nil {
-		return 0, database.ErrInvalidEnumKey(s)
-	}
-	return domain.FlowDefinitionPurpose(n), nil
-}
-
-var flowDefinitionSchema = database.NewSchema(map[domain.FlowDefinitionField]database.FieldBinding[domain.FlowDefinition]{
-	domain.FlowDefinitionFieldProjectID: {
-		SQLName:  "project_id",
-		Accessor: func(d *domain.FlowDefinition) any { return d.ProjectID },
-		Coerce:   database.CoerceString,
-	},
-	domain.FlowDefinitionFieldID: {
-		SQLName:  "id",
-		Accessor: func(d *domain.FlowDefinition) any { return d.ID },
-		Coerce:   database.CoerceString,
-	},
-	domain.FlowDefinitionFieldName: {
-		SQLName:  "name",
-		Accessor: func(d *domain.FlowDefinition) any { return d.Name },
-		Coerce:   database.CoerceString,
-	},
-	domain.FlowDefinitionFieldSchemaVersion: {
-		SQLName:  "schema_version",
-		Accessor: func(d *domain.FlowDefinition) any { return d.SchemaVersion },
-		Coerce:   database.CoerceString,
-	},
-	domain.FlowDefinitionFieldStatus: {
-		SQLName:  "status",
-		Accessor: func(d *domain.FlowDefinition) any { return d.Status },
-		Coerce:   database.CoerceNumber[domain.FlowDefinitionStatus],
-	},
-	domain.FlowDefinitionFieldCreatedAt: {
-		SQLName:  "created_at",
-		Accessor: func(d *domain.FlowDefinition) any { return d.CreatedAt },
-		Coerce:   database.CoerceTime,
-	},
-	domain.FlowDefinitionFieldUpdatedAt: {
-		SQLName:  "updated_at",
-		Accessor: func(d *domain.FlowDefinition) any { return d.UpdatedAt },
-		Coerce:   database.CoerceTime,
-	},
-	domain.FlowDefinitionFieldUserSchema: {
-		SQLName:  "user_schema",
-		Accessor: func(d *domain.FlowDefinition) any { return d.UserSchema },
-		Coerce:   database.CoerceString,
-	},
-	domain.FlowDefinitionFieldPurposes: {
-		SQLName:  "purposes",
-		Accessor: func(d *domain.FlowDefinition) any { return d.Purposes },
-		Coerce:   database.CoerceEnumKeyMapAsAny[domain.FlowDefinitionPurpose, string](parseFlowDefinitionPurposeKey),
-	},
-	domain.FlowDefinitionFieldAudience: {
-		SQLName:  "audience",
-		Accessor: func(d *domain.FlowDefinition) any { return d.Audience },
-		Coerce:   database.CoerceJSON[domain.FlowDefinitionAudience],
-	},
-	domain.FlowDefinitionFieldSteps: {
-		SQLName:  "steps",
-		Accessor: func(d *domain.FlowDefinition) any { return d.Steps },
-		Coerce:   database.CoerceSliceAsAny(database.CoerceJSONValue[domain.FlowDefinitionStep]),
-	},
-})

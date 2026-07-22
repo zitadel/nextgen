@@ -16,9 +16,6 @@ import (
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-// stubPool returns nil typed as database.Pool. The mock repository does not
-// invoke any methods on it, so the value is opaque — it only satisfies the
-// service constructor signature.
 func stubPool() database.Pool { return nil }
 
 func stubV2Pool() *service.DB { return nil }
@@ -186,6 +183,30 @@ func filterMatches(def *domain.FlowDefinition, filter v2database.Filter[domain.F
 func hasPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {
 	_, ok := def.Purposes[purpose]
 	return ok
+}
+
+func purposeFilterIs(filter v2database.Filter[domain.FlowDefinitionField], purpose domain.FlowDefinitionPurpose) bool {
+	switch f := filter.(type) {
+	case v2database.AndFilter[domain.FlowDefinitionField]:
+		for _, child := range f.Filters {
+			if purposeFilterIs(child, purpose) {
+				return true
+			}
+		}
+		return false
+	case *v2database.CompareFilter[domain.FlowDefinitionField]:
+		if f.Op != v2database.OpEqual || len(f.Terms) != 1 {
+			return false
+		}
+		term := f.Terms[0]
+		if term.Column.Field() != domain.FlowDefinitionFieldPurposes {
+			return false
+		}
+		s, ok := term.Value.(string)
+		return ok && s == purpose.String()
+	default:
+		return false
+	}
 }
 
 func ptr[T any](v T) *T { return &v }
