@@ -27,10 +27,15 @@ import { pathToFileURL } from "node:url";
  */
 const BARE_STATIC_IMPORT = /(?:^|\n)\s*(?:import|export)\b[^;'"]*from\s*["'](?![./])/;
 const BARE_SIDE_EFFECT_IMPORT = /(?:^|\n)\s*import\s*["'](?![./])/;
+const BARE_DYNAMIC_IMPORT = /\bimport\s*\(\s*["'](?![./])/;
 
 export function findArtifactViolations(source) {
   const violations = [];
-  if (BARE_STATIC_IMPORT.test(source) || BARE_SIDE_EFFECT_IMPORT.test(source)) {
+  if (
+    BARE_STATIC_IMPORT.test(source) ||
+    BARE_SIDE_EFFECT_IMPORT.test(source) ||
+    BARE_DYNAMIC_IMPORT.test(source)
+  ) {
     violations.push("bare package import (a browser cannot resolve it without an import map)");
   }
   if (source.includes(`"node:`) || source.includes(`'node:`)) {

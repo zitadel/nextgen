@@ -22,7 +22,7 @@ func ErrBrandingMissingProjectID() Error {
 }
 
 func ErrBrandingPermissionDenied() Error {
-	return newError(PrefixBranding.ErrorCodePrefix("permission_denied"), "branding: the branding management API requires the project secret", nil, nil)
+	return newError(PrefixBranding.ErrorCodePrefix("permission_denied"), "branding: requires an operator-grade token bound to the project (project.write or a branding.* scope)", nil, nil)
 }
 
 // Branding layout presets understood by the bundled login template. The wire

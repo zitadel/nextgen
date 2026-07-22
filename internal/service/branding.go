@@ -84,11 +84,19 @@ func (s *BrandingService) GetLatest(ctx context.Context, projectID string) (*dom
 	return branding, nil
 }
 
-// List returns revisions for the project, newest first.
+// maxBrandingListRevisions caps the list response: revisions accumulate
+// forever by design, so an unbounded fetch would grow without limit. The cap
+// generously covers the audit/rollback use case; full history querying
+// arrives with ADR 031's list-endpoint query language.
+const maxBrandingListRevisions = 100
+
+// List returns the newest revisions for the project, newest first, capped at
+// maxBrandingListRevisions.
 func (s *BrandingService) List(ctx context.Context, projectID string) ([]*domain.Branding, error) {
 	brandings, err := s.brandingRepo.List(ctx, s.pool,
 		database.WithCondition(s.brandingRepo.ProjectIDCondition(projectID)),
 		database.WithOrderByDescending(s.brandingRepo.CreatedAt(), s.brandingRepo.ID()),
+		database.WithLimit(maxBrandingListRevisions),
 	)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to list branding revisions")

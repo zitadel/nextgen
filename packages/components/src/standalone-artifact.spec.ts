@@ -31,8 +31,11 @@ describe("standalone artifact", () => {
     expect(findArtifactViolations(`import { createRequire } from "node:module";\n`)).not.toEqual(
       [],
     );
-    expect(findArtifactViolations(`import { x } from "./chunk.mjs";\nimport "/abs.mjs";\n`)).toEqual(
-      [],
-    );
+    expect(findArtifactViolations(`const m = await import("@zitadel/config");\n`)).not.toEqual([]);
+    expect(
+      findArtifactViolations(
+        `import { x } from "./chunk.mjs";\nimport "/abs.mjs";\nconst d = await import("./lazy.mjs");\n`,
+      ),
+    ).toEqual([]);
   });
 });

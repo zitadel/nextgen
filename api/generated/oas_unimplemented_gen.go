@@ -433,11 +433,11 @@ func (UnimplementedHandler) IssueChallenge(ctx context.Context, req *IssueChalle
 
 // ListBranding implements listBranding operation.
 //
-// Lists all branding revisions for the project, newest first. The first
-// entry is the revision flow responses currently resolve. Deliberately
-// unpaginated in v1 — list endpoints gain a real query mechanism together
-// (ADR 031); advertising pagination parameters the server ignores would
-// be worse than none.
+// Lists branding revisions for the project, newest first, capped at the
+// 100 most recent. The first entry is the revision flow responses
+// currently resolve. Deliberately unpaginated in v1 — list endpoints
+// gain a real query mechanism together (ADR 031); advertising pagination
+// parameters the server ignores would be worse than none.
 //
 // GET /branding
 func (UnimplementedHandler) ListBranding(ctx context.Context, params ListBrandingParams) (r ListBrandingRes, _ error) {
