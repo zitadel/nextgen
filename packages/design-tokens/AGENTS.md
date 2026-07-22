@@ -23,7 +23,8 @@ add it to `overrides.ts` with a doc comment explaining why.
 
 - **Figma plugin push:** branch `design-tokens/figma-sync`, token path
   `packages/design-tokens/figma-export/`. CI triggers on `push` to that branch
-  (`figma-export/**` only).
+  (`figma-export/**` only) and merges `main` into the sync branch before
+  generating so workflow helpers stay current.
 - `:sync-export` (`scripts/sync-from-export.ts`) — a **generic, file-name
   agnostic** DTCG resolver. It reads *every* `*.json` under `figma-export/`,
   builds one cross-collection registry, resolves every `{alias}` (including

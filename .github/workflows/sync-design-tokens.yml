@@ -58,6 +58,28 @@ jobs:
             }}
           fetch-depth: 0
 
+      # Keep the long-lived sync branch from going stale: plugin pushes land on
+      # design-tokens/figma-sync, so merge main before generating so workflow
+      # helpers and other tooling commits are present on the checked-out tip.
+      - name: Refresh sync branch from main
+        if: >-
+          github.event_name == 'push'
+          || (github.event_name == 'workflow_dispatch' && inputs.source == 'export')
+        env:
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo "design-tokens/figma-sync already contains origin/main"
+            exit 0
+          fi
+          git merge --no-edit origin/main
+          git push origin HEAD:design-tokens/figma-sync
+
       - uses: moonrepo/setup-toolchain@v0
 
       - name: Set up pnpm
@@ -110,8 +132,6 @@ jobs:
       # sync-export throws (fail-loud) and the job stops above.
       # Keep ${{ }} out of the open-PR script body — nested &&/||/format
       # expressions inside run: fail workflow parsing ("An expression was expected").
-      # The helper lives on design-tokens/figma-sync (via main); keep that branch
-      # up to date with main so checkout has the script.
       - name: Commit generated artifacts and open PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
