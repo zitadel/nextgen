@@ -132,16 +132,12 @@ func (s *PasskeyRegistrationService) Finish(ctx context.Context, in FinishRegist
 	return s.FinishWith(ctx, s.pool, in)
 }
 
-// FinishWith is like [Finish] but uses the given QueryExecutor for the UserPasskey
-// write instead of the pool. Used by [FlowPasskeyRegistrationAdapter] to run the
-// credential write inside the flow engine's transaction so the passkey save is
-// atomic with user creation. Registration session Get/Delete use the v2 statement
-// pool (hybrid: UserPasskey remains on v1).
+// FinishWith is like [Finish] but writes the UserPasskey through client (flow txn).
+// Registration Get/Delete use the v2 pool until UserPasskey is also on statements.
 func (s *PasskeyRegistrationService) FinishWith(ctx context.Context, client database.QueryExecutor, in FinishRegistrationInput) error {
 	reg, err := s.v2Pool.Statements().GetPasskeyRegistration(ctx, in.ProjectID, in.RegistrationID)
 	if err != nil {
-		var noRow *database.NoRowFoundError
-		if errors.As(err, &noRow) {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return domain.ErrPasskeyRegistrationNotFound()
 		}
 		return err

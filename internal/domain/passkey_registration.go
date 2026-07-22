@@ -29,17 +29,3 @@ type CreatePasskeyRegistration struct {
 	Challenge *PasskeyRegistrationChallenge
 	ExpiresAt time.Time
 }
-
-// PasskeyRegistrationField enumerates the fields of PasskeyRegistration which can
-// be used for filtering and ordering in storage statements.
-type PasskeyRegistrationField uint8
-
-const (
-	PasskeyRegistrationFieldUnspecified PasskeyRegistrationField = iota
-	PasskeyRegistrationFieldID
-	PasskeyRegistrationFieldProjectID
-	PasskeyRegistrationFieldUserID
-	PasskeyRegistrationFieldChallenge
-	PasskeyRegistrationFieldExpiresAt
-	PasskeyRegistrationFieldCreatedAt
-)

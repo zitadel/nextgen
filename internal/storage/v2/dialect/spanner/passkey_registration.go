@@ -36,7 +36,7 @@ func (ps passkeyRegistrationStatements) CreatePasskeyRegistration(ctx context.Co
 	}
 	stmt := buildStatement(createPasskeyRegistrationStmt, reg.ID, reg.ProjectID, reg.UserID, string(challengeJSON), reg.ExpiresAt).statement()
 	_, err = ps.db.Update(ctx, stmt)
-	return wrapError(err)
+	return err
 }
 
 // GetPasskeyRegistration implements [service.PasskeyRegistrationStatements].
@@ -49,7 +49,7 @@ func (ps passkeyRegistrationStatements) GetPasskeyRegistration(ctx context.Conte
 		return err
 	})
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, err
 	}
 	return reg, nil
 }
@@ -58,13 +58,13 @@ func (ps passkeyRegistrationStatements) GetPasskeyRegistration(ctx context.Conte
 func (ps passkeyRegistrationStatements) DeletePasskeyRegistration(ctx context.Context, projectID, id string) error {
 	stmt := buildStatement(deletePasskeyRegistrationStmt, id, projectID).statement()
 	_, err := ps.db.Update(ctx, stmt)
-	return wrapError(err)
+	return err
 }
 
 func (ps passkeyRegistrationStatements) scanPasskeyRegistration(row *spanner.Row) (*domain.PasskeyRegistration, error) {
 	var (
-		reg            domain.PasskeyRegistration
-		challengeJSON  string
+		reg           domain.PasskeyRegistration
+		challengeJSON string
 	)
 	if err := row.Columns(&reg.ID, &reg.ProjectID, &reg.UserID, &challengeJSON, &reg.ExpiresAt, &reg.CreatedAt); err != nil {
 		return nil, err

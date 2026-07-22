@@ -14,12 +14,10 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// --- fakes ---
-
 type fakePasskeyRegStmts struct {
 	testAllStatements
 	created   *domain.CreatePasskeyRegistration
-	stored    map[string]*domain.PasskeyRegistration // id → row
+	stored    map[string]*domain.PasskeyRegistration
 	deleted   []string
 	createErr error
 	getErr    error
@@ -124,13 +122,9 @@ type fakeIDGen struct{ next string }
 
 func (f *fakeIDGen) New(_ string) (string, error) { return f.next, nil }
 
-// --- helpers ---
-
 func buildTestRegistrationSvc(stmts *fakePasskeyRegStmts, pkRepo *fakePasskeyRepo) *service.PasskeyRegistrationService {
 	return service.NewPasskeyRegistrationService(nil, stubStatementPool{stmts: stmts}, pkRepo, &fakeIDGen{next: "pkreg_test01"})
 }
-
-// --- tests ---
 
 func TestPasskeyRegistrationService_Begin_StoresSession(t *testing.T) {
 	stmts := &fakePasskeyRegStmts{}
@@ -149,7 +143,6 @@ func TestPasskeyRegistrationService_Begin_StoresSession(t *testing.T) {
 	assert.Equal(t, "pkreg_test01", out.RegistrationID)
 	assert.NotEmpty(t, out.Options)
 
-	// Options should be valid JSON containing creation challenge fields.
 	var optMap map[string]any
 	require.NoError(t, json.Unmarshal(out.Options, &optMap))
 	assert.Contains(t, optMap, "challenge")
@@ -159,7 +152,6 @@ func TestPasskeyRegistrationService_Begin_StoresSession(t *testing.T) {
 	assert.Equal(t, "alice@example.com", user["name"])
 	assert.Equal(t, "Alice Example", user["displayName"])
 
-	// Session must be persisted.
 	require.NotNil(t, stmts.created)
 	assert.Equal(t, "proj-1", stmts.created.ProjectID)
 	assert.Equal(t, "user-1", stmts.created.UserID)
@@ -233,7 +225,6 @@ func TestPasskeyRegistrationService_Finish_InvalidAttestationReturnsProofRejecte
 	pkRepo := &fakePasskeyRepo{}
 	svc := buildTestRegistrationSvc(stmts, pkRepo)
 
-	// First begin a ceremony to create the session.
 	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
 		ProjectID: "proj-1",
 		UserID:    "user-1",
@@ -242,15 +233,12 @@ func TestPasskeyRegistrationService_Finish_InvalidAttestationReturnsProofRejecte
 	})
 	require.NoError(t, err)
 
-	// Submit a garbage attestation — the domain should reject it.
 	err = svc.Finish(context.Background(), service.FinishRegistrationInput{
 		ProjectID:      "proj-1",
 		RegistrationID: out.RegistrationID,
 		Attestation:    []byte(`{"not":"valid-webauthn"}`),
 	})
 	require.Error(t, err)
-	// Domain wraps parse/verify errors as proof-rejected.
 	assert.True(t, errors.Is(err, domain.ErrAuthAttemptProofRejected(nil)))
-	// Session is NOT deleted on failure (caller may retry).
 	assert.Empty(t, stmts.deleted)
 }
