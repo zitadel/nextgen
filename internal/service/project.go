@@ -70,7 +70,6 @@ func NewProjectService(
 }
 
 type projectService struct {
-	pool               database.Pool
 	v2Pool             *DB
 	schemaRepo         domain.JSONSchemaRepository
 	flowDefinitionRepo domain.FlowDefinitionRepository
