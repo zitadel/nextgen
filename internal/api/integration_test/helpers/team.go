@@ -10,7 +10,7 @@ func (h *Harness) EnsureTeamService(t *testing.T) *service.TeamService {
 	t.Helper()
 	if h.TeamService == nil {
 		h.TeamService = service.NewTeamService(
-			h.ServiceDB(t),
+			h.EnsureServiceDB(t),
 		)
 	}
 	return h.TeamService
