@@ -157,9 +157,6 @@ func (ss sessionStatements) ExchangeSession(ctx context.Context, projectID, hand
 		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
 	}
 	oldTokenID := targetSession.TokenID
-	if userID != nil {
-		targetSession.UserID = userID
-	}
 	if err := ss.updateSessionAfterExchange(ctx, projectID, targetSession.ID, userID, ttl); err != nil {
 		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
 	}

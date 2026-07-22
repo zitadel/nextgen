@@ -85,11 +85,7 @@ type TokenStatements interface {
 
 type SessionStatements interface {
 	Statements
-	// CreateSession creates a new (anonymous) session, mints a session token, and
-	// sets ID / timestamps / TokenID on entity.
 	CreateSession(ctx context.Context, entity *domain.Session) error
-	// ExchangeSession exchanges a handoff token for a session (create or step-up).
-	// Preserves ErrSessionInvalidHandoffToken and ErrSessionExchangeConflict.
 	ExchangeSession(ctx context.Context, projectID, handoffToken string, idempotencyKey *string, ttl time.Duration) (*domain.Session, error)
 	GetSessionByID(ctx context.Context, projectID, sessionID string) (*domain.Session, error)
 	ListSessions(ctx context.Context, filter *database.ListOptions[domain.SessionField]) (*database.ListResult[*domain.Session], error)

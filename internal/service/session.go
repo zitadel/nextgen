@@ -152,8 +152,7 @@ func NewSessionService(pool database.Pool, v2Pool StatementPool, users UserIdent
 	}
 }
 
-// SessionStatementsResolver adapts [StatementPool] to [SessionResolver] for
-// AuthAttemptService step-up lookups.
+// SessionStatementsResolver adapts StatementPool to SessionResolver.
 type SessionStatementsResolver struct {
 	Pool StatementPool
 }
