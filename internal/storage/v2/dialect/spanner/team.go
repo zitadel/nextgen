@@ -87,20 +87,22 @@ func (ts teamStatements) DeactivateTeam(ctx context.Context, projectID, id strin
 	userDeactivated := domain.UserStatusDeactivated.String()
 	teamDeactivated := domain.TeamStatusDeactivated.String()
 
-	for _, step := range []struct {
-		sql  string
-		args []any
-	}{
-		{deactivateTeamStmt, []any{teamDeactivated, projectID, id}},
-		{deactivateTeamMembershipsStmt, []any{membershipRemoved, projectID, id}},
-		{deactivateTeamOwnedUsersStmt, []any{userDeactivated, projectID, id}},
-		{deactivateOwnedUsersMembershipsStmt, []any{membershipRemoved, projectID, projectID, id}},
-	} {
-		if _, err := ts.db.Update(ctx, buildStatement(step.sql, step.args...).statement()); err != nil {
-			return err
+	return withTransaction(ctx, ts.db, func(ctx context.Context, tx queryExecutor) error {
+		for _, step := range []struct {
+			sql  string
+			args []any
+		}{
+			{deactivateTeamStmt, []any{teamDeactivated, projectID, id}},
+			{deactivateTeamMembershipsStmt, []any{membershipRemoved, projectID, id}},
+			{deactivateTeamOwnedUsersStmt, []any{userDeactivated, projectID, id}},
+			{deactivateOwnedUsersMembershipsStmt, []any{membershipRemoved, projectID, projectID, id}},
+		} {
+			if _, err := tx.Update(ctx, buildStatement(step.sql, step.args...).statement()); err != nil {
+				return err
+			}
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 func (ts teamStatements) scanTeam(row *spanner.Row) (*domain.Team, error) {
