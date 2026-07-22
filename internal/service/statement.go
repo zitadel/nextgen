@@ -7,7 +7,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,UserStatements
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,UserStatements,UserRecoveryCodesStatements
 
 type StatementPool interface {
 	Statementer[AllStatements]
@@ -23,6 +23,7 @@ type AllStatements interface {
 	FlowDefinitionStatements
 	CryptoKeyStatements
 	UserStatements
+	UserRecoveryCodesStatements
 	Statements
 }
 
@@ -83,4 +84,20 @@ type UserStatements interface {
 	ListUsersByAttributes(ctx context.Context, projectID string, teamScope *string, attrs []domain.Attribute, opts UserReadOptions) (*database.ListResult[*domain.User], error)
 	DeactivateUser(ctx context.Context, projectID, userID string) error
 	DeleteUserByID(ctx context.Context, projectID, userID string) error
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type UserRecoveryCodesPool interface {
+// 	Statementer[UserRecoveryCodesStatements]
+// 	Transactioner[UserRecoveryCodesStatements]
+// }
+
+type UserRecoveryCodesStatements interface {
+	Statements
+	CreateUserRecoveryCodes(ctx context.Context, codes *domain.CreateRecoveryCodes) error
+	GetUserRecoveryCodesByID(ctx context.Context, id int64) (*domain.UserRecoveryCodes, error)
+	GetUserRecoveryCodesByUserID(ctx context.Context, projectID, userID string) (*domain.UserRecoveryCodes, error)
+	ListUserRecoveryCodes(ctx context.Context, filter *database.ListOptions[domain.UserRecoveryCodesField]) (*database.ListResult[*domain.UserRecoveryCodes], error)
+	DeleteUserRecoveryCodesByID(ctx context.Context, id int64) error
+	DeleteUserRecoveryCodesByUserID(ctx context.Context, projectID, userID string) error
 }

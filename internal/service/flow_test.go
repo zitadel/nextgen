@@ -112,6 +112,30 @@ func (testAllStatements) DeleteUserByID(context.Context, string, string) error {
 	panic("unexpected call to DeleteUserByID")
 }
 
+func (testAllStatements) CreateUserRecoveryCodes(context.Context, *domain.CreateRecoveryCodes) error {
+	panic("unexpected call to CreateUserRecoveryCodes")
+}
+
+func (testAllStatements) GetUserRecoveryCodesByID(context.Context, int64) (*domain.UserRecoveryCodes, error) {
+	panic("unexpected call to GetUserRecoveryCodesByID")
+}
+
+func (testAllStatements) GetUserRecoveryCodesByUserID(context.Context, string, string) (*domain.UserRecoveryCodes, error) {
+	panic("unexpected call to GetUserRecoveryCodesByUserID")
+}
+
+func (testAllStatements) ListUserRecoveryCodes(context.Context, *v2database.ListOptions[domain.UserRecoveryCodesField]) (*v2database.ListResult[*domain.UserRecoveryCodes], error) {
+	panic("unexpected call to ListUserRecoveryCodes")
+}
+
+func (testAllStatements) DeleteUserRecoveryCodesByID(context.Context, int64) error {
+	panic("unexpected call to DeleteUserRecoveryCodesByID")
+}
+
+func (testAllStatements) DeleteUserRecoveryCodesByUserID(context.Context, string, string) error {
+	panic("unexpected call to DeleteUserRecoveryCodesByUserID")
+}
+
 var _ service.AllStatements = testAllStatements{}
 
 type v2TestTx struct {

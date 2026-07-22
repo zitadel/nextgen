@@ -19,6 +19,7 @@ type statements struct {
 	flowDefinitionStatements
 	cryptoKeyStatements
 	userStatements
+	userRecoveryCodesStatements
 }
 
 func (s statements) Statements() service.AllStatements {
@@ -30,10 +31,11 @@ func (s statements) IsStatements() {}
 
 func newStatements(client queryExecutor) statements {
 	return statements{
-		projectStatements:        newProjectStatements(client),
-		flowDefinitionStatements: newFlowDefinitionStatements(client),
-		cryptoKeyStatements:      newCryptoKeyStatements(client),
-		userStatements:           newUserStatements(client),
+		projectStatements:           newProjectStatements(client),
+		flowDefinitionStatements:    newFlowDefinitionStatements(client),
+		cryptoKeyStatements:         newCryptoKeyStatements(client),
+		userStatements:              newUserStatements(client),
+		userRecoveryCodesStatements: newUserRecoveryCodesStatements(client),
 	}
 }
 
