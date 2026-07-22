@@ -11,13 +11,13 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UsersIndexRouteImport } from './routes/users/index'
-import { Route as TeamsIndexRouteImport } from './routes/teams/index'
 import { Route as SystemIndexRouteImport } from './routes/system/index'
 import { Route as SessionsIndexRouteImport } from './routes/sessions/index'
 import { Route as SchemasIndexRouteImport } from './routes/schemas/index'
 import { Route as ProjectsIndexRouteImport } from './routes/projects/index'
 import { Route as FlowDefinitionsIndexRouteImport } from './routes/flow-definitions/index'
 import { Route as UsersUserIdRouteImport } from './routes/users/$userId'
+import { Route as SchemasSchemaIdRouteImport } from './routes/schemas/$schemaId'
 import { Route as FlowDefinitionsDefinitionIdRouteImport } from './routes/flow-definitions/$definitionId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -28,11 +28,6 @@ const IndexRoute = IndexRouteImport.update({
 const UsersIndexRoute = UsersIndexRouteImport.update({
   id: '/users/',
   path: '/users/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TeamsIndexRoute = TeamsIndexRouteImport.update({
-  id: '/teams/',
-  path: '/teams/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SystemIndexRoute = SystemIndexRouteImport.update({
@@ -65,6 +60,11 @@ const UsersUserIdRoute = UsersUserIdRouteImport.update({
   path: '/users/$userId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SchemasSchemaIdRoute = SchemasSchemaIdRouteImport.update({
+  id: '/schemas/$schemaId',
+  path: '/schemas/$schemaId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FlowDefinitionsDefinitionIdRoute =
   FlowDefinitionsDefinitionIdRouteImport.update({
     id: '/flow-definitions/$definitionId',
@@ -75,38 +75,38 @@ const FlowDefinitionsDefinitionIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/flow-definitions/$definitionId': typeof FlowDefinitionsDefinitionIdRoute
+  '/schemas/$schemaId': typeof SchemasSchemaIdRoute
   '/users/$userId': typeof UsersUserIdRoute
   '/flow-definitions/': typeof FlowDefinitionsIndexRoute
   '/projects/': typeof ProjectsIndexRoute
   '/schemas/': typeof SchemasIndexRoute
   '/sessions/': typeof SessionsIndexRoute
   '/system/': typeof SystemIndexRoute
-  '/teams/': typeof TeamsIndexRoute
   '/users/': typeof UsersIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/flow-definitions/$definitionId': typeof FlowDefinitionsDefinitionIdRoute
+  '/schemas/$schemaId': typeof SchemasSchemaIdRoute
   '/users/$userId': typeof UsersUserIdRoute
   '/flow-definitions': typeof FlowDefinitionsIndexRoute
   '/projects': typeof ProjectsIndexRoute
   '/schemas': typeof SchemasIndexRoute
   '/sessions': typeof SessionsIndexRoute
   '/system': typeof SystemIndexRoute
-  '/teams': typeof TeamsIndexRoute
   '/users': typeof UsersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/flow-definitions/$definitionId': typeof FlowDefinitionsDefinitionIdRoute
+  '/schemas/$schemaId': typeof SchemasSchemaIdRoute
   '/users/$userId': typeof UsersUserIdRoute
   '/flow-definitions/': typeof FlowDefinitionsIndexRoute
   '/projects/': typeof ProjectsIndexRoute
   '/schemas/': typeof SchemasIndexRoute
   '/sessions/': typeof SessionsIndexRoute
   '/system/': typeof SystemIndexRoute
-  '/teams/': typeof TeamsIndexRoute
   '/users/': typeof UsersIndexRoute
 }
 export interface FileRouteTypes {
@@ -114,50 +114,50 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/flow-definitions/$definitionId'
+    | '/schemas/$schemaId'
     | '/users/$userId'
     | '/flow-definitions/'
     | '/projects/'
     | '/schemas/'
     | '/sessions/'
     | '/system/'
-    | '/teams/'
     | '/users/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/flow-definitions/$definitionId'
+    | '/schemas/$schemaId'
     | '/users/$userId'
     | '/flow-definitions'
     | '/projects'
     | '/schemas'
     | '/sessions'
     | '/system'
-    | '/teams'
     | '/users'
   id:
     | '__root__'
     | '/'
     | '/flow-definitions/$definitionId'
+    | '/schemas/$schemaId'
     | '/users/$userId'
     | '/flow-definitions/'
     | '/projects/'
     | '/schemas/'
     | '/sessions/'
     | '/system/'
-    | '/teams/'
     | '/users/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   FlowDefinitionsDefinitionIdRoute: typeof FlowDefinitionsDefinitionIdRoute
+  SchemasSchemaIdRoute: typeof SchemasSchemaIdRoute
   UsersUserIdRoute: typeof UsersUserIdRoute
   FlowDefinitionsIndexRoute: typeof FlowDefinitionsIndexRoute
   ProjectsIndexRoute: typeof ProjectsIndexRoute
   SchemasIndexRoute: typeof SchemasIndexRoute
   SessionsIndexRoute: typeof SessionsIndexRoute
   SystemIndexRoute: typeof SystemIndexRoute
-  TeamsIndexRoute: typeof TeamsIndexRoute
   UsersIndexRoute: typeof UsersIndexRoute
 }
 
@@ -175,13 +175,6 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users/'
       preLoaderRoute: typeof UsersIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/teams/': {
-      id: '/teams/'
-      path: '/teams'
-      fullPath: '/teams/'
-      preLoaderRoute: typeof TeamsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/system/': {
@@ -226,6 +219,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UsersUserIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/schemas/$schemaId': {
+      id: '/schemas/$schemaId'
+      path: '/schemas/$schemaId'
+      fullPath: '/schemas/$schemaId'
+      preLoaderRoute: typeof SchemasSchemaIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/flow-definitions/$definitionId': {
       id: '/flow-definitions/$definitionId'
       path: '/flow-definitions/$definitionId'
@@ -239,13 +239,13 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   FlowDefinitionsDefinitionIdRoute: FlowDefinitionsDefinitionIdRoute,
+  SchemasSchemaIdRoute: SchemasSchemaIdRoute,
   UsersUserIdRoute: UsersUserIdRoute,
   FlowDefinitionsIndexRoute: FlowDefinitionsIndexRoute,
   ProjectsIndexRoute: ProjectsIndexRoute,
   SchemasIndexRoute: SchemasIndexRoute,
   SessionsIndexRoute: SessionsIndexRoute,
   SystemIndexRoute: SystemIndexRoute,
-  TeamsIndexRoute: TeamsIndexRoute,
   UsersIndexRoute: UsersIndexRoute,
 }
 export const routeTree = rootRouteImport

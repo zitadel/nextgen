@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -97,7 +98,10 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	if fields, ok := req.Fields.Get(); ok {
 		decoded, err := decodeFlowFields(fields)
 		if err != nil {
-			return errorResponseWithStatusCode(http.StatusBadRequest, domain.ErrRequestInvalid()), nil
+			// Safe client message; Parent keeps a log-safe wrapper that still Unwraps
+			// to the json.Unmarshal cause for diagnostics (ADR 030).
+			return errorResponseWithStatusCode(http.StatusBadRequest,
+				domain.ErrRequestInvalid().WithMessage(err.Error()).WithParent(err)), nil
 		}
 		submitReq.Fields = decoded
 	}
@@ -446,12 +450,38 @@ func toFlowStepComplete(c domain.FlowStepComplete) api.FlowStepComplete {
 	return api.FlowStepCompleteShow
 }
 
+// flowFieldDecodeError is a log-safe wrapper around a Fields value decode failure.
+// By the time decodeFlowFields runs, ogen has already syntax-validated the JSON;
+// failures here are typically values encoding/json cannot represent as Go any
+// (for example numbers outside float64). Error() names only the field for clients;
+// Unwrap preserves the json.Unmarshal cause for errors.Is/As. LogValue omits the
+// cause string (it can embed payload fragments / PII).
+type flowFieldDecodeError struct {
+	field string
+	err   error
+}
+
+func (e *flowFieldDecodeError) Error() string {
+	return fmt.Sprintf("invalid value for field %q", e.field)
+}
+
+func (e *flowFieldDecodeError) Unwrap() error {
+	return e.err
+}
+
+func (e *flowFieldDecodeError) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("kind", "field_value"),
+		slog.String("field", e.field),
+	)
+}
+
 func decodeFlowFields(raw map[string]jx.Raw) (map[string]any, error) {
 	out := make(map[string]any, len(raw))
 	for k, v := range raw {
 		var decoded any
 		if err := json.Unmarshal(v, &decoded); err != nil {
-			return nil, fmt.Errorf("decode field %q: %w", k, err)
+			return nil, &flowFieldDecodeError{field: k, err: err}
 		}
 		out[k] = decoded
 	}
