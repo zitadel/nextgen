@@ -10,7 +10,7 @@ func (h *Harness) EnsureFlowDefinitionService(t *testing.T) service.FlowDefiniti
 	t.Helper()
 	if h.FlowDefinitionService == nil {
 		h.FlowDefinitionService = service.NewFlowDefinitionService(
-			h.ServiceDB(t),
+			h.EnsureServiceDB(t),
 			h.EnsureSchemaService(t),
 			h.EnsureSchemaValidator(t),
 			nil,
