@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -114,10 +116,15 @@ func (a *pgAuthAttempt) scan(rows database.Rows, attempt *domain.AuthAttempt) er
 			attempt.SetCheck(checker)
 		}
 	}
+	// A row-iteration error must win over not-found: an aborted or broken
+	// query would otherwise masquerade as a missing attempt.
+	if err := rows.Err(); err != nil {
+		return err
+	}
 	if !found {
 		return domain.ErrAuthAttemptNotFound()
 	}
-	return rows.Err()
+	return nil
 }
 
 const pgAuthAttemptCreateStmt = `WITH inserted_attempt AS (` +
@@ -428,10 +435,33 @@ func (a *spannerAuthAttempt) scan(rows database.Rows, attempt *domain.AuthAttemp
 			attempt.SetCheck(checker)
 		}
 	}
+	// A row-iteration error must win over not-found: an aborted or broken
+	// query would otherwise masquerade as a missing attempt.
+	if err := rows.Err(); err != nil {
+		return err
+	}
 	if !found {
 		return domain.ErrAuthAttemptNotFound()
 	}
-	return rows.Err()
+	return nil
+}
+
+// spannerRandomID returns a random positive INT64 for columns whose identity
+// would otherwise be database-generated. Supplying the id keeps the INSERT
+// deterministic: go-sql-spanner retries aborted transactions by replaying
+// their statements and comparing results, and a THEN RETURN of a fresh
+// IDENTITY draw diverges on replay, failing the whole transaction with
+// ErrAbortedDueToConcurrentModification.
+func spannerRandomID() (int64, error) {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return 0, fmt.Errorf("failed to generate id: %w", err)
+	}
+	id := int64(binary.BigEndian.Uint64(b[:]) &^ (1 << 63))
+	if id == 0 {
+		id = 1
+	}
+	return id, nil
 }
 
 func (a *spannerAuthAttempt) Create(ctx context.Context, client database.QueryExecutor, attempt *domain.AuthAttempt) error {
@@ -446,15 +476,17 @@ func (a *spannerAuthAttempt) Create(ctx context.Context, client database.QueryEx
 		ttlNanos = new(attempt.TimeToLive.Nanoseconds())
 	}
 
-	var attemptID database.Identity
-	err := client.QueryRow(ctx,
-		`INSERT INTO auth_attempts (project_id, required_checks, time_to_live, session_id, created_at) VALUES ($1, $2, $3, $4, $5) THEN RETURN id`,
-		attempt.ProjectID, req, ttlNanos, sessionIDArg(attempt.SessionID), now).
-		Scan(&attemptID)
+	attemptID, err := spannerRandomID()
+	if err != nil {
+		return err
+	}
+	_, err = client.Exec(ctx,
+		`INSERT INTO auth_attempts (project_id, id, required_checks, time_to_live, session_id, created_at) VALUES ($1, $2, $3, $4, $5, $6)`,
+		attempt.ProjectID, attemptID, req, ttlNanos, sessionIDArg(attempt.SessionID), now)
 	if err != nil {
 		return fmt.Errorf("failed to create auth attempt: %w", err)
 	}
-	attempt.ID = attemptID.String()
+	attempt.ID = strconv.FormatInt(attemptID, 10)
 	attempt.CreatedAt = now
 
 	for _, check := range attempt.Checks {
@@ -489,16 +521,18 @@ func (a *spannerAuthAttempt) Create(ctx context.Context, client database.QueryEx
 			}
 		}
 
-		var checkID database.Identity
-		err = client.QueryRow(ctx,
-			`INSERT INTO checks (project_id, auth_attempt_id, type, last_challenged_at, last_verified_at, challenge_payload, factor_payload, failure_count) VALUES ($1, $2, $3, $4, $5, $6, $7, 0) THEN RETURN id`,
-			attempt.ProjectID, database.Identity(attempt.ID), int64(check.Type()), challengedAt, verifiedAt, challengePayload, factorPayload).
-			Scan(&checkID)
+		checkID, err := spannerRandomID()
+		if err != nil {
+			return err
+		}
+		_, err = client.Exec(ctx,
+			`INSERT INTO checks (project_id, id, auth_attempt_id, type, last_challenged_at, last_verified_at, challenge_payload, factor_payload, failure_count) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0)`,
+			attempt.ProjectID, checkID, database.Identity(attempt.ID), int64(check.Type()), challengedAt, verifiedAt, challengePayload, factorPayload)
 		if err != nil {
 			return fmt.Errorf("failed to create auth attempt check: %w", err)
 		}
 		if isChallenge {
-			challenge.SetID(checkID.String())
+			challenge.SetID(strconv.FormatInt(checkID, 10))
 		}
 	}
 	return nil
@@ -537,13 +571,19 @@ func (a *spannerAuthAttempt) SetChallenge(ctx context.Context, client database.Q
 		payloadStr = new(string(b))
 	}
 
+	// The generated id only lands on the insert arm; on conflict the row keeps
+	// its id and THEN RETURN reports it. Both arms replay deterministically.
+	newID, err := spannerRandomID()
+	if err != nil {
+		return err
+	}
 	var id database.Identity
 	err = client.QueryRow(ctx,
-		`INSERT INTO checks (project_id, auth_attempt_id, type, last_challenged_at, challenge_payload, failure_count, last_failed_at)`+
-			` VALUES ($1, $2, $3, $4, $5, 0, NULL) ON CONFLICT (project_id, auth_attempt_id, type)`+
+		`INSERT INTO checks (project_id, id, auth_attempt_id, type, last_challenged_at, challenge_payload, failure_count, last_failed_at)`+
+			` VALUES ($1, $2, $3, $4, $5, $6, 0, NULL) ON CONFLICT (project_id, auth_attempt_id, type)`+
 			` DO UPDATE SET	last_challenged_at = EXCLUDED.last_challenged_at, challenge_payload = EXCLUDED.challenge_payload, failure_count = 0, last_failed_at = NULL`+
 			` THEN RETURN id`,
-		projectID, database.Identity(authAttemptID), int64(challenge.Type()), now, payloadStr).
+		projectID, newID, database.Identity(authAttemptID), int64(challenge.Type()), now, payloadStr).
 		Scan(&id)
 	if err != nil {
 		return fmt.Errorf("failed to set challenge: %w", err)
