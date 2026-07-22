@@ -12,7 +12,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	storagedb "github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/authattempt"
 )
 
@@ -251,7 +250,7 @@ func (as authAttemptStatements) scan(iter *spanner.RowIterator, attempt *domain.
 		return nil
 	})
 	if err != nil {
-		return wrapError(err)
+		return err
 	}
 	if !found {
 		return domain.ErrAuthAttemptNotFound()
@@ -407,124 +406,4 @@ func parseAuthAttemptIdentity(id string) (int64, error) {
 	return n, nil
 }
 
-func coerceAuthAttemptIdentity(v any) (any, error) {
-	switch id := v.(type) {
-	case storagedb.Identity:
-		return id, nil
-	case string:
-		return storagedb.Identity(id), nil
-	case int64:
-		return storagedb.Identity(strconv.FormatInt(id, 10)), nil
-	default:
-		s, err := database.CoerceStringValue(v)
-		if err != nil {
-			return nil, err
-		}
-		return storagedb.Identity(s), nil
-	}
-}
-
-func coerceAuthAttemptBytes(v any) (any, error) {
-	switch b := v.(type) {
-	case []byte:
-		return b, nil
-	case string:
-		return []byte(b), nil
-	default:
-		return nil, database.ErrCoerceExpectedType("bytes", v)
-	}
-}
-
-func coerceAuthAttemptDuration(v any) (any, error) {
-	switch d := v.(type) {
-	case time.Duration:
-		return d.Nanoseconds(), nil
-	case int64:
-		return d, nil
-	case float64:
-		return int64(d), nil
-	case string:
-		parsed, err := time.ParseDuration(d)
-		if err != nil {
-			return nil, database.ErrCoerceParse("The cursor duration value could not be parsed.", err)
-		}
-		return parsed.Nanoseconds(), nil
-	default:
-		return nil, database.ErrCoerceExpectedType("duration", v)
-	}
-}
-
-func authAttemptOptionalIdentityAccessor(get func(*domain.AuthAttempt) *string) func(*domain.AuthAttempt) any {
-	return func(a *domain.AuthAttempt) any {
-		if v := get(a); v != nil {
-			return storagedb.Identity(*v)
-		}
-		return storagedb.Identity("")
-	}
-}
-
 var _ service.AuthAttemptStatements = (*authAttemptStatements)(nil)
-
-var authAttemptSchema = database.NewSchema(map[domain.AuthAttemptField]database.FieldBinding[domain.AuthAttempt]{
-	domain.AuthAttemptFieldProjectID: {
-		SQLName:  "project_id",
-		Accessor: func(a *domain.AuthAttempt) any { return a.ProjectID },
-		Coerce:   database.CoerceString,
-	},
-	domain.AuthAttemptFieldID: {
-		SQLName:  "id",
-		Accessor: func(a *domain.AuthAttempt) any { return storagedb.Identity(a.ID) },
-		Coerce:   coerceAuthAttemptIdentity,
-	},
-	domain.AuthAttemptFieldHandoffToken: {
-		SQLName: "handoff_token",
-		Accessor: func(a *domain.AuthAttempt) any {
-			if a.HandoffToken == nil {
-				return []byte(nil)
-			}
-			return a.HandoffToken.TokenHash
-		},
-		Coerce: coerceAuthAttemptBytes,
-	},
-	domain.AuthAttemptFieldHandedOffAt: {
-		SQLName: "handed_off_at",
-		Accessor: func(a *domain.AuthAttempt) any {
-			if a.HandedOffAt == nil {
-				return time.Time{}
-			}
-			return *a.HandedOffAt
-		},
-		Coerce: database.CoerceTime,
-	},
-	domain.AuthAttemptFieldSessionID: {
-		SQLName:  "session_id",
-		Accessor: authAttemptOptionalIdentityAccessor(func(a *domain.AuthAttempt) *string { return a.SessionID }),
-		Coerce:   coerceAuthAttemptIdentity,
-	},
-	domain.AuthAttemptFieldRequiredChecks: {
-		SQLName: "required_checks",
-		Accessor: func(a *domain.AuthAttempt) any {
-			out := make([]int64, len(a.RequiredChecks))
-			for i, c := range a.RequiredChecks {
-				out[i] = int64(c)
-			}
-			return out
-		},
-		Coerce: database.CoerceSliceAsAny(database.CoerceNumberValue[int64]),
-	},
-	domain.AuthAttemptFieldCreatedAt: {
-		SQLName:  "created_at",
-		Accessor: func(a *domain.AuthAttempt) any { return a.CreatedAt },
-		Coerce:   database.CoerceTime,
-	},
-	domain.AuthAttemptFieldTimeToLive: {
-		SQLName: "time_to_live",
-		Accessor: func(a *domain.AuthAttempt) any {
-			if a.TimeToLive == nil {
-				return int64(0)
-			}
-			return a.TimeToLive.Nanoseconds()
-		},
-		Coerce: coerceAuthAttemptDuration,
-	},
-})

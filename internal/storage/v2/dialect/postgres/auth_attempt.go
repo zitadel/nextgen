@@ -12,7 +12,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	storagedb "github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/authattempt"
 )
 
@@ -86,7 +85,7 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, authAttem
 		authAttempt.ProjectID, requiredChecks, authAttempt.TimeToLive,
 		storagedb.Identity(authattempt.SessionIDArg(authAttempt.SessionID)), checkRowsJSON)
 	if err != nil {
-		return wrapError(fmt.Errorf("failed to create auth attempt: %w", err))
+		return wrapError(err)
 	}
 	defer rows.Close()
 
@@ -104,7 +103,7 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, authAttem
 		)
 		err = rows.Scan(&attemptID, &createdAt, &challengeID, &checkType, &lastChallengedAt, &lastVerifiedAt)
 		if err != nil {
-			return wrapError(fmt.Errorf("failed to scan created auth attempt: %w", err))
+			return wrapError(err)
 		}
 		authAttempt.ID = attemptID.String()
 		authAttempt.CreatedAt = createdAt
@@ -122,7 +121,7 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, authAttem
 		}
 	}
 	if err = rows.Err(); err != nil {
-		return wrapError(fmt.Errorf("failed to read created auth attempt rows: %w", err))
+		return wrapError(err)
 	}
 	if authAttempt.ID == "" || authAttempt.CreatedAt.IsZero() {
 		return fmt.Errorf("failed to create auth attempt: no rows returned")
@@ -162,7 +161,7 @@ func (as authAttemptStatements) get(ctx context.Context, query, projectID string
 	attempt := new(domain.AuthAttempt)
 	rows, err := as.client.Query(ctx, query, projectID, matcher)
 	if err != nil {
-		return nil, wrapError(fmt.Errorf("failed to query auth attempt: %w", err))
+		return nil, wrapError(err)
 	}
 	defer rows.Close()
 	if err := as.scan(rows, attempt); err != nil {
@@ -196,7 +195,7 @@ func (as authAttemptStatements) scan(rows pgx.Rows, attempt *domain.AuthAttempt)
 			&requiredChecks, &attempt.CreatedAt, &checkType, &timeToLive,
 			&challengeID, &lastChallengedAt, &verifiedAt, &lastFailedAt, &failureCount, &challenge, &factor)
 		if err != nil {
-			return wrapError(fmt.Errorf("failed to scan auth attempt: %w", err))
+			return wrapError(err)
 		}
 		attempt.ID = attemptID.String()
 
@@ -273,7 +272,7 @@ func (as authAttemptStatements) HandoffAuthAttempt(ctx context.Context, attempt 
 	err := as.client.QueryRow(ctx, handoffAuthAttemptStmt,
 		attempt.ProjectID, storagedb.Identity(attempt.ID), attempt.HandoffToken.TokenHash).Scan(&handedOffAt)
 	if err != nil {
-		return wrapError(fmt.Errorf("failed to handoff auth attempt: %w", err))
+		return wrapError(err)
 	}
 	attempt.HandedOffAt = &handedOffAt
 	return nil
@@ -338,122 +337,4 @@ func (as authAttemptStatements) AuthAttemptChallengeFailed(ctx context.Context, 
 	return nil
 }
 
-func coerceAuthAttemptIdentity(v any) (any, error) {
-	switch id := v.(type) {
-	case storagedb.Identity:
-		return id, nil
-	case string:
-		return storagedb.Identity(id), nil
-	default:
-		s, err := database.CoerceStringValue(v)
-		if err != nil {
-			return nil, err
-		}
-		return storagedb.Identity(s), nil
-	}
-}
-
-func coerceAuthAttemptBytes(v any) (any, error) {
-	switch b := v.(type) {
-	case []byte:
-		return b, nil
-	case string:
-		return []byte(b), nil
-	default:
-		return nil, database.ErrCoerceExpectedType("bytes", v)
-	}
-}
-
-func coerceAuthAttemptDuration(v any) (any, error) {
-	switch d := v.(type) {
-	case time.Duration:
-		return d, nil
-	case int64:
-		return time.Duration(d), nil
-	case float64:
-		return time.Duration(d), nil
-	case string:
-		parsed, err := time.ParseDuration(d)
-		if err != nil {
-			return nil, database.ErrCoerceParse("The cursor duration value could not be parsed.", err)
-		}
-		return parsed, nil
-	default:
-		return nil, database.ErrCoerceExpectedType("duration", v)
-	}
-}
-
-func authAttemptOptionalIdentityAccessor(get func(*domain.AuthAttempt) *string) func(*domain.AuthAttempt) any {
-	return func(a *domain.AuthAttempt) any {
-		if v := get(a); v != nil {
-			return storagedb.Identity(*v)
-		}
-		return storagedb.Identity("")
-	}
-}
-
 var _ service.AuthAttemptStatements = (*authAttemptStatements)(nil)
-
-var authAttemptSchema = database.NewSchema(map[domain.AuthAttemptField]database.FieldBinding[domain.AuthAttempt]{
-	domain.AuthAttemptFieldProjectID: {
-		SQLName:  "project_id",
-		Accessor: func(a *domain.AuthAttempt) any { return a.ProjectID },
-		Coerce:   database.CoerceString,
-	},
-	domain.AuthAttemptFieldID: {
-		SQLName:  "id",
-		Accessor: func(a *domain.AuthAttempt) any { return storagedb.Identity(a.ID) },
-		Coerce:   coerceAuthAttemptIdentity,
-	},
-	domain.AuthAttemptFieldHandoffToken: {
-		SQLName: "handoff_token",
-		Accessor: func(a *domain.AuthAttempt) any {
-			if a.HandoffToken == nil {
-				return []byte(nil)
-			}
-			return a.HandoffToken.TokenHash
-		},
-		Coerce: coerceAuthAttemptBytes,
-	},
-	domain.AuthAttemptFieldHandedOffAt: {
-		SQLName: "handed_off_at",
-		Accessor: func(a *domain.AuthAttempt) any {
-			if a.HandedOffAt == nil {
-				return time.Time{}
-			}
-			return *a.HandedOffAt
-		},
-		Coerce: database.CoerceTime,
-	},
-	domain.AuthAttemptFieldSessionID: {
-		SQLName:  "session_id",
-		Accessor: authAttemptOptionalIdentityAccessor(func(a *domain.AuthAttempt) *string { return a.SessionID }),
-		Coerce:   coerceAuthAttemptIdentity,
-	},
-	domain.AuthAttemptFieldRequiredChecks: {
-		SQLName: "required_checks",
-		Accessor: func(a *domain.AuthAttempt) any {
-			out := make([]int16, len(a.RequiredChecks))
-			for i, c := range a.RequiredChecks {
-				out[i] = int16(c)
-			}
-			return out
-		},
-		Coerce: database.CoerceSliceAsAny(database.CoerceNumberValue[int16]),
-	},
-	domain.AuthAttemptFieldCreatedAt: {
-		SQLName:  "created_at",
-		Accessor: func(a *domain.AuthAttempt) any { return a.CreatedAt },
-		Coerce:   database.CoerceTime,
-	},
-	domain.AuthAttemptFieldTimeToLive: {
-		SQLName: "time_to_live",
-		Accessor: func(a *domain.AuthAttempt) any {
-			if a.TimeToLive == nil {
-				return time.Duration(0)
-			}
-			return *a.TimeToLive
-		},
-		Coerce: coerceAuthAttemptDuration,
-	},
-})

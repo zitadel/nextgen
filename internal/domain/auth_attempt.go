@@ -437,19 +437,3 @@ func (a *AuthAttempt) SetCheck(check AuthCheck) {
 	}
 	a.Checks = append(a.Checks, check)
 }
-
-// AuthAttemptField enumerates the fields of AuthAttempt which can be used for
-// filtering and ordering in list operations.
-type AuthAttemptField uint8
-
-const (
-	AuthAttemptFieldUnspecified AuthAttemptField = iota
-	AuthAttemptFieldProjectID
-	AuthAttemptFieldID
-	AuthAttemptFieldHandoffToken
-	AuthAttemptFieldHandedOffAt
-	AuthAttemptFieldSessionID
-	AuthAttemptFieldRequiredChecks
-	AuthAttemptFieldCreatedAt
-	AuthAttemptFieldTimeToLive
-)
