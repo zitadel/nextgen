@@ -313,7 +313,7 @@ This keeps both the value and its hash out of logs without losing debuggability:
 Policy:
 
 1. **Default-sensitive: do not log user/schema attribute payloads or raw request/response bodies.** Log the structured domain error (`code` + safe `message` + a few named, safe attributes), never the serialized body. This removes the blob problem at the source.
-2. **Declare sensitivity in the schema, enforce at the boundary.** Sensitivity is a property of the JSON Schema (`writeOnly`, `format: password`, or an `x-zitadel-sensitive` extension), consulted by the attribute-handling code — not guessed by the generic slog layer.
+2. **Declare sensitivity in the schema, enforce at the boundary.** Sensitivity is a property of the JSON Schema (`writeOnly`, `format: password`, or an `x-sensitive` extension — the implemented name in this repo; see [`user-property.yaml`](../../api/openapi/endpoints/schemas/user-property.yaml)), consulted by the attribute-handling code — not guessed by the generic slog layer.
 3. **Keep static key masking as defense-in-depth** for fixed-name credential attributes that appear in structured args.
 4. **URLs are safe-to-log by construction, not by redaction.** Path and query params are already logged everywhere downstream (proxies, load balancers, access logs, browser history, `Referer`), so the rule is the inverse of redaction: **no secret or PII may be carried in a path or query parameter** — those belong in headers or the request body. Logging keeps the URL and omits only the body.
 

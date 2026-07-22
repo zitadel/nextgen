@@ -13,7 +13,7 @@ What matters here is the contract: which schema annotations exist, how the flow 
 |---|---|---|---|
 | `x-identifier: true` | Field | Flow Engine | Field used for user resolution in the identifier step |
 | `x-mfa: "sms"` | Field | Policy Engine | Field can be used for OTP delivery |
-| `x-sensitive: true` | Field | Flow Engine | Value redacted in audit events |
+| `x-sensitive: true` | Field | Flow Engine / API producers | Value redacted in audit events; must not appear in API `message`/`details` when handling user attributes |
 | `x-editable: true` | Field | Flow Engine | Field appears in profiling / self-service flows |
 | `x-unique: "project"` | Field | Flow Engine | Server validates uniqueness on form submit (per-project scope) |
 | `x-claim: "claims.email"` | Field | Flow Engine | Maps to SSO/OIDC claim for auto-population |

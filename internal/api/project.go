@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"errors"
-	"net/http"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -48,14 +47,5 @@ func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (
 // ------------------ Errors ---------------
 
 func projectErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
-	switch err.Code {
-	case domain.ErrProjectNotFound().Code:
-		return errorResponseWithStatusCode(http.StatusNotFound, err)
-	case domain.ErrProjectPermissionDenied().Code:
-		return errorResponseWithStatusCode(http.StatusForbidden, err)
-	case domain.ErrProjectNameInvalid().Code:
-		return errorResponseWithStatusCode(http.StatusBadRequest, err)
-	default:
-		return internalErrorResponse(err)
-	}
+	return domainErrorResponse(err)
 }

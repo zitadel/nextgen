@@ -281,50 +281,41 @@ func sessionCookie(token string, maxAge int) string {
 }
 
 func sessionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
-	switch err.Code {
-	case domain.ErrSessionNotFound().Code:
-		return errorResponseWithStatusCode(http.StatusNotFound, err)
-	case domain.ErrSessionTokenCreationFailed().Code:
-		return errorResponseWithStatusCode(http.StatusInternalServerError, err)
-	case domain.ErrSessionExchangeConflict().Code,
-		domain.ErrSessionInvalidHandoffToken().Code:
-		return errorResponseWithStatusCode(http.StatusBadRequest, err)
-	case domain.ErrSessionTokenInvalid().Code:
-		return errorResponseWithStatusCode(http.StatusUnauthorized, err)
-	case domain.ErrNotImplemented().Code:
-		return errorResponseWithStatusCode(http.StatusNotImplemented, err)
-	case domain.ErrSessionInvalidTTL().Code:
-		apiErr := &api.ErrorDetailsStatusCode{
-			StatusCode: http.StatusBadRequest,
-		}
-
-		details, ok := err.Details.(domain.SessionInvalidTTLDetails)
-		if !ok {
-			apiErr.Response = domainErrorDetails(err)
-			return apiErr
-		}
-
-		encoder := jx.GetEncoder()
-		defer jx.PutEncoder(encoder)
-
-		encoder.ObjStart()
-		encoder.Field("ttl", ogenx.ISODuration(details.TTL).Encode)
-		encoder.Field("max_ttl", ogenx.ISODuration(details.MaxTTL).Encode)
-		encoder.ObjEnd()
-
-		apiErr.Response = api.ErrorDetails{
-			Code:    api.ErrorCode(err.Code),
-			Message: err.Message,
-			Details: api.OptErrorDetailsDetails{
-				Set: true,
-				Value: api.ErrorDetailsDetails{
-					"details": jx.Raw(encoder.Bytes()),
-				},
-			},
-		}
-		return apiErr
-	default:
-		return internalErrorResponse(err)
-
+	if err.Code == domain.ErrSessionInvalidTTL().Code {
+		return sessionInvalidTTLResponse(err)
 	}
+	return domainErrorResponse(err)
+}
+
+func sessionInvalidTTLResponse(err domain.Error) *api.ErrorDetailsStatusCode {
+	apiErr := &api.ErrorDetailsStatusCode{
+		StatusCode: http.StatusBadRequest,
+	}
+
+	ttlDetails, ok := err.Details.(domain.SessionInvalidTTLDetails)
+	if !ok {
+		apiErr.Response = domainErrorDetails(err)
+		return apiErr
+	}
+
+	apiErr.Response = api.ErrorDetails{
+		Code:    api.ErrorCode(err.Code),
+		Message: err.Message,
+		Details: marshalSessionInvalidTTLDetails(ttlDetails),
+	}
+	return apiErr
+}
+
+func marshalSessionInvalidTTLDetails(details domain.SessionInvalidTTLDetails) api.OptErrorDetailsDetails {
+	encoder := jx.GetEncoder()
+	defer jx.PutEncoder(encoder)
+
+	encoder.ObjStart()
+	encoder.Field("ttl", ogenx.ISODuration(details.TTL).Encode)
+	encoder.Field("max_ttl", ogenx.ISODuration(details.MaxTTL).Encode)
+	encoder.ObjEnd()
+
+	return api.NewOptErrorDetailsDetails(api.ErrorDetailsDetails{
+		"details": jx.Raw(encoder.Bytes()),
+	})
 }

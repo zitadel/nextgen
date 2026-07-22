@@ -222,8 +222,9 @@ func NewCreateUser(projectID string, teamID *string, id string, schemabs []byte,
 func SchemaFromUserMap(user map[string]any) (string, error) {
 	schemaURL, ok := maputil.Get[string](user, "$schema")
 	if !ok {
-		return "", ErrUserInvalid().
-			WithDetails("No $schema provided for the user. A schema must be provided when creating a new user. Against this schema, the user will be validated")
+		return "", ErrUserInvalid().WithMessage(
+			"No $schema provided for the user. A schema must be provided when creating a new user. Against this schema, the user will be validated",
+		)
 	}
 	return schemaURL, nil
 }

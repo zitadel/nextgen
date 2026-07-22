@@ -112,3 +112,14 @@ func TestDomainErrorDetailsOmitsDiagnostics(t *testing.T) {
 	require.Equal(t, "An unexpected error occurred.", details.Message)
 	require.False(t, details.Details.Set, "parent/location diagnostics must not be serialized")
 }
+
+func TestDomainErrorDetails_structuredFieldDetails(t *testing.T) {
+	t.Parallel()
+
+	details := domainErrorDetails(domain.ErrRequestInvalid().WithDetails(domain.RequestInvalidFieldDetails{
+		Field: "score",
+	}))
+
+	require.True(t, details.Details.Set)
+	require.JSONEq(t, `{"field":"score"}`, string(details.Details.Value["details"]))
+}

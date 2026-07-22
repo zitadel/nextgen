@@ -98,10 +98,11 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	if fields, ok := req.Fields.Get(); ok {
 		decoded, err := decodeFlowFields(fields)
 		if err != nil {
-			// Safe client message; Parent keeps a log-safe wrapper that still Unwraps
-			// to the json.Unmarshal cause for diagnostics (ADR 030).
-			return errorResponseWithStatusCode(http.StatusBadRequest,
-				domain.ErrRequestInvalid().WithMessage(err.Error()).WithParent(err)), nil
+			domErr := domain.ErrRequestInvalid().WithMessage(err.Error()).WithParent(err)
+			if decodeErr, ok := err.(*flowFieldDecodeError); ok {
+				domErr = domErr.WithDetails(domain.RequestInvalidFieldDetails{Field: decodeErr.field})
+			}
+			return errorResponseWithStatusCode(http.StatusBadRequest, domErr), nil
 		}
 		submitReq.Fields = decoded
 	}
@@ -502,20 +503,7 @@ var (
 )
 
 func flowErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
-	switch err.Code {
-	case codeFlowCookieInvalid, codeFlowCookieExpired:
-		return errorResponseWithStatusCode(http.StatusUnauthorized, err)
-	case codeFlowNotFound:
-		return errorResponseWithStatusCode(http.StatusNotFound, err)
-	case codeFlowCompleted:
-		return errorResponseWithStatusCode(http.StatusGone, err)
-	case codeFlowSessionConflict:
-		return errorResponseWithStatusCode(http.StatusConflict, err)
-	case codeFlowInvalidAction, codeFlowUnsupported, codeFlowInvalidPurpose:
-		return errorResponseWithStatusCode(http.StatusBadRequest, err)
-	default:
-		return internalErrorResponse(err)
-	}
+	return domainErrorResponse(err)
 }
 
 // isCookieOrIDError matches any sentinel that means "this caller isn't
@@ -598,40 +586,21 @@ var (
 
 func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
-	case codeFlowDefinitionNotFound:
-		return errorResponseWithStatusCode(http.StatusNotFound, err)
-	case codeFlowDefinitionPurposeMismatch,
-		codeMissingFlowDefinitionID,
-		codeMissingProjectID:
-		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case codeFlowDefinitionInvalid:
-		return errorResponseWithDetails(err, http.StatusBadRequest)
+		return flowDefinitionErrorResponseWithDetails(err, http.StatusBadRequest)
 	case codeFlowDefinitionAlreadyExists, codeFlowDefinitionUpdateConflict:
-		return errorResponseWithDetails(err, http.StatusConflict)
-	case codeFlowDefinitionDenied:
-		return errorResponseWithStatusCode(http.StatusForbidden, err)
+		return flowDefinitionErrorResponseWithDetails(err, http.StatusConflict)
 	default:
-		return internalErrorResponse(err)
+		return domainErrorResponse(err)
 	}
 }
 
+func flowDefinitionErrorResponseWithDetails(err domain.Error, statusCode int) *api.ErrorDetailsStatusCode {
+	return errorResponseWithStatusCode(statusCode, err)
+}
+
 func errorResponseWithDetails(err domain.Error, statusCode int) *api.ErrorDetailsStatusCode {
-	errResp := errorResponseWithStatusCode(statusCode, err)
-	if err.Details == nil {
-		return errResp
-	}
-	if details, ok := err.Details.(string); ok {
-		b, marshalErr := json.Marshal(details)
-		if marshalErr == nil {
-			errResp.Response.Details = api.OptErrorDetailsDetails{
-				Value: api.ErrorDetailsDetails{
-					"details": b,
-				},
-				Set: true,
-			}
-		}
-	}
-	return errResp
+	return errorResponseWithStatusCode(statusCode, err)
 }
 
 func parseURI(s string) (url.URL, error) {

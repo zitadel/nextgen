@@ -30,15 +30,26 @@ func domainErrorDetails(err error) api.ErrorDetails {
 		Message: domErr.Message,
 	}
 
-	if domErr.Details != nil {
-		if j, err := json.Marshal(domErr.Details); err == nil {
-			errDetails.Details = api.NewOptErrorDetailsDetails(api.ErrorDetailsDetails{
-				"details": j,
-			})
-		}
+	if details, ok := marshalErrorDetails(domErr.Details); ok {
+		errDetails.Details = details
 	}
 
 	return errDetails
+}
+
+// marshalErrorDetails encodes producer-attached Details for the wire envelope.
+// The legacy shape nests the payload under details.details (ADR 030).
+func marshalErrorDetails(details any) (api.OptErrorDetailsDetails, bool) {
+	if details == nil {
+		return api.OptErrorDetailsDetails{}, false
+	}
+	b, err := json.Marshal(details)
+	if err != nil {
+		return api.OptErrorDetailsDetails{}, false
+	}
+	return api.NewOptErrorDetailsDetails(api.ErrorDetailsDetails{
+		"details": b,
+	}), true
 }
 func errorResponse(err error) *api.ErrorDetailsStatusCode {
 	var e domain.Error
