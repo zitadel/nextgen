@@ -1,0 +1,114 @@
+{
+  "$source": {
+    "fileKey": "8UjCXw8yemgljmbkWGrSfE",
+    "libraryName": "Zitadel - Design System - External",
+    "fetchedVia": "Frozen snapshot of the pre-shadcn console token set from the Zitadel Design System library",
+    "modeId": "default",
+    "modeName": "Default (dark)"
+  },
+  "primitives": {
+    "color": {
+      "white": "#ffffff",
+      "gray": {
+        "50": "#0f0f11",
+        "75": "#252528",
+        "100": "#37373a",
+        "200": "#484a57",
+        "300": "#686883",
+        "400": "#82829c",
+        "500": "#9e9eb2",
+        "600": "#cfcfde",
+        "700": "#bfbfcf",
+        "800": "#e1e1e7",
+        "900": "#f4f4f6"
+      },
+      "purple": {
+        "100": "#e9defc",
+        "200": "#d4befa",
+        "300": "#bba5e4",
+        "400": "#a489d8",
+        "500": "#8a6dc8",
+        "600": "#6f53b3",
+        "700": "#5a3ea0",
+        "800": "#40188a"
+      },
+      "pink": {
+        "100": "#fbd8e0",
+        "200": "#f8aebc",
+        "300": "#f48aa0",
+        "500": "#ea4f70",
+        "600": "#c52247",
+        "700": "#a01237"
+      }
+    },
+    "spacing": {
+      "01": 4,
+      "02": 8,
+      "03": 16,
+      "04": 24,
+      "05": 32,
+      "06": 24,
+      "07": 40,
+      "08": 48,
+      "09": 56,
+      "10": 64,
+      "11": 80,
+      "12": 88,
+      "13": 96,
+      "14": 104,
+      "15": 112,
+      "16": 120
+    },
+    "cornerRadius": {
+      "xs": 4,
+      "s": 8,
+      "m": 12,
+      "l": 16,
+      "xl": 24
+    }
+  },
+  "tokens": {
+    "color": {
+      "surface": {
+        "default-black": { "primitive": "color.gray.50" },
+        "default-white": { "primitive": "color.gray.900" },
+        "default-primary-gray": { "primitive": "color.gray.75" },
+        "default-secondary-gray": { "primitive": "color.gray.100" }
+      },
+      "text": {
+        "primary-white": { "primitive": "color.gray.900" },
+        "secondary-gray": { "primitive": "color.gray.700" },
+        "button-default": { "primitive": "color.gray.50" },
+        "button-invert": { "primitive": "color.gray.900" },
+        "disabled": { "primitive": "color.gray.300" },
+        "error": { "primitive": "color.pink.500" },
+        "success": "#33a779",
+        "subtitle-pink": { "primitive": "color.pink.300" },
+        "subtitle-purple": { "primitive": "color.purple.300" },
+        "subtitle-gray": { "primitive": "color.gray.700" },
+        "subtitle-orange": "#f25543"
+      },
+      "icon": {
+        "default-black": { "primitive": "color.gray.50" },
+        "default-white": { "primitive": "color.gray.900" },
+        "default-gray": { "primitive": "color.gray.700" },
+        "default-pink": { "primitive": "color.pink.300" },
+        "default-purple": { "primitive": "color.purple.300" },
+        "default-orange": "#f25543",
+        "disabled": { "primitive": "color.gray.300" },
+        "error": { "primitive": "color.pink.500" },
+        "success": "#33a779"
+      },
+      "border": {
+        "default-black": { "primitive": "color.gray.75" },
+        "default-white": { "primitive": "color.gray.900" },
+        "default-gray-100": { "primitive": "color.gray.100" },
+        "default-gray-200": { "primitive": "color.gray.200" },
+        "default-gray-300": { "primitive": "color.gray.300" },
+        "default-gray-400": { "primitive": "color.gray.400" },
+        "error": { "primitive": "color.pink.500" },
+        "success": "#33a779"
+      }
+    }
+  }
+}

@@ -102,7 +102,7 @@ type FlowDefinitionRepository struct {
 	purposeElemCast  string                       // SQL cast suffix for a single element, e.g. "::zitadel_nextgen.flow_definition_purposes"
 	purposeArrCast   string                       // SQL cast suffix for an array, e.g. "::zitadel_nextgen.flow_definition_purposes[]"
 	encodePurposes   func([]string) any           // returns []string for Spanner, StringArray for Postgres
-	encodeDefinition func([]byte) any             // returns string for Spanner (JSON column), []byte for Postgres (JSONB)
+	encodeDefinition func([]byte) any             // NullJSON for Spanner, []byte for Postgres JSONB
 	now              database.Instruction         // NOW() for Postgres, CURRENT_TIMESTAMP() for Spanner
 	arrayContains    func(val, col string) string // produces "val = ANY(col)" or "val IN UNNEST(col)"
 }
@@ -115,7 +115,7 @@ func NewFlowDefinitionRepository(client database.QueryExecutor) *FlowDefinitionR
 		return &FlowDefinitionRepository{
 			meta:             flowDefinitionMeta{tableName: spannerTableFlowDefinitions},
 			encodePurposes:   func(s []string) any { return s },
-			encodeDefinition: func(b []byte) any { return string(b) },
+			encodeDefinition: encodeSpannerJSON,
 			now:              database.CurrentTimestampInstruction,
 			arrayContains:    func(val, col string) string { return val + " IN UNNEST(" + col + ")" },
 		}

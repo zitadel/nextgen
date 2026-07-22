@@ -71,9 +71,9 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: moon run server:test-postgres
 
-      # Spanner integration tests are not run in CI yet: the v2 spanner statement
-      # layer is unimplemented (see zitadel/nextgen#457). Re-enable via
-      # `moon run server:test-spanner` once that lands.
+      - name: Run Go integration tests (spanner)
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: moon run server:test-spanner
 
       - name: Build release snapshot without container
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}

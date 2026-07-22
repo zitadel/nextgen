@@ -1,23 +1,37 @@
 /**
- * Navigation metadata attached to routes via `staticData` (Console ADR 0001).
+ * Navigation metadata for the Figma admin sidebar (a single flat list, no group
+ * headings; order is driven by `order`).
  *
- * The sidebar is built by reading this metadata off the route tree, so adding
- * a navigable route automatically adds its nav entry — there is no separate
- * nav list to keep in sync.
+ * Built routes attach their entry via `staticData` (Console ADR 0001) so the
+ * sidebar stays in sync with the route tree. The design's sidebar also shows
+ * screens that are not built yet; those are listed in `DESIGN_ONLY_NAV` so the
+ * shell can render the full, pixel-accurate mock while marking un-built
+ * destinations as non-navigable.
  */
-export type NavGroup = "Identity" | "Configuration";
+import { Activity, AppWindow, BarChart3, Folder } from "lucide-react";
+
+import type { NavIcon } from "./components/app-shell/icons";
 
 export interface NavMeta {
-  /** Group heading. Items without a group render at the top (e.g. Dashboard). */
-  group?: NavGroup;
   /** Sidebar label. */
   label: string;
-  /** Sort order within the group (and among ungrouped items). */
+  /** Sort order in the flat sidebar list. */
   order: number;
+  /** Sidebar glyph (matches the design system's Lucide icon set). */
+  icon: NavIcon;
 }
 
-/** Order the groups render in. */
-export const NAV_GROUP_ORDER: NavGroup[] = ["Identity", "Configuration"];
+/**
+ * Sidebar entries for screens that exist in the Figma mock but are not built
+ * yet. Rendered identically to real entries (so the sidebar matches the design
+ * pixel-for-pixel) but without a route, so they are not navigable.
+ */
+export const DESIGN_ONLY_NAV: NavMeta[] = [
+  { label: "App groups", order: 3, icon: Folder },
+  { label: "Applications", order: 4, icon: AppWindow },
+  { label: "Analytics", order: 5, icon: BarChart3 },
+  { label: "Activity Log", order: 7, icon: Activity },
+];
 
 declare module "@tanstack/react-router" {
   interface StaticDataRouteOption {
