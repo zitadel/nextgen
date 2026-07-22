@@ -53,7 +53,10 @@ export type ZitadelClientOptions = {
  *     await client.createSchema(body, { project_id });
  */
 export function createZitadelClient(opts: ZitadelClientOptions): ZitadelClient {
-  const baseUrl = opts.baseUrl.replace(/\/+$/, "");
+  let baseUrl = opts.baseUrl;
+  while (baseUrl.endsWith("/")) {
+    baseUrl = baseUrl.slice(0, -1);
+  }
   return new Proxy(endpoints as ZitadelClient, {
     get(target, prop, receiver) {
       const value = Reflect.get(target, prop, receiver);
