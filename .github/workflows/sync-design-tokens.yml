@@ -64,8 +64,9 @@ jobs:
               && 'design-tokens/figma-sync'
               || github.ref
             }}
-          # Do not use fetch-depth: 0 — that fetches every remote branch and
-          # floods the log. Refresh step pulls only main + the sync branch.
+          # Shallow tip only — refresh step replaces the remote.fetch refspec
+          # and unshallows just main + the sync branch (fetch-depth: 0 would
+          # dump every remote branch into the log).
           fetch-depth: 1
 
       # Keep the long-lived sync branch from going stale: plugin pushes land on
@@ -82,12 +83,13 @@ jobs:
           GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
         run: |
           set -euo pipefail
-          # Only the two refs we need — not refs/heads/* (avoids listing every branch).
-          git fetch --no-tags --prune origin \
-            +refs/heads/main:refs/remotes/origin/main \
-            +refs/heads/design-tokens/figma-sync:refs/remotes/origin/design-tokens/figma-sync
-          # Replace the shallow tip from actions/checkout with the full sync ref
-          # so merge-base / merge can see ancestors.
+          # Narrow fetch to the two refs we need, then unshallow so merge-base
+          # sees real shared history (a plain shallow fetch of two tips looks
+          # like unrelated histories).
+          git config --unset-all remote.origin.fetch || true
+          git config --add remote.origin.fetch '+refs/heads/main:refs/remotes/origin/main'
+          git config --add remote.origin.fetch '+refs/heads/design-tokens/figma-sync:refs/remotes/origin/design-tokens/figma-sync'
+          git fetch --no-tags --prune --unshallow origin
           git reset --hard origin/design-tokens/figma-sync
           if git merge-base --is-ancestor origin/main HEAD; then
             echo "design-tokens/figma-sync already contains origin/main"
