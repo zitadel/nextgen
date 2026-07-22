@@ -54,13 +54,14 @@ A Figma Community sync plugin pushes DTCG JSON to GitHub. Plugin settings:
 | Token path | `packages/design-tokens/figma-export` |
 
 CI ([`.github/workflows/sync-design-tokens.yml`](../../.github/workflows/sync-design-tokens.yml))
-runs on push to that branch under `figma-export/**` → `:sync-export` →
-`:generate` → commits generated artifacts **on top of** the plugin's
-`figma-export` commits (no rebase/force-push) → opens or **updates one PR**
-titled `chore: sync tokens from Figma` → `:test` as a **hard gate**. The
-snapshot test runs after the PR is opened (so a legitimate rename still surfaces
-its diff for review) but is no longer `continue-on-error`, so a name change turns
-the PR check red instead of merging silently.
+runs on push to that branch under `figma-export/**` → **merges `main` into
+`design-tokens/figma-sync`** (so the long-lived branch cannot go stale) →
+`:sync-export` → `:generate` → commits generated artifacts **on top of** the
+plugin's `figma-export` commits (no rebase/force-push) → opens or **updates
+one PR** titled `chore: sync tokens from Figma` → `:test` as a **hard gate**.
+The snapshot test runs after the PR is opened (so a legitimate rename still
+surfaces its diff for review) but is no longer `continue-on-error`, so a name
+change turns the PR check red instead of merging silently.
 
 `:sync-export` is intentionally **file-name agnostic**: it reads every `*.json`
 under `figma-export/`, builds one registry of leaf values, resolves every
