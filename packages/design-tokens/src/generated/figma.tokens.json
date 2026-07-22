@@ -97,23 +97,23 @@
       "light": "#fafafa"
     },
     "chart-1": {
-      "dark": "#1d4ed8",
+      "dark": "#3b82f6",
       "light": "#ea580c"
     },
     "chart-2": {
-      "dark": "#10b981",
+      "dark": "#34d399",
       "light": "#0d9488"
     },
     "chart-3": {
-      "dark": "#f59e0b",
+      "dark": "#fbbf24",
       "light": "#164e63"
     },
     "chart-4": {
-      "dark": "#a855f7",
+      "dark": "#a78bfa",
       "light": "#fbbf24"
     },
     "chart-5": {
-      "dark": "#f43f5e",
+      "dark": "#fb7185",
       "light": "#f59e0b"
     },
     "sidebar-primary-foreground": {
