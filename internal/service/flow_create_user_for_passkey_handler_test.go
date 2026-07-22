@@ -74,7 +74,7 @@ func passkeyFlowState(collected map[string]any) *domain.FlowState {
 
 func expectSchemaLookup(f *passkeyHandlerFixture) {
 	f.schemaStore.EXPECT().
-		GetByID(gomock.Any(), "proj_1", "https://example.test/schema.json").
+		GetJSONSchemaByID(gomock.Any(), "proj_1", "https://example.test/schema.json").
 		Return(&domain.JSONSchema{
 			ProjectID: "proj_1",
 			URL:       "https://example.test/schema.json",

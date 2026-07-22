@@ -73,7 +73,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 		// Pass the just-created payload so Resolve does not re-load (or HTTP-refetch
 		// and re-insert) the same URL inside this transaction — Spanner can surface
 		// the duplicate as a commit-time AlreadyExists otherwise.
-		_, err := s.schemaResolver.Resolve(ctx, NewJSONSchemaStatementStore(stmts), input.ProjectID, model.URL, model.Schema)
+		_, err := s.schemaResolver.Resolve(ctx, stmts, input.ProjectID, model.URL, model.Schema)
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
 		}
@@ -96,7 +96,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchemaByURLInput) (*domain.JSONSchema, error) {
 	strURI := input.URL.String()
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		_, err := s.schemaResolver.Resolve(ctx, NewJSONSchemaStatementStore(tx.Statements()), input.ProjectID, strURI, nil)
+		_, err := s.schemaResolver.Resolve(ctx, tx.Statements(), input.ProjectID, strURI, nil)
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
 		}

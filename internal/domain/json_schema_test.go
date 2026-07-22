@@ -75,7 +75,7 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 			name: "cache hit",
 			run: func(t *testing.T, ctrl *gomock.Controller) {
 				store := domainmock.NewMockJSONSchemaStore(ctrl)
-				store.EXPECT().GetByID(gomock.Any(), projectID, simpleURL).Return(&domain.JSONSchema{
+				store.EXPECT().GetJSONSchemaByID(gomock.Any(), projectID, simpleURL).Return(&domain.JSONSchema{
 					Schema: []byte(simpleSchema),
 				}, nil).Times(1)
 
@@ -95,7 +95,7 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 			name: "database hit without HTTP",
 			run: func(t *testing.T, ctrl *gomock.Controller) {
 				store := domainmock.NewMockJSONSchemaStore(ctrl)
-				store.EXPECT().GetByID(gomock.Any(), projectID, simpleURL).Return(&domain.JSONSchema{
+				store.EXPECT().GetJSONSchemaByID(gomock.Any(), projectID, simpleURL).Return(&domain.JSONSchema{
 					Schema: []byte(simpleSchema),
 				}, nil)
 
@@ -110,7 +110,7 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 			name: "database miss without HTTP client",
 			run: func(t *testing.T, ctrl *gomock.Controller) {
 				store := domainmock.NewMockJSONSchemaStore(ctrl)
-				store.EXPECT().GetByID(gomock.Any(), projectID, simpleURL).Return(nil, database.NewNoRowFoundError(nil))
+				store.EXPECT().GetJSONSchemaByID(gomock.Any(), projectID, simpleURL).Return(nil, database.NewNoRowFoundError(nil))
 
 				resolver := newTestResolver(t, nil)
 
@@ -130,8 +130,8 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				t.Cleanup(srv.Close)
 
 				store := domainmock.NewMockJSONSchemaStore(ctrl)
-				store.EXPECT().GetByID(gomock.Any(), projectID, srv.URL).Return(nil, database.NewNoRowFoundError(nil))
-				store.EXPECT().Create(gomock.Any(), gomock.AssignableToTypeOf(&domain.JSONSchema{})).
+				store.EXPECT().GetJSONSchemaByID(gomock.Any(), projectID, srv.URL).Return(nil, database.NewNoRowFoundError(nil))
+				store.EXPECT().CreateJSONSchema(gomock.Any(), gomock.AssignableToTypeOf(&domain.JSONSchema{})).
 					DoAndReturn(func(_ context.Context, schema *domain.JSONSchema) error {
 						assert.Equal(t, projectID, schema.ProjectID)
 						assert.Equal(t, srv.URL, schema.URL)
@@ -150,7 +150,7 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 			run: func(t *testing.T, ctrl *gomock.Controller) {
 				dbErr := errors.New("db error")
 				store := domainmock.NewMockJSONSchemaStore(ctrl)
-				store.EXPECT().GetByID(gomock.Any(), projectID, simpleURL).Return(nil, dbErr)
+				store.EXPECT().GetJSONSchemaByID(gomock.Any(), projectID, simpleURL).Return(nil, dbErr)
 
 				resolver := newTestResolver(t, nil)
 
@@ -171,7 +171,7 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				store := domainmock.NewMockJSONSchemaStore(ctrl)
 
 				var getCalls int
-				store.EXPECT().GetByID(gomock.Any(), projectID, gomock.Any()).DoAndReturn(
+				store.EXPECT().GetJSONSchemaByID(gomock.Any(), projectID, gomock.Any()).DoAndReturn(
 					func(_ context.Context, _, schemaURL string) (*domain.JSONSchema, error) {
 						getCalls++
 						switch getCalls {
@@ -181,7 +181,7 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 						case 2:
 							return &domain.JSONSchema{Schema: []byte(schemaB)}, nil
 						default:
-							t.Fatalf("unexpected GetByID call %d", getCalls)
+							t.Fatalf("unexpected GetJSONSchemaByID call %d", getCalls)
 							return nil, errors.New("unexpected")
 						}
 					},
@@ -207,8 +207,8 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				t.Cleanup(srv.Close)
 
 				store := domainmock.NewMockJSONSchemaStore(ctrl)
-				store.EXPECT().GetByID(gomock.Any(), projectID, srv.URL).Return(nil, database.NewNoRowFoundError(nil))
-				store.EXPECT().Create(gomock.Any(), gomock.Any()).Return(persistErr)
+				store.EXPECT().GetJSONSchemaByID(gomock.Any(), projectID, srv.URL).Return(nil, database.NewNoRowFoundError(nil))
+				store.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any()).Return(persistErr)
 
 				resolver := newTestResolver(t, srv.Client())
 
@@ -229,8 +229,8 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				t.Cleanup(srv.Close)
 
 				store := domainmock.NewMockJSONSchemaStore(ctrl)
-				store.EXPECT().GetByID(gomock.Any(), projectID, srv.URL).Return(nil, database.NewNoRowFoundError(nil))
-				store.EXPECT().Create(gomock.Any(), gomock.AssignableToTypeOf(&domain.JSONSchema{})).Return(nil)
+				store.EXPECT().GetJSONSchemaByID(gomock.Any(), projectID, srv.URL).Return(nil, database.NewNoRowFoundError(nil))
+				store.EXPECT().CreateJSONSchema(gomock.Any(), gomock.AssignableToTypeOf(&domain.JSONSchema{})).Return(nil)
 
 				resolver := newTestResolver(t, srv.Client())
 
@@ -270,7 +270,7 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				)
 
 				store := domainmock.NewMockJSONSchemaStore(ctrl)
-				store.EXPECT().GetByID(gomock.Any(), projectID, refURL).Return(&domain.JSONSchema{
+				store.EXPECT().GetJSONSchemaByID(gomock.Any(), projectID, refURL).Return(&domain.JSONSchema{
 					Schema: []byte(refSchema),
 				}, nil).Times(1)
 
@@ -334,7 +334,7 @@ func TestJSONSchemaResolver_BuiltinEmbedded(t *testing.T) {
 	t.Run("URL under base but unknown path falls back to DB and errors when not found", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		store := domainmock.NewMockJSONSchemaStore(ctrl)
-		store.EXPECT().GetByID(gomock.Any(), "proj-1", "https://example.test/app/schemas/unknown/v.json").Return(nil, database.NewNoRowFoundError(nil))
+		store.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj-1", "https://example.test/app/schemas/unknown/v.json").Return(nil, database.NewNoRowFoundError(nil))
 		r := domain.NewJSONSchemaResolver(mustJSONSchemaCache(t, 128), 0, 0, nil, base)
 		_, err := r.Resolve(ctx, store, "proj-1", "https://example.test/app/schemas/unknown/v.json", nil)
 		require.Error(t, err)
@@ -342,7 +342,7 @@ func TestJSONSchemaResolver_BuiltinEmbedded(t *testing.T) {
 	t.Run("schema URL equals base only falls back to DB and errors when not found", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		store := domainmock.NewMockJSONSchemaStore(ctrl)
-		store.EXPECT().GetByID(gomock.Any(), "proj-1", base.String()).Return(nil, database.NewNoRowFoundError(nil))
+		store.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj-1", base.String()).Return(nil, database.NewNoRowFoundError(nil))
 		r := domain.NewJSONSchemaResolver(mustJSONSchemaCache(t, 128), 0, 0, nil, base)
 		_, err := r.Resolve(ctx, store, "proj-1", base.String(), nil)
 		require.Error(t, err)
@@ -352,7 +352,7 @@ func TestJSONSchemaResolver_BuiltinEmbedded(t *testing.T) {
 		const userSchema = `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}`
 		ctrl := gomock.NewController(t)
 		store := domainmock.NewMockJSONSchemaStore(ctrl)
-		store.EXPECT().GetByID(gomock.Any(), "proj-1", userSchemaURL).Return(&domain.JSONSchema{Schema: []byte(userSchema)}, nil)
+		store.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj-1", userSchemaURL).Return(&domain.JSONSchema{Schema: []byte(userSchema)}, nil)
 		r := domain.NewJSONSchemaResolver(mustJSONSchemaCache(t, 128), 0, 0, nil, base)
 		schema, err := r.Resolve(ctx, store, "proj-1", userSchemaURL, nil)
 		require.NoError(t, err)

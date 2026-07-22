@@ -41,79 +41,79 @@ func (m *MockJSONSchemaStore) EXPECT() *MockJSONSchemaStoreMockRecorder {
 	return m.recorder
 }
 
-// Create mocks base method.
-func (m *MockJSONSchemaStore) Create(ctx context.Context, schema *domain.JSONSchema) error {
+// CreateJSONSchema mocks base method.
+func (m *MockJSONSchemaStore) CreateJSONSchema(ctx context.Context, schema *domain.JSONSchema) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Create", ctx, schema)
+	ret := m.ctrl.Call(m, "CreateJSONSchema", ctx, schema)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// Create indicates an expected call of Create.
-func (mr *MockJSONSchemaStoreMockRecorder) Create(ctx, schema any) *MockJSONSchemaStoreCreateCall {
+// CreateJSONSchema indicates an expected call of CreateJSONSchema.
+func (mr *MockJSONSchemaStoreMockRecorder) CreateJSONSchema(ctx, schema any) *MockJSONSchemaStoreCreateJSONSchemaCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockJSONSchemaStore)(nil).Create), ctx, schema)
-	return &MockJSONSchemaStoreCreateCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateJSONSchema", reflect.TypeOf((*MockJSONSchemaStore)(nil).CreateJSONSchema), ctx, schema)
+	return &MockJSONSchemaStoreCreateJSONSchemaCall{Call: call}
 }
 
-// MockJSONSchemaStoreCreateCall wrap *gomock.Call
-type MockJSONSchemaStoreCreateCall struct {
+// MockJSONSchemaStoreCreateJSONSchemaCall wrap *gomock.Call
+type MockJSONSchemaStoreCreateJSONSchemaCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockJSONSchemaStoreCreateCall) Return(arg0 error) *MockJSONSchemaStoreCreateCall {
+func (c *MockJSONSchemaStoreCreateJSONSchemaCall) Return(arg0 error) *MockJSONSchemaStoreCreateJSONSchemaCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockJSONSchemaStoreCreateCall) Do(f func(context.Context, *domain.JSONSchema) error) *MockJSONSchemaStoreCreateCall {
+func (c *MockJSONSchemaStoreCreateJSONSchemaCall) Do(f func(context.Context, *domain.JSONSchema) error) *MockJSONSchemaStoreCreateJSONSchemaCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockJSONSchemaStoreCreateCall) DoAndReturn(f func(context.Context, *domain.JSONSchema) error) *MockJSONSchemaStoreCreateCall {
+func (c *MockJSONSchemaStoreCreateJSONSchemaCall) DoAndReturn(f func(context.Context, *domain.JSONSchema) error) *MockJSONSchemaStoreCreateJSONSchemaCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
-// GetByID mocks base method.
-func (m *MockJSONSchemaStore) GetByID(ctx context.Context, projectID, schemaID string) (*domain.JSONSchema, error) {
+// GetJSONSchemaByID mocks base method.
+func (m *MockJSONSchemaStore) GetJSONSchemaByID(ctx context.Context, projectID, schemaID string) (*domain.JSONSchema, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetByID", ctx, projectID, schemaID)
+	ret := m.ctrl.Call(m, "GetJSONSchemaByID", ctx, projectID, schemaID)
 	ret0, _ := ret[0].(*domain.JSONSchema)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetByID indicates an expected call of GetByID.
-func (mr *MockJSONSchemaStoreMockRecorder) GetByID(ctx, projectID, schemaID any) *MockJSONSchemaStoreGetByIDCall {
+// GetJSONSchemaByID indicates an expected call of GetJSONSchemaByID.
+func (mr *MockJSONSchemaStoreMockRecorder) GetJSONSchemaByID(ctx, projectID, schemaID any) *MockJSONSchemaStoreGetJSONSchemaByIDCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockJSONSchemaStore)(nil).GetByID), ctx, projectID, schemaID)
-	return &MockJSONSchemaStoreGetByIDCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetJSONSchemaByID", reflect.TypeOf((*MockJSONSchemaStore)(nil).GetJSONSchemaByID), ctx, projectID, schemaID)
+	return &MockJSONSchemaStoreGetJSONSchemaByIDCall{Call: call}
 }
 
-// MockJSONSchemaStoreGetByIDCall wrap *gomock.Call
-type MockJSONSchemaStoreGetByIDCall struct {
+// MockJSONSchemaStoreGetJSONSchemaByIDCall wrap *gomock.Call
+type MockJSONSchemaStoreGetJSONSchemaByIDCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockJSONSchemaStoreGetByIDCall) Return(arg0 *domain.JSONSchema, arg1 error) *MockJSONSchemaStoreGetByIDCall {
+func (c *MockJSONSchemaStoreGetJSONSchemaByIDCall) Return(arg0 *domain.JSONSchema, arg1 error) *MockJSONSchemaStoreGetJSONSchemaByIDCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockJSONSchemaStoreGetByIDCall) Do(f func(context.Context, string, string) (*domain.JSONSchema, error)) *MockJSONSchemaStoreGetByIDCall {
+func (c *MockJSONSchemaStoreGetJSONSchemaByIDCall) Do(f func(context.Context, string, string) (*domain.JSONSchema, error)) *MockJSONSchemaStoreGetJSONSchemaByIDCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockJSONSchemaStoreGetByIDCall) DoAndReturn(f func(context.Context, string, string) (*domain.JSONSchema, error)) *MockJSONSchemaStoreGetByIDCall {
+func (c *MockJSONSchemaStoreGetJSONSchemaByIDCall) DoAndReturn(f func(context.Context, string, string) (*domain.JSONSchema, error)) *MockJSONSchemaStoreGetJSONSchemaByIDCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

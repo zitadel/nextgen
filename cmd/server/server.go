@@ -141,7 +141,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	brandingRepo := repository.NewBrandingRepository(pool)
 
 	serviceDBPool := service.NewPool(v2Pool.(service.Pool))
-	schemaStore := service.NewJSONSchemaStatementStore(serviceDBPool.Statements())
+	schemaStore := serviceDBPool.Statements()
 
 	// ── Schema Stuff ─────────────────
 	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](cfg.Schema.LRUCacheSize)

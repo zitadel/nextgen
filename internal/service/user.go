@@ -113,7 +113,7 @@ func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (
 func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ map[string]any, err error) {
 	// CreateUser does not need a transaction, so we don't wrap it in an `ApplyActions` call
 
-	action := NewCreateUserAction(input, s.userRepo, NewJSONSchemaStatementStore(s.v2Pool.Statements()))
+	action := NewCreateUserAction(input, s.userRepo, s.v2Pool.Statements())
 	err = action.Prepare(ctx, s.pool)
 	if err != nil {
 		return nil, err
@@ -230,7 +230,7 @@ func (o *CreateUserAction) Prepare(ctx context.Context, db database.QueryExecuto
 		return err
 	}
 
-	schemaEntity, err := o.schemaStore.GetByID(ctx, o.ProjectID, schemaURL)
+	schemaEntity, err := o.schemaStore.GetJSONSchemaByID(ctx, o.ProjectID, schemaURL)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return domain.ErrUserInvalid().WithDetails("$schema is not known to the system. First create a schema, then create users.")

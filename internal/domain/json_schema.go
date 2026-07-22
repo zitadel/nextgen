@@ -102,10 +102,11 @@ func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error)
 // references them). Schemas can use versioned URLs to support multiple
 // versions of the same schema.
 //
-// Implementations are typically bound to a pool or transaction (v2 statements).
+// Method names match the v2 statement surface so pool/tx statements satisfy
+// this interface without an adapter.
 type JSONSchemaStore interface {
-	GetByID(ctx context.Context, projectID, schemaID string) (*JSONSchema, error)
-	Create(ctx context.Context, schema *JSONSchema) error
+	GetJSONSchemaByID(ctx context.Context, projectID, schemaID string) (*JSONSchema, error)
+	CreateJSONSchema(ctx context.Context, schema *JSONSchema) error
 }
 
 const (
@@ -166,7 +167,7 @@ type JSONSchemaResolver struct {
 // NewJSONSchemaResolver wires a resolver with an LRU cache, resolve limits,
 // an optional HTTP client for ingestion, and an optional builtinPublicBase URL.
 // When builtinPublicBase is non-nil, schema URLs under that prefix are loaded from embedded templates
-// instead of the database; they are not persisted via [JSONSchemaStore.Create].
+// instead of the database; they are not persisted via [JSONSchemaStore.CreateJSONSchema].
 // Persistence is supplied per [JSONSchemaResolver.Resolve] call via [JSONSchemaStore].
 func NewJSONSchemaResolver(
 	cache *lru.TwoQueueCache[string, *jsonschema.Schema],
@@ -361,7 +362,7 @@ func resolveRefs(node any, base *url.URL) (any, error) {
 }
 
 func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, store JSONSchemaStore, projectID, schemaURL string) ([]byte, error) {
-	dbSchema, err := store.GetByID(ctx, projectID, schemaURL)
+	dbSchema, err := store.GetJSONSchemaByID(ctx, projectID, schemaURL)
 	if err == nil {
 		return dbSchema.Schema, nil
 	}
@@ -382,7 +383,7 @@ func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, store JSONSche
 		URL:       schemaURL,
 		Schema:    data,
 	}
-	if err := store.Create(ctx, dbSchema); err != nil {
+	if err := store.CreateJSONSchema(ctx, dbSchema); err != nil {
 		return nil, err
 	}
 	return data, nil
