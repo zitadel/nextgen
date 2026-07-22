@@ -13,7 +13,10 @@ get:
         $ref: ../../../components/schemas/project-id.yaml
   security:
     - oauth2:
-        - project.read
+        # project.write, not project.read: project.read is carried by the
+        # browser-plane preview secret, so it cannot gate an operator read
+        # until ADR 036 splits the credential planes into distinct schemes.
+        - project.write
   responses:
     '200':
       description: Project state.

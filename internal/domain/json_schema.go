@@ -38,6 +38,10 @@ func ErrJSONSchemaAlreadyExists() Error {
 	return newError(PrefixJSONSchema.ErrorCodePrefix("already_exists"), "a schema with the given id already exists", nil, nil)
 }
 
+func ErrJSONSchemaPermissionDenied() Error {
+	return newError(PrefixJSONSchema.ErrorCodePrefix("permission_denied"), "the schema management API requires the project secret", nil, nil)
+}
+
 var absoluteScheme = regexp.MustCompile(`^https?://`)
 
 type JSONSchema struct {
