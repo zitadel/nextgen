@@ -108,21 +108,23 @@ type userAuthPresence struct {
 
 func scanUserHydrationRowParts(rows database.Rows) (*domain.User, userAuthPresence, error) {
 	var (
-		projectID string
-		schemaURL string
-		id        string
-		team      database.Null[string]
-		createdAt time.Time
-		updatedAt time.Time
-		attrKeys  []string
-		attrVals  [][]byte
-		flags     userAuthPresence
+		projectID            string
+		schemaURL            string
+		id                   string
+		lifecycleOwnerTeamID database.Null[string]
+		status               string
+		createdAt            time.Time
+		updatedAt            time.Time
+		attrKeys             []string
+		attrVals             [][]byte
+		flags                userAuthPresence
 	)
 	if err := rows.Scan(
 		&projectID,
 		&schemaURL,
 		&id,
-		&team,
+		&lifecycleOwnerTeamID,
+		&status,
 		&createdAt,
 		&updatedAt,
 		&attrKeys,
@@ -139,12 +141,13 @@ func scanUserHydrationRowParts(rows database.Rows) (*domain.User, userAuthPresen
 		ProjectID: projectID,
 		SchemaURL: schemaURL,
 		ID:        id,
+		Status:    domain.UserStatus(status),
 		CreatedAt: createdAt,
 		UpdatedAt: updatedAt,
 	}
-	if team.Valid {
-		copy := team.V
-		u.TeamID = &copy
+	if lifecycleOwnerTeamID.Valid {
+		copy := lifecycleOwnerTeamID.V
+		u.LifecycleOwnerTeamID = &copy
 	}
 
 	if len(attrKeys) != len(attrVals) {

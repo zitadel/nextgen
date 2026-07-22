@@ -24,7 +24,7 @@ import (
 func TestListUsers(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
@@ -64,11 +64,11 @@ func TestListUsers(t *testing.T) {
 			"email", fmt.Sprintf("list-%d@example.com", i), domain.AttributeUniquenessProject)
 		require.NoError(t, err)
 		require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
-			ProjectID:  project.ID,
-			SchemaURL:  schemaURL,
-			ID:         id,
-			TeamID:     &team.ID,
-			Attributes: []*domain.CreateAttribute{emailAttr},
+			ProjectID:               project.ID,
+			SchemaURL:               schemaURL,
+			ID:                      id,
+			InitialMembershipTeamID: &team.ID,
+			Attributes:              []*domain.CreateAttribute{emailAttr},
 		}))
 	}
 
@@ -93,7 +93,7 @@ func TestListUsers(t *testing.T) {
 	}))
 
 	// Another project's bearer sees nothing: scope comes from the token.
-	other, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 	otherClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)

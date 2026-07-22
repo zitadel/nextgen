@@ -80,6 +80,44 @@ func (c *MockTeamRepositoryCreateCall) DoAndReturn(f func(context.Context, datab
 	return c
 }
 
+// Deactivate mocks base method.
+func (m *MockTeamRepository) Deactivate(ctx context.Context, client database.QueryExecutor, projectID, id string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Deactivate", ctx, client, projectID, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Deactivate indicates an expected call of Deactivate.
+func (mr *MockTeamRepositoryMockRecorder) Deactivate(ctx, client, projectID, id any) *MockTeamRepositoryDeactivateCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Deactivate", reflect.TypeOf((*MockTeamRepository)(nil).Deactivate), ctx, client, projectID, id)
+	return &MockTeamRepositoryDeactivateCall{Call: call}
+}
+
+// MockTeamRepositoryDeactivateCall wrap *gomock.Call
+type MockTeamRepositoryDeactivateCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockTeamRepositoryDeactivateCall) Return(arg0 error) *MockTeamRepositoryDeactivateCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockTeamRepositoryDeactivateCall) Do(f func(context.Context, database.QueryExecutor, string, string) error) *MockTeamRepositoryDeactivateCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockTeamRepositoryDeactivateCall) DoAndReturn(f func(context.Context, database.QueryExecutor, string, string) error) *MockTeamRepositoryDeactivateCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // Get mocks base method.
 func (m *MockTeamRepository) Get(ctx context.Context, client database.QueryExecutor, projectID, id string) (*domain.Team, error) {
 	m.ctrl.T.Helper()
