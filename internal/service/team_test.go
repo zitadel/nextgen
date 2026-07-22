@@ -7,11 +7,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
+
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"go.uber.org/mock/gomock"
 )
 
 func TestTeamService_CreateTeam(t *testing.T) {
@@ -38,11 +39,7 @@ func TestTeamService_CreateTeam(t *testing.T) {
 				}
 			},
 			setupPool: func(pool *servicemocks.MockPool, statements testAllStatements) {
-				pool.EXPECT().
-					Transaction(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
-						return fn(ctx, v2TestTx{stmts: statements})
-					})
+				pool.EXPECT().Statements().Return(statements)
 			},
 		},
 		{
@@ -56,11 +53,7 @@ func TestTeamService_CreateTeam(t *testing.T) {
 				}
 			},
 			setupPool: func(pool *servicemocks.MockPool, statements testAllStatements) {
-				pool.EXPECT().
-					Transaction(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
-						return fn(ctx, v2TestTx{stmts: statements})
-					})
+				pool.EXPECT().Statements().Return(statements)
 			},
 			wantErr: true,
 		},

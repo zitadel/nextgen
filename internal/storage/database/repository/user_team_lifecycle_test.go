@@ -50,42 +50,35 @@ func deactivateTeam(t *testing.T, tx database.QueryExecutor, projectID, id strin
 	userDeactivated := domain.UserStatusDeactivated.String()
 	teamDeactivated := domain.TeamStatusDeactivated.String()
 
-	if isSpannerDB {
-		_, err := tx.Exec(ctx,
-			`UPDATE teams SET status = $1, updated_at = CURRENT_TIMESTAMP() WHERE project_id = $2 AND id = $3`,
-			teamDeactivated, projectID, id)
-		require.NoError(t, err)
-		_, err = tx.Exec(ctx,
-			`UPDATE team_memberships SET status = $1, updated_at = CURRENT_TIMESTAMP() WHERE project_id = $2 AND team_id = $3 AND status <> $1`,
-			membershipRemoved, projectID, id)
-		require.NoError(t, err)
-		_, err = tx.Exec(ctx,
-			`UPDATE users SET status = $1, updated_at = CURRENT_TIMESTAMP() WHERE project_id = $2 AND lifecycle_owner_team_id = $3 AND status <> $1`,
-			userDeactivated, projectID, id)
-		require.NoError(t, err)
-		_, err = tx.Exec(ctx,
-			`UPDATE team_memberships SET status = $1, updated_at = CURRENT_TIMESTAMP() WHERE project_id = $2 AND status <> $1 AND user_id IN (SELECT id FROM users WHERE project_id = $3 AND lifecycle_owner_team_id = $4)`,
-			membershipRemoved, projectID, projectID, id)
-		require.NoError(t, err)
-		return
+	var stmts []struct {
+		sql  string
+		args []any
 	}
-
-	_, err := tx.Exec(ctx,
-		`UPDATE zitadel_nextgen.teams SET status = $1, updated_at = now() WHERE project_id = $2 AND id = $3`,
-		teamDeactivated, projectID, id)
-	require.NoError(t, err)
-	_, err = tx.Exec(ctx,
-		`UPDATE zitadel_nextgen.team_memberships SET status = $1, updated_at = now() WHERE project_id = $2 AND team_id = $3 AND status <> $1`,
-		membershipRemoved, projectID, id)
-	require.NoError(t, err)
-	_, err = tx.Exec(ctx,
-		`UPDATE zitadel_nextgen.users SET status = $1, updated_at = now() WHERE project_id = $2 AND lifecycle_owner_team_id = $3 AND status <> $1`,
-		userDeactivated, projectID, id)
-	require.NoError(t, err)
-	_, err = tx.Exec(ctx,
-		`UPDATE zitadel_nextgen.team_memberships SET status = $1, updated_at = now() WHERE project_id = $2 AND status <> $1 AND user_id IN (SELECT id FROM zitadel_nextgen.users WHERE project_id = $3 AND lifecycle_owner_team_id = $4)`,
-		membershipRemoved, projectID, projectID, id)
-	require.NoError(t, err)
+	if isSpannerDB {
+		stmts = []struct {
+			sql  string
+			args []any
+		}{
+			{`UPDATE teams SET status = $1, updated_at = CURRENT_TIMESTAMP() WHERE project_id = $2 AND id = $3`, []any{teamDeactivated, projectID, id}},
+			{`UPDATE team_memberships SET status = $1, updated_at = CURRENT_TIMESTAMP() WHERE project_id = $2 AND team_id = $3 AND status <> $1`, []any{membershipRemoved, projectID, id}},
+			{`UPDATE users SET status = $1, updated_at = CURRENT_TIMESTAMP() WHERE project_id = $2 AND lifecycle_owner_team_id = $3 AND status <> $1`, []any{userDeactivated, projectID, id}},
+			{`UPDATE team_memberships SET status = $1, updated_at = CURRENT_TIMESTAMP() WHERE project_id = $2 AND status <> $1 AND user_id IN (SELECT id FROM users WHERE project_id = $3 AND lifecycle_owner_team_id = $4)`, []any{membershipRemoved, projectID, projectID, id}},
+		}
+	} else {
+		stmts = []struct {
+			sql  string
+			args []any
+		}{
+			{`UPDATE zitadel_nextgen.teams SET status = $1, updated_at = now() WHERE project_id = $2 AND id = $3`, []any{teamDeactivated, projectID, id}},
+			{`UPDATE zitadel_nextgen.team_memberships SET status = $1, updated_at = now() WHERE project_id = $2 AND team_id = $3 AND status <> $1`, []any{membershipRemoved, projectID, id}},
+			{`UPDATE zitadel_nextgen.users SET status = $1, updated_at = now() WHERE project_id = $2 AND lifecycle_owner_team_id = $3 AND status <> $1`, []any{userDeactivated, projectID, id}},
+			{`UPDATE zitadel_nextgen.team_memberships SET status = $1, updated_at = now() WHERE project_id = $2 AND status <> $1 AND user_id IN (SELECT id FROM zitadel_nextgen.users WHERE project_id = $3 AND lifecycle_owner_team_id = $4)`, []any{membershipRemoved, projectID, projectID, id}},
+		}
+	}
+	for _, step := range stmts {
+		_, err := tx.Exec(ctx, step.sql, step.args...)
+		require.NoError(t, err)
+	}
 }
 
 func createLifecycleUser(t *testing.T, tx database.Transaction, userRepo *repository.UserRepository, projectID, schemaURL, userID string, lifecycleOwner, participation *string) {
@@ -169,8 +162,6 @@ func TestUserTeamLifecycle_TeamOwnedUserDeactivatedOnTeamDeactivation(t *testing
 	require.Equal(t, domain.UserStatusDeactivated, got.Status)
 }
 
-// Team-owned users deactivated via team deactivate lose memberships on all teams
-// (same roster policy as UserRepository.Deactivate / ADR 024).
 func TestUserTeamLifecycle_TeamOwnedUserLosesAllMembershipsOnOwningTeamDeactivation(t *testing.T) {
 	skipIfSpanner(t)
 	tx, rollback := transactionForRollback(t)

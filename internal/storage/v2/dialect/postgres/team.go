@@ -15,10 +15,29 @@ const (
 	createTeamStmt = `INSERT INTO zitadel_nextgen.teams (project_id, id) VALUES ($1, $2) RETURNING project_id, id, status, created_at, updated_at`
 	teamQuery      = `SELECT project_id, id, status, created_at, updated_at FROM zitadel_nextgen.teams`
 
-	deactivateTeamStmt                  = `UPDATE zitadel_nextgen.teams SET status = $1, updated_at = now() WHERE project_id = $2 AND id = $3`
-	deactivateTeamMembershipsStmt       = `UPDATE zitadel_nextgen.team_memberships SET status = $1, updated_at = now() WHERE project_id = $2 AND team_id = $3 AND status <> $1`
-	deactivateTeamOwnedUsersStmt        = `UPDATE zitadel_nextgen.users SET status = $1, updated_at = now() WHERE project_id = $2 AND lifecycle_owner_team_id = $3 AND status <> $1`
-	deactivateOwnedUsersMembershipsStmt = `UPDATE zitadel_nextgen.team_memberships SET status = $1, updated_at = now() WHERE project_id = $2 AND status <> $1 AND user_id IN (SELECT id FROM zitadel_nextgen.users WHERE project_id = $3 AND lifecycle_owner_team_id = $4)`
+	deactivateTeamStmt = `
+UPDATE zitadel_nextgen.teams
+SET status = $1, updated_at = now()
+WHERE project_id = $2 AND id = $3`
+
+	deactivateTeamMembershipsStmt = `
+UPDATE zitadel_nextgen.team_memberships
+SET status = $1, updated_at = now()
+WHERE project_id = $2 AND team_id = $3 AND status <> $1`
+
+	deactivateTeamOwnedUsersStmt = `
+UPDATE zitadel_nextgen.users
+SET status = $1, updated_at = now()
+WHERE project_id = $2 AND lifecycle_owner_team_id = $3 AND status <> $1`
+
+	deactivateOwnedUsersMembershipsStmt = `
+UPDATE zitadel_nextgen.team_memberships
+SET status = $1, updated_at = now()
+WHERE project_id = $2 AND status <> $1
+  AND user_id IN (
+    SELECT id FROM zitadel_nextgen.users
+    WHERE project_id = $3 AND lifecycle_owner_team_id = $4
+  )`
 )
 
 type teamStatements struct{ statement }
@@ -75,21 +94,18 @@ func (ts teamStatements) DeactivateTeam(ctx context.Context, projectID, id strin
 	userDeactivated := domain.UserStatusDeactivated.String()
 	teamDeactivated := domain.TeamStatusDeactivated.String()
 
-	if _, err := ts.client.Exec(ctx, deactivateTeamStmt, teamDeactivated, projectID, id); err != nil {
-		return wrapError(err)
-	}
-	// Remove roster access to this team for all participants (self-owned and team-owned).
-	if _, err := ts.client.Exec(ctx, deactivateTeamMembershipsStmt, membershipRemoved, projectID, id); err != nil {
-		return wrapError(err)
-	}
-	// Deactivate users lifecycle-owned by this team (ADR 024).
-	if _, err := ts.client.Exec(ctx, deactivateTeamOwnedUsersStmt, userDeactivated, projectID, id); err != nil {
-		return wrapError(err)
-	}
-	// Match UserRepository.Deactivate: deprovisioned users lose all memberships/access,
-	// including roster rows on other teams.
-	if _, err := ts.client.Exec(ctx, deactivateOwnedUsersMembershipsStmt, membershipRemoved, projectID, projectID, id); err != nil {
-		return wrapError(err)
+	for _, step := range []struct {
+		sql  string
+		args []any
+	}{
+		{deactivateTeamStmt, []any{teamDeactivated, projectID, id}},
+		{deactivateTeamMembershipsStmt, []any{membershipRemoved, projectID, id}},
+		{deactivateTeamOwnedUsersStmt, []any{userDeactivated, projectID, id}},
+		{deactivateOwnedUsersMembershipsStmt, []any{membershipRemoved, projectID, projectID, id}},
+	} {
+		if _, err := ts.client.Exec(ctx, step.sql, step.args...); err != nil {
+			return wrapError(err)
+		}
 	}
 	return nil
 }

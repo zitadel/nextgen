@@ -26,26 +26,15 @@ func NewTeamService(v2Pool *DB) *TeamService {
 	}
 }
 
-func (s *TeamService) CreateTeam(ctx context.Context, input CreateTeamInput) (team *domain.Team, err error) {
+func (s *TeamService) CreateTeam(ctx context.Context, input CreateTeamInput) (*domain.Team, error) {
 	model, err := domain.NewTeam(input.ProjectID)
 	if err != nil {
 		return nil, err
 	}
 
-	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := tx.Statements().CreateTeam(ctx, model); err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to create team in database")
-		}
-		return nil
-	})
-	if err != nil {
-		var de domain.Error
-		if errors.As(err, &de) {
-			return nil, de
-		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to commit transaction")
+	if err := s.v2Pool.Statements().CreateTeam(ctx, model); err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to create team in database")
 	}
-
 	return model, nil
 }
 

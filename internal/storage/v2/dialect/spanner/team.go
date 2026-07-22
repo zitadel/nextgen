@@ -8,18 +8,35 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 const (
 	teamsTable     = "teams"
 	createTeamStmt = `INSERT INTO teams (project_id, id) VALUES (@p1, @p2) THEN RETURN project_id, id, status, created_at, updated_at`
-	teamQuery      = `SELECT project_id, id, status, created_at, updated_at FROM teams`
 
-	deactivateTeamStmt                  = `UPDATE teams SET status = @p1, updated_at = CURRENT_TIMESTAMP() WHERE project_id = @p2 AND id = @p3`
-	deactivateTeamMembershipsStmt       = `UPDATE team_memberships SET status = @p1, updated_at = CURRENT_TIMESTAMP() WHERE project_id = @p2 AND team_id = @p3 AND status <> @p1`
-	deactivateTeamOwnedUsersStmt        = `UPDATE users SET status = @p1, updated_at = CURRENT_TIMESTAMP() WHERE project_id = @p2 AND lifecycle_owner_team_id = @p3 AND status <> @p1`
-	deactivateOwnedUsersMembershipsStmt = `UPDATE team_memberships SET status = @p1, updated_at = CURRENT_TIMESTAMP() WHERE project_id = @p2 AND status <> @p1 AND user_id IN (SELECT id FROM users WHERE project_id = @p3 AND lifecycle_owner_team_id = @p4)`
+	deactivateTeamStmt = `
+UPDATE teams
+SET status = @p1, updated_at = CURRENT_TIMESTAMP()
+WHERE project_id = @p2 AND id = @p3`
+
+	deactivateTeamMembershipsStmt = `
+UPDATE team_memberships
+SET status = @p1, updated_at = CURRENT_TIMESTAMP()
+WHERE project_id = @p2 AND team_id = @p3 AND status <> @p1`
+
+	deactivateTeamOwnedUsersStmt = `
+UPDATE users
+SET status = @p1, updated_at = CURRENT_TIMESTAMP()
+WHERE project_id = @p2 AND lifecycle_owner_team_id = @p3 AND status <> @p1`
+
+	deactivateOwnedUsersMembershipsStmt = `
+UPDATE team_memberships
+SET status = @p1, updated_at = CURRENT_TIMESTAMP()
+WHERE project_id = @p2 AND status <> @p1
+  AND user_id IN (
+    SELECT id FROM users
+    WHERE project_id = @p3 AND lifecycle_owner_team_id = @p4
+  )`
 )
 
 var teamColumns = []string{
@@ -70,21 +87,18 @@ func (ts teamStatements) DeactivateTeam(ctx context.Context, projectID, id strin
 	userDeactivated := domain.UserStatusDeactivated.String()
 	teamDeactivated := domain.TeamStatusDeactivated.String()
 
-	if _, err := ts.db.Update(ctx, buildStatement(deactivateTeamStmt, teamDeactivated, projectID, id).statement()); err != nil {
-		return err
-	}
-	// Remove roster access to this team for all participants (self-owned and team-owned).
-	if _, err := ts.db.Update(ctx, buildStatement(deactivateTeamMembershipsStmt, membershipRemoved, projectID, id).statement()); err != nil {
-		return err
-	}
-	// Deactivate users lifecycle-owned by this team (ADR 024).
-	if _, err := ts.db.Update(ctx, buildStatement(deactivateTeamOwnedUsersStmt, userDeactivated, projectID, id).statement()); err != nil {
-		return err
-	}
-	// Match UserRepository.Deactivate: deprovisioned users lose all memberships/access,
-	// including roster rows on other teams.
-	if _, err := ts.db.Update(ctx, buildStatement(deactivateOwnedUsersMembershipsStmt, membershipRemoved, projectID, projectID, id).statement()); err != nil {
-		return err
+	for _, step := range []struct {
+		sql  string
+		args []any
+	}{
+		{deactivateTeamStmt, []any{teamDeactivated, projectID, id}},
+		{deactivateTeamMembershipsStmt, []any{membershipRemoved, projectID, id}},
+		{deactivateTeamOwnedUsersStmt, []any{userDeactivated, projectID, id}},
+		{deactivateOwnedUsersMembershipsStmt, []any{membershipRemoved, projectID, projectID, id}},
+	} {
+		if _, err := ts.db.Update(ctx, buildStatement(step.sql, step.args...).statement()); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -100,31 +114,3 @@ func (ts teamStatements) scanTeam(row *spanner.Row) (*domain.Team, error) {
 }
 
 var _ service.TeamStatements = (*teamStatements)(nil)
-
-var teamSchema = database.NewSchema(map[domain.TeamField]database.FieldBinding[domain.Team]{
-	domain.TeamFieldProjectID: {
-		SQLName:  "project_id",
-		Accessor: func(t *domain.Team) any { return t.ProjectID },
-		Coerce:   database.CoerceString,
-	},
-	domain.TeamFieldID: {
-		SQLName:  "id",
-		Accessor: func(t *domain.Team) any { return t.ID },
-		Coerce:   database.CoerceString,
-	},
-	domain.TeamFieldStatus: {
-		SQLName:  "status",
-		Accessor: func(t *domain.Team) any { return string(t.Status) },
-		Coerce:   database.CoerceString,
-	},
-	domain.TeamFieldCreatedAt: {
-		SQLName:  "created_at",
-		Accessor: func(t *domain.Team) any { return t.CreatedAt },
-		Coerce:   database.CoerceTime,
-	},
-	domain.TeamFieldUpdatedAt: {
-		SQLName:  "updated_at",
-		Accessor: func(t *domain.Team) any { return t.UpdatedAt },
-		Coerce:   database.CoerceTime,
-	},
-})

@@ -69,13 +69,9 @@ type CryptoKeyStatements interface {
 
 type TeamStatements interface {
 	Statements
-	// CreateTeam persists a new team. Callers must pre-populate [domain.Team.ID];
-	// an empty ID is rejected. Timestamps and status are set by the database.
 	CreateTeam(ctx context.Context, entity *domain.Team) error
-	// GetTeamByID retrieves a team by its composite primary key (project_id, id).
 	GetTeamByID(ctx context.Context, projectID, id string) (*domain.Team, error)
-	// DeactivateTeam tombstones the team and applies lifecycle policy to
-	// memberships and team-owned users. Callers should run this inside a
-	// transaction so the multi-statement update is atomic.
+	// DeactivateTeam applies team tombstone + membership/user lifecycle updates;
+	// callers must run it inside a transaction.
 	DeactivateTeam(ctx context.Context, projectID, id string) error
 }
