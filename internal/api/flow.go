@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -97,9 +98,10 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	if fields, ok := req.Fields.Get(); ok {
 		decoded, err := decodeFlowFields(fields)
 		if err != nil {
-			// Name the offending field only — do not surface json.Unmarshal text (ADR 030).
+			// Safe client message; Parent keeps a log-safe wrapper that still Unwraps
+			// to the json.Unmarshal cause for diagnostics (ADR 030).
 			return errorResponseWithStatusCode(http.StatusBadRequest,
-				domain.ErrRequestInvalid().WithMessage(err.Error())), nil
+				domain.ErrRequestInvalid().WithMessage(err.Error()).WithParent(err)), nil
 		}
 		submitReq.Fields = decoded
 	}
@@ -445,12 +447,36 @@ func toFlowStepComplete(c domain.FlowStepComplete) api.FlowStepComplete {
 	return api.FlowStepCompleteShow
 }
 
+// flowFieldDecodeError is a log-safe wrapper around a Fields JSON decode failure.
+// Error() names only the field for clients; Unwrap preserves the json.Unmarshal
+// cause for errors.Is/As. LogValue omits the cause string (it can embed payload
+// fragments / PII).
+type flowFieldDecodeError struct {
+	field string
+	err   error
+}
+
+func (e *flowFieldDecodeError) Error() string {
+	return fmt.Sprintf("invalid JSON for field %q", e.field)
+}
+
+func (e *flowFieldDecodeError) Unwrap() error {
+	return e.err
+}
+
+func (e *flowFieldDecodeError) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("kind", "json_decode"),
+		slog.String("field", e.field),
+	)
+}
+
 func decodeFlowFields(raw map[string]jx.Raw) (map[string]any, error) {
 	out := make(map[string]any, len(raw))
 	for k, v := range raw {
 		var decoded any
 		if err := json.Unmarshal(v, &decoded); err != nil {
-			return nil, fmt.Errorf("invalid JSON for field %q", k)
+			return nil, &flowFieldDecodeError{field: k, err: err}
 		}
 		out[k] = decoded
 	}
