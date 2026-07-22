@@ -94,10 +94,4 @@ func (h *Handler) ListSchemas(ctx context.Context, params api.ListSchemasParams)
 	return &resp, nil
 }
 
-// ------------------ Errors ---------------
-
-func schemaErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
-	return domainErrorResponse(err)
-}
-
 var unknownSchemaKindError = errors.New("unknown kind of schema")

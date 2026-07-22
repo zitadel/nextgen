@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"strings"
 
 	"github.com/go-faster/errors"
 	"github.com/ogen-go/ogen/ogenerrors"
@@ -56,28 +55,7 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 	if !errors.As(err, &e) {
 		return internalErrorResponse(err)
 	}
-	switch {
-	case strings.HasPrefix(e.Code, domain.PrefixAuthAttempt.ErrorCodePrefix("")):
-		return authAttemptErrorResponse(e)
-	case strings.HasPrefix(e.Code, domain.PrefixFlow.ErrorCodePrefix("")):
-		return flowErrorResponse(e)
-	case strings.HasPrefix(e.Code, domain.PrefixFlowDefinition.ErrorCodePrefix("")):
-		return flowDefinitionErrorResponse(e)
-	case strings.HasPrefix(e.Code, domain.PrefixSession.ErrorCodePrefix("")):
-		return sessionErrorResponse(e)
-	case strings.HasPrefix(e.Code, domain.PrefixJSONSchema.ErrorCodePrefix("")):
-		return schemaErrorResponse(e)
-	case strings.HasPrefix(e.Code, domain.PrefixUser.ErrorCodePrefix("")):
-		return userErrorResponse(e)
-	case strings.HasPrefix(e.Code, domain.PrefixTeam.ErrorCodePrefix("")):
-		return teamErrorResponse(e)
-	case strings.HasPrefix(e.Code, domain.PrefixProject.ErrorCodePrefix("")):
-		return projectErrorResponse(e)
-	case e.Code == domain.ErrNotImplemented().Code:
-		return errorResponseWithStatusCode(http.StatusNotImplemented, e)
-	default:
-		return internalErrorResponse(err)
-	}
+	return domainErrorResponse(e)
 }
 
 // errorResponse is a convenience helper for the common case where the caller

@@ -491,21 +491,6 @@ func jsonQuoted(s string) []byte {
 	return b
 }
 
-var (
-	codeFlowCookieInvalid   = domain.ErrFlowCookieInvalid().Code
-	codeFlowCookieExpired   = domain.ErrFlowCookieExpired().Code
-	codeFlowNotFound        = domain.ErrFlowNotFound().Code
-	codeFlowCompleted       = domain.ErrFlowCompleted().Code
-	codeFlowInvalidAction   = domain.ErrFlowInvalidAction().Code
-	codeFlowSessionConflict = domain.ErrFlowSessionConflict().Code
-	codeFlowUnsupported     = domain.ErrFlowUnsupported().Code
-	codeFlowInvalidPurpose  = domain.ErrFlowInvalidPurpose().Code
-)
-
-func flowErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
-	return domainErrorResponse(err)
-}
-
 // isCookieOrIDError matches any sentinel that means "this caller isn't
 // holding a valid flow handle for this path" — either the cookie was
 // missing/tampered/expired, or its embedded id doesn't match the path.
@@ -522,23 +507,23 @@ func mapFlowErrorStatus(err error) *api.ErrorDetailsStatusCode {
 		// err.Error() chain (ADR 030).
 		switch {
 		case errors.Is(err, domain.ErrFlowCookieInvalid()):
-			return flowErrorResponse(domain.ErrFlowCookieInvalid())
+			return domainErrorResponse(domain.ErrFlowCookieInvalid())
 		case errors.Is(err, domain.ErrFlowCookieExpired()):
-			return flowErrorResponse(domain.ErrFlowCookieExpired())
+			return domainErrorResponse(domain.ErrFlowCookieExpired())
 		case errors.Is(err, domain.ErrFlowNotFound()):
-			return flowErrorResponse(domain.ErrFlowNotFound())
+			return domainErrorResponse(domain.ErrFlowNotFound())
 		case errors.Is(err, domain.ErrFlowCompleted()):
-			return flowErrorResponse(domain.ErrFlowCompleted())
+			return domainErrorResponse(domain.ErrFlowCompleted())
 		case errors.Is(err, domain.ErrFlowInvalidAction()):
-			return flowErrorResponse(domain.ErrFlowInvalidAction())
+			return domainErrorResponse(domain.ErrFlowInvalidAction())
 		case errors.Is(err, domain.ErrFlowSessionConflict()):
-			return flowErrorResponse(domain.ErrFlowSessionConflict())
+			return domainErrorResponse(domain.ErrFlowSessionConflict())
 		case errors.Is(err, domain.ErrFlowUnsupported()):
-			return flowErrorResponse(domain.ErrFlowUnsupported())
+			return domainErrorResponse(domain.ErrFlowUnsupported())
 		case errors.Is(err, domain.ErrFlowInvalidPurpose()):
-			return flowErrorResponse(domain.ErrFlowInvalidPurpose())
+			return domainErrorResponse(domain.ErrFlowInvalidPurpose())
 		}
-		return flowErrorResponse(domErr)
+		return domainErrorResponse(domErr)
 	}
 	return errorResponse(err)
 }
@@ -571,36 +556,6 @@ func buildResolveHint(opt api.OptFlowHint) service.ResolveFlowHint {
 		out.UserSchemaID = &v
 	}
 	return out
-}
-
-var (
-	codeFlowDefinitionNotFound        = domain.ErrFlowDefinitionNotFound().Code
-	codeFlowDefinitionPurposeMismatch = domain.ErrFlowDefinitionPurposeMismatch().Code
-	codeFlowDefinitionInvalid         = domain.ErrFlowDefinitionInvalid(nil, nil).Code
-	codeMissingFlowDefinitionID       = domain.ErrMissingFlowDefinitionID().Code
-	codeMissingProjectID              = domain.ErrMissingProjectID().Code
-	codeFlowDefinitionAlreadyExists   = domain.ErrFlowDefinitionAlreadyExists().Code
-	codeFlowDefinitionUpdateConflict  = domain.ErrFlowDefinitionUpdateConflict(nil).Code
-	codeFlowDefinitionDenied          = domain.ErrFlowDefinitionPermissionDenied().Code
-)
-
-func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
-	switch err.Code {
-	case codeFlowDefinitionInvalid:
-		return flowDefinitionErrorResponseWithDetails(err, http.StatusBadRequest)
-	case codeFlowDefinitionAlreadyExists, codeFlowDefinitionUpdateConflict:
-		return flowDefinitionErrorResponseWithDetails(err, http.StatusConflict)
-	default:
-		return domainErrorResponse(err)
-	}
-}
-
-func flowDefinitionErrorResponseWithDetails(err domain.Error, statusCode int) *api.ErrorDetailsStatusCode {
-	return errorResponseWithStatusCode(statusCode, err)
-}
-
-func errorResponseWithDetails(err domain.Error, statusCode int) *api.ErrorDetailsStatusCode {
-	return errorResponseWithStatusCode(statusCode, err)
 }
 
 func parseURI(s string) (url.URL, error) {

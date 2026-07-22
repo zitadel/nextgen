@@ -4,7 +4,6 @@ import (
 	"context"
 
 	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -35,10 +34,4 @@ func (h *Handler) GetTeam(ctx context.Context, params api.GetTeamParams) (api.Ge
 		CreatedAt: team.CreatedAt,
 		UpdatedAt: team.UpdatedAt,
 	}, nil
-}
-
-// ------------------ Errors ---------------
-
-func teamErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
-	return domainErrorResponse(err)
 }

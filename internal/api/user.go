@@ -131,9 +131,3 @@ func (h *Handler) GetMyUser(ctx context.Context) (api.GetMyUserRes, error) {
 	}
 	return user, nil
 }
-
-// ------------------ Errors ---------------
-
-func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
-	return domainErrorResponse(err)
-}

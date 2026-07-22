@@ -277,7 +277,3 @@ func deleteSessionCookie() string {
 func sessionCookie(token string, maxAge int) string {
 	return fmt.Sprintf("%s=%s; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=%d", sessionCookieName, token, maxAge)
 }
-
-func sessionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
-	return domainErrorResponse(err)
-}

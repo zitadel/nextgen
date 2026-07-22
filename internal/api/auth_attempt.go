@@ -256,7 +256,3 @@ func authAttemptStateToAPI(attempt *domain.AuthAttempt) api.AuthAttemptResponseS
 	}
 	return api.AuthAttemptResponseStateInProgress
 }
-
-func authAttemptErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
-	return domainErrorResponse(err)
-}

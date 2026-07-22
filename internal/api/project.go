@@ -43,9 +43,3 @@ func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (
 		UpdatedAt: project.UpdatedAt,
 	}, nil
 }
-
-// ------------------ Errors ---------------
-
-func projectErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
-	return domainErrorResponse(err)
-}
