@@ -18,7 +18,7 @@ func (h *Harness) EnsureSchemaService(t *testing.T) *service.SchemaService {
 	t.Helper()
 	if h.SchemaService == nil {
 		h.SchemaService = service.NewSchemaService(
-			h.ServiceDB(t),
+			h.EnsureServiceDB(t),
 			h.EnsureSchemaResolver(t),
 			h.EnsureSchemaValidator(t),
 		)
@@ -29,7 +29,7 @@ func (h *Harness) EnsureSchemaService(t *testing.T) *service.SchemaService {
 func (h *Harness) EnsureSchemaStore(t *testing.T) domain.JSONSchemaStore {
 	t.Helper()
 	if h.SchemaStore == nil {
-		h.SchemaStore = h.ServiceDB(t).Statements()
+		h.SchemaStore = h.EnsureServiceDB(t).Statements()
 	}
 	return h.SchemaStore
 }
