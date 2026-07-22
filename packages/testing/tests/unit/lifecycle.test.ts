@@ -62,11 +62,38 @@ describe("bootLocalServer", () => {
     await expect(exists(keptDir as string)).resolves.toBe(true);
   });
 
-  it("rejects on non-envelope stdout", async () => {
+  it("rejects on non-envelope stdout and stops the possibly-running server", async () => {
     const fake = await fakeCliBin({ startStdout: "definitely not json" });
     await expect(bootLocalServer({ cliBin: fake.binPath })).rejects.toThrow(
       /expected a JSON envelope/,
     );
+    const calls = await fake.calls();
+    expect(calls.filter((args) => args[0] === "stop")).toHaveLength(1);
+  });
+
+  it("rejects on a non-ok envelope and stops the possibly-running server", async () => {
+    const fake = await fakeCliBin({
+      startStdout: '{"status":"error","command":"start","data":{}}',
+    });
+    await expect(bootLocalServer({ cliBin: fake.binPath })).rejects.toThrow(
+      /reported status "error"/,
+    );
+    const calls = await fake.calls();
+    expect(calls.filter((args) => args[0] === "stop")).toHaveLength(1);
+  });
+
+  it("aggregates unusable start output with a failed cleanup", async () => {
+    const fake = await fakeCliBin({ startStdout: "definitely not json", stopExitCode: 1 });
+    let error: unknown;
+    try {
+      await bootLocalServer({ cliBin: fake.binPath });
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(AggregateError);
+    const aggregate = error as AggregateError;
+    expect((aggregate.errors[0] as Error).message).toMatch(/expected a JSON envelope/);
+    expect((aggregate.errors[1] as Error).message).toMatch(/zitadel stop exited with code 1/);
   });
 
   it("stops via the CLI and removes the owned temp dir", async () => {

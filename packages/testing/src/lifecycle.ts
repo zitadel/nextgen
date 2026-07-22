@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { runCli, tail } from "./cli";
-import { parseCliEnvelope, type StartEnvelopeData } from "./envelope";
+import { parseCliEnvelope, type CliEnvelope, type StartEnvelopeData } from "./envelope";
 import { getFreePort } from "./ports";
 import type { LocalZitadelRuntime } from "./types";
 
@@ -61,13 +61,7 @@ export async function bootLocalServer(options: BootServerOptions = {}): Promise<
         `state dir kept for inspection: ${dir}`,
     );
   }
-  const envelope = parseCliEnvelope<StartEnvelopeData>(result.stdout, "zitadel start");
-  if (envelope.status !== "ok") {
-    throw new Error(`zitadel start reported status "${envelope.status}":\n${tail(result.stdout)}`);
-  }
-
-  const { runtime, urls } = envelope.data;
-  const runStop = async (): Promise<void> => {
+  const stopViaCli = async (): Promise<void> => {
     const stopResult = await runCli({
       args: ["stop", "--non-interactive", "--json", "-c", dir],
       bin: options.cliBin,
@@ -82,6 +76,36 @@ export async function bootLocalServer(options: BootServerOptions = {}): Promise<
           `state dir kept for inspection: ${dir}`,
       );
     }
+  };
+
+  let envelope: CliEnvelope<StartEnvelopeData>;
+  try {
+    envelope = parseCliEnvelope<StartEnvelopeData>(result.stdout, "zitadel start");
+    if (envelope.status !== "ok") {
+      throw new Error(
+        `zitadel start reported status "${envelope.status}":\n${tail(result.stdout)}`,
+      );
+    }
+  } catch (error) {
+    // start exited 0, so a server may well be running despite the unusable
+    // output — stop it instead of orphaning it and its embedded Postgres.
+    try {
+      await stopViaCli();
+    } catch (stopError) {
+      // Both errors are preserved in AggregateError.errors, which the rule
+      // below cannot model.
+      // oxlint-disable-next-line preserve-caught-error
+      throw new AggregateError(
+        [error, stopError],
+        `zitadel start produced unusable output and stopping the instance also failed; state dir kept: ${dir}`,
+      );
+    }
+    throw error;
+  }
+
+  const { runtime, urls } = envelope.data;
+  const runStop = async (): Promise<void> => {
+    await stopViaCli();
     if (ownsDir && !options.keep) {
       await rm(dir, { recursive: true, force: true });
     }

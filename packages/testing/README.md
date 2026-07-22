@@ -136,6 +136,10 @@ mutate project-wide state; revisit with warm-dir reuse if that need appears.
   processes (Playwright workers) are unaffected.
 - Requires the in-repo server binary (`moon run server:build`) via
   `ZITADEL_SERVER_BINARY`; the npm platform packages carry no binary in-repo.
+  That build also embeds no UIs, so the in-repo moon tasks set
+  `NEXTGEN_SERVER_LOGIN_ENABLED=false` / `NEXTGEN_SERVER_CONSOLE_ENABLED=false`
+  — the suites drive the app-embedded login, not the server-hosted `/ui/*`.
+  Published binaries ship with both UIs embedded.
 - macOS/Linux only (the CLI's port preflight uses `lsof`).
 
 ## Roadmap

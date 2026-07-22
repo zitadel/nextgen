@@ -8,7 +8,7 @@ import { access, rm } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { startLocalZitadel, writeHandshake } from "@zitadel/testing";
+import { startLocalZitadel, writeHandshake, type LocalZitadel } from "@zitadel/testing";
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const workspaceRoot = resolve(appDir, "../..");
@@ -27,38 +27,59 @@ await access(serverBinary).catch(() => {
   process.exit(1);
 });
 
+let zitadel: LocalZitadel | undefined;
+let signalled = false;
+let finishing: Promise<void> | undefined;
+
+const finish = (code: number): Promise<void> => {
+  finishing ??= (async () => {
+    let exitCode = code;
+    try {
+      await zitadel?.stop();
+    } catch (error) {
+      console.error(`[real-zitadel] stop failed: ${(error as Error).message}`);
+      exitCode = 1;
+    }
+    await rm(handshakePath, { force: true }).catch(() => undefined);
+    process.exit(exitCode);
+  })();
+  return finishing;
+};
+
+// Handlers are installed before the boot so a cancellation arriving while the
+// instance comes up (or before the handshake is written) still tears it down.
+const onSignal = (signal: NodeJS.Signals): void => {
+  signalled = true;
+  console.log(
+    `[real-zitadel] ${signal} received${zitadel ? ", stopping instance" : " during boot; stopping once ready"}`,
+  );
+  if (zitadel) {
+    void finish(0);
+  }
+};
+process.on("SIGTERM", onSignal);
+process.on("SIGINT", onSignal);
+
 await rm(handshakePath, { force: true });
 
-const zitadel = await startLocalZitadel({
+zitadel = await startLocalZitadel({
   port,
   appOrigins: [appOrigin],
   serverBinary,
 });
-await writeHandshake(handshakePath, zitadel.handle);
+if (signalled) {
+  await finish(0);
+}
+
+try {
+  await writeHandshake(handshakePath, zitadel.handle);
+} catch (error) {
+  console.error(`[real-zitadel] failed to write handshake: ${(error as Error).message}`);
+  await finish(1);
+}
 console.log(
   `[real-zitadel] instance ready at ${zitadel.handle.baseUrl} (project ${zitadel.handle.projectId})`,
 );
-
-let shuttingDown = false;
-const shutdown = (signal: NodeJS.Signals) => {
-  if (shuttingDown) {
-    return;
-  }
-  shuttingDown = true;
-  console.log(`[real-zitadel] ${signal} received, stopping instance`);
-  void zitadel
-    .stop()
-    .catch((error: unknown) => {
-      console.error(`[real-zitadel] stop failed: ${(error as Error).message}`);
-      process.exitCode = 1;
-    })
-    .finally(async () => {
-      await rm(handshakePath, { force: true });
-      process.exit();
-    });
-};
-process.on("SIGTERM", shutdown);
-process.on("SIGINT", shutdown);
 
 setInterval(() => {
   /* keep the event loop alive; Playwright owns this process's lifetime */

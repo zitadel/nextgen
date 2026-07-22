@@ -30,6 +30,11 @@ tasks:
       - "demo-next:build"
     env:
       ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
+      # server:build compiles only the Go binary (no embedded UIs); this suite
+      # drives the app-embedded <zitadel-login>, so the server-hosted UIs stay
+      # off instead of pulling console/login-ui builds into the dep graph.
+      NEXTGEN_SERVER_LOGIN_ENABLED: "false"
+      NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
     options:
       cache: false
       runInCI: false
