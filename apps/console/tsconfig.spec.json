@@ -8,7 +8,8 @@
     "composite": false,
     "declarationMap": false,
     "emitDeclarationOnly": false,
-    "noEmit": true
+    "noEmit": true,
+    "paths": { "@/*": ["./src/*"] }
   },
   "include": ["vite.config.mts", "src/**/*.ts", "src/**/*.tsx", "src/test-setup.ts"]
 }
