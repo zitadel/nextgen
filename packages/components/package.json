@@ -59,6 +59,7 @@
     "test:all": "vitest run"
   },
   "dependencies": {
+    "@zitadel/config": "workspace:*",
     "dompurify": "catalog:",
     "liquidjs": "catalog:",
     "lit": "catalog:",
@@ -69,7 +70,6 @@
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "@zitadel/api-mock": "workspace:*",
-    "@zitadel/config": "workspace:*",
     "jsdom": "catalog:",
     "msw": "catalog:",
     "playwright": "catalog:",

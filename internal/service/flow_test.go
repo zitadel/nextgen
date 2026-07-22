@@ -13,78 +13,12 @@ import (
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // stubPool returns nil typed as database.Pool. The mock repository does not
 // invoke any methods on it, so the value is opaque — it only satisfies the
 // service constructor signature.
 func stubPool() database.Pool { return nil }
-
-func stubV2Pool() *service.DB { return nil }
-
-type testAllStatements struct {
-	createProject  func(context.Context, *domain.Project) error
-	getProjectByID func(context.Context, string) (*domain.Project, error)
-	updateProject  func(context.Context, *domain.Project) error
-	listProjects   func(context.Context, *v2database.ListOptions[domain.ProjectField]) (*v2database.ListResult[*domain.Project], error)
-	deleteProject  func(context.Context, string) error
-}
-
-func (testAllStatements) IsStatements() {}
-
-func (s testAllStatements) CreateProject(ctx context.Context, project *domain.Project) error {
-	if s.createProject != nil {
-		return s.createProject(ctx, project)
-	}
-	return nil
-}
-
-func (s testAllStatements) GetProjectByID(ctx context.Context, id string) (*domain.Project, error) {
-	if s.getProjectByID != nil {
-		return s.getProjectByID(ctx, id)
-	}
-	return nil, nil
-}
-
-func (s testAllStatements) UpdateProject(ctx context.Context, project *domain.Project) error {
-	if s.updateProject != nil {
-		return s.updateProject(ctx, project)
-	}
-	return nil
-}
-
-func (s testAllStatements) ListProjects(ctx context.Context, opts *v2database.ListOptions[domain.ProjectField]) (*v2database.ListResult[*domain.Project], error) {
-	if s.listProjects != nil {
-		return s.listProjects(ctx, opts)
-	}
-	return nil, nil
-}
-
-func (s testAllStatements) DeleteProjectByID(ctx context.Context, id string) error {
-	if s.deleteProject != nil {
-		return s.deleteProject(ctx, id)
-	}
-	return nil
-}
-
-func (testAllStatements) CreateFlowDefinition(context.Context, *domain.FlowDefinition) error {
-	panic("unexpected call to CreateFlowDefinition")
-}
-
-func (testAllStatements) GetFlowDefinitionByID(context.Context, string) (*domain.FlowDefinition, error) {
-	panic("unexpected call to GetFlowDefinitionByID")
-}
-
-func (testAllStatements) ListFlowDefinitions(context.Context, *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
-	panic("unexpected call to ListFlowDefinitions")
-}
-
-func (testAllStatements) DeleteFlowDefinitionByID(context.Context, string) error {
-	panic("unexpected call to DeleteFlowDefinitionByID")
-}
-
-var _ service.AllStatements = testAllStatements{}
 
 type v2TestTx struct {
 	database.QueryExecutor

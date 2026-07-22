@@ -29,7 +29,6 @@ func TestCompareGreaterRestrictsAllTerms(t *testing.T) {
 	assert.True(t, filter.Restricts(database.Col(domain.ProjectFieldCreatedAt)))
 	assert.True(t, filter.Restricts(database.Col(domain.ProjectFieldID)))
 	assert.True(t, filter.Restricts(database.Col(domain.ProjectFieldUpdatedAt)))
-	assert.False(t, filter.Restricts(database.Col(domain.ProjectFieldProjectSecret)))
 	assert.Equal(t, database.OpGreater, filter.Op)
 }
 

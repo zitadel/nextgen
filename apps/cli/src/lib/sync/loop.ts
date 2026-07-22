@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 import { consola } from "consola";
 
+import { ZitadelError } from "../errors";
 import { FLOWS_DIR } from "../flows";
 import { stableStringify } from "../json";
 import { validatePlannedFlows } from "./flow-validation.js";
@@ -68,6 +69,27 @@ export async function buildSyncPlan(
     const dirPath = join(cwd, syncer.directory);
     consola.debug(`scanning ${syncer.directory}`);
     const onDisk = await readJsonDir(dirPath);
+
+    // A singleton syncer owns exactly one descriptor file. Failing on extras
+    // beats scanning them: a stray copy (branding.backup.json) would
+    // otherwise be published as one more live revision.
+    if (syncer.singletonFile) {
+      for (const absPath of onDisk.keys()) {
+        const name = basename(absPath);
+        if (name !== syncer.singletonFile) {
+          throw new ZitadelError(
+            "E_VALIDATION",
+            `unexpected file in ${syncer.directory}: ${name}`,
+            {
+              hint:
+                `${syncer.kind} is a singleton resource — keep exactly one descriptor at ` +
+                `${syncer.directory}/${syncer.singletonFile} and move other .json files ` +
+                `out of the directory (each scanned descriptor would publish as its own revision).`,
+            },
+          );
+        }
+      }
+    }
 
     for (const content of onDisk.values()) {
       syncer.validate(content);

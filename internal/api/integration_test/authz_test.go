@@ -38,12 +38,12 @@ func TestManagementAuthz(t *testing.T) {
 	// foreign holds a real, valid project secret — for the wrong project.
 	foreign, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	foreign.SetToken(other.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, foreign, other)
 
 	// preview holds the victim's own browser-plane preview secret.
 	preview, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	preview.SetToken(victim.PreviewSecret)
+	harness.SetPreviewSecretOnApiClient(t, preview, victim)
 
 	victimID := api.ProjectID(victim.ID)
 
@@ -232,7 +232,8 @@ func TestManagementAuthz(t *testing.T) {
 
 			ownClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 			require.NoError(t, err)
-			ownClient.SetToken(victim.ProjectSecret)
+			harness.SetProjectSecretOnApiClient(t, ownClient, victim)
+
 			missingResp, err := ownClient.GetProject(t.Context(), api.GetProjectParams{ProjectID: api.ProjectID("proj_does_not_exist")})
 			require.NoError(t, err)
 			require.IsType(t, &api.GetProjectNotFound{}, missingResp, helpers.MustMarshal(t, missingResp))

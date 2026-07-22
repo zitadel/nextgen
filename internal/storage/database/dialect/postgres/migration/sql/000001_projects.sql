@@ -6,8 +6,6 @@ CREATE TABLE IF NOT EXISTS zitadel_nextgen.projects(
     id TEXT COLLATE "C" NOT NULL CHECK (id <> '')
     , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     , updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    , project_secret TEXT     NOT NULL DEFAULT ''
-    , preview_secret TEXT     NOT NULL DEFAULT ''
     , preview_origins TEXT[]    NOT NULL DEFAULT '{}'
 
     , PRIMARY KEY (id)

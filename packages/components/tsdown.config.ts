@@ -38,6 +38,15 @@ const INLINE_INTERNAL = [
   /^@zitadel\/shared-component-styles(\/|$)/,
 ];
 
+/**
+ * Published workspace deps that stay EXTERNAL in the library build (declared
+ * runtime dependencies npm resolves — `@zitadel/config` provides the shared
+ * template contract) but MUST be inlined into the standalone file: a browser
+ * cannot resolve a bare package specifier, so leaving them external would
+ * break the unpkg/jsDelivr entry at load time.
+ */
+const INLINE_STANDALONE_ONLY = [/^@zitadel\/config(\/|$)/];
+
 /** Third-party runtime deps the components need in the browser. */
 const THIRD_PARTY = ["lit", /^lit\//, "liquidjs", "dompurify", "lucide", /^lucide\//] as const;
 
@@ -100,6 +109,6 @@ export default defineConfig([
     clean: false,
     target: "es2022",
     external: ["@zitadel/api-mock"],
-    noExternal: [...INLINE_INTERNAL, ...THIRD_PARTY],
+    noExternal: [...INLINE_INTERNAL, ...INLINE_STANDALONE_ONLY, ...THIRD_PARTY],
   },
 ]);

@@ -18,6 +18,15 @@ export function flowsReadmeContent(): string {
   return readFileSync(readmeUrl("README-flows.md"), "utf8");
 }
 
+/**
+ * README content the CLI copies to `.zitadel/branding/README.md` when a
+ * branding design is ejected. Source of truth is
+ * `packages/config/defaults/README-branding.md`.
+ */
+export function brandingReadmeContent(): string {
+  return readFileSync(readmeUrl("README-branding.md"), "utf8");
+}
+
 function readmeUrl(filename: string): string {
   return fileURLToPath(new URL(`../defaults/${filename}`, import.meta.url));
 }

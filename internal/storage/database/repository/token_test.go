@@ -217,7 +217,7 @@ func TestTokenRepository_CreateRejectsWrongIdentifier(t *testing.T) {
 		SessionID: &sess,
 		Scope:     []string{"openid"},
 	})
-	require.ErrorIs(t, err, domain.ErrInvalidTokenIdentifiers)
+	require.ErrorIs(t, err, domain.ErrInvalidTokenIdentifiers())
 }
 
 func TestTokenRepository_CreateRejectsClientTokenID(t *testing.T) {

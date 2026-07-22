@@ -11,7 +11,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 )
 
-const createProjectStmt = `INSERT INTO zitadel_nextgen.projects (id, project_secret, preview_secret, preview_origins) VALUES ($1, $2, $3, $4) RETURNING id, created_at, updated_at`
+const createProjectStmt = `INSERT INTO zitadel_nextgen.projects (id, preview_origins) VALUES ($1, $2) RETURNING id, created_at, updated_at`
 
 type projectStatements struct{ statement }
 
@@ -25,7 +25,7 @@ func newProjectStatements(client queryExecutor) projectStatements {
 
 // CreateProject implements [service.ProjectStatements].
 func (ps projectStatements) CreateProject(ctx context.Context, project *domain.Project) error {
-	return ps.client.QueryRow(ctx, createProjectStmt, project.ID, project.ProjectSecret, project.PreviewSecret, project.PreviewOrigins).
+	return ps.client.QueryRow(ctx, createProjectStmt, project.ID, project.PreviewOrigins).
 		Scan(&project.ID, &project.CreatedAt, &project.UpdatedAt)
 }
 
@@ -37,7 +37,7 @@ func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) er
 	return err
 }
 
-const projectQuery = "SELECT id, created_at, updated_at, project_secret, preview_secret, preview_origins FROM zitadel_nextgen.projects"
+const projectQuery = "SELECT id, created_at, updated_at, preview_origins FROM zitadel_nextgen.projects"
 
 // GetProjectByID implements [service.ProjectStatements].
 func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*domain.Project, error) {
@@ -98,7 +98,7 @@ func (ps projectStatements) ListProjects(ctx context.Context, filter *database.L
 
 func (ps projectStatements) scanProject(row pgx.CollectableRow) (*domain.Project, error) {
 	project := new(domain.Project)
-	if err := row.Scan(&project.ID, &project.CreatedAt, &project.UpdatedAt, &project.ProjectSecret, &project.PreviewSecret, &project.PreviewOrigins); err != nil {
+	if err := row.Scan(&project.ID, &project.CreatedAt, &project.UpdatedAt, &project.PreviewOrigins); err != nil {
 		return nil, err
 	}
 	return project, nil
@@ -121,16 +121,6 @@ var projectSchema = database.NewSchema(map[domain.ProjectField]database.FieldBin
 		SQLName:  "updated_at",
 		Accessor: func(p *domain.Project) any { return p.UpdatedAt },
 		Coerce:   database.CoerceTime,
-	},
-	domain.ProjectFieldProjectSecret: {
-		SQLName:  "project_secret",
-		Accessor: func(p *domain.Project) any { return p.ProjectSecret },
-		Coerce:   database.CoerceString,
-	},
-	domain.ProjectFieldPreviewSecret: {
-		SQLName:  "preview_secret",
-		Accessor: func(p *domain.Project) any { return p.PreviewSecret },
-		Coerce:   database.CoerceString,
 	},
 	domain.ProjectFieldPreviewOrigins: {
 		SQLName:  "preview_origins",

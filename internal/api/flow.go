@@ -70,12 +70,12 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 		return mapFlowErrorStatus(err), nil
 	}
 
-	cookieValue, err := h.sealState(result.State)
+	cookieValue, err := h.sealState(ctx, result.State)
 	if err != nil {
 		return internalErrorResponse(err), nil
 	}
 
-	resp := h.buildFlowResponse(result, false)
+	resp := h.buildFlowResponse(ctx, result, false)
 	return &api.FlowResponseHeaders{
 		SetCookie: api.NewOptString(flowSetCookie(cookieValue, false)),
 		Response:  resp,
@@ -83,7 +83,7 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 }
 
 func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest, params api.SubmitFlowStepParams) (api.SubmitFlowStepRes, error) {
-	state, err := h.openState(params.Zflow)
+	state, err := h.openState(ctx, params.Zflow)
 	if err != nil {
 		return mapFlowErrorStatus(err), nil
 	}
@@ -158,13 +158,13 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		return mapFlowErrorStatus(err), nil
 	}
 
-	cookieValue, err := h.sealState(result.State)
+	cookieValue, err := h.sealState(ctx, result.State)
 	if err != nil {
 		return internalErrorResponse(err), nil
 	}
 
 	terminal := result.Step != nil && result.Step.Complete != nil
-	flowResp := h.buildFlowResponse(result, terminal)
+	flowResp := h.buildFlowResponse(ctx, result, terminal)
 
 	// Validation error: state machine keeps the user on the step with Error set.
 	if result.Step != nil && result.Step.Error != nil {
@@ -181,7 +181,7 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 }
 
 func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams) (api.GetFlowStepRes, error) {
-	state, err := h.openState(params.Zflow)
+	state, err := h.openState(ctx, params.Zflow)
 	if err != nil {
 		return mapFlowGetError(err), nil
 	}
@@ -197,15 +197,30 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 		return mapFlowGetError(domain.ErrFlowCompleted()), nil
 	}
 
-	resp := h.buildFlowResponse(result, false)
+	resp := h.buildFlowResponse(ctx, result, false)
 	return &resp, nil
 }
 
-func (h *Handler) openState(raw string) (*domain.FlowState, error) {
+func (h *Handler) openState(ctx context.Context, raw string) (*domain.FlowState, error) {
 	if raw == "" {
 		return nil, domain.ErrFlowCookieInvalid()
 	}
-	payload, err := h.crypter.Decrypt(raw)
+
+	header, err := domain.DecodeJWEHeader(raw)
+	if err != nil {
+		return nil, domain.ErrFlowCookieInvalid()
+	}
+
+	decrypter, err := h.keyService.GetCrypter(ctx, header.KeyID, header.EncryptionAlgorithm)
+	if err != nil {
+		var domainError domain.Error
+		if errors.As(err, &domainError) && domainError.Code != domain.ErrInternal(nil).Code {
+			return nil, domain.ErrFlowCookieInvalid()
+		}
+		return nil, err
+	}
+
+	payload, err := decrypter.Decrypt(raw)
 	if err != nil {
 		return nil, domain.ErrFlowCookieInvalid()
 	}
@@ -219,12 +234,16 @@ func (h *Handler) openState(raw string) (*domain.FlowState, error) {
 	return &state, nil
 }
 
-func (h *Handler) sealState(state *domain.FlowState) (string, error) {
+func (h *Handler) sealState(ctx context.Context, state *domain.FlowState) (string, error) {
 	payload, err := json.Marshal(state)
 	if err != nil {
 		return "", fmt.Errorf("marshal flow state: %w", err)
 	}
-	return h.crypter.Encrypt(string(payload))
+	dek, err := h.keyService.GetProjectDEKCrypter(ctx, state.ProjectID)
+	if err != nil {
+		return "", err
+	}
+	return dek.Encrypt(string(payload))
 }
 
 func flowSetCookie(value string, clear bool) string {
@@ -248,12 +267,15 @@ func flowSetCookie(value string, clear bool) string {
 	return c.String()
 }
 
-func (h *Handler) buildFlowResponse(result domain.FlowStepResult, terminal bool) api.FlowResponse {
+// buildFlowResponse assembles the wire response for a flow step. Branding is
+// resolved per response (latest revision for the project, ADR 040) so a
+// published template change reaches in-flight flows on their next step.
+func (h *Handler) buildFlowResponse(ctx context.Context, result domain.FlowStepResult, terminal bool) api.FlowResponse {
 	resp := api.FlowResponse{
 		ID:        result.State.ID,
 		SessionID: result.State.SessionID,
 		Step:      toFlowStep(result.Step),
-		Branding:  api.NewOptBranding(defaultBranding()),
+		Branding:  api.NewOptBranding(h.resolveBranding(ctx, result.State.ProjectID)),
 	}
 	if terminal && result.State.RedirectURI != nil {
 		if u, err := parseURI(*result.State.RedirectURI); err == nil {

@@ -11,7 +11,6 @@ import (
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/tokengen"
 	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -21,17 +20,14 @@ type Harness struct {
 	EncryptionKey []byte
 	SigningKey    *rsa.PrivateKey
 
-	DBPool               database.Pool
-	DB                   *service.DB
-	HttpClient           *http.Client
-	TestServer           *httptest.Server
-	Hasher               *crypto.PasswapHasher
-	Crypter              crypto.Crypter
-	SecretGenerator      secrets.Generator
-	JWTGenerator         *tokengen.JWTGenerator
-	OpaqueTokenGenerator *tokengen.OpaqueTokenGenerator
-	TokenVerifier        *tokengen.AnyTokenTypeVerifier
-	JoseSigner           jose.Signer
+	DBPool          database.Pool
+	DB              *service.DB
+	HttpClient      *http.Client
+	TestServer      *httptest.Server
+	Hasher          *crypto.PasswapHasher
+	Crypter         crypto.Crypter
+	SecretGenerator secrets.Generator
+	JoseSigner      jose.Signer
 
 	GeneratedServer *generated.Server
 	Handler         *api.Handler
@@ -46,6 +42,9 @@ type Harness struct {
 	UserService           *service.UserService
 	FlowStateMachine      *domain.FlowStateMachineRuntime
 	TeamService           *service.TeamService
+	BrandingService       *service.BrandingService
+	KeyService            service.KeyService
+	TokenService          service.TokenService
 
 	SchemaRepo         domain.JSONSchemaRepository
 	SchemaResolver     *domain.JSONSchemaResolver
@@ -57,6 +56,7 @@ type Harness struct {
 	UserPasswordRepo   domain.UserPasswordRepository
 	UserPasskeyRepo    domain.UserPasskeyRepository
 	TeamRepo           domain.TeamRepository
+	BrandingRepo       domain.BrandingRepository
 
 	TestData test_data.TestData
 }
