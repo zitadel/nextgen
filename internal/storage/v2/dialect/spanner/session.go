@@ -28,7 +28,9 @@ func newSessionStatements(db queryExecutor) sessionStatements {
 }
 
 func (ss sessionStatements) CreateSession(ctx context.Context, session *domain.Session) error {
-	return ss.insertSession(ctx, session)
+	return withTransaction(ctx, ss.db, func(ctx context.Context, tx queryExecutor) error {
+		return sessionStatements{statement: statement{db: tx}}.insertSession(ctx, session)
+	})
 }
 
 func (ss sessionStatements) GetSessionByID(ctx context.Context, projectID, sessionID string) (*domain.Session, error) {
@@ -92,6 +94,16 @@ func (ss sessionStatements) DeleteSessionByID(ctx context.Context, projectID, se
 }
 
 func (ss sessionStatements) ExchangeSession(ctx context.Context, projectID, handoffToken string, _ *string, ttl time.Duration) (*domain.Session, error) {
+	var refreshed *domain.Session
+	err := withTransaction(ctx, ss.db, func(ctx context.Context, tx queryExecutor) error {
+		var err error
+		refreshed, err = sessionStatements{statement: statement{db: tx}}.exchangeSessionTx(ctx, projectID, handoffToken, ttl)
+		return err
+	})
+	return refreshed, err
+}
+
+func (ss sessionStatements) exchangeSessionTx(ctx context.Context, projectID, handoffToken string, ttl time.Duration) (*domain.Session, error) {
 	attempt, err := ss.getAuthAttemptByHandoffToken(ctx, projectID, hashHandoffToken(handoffToken))
 	if err != nil {
 		if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
