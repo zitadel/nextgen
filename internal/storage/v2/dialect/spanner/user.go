@@ -70,48 +70,50 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 	}
 	teamScope := user.AttributeTeamScope()
 
-	if _, err := us.db.Update(ctx, buildStatement(createUserHeaderStmt,
-		user.ProjectID, user.SchemaURL, user.ID, user.LifecycleOwnerTeamID, domain.UserStatusActive.String(),
-	).statement()); err != nil {
-		return err
-	}
+	return withTransaction(ctx, us.db, func(ctx context.Context, tx queryExecutor) error {
+		if _, err := tx.Update(ctx, buildStatement(createUserHeaderStmt,
+			user.ProjectID, user.SchemaURL, user.ID, user.LifecycleOwnerTeamID, domain.UserStatusActive.String(),
+		).statement()); err != nil {
+			return err
+		}
 
-	for _, a := range user.Attributes {
-		if a == nil {
-			return fmt.Errorf("nil attribute")
+		for _, a := range user.Attributes {
+			if a == nil {
+				return fmt.Errorf("nil attribute")
+			}
+			raw, err := json.Marshal(a.Value)
+			if err != nil {
+				return fmt.Errorf("marshal attribute %q: %w", a.Key, err)
+			}
+			if _, err := tx.Update(ctx, buildStatement(createUserAttributeStmt,
+				user.ProjectID, teamScope, user.ID, a.Key, string(raw),
+			).statement()); err != nil {
+				return err
+			}
+			if a.UniqueScope == domain.AttributeUniquenessUnspecified {
+				continue
+			}
+			scopeTeamID := teamScope
+			if a.UniqueScope == domain.AttributeUniquenessProject {
+				scopeTeamID = ""
+			}
+			sum := a.ValueHash
+			if _, err := tx.Update(ctx, buildStatement(createUserUniqueAttrStmt,
+				user.ProjectID, user.ID, scopeTeamID, a.Key, append([]byte(nil), sum[:]...),
+			).statement()); err != nil {
+				return err
+			}
 		}
-		raw, err := json.Marshal(a.Value)
-		if err != nil {
-			return fmt.Errorf("marshal attribute %q: %w", a.Key, err)
-		}
-		if _, err := us.db.Update(ctx, buildStatement(createUserAttributeStmt,
-			user.ProjectID, teamScope, user.ID, a.Key, string(raw),
-		).statement()); err != nil {
-			return err
-		}
-		if a.UniqueScope == domain.AttributeUniquenessUnspecified {
-			continue
-		}
-		scopeTeamID := teamScope
-		if a.UniqueScope == domain.AttributeUniquenessProject {
-			scopeTeamID = ""
-		}
-		sum := a.ValueHash
-		if _, err := us.db.Update(ctx, buildStatement(createUserUniqueAttrStmt,
-			user.ProjectID, user.ID, scopeTeamID, a.Key, append([]byte(nil), sum[:]...),
-		).statement()); err != nil {
-			return err
-		}
-	}
 
-	if user.InitialMembershipTeamID != nil && *user.InitialMembershipTeamID != "" {
-		if _, err := us.db.Update(ctx, buildStatement(createUserMembershipStmt,
-			user.ProjectID, *user.InitialMembershipTeamID, user.ID, domain.MembershipStatusActive.String(),
-		).statement()); err != nil {
-			return err
+		if user.InitialMembershipTeamID != nil && *user.InitialMembershipTeamID != "" {
+			if _, err := tx.Update(ctx, buildStatement(createUserMembershipStmt,
+				user.ProjectID, *user.InitialMembershipTeamID, user.ID, domain.MembershipStatusActive.String(),
+			).statement()); err != nil {
+				return err
+			}
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 // GetUserByID implements [service.UserStatements].
@@ -279,34 +281,38 @@ WHERE project_id = @p1 AND key = @p2 AND TO_JSON_STRING(value) = @p3`
 
 // DeactivateUser implements [service.UserStatements].
 func (us userStatements) DeactivateUser(ctx context.Context, projectID, userID string) error {
-	n, err := us.db.Update(ctx, buildStatement(deactivateUserStmt,
-		domain.UserStatusDeactivated.String(), projectID, userID,
-	).statement())
-	if err != nil {
+	return withTransaction(ctx, us.db, func(ctx context.Context, tx queryExecutor) error {
+		n, err := tx.Update(ctx, buildStatement(deactivateUserStmt,
+			domain.UserStatusDeactivated.String(), projectID, userID,
+		).statement())
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return wrapError(spanner.ErrRowNotFound)
+		}
+		_, err = tx.Update(ctx, buildStatement(deactivateUserMembershipsStmt,
+			domain.MembershipStatusRemoved.String(), projectID, userID,
+		).statement())
 		return err
-	}
-	if n == 0 {
-		return wrapError(spanner.ErrRowNotFound)
-	}
-	_, err = us.db.Update(ctx, buildStatement(deactivateUserMembershipsStmt,
-		domain.MembershipStatusRemoved.String(), projectID, userID,
-	).statement())
-	return err
+	})
 }
 
 // DeleteUserByID implements [service.UserStatements].
 func (us userStatements) DeleteUserByID(ctx context.Context, projectID, userID string) error {
-	if _, err := us.db.Update(ctx, buildStatement(deleteUserMembershipsStmt, projectID, userID).statement()); err != nil {
-		return err
-	}
-	n, err := us.db.Update(ctx, buildStatement(deleteUserStmt, projectID, userID).statement())
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return wrapError(spanner.ErrRowNotFound)
-	}
-	return nil
+	return withTransaction(ctx, us.db, func(ctx context.Context, tx queryExecutor) error {
+		if _, err := tx.Update(ctx, buildStatement(deleteUserMembershipsStmt, projectID, userID).statement()); err != nil {
+			return err
+		}
+		n, err := tx.Update(ctx, buildStatement(deleteUserStmt, projectID, userID).statement())
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return wrapError(spanner.ErrRowNotFound)
+		}
+		return nil
+	})
 }
 
 func (us userStatements) hasActiveMembership(ctx context.Context, projectID, teamID, userID string) (bool, error) {

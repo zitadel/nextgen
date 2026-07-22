@@ -407,30 +407,34 @@ JOIN zitadel_nextgen.users u ON u.project_id = $3 AND u.id = m.user_id`,
 
 // DeactivateUser implements [service.UserStatements].
 func (us userStatements) DeactivateUser(ctx context.Context, projectID, userID string) error {
-	tag, err := us.client.Exec(ctx, deactivateUserStmt, domain.UserStatusDeactivated.String(), projectID, userID)
-	if err != nil {
+	return withTransaction(ctx, us.client, func(ctx context.Context, tx queryExecutor) error {
+		tag, err := tx.Exec(ctx, deactivateUserStmt, domain.UserStatusDeactivated.String(), projectID, userID)
+		if err != nil {
+			return wrapError(err)
+		}
+		if tag.RowsAffected() == 0 {
+			return wrapError(pgx.ErrNoRows)
+		}
+		_, err = tx.Exec(ctx, deactivateUserMembershipsStmt, domain.MembershipStatusRemoved.String(), projectID, userID)
 		return wrapError(err)
-	}
-	if tag.RowsAffected() == 0 {
-		return wrapError(pgx.ErrNoRows)
-	}
-	_, err = us.client.Exec(ctx, deactivateUserMembershipsStmt, domain.MembershipStatusRemoved.String(), projectID, userID)
-	return wrapError(err)
+	})
 }
 
 // DeleteUserByID implements [service.UserStatements].
 func (us userStatements) DeleteUserByID(ctx context.Context, projectID, userID string) error {
-	if _, err := us.client.Exec(ctx, deleteUserMembershipsStmt, projectID, userID); err != nil {
-		return wrapError(err)
-	}
-	tag, err := us.client.Exec(ctx, deleteUserStmt, projectID, userID)
-	if err != nil {
-		return wrapError(err)
-	}
-	if tag.RowsAffected() == 0 {
-		return wrapError(pgx.ErrNoRows)
-	}
-	return nil
+	return withTransaction(ctx, us.client, func(ctx context.Context, tx queryExecutor) error {
+		if _, err := tx.Exec(ctx, deleteUserMembershipsStmt, projectID, userID); err != nil {
+			return wrapError(err)
+		}
+		tag, err := tx.Exec(ctx, deleteUserStmt, projectID, userID)
+		if err != nil {
+			return wrapError(err)
+		}
+		if tag.RowsAffected() == 0 {
+			return wrapError(pgx.ErrNoRows)
+		}
+		return nil
+	})
 }
 
 func userHydrationExpressions(rowQualifier, attrKeysPlaceholder, authPlaceholder string) string {
