@@ -41,6 +41,7 @@ func TestProjectStatements_CRUD(t *testing.T) {
 
 	project := &domain.Project{
 		ID:             "proj_v2_crud",
+		Name:           "test project",
 		ProjectSecret:  "project-secret",
 		PreviewSecret:  "preview-secret",
 		PreviewOrigins: []string{"*.example.com", "localhost:3000"},
@@ -52,6 +53,7 @@ func TestProjectStatements_CRUD(t *testing.T) {
 	got, err := stmts.GetProjectByID(ctx, project.ID)
 	require.NoError(t, err)
 	assert.Equal(t, project.ID, got.ID)
+	assert.Equal(t, project.Name, got.Name)
 	assert.Equal(t, project.ProjectSecret, got.ProjectSecret)
 	assert.Equal(t, project.PreviewSecret, got.PreviewSecret)
 	assert.Equal(t, project.PreviewOrigins, got.PreviewOrigins)

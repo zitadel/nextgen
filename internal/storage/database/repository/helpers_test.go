@@ -23,16 +23,18 @@ func skipIfSpanner(t *testing.T) {
 func ensureProject(t *testing.T, client database.QueryExecutor, projectID string) {
 	t.Helper()
 	ctx := t.Context()
+	// name is NOT NULL; derive it from the project ID.
+	name := "project-" + projectID
 	var err error
 	if isSpannerDB {
 		_, err = client.Exec(ctx,
-			`INSERT OR IGNORE INTO projects (id, created_at, updated_at) VALUES ($1, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`,
-			projectID,
+			`INSERT OR IGNORE INTO projects (id, name, created_at, updated_at) VALUES ($1, $2, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`,
+			projectID, name,
 		)
 	} else {
 		_, err = client.Exec(ctx,
-			`INSERT INTO zitadel_nextgen.projects (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`,
-			projectID,
+			`INSERT INTO zitadel_nextgen.projects (id, name) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING`,
+			projectID, name,
 		)
 	}
 	require.NoError(t, err)

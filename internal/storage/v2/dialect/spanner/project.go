@@ -14,13 +14,13 @@ import (
 
 const (
 	projectsTable         = "projects"
-	createProjectStmt     = `INSERT INTO projects (id, project_secret, preview_secret, preview_origins) VALUES (@p1, @p2, @p3, @p4) THEN RETURN id, created_at, updated_at`
+	createProjectStmt     = `INSERT INTO projects (id, name, project_secret, preview_secret, preview_origins) VALUES (@p1, @p2, @p3, @p4, @p5) THEN RETURN id, created_at, updated_at`
 	deleteByIDProjectStmt = `DELETE FROM projects WHERE id = @p1`
-	projectQuery          = "SELECT id, created_at, updated_at, project_secret, preview_secret, preview_origins FROM projects"
+	projectQuery          = "SELECT id, name, created_at, updated_at, project_secret, preview_secret, preview_origins FROM projects"
 )
 
 var projectColumns = []string{
-	"id", "created_at", "updated_at", "project_secret", "preview_secret", "preview_origins",
+	"id", "name", "created_at", "updated_at", "project_secret", "preview_secret", "preview_origins",
 }
 
 type projectStatements struct{ statement }
@@ -39,7 +39,7 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 	if err != nil {
 		return wrapError(err)
 	}
-	stmt := buildStatement(createProjectStmt, project.ID, project.ProjectSecret, project.PreviewSecret, previewOrigins).statement()
+	stmt := buildStatement(createProjectStmt, project.ID, project.Name, project.ProjectSecret, project.PreviewSecret, previewOrigins).statement()
 	return ps.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 			return struct{}{}, row.Columns(&project.ID, &project.CreatedAt, &project.UpdatedAt)
@@ -104,7 +104,7 @@ func (ps projectStatements) ListProjects(ctx context.Context, filter *database.L
 func (ps projectStatements) scanProject(row *spanner.Row) (*domain.Project, error) {
 	project := new(domain.Project)
 	var previewOriginsJSON string
-	if err := row.Columns(&project.ID, &project.CreatedAt, &project.UpdatedAt, &project.ProjectSecret, &project.PreviewSecret, &previewOriginsJSON); err != nil {
+	if err := row.Columns(&project.ID, &project.Name, &project.CreatedAt, &project.UpdatedAt, &project.ProjectSecret, &project.PreviewSecret, &previewOriginsJSON); err != nil {
 		return nil, err
 	}
 	origins, err := decodePreviewOrigins(previewOriginsJSON)
@@ -143,6 +143,11 @@ var projectSchema = database.NewSchema(map[domain.ProjectField]database.FieldBin
 	domain.ProjectFieldID: {
 		SQLName:  "id",
 		Accessor: func(p *domain.Project) any { return p.ID },
+		Coerce:   database.CoerceString,
+	},
+	domain.ProjectFieldName: {
+		SQLName:  "name",
+		Accessor: func(p *domain.Project) any { return p.Name },
 		Coerce:   database.CoerceString,
 	},
 	domain.ProjectFieldCreatedAt: {

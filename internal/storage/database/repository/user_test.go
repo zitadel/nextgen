@@ -27,7 +27,7 @@ func TestUserRepository_CreateGetListDelete(t *testing.T) {
 		userID    = "usr_aaa"
 	)
 
-	_, err := tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s (id) VALUES ($1)`, dbTable("projects")), pid)
+	_, err := tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s (id, name) VALUES ($1, $2)`, dbTable("projects")), pid, "project-"+pid)
 	require.NoError(t, err)
 	_, err = tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s (project_id, id) VALUES ($1,$2)`, dbTable("teams")), pid, tid)
 	require.NoError(t, err)
@@ -113,7 +113,7 @@ func TestUserRepository_CreateWithoutTeam(t *testing.T) {
 		userID    = "usr_no_team"
 	)
 
-	_, err := tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s (id) VALUES ($1)`, dbTable("projects")), pid)
+	_, err := tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s (id, name) VALUES ($1, $2)`, dbTable("projects")), pid, "project-"+pid)
 	require.NoError(t, err)
 	_, err = tx.Exec(ctx,
 		fmt.Sprintf(`INSERT INTO %s (project_id, url, payload) VALUES ($1,$2,$3%s)`, dbTable("json_schemas"), jsonCast()),
@@ -156,7 +156,7 @@ func TestUserRepository_AttributesCondition(t *testing.T) {
 		schemaURL = "https://schemas.test/users-attr-cond/v1.json"
 	)
 
-	_, err := tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s (id) VALUES ($1)`, dbTable("projects")), pid)
+	_, err := tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s (id, name) VALUES ($1, $2)`, dbTable("projects")), pid, "project-"+pid)
 	require.NoError(t, err)
 	_, err = tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s (project_id, id) VALUES ($1,$2)`, dbTable("teams")), pid, tid)
 	require.NoError(t, err)
