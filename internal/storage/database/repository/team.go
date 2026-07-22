@@ -166,7 +166,7 @@ func (r *TeamRepository) Deactivate(ctx context.Context, client database.QueryEx
 			return err
 		}
 
-		// Match UserRepository.Deactivate: deprovisioned users lose all memberships/access,
+		// Match UserStatements.DeactivateUser: deprovisioned users lose all memberships/access,
 		// including roster rows on other teams.
 		ob := database.NewStatementBuilder("UPDATE ")
 		ob.WriteString(r.membershipsTable)

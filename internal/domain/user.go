@@ -1,13 +1,11 @@
 package domain
 
 import (
-	"context"
 	"encoding/json"
 	"time"
 
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/zitadel/nextgen/internal/maputil"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 type AuthMethod int
@@ -228,40 +226,17 @@ func SchemaFromUserMap(user map[string]any) (string, error) {
 	return schemaURL, nil
 }
 
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/user.mock.go . UserRepository
+// UserField enumerates the fields of User which can be used for filtering and
+// ordering in list operations.
+type UserField uint8
 
-type UserRepository interface {
-	Repository
-
-	userConditions
-	userChanges
-	userJoins
-
-	GetByID(ctx context.Context, client database.QueryExecutor, projectID string, membershipTeamID *string, userID string) (*User, error)
-	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*User, error)
-	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*User, error)
-	Create(ctx context.Context, client database.QueryExecutor, user *CreateUser) error
-	Deactivate(ctx context.Context, client database.QueryExecutor, projectID, userID string) error
-	Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error
-}
-
-type userConditions interface {
-	ProjectIDCondition(projectID string) database.Condition
-	IDCondition(id string) database.Condition
-	PrimaryKeyCondition(projectID, id string) database.Condition
-	LifecycleOwnerTeamIDCondition(teamID string) database.Condition
-	MembershipTeamCondition(teamID string) database.Condition
-	AttributesCondition(attributes []Attribute) database.Condition
-}
-
-type userChanges interface {
-	SetLifecycleOwnerTeamID(teamID *string) database.Change
-	SetStatus(status UserStatus) database.Change
-	SetAttribute(a CreateAttribute) database.Change
-	DeleteAttribute(key string) database.Condition
-}
-
-type userJoins interface {
-	WithAttributes(filterKeys ...string) database.QueryOption
-	WithAvailableAuthMethods() database.QueryOption
-}
+const (
+	UserFieldUnspecified UserField = iota
+	UserFieldProjectID
+	UserFieldID
+	UserFieldSchemaURL
+	UserFieldLifecycleOwnerTeamID
+	UserFieldStatus
+	UserFieldCreatedAt
+	UserFieldUpdatedAt
+)

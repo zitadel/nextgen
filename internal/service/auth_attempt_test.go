@@ -368,9 +368,7 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 		users := mocks.NewMockUserLookup(ctrl)
 
 		repo.EXPECT().GetByID(gomock.Any(), gomock.Any(), "proj", "att-1").Return(newUserChallengeAttempt(), nil)
-		users.EXPECT().ProjectIDCondition(gomock.Any()).Return(nil).AnyTimes()
-		users.EXPECT().AttributesCondition(gomock.Any()).Return(nil).AnyTimes()
-		users.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{ID: "user-1"}, nil)
+		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any()).Return(&domain.User{ID: "user-1"}, nil)
 
 		var succeededFactor domain.AuthFactor
 		repo.EXPECT().ChallengeSucceeded(gomock.Any(), gomock.Any(), "proj", "att-1", gomock.Any(), "ch-1").
@@ -415,9 +413,7 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 		users := mocks.NewMockUserLookup(ctrl)
 
 		repo.EXPECT().GetByID(gomock.Any(), gomock.Any(), "proj", "att-1").Return(newUserChallengeAttempt(), nil)
-		users.EXPECT().ProjectIDCondition(gomock.Any()).Return(nil).AnyTimes()
-		users.EXPECT().AttributesCondition(gomock.Any()).Return(nil).AnyTimes()
-		users.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, rejectErr)
+		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any()).Return(nil, rejectErr)
 
 		var failedChallenge domain.AuthChallenge
 		repo.EXPECT().ChallengeFailed(gomock.Any(), gomock.Any(), "proj", "att-1", gomock.Any()).
@@ -442,9 +438,7 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 		users := mocks.NewMockUserLookup(ctrl)
 
 		repo.EXPECT().GetByID(gomock.Any(), gomock.Any(), "proj", "att-1").Return(newUserChallengeAttempt(), nil)
-		users.EXPECT().ProjectIDCondition(gomock.Any()).Return(nil).AnyTimes()
-		users.EXPECT().AttributesCondition(gomock.Any()).Return(nil).AnyTimes()
-		users.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{ID: "user-1"}, nil)
+		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any()).Return(&domain.User{ID: "user-1"}, nil)
 		// ChallengeFailed must not be called: a persistence failure is not a proof rejection.
 		repo.EXPECT().ChallengeSucceeded(gomock.Any(), gomock.Any(), "proj", "att-1", gomock.Any(), "ch-1").Return(succeedErr)
 

@@ -7,7 +7,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,UserStatements
 
 type StatementPool interface {
 	Statementer[AllStatements]
@@ -22,6 +22,7 @@ type AllStatements interface {
 	ProjectStatements
 	FlowDefinitionStatements
 	CryptoKeyStatements
+	UserStatements
 	Statements
 }
 
@@ -58,4 +59,28 @@ type CryptoKeyStatements interface {
 	Statements
 	GetEncryptionKey(ctx context.Context, filter database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error)
 	CreateEncryptionKey(ctx context.Context, dek *domain.EncryptionKey) error
+}
+
+type UserReadOptions struct {
+	// AttributeKeys limits hydrated EAV keys; empty means all attributes.
+	AttributeKeys []string
+	// WithAuthMethods loads AvailableAuthMethods from credential tables.
+	WithAuthMethods bool
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type UserPool interface {
+// 	Statementer[UserStatements]
+// 	Transactioner[UserStatements]
+// }
+
+type UserStatements interface {
+	Statements
+	CreateUser(ctx context.Context, user *domain.CreateUser) error
+	GetUserByID(ctx context.Context, projectID string, membershipTeamID *string, userID string, opts UserReadOptions) (*domain.User, error)
+	GetUserByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute, opts UserReadOptions) (*domain.User, error)
+	ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], offset uint32, opts UserReadOptions) (*database.ListResult[*domain.User], error)
+	ListUsersByAttributes(ctx context.Context, projectID string, teamScope *string, attrs []domain.Attribute, opts UserReadOptions) (*database.ListResult[*domain.User], error)
+	DeactivateUser(ctx context.Context, projectID, userID string) error
+	DeleteUserByID(ctx context.Context, projectID, userID string) error
 }

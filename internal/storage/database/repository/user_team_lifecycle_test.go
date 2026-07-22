@@ -3,7 +3,7 @@
 package repository_test
 
 import (
-	"fmt"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,12 +12,10 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
-func setupLifecycleFixture(t *testing.T, tx database.Transaction, projectID string) (teamRepo *repository.TeamRepository, userRepo *repository.UserRepository) {
+func setupLifecycleFixture(t *testing.T, tx database.Transaction, projectID string) *repository.TeamRepository {
 	t.Helper()
 	ensureProject(t, tx, projectID)
-	teamRepo = repository.NewTeamRepository(tx)
-	userRepo = repository.NewUserRepository()
-	return teamRepo, userRepo
+	return repository.NewTeamRepository(tx)
 }
 
 func createTeam(t *testing.T, tx database.Transaction, teamRepo *repository.TeamRepository, projectID, teamID string) {
@@ -25,7 +23,7 @@ func createTeam(t *testing.T, tx database.Transaction, teamRepo *repository.Team
 	require.NoError(t, teamRepo.Create(t.Context(), tx, &domain.Team{ProjectID: projectID, ID: teamID}))
 }
 
-func createLifecycleUser(t *testing.T, tx database.Transaction, userRepo *repository.UserRepository, projectID, schemaURL, userID string, lifecycleOwner, participation *string) {
+func createLifecycleUser(t *testing.T, tx database.Transaction, projectID, schemaURL, userID string, lifecycleOwner, participation *string) {
 	t.Helper()
 	if participation != nil && *participation != "" {
 		ensureTeam(t, tx, projectID, *participation)
@@ -34,16 +32,58 @@ func createLifecycleUser(t *testing.T, tx database.Transaction, userRepo *reposi
 		ensureTeam(t, tx, projectID, *lifecycleOwner)
 	}
 	ensureJSONSchemaRow(t, tx, projectID, schemaURL, []byte("{}"))
-	attr, err := domain.NewCreateAttribute("nickname", userID, domain.AttributeUniquenessUnspecified)
+	ctx := t.Context()
+	_, err := tx.Exec(ctx,
+		`INSERT INTO zitadel_nextgen.users (project_id, schema_url, id, lifecycle_owner_team_id, status)
+		 VALUES ($1, $2, $3, $4, $5)
+		 ON CONFLICT (project_id, id) DO NOTHING`,
+		projectID, schemaURL, userID, lifecycleOwner, domain.UserStatusActive.String(),
+	)
 	require.NoError(t, err)
-	require.NoError(t, userRepo.Create(t.Context(), tx, &domain.CreateUser{
-		ProjectID:               projectID,
-		SchemaURL:               schemaURL,
-		ID:                      userID,
-		LifecycleOwnerTeamID:    lifecycleOwner,
-		InitialMembershipTeamID: participation,
-		Attributes:              []*domain.CreateAttribute{attr},
-	}))
+	if participation != nil && *participation != "" {
+		membershipRepo := repository.NewTeamMembershipRepository(tx)
+		require.NoError(t, membershipRepo.Create(ctx, tx, &domain.TeamMembership{
+			ProjectID: projectID,
+			TeamID:    *participation,
+			UserID:    userID,
+			Status:    domain.MembershipStatusActive,
+		}))
+	}
+	attrVal, err := json.Marshal(userID)
+	require.NoError(t, err)
+	teamScope := ""
+	if participation != nil {
+		teamScope = *participation
+	}
+	_, err = tx.Exec(ctx,
+		`INSERT INTO zitadel_nextgen.user_attributes (project_id, team_id, user_id, key, value)
+		 VALUES ($1, $2, $3, 'nickname', $4::jsonb)
+		 ON CONFLICT DO NOTHING`,
+		projectID, teamScope, userID, attrVal,
+	)
+	require.NoError(t, err)
+}
+
+func getUserStatus(t *testing.T, tx database.Transaction, projectID, userID string) (domain.UserStatus, *string) {
+	t.Helper()
+	var status string
+	var lifecycleOwner database.Null[string]
+	err := tx.QueryRow(t.Context(),
+		`SELECT status, lifecycle_owner_team_id FROM zitadel_nextgen.users WHERE project_id = $1 AND id = $2`,
+		projectID, userID,
+	).Scan(&status, &lifecycleOwner)
+	require.NoError(t, err)
+	var owner *string
+	if lifecycleOwner.Valid {
+		v := lifecycleOwner.V
+		owner = &v
+	}
+	return domain.UserStatus(status), owner
+}
+
+func deleteLifecycleUser(t *testing.T, tx database.Transaction, projectID, userID string) {
+	t.Helper()
+	deleteUser(t, tx, projectID, userID)
 }
 
 // Acceptance signal 1: self-owned user survives team deactivation.
@@ -60,18 +100,17 @@ func TestUserTeamLifecycle_SelfOwnedUserSurvivesTeamDeactivation(t *testing.T) {
 		schemaURL = "https://schemas.test/lifecycle-self/v1.json"
 	)
 
-	teamRepo, userRepo := setupLifecycleFixture(t, tx, pid)
+	teamRepo := setupLifecycleFixture(t, tx, pid)
 	createTeam(t, tx, teamRepo, pid, teamID)
 
 	participation := teamID
-	createLifecycleUser(t, tx, userRepo, pid, schemaURL, userID, nil, &participation)
+	createLifecycleUser(t, tx, pid, schemaURL, userID, nil, &participation)
 
 	require.NoError(t, teamRepo.Deactivate(ctx, tx, pid, teamID))
 
-	got, err := userRepo.Get(ctx, tx, database.WithCondition(userRepo.PrimaryKeyCondition(pid, userID)))
-	require.NoError(t, err)
-	require.True(t, got.IsSelfOwned())
-	require.Equal(t, domain.UserStatusActive, got.Status)
+	status, owner := getUserStatus(t, tx, pid, userID)
+	require.Nil(t, owner)
+	require.Equal(t, domain.UserStatusActive, status)
 
 	team, err := teamRepo.Get(ctx, tx, pid, teamID)
 	require.NoError(t, err)
@@ -92,23 +131,23 @@ func TestUserTeamLifecycle_TeamOwnedUserDeactivatedOnTeamDeactivation(t *testing
 		schemaURL = "https://schemas.test/lifecycle-owned/v1.json"
 	)
 
-	teamRepo, userRepo := setupLifecycleFixture(t, tx, pid)
+	teamRepo := setupLifecycleFixture(t, tx, pid)
 	createTeam(t, tx, teamRepo, pid, teamID)
 
 	owner := teamID
 	participation := teamID
-	createLifecycleUser(t, tx, userRepo, pid, schemaURL, userID, &owner, &participation)
+	createLifecycleUser(t, tx, pid, schemaURL, userID, &owner, &participation)
 
 	require.NoError(t, teamRepo.Deactivate(ctx, tx, pid, teamID))
 
-	got, err := userRepo.Get(ctx, tx, database.WithCondition(userRepo.PrimaryKeyCondition(pid, userID)))
-	require.NoError(t, err)
-	require.True(t, got.IsTeamOwned())
-	require.Equal(t, domain.UserStatusDeactivated, got.Status)
+	status, gotOwner := getUserStatus(t, tx, pid, userID)
+	require.NotNil(t, gotOwner)
+	require.Equal(t, owner, *gotOwner)
+	require.Equal(t, domain.UserStatusDeactivated, status)
 }
 
 // Team-owned users deactivated via TeamRepository.Deactivate lose memberships on all teams
-// (same roster policy as UserRepository.Deactivate / ADR 024).
+// (same roster policy as UserStatements.DeactivateUser / ADR 024).
 func TestUserTeamLifecycle_TeamOwnedUserLosesAllMembershipsOnOwningTeamDeactivation(t *testing.T) {
 	skipIfSpanner(t)
 	tx, rollback := transactionForRollback(t)
@@ -123,13 +162,13 @@ func TestUserTeamLifecycle_TeamOwnedUserLosesAllMembershipsOnOwningTeamDeactivat
 		schemaURL   = "https://schemas.test/lifecycle-cross/v1.json"
 	)
 
-	teamRepo, userRepo := setupLifecycleFixture(t, tx, pid)
+	teamRepo := setupLifecycleFixture(t, tx, pid)
 	createTeam(t, tx, teamRepo, pid, ownerTeamID)
 	createTeam(t, tx, teamRepo, pid, otherTeamID)
 
 	owner := ownerTeamID
 	participation := ownerTeamID
-	createLifecycleUser(t, tx, userRepo, pid, schemaURL, userID, &owner, &participation)
+	createLifecycleUser(t, tx, pid, schemaURL, userID, &owner, &participation)
 
 	membershipRepo := repository.NewTeamMembershipRepository(tx)
 	require.NoError(t, membershipRepo.Create(ctx, tx, &domain.TeamMembership{
@@ -141,9 +180,8 @@ func TestUserTeamLifecycle_TeamOwnedUserLosesAllMembershipsOnOwningTeamDeactivat
 
 	require.NoError(t, teamRepo.Deactivate(ctx, tx, pid, ownerTeamID))
 
-	got, err := userRepo.Get(ctx, tx, database.WithCondition(userRepo.PrimaryKeyCondition(pid, userID)))
-	require.NoError(t, err)
-	require.Equal(t, domain.UserStatusDeactivated, got.Status)
+	status, _ := getUserStatus(t, tx, pid, userID)
+	require.Equal(t, domain.UserStatusDeactivated, status)
 
 	for _, teamID := range []string{ownerTeamID, otherTeamID} {
 		membership, err := membershipRepo.Get(ctx, tx, pid, teamID, userID)
@@ -166,13 +204,13 @@ func TestUserTeamLifecycle_UserDeleteDoesNotRemoveTeams(t *testing.T) {
 		schemaURL = "https://schemas.test/lifecycle-delete/v1.json"
 	)
 
-	teamRepo, userRepo := setupLifecycleFixture(t, tx, pid)
+	teamRepo := setupLifecycleFixture(t, tx, pid)
 	createTeam(t, tx, teamRepo, pid, teamID)
 
 	participation := teamID
-	createLifecycleUser(t, tx, userRepo, pid, schemaURL, userID, nil, &participation)
+	createLifecycleUser(t, tx, pid, schemaURL, userID, nil, &participation)
 
-	require.NoError(t, userRepo.Delete(ctx, tx, userRepo.PrimaryKeyCondition(pid, userID)))
+	deleteLifecycleUser(t, tx, pid, userID)
 
 	team, err := teamRepo.Get(ctx, tx, pid, teamID)
 	require.NoError(t, err)
@@ -210,72 +248,4 @@ WHERE n.nspname = 'zitadel_nextgen'
 	}
 	require.NoError(t, rows.Err())
 	require.Empty(t, cascades, "user/team graph must not use ON DELETE CASCADE: %v", cascades)
-}
-
-// Create with a stale membership team must not leave a partial user row.
-func TestUserRepository_Create_RollsBackWhenMembershipInsertFails(t *testing.T) {
-	skipIfSpanner(t)
-	tx, rollback := transactionForRollback(t)
-	defer rollback()
-	ctx := t.Context()
-
-	const (
-		pid       = "proj-lifecycle-create-atomic"
-		teamID    = "team-lifecycle-missing"
-		userID    = "usr-lifecycle-create-atomic"
-		schemaURL = "https://schemas.test/lifecycle-create-atomic/v1.json"
-	)
-
-	userRepo := repository.NewUserRepository()
-	ensureProject(t, tx, pid)
-	ensureJSONSchemaRow(t, tx, pid, schemaURL, []byte("{}"))
-
-	attr, err := domain.NewCreateAttribute("nickname", userID, domain.AttributeUniquenessUnspecified)
-	require.NoError(t, err)
-	missingTeam := teamID
-	err = userRepo.Create(ctx, tx, &domain.CreateUser{
-		ProjectID:               pid,
-		SchemaURL:               schemaURL,
-		ID:                      userID,
-		InitialMembershipTeamID: &missingTeam,
-		Attributes:              []*domain.CreateAttribute{attr},
-	})
-	require.Error(t, err)
-
-	_, getErr := userRepo.Get(ctx, tx, database.WithCondition(userRepo.PrimaryKeyCondition(pid, userID)))
-	require.Error(t, getErr)
-}
-
-func TestUserRepository_DeactivateRemovesMemberships(t *testing.T) {
-	skipIfSpanner(t)
-	tx, rollback := transactionForRollback(t)
-	defer rollback()
-	ctx := t.Context()
-
-	const (
-		pid       = "proj-user-deactivate"
-		teamID    = "team-user-deactivate"
-		userID    = "usr-user-deactivate"
-		schemaURL = "https://schemas.test/user-deactivate/v1.json"
-	)
-
-	teamRepo, userRepo := setupLifecycleFixture(t, tx, pid)
-	createTeam(t, tx, teamRepo, pid, teamID)
-
-	participation := teamID
-	createLifecycleUser(t, tx, userRepo, pid, schemaURL, userID, nil, &participation)
-
-	require.NoError(t, userRepo.Deactivate(ctx, tx, pid, userID))
-
-	got, err := userRepo.Get(ctx, tx, database.WithCondition(userRepo.PrimaryKeyCondition(pid, userID)))
-	require.NoError(t, err)
-	require.Equal(t, domain.UserStatusDeactivated, got.Status)
-
-	membershipRepo := repository.NewTeamMembershipRepository(tx)
-	membership, err := membershipRepo.Get(ctx, tx, pid, teamID, userID)
-	require.NoError(t, err)
-	require.Equal(t, domain.MembershipStatusRemoved, membership.Status)
-
-	_, err = teamRepo.Get(ctx, tx, pid, teamID)
-	require.NoError(t, err, fmt.Sprintf("team %s should still exist after user deactivation", teamID))
 }

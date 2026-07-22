@@ -53,7 +53,7 @@ func TestGetMySession_Identity(t *testing.T) {
 		require.NoError(t, err)
 		attrs = append(attrs, attr)
 	}
-	require.NoError(t, harness.EnsureUserRepo(t).Create(t.Context(), db, &domain.CreateUser{
+	require.NoError(t, harness.EnsureUserFixture(t).Create(t.Context(), &domain.CreateUser{
 		ProjectID:  project.ID,
 		SchemaURL:  userSchemaURL,
 		ID:         userID,

@@ -15,23 +15,18 @@ import (
 
 func insertTokenTestUser(t *testing.T, ctx context.Context, tx database.QueryExecutor, pid, tid, schemaURL, userID string) {
 	t.Helper()
+	ensureUser(t, tx, pid, tid, schemaURL, userID)
 	if isSpannerDB {
-		ensureUser(t, tx, pid, tid, schemaURL, userID)
 		return
 	}
-	ensureProject(t, tx, pid)
-	ensureTeam(t, tx, pid, tid)
-	ensureJSONSchemaRow(t, tx, pid, schemaURL, []byte("{}"))
-	attr, err := domain.NewCreateAttribute("country", "CH", domain.AttributeUniquenessUnspecified)
+	attrVal := []byte(`"CH"`)
+	_, err := tx.Exec(ctx,
+		`INSERT INTO zitadel_nextgen.user_attributes (project_id, team_id, user_id, key, value)
+		 VALUES ($1, $2, $3, 'country', $4::jsonb)
+		 ON CONFLICT DO NOTHING`,
+		pid, tid, userID, attrVal,
+	)
 	require.NoError(t, err)
-	teamCopy := tid
-	require.NoError(t, repository.NewUserRepository().Create(ctx, tx, &domain.CreateUser{
-		ProjectID:               pid,
-		SchemaURL:               schemaURL,
-		ID:                      userID,
-		InitialMembershipTeamID: &teamCopy,
-		Attributes:              []*domain.CreateAttribute{attr},
-	}))
 }
 
 func requireGeneratedTokenID(t *testing.T, tokenID string) {

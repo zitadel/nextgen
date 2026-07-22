@@ -1,13 +1,13 @@
 package helpers
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
 func (h *Harness) EnsureUserService(t *testing.T) *service.UserService {
@@ -15,7 +15,7 @@ func (h *Harness) EnsureUserService(t *testing.T) *service.UserService {
 	if h.UserService == nil {
 		h.UserService = service.NewUserService(
 			h.EnsureDBPool(t),
-			h.EnsureUserRepo(t),
+			h.ServiceDB(t),
 			h.EnsureUserPasswordRepo(t),
 			h.EnsureSchemaRepo(t),
 			h.EnsureHasher(t),
@@ -24,13 +24,28 @@ func (h *Harness) EnsureUserService(t *testing.T) *service.UserService {
 	return h.UserService
 }
 
-func (h *Harness) EnsureUserRepo(t *testing.T) domain.UserRepository {
-	t.Helper()
-	if h.UserRepo == nil {
-		h.UserRepo = repository.NewUserRepository()
-	}
+// UserFixture exposes UserStatements helpers for integration tests.
+type UserFixture struct {
+	Pool *service.DB
+}
 
-	return h.UserRepo
+func (h *Harness) EnsureUserFixture(t *testing.T) UserFixture {
+	t.Helper()
+	return UserFixture{Pool: h.ServiceDB(t)}
+}
+
+func (f UserFixture) Create(ctx context.Context, user *domain.CreateUser) error {
+	return f.Pool.Transaction(ctx, func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+		return tx.Statements().CreateUser(ctx, user)
+	})
+}
+
+func (f UserFixture) GetByID(ctx context.Context, projectID, userID string) (*domain.User, error) {
+	return f.Pool.Statements().GetUserByID(ctx, projectID, nil, userID, service.UserReadOptions{})
+}
+
+func (f UserFixture) GetByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute) (*domain.User, error) {
+	return f.Pool.Statements().GetUserByAttributes(ctx, projectID, attrs, service.UserReadOptions{})
 }
 
 func CreateSessionUsingPassword(t *testing.T,
