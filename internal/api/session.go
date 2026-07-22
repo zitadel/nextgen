@@ -13,6 +13,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api/ogenx"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
 const (
@@ -29,7 +30,13 @@ func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionReques
 	if err != nil {
 		return nil, err
 	}
-	return sessionWithTokenToAPI(session, h.sessionTokenGenerator)
+
+	dek, err := h.keyService.GetProjectDEKCrypter(ctx, string(req.ProjectID))
+	if err != nil {
+		return nil, err
+	}
+
+	return sessionWithTokenToAPI(session, dek)
 }
 
 func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, params api.ExchangeHandoffParams) (api.ExchangeHandoffRes, error) {
@@ -41,7 +48,13 @@ func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, 
 	if err != nil {
 		return nil, err
 	}
-	return sessionWithTokenToAPI(session, h.sessionTokenGenerator)
+
+	dek, err := h.keyService.GetProjectDEKCrypter(ctx, string(params.ProjectID))
+	if err != nil {
+		return nil, err
+	}
+
+	return sessionWithTokenToAPI(session, dek)
 }
 
 func exchangeInputFromRequest(req *api.ExchangeRequest, params api.ExchangeHandoffParams) (service.ExchangeInput, error) {
@@ -175,8 +188,8 @@ func userAgentToDomain(agent api.OptCreateSessionRequestUserAgent) *domain.UserA
 	}
 }
 
-func sessionWithTokenToAPI(session *domain.Session, tokenGenerator domain.TokenGenerator) (*api.SessionWithTokenResponseHeaders, error) {
-	token, err := session.Token(tokenGenerator)
+func sessionWithTokenToAPI(session *domain.Session, encrypter op.Encrypter) (*api.SessionWithTokenResponseHeaders, error) {
+	token, err := session.Token(encrypter)
 	if err != nil {
 		return nil, err
 	}

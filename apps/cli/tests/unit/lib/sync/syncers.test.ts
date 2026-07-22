@@ -29,14 +29,14 @@ afterEach(() => server.resetHandlers());
 
 describe("makeSyncers", () => {
   it("returns the schema and flow syncers in order", () => {
-    const syncers = makeSyncers({ client, projectId: "proj-1", env: {} });
+    const syncers = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
 
-    expect(syncers).toHaveLength(2);
-    expect(syncers.map((s) => s.kind)).toEqual(["schema", "flow"]);
+    expect(syncers).toHaveLength(3);
+    expect(syncers.map((s) => s.kind)).toEqual(["schema", "flow", "branding"]);
   });
 
   it("configures the schema syncer (immutable, SCHEMAS_DIR)", () => {
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {} });
+    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
 
     expect(schema.kind).toBe("schema");
     expect(schema.directory).toBe(SCHEMAS_DIR);
@@ -45,7 +45,7 @@ describe("makeSyncers", () => {
   });
 
   it("configures the flow syncer (mutable, FLOWS_DIR)", () => {
-    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {} });
+    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
 
     expect(flow.kind).toBe("flow");
     expect(flow.directory).toBe(FLOWS_DIR);
@@ -56,7 +56,7 @@ describe("makeSyncers", () => {
 
 describe("SchemaSyncer", () => {
   it("validate accepts a user-schema body with the required spec fields", () => {
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {} });
+    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
 
     expect(() =>
       schema.validate({
@@ -69,13 +69,13 @@ describe("SchemaSyncer", () => {
   });
 
   it("validate throws E_VALIDATION on a malformed JSON Schema", () => {
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {} });
+    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
 
     expect(() => schema.validate({ type: 123 })).toThrow(ZitadelError);
   });
 
   it("validate throws E_VALIDATION when the kind discriminator is missing", () => {
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {} });
+    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
 
     expect(() => schema.validate({ type: "object" })).toThrow(ZitadelError);
   });
@@ -93,7 +93,7 @@ describe("SchemaSyncer", () => {
         HttpResponse.json({ kind: "user-schema", version: 1 }),
       ),
     );
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {} });
+    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
     const data = { kind: "user-schema", version: 1 };
 
     const result = await schema.create(data);
@@ -115,7 +115,7 @@ describe("SchemaSyncer", () => {
         HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
       ),
     );
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {} });
+    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
 
     const result = await schema.create({ kind: "user-schema" });
 
@@ -124,12 +124,12 @@ describe("SchemaSyncer", () => {
   });
 
   it("update throws E_NOT_IMPLEMENTED — schemas are revisioned, edits publish a new revision", async () => {
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {} });
+    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
     await expect(schema.update("schema-id-1", { a: 1 })).rejects.toThrow(/revisioned/);
   });
 
   it("exposes revisioned=true — a schema-file hash change publishes a new revision", () => {
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {} });
+    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
     expect(schema.revisioned).toBe(true);
   });
 
@@ -141,7 +141,7 @@ describe("SchemaSyncer", () => {
         return HttpResponse.json({ kind: "user-schema", version: 1 });
       }),
     );
-    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {} });
+    const [schema] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
 
     const body = await schema.fetch?.("schema-id-1");
 
@@ -161,12 +161,12 @@ const VALID_FLOW = {
 
 describe("FlowDefinitionSyncer", () => {
   it("validate accepts a well-formed flow definition", () => {
-    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {} });
+    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
     expect(() => flow.validate(VALID_FLOW)).not.toThrow();
   });
 
   it("validate throws E_VALIDATION on a malformed flow definition", () => {
-    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {} });
+    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
     expect(() => flow.validate({ version: 99, kind: "wrong" })).toThrow(ZitadelError);
   });
 
@@ -187,7 +187,7 @@ describe("FlowDefinitionSyncer", () => {
   };
 
   it("validate throws E_VALIDATION when a referenced env var is missing", () => {
-    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {} });
+    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
     expect(() => flow.validate(FLOW_WITH_ENV_REF)).toThrow(ZitadelError);
   });
 
@@ -196,6 +196,7 @@ describe("FlowDefinitionSyncer", () => {
       client,
       projectId: "proj-1",
       env: { MY_SECRET: "hunter2" },
+      cwd: "/tmp/zitadel-sync-test",
     });
     expect(() => flow.validate(FLOW_WITH_ENV_REF)).not.toThrow();
   });
@@ -211,7 +212,7 @@ describe("FlowDefinitionSyncer", () => {
         );
       }),
     );
-    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {} });
+    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
     const data = { name: "Default", status: "active", version: 2 };
 
     const result = await flow.create(data);
@@ -239,7 +240,7 @@ describe("FlowDefinitionSyncer", () => {
         });
       }),
     );
-    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {} });
+    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
 
     const result = await flow.update("flow-id-1", { status: "active", version: 3 });
 
@@ -258,7 +259,7 @@ describe("FlowDefinitionSyncer", () => {
         return new HttpResponse(null, { status: 204 });
       }),
     );
-    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {} });
+    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
 
     await flow.delete("flow-id-1");
 
@@ -284,11 +285,254 @@ describe("FlowDefinitionSyncer", () => {
         });
       }),
     );
-    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {} });
+    const [, flow] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd: "/tmp/zitadel-sync-test" });
 
     const body = await flow.fetch?.("flow-id-1");
 
     expect(new URL(receivedUrl).searchParams.get("project_id")).toBe("proj-1");
     expect(body).toEqual({ name: "Default", status: "active", version: 2 });
+  });
+});
+
+describe("BrandingSyncer", () => {
+  const VALID_TEMPLATE = `<div>{% for f in fields %}<zl-field name="{{ f.name }}"></zl-field>{% endfor %}{% mandatory_gates %}</div>`;
+
+  /** A throwaway project dir with `.zitadel/branding/login.liquid` seeded. */
+  async function makeBrandingProject(template = VALID_TEMPLATE): Promise<string> {
+    const { mkdtemp, mkdir, writeFile } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-branding-sync-"));
+    await mkdir(join(cwd, ".zitadel/branding"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel/branding/login.liquid"), template);
+    return cwd;
+  }
+
+  const descriptor = {
+    $schema: "../meta/branding.json",
+    layout: "split",
+    liquid_template_file: "./login.liquid",
+    logo_url: "https://cdn.example.com/logo.svg",
+  };
+
+  it("configures the branding syncer (revisioned, BRANDING_DIR)", async () => {
+    const cwd = await makeBrandingProject();
+    const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    expect(branding.kind).toBe("branding");
+    expect(branding.directory).toBe(".zitadel/branding");
+    expect(branding.mutable).toBe(false);
+    expect(branding.revisioned).toBe(true);
+    expect(branding.singletonFile).toBe("branding.json");
+  });
+
+  it("validate accepts a descriptor whose referenced template is valid", async () => {
+    const cwd = await makeBrandingProject();
+    const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    expect(() => branding.validate(descriptor)).not.toThrow();
+  });
+
+  it("validate throws E_VALIDATION when the referenced template file is missing", async () => {
+    const cwd = await makeBrandingProject();
+    const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    expect(() =>
+      branding.validate({ ...descriptor, liquid_template_file: "./missing.liquid" }),
+    ).toThrow(ZitadelError);
+  });
+
+  it("validate throws E_VALIDATION when the template file escapes the project", async () => {
+    const cwd = await makeBrandingProject();
+    const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    expect(() =>
+      branding.validate({ ...descriptor, liquid_template_file: "../../../../etc/passwd" }),
+    ).toThrow(ZitadelError);
+  });
+
+  it("validate throws E_VALIDATION on a hostile template", async () => {
+    const cwd = await makeBrandingProject(`<img src=x onerror=alert(1)>{% mandatory_gates %}`);
+    const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    expect(() => branding.validate(descriptor)).toThrow(ZitadelError);
+  });
+
+  it("validate throws E_VALIDATION when both template carriers are present", async () => {
+    const cwd = await makeBrandingProject();
+    const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    expect(() =>
+      branding.validate({ ...descriptor, liquid_template: VALID_TEMPLATE }),
+    ).toThrow(ZitadelError);
+  });
+
+  it("validate throws E_VALIDATION on non-https asset URLs (server parity)", async () => {
+    const cwd = await makeBrandingProject();
+    const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    // apply mutates schemas and flows before branding, so plan must reject
+    // exactly what the server's https-only gate would reject.
+    const attempt = (): void =>
+      branding.validate({ ...descriptor, logo_url: "http://cdn.example.com/logo.svg" });
+    expect(attempt).toThrow(ZitadelError);
+    try {
+      attempt();
+    } catch (error) {
+      expect(JSON.stringify((error as ZitadelError).details)).toContain("https");
+    }
+  });
+
+  it("validate rejects URLs the WHATWG parser forgives but Go's url.Parse rejects", async () => {
+    const cwd = await makeBrandingProject();
+    const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    // new URL() normalizes all of these into valid https URLs; the server's
+    // Go parser rejects them — plan must be stricter-or-equal, never looser.
+    for (const hostile of [
+      "https:example.com",
+      String.raw`https:\\cdn.example.com\logo.svg`,
+      "https://cdn.example.com/logo .svg",
+      " https://cdn.example.com/logo.svg",
+    ]) {
+      expect(
+        () => branding.validate({ ...descriptor, logo_url: hostile }),
+        `should reject ${JSON.stringify(hostile)}`,
+      ).toThrow(ZitadelError);
+    }
+  });
+
+  it("validate throws E_VALIDATION on unknown descriptor keys", async () => {
+    const cwd = await makeBrandingProject();
+    const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    // A typo like hero_urll would otherwise pass plan, be ignored by the
+    // server, and vanish on canonical write-back.
+    expect(() =>
+      branding.validate({ ...descriptor, hero_urll: "https://cdn.example.com/hero.png" }),
+    ).toThrow(ZitadelError);
+  });
+
+  it("validate throws E_VALIDATION on font_url (read-only in v1)", async () => {
+    const cwd = await makeBrandingProject();
+    const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    const attempt = (): void =>
+      branding.validate({ ...descriptor, font_url: "https://fonts.example.com/css2" });
+    expect(attempt).toThrow(ZitadelError);
+    try {
+      attempt();
+    } catch (error) {
+      expect(JSON.stringify((error as ZitadelError).details)).toContain("font_url");
+    }
+  });
+
+  it("normalize inlines the template file so a .liquid edit changes the hash", async () => {
+    const { writeFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const cwd = await makeBrandingProject();
+    const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    const before = branding.normalize?.(descriptor) as { liquid_template?: string };
+    expect(before.liquid_template).toBe(VALID_TEMPLATE);
+    expect(before).not.toHaveProperty("$schema");
+    expect(before).not.toHaveProperty("liquid_template_file");
+
+    const edited = `<p data-edit="1">edited</p>{% mandatory_gates %}`;
+    await writeFile(join(cwd, ".zitadel/branding/login.liquid"), edited);
+    const after = branding.normalize?.(descriptor) as { liquid_template?: string };
+    expect(after.liquid_template).toBe(edited);
+  });
+
+  it("create POSTs the inlined wire body and returns the canonical in file-ref form", async () => {
+    const cwd = await makeBrandingProject();
+    let receivedBody: unknown;
+    let receivedProjectId: string | null = null;
+    server.use(
+      http.post(`${BASE}/branding`, async ({ request }) => {
+        receivedProjectId = new URL(request.url).searchParams.get("project_id");
+        receivedBody = await request.json();
+        return HttpResponse.json(
+          {
+            id: "brnd-1",
+            created_at: "2026-07-20T00:00:00Z",
+            branding: {
+              layout: "split",
+              liquid_template: VALID_TEMPLATE,
+              logo_url: "https://cdn.example.com/logo.svg",
+            },
+          },
+          { status: 201 },
+        );
+      }),
+    );
+    const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    const result = await branding.create(descriptor);
+
+    expect(receivedProjectId).toBe("proj-1");
+    expect(receivedBody).toEqual({
+      layout: "split",
+      liquid_template: VALID_TEMPLATE,
+      logo_url: "https://cdn.example.com/logo.svg",
+    });
+    expect(result.id).toBe("brnd-1");
+    expect(result.canonical).toEqual({
+      layout: "split",
+      liquid_template_file: "./login.liquid",
+      logo_url: "https://cdn.example.com/logo.svg",
+    });
+  });
+
+  it("create writes a differing canonical template back to the referenced file", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const cwd = await makeBrandingProject();
+    const serverTemplate = `<p data-server="1">canonical</p>{% mandatory_gates %}`;
+    server.use(
+      http.post(`${BASE}/branding`, () =>
+        HttpResponse.json(
+          {
+            id: "brnd-2",
+            created_at: "2026-07-20T00:00:00Z",
+            branding: { layout: "split", liquid_template: serverTemplate },
+          },
+          { status: 201 },
+        ),
+      ),
+    );
+    const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    await branding.create(descriptor);
+
+    const onDisk = await readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8");
+    expect(onDisk).toBe(serverTemplate);
+  });
+
+  it("update and delete throw E_NOT_IMPLEMENTED (revisioned resource)", async () => {
+    const cwd = await makeBrandingProject();
+    const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    await expect(branding.update("brnd-1", descriptor)).rejects.toThrow(ZitadelError);
+    await expect(branding.delete("brnd-1")).rejects.toThrow(ZitadelError);
+  });
+
+  it("fetch unwraps the revision envelope", async () => {
+    const cwd = await makeBrandingProject();
+    server.use(
+      http.get(`${BASE}/branding/brnd-1`, ({ request }) => {
+        expect(new URL(request.url).searchParams.get("project_id")).toBe("proj-1");
+        return HttpResponse.json({
+          id: "brnd-1",
+          created_at: "2026-07-20T00:00:00Z",
+          branding: { layout: "centered", liquid_template: VALID_TEMPLATE },
+        });
+      }),
+    );
+    const [, , branding] = makeSyncers({ client, projectId: "proj-1", env: {}, cwd });
+
+    const body = await branding.fetch?.("brnd-1");
+
+    expect(body).toEqual({ layout: "centered", liquid_template: VALID_TEMPLATE });
   });
 });
