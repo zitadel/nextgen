@@ -59,9 +59,14 @@ func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*dom
 	return project, nil
 }
 
+const updateProjectStmt = `UPDATE zitadel_nextgen.projects SET name = $2, updated_at = now() WHERE id = $1 RETURNING updated_at`
+
 // UpdateProject implements [service.ProjectStatements].
+// Only name is updated; secrets and preview origins are left untouched.
+// updated_at is refreshed and read back onto project.
 func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.Project) error {
-	panic("unimplemented")
+	return wrapError(ps.client.QueryRow(ctx, updateProjectStmt, project.ID, project.Name).
+		Scan(&project.UpdatedAt))
 }
 
 // ListProjects implements [service.ProjectStatements].

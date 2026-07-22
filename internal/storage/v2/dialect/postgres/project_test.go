@@ -4,6 +4,7 @@ package postgres
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"log/slog"
 	"os"
@@ -105,7 +106,7 @@ func uniqueProjectID(t *testing.T) string {
 // newTestProject builds a persistable project. PreviewOrigins is a non-nil empty
 // slice because the projects table declares preview_origins NOT NULL.
 func newTestProject(id string) *domain.Project {
-	return &domain.Project{ID: id, Name: "project-" + id, PreviewOrigins: []string{}}
+	return &domain.Project{ID: id, Name: "project-" + rand.Text(), PreviewOrigins: []string{}}
 }
 
 func TestProjectStatements_Create(t *testing.T) {
@@ -134,6 +135,31 @@ func TestProjectStatements_Create(t *testing.T) {
 
 		err := testPool.CreateProject(t.Context(), newTestProject(project.ID))
 		assert.Error(t, err)
+	})
+}
+
+func TestProjectStatements_Update(t *testing.T) {
+	t.Run("updates name and refreshes updated_at", func(t *testing.T) {
+		project := newTestProject(uniqueProjectID(t))
+		t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), project.ID) })
+		require.NoError(t, testPool.CreateProject(t.Context(), project))
+		createdUpdatedAt := project.UpdatedAt
+
+		projectName := "project-" + rand.Text()
+		project.Name = projectName
+		require.NoError(t, testPool.UpdateProject(t.Context(), project))
+		assert.False(t, project.UpdatedAt.Before(createdUpdatedAt))
+
+		stored, err := testPool.GetProjectByID(t.Context(), project.ID)
+		require.NoError(t, err)
+		assert.Equal(t, projectName, stored.Name)
+		assert.Equal(t, project.UpdatedAt.UTC(), stored.UpdatedAt.UTC())
+	})
+
+	t.Run("not found returns NoRowFoundError", func(t *testing.T) {
+		project := newTestProject(uniqueProjectID(t))
+		err := testPool.UpdateProject(t.Context(), project)
+		assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 	})
 }
 

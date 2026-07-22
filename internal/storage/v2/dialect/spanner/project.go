@@ -7,7 +7,6 @@ import (
 	"cloud.google.com/go/spanner"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	storagedb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 )
@@ -15,6 +14,7 @@ import (
 const (
 	projectsTable         = "projects"
 	createProjectStmt     = `INSERT INTO projects (id, name, project_secret, preview_secret, preview_origins) VALUES (@p1, @p2, @p3, @p4, @p5) THEN RETURN id, created_at, updated_at`
+	updateProjectStmt     = `UPDATE projects SET name = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN updated_at`
 	deleteByIDProjectStmt = `DELETE FROM projects WHERE id = @p1`
 	projectQuery          = "SELECT id, name, created_at, updated_at, project_secret, preview_secret, preview_origins FROM projects"
 )
@@ -65,8 +65,16 @@ func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*dom
 }
 
 // UpdateProject implements [service.ProjectStatements].
+// Only name is updated; secrets and preview origins are left untouched.
+// updated_at is refreshed and read back onto project.
 func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.Project) error {
-	return storagedb.NewUnimplementedError(nil)
+	stmt := buildStatement(updateProjectStmt, project.ID, project.Name).statement()
+	return ps.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
+			return struct{}{}, row.Columns(&project.UpdatedAt)
+		})
+		return err
+	})
 }
 
 // ListProjects implements [service.ProjectStatements].

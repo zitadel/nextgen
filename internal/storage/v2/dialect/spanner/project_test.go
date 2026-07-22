@@ -3,6 +3,7 @@
 package spanner
 
 import (
+	"crypto/rand"
 	"database/sql"
 	"testing"
 
@@ -41,7 +42,7 @@ func TestProjectStatements_CRUD(t *testing.T) {
 
 	project := &domain.Project{
 		ID:             "proj_v2_crud",
-		Name:           "test project",
+		Name:           "project-" + rand.Text(),
 		ProjectSecret:  "project-secret",
 		PreviewSecret:  "preview-secret",
 		PreviewOrigins: []string{"*.example.com", "localhost:3000"},
@@ -72,9 +73,23 @@ func TestProjectStatements_CRUD(t *testing.T) {
 	require.Len(t, listed.Items, 1)
 	assert.Equal(t, project.ID, listed.Items[0].ID)
 
+	createdUpdatedAt := project.UpdatedAt
+	projectName := "project-" + rand.Text()
+	project.Name = projectName
+	require.NoError(t, stmts.UpdateProject(ctx, project))
+	assert.False(t, project.UpdatedAt.Before(createdUpdatedAt))
+
+	updated, err := stmts.GetProjectByID(ctx, project.ID)
+	require.NoError(t, err)
+	assert.Equal(t, projectName, updated.Name)
+	assert.Equal(t, project.UpdatedAt.UTC(), updated.UpdatedAt.UTC())
+
 	require.NoError(t, stmts.DeleteProjectByID(ctx, project.ID))
 
 	_, err = stmts.GetProjectByID(ctx, project.ID)
 	require.Error(t, err)
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
+
+	err = stmts.UpdateProject(ctx, project)
 	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }
