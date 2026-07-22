@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -43,9 +44,10 @@ func TestProjectStatements_CRUD(t *testing.T) {
 	stmts := pool.(*Client).Statements()
 
 	// Unique per run: the database may be shared with other test packages and
-	// persist across runs, so a fixed ID would collide.
+	// persist across runs, so a fixed ID would collide. The test name keeps
+	// uniqueness from resting on clock resolution alone.
 	project := &domain.Project{
-		ID:             "proj_v2_crud_" + strconv.FormatInt(time.Now().UnixNano(), 10),
+		ID:             "proj_v2_crud_" + strings.ReplaceAll(t.Name(), "/", "_") + "_" + strconv.FormatInt(time.Now().UnixNano(), 10),
 		ProjectSecret:  "project-secret",
 		PreviewSecret:  "preview-secret",
 		PreviewOrigins: []string{"*.example.com", "localhost:3000"},
