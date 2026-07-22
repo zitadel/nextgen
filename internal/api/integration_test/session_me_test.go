@@ -67,7 +67,7 @@ func TestGetMySession_Identity(t *testing.T) {
 		RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
 		Checks:         []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}},
 	}
-	stmts := harness.ServiceDB(t)
+	stmts := harness.EnsureServiceDB(t)
 	require.NoError(t, stmts.Statements().CreateAuthAttempt(t.Context(), attempt))
 	const plainToken = "handoff_session_me_test"
 	sum := sha256.Sum256([]byte(plainToken))
