@@ -15,7 +15,7 @@ type UserPasskeyFixture struct {
 
 func (h *Harness) EnsureUserPasskeyFixture(t *testing.T) UserPasskeyFixture {
 	t.Helper()
-	return UserPasskeyFixture{Pool: h.ServiceDB(t)}
+	return UserPasskeyFixture{Pool: h.EnsureServiceDB(t)}
 }
 
 func (f UserPasskeyFixture) Create(ctx context.Context, passkey *domain.CreateUserPasskey) error {
