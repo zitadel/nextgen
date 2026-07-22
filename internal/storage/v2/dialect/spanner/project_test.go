@@ -5,11 +5,10 @@ package spanner
 import (
 	"context"
 	"database/sql"
-	"strconv"
 	"strings"
 	"testing"
-	"time"
 
+	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -44,10 +43,9 @@ func TestProjectStatements_CRUD(t *testing.T) {
 	stmts := pool.(*Client).Statements()
 
 	// Unique per run: the database may be shared with other test packages and
-	// persist across runs, so a fixed ID would collide. The test name keeps
-	// uniqueness from resting on clock resolution alone.
+	// persist across runs, so a fixed ID would collide.
 	project := &domain.Project{
-		ID:             "proj_v2_crud_" + strings.ReplaceAll(t.Name(), "/", "_") + "_" + strconv.FormatInt(time.Now().UnixNano(), 10),
+		ID:             "proj_v2_crud_" + strings.ReplaceAll(t.Name(), "/", "_") + "_" + ulid.Make().String(),
 		PreviewOrigins: []string{"*.example.com", "localhost:3000"},
 	}
 	require.NoError(t, stmts.CreateProject(ctx, project))
@@ -58,6 +56,8 @@ func TestProjectStatements_CRUD(t *testing.T) {
 	got, err := stmts.GetProjectByID(ctx, project.ID)
 	require.NoError(t, err)
 	assert.Equal(t, project.ID, got.ID)
+	assert.Equal(t, project.ProjectSecret, got.ProjectSecret)
+	assert.Equal(t, project.PreviewSecret, got.PreviewSecret)
 	assert.Equal(t, project.PreviewOrigins, got.PreviewOrigins)
 	assert.Equal(t, project.CreatedAt.UTC(), got.CreatedAt.UTC())
 	assert.Equal(t, project.UpdatedAt.UTC(), got.UpdatedAt.UTC())
