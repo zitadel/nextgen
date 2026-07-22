@@ -1,42 +1,54 @@
-package postgres
+package spanner
 
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5"
+	"cloud.google.com/go/spanner"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	database2 "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 const (
 	createEncryptionKeyStmt = `
-	INSERT INTO zitadel_nextgen.encryption_keys (id, project_id, key, algorithm, state, activated_at, retired_at, purpose)
-	VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-	RETURNING id, created_at
+	INSERT INTO encryption_keys (id, project_id, key, algorithm, state, activated_at, retired_at, purpose)
+	VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8)
+	THEN RETURN id, created_at
 `
 	encryptionKeyQuery = `
 	SELECT id, project_id, key, algorithm, state, created_at, activated_at, retired_at, purpose
-	FROM zitadel_nextgen.encryption_keys
+	FROM encryption_keys
 `
 )
 
 type cryptoKeyStatements struct{ statement }
 
-func newCryptoKeyStatements(client queryExecutor) cryptoKeyStatements {
+func newCryptoKeyStatements(db queryExecutor) cryptoKeyStatements {
 	return cryptoKeyStatements{
 		statement{
-			client: client,
+			db: db,
 		},
 	}
 }
 
+// CreateEncryptionKey implements [service.CryptoKeyStatements].
 func (s cryptoKeyStatements) CreateEncryptionKey(ctx context.Context, key *domain.EncryptionKey) error {
-	return s.client.QueryRow(ctx, createEncryptionKeyStmt,
+	stmt := buildStatement(createEncryptionKeyStmt,
 		key.ID, key.ProjectID, key.Key, key.Algorithm, key.State, key.ActivatedAt, key.RetiredAt, key.Purpose,
-	).Scan(&key.ID, &key.CreatedAt)
+	).statement()
+	return s.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
+			return struct{}{}, row.Columns(&key.ID, &key.CreatedAt)
+		})
+		if err != nil {
+			panic(err)
+		}
+		return err
+	})
 }
 
+// GetEncryptionKey implements [service.CryptoKeyStatements].
 func (s cryptoKeyStatements) GetEncryptionKey(ctx context.Context, filter database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error) {
 	var compiler statementCompiler
 	err := compileRead(
@@ -49,25 +61,36 @@ func (s cryptoKeyStatements) GetEncryptionKey(ctx context.Context, filter databa
 		return nil, err
 	}
 
-	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+	var keys []*domain.EncryptionKey
+	err = s.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		keys, err = collectRows(iter, s.scanEncryptionKey)
+		return err
+	})
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	key, err := pgx.CollectExactlyOneRow(rows, s.scanEncryptionKey)
-	if err != nil {
-		return nil, wrapError(err)
+
+	if len(keys) == 0 {
+		return nil, database2.NewNoRowFoundError(nil)
 	}
-	return key, nil
+	if len(keys) > 1 {
+		return nil, errTooManyRows
+	}
+	return keys[0], nil
 }
 
-func (s cryptoKeyStatements) scanEncryptionKey(row pgx.CollectableRow) (*domain.EncryptionKey, error) {
+func (s cryptoKeyStatements) scanEncryptionKey(row *spanner.Row) (*domain.EncryptionKey, error) {
 	key := new(domain.EncryptionKey)
-	err := row.Scan(&key.ID, &key.ProjectID, &key.Key, &key.Algorithm, &key.State, &key.CreatedAt, &key.ActivatedAt, &key.RetiredAt, &key.Purpose)
+	err := row.Columns(&key.ID, &key.ProjectID, &key.Key, &key.Algorithm, &key.State, &key.CreatedAt, &key.ActivatedAt, &key.RetiredAt, &key.Purpose)
 	if err != nil {
 		return nil, err
 	}
 	return key, nil
 }
+
+// IsStatements implements [service.CryptoKeyStatements].
+func (s cryptoKeyStatements) IsStatements() {}
 
 var _ service.CryptoKeyStatements = (*cryptoKeyStatements)(nil)
 
