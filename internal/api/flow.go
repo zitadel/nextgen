@@ -97,7 +97,9 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	if fields, ok := req.Fields.Get(); ok {
 		decoded, err := decodeFlowFields(fields)
 		if err != nil {
-			return errorResponseWithStatusCode(http.StatusBadRequest, domain.ErrRequestInvalid()), nil
+			// Name the offending field only — do not surface json.Unmarshal text (ADR 030).
+			return errorResponseWithStatusCode(http.StatusBadRequest,
+				domain.ErrRequestInvalid().WithMessage(err.Error())), nil
 		}
 		submitReq.Fields = decoded
 	}
@@ -448,7 +450,7 @@ func decodeFlowFields(raw map[string]jx.Raw) (map[string]any, error) {
 	for k, v := range raw {
 		var decoded any
 		if err := json.Unmarshal(v, &decoded); err != nil {
-			return nil, fmt.Errorf("decode field %q: %w", k, err)
+			return nil, fmt.Errorf("invalid JSON for field %q", k)
 		}
 		out[k] = decoded
 	}
