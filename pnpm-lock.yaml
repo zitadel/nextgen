@@ -573,6 +573,9 @@ importers:
       '@playwright/test':
         specifier: 'catalog:'
         version: 1.60.0
+      '@zitadel/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
       eslint-plugin-playwright:
         specifier: 'catalog:'
         version: 2.10.2(eslint@10.2.1(jiti@2.7.0))

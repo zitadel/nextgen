@@ -4,9 +4,9 @@
 # Used by .github/workflows/sync-design-tokens.yml. Kept as a script so it can
 # be syntax-checked and dry-run locally without a Figma push.
 #
-# Required env:
-#   EVENT_NAME   — github.event_name (push | workflow_dispatch)
-#   ACTOR        — github.actor
+# Required env (each falls back to the Actions default when unset):
+#   EVENT_NAME   — github.event_name (push | workflow_dispatch); default $GITHUB_EVENT_NAME
+#   ACTOR        — github.actor;                                  default $GITHUB_ACTOR
 # Optional env:
 #   DRY_RUN=1    — print actions; do not stage, commit, push, or call gh
 set -euo pipefail
@@ -14,8 +14,8 @@ set -euo pipefail
 SYNC_BRANCH=design-tokens/figma-sync
 # Scope omitted: design-tokens is not in .github/semantic.yml.
 TITLE='chore: sync tokens from Figma'
-EVENT_NAME=${EVENT_NAME:?EVENT_NAME is required}
-ACTOR=${ACTOR:?ACTOR is required}
+EVENT_NAME=${EVENT_NAME:-${GITHUB_EVENT_NAME:?EVENT_NAME or GITHUB_EVENT_NAME is required}}
+ACTOR=${ACTOR:-${GITHUB_ACTOR:?ACTOR or GITHUB_ACTOR is required}}
 DRY_RUN=${DRY_RUN:-0}
 
 # Generated + provenance artifacts the sync owns. Full paths so the PR body
@@ -95,13 +95,11 @@ case "$CURRENT_BRANCH" in
       echo "REST sync produced no changes; leaving $SYNC_BRANCH untouched."
       exit 0
     fi
-    # Fetch first so --force-with-lease can compare against the current remote
-    # tip (without a tracking ref it degrades to an unprotected force).
-    if [[ "$DRY_RUN" == "1" ]]; then
-      run git fetch -q origin "refs/heads/$SYNC_BRANCH:refs/remotes/origin/$SYNC_BRANCH"
-    else
-      git fetch -q origin "refs/heads/$SYNC_BRANCH:refs/remotes/origin/$SYNC_BRANCH" || true
-    fi
+    # Refresh the tracking ref so --force-with-lease compares against the real
+    # remote tip. Do not swallow a fetch failure: a stale/absent lease would let
+    # the force-push clobber commits that landed since checkout, defeating the
+    # point of --force-with-lease.
+    run git fetch -q origin "refs/heads/$SYNC_BRANCH:refs/remotes/origin/$SYNC_BRANCH"
     run git push -q --force-with-lease origin "HEAD:$SYNC_BRANCH"
     ;;
   *)

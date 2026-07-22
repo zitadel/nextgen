@@ -157,7 +157,7 @@
       "$type": "color"
     },
     "chart-1-dark": {
-      "$value": "{tailwind colors.blue.700}",
+      "$value": "{tailwind colors.blue.500}",
       "$type": "color"
     },
     "chart-2-light": {
@@ -165,7 +165,7 @@
       "$type": "color"
     },
     "chart-2-dark": {
-      "$value": "{tailwind colors.emerald.500}",
+      "$value": "{tailwind colors.emerald.400}",
       "$type": "color"
     },
     "chart-3-light": {
@@ -173,7 +173,7 @@
       "$type": "color"
     },
     "chart-3-dark": {
-      "$value": "{tailwind colors.amber.500}",
+      "$value": "{tailwind colors.amber.400}",
       "$type": "color"
     },
     "chart-4-light": {
@@ -181,7 +181,7 @@
       "$type": "color"
     },
     "chart-4-dark": {
-      "$value": "{tailwind colors.purple.500}",
+      "$value": "{tailwind colors.violet.400}",
       "$type": "color"
     },
     "chart-5-light": {
@@ -189,7 +189,7 @@
       "$type": "color"
     },
     "chart-5-dark": {
-      "$value": "{tailwind colors.rose.500}",
+      "$value": "{tailwind colors.rose.400}",
       "$type": "color"
     },
     "sidebar-foreground-light": {
