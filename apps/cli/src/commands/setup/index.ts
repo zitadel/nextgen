@@ -6,6 +6,7 @@ import { Flags } from "@oclif/core";
 import { createZitadelClient } from "@zitadel/api/client";
 import type { CreateProject201 } from "@zitadel/api/generated/model";
 import {
+  BRANDING_DESIGNS,
   DEFAULT_SETUP_PRESET,
   DEFAULT_SETUP_USE_CASE,
   SETUP_PRESETS,
@@ -97,6 +98,11 @@ export default class Setup extends BaseCommand {
       description:
         "Use case for the scaffolded schema fields: who signs in to the app (default: minimal).",
       options: [...SETUP_USE_CASES],
+    }),
+    design: Flags.string({
+      description:
+        "Login design to eject into .zitadel/branding/ and publish as branding revision 1. When omitted, the login uses the built-in template; run the `branding eject` command later to customize.",
+      options: [...BRANDING_DESIGNS],
     }),
   };
 
@@ -278,6 +284,7 @@ export default class Setup extends BaseCommand {
             force,
             preset: answers.preset,
             useCase: answers.useCase,
+            design: flags.design,
           });
     } catch (error) {
       // Setup is not atomic: the patcher already wrote `zitadel.json` (the
@@ -434,6 +441,7 @@ type SetupRetryOptions = {
   framework?: string;
   preset?: SetupPreset;
   useCase?: SetupUseCase;
+  design?: string;
   renderer?: string;
   devPort?: number;
   nonInteractive?: boolean;
@@ -454,6 +462,9 @@ function setupRetryFlags(opts: SetupRetryOptions): string {
   }
   if (opts.useCase && opts.useCase !== DEFAULT_SETUP_USE_CASE) {
     parts.push(`--use-case ${opts.useCase}`);
+  }
+  if (opts.design) {
+    parts.push(`--design ${opts.design}`);
   }
   if (opts.renderer && opts.renderer !== "react") {
     parts.push(`--renderer ${opts.renderer}`);
@@ -477,6 +488,7 @@ function retryOptionsFromFlags(flags: {
   framework?: string;
   preset?: string;
   "use-case"?: string;
+  design?: string;
   renderer?: string;
   "dev-port"?: number;
   "non-interactive"?: boolean;
@@ -485,6 +497,7 @@ function retryOptionsFromFlags(flags: {
     framework: flags.framework,
     preset: flags.preset as SetupPreset | undefined,
     useCase: flags["use-case"] as SetupUseCase | undefined,
+    design: flags.design,
     renderer: flags.renderer,
     devPort: flags["dev-port"],
     nonInteractive: Boolean(flags["non-interactive"]),

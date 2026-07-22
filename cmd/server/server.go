@@ -139,6 +139,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
 	schemaRepo := repository.NewJSONSchemaRepository(pool)
 	teamRepo := repository.NewTeamRepository(pool)
+	brandingRepo := repository.NewBrandingRepository(pool)
 
 	serviceDBPool := service.NewPool(v2Pool.(service.Pool))
 
@@ -197,6 +198,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		flowDefinitionRepo,
 	)
 	teamService := service.NewTeamService(pool, teamRepo)
+	brandingService := service.NewBrandingService(pool, brandingRepo)
 	userService := service.NewUserService(
 		pool,
 		userRepo,
@@ -248,6 +250,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			schemaService,
 			flowDefinitionSvc,
 			teamService,
+			brandingService,
 			tokenService,
 			keyService,
 		),

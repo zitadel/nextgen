@@ -17,6 +17,10 @@ type CreateAuthAttemptRes interface {
 	createAuthAttemptRes()
 }
 
+type CreateBrandingRes interface {
+	createBrandingRes()
+}
+
 type CreateFlowDefinitionRes interface {
 	createFlowDefinitionRes()
 }
@@ -67,6 +71,10 @@ type ExchangeHandoffRes interface {
 
 type GetAuthAttemptRes interface {
 	getAuthAttemptRes()
+}
+
+type GetBrandingByIdRes interface {
+	getBrandingByIdRes()
 }
 
 type GetFlowDefinitionRes interface {
@@ -139,6 +147,10 @@ type IntrospectRes interface {
 
 type IssueChallengeRes interface {
 	issueChallengeRes()
+}
+
+type ListBrandingRes interface {
+	listBrandingRes()
 }
 
 type ListFlowDefinitionsRes interface {
