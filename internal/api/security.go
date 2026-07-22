@@ -39,6 +39,7 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 
 	scope := ScopeContext{
 		ProjectID: payload.ProjectID,
+		Scope:     payload.Scope,
 	}
 
 	ctx = WithScopeContext(ctx, scope)
@@ -127,6 +128,11 @@ func requestOriginFromContext(ctx context.Context) (string, bool) {
 
 type ScopeContext struct {
 	ProjectID string
+	// Scope carries the token's minted scopes verbatim (domain.Token.Scope):
+	// project secrets hold project.write + project.read, preview secrets hold
+	// project.read only. Handlers that gate management operations check this
+	// list; blanket per-operation scope enforcement is ADR 036 territory.
+	Scope []string
 }
 
 func WithScopeContext(ctx context.Context, scopeCtx ScopeContext) context.Context {

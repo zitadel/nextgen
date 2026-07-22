@@ -564,6 +564,7 @@ var (
 	codeMissingProjectID              = domain.ErrMissingProjectID().Code
 	codeFlowDefinitionAlreadyExists   = domain.ErrFlowDefinitionAlreadyExists().Code
 	codeFlowDefinitionUpdateConflict  = domain.ErrFlowDefinitionUpdateConflict(nil).Code
+	codeFlowDefinitionDenied          = domain.ErrFlowDefinitionPermissionDenied().Code
 )
 
 func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
@@ -578,6 +579,8 @@ func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithDetails(err, http.StatusBadRequest)
 	case codeFlowDefinitionAlreadyExists, codeFlowDefinitionUpdateConflict:
 		return errorResponseWithDetails(err, http.StatusConflict)
+	case codeFlowDefinitionDenied:
+		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	default:
 		return internalErrorResponse(err)
 	}

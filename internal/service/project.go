@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 
 	"github.com/go-jose/go-jose/v4"
@@ -20,7 +21,7 @@ type ProjectService interface {
 	// If seedDefaults is true, server fallback schema and flow resources are
 	// created with the project for non-CLI creation paths.
 	// Returns the stored project including timestamps.
-	Create(ctx context.Context, previewOrigins []string, seedDefaults bool) (*domain.Project, error)
+	Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (*domain.Project, error)
 
 	// Get retrieves a project by ID.
 	// Returns [database.NoRowFoundError] when no project with the given ID exists.
@@ -58,9 +59,8 @@ type projectService struct {
 
 var _ ProjectService = (*projectService)(nil)
 
-func (s *projectService) Create(ctx context.Context, previewOrigins []string, seedDefaults bool) (_ *domain.Project, err error) {
-	// TODO: pass project name
-	project, err := domain.NewProject("tmp", previewOrigins)
+func (s *projectService) Create(ctx context.Context, name string, previewOrigins []string, seedDefaults bool) (_ *domain.Project, err error) {
+	project, err := domain.NewProject(name, previewOrigins)
 	if err != nil {
 		return nil, err
 	}
@@ -78,6 +78,9 @@ func (s *projectService) Create(ctx context.Context, previewOrigins []string, se
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().CreateProject(ctx, project); err != nil {
+			if mapped := mapStorageError(err); mapped != err {
+				return mapped
+			}
 			return domain.ErrInternal(err).WithMessage("failed to create project in the database")
 		}
 
@@ -102,6 +105,13 @@ func (s *projectService) Create(ctx context.Context, previewOrigins []string, se
 	})
 
 	if err != nil {
+		err = mapStorageError(err)
+		// Callback failures are already domain errors (create/schema/flow). Only
+		// wrap unexpected commit/infrastructure failures as commit errors.
+		var de domain.Error
+		if errors.As(err, &de) {
+			return nil, de
+		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to commit transaction")
 	}
 	return project, nil
@@ -148,5 +158,6 @@ func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, 
 func (s *projectService) Get(ctx context.Context, id string) (*domain.Project, error) {
 	logger := getLoggingContext(ctx, "project")
 	logger.Info("getting project", slog.String("project_id", id))
-	return s.v2Pool.Statements().GetProjectByID(ctx, id)
+	project, err := s.v2Pool.Statements().GetProjectByID(ctx, id)
+	return project, mapStorageError(err)
 }

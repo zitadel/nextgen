@@ -23,10 +23,10 @@ func (s cryptoKeyStatements) GetEncryptionKey(ctx context.Context, filter databa
 // IsStatements implements [service.CryptoKeyStatements].
 func (s cryptoKeyStatements) IsStatements() {}
 
-func newCryptoKeyStatements(client queryExecutor) cryptoKeyStatements {
+func newCryptoKeyStatements(db queryExecutor) cryptoKeyStatements {
 	return cryptoKeyStatements{
 		statement: statement{
-			client: client,
+			db: db,
 		},
 	}
 }

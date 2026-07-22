@@ -81,18 +81,21 @@ func TestProjectService_Create(t *testing.T) {
 
 		tcs := []struct {
 			name                   string
+			projectName            string
 			previewOrigins         []string
 			seedDefaults           bool
 			expectedPreviewOrigins []string
 		}{
 			{
 				name:                   "ok — no preview origins",
+				projectName:            "test",
 				previewOrigins:         nil,
 				seedDefaults:           true,
 				expectedPreviewOrigins: make([]string, 0),
 			},
 			{
 				name:                   "ok — with preview origins",
+				projectName:            "test",
 				previewOrigins:         []string{"*.vercel.app", "*.netlify.app"},
 				seedDefaults:           true,
 				expectedPreviewOrigins: []string{"*.vercel.app", "*.netlify.app"},
@@ -111,7 +114,7 @@ func TestProjectService_Create(t *testing.T) {
 				schemaRepo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any())
 				definitionRepo.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any())
 
-				got, err := svc.Create(context.Background(), tc.previewOrigins, tc.seedDefaults)
+				got, err := svc.Create(context.Background(), tc.projectName, tc.previewOrigins, tc.seedDefaults)
 
 				assert.NoError(t, err)
 				if assert.NotNil(t, got) {
@@ -132,7 +135,7 @@ func TestProjectService_Create(t *testing.T) {
 			schemaRepo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			definitionRepo.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
-			_, err := svc.Create(context.Background(), nil, false)
+			_, err := svc.Create(context.Background(), "test", nil, false)
 			assert.NoError(t, err)
 		})
 	})
@@ -148,7 +151,18 @@ func TestProjectService_Create(t *testing.T) {
 			kek.EXPECT().Encrypt(gomock.Any())
 			statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).Return(errors.New("db error"))
 
-			got, err := svc.Create(context.Background(), nil, false)
+			got, err := svc.Create(context.Background(), "test", nil, false)
+
+			assert.Nil(t, got)
+			assert.Error(t, err)
+		})
+
+		t.Run("missing project name", func(t *testing.T) {
+			t.Parallel()
+
+			svc, _, _, _, _, _, _, _, _, _, _, _ := createMockedProjectService(t)
+
+			got, err := svc.Create(context.Background(), "", nil, false)
 
 			assert.Nil(t, got)
 			assert.Error(t, err)
@@ -165,6 +179,7 @@ func TestProjectService_Get(t *testing.T) {
 		projectID := "proj_aaa"
 		project := &domain.Project{
 			ID:             projectID,
+			Name:           "project aaa",
 			CreatedAt:      time.Now().UTC(),
 			UpdatedAt:      time.Now().UTC(),
 			PreviewOrigins: []string{"myapp.example.com"},

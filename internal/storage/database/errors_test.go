@@ -88,6 +88,16 @@ func TestError(t *testing.T) {
 			err:  NewUnknownError(errors.New("original error")),
 			want: `unknown database error: original error`,
 		},
+		{
+			name: "unimplemented without original error",
+			err:  NewUnimplementedError(nil),
+			want: `unimplemented`,
+		},
+		{
+			name: "unimplemented with original error",
+			err:  NewUnimplementedError(errors.New("original error")),
+			want: `unimplemented: original error`,
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			assert.Equal(t, test.want, test.err.Error())
@@ -222,6 +232,16 @@ func TestUnwrap(t *testing.T) {
 			err:  NewUnknownError(originalErr),
 			want: originalErr,
 		},
+		{
+			name: "unimplemented without original error",
+			err:  NewUnimplementedError(nil),
+			want: nil,
+		},
+		{
+			name: "unimplemented with original error",
+			err:  NewUnimplementedError(originalErr),
+			want: originalErr,
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			assert.Equal(t, test.want, errors.Unwrap(test.err))
@@ -295,6 +315,11 @@ func TestIs(t *testing.T) {
 			name: "unknown error",
 			err:  NewUnknownError(originalErr),
 			want: new(UnknownError),
+		},
+		{
+			name: "unimplemented",
+			err:  NewUnimplementedError(originalErr),
+			want: new(UnimplementedError),
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {

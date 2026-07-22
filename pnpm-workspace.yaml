@@ -1,5 +1,4 @@
 packages:
-  - frontend/*
   - "apps/*"
   - "packages/*"
 

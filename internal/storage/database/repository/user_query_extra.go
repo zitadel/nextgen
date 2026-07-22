@@ -6,7 +6,7 @@ type UserQueryExtra struct {
 	// ListProject is required when ListScalarFilters is non-empty (strict project scoping for EAV match).
 	ListProject string
 
-	// ListTeamScope limits list queries when set (matches users.team_id IS NOT DISTINCT FROM value).
+	// ListTeamScope limits scalar list queries to attributes stored under the given team uniqueness scope.
 	ListTeamScope *string
 
 	AttributeKeys   []string

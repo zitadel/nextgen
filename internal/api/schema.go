@@ -11,6 +11,9 @@ import (
 )
 
 func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq, params api.CreateSchemaParams) (api.CreateSchemaRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), schemaAccess, opWrite); err != nil {
+		return nil, err
+	}
 	var schema *domain.JSONSchema
 
 	switch req.Type {
@@ -46,6 +49,9 @@ func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq, par
 }
 
 func (h *Handler) GetSchemaById(ctx context.Context, params api.GetSchemaByIdParams) (api.GetSchemaByIdRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), schemaAccess, opRead); err != nil {
+		return nil, err
+	}
 	schema, err := h.schemaService.GetSchema(ctx, string(params.ProjectID), string(params.TeamID.Value), params.ID)
 	if err != nil {
 		return nil, err
@@ -64,6 +70,9 @@ func (h *Handler) GetSchemaById(ctx context.Context, params api.GetSchemaByIdPar
 }
 
 func (h *Handler) ListSchemas(ctx context.Context, params api.ListSchemasParams) (api.ListSchemasRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), schemaAccess, opRead); err != nil {
+		return nil, err
+	}
 	schemas, err := h.schemaService.ListSchemas(ctx,
 		string(params.ProjectID),
 		params.ObjectType.Value,
@@ -96,6 +105,8 @@ func schemaErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	case domain.ErrJSONSchemaInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
+	case domain.ErrJSONSchemaPermissionDenied().Code:
+		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	default:
 		return internalErrorResponse(err)
 	}

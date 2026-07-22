@@ -26,11 +26,11 @@ func insertTokenTestUser(t *testing.T, ctx context.Context, tx database.QueryExe
 	require.NoError(t, err)
 	teamCopy := tid
 	require.NoError(t, repository.NewUserRepository().Create(ctx, tx, &domain.CreateUser{
-		ProjectID:  pid,
-		SchemaURL:  schemaURL,
-		ID:         userID,
-		TeamID:     &teamCopy,
-		Attributes: []*domain.CreateAttribute{attr},
+		ProjectID:               pid,
+		SchemaURL:               schemaURL,
+		ID:                      userID,
+		InitialMembershipTeamID: &teamCopy,
+		Attributes:              []*domain.CreateAttribute{attr},
 	}))
 }
 

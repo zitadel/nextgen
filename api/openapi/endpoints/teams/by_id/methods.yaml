@@ -14,7 +14,7 @@ get:
         $ref: ../../../components/schemas/team-id.yaml
   security:
     - oauth2:
-        - teams.read
+        - team.read
   responses:
     '200':
       description: Team state.
