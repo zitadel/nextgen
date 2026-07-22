@@ -31,7 +31,7 @@ func TestCreateUser(t *testing.T) {
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	params := api.CreateUserParams{
 		ProjectID: api.ProjectID(project.ID),
@@ -201,7 +201,7 @@ func TestSetUserPassword(t *testing.T) {
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	// Each subtest gets its own user: the subtests run in parallel and the
 	// password upsert is last-writer-wins on (project_id, user_id), so with a
@@ -299,7 +299,7 @@ func TestSetUserPassword(t *testing.T) {
 
 			projClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 			require.NoError(t, err)
-			projClient.SetToken(project.ProjectSecret)
+			harness.SetProjectSecretOnApiClient(t, projClient, project)
 
 			request := &api.SetUserPasswordRequest{
 				Password: "fake-password",
@@ -331,7 +331,7 @@ func TestGetUser(t *testing.T) {
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	params := api.GetUserByIDParams{
 		ProjectID: api.ProjectID(project.ID),
@@ -386,7 +386,10 @@ func TestGetMyUser(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		sessionToken, err := session.Token(harness.EnsureOpaqueTokenGenerator(t))
+		keyService := harness.EnsureKeyService(t)
+		projectDEK, err := keyService.GetProjectDEKCrypter(t.Context(), project.ID)
+		require.NoError(t, err)
+		sessionToken, err := session.Token(projectDEK)
 		require.NoError(t, err)
 
 		// GET USER USING TOKEN
