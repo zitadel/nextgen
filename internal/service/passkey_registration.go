@@ -10,7 +10,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 const passkeyRegistrationTTL = 5 * time.Minute
@@ -132,8 +131,9 @@ func (s *PasskeyRegistrationService) Finish(ctx context.Context, in FinishRegist
 	return s.FinishWith(ctx, s.pool, in)
 }
 
-// FinishWith is like [Finish] but uses the given QueryExecutor for the registration
-// session Get/Delete. The credential write uses UserPasskeyStatements on the v2 pool.
+// FinishWith is like [Finish] but writes the UserPasskey through client when it is a
+// v2 statements transaction (hybrid bridge), so the credential save shares that txn.
+// Registration Get/Delete use client (v1 PasskeyRegistration repository).
 func (s *PasskeyRegistrationService) FinishWith(ctx context.Context, client database.QueryExecutor, in FinishRegistrationInput) error {
 	reg, err := s.registrations.Get(ctx, client, in.ProjectID, in.RegistrationID)
 	if err != nil {
@@ -147,7 +147,7 @@ func (s *PasskeyRegistrationService) FinishWith(ctx context.Context, client data
 	newPasskey.ProjectID = in.ProjectID
 	newPasskey.UserID = reg.UserID
 
-	if err := s.v2Pool.Statements().CreateUserPasskey(ctx, newPasskey); err != nil {
+	if err := s.createUserPasskey(ctx, client, newPasskey); err != nil {
 		return fmt.Errorf("passkey registration: store credential: %w", err)
 	}
 
@@ -156,17 +156,17 @@ func (s *PasskeyRegistrationService) FinishWith(ctx context.Context, client data
 	return nil
 }
 
-func (s *PasskeyRegistrationService) listPasskeys(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error) {
-	result, err := s.v2Pool.Statements().ListUserPasskeys(ctx, &v2database.ListOptions[domain.UserPasskeyField]{
-		Filter: v2database.And(
-			v2database.Equal(v2database.Col(domain.UserPasskeyFieldProjectID), projectID),
-			v2database.Equal(v2database.Col(domain.UserPasskeyFieldUserID), userID),
-		),
-	})
-	if err != nil {
-		return nil, err
+// createUserPasskey prefers client when it is a v2 Statementer (same txn as the
+// caller); otherwise writes via the v2 pool.
+func (s *PasskeyRegistrationService) createUserPasskey(ctx context.Context, client database.QueryExecutor, passkey *domain.CreateUserPasskey) error {
+	if tx, ok := client.(Statementer[AllStatements]); ok {
+		return tx.Statements().CreateUserPasskey(ctx, passkey)
 	}
-	return result.Items, nil
+	return s.v2Pool.Statements().CreateUserPasskey(ctx, passkey)
+}
+
+func (s *PasskeyRegistrationService) listPasskeys(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error) {
+	return UserPasskeyStatementsStore{Pool: s.v2Pool}.ListByUser(ctx, projectID, userID)
 }
 
 func parseOrigins(raw []string) ([]url.URL, error) {

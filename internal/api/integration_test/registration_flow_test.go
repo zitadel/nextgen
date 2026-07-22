@@ -70,7 +70,6 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-
 	emailAttr, err := domain.NewCreateAttribute("email", "pkreg-flow@example.com", domain.AttributeUniquenessUnspecified)
 	require.NoError(t, err)
 

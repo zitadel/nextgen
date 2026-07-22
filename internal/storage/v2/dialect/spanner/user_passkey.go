@@ -73,7 +73,7 @@ func (ps userPasskeyStatements) CreateUserPasskey(ctx context.Context, p *domain
 	return ps.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 			var (
-				id                  int64
+				id                   int64
 				createdAt, updatedAt time.Time
 			)
 			return struct{}{}, row.Columns(&id, &createdAt, &updatedAt)

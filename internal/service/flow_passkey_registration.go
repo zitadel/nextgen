@@ -41,8 +41,8 @@ func (a *FlowPasskeyRegistrationAdapter) IssuePasskeyRegistrationChallenge(ctx c
 }
 
 // SubmitPasskeyRegistration implements [domain.FlowPasskeyRegistrationService].
-// client is the flow engine's DB transaction; the passkey write shares that
-// transaction so it is atomic with user creation.
+// client is forwarded to FinishWith: when it is a v2 statements transaction the
+// credential write shares that txn; otherwise the v2 pool is used.
 func (a *FlowPasskeyRegistrationAdapter) SubmitPasskeyRegistration(ctx context.Context, client database.QueryExecutor, in domain.FlowSubmitPasskeyRegistrationInput) error {
 	return a.svc.FinishWith(ctx, client, FinishRegistrationInput{
 		ProjectID:      in.ProjectID,

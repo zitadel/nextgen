@@ -185,7 +185,6 @@ type UserPasswords interface {
 	ProjectIDCondition(pid string) database.Condition
 }
 
-// UserPasskeys is the auth-attempt port over stored WebAuthn credentials.
 type UserPasskeys interface {
 	ListByUser(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error)
 	Get(ctx context.Context, projectID, userID, credentialID string) (*domain.UserPasskey, error)
@@ -196,6 +195,8 @@ type UserPasskeys interface {
 type UserPasskeyStatementsStore struct {
 	Pool StatementPool
 }
+
+var _ UserPasskeys = UserPasskeyStatementsStore{}
 
 func (s UserPasskeyStatementsStore) ListByUser(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error) {
 	result, err := s.Pool.Statements().ListUserPasskeys(ctx, &v2database.ListOptions[domain.UserPasskeyField]{
