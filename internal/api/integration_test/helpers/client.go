@@ -100,3 +100,14 @@ func (h *Harness) SetProjectSecretOnApiClient(t *testing.T, client *ApiClient, p
 
 	client.SetToken(secret)
 }
+
+func (h *Harness) SetPreviewSecretOnApiClient(t *testing.T, client *ApiClient, project *domain.Project) {
+	t.Helper()
+
+	dek, err := h.EnsureKeyService(t).GetProjectDEKCrypter(t.Context(), project.ID)
+	require.NoError(t, err)
+	secret, err := project.PreviewSecret(dek)
+	require.NoError(t, err)
+
+	client.SetToken(secret)
+}

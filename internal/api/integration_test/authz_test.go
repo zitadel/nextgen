@@ -43,7 +43,7 @@ func TestManagementAuthz(t *testing.T) {
 	// preview holds the victim's own browser-plane preview secret.
 	preview, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	harness.SetProjectSecretOnApiClient(t, preview, other)
+	harness.SetPreviewSecretOnApiClient(t, preview, other)
 
 	victimID := api.ProjectID(victim.ID)
 
