@@ -109,6 +109,12 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: env -u CI -u GITHUB_ACTIONS moon run testing:test-integration demo-next-e2e:e2e-real
 
+      # Dogfoods @zitadel/testing through a second consumer. Keep this separate
+      # from the demo suite so two embedded-Postgres instances do not contend.
+      - name: Run console real-instance suite
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: env -u CI -u GITHUB_ACTIONS moon run console-e2e:e2e-real
+
       - name: Validate version PR
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
         run: env -u CI -u GITHUB_ACTIONS moon run release:version
@@ -140,5 +146,17 @@ jobs:
           path: |
             ${{ runner.temp }}/ci-journey/diagnostics
             ${{ runner.temp }}/ci-journey-passkey-first/diagnostics
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # The handshake is deliberately excluded: it carries the project secret.
+      - name: Upload console e2e diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: console-e2e-diagnostics
+          path: |
+            apps/console-e2e/test-results
+            apps/console-e2e/playwright-report
           if-no-files-found: ignore
           retention-days: 7
