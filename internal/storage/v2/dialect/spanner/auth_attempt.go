@@ -69,72 +69,74 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 		sessionID = id
 	}
 
-	stmt := buildStatement(createAuthAttemptStmt, attempt.ProjectID, req, ttlNanos, sessionID, now).statement()
-	var attemptID storagedb.Identity
-	err := as.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
-		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
-			return struct{}{}, row.Columns(&attemptID)
-		})
-		return err
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create auth attempt: %w", err)
-	}
-	attempt.ID = attemptID.String()
-	attempt.CreatedAt = now
-
-	for _, check := range attempt.Checks {
-		challenge, isChallenge := check.(domain.AuthChallenge)
-		factor, isFactor := check.(domain.AuthFactor)
-
-		var challengedAt, verifiedAt *time.Time
-		var challengePayload, factorPayload *string
-
-		if isChallenge {
-			challengedAt = &now
-			challenge.SetLastChallengedAt(now)
-			if cp := challenge.Payload(); cp != nil {
-				b, err := json.Marshal(cp)
-				if err != nil {
-					return fmt.Errorf("failed to marshal challenge payload: %w", err)
-				}
-				s := string(b)
-				challengePayload = &s
-			}
-		}
-		if isFactor {
-			if !isChallenge {
-				verifiedAt = &now
-				factor.SetLastVerifiedAt(now)
-			}
-			if fp := factor.Payload(); fp != nil {
-				b, err := json.Marshal(fp)
-				if err != nil {
-					return fmt.Errorf("failed to marshal factor payload: %w", err)
-				}
-				s := string(b)
-				factorPayload = &s
-			}
-		}
-
-		checkStmt := buildStatement(createAuthCheckStmt,
-			attempt.ProjectID, storagedb.Identity(attempt.ID), int64(check.Type()),
-			challengedAt, verifiedAt, challengePayload, factorPayload).statement()
-		var checkID storagedb.Identity
-		err = as.db.Write(ctx, checkStmt, func(iter *spanner.RowIterator) error {
+	return withTransaction(ctx, as.db, func(ctx context.Context, tx queryExecutor) error {
+		stmt := buildStatement(createAuthAttemptStmt, attempt.ProjectID, req, ttlNanos, sessionID, now).statement()
+		var attemptID storagedb.Identity
+		err := tx.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 			_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
-				return struct{}{}, row.Columns(&checkID)
+				return struct{}{}, row.Columns(&attemptID)
 			})
 			return err
 		})
 		if err != nil {
-			return fmt.Errorf("failed to create auth attempt check: %w", err)
+			return fmt.Errorf("failed to create auth attempt: %w", err)
 		}
-		if isChallenge {
-			challenge.SetID(checkID.String())
+		attempt.ID = attemptID.String()
+		attempt.CreatedAt = now
+
+		for _, check := range attempt.Checks {
+			challenge, isChallenge := check.(domain.AuthChallenge)
+			factor, isFactor := check.(domain.AuthFactor)
+
+			var challengedAt, verifiedAt *time.Time
+			var challengePayload, factorPayload *string
+
+			if isChallenge {
+				challengedAt = &now
+				challenge.SetLastChallengedAt(now)
+				if cp := challenge.Payload(); cp != nil {
+					b, err := json.Marshal(cp)
+					if err != nil {
+						return fmt.Errorf("failed to marshal challenge payload: %w", err)
+					}
+					s := string(b)
+					challengePayload = &s
+				}
+			}
+			if isFactor {
+				if !isChallenge {
+					verifiedAt = &now
+					factor.SetLastVerifiedAt(now)
+				}
+				if fp := factor.Payload(); fp != nil {
+					b, err := json.Marshal(fp)
+					if err != nil {
+						return fmt.Errorf("failed to marshal factor payload: %w", err)
+					}
+					s := string(b)
+					factorPayload = &s
+				}
+			}
+
+			checkStmt := buildStatement(createAuthCheckStmt,
+				attempt.ProjectID, storagedb.Identity(attempt.ID), int64(check.Type()),
+				challengedAt, verifiedAt, challengePayload, factorPayload).statement()
+			var checkID storagedb.Identity
+			err = tx.Write(ctx, checkStmt, func(iter *spanner.RowIterator) error {
+				_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
+					return struct{}{}, row.Columns(&checkID)
+				})
+				return err
+			})
+			if err != nil {
+				return fmt.Errorf("failed to create auth attempt check: %w", err)
+			}
+			if isChallenge {
+				challenge.SetID(checkID.String())
+			}
 		}
-	}
-	return nil
+		return nil
+	})
 }
 
 // GetAuthAttemptByID implements [service.AuthAttemptStatements].
