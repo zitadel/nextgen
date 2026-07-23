@@ -49,7 +49,6 @@ type ProjectService interface {
 // NewProjectService returns a [ProjectService] backed by the given repository.
 func NewProjectService(
 	v2Pool *DB,
-	schemaRepo domain.JSONSchemaRepository,
 	flowDefinitionRepo domain.FlowDefinitionRepository,
 	serverURL string,
 	schemaValidator *domain.SchemaValidator,
@@ -57,7 +56,6 @@ func NewProjectService(
 ) ProjectService {
 	return &projectService{
 		v2Pool:             v2Pool,
-		schemaRepo:         schemaRepo,
 		flowDefinitionRepo: flowDefinitionRepo,
 		serverURL:          serverURL,
 		schemaValidator:    schemaValidator,
@@ -67,7 +65,6 @@ func NewProjectService(
 
 type projectService struct {
 	v2Pool             *DB
-	schemaRepo         domain.JSONSchemaRepository
 	flowDefinitionRepo domain.FlowDefinitionRepository
 	serverURL          string
 	schemaValidator    *domain.SchemaValidator
@@ -109,7 +106,7 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 			return nil
 		}
 
-		userschema, err := s.createDefaultUserSchemas(ctx, tx.(database.QueryExecutor), project.ID)
+		userschema, err := s.createDefaultUserSchemas(ctx, tx.Statements(), project.ID)
 		if err != nil {
 			return err
 		}
@@ -134,7 +131,7 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 	return project, nil
 }
 
-func (s *projectService) createDefaultUserSchemas(ctx context.Context, client database.QueryExecutor, projectID string) (*domain.JSONSchema, error) {
+func (s *projectService) createDefaultUserSchemas(ctx context.Context, stmts JSONSchemaStatements, projectID string) (*domain.JSONSchema, error) {
 	schemabs := schemas.DefaultHumanUserSchema(s.serverURL)
 	schema, err := domain.NewJSONSchema(projectID, schemabs)
 	if err != nil {
@@ -143,7 +140,7 @@ func (s *projectService) createDefaultUserSchemas(ctx context.Context, client da
 	if err = s.schemaValidator.ValidateAgainstMetaSchema(schemabs); err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("default human user schema invalid")
 	}
-	if err := s.schemaRepo.Create(ctx, client, schema); err != nil {
+	if err := stmts.CreateJSONSchema(ctx, schema); err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to save default human schema to project")
 	}
 	return schema, nil

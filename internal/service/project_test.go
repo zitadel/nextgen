@@ -20,7 +20,6 @@ import (
 func createMockedProjectService(t *testing.T) (svc service.ProjectService,
 	mock *gomock.Controller,
 	db *service.DB,
-	schemaRepo *domainmock.MockJSONSchemaRepository,
 	flowDefinitionRepo *domainmock.MockFlowDefinitionRepository,
 	serverURL string,
 	schemaValidator *domain.SchemaValidator,
@@ -35,7 +34,6 @@ func createMockedProjectService(t *testing.T) (svc service.ProjectService,
 	mock = gomock.NewController(t)
 
 	pool = servicemocks.NewMockPool(mock)
-	schemaRepo = domainmock.NewMockJSONSchemaRepository(mock)
 	flowDefinitionRepo = domainmock.NewMockFlowDefinitionRepository(mock)
 	kek = cryptomock.NewMockCrypter(mock)
 
@@ -63,7 +61,6 @@ func createMockedProjectService(t *testing.T) (svc service.ProjectService,
 
 	svc = service.NewProjectService(
 		db,
-		schemaRepo,
 		flowDefinitionRepo,
 		baseURL,
 		schemaValidator,
@@ -81,7 +78,7 @@ func TestProjectService_Create(t *testing.T) {
 		projectName            string
 		previewOrigins         []string
 		seedDefaults           bool
-		setupMocks             func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements, schemaRepo *domainmock.MockJSONSchemaRepository, definitionRepo *domainmock.MockFlowDefinitionRepository)
+		setupMocks             func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements, definitionRepo *domainmock.MockFlowDefinitionRepository)
 		wantErr                error
 		expectedPreviewOrigins []string
 	}{
@@ -90,11 +87,11 @@ func TestProjectService_Create(t *testing.T) {
 			projectName:    "test",
 			previewOrigins: nil,
 			seedDefaults:   true,
-			setupMocks: func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements, schemaRepo *domainmock.MockJSONSchemaRepository, definitionRepo *domainmock.MockFlowDefinitionRepository) {
+			setupMocks: func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements, definitionRepo *domainmock.MockFlowDefinitionRepository) {
 				kek.EXPECT().Encrypt(gomock.Any())
 				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any())
 				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any())
-				schemaRepo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any())
+				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
 				definitionRepo.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any())
 			},
 			expectedPreviewOrigins: make([]string, 0),
@@ -104,11 +101,11 @@ func TestProjectService_Create(t *testing.T) {
 			projectName:    "test",
 			previewOrigins: []string{"*.vercel.app", "*.netlify.app"},
 			seedDefaults:   true,
-			setupMocks: func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements, schemaRepo *domainmock.MockJSONSchemaRepository, definitionRepo *domainmock.MockFlowDefinitionRepository) {
+			setupMocks: func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements, definitionRepo *domainmock.MockFlowDefinitionRepository) {
 				kek.EXPECT().Encrypt(gomock.Any())
 				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any())
 				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any())
-				schemaRepo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any())
+				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
 				definitionRepo.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any())
 			},
 			expectedPreviewOrigins: []string{"*.vercel.app", "*.netlify.app"},
@@ -117,12 +114,12 @@ func TestProjectService_Create(t *testing.T) {
 			name:         "ok — skip fallback defaults",
 			projectName:  "test",
 			seedDefaults: false,
-			setupMocks: func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements, schemaRepo *domainmock.MockJSONSchemaRepository, definitionRepo *domainmock.MockFlowDefinitionRepository) {
+			setupMocks: func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements, definitionRepo *domainmock.MockFlowDefinitionRepository) {
 				kek.EXPECT().Encrypt(gomock.Any())
 				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any())
 				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any())
 				// No schema/flow-definition seeding when seedDefaults is false.
-				schemaRepo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any()).Times(0)
 				definitionRepo.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			},
 			expectedPreviewOrigins: make([]string, 0),
@@ -130,7 +127,7 @@ func TestProjectService_Create(t *testing.T) {
 		{
 			name:        "project creation error should bubble up",
 			projectName: "test",
-			setupMocks: func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements, _ *domainmock.MockJSONSchemaRepository, _ *domainmock.MockFlowDefinitionRepository) {
+			setupMocks: func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements, _ *domainmock.MockFlowDefinitionRepository) {
 				kek.EXPECT().Encrypt(gomock.Any())
 				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).Return(assert.AnError)
 			},
@@ -139,7 +136,7 @@ func TestProjectService_Create(t *testing.T) {
 		{
 			name:        "missing project name",
 			projectName: "",
-			setupMocks: func(*cryptomock.MockCrypter, *servicemocks.MockAllStatements, *domainmock.MockJSONSchemaRepository, *domainmock.MockFlowDefinitionRepository) {
+			setupMocks: func(*cryptomock.MockCrypter, *servicemocks.MockAllStatements, *domainmock.MockFlowDefinitionRepository) {
 			},
 			wantErr: domain.ErrProjectNameInvalid(),
 		},
@@ -149,8 +146,8 @@ func TestProjectService_Create(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			svc, _, _, schemaRepo, definitionRepo, _, _, kek, _, _, _, statements := createMockedProjectService(t)
-			tc.setupMocks(kek, statements, schemaRepo, definitionRepo)
+			svc, _, _, definitionRepo, _, _, kek, _, _, _, statements := createMockedProjectService(t)
+			tc.setupMocks(kek, statements, definitionRepo)
 
 			got, err := svc.Create(context.Background(), tc.projectName, tc.previewOrigins, tc.seedDefaults)
 			if tc.wantErr != nil {
@@ -207,7 +204,7 @@ func TestProjectService_Get(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			svc, _, _, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+			svc, _, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 			tc.setupStmt(statements)
 
 			got, err := svc.Get(context.Background(), tc.id)
@@ -294,7 +291,7 @@ func TestProjectService_Update(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			svc, _, _, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+			svc, _, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 			tc.setupStmt(statements)
 
 			got, err := svc.Update(context.Background(), tc.id, tc.projectName)
@@ -347,7 +344,7 @@ func TestProjectService_Delete(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			svc, _, _, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+			svc, _, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 			tc.setupStmt(statements)
 
 			err := svc.Delete(context.Background(), tc.id)
@@ -498,7 +495,7 @@ func TestProjectService_List(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			svc, _, _, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+			svc, _, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 
 			var gotOpts *v2database.ListOptions[domain.ProjectField]
 			statements.EXPECT().ListProjects(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -574,7 +571,7 @@ func TestProjectService_List_ValidationErrors(t *testing.T) {
 
 			// The statement must never be reached: validation fails first, so no
 			// ListProjects expectation is set and gomock would flag an unexpected call.
-			svc, _, _, _, _, _, _, _, _, _, _, _ := createMockedProjectService(t)
+			svc, _, _, _, _, _, _, _, _, _, _ := createMockedProjectService(t)
 
 			_, err := svc.List(context.Background(), tc.req)
 			require.ErrorIs(t, err, tc.wantErr)

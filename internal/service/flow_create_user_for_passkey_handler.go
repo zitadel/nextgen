@@ -13,18 +13,18 @@ import (
 type FlowCreateUserForPasskeyHandler struct {
 	userRepo    domain.UserRepository
 	userService *UserService
-	schemaRepo  domain.JSONSchemaRepository
+	schemaStore domain.JSONSchemaStore
 }
 
 func NewFlowCreateUserForPasskeyHandler(
 	userRepo domain.UserRepository,
 	userService *UserService,
-	schemaRepo domain.JSONSchemaRepository,
+	schemaStore domain.JSONSchemaStore,
 ) *FlowCreateUserForPasskeyHandler {
 	return &FlowCreateUserForPasskeyHandler{
 		userRepo:    userRepo,
 		userService: userService,
-		schemaRepo:  schemaRepo,
+		schemaStore: schemaStore,
 	}
 }
 
@@ -37,7 +37,7 @@ func (h *FlowCreateUserForPasskeyHandler) CreateProvisionalUser(ctx context.Cont
 			ID:        userID,
 		},
 		h.userRepo,
-		h.schemaRepo,
+		h.schemaStore,
 	)
 	err := h.userService.ApplyActions(ctx, action)
 	if derr, ok := errors.AsType[domain.Error](err); ok && derr.Code == domain.ErrUserAlreadyExists().Code {
