@@ -14,7 +14,9 @@ concurrency:
 
 jobs:
   full-pr:
-    runs-on: depot-ubuntu-24.04-16
+    # Fork PRs execute untrusted repository code. Keep them off Depot runners,
+    # which inject DEPOT_CACHE_TOKEN independently of GitHub secret filtering.
+    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || 'depot-ubuntu-24.04-16' }}
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v6

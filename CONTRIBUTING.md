@@ -233,8 +233,9 @@ intent.
 Task runs are accelerated by Moon's remote cache, configured under `remote` in
 [`.moon/workspace.yml`](.moon/workspace.yml); Depot CI runners authenticate
 automatically. Local runs skip the remote cache unless you export a Depot API
-token as `DEPOT_TOKEN` — with one set, your machine downloads shared task
-outputs but never uploads (uploads happen only in CI).
+token as `DEPOT_CACHE_TOKEN` — with one set, your machine downloads shared task
+outputs but never uploads (uploads happen only in CI). Pull requests from forks
+run on GitHub-hosted runners without the Depot cache credential.
 
 To run the full CI-parity suite locally — including database integration
 tests, package checks, and the fresh-app journey — run
