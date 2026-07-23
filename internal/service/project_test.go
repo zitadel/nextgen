@@ -451,6 +451,22 @@ func TestProjectService_List(t *testing.T) {
 			},
 		},
 		{
+			name: "createdAt range filter ANDs both bounds",
+			req: service.ListProjectsRequest{
+				Filters: []service.Filter{
+					{Field: "createdAt", Operation: "greater_than", Value: createdAt.Format(time.RFC3339)},
+					{Field: "createdAt", Operation: "less_than", Value: createdAt.Add(time.Hour).Format(time.RFC3339)},
+				},
+			},
+			result: &v2database.ListResult[*domain.Project]{},
+			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, v2database.And(
+					v2database.GreaterThan(v2database.Col(domain.ProjectFieldCreatedAt), createdAt),
+					v2database.LessThan(v2database.Col(domain.ProjectFieldCreatedAt), createdAt.Add(time.Hour)),
+				), opts.Filter)
+			},
+		},
+		{
 			name:   "page token passed through as cursor",
 			req:    service.ListProjectsRequest{PageToken: "tok"},
 			result: &v2database.ListResult[*domain.Project]{},
