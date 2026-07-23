@@ -17,11 +17,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-const (
-	// Sortable/filterable field names for a project
-	projectFieldName      = "name"
-	projectFieldCreatedAt = "createdAt"
-)
+const projectFieldCreatedAt = "createdAt"
 
 // ProjectService is the project use-case surface.
 type ProjectService interface {
@@ -297,36 +293,22 @@ func projectFilter(f Filter) (v2database.Filter[domain.ProjectField], error) {
 		return nil, err
 	}
 
-	col := v2database.Col(field)
-	switch field {
-	case domain.ProjectFieldName:
-		value, ok := f.Value.(string)
-		if !ok {
-			return nil, domain.ErrRequestInvalid().WithDetails("name filter value must be a string")
-		}
-		return stringFilter(f.Operation, col, value)
-	case domain.ProjectFieldCreatedAt:
-		raw, ok := f.Value.(string)
-		if !ok {
-			return nil, domain.ErrRequestInvalid().WithDetails("createdAt filter value must be an RFC3339 string")
-		}
-		// The createdAt filter value arrives as an untyped string (the filter-value union in the openapi contract
-		// does not specify a format for a timestamp); parse it into the time.Time needed for the comparison.
-		value, err := v2database.CoerceTimeValue(raw)
-		if err != nil {
-			return nil, domain.ErrRequestInvalid().WithDetails("createdAt filter value must be a valid RFC3339 timestamp")
-		}
-		return compareFilter(f.Operation, col, value)
-	default:
-		return nil, domain.ErrRequestInvalid()
+	raw, ok := f.Value.(string)
+	if !ok {
+		return nil, domain.ErrRequestInvalid().WithDetails("createdAt filter value must be an RFC3339 string")
 	}
+	// The createdAt filter value arrives as an untyped string (the filter-value union in the openapi contract
+	// does not specify a format for a timestamp); parse it into the time.Time needed for the comparison.
+	value, err := v2database.CoerceTimeValue(raw)
+	if err != nil {
+		return nil, domain.ErrRequestInvalid().WithDetails("createdAt filter value must be a valid RFC3339 timestamp")
+	}
+	return compareFilter(f.Operation, v2database.Col(field), value)
 }
 
 // projectField maps an API field name to its [domain.ProjectField].
 func projectField(field string) (domain.ProjectField, error) {
 	switch field {
-	case projectFieldName:
-		return domain.ProjectFieldName, nil
 	case projectFieldCreatedAt:
 		return domain.ProjectFieldCreatedAt, nil
 	default:

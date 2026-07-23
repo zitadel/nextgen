@@ -413,28 +413,28 @@ func TestProjectService_List(t *testing.T) {
 			},
 		},
 		{
-			name: "sort by name desc",
+			name: "sort by createdAt desc",
 			req: service.ListProjectsRequest{
-				Sorting: &service.Sorting{Field: "name", Direction: "desc"},
+				Sorting: &service.Sorting{Field: "createdAt", Direction: "desc"},
 			},
 			result: &v2database.ListResult[*domain.Project]{},
 			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
 				assert.Equal(t, v2database.OrderDesc, opts.Pagination.OrderBy.Direction)
 				assert.Equal(t, []v2database.Column[domain.ProjectField]{
-					v2database.Col(domain.ProjectFieldName),
+					v2database.Col(domain.ProjectFieldCreatedAt),
 					v2database.Col(domain.ProjectFieldID),
 				}, opts.Pagination.OrderBy.Columns)
 			},
 		},
 		{
-			name: "filter equals name",
+			name: "filter equals createdAt",
 			req: service.ListProjectsRequest{
-				Filters: []service.Filter{{Field: "name", Operation: "equals", Value: "acme"}},
+				Filters: []service.Filter{{Field: "createdAt", Operation: "equals", Value: createdAt.Format(time.RFC3339)}},
 			},
 			result: &v2database.ListResult[*domain.Project]{},
 			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
 				assert.Equal(t, v2database.And(
-					v2database.StringEqual(v2database.Col(domain.ProjectFieldName), "acme"),
+					v2database.Equal(v2database.Col(domain.ProjectFieldCreatedAt), createdAt),
 				), opts.Filter)
 			},
 		},
@@ -518,28 +518,28 @@ func TestProjectService_List_ValidationErrors(t *testing.T) {
 		{
 			name: "unsupported operation not implemented",
 			req: service.ListProjectsRequest{
-				Filters: []service.Filter{{Field: "name", Operation: "not_equals", Value: "acme"}},
+				Filters: []service.Filter{{Field: "createdAt", Operation: "not_equals", Value: time.Now().UTC().Format(time.RFC3339)}},
 			},
 			wantErr: domain.ErrNotImplemented(),
 		},
 		{
 			name: "unknown field is invalid",
 			req: service.ListProjectsRequest{
-				Filters: []service.Filter{{Field: "bogus", Operation: "equals", Value: "x"}},
+				Filters: []service.Filter{{Field: "name", Operation: "equals", Value: "x"}},
 			},
 			wantErr: domain.ErrRequestInvalid(),
 		},
 		{
 			name: "unknown sort direction is invalid",
 			req: service.ListProjectsRequest{
-				Sorting: &service.Sorting{Field: "name", Direction: "sideways"},
+				Sorting: &service.Sorting{Field: "createdAt", Direction: "sideways"},
 			},
 			wantErr: domain.ErrRequestInvalid(),
 		},
 		{
-			name: "non-string name value is invalid",
+			name: "non-string createdAt value is invalid",
 			req: service.ListProjectsRequest{
-				Filters: []service.Filter{{Field: "name", Operation: "equals", Value: 42}},
+				Filters: []service.Filter{{Field: "createdAt", Operation: "equals", Value: 42}},
 			},
 			wantErr: domain.ErrRequestInvalid(),
 		},

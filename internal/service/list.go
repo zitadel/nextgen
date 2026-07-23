@@ -79,8 +79,7 @@ func parseSortDirection(direction string) (v2database.OrderDirection, error) {
 	}
 }
 
-// compareFilter maps an operation to a comparison filter for an ordered column.
-// Operations the v2 filter layer cannot express (!=, <=, >=, not-contains) return [domain.ErrNotImplemented]
+// compareFilter maps an operation to a comparison filter for an ordered column (e.g. a timestamp or number).
 func compareFilter[F ~uint8](op string, col v2database.Column[F], value any) (v2database.Filter[F], error) {
 	switch op {
 	case filterOpEquals:
@@ -89,29 +88,28 @@ func compareFilter[F ~uint8](op string, col v2database.Column[F], value any) (v2
 		return v2database.LessThan(col, value), nil
 	case filterOpGreaterThan:
 		return v2database.GreaterThan(col, value), nil
-	case filterOpNotEquals, filterOpNotContains, filterOpLessThanOrEqual, filterOpGreaterThanOrEqual:
+	case filterOpNotEquals, filterOpLessThanOrEqual, filterOpGreaterThanOrEqual:
 		// todo (grvijayan): update when these operations are supported
 		return nil, domain.ErrNotImplemented().WithDetails(fmt.Sprintf("operation %q is not supported", op))
+	case filterOpContains, filterOpNotContains:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("operation %q is not valid for this field", op))
 	default:
 		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown operation %q", op))
 	}
 }
 
-// stringFilter maps an operation to a text filter, adding substring matching on
-// top of the comparison operations.
+// stringFilter maps an operation to a text filter.
 func stringFilter[F ~uint8](op string, col v2database.Column[F], value string) (v2database.Filter[F], error) {
 	switch op {
 	case filterOpEquals:
 		return v2database.StringEqual(col, value), nil
 	case filterOpContains:
 		return v2database.StringContains(col, value), nil
-	case filterOpLessThan:
-		return v2database.LessThan(col, value), nil
-	case filterOpGreaterThan:
-		return v2database.GreaterThan(col, value), nil
-	case filterOpNotEquals, filterOpNotContains, filterOpLessThanOrEqual, filterOpGreaterThanOrEqual:
+	case filterOpNotEquals, filterOpNotContains:
 		// todo (grvijayan): update when these operations are supported
 		return nil, domain.ErrNotImplemented().WithDetails(fmt.Sprintf("operation %q is not supported", op))
+	case filterOpLessThan, filterOpGreaterThan, filterOpLessThanOrEqual, filterOpGreaterThanOrEqual:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("operation %q is not valid for this field", op))
 	default:
 		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown operation %q", op))
 	}

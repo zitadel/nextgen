@@ -114,9 +114,10 @@ func TestCompareFilter(t *testing.T) {
 		{name: "less_than time", op: filterOpLessThan, value: ts, want: v2database.LessThan(col, ts)},
 		{name: "greater_than time", op: filterOpGreaterThan, value: ts, want: v2database.GreaterThan(col, ts)},
 		{name: "not_equals not implemented", op: filterOpNotEquals, value: "v", wantErr: domain.ErrNotImplemented()},
-		{name: "not_contains not implemented", op: filterOpNotContains, value: "v", wantErr: domain.ErrNotImplemented()},
 		{name: "less_than_or_equal not implemented", op: filterOpLessThanOrEqual, value: "v", wantErr: domain.ErrNotImplemented()},
 		{name: "greater_than_or_equal not implemented", op: filterOpGreaterThanOrEqual, value: "v", wantErr: domain.ErrNotImplemented()},
+		{name: "contains is invalid for a comparable field", op: filterOpContains, value: "v", wantErr: domain.ErrRequestInvalid()},
+		{name: "not_contains is invalid for a comparable field", op: filterOpNotContains, value: "v", wantErr: domain.ErrRequestInvalid()},
 		{name: "unknown op is invalid", op: "bogus", value: "v", wantErr: domain.ErrRequestInvalid()},
 	}
 
@@ -149,12 +150,12 @@ func TestStringFilter(t *testing.T) {
 	}{
 		{name: "equals", op: filterOpEquals, want: v2database.StringEqual(col, value)},
 		{name: "contains", op: filterOpContains, want: v2database.StringContains(col, value)},
-		{name: "less_than", op: filterOpLessThan, want: v2database.LessThan(col, value)},
-		{name: "greater_than", op: filterOpGreaterThan, want: v2database.GreaterThan(col, value)},
 		{name: "not_equals not implemented", op: filterOpNotEquals, wantErr: domain.ErrNotImplemented()},
 		{name: "not_contains not implemented", op: filterOpNotContains, wantErr: domain.ErrNotImplemented()},
-		{name: "less_than_or_equal not implemented", op: filterOpLessThanOrEqual, wantErr: domain.ErrNotImplemented()},
-		{name: "greater_than_or_equal not implemented", op: filterOpGreaterThanOrEqual, wantErr: domain.ErrNotImplemented()},
+		{name: "less_than is invalid for a string field", op: filterOpLessThan, wantErr: domain.ErrRequestInvalid()},
+		{name: "greater_than is invalid for a string field", op: filterOpGreaterThan, wantErr: domain.ErrRequestInvalid()},
+		{name: "less_than_or_equal is invalid for a string field", op: filterOpLessThanOrEqual, wantErr: domain.ErrRequestInvalid()},
+		{name: "greater_than_or_equal is invalid for a string field", op: filterOpGreaterThanOrEqual, wantErr: domain.ErrRequestInvalid()},
 		{name: "unknown op is invalid", op: "bogus", wantErr: domain.ErrRequestInvalid()},
 	}
 
