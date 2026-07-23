@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/jackc/pgx/v5"
 
@@ -105,23 +104,6 @@ func (js jsonSchemaStatements) scanJSONSchema(row pgx.CollectableRow) (*domain.J
 
 var _ service.JSONSchemaStatements = (*jsonSchemaStatements)(nil)
 
-func coerceJSONSchemaPayload(v any) (any, error) {
-	switch t := v.(type) {
-	case []byte:
-		return t, nil
-	case json.RawMessage:
-		return []byte(t), nil
-	case string:
-		return []byte(t), nil
-	default:
-		data, err := json.Marshal(v)
-		if err != nil {
-			return nil, err
-		}
-		return data, nil
-	}
-}
-
 var jsonSchemaSchema = database.NewSchema(map[domain.JSONSchemaField]database.FieldBinding[domain.JSONSchema]{
 	domain.JSONSchemaFieldProjectID: {
 		SQLName:  "project_id",
@@ -147,10 +129,5 @@ var jsonSchemaSchema = database.NewSchema(map[domain.JSONSchemaField]database.Fi
 		SQLName:  "created_at",
 		Accessor: func(s *domain.JSONSchema) any { return s.CreatedAt },
 		Coerce:   database.CoerceTime,
-	},
-	domain.JSONSchemaFieldPayload: {
-		SQLName:  "payload",
-		Accessor: func(s *domain.JSONSchema) any { return s.Schema },
-		Coerce:   coerceJSONSchemaPayload,
 	},
 })

@@ -62,7 +62,6 @@ const (
 	JSONSchemaFieldURL
 	JSONSchemaFieldObjectType
 	JSONSchemaFieldCreatedAt
-	JSONSchemaFieldPayload
 )
 
 func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error) {
