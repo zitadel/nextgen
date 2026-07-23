@@ -246,6 +246,40 @@ func TestUserRepository_Create_RollsBackWhenMembershipInsertFails(t *testing.T) 
 	require.Error(t, getErr)
 }
 
+// project deletion purges teams, users, and their
+// memberships together (unlike team/user deletion, which must not cascade).
+func TestUserTeamLifecycle_ProjectDeleteCascadesThroughMemberships(t *testing.T) {
+	skipIfSpanner(t)
+	tx, rollback := transactionForRollback(t)
+	defer rollback()
+	ctx := t.Context()
+
+	const (
+		pid       = "proj-lifecycle-project-delete"
+		teamID    = "team-lifecycle-project-delete"
+		userID    = "usr-lifecycle-project-delete"
+		schemaURL = "https://schemas.test/lifecycle-project-delete/v1.json"
+	)
+
+	teamRepo, userRepo := setupLifecycleFixture(t, tx, pid)
+	createTeam(t, tx, teamRepo, pid, teamID)
+
+	participation := teamID
+	createLifecycleUser(t, tx, userRepo, pid, schemaURL, userID, nil, &participation)
+
+	deleteProject(t, tx, pid)
+
+	_, err := userRepo.Get(ctx, tx, database.WithCondition(userRepo.PrimaryKeyCondition(pid, userID)))
+	require.ErrorIs(t, err, new(database.NoRowFoundError))
+
+	_, err = teamRepo.Get(ctx, tx, pid, teamID)
+	require.ErrorIs(t, err, new(database.NoRowFoundError))
+
+	membershipRepo := repository.NewTeamMembershipRepository(tx)
+	_, err = membershipRepo.Get(ctx, tx, pid, teamID, userID)
+	require.ErrorIs(t, err, new(database.NoRowFoundError))
+}
+
 func TestUserRepository_DeactivateRemovesMemberships(t *testing.T) {
 	skipIfSpanner(t)
 	tx, rollback := transactionForRollback(t)

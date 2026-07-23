@@ -16,6 +16,14 @@ ALTER TABLE zitadel_nextgen.passkey_registrations
         FOREIGN KEY (project_id) REFERENCES zitadel_nextgen.projects (id)
         ON DELETE CASCADE;
 
+-- team_memberships has RESTRICT FKs to teams/users (ADR 024: team/user
+-- deletion must go through a lifecycle service, not a raw cascade);
+-- project deletion gets its own direct path instead.
+ALTER TABLE zitadel_nextgen.team_memberships
+    ADD CONSTRAINT fk_team_memberships_project
+        FOREIGN KEY (project_id) REFERENCES zitadel_nextgen.projects (id)
+        ON DELETE CASCADE;
+
 -- Had the project FK but not the cascade; reuse the auto-generated names so a
 -- migrated schema matches a fresh install.
 ALTER TABLE zitadel_nextgen.auth_attempts
@@ -51,6 +59,9 @@ ALTER TABLE zitadel_nextgen.auth_attempts
     DROP CONSTRAINT auth_attempts_project_id_fkey,
     ADD CONSTRAINT auth_attempts_project_id_fkey
         FOREIGN KEY (project_id) REFERENCES zitadel_nextgen.projects (id);
+
+ALTER TABLE zitadel_nextgen.team_memberships
+    DROP CONSTRAINT IF EXISTS fk_team_memberships_project;
 
 ALTER TABLE zitadel_nextgen.passkey_registrations
     DROP CONSTRAINT IF EXISTS fk_passkey_registrations_project;
