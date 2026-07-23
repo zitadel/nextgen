@@ -7,7 +7,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements
 
 type StatementPool interface {
 	Statementer[AllStatements]
@@ -23,6 +23,7 @@ type AllStatements interface {
 	FlowDefinitionStatements
 	CryptoKeyStatements
 	JSONSchemaStatements
+	TeamStatements
 	Statements
 }
 
@@ -73,4 +74,20 @@ type JSONSchemaStatements interface {
 	GetJSONSchemaByID(ctx context.Context, projectID, schemaID string) (*domain.JSONSchema, error)
 	ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField]) (*database.ListResult[*domain.JSONSchema], error)
 	DeleteJSONSchemaByID(ctx context.Context, projectID, schemaID string) error
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type TeamPool interface {
+// 	Statementer[TeamStatements]
+// 	Transactioner[TeamStatements]
+// }
+
+type TeamStatements interface {
+	Statements
+	CreateTeam(ctx context.Context, entity *domain.Team) error
+	GetTeamByID(ctx context.Context, projectID, id string) (*domain.Team, error)
+	// DeactivateTeam tombs the team and cascades membership/user lifecycle
+	// updates. It wraps the multi-write steps in withTransaction (opens a tx
+	// via Statements(), joins an outer pool.Transaction when already nested).
+	DeactivateTeam(ctx context.Context, projectID, id string) error
 }
