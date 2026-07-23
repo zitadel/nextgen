@@ -17,19 +17,25 @@ Liquid maps branding into `--zl-*` on `:host` ([`tokens.md`](tokens.md)). Either
 
 ## Tier 2: CSS parts
 
-Use `::part()` to restyle internals of a named atom without forking it.
+Use `::part()` to restyle internals of a named atom without forking it. Two scopes:
+
+**Through the orchestrator** — the page embedding `<zitadel-login>` addresses atom internals as `<atom>-<part>`: the atom's tag minus `zl-`, a hyphen, the part name. The orchestrator stamps the forwarding (`exportparts`, derived from the manifest registry in `packages/components/src/orchestrator/exportparts.ts`) on every atom it renders — template-rendered and gate-patched alike — so the mapping holds for tenant templates too. Templates cannot author their own forwarding; the sanitiser strips `exportparts`.
 
 ```css
-zl-field::part(input) {
+zitadel-login::part(field-input) {
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
-zl-submit::part(button)::after {
+zitadel-login::part(button-root)::after {
   content: " →";
 }
 ```
 
-Every atom exposes a documented part set (`input`, `label`, `button`, `divider`, …). Part names are part of the public contract and follow the same stability rules as token names.
+The orchestrator additionally exposes its own chrome parts directly: `form`, `attribution`, `attribution-pill`.
+
+**Directly composed atoms** — a page using atoms without the orchestrator addresses bare part names: `zl-field::part(input)`.
+
+Each atom's manifest is the canonical part catalogue ([`validator.md`](validator.md)). Part names and the `<atom>-<part>` forwarding rule are public contract and follow the same stability rules as token names.
 
 ## Tier 3: Named slots
 

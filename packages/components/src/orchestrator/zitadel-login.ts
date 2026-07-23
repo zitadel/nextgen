@@ -25,6 +25,7 @@ import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
 import type { Branding } from "./branding.js";
 import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { validateBranding } from "./branding-validator.js";
+import { stampExportparts } from "./exportparts.js";
 import { applyDefaultFont, applyFontUrl } from "./font-loader.js";
 import { emit } from "../internal/emit.js";
 import { escapeHtml } from "../internal/escape-html.js";
@@ -298,6 +299,12 @@ export class ZitadelLogin extends LitElement {
   }
 
   override updated(changed: PropertyValues<this>): void {
+    // Re-stamp part forwarding on every commit: `unsafeHTML` re-parses
+    // whenever the rendered string changes (step swap, loading toggle,
+    // error dismiss), replacing previously stamped nodes.
+    if (this.shadowRoot) {
+      stampExportparts(this.shadowRoot);
+    }
     const props = changed as Map<string, unknown>;
     if (!props.has("response")) return;
     void this.hydrateStepAfterRender();

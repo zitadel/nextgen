@@ -99,6 +99,26 @@ describe("branding design catalog", () => {
     expect(right).toContain("zl-split--right");
   });
 
+  it("split-family designs render the mobile compact brand header", () => {
+    // The chrome hides .zl-split__brand on narrow viewports; the compact
+    // node is the fallback that keeps the tenant's identity visible there.
+    for (const design of ["split", "split-right", "hero"]) {
+      expect(renderDesign(design), design).toContain('class="zl-split__compact"');
+    }
+  });
+
+  it("hero keeps the landing pane on the split shell", () => {
+    const hero = renderDesign("hero");
+    expect(hero).toContain('class="zl-split"');
+    expect(hero).toContain('class="zl-split__brand"');
+    expect(hero).toContain('class="zl-hero"');
+    expect(hero).toContain('class="zl-hero__headline"');
+    expect(hero).toContain('class="zl-hero__bullets"');
+    // Landing CTAs must be anchors — button/input/form are stripped by the
+    // sanitiser, so a surviving <button> would mean the allowlist changed.
+    expect(hero).not.toContain("<button");
+  });
+
   it("minimal renders without card chrome", () => {
     const minimal = renderDesign("minimal");
     expect(minimal).toContain('class="zl-minimal"');

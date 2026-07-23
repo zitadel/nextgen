@@ -158,7 +158,7 @@ form-associated inputs.
 | --- | --- | --- |
 | SDK config | `configureZitadel({ projectId, proxyPath })` from `@zitadel/api/config` | every consumer — sets the project + proxy path the element reads |
 | Tokens | branding payload returned from the server | tenant colour / logo / font |
-| CSS hooks | `zitadel-login::part(form)`, `zl-field::part(input)` | targeted overrides from the host page |
+| CSS hooks | `zitadel-login::part(form)`, `zitadel-login::part(field-input)` | targeted overrides from the host page |
 | Locale | `el.lang = 'de'` / `el.locales = { ... }` | i18n / custom copy |
 | MSW mocks | `setupWorker` / `setupServer` from `msw` | offline / staging / fixtures |
 | Custom template | (planned) | tenant-supplied Liquid layouts |
@@ -168,10 +168,27 @@ For styling, start with the generated `--zl-*` variables from
 `@zitadel/design-tokens`, then use host CSS on `zitadel-login { ... }` for page
 placement and `::part(...)` hooks for targeted internals such as the form or
 field input. The design-token package README is the canonical token catalogue;
-the branding design notes explain the broader override ladder. The current
-orchestrator is page-oriented: the host element can be constrained, but the
-inner `.zl-mount` still claims `100vh`, so embedding it as a small inline card is
-limited until the component follow-up relaxes that layout.
+the branding design notes explain the broader override ladder. The orchestrator
+is page-oriented by default (the widget claims the full viewport height, like a
+hosted login page); to embed it as a card inside a section, sidebar, or modal,
+size it to content and drop the full-bleed background from the host page:
+
+```css
+zitadel-login.embedded {
+  --zl-page-min-height: auto; /* releases the internal 100vh claims */
+  background: transparent; /* host rules on the element beat :host */
+}
+```
+
+`--zl-page-min-height` inherits across the shadow boundaries, so it releases
+both the orchestrator mount and the `zl-page-shell` atom in one setting
+(`embedding.browser.spec.ts` pins this contract).
+
+Atom internals forward through the orchestrator as `<atom>-<part>` names —
+`zitadel-login::part(field-input)`, `zitadel-login::part(button-root)` — for
+every part an atom's manifest declares; bare names (`zl-field::part(input)`)
+apply when composing atoms directly without the orchestrator
+(`exportparts.browser.spec.ts` pins the forwarding).
 
 Automation can use the stable host and native shadow-root hooks that the default
 template emits. Host atoms expose hooks such as `zitadel-field-email`,

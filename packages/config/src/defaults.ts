@@ -71,7 +71,7 @@ function presetTemplates(preset: string): { schema: unknown; flow: unknown } {
  * to — the wire `layout` enum stays `centered | split`, richer designs are
  * delivered as templates (ADR 040).
  */
-export const BRANDING_DESIGNS = ["centered", "split", "split-right", "minimal"] as const;
+export const BRANDING_DESIGNS = ["centered", "split", "split-right", "hero", "minimal"] as const;
 
 export type BrandingDesign = (typeof BRANDING_DESIGNS)[number];
 
@@ -82,6 +82,7 @@ const DESIGN_LAYOUTS: Record<BrandingDesign, "centered" | "split"> = {
   centered: "centered",
   split: "split",
   "split-right": "split",
+  hero: "split",
   minimal: "centered",
 };
 

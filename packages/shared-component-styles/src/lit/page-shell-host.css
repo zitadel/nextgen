@@ -1,7 +1,10 @@
 /* Lit-only: <zl-page-shell> host background; layout lives on .zr-page-shell. */
 :host {
   display: block;
-  min-height: 100vh;
+  /* Page-oriented by default; embedding hosts size the whole widget to
+     content by setting `--zl-page-min-height: auto` on the element (the
+     property inherits across shadow boundaries). */
+  min-height: var(--zl-page-min-height, 100vh);
   background: var(--zl-color-surface-default-black, #0f0f11);
   color: var(--zl-color-text-primary-white, #f4f4f6);
 }

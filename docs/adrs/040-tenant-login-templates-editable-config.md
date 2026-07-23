@@ -168,7 +168,7 @@ template, and **layout** is the wire degrade enum.
 `zitadel branding eject [--design <name>]` scaffolds the local files from
 a shipped design; `zitadel setup --design <name>` does the same during
 project setup and uploads revision 1. Designs
-(`centered`, `split`, `split-right`, `minimal`) are full template files in
+(`centered`, `split`, `split-right`, `hero`, `minimal`) are full template files in
 `@zitadel/config` defaults — the catalog documented in
 [branding/templates.md](../design/branding/templates.md). The wire
 `layout` enum stays `centered | split`: richer designs are delivered *as

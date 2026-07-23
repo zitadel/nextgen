@@ -1,16 +1,62 @@
 <zl-page-shell data-zl-template-root>
   <div class="zl-split">
     <aside class="zl-split__brand">
-      {% if branding.logo_url %}
-        <img class="zl-split__logo" src="{{ branding.logo_url }}" alt="" />
-      {% endif %}
-      {% if branding.hero_url %}
-        <img class="zl-split__hero" src="{{ branding.hero_url }}" alt="" />
-      {% endif %}
+      {% comment %} ──────────────────────────────────────────────────────────
+        YOUR LANDING CONTENT — everything inside this aside is yours.
+        Edit the copy and structure freely: structural HTML (div, section,
+        nav, h1–h6, ul, li, a, img, …) plus inline style="" attributes are
+        allowed; button, input, form, script, and style tags are stripped —
+        use plain anchors for landing CTAs. The zl-hero__* classes keep
+        this pane on design tokens so palettes and theme mode apply.
+
+        The login card in the section below is fully wired to the flow
+        engine; leave its zl-* atoms intact. Layout knobs (set on the root
+        element's style attribute): --zl-split-columns, --zl-split-align,
+        --zl-split-brand-mobile. Add zl-split--right to the wrapper div to
+        mirror the panes. More in .zitadel/branding/README.md.
+      ────────────────────────────────────────────────────────────── {% endcomment %}
+      <div class="zl-hero">
+        <nav class="zl-hero__nav">
+          <span class="zl-hero__brand">
+            {% if branding.logo_url %}
+              <img class="zl-hero__brand-logo" src="{{ branding.logo_url }}" alt="" />
+            {% else %}
+              <span class="zl-hero__brand-mark" aria-hidden="true"></span>
+            {% endif %}
+            Northwind
+          </span>
+          <span class="zl-hero__nav-links">
+            <a href="#">Product</a>
+            <a href="#">Pricing</a>
+            <a href="#">Docs</a>
+          </span>
+        </nav>
+
+        <p class="zl-hero__eyebrow">Customer platform</p>
+        <h2 class="zl-hero__headline">Everything your team ships, in one place.</h2>
+        <p class="zl-hero__sub">
+          Northwind unifies auth, billing, and customer data so you can launch
+          faster and keep every login secure — without stitching together five
+          vendors.
+        </p>
+
+        <ul class="zl-hero__bullets">
+          <li>SOC 2 &amp; passkey-ready authentication</li>
+          <li>Usage-based billing out of the box</li>
+          <li>One dashboard for every customer</li>
+        </ul>
+
+        <p class="zl-hero__footnote">
+          Trusted by teams at <strong>Vertex</strong>, <strong>Loop</strong>
+          and <strong>Halcyon</strong>.
+        </p>
+      </div>
     </aside>
     <section class="zl-split__form">
     {% if branding.logo_url %}
       <img class="zl-split__compact" src="{{ branding.logo_url }}" alt="" />
+    {% else %}
+      <p class="zl-split__compact zl-hero__compact-brand">Northwind</p>
     {% endif %}
     <zl-card>
       <h1 slot="header" class="zl-card-title">{{ step.texts.title_key | t: identity.display_name }}</h1>
