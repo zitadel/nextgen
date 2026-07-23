@@ -52,6 +52,7 @@ export default class Apply extends BaseCommand {
       client,
       projectId: secret.project_id,
       env,
+      cwd,
     });
 
     if (!dryRun) {

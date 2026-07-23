@@ -4,6 +4,7 @@ layer: "automation"
 stack: "frontend"
 dependsOn:
   - "console"
+  - "testing"
 
 tasks:
   lint:
@@ -16,3 +17,22 @@ tasks:
     options:
       runInCI: false
 
+  # Live console resource coverage through the Vite server-side API proxy.
+  # Boots one ephemeral real Zitadel instance shared by Playwright workers.
+  e2e-real:
+    command: "corepack pnpm exec playwright test --config playwright.real.config.mts"
+    deps:
+      - "testing:build"
+      - "cli:build"
+      - "server:build"
+      - "console:build"
+    env:
+      REAL_ZITADEL_PORT: "8093"
+      ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
+      # Vite serves the console and proxies its API requests. The source-built
+      # Go binary has no embedded UI dists, so keep both server surfaces off.
+      NEXTGEN_SERVER_LOGIN_ENABLED: "false"
+      NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
+    options:
+      cache: false
+      runInCI: false

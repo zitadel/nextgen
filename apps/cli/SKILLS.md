@@ -188,10 +188,23 @@ supported frameworks.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `plan` and `apply`. Schema and flow files are synced from
-`.zitadel/schemas/*.json` and `.zitadel/flows/*.json`; templates are not
-supported until the server exposes template storage and APIs. Server-provisioned
-defaults remain a fallback for non-CLI project creation, but CLI-created
-projects are authored from local files first. Flow create, read, list, and
+`.zitadel/schemas/*.json` and `.zitadel/flows/*.json`. Login templates
+(branding) are synced from `.zitadel/branding/`: a single `branding.json`
+descriptor (layout, asset URLs) plus a sibling `login.liquid` LiquidJS
+template referenced via `liquid_template_file`. Scaffold them with the
+`branding eject` command (`--design centered|split|split-right|minimal`,
+interactive picker on a TTY) or at project creation with
+`setup --design <name>`, which also publishes revision 1. Branding is
+revisioned and immutable: every edit — including a `.liquid`-only edit —
+plans as a `revise` and `apply` publishes a new revision; the login serves
+the newest one. `plan` validates templates with the authoritative LiquidJS
+validator (`E_VALIDATION` lists rule ids such as `no-script-tag` and
+`mandatory-gates`; every template must keep a trailing
+`{% mandatory_gates %}` tag). `font_url` is not writable yet; asset URLs
+must be absolute `https://`. Keep exactly one descriptor in
+`.zitadel/branding/` — extra `*.json` files there fail the scan.
+Server-provisioned defaults remain a fallback for non-CLI project
+creation, but CLI-created projects are authored from local files first. Flow create, read, list, and
 update are available, while the server enforces lifecycle rules such as
 draft-only edits. Managed files carry a marker comment; `eject` removes only
 files that still carry it, preserving anything the user replaced. For app-local

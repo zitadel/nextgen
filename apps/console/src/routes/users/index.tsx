@@ -1,21 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import {
-  ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  MoreVertical,
-  Plus,
-  Search,
-  Users,
-} from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { ArrowUpDown, MoreVertical, Plus, Search, Users } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -31,56 +20,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+import { api } from "../../api/zitadel";
+import { field } from "../../lib/record";
 
 export const Route = createFileRoute("/users/")({
   staticData: { nav: { label: "Users", order: 2, icon: Users } },
+  loader: () => api.listUsers(),
   component: UsersScreen,
 });
-
-type UserType = "Human" | "Agent" | "Machine";
-type UserStatus = "Active" | "Invited" | "Blocked";
 
 interface UserRow {
   id: string;
   name: string;
   email: string;
-  role: string;
-  type: UserType;
-  status: UserStatus;
-  team: string;
-  lastLogin: string;
 }
-
-/**
- * Users list — a faithful build of the Figma "Users" screen
- * (`j3qqriDab6WQfrlgLujf4Y`, node `277:290894`). Dummy data until the user
- * management API is wired, mirroring the designed rows.
- */
-const USERS: UserRow[] = [
-  { id: "1", name: "Maya Patel", email: "maya.patel@acme.com", role: "IAM Admin", type: "Human", status: "Active", team: "Atlas Engineering", lastLogin: "Today, 14:22" },
-  { id: "2", name: "Oscar Nguyen", email: "oscar.nguyen@acme.com", role: "Human", type: "Human", status: "Active", team: "Nebula Research", lastLogin: "Jul 14, 2026" },
-  { id: "3", name: "Sasha Kim", email: "sasha.kim@acme.com", role: "Agent", type: "Agent", status: "Invited", team: "Atlas Engineering", lastLogin: "Never" },
-  { id: "4", name: "Theo Rossi", email: "theo.rossi@acme.com", role: "Machine", type: "Machine", status: "Active", team: "Horizon Ops", lastLogin: "Jul 10, 2026" },
-  { id: "5", name: "Ines Larsson", email: "ines.larsson@acme.com", role: "Human", type: "Human", status: "Active", team: "Nebula Research", lastLogin: "Jul 15, 2026" },
-  { id: "6", name: "Kenji Okafor", email: "kenji.okafor@acme.com", role: "Human", type: "Human", status: "Blocked", team: "Horizon Ops", lastLogin: "Jun 28, 2026" },
-  { id: "7", name: "Amara Singh", email: "amara.singh@acme.com", role: "Machine", type: "Machine", status: "Active", team: "Atlas Engineering", lastLogin: "Jul 12, 2026" },
-  { id: "8", name: "Felix Moreau", email: "felix.moreau@acme.com", role: "Human", type: "Human", status: "Active", team: "Nebula Research", lastLogin: "Jul 16, 2026" },
-  { id: "9", name: "Zara Hendricks", email: "zara.hendricks@acme.com", role: "Agent", type: "Agent", status: "Active", team: "Horizon Ops", lastLogin: "Jul 11, 2026" },
-  { id: "10", name: "Liam Tanaka", email: "liam.tanaka@acme.com", role: "Human", type: "Human", status: "Invited", team: "Atlas Engineering", lastLogin: "Never" },
-  { id: "11", name: "Liam Tanaka", email: "liam.tanaka@acme.com", role: "Human", type: "Human", status: "Invited", team: "Atlas Engineering", lastLogin: "Never" },
-  { id: "12", name: "Liam Tanaka", email: "liam.tanaka@acme.com", role: "Human", type: "Human", status: "Invited", team: "Atlas Engineering", lastLogin: "Never" },
-  { id: "13", name: "Liam Tanaka", email: "liam.tanaka@acme.com", role: "Human", type: "Human", status: "Invited", team: "Atlas Engineering", lastLogin: "Never" },
-  { id: "14", name: "Liam Tanaka", email: "liam.tanaka@acme.com", role: "Human", type: "Human", status: "Invited", team: "Atlas Engineering", lastLogin: "Never" },
-  { id: "15", name: "Noor Becker", email: "noor.becker@acme.com", role: "Human", type: "Human", status: "Active", team: "Nebula Research", lastLogin: "Jul 08, 2026" },
-];
-
-const TABS: { value: string; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "Human", label: "Human" },
-  { value: "Agent", label: "Agent" },
-  { value: "Machine", label: "Machine" },
-];
 
 /** Platform-correct modifier for the search shortcut hint (⌘ on Apple, Ctrl elsewhere). */
 function searchShortcutLabel(): string {
@@ -92,7 +46,7 @@ function searchShortcutLabel(): string {
 }
 
 function UsersScreen() {
-  const [tab, setTab] = useState("all");
+  const users = Route.useLoaderData();
   const [query, setQuery] = useState("");
   const [sortAsc, setSortAsc] = useState<boolean | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -106,12 +60,7 @@ function UsersScreen() {
       const target = event.target;
       if (target instanceof HTMLElement) {
         const tag = target.tagName;
-        if (
-          tag === "INPUT" ||
-          tag === "TEXTAREA" ||
-          tag === "SELECT" ||
-          target.isContentEditable
-        ) {
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable) {
           return;
         }
       }
@@ -124,13 +73,13 @@ function UsersScreen() {
 
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    let next = USERS.filter((user) => {
-      const matchesTab = tab === "all" || user.type === tab;
-      const matchesQuery =
+    let next = users.map(toUserRow).filter((user) => {
+      return (
         needle === "" ||
         user.name.toLowerCase().includes(needle) ||
-        user.email.toLowerCase().includes(needle);
-      return matchesTab && matchesQuery;
+        user.email.toLowerCase().includes(needle) ||
+        user.id.toLowerCase().includes(needle)
+      );
     });
     if (sortAsc !== null) {
       next = [...next].sort((a, b) =>
@@ -138,24 +87,13 @@ function UsersScreen() {
       );
     }
     return next;
-  }, [tab, query, sortAsc]);
+  }, [users, query, sortAsc]);
 
   return (
     <div className="px-4 pb-8 pt-9 sm:px-8">
       <h1 className="font-serif text-2xl leading-6 tracking-tight text-foreground">Users</h1>
 
-      {/* Mobile (`Dashboard xs`): tabs → search → full-width Add. Desktop: one row. */}
-      <div className="mt-6 flex flex-col gap-4 lg:h-10 lg:flex-row lg:items-center lg:justify-between">
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList aria-label="User type">
-            {TABS.map((item) => (
-              <TabsTrigger key={item.value} value={item.value}>
-                {item.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-
+      <div className="mt-6 flex flex-col gap-4 lg:h-10 lg:flex-row lg:items-center lg:justify-end">
         <div className="flex w-full flex-col gap-2.5 lg:w-auto lg:flex-row lg:items-center lg:gap-3">
           <div className="relative w-full lg:w-[373px]">
             <Search
@@ -186,88 +124,76 @@ function UsersScreen() {
       <div className="mt-6 overflow-hidden rounded-2xl border border-sidebar-border bg-card">
         <Table className="table-fixed text-xs">
           <colgroup>
-            <col className="w-[177px]" />
-            <col className="w-[179px]" />
-            <col className="w-[120px]" />
-            <col className="w-[80px]" />
-            <col className="w-[177px]" />
-            <col className="w-[168px]" />
+            <col className="w-[240px]" />
+            <col className="w-[280px]" />
+            <col className="w-[280px]" />
             <col className="w-[60px]" />
           </colgroup>
           <TableHeader>
             <TableRow className="border-b border-border hover:bg-transparent">
               <HeadCell
                 sortable
-                ariaSort={
-                  sortAsc === null ? "none" : sortAsc ? "ascending" : "descending"
-                }
+                ariaSort={sortAsc === null ? "none" : sortAsc ? "ascending" : "descending"}
                 onSort={() => setSortAsc((value) => (value === null ? true : !value))}
               >
                 Name
               </HeadCell>
               <HeadCell>Email</HeadCell>
-              <HeadCell>Role</HeadCell>
-              <HeadCell>Status</HeadCell>
-              <HeadCell>Team</HeadCell>
-              <HeadCell>Last login</HeadCell>
+              <HeadCell>ID</HeadCell>
               <TableHead className="h-14 px-2" />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((user) => (
-              <TableRow key={user.id} className="border-0 hover:bg-muted/40">
-                <TableCell className="h-11 truncate px-4 py-0">
-                  <div className="flex items-center gap-2">
-                    <Avatar size="sm">
-                      <AvatarFallback>{initials(user.name)}</AvatarFallback>
-                    </Avatar>
-                    <span className="truncate font-medium text-foreground">{user.name}</span>
-                  </div>
-                </TableCell>
-                <TableCell className="h-11 truncate px-2 py-0 text-muted-foreground">
-                  {user.email}
-                </TableCell>
-                <TableCell className="h-11 px-2 py-0">
-                  <Badge variant="outline">{user.role}</Badge>
-                </TableCell>
-                <TableCell className="h-11 px-2 py-0">
-                  <StatusPill status={user.status} />
-                </TableCell>
-                <TableCell className="h-11 truncate px-2 py-0 text-foreground">{user.team}</TableCell>
-                <TableCell className="h-11 truncate px-2 py-0 text-foreground">
-                  {user.lastLogin}
-                </TableCell>
-                <TableCell className="h-11 px-2 py-0">
-                  <RowActions name={user.name} />
+            {rows.length === 0 ? (
+              <TableRow className="border-0 hover:bg-transparent">
+                <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                  {users.length === 0 ? "No users yet." : "No users match the current filters."}
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              rows.map((user) => (
+                <TableRow key={user.id} className="border-0 hover:bg-muted/40">
+                  <TableCell className="h-11 truncate px-4 py-0">
+                    <div className="flex items-center gap-2">
+                      <Avatar size="sm">
+                        <AvatarFallback>{initials(user.name)}</AvatarFallback>
+                      </Avatar>
+                      <Link
+                        to="/users/$userId"
+                        params={{ userId: user.id }}
+                        className="truncate font-medium text-foreground underline-offset-2 hover:underline"
+                      >
+                        {user.name}
+                      </Link>
+                    </div>
+                  </TableCell>
+                  <TableCell className="h-11 truncate px-2 py-0 text-muted-foreground">
+                    {user.email}
+                  </TableCell>
+                  <TableCell className="h-11 truncate px-2 py-0 text-foreground">
+                    {user.id}
+                  </TableCell>
+                  <TableCell className="h-11 px-2 py-0">
+                    <RowActions name={user.name} />
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
-
-      {/* Static pagination stub matching the Figma frame. Page count, disabled
-          state, and button handlers are wired when the user-management API
-          loader lands (server-side paging: page size + cursor + total). */}
-      <div className="mt-4 flex items-center justify-end gap-4 pr-1">
-        <span className="text-xs text-muted-foreground tabular-nums">1/7</span>
-        <div className="flex items-center gap-1">
-          <Button variant="outline" size="icon" aria-label="First page" disabled>
-            <ChevronsLeft />
-          </Button>
-          <Button variant="outline" size="icon" aria-label="Previous page" disabled>
-            <ChevronLeft />
-          </Button>
-          <Button variant="outline" size="icon" aria-label="Next page" disabled>
-            <ChevronRight />
-          </Button>
-          <Button variant="outline" size="icon" aria-label="Last page" disabled>
-            <ChevronsRight />
-          </Button>
-        </div>
-      </div>
     </div>
   );
+}
+
+function toUserRow(user: Record<string, unknown>, index: number): UserRow {
+  const id = field(user, "id") ?? `unknown-user-${index}`;
+  const email = field(user, "email") ?? "—";
+  return {
+    id,
+    name: field(user, "username") ?? (email === "—" ? id : email),
+    email,
+  };
 }
 
 function HeadCell({
@@ -301,21 +227,6 @@ function HeadCell({
       )}
     </TableHead>
   );
-}
-
-function StatusPill({ status }: { status: UserStatus }) {
-  // In Figma every status is a Badge (px-2 py-0.5) — Active/Invited are the
-  // transparent "ghost" variant, Blocked is destructive. Keeping the same
-  // padding for all three keeps the text left-aligned across rows.
-  const base = "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium";
-  if (status === "Blocked") {
-    return (
-      <span className={`${base} bg-destructive/10 text-destructive dark:bg-destructive/20`}>
-        Blocked
-      </span>
-    );
-  }
-  return <span className={`${base} text-foreground`}>{status}</span>;
 }
 
 function RowActions({ name }: { name: string }) {
