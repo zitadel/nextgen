@@ -116,7 +116,7 @@ type TokenStatements interface {
 
 type PasskeyRegistrationStatements interface {
 	Statements
-	CreatePasskeyRegistration(ctx context.Context, reg *domain.CreatePasskeyRegistration) error
+	CreatePasskeyRegistration(ctx context.Context, entity *domain.CreatePasskeyRegistration) error
 	GetPasskeyRegistration(ctx context.Context, projectID, id string) (*domain.PasskeyRegistration, error)
 	DeletePasskeyRegistration(ctx context.Context, projectID, id string) error
 }

@@ -4,17 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-const createPasskeyRegistrationStmt = `INSERT INTO zitadel_nextgen.passkey_registrations (id, project_id, user_id, challenge, expires_at) VALUES ($1, $2, $3, $4::JSONB, $5)`
-
-const getPasskeyRegistrationStmt = `SELECT id, project_id, user_id, challenge, expires_at, created_at FROM zitadel_nextgen.passkey_registrations WHERE id = $1 AND project_id = $2 AND expires_at > $3`
-
-const deletePasskeyRegistrationStmt = `DELETE FROM zitadel_nextgen.passkey_registrations WHERE id = $1 AND project_id = $2`
+const (
+	createPasskeyRegistrationStmt = `INSERT INTO zitadel_nextgen.passkey_registrations (id, project_id, user_id, challenge, expires_at) VALUES ($1, $2, $3, $4::JSONB, $5)`
+	getPasskeyRegistrationStmt    = `SELECT id, project_id, user_id, challenge, expires_at, created_at FROM zitadel_nextgen.passkey_registrations WHERE id = $1 AND project_id = $2 AND expires_at > now()`
+	deletePasskeyRegistrationStmt = `DELETE FROM zitadel_nextgen.passkey_registrations WHERE id = $1 AND project_id = $2`
+)
 
 type passkeyRegistrationStatements struct{ statement }
 
@@ -42,7 +41,7 @@ func (ps passkeyRegistrationStatements) GetPasskeyRegistration(ctx context.Conte
 		reg          domain.PasskeyRegistration
 		challengeRaw []byte
 	)
-	err := ps.client.QueryRow(ctx, getPasskeyRegistrationStmt, id, projectID, time.Now()).
+	err := ps.client.QueryRow(ctx, getPasskeyRegistrationStmt, id, projectID).
 		Scan(&reg.ID, &reg.ProjectID, &reg.UserID, &challengeRaw, &reg.ExpiresAt, &reg.CreatedAt)
 	if err != nil {
 		return nil, wrapError(err)

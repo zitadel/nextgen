@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"cloud.google.com/go/spanner"
 
@@ -14,7 +13,7 @@ import (
 
 const (
 	createPasskeyRegistrationStmt = `INSERT INTO passkey_registrations (id, project_id, user_id, challenge, expires_at) VALUES (@p1, @p2, @p3, PARSE_JSON(@p4), @p5)`
-	getPasskeyRegistrationStmt    = `SELECT id, project_id, user_id, TO_JSON_STRING(challenge), expires_at, created_at FROM passkey_registrations WHERE id = @p1 AND project_id = @p2 AND expires_at > @p3`
+	getPasskeyRegistrationStmt    = `SELECT id, project_id, user_id, TO_JSON_STRING(challenge), expires_at, created_at FROM passkey_registrations WHERE id = @p1 AND project_id = @p2 AND expires_at > CURRENT_TIMESTAMP()`
 	deletePasskeyRegistrationStmt = `DELETE FROM passkey_registrations WHERE id = @p1 AND project_id = @p2`
 )
 
@@ -41,17 +40,14 @@ func (ps passkeyRegistrationStatements) CreatePasskeyRegistration(ctx context.Co
 
 // GetPasskeyRegistration implements [service.PasskeyRegistrationStatements].
 func (ps passkeyRegistrationStatements) GetPasskeyRegistration(ctx context.Context, projectID, id string) (*domain.PasskeyRegistration, error) {
-	stmt := buildStatement(getPasskeyRegistrationStmt, id, projectID, time.Now()).statement()
+	stmt := buildStatement(getPasskeyRegistrationStmt, id, projectID).statement()
 	var reg *domain.PasskeyRegistration
 	err := ps.db.Query(ctx, stmt, func(iter *spanner.RowIterator) error {
 		var err error
 		reg, err = collectOneRow(iter, ps.scanPasskeyRegistration)
 		return err
 	})
-	if err != nil {
-		return nil, err
-	}
-	return reg, nil
+	return reg, err
 }
 
 // DeletePasskeyRegistration implements [service.PasskeyRegistrationStatements].

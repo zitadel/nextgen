@@ -318,17 +318,17 @@ func (c *MockAllStatementsCreateJSONSchemaCall) DoAndReturn(f func(context.Conte
 }
 
 // CreatePasskeyRegistration mocks base method.
-func (m *MockAllStatements) CreatePasskeyRegistration(ctx context.Context, reg *domain.CreatePasskeyRegistration) error {
+func (m *MockAllStatements) CreatePasskeyRegistration(ctx context.Context, entity *domain.CreatePasskeyRegistration) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreatePasskeyRegistration", ctx, reg)
+	ret := m.ctrl.Call(m, "CreatePasskeyRegistration", ctx, entity)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CreatePasskeyRegistration indicates an expected call of CreatePasskeyRegistration.
-func (mr *MockAllStatementsMockRecorder) CreatePasskeyRegistration(ctx, reg any) *MockAllStatementsCreatePasskeyRegistrationCall {
+func (mr *MockAllStatementsMockRecorder) CreatePasskeyRegistration(ctx, entity any) *MockAllStatementsCreatePasskeyRegistrationCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreatePasskeyRegistration", reflect.TypeOf((*MockAllStatements)(nil).CreatePasskeyRegistration), ctx, reg)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreatePasskeyRegistration", reflect.TypeOf((*MockAllStatements)(nil).CreatePasskeyRegistration), ctx, entity)
 	return &MockAllStatementsCreatePasskeyRegistrationCall{Call: call}
 }
 
@@ -2431,17 +2431,17 @@ func (m *MockPasskeyRegistrationStatements) EXPECT() *MockPasskeyRegistrationSta
 }
 
 // CreatePasskeyRegistration mocks base method.
-func (m *MockPasskeyRegistrationStatements) CreatePasskeyRegistration(ctx context.Context, reg *domain.CreatePasskeyRegistration) error {
+func (m *MockPasskeyRegistrationStatements) CreatePasskeyRegistration(ctx context.Context, entity *domain.CreatePasskeyRegistration) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreatePasskeyRegistration", ctx, reg)
+	ret := m.ctrl.Call(m, "CreatePasskeyRegistration", ctx, entity)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CreatePasskeyRegistration indicates an expected call of CreatePasskeyRegistration.
-func (mr *MockPasskeyRegistrationStatementsMockRecorder) CreatePasskeyRegistration(ctx, reg any) *MockPasskeyRegistrationStatementsCreatePasskeyRegistrationCall {
+func (mr *MockPasskeyRegistrationStatementsMockRecorder) CreatePasskeyRegistration(ctx, entity any) *MockPasskeyRegistrationStatementsCreatePasskeyRegistrationCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreatePasskeyRegistration", reflect.TypeOf((*MockPasskeyRegistrationStatements)(nil).CreatePasskeyRegistration), ctx, reg)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreatePasskeyRegistration", reflect.TypeOf((*MockPasskeyRegistrationStatements)(nil).CreatePasskeyRegistration), ctx, entity)
 	return &MockPasskeyRegistrationStatementsCreatePasskeyRegistrationCall{Call: call}
 }
 
