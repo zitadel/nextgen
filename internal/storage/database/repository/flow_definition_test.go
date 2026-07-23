@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
@@ -91,7 +92,7 @@ func TestFlowDefinitionRepository_GetNotFound(t *testing.T) {
 	repo := repository.NewFlowDefinitionRepository(tx)
 
 	_, err := repo.GetFlowDefinition(t.Context(), tx, "proj-missing", "flow-missing")
-	require.Error(t, err)
+	require.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
 func TestFlowDefinitionRepository_List(t *testing.T) {
@@ -280,7 +281,22 @@ func TestFlowDefinitionRepository_Delete(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = repo.GetFlowDefinition(t.Context(), tx, "proj-jdel", "flow-jdel")
-	require.Error(t, err)
+	require.ErrorIs(t, err, new(database.NoRowFoundError))
+}
+
+func TestFlowDefinitionRepository_DeleteProjectCascades(t *testing.T) {
+	tx, rollback := transactionForRollback(t)
+	defer rollback()
+
+	repo := repository.NewFlowDefinitionRepository(tx)
+	ensureProject(t, tx, "proj-jcascade")
+	def := sampleFlowDefinition("proj-jcascade", "flow-jcascade")
+	require.NoError(t, repo.CreateFlowDefinition(t.Context(), tx, def))
+
+	deleteProject(t, tx, "proj-jcascade")
+
+	_, err := repo.GetFlowDefinition(t.Context(), tx, "proj-jcascade", "flow-jcascade")
+	require.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
 func TestFlowDefinitionRepository_ProjectIsolation(t *testing.T) {

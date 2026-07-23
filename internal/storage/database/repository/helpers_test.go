@@ -40,6 +40,16 @@ func ensureProject(t *testing.T, client database.QueryExecutor, projectID string
 	require.NoError(t, err)
 }
 
+// deleteProject deletes a project row directly; the repository package has no
+// project repository of its own (project storage lives in v2), so cascade tests
+// need this to trigger the FK cascades added in migration 000013.
+func deleteProject(t *testing.T, client database.QueryExecutor, projectID string) {
+	t.Helper()
+	ctx := t.Context()
+	_, err := client.Exec(ctx, `DELETE FROM `+dbTable("projects")+` WHERE id = $1`, projectID)
+	require.NoError(t, err)
+}
+
 func ensureTeam(t *testing.T, client database.QueryExecutor, projectID, teamID string) {
 	t.Helper()
 	ensureProject(t, client, projectID)

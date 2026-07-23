@@ -143,6 +143,43 @@ func TestUserRepository_CreateWithoutTeam(t *testing.T) {
 	require.Len(t, got.Attributes, 2)
 }
 
+func TestUserRepository_DeleteProjectCascades(t *testing.T) {
+	skipIfSpanner(t)
+	repo := repository.NewUserRepository()
+	tx, rollback := transactionForRollback(t)
+	defer rollback()
+	ctx := t.Context()
+
+	const (
+		pid       = "proj-user-cascade"
+		schemaURL = "https://schemas.test/users-cascade/v1.json"
+		userID    = "usr_cascade"
+	)
+
+	_, err := tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s (id, name) VALUES ($1, $2)`, dbTable("projects")), pid, "project-"+pid)
+	require.NoError(t, err)
+	_, err = tx.Exec(ctx,
+		fmt.Sprintf(`INSERT INTO %s (project_id, url, payload) VALUES ($1,$2,$3%s)`, dbTable("json_schemas"), jsonCast()),
+		pid, schemaURL, []byte("{}"),
+	)
+	require.NoError(t, err)
+
+	attr, err := domain.NewCreateAttribute("country", "CH", domain.AttributeUniquenessUnspecified)
+	require.NoError(t, err)
+
+	require.NoError(t, repo.Create(ctx, tx, &domain.CreateUser{
+		ProjectID:  pid,
+		SchemaURL:  schemaURL,
+		ID:         userID,
+		Attributes: []*domain.CreateAttribute{attr},
+	}))
+
+	deleteProject(t, tx, pid)
+
+	_, err = repo.Get(ctx, tx, database.WithCondition(repo.PrimaryKeyCondition(pid, userID)))
+	require.ErrorIs(t, err, new(database.NoRowFoundError))
+}
+
 func TestUserRepository_AttributesCondition(t *testing.T) {
 	skipIfSpanner(t)
 	repo := repository.NewUserRepository()
