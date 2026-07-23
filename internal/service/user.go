@@ -56,7 +56,7 @@ type GetMyUserInput struct {
 
 type UserService struct {
 	pool         database.Pool
-	v2Pool       *DB
+	schemaStore  domain.JSONSchemaStore
 	userRepo     domain.UserRepository
 	passwordRepo domain.UserPasswordRepository
 	hasher       crypto.Hasher
@@ -64,14 +64,14 @@ type UserService struct {
 
 func NewUserService(
 	pool database.Pool,
-	v2Pool *DB,
+	schemaStore domain.JSONSchemaStore,
 	userRepo domain.UserRepository,
 	passwordRepo domain.UserPasswordRepository,
 	hasher crypto.Hasher,
 ) *UserService {
 	return &UserService{
 		pool:         pool,
-		v2Pool:       v2Pool,
+		schemaStore:  schemaStore,
 		userRepo:     userRepo,
 		passwordRepo: passwordRepo,
 		hasher:       hasher,
@@ -113,7 +113,7 @@ func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (
 func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ map[string]any, err error) {
 	// CreateUser does not need a transaction, so we don't wrap it in an `ApplyActions` call
 
-	action := NewCreateUserAction(input, s.userRepo, s.v2Pool.Statements())
+	action := NewCreateUserAction(input, s.userRepo, s.schemaStore)
 	err = action.Prepare(ctx, s.pool)
 	if err != nil {
 		return nil, err

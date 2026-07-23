@@ -15,7 +15,7 @@ func (h *Harness) EnsureUserService(t *testing.T) *service.UserService {
 	if h.UserService == nil {
 		h.UserService = service.NewUserService(
 			h.EnsureDBPool(t),
-			h.EnsureServiceDB(t),
+			h.EnsureSchemaStore(t),
 			h.EnsureUserRepo(t),
 			h.EnsureUserPasswordRepo(t),
 			h.EnsureHasher(t),

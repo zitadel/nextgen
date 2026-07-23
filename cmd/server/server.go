@@ -200,7 +200,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	brandingService := service.NewBrandingService(pool, brandingRepo)
 	userService := service.NewUserService(
 		pool,
-		serviceDBPool,
+		schemaStore,
 		userRepo,
 		userPasswordRepo,
 		passwordHasher,

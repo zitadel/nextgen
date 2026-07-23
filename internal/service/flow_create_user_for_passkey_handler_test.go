@@ -10,7 +10,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/service"
-	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/dbmock"
 	"go.uber.org/mock/gomock"
@@ -45,9 +44,8 @@ func newPasskeyHandlerFixture(t *testing.T) *passkeyHandlerFixture {
 	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
 	pool := dbmock.NewMockPool(ctrl)
 	tx := dbmock.NewMockTransaction(ctrl)
-	v2Pool := servicemocks.NewMockPool(ctrl)
 
-	userService := service.NewUserService(pool, service.NewPool(v2Pool), userRepo, passwordRepo, nil)
+	userService := service.NewUserService(pool, schemaStore, userRepo, passwordRepo, nil)
 	handler := service.NewFlowCreateUserForPasskeyHandler(userRepo, userService, schemaStore)
 
 	return &passkeyHandlerFixture{
@@ -143,7 +141,10 @@ func TestFlowCreateUserForPasskey_PersistsAllCollectedSchemaFields(t *testing.T)
 	require.NoError(t, err)
 	require.NotNil(t, captured)
 
-	assert.Equal(t, "bob@example.com", attributeByKey(t, captured.Attributes, "email").Value)
+	emailAttr := attributeByKey(t, captured.Attributes, "email")
+	assert.Equal(t, "bob@example.com", emailAttr.Value)
+	assert.Equal(t, domain.AttributeUniquenessProject, emailAttr.UniqueScope, "x-unique on the schema must carry through")
+
 	assert.Equal(t, "Bob", attributeByKey(t, captured.Attributes, "givenName").Value)
 	assert.Equal(t, "Builder", attributeByKey(t, captured.Attributes, "familyName").Value)
 }
