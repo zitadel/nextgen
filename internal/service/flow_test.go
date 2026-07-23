@@ -78,6 +78,50 @@ func (testAllStatements) CreateEncryptionKey(context.Context, *domain.Encryption
 	panic("unexpected call to CreateEncryptionKey")
 }
 
+func (testAllStatements) CreateJSONSchema(context.Context, *domain.JSONSchema) error {
+	panic("unexpected call to CreateJSONSchema")
+}
+
+func (testAllStatements) GetJSONSchemaByID(context.Context, string, string) (*domain.JSONSchema, error) {
+	panic("unexpected call to GetJSONSchemaByID")
+}
+
+func (testAllStatements) ListJSONSchemas(context.Context, *v2database.ListOptions[domain.JSONSchemaField]) (*v2database.ListResult[*domain.JSONSchema], error) {
+	panic("unexpected call to ListJSONSchemas")
+}
+
+func (testAllStatements) DeleteJSONSchemaByID(context.Context, string, string) error {
+	panic("unexpected call to DeleteJSONSchemaByID")
+}
+
+func (testAllStatements) CreateTeam(context.Context, *domain.Team) error {
+	panic("unexpected call to CreateTeam")
+}
+
+func (testAllStatements) GetTeamByID(context.Context, string, string) (*domain.Team, error) {
+	panic("unexpected call to GetTeamByID")
+}
+
+func (testAllStatements) DeactivateTeam(context.Context, string, string) error {
+	panic("unexpected call to DeactivateTeam")
+}
+
+func (testAllStatements) CreateToken(context.Context, *domain.Token) error {
+	panic("unexpected call to CreateToken")
+}
+
+func (testAllStatements) GetTokenByID(context.Context, string, string) (*domain.Token, error) {
+	panic("unexpected call to GetTokenByID")
+}
+
+func (testAllStatements) ListTokens(context.Context, *v2database.ListOptions[domain.TokenField]) (*v2database.ListResult[*domain.Token], error) {
+	panic("unexpected call to ListTokens")
+}
+
+func (testAllStatements) DeleteTokenByID(context.Context, string, string) error {
+	panic("unexpected call to DeleteTokenByID")
+}
+
 func (testAllStatements) CreatePasskeyRegistration(context.Context, *domain.CreatePasskeyRegistration) error {
 	panic("unexpected call to CreatePasskeyRegistration")
 }

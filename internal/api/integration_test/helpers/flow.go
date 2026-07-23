@@ -17,7 +17,7 @@ func (h *Harness) EnsureCreateUserHandler(t *testing.T) *service.FlowCreateUserW
 		h.EnsureUserPasswordRepo(t),
 		h.EnsureHasher(t),
 		h.EnsureUserService(t),
-		h.EnsureSchemaRepo(t),
+		h.EnsureSchemaStore(t),
 	)
 }
 
@@ -26,7 +26,7 @@ func (h *Harness) EnsureFlowCreateUserForPasskeyHandler(t *testing.T) *service.F
 	return service.NewFlowCreateUserForPasskeyHandler(
 		h.EnsureUserRepo(t),
 		h.EnsureUserService(t),
-		h.EnsureSchemaRepo(t),
+		h.EnsureSchemaStore(t),
 	)
 }
 
@@ -57,6 +57,7 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 		passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
 		h.FlowStateMachine = domain.NewFlowStateMachine(
 			h.EnsureSchemaResolver(t),
+			h.EnsureSchemaStore(t),
 			fields,
 			h.EnsureCreateUserHandler(t),
 			h.EnsureFlowCreateUserForPasskeyHandler(t),

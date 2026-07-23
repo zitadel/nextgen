@@ -8,6 +8,9 @@ type statements struct {
 	projectStatements
 	flowDefinitionStatements
 	cryptoKeyStatements
+	jsonSchemaStatements
+	teamStatements
+	tokenStatements
 	passkeyRegistrationStatements
 }
 
@@ -23,6 +26,9 @@ func newStatements(db queryExecutor) statements {
 		projectStatements:             newProjectStatements(db),
 		flowDefinitionStatements:      newFlowDefinitionStatements(db),
 		cryptoKeyStatements:           newCryptoKeyStatements(db),
+		jsonSchemaStatements:          newJSONSchemaStatements(db),
+		teamStatements:                newTeamStatements(db),
+		tokenStatements:               newTokenStatements(db),
 		passkeyRegistrationStatements: newPasskeyRegistrationStatements(db),
 	}
 }
