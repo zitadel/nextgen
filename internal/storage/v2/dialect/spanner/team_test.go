@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
 	spannerdialect "github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
@@ -61,9 +60,7 @@ func TestTeamStatements_CRUD(t *testing.T) {
 	assert.Equal(t, project.ID, got.ProjectID)
 	assert.Equal(t, domain.TeamStatusActive, got.Status)
 
-	require.NoError(t, client.Transaction(ctx, func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
-		return tx.Statements().DeactivateTeam(ctx, project.ID, team.ID)
-	}))
+	require.NoError(t, stmts.DeactivateTeam(ctx, project.ID, team.ID))
 
 	got, err = stmts.GetTeamByID(ctx, project.ID, team.ID)
 	require.NoError(t, err)
