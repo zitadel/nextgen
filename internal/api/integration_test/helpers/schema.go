@@ -71,7 +71,7 @@ func (h *Harness) CreateUserSchema(t *testing.T, project *domain.Project, schema
 	t.Helper()
 	client, err := NewApiClient(h.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	h.SetProjectSecretOnApiClient(t, client, project)
 
 	apiSchema := api.UserSchema{}
 	err = apiSchema.UnmarshalJSON([]byte(schema))

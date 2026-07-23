@@ -5,7 +5,9 @@
  * surface as the Figma-sourced tokens, namespaced under `--zl-*` so they're
  * indistinguishable to consumers. Anything authored here is a deliberate
  * decision documented inline; if a value belongs to the design system it
- * should be added to Figma and pulled via sync instead.
+ * should be added to Figma and pulled via sync instead. Each entry stays here
+ * only until Figma publishes its equivalent — then delete it and let the sync
+ * surface it (as `container` already does).
  *
  * Mode handling (current PR):
  *   - The default surface is dark mode, applied at `:root` and mirrored on
@@ -31,7 +33,6 @@ export interface DesignTokenOverrides {
   motion: MotionTokens;
   focus: FocusTokens;
   breakpoint: BreakpointTokens;
-  container: ContainerTokens;
 }
 
 export interface ColorPrimitiveTokens {
@@ -98,13 +99,6 @@ export interface BreakpointTokens {
   "4xl": string;
 }
 
-export interface ContainerTokens {
-  /** Auth card max-width per the Figma spec (24rem = 384px). */
-  authCard: string;
-  /** Page shell upper bound used when an auth page also renders marketing chrome. */
-  page: string;
-}
-
 export const overrides: DesignTokenOverrides = {
   colorPrimitive: {
     gray: {
@@ -155,9 +149,5 @@ export const overrides: DesignTokenOverrides = {
     "2xl": "96rem",
     "3xl": "120rem",
     "4xl": "160rem",
-  },
-  container: {
-    authCard: "24rem",
-    page: "80rem",
   },
 };

@@ -27,6 +27,11 @@ func TestGetMySession_Identity(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
+	dek, err := harness.EnsureKeyService(t).GetProjectDEKCrypter(t.Context(), project.ID)
+	require.NoError(t, err)
+	projectSecret, err := project.ProjectSecret(dek)
+	require.NoError(t, err)
+
 	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 	userSchemaURL := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 
@@ -75,7 +80,8 @@ func TestGetMySession_Identity(t *testing.T) {
 		testServer.URL+"/sessions/exchange?project_id="+project.ID, bytes.NewReader(exchangeBody))
 	require.NoError(t, err)
 	exchangeReq.Header.Set("Content-Type", "application/json")
-	exchangeReq.Header.Set("Authorization", "Bearer "+project.ProjectSecret)
+
+	exchangeReq.Header.Set("Authorization", "Bearer "+projectSecret)
 
 	exchangeResp, err := testServer.Client().Do(exchangeReq)
 	require.NoError(t, err)

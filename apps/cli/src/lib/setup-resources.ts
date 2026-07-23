@@ -4,27 +4,35 @@ import { dirname, join } from "node:path";
 import { consola } from "consola";
 
 import type {
+  CreateBranding201,
+  CreateBrandingBody,
   CreateFlowDefinition201,
   CreateSchema201,
   CreateSchemaBody,
 } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "@zitadel/api/client";
 import {
+  DEFAULT_BRANDING_CONFIG_PATH,
+  DEFAULT_BRANDING_TEMPLATE_PATH,
   DEFAULT_FLOW_CONFIG_PATH,
   DEFAULT_FLOW_SCHEMA_URI,
   DEFAULT_SCHEMA_CONFIG_PATH,
   DEFAULT_SETUP_PRESET,
   DEFAULT_SETUP_USE_CASE,
+  brandingReadmeContent,
   flowsReadmeContent,
+  getDefaultBrandingConfig,
   getDefaultHumanUserSchema,
   getDefaultLoginFlow,
   schemasReadmeContent,
   type SetupPreset,
   type SetupUseCase,
 } from "@zitadel/config/defaults";
+import { BRANDING_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
 
 import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
 
+import { BRANDING_DIR, toBrandingWireBody } from "./branding";
 import { FLOWS_DIR } from "./flows";
 import { stableStringify } from "./json";
 import { hashForState, writeBackResource } from "./sync";
@@ -56,6 +64,12 @@ export async function materializeSetupResources(opts: {
   preset?: SetupPreset;
   /** Use case (schema field set) to scaffold; defaults to minimal. */
   useCase?: SetupUseCase;
+  /**
+   * Login design to eject into `.zitadel/branding/` and publish as branding
+   * revision 1. When absent, no branding files are scaffolded and the login
+   * renders the built-in template (the `branding eject` command opts in later).
+   */
+  design?: string;
 }): Promise<MaterializeSetupResourcesResult> {
   await mkdir(join(opts.cwd, FLOWS_DIR), { recursive: true });
   await mkdir(join(opts.cwd, SCHEMAS_DIR), { recursive: true });
@@ -141,6 +155,34 @@ export async function materializeSetupResources(opts: {
     status: flowBody.status,
   });
 
+  if (opts.design) {
+    await mkdir(join(opts.cwd, BRANDING_DIR), { recursive: true });
+    const { branding, template } = getDefaultBrandingConfig(opts.design);
+    const descriptor = { $schema: BRANDING_FILE_SCHEMA_REF, ...branding };
+
+    if (await writeResourceFile(opts.cwd, DEFAULT_BRANDING_CONFIG_PATH, descriptor, opts.force)) {
+      filesWritten.push(join(opts.cwd, DEFAULT_BRANDING_CONFIG_PATH));
+    }
+    if (await writeRawFile(opts.cwd, DEFAULT_BRANDING_TEMPLATE_PATH, template, opts.force)) {
+      filesWritten.push(join(opts.cwd, DEFAULT_BRANDING_TEMPLATE_PATH));
+    }
+
+    const brandingNormalize = (data: object): object => toBrandingWireBody(opts.cwd, data);
+    const created = (await opts.client.createBranding(
+      brandingNormalize(descriptor) as CreateBrandingBody,
+      { project_id: opts.projectId },
+    )) as CreateBranding201;
+    await updateState(opts.cwd, DEFAULT_BRANDING_CONFIG_PATH, {
+      id: requiredString(created.id, "created branding revision id"),
+      hash: hashForState({ normalize: brandingNormalize }, descriptor),
+    });
+
+    const brandingReadme = join(BRANDING_DIR, "README.md");
+    if (await writeReadmeFile(opts.cwd, brandingReadme, brandingReadmeContent())) {
+      filesWritten.push(join(opts.cwd, brandingReadme));
+    }
+  }
+
   const schemasReadme = join(SCHEMAS_DIR, "README.md");
   const flowsReadme = join(FLOWS_DIR, "README.md");
   if (await writeReadmeFile(opts.cwd, schemasReadme, schemasReadmeContent())) {
@@ -151,6 +193,32 @@ export async function materializeSetupResources(opts: {
   }
 
   return { filesWritten };
+}
+
+/**
+ * Write a non-JSON scaffold file (the `.liquid` template) with the same
+ * conflict semantics as {@link writeResourceFile}: `--force` overwrites,
+ * otherwise an existing file is an `E_CONFLICT`.
+ */
+async function writeRawFile(
+  cwd: string,
+  relPath: string,
+  content: string,
+  force: boolean,
+): Promise<boolean> {
+  const dest = join(cwd, relPath);
+  await mkdir(dirname(dest), { recursive: true });
+  try {
+    await writeFile(dest, content, force ? undefined : { flag: "wx" });
+    return true;
+  } catch (error) {
+    if (isErrno(error, "EEXIST")) {
+      throw new ZitadelError("E_CONFLICT", `${relPath} already exists`, {
+        hint: "Move the file aside or rerun setup with --force if you want setup to replace it.",
+      });
+    }
+    throw error;
+  }
 }
 
 /**

@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import type {
   CreateFlowDefinitionBodyFlowDefinition,
   CreateSchemaBody,
@@ -16,12 +19,14 @@ import passkeyFirstLoginFlowTemplate from "../defaults/presets/passkey-first/log
   type: "json",
 };
 
-export { flowsReadmeContent, schemasReadmeContent } from "./readmes.js";
+export { brandingReadmeContent, flowsReadmeContent, schemasReadmeContent } from "./readmes.js";
 
 export const DEFAULT_BUILTIN_SCHEMA_BASE = "https://nextgen.com/api/schemas";
 export const DEFAULT_FLOW_SCHEMA_URI = "https://nextgen.com/flow-definition.json";
 export const DEFAULT_SCHEMA_CONFIG_PATH = ".zitadel/schemas/default-human-user.json";
 export const DEFAULT_FLOW_CONFIG_PATH = ".zitadel/flows/default-login.json";
+export const DEFAULT_BRANDING_CONFIG_PATH = ".zitadel/branding/branding.json";
+export const DEFAULT_BRANDING_TEMPLATE_PATH = ".zitadel/branding/login.liquid";
 
 /**
  * Named schema+flow bundles `zitadel setup` can scaffold (#448: the prompt
@@ -57,6 +62,71 @@ function presetTemplates(preset: string): { schema: unknown; flow: unknown } {
     );
   }
   return PRESET_TEMPLATES[preset as SetupPreset];
+}
+
+/**
+ * Login-design starting points `zitadel branding eject --design <name>` (and
+ * `zitadel setup --design <name>`) scaffold into `.zitadel/branding/`. A
+ * design is a full Liquid template plus the descriptor `layout` it degrades
+ * to — the wire `layout` enum stays `centered | split`, richer designs are
+ * delivered as templates (ADR 040).
+ */
+export const BRANDING_DESIGNS = ["centered", "split", "split-right", "minimal"] as const;
+
+export type BrandingDesign = (typeof BRANDING_DESIGNS)[number];
+
+export const DEFAULT_BRANDING_DESIGN: BrandingDesign = "centered";
+
+/** Descriptor `layout` each design degrades to when its template is rejected. */
+const DESIGN_LAYOUTS: Record<BrandingDesign, "centered" | "split"> = {
+  centered: "centered",
+  split: "split",
+  "split-right": "split",
+  minimal: "centered",
+};
+
+export type DefaultBrandingConfig = {
+  /** The `.zitadel/branding/branding.json` descriptor body (sans `$schema`). */
+  branding: {
+    layout: "centered" | "split";
+    liquid_template_file: string;
+  };
+  /** The `.zitadel/branding/login.liquid` template content. */
+  template: string;
+};
+
+/**
+ * Renders the scaffold files for a branding design. The `centered` template
+ * is a drift-tested copy of the bundled default in `@zitadel/components`;
+ * the other designs are authored variants of it.
+ */
+export function getDefaultBrandingConfig(
+  design: string = DEFAULT_BRANDING_DESIGN,
+): DefaultBrandingConfig {
+  if (!Object.hasOwn(DESIGN_LAYOUTS, design)) {
+    throw new Error(
+      `unknown branding design ${JSON.stringify(design)} (known designs: ${BRANDING_DESIGNS.join(", ")})`,
+    );
+  }
+  const known = design as BrandingDesign;
+  return {
+    branding: {
+      layout: DESIGN_LAYOUTS[known],
+      liquid_template_file: "./login.liquid",
+    },
+    template: readFileSync(packageFilePath(`../defaults/branding/${known}/login.liquid`), "utf8"),
+  };
+}
+
+/**
+ * Resolves a package-relative file to a real filesystem path. Vite-driven
+ * runtimes (vitest in dependent packages) rewrite `import.meta.url` to a
+ * `/@fs/...` URL, which `fileURLToPath` passes through verbatim — strip the
+ * prefix so `readFileSync` gets an actual path.
+ */
+function packageFilePath(relative: string): string {
+  const path = fileURLToPath(new URL(relative, import.meta.url));
+  return path.startsWith("/@fs/") ? path.slice("/@fs".length) : path;
 }
 
 /**
@@ -242,5 +312,9 @@ function renderTemplate(value: unknown, replacements: Record<string, string>): u
 }
 
 function trimTrailingSlash(value: string): string {
-  return value.replace(/\/+$/u, "");
+  let trimmed = value;
+  while (trimmed.endsWith("/")) {
+    trimmed = trimmed.slice(0, -1);
+  }
+  return trimmed;
 }
