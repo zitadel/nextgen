@@ -97,9 +97,6 @@ func (ts tokenStatements) CreateToken(ctx context.Context, token *domain.Token) 
 	if err != nil {
 		return err
 	}
-	if tokenID == 0 {
-		return fmt.Errorf("failed to create token: no token_id returned")
-	}
 	token.TokenID = strconv.FormatInt(tokenID, 10)
 	return nil
 }
@@ -241,15 +238,11 @@ func tokenSessionIDArg(sessionID *string) (any, error) {
 	return id, nil
 }
 
-func tokenOptionalInt64(id *string) any {
+func tokenOptionalString(id *string) any {
 	if id == nil || *id == "" {
 		return nil
 	}
-	n, err := strconv.ParseInt(*id, 10, 64)
-	if err != nil {
-		return nil
-	}
-	return n
+	return *id
 }
 
 func coerceTokenType(v any) (any, error) {
@@ -267,12 +260,12 @@ func coerceTokenType(v any) (any, error) {
 	}
 }
 
+// coerceTokenInt64 converts cursor/filter values to INT64 binds.
+// Accessors return domain strings so JSON cursors keep large Spanner IDs.
 func coerceTokenInt64(v any) (any, error) {
 	switch id := v.(type) {
 	case int64:
 		return id, nil
-	case float64:
-		return int64(id), nil
 	case string:
 		return strconv.ParseInt(id, 10, 64)
 	case storagedb.Identity:
@@ -295,15 +288,9 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 		Coerce:   database.CoerceString,
 	},
 	domain.TokenFieldTokenID: {
-		SQLName: "token_id",
-		Accessor: func(t *domain.Token) any {
-			id, err := parseTokenIdentity(t.TokenID)
-			if err != nil {
-				return int64(0)
-			}
-			return id
-		},
-		Coerce: coerceTokenInt64,
+		SQLName:  "token_id",
+		Accessor: func(t *domain.Token) any { return t.TokenID },
+		Coerce:   coerceTokenInt64,
 	},
 	domain.TokenFieldUserID: {
 		SQLName:  "user_id",
@@ -317,17 +304,17 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 	},
 	domain.TokenFieldSessionID: {
 		SQLName:  "session_id",
-		Accessor: func(t *domain.Token) any { return tokenOptionalInt64(t.SessionID) },
+		Accessor: func(t *domain.Token) any { return tokenOptionalString(t.SessionID) },
 		Coerce:   coerceTokenInt64,
 	},
 	domain.TokenFieldOIDCSessionID: {
 		SQLName:  "oidc_session_id",
-		Accessor: func(t *domain.Token) any { return tokenOptionalInt64(t.OIDCSessionID) },
+		Accessor: func(t *domain.Token) any { return tokenOptionalString(t.OIDCSessionID) },
 		Coerce:   coerceTokenInt64,
 	},
 	domain.TokenFieldSAMLSessionID: {
 		SQLName:  "saml_session_id",
-		Accessor: func(t *domain.Token) any { return tokenOptionalInt64(t.SAMLSessionID) },
+		Accessor: func(t *domain.Token) any { return tokenOptionalString(t.SAMLSessionID) },
 		Coerce:   coerceTokenInt64,
 	},
 	domain.TokenFieldScope: {

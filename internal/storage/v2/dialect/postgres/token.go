@@ -199,6 +199,13 @@ func tokenSessionIDArg(sessionID *string) storagedb.Identity {
 	return storagedb.Identity(*sessionID)
 }
 
+func tokenOptionalIdentity(id *string) any {
+	if id == nil {
+		return nil
+	}
+	return storagedb.Identity(*id)
+}
+
 func coerceTokenType(v any) (any, error) {
 	switch t := v.(type) {
 	case domain.TokenType:
@@ -254,17 +261,17 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 	},
 	domain.TokenFieldSessionID: {
 		SQLName:  "session_id",
-		Accessor: func(t *domain.Token) any { return tokenSessionIDArg(t.SessionID) },
+		Accessor: func(t *domain.Token) any { return tokenOptionalIdentity(t.SessionID) },
 		Coerce:   coerceTokenIdentity,
 	},
 	domain.TokenFieldOIDCSessionID: {
 		SQLName:  "oidc_session_id",
-		Accessor: func(t *domain.Token) any { return tokenSessionIDArg(t.OIDCSessionID) },
+		Accessor: func(t *domain.Token) any { return tokenOptionalIdentity(t.OIDCSessionID) },
 		Coerce:   coerceTokenIdentity,
 	},
 	domain.TokenFieldSAMLSessionID: {
 		SQLName:  "saml_session_id",
-		Accessor: func(t *domain.Token) any { return tokenSessionIDArg(t.SAMLSessionID) },
+		Accessor: func(t *domain.Token) any { return tokenOptionalIdentity(t.SAMLSessionID) },
 		Coerce:   coerceTokenIdentity,
 	},
 	domain.TokenFieldScope: {
