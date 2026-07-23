@@ -3,7 +3,6 @@
 package spanner
 
 import (
-	"context"
 	"database/sql"
 	"testing"
 
