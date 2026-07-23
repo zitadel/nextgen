@@ -230,6 +230,12 @@ get an informational Changesets comment; maintainers use that and the
 [changeset decision table](.changeset/README.md#decision-table) to review release
 intent.
 
+Task runs are accelerated by Moon's remote cache, configured under `remote` in
+[`.moon/workspace.yml`](.moon/workspace.yml); Depot CI runners authenticate
+automatically. Local runs skip the remote cache unless you export a Depot API
+token as `DEPOT_TOKEN` — with one set, your machine downloads shared task
+outputs but never uploads (uploads happen only in CI).
+
 To run the full CI-parity suite locally — including database integration
 tests, package checks, and the fresh-app journey — run
 `moon run workspace:check -- --full`. The demo end-to-end suites are not part
