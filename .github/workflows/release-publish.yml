@@ -19,10 +19,20 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Dry run: build and report what a real run would publish. Uncheck to idempotently publish whatever is missing for the checked-out main version."
+        description: "Dry run: build and report what a real run would publish. Uncheck to idempotently publish whatever is missing for the pinned release commit."
         required: true
         default: true
         type: boolean
+      release_ref:
+        description: "Optional immutable commit or tag to recover. It must be an ancestor of main; leave empty to use the commit selected when dispatching."
+        required: false
+        default: ""
+        type: string
+      recover_version:
+        description: "Required with release_ref: exact @zitadel/server version expected at that ref, for example 0.1.0-alpha.17."
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -38,6 +48,7 @@ jobs:
     outputs:
       publish_should_run: ${{ steps.release-publish.outputs.should_run }}
       publish_reason: ${{ steps.release-publish.outputs.reason }}
+      release_sha: ${{ steps.release-target.outputs.sha }}
     steps:
       - name: Generate release app token
         if: ${{ github.event_name == 'push' }}
@@ -49,11 +60,37 @@ jobs:
 
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_ref || github.sha }}
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token || github.token }}
 
+      - name: Resolve immutable release target
+        id: release-target
+        shell: bash
+        run: |
+          release_sha="$(git rev-parse HEAD)"
+          if ! git merge-base --is-ancestor "${release_sha}" origin/main; then
+            echo "::error::Release target ${release_sha} is not an ancestor of main"
+            exit 1
+          fi
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] &&
+            [ -z "${RELEASE_REF}" ] &&
+            [ "${release_sha}" != "$(git rev-parse origin/main)" ]; then
+            echo "::error::main moved after this dispatch was created; rerun for current main or set release_ref and recover_version explicitly"
+            exit 1
+          fi
+          if [ -n "${RELEASE_REF}" ] && [ -z "${RECOVER_VERSION}" ]; then
+            echo "::error::recover_version is required when release_ref is set"
+            exit 1
+          fi
+          echo "sha=${release_sha}" >> "${GITHUB_OUTPUT}"
+          echo "Pinned release target: ${release_sha}"
+        env:
+          RELEASE_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.release_ref || '' }}
+          RECOVER_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.recover_version || '' }}
+
       - name: Detect release publish
+        if: ${{ github.event_name == 'push' }}
         id: release-publish
         run: node scripts/release-automation.mjs publish --base "$BASE_SHA" --summary
         env:
@@ -99,7 +136,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
+          ref: ${{ needs.changesets.outputs.release_sha }}
           fetch-depth: 0
 
       - uses: moonrepo/setup-toolchain@v0
@@ -136,8 +173,13 @@ jobs:
           retention-days: 7
 
   publish:
-    needs: build
-    runs-on: depot-ubuntu-24.04-4
+    needs:
+      - changesets
+      - build
+    # npm trusted publishing supports GitHub-hosted runners, not self-hosted
+    # runners. Keep the compilation-heavy build job on Depot; this job only
+    # verifies and promotes its downloaded artifact.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: write
@@ -146,7 +188,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
+          ref: ${{ needs.changesets.outputs.release_sha }}
           fetch-depth: 0
 
       - uses: moonrepo/setup-toolchain@v0
@@ -196,15 +238,19 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Depot runners are self-hosted from npm's provenance verifier's
-          # perspective. Keep trusted publishing via OIDC, but do not request
-          # npm provenance until the release job runs on GitHub-hosted runners.
-          NPM_CONFIG_PROVENANCE: "false"
+          # Trusted publishing intentionally covers npm publish only. npm does
+          # not authorize dist-tag repair through OIDC, so a package-scoped,
+          # short-lived granular token is mapped to npm auth only for stale-tag
+          # repair or historical-recovery cleanup.
+          NPM_DIST_TAG_TOKEN: ${{ secrets.NPM_DIST_TAG_TOKEN }}
           ZITADEL_RELEASE_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '' }}
-          # Manual dispatch = idempotent re-run: every surface checks the
-          # registry/release state and skips what already exists, so recovery
-          # is just dispatching again - no special recover mode.
+          ZITADEL_RELEASE_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.release_ref || '' }}
+          ZITADEL_RELEASE_SHA: ${{ needs.changesets.outputs.release_sha }}
+          # Manual dispatch = idempotent re-run of one pinned commit. For an
+          # older release, release_ref and recover_version must be supplied
+          # together so the target is both immutable and human-checked.
           ZITADEL_RELEASE_MANUAL: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
+          RECOVER_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.recover_version || '' }}
 
       - name: Smoke the compose deployment (dry run)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}

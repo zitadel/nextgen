@@ -1,7 +1,7 @@
+import { spawnSync } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
 
 import { PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
 
@@ -12,9 +12,8 @@ if (!tarballsDir) {
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");
-const requiredPackageNames = new Set(
-  await Promise.all(PUBLIC_PACKAGE_DIRS.map(packageName)),
-);
+const requiredPackageNames = new Set(await Promise.all(PUBLIC_PACKAGE_DIRS.map(packageName)));
+const expectedReleaseVersion = await packageVersion("apps/server");
 const dependencyFields = [
   "dependencies",
   "devDependencies",
@@ -26,9 +25,7 @@ const semverVersion = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const manifests = new Map();
 const serverPlatformPackagePattern = /^@zitadel\/server-(?:darwin|linux|win32)-/;
 
-const tarballs = (await readdir(tarballsDir))
-  .filter((file) => file.endsWith(".tgz"))
-  .sort();
+const tarballs = (await readdir(tarballsDir)).filter((file) => file.endsWith(".tgz")).sort();
 
 if (tarballs.length === 0) {
   throw new Error(`no .tgz files found in ${tarballsDir}`);
@@ -57,7 +54,7 @@ for (const expectedName of requiredPackageNames) {
   }
 }
 
-assertValidVersions(manifests);
+assertValidVersions(manifests, expectedReleaseVersion);
 
 console.log(
   `verified ${manifests.size} installable tarballs; required packages present: ${[...requiredPackageNames].sort().join(", ")}`,
@@ -115,7 +112,7 @@ function assertServerPlatformBinary(tarball, manifest) {
   }
 }
 
-function assertValidVersions(manifests) {
+function assertValidVersions(manifests, expectedVersion) {
   const invalid = [...manifests.values()]
     .filter((manifest) => !semverVersion.test(manifest.version))
     .map((manifest) => `${manifest.name}@${manifest.version}`)
@@ -123,14 +120,29 @@ function assertValidVersions(manifests) {
   if (invalid.length > 0) {
     throw new Error(`public package tarballs must use semver versions: ${invalid.join(", ")}`);
   }
+  const mismatched = [...manifests.values()]
+    .filter((manifest) => manifest.version !== expectedVersion)
+    .map((manifest) => `${manifest.name}@${manifest.version}`)
+    .sort();
+  if (mismatched.length > 0) {
+    throw new Error(
+      `public package tarballs must match release ${expectedVersion}: ${mismatched.join(", ")}`,
+    );
+  }
 }
 
 async function packageName(relativePath) {
-  const pkg = JSON.parse(
-    await readFile(join(repoRoot, relativePath, "package.json"), "utf8"),
-  );
+  const pkg = JSON.parse(await readFile(join(repoRoot, relativePath, "package.json"), "utf8"));
   if (typeof pkg.name !== "string" || pkg.name.length === 0) {
     throw new Error(`${relativePath}/package.json has no name`);
   }
   return pkg.name;
+}
+
+async function packageVersion(relativePath) {
+  const pkg = JSON.parse(await readFile(join(repoRoot, relativePath, "package.json"), "utf8"));
+  if (typeof pkg.version !== "string" || pkg.version.length === 0) {
+    throw new Error(`${relativePath}/package.json has no version`);
+  }
+  return pkg.version;
 }

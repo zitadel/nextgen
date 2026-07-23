@@ -10,6 +10,7 @@ type PublishPlan = {
   reason: string;
   version: string;
   tag: string;
+  commit: string;
   prerelease: boolean;
   recoverVersion: string;
 };
@@ -70,6 +71,7 @@ function rehearsalPlan(overrides: Partial<PublishPlan> = {}): PublishPlan {
     reason: "release rehearsal (gate-free dry run)",
     version: "0.1.0-alpha.14",
     tag: "v0.1.0-alpha.14",
+    commit: "a".repeat(40),
     prerelease: true,
     recoverVersion: "",
     ...overrides,
@@ -81,9 +83,7 @@ describe("release npm rehearsal", () => {
     const { assertLocalRegistryUrl } = await loadModule();
 
     expect(() => assertLocalRegistryUrl("http://127.0.0.1:4873")).not.toThrow();
-    expect(() => assertLocalRegistryUrl("https://registry.npmjs.org")).toThrow(
-      "local registry",
-    );
+    expect(() => assertLocalRegistryUrl("https://registry.npmjs.org")).toThrow("local registry");
     expect(() => assertLocalRegistryUrl("http://localhost:4873")).toThrow("local registry");
     expect(() => assertLocalRegistryUrl("http://0.0.0.0:4873")).toThrow("local registry");
     expect(() => assertLocalRegistryUrl("not-a-url")).toThrow("must be a URL");

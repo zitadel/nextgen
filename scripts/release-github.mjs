@@ -28,7 +28,15 @@ export async function upsertProductGithubRelease(options = {}) {
     return { action: "dry-run", tag, body };
   }
 
-  const github = githubReleaseConfig(options.env ?? process.env, options.fetchImpl ?? globalThis.fetch);
+  const github = githubReleaseConfig(
+    options.env ?? process.env,
+    options.fetchImpl ?? globalThis.fetch,
+  );
+  if (github.sha !== metadata.commit) {
+    throw new Error(
+      `GitHub Release target ${github.sha} does not match artifact commit ${metadata.commit}`,
+    );
+  }
   const existing = await findGithubReleaseByTag({ ...github, tag });
 
   if (!existing) {
@@ -128,7 +136,10 @@ export function extractVersionSection(source, version) {
 
   const next = lines.findIndex((line, index) => index > start && /^##\s+/.test(line));
   const end = next === -1 ? lines.length : next;
-  return lines.slice(start + 1, end).join("\n").trim();
+  return lines
+    .slice(start + 1, end)
+    .join("\n")
+    .trim();
 }
 
 export function normalizeChangelogSection(section) {
@@ -229,10 +240,11 @@ function releaseTag(metadata) {
 }
 
 function githubReleaseConfig(env, fetchImpl) {
+  const releaseSha = env.ZITADEL_RELEASE_SHA || env.GITHUB_SHA;
   const missing = [];
   if (!env.GITHUB_TOKEN) missing.push("GITHUB_TOKEN");
   if (!env.GITHUB_REPOSITORY) missing.push("GITHUB_REPOSITORY");
-  if (!env.GITHUB_SHA) missing.push("GITHUB_SHA");
+  if (!releaseSha) missing.push("ZITADEL_RELEASE_SHA or GITHUB_SHA");
   if (missing.length > 0) {
     throw new Error(`GitHub Release creation requires ${missing.join(", ")}`);
   }
@@ -248,7 +260,7 @@ function githubReleaseConfig(env, fetchImpl) {
   return {
     apiBase: `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,
     fetchImpl,
-    sha: env.GITHUB_SHA,
+    sha: releaseSha,
     token: env.GITHUB_TOKEN,
   };
 }
@@ -256,10 +268,13 @@ function githubReleaseConfig(env, fetchImpl) {
 async function findGithubReleaseByTag(options) {
   let page = 1;
   while (true) {
-    const response = await options.fetchImpl(`${options.apiBase}/releases?per_page=100&page=${page}`, {
-      method: "GET",
-      headers: githubHeaders(options.token),
-    });
+    const response = await options.fetchImpl(
+      `${options.apiBase}/releases?per_page=100&page=${page}`,
+      {
+        method: "GET",
+        headers: githubHeaders(options.token),
+      },
+    );
     if (!response.ok) {
       throw new Error(`GitHub Release lookup failed: ${await responseText(response)}`);
     }
@@ -303,7 +318,7 @@ async function patchGithubRelease(options) {
   const response = await options.fetchImpl(`${options.apiBase}/releases/${options.releaseId}`, {
     method: "PATCH",
     headers: githubHeaders(options.token),
-    body: JSON.stringify({ body: options.body }),
+    body: JSON.stringify({ body: options.body, target_commitish: options.sha }),
   });
   if (!response.ok) {
     throw new Error(`GitHub Release update failed: ${await responseText(response)}`);

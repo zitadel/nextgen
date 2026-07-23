@@ -10,6 +10,7 @@ type PublishPlan = {
   reason: string;
   version: string;
   tag: string;
+  commit: string;
   prerelease: boolean;
   recoverVersion: string;
 };
@@ -24,9 +25,14 @@ type ReleaseNpmModule = {
     registryUrl?: string;
     tarballsDir: string;
     distTag?: string;
+    distTagToken?: string;
     publicPackageNames?: string[];
     run?: (command: string, args: string[], options?: unknown) => Promise<unknown>;
-    runCapture?: (command: string, args: string[], options?: unknown) => Promise<{ stdout: string }>;
+    runCapture?: (
+      command: string,
+      args: string[],
+      options?: unknown,
+    ) => Promise<{ stdout: string }>;
     log?: (message: string) => void;
   }) => Promise<{
     skipped: boolean;
@@ -38,6 +44,11 @@ type ReleaseNpmModule = {
     registryUrl: string;
     runCapture?: (command: string, args: string[]) => Promise<{ stdout: string }>;
   }) => Promise<boolean>;
+  readRegistryDistTags: (options: {
+    name: string;
+    registryUrl: string;
+    runCapture?: (command: string, args: string[]) => Promise<{ stdout: string }>;
+  }) => Promise<Record<string, string>>;
   resolveDistTag: (repoRoot: string) => Promise<string>;
   parseArgs: (args: string[]) => { registryUrl: string; tarballsDir: string; distTag: string };
 };
@@ -72,6 +83,7 @@ function plan(overrides: Partial<PublishPlan> = {}): PublishPlan {
     reason: "version commit detected",
     version: "0.1.0-alpha.14",
     tag: "v0.1.0-alpha.14",
+    commit: "a".repeat(40),
     prerelease: true,
     recoverVersion: "",
     ...overrides,
@@ -85,11 +97,12 @@ function notFoundError(spec: string): Error {
   });
 }
 
-// Simulates the two external commands publishNpmTarballs shells out to:
-// `tar -xOf <tgz> package/package.json` and `npm view <spec> version`.
+// Simulates the external inspection commands used by publishNpmTarballs:
+// tarball manifests, exact npm versions, and package dist-tags.
 function fakeRunCapture(options: {
   manifests: Record<string, { name: string; version: string; private?: boolean }>;
   existingSpecs?: string[];
+  distTags?: Record<string, Record<string, string>>;
   viewError?: Error;
 }) {
   return async (command: string, args: string[]) => {
@@ -107,6 +120,9 @@ function fakeRunCapture(options: {
         throw options.viewError;
       }
       const spec = args[1] ?? "";
+      if (args[2] === "dist-tags") {
+        return { stdout: JSON.stringify(options.distTags?.[spec] ?? {}) };
+      }
       if ((options.existingSpecs ?? []).includes(spec)) {
         return { stdout: "0.1.0-alpha.14\n" };
       }
@@ -128,6 +144,7 @@ describe("release npm tarball promotion", () => {
       plan: plan(),
       tarballsDir,
       distTag: "alpha",
+      distTagToken: "test-dist-tag-token",
       registryUrl: "https://registry.example.test",
       publicPackageNames: ["@zitadel/cli", "@zitadel/sdk-core"],
       run: async (command, args) => {
@@ -142,6 +159,7 @@ describe("release npm tarball promotion", () => {
           },
         },
         existingSpecs: ["@zitadel/cli@0.1.0-alpha.14"],
+        distTags: { "@zitadel/cli": { alpha: "0.1.0-alpha.14" } },
       }),
       log: () => undefined,
     });
@@ -166,6 +184,166 @@ describe("release npm tarball promotion", () => {
         "--ignore-scripts",
       ]),
     );
+  });
+
+  it("does not roll the release dist-tag backward during historical recovery", async () => {
+    const { publishNpmTarballs } = await loadModule();
+    const tarballsDir = await tempDir("zitadel-npm-historical-existing-");
+    await writeFile(join(tarballsDir, "zitadel-cli-0.1.0-alpha.14.tgz"), "");
+
+    const calls: CommandCall[] = [];
+    const result = await publishNpmTarballs({
+      plan: plan({ recoverVersion: "0.1.0-alpha.14" }),
+      tarballsDir,
+      distTag: "alpha",
+      publicPackageNames: ["@zitadel/cli"],
+      run: async (command, args) => {
+        calls.push({ command, args });
+      },
+      runCapture: fakeRunCapture({
+        manifests: {
+          "zitadel-cli-0.1.0-alpha.14.tgz": {
+            name: "@zitadel/cli",
+            version: "0.1.0-alpha.14",
+          },
+        },
+        existingSpecs: ["@zitadel/cli@0.1.0-alpha.14"],
+        distTags: { "@zitadel/cli": { alpha: "0.1.0-alpha.17" } },
+      }),
+      log: () => undefined,
+    });
+
+    expect(calls).toHaveLength(0);
+    expect(result.results).toEqual([
+      { name: "@zitadel/cli", version: "0.1.0-alpha.14", action: "exists" },
+    ]);
+  });
+
+  it("uses and removes a temporary tag when backfilling a historical npm version", async () => {
+    const { publishNpmTarballs } = await loadModule();
+    const tarballsDir = await tempDir("zitadel-npm-historical-missing-");
+    await writeFile(join(tarballsDir, "zitadel-cli-0.1.0-alpha.14.tgz"), "");
+
+    const calls: CommandCall[] = [];
+    const result = await publishNpmTarballs({
+      plan: plan({ recoverVersion: "0.1.0-alpha.14" }),
+      tarballsDir,
+      distTag: "alpha",
+      distTagToken: "test-dist-tag-token",
+      publicPackageNames: ["@zitadel/cli"],
+      run: async (command, args) => {
+        calls.push({ command, args });
+      },
+      runCapture: fakeRunCapture({
+        manifests: {
+          "zitadel-cli-0.1.0-alpha.14.tgz": {
+            name: "@zitadel/cli",
+            version: "0.1.0-alpha.14",
+          },
+        },
+      }),
+      log: () => undefined,
+    });
+
+    expect(result.results).toEqual([
+      { name: "@zitadel/cli", version: "0.1.0-alpha.14", action: "published" },
+    ]);
+    expect(calls).toHaveLength(2);
+    expect(calls[0]?.args).toEqual(
+      expect.arrayContaining(["publish", "--tag", "zitadel-recovery-0-1-0-alpha-14"]),
+    );
+    expect(calls[1]?.args).toEqual([
+      "dist-tag",
+      "rm",
+      "@zitadel/cli",
+      "zitadel-recovery-0-1-0-alpha-14",
+      "--registry",
+      "https://registry.npmjs.org",
+      "--loglevel",
+      "warn",
+    ]);
+  });
+
+  it("repairs a stale dist-tag when the exact version already exists", async () => {
+    const { publishNpmTarballs } = await loadModule();
+    const tarballsDir = await tempDir("zitadel-npm-retag-");
+    await writeFile(join(tarballsDir, "zitadel-cli-0.1.0-alpha.14.tgz"), "");
+
+    const calls: CommandCall[] = [];
+    const result = await publishNpmTarballs({
+      plan: plan(),
+      tarballsDir,
+      distTag: "alpha",
+      distTagToken: "test-dist-tag-token",
+      registryUrl: "https://registry.example.test",
+      publicPackageNames: ["@zitadel/cli"],
+      run: async (command, args) => {
+        calls.push({ command, args });
+      },
+      runCapture: fakeRunCapture({
+        manifests: {
+          "zitadel-cli-0.1.0-alpha.14.tgz": {
+            name: "@zitadel/cli",
+            version: "0.1.0-alpha.14",
+          },
+        },
+        existingSpecs: ["@zitadel/cli@0.1.0-alpha.14"],
+        distTags: { "@zitadel/cli": { alpha: "0.1.0-alpha.13" } },
+      }),
+      log: () => undefined,
+    });
+
+    expect(result.results).toEqual([
+      { name: "@zitadel/cli", version: "0.1.0-alpha.14", action: "tagged" },
+    ]);
+    expect(calls).toEqual([
+      {
+        command: "npm",
+        args: [
+          "dist-tag",
+          "add",
+          "@zitadel/cli@0.1.0-alpha.14",
+          "alpha",
+          "--registry",
+          "https://registry.example.test",
+          "--loglevel",
+          "warn",
+        ],
+      },
+    ]);
+  });
+
+  it("reports a stale dist-tag without mutating it during dry runs", async () => {
+    const { publishNpmTarballs } = await loadModule();
+    const tarballsDir = await tempDir("zitadel-npm-retag-dry-");
+    await writeFile(join(tarballsDir, "zitadel-cli-0.1.0-alpha.14.tgz"), "");
+
+    const calls: CommandCall[] = [];
+    const result = await publishNpmTarballs({
+      plan: plan({ dryRun: true }),
+      tarballsDir,
+      distTag: "alpha",
+      publicPackageNames: ["@zitadel/cli"],
+      run: async (command, args) => {
+        calls.push({ command, args });
+      },
+      runCapture: fakeRunCapture({
+        manifests: {
+          "zitadel-cli-0.1.0-alpha.14.tgz": {
+            name: "@zitadel/cli",
+            version: "0.1.0-alpha.14",
+          },
+        },
+        existingSpecs: ["@zitadel/cli@0.1.0-alpha.14"],
+        distTags: { "@zitadel/cli": { alpha: "0.1.0-alpha.13" } },
+      }),
+      log: () => undefined,
+    });
+
+    expect(calls).toHaveLength(0);
+    expect(result.results).toEqual([
+      { name: "@zitadel/cli", version: "0.1.0-alpha.14", action: "would-tag" },
+    ]);
   });
 
   it("only reports what a dry-run plan would publish", async () => {
@@ -247,6 +425,29 @@ describe("release npm tarball promotion", () => {
     ).rejects.toThrow("unexpected package");
   });
 
+  it("refuses tarballs whose version differs from the publish plan", async () => {
+    const { publishNpmTarballs } = await loadModule();
+    const tarballsDir = await tempDir("zitadel-npm-version-guard-");
+    await writeFile(join(tarballsDir, "zitadel-cli-0.1.0-alpha.13.tgz"), "");
+
+    await expect(
+      publishNpmTarballs({
+        plan: plan(),
+        tarballsDir,
+        publicPackageNames: ["@zitadel/cli"],
+        runCapture: fakeRunCapture({
+          manifests: {
+            "zitadel-cli-0.1.0-alpha.13.tgz": {
+              name: "@zitadel/cli",
+              version: "0.1.0-alpha.13",
+            },
+          },
+        }),
+        log: () => undefined,
+      }),
+    ).rejects.toThrow("expected release 0.1.0-alpha.14");
+  });
+
   it("treats only 404s as missing versions and surfaces other registry errors", async () => {
     const { versionExistsOnRegistry } = await loadModule();
 
@@ -281,6 +482,20 @@ describe("release npm tarball promotion", () => {
     ).rejects.toThrow("failed to check");
   });
 
+  it("reads package dist-tags as registry state", async () => {
+    const { readRegistryDistTags } = await loadModule();
+
+    await expect(
+      readRegistryDistTags({
+        name: "@zitadel/cli",
+        registryUrl: "https://registry.example.test",
+        runCapture: async () => ({
+          stdout: JSON.stringify({ alpha: "0.1.0-alpha.14", latest: "0.0.9" }),
+        }),
+      }),
+    ).resolves.toEqual({ alpha: "0.1.0-alpha.14", latest: "0.0.9" });
+  });
+
   it("resolves the dist-tag from Changesets pre mode", async () => {
     const { resolveDistTag } = await loadModule();
 
@@ -307,9 +522,9 @@ describe("release npm tarball promotion", () => {
   it("parses registry, tarballs-dir, and dist-tag flags", async () => {
     const { parseArgs } = await loadModule();
 
-    expect(
-      parseArgs(["--registry", "http://127.0.0.1:4873", "--dist-tag", "alpha"]),
-    ).toMatchObject({ registryUrl: "http://127.0.0.1:4873", distTag: "alpha" });
+    expect(parseArgs(["--registry", "http://127.0.0.1:4873", "--dist-tag", "alpha"])).toMatchObject(
+      { registryUrl: "http://127.0.0.1:4873", distTag: "alpha" },
+    );
     expect(() => parseArgs(["--registry"])).toThrow("--registry requires a value");
     expect(() => parseArgs(["--bogus"])).toThrow("unknown option");
   });

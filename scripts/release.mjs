@@ -4,13 +4,6 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
-import { upsertProductGithubRelease } from "./release-github.mjs";
-import {
-  detectReleaseAutomation,
-  findUnrecordedPendingChangesets,
-  readPrereleaseChangesetIds,
-  readReleaseChangesets,
-} from "./release-automation.mjs";
 import {
   CONTAINER_PLATFORMS,
   SERVER_IMAGE,
@@ -29,8 +22,16 @@ import {
   stageServerNpmBinaries,
   verifyArchiveChecksums,
   verifyLocalArtifacts,
+  verifyReleaseMetadata,
   writeReleaseMetadata,
 } from "./release-artifacts.mjs";
+import {
+  detectReleaseAutomation,
+  findUnrecordedPendingChangesets,
+  readPrereleaseChangesetIds,
+  readReleaseChangesets,
+} from "./release-automation.mjs";
+import { upsertProductGithubRelease } from "./release-github.mjs";
 import {
   planSkipMessage,
   readPublishPlan,
@@ -92,6 +93,7 @@ async function commandBuild() {
   await prepareDockerContext({ repoRoot, outDir, version: release.version });
   await writeReleaseMetadata({ repoRoot, outDir, release, gitInfo: info });
   await verifyLocalArtifacts({ repoRoot, outDir, release });
+  await verifyReleaseMetadata({ repoRoot, outDir, release, expectedCommit: info.commit });
   console.log(`release artifacts ready: ${outDir}`);
 }
 
@@ -132,23 +134,23 @@ async function commandPack() {
 // which is how a Moon task graph carries a runtime gate decision.
 //
 // Two modes: the automatic push path requires a Changesets version commit;
-// manual dispatch is an idempotent re-run that publishes whatever is still
-// missing for the checked-out main version (each surface checks-and-skips),
-// so recovery is just "dispatch again" instead of a special mode.
+// manual dispatch idempotently publishes anything missing for one immutable
+// checkout. Historical recovery also carries an explicit version assertion.
 async function commandGate(options) {
   const release = await readServerRelease(repoRoot);
+  const info = await gitInfo({ repoRoot });
   const dryRun = options.dryRun || isEnvFlag(process.env.ZITADEL_RELEASE_DRY_RUN);
   const recoverVersion = options.recoverVersion || process.env.RECOVER_VERSION || "";
+  const releaseRef = process.env.ZITADEL_RELEASE_REF || "";
   const manual =
     options.manual || isEnvFlag(process.env.ZITADEL_RELEASE_MANUAL) || Boolean(recoverVersion);
   const base = options.base || process.env.BASE_SHA || "HEAD^";
 
+  if (releaseRef && !recoverVersion) {
+    throw new Error("release_ref requires recover_version");
+  }
   if (recoverVersion) {
     assertRecoverVersion(release, recoverVersion);
-    console.warn(
-      "release gate: recover_version is deprecated - manual dispatch is already an " +
-        "idempotent re-run of the checked-out version; drop the input",
-    );
   }
 
   const preflight = manual
@@ -167,6 +169,7 @@ async function commandGate(options) {
     reason: decision.reason,
     version: release.version,
     tag: release.tag,
+    commit: info.commit,
     prerelease: release.prerelease,
     recoverVersion,
   });
@@ -182,12 +185,14 @@ async function commandGate(options) {
 // always dry, so no surface can mutate anything remote.
 async function commandRehearsePlan() {
   const release = await readServerRelease(repoRoot);
+  const info = await gitInfo({ repoRoot });
   const plan = await writePublishPlan(repoRoot, {
     shouldPublish: true,
     dryRun: true,
     reason: "release rehearsal (gate-free dry run)",
     version: release.version,
     tag: release.tag,
+    commit: info.commit,
     prerelease: release.prerelease,
     recoverVersion: "",
   });
@@ -198,7 +203,7 @@ export function resolvePublishGate({ manual = false, recoverVersion = "", prefli
   if (recoverVersion) {
     return {
       shouldPublish: true,
-      reason: `manual recovery for ${recoverVersion} (deprecated recover_version input)`,
+      reason: `manual recovery for ${recoverVersion}`,
     };
   }
   if (manual) {
@@ -230,9 +235,16 @@ async function commandVerify() {
     return;
   }
   if (plan) {
-    assertPlanVersion(plan, release);
+    await assertPlanTarget(plan, release);
   }
+  const info = await gitInfo({ repoRoot });
   await verifyLocalArtifacts({ repoRoot, release, outDir });
+  await verifyReleaseMetadata({
+    repoRoot,
+    release,
+    outDir,
+    expectedCommit: plan?.commit ?? info.commit,
+  });
   await verifyArchiveChecksums({ outDir });
   await run("node", ["apps/cli-journey-e2e/scripts/verify-tarballs.mjs", join(outDir, "npm")], {
     cwd: repoRoot,
@@ -247,14 +259,12 @@ async function commandPublishContainer() {
     console.log(planSkipMessage("publish-container", plan));
     return;
   }
-  assertPlanVersion(plan, release);
+  await assertPlanTarget(plan, release);
 
   const outDir = releaseDir(repoRoot, release.version);
   const contextDir = join(outDir, "docker-context");
   if (!(await exists(join(contextDir, "Dockerfile")))) {
-    throw new Error(
-      `missing docker context at ${contextDir}; run moon run release:build first`,
-    );
+    throw new Error(`missing docker context at ${contextDir}; run moon run release:build first`);
   }
 
   const primary = `${SERVER_IMAGE}:${release.version}`;
@@ -319,7 +329,7 @@ async function commandPublishGithub() {
     console.log(planSkipMessage("publish-github", plan));
     return;
   }
-  assertPlanVersion(plan, release);
+  await assertPlanTarget(plan, release);
   const outDir = releaseDir(repoRoot, release.version);
   await upsertProductGithubRelease({ repoRoot, outDir, dryRun: plan.dryRun, log: console.log });
 }
@@ -335,7 +345,7 @@ async function commandPublishTags() {
     console.log(planSkipMessage("publish-tags", plan));
     return;
   }
-  assertPlanVersion(plan, release);
+  await assertPlanTarget(plan, release);
   if (plan.dryRun) {
     console.log("release publish-tags: dry run - would run changeset tag and push tags to origin");
     return;
@@ -362,8 +372,25 @@ function assertPlanVersion(plan, release) {
   }
 }
 
+async function assertPlanTarget(plan, release) {
+  assertPlanVersion(plan, release);
+  const info = await gitInfo({ repoRoot });
+  if (plan.commit !== info.commit) {
+    throw new Error(
+      `publish plan commit ${plan.commit} does not match checked-out commit ${info.commit}; ` +
+        "re-run the release gate on this checkout",
+    );
+  }
+}
+
 function parseOptions(args) {
-  const parsed = { dryRun: false, manual: false, skipContainer: false, recoverVersion: "", base: "" };
+  const parsed = {
+    dryRun: false,
+    manual: false,
+    skipContainer: false,
+    recoverVersion: "",
+    base: "",
+  };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     switch (arg) {
@@ -410,7 +437,9 @@ async function assertMainBranch(options, { allowDryRunBypass = true } = {}) {
   if ((allowDryRunBypass && options.dryRun) || process.env.GITHUB_REF === "refs/heads/main") {
     return;
   }
-  const branch = (await runCapture("git", ["branch", "--show-current"], { cwd: repoRoot })).stdout.trim();
+  const branch = (
+    await runCapture("git", ["branch", "--show-current"], { cwd: repoRoot })
+  ).stdout.trim();
   if (branch !== "main") {
     throw new Error(`release publish must run from main, got ${branch || "detached HEAD"}`);
   }
@@ -455,14 +484,14 @@ npm publishing lives in scripts/release-npm.mjs (release:publish-npm task).
 Options:
   --dry-run          Gate only: record a dry-run plan (no remote mutations).
   --manual           Gate only: manual dispatch - idempotently publish
-                     whatever is missing for the checked-out main version.
+                     whatever is missing for the checked-out release commit.
   --skip-container   Snapshot only: verify artifacts without a local image.
   --recover-version <v>
-                     Deprecated alias for --manual with a version assertion.
+                     Gate only: assert the historical recovery version.
   --base <ref>       Gate only: base ref for release publish detection.
 
 Environment fallbacks for gate: ZITADEL_RELEASE_DRY_RUN, ZITADEL_RELEASE_MANUAL,
-RECOVER_VERSION (deprecated), BASE_SHA.
+ZITADEL_RELEASE_REF, RECOVER_VERSION, BASE_SHA.
 `);
   process.exit(error ? 1 : 0);
 }

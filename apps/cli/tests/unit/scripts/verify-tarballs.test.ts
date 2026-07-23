@@ -22,15 +22,22 @@ afterEach(async () => {
 });
 
 describe("verify-tarballs script", () => {
-  it("accepts installable tarballs with independent package versions", async () => {
-    const tarballsDir = await fixtureTarballs({
-      "@zitadel/components": "0.2.0-alpha.1",
-      "@zitadel/sdk-next": "0.1.0-alpha.4",
-    });
+  it("accepts installable tarballs that all match the release version", async () => {
+    const tarballsDir = await fixtureTarballs();
 
     const packageCount = (await publicPackageDirs()).length;
     await expect(runVerify(tarballsDir)).resolves.toMatchObject({
       stdout: expect.stringContaining(`verified ${packageCount} installable tarballs`),
+    });
+  });
+
+  it("rejects public tarballs from a different release version", async () => {
+    const tarballsDir = await fixtureTarballs({
+      "@zitadel/sdk-next": "0.1.0-alpha.16",
+    });
+
+    await expect(runVerify(tarballsDir)).rejects.toMatchObject({
+      stderr: expect.stringContaining("public package tarballs must match release"),
     });
   });
 
@@ -65,18 +72,26 @@ async function fixtureTarballs(
   const tarballsDir = join(root, "tarballs");
   await mkdir(tarballsDir);
   const packageDirs = await publicPackageDirs();
+  const releaseVersion = await currentReleaseVersion();
 
   for (const dir of packageDirs) {
     const manifest = JSON.parse(await readFile(join(repoRoot, dir, "package.json"), "utf8")) as {
       name: string;
     };
-    const version = versionOverrides[manifest.name] ?? "0.1.0-alpha.5";
+    const version = versionOverrides[manifest.name] ?? releaseVersion;
     await createTarball(tarballsDir, manifest.name, version, {
       executable: manifest.name !== options.nonExecutablePackage,
     });
   }
 
   return tarballsDir;
+}
+
+async function currentReleaseVersion(): Promise<string> {
+  const manifest = JSON.parse(
+    await readFile(join(repoRoot, "apps/server/package.json"), "utf8"),
+  ) as { version: string };
+  return manifest.version;
 }
 
 async function publicPackageDirs(): Promise<string[]> {

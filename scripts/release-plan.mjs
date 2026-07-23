@@ -59,12 +59,16 @@ export function normalizePublishPlan(plan) {
   if (typeof plan.version !== "string" || plan.version.length === 0) {
     throw new Error("invalid publish plan: version is required");
   }
+  if (typeof plan.commit !== "string" || !/^[0-9a-f]{40,64}$/i.test(plan.commit)) {
+    throw new Error("invalid publish plan: commit must be a full git commit SHA");
+  }
   return {
     shouldPublish: plan.shouldPublish,
     dryRun: Boolean(plan.dryRun),
     reason: typeof plan.reason === "string" ? plan.reason : "",
     version: plan.version,
     tag: typeof plan.tag === "string" ? plan.tag : `v${plan.version}`,
+    commit: plan.commit,
     prerelease: Boolean(plan.prerelease),
     recoverVersion: typeof plan.recoverVersion === "string" ? plan.recoverVersion : "",
   };

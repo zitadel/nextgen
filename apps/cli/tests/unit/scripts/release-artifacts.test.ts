@@ -34,6 +34,12 @@ type ReleaseArtifactsModule = {
     }>;
   }) => Promise<void>;
   validateSemver: (version: string) => void;
+  verifyReleaseMetadata: (options: {
+    repoRoot: string;
+    release: { name: string; version: string; tag: string; prerelease: boolean };
+    outDir: string;
+    expectedCommit: string;
+  }) => Promise<unknown>;
   verifyLocalArtifacts: (options: {
     repoRoot: string;
     release: { name: string; version: string; tag: string; prerelease: boolean };
@@ -266,6 +272,77 @@ describe("release artifact helpers", () => {
     ).rejects.toThrow("missing release artifacts");
   });
 
+  it("binds release metadata to the checkout commit and public package manifests", async () => {
+    const { verifyReleaseMetadata } = await loadModule();
+    const manifestModule = (await import(
+      new URL("../../../../../scripts/release-manifest.mjs", import.meta.url).href
+    )) as { PUBLIC_RELEASE_PACKAGES: Array<{ name: string; dir: string }> };
+    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-metadata-"));
+    tempDirs.push(repoRoot);
+    const release = {
+      name: "@zitadel/server",
+      version: "0.1.0-alpha.17",
+      tag: "v0.1.0-alpha.17",
+      prerelease: true,
+    };
+    const commit = "a".repeat(40);
+    const outDir = join(repoRoot, "dist/release", release.version);
+    const packages = [];
+    for (const pkg of manifestModule.PUBLIC_RELEASE_PACKAGES) {
+      await mkdir(join(repoRoot, pkg.dir), { recursive: true });
+      await writeFile(
+        join(repoRoot, pkg.dir, "package.json"),
+        `${JSON.stringify({ name: pkg.name, version: release.version }, null, 2)}\n`,
+      );
+      packages.push({ name: pkg.name, version: release.version, path: pkg.dir });
+    }
+    await mkdir(outDir, { recursive: true });
+    await writeFile(
+      join(outDir, "metadata.json"),
+      `${JSON.stringify(
+        {
+          version: release.version,
+          tag: release.tag,
+          commit,
+          packages,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    await expect(
+      verifyReleaseMetadata({ repoRoot, release, outDir, expectedCommit: commit }),
+    ).resolves.toMatchObject({ commit, version: release.version });
+
+    await expect(
+      verifyReleaseMetadata({
+        repoRoot,
+        release,
+        outDir,
+        expectedCommit: "b".repeat(40),
+      }),
+    ).rejects.toThrow("release metadata commit");
+
+    packages[0].version = "0.1.0-alpha.16";
+    await writeFile(
+      join(outDir, "metadata.json"),
+      `${JSON.stringify(
+        {
+          version: release.version,
+          tag: release.tag,
+          commit,
+          packages,
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    await expect(
+      verifyReleaseMetadata({ repoRoot, release, outDir, expectedCommit: commit }),
+    ).rejects.toThrow("package set");
+  });
+
   it("rejects packing public packages before release build output exists", async () => {
     const { packPublicPackages } = await loadModule();
     const manifest = (await import(
@@ -289,7 +366,7 @@ describe("release artifact helpers", () => {
         version: "0.1.0-alpha.6",
         run: async () => undefined,
       }),
-    ).rejects.toThrow("requires apps/cli/dist before packing");
+    ).rejects.toThrow(/requires (?:apps|packages)\/.+\/dist before packing/);
   });
 
   it("stamps CLI release packs with the production telemetry channel", async () => {

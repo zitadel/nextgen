@@ -80,11 +80,11 @@ jobs:
 
       - name: Rehearse release publish (dry run)
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        # Environment parity with the release-publish publish job: unset only
-        # CI (keep GITHUB_ACTIONS), provide GITHUB_TOKEN, disable provenance.
-        # Code that behaves differently in the publish environment breaks
-        # here, on the offending PR, instead of on release day. The compose
-        # deployment smoke joins in when the diff touches the deploy surface.
+        # Preserve the GitHub Actions environment used by the real publish
+        # job. The rehearsal is remote-dry, so provenance stays disabled; the
+        # version-only lane below exercises npm against local Verdaccio.
+        # The compose deployment smoke joins in when the diff touches the
+        # deploy surface.
         run: |
           args=(release:rehearse)
           if [ "${DEPLOY_SMOKE}" = "true" ]; then

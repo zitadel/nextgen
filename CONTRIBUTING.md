@@ -250,16 +250,20 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
 - `moon run server:check-generate` — Go generated-file drift check.
 - Playwright Chromium install for `@zitadel/components`.
 - `moon ci :lint :typecheck :build :test :test-browser`.
-- `moon run server:test`, then `moon run server:test-postgres` (Spanner
-  integration is not run in CI yet; see the note in the workflow).
-- `moon run release:snapshot -- --skip-container` — a non-publishing release
-  snapshot.
+- `moon run server:test`, `moon run server:test-postgres`, and
+  `moon run server:test-spanner`.
+- `moon run release:rehearse` — builds and verifies the release artifacts and
+  runs the container and GitHub Release publish surfaces dry; deployment
+  changes also run the compose smoke.
 - The fresh-app consumer journey (`cli-journey-e2e:e2e-local`) with the npm
-  binary runtime against the snapshot's packed tarballs, plus one
+  binary runtime against the rehearsal's packed tarballs, plus one
   passkey-first preset journey run.
+- The `@zitadel/testing` real-instance integration suite, a real demo-next
+  browser flow, and the console real-instance suite.
 
-**Version-only mode** (Changesets version PRs) runs `release:version`,
-`release:pack`, and tarball verification instead.
+**Version-only mode** (Changesets version PRs) runs the full release rehearsal,
+including a real publish of every tarball to a throwaway local Verdaccio and
+the compose deployment smoke, then verifies the release tarballs again.
 
 CI consumes the workflow's packed npm tarballs, not public Zitadel packages.
 Changesets PR comments are informational release-intent feedback, not a
@@ -341,8 +345,9 @@ automatically.
 
 To cut or recover a release, follow the
 [release runbook](docs/runbooks/manual-release.md). Moon builds the artifacts
-and the draft GitHub Release; Changesets owns versions, npm publishing, and
-release notes — see
+and promotes the prebuilt npm tarballs, tags, container, and draft GitHub
+Release; Changesets owns release intent, versions, changelogs, fixed-group and
+prerelease policy, and tag generation — see
 [ADR 002](docs/adrs/002-multi-package-release-strategy.md) and
 [`.changeset/README.md`](.changeset/README.md).
 

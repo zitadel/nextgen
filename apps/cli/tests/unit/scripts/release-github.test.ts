@@ -9,7 +9,10 @@ type ReleaseGithubModule = {
   GENERATED_BLOCK_START: string;
   extractVersionSection: (source: string, version: string) => string;
   normalizeChangelogSection: (section: string) => string;
-  renderPackageChanges: (options: { repoRoot: string; metadata: ReleaseMetadata }) => Promise<string>;
+  renderPackageChanges: (options: {
+    repoRoot: string;
+    metadata: ReleaseMetadata;
+  }) => Promise<string>;
   upsertGeneratedBlock: (existingBody: string, generatedBlock: string) => string;
   upsertProductGithubRelease: (options: {
     dryRun?: boolean;
@@ -215,15 +218,39 @@ describe("product GitHub release API", () => {
     const createBody = JSON.parse(calls[1].init.body ?? "{}");
     expect(createBody).toMatchObject({
       tag_name: "v0.1.0-alpha.9",
-      target_commitish: "abc123",
+      target_commitish: "abc123def456",
       draft: true,
       prerelease: true,
     });
     expect(createBody.body).toContain("nextgen-release-facts:start");
   });
 
+  it("targets the pinned release SHA instead of the workflow trigger SHA", async () => {
+    const { upsertProductGithubRelease } = await loadModule();
+    const calls: FetchCall[] = [];
+    const fetchImpl = async (url: unknown, init: unknown) => {
+      calls.push(fetchCall(url, init));
+      return calls.length === 1 ? jsonResponse(200, []) : jsonResponse(201, { id: 123 });
+    };
+
+    await upsertProductGithubRelease({
+      metadata: metadata(),
+      env: {
+        ...githubEnv(),
+        GITHUB_SHA: "trigger-sha",
+        ZITADEL_RELEASE_SHA: "abc123def456",
+      },
+      fetchImpl,
+      log: () => undefined,
+    });
+
+    const createBody = JSON.parse(calls[1].init.body ?? "{}");
+    expect(createBody.target_commitish).toBe("abc123def456");
+  });
+
   it("patches only the generated block when a release already exists", async () => {
-    const { GENERATED_BLOCK_END, GENERATED_BLOCK_START, upsertProductGithubRelease } = await loadModule();
+    const { GENERATED_BLOCK_END, GENERATED_BLOCK_START, upsertProductGithubRelease } =
+      await loadModule();
     const calls: FetchCall[] = [];
     const fetchImpl = async (url: unknown, init: unknown) => {
       calls.push(fetchCall(url, init));
@@ -259,10 +286,12 @@ Human tail.`,
     expect(patchBody.body).toContain("Human tail.");
     expect(patchBody.body).toContain("Generated Release Facts");
     expect(patchBody.body).not.toContain("old generated facts");
+    expect(patchBody.target_commitish).toBe("abc123def456");
   });
 
   it("finds existing draft releases by scanning paginated release listings", async () => {
-    const { GENERATED_BLOCK_END, GENERATED_BLOCK_START, upsertProductGithubRelease } = await loadModule();
+    const { GENERATED_BLOCK_END, GENERATED_BLOCK_START, upsertProductGithubRelease } =
+      await loadModule();
     const calls: FetchCall[] = [];
     const firstPage = Array.from({ length: 100 }, (_, index) => ({
       id: index + 1,
@@ -359,7 +388,7 @@ function metadata(): ReleaseMetadata {
 function githubEnv(): Record<string, string> {
   return {
     GITHUB_REPOSITORY: "zitadel/nextgen",
-    GITHUB_SHA: "abc123",
+    GITHUB_SHA: "abc123def456",
     GITHUB_TOKEN: "token",
   };
 }

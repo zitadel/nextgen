@@ -1,8 +1,10 @@
 # Changesets
 
 A changeset records a PR's **release intent** — it feeds the generated changelog
-and the `v<version>` GitHub Release notes, and drives npm versions and publishing.
-This file is the source of truth for "do I need one?"; other docs link here.
+and the `v<version>` GitHub Release notes, and drives npm versions, prerelease
+policy, and package tag generation. Moon promotes the resulting prebuilt npm
+tarballs. This file is the source of truth for "do I need one?"; other docs
+link here.
 
 ## Publishable npm packages
 
@@ -71,8 +73,9 @@ The repo is in changesets prerelease mode, tag `alpha` (`.changeset/pre.json`):
 
 - `changeset version` cuts `0.1.0-alpha.N`; consumed changesets are recorded in
   `pre.json`, pending ones stay in the tree.
-- The fixed group versions together; `changeset publish` uses the `alpha` npm
-  dist-tag.
+- The fixed group versions together; release promotion reads the `alpha` npm
+  dist-tag from `pre.json`, publishes the exact prebuilt tarballs, and repairs
+  that tag if an idempotent rerun finds it stale.
 
 Leave alpha for a stable `latest` release:
 
@@ -86,19 +89,28 @@ corepack pnpm changeset version   # strips -alpha
 On merge to `main`, `release-publish.yml` opens a "Version Packages" PR — via the
 changesets action, using the release GitHub App token so `full-pr` runs. Merging
 it publishes the npm packages, pushes the server container, and updates the draft
-GitHub Release for `v<version>`. Re-run with `recover_version=<version>` to
-backfill a missing artifact; `changeset publish` skips versions already on npm.
+GitHub Release for `v<version>`. Normal manual reruns pin the dispatch-selected
+commit. To recover an older release after `main` has moved, supply both
+`release_ref=<full commit or tag>` and `recover_version=<version>`; promotion
+verifies the pinned commit and artifact metadata, skips npm versions already
+present, and leaves the active `alpha` or `latest` dist-tag unchanged.
 Full steps: [release runbook](../docs/runbooks/manual-release.md). Ownership and
 rationale: [ADR 002](../docs/adrs/002-multi-package-release-strategy.md)
 (supersedes [ADR 023](../docs/adrs/023-lockstep-alpha-release-train.md)).
 
-Publishing uses **npm trusted publishing (OIDC)** — there is no `NPM_TOKEN`. Once
-per public package, a maintainer adds a trusted publisher on npmjs.com (Settings →
-Trusted Publishing): provider GitHub Actions, repo `zitadel/nextgen`, workflow
-`release-publish.yml`. The package must exist on npm first (publish `0.0.x` by
-hand if needed). The release job runs on Depot, which npm treats as self-hosted;
-keep `NPM_CONFIG_PROVENANCE=false` until npm provenance is supported for that
-runner environment or the publish job moves to GitHub-hosted runners.
+Publishing uses **npm trusted publishing (OIDC)** for `npm publish` — there is no
+general `NPM_TOKEN`. Once per public package, a maintainer adds a trusted
+publisher on npmjs.com (Settings → Trusted Publishing): provider GitHub Actions,
+repo `zitadel/nextgen`, workflow `release-publish.yml`. The package must exist on
+npm first (publish `0.0.x` by hand if needed). The credentialed publish job runs
+on a GitHub-hosted runner because npm does not support trusted publishing from
+self-hosted runners.
+
+npm does not authorize `dist-tag` mutations through trusted-publishing OIDC.
+Configure `NPM_DIST_TAG_TOKEN` as a short-lived, package-scoped granular token
+for the release workflow. Automation maps it to npm's `NODE_AUTH_TOKEN` only
+for a stale-tag repair or historical-recovery cleanup command; normal package
+publication remains OIDC.
 
 Each public package must declare its license and ship a `LICENSE` file before its
 first publish — see [LICENSING.md](../LICENSING.md).

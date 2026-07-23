@@ -263,7 +263,9 @@ Keep private mocks aligned with public CLI behavior.
 `,
       },
       runChangesetStatus: async () => {
-        throw new Error("Found mixed changeset mixed: ignored @zitadel/api-mock and not ignored @zitadel/cli");
+        throw new Error(
+          "Found mixed changeset mixed: ignored @zitadel/api-mock and not ignored @zitadel/cli",
+        );
       },
     });
 
@@ -313,7 +315,11 @@ This package is private.
     const report = await checkChangesetsStatus({
       entries: [{ status: "M", file: "docs/release.md" }],
       config: {
-        fixed: [publicPackages.map((pkg) => pkg.name).filter((name) => name !== "@zitadel/server-linux-x64")],
+        fixed: [
+          publicPackages
+            .map((pkg) => pkg.name)
+            .filter((name) => name !== "@zitadel/server-linux-x64"),
+        ],
       },
     });
 
@@ -549,7 +555,7 @@ describe("release publish guard", () => {
 
     expect(resolvePublishGate({ recoverVersion: "0.1.0-alpha.14", release })).toEqual({
       shouldPublish: true,
-      reason: "manual recovery for 0.1.0-alpha.14 (deprecated recover_version input)",
+      reason: "manual recovery for 0.1.0-alpha.14",
     });
   });
 

@@ -30,10 +30,12 @@ proposals and implementations with recorded decisions.
 
 This repo is the pre-release next generation of Zitadel. Moon owns the
 monorepo task graph, release artifact builds, and the draft GitHub Release
-shell; Changesets owns package versions, changelogs, npm publishing, and
-public package tags (see "Release, Licensing, And Secrets"). This section
-maps roles, not an exhaustive inventory — the authoritative project list is
-`moon projects`, and workspace globs live in `pnpm-workspace.yaml`.
+shell; Changesets owns release intent, package versions, changelogs,
+fixed-group and prerelease policy, and package-tag generation. Moon promotes
+the prebuilt npm tarballs and pushes the generated tags (see "Release,
+Licensing, And Secrets"). This section maps roles, not an exhaustive inventory
+— the authoritative project list is `moon projects`, and workspace globs live
+in `pnpm-workspace.yaml`.
 
 Go server:
 

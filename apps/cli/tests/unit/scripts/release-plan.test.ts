@@ -10,6 +10,7 @@ type PublishPlan = {
   reason: string;
   version: string;
   tag: string;
+  commit: string;
   prerelease: boolean;
   recoverVersion: string;
 };
@@ -56,6 +57,7 @@ describe("release publish plan", () => {
       dryRun: true,
       reason: "version commit detected",
       version: "0.1.0-alpha.14",
+      commit: "a".repeat(40),
       prerelease: true,
     });
 
@@ -72,11 +74,16 @@ describe("release publish plan", () => {
     await expect(readPublishPlanIfExists(repoRoot)).resolves.toBeNull();
   });
 
-  it("rejects plans without a boolean decision or version", async () => {
+  it("rejects plans without a boolean decision, version, or full commit", async () => {
     const { normalizePublishPlan } = await loadModule();
 
-    expect(() => normalizePublishPlan({ version: "1.0.0" })).toThrow("shouldPublish");
+    expect(() => normalizePublishPlan({ version: "1.0.0", commit: "a".repeat(40) })).toThrow(
+      "shouldPublish",
+    );
     expect(() => normalizePublishPlan({ shouldPublish: true })).toThrow("version");
+    expect(() =>
+      normalizePublishPlan({ shouldPublish: true, version: "1.0.0", commit: "abc123" }),
+    ).toThrow("full git commit SHA");
     expect(() => normalizePublishPlan(null)).toThrow("expected an object");
   });
 

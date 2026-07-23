@@ -58,13 +58,19 @@ export function validateSemver(version) {
 export async function gitInfo(options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
   const runCaptureFn = options.runCapture ?? runCapture;
-  const commit = (await runCaptureFn("git", ["rev-parse", "HEAD"], { cwd: repoRoot })).stdout.trim();
-  const shortCommit = (await runCaptureFn("git", ["rev-parse", "--short=12", "HEAD"], {
-    cwd: repoRoot,
-  })).stdout.trim();
-  const date = (await runCaptureFn("git", ["show", "-s", "--format=%cI", "HEAD"], {
-    cwd: repoRoot,
-  })).stdout.trim();
+  const commit = (
+    await runCaptureFn("git", ["rev-parse", "HEAD"], { cwd: repoRoot })
+  ).stdout.trim();
+  const shortCommit = (
+    await runCaptureFn("git", ["rev-parse", "--short=12", "HEAD"], {
+      cwd: repoRoot,
+    })
+  ).stdout.trim();
+  const date = (
+    await runCaptureFn("git", ["show", "-s", "--format=%cI", "HEAD"], {
+      cwd: repoRoot,
+    })
+  ).stdout.trim();
   return { commit, shortCommit, date };
 }
 
@@ -183,7 +189,10 @@ export async function createArchives(options = {}) {
       const stagingDir = join(outDir, "archive-staging", name);
       await rm(stagingDir, { recursive: true, force: true });
       await mkdir(stagingDir, { recursive: true });
-      await copyFile(join(sourceDir, binaryName(platform.goos)), join(stagingDir, binaryName(platform.goos)));
+      await copyFile(
+        join(sourceDir, binaryName(platform.goos)),
+        join(stagingDir, binaryName(platform.goos)),
+      );
       await copyFile(join(repoRoot, "LICENSE"), join(stagingDir, "LICENSE"));
       await copyFile(join(repoRoot, "README.md"), join(stagingDir, "README.md"));
       const archivePath = join(archivesDir, `${name}.zip`);
@@ -282,17 +291,29 @@ export async function buildContainerImage(options = {}) {
   const runFn = options.run ?? run;
   const platformList = options.platforms ?? CONTAINER_PLATFORMS;
   const contextPlatforms = options.contextPlatforms ?? platformList;
-  const contextDir = options.contextDir ??
+  const contextDir =
+    options.contextDir ??
     (await prepareDockerContext({
       repoRoot,
       outDir,
       version: release.version,
       platforms: contextPlatforms,
     }));
-  const platformArgs = platformList.map((platform) => `${platform.goos}/${platform.goarch}`).join(",");
+  const platformArgs = platformList
+    .map((platform) => `${platform.goos}/${platform.goarch}`)
+    .join(",");
   const image = options.image ?? SERVER_IMAGE;
-  const tags = options.tags ?? containerTags({ image, version: release.version, prerelease: release.prerelease });
-  const args = ["buildx", "build", "--platform", platformArgs, "-f", join(contextDir, "Dockerfile")];
+  const tags =
+    options.tags ??
+    containerTags({ image, version: release.version, prerelease: release.prerelease });
+  const args = [
+    "buildx",
+    "build",
+    "--platform",
+    platformArgs,
+    "-f",
+    join(contextDir, "Dockerfile"),
+  ];
 
   for (const tag of tags) {
     args.push("-t", tag);
@@ -410,12 +431,53 @@ export async function writeReleaseMetadata(options = {}) {
     shortCommit: info.shortCommit,
     date: info.date,
     image: SERVER_IMAGE,
-    imageTags: containerTags({ image: SERVER_IMAGE, version: release.version, prerelease: release.prerelease }),
+    imageTags: containerTags({
+      image: SERVER_IMAGE,
+      version: release.version,
+      prerelease: release.prerelease,
+    }),
     packages,
   };
   await mkdir(outDir, { recursive: true });
   await writeFile(join(outDir, "metadata.json"), `${JSON.stringify(metadata, null, 2)}\n`);
   await writeFile(join(outDir, "artifact-summary.md"), artifactSummary(metadata));
+  return metadata;
+}
+
+export async function verifyReleaseMetadata(options = {}) {
+  const repoRoot = options.repoRoot ?? defaultRepoRoot;
+  const release = options.release ?? (await readServerRelease(repoRoot));
+  const outDir = options.outDir ?? releaseDir(repoRoot, release.version);
+  const expectedCommit =
+    options.expectedCommit ?? (await gitInfo({ repoRoot, runCapture: options.runCapture })).commit;
+  const metadata = JSON.parse(await readFile(join(outDir, "metadata.json"), "utf8"));
+
+  if (metadata.version !== release.version || metadata.tag !== release.tag) {
+    throw new Error(
+      `release metadata targets ${metadata.tag ?? metadata.version}, expected ${release.tag}`,
+    );
+  }
+  if (metadata.commit !== expectedCommit) {
+    throw new Error(
+      `release metadata commit ${metadata.commit ?? "missing"} does not match ${expectedCommit}`,
+    );
+  }
+
+  const expectedPackages = [];
+  for (const pkg of PUBLIC_RELEASE_PACKAGES) {
+    const manifest = await readPackageManifest(repoRoot, join(pkg.dir, "package.json"));
+    if (manifest.name !== pkg.name) {
+      throw new Error(
+        `${pkg.dir}/package.json is ${manifest.name ?? "unnamed"}, expected ${pkg.name}`,
+      );
+    }
+    expectedPackages.push({ name: pkg.name, version: manifest.version, path: pkg.dir });
+  }
+  if (JSON.stringify(metadata.packages) !== JSON.stringify(expectedPackages)) {
+    throw new Error(
+      "release metadata package set does not match the checked-out public release manifests",
+    );
+  }
   return metadata;
 }
 
@@ -443,7 +505,9 @@ export function artifactImageRows(metadata) {
 }
 
 export function artifactPackageRows(metadata) {
-  return (metadata.packages ?? []).map((pkg) => `| \`${pkg.name}\` | \`${pkg.version}\` |`).join("\n");
+  return (metadata.packages ?? [])
+    .map((pkg) => `| \`${pkg.name}\` | \`${pkg.version}\` |`)
+    .join("\n");
 }
 
 // Recomputes archive digests against checksums.txt. The publish job runs this
@@ -490,7 +554,11 @@ export async function verifyLocalArtifacts(options = {}) {
   const missing = [];
   for (const platform of SERVER_PLATFORMS) {
     const extension = platform.goos === "windows" ? "zip" : "tar.gz";
-    const archive = join(outDir, "archives", `nextgen_${release.version}_${platformName(platform)}.${extension}`);
+    const archive = join(
+      outDir,
+      "archives",
+      `nextgen_${release.version}_${platformName(platform)}.${extension}`,
+    );
     if (!(await exists(archive))) {
       missing.push(archive);
     }

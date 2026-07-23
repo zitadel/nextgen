@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
-import { readServerRelease, releaseDir } from "./release-artifacts.mjs";
+import { gitInfo, readServerRelease, releaseDir } from "./release-artifacts.mjs";
 import { PUBLIC_PACKAGE_NAMES } from "./release-manifest.mjs";
 import { planSkipMessage, readPublishPlan } from "./release-plan.mjs";
 
@@ -13,14 +13,17 @@ export const DEFAULT_REGISTRY_URL = "https://registry.npmjs.org";
 
 // Tarball promotion: the build job packed every public package once
 // (prepack hooks included), so publishing means promoting those exact .tgz
-// files. Idempotency comes from an explicit registry existence check instead
-// of `changeset publish` — a re-run publishes only what is still missing.
+// files. Idempotency comes from explicit version and dist-tag registry checks
+// instead of `changeset publish`: a current-release rerun publishes only what
+// is missing and repairs stale tags, while historical recovery never moves the
+// mutable alpha/latest tag backward.
 export async function publishNpmTarballs(options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
   const log = options.log ?? console.log;
   const runFn = options.run ?? run;
   const runCaptureFn = options.runCapture ?? runCapture;
   const plan = options.plan ?? (await readPublishPlan(repoRoot));
+  const distTagToken = options.distTagToken ?? process.env.NPM_DIST_TAG_TOKEN ?? "";
 
   if (!plan.shouldPublish) {
     log(planSkipMessage("publish-npm", plan));
@@ -28,8 +31,7 @@ export async function publishNpmTarballs(options = {}) {
   }
 
   const registryUrl = options.registryUrl ?? DEFAULT_REGISTRY_URL;
-  const tarballsDir =
-    options.tarballsDir ?? join(releaseDir(repoRoot, plan.version), "npm");
+  const tarballsDir = options.tarballsDir ?? join(releaseDir(repoRoot, plan.version), "npm");
   const distTag = options.distTag ?? (await resolveDistTag(repoRoot));
   const tarballs = (await readdir(tarballsDir)).filter((file) => file.endsWith(".tgz")).sort();
   if (tarballs.length === 0) {
@@ -47,20 +49,100 @@ export async function publishNpmTarballs(options = {}) {
     if (!publicNames.has(manifest.name)) {
       throw new Error(`${tarball} contains unexpected package ${manifest.name}`);
     }
+    if (manifest.version !== plan.version) {
+      throw new Error(
+        `${tarball} contains ${manifest.name}@${manifest.version}, expected release ${plan.version}`,
+      );
+    }
 
     const spec = `${manifest.name}@${manifest.version}`;
     if (await versionExistsOnRegistry({ spec, registryUrl, runCapture: runCaptureFn })) {
-      log(`release publish-npm: ${spec} already on ${registryUrl} - skipping`);
-      results.push({ name: manifest.name, version: manifest.version, action: "exists" });
+      const distTags = await readRegistryDistTags({
+        name: manifest.name,
+        registryUrl,
+        runCapture: runCaptureFn,
+      });
+      const recoveryTag = historicalRecoveryTag(plan, manifest.version);
+      if (recoveryTag) {
+        if (distTags[recoveryTag] === manifest.version) {
+          if (plan.dryRun) {
+            log(
+              `release publish-npm: dry run - would remove temporary dist-tag ` +
+                `${manifest.name}@${recoveryTag}`,
+            );
+            results.push({
+              name: manifest.name,
+              version: manifest.version,
+              action: "would-untag",
+            });
+            continue;
+          }
+          await removeRegistryDistTag({
+            name: manifest.name,
+            distTag: recoveryTag,
+            registryUrl,
+            token: distTagToken,
+            repoRoot,
+            env: options.env,
+            run: runFn,
+          });
+          log(`release publish-npm: removed temporary dist-tag ${manifest.name}@${recoveryTag}`);
+        } else {
+          log(
+            `release publish-npm: ${spec} already on ${registryUrl}; ` +
+              `historical recovery leaves dist-tag ${distTag} unchanged`,
+          );
+        }
+        results.push({ name: manifest.name, version: manifest.version, action: "exists" });
+        continue;
+      }
+      if (distTags[distTag] === manifest.version) {
+        log(
+          `release publish-npm: ${spec} already on ${registryUrl} with dist-tag ${distTag} - skipping`,
+        );
+        results.push({ name: manifest.name, version: manifest.version, action: "exists" });
+        continue;
+      }
+
+      if (plan.dryRun) {
+        log(
+          `release publish-npm: dry run - would point ${manifest.name} dist-tag ${distTag} ` +
+            `at ${manifest.version}`,
+        );
+        results.push({ name: manifest.name, version: manifest.version, action: "would-tag" });
+        continue;
+      }
+
+      await setRegistryDistTag({
+        spec,
+        distTag,
+        registryUrl,
+        token: distTagToken,
+        repoRoot,
+        env: options.env,
+        run: runFn,
+      });
+      log(
+        `release publish-npm: pointed ${manifest.name} dist-tag ${distTag} at ${manifest.version}`,
+      );
+      results.push({ name: manifest.name, version: manifest.version, action: "tagged" });
       continue;
     }
 
     if (plan.dryRun) {
-      log(`release publish-npm: dry run - would publish ${spec} with dist-tag ${distTag}`);
+      const publishTag = historicalRecoveryTag(plan, manifest.version) || distTag;
+      log(`release publish-npm: dry run - would publish ${spec} with dist-tag ${publishTag}`);
       results.push({ name: manifest.name, version: manifest.version, action: "would-publish" });
       continue;
     }
 
+    const recoveryTag = historicalRecoveryTag(plan, manifest.version);
+    if (recoveryTag && !distTagToken) {
+      throw new Error(
+        `historical npm recovery for ${spec} requires NPM_DIST_TAG_TOKEN ` +
+          "to remove its temporary dist-tag after publishing",
+      );
+    }
     await runFn(
       "npm",
       [
@@ -69,7 +151,7 @@ export async function publishNpmTarballs(options = {}) {
         "--registry",
         registryUrl,
         "--tag",
-        distTag,
+        recoveryTag || distTag,
         "--access",
         "public",
         "--ignore-scripts",
@@ -78,16 +160,39 @@ export async function publishNpmTarballs(options = {}) {
       ],
       { cwd: repoRoot, env: options.env ?? process.env },
     );
-    log(`release publish-npm: published ${spec} with dist-tag ${distTag}`);
+    if (recoveryTag) {
+      await removeRegistryDistTag({
+        name: manifest.name,
+        distTag: recoveryTag,
+        registryUrl,
+        token: distTagToken,
+        repoRoot,
+        env: options.env,
+        run: runFn,
+      });
+      log(
+        `release publish-npm: published ${spec} for historical recovery and removed ` +
+          `temporary dist-tag ${recoveryTag}; ${distTag} was not moved`,
+      );
+    } else {
+      log(`release publish-npm: published ${spec} with dist-tag ${distTag}`);
+    }
     results.push({ name: manifest.name, version: manifest.version, action: "published" });
   }
 
   const published = results.filter((entry) => entry.action === "published").length;
+  const tagged = results.filter((entry) => entry.action === "tagged").length;
   const existing = results.filter((entry) => entry.action === "exists").length;
   const pending = results.filter((entry) => entry.action === "would-publish").length;
+  const pendingTags = results.filter((entry) => entry.action === "would-tag").length;
+  const pendingUntag = results.filter((entry) => entry.action === "would-untag").length;
   log(
-    `release publish-npm: ${published} published, ${existing} already on registry` +
-      (plan.dryRun ? `, ${pending} would publish` : ""),
+    `release publish-npm: ${published} published, ${tagged} dist-tags updated, ` +
+      `${existing} already present` +
+      (plan.dryRun
+        ? `, ${pending} would publish, ${pendingTags} would update a dist-tag, ` +
+          `${pendingUntag} would remove a temporary dist-tag`
+        : ""),
   );
   return { skipped: false, distTag, registryUrl, results };
 }
@@ -114,6 +219,90 @@ export async function versionExistsOnRegistry(options) {
       `failed to check ${options.spec} on ${options.registryUrl}: ${error?.message ?? error}`,
     );
   }
+}
+
+export async function readRegistryDistTags(options) {
+  const runCaptureFn = options.runCapture ?? runCapture;
+  try {
+    const result = await runCaptureFn("npm", [
+      "view",
+      options.name,
+      "dist-tags",
+      "--json",
+      "--registry",
+      options.registryUrl,
+      "--loglevel",
+      "error",
+    ]);
+    const parsed = JSON.parse(result.stdout || "{}");
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("expected a JSON object");
+    }
+    return parsed;
+  } catch (error) {
+    throw new Error(
+      `failed to read dist-tags for ${options.name} on ${options.registryUrl}: ` +
+        `${error?.message ?? error}`,
+    );
+  }
+}
+
+async function setRegistryDistTag(options) {
+  requireDistTagToken(options.token, `${options.spec} ${options.distTag}`);
+  await options.run(
+    "npm",
+    [
+      "dist-tag",
+      "add",
+      options.spec,
+      options.distTag,
+      "--registry",
+      options.registryUrl,
+      "--loglevel",
+      "warn",
+    ],
+    {
+      cwd: options.repoRoot,
+      env: { ...process.env, ...(options.env ?? {}), NODE_AUTH_TOKEN: options.token },
+    },
+  );
+}
+
+async function removeRegistryDistTag(options) {
+  requireDistTagToken(options.token, `${options.name} ${options.distTag}`);
+  await options.run(
+    "npm",
+    [
+      "dist-tag",
+      "rm",
+      options.name,
+      options.distTag,
+      "--registry",
+      options.registryUrl,
+      "--loglevel",
+      "warn",
+    ],
+    {
+      cwd: options.repoRoot,
+      env: { ...process.env, ...(options.env ?? {}), NODE_AUTH_TOKEN: options.token },
+    },
+  );
+}
+
+function requireDistTagToken(token, target) {
+  if (!token) {
+    throw new Error(
+      `npm dist-tag repair for ${target} requires NPM_DIST_TAG_TOKEN; ` +
+        "trusted publishing OIDC authorizes npm publish, not dist-tag mutations",
+    );
+  }
+}
+
+function historicalRecoveryTag(plan, version) {
+  if (!plan.recoverVersion) {
+    return "";
+  }
+  return `zitadel-recovery-${version.replace(/[^0-9A-Za-z-]/g, "-")}`;
 }
 
 // Changesets publishes prereleases under the pre-mode tag (.changeset/pre.json)
@@ -190,6 +379,14 @@ release gate; dry-run plans only report what a real run would publish.
     throw new Error(
       `publish plan version ${plan.version} does not match checked-out server version ${release.version}`,
     );
+  }
+  if (plan.shouldPublish) {
+    const info = await gitInfo({ repoRoot: defaultRepoRoot });
+    if (plan.commit !== info.commit) {
+      throw new Error(
+        `publish plan commit ${plan.commit} does not match checked-out commit ${info.commit}`,
+      );
+    }
   }
 
   await publishNpmTarballs({
