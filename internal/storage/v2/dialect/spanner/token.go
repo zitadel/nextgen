@@ -84,7 +84,7 @@ func (ts tokenStatements) CreateToken(ctx context.Context, token *domain.Token) 
 		oidcSessionID,
 		samlSessionID,
 		scope,
-		token.ExpiresAt,
+		tokenExpiresAtArg(token.ExpiresAt),
 	).statement()
 
 	var tokenID int64
@@ -238,6 +238,13 @@ func tokenSessionIDArg(sessionID *string) (any, error) {
 		return nil, fmt.Errorf("invalid session id %q: %w", *sessionID, err)
 	}
 	return id, nil
+}
+
+func tokenExpiresAtArg(expiresAt *time.Time) any {
+	if expiresAt == nil {
+		return nil
+	}
+	return *expiresAt
 }
 
 func tokenOptionalString(id *string) any {
