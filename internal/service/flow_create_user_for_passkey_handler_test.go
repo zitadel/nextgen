@@ -132,53 +132,53 @@ func TestFlowCreateUserForPasskey_PersistsAllCollectedSchemaFields(t *testing.T)
 		})
 
 	state := passkeyFlowState(map[string]any{
-		"email":      "bob@example.com",
-		"givenName":  "Bob",
-		"familyName": "Builder",
+		"email":      "alice@example.com",
+		"givenName":  "Alice",
+		"familyName": "Doe",
 	})
 
-	err := f.handler.CreateProvisionalUser(t.Context(), "user_bob", state)
+	err := f.handler.CreateProvisionalUser(t.Context(), "user_1", state)
 	require.NoError(t, err)
 	require.NotNil(t, captured)
 
 	emailAttr := attributeByKey(t, captured.Attributes, "email")
-	assert.Equal(t, "bob@example.com", emailAttr.Value)
+	assert.Equal(t, "alice@example.com", emailAttr.Value)
 	assert.Equal(t, domain.AttributeUniquenessProject, emailAttr.UniqueScope, "x-unique on the schema must carry through")
 
-	assert.Equal(t, "Bob", attributeByKey(t, captured.Attributes, "givenName").Value)
-	assert.Equal(t, "Builder", attributeByKey(t, captured.Attributes, "familyName").Value)
+	givenAttr := attributeByKey(t, captured.Attributes, "givenName")
+	assert.Equal(t, "Alice", givenAttr.Value)
+
+	familyAttr := attributeByKey(t, captured.Attributes, "familyName")
+	assert.Equal(t, "Doe", familyAttr.Value)
 }
 
-func TestFlowCreateUserForPasskey_AlreadyExistsIsIdempotent(t *testing.T) {
+func TestFlowCreateUserForPasskey_UserAlreadyExistsIsSilent(t *testing.T) {
 	f := newPasskeyHandlerFixture(t)
 	expectSchemaLookup(f)
 	f.pool.EXPECT().Begin(gomock.Any(), gomock.Any()).Return(f.tx, nil)
 	f.tx.EXPECT().Rollback(gomock.Any()).Return(nil)
 	f.userRepo.EXPECT().
 		Create(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(database.NewUniqueError("users", "users_pkey", errors.New("duplicate")))
+		Return(&database.UniqueError{})
 
-	state := passkeyFlowState(map[string]any{
-		"email": "carol@example.com",
-	})
+	state := passkeyFlowState(map[string]any{"email": "alice@example.com"})
 
-	err := f.handler.CreateProvisionalUser(t.Context(), "user_existing", state)
-	require.NoError(t, err, "already-exists must be treated as success for provisional create")
+	err := f.handler.CreateProvisionalUser(t.Context(), "user_1", state)
+	assert.NoError(t, err, "racing prior on_success must not surface as an error")
 }
 
-func TestFlowCreateUserForPasskey_PropagatesNonExistsErrors(t *testing.T) {
+func TestFlowCreateUserForPasskey_OtherErrorsPropagate(t *testing.T) {
 	f := newPasskeyHandlerFixture(t)
 	expectSchemaLookup(f)
 	f.pool.EXPECT().Begin(gomock.Any(), gomock.Any()).Return(f.tx, nil)
 	f.tx.EXPECT().Rollback(gomock.Any()).Return(nil)
+	sentinel := errors.New("repo exploded")
 	f.userRepo.EXPECT().
 		Create(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(errors.New("db unavailable"))
+		Return(sentinel)
 
-	state := passkeyFlowState(map[string]any{
-		"email": "dave@example.com",
-	})
+	state := passkeyFlowState(map[string]any{"email": "alice@example.com"})
 
-	err := f.handler.CreateProvisionalUser(t.Context(), "user_dave", state)
+	err := f.handler.CreateProvisionalUser(t.Context(), "user_1", state)
 	require.Error(t, err)
 }
