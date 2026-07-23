@@ -80,8 +80,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 		return nil
 	})
 	if err != nil {
-		var de domain.Error
-		if errors.As(err, &de) {
+		if de, ok := errors.AsType[domain.Error](err); ok {
 			return nil, de
 		}
 		if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
@@ -103,8 +102,7 @@ func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchem
 		return nil
 	})
 	if err != nil {
-		var de domain.Error
-		if errors.As(err, &de) {
+		if de, ok := errors.AsType[domain.Error](err); ok {
 			return nil, de
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to commit transaction")
