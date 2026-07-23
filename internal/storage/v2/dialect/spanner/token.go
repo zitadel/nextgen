@@ -87,7 +87,7 @@ func (ts tokenStatements) CreateToken(ctx context.Context, token *domain.Token) 
 		token.ExpiresAt,
 	).statement()
 
-	var tokenID storagedb.Identity
+	var tokenID int64
 	err = ts.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 			return struct{}{}, row.Columns(&tokenID)
@@ -97,10 +97,10 @@ func (ts tokenStatements) CreateToken(ctx context.Context, token *domain.Token) 
 	if err != nil {
 		return err
 	}
-	if tokenID == "" {
+	if tokenID == 0 {
 		return fmt.Errorf("failed to create token: no token_id returned")
 	}
-	token.TokenID = tokenID.String()
+	token.TokenID = strconv.FormatInt(tokenID, 10)
 	return nil
 }
 
@@ -163,7 +163,7 @@ func (ts tokenStatements) ListTokens(ctx context.Context, filter *database.ListO
 func (ts tokenStatements) scanToken(row *spanner.Row) (*domain.Token, error) {
 	token := new(domain.Token)
 	var (
-		tokenID                          storagedb.Identity
+		tokenID                          int64
 		userID                           spanner.NullString
 		sessionID, oidcSessionID, samlID spanner.NullInt64
 		scope                            []string
@@ -184,7 +184,7 @@ func (ts tokenStatements) scanToken(row *spanner.Row) (*domain.Token, error) {
 	); err != nil {
 		return nil, err
 	}
-	token.TokenID = tokenID.String()
+	token.TokenID = strconv.FormatInt(tokenID, 10)
 	if err := token.Type.Scan(tokenType); err != nil {
 		return nil, err
 	}
@@ -241,11 +241,15 @@ func tokenSessionIDArg(sessionID *string) (any, error) {
 	return id, nil
 }
 
-func tokenOptionalIdentity(id *string) storagedb.Identity {
-	if id == nil {
-		return ""
+func tokenOptionalInt64(id *string) any {
+	if id == nil || *id == "" {
+		return nil
 	}
-	return storagedb.Identity(*id)
+	n, err := strconv.ParseInt(*id, 10, 64)
+	if err != nil {
+		return nil
+	}
+	return n
 }
 
 func coerceTokenType(v any) (any, error) {
@@ -263,20 +267,22 @@ func coerceTokenType(v any) (any, error) {
 	}
 }
 
-func coerceTokenIdentity(v any) (any, error) {
+func coerceTokenInt64(v any) (any, error) {
 	switch id := v.(type) {
-	case storagedb.Identity:
-		return id, nil
-	case string:
-		return storagedb.Identity(id), nil
 	case int64:
-		return storagedb.Identity(strconv.FormatInt(id, 10)), nil
+		return id, nil
+	case float64:
+		return int64(id), nil
+	case string:
+		return strconv.ParseInt(id, 10, 64)
+	case storagedb.Identity:
+		return strconv.ParseInt(string(id), 10, 64)
 	default:
 		s, err := database.CoerceStringValue(v)
 		if err != nil {
 			return nil, err
 		}
-		return storagedb.Identity(s), nil
+		return strconv.ParseInt(s, 10, 64)
 	}
 }
 
@@ -289,9 +295,15 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 		Coerce:   database.CoerceString,
 	},
 	domain.TokenFieldTokenID: {
-		SQLName:  "token_id",
-		Accessor: func(t *domain.Token) any { return storagedb.Identity(t.TokenID) },
-		Coerce:   coerceTokenIdentity,
+		SQLName: "token_id",
+		Accessor: func(t *domain.Token) any {
+			id, err := parseTokenIdentity(t.TokenID)
+			if err != nil {
+				return int64(0)
+			}
+			return id
+		},
+		Coerce: coerceTokenInt64,
 	},
 	domain.TokenFieldUserID: {
 		SQLName:  "user_id",
@@ -305,18 +317,18 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 	},
 	domain.TokenFieldSessionID: {
 		SQLName:  "session_id",
-		Accessor: func(t *domain.Token) any { return tokenOptionalIdentity(t.SessionID) },
-		Coerce:   coerceTokenIdentity,
+		Accessor: func(t *domain.Token) any { return tokenOptionalInt64(t.SessionID) },
+		Coerce:   coerceTokenInt64,
 	},
 	domain.TokenFieldOIDCSessionID: {
 		SQLName:  "oidc_session_id",
-		Accessor: func(t *domain.Token) any { return tokenOptionalIdentity(t.OIDCSessionID) },
-		Coerce:   coerceTokenIdentity,
+		Accessor: func(t *domain.Token) any { return tokenOptionalInt64(t.OIDCSessionID) },
+		Coerce:   coerceTokenInt64,
 	},
 	domain.TokenFieldSAMLSessionID: {
 		SQLName:  "saml_session_id",
-		Accessor: func(t *domain.Token) any { return tokenOptionalIdentity(t.SAMLSessionID) },
-		Coerce:   coerceTokenIdentity,
+		Accessor: func(t *domain.Token) any { return tokenOptionalInt64(t.SAMLSessionID) },
+		Coerce:   coerceTokenInt64,
 	},
 	domain.TokenFieldScope: {
 		SQLName:  "scope",
