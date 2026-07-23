@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { api, projectId } from "../../api/zitadel";
-import { Page } from "../../components/layout";
-import { PageHeader } from "../../components/resource-page";
+import { api } from "../../../api/zitadel";
+import { getConsoleProjectId } from "../../../runtime/runtime";
+import { Page } from "../../../components/layout";
+import { PageHeader } from "../../../components/resource-page";
 
-export const Route = createFileRoute("/schemas/$schemaId")({
-  loader: ({ params }) => api.getSchemaById(params.schemaId, { project_id: projectId }),
+export const Route = createFileRoute("/_authed/schemas/$schemaId")({
+  loader: ({ params }) => api.getSchemaById(params.schemaId, { project_id: getConsoleProjectId() }),
   component: SchemaDetail,
 });
 

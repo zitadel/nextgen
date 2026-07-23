@@ -13,6 +13,7 @@ import (
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	v2db "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // ProjectService is the project use-case surface.
@@ -26,6 +27,15 @@ type ProjectService interface {
 	// Get retrieves a project by ID.
 	// Returns [database.NoRowFoundError] when no project with the given ID exists.
 	Get(ctx context.Context, id string) (*domain.Project, error)
+
+	// DefaultProject resolves the project a standalone deployment tracks
+	// (Console ADR 0004 §3): the configured project when cfgProjectID is
+	// set — which must exist; a missing configured project is a
+	// configuration error — otherwise the deployment's first-created
+	// project. Returns (nil, nil) while no project exists yet: the server
+	// never creates the default project, the customer's integration
+	// (`zitadel setup` → POST /projects) does.
+	DefaultProject(ctx context.Context, cfgProjectID string) (*domain.Project, error)
 }
 
 // NewProjectService returns a [ProjectService] backed by the given repository.
@@ -160,4 +170,40 @@ func (s *projectService) Get(ctx context.Context, id string) (*domain.Project, e
 	logger.Info("getting project", slog.String("project_id", id))
 	project, err := s.v2Pool.Statements().GetProjectByID(ctx, id)
 	return project, mapStorageError(err)
+}
+
+func (s *projectService) DefaultProject(ctx context.Context, cfgProjectID string) (*domain.Project, error) {
+	if cfgProjectID != "" {
+		project, err := s.Get(ctx, cfgProjectID)
+		if err != nil {
+			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+				return nil, domain.ErrProjectNotFound().
+					WithMessage("configured platform project does not exist").
+					WithDetails(cfgProjectID)
+			}
+			return nil, err
+		}
+		return project, nil
+	}
+
+	// The deployment's first-created project is the default. Deterministic
+	// (created_at ascending) so every replica answers the same, and cheap
+	// enough to resolve per runtime.json request — no cached state to
+	// invalidate when `zitadel setup` creates the first project.
+	result, err := s.v2Pool.Statements().ListProjects(ctx, &v2db.ListOptions[domain.ProjectField]{
+		Pagination: v2db.Page[domain.ProjectField]{
+			Limit: 1,
+			OrderBy: v2db.OrderBy[domain.ProjectField]{
+				Columns:   []v2db.Column[domain.ProjectField]{v2db.Col(domain.ProjectFieldCreatedAt)},
+				Direction: v2db.OrderAsc,
+			},
+		},
+	})
+	if err != nil {
+		return nil, mapStorageError(err)
+	}
+	if result == nil || len(result.Items) == 0 {
+		return nil, nil
+	}
+	return result.Items[0], nil
 }

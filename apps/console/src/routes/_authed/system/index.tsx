@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Alert } from "@zitadel/ui-react";
 
-import { api } from "../../api/zitadel";
-import { Page } from "../../components/layout";
-import { PageHeader } from "../../components/resource-page";
+import { api } from "../../../api/zitadel";
+import { Page } from "../../../components/layout";
+import { PageHeader } from "../../../components/resource-page";
 
-export const Route = createFileRoute("/system/")({
+export const Route = createFileRoute("/_authed/system/")({
   loader: async () => {
     // `getHealth` resolves on a healthy server and throws ApiError otherwise;
     // the error boundary renders the unhealthy state.

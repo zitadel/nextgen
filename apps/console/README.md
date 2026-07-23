@@ -63,6 +63,51 @@ same-origin API base (`/api` by default), and a server-side proxy attaches the
 `Authorization: Bearer` token before forwarding to the API. See the Vite proxy
 config and environment variables below.
 
+### Console sign-in (Console ADR 0003)
+
+Console users sign in through the embedded `<zitadel-login>` widget on
+`/login` (via `@zitadel/sdk-react`). Completing the flow exchanges the
+widget's handoff token for the `__nextgen_session` HttpOnly cookie; the
+pathless `_authed` layout guards every screen by confirming that cookie
+against `GET /sessions/me` and redirects unauthenticated visitors to
+`/login?next=…`. Sign-out lives in the sidebar user menu
+(`DELETE /sessions/me`).
+
+The cookie authenticates the console UI and the session endpoints; the
+management API still authorizes via the server-held project secret (injected
+by the proxy) until session-derived permissions land server-side — see
+[ADR 0003](docs/adrs/0003-console-authentication.md) for the model and its
+caveats (including the widget's dark-only styling for now).
+
+### Runtime discovery and the default project (Console ADR 0004)
+
+At boot the console fetches `GET /console/runtime.json` (public, served by
+the Go server; proxied in dev) to learn the deployment `mode` and which
+project to sign into. A standalone (self-host) deployment **tracks exactly
+one project, and the server never creates it**: the first project created —
+by the customer's `zitadel setup` (`POST /projects`) — becomes the default
+the console signs into and manages. `platform.project_id` /
+`NEXTGEN_PLATFORM_PROJECT_ID` pins a specific existing project instead.
+While no project exists yet, the login screen shows a "run `zitadel setup`"
+hint; refresh after setup and the console picks the new project up. Only
+`standalone` mode exists today; `platform` (cloud portal) mode is future
+work.
+
+The runtime document also carries the default project's **publishable key**
+(root ADR 036): a browser-safe, origin-scoped bearer the login widget sends
+on flow calls and the handoff exchange. Sign-in therefore needs no
+`CONSOLE_PROJECT_SECRET` — the secret remains only for the management
+(operator-plane) data calls until session-derived permissions land
+(ADR 0003 §4).
+
+Local dev prerequisites for a working sign-in: the effective project
+(`VITE_CONSOLE_PROJECT_ID` when set, otherwise the discovered
+`console_project_id`) needs at least one user — seed one with the server's
+`--user-file` bootstrap flag. When using the dev proxy's
+`CONSOLE_PROJECT_SECRET` for data calls, that secret must belong to the same
+project, so keep `VITE_CONSOLE_PROJECT_ID` set to that project while the
+secret-based interim lasts.
+
 ## Environment variables
 
 | Variable | Where | Purpose |
@@ -70,7 +115,7 @@ config and environment variables below.
 | `CONSOLE_BACKEND_URL` | Node (dev proxy) | Upstream API origin (defaults in `vite.config.mts`) |
 | `CONSOLE_PROJECT_SECRET` | Node (dev proxy) | Bearer attached by the proxy; never shipped to the browser |
 | `VITE_CONSOLE_API_BASE` | Client | Same-origin API base the SDK calls (default `/api`) |
-| `VITE_CONSOLE_PROJECT_ID` | Client | Project id sent with API requests (optional) |
+| `VITE_CONSOLE_PROJECT_ID` | Client | Dev override for the project id; when unset it is discovered from `/console/runtime.json` (Console ADR 0004) |
 
 ## Commands
 

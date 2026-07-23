@@ -19,3 +19,21 @@ if (typeof window !== "undefined" && !window.matchMedia) {
       dispatchEvent: () => false,
     }) as unknown as MediaQueryList;
 }
+
+// jsdom has no ResizeObserver; Radix popover/menu content measures with it
+// (used by the sidebar user menu). A no-op stub is enough for jsdom specs.
+if (typeof window !== "undefined" && !("ResizeObserver" in window)) {
+  class ResizeObserverStub {
+    observe(): void {
+      /* no-op: jsdom specs never lay out */
+    }
+    unobserve(): void {
+      /* no-op */
+    }
+    disconnect(): void {
+      /* no-op */
+    }
+  }
+  (window as unknown as { ResizeObserver: typeof ResizeObserverStub }).ResizeObserver =
+    ResizeObserverStub;
+}

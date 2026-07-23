@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { Page } from "../components/layout";
+import { Page } from "../../components/layout";
 
 /**
  * The "General" screen — the one fully-designed frame in the Figma handoff. It is
@@ -18,7 +18,7 @@ import { Page } from "../components/layout";
  * Home is reached via the sidebar logo, so it has no sidebar nav entry (the
  * Figma sidebar has no "Get started" row).
  */
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_authed/")({
   component: Dashboard,
 });
 

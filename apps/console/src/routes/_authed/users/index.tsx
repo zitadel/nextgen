@@ -21,10 +21,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import { api } from "../../api/zitadel";
-import { field } from "../../lib/record";
+import { api } from "../../../api/zitadel";
+import { field } from "../../../lib/record";
 
-export const Route = createFileRoute("/users/")({
+export const Route = createFileRoute("/_authed/users/")({
   staticData: { nav: { label: "Users", order: 2, icon: Users } },
   loader: () => api.listUsers(),
   component: UsersScreen,

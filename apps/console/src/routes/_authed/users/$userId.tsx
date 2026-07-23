@@ -1,12 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { api, projectId } from "../../api/zitadel";
-import { Page } from "../../components/layout";
-import { KeyValueTable, PageHeader } from "../../components/resource-page";
-import { field } from "../../lib/record";
+import { api } from "../../../api/zitadel";
+import { getConsoleProjectId } from "../../../runtime/runtime";
+import { Page } from "../../../components/layout";
+import { KeyValueTable, PageHeader } from "../../../components/resource-page";
+import { field } from "../../../lib/record";
 
-export const Route = createFileRoute("/users/$userId")({
-  loader: ({ params }) => api.getUserByID(params.userId, { project_id: projectId }),
+export const Route = createFileRoute("/_authed/users/$userId")({
+  loader: ({ params }) => api.getUserByID(params.userId, { project_id: getConsoleProjectId() }),
   component: UserDetail,
 });
 

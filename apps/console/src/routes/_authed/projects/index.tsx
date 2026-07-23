@@ -2,13 +2,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Alert } from "@zitadel/ui-react";
 import { Boxes } from "lucide-react";
 
-import { api, projectId } from "../../api/zitadel";
-import { Page } from "../../components/layout";
-import { KeyValueTable, PageHeader } from "../../components/resource-page";
+import { api } from "../../../api/zitadel";
+import { getConsoleProjectId } from "../../../runtime/runtime";
+import { Page } from "../../../components/layout";
+import { KeyValueTable, PageHeader } from "../../../components/resource-page";
 
-export const Route = createFileRoute("/projects/")({
+export const Route = createFileRoute("/_authed/projects/")({
   staticData: { nav: { label: "Projects", order: 1, icon: Boxes } },
-  loader: () => api.getProject(projectId),
+  loader: () => api.getProject(getConsoleProjectId()),
   component: ProjectView,
 });
 

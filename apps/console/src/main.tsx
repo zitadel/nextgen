@@ -2,6 +2,7 @@ import { RouterProvider } from "@tanstack/react-router";
 import ReactDOM from "react-dom/client";
 
 import { createAppRouter } from "./router";
+import { initRuntime } from "./runtime/runtime";
 
 const router = createAppRouter();
 
@@ -14,6 +15,11 @@ async function clearStaleServiceWorkers(): Promise<void> {
 
 async function main(): Promise<void> {
   await clearStaleServiceWorkers();
+  // Discover deployment runtime metadata (mode + project ids) before any
+  // route guard or loader runs (Console ADR 0004 §2). Falls back to
+  // standalone when the endpoint is unreachable, so rendering never blocks
+  // on a broken backend.
+  await initRuntime();
 
   const rootElement = document.getElementById("app");
   if (rootElement && !rootElement.innerHTML) {
