@@ -239,3 +239,48 @@ func TestTokenStatements_Get_NotFound(t *testing.T) {
 	_, err := testPool.GetTokenByID(t.Context(), projectID, "999999")
 	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 }
+
+func TestTokenStatements_List_NextCursorRequiresOrderBy(t *testing.T) {
+	projectID, schemaURL, userID := uniqueTokenFixtureIDs(t)
+	ensureTokenTestUser(t, projectID, schemaURL, userID)
+
+	for _, sess := range []string{"2101", "2102"} {
+		sess := sess
+		tok := &domain.Token{
+			ProjectID:     projectID,
+			UserID:        userID,
+			Type:          domain.TokenTypeOIDCAccessToken,
+			OIDCSessionID: &sess,
+			Scope:         []string{"openid"},
+		}
+		require.NoError(t, testPool.CreateToken(t.Context(), tok))
+		requireGeneratedTokenID(t, tok.TokenID)
+		t.Cleanup(func() {
+			_ = testPool.DeleteTokenByID(context.Background(), projectID, tok.TokenID)
+		})
+	}
+
+	noOrder, err := testPool.ListTokens(t.Context(), &v2database.ListOptions[domain.TokenField]{
+		Filter: v2database.Equal(v2database.Col(domain.TokenFieldProjectID), projectID),
+		Pagination: v2database.Page[domain.TokenField]{
+			Limit: 1,
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, noOrder.Items, 1)
+	assert.Nil(t, noOrder.NextCursor)
+
+	withOrder, err := testPool.ListTokens(t.Context(), &v2database.ListOptions[domain.TokenField]{
+		Filter: v2database.Equal(v2database.Col(domain.TokenFieldProjectID), projectID),
+		Pagination: v2database.Page[domain.TokenField]{
+			Limit: 1,
+			OrderBy: v2database.OrderBy[domain.TokenField]{
+				Columns:   []v2database.Column[domain.TokenField]{v2database.Col(domain.TokenFieldTokenID)},
+				Direction: v2database.OrderAsc,
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, withOrder.Items, 1)
+	assert.NotEmpty(t, withOrder.NextCursor)
+}
