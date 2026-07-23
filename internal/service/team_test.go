@@ -13,7 +13,100 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
+
+// testAllStatements is a lightweight AllStatements stub for TeamService unit tests.
+type testAllStatements struct {
+	createTeam     func(context.Context, *domain.Team) error
+	getTeamByID    func(context.Context, string, string) (*domain.Team, error)
+	deactivateTeam func(context.Context, string, string) error
+}
+
+func (testAllStatements) IsStatements() {}
+
+func (testAllStatements) CreateProject(context.Context, *domain.Project) error {
+	panic("unexpected call to CreateProject")
+}
+
+func (testAllStatements) GetProjectByID(context.Context, string) (*domain.Project, error) {
+	panic("unexpected call to GetProjectByID")
+}
+
+func (testAllStatements) UpdateProject(context.Context, *domain.Project) error {
+	panic("unexpected call to UpdateProject")
+}
+
+func (testAllStatements) ListProjects(context.Context, *v2database.ListOptions[domain.ProjectField]) (*v2database.ListResult[*domain.Project], error) {
+	panic("unexpected call to ListProjects")
+}
+
+func (testAllStatements) DeleteProjectByID(context.Context, string) error {
+	panic("unexpected call to DeleteProjectByID")
+}
+
+func (testAllStatements) CreateFlowDefinition(context.Context, *domain.FlowDefinition) error {
+	panic("unexpected call to CreateFlowDefinition")
+}
+
+func (testAllStatements) GetFlowDefinitionByID(context.Context, string) (*domain.FlowDefinition, error) {
+	panic("unexpected call to GetFlowDefinitionByID")
+}
+
+func (testAllStatements) ListFlowDefinitions(context.Context, *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
+	panic("unexpected call to ListFlowDefinitions")
+}
+
+func (testAllStatements) DeleteFlowDefinitionByID(context.Context, string) error {
+	panic("unexpected call to DeleteFlowDefinitionByID")
+}
+
+func (testAllStatements) GetEncryptionKey(context.Context, v2database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error) {
+	panic("unexpected call to GetEncryptionKey")
+}
+
+func (testAllStatements) CreateEncryptionKey(context.Context, *domain.EncryptionKey) error {
+	panic("unexpected call to CreateEncryptionKey")
+}
+
+func (testAllStatements) CreateJSONSchema(context.Context, *domain.JSONSchema) error {
+	panic("unexpected call to CreateJSONSchema")
+}
+
+func (testAllStatements) GetJSONSchemaByID(context.Context, string, string) (*domain.JSONSchema, error) {
+	panic("unexpected call to GetJSONSchemaByID")
+}
+
+func (testAllStatements) ListJSONSchemas(context.Context, *v2database.ListOptions[domain.JSONSchemaField]) (*v2database.ListResult[*domain.JSONSchema], error) {
+	panic("unexpected call to ListJSONSchemas")
+}
+
+func (testAllStatements) DeleteJSONSchemaByID(context.Context, string, string) error {
+	panic("unexpected call to DeleteJSONSchemaByID")
+}
+
+func (s testAllStatements) CreateTeam(ctx context.Context, team *domain.Team) error {
+	if s.createTeam != nil {
+		return s.createTeam(ctx, team)
+	}
+	return nil
+}
+
+func (s testAllStatements) GetTeamByID(ctx context.Context, projectID, id string) (*domain.Team, error) {
+	if s.getTeamByID != nil {
+		return s.getTeamByID(ctx, projectID, id)
+	}
+	return nil, nil
+}
+
+func (s testAllStatements) DeactivateTeam(ctx context.Context, projectID, id string) error {
+	if s.deactivateTeam != nil {
+		return s.deactivateTeam(ctx, projectID, id)
+	}
+	panic("unexpected call to DeactivateTeam")
+}
+
+var _ service.AllStatements = testAllStatements{}
 
 func TestTeamService_CreateTeam(t *testing.T) {
 	tests := []struct {
