@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 const testProjectID = "proj-1"
@@ -31,7 +30,7 @@ type fakeSchemaResolver struct {
 	bytesByURL map[string][]byte
 }
 
-func (f *fakeSchemaResolver) Resolve(_ context.Context, _ database.QueryExecutor, _, schemaURL string, _ []byte) (*jsonschema.Schema, error) {
+func (f *fakeSchemaResolver) Resolve(_ context.Context, _ domain.JSONSchemaStore, _, schemaURL string, _ []byte) (*jsonschema.Schema, error) {
 	raw, ok := f.bytesByURL[schemaURL]
 	if !ok {
 		return nil, errors.New("fakeSchemaResolver: schema not found: " + schemaURL)
