@@ -175,8 +175,8 @@ func TestUserTeamLifecycle_ProjectDeleteCascadesThroughMemberships(t *testing.T)
 		schemaURL = "https://schemas.test/lifecycle-project-delete/v1.json"
 	)
 
-	teamRepo, userRepo := setupLifecycleFixture(t, tx, pid)
-	createTeam(t, tx, teamRepo, pid, teamID)
+	userRepo := setupLifecycleFixture(t, tx, pid)
+	ensureTeam(t, tx, pid, teamID)
 
 	participation := teamID
 	createLifecycleUser(t, tx, userRepo, pid, schemaURL, userID, nil, &participation)
@@ -186,8 +186,11 @@ func TestUserTeamLifecycle_ProjectDeleteCascadesThroughMemberships(t *testing.T)
 	_, err := userRepo.Get(ctx, tx, database.WithCondition(userRepo.PrimaryKeyCondition(pid, userID)))
 	require.ErrorIs(t, err, new(database.NoRowFoundError))
 
-	_, err = teamRepo.Get(ctx, tx, pid, teamID)
-	require.ErrorIs(t, err, new(database.NoRowFoundError))
+	var teamCount int
+	require.NoError(t, tx.QueryRow(ctx,
+		`SELECT count(*) FROM zitadel_nextgen.teams WHERE project_id = $1 AND id = $2`,
+		pid, teamID).Scan(&teamCount))
+	require.Zero(t, teamCount, "team should be removed by project delete cascade")
 
 	membershipRepo := repository.NewTeamMembershipRepository(tx)
 	_, err = membershipRepo.Get(ctx, tx, pid, teamID, userID)
