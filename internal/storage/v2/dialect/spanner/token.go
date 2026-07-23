@@ -241,6 +241,13 @@ func tokenSessionIDArg(sessionID *string) (any, error) {
 	return id, nil
 }
 
+func tokenOptionalIdentity(id *string) storagedb.Identity {
+	if id == nil {
+		return ""
+	}
+	return storagedb.Identity(*id)
+}
+
 func coerceTokenType(v any) (any, error) {
 	switch t := v.(type) {
 	case domain.TokenType:
@@ -297,34 +304,19 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 		Coerce:   coerceTokenType,
 	},
 	domain.TokenFieldSessionID: {
-		SQLName: "session_id",
-		Accessor: func(t *domain.Token) any {
-			if t.SessionID == nil {
-				return storagedb.Identity("")
-			}
-			return storagedb.Identity(*t.SessionID)
-		},
-		Coerce: coerceTokenIdentity,
+		SQLName:  "session_id",
+		Accessor: func(t *domain.Token) any { return tokenOptionalIdentity(t.SessionID) },
+		Coerce:   coerceTokenIdentity,
 	},
 	domain.TokenFieldOIDCSessionID: {
-		SQLName: "oidc_session_id",
-		Accessor: func(t *domain.Token) any {
-			if t.OIDCSessionID == nil {
-				return storagedb.Identity("")
-			}
-			return storagedb.Identity(*t.OIDCSessionID)
-		},
-		Coerce: coerceTokenIdentity,
+		SQLName:  "oidc_session_id",
+		Accessor: func(t *domain.Token) any { return tokenOptionalIdentity(t.OIDCSessionID) },
+		Coerce:   coerceTokenIdentity,
 	},
 	domain.TokenFieldSAMLSessionID: {
-		SQLName: "saml_session_id",
-		Accessor: func(t *domain.Token) any {
-			if t.SAMLSessionID == nil {
-				return storagedb.Identity("")
-			}
-			return storagedb.Identity(*t.SAMLSessionID)
-		},
-		Coerce: coerceTokenIdentity,
+		SQLName:  "saml_session_id",
+		Accessor: func(t *domain.Token) any { return tokenOptionalIdentity(t.SAMLSessionID) },
+		Coerce:   coerceTokenIdentity,
 	},
 	domain.TokenFieldScope: {
 		SQLName:  "scope",
