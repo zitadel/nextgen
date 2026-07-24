@@ -11,10 +11,12 @@
 > after claim** (an accepted, ADR-documented risk until a dedicated rotation
 > epic), `claim/status` is a plain completion signal with no secret handover,
 > and the CLI only records `claimed_at` / `team_id` in `.zitadel/secret` without
-> changing the secret value. The "What changes at claim", rotation, and
-> `secret rotate` / `secret restore` sections below therefore describe the
-> future target, not MVP claim. The checked-in CLI and server do not yet expose
-> the claim lifecycle or a `zitadel claim` command.
+> changing the secret value. This document's opening description of the secret
+> being "rotated to a claimed credential after claim", together with the "What
+> changes at claim", rotation, and `secret rotate` / `secret restore` sections
+> below, therefore describe the future target, not MVP claim. The checked-in
+> CLI and server do not yet expose the claim lifecycle or a `zitadel claim`
+> command.
 
 The project secret is a server-issued bearer token that authenticates SDK and CLI calls against a project. Before claim, it is the only authentication on the project. After claim, it is rotated to a **claimed credential** bound to the team that claimed the project. The same file on disk (`.zitadel/secret`) also carries an **origin-scoped project secret** (historically called the "preview secret") — a companion token that the setup CLI hands to the customer's deploy platform (Vercel, Netlify, Cloudflare) so preview builds work before the project is claimed.
 
