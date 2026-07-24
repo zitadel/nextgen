@@ -59,7 +59,7 @@ func ensureServerKEK(cfg *ServerConfig) error {
 
 	var newestFile string
 	var newestFileModTime time.Time
-	keysFromDir := make([]EncryptionKeyConfig, 0, len(files))
+	keysFromDir := make(map[string]*EncryptionKeyConfig, len(files))
 	for _, file := range files {
 		if file.IsDir() {
 			continue
@@ -75,18 +75,19 @@ func ensureServerKEK(cfg *ServerConfig) error {
 			newestFileModTime = info.ModTime()
 		}
 
-		keysFromDir = append(keysFromDir, EncryptionKeyConfig{
-			ID:   file.Name(),
+		keysFromDir[file.Name()] = &EncryptionKeyConfig{
 			File: keyPath,
-		})
+		}
 	}
 
 	if len(cfg.EncryptionKeys) > 0 {
-		cfg.EncryptionKeys = append(cfg.EncryptionKeys, keysFromDir...)
+		for id, key := range keysFromDir {
+			cfg.EncryptionKeys[id] = key
+		}
 	} else {
-		for i := range keysFromDir {
-			if keysFromDir[i].File == newestFile {
-				keysFromDir[i].UseForEncryption = true
+		for id, key := range keysFromDir {
+			if key.File == newestFile {
+				keysFromDir[id].UseForEncryption = true
 				break
 			}
 		}
@@ -98,9 +99,8 @@ func ensureServerKEK(cfg *ServerConfig) error {
 		if err != nil {
 			return err
 		}
-		cfg.EncryptionKeys = []EncryptionKeyConfig{
-			{
-				ID:               "root-kek.pem",
+		cfg.EncryptionKeys = map[string]*EncryptionKeyConfig{
+			"root-kek.pem": {
 				File:             filePath,
 				UseForEncryption: true,
 			},

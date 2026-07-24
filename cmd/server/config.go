@@ -54,7 +54,7 @@ type ServerConfig struct {
 	// in the kek directory. If there are no keys specified in the config but
 	// files exist in the kek directory, the newest file is used for
 	// encryption.
-	EncryptionKeys []EncryptionKeyConfig `mapstructure:"encryption_keys"`
+	EncryptionKeys map[string]*EncryptionKeyConfig `mapstructure:"encryption_keys"`
 
 	ConsoleEnabled bool   `mapstructure:"console_enabled"`
 	ConsolePath    string `mapstructure:"console_path"`
@@ -68,9 +68,6 @@ type SchemaConfig struct {
 }
 
 type EncryptionKeyConfig struct {
-	// ID is the identifier by which JWEs can identify which encryption key
-	// has been used to encrypt the data
-	ID string `mapstructure:"id"`
 	// File is the path to a file which contains the RSA private key in either a
 	// JWK or a PEM file.
 	//

@@ -513,11 +513,11 @@ func embeddedPostgresOptions(dataDir string) embedded.Options {
 
 // ----------------------------- CRYPTO --------------------------------------
 
-func buildRootKEK(keyConfigs []EncryptionKeyConfig) (*domain.RootKEKs, error) {
+func buildRootKEK(keyConfigs map[string]*EncryptionKeyConfig) (*domain.RootKEKs, error) {
 	ks := make([]domain.RootKEK, 0, len(keyConfigs))
-	for _, cfg := range keyConfigs {
-		if cfg.PrivateKey == "" && cfg.File == "" {
-			return nil, fmt.Errorf("server: either a private key or file must be provided (%s)", cfg.ID)
+	for id, cfg := range keyConfigs {
+		if cfg == nil || (cfg.PrivateKey == "" && cfg.File == "") {
+			return nil, fmt.Errorf("server: either a private key or file must be provided (%s)", id)
 		}
 
 		raw := cfg.PrivateKey
@@ -534,7 +534,7 @@ func buildRootKEK(keyConfigs []EncryptionKeyConfig) (*domain.RootKEKs, error) {
 			return nil, fmt.Errorf("server: %w", err)
 		}
 		ks = append(ks, domain.NewRootKEK(
-			cfg.ID,
+			id,
 			*key,
 			cfg.UseForEncryption,
 		))

@@ -36,11 +36,12 @@ func TestLoadConfigCreatesAndReusesEncryptionKeyFile(t *testing.T) {
 	assert.NotEmpty(t, keyFilePath)
 	assert.FileExists(t, keyFilePath)
 
-	assert.Contains(t, cfg.Server.EncryptionKeys, EncryptionKeyConfig{
-		ID:               "root-kek.pem",
-		File:             keyFilePath,
-		UseForEncryption: true,
-	})
+	if assert.Contains(t, cfg.Server.EncryptionKeys, "root-kek.pem") {
+		assert.Equal(t, &EncryptionKeyConfig{
+			File:             keyFilePath,
+			UseForEncryption: true,
+		}, cfg.Server.EncryptionKeys["root-kek.pem"])
+	}
 
 	if runtime.GOOS != "windows" {
 		info, err := os.Stat(keyFilePath)
@@ -61,7 +62,7 @@ func TestLoadConfigDoesNotCreateEncryptionKeyFileWhenKeyConfigured(t *testing.T)
 	require.NoError(t, os.WriteFile(configPath, []byte(`
 server:
   encryption_keys:
-    - id: configured-kek
+    configured-kek: 
       use_for_encryption: true
       private_key: configured-private-key
 `), 0o600))
@@ -72,9 +73,12 @@ server:
 	// A configured key means ensureServerKEK generates nothing: the KEK
 	// directory is created but no key file is written into it.
 	require.Len(t, cfg.Server.EncryptionKeys, 1)
-	assert.Equal(t, "configured-kek", cfg.Server.EncryptionKeys[0].ID)
-	assert.True(t, cfg.Server.EncryptionKeys[0].UseForEncryption)
-	assert.Equal(t, "configured-private-key", cfg.Server.EncryptionKeys[0].PrivateKey)
+	if assert.Contains(t, cfg.Server.EncryptionKeys, "configured-kek") {
+		assert.Equal(t, &EncryptionKeyConfig{
+			UseForEncryption: true,
+			PrivateKey:       "configured-private-key",
+		}, cfg.Server.EncryptionKeys["configured-kek"])
+	}
 
 	// The directory exists, but no key file was generated.
 	entries, err := os.ReadDir(filepath.Join(dataDir, defaultKEKDirName))
@@ -122,12 +126,18 @@ func TestEnsureServerKEKLoadsAllKeysAndMarksNewestForEncryption(t *testing.T) {
 
 	// Every key file is loaded as a file-backed entry.
 	require.Len(t, cfg.EncryptionKeys, 3)
-	assert.Contains(t, cfg.EncryptionKeys, EncryptionKeyConfig{ID: "kek-1.pem", File: oldest})
-	assert.Contains(t, cfg.EncryptionKeys, EncryptionKeyConfig{ID: "kek-2.pem", File: middle})
-	assert.Contains(t, cfg.EncryptionKeys, EncryptionKeyConfig{ID: "kek-3.pem", File: newest, UseForEncryption: true})
+	if assert.Contains(t, cfg.EncryptionKeys, "kek-1.pem") {
+		assert.Equal(t, cfg.EncryptionKeys["kek-1.pem"], &EncryptionKeyConfig{File: oldest})
+	}
+	if assert.Contains(t, cfg.EncryptionKeys, "kek-2.pem") {
+		assert.Equal(t, cfg.EncryptionKeys["kek-2.pem"], &EncryptionKeyConfig{File: middle})
+	}
+	if assert.Contains(t, cfg.EncryptionKeys, "kek-3.pem") {
+		assert.Equal(t, cfg.EncryptionKeys["kek-3.pem"], &EncryptionKeyConfig{File: newest, UseForEncryption: true})
+	}
 
 	// Exactly one key is marked for encryption, and it is the newest.
-	var forEncryption []EncryptionKeyConfig
+	var forEncryption []*EncryptionKeyConfig
 	for _, k := range cfg.EncryptionKeys {
 		if k.UseForEncryption {
 			forEncryption = append(forEncryption, k)
