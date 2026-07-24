@@ -359,6 +359,36 @@ func (s *Branding) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if value, ok := s.LiquidTemplate.Get(); ok {
+			if err := func() error {
+				if err := (validate.String{
+					MinLength:     0,
+					MinLengthSet:  false,
+					MaxLength:     131072,
+					MaxLengthSet:  true,
+					Email:         false,
+					Hostname:      false,
+					Regex:         nil,
+					MinNumeric:    0,
+					MinNumericSet: false,
+					MaxNumeric:    0,
+					MaxNumericSet: false,
+				}).Validate(string(value)); err != nil {
+					return errors.Wrap(err, "string")
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "liquid_template",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -374,6 +404,29 @@ func (s BrandingLayout) Validate() error {
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
+}
+
+func (s *BrandingRevisionResponse) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Branding.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "branding",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
 }
 
 func (s ChallengeID) Validate() error {
@@ -980,8 +1033,6 @@ func (s FieldValidationFormat) Validate() error {
 
 func (s FilterField) Validate() error {
 	switch s {
-	case "name":
-		return nil
 	case "createdAt":
 		return nil
 	default:
@@ -1983,6 +2034,14 @@ func (s Limit) Validate() error {
 		Pattern:       nil,
 	}).Validate(int64(alias)); err != nil {
 		return errors.Wrap(err, "int")
+	}
+	return nil
+}
+
+func (s ListBrandingResponse) Validate() error {
+	alias := ([]ListBrandingResponseItem)(s)
+	if alias == nil {
+		return errors.New("nil is invalid value")
 	}
 	return nil
 }

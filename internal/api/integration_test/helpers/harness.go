@@ -42,10 +42,11 @@ type Harness struct {
 	UserService           *service.UserService
 	FlowStateMachine      *domain.FlowStateMachineRuntime
 	TeamService           *service.TeamService
+	BrandingService       *service.BrandingService
 	KeyService            service.KeyService
 	TokenService          service.TokenService
 
-	SchemaRepo         domain.JSONSchemaRepository
+	SchemaStore        domain.JSONSchemaStore
 	SchemaResolver     *domain.JSONSchemaResolver
 	SchemaValidator    *domain.SchemaValidator
 	FlowDefinitionRepo domain.FlowDefinitionRepository
@@ -54,7 +55,7 @@ type Harness struct {
 	UserRepo           domain.UserRepository
 	UserPasswordRepo   domain.UserPasswordRepository
 	UserPasskeyRepo    domain.UserPasskeyRepository
-	TeamRepo           domain.TeamRepository
+	BrandingRepo       domain.BrandingRepository
 
 	TestData test_data.TestData
 }

@@ -96,6 +96,20 @@ var teamAccess = resourceAccess{
 	denied:    domain.ErrTeamPermissionDenied,
 }
 
+// brandingAccess is the row this access model was generalized from (ADR 040,
+// "Access model"): managing templates and rendering them during login are
+// different planes, and the login path never calls the branding management
+// API — branding arrives inline on flow responses.
+var brandingAccess = resourceAccess{
+	scopes: map[accessOp][]string{
+		opRead:  {"branding.read", "branding.write"},
+		opWrite: {"branding.write"},
+	},
+	readMiss:  domain.ErrBrandingNotFound,
+	writeMiss: func() domain.Error { return domain.ErrBrandingInvalid("project does not exist", nil) },
+	denied:    domain.ErrBrandingPermissionDenied,
+}
+
 // projectAccess deliberately lists no finer read scope: project.read is the
 // preview secret's scope — a browser-plane credential — so it cannot gate an
 // operator read. Until ADR 036 splits the schemes, project.write is the only

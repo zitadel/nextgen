@@ -1,10 +1,7 @@
 package domain
 
 import (
-	"context"
 	"time"
-
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 const (
@@ -58,22 +55,14 @@ func NewTeam(projectID string) (*Team, error) {
 	}, nil
 }
 
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/team.mock.go . TeamRepository
+// TeamField enumerates the fields of Team which can be used for filtering and ordering.
+type TeamField uint8
 
-// TeamRepository provides storage operations for [Team]s.
-type TeamRepository interface {
-	// Create persists a new team. Callers must pre-populate [Team.ID] with a value
-	// generated via idgen.Generator (e.g. idgen.New("team")); an empty ID is rejected.
-	// The repository sets [Team.CreatedAt] and [Team.UpdatedAt] to the current time;
-	// callers should not pre-populate those fields.
-	// Returns a [database.IntegrityViolationError] (specifically [database.UniqueError])
-	// if a team with the same (project_id, id) already exists.
-	Create(ctx context.Context, client database.QueryExecutor, team *Team) error
-
-	// Get retrieves a team by its composite primary key (project_id, id).
-	// Returns a [database.NoRowFoundError] when no team with the given keys exists.
-	Get(ctx context.Context, client database.QueryExecutor, projectID, id string) (*Team, error)
-
-	// Deactivate tombstones the team and applies lifecycle policy to memberships and team-owned users.
-	Deactivate(ctx context.Context, client database.QueryExecutor, projectID, id string) error
-}
+const (
+	TeamFieldUnspecified TeamField = iota
+	TeamFieldProjectID
+	TeamFieldID
+	TeamFieldStatus
+	TeamFieldCreatedAt
+	TeamFieldUpdatedAt
+)

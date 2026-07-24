@@ -76,6 +76,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	CreateAuthAttemptOperation: []string{
 		"auth_attempts.write",
 	},
+	CreateBrandingOperation: []string{
+		"branding.write",
+	},
 	CreateFlowDefinitionOperation: []string{
 		"flow_definitions.write",
 	},
@@ -106,6 +109,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetAuthAttemptOperation: []string{
 		"auth_attempts.read",
 	},
+	GetBrandingByIdOperation: []string{
+		"branding.read",
+	},
 	GetFlowDefinitionOperation: []string{
 		"flow_definitions.read",
 	},
@@ -129,6 +135,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	IssueChallengeOperation: []string{
 		"auth_attempts.write",
 	},
+	ListBrandingOperation: []string{
+		"branding.read",
+	},
 	ListFlowDefinitionsOperation: []string{
 		"flow_definitions.read",
 	},
@@ -145,7 +154,7 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"project.write",
 	},
 	QueryProjectsOperation: []string{
-		"project.read",
+		"project.write",
 	},
 	RevokeSessionOperation: []string{
 		"session.delete",
