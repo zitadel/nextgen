@@ -47,10 +47,6 @@ func serverKEKDir(cfg ServerConfig) (string, error) {
 }
 
 func ensureServerKEK(cfg *ServerConfig) error {
-	if len(cfg.EncryptionKeys) > 0 {
-		return nil
-	}
-
 	kekDir, err := serverKEKDir(*cfg)
 	if err != nil {
 		return fmt.Errorf("failed to get KEK directory: %w", err)

@@ -69,13 +69,17 @@ server:
 	cfg, err := loadConfig(configPath)
 	require.NoError(t, err)
 
-	// A configured key short-circuits ensureServerKEK, so no KEK is generated
-	// and no key directory is created below the data dir.
+	// A configured key means ensureServerKEK generates nothing: the KEK
+	// directory is created but no key file is written into it.
 	require.Len(t, cfg.Server.EncryptionKeys, 1)
 	assert.Equal(t, "configured-kek", cfg.Server.EncryptionKeys[0].ID)
 	assert.True(t, cfg.Server.EncryptionKeys[0].UseForEncryption)
 	assert.Equal(t, "configured-private-key", cfg.Server.EncryptionKeys[0].PrivateKey)
-	assert.NoDirExists(t, filepath.Join(dataDir, defaultKEKDirName))
+
+	// The directory exists, but no key file was generated.
+	entries, err := os.ReadDir(filepath.Join(dataDir, defaultKEKDirName))
+	require.NoError(t, err)
+	assert.Empty(t, entries, "no key file should be generated when a key is configured")
 }
 
 func TestEmbeddedPostgresOptionsUseDataDir(t *testing.T) {

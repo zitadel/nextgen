@@ -248,10 +248,12 @@ func NewRootKEKs(keys []RootKEK) (*RootKEKs, error) {
 	default:
 		for i, k := range keys {
 			if k.ShouldBeUsedForEncryption {
+				if encryptionKey != nil {
+					return nil, ErrRequestInvalid().WithMessage("only one key can be marked for encryption")
+				}
 				encryptionKey = new(k)
 				keys[i] = keys[len(keys)-1]
 				keys = keys[:len(keys)-1]
-				break
 			}
 		}
 	}

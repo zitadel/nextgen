@@ -518,19 +518,19 @@ func buildRootKEK(keyConfigs []EncryptionKeyConfig) (*domain.RootKEKs, error) {
 	for _, cfg := range keyConfigs {
 		// The key material is provided inline via PrivateKey or, for keys
 		// generated/reused from the KEK directory, read from File.
-		pemKey := cfg.PrivateKey
-		if pemKey == "" && cfg.File != "" {
+		raw := cfg.PrivateKey
+		if raw == "" && cfg.File != "" {
 			bs, err := os.ReadFile(cfg.File)
 			if err != nil {
 				return nil, fmt.Errorf("server: failed to read encryption key file %q: %w", cfg.File, err)
 			}
-			pemKey = string(bs)
+			raw = string(bs)
 		}
-		if pemKey == "" {
+		if raw == "" {
 			continue
 		}
 
-		key, err := crypto.ParsePrivatePEMKey(pemKey)
+		key, err := crypto.ParseRSAKey(raw)
 		if err != nil {
 			return nil, fmt.Errorf("server: %w", err)
 		}
