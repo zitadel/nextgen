@@ -5,6 +5,7 @@ package repository_test
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -12,17 +13,34 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
-func setupLifecycleFixture(t *testing.T, tx database.Transaction, projectID string) (teamRepo *repository.TeamRepository, userRepo *repository.UserRepository) {
+func setupLifecycleFixture(t *testing.T, tx database.Transaction, projectID string) *repository.UserRepository {
 	t.Helper()
 	ensureProject(t, tx, projectID)
-	teamRepo = repository.NewTeamRepository(tx)
-	userRepo = repository.NewUserRepository()
-	return teamRepo, userRepo
+	return repository.NewUserRepository()
 }
 
-func createTeam(t *testing.T, tx database.Transaction, teamRepo *repository.TeamRepository, projectID, teamID string) {
+func getTeam(t *testing.T, tx database.QueryExecutor, projectID, id string) *domain.Team {
 	t.Helper()
-	require.NoError(t, teamRepo.Create(t.Context(), tx, &domain.Team{ProjectID: projectID, ID: teamID}))
+	ctx := t.Context()
+	var (
+		status    string
+		createdAt time.Time
+		updatedAt time.Time
+	)
+	query := `SELECT project_id, id, status, created_at, updated_at FROM zitadel_nextgen.teams WHERE project_id = $1 AND id = $2`
+	if isSpannerDB {
+		query = `SELECT project_id, id, status, created_at, updated_at FROM teams WHERE project_id = $1 AND id = $2`
+	}
+	row := tx.QueryRow(ctx, query, projectID, id)
+	var gotProjectID, gotID string
+	require.NoError(t, row.Scan(&gotProjectID, &gotID, &status, &createdAt, &updatedAt))
+	return &domain.Team{
+		ProjectID: gotProjectID,
+		ID:        gotID,
+		Status:    domain.TeamStatus(status),
+		CreatedAt: createdAt,
+		UpdatedAt: updatedAt,
+	}
 }
 
 func createLifecycleUser(t *testing.T, tx database.Transaction, userRepo *repository.UserRepository, projectID, schemaURL, userID string, lifecycleOwner, participation *string) {
@@ -46,113 +64,10 @@ func createLifecycleUser(t *testing.T, tx database.Transaction, userRepo *reposi
 	}))
 }
 
-// Acceptance signal 1: self-owned user survives team deactivation.
-func TestUserTeamLifecycle_SelfOwnedUserSurvivesTeamDeactivation(t *testing.T) {
-	skipIfSpanner(t)
-	tx, rollback := transactionForRollback(t)
-	defer rollback()
-	ctx := t.Context()
-
-	const (
-		pid       = "proj-lifecycle-self-owned"
-		teamID    = "team-lifecycle-self"
-		userID    = "usr-lifecycle-self"
-		schemaURL = "https://schemas.test/lifecycle-self/v1.json"
-	)
-
-	teamRepo, userRepo := setupLifecycleFixture(t, tx, pid)
-	createTeam(t, tx, teamRepo, pid, teamID)
-
-	participation := teamID
-	createLifecycleUser(t, tx, userRepo, pid, schemaURL, userID, nil, &participation)
-
-	require.NoError(t, teamRepo.Deactivate(ctx, tx, pid, teamID))
-
-	got, err := userRepo.Get(ctx, tx, database.WithCondition(userRepo.PrimaryKeyCondition(pid, userID)))
-	require.NoError(t, err)
-	require.True(t, got.IsSelfOwned())
-	require.Equal(t, domain.UserStatusActive, got.Status)
-
-	team, err := teamRepo.Get(ctx, tx, pid, teamID)
-	require.NoError(t, err)
-	require.Equal(t, domain.TeamStatusDeactivated, team.Status)
-}
-
-// Acceptance signal 2: team-owned user is deactivated (not hard-deleted) when owning team is deactivated.
-func TestUserTeamLifecycle_TeamOwnedUserDeactivatedOnTeamDeactivation(t *testing.T) {
-	skipIfSpanner(t)
-	tx, rollback := transactionForRollback(t)
-	defer rollback()
-	ctx := t.Context()
-
-	const (
-		pid       = "proj-lifecycle-team-owned"
-		teamID    = "team-lifecycle-owned"
-		userID    = "usr-lifecycle-owned"
-		schemaURL = "https://schemas.test/lifecycle-owned/v1.json"
-	)
-
-	teamRepo, userRepo := setupLifecycleFixture(t, tx, pid)
-	createTeam(t, tx, teamRepo, pid, teamID)
-
-	owner := teamID
-	participation := teamID
-	createLifecycleUser(t, tx, userRepo, pid, schemaURL, userID, &owner, &participation)
-
-	require.NoError(t, teamRepo.Deactivate(ctx, tx, pid, teamID))
-
-	got, err := userRepo.Get(ctx, tx, database.WithCondition(userRepo.PrimaryKeyCondition(pid, userID)))
-	require.NoError(t, err)
-	require.True(t, got.IsTeamOwned())
-	require.Equal(t, domain.UserStatusDeactivated, got.Status)
-}
-
-// Team-owned users deactivated via TeamRepository.Deactivate lose memberships on all teams
-// (same roster policy as UserRepository.Deactivate / ADR 024).
-func TestUserTeamLifecycle_TeamOwnedUserLosesAllMembershipsOnOwningTeamDeactivation(t *testing.T) {
-	skipIfSpanner(t)
-	tx, rollback := transactionForRollback(t)
-	defer rollback()
-	ctx := t.Context()
-
-	const (
-		pid         = "proj-lifecycle-cross-team"
-		ownerTeamID = "team-lifecycle-owner"
-		otherTeamID = "team-lifecycle-other"
-		userID      = "usr-lifecycle-cross"
-		schemaURL   = "https://schemas.test/lifecycle-cross/v1.json"
-	)
-
-	teamRepo, userRepo := setupLifecycleFixture(t, tx, pid)
-	createTeam(t, tx, teamRepo, pid, ownerTeamID)
-	createTeam(t, tx, teamRepo, pid, otherTeamID)
-
-	owner := ownerTeamID
-	participation := ownerTeamID
-	createLifecycleUser(t, tx, userRepo, pid, schemaURL, userID, &owner, &participation)
-
-	membershipRepo := repository.NewTeamMembershipRepository(tx)
-	require.NoError(t, membershipRepo.Create(ctx, tx, &domain.TeamMembership{
-		ProjectID: pid,
-		TeamID:    otherTeamID,
-		UserID:    userID,
-		Status:    domain.MembershipStatusActive,
-	}))
-
-	require.NoError(t, teamRepo.Deactivate(ctx, tx, pid, ownerTeamID))
-
-	got, err := userRepo.Get(ctx, tx, database.WithCondition(userRepo.PrimaryKeyCondition(pid, userID)))
-	require.NoError(t, err)
-	require.Equal(t, domain.UserStatusDeactivated, got.Status)
-
-	for _, teamID := range []string{ownerTeamID, otherTeamID} {
-		membership, err := membershipRepo.Get(ctx, tx, pid, teamID, userID)
-		require.NoError(t, err)
-		require.Equal(t, domain.MembershipStatusRemoved, membership.Status, "team %s", teamID)
-	}
-}
-
-// Acceptance signal 3: deleting a user does not cascade-delete teams they participate in.
+// Acceptance signal: deleting a user does not cascade-delete teams they participate in.
+// Team-deactivation cascade coverage lives in v2 dialect tests
+// (TestTeamStatements_Deactivate_CascadesMembershipsAndOwnedUsers) so production
+// DeactivateTeam SQL is exercised instead of a forked copy.
 func TestUserTeamLifecycle_UserDeleteDoesNotRemoveTeams(t *testing.T) {
 	skipIfSpanner(t)
 	tx, rollback := transactionForRollback(t)
@@ -166,16 +81,15 @@ func TestUserTeamLifecycle_UserDeleteDoesNotRemoveTeams(t *testing.T) {
 		schemaURL = "https://schemas.test/lifecycle-delete/v1.json"
 	)
 
-	teamRepo, userRepo := setupLifecycleFixture(t, tx, pid)
-	createTeam(t, tx, teamRepo, pid, teamID)
+	userRepo := setupLifecycleFixture(t, tx, pid)
+	ensureTeam(t, tx, pid, teamID)
 
 	participation := teamID
 	createLifecycleUser(t, tx, userRepo, pid, schemaURL, userID, nil, &participation)
 
 	require.NoError(t, userRepo.Delete(ctx, tx, userRepo.PrimaryKeyCondition(pid, userID)))
 
-	team, err := teamRepo.Get(ctx, tx, pid, teamID)
-	require.NoError(t, err)
+	team := getTeam(t, tx, pid, teamID)
 	require.Equal(t, teamID, team.ID)
 }
 
@@ -246,6 +160,43 @@ func TestUserRepository_Create_RollsBackWhenMembershipInsertFails(t *testing.T) 
 	require.Error(t, getErr)
 }
 
+// project deletion purges teams, users, and their
+// memberships together (unlike team/user deletion, which must not cascade).
+func TestUserTeamLifecycle_ProjectDeleteCascadesThroughMemberships(t *testing.T) {
+	skipIfSpanner(t)
+	tx, rollback := transactionForRollback(t)
+	defer rollback()
+	ctx := t.Context()
+
+	const (
+		pid       = "proj-lifecycle-project-delete"
+		teamID    = "team-lifecycle-project-delete"
+		userID    = "usr-lifecycle-project-delete"
+		schemaURL = "https://schemas.test/lifecycle-project-delete/v1.json"
+	)
+
+	userRepo := setupLifecycleFixture(t, tx, pid)
+	ensureTeam(t, tx, pid, teamID)
+
+	participation := teamID
+	createLifecycleUser(t, tx, userRepo, pid, schemaURL, userID, nil, &participation)
+
+	deleteProject(t, tx, pid)
+
+	_, err := userRepo.Get(ctx, tx, database.WithCondition(userRepo.PrimaryKeyCondition(pid, userID)))
+	require.ErrorIs(t, err, new(database.NoRowFoundError))
+
+	var teamCount int
+	require.NoError(t, tx.QueryRow(ctx,
+		`SELECT count(*) FROM zitadel_nextgen.teams WHERE project_id = $1 AND id = $2`,
+		pid, teamID).Scan(&teamCount))
+	require.Zero(t, teamCount, "team should be removed by project delete cascade")
+
+	membershipRepo := repository.NewTeamMembershipRepository(tx)
+	_, err = membershipRepo.Get(ctx, tx, pid, teamID, userID)
+	require.ErrorIs(t, err, new(database.NoRowFoundError))
+}
+
 func TestUserRepository_DeactivateRemovesMemberships(t *testing.T) {
 	skipIfSpanner(t)
 	tx, rollback := transactionForRollback(t)
@@ -259,8 +210,8 @@ func TestUserRepository_DeactivateRemovesMemberships(t *testing.T) {
 		schemaURL = "https://schemas.test/user-deactivate/v1.json"
 	)
 
-	teamRepo, userRepo := setupLifecycleFixture(t, tx, pid)
-	createTeam(t, tx, teamRepo, pid, teamID)
+	userRepo := setupLifecycleFixture(t, tx, pid)
+	ensureTeam(t, tx, pid, teamID)
 
 	participation := teamID
 	createLifecycleUser(t, tx, userRepo, pid, schemaURL, userID, nil, &participation)
@@ -276,6 +227,6 @@ func TestUserRepository_DeactivateRemovesMemberships(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, domain.MembershipStatusRemoved, membership.Status)
 
-	_, err = teamRepo.Get(ctx, tx, pid, teamID)
-	require.NoError(t, err, fmt.Sprintf("team %s should still exist after user deactivation", teamID))
+	team := getTeam(t, tx, pid, teamID)
+	require.Equal(t, teamID, team.ID, fmt.Sprintf("team %s should still exist after user deactivation", teamID))
 }

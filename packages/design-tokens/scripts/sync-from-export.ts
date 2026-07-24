@@ -23,7 +23,7 @@
  *   - any other multi-mode collection is treated as viewport typography
  *     (its leaves become `typography.<mode>.<name>`);
  *   - single-mode collections contribute primitives, surfaced by group name
- *     (`radius`, `text`, `font`, `font-weight`).
+ *     (`radius`, `text`, `font`, `font-weight`, `container`).
  */
 import { access, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
@@ -253,6 +253,8 @@ export interface SyncedTokens {
   text: Record<string, unknown>;
   fontFamily: Record<string, unknown>;
   fontWeight: Record<string, unknown>;
+  /** Figma's `container/*` max-width scale (px). `build.ts` maps semantic roles onto these steps. */
+  container: Record<string, unknown>;
   typography: Record<string, Record<string, unknown>>;
 }
 
@@ -329,6 +331,7 @@ export function syncTokens(files: Array<{ name: string; data: unknown }>): Synce
     text: buildGroup("text", singleMode, registry),
     fontFamily: buildGroup("font", singleMode, registry),
     fontWeight: buildGroup("font-weight", singleMode, registry),
+    container: buildGroup("container", singleMode, registry),
     typography,
   };
 }

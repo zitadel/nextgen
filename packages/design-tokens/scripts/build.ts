@@ -1,8 +1,8 @@
 /**
  * Builds the public token surfaces of `@zitadel/design-tokens` from:
  *   - `src/legacy.tokens.json` — frozen legacy `--zl-color-*` surface
- *   - `src/generated/figma.tokens.json` — resolved shadcn semantic colours
- *   - `src/overrides.ts` — typography, motion, focus, breakpoints, containers
+ *   - `src/generated/figma.tokens.json` — resolved shadcn colours + container scale
+ *   - `src/overrides.ts` — fonts, motion, focus, breakpoints, gray primitives
  *
  * Emits four files into `src/generated/`:
  *
@@ -68,6 +68,8 @@ interface ShadcnTokensFile {
   text: Record<string, unknown>;
   fontFamily: Record<string, string>;
   fontWeight: Record<string, number>;
+  /** Figma's `container/*` max-width scale in px (`sm`=384 … `7xl`=1280). */
+  container: Record<string, Px>;
   typography: Record<string, Record<string, unknown>>;
 }
 
@@ -214,10 +216,10 @@ function build(): BuildResult {
     push(cssVarName("breakpoint", name), value, ["breakpoint", name]);
   }
 
-  // ---- overrides: container max-widths ----
-  for (const [name, value] of Object.entries(overrides.container)) {
-    push(cssVarName("container", kebab(name)), value, ["container", name]);
-  }
+  // ---- container max-widths: Zitadel semantic roles mapped onto Figma's `container/*` scale ----
+  // Figma owns the pixel values; build owns which scale step each role uses.
+  push(cssVarName("container", "auth-card"), pxToRem(containerStep("sm")), ["container", "authCard"]);
+  push(cssVarName("container", "page"), pxToRem(containerStep("7xl")), ["container", "page"]);
 
   // ---- layout: grid columns / gutter / margin (columns unitless, spacing in rem) ----
   for (const [name, value] of Object.entries(figma.layout ?? {})) {
@@ -244,6 +246,15 @@ function setDeep(target: Record<string, unknown>, path: string[], value: string)
     cursor = cursor[key] as Record<string, unknown>;
   }
   cursor[path[path.length - 1] ?? ""] = value;
+}
+
+/** Read a step from Figma's container scale, failing loud if the designer dropped it. */
+function containerStep(name: string): Px {
+  const px = shadcn.container?.[name];
+  if (typeof px !== "number") {
+    throw new Error(`figma.tokens.json is missing container.${name} — cannot emit the container max-width surface`);
+  }
+  return px;
 }
 
 function resolveFocusColor(): Hex {
@@ -362,9 +373,6 @@ function emitShadcn(shadcnColorVars: string[]): string {
 
 function toCamel(s: string): string {
   return s.replace(/[-_/](.)/g, (_, ch) => ch.toUpperCase());
-}
-function kebab(s: string): string {
-  return s.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
 }
 function sortedNumeric<V>(record: Record<string, V>): Array<[string, V]> {
   return Object.entries(record).sort(([a], [b]) => Number(a) - Number(b));

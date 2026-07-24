@@ -133,15 +133,13 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	userRepo := repository.NewUserRepository()
 	userPasswordRepo := repository.NewUserPasswordRepository()
 	userPasskeyRepo := repository.NewUserPasskeyRepository()
-	passkeyRegRepo := repository.NewPasskeyRegistrationRepository()
 	sessionRepo := repository.NewSessionRepository(pool)
 	flowDefinitionRepo := repository.NewFlowDefinitionRepository(pool)
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
-	schemaRepo := repository.NewJSONSchemaRepository(pool)
-	teamRepo := repository.NewTeamRepository(pool)
 	brandingRepo := repository.NewBrandingRepository(pool)
 
 	serviceDBPool := service.NewPool(v2Pool.(service.Pool))
+	schemaStore := serviceDBPool.Statements()
 
 	// ── Schema Stuff ─────────────────
 	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](cfg.Schema.LRUCacheSize)
@@ -157,9 +155,9 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		}
 	}
 
-	schemaResolverWithHTTP := domain.NewJSONSchemaResolver(schemaRepo, schemaCache, 10, 1000_000, &http.Client{}, builtinPublicBase)
+	schemaResolverWithHTTP := domain.NewJSONSchemaResolver(schemaCache, 10, 1000_000, &http.Client{}, builtinPublicBase)
 	// storageSchemaResolver without an HTTP client to fetch tenant schemas from the cache/storage
-	storageSchemaResolver := domain.NewJSONSchemaResolver(schemaRepo, schemaCache, 10, 1000_000, nil, builtinPublicBase)
+	storageSchemaResolver := domain.NewJSONSchemaResolver(schemaCache, 10, 1000_000, nil, builtinPublicBase)
 	schemaValidator, err := domain.NewSchemaValidator(builtinPublicBase.String())
 	if err != nil {
 		return fmt.Errorf("failed to build schema validator: %w", err)
@@ -183,13 +181,12 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	})
 	projectService := service.NewProjectService(
 		serviceDBPool,
-		schemaRepo,
 		flowDefinitionRepo,
 		builtinPublicBase.String(),
 		schemaValidator,
 		keyService,
 	)
-	schemaService := service.NewSchemaService(pool, schemaRepo, schemaResolverWithHTTP, schemaValidator)
+	schemaService := service.NewSchemaService(serviceDBPool, schemaResolverWithHTTP, schemaValidator)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
 		pool,
 		schemaService,
@@ -197,13 +194,13 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		nil,
 		flowDefinitionRepo,
 	)
-	teamService := service.NewTeamService(pool, teamRepo)
+	teamService := service.NewTeamService(serviceDBPool)
 	brandingService := service.NewBrandingService(pool, brandingRepo)
 	userService := service.NewUserService(
 		pool,
+		schemaStore,
 		userRepo,
 		userPasswordRepo,
-		schemaRepo,
 		passwordHasher,
 	)
 
@@ -216,13 +213,14 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		userPasswordRepo,
 		passwordHasher,
 		userService,
-		schemaRepo,
+		schemaStore,
 	)
-	createUserForPasskeyHandler := service.NewFlowCreateUserForPasskeyHandler(userRepo, userService, schemaRepo)
-	passkeyRegSvc := service.NewPasskeyRegistrationService(pool, passkeyRegRepo, userPasskeyRepo, ids)
+	createUserForPasskeyHandler := service.NewFlowCreateUserForPasskeyHandler(userRepo, userService, schemaStore)
+	passkeyRegSvc := service.NewPasskeyRegistrationService(pool, serviceDBPool, userPasskeyRepo, ids)
 	passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
 	stateMachine := domain.NewFlowStateMachine(
 		storageSchemaResolver,
+		schemaStore,
 		fields,
 		createUserHandler,
 		createUserForPasskeyHandler,

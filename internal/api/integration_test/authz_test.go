@@ -254,6 +254,51 @@ func TestManagementAuthz(t *testing.T) {
 			require.NoError(t, err)
 			assertAuthzStatus(t, resp, 403, "proj.permission_denied")
 		})
+
+		// queryProjects has no handler yet; until then it always
+		// answers ht.ErrNotImplemented regardless of caller, so there is no authz
+		// signal to probe. #410 implements the handler and un-skips this.
+		t.Run("query projects", func(t *testing.T) {
+			t.Parallel()
+
+			t.Run("bound to the token's project", func(t *testing.T) {
+				t.Parallel()
+				// todo (grvijayan)
+				t.Skip("queryProjects handler not yet implemented")
+
+				// queryProjects is scoped to the caller's bound project: each secret sees
+				// exactly its own project and never one it isn't bound to (foreign, bound to
+				// other, must not see victim).
+				resp, err := foreign.QueryProjects(t.Context(), &api.QueryProjectsRequest{})
+				require.NoError(t, err)
+				listResp, ok := resp.(*api.QueryProjectsResponse)
+				require.True(t, ok, helpers.MustMarshal(t, resp))
+				require.Len(t, listResp.Projects, 1, "the foreign secret sees only its own project")
+				assert.Equal(t, other.ID, listResp.Projects[0].ID, "the foreign secret sees exactly its own project (other)")
+
+				// a client with the own secret sees its own project.
+				ownClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+				require.NoError(t, err)
+				harness.SetProjectSecretOnApiClient(t, ownClient, victim)
+
+				ownResp, err := ownClient.QueryProjects(t.Context(), &api.QueryProjectsRequest{})
+				require.NoError(t, err)
+				ownListResp, ok := ownResp.(*api.QueryProjectsResponse)
+				require.True(t, ok, helpers.MustMarshal(t, ownResp))
+				require.Len(t, ownListResp.Projects, 1, "the own secret sees only its own project")
+				assert.Equal(t, victim.ID, ownListResp.Projects[0].ID, "the own secret sees exactly its own project (victim)")
+			})
+
+			t.Run("preview secret rejected", func(t *testing.T) {
+				t.Parallel()
+				// todo (grvijayan)
+				t.Skip("queryProjects handler not yet implemented")
+
+				resp, err := preview.QueryProjects(t.Context(), &api.QueryProjectsRequest{})
+				require.NoError(t, err)
+				assertAuthzStatus(t, resp, 403, "proj.permission_denied")
+			})
+		})
 	})
 }
 
