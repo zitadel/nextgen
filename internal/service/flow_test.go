@@ -13,122 +13,12 @@ import (
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // stubPool returns nil typed as database.Pool. The mock repository does not
 // invoke any methods on it, so the value is opaque — it only satisfies the
 // service constructor signature.
 func stubPool() database.Pool { return nil }
-
-func stubV2Pool() *service.DB { return nil }
-
-type testAllStatements struct {
-	createProject  func(context.Context, *domain.Project) error
-	getProjectByID func(context.Context, string) (*domain.Project, error)
-	createUser     func(context.Context, *domain.CreateUser) error
-}
-
-func (testAllStatements) IsStatements() {}
-
-func (s testAllStatements) CreateProject(ctx context.Context, project *domain.Project) error {
-	if s.createProject != nil {
-		return s.createProject(ctx, project)
-	}
-	return nil
-}
-
-func (s testAllStatements) GetProjectByID(ctx context.Context, id string) (*domain.Project, error) {
-	if s.getProjectByID != nil {
-		return s.getProjectByID(ctx, id)
-	}
-	return nil, nil
-}
-
-func (testAllStatements) UpdateProject(context.Context, *domain.Project) error {
-	panic("unexpected call to UpdateProject")
-}
-
-func (testAllStatements) ListProjects(context.Context, *v2database.ListOptions[domain.ProjectField]) (*v2database.ListResult[*domain.Project], error) {
-	panic("unexpected call to ListProjects")
-}
-
-func (testAllStatements) DeleteProjectByID(context.Context, string) error {
-	panic("unexpected call to DeleteProjectByID")
-}
-
-func (testAllStatements) CreateFlowDefinition(context.Context, *domain.FlowDefinition) error {
-	panic("unexpected call to CreateFlowDefinition")
-}
-
-func (testAllStatements) GetFlowDefinitionByID(context.Context, string) (*domain.FlowDefinition, error) {
-	panic("unexpected call to GetFlowDefinitionByID")
-}
-
-func (testAllStatements) ListFlowDefinitions(context.Context, *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
-	panic("unexpected call to ListFlowDefinitions")
-}
-
-func (testAllStatements) DeleteFlowDefinitionByID(context.Context, string) error {
-	panic("unexpected call to DeleteFlowDefinitionByID")
-}
-
-func (testAllStatements) GetEncryptionKey(context.Context, v2database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error) {
-	panic("unexpected call to GetEncryptionKey")
-}
-
-func (testAllStatements) CreateEncryptionKey(context.Context, *domain.EncryptionKey) error {
-	panic("unexpected call to CreateEncryptionKey")
-}
-
-func (s testAllStatements) CreateUser(ctx context.Context, user *domain.CreateUser) error {
-	if s.createUser != nil {
-		return s.createUser(ctx, user)
-	}
-	panic("unexpected call to CreateUser")
-}
-
-func (testAllStatements) GetUserByID(context.Context, string, *string, string, service.UserReadOptions) (*domain.User, error) {
-	panic("unexpected call to GetUserByID")
-}
-
-func (testAllStatements) GetUserByAttributes(context.Context, string, []domain.Attribute, service.UserReadOptions) (*domain.User, error) {
-	panic("unexpected call to GetUserByAttributes")
-}
-
-func (testAllStatements) ListUsers(context.Context, *v2database.ListOptions[domain.UserField], uint32, service.UserReadOptions) (*v2database.ListResult[*domain.User], error) {
-	panic("unexpected call to ListUsers")
-}
-
-func (testAllStatements) ListUsersByAttributes(context.Context, string, *string, []domain.Attribute, service.UserReadOptions) (*v2database.ListResult[*domain.User], error) {
-	panic("unexpected call to ListUsersByAttributes")
-}
-
-func (testAllStatements) DeactivateUser(context.Context, string, string) error {
-	panic("unexpected call to DeactivateUser")
-}
-
-func (testAllStatements) DeleteUserByID(context.Context, string, string) error {
-	panic("unexpected call to DeleteUserByID")
-}
-
-func (testAllStatements) SetUserPassword(context.Context, *domain.SetUserPassword) error {
-	panic("unexpected call to SetUserPassword")
-}
-
-func (testAllStatements) GetUserPasswordByUserID(context.Context, string, string) (*domain.UserPassword, error) {
-	panic("unexpected call to GetUserPasswordByUserID")
-}
-
-func (testAllStatements) ListUserPasswords(context.Context, *v2database.ListOptions[domain.UserPasswordField]) (*v2database.ListResult[*domain.UserPassword], error) {
-	panic("unexpected call to ListUserPasswords")
-}
-
-func (testAllStatements) DeleteUserPasswordByUserID(context.Context, string, string) error {
-	panic("unexpected call to DeleteUserPasswordByUserID")
-}
-
-var _ service.AllStatements = testAllStatements{}
 
 type v2TestTx struct {
 	database.QueryExecutor
