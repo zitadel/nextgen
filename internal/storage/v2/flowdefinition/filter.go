@@ -8,13 +8,13 @@ import (
 // ExtractPurposeContains pulls an OpEqual filter on Purposes out of the tree so
 // dialects can emit array-contains SQL instead of a plain column compare.
 func ExtractPurposeContains(filter database.Filter[domain.FlowDefinitionField]) (purpose string, remaining database.Filter[domain.FlowDefinitionField]) {
-	return extractEqual(filter, domain.FlowDefinitionFieldPurposes, purposeFilterValue)
+	return extractEqual(filter, domain.FlowDefinitionFieldPurposes, stringFilterValue)
 }
 
 // ExtractStatusEqual pulls an OpEqual filter on Status so Postgres can bind the
 // enum cast that plain compare compilation does not apply.
 func ExtractStatusEqual(filter database.Filter[domain.FlowDefinitionField]) (status string, remaining database.Filter[domain.FlowDefinitionField]) {
-	return extractEqual(filter, domain.FlowDefinitionFieldStatus, statusFilterValue)
+	return extractEqual(filter, domain.FlowDefinitionFieldStatus, stringFilterValue)
 }
 
 func extractEqual(
@@ -55,34 +55,8 @@ func extractEqual(
 	}
 }
 
-func purposeFilterValue(v any) string {
-	switch p := v.(type) {
-	case string:
-		return p
-	case domain.FlowDefinitionPurpose:
-		return p.String()
-	case *domain.FlowDefinitionPurpose:
-		if p == nil {
-			return ""
-		}
-		return p.String()
-	default:
-		return ""
-	}
-}
-
-func statusFilterValue(v any) string {
-	switch s := v.(type) {
-	case string:
-		return s
-	case domain.FlowDefinitionStatus:
-		return s.String()
-	case *domain.FlowDefinitionStatus:
-		if s == nil {
-			return ""
-		}
-		return s.String()
-	default:
-		return ""
-	}
+// Call sites pass .String() for purpose/status equals filters.
+func stringFilterValue(v any) string {
+	s, _ := v.(string)
+	return s
 }

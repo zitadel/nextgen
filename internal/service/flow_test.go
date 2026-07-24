@@ -20,15 +20,6 @@ func stubPool() database.Pool { return nil }
 
 func stubV2Pool() *service.DB { return nil }
 
-type v2TestTx struct {
-	database.QueryExecutor
-	stmts service.AllStatements
-}
-
-func (t v2TestTx) Statements() service.AllStatements {
-	return t.stmts
-}
-
 // stubListFlowDefinitions wires ListFlowDefinitions to filter the given slice
 // in-memory the same way the storage layer does.
 func stubListFlowDefinitions(t *testing.T, defs []*domain.FlowDefinition) *service.DB {
@@ -101,30 +92,6 @@ func filterMatches(def *domain.FlowDefinition, filter v2database.Filter[domain.F
 func hasPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {
 	_, ok := def.Purposes[purpose]
 	return ok
-}
-
-func purposeFilterIs(filter v2database.Filter[domain.FlowDefinitionField], purpose domain.FlowDefinitionPurpose) bool {
-	switch f := filter.(type) {
-	case v2database.AndFilter[domain.FlowDefinitionField]:
-		for _, child := range f.Filters {
-			if purposeFilterIs(child, purpose) {
-				return true
-			}
-		}
-		return false
-	case *v2database.CompareFilter[domain.FlowDefinitionField]:
-		if f.Op != v2database.OpEqual || len(f.Terms) != 1 {
-			return false
-		}
-		term := f.Terms[0]
-		if term.Column.Field() != domain.FlowDefinitionFieldPurposes {
-			return false
-		}
-		s, ok := term.Value.(string)
-		return ok && s == purpose.String()
-	default:
-		return false
-	}
 }
 
 func ptr[T any](v T) *T { return &v }
@@ -514,7 +481,7 @@ func (s *stubIDGen) New(prefix string) (string, error) {
 	return prefix + "_" + strconv.Itoa(s.calls), nil
 }
 
-// stubGetFlowDefinition returns def for any GetFlowDefinition call.
+// stubGetFlowDefinition returns def for any GetFlowDefinitionByID call.
 func stubGetFlowDefinition(t *testing.T, def *domain.FlowDefinition) *service.DB {
 	t.Helper()
 	ctrl := gomock.NewController(t)

@@ -20,6 +20,8 @@ func ParsePurposeKey(s string) (domain.FlowDefinitionPurpose, error) {
 }
 
 // Schema binds flow definition list/filter/order fields for both dialects.
+// Nested payload (user schema, audience, steps) lives in the definition JSON
+// column and is handled by Marshal/ToDomain — not as list Schema columns.
 var Schema = database.NewSchema(map[domain.FlowDefinitionField]database.FieldBinding[domain.FlowDefinition]{
 	domain.FlowDefinitionFieldProjectID: {
 		SQLName:  "project_id",
@@ -43,8 +45,8 @@ var Schema = database.NewSchema(map[domain.FlowDefinitionField]database.FieldBin
 	},
 	domain.FlowDefinitionFieldStatus: {
 		SQLName:  "status",
-		Accessor: func(d *domain.FlowDefinition) any { return d.Status },
-		Coerce:   database.CoerceNumber[domain.FlowDefinitionStatus],
+		Accessor: func(d *domain.FlowDefinition) any { return d.Status.String() },
+		Coerce:   database.CoerceString,
 	},
 	domain.FlowDefinitionFieldCreatedAt: {
 		SQLName:  "created_at",
@@ -56,24 +58,9 @@ var Schema = database.NewSchema(map[domain.FlowDefinitionField]database.FieldBin
 		Accessor: func(d *domain.FlowDefinition) any { return d.UpdatedAt },
 		Coerce:   database.CoerceTime,
 	},
-	domain.FlowDefinitionFieldUserSchema: {
-		SQLName:  "user_schema",
-		Accessor: func(d *domain.FlowDefinition) any { return d.UserSchema },
-		Coerce:   database.CoerceString,
-	},
 	domain.FlowDefinitionFieldPurposes: {
 		SQLName:  "purposes",
 		Accessor: func(d *domain.FlowDefinition) any { return d.Purposes },
 		Coerce:   database.CoerceEnumKeyMapAsAny[domain.FlowDefinitionPurpose, string](ParsePurposeKey),
-	},
-	domain.FlowDefinitionFieldAudience: {
-		SQLName:  "audience",
-		Accessor: func(d *domain.FlowDefinition) any { return d.Audience },
-		Coerce:   database.CoerceJSON[domain.FlowDefinitionAudience],
-	},
-	domain.FlowDefinitionFieldSteps: {
-		SQLName:  "steps",
-		Accessor: func(d *domain.FlowDefinition) any { return d.Steps },
-		Coerce:   database.CoerceSliceAsAny(database.CoerceJSONValue[domain.FlowDefinitionStep]),
 	},
 })

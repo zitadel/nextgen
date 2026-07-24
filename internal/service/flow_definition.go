@@ -78,11 +78,9 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 		),
 	})
 	if err != nil {
-		if !errors.Is(err, &database.NoRowFoundError{}) {
-			return nil, err
-		}
+		return nil, err
 	}
-	if existing != nil && len(existing.Items) > 0 {
+	if len(existing.Items) > 0 {
 		return nil, domain.ErrFlowDefinitionAlreadyExists()
 	}
 
@@ -205,7 +203,7 @@ func (fd *flowDefinitionService) isUpdateAllowed(
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage(fmt.Sprintf("failed to list flow definitions for old purpose %q", purpose))
 		}
-		if fds == nil || len(fds.Items) <= 1 {
+		if len(fds.Items) <= 1 {
 			return domain.ErrFlowDefinitionUpdateConflict(fmt.Sprintf("cannot update: no other active flow definition found with purpose %q", purpose))
 		}
 	}
@@ -250,7 +248,7 @@ func (fd *flowDefinitionService) validatePivotingTargets(ctx context.Context, pi
 		if err != nil {
 			return err
 		}
-		if defs == nil || len(defs.Items) == 0 {
+		if len(defs.Items) == 0 {
 			return domain.ErrFlowDefinitionInvalid(fmt.Sprintf(
 				"step %q: transition %q targets unknown or inactive flow %q", target.Step, target.Transition, target.Name), nil)
 		}
@@ -279,7 +277,7 @@ func (fd *flowDefinitionService) Get(ctx context.Context, projectID, id string) 
 	}
 	definition, err := fd.v2Pool.Statements().GetFlowDefinitionByID(ctx, projectID, id)
 	if err != nil {
-		if errors.Is(err, &database.NoRowFoundError{}) {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrFlowDefinitionNotFound()
 		}
 		return nil, err
@@ -317,9 +315,6 @@ func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitio
 	result, err := fd.v2Pool.Statements().ListFlowDefinitions(ctx, opts)
 	if err != nil {
 		return nil, err
-	}
-	if result == nil {
-		return nil, nil
 	}
 	return result.Items, nil
 }

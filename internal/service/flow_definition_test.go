@@ -309,7 +309,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 			},
 		},
 		{
-			name: "flow definition created successfully - list flow definitions - no rows found error",
+			name: "list flow definitions error bubbles up",
 			fields: fields{
 				schemaResolver: &mockSchemaGetter{
 					getSchema: func(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
@@ -329,12 +329,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				},
 				statements: func(ctrl *gomock.Controller) *servicemocks.MockAllStatements {
 					stmts := servicemocks.NewMockAllStatements(ctrl)
-					stmts.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *domain.FlowDefinition) error {
-						return nil
-					}).AnyTimes()
-					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
-						return &v2database.ListResult[*domain.FlowDefinition]{Items: nil}, &database.NoRowFoundError{}
-					}).AnyTimes()
+					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).Return(nil, assert.AnError)
 					return stmts
 				},
 			},
@@ -370,40 +365,7 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					},
 				},
 			},
-			wantFlowSchemaURI: "https://example.com/schemas/flow-definition.json",
-			want: &domain.FlowDefinition{
-				ProjectID:     "project1",
-				Name:          "login",
-				SchemaVersion: "1.0.0",
-				Status:        domain.FlowDefinitionStatusActive,
-				CreatedAt:     time.Now(),
-				UpdatedAt:     time.Now(),
-				UserSchema:    "https://tenant.com/schemas/my-user.json",
-				Purposes:      map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "step_1"},
-				Audience: domain.FlowDefinitionAudience{
-					AppIDs:  []string{"app1"},
-					TeamIDs: []string{"team1"},
-				},
-				Steps: []domain.FlowDefinitionStep{
-					{
-						Name:   "step_1",
-						Fields: []domain.Field{"email"},
-						Actions: []domain.FlowStepAction{
-							{Name: "submit", Kind: domain.FlowActionKindSubmit},
-
-							{Name: "next", Kind: domain.FlowActionKindSubmit},
-						},
-						Transitions: map[string]domain.FlowStepTransition{
-							"submit": {Target: "done"},
-							"next":   {Target: "external-flow", Action: new(domain.Switch)},
-						},
-					},
-					{
-						Name:     "done",
-						Complete: new(domain.FlowStepCompleteRedirect),
-					},
-				},
-			},
+			wantErr: assert.AnError,
 		},
 		{
 			name: "failed to create flow definition - target with a non-existing external flow",
@@ -1426,6 +1388,30 @@ func assertErrorDetails(t *testing.T, err error, wantErr error) {
 	assert.Equal(t, wantDomainErr.Details, gotErr.Details)
 	if wantDomainErr.Parent != nil {
 		assert.EqualError(t, gotErr.Parent, wantDomainErr.Parent.Error())
+	}
+}
+
+func purposeFilterIs(filter v2database.Filter[domain.FlowDefinitionField], purpose domain.FlowDefinitionPurpose) bool {
+	switch f := filter.(type) {
+	case v2database.AndFilter[domain.FlowDefinitionField]:
+		for _, child := range f.Filters {
+			if purposeFilterIs(child, purpose) {
+				return true
+			}
+		}
+		return false
+	case *v2database.CompareFilter[domain.FlowDefinitionField]:
+		if f.Op != v2database.OpEqual || len(f.Terms) != 1 {
+			return false
+		}
+		term := f.Terms[0]
+		if term.Column.Field() != domain.FlowDefinitionFieldPurposes {
+			return false
+		}
+		s, ok := term.Value.(string)
+		return ok && s == purpose.String()
+	default:
+		return false
 	}
 }
 

@@ -235,6 +235,4 @@ func decodeFlowDefinitionJSON(v spanner.NullJSON) ([]byte, error) {
 	return json.Marshal(v.Value)
 }
 
-func (f flowDefinitionStatements) IsStatements() {}
-
 var _ service.FlowDefinitionStatements = (*flowDefinitionStatements)(nil)

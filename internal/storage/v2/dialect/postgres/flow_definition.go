@@ -229,7 +229,4 @@ func (f flowDefinitionStatements) scanFlowDefinition(row pgx.CollectableRow) (*d
 	return flowdefinition.ToDomain(projectID, id, name, schemaVersion, status, createdAt, updatedAt, definition)
 }
 
-// IsStatements implements [service.FlowDefinitionStatements].
-func (f flowDefinitionStatements) IsStatements() {}
-
 var _ service.FlowDefinitionStatements = (*flowDefinitionStatements)(nil)

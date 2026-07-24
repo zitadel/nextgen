@@ -115,7 +115,7 @@ func (s *flowService) resolveByName(ctx context.Context, req ResolveFlowRequest)
 	if err != nil {
 		return nil, err
 	}
-	if result == nil || len(result.Items) == 0 {
+	if len(result.Items) == 0 {
 		return nil, domain.ErrFlowDefinitionNotFound()
 	}
 
@@ -154,10 +154,7 @@ func (s *flowService) resolveByAudience(ctx context.Context, req ResolveFlowRequ
 	if err != nil {
 		return nil, err
 	}
-	defs := []*domain.FlowDefinition{}
-	if result != nil {
-		defs = result.Items
-	}
+	defs := result.Items
 
 	var best *domain.FlowDefinition
 	bestScore := -1
