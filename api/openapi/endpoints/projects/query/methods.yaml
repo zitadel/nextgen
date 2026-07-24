@@ -3,9 +3,12 @@ post:
   summary: Query projects
   tags:
     - Projects
-  security: 
+  security:
     - oauth2:
-        - project.read
+        # project.write, not project.read: project.read is carried by the
+        # browser-plane preview secret, so it cannot gate an operator read
+        # until ADR 036 splits the credential planes into distinct schemes.
+        - project.write
   requestBody:
     description: Request to query projects.
     required: true
