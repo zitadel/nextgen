@@ -410,6 +410,40 @@ func TestProjectService_List(t *testing.T) {
 			},
 		},
 		{
+			name:   "zero limit uses default, not storage's no-limit",
+			req:    service.ListProjectsRequest{Limit: 0},
+			result: &v2database.ListResult[*domain.Project]{},
+			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, uint32(20), opts.Pagination.Limit)
+			},
+		},
+		{
+			name: "project id restricts results to that project",
+			req:  service.ListProjectsRequest{ProjectID: "proj_a"},
+			result: &v2database.ListResult[*domain.Project]{
+				Items: []*domain.Project{{ID: "proj_a"}},
+			},
+			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, v2database.And(
+					v2database.Equal(v2database.Col(domain.ProjectFieldID), "proj_a"),
+				), opts.Filter)
+			},
+		},
+		{
+			name: "project id filter",
+			req: service.ListProjectsRequest{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "createdAt", Operation: "equals", Value: createdAt.Format(time.RFC3339)}},
+			},
+			result: &v2database.ListResult[*domain.Project]{},
+			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, v2database.And(
+					v2database.Equal(v2database.Col(domain.ProjectFieldID), "proj_a"),
+					v2database.Equal(v2database.Col(domain.ProjectFieldCreatedAt), createdAt),
+				), opts.Filter)
+			},
+		},
+		{
 			name: "sort by createdAt desc",
 			req: service.ListProjectsRequest{
 				Sorting: &service.Sorting{Field: "createdAt", Direction: "desc"},
