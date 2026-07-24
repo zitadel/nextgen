@@ -7,7 +7,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TokenStatements
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TokenStatements,PasskeyRegistrationStatements
 
 type StatementPool interface {
 	Statementer[AllStatements]
@@ -25,6 +25,7 @@ type AllStatements interface {
 	JSONSchemaStatements
 	TeamStatements
 	TokenStatements
+	PasskeyRegistrationStatements
 	Statements
 }
 
@@ -105,4 +106,17 @@ type TokenStatements interface {
 	GetTokenByID(ctx context.Context, projectID, tokenID string) (*domain.Token, error)
 	ListTokens(ctx context.Context, filter *database.ListOptions[domain.TokenField]) (*database.ListResult[*domain.Token], error)
 	DeleteTokenByID(ctx context.Context, projectID, tokenID string) error
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type PasskeyRegistrationPool interface {
+// 	Statementer[PasskeyRegistrationStatements]
+// 	Transactioner[PasskeyRegistrationStatements]
+// }
+
+type PasskeyRegistrationStatements interface {
+	Statements
+	CreatePasskeyRegistration(ctx context.Context, entity *domain.CreatePasskeyRegistration) error
+	GetPasskeyRegistration(ctx context.Context, projectID, id string) (*domain.PasskeyRegistration, error)
+	DeletePasskeyRegistration(ctx context.Context, projectID, id string) error
 }

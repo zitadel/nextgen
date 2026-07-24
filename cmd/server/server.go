@@ -133,7 +133,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	userRepo := repository.NewUserRepository()
 	userPasswordRepo := repository.NewUserPasswordRepository()
 	userPasskeyRepo := repository.NewUserPasskeyRepository()
-	passkeyRegRepo := repository.NewPasskeyRegistrationRepository()
 	sessionRepo := repository.NewSessionRepository(pool)
 	flowDefinitionRepo := repository.NewFlowDefinitionRepository(pool)
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
@@ -217,7 +216,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		schemaStore,
 	)
 	createUserForPasskeyHandler := service.NewFlowCreateUserForPasskeyHandler(userRepo, userService, schemaStore)
-	passkeyRegSvc := service.NewPasskeyRegistrationService(pool, passkeyRegRepo, userPasskeyRepo, ids)
+	passkeyRegSvc := service.NewPasskeyRegistrationService(pool, serviceDBPool, userPasskeyRepo, ids)
 	passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
 	stateMachine := domain.NewFlowStateMachine(
 		storageSchemaResolver,
