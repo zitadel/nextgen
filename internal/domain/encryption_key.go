@@ -3,6 +3,7 @@ package domain
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"errors"
 	"time"
 
 	"github.com/go-jose/go-jose/v4"
@@ -245,6 +246,7 @@ func NewRootKEKs(keys []RootKEK) (*RootKEKs, error) {
 		return nil, ErrRequestInvalid().WithMessage("no root encryption key provided")
 	case 1:
 		encryptionKey = new(keys[0])
+		keys = nil
 	default:
 		for i, k := range keys {
 			if k.ShouldBeUsedForEncryption {
@@ -273,20 +275,18 @@ func (ks RootKEKs) Encrypt(decrypted string) (string, error) {
 }
 
 func (ks RootKEKs) Decrypt(encrypted string) (string, error) {
-	var s string
-	var err error
-	if s, err = ks.EncryptionKey.Decrypt(encrypted); err == nil {
-		return s, nil
+	header, err := DecodeJWEHeader(encrypted)
+	if err != nil {
+		return "", ErrDecryptionFailed(err).WithDetails("failed to decode JWE header")
 	}
 
-	for _, k := range ks.Keys {
-		if s, serr := k.Decrypt(encrypted); serr == nil {
-			return s, nil
-		}
+	kek := ks.GetByKeyID(header.KeyID)
+	if kek == nil {
+		return "", ErrDecryptionFailed(errors.New("no key found to decrypt key")).
+			WithDetails(map[string]any{"keyID": header.KeyID})
 	}
 
-	// only return the error of the key with which data is encrypted
-	return "", err
+	return kek.Decrypt(encrypted)
 }
 
 func (ks RootKEKs) GetByKeyID(id string) *RootKEK {

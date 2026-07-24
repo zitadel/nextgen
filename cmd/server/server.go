@@ -516,8 +516,10 @@ func embeddedPostgresOptions(dataDir string) embedded.Options {
 func buildRootKEK(keyConfigs []EncryptionKeyConfig) (*domain.RootKEKs, error) {
 	ks := make([]domain.RootKEK, 0, len(keyConfigs))
 	for _, cfg := range keyConfigs {
-		// The key material is provided inline via PrivateKey or, for keys
-		// generated/reused from the KEK directory, read from File.
+		if cfg.PrivateKey == "" && cfg.File == "" {
+			return nil, fmt.Errorf("server: either a private key or file must be provided (%s)", cfg.ID)
+		}
+
 		raw := cfg.PrivateKey
 		if raw == "" && cfg.File != "" {
 			bs, err := os.ReadFile(cfg.File)
@@ -525,9 +527,6 @@ func buildRootKEK(keyConfigs []EncryptionKeyConfig) (*domain.RootKEKs, error) {
 				return nil, fmt.Errorf("server: failed to read encryption key file %q: %w", cfg.File, err)
 			}
 			raw = string(bs)
-		}
-		if raw == "" {
-			continue
 		}
 
 		key, err := crypto.ParseRSAKey(raw)
