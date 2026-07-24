@@ -33,7 +33,7 @@ type passkeyHandlerFixture struct {
 	schemaRepo *domainmock.MockJSONSchemaRepository
 	pool       *dbmock.MockPool
 	v2Pool     *servicemocks.MockPool
-	stmts      testAllStatements
+	stmts      *servicemocks.MockAllStatements
 }
 
 func newPasskeyHandlerFixture(t *testing.T) *passkeyHandlerFixture {
@@ -43,7 +43,7 @@ func newPasskeyHandlerFixture(t *testing.T) *passkeyHandlerFixture {
 	schemaRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
 	pool := dbmock.NewMockPool(ctrl)
 	v2Pool := servicemocks.NewMockPool(ctrl)
-	stmts := testAllStatements{}
+	stmts := servicemocks.NewMockAllStatements(ctrl)
 
 	userService := service.NewUserService(pool, service.NewPool(v2Pool), passwordRepo, schemaRepo, nil)
 	handler := service.NewFlowCreateUserForPasskeyHandler(userService, schemaRepo)
@@ -80,7 +80,7 @@ func expectSchemaLookup(f *passkeyHandlerFixture) {
 }
 
 func expectCreateUserTx(f *passkeyHandlerFixture, createFn func(context.Context, *domain.CreateUser) error) {
-	f.stmts.createUser = createFn
+	f.stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).DoAndReturn(createFn)
 	f.v2Pool.EXPECT().
 		Transaction(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {

@@ -9,8 +9,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
+
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
@@ -58,40 +61,23 @@ func (f *fakePasskeyRegRepo) Delete(_ context.Context, _ database.QueryExecutor,
 	return nil
 }
 
-type fakePasskeyStatements struct {
-	testAllStatements
+type passkeyUserState struct {
 	created []*domain.CreateUserPasskey
 	listed  []*domain.UserPasskey
 }
 
-func (f *fakePasskeyStatements) CreateUserPasskey(_ context.Context, p *domain.CreateUserPasskey) error {
-	f.created = append(f.created, p)
-	return nil
-}
-
-func (f *fakePasskeyStatements) ListUserPasskeys(_ context.Context, _ *v2database.ListOptions[domain.UserPasskeyField]) (*v2database.ListResult[*domain.UserPasskey], error) {
-	return &v2database.ListResult[*domain.UserPasskey]{Items: f.listed}, nil
-}
-
-func (f *fakePasskeyStatements) GetUserPasskey(context.Context, string, string, string) (*domain.UserPasskey, error) {
-	panic("unexpected call to GetUserPasskey")
-}
-
-func (f *fakePasskeyStatements) UpdateUserPasskey(context.Context, *domain.UserPasskey) error {
-	panic("unexpected call to UpdateUserPasskey")
-}
-
-func (f *fakePasskeyStatements) DeleteUserPasskey(context.Context, string, string, string) error {
-	panic("unexpected call to DeleteUserPasskey")
-}
-
-type fakePasskeyV2Pool struct {
-	stmts *fakePasskeyStatements
-}
-
-func (p fakePasskeyV2Pool) Statements() service.AllStatements { return p.stmts }
-func (p fakePasskeyV2Pool) Transaction(context.Context, func(context.Context, service.Statementer[service.AllStatements]) error) error {
-	panic("unexpected transaction")
+func (s *passkeyUserState) expectUserPasskeys(stmts *servicemocks.MockAllStatements) {
+	stmts.EXPECT().
+		ListUserPasskeys(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ *v2database.ListOptions[domain.UserPasskeyField]) (*v2database.ListResult[*domain.UserPasskey], error) {
+			return &v2database.ListResult[*domain.UserPasskey]{Items: s.listed}, nil
+		}).AnyTimes()
+	stmts.EXPECT().
+		CreateUserPasskey(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, p *domain.CreateUserPasskey) error {
+			s.created = append(s.created, p)
+			return nil
+		}).AnyTimes()
 }
 
 type fakeIDGen struct{ next string }
@@ -100,16 +86,22 @@ func (f *fakeIDGen) New(_ string) (string, error) { return f.next, nil }
 
 // --- helpers ---
 
-func buildTestRegistrationSvc(regRepo *fakePasskeyRegRepo, stmts *fakePasskeyStatements) *service.PasskeyRegistrationService {
-	return service.NewPasskeyRegistrationService(nil, fakePasskeyV2Pool{stmts: stmts}, regRepo, &fakeIDGen{next: "pkreg_test01"})
+func buildTestRegistrationSvc(t *testing.T, regRepo *fakePasskeyRegRepo, state *passkeyUserState) *service.PasskeyRegistrationService {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockStatementPool(ctrl)
+	statements := servicemocks.NewMockAllStatements(ctrl)
+	pool.EXPECT().Statements().Return(statements).AnyTimes()
+	state.expectUserPasskeys(statements)
+	return service.NewPasskeyRegistrationService(nil, pool, regRepo, &fakeIDGen{next: "pkreg_test01"})
 }
 
 // --- tests ---
 
 func TestPasskeyRegistrationService_Begin_StoresSession(t *testing.T) {
 	regRepo := &fakePasskeyRegRepo{}
-	stmts := &fakePasskeyStatements{}
-	svc := buildTestRegistrationSvc(regRepo, stmts)
+	state := &passkeyUserState{}
+	svc := buildTestRegistrationSvc(t, regRepo, state)
 
 	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
 		ProjectID:   "proj-1",
@@ -145,8 +137,8 @@ func TestPasskeyRegistrationService_Begin_StoresSession(t *testing.T) {
 
 func TestPasskeyRegistrationService_Begin_UsesNeutralLabelWithoutUsername(t *testing.T) {
 	regRepo := &fakePasskeyRegRepo{}
-	stmts := &fakePasskeyStatements{}
-	svc := buildTestRegistrationSvc(regRepo, stmts)
+	state := &passkeyUserState{}
+	svc := buildTestRegistrationSvc(t, regRepo, state)
 
 	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
 		ProjectID: "proj-1",
@@ -169,8 +161,8 @@ func TestPasskeyRegistrationService_Begin_UsesNeutralLabelWithoutUsername(t *tes
 
 func TestPasskeyRegistrationService_Begin_RequestsDiscoverableCredential(t *testing.T) {
 	regRepo := &fakePasskeyRegRepo{}
-	stmts := &fakePasskeyStatements{}
-	svc := buildTestRegistrationSvc(regRepo, stmts)
+	state := &passkeyUserState{}
+	svc := buildTestRegistrationSvc(t, regRepo, state)
 
 	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
 		ProjectID: "proj-1",
@@ -190,8 +182,8 @@ func TestPasskeyRegistrationService_Begin_RequestsDiscoverableCredential(t *test
 
 func TestPasskeyRegistrationService_Finish_NotFoundReturnsError(t *testing.T) {
 	regRepo := &fakePasskeyRegRepo{}
-	stmts := &fakePasskeyStatements{}
-	svc := buildTestRegistrationSvc(regRepo, stmts)
+	state := &passkeyUserState{}
+	svc := buildTestRegistrationSvc(t, regRepo, state)
 
 	err := svc.Finish(context.Background(), service.FinishRegistrationInput{
 		ProjectID:      "proj-1",
@@ -203,8 +195,8 @@ func TestPasskeyRegistrationService_Finish_NotFoundReturnsError(t *testing.T) {
 
 func TestPasskeyRegistrationService_Finish_InvalidAttestationReturnsProofRejected(t *testing.T) {
 	regRepo := &fakePasskeyRegRepo{}
-	stmts := &fakePasskeyStatements{}
-	svc := buildTestRegistrationSvc(regRepo, stmts)
+	state := &passkeyUserState{}
+	svc := buildTestRegistrationSvc(t, regRepo, state)
 
 	// First begin a ceremony to create the session.
 	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
