@@ -13,128 +13,12 @@ import (
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // stubPool returns nil typed as database.Pool. The mock repository does not
 // invoke any methods on it, so the value is opaque — it only satisfies the
 // service constructor signature.
 func stubPool() database.Pool { return nil }
-
-type testAllStatements struct {
-	createProject  func(context.Context, *domain.Project) error
-	getProjectByID func(context.Context, string) (*domain.Project, error)
-}
-
-func (testAllStatements) IsStatements() {}
-
-func (s testAllStatements) CreateProject(ctx context.Context, project *domain.Project) error {
-	if s.createProject != nil {
-		return s.createProject(ctx, project)
-	}
-	return nil
-}
-
-func (s testAllStatements) GetProjectByID(ctx context.Context, id string) (*domain.Project, error) {
-	if s.getProjectByID != nil {
-		return s.getProjectByID(ctx, id)
-	}
-	return nil, nil
-}
-
-func (testAllStatements) UpdateProject(context.Context, *domain.Project) error {
-	panic("unexpected call to UpdateProject")
-}
-
-func (testAllStatements) ListProjects(context.Context, *v2database.ListOptions[domain.ProjectField]) (*v2database.ListResult[*domain.Project], error) {
-	panic("unexpected call to ListProjects")
-}
-
-func (testAllStatements) DeleteProjectByID(context.Context, string) error {
-	panic("unexpected call to DeleteProjectByID")
-}
-
-func (testAllStatements) CreateFlowDefinition(context.Context, *domain.FlowDefinition) error {
-	panic("unexpected call to CreateFlowDefinition")
-}
-
-func (testAllStatements) GetFlowDefinitionByID(context.Context, string) (*domain.FlowDefinition, error) {
-	panic("unexpected call to GetFlowDefinitionByID")
-}
-
-func (testAllStatements) ListFlowDefinitions(context.Context, *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
-	panic("unexpected call to ListFlowDefinitions")
-}
-
-func (testAllStatements) DeleteFlowDefinitionByID(context.Context, string) error {
-	panic("unexpected call to DeleteFlowDefinitionByID")
-}
-
-func (testAllStatements) GetEncryptionKey(context.Context, v2database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error) {
-	panic("unexpected call to GetEncryptionKey")
-}
-
-func (testAllStatements) CreateEncryptionKey(context.Context, *domain.EncryptionKey) error {
-	panic("unexpected call to CreateEncryptionKey")
-}
-
-func (testAllStatements) CreateJSONSchema(context.Context, *domain.JSONSchema) error {
-	panic("unexpected call to CreateJSONSchema")
-}
-
-func (testAllStatements) GetJSONSchemaByID(context.Context, string, string) (*domain.JSONSchema, error) {
-	panic("unexpected call to GetJSONSchemaByID")
-}
-
-func (testAllStatements) ListJSONSchemas(context.Context, *v2database.ListOptions[domain.JSONSchemaField]) (*v2database.ListResult[*domain.JSONSchema], error) {
-	panic("unexpected call to ListJSONSchemas")
-}
-
-func (testAllStatements) DeleteJSONSchemaByID(context.Context, string, string) error {
-	panic("unexpected call to DeleteJSONSchemaByID")
-}
-
-func (testAllStatements) CreateTeam(context.Context, *domain.Team) error {
-	panic("unexpected call to CreateTeam")
-}
-
-func (testAllStatements) GetTeamByID(context.Context, string, string) (*domain.Team, error) {
-	panic("unexpected call to GetTeamByID")
-}
-
-func (testAllStatements) DeactivateTeam(context.Context, string, string) error {
-	panic("unexpected call to DeactivateTeam")
-}
-
-func (testAllStatements) CreateToken(context.Context, *domain.Token) error {
-	panic("unexpected call to CreateToken")
-}
-
-func (testAllStatements) GetTokenByID(context.Context, string, string) (*domain.Token, error) {
-	panic("unexpected call to GetTokenByID")
-}
-
-func (testAllStatements) ListTokens(context.Context, *v2database.ListOptions[domain.TokenField]) (*v2database.ListResult[*domain.Token], error) {
-	panic("unexpected call to ListTokens")
-}
-
-func (testAllStatements) DeleteTokenByID(context.Context, string, string) error {
-	panic("unexpected call to DeleteTokenByID")
-}
-
-func (testAllStatements) CreatePasskeyRegistration(context.Context, *domain.CreatePasskeyRegistration) error {
-	panic("unexpected call to CreatePasskeyRegistration")
-}
-
-func (testAllStatements) GetPasskeyRegistration(context.Context, string, string) (*domain.PasskeyRegistration, error) {
-	panic("unexpected call to GetPasskeyRegistration")
-}
-
-func (testAllStatements) DeletePasskeyRegistration(context.Context, string, string) error {
-	panic("unexpected call to DeletePasskeyRegistration")
-}
-
-var _ service.AllStatements = testAllStatements{}
 
 type v2TestTx struct {
 	database.QueryExecutor
