@@ -106,7 +106,7 @@ func (f passkeyFixture) challengeAttempt(t *testing.T, challengeID string) (*dom
 
 func newAuthAttemptSvc(
 	ctrl *gomock.Controller,
-	stmts testAllStatements,
+	stmts *mocks.MockAllStatements,
 	sessions service.SessionResolver,
 	users service.UserLookup,
 	userPasswords service.UserPasswords,
@@ -127,12 +127,11 @@ func TestAuthAttemptService_Create(t *testing.T) {
 		sessions := mocks.NewMockSessionResolver(ctrl)
 
 		var created *domain.AuthAttempt
-		stmts := testAllStatements{
-			createAuthAttempt: func(_ context.Context, a *domain.AuthAttempt) error {
-				created = a
-				return nil
-			},
-		}
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().CreateAuthAttempt(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, a *domain.AuthAttempt) error {
+			created = a
+			return nil
+		})
 
 		svc := newAuthAttemptSvc(ctrl, stmts, sessions, nil, nil, nil)
 		got, err := svc.Create(t.Context(), service.CreateAuthAttemptInput{
@@ -151,9 +150,8 @@ func TestAuthAttemptService_Create(t *testing.T) {
 
 		sessions.EXPECT().Get(gomock.Any(), gomock.Any(), "proj", sessionID).
 			Return(&domain.Session{Factors: []domain.AuthFactor{&domain.AuthFactorUser{UserID: "user-1"}}}, nil)
-		stmts := testAllStatements{
-			createAuthAttempt: func(context.Context, *domain.AuthAttempt) error { return nil },
-		}
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().CreateAuthAttempt(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *domain.AuthAttempt) error { return nil })
 
 		svc := newAuthAttemptSvc(ctrl, stmts, sessions, nil, nil, nil)
 		got, err := svc.Create(t.Context(), service.CreateAuthAttemptInput{
@@ -176,7 +174,7 @@ func TestAuthAttemptService_Create(t *testing.T) {
 		sessions.EXPECT().Get(gomock.Any(), gomock.Any(), "proj", sessionID).
 			Return(nil, domain.ErrSessionNotFound())
 
-		svc := newAuthAttemptSvc(ctrl, testAllStatements{}, sessions, nil, nil, nil)
+		svc := newAuthAttemptSvc(ctrl, mocks.NewMockAllStatements(ctrl), sessions, nil, nil, nil)
 		got, err := svc.Create(t.Context(), service.CreateAuthAttemptInput{
 			ProjectID:      "proj",
 			SessionID:      &sessionID,
@@ -189,9 +187,8 @@ func TestAuthAttemptService_Create(t *testing.T) {
 
 	t.Run("maps create repository failure to internal error", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		stmts := testAllStatements{
-			createAuthAttempt: func(context.Context, *domain.AuthAttempt) error { return createErr },
-		}
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().CreateAuthAttempt(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *domain.AuthAttempt) error { return createErr })
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil, nil)
 		got, err := svc.Create(t.Context(), service.CreateAuthAttemptInput{
@@ -210,7 +207,7 @@ func TestAuthAttemptService_Create(t *testing.T) {
 		sessions.EXPECT().Get(gomock.Any(), gomock.Any(), "proj", sessionID).
 			Return(nil, unexpectedSessionErr)
 
-		svc := newAuthAttemptSvc(ctrl, testAllStatements{}, sessions, nil, nil, nil)
+		svc := newAuthAttemptSvc(ctrl, mocks.NewMockAllStatements(ctrl), sessions, nil, nil, nil)
 		got, err := svc.Create(t.Context(), service.CreateAuthAttemptInput{
 			ProjectID:      "proj",
 			SessionID:      &sessionID,
@@ -228,13 +225,12 @@ func TestAuthAttemptService_GetByID(t *testing.T) {
 
 	t.Run("returns repository attempt", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		stmts := testAllStatements{
-			getAuthAttemptByID: func(_ context.Context, projectID, id string) (*domain.AuthAttempt, error) {
-				assert.Equal(t, "proj", projectID)
-				assert.Equal(t, "att-1", id)
-				return attempt, nil
-			},
-		}
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, projectID, id string) (*domain.AuthAttempt, error) {
+			assert.Equal(t, "proj", projectID)
+			assert.Equal(t, "att-1", id)
+			return attempt, nil
+		})
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil, nil)
 		got, err := svc.GetByID(t.Context(), "proj", "att-1")
@@ -245,11 +241,10 @@ func TestAuthAttemptService_GetByID(t *testing.T) {
 
 	t.Run("propagates repository auth attempt not found error", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		stmts := testAllStatements{
-			getAuthAttemptByID: func(context.Context, string, string) (*domain.AuthAttempt, error) {
-				return nil, domain.ErrAuthAttemptNotFound()
-			},
-		}
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return nil, domain.ErrAuthAttemptNotFound()
+		})
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil, nil)
 		got, err := svc.GetByID(t.Context(), "proj", "att-1")
@@ -260,11 +255,10 @@ func TestAuthAttemptService_GetByID(t *testing.T) {
 
 	t.Run("maps repository error to internal error", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		stmts := testAllStatements{
-			getAuthAttemptByID: func(context.Context, string, string) (*domain.AuthAttempt, error) {
-				return nil, repoErr
-			},
-		}
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return nil, repoErr
+		})
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil, nil)
 		got, err := svc.GetByID(t.Context(), "proj", "att-1")
@@ -287,15 +281,14 @@ func TestAuthAttemptService_IssueChallenge(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		attempt := &domain.AuthAttempt{ProjectID: "proj", ID: "att-1"}
 		var setChallenge domain.AuthChallenge
-		stmts := testAllStatements{
-			getAuthAttemptByID: func(context.Context, string, string) (*domain.AuthAttempt, error) {
-				return attempt, nil
-			},
-			setAuthAttemptChallenge: func(_ context.Context, _, _ string, c domain.AuthChallenge) error {
-				setChallenge = c
-				return nil
-			},
-		}
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return attempt, nil
+		})
+		stmts.EXPECT().SetAuthAttemptChallenge(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, c domain.AuthChallenge) error {
+			setChallenge = c
+			return nil
+		})
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil, nil)
 		got, err := svc.IssueChallenge(t.Context(), service.IssueChallengeInput{
@@ -315,15 +308,14 @@ func TestAuthAttemptService_IssueChallenge(t *testing.T) {
 			Checks:    []domain.AuthCheck{&domain.AuthFactorUser{UserID: "user-1"}},
 		}
 		var setChallenge domain.AuthChallenge
-		stmts := testAllStatements{
-			getAuthAttemptByID: func(context.Context, string, string) (*domain.AuthAttempt, error) {
-				return attempt, nil
-			},
-			setAuthAttemptChallenge: func(_ context.Context, _, _ string, c domain.AuthChallenge) error {
-				setChallenge = c
-				return nil
-			},
-		}
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return attempt, nil
+		})
+		stmts.EXPECT().SetAuthAttemptChallenge(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, c domain.AuthChallenge) error {
+			setChallenge = c
+			return nil
+		})
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil, nil)
 		got, err := svc.IssueChallenge(t.Context(), service.IssueChallengeInput{
@@ -338,11 +330,10 @@ func TestAuthAttemptService_IssueChallenge(t *testing.T) {
 	t.Run("returns invalid request for unsupported challenge type", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		attempt := &domain.AuthAttempt{ProjectID: "proj", ID: "att-1"}
-		stmts := testAllStatements{
-			getAuthAttemptByID: func(context.Context, string, string) (*domain.AuthAttempt, error) {
-				return attempt, nil
-			},
-		}
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return attempt, nil
+		})
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil, nil)
 		got, err := svc.IssueChallenge(t.Context(), service.IssueChallengeInput{
@@ -356,14 +347,13 @@ func TestAuthAttemptService_IssueChallenge(t *testing.T) {
 	t.Run("propagates set challenge error", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		attempt := &domain.AuthAttempt{ProjectID: "proj", ID: "att-1"}
-		stmts := testAllStatements{
-			getAuthAttemptByID: func(context.Context, string, string) (*domain.AuthAttempt, error) {
-				return attempt, nil
-			},
-			setAuthAttemptChallenge: func(context.Context, string, string, domain.AuthChallenge) error {
-				return repoErr
-			},
-		}
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return attempt, nil
+		})
+		stmts.EXPECT().SetAuthAttemptChallenge(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string, domain.AuthChallenge) error {
+			return repoErr
+		})
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil, nil)
 		got, err := svc.IssueChallenge(t.Context(), service.IssueChallengeInput{
@@ -395,15 +385,14 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 		users := mocks.NewMockUserLookup(ctrl)
 
 		var succeededFactor domain.AuthFactor
-		stmts := testAllStatements{
-			getAuthAttemptByID: func(context.Context, string, string) (*domain.AuthAttempt, error) {
-				return newUserChallengeAttempt(), nil
-			},
-			authAttemptChallengeSucceeded: func(_ context.Context, _, _ string, factor domain.AuthFactor, _ string) error {
-				succeededFactor = factor
-				return nil
-			},
-		}
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return newUserChallengeAttempt(), nil
+		})
+		stmts.EXPECT().AuthAttemptChallengeSucceeded(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, factor domain.AuthFactor, _ string) error {
+			succeededFactor = factor
+			return nil
+		})
 		users.EXPECT().ProjectIDCondition(gomock.Any()).Return(nil).AnyTimes()
 		users.EXPECT().AttributesCondition(gomock.Any()).Return(nil).AnyTimes()
 		users.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{ID: "user-1"}, nil)
@@ -423,11 +412,10 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 	t.Run("stale challenge returns error without recording failure", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		users := mocks.NewMockUserLookup(ctrl)
-		stmts := testAllStatements{
-			getAuthAttemptByID: func(context.Context, string, string) (*domain.AuthAttempt, error) {
-				return newUserChallengeAttempt(), nil
-			},
-		}
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return newUserChallengeAttempt(), nil
+		})
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, users, nil, nil)
 		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
@@ -443,15 +431,14 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 		users := mocks.NewMockUserLookup(ctrl)
 
 		var failedChallenge domain.AuthChallenge
-		stmts := testAllStatements{
-			getAuthAttemptByID: func(context.Context, string, string) (*domain.AuthAttempt, error) {
-				return newUserChallengeAttempt(), nil
-			},
-			authAttemptChallengeFailed: func(_ context.Context, _, _ string, c domain.AuthChallenge) error {
-				failedChallenge = c
-				return nil
-			},
-		}
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return newUserChallengeAttempt(), nil
+		})
+		stmts.EXPECT().AuthAttemptChallengeFailed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, c domain.AuthChallenge) error {
+			failedChallenge = c
+			return nil
+		})
 		users.EXPECT().ProjectIDCondition(gomock.Any()).Return(nil).AnyTimes()
 		users.EXPECT().AttributesCondition(gomock.Any()).Return(nil).AnyTimes()
 		users.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, rejectErr)
@@ -469,14 +456,13 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 	t.Run("propagates challenge succeeded persistence error", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		users := mocks.NewMockUserLookup(ctrl)
-		stmts := testAllStatements{
-			getAuthAttemptByID: func(context.Context, string, string) (*domain.AuthAttempt, error) {
-				return newUserChallengeAttempt(), nil
-			},
-			authAttemptChallengeSucceeded: func(context.Context, string, string, domain.AuthFactor, string) error {
-				return succeedErr
-			},
-		}
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return newUserChallengeAttempt(), nil
+		})
+		stmts.EXPECT().AuthAttemptChallengeSucceeded(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string, domain.AuthFactor, string) error {
+			return succeedErr
+		})
 		users.EXPECT().ProjectIDCondition(gomock.Any()).Return(nil).AnyTimes()
 		users.EXPECT().AttributesCondition(gomock.Any()).Return(nil).AnyTimes()
 		users.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{ID: "user-1"}, nil)
@@ -506,15 +492,14 @@ func TestAuthAttemptService_Handoff(t *testing.T) {
 	t.Run("creates and persists handoff for completed attempt", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		var handed *domain.AuthAttempt
-		stmts := testAllStatements{
-			getAuthAttemptByID: func(context.Context, string, string) (*domain.AuthAttempt, error) {
-				return completedAttempt(), nil
-			},
-			handoffAuthAttempt: func(_ context.Context, a *domain.AuthAttempt) error {
-				handed = a
-				return nil
-			},
-		}
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return completedAttempt(), nil
+		})
+		stmts.EXPECT().HandoffAuthAttempt(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, a *domain.AuthAttempt) error {
+			handed = a
+			return nil
+		})
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil, nil)
 		got, err := svc.Handoff(t.Context(), service.HandoffInput{ProjectID: "proj", AttemptID: "att-1"})
@@ -527,15 +512,14 @@ func TestAuthAttemptService_Handoff(t *testing.T) {
 
 	t.Run("returns not completed when required factors are missing", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		stmts := testAllStatements{
-			getAuthAttemptByID: func(context.Context, string, string) (*domain.AuthAttempt, error) {
-				return &domain.AuthAttempt{
-					ProjectID:      "proj",
-					ID:             "att-1",
-					RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypePassword},
-				}, nil
-			},
-		}
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return &domain.AuthAttempt{
+				ProjectID:      "proj",
+				ID:             "att-1",
+				RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypePassword},
+			}, nil
+		})
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil, nil)
 		got, err := svc.Handoff(t.Context(), service.HandoffInput{ProjectID: "proj", AttemptID: "att-1"})
@@ -546,14 +530,13 @@ func TestAuthAttemptService_Handoff(t *testing.T) {
 
 	t.Run("propagates repository handoff failure", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		stmts := testAllStatements{
-			getAuthAttemptByID: func(context.Context, string, string) (*domain.AuthAttempt, error) {
-				return completedAttempt(), nil
-			},
-			handoffAuthAttempt: func(context.Context, *domain.AuthAttempt) error {
-				return repoErr
-			},
-		}
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return completedAttempt(), nil
+		})
+		stmts.EXPECT().HandoffAuthAttempt(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *domain.AuthAttempt) error {
+			return repoErr
+		})
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil, nil)
 		got, err := svc.Handoff(t.Context(), service.HandoffInput{ProjectID: "proj", AttemptID: "att-1"})
@@ -573,15 +556,14 @@ func TestAuthAttemptService_IssuePasskeyChallenge(t *testing.T) {
 		Checks:    []domain.AuthCheck{&domain.AuthFactorUser{UserID: passkeyUserID}},
 	}
 	var setChallenge domain.AuthChallenge
-	stmts := testAllStatements{
-		getAuthAttemptByID: func(context.Context, string, string) (*domain.AuthAttempt, error) {
-			return attempt, nil
-		},
-		setAuthAttemptChallenge: func(_ context.Context, _, _ string, c domain.AuthChallenge) error {
-			setChallenge = c
-			return nil
-		},
-	}
+	stmts := mocks.NewMockAllStatements(ctrl)
+	stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+		return attempt, nil
+	})
+	stmts.EXPECT().SetAuthAttemptChallenge(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, c domain.AuthChallenge) error {
+		setChallenge = c
+		return nil
+	})
 	passkeys := newUserPasskeysMock(ctrl, []*domain.UserPasskey{f.passkey})
 
 	svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil, passkeys)
@@ -605,15 +587,14 @@ func TestAuthAttemptService_VerifyPasskeyProof(t *testing.T) {
 		attempt, assertion := f.challengeAttempt(t, "ch-1")
 
 		var succeededFactor domain.AuthFactor
-		stmts := testAllStatements{
-			getAuthAttemptByID: func(context.Context, string, string) (*domain.AuthAttempt, error) {
-				return attempt, nil
-			},
-			authAttemptChallengeSucceeded: func(_ context.Context, _, _ string, factor domain.AuthFactor, _ string) error {
-				succeededFactor = factor
-				return nil
-			},
-		}
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return attempt, nil
+		})
+		stmts.EXPECT().AuthAttemptChallengeSucceeded(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, factor domain.AuthFactor, _ string) error {
+			succeededFactor = factor
+			return nil
+		})
 
 		passkeys := newUserPasskeysMock(ctrl, []*domain.UserPasskey{f.passkey})
 		var persistedSignCount int64
@@ -648,14 +629,13 @@ func TestAuthAttemptService_VerifyPasskeyProof(t *testing.T) {
 		f := newPasskeyFixture(t)
 		attempt, _ := f.challengeAttempt(t, "ch-1")
 
-		stmts := testAllStatements{
-			getAuthAttemptByID: func(context.Context, string, string) (*domain.AuthAttempt, error) {
-				return attempt, nil
-			},
-			authAttemptChallengeFailed: func(context.Context, string, string, domain.AuthChallenge) error {
-				return nil
-			},
-		}
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return attempt, nil
+		})
+		stmts.EXPECT().AuthAttemptChallengeFailed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string, domain.AuthChallenge) error {
+			return nil
+		})
 		passkeys := newUserPasskeysMock(ctrl, []*domain.UserPasskey{f.passkey})
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil, passkeys)
