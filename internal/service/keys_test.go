@@ -32,7 +32,7 @@ func newMockedKeyService(t *testing.T) (
 	pool := servicemocks.NewMockPool(ctrl)
 	statements = servicemocks.NewMockAllStatements(ctrl)
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
-	key, err := rsa.GenerateKey(rand.Reader, 4096)
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
 	prootKEKs, err := domain.NewRootKEKs([]domain.RootKEK{

@@ -41,7 +41,7 @@ func serverKEKDir(cfg ServerConfig) (string, error) {
 	path := filepath.Join(dataDir, defaultKEKDirName)
 	err := os.MkdirAll(path, 0o700)
 	if err != nil {
-		return "", fmt.Errorf("failed to KEK dir: %w", err)
+		return "", fmt.Errorf("failed to create KEK dir: %w", err)
 	}
 	return path, nil
 }
@@ -105,7 +105,7 @@ func ensureServerKEK(cfg *ServerConfig) error {
 				UseForEncryption: true,
 			},
 		}
-		fmt.Fprintf(os.Stderr, "created server encryption key file at %s\n", kekDir)
+		fmt.Fprintf(os.Stderr, "created server KEK file at %s\n", filePath)
 	}
 
 	return nil
@@ -123,8 +123,16 @@ func createEncryptionKey(dir string) (string, error) {
 	})
 
 	path := filepath.Join(dir, "root-kek.pem")
-	if err := os.WriteFile(path, bs, 0o600); err != nil {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
 		return "", fmt.Errorf("failed to create kek file %q: %w", path, err)
+	}
+	if _, err := f.Write(bs); err != nil {
+		_ = f.Close()
+		return "", fmt.Errorf("failed to write kek file %q: %w", path, err)
+	}
+	if err := f.Close(); err != nil {
+		return "", fmt.Errorf("failed to close kek file %q: %w", path, err)
 	}
 
 	return path, nil

@@ -261,7 +261,7 @@ func NewRootKEKs(keys []RootKEK) (*RootKEKs, error) {
 	}
 
 	if encryptionKey == nil {
-		return nil, ErrRequestInvalid().WithMessage("no encryption is marked for encryption")
+		return nil, ErrRequestInvalid().WithMessage("no key is marked for encryption")
 	}
 
 	return &RootKEKs{
