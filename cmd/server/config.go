@@ -81,7 +81,6 @@ type EncryptionKeyConfig struct {
 	// encryption. Exactly one key must be marked for encryption, otherwise the
 	// application won't start.
 	UseForEncryption bool `mapstructure:"use_for_encryption"`
-	// PrivateKey is the RSA key with which data will be decrypted. it is not
-	// required when a File is provided. The key must be in a PEM format.
-	PrivateKey string `mapstructure:"private_key"`
+	// PrivateKey is the RSA private key used to decrypt wrapped data.
+	// It may be provided as PEM (including OpenSSH) or as a private JWK.
 }

@@ -119,7 +119,7 @@ func (s cryptoKeyStatements) ListEncryptionKeys(ctx context.Context, opts *datab
 func (s cryptoKeyStatements) UpdateKey(ctx context.Context, id string, key string) error {
 	stmt := buildStatement(updateEncryptionKeyStmt, id, key).statement()
 	if _, err := s.db.Update(ctx, stmt); err != nil {
-		return err
+		return wrapError(err)
 	}
 	return nil
 }

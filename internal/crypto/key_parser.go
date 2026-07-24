@@ -31,7 +31,7 @@ func ParsePrivatePEMKey(s string) (*rsa.PrivateKey, error) {
 
 	rsakey, ok := key.(*rsa.PrivateKey)
 	if !ok {
-		return nil, errors.New("key is no rsa key. only rsa keys are supported")
+		return nil, errors.New("key is not an RSA private key; only RSA keys are supported")
 	}
 
 	return rsakey, nil

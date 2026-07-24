@@ -245,6 +245,7 @@ func NewRootKEKs(keys []RootKEK) (*RootKEKs, error) {
 		return nil, ErrRequestInvalid().WithMessage("no root encryption key provided")
 	case 1:
 		encryptionKey = new(keys[0])
+		keys = nil
 	default:
 		for i, k := range keys {
 			if k.ShouldBeUsedForEncryption {
@@ -259,7 +260,7 @@ func NewRootKEKs(keys []RootKEK) (*RootKEKs, error) {
 	}
 
 	if encryptionKey == nil {
-		return nil, ErrRequestInvalid().WithMessage("no encryption is marked for encryption")
+		return nil, ErrRequestInvalid().WithMessage("no key is marked for encryption")
 	}
 
 	return &RootKEKs{
