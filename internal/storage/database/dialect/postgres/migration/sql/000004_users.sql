@@ -8,6 +8,10 @@ CREATE TABLE zitadel_nextgen.users (
     , updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 
     , PRIMARY KEY (project_id, id)
+    , CONSTRAINT fk_users_project
+        FOREIGN KEY (project_id)
+        REFERENCES zitadel_nextgen.projects(id)
+        ON DELETE CASCADE
     , FOREIGN KEY (project_id, team_id)
         REFERENCES zitadel_nextgen.teams(project_id, id)
         ON DELETE CASCADE
