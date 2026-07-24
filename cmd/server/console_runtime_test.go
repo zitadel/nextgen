@@ -130,6 +130,18 @@ func (f *fakeProjectService) Get(context.Context, string) (*domain.Project, erro
 	panic("unused")
 }
 
+func (f *fakeProjectService) Update(context.Context, string, string) (*domain.Project, error) {
+	panic("unused")
+}
+
+func (f *fakeProjectService) List(context.Context, service.ListProjectsRequest) (*service.ListProjectsResponse, error) {
+	panic("unused")
+}
+
+func (f *fakeProjectService) Delete(context.Context, string) error {
+	panic("unused")
+}
+
 func (f *fakeProjectService) DefaultProject(context.Context, string) (*domain.Project, error) {
 	return f.project, f.err
 }
