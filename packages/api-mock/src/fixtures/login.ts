@@ -12,6 +12,7 @@
  */
 import type { CreateFlow201, CreateFlow201Step } from "@zitadel/api/generated/model";
 
+import { generateAltchaChallenge } from "../altcha.js";
 import { signHandoffToken } from "../crypto.js";
 import type { StoredCredential } from "../lib/authn/index.js";
 
@@ -76,7 +77,10 @@ function wrap(input: StepFixtureInput, step: CreateFlow201Step, extras?: Partial
  * Matches the Flow API shape in `docs/design/flowengine/flow-engine.md`
  * (single `login` step with `fields: [email, password]`).
  */
-export function identifierStep(input: StepFixtureInput): CreateFlow201 {
+export async function identifierStep(input: StepFixtureInput): Promise<CreateFlow201> {
+  // Async on purpose: every render mints a fresh Altcha challenge for the
+  // `bot_check` gate, the way the real engine will (ADR 019).
+  const altcha = await generateAltchaChallenge();
   return wrap(input, {
     name: "identifier",
     texts: { title_key: "identifier.title" },
@@ -100,7 +104,9 @@ export function identifierStep(input: StepFixtureInput): CreateFlow201 {
       { name: "register", kind: "navigate", text_key: "identifier.action.register.link" },
       { name: "recover", kind: "navigate", text_key: "action.forgot_password" },
     ],
-    gates: {},
+    gates: {
+      bot_check: { kind: "captcha", provider: "altcha", config: altcha },
+    },
   });
 }
 

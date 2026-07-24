@@ -290,6 +290,69 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(typeof submits[0]?.body.session_token).toBe("string");
   });
 
+  it("injects <zl-captcha>, solves the gate, and submits a proof the mock verifies", async () => {
+    // Strict mode: the mock rejects any identifier submit whose gate proof
+    // is missing or invalid, so reaching "done" proves the whole loop —
+    // patcher injection → Altcha solve → gate_proofs on the wire → verify.
+    mock = setupMockHandlers({ verifyGates: true });
+    server.resetHandlers(...mock.handlers);
+
+    const element = attachLogin(host);
+    const proofEvents: CustomEvent[] = [];
+    element.addEventListener("zl-captcha-result", (event: Event) =>
+      proofEvents.push(event as CustomEvent),
+    );
+
+    // The template never mentions gates — the mandatory-gates patcher must
+    // inject the atom for the fixture's `bot_check` gate.
+    await waitFor(() => element.shadowRoot?.querySelector('zl-captcha[gate-name="bot_check"]'));
+    await waitFor(() => (proofEvents.length > 0 ? proofEvents : null));
+
+    await advanceMockLoginFlow(element);
+    await waitFor(() => {
+      const title = element.shadowRoot?.querySelector(".zl-card-title");
+      return title?.textContent?.includes("You're signed in") ? title : null;
+    });
+
+    const submit = mock
+      .getCaptured()
+      .find(
+        (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+          req.kind === "submitFlowStep",
+      );
+    const proof = submit?.body.gate_proofs?.["bot_check"];
+    expect(typeof proof).toBe("string");
+    const payload = JSON.parse(atob(proof as string)) as { number: number; salt: string };
+    expect(typeof payload.number).toBe("number");
+    expect(typeof payload.salt).toBe("string");
+  });
+
+  it("renders the gate-failed banner once on zl-captcha-error without looping", async () => {
+    const element = await mount(host);
+
+    const dispatchError = () =>
+      element.shadowRoot?.dispatchEvent(
+        new CustomEvent("zl-captcha-error", {
+          bubbles: true,
+          composed: true,
+          detail: { gate_name: "bot_check", error: "widget exploded" },
+        }),
+      );
+
+    dispatchError();
+    await waitFor(() => {
+      const alert = element.shadowRoot?.querySelector("zl-alert");
+      return alert?.textContent?.includes("security check") ? alert : null;
+    });
+
+    // A second error for the same step must not trigger another update —
+    // the re-render remounts the atom, so without the guard this loops.
+    dispatchError();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const alerts = element.shadowRoot?.querySelectorAll("zl-alert") ?? [];
+    expect(alerts).toHaveLength(1);
+  });
+
   it("emits zitadel-flow-complete when the step ends with `complete: show`", async () => {
     const element = await mount(host);
     const completeEvents: CustomEvent[] = [];

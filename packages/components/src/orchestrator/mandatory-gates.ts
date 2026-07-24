@@ -62,6 +62,13 @@ function collectMissingAtoms(
 ): Element[] {
   const additions: Element[] = [];
 
+  // Gates first — invisible atoms should start solving as soon as the
+  // step mounts, before any visible field work.
+  for (const [name, gate] of Object.entries(step.gates ?? {})) {
+    if (hasGateFor(fragment, name)) continue;
+    additions.push(buildGate(name, gate));
+  }
+
   if (step.fields) {
     for (const field of step.fields) {
       if (!field.required) continue;
@@ -84,6 +91,15 @@ function hasPrimaryButton(fragment: DocumentFragment): boolean {
   // CSS attribute selectors with quotes are fine for static values like
   // "primary"; no escaping risk here.
   return Boolean(fragment.querySelector('zl-button[hierarchy="primary"]'));
+}
+
+function hasGateFor(fragment: DocumentFragment, name: string): boolean {
+  // Same rationale as `hasFieldFor`: walk instead of a CSS attribute
+  // selector so arbitrary characters in the gate name need no escaping.
+  for (const gate of fragment.querySelectorAll("zl-captcha")) {
+    if (gate.getAttribute("gate-name") === name) return true;
+  }
+  return false;
 }
 
 function hasFieldFor(fragment: DocumentFragment, name: string): boolean {
@@ -116,6 +132,20 @@ function findMarkerComment(fragment: DocumentFragment): Comment | null {
     node = walker.nextNode();
   }
   return null;
+}
+
+function buildGate(
+  name: string,
+  gate: { kind: string; provider: string; config?: Record<string, unknown> },
+): Element {
+  const el = document.createElement("zl-captcha");
+  el.setAttribute("gate-name", name);
+  el.setAttribute("kind", gate.kind);
+  el.setAttribute("provider", gate.provider);
+  if (gate.config) {
+    el.setAttribute("config", JSON.stringify(gate.config));
+  }
+  return el;
 }
 
 function buildField(

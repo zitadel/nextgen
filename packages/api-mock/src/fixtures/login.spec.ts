@@ -39,7 +39,6 @@ const input: StepFixtureInput = {
 };
 
 const syncBuilders = {
-  identifierStep,
   registerStep,
   registerPasswordStep,
   passwordStep,
@@ -60,5 +59,21 @@ describe("runtime login-flow fixtures match the generated flow-step schema", () 
   test("doneStep is spec-conformant", async () => {
     const resolved = await doneStep(input);
     expect(() => GetFlowStepResponse.parse(resolved)).not.toThrow();
+  });
+
+  // `identifierStep` is async too (it mints an Altcha challenge for the
+  // `bot_check` gate on every render).
+  test("identifierStep is spec-conformant and carries the bot_check gate", async () => {
+    const resolved = await identifierStep(input);
+    expect(() => GetFlowStepResponse.parse(resolved)).not.toThrow();
+    const gate = resolved.step.gates?.["bot_check"];
+    expect(gate?.kind).toBe("captcha");
+    expect(gate?.provider).toBe("altcha");
+    expect(gate?.config).toMatchObject({
+      algorithm: "SHA-256",
+      max_number: expect.any(Number),
+      challenge: expect.any(String),
+      salt: expect.any(String),
+    });
   });
 });

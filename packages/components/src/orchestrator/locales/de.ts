@@ -175,6 +175,8 @@ export const de: Locale = {
     "Passkey-Registrierung wurde nicht abgeschlossen. Bitte versuche es erneut.",
   "error.passkey_unsupported": "Dieses Gerät unterstützt keine Passkeys",
   "error.passkey_failed": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+  "error.gate_failed":
+    "Die Sicherheitsprüfung konnte nicht abgeschlossen werden. Bitte versuche es erneut.",
   "error.passkey_invalid":
     "Dieser Passkey konnte nicht bestätigt werden. Bitte versuche es erneut.",
   "error.passkey_registration_invalid":

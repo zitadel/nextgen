@@ -172,6 +172,7 @@ export const it: Locale = {
     "La registrazione della passkey non è stata completata. Riprova.",
   "error.passkey_unsupported": "Questo dispositivo non supporta le passkey",
   "error.passkey_failed": "Qualcosa è andato storto. Riprova.",
+  "error.gate_failed": "Impossibile completare la verifica di sicurezza. Riprova.",
   "error.passkey_invalid": "Non è stato possibile verificare questa passkey. Riprova.",
   "error.passkey_registration_invalid":
     "Non è stato possibile verificare la nuova passkey. Riprova a registrarla.",

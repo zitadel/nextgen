@@ -237,6 +237,13 @@ export class ZitadelLogin extends LitElement {
       // <zl-passkey> emits `zl-passkey-error` when the ceremony fails or is
       // cancelled. Surface the error on the current step.
       root.addEventListener("zl-passkey-error", this.handlePasskeyError as EventListener);
+      // <zl-captcha> emits `zl-captcha-result` when a gate is solved.
+      // Collect the proof — it rides along as `gate_proofs` on the next
+      // submit; the user still drives the submission (ADR 019).
+      root.addEventListener("zl-captcha-result", this.handleCaptchaResult as EventListener);
+      // <zl-captcha> emits `zl-captcha-error` when solving fails for good.
+      // Surface the error on the current step.
+      root.addEventListener("zl-captcha-error", this.handleCaptchaError as EventListener);
     }
     return root;
   }
@@ -451,6 +458,9 @@ export class ZitadelLogin extends LitElement {
   private applyResponse(wire: CreateFlow201): void {
     // A fresh response carries fresh (or no) errors — un-dismiss.
     this.stepErrorDismissed = false;
+    // Gate proofs are per-step: a fresh response carries fresh gates (or
+    // none), so proofs from the previous render must not leak forward.
+    this.gateProofs = {};
     this.response = wire;
     const { branding, issues } = validateBranding(wire.branding);
     this.branding = branding;
@@ -899,6 +909,46 @@ export class ZitadelLogin extends LitElement {
     );
   };
 
+  /**
+   * Gate proofs collected from `<zl-captcha>` for the current step, keyed
+   * by gate name. A plain field on purpose: proofs never affect rendering,
+   * they only ride along on the next submit body as `gate_proofs`.
+   */
+  private gateProofs: Record<string, string> = {};
+
+  /** Collect a solved gate proof for the next submit. */
+  private handleCaptchaResult = (
+    event: CustomEvent<{ gate_name: string; proof: string }>,
+  ): void => {
+    const { gate_name, proof } = event.detail;
+    if (!gate_name) return;
+    this.gateProofs = { ...this.gateProofs, [gate_name]: proof };
+  };
+
+  /**
+   * Handle a captcha solve failure. Re-render the current step with an
+   * error banner. Same guard as {@link handlePasskeyError}: the re-render
+   * remounts a fresh `<zl-captcha>` that re-solves; if that fails again,
+   * the matching error key stops the second update and breaks the loop.
+   */
+  private handleCaptchaError = (
+    event: CustomEvent<{ gate_name: string; error: string }>,
+  ): void => {
+    if (!this.response) return;
+    const errorKey = "error.gate_failed";
+    if (this.response.step.error === errorKey) return;
+    // This path replaces the response without going through applyResponse;
+    // the fresh error must not start life dismissed.
+    this.stepErrorDismissed = false;
+    this.response = {
+      ...this.response,
+      step: { ...this.response.step, error: errorKey },
+    };
+    console.warn(
+      `[zitadel-login] captcha gate "${event.detail.gate_name}" failed: ${event.detail.error}`,
+    );
+  };
+
   private findPrimaryAction(): string | null {
     const root = this.shadowRoot;
     if (!root) return null;
@@ -933,6 +983,7 @@ export class ZitadelLogin extends LitElement {
         session_token,
         action: action ?? "submit",
         fields,
+        ...(Object.keys(this.gateProofs).length > 0 ? { gate_proofs: this.gateProofs } : {}),
         ...(challengeResponse ? { challenge_response: challengeResponse } : {}),
       };
       const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");

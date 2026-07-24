@@ -9,6 +9,7 @@
 import {
   zlAlertManifest,
   zlButtonManifest,
+  zlCaptchaManifest,
   zlCardManifest,
   zlCheckboxManifest,
   zlFieldManifest,
@@ -23,6 +24,7 @@ import type { AtomManifest } from "./manifest.js";
 export const manifestRegistry: readonly AtomManifest[] = [
   zlAlertManifest,
   zlButtonManifest,
+  zlCaptchaManifest,
   zlCardManifest,
   zlCheckboxManifest,
   zlFieldManifest,

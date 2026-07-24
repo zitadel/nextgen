@@ -276,3 +276,87 @@ describe("setupMockHandlers", () => {
     expect(next.branding).toBeUndefined();
   });
 });
+
+/** Brute-force the Altcha solution the way `<zl-captcha>` does. */
+async function solveGate(config: Record<string, unknown>): Promise<string> {
+  const { algorithm, challenge, salt, max_number } = config as {
+    algorithm: string;
+    challenge: string;
+    salt: string;
+    max_number: number;
+  };
+  const encoder = new TextEncoder();
+  for (let n = 0; n <= max_number; n++) {
+    const digest = await crypto.subtle.digest(algorithm, encoder.encode(salt + n));
+    const hex = Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    if (hex === challenge) {
+      return btoa(JSON.stringify({ algorithm, challenge, number: n, salt }));
+    }
+  }
+  throw new Error("gate unsolvable within max_number");
+}
+
+describe("gate verification (verifyGates: true)", () => {
+  beforeEach(() => {
+    const gated = setupMockHandlers({ verifyGates: true });
+    server.use(...gated.handlers);
+  });
+
+  test("issues a bot_check gate on the identifier step", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const gate = start.step.gates?.["bot_check"];
+    expect(gate?.kind).toBe("captcha");
+    expect(gate?.provider).toBe("altcha");
+    expect(gate?.config?.challenge).toBeTruthy();
+  });
+
+  test("rejects a submit without a proof and re-renders with a fresh challenge", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const firstChallenge = start.step.gates?.["bot_check"]?.config?.challenge;
+
+    const rejected = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "submit",
+      fields: { email: "alice@acme.com", password: "hunter2" },
+    });
+    expect(rejected.step.name).toBe("identifier");
+    expect(rejected.step.error).toBe("error.gate_failed");
+    const freshChallenge = rejected.step.gates?.["bot_check"]?.config?.challenge;
+    expect(freshChallenge).toBeTruthy();
+    expect(freshChallenge).not.toBe(firstChallenge);
+  });
+
+  test("rejects a tampered proof", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const config = start.step.gates?.["bot_check"]?.config as Record<string, unknown>;
+    const valid = await solveGate(config);
+    const tampered = btoa(
+      JSON.stringify({ ...(JSON.parse(atob(valid)) as Record<string, unknown>), number: -1 }),
+    );
+
+    const rejected = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "submit",
+      fields: { email: "alice@acme.com", password: "hunter2" },
+      gate_proofs: { bot_check: tampered },
+    });
+    expect(rejected.step.error).toBe("error.gate_failed");
+  });
+
+  test("accepts a valid proof and advances the flow", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const config = start.step.gates?.["bot_check"]?.config as Record<string, unknown>;
+    const proof = await solveGate(config);
+
+    const done = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "submit",
+      fields: { email: "alice@acme.com", password: "hunter2" },
+      gate_proofs: { bot_check: proof },
+    });
+    expect(done.step.name).toBe("done");
+    expect(done.step.error).toBeUndefined();
+  });
+});
