@@ -125,7 +125,7 @@ tKmiTgdlqX8AAAALd2ltQG9tYXJjaHk=
 		t.Parallel()
 		_, err := ParsePrivatePEMKey(pkcs8PEM(t, ecKey))
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "rsa")
+		assert.Contains(t, err.Error(), "RSA")
 	})
 
 	t.Run("returns an error for non-PEM input without panicking", func(t *testing.T) {

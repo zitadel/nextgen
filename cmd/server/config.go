@@ -83,4 +83,5 @@ type EncryptionKeyConfig struct {
 	UseForEncryption bool `mapstructure:"use_for_encryption"`
 	// PrivateKey is the RSA private key used to decrypt wrapped data.
 	// It may be provided as PEM (including OpenSSH) or as a private JWK.
+	PrivateKey string `mapstructure:"private_key"`
 }
