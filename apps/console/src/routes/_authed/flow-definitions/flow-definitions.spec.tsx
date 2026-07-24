@@ -11,7 +11,6 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-
 // Absolute base so requests parse under jsdom/undici and MSW can intercept.
 vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
@@ -58,12 +57,21 @@ describe("login flows list states", () => {
   });
 
   it("renders the error boundary when the request fails", async () => {
-    server.use(
-      http.get(FLOWS_URL, () =>
-        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
-      ),
-    );
-    await renderAt("/flow-definitions");
-    expect(await screen.findByText("Request failed (500)")).toBeInTheDocument();
+    // The loader error is *expected* here; silence React's error-boundary
+    // dump and the router's route-match warning so passing runs stay quiet.
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      server.use(
+        http.get(FLOWS_URL, () =>
+          HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+        ),
+      );
+      await renderAt("/flow-definitions");
+      expect(await screen.findByText("Request failed (500)")).toBeInTheDocument();
+    } finally {
+      errorSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
   });
 });

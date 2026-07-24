@@ -37,3 +37,15 @@ if (typeof window !== "undefined" && !("ResizeObserver" in window)) {
   (window as unknown as { ResizeObserver: typeof ResizeObserverStub }).ResizeObserver =
     ResizeObserverStub;
 }
+
+// jsdom has no scrollTo; TanStack Router's scroll restoration calls it on
+// navigation. A no-op keeps passing runs free of "Not implemented" stderr spam.
+if (typeof window !== "undefined") {
+  window.scrollTo = (() => undefined) as typeof window.scrollTo;
+}
+
+// Hermetic env: Vitest (via Vite) loads `.env.local`, so without this stub a
+// developer's local VITE_CONSOLE_PROJECT_ID would leak into test requests and
+// make outcomes depend on gitignored local files. Specs that need a value
+// stub their own (vi.stubEnv wins over this default).
+vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "");

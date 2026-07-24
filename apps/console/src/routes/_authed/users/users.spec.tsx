@@ -64,22 +64,30 @@ describe("users screen", () => {
   it("renders the not-authorized state on a 401 with a live session (no redirect loop)", async () => {
     // A 401 data call while `GET /sessions/me` still answers with a session
     // means the operator-plane credential is missing (e.g. no dev-proxy
-    // secret) — the boundary must render copy, not bounce to /login.
-    server.use(
-      http.get(USERS_URL, () =>
-        HttpResponse.json(
-          {
-            code: "auth.unauthorized",
-            message: "The request lacks valid authentication credentials.",
-          },
-          { status: 401 },
+    // secret) — the boundary must render copy, not bounce to /login. The
+    // loader error is expected; silence the boundary/router noise.
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      server.use(
+        http.get(USERS_URL, () =>
+          HttpResponse.json(
+            {
+              code: "auth.unauthorized",
+              message: "The request lacks valid authentication credentials.",
+            },
+            { status: 401 },
+          ),
         ),
-      ),
-    );
-    const router = await renderUsers();
+      );
+      const router = await renderUsers();
 
-    expect(await screen.findByText("Console API not authorized")).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/users");
+      expect(await screen.findByText("Console API not authorized")).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe("/users");
+    } finally {
+      errorSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
   });
 
   it("filters live users by name, email, or id", async () => {
