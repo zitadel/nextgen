@@ -302,6 +302,17 @@ these and connects to your database instead of starting a container, so
 `go test -tags … ./...` needs no Docker. Point it at a throwaway database —
 the suites run migrations that create the `zitadel_nextgen` schema.
 
+The Spanner emulator only supports one transaction at a time, so concurrent
+integration tests are flaky against it. To run against a real, long-lived
+Spanner test instance instead, set `ZITADEL_TEST_SPANNER_INSTANCE` to an
+instance path (`projects/<project>/instances/<instance>`). The suites then
+provision a uniquely named database on that instance before the run and drop
+it afterwards, so parallel runs stay isolated. Authentication uses Application
+Default Credentials — locally run `gcloud auth application-default login`; CI
+authenticates via Workload Identity Federation. Precedence when multiple are
+set: `ZITADEL_TEST_SPANNER_INSTANCE` > `ZITADEL_TEST_SPANNER_URL` > emulator
+container.
+
 ### Demo end-to-end suites
 
 These tests start real servers and require a browser install, so they are opt-in
