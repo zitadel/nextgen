@@ -11,7 +11,7 @@ CREATE TABLE passkey_registrations (
     CONSTRAINT fk_passkey_registrations_project
         FOREIGN KEY (project_id)
         REFERENCES projects (id)
-        ON DELETE CASCADE,
+        ON DELETE CASCADE
 ) PRIMARY KEY (id)
 -- +goose StatementEnd
 -- +goose StatementBegin
