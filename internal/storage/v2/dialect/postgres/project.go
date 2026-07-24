@@ -25,8 +25,8 @@ func newProjectStatements(client queryExecutor) projectStatements {
 
 // CreateProject implements [service.ProjectStatements].
 func (ps projectStatements) CreateProject(ctx context.Context, project *domain.Project) error {
-	return ps.client.QueryRow(ctx, createProjectStmt, project.ID, project.Name, project.PreviewOrigins).
-		Scan(&project.ID, &project.CreatedAt, &project.UpdatedAt)
+	return wrapError(ps.client.QueryRow(ctx, createProjectStmt, project.ID, project.Name, project.PreviewOrigins).
+		Scan(&project.ID, &project.CreatedAt, &project.UpdatedAt))
 }
 
 const deleteByIDProjectStmt = `DELETE FROM zitadel_nextgen.projects WHERE id = $1`
