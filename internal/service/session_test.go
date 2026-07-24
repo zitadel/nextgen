@@ -7,48 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/mock/gomock"
+
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
-
-type sessionStmtsStub struct {
-	testAllStatements
-	createFunc   func(context.Context, *domain.Session) error
-	exchangeFunc func(context.Context, string, string, *string, time.Duration) (*domain.Session, error)
-	getFunc      func(context.Context, string, string) (*domain.Session, error)
-}
-
-func (s *sessionStmtsStub) CreateSession(ctx context.Context, session *domain.Session) error {
-	if s.createFunc == nil {
-		panic("unexpected CreateSession call")
-	}
-	return s.createFunc(ctx, session)
-}
-
-func (s *sessionStmtsStub) ExchangeSession(ctx context.Context, projectID, handoffToken string, idempotencyKey *string, ttl time.Duration) (*domain.Session, error) {
-	if s.exchangeFunc == nil {
-		panic("unexpected ExchangeSession call")
-	}
-	return s.exchangeFunc(ctx, projectID, handoffToken, idempotencyKey, ttl)
-}
-
-func (s *sessionStmtsStub) GetSessionByID(ctx context.Context, projectID, sessionID string) (*domain.Session, error) {
-	if s.getFunc == nil {
-		panic("unexpected GetSessionByID call")
-	}
-	return s.getFunc(ctx, projectID, sessionID)
-}
-
-type sessionStatementPool struct {
-	stmts service.AllStatements
-}
-
-func (s sessionStatementPool) Statements() service.AllStatements { return s.stmts }
-
-func (s sessionStatementPool) Transaction(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
-	return fn(ctx, s)
-}
 
 // userReaderStub implements service.UserIdentityReader and records the
 // condition/option inputs so tests can assert which user was hydrated.
@@ -78,6 +43,21 @@ func (s *userReaderStub) WithAttributes(keys ...string) database.QueryOption {
 
 func sessionConfigForTest() service.SessionConfig {
 	return service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour}
+}
+
+func newMockedSessionService(t *testing.T, users service.UserIdentityReader, cfg service.SessionConfig) (service.SessionService, *servicemocks.MockAllStatements) {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockStatementPool(ctrl)
+	statements := servicemocks.NewMockAllStatements(ctrl)
+	pool.EXPECT().Statements().Return(statements).AnyTimes()
+	pool.EXPECT().
+		Transaction(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return fn(ctx, pool)
+		}).
+		AnyTimes()
+	return service.NewSessionService(stubPool(), pool, users, cfg), statements
 }
 
 func TestSessionService_Create(t *testing.T) {
@@ -115,8 +95,10 @@ func TestSessionService_Create(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			stmts := &sessionStmtsStub{
-				createFunc: func(_ context.Context, gotSession *domain.Session) error {
+			svc, statements := newMockedSessionService(t, &userReaderStub{}, sessionConfigForTest())
+			statements.EXPECT().
+				CreateSession(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, gotSession *domain.Session) error {
 					if gotSession.ProjectID != tt.input.ProjectID {
 						t.Fatalf("Create session.ProjectID = %q, want %q", gotSession.ProjectID, tt.input.ProjectID)
 					}
@@ -128,10 +110,9 @@ func TestSessionService_Create(t *testing.T) {
 					}
 					gotSession.ID = tt.wantID
 					return tt.repoErr
-				},
-			}
+				})
 
-			got, err := service.NewSessionService(stubPool(), sessionStatementPool{stmts: stmts}, &userReaderStub{}, sessionConfigForTest()).Create(t.Context(), tt.input)
+			got, err := svc.Create(t.Context(), tt.input)
 			if tt.wantErr != nil {
 				assertSessionResult(t, "Create", got, err, nil, tt.wantErr)
 				return
@@ -235,25 +216,28 @@ func TestSessionService_Exchange(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			stmts := &sessionStmtsStub{
-				exchangeFunc: func(_ context.Context, projectID, handoffToken string, gotIdempotencyKey *string, gotTTL time.Duration) (*domain.Session, error) {
-					if projectID != tt.input.ProjectID {
-						t.Fatalf("Exchange projectID = %q, want %q", projectID, tt.input.ProjectID)
-					}
-					if handoffToken != tt.input.HandoffToken {
-						t.Fatalf("Exchange handoffToken = %q, want %q", handoffToken, tt.input.HandoffToken)
-					}
-					if gotIdempotencyKey != tt.input.IdempotencyKey {
-						t.Fatalf("Exchange idempotencyKey = %p, want %p", gotIdempotencyKey, tt.input.IdempotencyKey)
-					}
-					if tt.wantErr == nil && gotTTL != tt.wantTTL {
-						t.Fatalf("Exchange ttl = %v, want %v", gotTTL, tt.wantTTL)
-					}
-					return tt.repoResult, tt.repoErr
-				},
+			svc, statements := newMockedSessionService(t, &userReaderStub{}, cfg)
+			if tt.repoResult != nil || tt.repoErr != nil {
+				statements.EXPECT().
+					ExchangeSession(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ context.Context, projectID, handoffToken string, gotIdempotencyKey *string, gotTTL time.Duration) (*domain.Session, error) {
+						if projectID != tt.input.ProjectID {
+							t.Fatalf("Exchange projectID = %q, want %q", projectID, tt.input.ProjectID)
+						}
+						if handoffToken != tt.input.HandoffToken {
+							t.Fatalf("Exchange handoffToken = %q, want %q", handoffToken, tt.input.HandoffToken)
+						}
+						if gotIdempotencyKey != tt.input.IdempotencyKey {
+							t.Fatalf("Exchange idempotencyKey = %p, want %p", gotIdempotencyKey, tt.input.IdempotencyKey)
+						}
+						if tt.wantErr == nil && gotTTL != tt.wantTTL {
+							t.Fatalf("Exchange ttl = %v, want %v", gotTTL, tt.wantTTL)
+						}
+						return tt.repoResult, tt.repoErr
+					})
 			}
 
-			got, err := service.NewSessionService(stubPool(), sessionStatementPool{stmts: stmts}, &userReaderStub{}, cfg).Exchange(t.Context(), tt.input)
+			got, err := svc.Exchange(t.Context(), tt.input)
 			assertSessionResult(t, "Exchange", got, err, tt.want, tt.wantErr)
 		})
 	}
@@ -299,8 +283,10 @@ func TestSessionService_Get(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			stmts := &sessionStmtsStub{
-				getFunc: func(_ context.Context, projectID, sessionID string) (*domain.Session, error) {
+			svc, statements := newMockedSessionService(t, &userReaderStub{}, sessionConfigForTest())
+			statements.EXPECT().
+				GetSessionByID(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, projectID, sessionID string) (*domain.Session, error) {
 					if projectID != tt.input.ProjectID {
 						t.Fatalf("Get projectID = %q, want %q", projectID, tt.input.ProjectID)
 					}
@@ -308,10 +294,9 @@ func TestSessionService_Get(t *testing.T) {
 						t.Fatalf("Get sessionID = %q, want %q", sessionID, tt.input.SessionID)
 					}
 					return tt.repoResult, tt.repoErr
-				},
-			}
+				})
 
-			got, err := service.NewSessionService(stubPool(), sessionStatementPool{stmts: stmts}, &userReaderStub{}, sessionConfigForTest()).Get(t.Context(), tt.input)
+			got, err := svc.Get(t.Context(), tt.input)
 			assertSessionResult(t, "Get", got, err, tt.want, tt.wantErr)
 		})
 	}
@@ -359,11 +344,6 @@ func TestSessionService_Get_UserIdentity(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			stmts := &sessionStmtsStub{
-				getFunc: func(context.Context, string, string) (*domain.Session, error) {
-					return &domain.Session{ProjectID: "proj", ID: "sess", UserID: tt.sessionUserID}, nil
-				},
-			}
 			users := &userReaderStub{}
 			if tt.sessionUserID != nil {
 				users.getFunc = func(_ context.Context, q database.QueryExecutor, _ ...database.QueryOption) (*domain.User, error) {
@@ -374,8 +354,13 @@ func TestSessionService_Get_UserIdentity(t *testing.T) {
 				}
 			}
 
+			svc, statements := newMockedSessionService(t, users, sessionConfigForTest())
+			statements.EXPECT().
+				GetSessionByID(gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(&domain.Session{ProjectID: "proj", ID: "sess", UserID: tt.sessionUserID}, nil)
+
 			input := service.GetSessionInput{ProjectID: "proj", SessionID: "sess", WithUserIdentity: true}
-			got, err := service.NewSessionService(stubPool(), sessionStatementPool{stmts: stmts}, users, sessionConfigForTest()).Get(t.Context(), input)
+			got, err := svc.Get(t.Context(), input)
 			if tt.wantErr != nil {
 				if !errors.Is(err, tt.wantErr) {
 					t.Fatalf("Get err = %v, want %v", err, tt.wantErr)
