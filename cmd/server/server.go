@@ -514,19 +514,31 @@ func embeddedPostgresOptions(dataDir string) embedded.Options {
 // ----------------------------- CRYPTO --------------------------------------
 
 func buildRootKEK(keyConfigs []EncryptionKeyConfig) (*domain.RootKEKs, error) {
-	ks := make([]domain.RootKEK, len(keyConfigs), len(keyConfigs))
-	for i, cfg := range keyConfigs {
-		if cfg.PrivateKey != "" {
-			key, err := crypto.ParsePrivatePEMKey(cfg.PrivateKey)
+	ks := make([]domain.RootKEK, 0, len(keyConfigs))
+	for _, cfg := range keyConfigs {
+		// The key material is provided inline via PrivateKey or, for keys
+		// generated/reused from the KEK directory, read from File.
+		pemKey := cfg.PrivateKey
+		if pemKey == "" && cfg.File != "" {
+			bs, err := os.ReadFile(cfg.File)
 			if err != nil {
-				return nil, fmt.Errorf("server: %w", err)
+				return nil, fmt.Errorf("server: failed to read encryption key file %q: %w", cfg.File, err)
 			}
-			ks[i] = domain.NewRootKEK(
-				cfg.ID,
-				*key,
-				cfg.UseForEncryption,
-			)
+			pemKey = string(bs)
 		}
+		if pemKey == "" {
+			continue
+		}
+
+		key, err := crypto.ParsePrivatePEMKey(pemKey)
+		if err != nil {
+			return nil, fmt.Errorf("server: %w", err)
+		}
+		ks = append(ks, domain.NewRootKEK(
+			cfg.ID,
+			*key,
+			cfg.UseForEncryption,
+		))
 	}
 
 	keks, err := domain.NewRootKEKs(ks)
