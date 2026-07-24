@@ -13,3 +13,9 @@ func useSpannerContainer() bool { return false }
 func newSpannerContainerDB(_ context.Context) (database.PoolTest, func(), error) {
 	panic("unreachable: build with -tags spanner_integration to enable Spanner testcontainer")
 }
+
+func useSpannerInstance() bool { return false }
+
+func newSpannerInstanceDB(_ context.Context) (database.PoolTest, func(), error) {
+	panic("unreachable: build with -tags spanner_integration to enable the Spanner test instance")
+}

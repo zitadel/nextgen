@@ -30,7 +30,9 @@ func runTests(m *testing.M) int {
 	var err error
 	ctx := context.Background()
 
-	if spannerURL := os.Getenv("ZITADEL_TEST_SPANNER_URL"); spannerURL != "" {
+	if useSpannerInstance() {
+		pool, stop, err = newSpannerInstanceDB(ctx)
+	} else if spannerURL := os.Getenv("ZITADEL_TEST_SPANNER_URL"); spannerURL != "" {
 		pool, stop, err = newSpannerURLDB(ctx, spannerURL)
 	} else if useSpannerContainer() {
 		pool, stop, err = newSpannerContainerDB(ctx)
