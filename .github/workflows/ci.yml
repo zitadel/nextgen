@@ -78,26 +78,6 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: moon run server:test-postgres
 
-      # Authenticate to the shared Spanner test instance via Workload Identity
-      # Federation (keyless). Skipped for fork PRs, which have no access to
-      # secrets and fall back to the emulator below. If the GCP secrets/vars are
-      # not configured yet, the spanner step's env resolves empty and the tests
-      # also fall back to the emulator, so CI stays green during rollout.
-      - name: Authenticate to Google Cloud (Spanner test instance)
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-
-      - name: Run Go integration tests (spanner)
-        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        env:
-          # Trusted runs target the real instance; fork PRs get an empty value
-          # and fall back to the emulator (see dbtest.Spanner precedence).
-          ZITADEL_TEST_SPANNER_INSTANCE: ${{ (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) && vars.SPANNER_TEST_INSTANCE || '' }}
-        run: moon run server:test-spanner
-
       - name: Build release snapshot without container
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container
@@ -137,6 +117,27 @@ jobs:
       - name: Run console real-instance suite
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: env -u CI -u GITHUB_ACTIONS moon run console-e2e:e2e-real
+
+      # Spanner integration runs last on purpose: until the GCP infrastructure
+      # and the GCP_* secrets are provisioned (see PR notes), the auth step
+      # below fails on trusted runs by design, as a visible signal that the real
+      # test instance is not configured yet. Keeping it at the end prevents that
+      # expected failure from skipping the unrelated steps above. Fork PRs skip
+      # auth and fall back to the emulator.
+      - name: Authenticate to Google Cloud (Spanner test instance)
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Run Go integration tests (spanner)
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        env:
+          # Trusted runs target the real instance; fork PRs get an empty value
+          # and fall back to the emulator (see dbtest.Spanner precedence).
+          ZITADEL_TEST_SPANNER_INSTANCE: ${{ (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) && vars.SPANNER_TEST_INSTANCE || '' }}
+        run: moon run server:test-spanner
 
       - name: Validate version PR
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
