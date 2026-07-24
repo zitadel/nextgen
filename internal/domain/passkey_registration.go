@@ -1,10 +1,7 @@
 package domain
 
 import (
-	"context"
 	"time"
-
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 const PrefixPasskeyRegistration ResourcePrefix = "pkreg"
@@ -31,16 +28,4 @@ type CreatePasskeyRegistration struct {
 	UserID    string
 	Challenge *PasskeyRegistrationChallenge
 	ExpiresAt time.Time
-}
-
-// PasskeyRegistrationRepository persists pending registration sessions.
-type PasskeyRegistrationRepository interface {
-	// Create stores a new pending registration session.
-	Create(ctx context.Context, client database.QueryExecutor, reg *CreatePasskeyRegistration) error
-
-	// Get retrieves a session by its id. Returns an error if not found or expired.
-	Get(ctx context.Context, client database.QueryExecutor, projectID, id string) (*PasskeyRegistration, error)
-
-	// Delete removes the session after it has been used (or abandoned).
-	Delete(ctx context.Context, client database.QueryExecutor, projectID, id string) error
 }
