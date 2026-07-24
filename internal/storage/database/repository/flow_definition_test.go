@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
@@ -17,6 +18,7 @@ func TestFlowDefinitionRepository_CreateAndGet(t *testing.T) {
 	defer rollback()
 
 	repo := repository.NewFlowDefinitionRepository(tx)
+	ensureProject(t, tx, "proj-j1")
 	def := sampleFlowDefinition("proj-j1", "flow-j1")
 
 	err := repo.CreateFlowDefinition(t.Context(), tx, def)
@@ -90,7 +92,7 @@ func TestFlowDefinitionRepository_GetNotFound(t *testing.T) {
 	repo := repository.NewFlowDefinitionRepository(tx)
 
 	_, err := repo.GetFlowDefinition(t.Context(), tx, "proj-missing", "flow-missing")
-	require.Error(t, err)
+	require.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
 func TestFlowDefinitionRepository_List(t *testing.T) {
@@ -98,6 +100,7 @@ func TestFlowDefinitionRepository_List(t *testing.T) {
 	defer rollback()
 
 	repo := repository.NewFlowDefinitionRepository(tx)
+	ensureProject(t, tx, "proj-jlist")
 
 	for _, id := range []string{"flow-ja", "flow-jb", "flow-jc"} {
 		def := sampleFlowDefinition("proj-jlist", id)
@@ -123,6 +126,7 @@ func TestFlowDefinitionRepository_ListByPurpose(t *testing.T) {
 	defer rollback()
 
 	repo := repository.NewFlowDefinitionRepository(tx)
+	ensureProject(t, tx, "proj-jpurp")
 
 	// flow-pa: serves login only (via sampleFlowDefinition)
 	defA := sampleFlowDefinition("proj-jpurp", "flow-pa")
@@ -150,6 +154,7 @@ func TestFlowDefinitionRepository_ListBySchemaVersion(t *testing.T) {
 	defer rollback()
 
 	repo := repository.NewFlowDefinitionRepository(tx)
+	ensureProject(t, tx, "proj-jpurp")
 
 	defA := sampleFlowDefinition("proj-jpurp", "flow-pa")
 	require.NoError(t, repo.CreateFlowDefinition(t.Context(), tx, defA))
@@ -171,6 +176,7 @@ func TestFlowDefinitionRepository_ListPagination(t *testing.T) {
 	defer rollback()
 
 	repo := repository.NewFlowDefinitionRepository(tx)
+	ensureProject(t, tx, "proj-jpage")
 
 	for _, id := range []string{"flow-jp1", "flow-jp2", "flow-jp3", "flow-jp4"} {
 		require.NoError(t, repo.CreateFlowDefinition(t.Context(), tx, sampleFlowDefinition("proj-jpage", id)))
@@ -195,6 +201,7 @@ func TestFlowDefinitionRepository_UpdateStatus(t *testing.T) {
 	defer rollback()
 
 	repo := repository.NewFlowDefinitionRepository(tx)
+	ensureProject(t, tx, "proj-jupd")
 	def := sampleFlowDefinition("proj-jupd", "flow-jupd")
 	require.NoError(t, repo.CreateFlowDefinition(t.Context(), tx, def))
 
@@ -211,6 +218,7 @@ func TestFlowDefinitionRepository_UpdateFlowDefinition(t *testing.T) {
 	defer rollback()
 
 	repo := repository.NewFlowDefinitionRepository(tx)
+	ensureProject(t, tx, "proj-j1")
 	def := sampleFlowDefinition("proj-j1", "flow-j1")
 	require.NoError(t, repo.CreateFlowDefinition(t.Context(), tx, def))
 
@@ -265,6 +273,7 @@ func TestFlowDefinitionRepository_Delete(t *testing.T) {
 	defer rollback()
 
 	repo := repository.NewFlowDefinitionRepository(tx)
+	ensureProject(t, tx, "proj-jdel")
 	def := sampleFlowDefinition("proj-jdel", "flow-jdel")
 	require.NoError(t, repo.CreateFlowDefinition(t.Context(), tx, def))
 
@@ -272,7 +281,22 @@ func TestFlowDefinitionRepository_Delete(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = repo.GetFlowDefinition(t.Context(), tx, "proj-jdel", "flow-jdel")
-	require.Error(t, err)
+	require.ErrorIs(t, err, new(database.NoRowFoundError))
+}
+
+func TestFlowDefinitionRepository_DeleteProjectCascades(t *testing.T) {
+	tx, rollback := transactionForRollback(t)
+	defer rollback()
+
+	repo := repository.NewFlowDefinitionRepository(tx)
+	ensureProject(t, tx, "proj-jcascade")
+	def := sampleFlowDefinition("proj-jcascade", "flow-jcascade")
+	require.NoError(t, repo.CreateFlowDefinition(t.Context(), tx, def))
+
+	deleteProject(t, tx, "proj-jcascade")
+
+	_, err := repo.GetFlowDefinition(t.Context(), tx, "proj-jcascade", "flow-jcascade")
+	require.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
 func TestFlowDefinitionRepository_ProjectIsolation(t *testing.T) {
@@ -280,6 +304,8 @@ func TestFlowDefinitionRepository_ProjectIsolation(t *testing.T) {
 	defer rollback()
 
 	repo := repository.NewFlowDefinitionRepository(tx)
+	ensureProject(t, tx, "proj-jA")
+	ensureProject(t, tx, "proj-jB")
 	require.NoError(t, repo.CreateFlowDefinition(t.Context(), tx, sampleFlowDefinition("proj-jA", "flow-j1")))
 	require.NoError(t, repo.CreateFlowDefinition(t.Context(), tx, sampleFlowDefinition("proj-jB", "flow-j1")))
 
