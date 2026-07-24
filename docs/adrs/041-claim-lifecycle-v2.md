@@ -49,9 +49,9 @@ were written, the epic revised several decisions, which this ADR records.
   project belongs to exactly one team.
 - **The association is a grant in the permission engine** (the ADR 032 to 034 /
   [#419](https://github.com/zitadel/nextgen/issues/419) track), not a new
-  first-class table. [ADR 027's](027-cursor-based-pagination.md) surrounding
-  permission work keeps authorization rows in the same database as the resources
-  they protect, which makes the claim transaction feasible.
+  first-class table. [ADR 033](033-internal-permission-management.md) keeps
+  authorization facts in the same database as the resources they protect,
+  updated in the same transaction, which makes the claim transaction feasible.
 
 ## Decision
 
