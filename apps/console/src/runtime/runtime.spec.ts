@@ -46,7 +46,6 @@ describe("initRuntime", () => {
     expect(fetchMock).toHaveBeenCalledWith(RUNTIME_URL, { credentials: "same-origin" });
     expect(runtime).toEqual({
       mode: "standalone",
-      platform_project_id: undefined,
       console_project_id: "proj_first",
       publishable_key: "pk_test",
     });

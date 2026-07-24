@@ -18,13 +18,12 @@
 export interface ConsoleRuntime {
   /** `"platform"` (cloud portal) is future work; servers send `"standalone"` today. */
   mode: "platform" | "standalone";
-  /** Reserved for platform (cloud) mode; standalone deployments omit it. */
-  platform_project_id?: string;
   /**
-   * The project the console signs into and manages. In standalone this is
-   * the deployment's single tracked project — the first one created (by
-   * `zitadel setup`) or the configured pin. Absent while no project exists
-   * yet; the login screen then shows its setup hint.
+   * The one project the console signs into and manages: in standalone the
+   * deployment's single tracked project — first-created (by `zitadel
+   * setup`) or the configured pin; in future platform mode, the platform
+   * project. Absent while no project exists yet; the login screen then
+   * shows its setup hint.
    */
   console_project_id?: string;
   /**
@@ -98,7 +97,6 @@ function parseRuntime(doc: unknown): ConsoleRuntime | undefined {
   if (record.mode !== "standalone" && record.mode !== "platform") return undefined;
   return {
     mode: record.mode,
-    platform_project_id: optionalString(record.platform_project_id),
     console_project_id: optionalString(record.console_project_id),
     publishable_key: optionalString(record.publishable_key),
   };

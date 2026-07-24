@@ -1,7 +1,8 @@
 # Console ADR 0004: Deployment modes — platform cloud vs standalone self-host
 
 > **Status:** Proposed
-> **Date:** 2026-07-23
+> **Date:** 2026-07-23 (revised same day: portal gating moved from a
+> console-facing capabilities array to effective permissions)
 > **Implementation state:** the standalone slice is implemented — the
 > `platform.project_id` config key, single-project default resolution
 > (§3: first-created project wins, no server-side creation), the
@@ -114,8 +115,7 @@ GET /console/runtime.json
 
 {
   "mode": "platform" | "standalone",
-  "platform_project_id": "proj_…",   // platform mode only; standalone omits it
-  "console_project_id": "proj_…"     // omitted while the deployment has no project
+  "console_project_id": "proj_…"   // omitted while the deployment has no project
 }
 ```
 
@@ -158,10 +158,11 @@ Alternatives rejected:
   round trip (viable later as an optimization; `index.html` is already
   `no-store`) but couples `internal/staticui` to live config today for no
   functional gain.
-- **A console-facing `capabilities` array in this document** — rejected:
-  portal surfaces render post-login, so per-surface gating can (and should)
-  ride the permission model instead of a second, pre-session vocabulary that
-  the permission set would then have to agree with. See §4.
+- **A console-facing `capabilities` array in this document** — the first
+  draft of this ADR had one. Dropped: portal surfaces render post-login, so
+  per-surface gating can (and should) ride the permission model instead of a
+  second, pre-session vocabulary that the permission set would then have to
+  agree with. See §4.
 
 ### 3. Standalone: the first-created project *is* the default
 
@@ -186,11 +187,11 @@ Implemented (`ProjectService.DefaultProject`,
   and the console's login screen renders a "run `zitadel setup`" hint
   instead of the widget.
 
-Rejected alternative: provisioning a reserved `proj_platform` project at
-startup. It would leave every self-host deployment with *two* projects —
-an empty one the console signs into and the real one holding the
-customer's users. Startup provisioning of a dedicated platform project is
-instead a **platform-mode** concern (#527), where the platform project
+An earlier draft of this section bootstrapped a reserved `proj_platform`
+at startup. Dropped: it left every self-host deployment with *two* projects
+— an empty one the console signed into and the real one holding the
+customer's users. Startup provisioning of a dedicated platform project
+returns as a **platform-mode** concern (#527), where the platform project
 hosts customer registration and ownership rather than the deployment's app
 users.
 
@@ -231,8 +232,8 @@ export const Route = createFileRoute("/_authed/billing/")({
   `mode`.
 - #555's license-key case — a self-hosted deployment unlocking portal
   surfaces — is a server-side config/license change that widens effective
-  permission sets. **Zero console changes** — the unlock flows entirely
-  through the permission path.
+  permission sets. **Zero console changes**, same as the first draft, but
+  now through the permission path.
 
 **Bridge until ADR 033 ships:** there are no per-user grants yet, so the
 server's effective set starts as *the deployment-level set for every
@@ -244,15 +245,21 @@ one; per-user narrowing arrives entirely server-side when the catalogs land.
 
 ADR 0003's guard signs into one project. This ADR defines which:
 
-- **`standalone`** — `console_project_id`: the deployment's single tracked
-  project (§3 — first-created, or the configured pin).
-  `VITE_CONSOLE_PROJECT_ID` becomes a dev-only override and is eventually
-  retired in favor of the runtime document.
-- **`platform`** — `platform_project_id`: customers register/log in on the
-  platform project (#527's hosted registration) and manage the customer
-  projects their teams own from the multi-project dashboard. Inspecting a
-  child project rides on the cross-project authorization model (#419/#333)
-  and is **out of scope here**, as is the claim flow (#96).
+`console_project_id` is deliberately the document's only project id — the
+console always operates on exactly one project, and what that project *is*
+follows from the mode:
+
+- **`standalone`** — the deployment's single tracked project (§3 —
+  first-created, or the configured pin). `VITE_CONSOLE_PROJECT_ID` becomes
+  a dev-only override and is eventually retired in favor of the runtime
+  document.
+- **`platform`** — the reserved platform project: customers register/log in
+  on it (#527's hosted registration) and manage the customer projects their
+  teams own from the multi-project dashboard. Those customer-project ids are
+  API data scoped by the session, not deployment metadata — they never
+  belong in this document. Inspecting a child project rides on the
+  cross-project authorization model (#419/#333) and is **out of scope
+  here**, as is the claim flow (#96).
 
 ### 6. UI gating is not authorization
 

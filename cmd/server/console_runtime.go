@@ -25,13 +25,12 @@ const ConsoleModeStandalone = "standalone"
 type consoleRuntime struct {
 	// Mode is "standalone" or, in the future, "platform".
 	Mode string `json:"mode"`
-	// PlatformProjectID is reserved for platform (cloud) mode; standalone
-	// deployments track a single project and omit it.
-	PlatformProjectID string `json:"platform_project_id,omitempty"`
-	// ConsoleProjectID is the project the console signs into and manages.
-	// Omitted while the deployment has no project yet — the customer's
-	// integration (`zitadel setup`) creates the first project, which
-	// becomes the default (Console ADR 0004 §3).
+	// ConsoleProjectID is the one project the console signs into and
+	// manages: the resolved default in standalone (Console ADR 0004 §3),
+	// the platform project in future platform mode. Omitted while the
+	// deployment has no project yet — the customer's integration
+	// (`zitadel setup`) creates the first project, which becomes the
+	// default.
 	ConsoleProjectID string `json:"console_project_id,omitempty"`
 	// PublishableKey is the default project's browser-safe, origin-scoped
 	// public-plane bearer (root ADR 036: today's preview secret, promoted).
