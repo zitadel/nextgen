@@ -50,7 +50,8 @@ The server wraps its data-encryption keys (DEKs) with one or more root key-encry
 ```yaml
 server:
   encryption_keys:
-    - id: root-kek
+    # Each key is keyed by its ID; the ID identifies which key wrapped a value.
+    root-kek:
       use_for_encryption: true
       # RSA private key inline as PEM (incl. OpenSSH) or JWK ...
       private_key: |

@@ -2,11 +2,11 @@ server:
   address: ":8080"
   # Optional. If unset, a nextgen-data directory next to the server binary is used.
   data_dir: ./nextgen-data
-  # Optional. Root key-encryption keys (KEKs) that wrap data-encryption keys.
-  # If unset, the server generates and reuses an RSA KEK under <data_dir>/keks.
-  # Exactly one key must be marked use_for_encryption.
+  # Optional. Root key-encryption keys (KEKs) that wrap data-encryption keys,
+  # keyed by key ID. If unset, the server generates and reuses an RSA KEK under
+  # <data_dir>/keks. Exactly one key must be marked use_for_encryption.
   # encryption_keys:
-  #   - id: root-kek
+  #   root-kek:
   #     use_for_encryption: true
   #     # Provide the RSA private key as a file (PEM incl. OpenSSH, or JWK) ...
   #     file: ./nextgen-data/keks/root-kek.pem
