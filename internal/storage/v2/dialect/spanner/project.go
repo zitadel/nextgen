@@ -65,7 +65,7 @@ func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*dom
 }
 
 // UpdateProject implements [service.ProjectStatements].
-// Only name is updated; secrets and preview origins are left untouched.
+// Only name is updated; preview origins are left untouched.
 // updated_at is refreshed and read back onto project.
 func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.Project) error {
 	stmt := buildStatement(updateProjectStmt, project.ID, project.Name).statement()

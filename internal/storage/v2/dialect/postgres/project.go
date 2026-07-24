@@ -62,7 +62,7 @@ func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*dom
 const updateProjectStmt = `UPDATE zitadel_nextgen.projects SET name = $2, updated_at = now() WHERE id = $1 RETURNING updated_at`
 
 // UpdateProject implements [service.ProjectStatements].
-// Only name is updated; secrets and preview origins are left untouched.
+// Only name is updated; preview origins are left untouched.
 // updated_at is refreshed and read back onto project.
 func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.Project) error {
 	return wrapError(ps.client.QueryRow(ctx, updateProjectStmt, project.ID, project.Name).
