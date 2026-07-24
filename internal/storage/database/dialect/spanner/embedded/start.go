@@ -10,8 +10,6 @@ import (
 	"os"
 	"time"
 
-	database_admin "cloud.google.com/go/spanner/admin/database/apiv1"
-	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	instance_admin "cloud.google.com/go/spanner/admin/instance/apiv1"
 	"cloud.google.com/go/spanner/admin/instance/apiv1/instancepb"
 	_ "github.com/jackc/pgx/v5/stdlib" // registers "pgx" driver for wait.ForSQL
@@ -19,6 +17,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	spannerdb "github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
+	"github.com/zitadel/nextgen/internal/storage/database/dialect/spanner/testdb"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -88,10 +87,13 @@ func StartEmbedded(ctx context.Context) (database.Connector, func(), error) {
 }
 
 func createInstanceAndDatabase(ctx context.Context, emulatorHost string) error {
+	// Emulator-only options: it has no auth and speaks plaintext gRPC. A real
+	// test instance uses Application Default Credentials instead (no opts) via
+	// the testdb package.
 	opts := []option.ClientOption{
 		option.WithEndpoint(emulatorHost),
-		option.WithoutAuthentication(), // TODO(IAM-Marco): In prod should use authentication, maybe read from env vars
-		option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())), // TODO(IAM-Marco): For prod, should use authentication
+		option.WithoutAuthentication(),
+		option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
 	}
 
 	// The TCP port becomes reachable before the gRPC server finishes initializing.
@@ -137,24 +139,7 @@ func tryCreateInstanceAndDatabase(ctx context.Context, opts []option.ClientOptio
 		return fmt.Errorf("wait for instance: %w", err)
 	}
 
-	// Create database
-	dbClient, err := database_admin.NewDatabaseAdminClient(ctx, opts...)
-	if err != nil {
-		return fmt.Errorf("database admin client: %w", err)
-	}
-	defer dbClient.Close()
-
-	dbOp, err := dbClient.CreateDatabase(ctx, &databasepb.CreateDatabaseRequest{
-		// TODO(IAM-Marco): This should be read from config
-		Parent:          "projects/" + testProject + "/instances/" + testInstance,
-		CreateStatement: "CREATE DATABASE `" + testDatabase + "`",
-	})
-	if err != nil {
-		return fmt.Errorf("create database: %w", err)
-	}
-	if _, err = dbOp.Wait(ctx); err != nil {
-		return fmt.Errorf("wait for database: %w", err)
-	}
-
-	return nil
+	// Create the database on the freshly created instance, reusing the shared
+	// admin helper (same call path the real test instance uses).
+	return testdb.CreateDatabase(ctx, testProject, testInstance, testDatabase, opts...)
 }
