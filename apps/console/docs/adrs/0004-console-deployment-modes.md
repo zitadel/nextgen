@@ -1,8 +1,7 @@
 # Console ADR 0004: Deployment modes — platform cloud vs standalone self-host
 
 > **Status:** Proposed
-> **Date:** 2026-07-23 (revised same day: portal gating moved from a
-> console-facing capabilities array to effective permissions)
+> **Date:** 2026-07-23
 > **Implementation state:** the standalone slice is implemented — the
 > `platform.project_id` config key, single-project default resolution
 > (§3: first-created project wins, no server-side creation), the
@@ -159,11 +158,10 @@ Alternatives rejected:
   round trip (viable later as an optimization; `index.html` is already
   `no-store`) but couples `internal/staticui` to live config today for no
   functional gain.
-- **A console-facing `capabilities` array in this document** — the first
-  draft of this ADR had one. Dropped: portal surfaces render post-login, so
-  per-surface gating can (and should) ride the permission model instead of a
-  second, pre-session vocabulary that the permission set would then have to
-  agree with. See §4.
+- **A console-facing `capabilities` array in this document** — rejected:
+  portal surfaces render post-login, so per-surface gating can (and should)
+  ride the permission model instead of a second, pre-session vocabulary that
+  the permission set would then have to agree with. See §4.
 
 ### 3. Standalone: the first-created project *is* the default
 
@@ -188,11 +186,11 @@ Implemented (`ProjectService.DefaultProject`,
   and the console's login screen renders a "run `zitadel setup`" hint
   instead of the widget.
 
-An earlier draft of this section bootstrapped a reserved `proj_platform`
-at startup. Dropped: it left every self-host deployment with *two* projects
-— an empty one the console signed into and the real one holding the
-customer's users. Startup provisioning of a dedicated platform project
-returns as a **platform-mode** concern (#527), where the platform project
+Rejected alternative: provisioning a reserved `proj_platform` project at
+startup. It would leave every self-host deployment with *two* projects —
+an empty one the console signs into and the real one holding the
+customer's users. Startup provisioning of a dedicated platform project is
+instead a **platform-mode** concern (#527), where the platform project
 hosts customer registration and ownership rather than the deployment's app
 users.
 
@@ -233,8 +231,8 @@ export const Route = createFileRoute("/_authed/billing/")({
   `mode`.
 - #555's license-key case — a self-hosted deployment unlocking portal
   surfaces — is a server-side config/license change that widens effective
-  permission sets. **Zero console changes**, same as the first draft, but
-  now through the permission path.
+  permission sets. **Zero console changes** — the unlock flows entirely
+  through the permission path.
 
 **Bridge until ADR 033 ships:** there are no per-user grants yet, so the
 server's effective set starts as *the deployment-level set for every
