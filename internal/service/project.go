@@ -198,6 +198,12 @@ func (s *projectService) Update(ctx context.Context, id, name string) (*domain.P
 
 // ListProjectsRequest is the input for listing projects.
 type ListProjectsRequest struct {
+	// ProjectID, if set, restricts results to that single project.
+	// It is set based on the scope of the caller.
+	// If it's bound to a single project, the ProjectID should be set by the handler.
+	// Left empty, the list spans all projects: the handler need not pass a ProjectID
+	// if the caller has broader access (e.g., system-level read access).
+	ProjectID string
 	Limit     int
 	PageToken string
 	Sorting   *Sorting // optional; defaults to createdAt asc
@@ -211,7 +217,10 @@ type ListProjectsResponse struct {
 }
 
 func (s *projectService) List(ctx context.Context, req ListProjectsRequest) (*ListProjectsResponse, error) {
-	filters := make([]v2database.Filter[domain.ProjectField], 0, len(req.Filters))
+	filters := make([]v2database.Filter[domain.ProjectField], 0, len(req.Filters)+1)
+	if req.ProjectID != "" {
+		filters = append(filters, v2database.Equal(v2database.Col(domain.ProjectFieldID), req.ProjectID))
+	}
 	for _, f := range req.Filters {
 		filter, err := projectFilter(f)
 		if err != nil {
