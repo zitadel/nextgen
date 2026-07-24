@@ -56,7 +56,9 @@ language. `<zitadel-login>` reads the global project handle from
   el.lang = 'en'; // optional; defaults to <html lang> / navigator.language
 </script>
 
-<zitadel-login id="login" purpose="login"></zitadel-login>
+<!-- variant="page" = a dedicated login route that owns the viewport.
+     Omit it to embed a content-sized widget inside your own layout. -->
+<zitadel-login id="login" variant="page" purpose="login"></zitadel-login>
 ```
 
 What `<zitadel-login>` handles for you:
@@ -168,21 +170,26 @@ For styling, start with the generated `--zl-*` variables from
 `@zitadel/design-tokens`, then use host CSS on `zitadel-login { ... }` for page
 placement and `::part(...)` hooks for targeted internals such as the form or
 field input. The design-token package README is the canonical token catalogue;
-the branding design notes explain the broader override ladder. The orchestrator
-is page-oriented by default (the widget claims the full viewport height, like a
-hosted login page); to embed it as a card inside a section, sidebar, or modal,
-size it to content and drop the full-bleed background from the host page:
+the branding design notes explain the broader override ladder.
 
-```css
-zitadel-login.embedded {
-  --zl-page-min-height: auto; /* releases the internal 100vh claims */
-  background: transparent; /* host rules on the element beat :host */
-}
+**Sizing is a two-mode contract.** The default is `variant="widget"`:
+content-sized, transparent through every layer, no fonts injected into your
+document, no focus grab on load — drop it into a section, sidebar, or modal
+and your app keeps owning the page. Dedicated login routes opt into the
+full-page chrome:
+
+```html
+<zitadel-login variant="page"></zitadel-login>
+<!-- claims the viewport, paints the surface background from tokens,
+     loads the brand font, focuses the first field -->
 ```
 
-`--zl-page-min-height` inherits across the shadow boundaries, so it releases
-both the orchestrator mount and the `zl-page-shell` atom in one setting
-(`embedding.browser.spec.ts` pins this contract).
+Width-responsive chrome (the split designs' two-column collapse, the compact
+brand header) keys off the **widget's own width** via container queries, so a
+narrow embed on a desktop viewport lays out like a phone. Fine-grained height
+control in either mode: `--zl-page-min-height` (inherits across the shadow
+boundaries, releasing the orchestrator mount and the `zl-page-shell` atom in
+one setting). `embedding.browser.spec.ts` pins this whole contract.
 
 Atom internals forward through the orchestrator as `<atom>-<part>` names —
 `zitadel-login::part(field-input)`, `zitadel-login::part(button-root)` — for
@@ -210,6 +217,7 @@ renders the bundled `default.liquid`. Tracked as a follow-up.
 
 | Property | Type | Notes |
 | --- | --- | --- |
+| `variant` | `'widget' \| 'page'` | Sizing/chrome mode. `widget` (default): content-sized, transparent, no font injection, no initial focus grab. `page`: full-page chrome for dedicated login routes |
 | `purpose` | `'login' \| 'register' \| 'reset_password' \| string` | Which flow purpose to drive |
 | `flowName` / `flow-name` | `string` | Run the flow definition with this `name` instead of the project default |
 | `project` | `ZitadelProject` | SDK handle from `configureZitadel()`. Object property (not an attribute). When unset, the element falls back to the global handle from `getZitadelConfig()` |

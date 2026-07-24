@@ -23,7 +23,7 @@
             {% else %}
               <span class="zl-hero__brand-mark" aria-hidden="true"></span>
             {% endif %}
-            Northwind
+            Your brand
           </span>
           <span class="zl-hero__nav-links">
             <a href="#">Product</a>
@@ -32,23 +32,23 @@
           </span>
         </nav>
 
-        <p class="zl-hero__eyebrow">Customer platform</p>
-        <h2 class="zl-hero__headline">Everything your team ships, in one place.</h2>
+        <p class="zl-hero__eyebrow">Your product category</p>
+        <h2 class="zl-hero__headline">A headline about what you ship.</h2>
         <p class="zl-hero__sub">
-          Northwind unifies auth, billing, and customer data so you can launch
-          faster and keep every login secure — without stitching together five
-          vendors.
+          Use this pane to tell visitors why they sign up: what your product
+          does, who it is for, and what happens after they sign in. Replace
+          every line here before you publish.
         </p>
 
         <ul class="zl-hero__bullets">
-          <li>SOC 2 &amp; passkey-ready authentication</li>
-          <li>Usage-based billing out of the box</li>
-          <li>One dashboard for every customer</li>
+          <li>Your first selling point</li>
+          <li>Your second selling point</li>
+          <li>Your third selling point</li>
         </ul>
 
         <p class="zl-hero__footnote">
-          Trusted by teams at <strong>Vertex</strong>, <strong>Loop</strong>
-          and <strong>Halcyon</strong>.
+          Replace this line with real social proof, such as customer logos or
+          a certification you actually hold.
         </p>
       </div>
     </aside>
@@ -56,7 +56,7 @@
     {% if branding.logo_url %}
       <img class="zl-split__compact" src="{{ branding.logo_url }}" alt="" />
     {% else %}
-      <p class="zl-split__compact zl-hero__compact-brand">Northwind</p>
+      <p class="zl-split__compact zl-hero__compact-brand">Your brand</p>
     {% endif %}
     <zl-card>
       <h1 slot="header" class="zl-card-title">{{ step.texts.title_key | t: identity.display_name }}</h1>

@@ -16,6 +16,17 @@
 :host([data-embedded]) .zr-page-shell {
   min-height: 100%;
 }
+/* Widget mode — stamped by the <zitadel-login> orchestrator when its
+   `variant` is `widget` (the default): content-sized, paints nothing.
+   Distinct from [data-embedded], which means "parent sets the height". */
+:host([data-widget]) {
+  min-height: auto;
+  background: transparent;
+}
+:host([data-widget]) .zr-page-shell {
+  min-height: var(--zl-page-min-height, auto);
+  background: transparent;
+}
 .zr-page-shell ::slotted([slot="header"]),
 .zr-page-shell ::slotted([slot="footer"]) {
   margin: 0;

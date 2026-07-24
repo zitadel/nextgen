@@ -101,9 +101,20 @@ export class ZitadelLogin extends LitElement {
     :host {
       display: block;
       width: 100%;
-      min-height: 100vh;
     }
   `;
+
+  /**
+   * Sizing/chrome mode. Components size to content; pages compose them —
+   * so the default is `widget`: content-sized, transparent host, no
+   * document-level default-font injection, no initial focus grab (matching
+   * the polarity of `<zitadel-logout>`). Dedicated login routes — the
+   * hosted shell and the scaffolded pages — opt into `page`, which claims
+   * the viewport, paints the surface background, ships the brand font, and
+   * focuses the first field on load. Fine-grained height override in both
+   * modes: `--zl-page-min-height`.
+   */
+  @property({ type: String, reflect: true }) accessor variant: "widget" | "page" = "widget";
 
   @property({ type: String }) accessor purpose: CreateFlowBodyPurpose = "login";
 
@@ -287,10 +298,14 @@ export class ZitadelLogin extends LitElement {
     if (root) {
       applyBaseTokens(root);
       applyBrandingTokens(root, this.branding, this.themeController.theme);
-      // Ship the design-system brand face by default; drop it when a tenant
-      // font takes over so we don't fire a redundant request.
+      // Ship the design-system brand face by default on dedicated login
+      // pages; drop it when a tenant font takes over so we don't fire a
+      // redundant request. Widget mode never injects the default into the
+      // host document — the embedding app owns its typography (and its
+      // visitors' font-CDN connections). Tenant `font_url` is explicit
+      // server-side branding state, so it applies in both modes.
       const tenantFontUrl = this.branding?.font_url ?? null;
-      applyDefaultFont(root, tenantFontUrl ? null : undefined);
+      applyDefaultFont(root, this.variant === "page" && !tenantFontUrl ? undefined : null);
       applyFontUrl(root, tenantFontUrl);
     }
     this.dataset.theme = this.themeController.theme;
@@ -299,15 +314,26 @@ export class ZitadelLogin extends LitElement {
   }
 
   override updated(changed: PropertyValues<this>): void {
-    // Re-stamp part forwarding on every commit: `unsafeHTML` re-parses
-    // whenever the rendered string changes (step swap, loading toggle,
-    // error dismiss), replacing previously stamped nodes.
+    // Re-stamp part forwarding and widget-mode chrome on every commit:
+    // `unsafeHTML` re-parses whenever the rendered string changes (step
+    // swap, loading toggle, error dismiss), replacing previously stamped
+    // nodes. The template's `zl-page-shell` sits in a different shadow
+    // scope, so the variant reaches it as a stamped attribute, not a
+    // `:host([variant])` selector.
     if (this.shadowRoot) {
       stampExportparts(this.shadowRoot);
+      const widget = this.variant !== "page";
+      for (const shell of this.shadowRoot.querySelectorAll("zl-page-shell")) {
+        shell.toggleAttribute("data-widget", widget);
+      }
     }
     const props = changed as Map<string, unknown>;
     if (!props.has("response")) return;
-    void this.hydrateStepAfterRender();
+    // `changed` holds the OLD value: nullish (`null` initializer, or
+    // undefined when the property never changed before) means this commit
+    // applied the first response — the initial paint, not a user-driven
+    // step swap.
+    void this.hydrateStepAfterRender(props.get("response") == null);
   }
 
   /**
@@ -316,15 +342,22 @@ export class ZitadelLogin extends LitElement {
    * but those render their own shadow DOM on a later microtask — so await
    * this element's update *and* the child atoms' first render before touching
    * them, rather than guessing a frame with `requestAnimationFrame`.
+   *
+   * Focus on the *initial* response is page-mode-only: a dedicated login
+   * route should focus its first field, but a widget embedded further down
+   * an arbitrary page must not steal focus and scroll-jump on load. Step
+   * swaps are user-initiated, so focus moves in both modes.
    */
-  private async hydrateStepAfterRender(): Promise<void> {
+  private async hydrateStepAfterRender(initial = false): Promise<void> {
     await this.updateComplete;
     const atoms = this.shadowRoot?.querySelectorAll<LitElement>("zl-field, zl-button");
     if (atoms) {
       await Promise.all(Array.from(atoms).map((atom) => atom.updateComplete));
     }
     this.applyValuesToFields();
-    this.moveFocusToFirstField();
+    if (!initial || this.variant === "page") {
+      this.moveFocusToFirstField();
+    }
   }
 
   override render() {

@@ -5,19 +5,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "./zitadel-login.js";
 import type { ZitadelLogin } from "./zitadel-login.js";
+// Raw import via the liquidRaw Vite plugin — @zitadel/config/defaults reads
+// files with node:fs at call time, which cannot run inside Chromium.
+import splitTemplate from "../../../config/defaults/branding/split/login.liquid";
 
 /**
- * Real-browser checks for the in-page embedding contract: a host page that
- * places `<zitadel-login>` inside a section, sidebar, or modal (rather than
- * the scaffolded full-page login route) must be able to size the widget to
- * its content and drop the full-bleed background.
+ * Real-browser checks for the widget-first embedding contract.
  *
- * The layout chrome defaults to a page-oriented shape — the shadow-internal
- * `.zl-mount` claims `min-height: 100vh` — and host CSS cannot reach into
- * the shadow root, so sizing is exposed as the `--zl-page-min-height`
- * custom property (custom properties inherit across the boundary). The
- * background needs no knob: document rules targeting the host element win
- * over `:host` rules in the cascade.
+ * `<zitadel-login>` defaults to `variant="widget"`: content-sized,
+ * transparent through EVERY layer (host, `zl-page-shell` host, inner
+ * `.zr-page-shell` — asserting only the outer host is how a black page
+ * shell once hid behind a "transparent" widget), no design-system font
+ * injected into the host document, no focus grab on initial load.
+ * Dedicated login routes opt into `variant="page"`, which restores the
+ * full-page shape: viewport min-height, surface background, brand font,
+ * and initial focus.
+ *
+ * Width-responsive chrome is container-based: a narrow host on a wide
+ * viewport collapses the split layout exactly like a phone would.
  */
 
 const identifierStep: CreateFlow201 = {
@@ -34,6 +39,18 @@ const identifierStep: CreateFlow201 = {
     gates: {},
   },
 };
+
+/** The shipped split design carried as tenant branding, logo-less. */
+const splitHeroOnlyStep: CreateFlow201 = {
+  ...identifierStep,
+  branding: {
+    layout: "split",
+    liquid_template: splitTemplate,
+    hero_url: "https://cdn.example.com/hero.png",
+  },
+} as unknown as CreateFlow201;
+
+const TRANSPARENT = "rgba(0, 0, 0, 0)";
 
 function installFlowFetchStub(responses: readonly CreateFlow201[]): { restore: () => void } {
   let cursor = 0;
@@ -60,10 +77,9 @@ async function waitFor<T>(probe: () => T | null | undefined, timeout = 3000): Pr
   throw new Error("waitFor timed out");
 }
 
-describe("<zitadel-login> in-page embedding (chromium)", () => {
+describe("<zitadel-login> widget-first embedding (chromium)", () => {
   let host: HTMLDivElement;
-  let hostStyles: HTMLStyleElement;
-  let stub: ReturnType<typeof installFlowFetchStub>;
+  let stub: ReturnType<typeof installFlowFetchStub> | undefined;
   let project: ZitadelProject;
 
   beforeEach(() => {
@@ -73,67 +89,102 @@ describe("<zitadel-login> in-page embedding (chromium)", () => {
       projectId: "embed-test",
       url: "http://localhost:4000",
     });
-    // Host-page stylesheet, exactly what an embedding app would ship.
-    hostStyles = document.createElement("style");
-    hostStyles.textContent = `
-      zitadel-login.zl-embedded {
-        --zl-page-min-height: auto;
-        background: transparent;
-      }
-    `;
-    document.head.appendChild(hostStyles);
     host = document.createElement("div");
     host.style.width = "360px";
     document.body.appendChild(host);
-    stub = installFlowFetchStub([identifierStep]);
   });
 
   afterEach(() => {
     host.remove();
-    hostStyles.remove();
-    stub.restore();
+    stub?.restore();
+    // The font links are document-level state the orchestrator manages on
+    // update; isolate tests from each other.
+    document.getElementById("zl-default-font-link")?.remove();
+    document.getElementById("zl-font-link")?.remove();
   });
 
-  async function mount(className?: string): Promise<ZitadelLogin> {
+  async function mount(
+    response: CreateFlow201,
+    configure?: (el: ZitadelLogin) => void,
+  ): Promise<ZitadelLogin> {
+    stub = installFlowFetchStub([response]);
     const element = document.createElement("zitadel-login") as ZitadelLogin;
     element.purpose = "login";
     element.project = project;
-    if (className) {
-      element.className = className;
-    }
+    configure?.(element);
     host.appendChild(element);
-    await waitFor(() => {
-      const root = element.shadowRoot;
-      return root && root.querySelector("zl-field") ? root : null;
-    });
+    await waitFor(() => (element.shadowRoot?.querySelector("zl-field") ? element : null));
     await waitFor(() => (element.getAttribute("aria-busy") === "false" ? element : null));
+    // Let hydrate (values + focus pass) settle before asserting.
+    await new Promise((resolve) => setTimeout(resolve, 150));
     return element;
   }
 
-  it("defaults to the page-oriented shape: the mount claims the viewport height", async () => {
-    const element = await mount();
-    const mountNode = element.shadowRoot?.querySelector(".zl-mount");
-    expect(mountNode).toBeTruthy();
-    const rect = (mountNode as HTMLElement).getBoundingClientRect();
-    expect(rect.height).toBeGreaterThanOrEqual(window.innerHeight - 1);
-  });
+  it("widget default: content-sized, and transparent through every layer", async () => {
+    const element = await mount(identifierStep);
+    expect(element.getAttribute("variant")).toBe("widget");
 
-  it("sizes to content when the host page sets --zl-page-min-height: auto", async () => {
-    const element = await mount("zl-embedded");
-    const mountNode = element.shadowRoot?.querySelector(".zl-mount") as HTMLElement;
-    // Chromium reports the computed value of `min-height: auto` as "0px" on
-    // non-flex-items; either spelling means the 100vh default is gone.
-    expect(["auto", "0px"]).toContain(getComputedStyle(mountNode).minHeight);
-    // One email field + a submit renders far below the viewport height —
-    // the widget now behaves like a card, not a page.
     const rect = element.getBoundingClientRect();
     expect(rect.height).toBeGreaterThan(0);
     expect(rect.height).toBeLessThan(window.innerHeight * 0.9);
+
+    // Outer host.
+    expect(getComputedStyle(element).backgroundColor).toBe(TRANSPARENT);
+    // Inner layers — the gap an outer-host-only assertion once left open.
+    const shell = element.shadowRoot?.querySelector("zl-page-shell") as HTMLElement;
+    expect(shell).toBeTruthy();
+    expect(shell.hasAttribute("data-widget")).toBe(true);
+    expect(getComputedStyle(shell).backgroundColor).toBe(TRANSPARENT);
+    const surface = shell.shadowRoot?.querySelector(".zr-page-shell") as HTMLElement;
+    expect(surface).toBeTruthy();
+    expect(getComputedStyle(surface).backgroundColor).toBe(TRANSPARENT);
   });
 
-  it("lets host CSS on the element drop the full-bleed background", async () => {
-    const element = await mount("zl-embedded");
-    // Document rules targeting the host element beat the :host default.
-    expect(getComputedStyle(element).backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  it("widget default: no design-system font is injected into the host document", async () => {
+    await mount(identifierStep);
+    expect(document.getElementById("zl-default-font-link")).toBeNull();
+  });
+
+  it("widget default: does not steal focus on initial load", async () => {
+    const element = await mount(identifierStep);
+    expect(element.shadowRoot?.activeElement).toBeNull();
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it("variant=page restores the full-page shape, font, and initial focus", async () => {
+    const element = await mount(identifierStep, (el) => {
+      el.variant = "page";
+    });
+    const mountNode = element.shadowRoot?.querySelector(".zl-mount") as HTMLElement;
+    expect(mountNode.getBoundingClientRect().height).toBeGreaterThanOrEqual(
+      window.innerHeight - 1,
+    );
+    expect(getComputedStyle(element).backgroundColor).not.toBe(TRANSPARENT);
+    expect(document.getElementById("zl-default-font-link")).not.toBeNull();
+    await waitFor(() => element.shadowRoot?.activeElement);
+    expect(element.shadowRoot?.activeElement).toBeTruthy();
+  });
+
+  it("--zl-page-min-height still overrides the widget default", async () => {
+    const element = await mount(identifierStep, (el) => {
+      el.style.setProperty("--zl-page-min-height", "40rem");
+    });
+    const mountNode = element.shadowRoot?.querySelector(".zl-mount") as HTMLElement;
+    expect(getComputedStyle(mountNode).minHeight).toBe("640px");
+  });
+
+  it("split chrome collapses to the widget's width, not the viewport's", async () => {
+    // 360px host on the (wide) test viewport: a viewport media query would
+    // keep two columns and hide the compact fallback — the container query
+    // must collapse to one column and reveal it.
+    const element = await mount(splitHeroOnlyStep);
+    const brand = element.shadowRoot?.querySelector(".zl-split__brand") as HTMLElement;
+    expect(brand).toBeTruthy();
+    expect(getComputedStyle(brand).display).toBe("none");
+    const compact = element.shadowRoot?.querySelector(".zl-split__compact") as HTMLElement;
+    expect(compact).toBeTruthy();
+    expect(getComputedStyle(compact).display).not.toBe("none");
+    // hero_url-only tenants get the banner variant of the fallback.
+    expect(compact.classList.contains("zl-split__compact--hero")).toBe(true);
   });
 });

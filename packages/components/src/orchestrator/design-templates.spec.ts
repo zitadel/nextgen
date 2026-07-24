@@ -100,10 +100,28 @@ describe("branding design catalog", () => {
   });
 
   it("split-family designs render the mobile compact brand header", () => {
-    // The chrome hides .zl-split__brand on narrow viewports; the compact
+    // The chrome hides .zl-split__brand on narrow widths; the compact
     // node is the fallback that keeps the tenant's identity visible there.
     for (const design of ["split", "split-right", "hero"]) {
       expect(renderDesign(design), design).toContain('class="zl-split__compact"');
+    }
+  });
+
+  it("hero_url-only tenants still get a compact fallback (banner variant)", () => {
+    const engine = createLiquidEngine({ locale });
+    const heroOnly = {
+      ...context,
+      branding: { hero_url: "https://cdn.example.com/hero.png" },
+    };
+    for (const design of ["split", "split-right"]) {
+      const { template } = getDefaultBrandingConfig(design);
+      const html = patchMandatoryGates(
+        createSanitiser()(engine.parseAndRenderSync(template, heroOnly)),
+        step,
+        locale,
+      );
+      expect(html, design).toContain("zl-split__compact--hero");
+      expect(html, design).toContain('src="https://cdn.example.com/hero.png"');
     }
   });
 

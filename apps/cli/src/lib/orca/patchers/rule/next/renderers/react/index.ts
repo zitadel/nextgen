@@ -56,6 +56,7 @@ const ${elementName} = dynamic(
     return function ${elementName}Element() {
       return (
         <zitadel-login
+          variant="page"
           project={project}
           purpose="${mode}"
           post-sign-in-url="/profile"
@@ -67,8 +68,10 @@ const ${elementName} = dynamic(
 );
 
 export default function ${componentName}() {
+  // variant="page" makes the widget paint the full-page chrome itself
+  // (viewport height, surface background) from design tokens.
   return (
-    <main style={{ minHeight: "100vh", colorScheme: "dark", background: "#0f0f11" }}>
+    <main style={{ colorScheme: "dark" }}>
       <${elementName} />
     </main>
   );
@@ -130,6 +133,7 @@ declare module "react" {
         "post-sign-in-url"?: string;
         purpose?: string;
         "flow-name"?: string;
+        variant?: "widget" | "page";
       };
       "zitadel-logout": React.HTMLAttributes<HTMLElement> & {
         project?: ZitadelProject;

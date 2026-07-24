@@ -125,6 +125,14 @@ export interface ZitadelLoginConfig {
   readonly projectId?: string;
   /** Reverse-proxy path prefix the widget calls. */
   readonly proxyPath?: string;
+  /**
+   * Sizing/chrome mode. `widget` (default) is content-sized and paints no
+   * page chrome — for embedding inside an existing layout. `page` claims
+   * the viewport, paints the surface background, loads the brand font, and
+   * focuses the first field — for dedicated login routes.
+   * @default "widget"
+   */
+  readonly variant?: "widget" | "page";
   /** Flow purpose. @default "login" */
   readonly purpose?: CreateFlowBodyPurpose;
   /**

@@ -136,11 +136,13 @@ On viewports ≤48rem the chrome collapses `.zl-split` to one column and hides `
 | `--zl-split-align`        | `center`                           | Vertical alignment of the two panes (`start` for tall brand content). |
 | `--zl-split-brand-mobile` | `none`                             | `flex` keeps the full brand pane on mobile, stacked above the form. |
 
-One widget-level knob belongs to the **embedding page**, not the template:
-`--zl-page-min-height` (default `100vh`) sizes the whole widget. Hosts placing
-`<zitadel-login>` inside a section, sidebar, or modal set it to `auto` on the
-element to get a content-sized card instead of a page — see the embedding
-section in the `@zitadel/components` README.
+Widget-level sizing belongs to the **embedding page**, not the template:
+`<zitadel-login>` defaults to `variant="widget"` (content-sized, no page
+chrome) and dedicated login routes set `variant="page"` for the full-page
+shape. `--zl-page-min-height` remains the fine-grained height override in
+both modes, and the split-family collapse responds to the widget's own width
+(container queries), not the viewport — see the embedding section in the
+`@zitadel/components` README.
 
 ## Authoring workflow (eject → edit → plan → apply)
 

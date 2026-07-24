@@ -8,23 +8,34 @@
  * `:host` via the branding stylesheet.
  */
 
+/* Widget-first: the default host is content-sized and paints nothing —
+   the embedding app owns the page. `variant="page"` (hosted shell,
+   scaffolded login routes) opts into the full-page chrome. The
+   `--zl-page-min-height` custom property overrides the height in both
+   modes (a host-set value always wins over the variant default). */
 :host {
   display: block;
-  min-height: 100%;
-  background: var(--zl-color-surface-default-black, #0f0f11);
+  background: transparent;
   color: var(--zl-color-text-primary-white, #f4f4f6);
   font-family: var(--zl-font-family-sans, system-ui, sans-serif);
+}
+:host([variant="page"]) {
+  min-height: 100%;
+  background: var(--zl-color-surface-default-black, #0f0f11);
 }
 .zl-mount {
   display: flex;
   flex-direction: column;
-  /* Full-viewport by default (the hosted-login / scaffolded-route shape).
-     Hosts embedding the widget inside a section, sidebar, or modal size it
-     to content with `zitadel-login { --zl-page-min-height: auto }` — the
-     same property releases the `zl-page-shell` atom's viewport claim. */
-  min-height: var(--zl-page-min-height, 100vh);
+  /* Width-based chrome below (`@container`) responds to the widget's own
+     width, not the viewport — a sidebar embed on a desktop viewport must
+     collapse like a phone would. */
+  container-type: inline-size;
+  min-height: var(--zl-page-min-height, auto);
   background: inherit;
   color: inherit;
+}
+:host([variant="page"]) .zl-mount {
+  min-height: var(--zl-page-min-height, 100vh);
 }
 .zl-mount > zl-page-shell,
 .zl-mount > [data-zl-template-root] {
@@ -161,13 +172,24 @@
   max-height: 2.5rem;
   max-width: min(12rem, 60%);
 }
+/* hero_url-only tenants: the compact fallback renders the hero image as a
+   modest banner instead of vanishing with the brand pane. */
+.zl-split__compact--hero {
+  max-height: 6rem;
+  max-width: 100%;
+  width: 100%;
+  border-radius: var(--zl-radius-m, 0.75rem);
+  object-fit: cover;
+}
 .zl-split--right .zl-split__brand {
   order: 2;
 }
 .zl-split--right .zl-split__form {
   order: 1;
 }
-@media (max-width: 48rem) {
+/* Container query, not media query: keyed to the mount's inline size so a
+   narrow embed on a wide viewport collapses exactly like a phone. */
+@container (max-width: 48rem) {
   .zl-split {
     grid-template-columns: minmax(0, 1fr);
   }
