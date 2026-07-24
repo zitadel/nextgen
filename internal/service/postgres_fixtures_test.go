@@ -15,9 +15,10 @@ import (
 
 func ensureProject(t *testing.T, pool database.QueryExecutor, projectID string) {
 	t.Helper()
+	// name is NOT NULL; derive it from the project ID
 	_, err := pool.Exec(t.Context(),
-		`INSERT INTO zitadel_nextgen.projects (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`,
-		projectID,
+		`INSERT INTO zitadel_nextgen.projects (id, name) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING`,
+		projectID, "project-"+projectID,
 	)
 	require.NoError(t, err)
 }
