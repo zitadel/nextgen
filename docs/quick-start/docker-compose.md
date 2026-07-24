@@ -32,8 +32,8 @@ The template exposes:
 
 The compose file sets `NEXTGEN_DATABASE_POSTGRES` for the bundled Postgres
 container and persists server data under the `nextgen-server-data` volume. When
-no `NEXTGEN_SERVER_ENCRYPTION_KEY` is set, the server creates and reuses
-`server-encryption-key` in that mounted data directory.
+no encryption keys are configured, the server generates and reuses an RSA
+key-encryption key (KEK) under `keks/` in that mounted data directory.
 
 ## Bootstrap users
 
