@@ -20,89 +20,6 @@ func stubPool() database.Pool { return nil }
 
 func stubV2Pool() *service.DB { return nil }
 
-type testAllStatements struct {
-	createProject            func(context.Context, *domain.Project) error
-	getProjectByID           func(context.Context, string) (*domain.Project, error)
-	createFlowDefinition     func(context.Context, *domain.FlowDefinition) error
-	getFlowDefinitionByID    func(context.Context, string, string) (*domain.FlowDefinition, error)
-	updateFlowDefinition     func(context.Context, *domain.FlowDefinition) error
-	listFlowDefinitions      func(context.Context, *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error)
-	deleteFlowDefinitionByID func(context.Context, string, string) error
-}
-
-func (testAllStatements) IsStatements() {}
-
-func (s testAllStatements) CreateProject(ctx context.Context, project *domain.Project) error {
-	if s.createProject != nil {
-		return s.createProject(ctx, project)
-	}
-	return nil
-}
-
-func (s testAllStatements) GetProjectByID(ctx context.Context, id string) (*domain.Project, error) {
-	if s.getProjectByID != nil {
-		return s.getProjectByID(ctx, id)
-	}
-	return nil, nil
-}
-
-func (testAllStatements) UpdateProject(context.Context, *domain.Project) error {
-	panic("unexpected call to UpdateProject")
-}
-
-func (testAllStatements) ListProjects(context.Context, *v2database.ListOptions[domain.ProjectField]) (*v2database.ListResult[*domain.Project], error) {
-	panic("unexpected call to ListProjects")
-}
-
-func (testAllStatements) DeleteProjectByID(context.Context, string) error {
-	panic("unexpected call to DeleteProjectByID")
-}
-
-func (s testAllStatements) CreateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error {
-	if s.createFlowDefinition != nil {
-		return s.createFlowDefinition(ctx, entity)
-	}
-	panic("unexpected call to CreateFlowDefinition")
-}
-
-func (s testAllStatements) GetFlowDefinitionByID(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error) {
-	if s.getFlowDefinitionByID != nil {
-		return s.getFlowDefinitionByID(ctx, projectID, id)
-	}
-	panic("unexpected call to GetFlowDefinitionByID")
-}
-
-func (s testAllStatements) UpdateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error {
-	if s.updateFlowDefinition != nil {
-		return s.updateFlowDefinition(ctx, entity)
-	}
-	panic("unexpected call to UpdateFlowDefinition")
-}
-
-func (s testAllStatements) ListFlowDefinitions(ctx context.Context, filter *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
-	if s.listFlowDefinitions != nil {
-		return s.listFlowDefinitions(ctx, filter)
-	}
-	panic("unexpected call to ListFlowDefinitions")
-}
-
-func (s testAllStatements) DeleteFlowDefinitionByID(ctx context.Context, projectID, id string) error {
-	if s.deleteFlowDefinitionByID != nil {
-		return s.deleteFlowDefinitionByID(ctx, projectID, id)
-	}
-	panic("unexpected call to DeleteFlowDefinitionByID")
-}
-
-func (testAllStatements) GetEncryptionKey(context.Context, v2database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error) {
-	panic("unexpected call to GetEncryptionKey")
-}
-
-func (testAllStatements) CreateEncryptionKey(context.Context, *domain.EncryptionKey) error {
-	panic("unexpected call to CreateEncryptionKey")
-}
-
-var _ service.AllStatements = testAllStatements{}
-
 type v2TestTx struct {
 	database.QueryExecutor
 	stmts service.AllStatements
@@ -118,8 +35,9 @@ func stubListFlowDefinitions(t *testing.T, defs []*domain.FlowDefinition) *servi
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
-	stmts := testAllStatements{
-		listFlowDefinitions: func(_ context.Context, opts *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, opts *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
 			out := make([]*domain.FlowDefinition, 0, len(defs))
 			for _, def := range defs {
 				if !matchesFlowDefinitionFilter(def, opts) {
@@ -129,7 +47,7 @@ func stubListFlowDefinitions(t *testing.T, defs []*domain.FlowDefinition) *servi
 			}
 			return &v2database.ListResult[*domain.FlowDefinition]{Items: out}, nil
 		},
-	}
+	).AnyTimes()
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 	return service.NewPool(pool)
 }
@@ -251,8 +169,9 @@ func TestResolve_ResolveByName_FiltersWithRequestedOptions(t *testing.T) {
 
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
-	stmts := testAllStatements{
-		listFlowDefinitions: func(_ context.Context, opts *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, opts *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
 			if opts == nil || opts.Filter == nil {
 				t.Fatal("expected filter")
 			}
@@ -271,7 +190,7 @@ func TestResolve_ResolveByName_FiltersWithRequestedOptions(t *testing.T) {
 			}
 			return &v2database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{def}}, nil
 		},
-	}
+	)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 	repo := service.NewPool(pool)
 
@@ -384,11 +303,8 @@ func TestResolve_ResolveByAudience_RepoErrorPropagates(t *testing.T) {
 	sentinel := errors.New("boom")
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
-	stmts := testAllStatements{
-		listFlowDefinitions: func(context.Context, *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
-			return nil, sentinel
-		},
-	}
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).Return(nil, sentinel)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 	repo := service.NewPool(pool)
 
@@ -603,14 +519,15 @@ func stubGetFlowDefinition(t *testing.T, def *domain.FlowDefinition) *service.DB
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
-	stmts := testAllStatements{
-		getFlowDefinitionByID: func(_ context.Context, projectID, id string) (*domain.FlowDefinition, error) {
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	stmts.EXPECT().GetFlowDefinitionByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, projectID, id string) (*domain.FlowDefinition, error) {
 			if def == nil || def.ProjectID != projectID || def.ID != id {
 				return nil, database.NewNoRowFoundError(nil)
 			}
 			return def, nil
 		},
-	}
+	).AnyTimes()
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 	return service.NewPool(pool)
 }
