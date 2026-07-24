@@ -18,6 +18,11 @@ jobs:
     # which inject DEPOT_CACHE_TOKEN independently of GitHub secret filtering.
     runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || 'depot-ubuntu-24.04-16' }}
     timeout-minutes: 120
+    permissions:
+      contents: read
+      # Required to mint the OIDC token for Workload Identity Federation when
+      # authenticating to the Spanner test instance (trusted runs only).
+      id-token: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -73,8 +78,24 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: moon run server:test-postgres
 
+      # Authenticate to the shared Spanner test instance via Workload Identity
+      # Federation (keyless). Skipped for fork PRs, which have no access to
+      # secrets and fall back to the emulator below. If the GCP secrets/vars are
+      # not configured yet, the spanner step's env resolves empty and the tests
+      # also fall back to the emulator, so CI stays green during rollout.
+      - name: Authenticate to Google Cloud (Spanner test instance)
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
       - name: Run Go integration tests (spanner)
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        env:
+          # Trusted runs target the real instance; fork PRs get an empty value
+          # and fall back to the emulator (see dbtest.Spanner precedence).
+          ZITADEL_TEST_SPANNER_INSTANCE: ${{ (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) && vars.SPANNER_TEST_INSTANCE || '' }}
         run: moon run server:test-spanner
 
       - name: Build release snapshot without container
