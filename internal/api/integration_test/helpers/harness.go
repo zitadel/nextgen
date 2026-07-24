@@ -25,7 +25,7 @@ type Harness struct {
 	HttpClient      *http.Client
 	TestServer      *httptest.Server
 	Hasher          *crypto.PasswapHasher
-	Crypter         crypto.Crypter
+	RootKEKs        *domain.RootKEKs
 	SecretGenerator secrets.Generator
 	JoseSigner      jose.Signer
 

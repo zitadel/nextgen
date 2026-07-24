@@ -11,7 +11,7 @@ func (h *Harness) EnsureKeyService(t *testing.T) service.KeyService {
 	if h.KeyService == nil {
 		h.KeyService = service.NewKeyService(
 			h.EnsureServiceDB(t),
-			h.EnsureKekCrypter(t),
+			*(h.EnsureRootKEK(t)),
 		)
 	}
 	return h.KeyService

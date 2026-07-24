@@ -41,13 +41,20 @@ type ServerConfig struct {
 	// DataDir is the local runtime root used by zero-config server defaults.
 	// When unset, it defaults to a nextgen-data directory next to the binary.
 	DataDir string `mapstructure:"data_dir"`
-	// EncryptionKey is the 32-byte (hex-encoded, 64 chars) symmetric
-	// key used to seal flow cookies. If unset, the server creates or reuses
-	// EncryptionKeyFile.
-	EncryptionKey string `mapstructure:"encryption_key"`
-	// EncryptionKeyFile stores the generated encryption key for zero-config
-	// local starts. When unset, it defaults under DataDir.
-	EncryptionKeyFile string `mapstructure:"encryption_key_file"`
+	// EncryptionKeys is a collection of encryption keys used as KEK (key
+	// encryption key) by the application. DEKs (data encryption key) will be
+	// created by the application and encrypted with a KEK.
+	//
+	// This is a collection to enable encryption key rotation. Multiple keys
+	// can be provided but only one should be marked to be used for encryption.
+	// Once multiple keys are provided, all DEKs will be re-encrypted using the
+	// KEK marked to use for encryption.
+	//
+	// If no encryption keys are provided, a default encryption key is created
+	// in the kek directory. If there are no keys specified in the config but
+	// files exist in the kek directory, the newest file is used for
+	// encryption.
+	EncryptionKeys []EncryptionKeyConfig `mapstructure:"encryption_keys"`
 
 	ConsoleEnabled bool   `mapstructure:"console_enabled"`
 	ConsolePath    string `mapstructure:"console_path"`
@@ -58,4 +65,23 @@ type ServerConfig struct {
 type SchemaConfig struct {
 	BuiltinPublicBase string `mapstructure:"builtin_public_base"`
 	LRUCacheSize      int    `mapstructure:"lru_cache_size"`
+}
+
+type EncryptionKeyConfig struct {
+	// ID is the identifier by which JWEs can identify which encryption key
+	// has been used to encrypt the data
+	ID string `mapstructure:"id"`
+	// File is the path to a file which contains the RSA private key in either a
+	// JWK or a PEM file.
+	//
+	// Not required when PrivateKey is provided.
+	// When PrivateKey is provided, File is ignored.
+	File string `mapstructure:"file"`
+	// UseForEncryption indicates whether this key should be used for
+	// encryption. Exactly one key must be marked for encryption, otherwise the
+	// application won't start.
+	UseForEncryption bool `mapstructure:"use_for_encryption"`
+	// PrivateKey is the RSA key with which data will be decrypted. it is not
+	// required when a File is provided. The key must be in a PEM format.
+	PrivateKey string `mapstructure:"private_key"`
 }

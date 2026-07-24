@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/crypto"
-	"github.com/zitadel/oidc/v3/pkg/op"
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 func (h *Harness) EnsureKek(t *testing.T) [32]byte {
@@ -73,13 +73,19 @@ func createNewHasher(t *testing.T) *crypto.PasswapHasher {
 	return hasher
 }
 
-func (h *Harness) EnsureKekCrypter(t *testing.T) crypto.Crypter {
+func (h *Harness) EnsureRootKEK(t *testing.T) *domain.RootKEKs {
 	t.Helper()
-	if h.Crypter == nil {
-		h.Crypter = op.NewAES256GCMCrypto(
-			h.EnsureKek(t),
-			"", // TODO: must be empty to match the kek id for now
-		)
+	if h.RootKEKs == nil {
+		key, err := rsa.GenerateKey(rand.Reader, 4096)
+		require.NoError(t, err)
+		h.RootKEKs, err = domain.NewRootKEKs([]domain.RootKEK{
+			domain.NewRootKEK(
+				"root-kek",
+				*key,
+				true,
+			),
+		})
+		require.NoError(t, err)
 	}
-	return h.Crypter
+	return h.RootKEKs
 }

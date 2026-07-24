@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"crypto/rand"
+	"crypto/rsa"
 	"errors"
 	"testing"
 
@@ -20,7 +21,7 @@ import (
 func newMockedKeyService(t *testing.T) (
 	svc service.KeyService,
 	statements *servicemocks.MockAllStatements,
-	kek op.Crypto,
+	rootKEKs domain.RootKEKs,
 ) {
 	t.Helper()
 
@@ -29,10 +30,20 @@ func newMockedKeyService(t *testing.T) (
 	pool := servicemocks.NewMockPool(ctrl)
 	statements = servicemocks.NewMockAllStatements(ctrl)
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
-	kek = op.NewAES256GCMCrypto([32]byte([]byte("MasterkeyNeedsToHave32Characters")), "")
+	key, err := rsa.GenerateKey(rand.Reader, 4096)
+	require.NoError(t, err)
 
-	svc = service.NewKeyService(service.NewPool(pool), kek)
-	return svc, statements, kek
+	prootKEKs, err := domain.NewRootKEKs([]domain.RootKEK{
+		domain.NewRootKEK(
+			"root-kek",
+			*key,
+			true,
+		),
+	})
+	require.NoError(t, err)
+
+	svc = service.NewKeyService(service.NewPool(pool), *prootKEKs)
+	return svc, statements, *prootKEKs
 }
 
 func newActiveDEK(t *testing.T, projectID string, kek op.Crypto) *domain.EncryptionKey {

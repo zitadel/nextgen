@@ -1,18 +1,19 @@
 package server
 
 import (
-	cryptorand "crypto/rand"
-	"encoding/hex"
-	"errors"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
+	"time"
 )
 
 const (
-	defaultDataDirName           = "nextgen-data"
-	defaultEncryptionKeyFileName = "server-encryption-key"
+	defaultDataDirName = "nextgen-data"
+	defaultKEKDirName  = "keks"
 )
 
 func defaultServerDataDir() (string, error) {
@@ -20,36 +21,15 @@ func defaultServerDataDir() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolve executable path: %w", err)
 	}
-	return filepath.Join(filepath.Dir(exe), defaultDataDirName), nil
+	path := filepath.Join(filepath.Dir(exe), defaultDataDirName)
+	err = os.MkdirAll(path, 0o700)
+	if err != nil {
+		return "", fmt.Errorf("failed to create server data dir: %w", err)
+	}
+	return path, nil
 }
 
-func ensureServerEncryptionKey(cfg *ServerConfig) error {
-	if cfg.EncryptionKey != "" {
-		return nil
-	}
-
-	keyPath, err := serverEncryptionKeyPath(*cfg)
-	if err != nil {
-		return err
-	}
-
-	key, created, err := readOrCreateEncryptionKey(keyPath)
-	if err != nil {
-		return err
-	}
-	cfg.EncryptionKey = key
-	cfg.EncryptionKeyFile = keyPath
-
-	if created {
-		fmt.Fprintf(os.Stderr, "created server encryption key file at %s\n", keyPath)
-	}
-	return nil
-}
-
-func serverEncryptionKeyPath(cfg ServerConfig) (string, error) {
-	if cfg.EncryptionKeyFile != "" {
-		return cfg.EncryptionKeyFile, nil
-	}
+func serverKEKDir(cfg ServerConfig) (string, error) {
 	dataDir := cfg.DataDir
 	if dataDir == "" {
 		defaultDir, err := defaultServerDataDir()
@@ -58,54 +38,98 @@ func serverEncryptionKeyPath(cfg ServerConfig) (string, error) {
 		}
 		dataDir = defaultDir
 	}
-	return filepath.Join(dataDir, defaultEncryptionKeyFileName), nil
-}
-
-func readOrCreateEncryptionKey(path string) (key string, created bool, err error) {
-	existing, err := os.ReadFile(path)
-	if err == nil {
-		return strings.TrimSpace(string(existing)), false, nil
-	}
-	if !errors.Is(err, os.ErrNotExist) {
-		return "", false, fmt.Errorf("read server encryption key file %q: %w", path, err)
-	}
-
-	keyBytes := make([]byte, 32)
-	if _, err := cryptorand.Read(keyBytes); err != nil {
-		return "", false, fmt.Errorf("generate server encryption key: %w", err)
-	}
-	encoded := hex.EncodeToString(keyBytes)
-
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return "", false, fmt.Errorf("create server data directory: %w", err)
-	}
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
-	if errors.Is(err, os.ErrExist) {
-		key, _, err := readOrCreateEncryptionKey(path)
-		return key, false, err
-	}
+	path := filepath.Join(dataDir, defaultKEKDirName)
+	err := os.MkdirAll(path, 0o700)
 	if err != nil {
-		return "", false, fmt.Errorf("create server encryption key file %q: %w", path, err)
+		return "", fmt.Errorf("failed to KEK dir: %w", err)
 	}
-	if _, err := file.WriteString(encoded + "\n"); err != nil {
-		_ = file.Close()
-		return "", false, removeIncompleteEncryptionKeyFile(
-			path,
-			fmt.Errorf("write server encryption key file %q: %w", path, err),
-		)
-	}
-	if err := file.Close(); err != nil {
-		return "", false, removeIncompleteEncryptionKeyFile(
-			path,
-			fmt.Errorf("close server encryption key file %q: %w", path, err),
-		)
-	}
-	return encoded, true, nil
+	return path, nil
 }
 
-func removeIncompleteEncryptionKeyFile(path string, cause error) error {
-	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return errors.Join(cause, fmt.Errorf("remove incomplete server encryption key file %q: %w", path, err))
+func ensureServerKEK(cfg *ServerConfig) error {
+	if len(cfg.EncryptionKeys) > 0 {
+		return nil
 	}
-	return cause
+
+	kekDir, err := serverKEKDir(*cfg)
+	if err != nil {
+		return fmt.Errorf("failed to get KEK directory: %w", err)
+	}
+
+	files, err := os.ReadDir(kekDir)
+	if err != nil {
+		return fmt.Errorf("failed to list KEK directory: %w", err)
+	}
+
+	var newestFile string
+	var newestFileModTime time.Time
+	keysFromDir := make([]EncryptionKeyConfig, 0, len(files))
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+
+		info, err := file.Info()
+		if err != nil {
+			return fmt.Errorf("failed to get info of file %s: %w", file.Name(), err)
+		}
+		keyPath := filepath.Join(kekDir, file.Name())
+		if info.ModTime().After(newestFileModTime) {
+			newestFile = keyPath
+			newestFileModTime = info.ModTime()
+		}
+
+		keysFromDir = append(keysFromDir, EncryptionKeyConfig{
+			ID:   file.Name(),
+			File: keyPath,
+		})
+	}
+
+	if len(cfg.EncryptionKeys) > 0 {
+		cfg.EncryptionKeys = append(cfg.EncryptionKeys, keysFromDir...)
+	} else {
+		for i := range keysFromDir {
+			if keysFromDir[i].File == newestFile {
+				keysFromDir[i].UseForEncryption = true
+				break
+			}
+		}
+		cfg.EncryptionKeys = keysFromDir
+	}
+
+	if len(cfg.EncryptionKeys) == 0 {
+		filePath, err := createEncryptionKey(kekDir)
+		if err != nil {
+			return err
+		}
+		cfg.EncryptionKeys = []EncryptionKeyConfig{
+			{
+				ID:               "root-kek.pem",
+				File:             filePath,
+				UseForEncryption: true,
+			},
+		}
+		fmt.Fprintf(os.Stderr, "created server encryption key file at %s\n", kekDir)
+	}
+
+	return nil
+}
+
+func createEncryptionKey(dir string) (string, error) {
+	key, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate RSA key: %w", err)
+	}
+
+	bs := pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(key),
+	})
+
+	path := filepath.Join(dir, "root-kek.pem")
+	if err := os.WriteFile(path, bs, 0o600); err != nil {
+		return "", fmt.Errorf("failed to create kek file %q: %w", path, err)
+	}
+
+	return path, nil
 }
