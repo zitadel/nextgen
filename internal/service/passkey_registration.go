@@ -41,12 +41,13 @@ func NewPasskeyRegistrationService(
 
 // BeginRegistrationInput carries the parameters needed to start a passkey registration ceremony.
 type BeginRegistrationInput struct {
-	ProjectID   string
-	UserID      string
-	Username    string
-	DisplayName string
-	RPID        string
-	RPOrigins   []string
+	ProjectID        string
+	UserID           string
+	Username         string
+	DisplayName      string
+	RPID             string
+	RPOrigins        []string
+	UserVerification string
 }
 
 // BeginRegistrationOutput is returned by [PasskeyRegistrationService.Begin].
@@ -70,13 +71,14 @@ func (s *PasskeyRegistrationService) Begin(ctx context.Context, in BeginRegistra
 	}
 
 	username, displayName := passkeyRegistrationLabels(in.Username, in.DisplayName)
-	challenge, err := domain.CreatePasskeyRegistrationChallenge(
+	ceremony, err := domain.CreatePasskeyRegistrationChallenge(
 		in.UserID, username, displayName,
 		existing,
 		in.RPID, origins,
+		in.UserVerification,
 	)
 	if err != nil {
-		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: begin: %w", err)
+		return BeginRegistrationOutput{}, err
 	}
 
 	regID, err := s.ids.New(string(domain.PrefixPasskeyRegistration))
@@ -88,21 +90,16 @@ func (s *PasskeyRegistrationService) Begin(ctx context.Context, in BeginRegistra
 		ID:        regID,
 		ProjectID: in.ProjectID,
 		UserID:    in.UserID,
-		Challenge: challenge,
+		Challenge: ceremony,
 		ExpiresAt: time.Now().Add(passkeyRegistrationTTL),
 	}); err != nil {
 		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: store challenge: %w", err)
 	}
 
-	chWrapper := &domain.AuthChallengePasskeyRegistration{
-		PasskeyRegistrationChallenge: challenge,
-	}
-	options, err := domain.BuildPasskeyCreationOptions(chWrapper)
-	if err != nil {
-		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: build options: %w", err)
-	}
-
-	return BeginRegistrationOutput{RegistrationID: regID, Options: options}, nil
+	return BeginRegistrationOutput{
+		RegistrationID: regID,
+		Options:        ceremony.ClientOptions(),
+	}, nil
 }
 
 func passkeyRegistrationLabels(username, displayName string) (string, string) {
@@ -140,7 +137,7 @@ func (s *PasskeyRegistrationService) FinishWith(ctx context.Context, client data
 		return err
 	}
 
-	newPasskey, err := domain.VerifyPasskeyRegistration(reg.Challenge, in.Attestation)
+	newPasskey, err := domain.VerifyPasskeyRegistrationChallenge(reg.Challenge, in.Attestation)
 	if err != nil {
 		return domain.ErrAuthAttemptProofRejected(err)
 	}

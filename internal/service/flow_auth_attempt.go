@@ -140,11 +140,7 @@ func (a *FlowAuthAttemptAdapter) IssuePasskeyChallenge(ctx context.Context, in d
 	if !ok {
 		return domain.FlowPasskeyChallengeOutput{}, fmt.Errorf("flow auth-attempt adapter: unexpected passkey challenge type %T", ch)
 	}
-	options, err := domain.BuildPasskeyRequestOptions(passkeyCh)
-	if err != nil {
-		return domain.FlowPasskeyChallengeOutput{}, fmt.Errorf("flow auth-attempt adapter: build passkey options: %w", err)
-	}
-	return domain.FlowPasskeyChallengeOutput{ChallengeID: ch.GetID(), Options: options}, nil
+	return domain.FlowPasskeyChallengeOutput{ChallengeID: ch.GetID(), Options: passkeyCh.ClientOptions()}, nil
 }
 
 // SubmitPasskey verifies the assertion against the challenge identified by

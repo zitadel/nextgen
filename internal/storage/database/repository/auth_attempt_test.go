@@ -128,7 +128,7 @@ func TestAuthAttempt_Create(t *testing.T) {
 				Checks: []domain.AuthCheck{
 					&domain.AuthChallengeUser{},
 					&domain.AuthChallengePassword{},
-					&domain.AuthChallengePasskey{PasskeyChallenge: &domain.PasskeyChallenge{Challenge: "challenge"}},
+					&domain.AuthChallengePasskey{PasskeyCeremony: &domain.PasskeyCeremony{SessionData: []byte(`{"challenge":"abc","rpId":"example.com"}`)}},
 				},
 			},
 			assertAttempt: func(t *testing.T, attempt *domain.AuthAttempt) {
@@ -334,7 +334,7 @@ func TestAuthAttempt_SetChallenge(t *testing.T) {
 		ensureProject(t, tx, attempt.ProjectID)
 		require.NoError(t, repo.Create(t.Context(), tx, attempt))
 
-		challenge := &domain.AuthChallengePasskey{PasskeyChallenge: &domain.PasskeyChallenge{Challenge: "set-challenge"}}
+		challenge := &domain.AuthChallengePasskey{PasskeyCeremony: &domain.PasskeyCeremony{SessionData: []byte(`{"challenge":"set-challenge","rpId":"example.com"}`)}}
 		require.NoError(t, repo.SetChallenge(t.Context(), tx, attempt.ProjectID, attempt.ID, challenge))
 		assert.NotZero(t, challenge.LastChallengedAt)
 
@@ -344,7 +344,7 @@ func TestAuthAttempt_SetChallenge(t *testing.T) {
 		require.True(t, ok) // gates type assertion below
 		storedCheck, ok := storedCheckRaw.(*domain.AuthChallengePasskey)
 		require.True(t, ok) // gates field access below
-		assert.Equal(t, "set-challenge", storedCheck.Challenge)
+		assert.JSONEq(t, `{"challenge":"set-challenge","rpId":"example.com"}`, string(storedCheck.SessionData))
 	})
 
 	t.Run("resets failure metadata when challenge is set again", func(t *testing.T) {
@@ -355,14 +355,14 @@ func TestAuthAttempt_SetChallenge(t *testing.T) {
 		ensureProject(t, tx, attempt.ProjectID)
 		require.NoError(t, repo.Create(t.Context(), tx, attempt))
 
-		challenge := &domain.AuthChallengePasskey{PasskeyChallenge: &domain.PasskeyChallenge{Challenge: "second"}}
+		challenge := &domain.AuthChallengePasskey{PasskeyCeremony: &domain.PasskeyCeremony{SessionData: []byte(`{"challenge":"second","rpId":"example.com"}`)}}
 		require.NoError(t, repo.SetChallenge(t.Context(), tx, attempt.ProjectID, attempt.ID, challenge))
 		require.NoError(t, repo.ChallengeFailed(t.Context(), tx, attempt.ProjectID, attempt.ID, challenge))
 		require.NoError(t, repo.ChallengeFailed(t.Context(), tx, attempt.ProjectID, attempt.ID, challenge))
 		assert.Equal(t, uint16(2), challenge.FailureCount)
 		assert.NotNil(t, challenge.LastFailedAt)
 
-		challenge = &domain.AuthChallengePasskey{PasskeyChallenge: &domain.PasskeyChallenge{Challenge: "second"}}
+		challenge = &domain.AuthChallengePasskey{PasskeyCeremony: &domain.PasskeyCeremony{SessionData: []byte(`{"challenge":"second","rpId":"example.com"}`)}}
 		require.NoError(t, repo.SetChallenge(t.Context(), tx, attempt.ProjectID, attempt.ID, challenge))
 
 		stored, err := repo.GetByID(t.Context(), tx, attempt.ProjectID, attempt.ID)

@@ -54,7 +54,7 @@ func (r *PasskeyRegistrationRepository) Get(ctx context.Context, client database
 		}
 		return nil, err
 	}
-	reg.Challenge = new(domain.PasskeyRegistrationChallenge)
+	reg.Challenge = new(domain.PasskeyCeremony)
 	if err := json.Unmarshal(challengeRaw, reg.Challenge); err != nil {
 		return nil, fmt.Errorf("passkey_registration: unmarshal challenge: %w", err)
 	}

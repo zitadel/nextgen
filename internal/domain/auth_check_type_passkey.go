@@ -3,7 +3,7 @@ package domain
 import "time"
 
 type AuthChallengePasskey struct {
-	*PasskeyChallenge
+	*PasskeyCeremony
 	authChallenge
 }
 
@@ -17,7 +17,7 @@ func (a *AuthChallengePasskey) Payload() any {
 
 func SetAuthChallengePasskey(id string, lastChallengedAt, lastFailedAt time.Time, failureCount uint16) *AuthChallengePasskey {
 	return &AuthChallengePasskey{
-		PasskeyChallenge: new(PasskeyChallenge),
+		PasskeyCeremony: &PasskeyCeremony{},
 		authChallenge: authChallenge{
 			ID:               id,
 			LastChallengedAt: lastChallengedAt,
@@ -53,7 +53,7 @@ func (a *AuthFactorPasskey) Payload() any {
 }
 
 type AuthChallengePasskeyRegistration struct {
-	*PasskeyRegistrationChallenge
+	*PasskeyCeremony
 	authChallenge
 }
 
@@ -67,7 +67,7 @@ func (a *AuthChallengePasskeyRegistration) Payload() any {
 
 func SetAuthChallengePasskeyRegistration(id string, lastChallengedAt, lastFailedAt time.Time, failureCount uint16) *AuthChallengePasskeyRegistration {
 	return &AuthChallengePasskeyRegistration{
-		PasskeyRegistrationChallenge: new(PasskeyRegistrationChallenge),
+		PasskeyCeremony: &PasskeyCeremony{},
 		authChallenge: authChallenge{
 			ID:               id,
 			LastChallengedAt: lastChallengedAt,

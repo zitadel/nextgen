@@ -19,7 +19,7 @@ type PasskeyRegistration struct {
 	ID        string
 	ProjectID string
 	UserID    string
-	Challenge *PasskeyRegistrationChallenge
+	Challenge *PasskeyCeremony
 	ExpiresAt time.Time
 	CreatedAt time.Time
 }
@@ -29,7 +29,7 @@ type CreatePasskeyRegistration struct {
 	ID        string
 	ProjectID string
 	UserID    string
-	Challenge *PasskeyRegistrationChallenge
+	Challenge *PasskeyCeremony
 	ExpiresAt time.Time
 }
 

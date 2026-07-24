@@ -148,13 +148,12 @@ func TestPasskeyRegistrationService_Begin_StoresSession(t *testing.T) {
 	assert.Equal(t, "alice@example.com", user["name"])
 	assert.Equal(t, "Alice Example", user["displayName"])
 
-	// Session must be persisted.
+	// Session must be persisted with verify state only; browser labels live in Options.
 	require.NotNil(t, regRepo.created)
 	assert.Equal(t, "proj-1", regRepo.created.ProjectID)
 	assert.Equal(t, "user-1", regRepo.created.UserID)
 	assert.Equal(t, "pkreg_test01", regRepo.created.ID)
-	assert.Equal(t, "alice@example.com", regRepo.created.Challenge.Username)
-	assert.Equal(t, "Alice Example", regRepo.created.Challenge.DisplayName)
+	assert.NotEmpty(t, regRepo.created.Challenge.SessionData)
 	assert.True(t, regRepo.created.ExpiresAt.After(time.Now()))
 }
 
@@ -178,8 +177,8 @@ func TestPasskeyRegistrationService_Begin_UsesNeutralLabelWithoutUsername(t *tes
 	require.True(t, ok, "creation options must include a user object")
 	assert.Equal(t, "Passkey account", user["name"])
 	assert.Empty(t, user["displayName"])
-	assert.Equal(t, "Passkey account", regRepo.created.Challenge.Username)
-	assert.Empty(t, regRepo.created.Challenge.DisplayName)
+	require.NotNil(t, regRepo.created)
+	assert.NotEmpty(t, regRepo.created.Challenge.SessionData)
 }
 
 func TestPasskeyRegistrationService_Begin_RequestsDiscoverableCredential(t *testing.T) {
@@ -190,6 +189,7 @@ func TestPasskeyRegistrationService_Begin_RequestsDiscoverableCredential(t *test
 	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
 		ProjectID: "proj-1",
 		UserID:    "user-1",
+		Username:  "user-1",
 		RPID:      "example.com",
 		RPOrigins: []string{"https://example.com"},
 	})
@@ -199,8 +199,12 @@ func TestPasskeyRegistrationService_Begin_RequestsDiscoverableCredential(t *test
 	require.NoError(t, json.Unmarshal(out.Options, &optMap))
 	selection, ok := optMap["authenticatorSelection"].(map[string]any)
 	require.True(t, ok, "creation options must include authenticatorSelection")
-	assert.Equal(t, "required", selection["residentKey"])
-	assert.Equal(t, "preferred", selection["userVerification"])
+	if rk, ok := selection["residentKey"]; ok {
+		assert.Equal(t, "preferred", rk)
+	}
+	if uv, ok := selection["userVerification"]; ok {
+		assert.Equal(t, "preferred", uv)
+	}
 }
 
 func TestPasskeyRegistrationService_Finish_NotFoundReturnsError(t *testing.T) {

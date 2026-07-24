@@ -282,9 +282,9 @@ func (a *AuthAttempt) SetPasswordChallenge() *AuthChallengePassword {
 	return challenge
 }
 
-func (a *AuthAttempt) SetPasskeyChallenge(passkeyChallenge *PasskeyChallenge) *AuthChallengePasskey {
+func (a *AuthAttempt) SetPasskeyChallenge(ceremony *PasskeyCeremony) *AuthChallengePasskey {
 	challenge := &AuthChallengePasskey{
-		PasskeyChallenge: passkeyChallenge,
+		PasskeyCeremony: ceremony,
 	}
 	a.SetCheck(challenge)
 	return challenge

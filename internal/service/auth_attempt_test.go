@@ -2,7 +2,6 @@ package service_test
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"net/url"
 	"testing"
@@ -83,7 +82,7 @@ func (f passkeyFixture) challengeAttempt(t *testing.T, challengeID string) (*dom
 	challenge, err := domain.CreatePasskeyChallenge(passkeyUserID, []*domain.UserPasskey{f.passkey}, "preferred", passkeyRPID, f.origins)
 	require.NoError(t, err)
 	check := domain.SetAuthChallengePasskey(challengeID, time.Now(), time.Time{}, 0)
-	check.PasskeyChallenge = challenge
+	check.PasskeyCeremony = challenge
 
 	attempt := &domain.AuthAttempt{
 		ProjectID: "proj",
@@ -91,17 +90,9 @@ func (f passkeyFixture) challengeAttempt(t *testing.T, challengeID string) (*dom
 		Checks:    []domain.AuthCheck{&domain.AuthFactorUser{UserID: passkeyUserID}, check},
 	}
 
-	rawChallenge, err := base64.RawURLEncoding.DecodeString(challenge.Challenge)
+	opts, err := virtualwebauthn.ParseAssertionOptions(string(challenge.ClientOptions()))
 	require.NoError(t, err)
-	allowed := make([]string, 0, len(challenge.AllowedCredentialIDs))
-	for _, id := range challenge.AllowedCredentialIDs {
-		allowed = append(allowed, base64.RawURLEncoding.EncodeToString(id))
-	}
-	assertion := virtualwebauthn.CreateAssertionResponse(f.rp, f.auth, f.cred, virtualwebauthn.AssertionOptions{
-		Challenge:        rawChallenge,
-		RelyingPartyID:   challenge.RPID,
-		AllowCredentials: allowed,
-	})
+	assertion := virtualwebauthn.CreateAssertionResponse(f.rp, f.auth, f.cred, *opts)
 	return attempt, []byte(assertion)
 }
 
@@ -552,8 +543,11 @@ func TestAuthAttemptService_IssuePasskeyChallenge(t *testing.T) {
 
 	challenge, ok := setChallenge.(*domain.AuthChallengePasskey)
 	require.True(t, ok, "SetChallenge must receive a *domain.AuthChallengePasskey")
-	assert.NotEmpty(t, challenge.Challenge, "issued passkey challenge must carry a WebAuthn challenge")
-	assert.Equal(t, passkeyRPID, challenge.RPID)
+	require.NotNil(t, challenge.PasskeyCeremony)
+	assert.NotEmpty(t, challenge.ClientOptions())
+	opts, err := virtualwebauthn.ParseAssertionOptions(string(challenge.ClientOptions()))
+	require.NoError(t, err)
+	assert.Equal(t, passkeyRPID, opts.RelyingPartyID)
 }
 
 func TestAuthAttemptService_VerifyPasskeyProof(t *testing.T) {

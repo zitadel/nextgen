@@ -30,12 +30,13 @@ type FlowPasskeyRegistrationService interface {
 // UserID is the stable WebAuthn user handle; Username and DisplayName are
 // browser-visible labels when the flow has a collected identifier.
 type FlowIssuePasskeyRegistrationChallengeInput struct {
-	ProjectID   string
-	UserID      string
-	Username    string
-	DisplayName string
-	RPID        string
-	RPOrigins   []string
+	ProjectID        string
+	UserID           string
+	Username         string
+	DisplayName      string
+	RPID             string
+	RPOrigins        []string
+	UserVerification string
 }
 
 // FlowPasskeyRegistrationChallengeOutput is the issued challenge.
