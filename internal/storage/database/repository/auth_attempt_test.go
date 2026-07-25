@@ -397,6 +397,19 @@ func TestAuthAttempt_Delete(t *testing.T) {
 		err := repo.Delete(t.Context(), tx, "project-ghost", "999999")
 		assert.NoError(t, err)
 	})
+
+	t.Run("project delete cascades", func(t *testing.T) {
+		tx, rollback := transactionForRollback(t)
+		defer rollback()
+
+		attempt, _ := newTestAttemptWithFactor(t, repo, tx, "proj-attempt-cascade")
+
+		deleteProject(t, tx, "proj-attempt-cascade")
+
+		stored, err := repo.GetByID(t.Context(), tx, attempt.ProjectID, attempt.ID)
+		require.ErrorIs(t, err, domain.ErrAuthAttemptNotFound())
+		assert.Empty(t, stored.ID)
+	})
 }
 
 func TestAuthAttempt_ChallengeFailed(t *testing.T) {

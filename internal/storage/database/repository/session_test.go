@@ -244,6 +244,26 @@ func TestSession_Delete(t *testing.T) {
 	require.ErrorIs(t, err, domain.ErrSessionNotFound())
 }
 
+func TestSession_DeleteProjectCascades(t *testing.T) {
+	if isSpannerDB {
+		t.Skip("sub transactions not supported in Spanner, and this test relies on rollback to avoid committing")
+	}
+
+	repo := repository.NewSessionRepository(pool)
+	tx, rollback := transactionForRollback(t)
+	defer rollback()
+
+	session, err := domain.NewSession("p-sess-cascade", nil)
+	require.NoError(t, err)
+	ensureProject(t, tx, session.ProjectID)
+	require.NoError(t, repo.Create(t.Context(), tx, session))
+
+	deleteProject(t, tx, session.ProjectID)
+
+	_, err = repo.Get(t.Context(), tx, session.ProjectID, session.ID)
+	require.ErrorIs(t, err, domain.ErrSessionNotFound())
+}
+
 func TestSession_Exchange_invalidToken(t *testing.T) {
 	if isSpannerDB {
 		t.Skip("sub transactions not supported in Spanner, and this test relies on rollback to avoid committing")

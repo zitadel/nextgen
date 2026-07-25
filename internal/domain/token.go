@@ -175,3 +175,21 @@ type tokenConditions interface {
 	TokenIDCondition(tokenID string) database.Condition
 	UserIDCondition(userID string) database.Condition
 }
+
+// TokenField enumerates the fields of Token which can be used for filtering and
+// ordering in list operations.
+type TokenField uint8
+
+const (
+	TokenFieldUnspecified TokenField = iota
+	TokenFieldProjectID
+	TokenFieldTokenID
+	TokenFieldUserID
+	TokenFieldType
+	TokenFieldSessionID
+	TokenFieldOIDCSessionID
+	TokenFieldSAMLSessionID
+	TokenFieldScope
+	TokenFieldExpiresAt
+	TokenFieldCreatedAt
+)
