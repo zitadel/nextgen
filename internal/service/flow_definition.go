@@ -1,11 +1,13 @@
 package service
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -17,7 +19,7 @@ type FlowDefinitionService interface {
 	Create(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error)
 	Update(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error)
 	Get(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error)
-	List(ctx context.Context, req ListFlowDefinitionsRequest) ([]*domain.FlowDefinition, error)
+	List(ctx context.Context, req ListFlowDefinitionsRequest) (*ListFlowDefinitionsResponse, error)
 	Delete(ctx context.Context, projectID string, id string) error
 }
 
@@ -174,36 +176,42 @@ func (fd *flowDefinitionService) isUpdateAllowed(
 		return nil
 	}
 
-	purposesToCheck := make(map[domain.FlowDefinitionPurpose]struct{})
-
+	purposesToCheck := make([]domain.FlowDefinitionPurpose, 0, len(currentPurposes))
 	if reqStatus != domain.FlowDefinitionStatusActive {
 		for p := range currentPurposes {
-			purposesToCheck[p] = struct{}{}
+			purposesToCheck = append(purposesToCheck, p)
 		}
 	} else {
 		for p := range currentPurposes {
 			if _, ok := reqPurposes[p]; !ok {
-				purposesToCheck[p] = struct{}{}
+				purposesToCheck = append(purposesToCheck, p)
 			}
 		}
 	}
-
 	if len(purposesToCheck) == 0 {
 		return nil
 	}
+	slices.SortFunc(purposesToCheck, func(a, b domain.FlowDefinitionPurpose) int {
+		return cmp.Compare(a.String(), b.String())
+	})
 
-	for purpose := range purposesToCheck {
-		fds, err := fd.v2Pool.Statements().ListFlowDefinitions(ctx, &v2database.ListOptions[domain.FlowDefinitionField]{
-			Filter: v2database.And(
-				v2database.Equal(v2database.Col(domain.FlowDefinitionFieldProjectID), projectID),
-				v2database.Equal(v2database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
-				v2database.ArrayContains(v2database.Col(domain.FlowDefinitionFieldPurposes), purpose.String()),
-			),
-		})
-		if err != nil {
-			return domain.ErrInternal(err).WithMessage(fmt.Sprintf("failed to list flow definitions for old purpose %q", purpose))
+	fds, err := fd.v2Pool.Statements().ListFlowDefinitions(ctx, &v2database.ListOptions[domain.FlowDefinitionField]{
+		Filter: v2database.And(
+			v2database.Equal(v2database.Col(domain.FlowDefinitionFieldProjectID), projectID),
+			v2database.Equal(v2database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
+		),
+	})
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to list active flow definitions for update conflict check")
+	}
+	for _, purpose := range purposesToCheck {
+		count := 0
+		for _, item := range fds.Items {
+			if _, ok := item.Purposes[purpose]; ok {
+				count++
+			}
 		}
-		if len(fds.Items) <= 1 {
+		if count <= 1 {
 			return domain.ErrFlowDefinitionUpdateConflict(fmt.Sprintf("cannot update: no other active flow definition found with purpose %q", purpose))
 		}
 	}
@@ -293,7 +301,12 @@ type ListFlowDefinitionsRequest struct {
 	PageToken string
 }
 
-func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitionsRequest) ([]*domain.FlowDefinition, error) {
+type ListFlowDefinitionsResponse struct {
+	Items         []*domain.FlowDefinition
+	NextPageToken string
+}
+
+func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitionsRequest) (*ListFlowDefinitionsResponse, error) {
 	// todo (grvijayan): get the project ID from the context when the functionality is implemented
 	if req.ProjectID == "" {
 		return nil, domain.ErrMissingProjectID()
@@ -308,17 +321,25 @@ func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitio
 		}
 		filters = append(filters, v2database.ArrayContains(v2database.Col(domain.FlowDefinitionFieldPurposes), purpose.String()))
 	}
+	var cursor []byte
+	if req.PageToken != "" {
+		cursor = []byte(req.PageToken)
+	}
 	opts := &v2database.ListOptions[domain.FlowDefinitionField]{
 		Filter: v2database.And(filters...),
-	}
-	if req.Limit > 0 {
-		opts.Pagination.Limit = uint32(req.Limit)
+		Pagination: v2database.Page[domain.FlowDefinitionField]{
+			Limit:  uint32(req.Limit),
+			Cursor: cursor,
+		},
 	}
 	result, err := fd.v2Pool.Statements().ListFlowDefinitions(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
-	return result.Items, nil
+	return &ListFlowDefinitionsResponse{
+		Items:         result.Items,
+		NextPageToken: string(result.NextCursor),
+	}, nil
 }
 
 func (fd *flowDefinitionService) Delete(ctx context.Context, projectID, id string) error {

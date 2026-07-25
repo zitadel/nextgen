@@ -104,22 +104,10 @@ func (f flowDefinitionStatements) UpdateFlowDefinition(ctx context.Context, enti
 
 // ListFlowDefinitions implements [service.FlowDefinitionStatements].
 func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
-	if filter == nil {
-		filter = &database.ListOptions[domain.FlowDefinitionField]{}
-	}
-	opts := *filter
-	if len(opts.Pagination.OrderBy.Columns) == 0 {
-		opts.Pagination.OrderBy = database.OrderBy[domain.FlowDefinitionField]{
-			Columns: []database.Column[domain.FlowDefinitionField]{
-				database.Col(domain.FlowDefinitionFieldCreatedAt),
-				database.Col(domain.FlowDefinitionFieldID),
-			},
-			Direction: database.OrderDesc,
-		}
-	}
+	opts := flowdefinition.EnsureListOptions(filter)
 
 	var compiler statementCompiler
-	err := compileRead(&compiler, flowDefinitionQuery, &opts, flowdefinition.Schema)
+	err := compileRead(&compiler, flowDefinitionQuery, opts, flowdefinition.Schema)
 	if err != nil {
 		return nil, err
 	}
