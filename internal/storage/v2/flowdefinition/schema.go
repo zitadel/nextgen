@@ -44,9 +44,10 @@ var Schema = database.NewSchema(map[domain.FlowDefinitionField]database.FieldBin
 		Coerce:   database.CoerceString,
 	},
 	domain.FlowDefinitionFieldStatus: {
-		SQLName:  "status",
-		Accessor: func(d *domain.FlowDefinition) any { return d.Status.String() },
-		Coerce:   database.CoerceString,
+		SQLName:   "status",
+		Accessor:  func(d *domain.FlowDefinition) any { return d.Status.String() },
+		Coerce:    database.CoerceString,
+		ParamCast: "::zitadel_nextgen.flow_definition_states",
 	},
 	domain.FlowDefinitionFieldCreatedAt: {
 		SQLName:  "created_at",
@@ -59,8 +60,9 @@ var Schema = database.NewSchema(map[domain.FlowDefinitionField]database.FieldBin
 		Coerce:   database.CoerceTime,
 	},
 	domain.FlowDefinitionFieldPurposes: {
-		SQLName:  "purposes",
-		Accessor: func(d *domain.FlowDefinition) any { return d.Purposes },
-		Coerce:   database.CoerceEnumKeyMapAsAny[domain.FlowDefinitionPurpose, string](ParsePurposeKey),
+		SQLName:   "purposes",
+		Accessor:  func(d *domain.FlowDefinition) any { return d.Purposes },
+		Coerce:    database.CoerceEnumKeyMapAsAny[domain.FlowDefinitionPurpose, string](ParsePurposeKey),
+		ParamCast: "::zitadel_nextgen.flow_definition_purposes",
 	},
 })

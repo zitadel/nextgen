@@ -14,9 +14,8 @@ import (
 )
 
 const (
-	statusCast      = "::zitadel_nextgen.flow_definition_states"
-	purposeElemCast = "::zitadel_nextgen.flow_definition_purposes"
-	purposeArrCast  = "::zitadel_nextgen.flow_definition_purposes[]"
+	statusCast     = "::zitadel_nextgen.flow_definition_states"
+	purposeArrCast = "::zitadel_nextgen.flow_definition_purposes[]"
 
 	createFlowDefinitionStmt = `INSERT INTO zitadel_nextgen.flow_definitions ` +
 		`(project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at) ` +
@@ -119,38 +118,8 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 		}
 	}
 
-	statusValue, remaining := flowdefinition.ExtractStatusEqual(opts.Filter)
-	purposeValue, remaining := flowdefinition.ExtractPurposeContains(remaining)
-	opts.Filter = remaining
-
 	var compiler statementCompiler
-	err := compileRead(&compiler, flowDefinitionQuery, &opts, flowdefinition.Schema,
-		func(c *statementCompiler, hasWhere bool) bool {
-			if statusValue != "" {
-				if hasWhere {
-					c.WriteString(" AND ")
-				} else {
-					c.WriteString(" WHERE ")
-				}
-				c.WriteString("status = ")
-				writeArg(c, statusValue)
-				c.WriteString(statusCast)
-				hasWhere = true
-			}
-			if purposeValue != "" {
-				if hasWhere {
-					c.WriteString(" AND ")
-				} else {
-					c.WriteString(" WHERE ")
-				}
-				writeArg(c, purposeValue)
-				c.WriteString(purposeElemCast)
-				c.WriteString(" = ANY(purposes)")
-				hasWhere = true
-			}
-			return hasWhere
-		},
-	)
+	err := compileRead(&compiler, flowDefinitionQuery, &opts, flowdefinition.Schema)
 	if err != nil {
 		return nil, err
 	}

@@ -19,13 +19,7 @@ func (c *statementCompiler) Reset() {
 	c.args = nil
 }
 
-func compileRead[F ~uint8, T any](
-	c *statementCompiler,
-	stmt string,
-	opt *database.ListOptions[F],
-	schema database.Schema[F, T],
-	extraWhere ...func(*statementCompiler, bool) bool,
-) error {
+func compileRead[F ~uint8, T any](c *statementCompiler, stmt string, opt *database.ListOptions[F], schema database.Schema[F, T]) error {
 	c.WriteString(stmt)
 
 	filter := opt.Filter
@@ -48,14 +42,9 @@ func compileRead[F ~uint8, T any](
 			filter = database.And(filter, database.CompareLess(terms...))
 		}
 	}
-	hasWhere := false
 	if filter != nil {
 		c.WriteString(" WHERE ")
 		compileFilter(c, filter, schema)
-		hasWhere = true
-	}
-	for _, extra := range extraWhere {
-		hasWhere = extra(c, hasWhere)
 	}
 
 	compileOrderBy(c, opt.Pagination.OrderBy, schema)
@@ -86,6 +75,8 @@ func compileFilter[F ~uint8, T any](c *statementCompiler, filter database.Filter
 		compileCompareFilter(c, f, schema)
 	case *database.StringFilter[F]:
 		compileStringFilter(c, f, schema)
+	case *database.ArrayContainsFilter[F]:
+		compileArrayContainsFilter(c, f, schema)
 	default:
 		panic("unknown filter type")
 	}
@@ -154,6 +145,13 @@ func compileCompareFilter[F ~uint8, T any](c *statementCompiler, filter *databas
 		}
 		writeArg(c, term.Value)
 	}
+	c.WriteString(")")
+}
+
+func compileArrayContainsFilter[F ~uint8, T any](c *statementCompiler, filter *database.ArrayContainsFilter[F], schema database.Schema[F, T]) {
+	writeArg(c, filter.Value)
+	c.WriteString(" IN UNNEST(")
+	c.WriteString(schema.SQLName(filter.Column))
 	c.WriteString(")")
 }
 

@@ -145,7 +145,7 @@ func TestFlowDefinitionStatements_ListByPurpose(t *testing.T) {
 	listed, err := testPool.ListFlowDefinitions(t.Context(), &database.ListOptions[domain.FlowDefinitionField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
-			database.Equal(database.Col(domain.FlowDefinitionFieldPurposes), domain.FlowDefinitionPurposeLogin.String()),
+			database.ArrayContains(database.Col(domain.FlowDefinitionFieldPurposes), domain.FlowDefinitionPurposeLogin.String()),
 		),
 	})
 	require.NoError(t, err)

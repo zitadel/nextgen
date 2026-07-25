@@ -1400,16 +1400,8 @@ func purposeFilterIs(filter v2database.Filter[domain.FlowDefinitionField], purpo
 			}
 		}
 		return false
-	case *v2database.CompareFilter[domain.FlowDefinitionField]:
-		if f.Op != v2database.OpEqual || len(f.Terms) != 1 {
-			return false
-		}
-		term := f.Terms[0]
-		if term.Column.Field() != domain.FlowDefinitionFieldPurposes {
-			return false
-		}
-		s, ok := term.Value.(string)
-		return ok && s == purpose.String()
+	case *v2database.ArrayContainsFilter[domain.FlowDefinitionField]:
+		return f.Column.Field() == domain.FlowDefinitionFieldPurposes && f.Value == purpose.String()
 	default:
 		return false
 	}

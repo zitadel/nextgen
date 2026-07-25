@@ -213,6 +213,30 @@ func TestCompileReadStringEqualFold(t *testing.T) {
 	assert.Equal(t, "Login", args[0])
 }
 
+func TestCompileArrayContains(t *testing.T) {
+	t.Parallel()
+
+	sql, args := compileFilterOnly(t,
+		database.ArrayContains(database.Col(domain.FlowDefinitionFieldPurposes), "login"),
+		flowdefinition.Schema,
+	)
+	assert.Equal(t, "@p1 IN UNNEST(purposes)", sql)
+	require.Len(t, args, 1)
+	assert.Equal(t, "login", args[0])
+}
+
+func TestCompileStatusEqualNoParamCast(t *testing.T) {
+	t.Parallel()
+
+	sql, args := compileFilterOnly(t,
+		database.Equal(database.Col(domain.FlowDefinitionFieldStatus), "active"),
+		flowdefinition.Schema,
+	)
+	assert.Equal(t, "status = @p1", sql)
+	require.Len(t, args, 1)
+	assert.Equal(t, "active", args[0])
+}
+
 func TestCompileReadCursorDesc(t *testing.T) {
 	t.Parallel()
 

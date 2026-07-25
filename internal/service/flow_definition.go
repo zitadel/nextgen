@@ -197,7 +197,7 @@ func (fd *flowDefinitionService) isUpdateAllowed(
 			Filter: v2database.And(
 				v2database.Equal(v2database.Col(domain.FlowDefinitionFieldProjectID), projectID),
 				v2database.Equal(v2database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
-				v2database.Equal(v2database.Col(domain.FlowDefinitionFieldPurposes), purpose.String()),
+				v2database.ArrayContains(v2database.Col(domain.FlowDefinitionFieldPurposes), purpose.String()),
 			),
 		})
 		if err != nil {
@@ -306,7 +306,7 @@ func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitio
 		if err != nil {
 			return nil, domain.ErrFlowDefinitionInvalid("invalid purpose", nil)
 		}
-		filters = append(filters, v2database.Equal(v2database.Col(domain.FlowDefinitionFieldPurposes), purpose.String()))
+		filters = append(filters, v2database.ArrayContains(v2database.Col(domain.FlowDefinitionFieldPurposes), purpose.String()))
 	}
 	opts := &v2database.ListOptions[domain.FlowDefinitionField]{
 		Filter: v2database.And(filters...),

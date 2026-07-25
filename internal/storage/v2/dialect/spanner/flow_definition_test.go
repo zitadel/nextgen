@@ -75,7 +75,7 @@ func TestFlowDefinitionStatements_CRUD(t *testing.T) {
 	listed, err := stmts.ListFlowDefinitions(ctx, &v2database.ListOptions[domain.FlowDefinitionField]{
 		Filter: v2database.And(
 			v2database.Equal(v2database.Col(domain.FlowDefinitionFieldProjectID), project.ID),
-			v2database.Equal(v2database.Col(domain.FlowDefinitionFieldPurposes), domain.FlowDefinitionPurposeLogin.String()),
+			v2database.ArrayContains(v2database.Col(domain.FlowDefinitionFieldPurposes), domain.FlowDefinitionPurposeLogin.String()),
 		),
 	})
 	require.NoError(t, err)

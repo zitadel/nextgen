@@ -75,15 +75,18 @@ func filterMatches(def *domain.FlowDefinition, filter v2database.Filter[domain.F
 			return def.SchemaVersion == term.Value.(string)
 		case domain.FlowDefinitionFieldStatus:
 			return def.Status.String() == term.Value.(string)
-		case domain.FlowDefinitionFieldPurposes:
-			purpose, err := domain.FlowDefinitionPurposeString(term.Value.(string))
-			if err != nil {
-				return false
-			}
-			return hasPurpose(def, purpose)
 		default:
 			return true
 		}
+	case *v2database.ArrayContainsFilter[domain.FlowDefinitionField]:
+		if f.Column.Field() != domain.FlowDefinitionFieldPurposes {
+			return true
+		}
+		purpose, err := domain.FlowDefinitionPurposeString(f.Value)
+		if err != nil {
+			return false
+		}
+		return hasPurpose(def, purpose)
 	default:
 		return true
 	}

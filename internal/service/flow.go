@@ -142,7 +142,7 @@ func (s *flowService) resolveByAudience(ctx context.Context, req ResolveFlowRequ
 	filters := []v2database.Filter[domain.FlowDefinitionField]{
 		v2database.Equal(v2database.Col(domain.FlowDefinitionFieldProjectID), req.ProjectID),
 		v2database.Equal(v2database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
-		v2database.Equal(v2database.Col(domain.FlowDefinitionFieldPurposes), req.Purpose.String()),
+		v2database.ArrayContains(v2database.Col(domain.FlowDefinitionFieldPurposes), req.Purpose.String()),
 	}
 	if req.SchemaVersion != nil {
 		filters = append(filters, v2database.Equal(v2database.Col(domain.FlowDefinitionFieldSchemaVersion), *req.SchemaVersion))

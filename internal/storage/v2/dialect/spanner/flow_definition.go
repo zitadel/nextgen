@@ -114,25 +114,8 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 		}
 	}
 
-	purposeValue, remaining := flowdefinition.ExtractPurposeContains(opts.Filter)
-	opts.Filter = remaining
-
 	var compiler statementCompiler
-	err := compileRead(&compiler, flowDefinitionQuery, &opts, flowdefinition.Schema,
-		func(c *statementCompiler, hasWhere bool) bool {
-			if purposeValue == "" {
-				return hasWhere
-			}
-			if hasWhere {
-				c.WriteString(" AND ")
-			} else {
-				c.WriteString(" WHERE ")
-			}
-			writeArg(c, purposeValue)
-			c.WriteString(" IN UNNEST(purposes)")
-			return true
-		},
-	)
+	err := compileRead(&compiler, flowDefinitionQuery, &opts, flowdefinition.Schema)
 	if err != nil {
 		return nil, err
 	}
