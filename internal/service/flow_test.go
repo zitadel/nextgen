@@ -21,9 +21,13 @@ func stubPool() database.Pool { return nil }
 func stubV2Pool() *service.DB { return nil }
 
 // stubListFlowDefinitions wires ListFlowDefinitions to filter the given slice
-// in-memory the same way the storage layer does.
-func stubListFlowDefinitions(t *testing.T, defs []*domain.FlowDefinition) *service.DB {
+// in-memory the same way the storage layer does. Optional times defaults to 1.
+func stubListFlowDefinitions(t *testing.T, defs []*domain.FlowDefinition, times ...int) *service.DB {
 	t.Helper()
+	n := 1
+	if len(times) > 0 {
+		n = times[0]
+	}
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
 	stmts := servicemocks.NewMockAllStatements(ctrl)
@@ -38,7 +42,7 @@ func stubListFlowDefinitions(t *testing.T, defs []*domain.FlowDefinition) *servi
 			}
 			return &v2database.ListResult[*domain.FlowDefinition]{Items: out}, nil
 		},
-	).AnyTimes()
+	).Times(n)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 	return service.NewPool(pool)
 }
@@ -376,7 +380,7 @@ func TestResolve_ResolveByAudience_UserSchemaHintFilters(t *testing.T) {
 	machine := newDef("machine", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	machine.UserSchema = "https://tenant.com/schemas/machine.json"
 	machine.CreatedAt = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{human, machine})
+	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{human, machine}, 2)
 
 	svc := service.NewFlowService(stubPool(), repo, nil, nil)
 	got, err := svc.Resolve(t.Context(), service.ResolveFlowRequest{
@@ -501,7 +505,7 @@ func stubGetFlowDefinition(t *testing.T, def *domain.FlowDefinition) *service.DB
 			}
 			return def, nil
 		},
-	).AnyTimes()
+	).Times(1)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 	return service.NewPool(pool)
 }
