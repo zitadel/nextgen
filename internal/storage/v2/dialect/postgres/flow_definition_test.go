@@ -179,3 +179,16 @@ func TestFlowDefinitionStatements_ListByStatus(t *testing.T) {
 	require.Len(t, listed.Items, 1)
 	assert.Equal(t, active.ID, listed.Items[0].ID)
 }
+
+func TestFlowDefinitionStatements_DeleteProjectCascades(t *testing.T) {
+	projectID := uniqueProjectID(t)
+	require.NoError(t, testPool.CreateProject(t.Context(), newTestProject(projectID)))
+
+	def := sampleFlowDefinition(projectID, uniqueFlowDefinitionID(t))
+	require.NoError(t, testPool.CreateFlowDefinition(t.Context(), def))
+
+	require.NoError(t, testPool.DeleteProjectByID(t.Context(), projectID))
+
+	_, err := testPool.GetFlowDefinitionByID(t.Context(), projectID, def.ID)
+	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+}

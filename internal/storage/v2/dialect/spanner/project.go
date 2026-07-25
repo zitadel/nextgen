@@ -7,20 +7,20 @@ import (
 	"cloud.google.com/go/spanner"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	storagedb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 )
 
 const (
 	projectsTable         = "projects"
-	createProjectStmt     = `INSERT INTO projects (id, preview_origins) VALUES (@p1, @p2) THEN RETURN id, created_at, updated_at`
+	createProjectStmt     = `INSERT INTO projects (id, name, preview_origins) VALUES (@p1, @p2, @p3) THEN RETURN id, created_at, updated_at`
+	updateProjectStmt     = `UPDATE projects SET name = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN updated_at`
 	deleteByIDProjectStmt = `DELETE FROM projects WHERE id = @p1`
-	projectQuery          = "SELECT id, created_at, updated_at, preview_origins FROM projects"
+	projectQuery          = "SELECT id, name, created_at, updated_at, preview_origins FROM projects"
 )
 
 var projectColumns = []string{
-	"id", "created_at", "updated_at", "preview_origins",
+	"id", "name", "created_at", "updated_at", "preview_origins",
 }
 
 type projectStatements struct{ statement }
@@ -39,7 +39,7 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 	if err != nil {
 		return wrapError(err)
 	}
-	stmt := buildStatement(createProjectStmt, project.ID, previewOrigins).statement()
+	stmt := buildStatement(createProjectStmt, project.ID, project.Name, previewOrigins).statement()
 	return ps.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 			return struct{}{}, row.Columns(&project.ID, &project.CreatedAt, &project.UpdatedAt)
@@ -65,8 +65,16 @@ func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*dom
 }
 
 // UpdateProject implements [service.ProjectStatements].
+// Only name is updated; preview origins are left untouched.
+// updated_at is refreshed and read back onto project.
 func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.Project) error {
-	return storagedb.NewUnimplementedError(nil)
+	stmt := buildStatement(updateProjectStmt, project.ID, project.Name).statement()
+	return ps.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
+			return struct{}{}, row.Columns(&project.UpdatedAt)
+		})
+		return err
+	})
 }
 
 // ListProjects implements [service.ProjectStatements].
@@ -104,7 +112,7 @@ func (ps projectStatements) ListProjects(ctx context.Context, filter *database.L
 func (ps projectStatements) scanProject(row *spanner.Row) (*domain.Project, error) {
 	project := new(domain.Project)
 	var previewOriginsJSON string
-	if err := row.Columns(&project.ID, &project.CreatedAt, &project.UpdatedAt, &previewOriginsJSON); err != nil {
+	if err := row.Columns(&project.ID, &project.Name, &project.CreatedAt, &project.UpdatedAt, &previewOriginsJSON); err != nil {
 		return nil, err
 	}
 	origins, err := decodePreviewOrigins(previewOriginsJSON)
@@ -143,6 +151,11 @@ var projectSchema = database.NewSchema(map[domain.ProjectField]database.FieldBin
 	domain.ProjectFieldID: {
 		SQLName:  "id",
 		Accessor: func(p *domain.Project) any { return p.ID },
+		Coerce:   database.CoerceString,
+	},
+	domain.ProjectFieldName: {
+		SQLName:  "name",
+		Accessor: func(p *domain.Project) any { return p.Name },
 		Coerce:   database.CoerceString,
 	},
 	domain.ProjectFieldCreatedAt: {

@@ -122,3 +122,42 @@ func TestFlowDefinitionStatements_CRUD(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }
+
+func TestFlowDefinitionStatements_DeleteProjectCascades(t *testing.T) {
+	ctx := t.Context()
+
+	connector, stop, err := dbtest.Spanner(ctx)
+	require.NoError(t, err)
+	t.Cleanup(stop)
+
+	cfg, ok := connector.(*spannerdialect.Config)
+	require.True(t, ok)
+
+	db, err := sql.Open("spanner", cfg.DSN)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	require.NoError(t, migration.Migrate(ctx, db))
+
+	dialect, err := DecodeConfig(cfg.DSN)
+	require.NoError(t, err)
+	pool, err := dialect.Connect(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = pool.Close(ctx) })
+
+	stmts := pool.(*Client).Statements()
+
+	project := &domain.Project{
+		ID:             "proj_v2_flowdef_cascade",
+		PreviewOrigins: []string{},
+	}
+	require.NoError(t, stmts.CreateProject(ctx, project))
+
+	def := sampleFlowDefinition(project.ID, uniqueFlowDefinitionID(t))
+	require.NoError(t, stmts.CreateFlowDefinition(ctx, def))
+
+	require.NoError(t, stmts.DeleteProjectByID(ctx, project.ID))
+
+	_, err = stmts.GetFlowDefinitionByID(ctx, project.ID, def.ID)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
+}

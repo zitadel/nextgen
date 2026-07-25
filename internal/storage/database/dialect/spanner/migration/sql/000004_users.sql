@@ -8,6 +8,10 @@ CREATE TABLE users (
     created_at  TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     updated_at  TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     schema_url  STRING(MAX) NOT NULL,
+    CONSTRAINT fk_users_project
+        FOREIGN KEY (project_id)
+        REFERENCES projects (id)
+        ON DELETE CASCADE,
     CONSTRAINT fk_users_team
         FOREIGN KEY (project_id, team_id)
         REFERENCES teams (project_id, id)

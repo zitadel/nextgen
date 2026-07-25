@@ -24,6 +24,12 @@ CREATE TABLE team_memberships (
     status      STRING(MAX) NOT NULL DEFAULT ('active'),
     created_at  TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     updated_at  TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
+    -- teams/users stay NO ACTION (ADR 024: team/user deletion goes through a
+    -- lifecycle service, not a raw cascade); project deletion gets its own path.
+    CONSTRAINT fk_team_memberships_project
+        FOREIGN KEY (project_id)
+        REFERENCES projects (id)
+        ON DELETE CASCADE,
     CONSTRAINT fk_team_memberships_team
         FOREIGN KEY (project_id, team_id)
         REFERENCES teams (project_id, id)
