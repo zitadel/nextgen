@@ -191,6 +191,19 @@ control in either mode: `--zl-page-min-height` (inherits across the shadow
 boundaries, releasing the orchestrator mount and the `zl-page-shell` atom in
 one setting). `embedding.browser.spec.ts` pins this whole contract.
 
+**Colour mode** ships light and dark. A `page` renders dark (the design
+system's primary surface); a `widget` follows the visitor's
+`prefers-color-scheme` so it doesn't force a dark card onto a light page.
+Pin it when your app's surface is fixed:
+
+```html
+<zitadel-login theme="light"></zitadel-login>
+```
+
+Resolution runs strongest-first: this `theme` property → the tenant's
+`branding.theme.mode` → the variant default. The resolved mode lands on
+`data-theme` on the element, and every `--zl-*` token repaints with it.
+
 Atom internals forward through the orchestrator as `<atom>-<part>` names —
 `zitadel-login::part(field-input)`, `zitadel-login::part(button-root)` — for
 every part an atom's manifest declares; bare names (`zl-field::part(input)`)
@@ -218,6 +231,7 @@ renders the bundled `default.liquid`. Tracked as a follow-up.
 | Property | Type | Notes |
 | --- | --- | --- |
 | `variant` | `'widget' \| 'page'` | Sizing/chrome mode. `widget` (default): content-sized, transparent, no font injection, no initial focus grab. `page`: full-page chrome for dedicated login routes |
+| `theme` | `'light' \| 'dark' \| 'auto'` | Colour mode. Unset defers to `branding.theme.mode`, then to the variant default (`dark` for `page`, `auto` for `widget`). Resolved value lands on `data-theme` |
 | `purpose` | `'login' \| 'register' \| 'reset_password' \| string` | Which flow purpose to drive |
 | `flowName` / `flow-name` | `string` | Run the flow definition with this `name` instead of the project default |
 | `project` | `ZitadelProject` | SDK handle from `configureZitadel()`. Object property (not an attribute). When unset, the element falls back to the global handle from `getZitadelConfig()` |

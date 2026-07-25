@@ -78,7 +78,9 @@ export const SignIn: Story = {};
 /**
  * The widget default: no `variant` means content-sized and transparent —
  * the embedding page owns layout, background, and typography. Rendered
- * here inside a constrained light-page card to show the polarity.
+ * here inside a constrained light-page card, with `theme="light"` pinning
+ * the colour mode the way an app with a fixed light surface would (the
+ * unset default follows the visitor's `prefers-color-scheme`).
  */
 export const WidgetEmbed: Story = {
   parameters: { layout: "padded" },
@@ -89,7 +91,7 @@ export const WidgetEmbed: Story = {
       <p style="margin: 0 0 1rem; font-family: sans-serif; color: #333;">
         Your app's own page content around the login widget:
       </p>
-      <zitadel-login></zitadel-login>
+      <zitadel-login theme="light"></zitadel-login>
     </div>
   `,
 };

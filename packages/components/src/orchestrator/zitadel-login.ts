@@ -37,7 +37,7 @@ import { zitadelAttributionPillInnerHtml } from "@zitadel/shared-component-style
 import { createSanitiser } from "./sanitiser.js";
 import type { FlowError, FlowIdentity, LiquidContext } from "./template-context.js";
 import layoutChromeCss from "./templates/layout-chrome.css?inline";
-import { ThemeController } from "./theme-controller.js";
+import { ThemeController, type ThemeMode } from "./theme-controller.js";
 
 /**
  * The uniform value contract every input atom exposes (`<zl-field>`,
@@ -115,6 +115,17 @@ export class ZitadelLogin extends LitElement {
    * modes: `--zl-page-min-height`.
    */
   @property({ type: String, reflect: true }) accessor variant: "widget" | "page" = "widget";
+
+  /**
+   * Colour mode: `light`, `dark`, or `auto` (follow `prefers-color-scheme`).
+   * Empty means "not stated", and resolution falls through to the tenant's
+   * `branding.theme.mode`, then to a variant-derived default — `dark` for
+   * `page` (the hosted design system surface) and `auto` for `widget`, so an
+   * embedded widget matches the visitor's preference instead of forcing a
+   * dark card onto a light page. Set it explicitly when your app's surface
+   * is fixed: `<zitadel-login theme="light">`.
+   */
+  @property({ type: String }) accessor theme: "" | ThemeMode = "";
 
   @property({ type: String }) accessor purpose: CreateFlowBodyPurpose = "login";
 
@@ -294,6 +305,12 @@ export class ZitadelLogin extends LitElement {
     if (!this.engine || changed.has("locales") || changed.has("lang")) {
       this.engine = createLiquidEngine({ locale: this.resolveLocale() });
     }
+    // Resolve before reading `themeController.theme` below: a page owns its
+    // surface (dark), a widget defers to the visitor's preference (auto).
+    this.themeController.setModePreference(
+      this.theme === "" ? undefined : this.theme,
+      this.variant === "page" ? "dark" : "auto",
+    );
     const root = this.shadowRoot;
     if (root) {
       applyBaseTokens(root);
