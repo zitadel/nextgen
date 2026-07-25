@@ -251,11 +251,17 @@ async function expectVirtualCredentialCount(
 
 async function logout(page: Page): Promise<void> {
   const logout = logoutLocator(page);
-  if (!(await logout.first().isVisible({ timeout: 1000 }).catch(() => false))) {
-    await page.getByRole("button", { name: /open user menu/i }).click();
+  const userMenu = page.getByRole("button", { name: /open user menu/i });
+
+  // `<zitadel-session>` exposes Sign out directly; `<zitadel-logout>` hides it
+  // behind an avatar menu. Wait for either surface, and only open the menu when
+  // the direct logout control is not already visible.
+  await expect(logout.or(userMenu)).toBeVisible({ timeout: 30_000 });
+  if (!(await logout.isVisible().catch(() => false))) {
+    await userMenu.click();
+    await expect(logout).toBeVisible({ timeout: 5_000 });
   }
-  await expect(logout.first()).toBeVisible({ timeout: 5000 });
-  await logout.first().click();
+  await logout.click();
   const loggedOutUrl = expectsProtectedRouteRedirect
     ? loginUrl
     : /\/(?:login)?(?:[/?#]|$)/;
@@ -411,7 +417,8 @@ function fieldControl(page: Page, fieldName: string, label: RegExp): Locator {
 
 function logoutLocator(page: Page) {
   return page
-    .locator("zitadel-logout .signout-btn")
+    .getByTestId("zitadel-session-logout")
+    .or(page.locator("zitadel-logout .signout-btn"))
     .or(actionLocator(page, "logout"))
     .or(page.getByRole("button", { name: /logout|sign out/i }))
     .or(page.getByRole("link", { name: /logout|sign out/i }));
