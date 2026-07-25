@@ -13,6 +13,7 @@ type statements struct {
 	teamMembershipStatements
 	tokenStatements
 	passkeyRegistrationStatements
+	sessionStatements
 }
 
 func (s statements) Statements() service.AllStatements {
@@ -32,6 +33,7 @@ func newStatements(db queryExecutor) statements {
 		teamMembershipStatements:      newTeamMembershipStatements(db),
 		tokenStatements:               newTokenStatements(db),
 		passkeyRegistrationStatements: newPasskeyRegistrationStatements(db),
+		sessionStatements:             newSessionStatements(db),
 	}
 }
 

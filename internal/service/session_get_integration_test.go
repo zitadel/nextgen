@@ -3,6 +3,7 @@
 package service_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -58,7 +59,9 @@ func TestSessionService_Get_UserIdentity_integration(t *testing.T) {
 
 	session, err := domain.NewSession(projectID, nil)
 	require.NoError(t, err)
-	require.NoError(t, repository.NewSessionRepository(pool).Create(t.Context(), pool, session))
+	require.NoError(t, integrationV2PoolOrFail(t).Transaction(t.Context(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+		return tx.Statements().CreateSession(ctx, session)
+	}))
 	_, err = pool.Exec(t.Context(),
 		`UPDATE zitadel_nextgen.sessions SET user_id = $1 WHERE project_id = $2 AND id = $3`,
 		userID, projectID, session.ID,

@@ -50,7 +50,6 @@ type Harness struct {
 	SchemaResolver   *domain.JSONSchemaResolver
 	SchemaValidator  *domain.SchemaValidator
 	AuthAttemptRepo  domain.AuthAttemptRepository
-	SessionRepo      domain.SessionRepository
 	UserRepo         domain.UserRepository
 	UserPasswordRepo domain.UserPasswordRepository
 	UserPasskeyRepo  domain.UserPasskeyRepository
