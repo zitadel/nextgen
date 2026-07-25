@@ -284,18 +284,21 @@ func (ss sessionStatements) updateSessionAfterExchange(ctx context.Context, proj
 	if err != nil {
 		return err
 	}
-	args := []any{projectID, id}
-	sql := `UPDATE sessions SET updated_at = CURRENT_TIMESTAMP()`
+	var c statementCompiler
+	c.WriteString(`UPDATE sessions SET updated_at = CURRENT_TIMESTAMP()`)
 	if userID != nil {
-		args = append(args, *userID)
-		sql += fmt.Sprintf(", user_id = @p%d", len(args))
+		c.WriteString(", user_id = ")
+		c.WriteArg(*userID)
 	}
 	if ttl > 0 {
-		args = append(args, ttl.Nanoseconds())
-		sql += fmt.Sprintf(", time_to_live = @p%d", len(args))
+		c.WriteString(", time_to_live = ")
+		c.WriteArg(ttl.Nanoseconds())
 	}
-	sql += " WHERE project_id = @p1 AND id = @p2"
-	n, err := ss.db.Update(ctx, buildStatement(sql, args...).statement())
+	c.WriteString(" WHERE project_id = ")
+	c.WriteArg(projectID)
+	c.WriteString(" AND id = ")
+	c.WriteArg(id)
+	n, err := ss.db.Update(ctx, c.statement())
 	if err != nil {
 		return err
 	}

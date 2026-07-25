@@ -265,18 +265,22 @@ func (ss sessionStatements) createSessionToken(ctx context.Context, session *dom
 }
 
 func (ss sessionStatements) updateSessionAfterExchange(ctx context.Context, projectID, sessionID string, userID *string, ttl time.Duration) error {
-	args := []any{projectID, storagedb.Identity(sessionID)}
-	sql := `UPDATE zitadel_nextgen.sessions SET updated_at = NOW()`
+	var c statementCompiler
+	c.WriteString(`UPDATE zitadel_nextgen.sessions SET updated_at = NOW()`)
 	if userID != nil {
-		args = append(args, *userID)
-		sql += fmt.Sprintf(", user_id = $%d", len(args))
+		c.WriteString(", user_id = ")
+		c.WriteArg(*userID)
 	}
 	if ttl > 0 {
-		args = append(args, ttl)
-		sql += fmt.Sprintf(", time_to_live = $%d::INTERVAL", len(args))
+		c.WriteString(", time_to_live = ")
+		c.WriteArg(ttl)
+		c.WriteString("::INTERVAL")
 	}
-	sql += " WHERE project_id = $1 AND id = $2"
-	tag, err := ss.client.Exec(ctx, sql, args...)
+	c.WriteString(" WHERE project_id = ")
+	c.WriteArg(projectID)
+	c.WriteString(" AND id = ")
+	c.WriteArg(storagedb.Identity(sessionID))
+	tag, err := ss.client.Exec(ctx, c.String(), c.args...)
 	if err != nil {
 		return wrapError(err)
 	}
