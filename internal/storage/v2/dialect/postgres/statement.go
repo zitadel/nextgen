@@ -46,6 +46,7 @@ func newStatements(client queryExecutor) statements {
 }
 
 var _ service.Statements = (*statements)(nil)
+var _ service.AllStatements = (*statements)(nil)
 
 type statement struct {
 	client queryExecutor

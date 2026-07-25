@@ -3,7 +3,7 @@
 package spanner
 
 import (
-	"database/sql"
+	"context"
 	"testing"
 	"time"
 
@@ -12,71 +12,41 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
-	spannerdialect "github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
-	"github.com/zitadel/nextgen/internal/storage/database/dialect/spanner/migration"
 )
 
 func TestTeamMembershipStatements_CRUD(t *testing.T) {
 	ctx := t.Context()
+	stmts := testClient.Statements()
+	db := newClientDB(testClient.client)
 
-	connector, stop, err := dbtest.Spanner(ctx)
-	require.NoError(t, err)
-	t.Cleanup(stop)
+	project := newTestProject(uniqueProjectID(t))
+	require.NoError(t, stmts.CreateProject(ctx, project))
+	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
 
-	cfg, ok := connector.(*spannerdialect.Config)
-	require.True(t, ok)
-
-	db, err := sql.Open("spanner", cfg.DSN)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
-	require.NoError(t, migration.Migrate(ctx, db))
-
-	dialect, err := DecodeConfig(cfg.DSN)
-	require.NoError(t, err)
-	pool, err := dialect.Connect(ctx)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = pool.Close(ctx) })
-
-	stmts := pool.(*Client).Statements()
-
-	projectID := "proj_tm_v2"
 	teamID := "team_tm_v2"
 	userID := "usr_tm_v2"
 	schemaURL := "https://schemas.test/team-membership/v1.json"
 
-	require.NoError(t, stmts.CreateProject(ctx, &domain.Project{
-		ID:             projectID,
-		ProjectSecret:  "project-secret",
-		PreviewSecret:  "preview-secret",
-		PreviewOrigins: []string{},
+	require.NoError(t, stmts.CreateJSONSchema(ctx, &domain.JSONSchema{
+		ProjectID: project.ID,
+		URL:       schemaURL,
+		Schema:    []byte("{}"),
 	}))
-	t.Cleanup(func() { _ = stmts.DeleteProjectByID(ctx, projectID) })
+	require.NoError(t, stmts.CreateTeam(ctx, &domain.Team{ProjectID: project.ID, ID: teamID}))
 
-	_, err = db.ExecContext(ctx,
-		`INSERT INTO json_schemas (project_id, url, payload) VALUES (?, ?, ?)`,
-		projectID, schemaURL, "{}",
-	)
-	require.NoError(t, err)
-	_, err = db.ExecContext(ctx,
-		`INSERT INTO teams (project_id, id, created_at, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`,
-		projectID, teamID,
-	)
-	require.NoError(t, err)
-	_, err = db.ExecContext(ctx,
-		`INSERT INTO users (project_id, schema_url, id, status, created_at, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`,
-		projectID, schemaURL, userID, domain.UserStatusActive.String(),
-	)
+	// Users are still on the v1 repository; seed the parent row via DML.
+	_, err := db.Update(ctx, buildStatement(
+		`INSERT INTO users (project_id, schema_url, id, status, created_at, updated_at) VALUES (@p1, @p2, @p3, @p4, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`,
+		project.ID, schemaURL, userID, domain.UserStatusActive.String(),
+	).statement())
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		_, _ = db.ExecContext(ctx, `DELETE FROM team_memberships WHERE project_id = ?`, projectID)
-		_, _ = db.ExecContext(ctx, `DELETE FROM users WHERE project_id = ?`, projectID)
-		_, _ = db.ExecContext(ctx, `DELETE FROM teams WHERE project_id = ?`, projectID)
-		_, _ = db.ExecContext(ctx, `DELETE FROM json_schemas WHERE project_id = ?`, projectID)
+		_, _ = db.Update(context.Background(), buildStatement(`DELETE FROM team_memberships WHERE project_id = @p1`, project.ID).statement())
+		_, _ = db.Update(context.Background(), buildStatement(`DELETE FROM users WHERE project_id = @p1`, project.ID).statement())
 	})
 
 	membership := &domain.TeamMembership{
-		ProjectID: projectID,
+		ProjectID: project.ID,
 		TeamID:    teamID,
 		UserID:    userID,
 		Status:    domain.MembershipStatusActive,
@@ -85,21 +55,21 @@ func TestTeamMembershipStatements_CRUD(t *testing.T) {
 	assert.False(t, membership.CreatedAt.IsZero())
 	assert.False(t, membership.UpdatedAt.IsZero())
 
-	got, err := stmts.GetTeamMembership(ctx, projectID, teamID, userID)
+	got, err := stmts.GetTeamMembership(ctx, project.ID, teamID, userID)
 	require.NoError(t, err)
 	assert.Equal(t, domain.MembershipStatusActive, got.Status)
 	assert.WithinDuration(t, membership.CreatedAt, got.CreatedAt, time.Second)
 
-	byUser, err := stmts.ListTeamMembershipsByUser(ctx, projectID, userID)
+	byUser, err := stmts.ListTeamMembershipsByUser(ctx, project.ID, userID)
 	require.NoError(t, err)
 	require.Len(t, byUser, 1)
 
-	byTeam, err := stmts.ListTeamMembershipsByTeam(ctx, projectID, teamID)
+	byTeam, err := stmts.ListTeamMembershipsByTeam(ctx, project.ID, teamID)
 	require.NoError(t, err)
 	require.Len(t, byTeam, 1)
 
-	require.NoError(t, stmts.UpdateTeamMembershipStatus(ctx, projectID, teamID, userID, domain.MembershipStatusRemoved))
-	updated, err := stmts.GetTeamMembership(ctx, projectID, teamID, userID)
+	require.NoError(t, stmts.UpdateTeamMembershipStatus(ctx, project.ID, teamID, userID, domain.MembershipStatusRemoved))
+	updated, err := stmts.GetTeamMembership(ctx, project.ID, teamID, userID)
 	require.NoError(t, err)
 	assert.Equal(t, domain.MembershipStatusRemoved, updated.Status)
 

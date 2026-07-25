@@ -10,6 +10,8 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres"
+	"github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
 )
 
 const (
@@ -243,6 +245,13 @@ func (r *UserRepository) Create(ctx context.Context, client database.QueryExecut
 		scopes[i] = uniquenessScopeLiteral(a.UniqueScope)
 	}
 
+	// Dialect selection uses the outer client: nested Begin returns a savepoint
+	// that may not implement the dialect pooler marker.
+	membershipTable := ""
+	if user.InitialMembershipTeamID != nil && *user.InitialMembershipTeamID != "" {
+		membershipTable = membershipTableFor(client)
+	}
+
 	return withTransaction(ctx, client, func(ctx context.Context, tx database.QueryExecutor) error {
 		if _, err := tx.Exec(ctx, userInsertSQL,
 			user.ProjectID, user.SchemaURL, user.ID, user.LifecycleOwnerTeamID,
@@ -252,17 +261,27 @@ func (r *UserRepository) Create(ctx context.Context, client database.QueryExecut
 			return err
 		}
 		// Initial roster row stays inline until User moves to statements.
-		if user.InitialMembershipTeamID == nil || *user.InitialMembershipTeamID == "" {
+		if membershipTable == "" {
 			return nil
 		}
 		b := database.NewStatementBuilder("INSERT INTO ")
-		b.WriteString(pgTableMemberships)
+		b.WriteString(membershipTable)
 		b.WriteString(" (project_id, team_id, user_id, status) VALUES (")
 		b.WriteArgs(user.ProjectID, *user.InitialMembershipTeamID, user.ID, domain.MembershipStatusActive.String())
 		b.WriteString(")")
 		_, err := tx.Exec(ctx, b.String(), b.Args()...)
 		return err
 	})
+}
+
+func membershipTableFor(client database.QueryExecutor) string {
+	switch client.(type) {
+	case spanner.SpannerPooler:
+		return spannerTableMembers
+	case postgres.PostgresPooler:
+		return pgTableMemberships
+	}
+	panic("membershipTableFor: unsupported client type")
 }
 
 func userHydrationExpressions(rowQualifier, attrKeysPlaceholder, authPlaceholder string) string {
