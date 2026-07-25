@@ -1033,8 +1033,6 @@ func (s FieldValidationFormat) Validate() error {
 
 func (s FilterField) Validate() error {
 	switch s {
-	case "name":
-		return nil
 	case "createdAt":
 		return nil
 	default:

@@ -2,11 +2,8 @@ package postgres
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"log/slog"
 	"strconv"
 	"time"
 
@@ -17,11 +14,10 @@ import (
 	storagedb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
+	v2session "github.com/zitadel/nextgen/internal/storage/v2/session"
 )
 
 const (
-	userAgentFingerprintKey = "fingerprint"
-
 	insertUserAgentStmt = `INSERT INTO zitadel_nextgen.user_agents (project_id, info) VALUES ($1, $2) RETURNING id`
 	insertSessionStmt   = `INSERT INTO zitadel_nextgen.sessions (project_id, user_agent_id, time_to_live, token_id)
 VALUES ($1, $2, $3::INTERVAL, 0) RETURNING id, created_at, updated_at, expires_at`
@@ -115,74 +111,53 @@ func (ss sessionStatements) ExchangeSession(ctx context.Context, projectID, hand
 	var refreshed *domain.Session
 	err := withTransaction(ctx, ss.client, func(ctx context.Context, tx queryExecutor) error {
 		var err error
-		refreshed, err = sessionStatements{statement: statement{client: tx}}.exchangeSessionTx(ctx, projectID, handoffToken, ttl)
+		refreshed, err = v2session.RunExchange(ctx, sessionExchangeStore{sessionStatements{statement: statement{client: tx}}}, projectID, handoffToken, ttl)
 		return err
 	})
 	return refreshed, err
 }
 
-func (ss sessionStatements) exchangeSessionTx(ctx context.Context, projectID, handoffToken string, ttl time.Duration) (*domain.Session, error) {
-	attempt, err := ss.getAuthAttemptByHandoffToken(ctx, projectID, hashHandoffToken(handoffToken))
-	if err != nil {
-		if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
-			return nil, domain.ErrSessionInvalidHandoffToken()
-		}
-		return nil, err
-	}
-	if err := validateHandoffAttempt(attempt); err != nil {
-		return nil, err
-	}
-	if !attempt.IsCompleted() {
-		return nil, domain.ErrSessionInvalidHandoffToken()
-	}
+// sessionExchangeStore adapts sessionStatements to [v2session.ExchangeStore].
+// GetAuthAttemptByHandoffToken stays here so it does not collide with
+// [authAttemptStatements] when both are embedded in [statements].
+type sessionExchangeStore struct{ sessionStatements }
 
-	var targetSession *domain.Session
-	if attempt.SessionID != nil {
-		targetSession, err = ss.GetSessionByID(ctx, projectID, *attempt.SessionID)
-		if err != nil {
-			if errors.Is(err, domain.ErrSessionNotFound()) {
-				return nil, domain.ErrSessionExchangeConflict()
-			}
-			return nil, err
-		}
-	} else {
-		targetSession = &domain.Session{ProjectID: projectID, TimeToLive: exchangeTTL(ttl)}
-		if err := ss.insertSession(ctx, targetSession); err != nil {
-			return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
-		}
-	}
+func (s sessionExchangeStore) GetAuthAttemptByHandoffToken(ctx context.Context, projectID string, handoffTokenHash []byte) (*domain.AuthAttempt, error) {
+	return s.getAuthAttemptByHandoffToken(ctx, projectID, handoffTokenHash)
+}
 
-	attemptChecks, err := ss.loadStoredChecks(ctx, loadAttemptChecksStmt, projectID, attempt.ID, true)
-	if err != nil {
-		return nil, err
+func (s sessionExchangeStore) InsertSession(ctx context.Context, session *domain.Session) error {
+	return s.insertSession(ctx, session)
+}
+
+func (s sessionExchangeStore) LoadVerifiedChecks(ctx context.Context, projectID, id string, onAttempt bool) ([]v2session.StoredCheck, error) {
+	if onAttempt {
+		return s.loadStoredChecks(ctx, loadAttemptChecksStmt, projectID, id, true)
 	}
-	sessionChecks, err := ss.loadStoredChecks(ctx, loadSessionChecksStmt, projectID, targetSession.ID, false)
-	if err != nil {
-		return nil, err
+	return s.loadStoredChecks(ctx, loadSessionChecksStmt, projectID, id, false)
+}
+
+func (s sessionExchangeStore) ApplyExchange(ctx context.Context, projectID, sessionID string, last map[domain.AuthCheckType]v2session.StoredCheck) error {
+	return s.applyExchange(ctx, projectID, sessionID, last)
+}
+
+func (s sessionExchangeStore) UserIDFromLastVerifiedChecks(ctx context.Context, projectID string, last map[domain.AuthCheckType]v2session.StoredCheck) (*string, error) {
+	return s.userIDFromLastVerifiedChecks(ctx, projectID, last)
+}
+
+func (s sessionExchangeStore) UpdateSessionAfterExchange(ctx context.Context, projectID, sessionID string, userID *string, ttl time.Duration) error {
+	return s.updateSessionAfterExchange(ctx, projectID, sessionID, userID, ttl)
+}
+
+func (s sessionExchangeStore) DeleteAuthAttempt(ctx context.Context, projectID, attemptID string) error {
+	if _, err := s.client.Exec(ctx, deleteAuthAttemptStmt, projectID, storagedb.Identity(attemptID)); err != nil {
+		return wrapError(err)
 	}
-	lastVerifiedChecks := pickLastVerifiedChecksByType(attemptChecks, sessionChecks)
-	if err := ss.applyExchange(ctx, projectID, targetSession.ID, lastVerifiedChecks); err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
-	}
-	userID, err := ss.userIDFromLastVerifiedChecks(ctx, projectID, lastVerifiedChecks)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
-	}
-	oldTokenID := targetSession.TokenID
-	if err := ss.updateSessionAfterExchange(ctx, projectID, targetSession.ID, userID, ttl); err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
-	}
-	if _, err := ss.client.Exec(ctx, deleteAuthAttemptStmt, projectID, storagedb.Identity(attempt.ID)); err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), wrapError(err))
-	}
-	refreshed, err := ss.GetSessionByID(ctx, projectID, targetSession.ID)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
-	}
-	if err := ss.createSessionToken(ctx, refreshed, oldTokenID); err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
-	}
-	return refreshed, nil
+	return nil
+}
+
+func (s sessionExchangeStore) CreateSessionToken(ctx context.Context, session *domain.Session, previousTokenID string) error {
+	return s.createSessionToken(ctx, session, previousTokenID)
 }
 
 func (ss sessionStatements) querySessions(ctx context.Context, filter *database.ListOptions[domain.SessionField]) ([]*domain.Session, error) {
@@ -216,7 +191,7 @@ func (ss sessionStatements) insertSession(ctx context.Context, session *domain.S
 			info["ip"] = session.UserAgent.IP
 		}
 		if session.UserAgent.ID != "" {
-			info[userAgentFingerprintKey] = session.UserAgent.ID
+			info[v2session.UserAgentFingerprintKey] = session.UserAgent.ID
 		}
 		raw, err := json.Marshal(info)
 		if err != nil {
@@ -259,7 +234,7 @@ func (ss sessionStatements) createSessionToken(ctx context.Context, session *dom
 		return fmt.Errorf("failed to set session token_id: %w", wrapError(err))
 	}
 	session.TokenID = tok.TokenID
-	if previousTokenID != "" && previousTokenID != "0" {
+	if v2session.HasRealSessionToken(previousTokenID) {
 		if err := tokens.DeleteTokenByID(ctx, session.ProjectID, previousTokenID); err != nil {
 			return fmt.Errorf("failed to revoke previous session token: %w", err)
 		}
@@ -268,18 +243,22 @@ func (ss sessionStatements) createSessionToken(ctx context.Context, session *dom
 }
 
 func (ss sessionStatements) updateSessionAfterExchange(ctx context.Context, projectID, sessionID string, userID *string, ttl time.Duration) error {
-	args := []any{projectID, storagedb.Identity(sessionID)}
-	sql := `UPDATE zitadel_nextgen.sessions SET updated_at = NOW()`
+	var c statementCompiler
+	c.WriteString(`UPDATE zitadel_nextgen.sessions SET updated_at = NOW()`)
 	if userID != nil {
-		args = append(args, *userID)
-		sql += fmt.Sprintf(", user_id = $%d", len(args))
+		c.WriteString(", user_id = ")
+		c.WriteArg(*userID)
 	}
 	if ttl > 0 {
-		args = append(args, ttl)
-		sql += fmt.Sprintf(", time_to_live = $%d::INTERVAL", len(args))
+		c.WriteString(", time_to_live = ")
+		c.WriteArg(ttl)
+		c.WriteString("::INTERVAL")
 	}
-	sql += " WHERE project_id = $1 AND id = $2"
-	tag, err := ss.client.Exec(ctx, sql, args...)
+	c.WriteString(" WHERE project_id = ")
+	c.WriteArg(projectID)
+	c.WriteString(" AND id = ")
+	c.WriteArg(storagedb.Identity(sessionID))
+	tag, err := ss.client.Exec(ctx, c.String(), c.args...)
 	if err != nil {
 		return wrapError(err)
 	}
@@ -289,7 +268,7 @@ func (ss sessionStatements) updateSessionAfterExchange(ctx context.Context, proj
 	return nil
 }
 
-func (ss sessionStatements) applyExchange(ctx context.Context, projectID, sessionID string, lastVerifiedChecks map[domain.AuthCheckType]storedCheck) error {
+func (ss sessionStatements) applyExchange(ctx context.Context, projectID, sessionID string, lastVerifiedChecks map[domain.AuthCheckType]v2session.StoredCheck) error {
 	for _, c := range lastVerifiedChecks {
 		if !c.OnAttempt {
 			continue
@@ -310,7 +289,7 @@ func (ss sessionStatements) applyExchange(ctx context.Context, projectID, sessio
 	return nil
 }
 
-func (ss sessionStatements) userIDFromLastVerifiedChecks(ctx context.Context, projectID string, lastVerifiedChecks map[domain.AuthCheckType]storedCheck) (*string, error) {
+func (ss sessionStatements) userIDFromLastVerifiedChecks(ctx context.Context, projectID string, lastVerifiedChecks map[domain.AuthCheckType]v2session.StoredCheck) (*string, error) {
 	w, ok := lastVerifiedChecks[domain.AuthCheckTypeUser]
 	if !ok {
 		return nil, nil
@@ -331,13 +310,13 @@ func (ss sessionStatements) userIDFromLastVerifiedChecks(ctx context.Context, pr
 	return &payload.UserID, nil
 }
 
-func (ss sessionStatements) loadStoredChecks(ctx context.Context, query, projectID, id string, onAttempt bool) ([]storedCheck, error) {
+func (ss sessionStatements) loadStoredChecks(ctx context.Context, query, projectID, id string, onAttempt bool) ([]v2session.StoredCheck, error) {
 	rows, err := ss.client.Query(ctx, query, projectID, storagedb.Identity(id))
 	if err != nil {
 		return nil, wrapError(err)
 	}
 	defer rows.Close()
-	var out []storedCheck
+	var out []v2session.StoredCheck
 	for rows.Next() {
 		var checkID storagedb.Identity
 		var typ int64
@@ -345,7 +324,7 @@ func (ss sessionStatements) loadStoredChecks(ctx context.Context, query, project
 		if err := rows.Scan(&checkID, &typ, &lastVerifiedAt); err != nil {
 			return nil, err
 		}
-		out = append(out, storedCheck{ID: checkID.String(), Type: domain.AuthCheckType(typ), LastVerifiedAt: lastVerifiedAt, OnAttempt: onAttempt})
+		out = append(out, v2session.StoredCheck{ID: checkID.String(), Type: domain.AuthCheckType(typ), LastVerifiedAt: lastVerifiedAt, OnAttempt: onAttempt})
 	}
 	return out, rows.Err()
 }
@@ -361,13 +340,6 @@ func (ss sessionStatements) getAuthAttemptByHandoffToken(ctx context.Context, pr
 		return nil, err
 	}
 	return attempt, nil
-}
-
-type storedCheck struct {
-	ID             string
-	Type           domain.AuthCheckType
-	LastVerifiedAt time.Time
-	OnAttempt      bool
 }
 
 func scanSessions(rows pgx.Rows) ([]*domain.Session, error) {
@@ -402,7 +374,7 @@ func scanSessions(rows pgx.Rows) ([]*domain.Session, error) {
 						return nil, fmt.Errorf("failed to unmarshal user agent info: %w", err)
 					}
 				}
-				session.UserAgent = userAgentFromStoredInfo(info)
+				session.UserAgent = v2session.UserAgentFromStoredInfo(info)
 			}
 			byID[id] = session
 			order = append(order, id)
@@ -424,13 +396,13 @@ func scanSessions(rows pgx.Rows) ([]*domain.Session, error) {
 		if failureCount != nil {
 			failures = *failureCount
 		}
-		checks, err := newSessionAuthChecks(domain.AuthCheckType(*checkType), checkID.String(), challengedAt, failedAt, verifiedAt, failures, challenge, factor)
+		checks, err := v2session.DecodeAuthChecks(domain.AuthCheckType(*checkType), checkID.String(), challengedAt, failedAt, verifiedAt, failures, challenge, factor)
 		if err != nil {
 			return nil, err
 		}
 		for _, check := range checks {
 			if f, ok := check.(domain.AuthFactor); ok {
-				appendSessionFactor(session, f)
+				v2session.AppendFactor(session, f)
 			}
 		}
 	}
@@ -499,7 +471,7 @@ func scanAuthAttempt(rows pgx.Rows, attempt *domain.AuthAttempt) error {
 		if failureCount != nil {
 			failures = *failureCount
 		}
-		checks, err := newSessionAuthChecks(*checkType, cid, challengedAt, failedAt, verified, failures, challenge, factor)
+		checks, err := v2session.DecodeAuthChecks(*checkType, cid, challengedAt, failedAt, verified, failures, challenge, factor)
 		if err != nil {
 			return fmt.Errorf("failed to unmarshal auth check: %w", err)
 		}
@@ -513,104 +485,6 @@ func scanAuthAttempt(rows pgx.Rows, attempt *domain.AuthAttempt) error {
 	return rows.Err()
 }
 
-func newSessionAuthChecks(checkType domain.AuthCheckType, id string, lastChallengedAt, lastFailedAt, verifiedAt time.Time, failureCount uint16, challenge, factor json.RawMessage) (checks []domain.AuthCheck, err error) {
-	switch checkType {
-	case domain.AuthCheckTypeUser:
-		if !verifiedAt.IsZero() {
-			userFactor := domain.SetAuthFactorUser(verifiedAt)
-			if len(factor) > 0 {
-				if err = json.Unmarshal(factor, &userFactor); err != nil {
-					return nil, fmt.Errorf("failed to unmarshal user auth check factor payload: %w", err)
-				}
-			}
-			checks = append(checks, userFactor)
-		}
-		if !lastChallengedAt.IsZero() {
-			checks = append(checks, domain.SetAuthChallengeUser(id, lastChallengedAt, lastFailedAt, failureCount))
-		}
-	case domain.AuthCheckTypePassword:
-		if !verifiedAt.IsZero() {
-			checks = append(checks, domain.SetAuthFactorPassword(verifiedAt))
-		}
-		if !lastChallengedAt.IsZero() {
-			checks = append(checks, domain.SetAuthChallengePassword(id, lastChallengedAt, lastFailedAt, failureCount))
-		}
-	case domain.AuthCheckTypePasskey:
-		if !verifiedAt.IsZero() {
-			passkeyFactor := domain.SetAuthFactorPasskey(verifiedAt)
-			if len(factor) > 0 {
-				if err = json.Unmarshal(factor, passkeyFactor); err != nil {
-					return nil, fmt.Errorf("failed to unmarshal passkey auth check factor payload: %w", err)
-				}
-			}
-			checks = append(checks, passkeyFactor)
-		}
-		if !lastChallengedAt.IsZero() {
-			passkeyCheck := domain.SetAuthChallengePasskey(id, lastChallengedAt, lastFailedAt, failureCount)
-			if len(challenge) > 0 {
-				if err = json.Unmarshal(challenge, passkeyCheck); err != nil {
-					return nil, fmt.Errorf("failed to unmarshal passkey auth check challenge payload: %w", err)
-				}
-			}
-			checks = append(checks, passkeyCheck)
-		}
-	default:
-		slog.Error("unsupported auth check type", slog.Any("check_type", checkType))
-	}
-	return checks, nil
-}
-
-func hashHandoffToken(plain string) []byte { sum := sha256.Sum256([]byte(plain)); return sum[:] }
-func exchangeTTL(ttl time.Duration) time.Duration {
-	if ttl > 0 {
-		return ttl
-	}
-	return domain.SessionAnonymousTTL
-}
-func validateHandoffAttempt(attempt *domain.AuthAttempt) error {
-	if attempt.HandoffToken == nil || attempt.HandedOffAt == nil || attempt.HandedOffAt.IsZero() {
-		return domain.ErrSessionInvalidHandoffToken()
-	}
-	if time.Now().After(attempt.HandoffToken.ExpiresAt(attempt.HandedOffAt)) {
-		return domain.ErrSessionInvalidHandoffToken()
-	}
-	if attempt.IsExpired() {
-		return domain.ErrSessionInvalidHandoffToken()
-	}
-	return nil
-}
-func pickLastVerifiedChecksByType(attemptChecks, sessionChecks []storedCheck) map[domain.AuthCheckType]storedCheck {
-	out := map[domain.AuthCheckType]storedCheck{}
-	for _, c := range sessionChecks {
-		out[c.Type] = c
-	}
-	for _, c := range attemptChecks {
-		existing, ok := out[c.Type]
-		if !ok || c.LastVerifiedAt.After(existing.LastVerifiedAt) {
-			out[c.Type] = c
-		}
-	}
-	return out
-}
-func userAgentFromStoredInfo(info map[string]any) *domain.UserAgent {
-	ua := &domain.UserAgent{Info: info}
-	if ip, ok := info["ip"].(string); ok {
-		ua.IP = ip
-	}
-	if fp, ok := info[userAgentFingerprintKey].(string); ok {
-		ua.ID = fp
-	}
-	return ua
-}
-func appendSessionFactor(session *domain.Session, factor domain.AuthFactor) {
-	for i, f := range session.Factors {
-		if f.Type() == factor.Type() {
-			session.Factors[i] = factor
-			return
-		}
-	}
-	session.Factors = append(session.Factors, factor)
-}
 func coerceSessionIdentity(v any) (any, error) {
 	switch id := v.(type) {
 	case storagedb.Identity:
@@ -645,6 +519,7 @@ func coerceSessionDuration(v any) (any, error) {
 }
 
 var _ service.SessionStatements = (*sessionStatements)(nil)
+var _ v2session.ExchangeStore = sessionExchangeStore{}
 
 var sessionSchema = database.NewSchema(map[domain.SessionField]database.FieldBinding[domain.Session]{
 	domain.SessionFieldProjectID:  {SQLName: "s.project_id", Accessor: func(s *domain.Session) any { return s.ProjectID }, Coerce: database.CoerceString},

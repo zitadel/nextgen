@@ -9,6 +9,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
+	"github.com/zitadel/nextgen/internal/storage/v2/flowdefinition"
 )
 
 const testProjectQuery = "SELECT id, created_at, updated_at, project_secret, preview_secret, preview_origins FROM zitadel_nextgen.projects"
@@ -196,6 +197,30 @@ func TestCompileReadStringEqualFold(t *testing.T) {
 	assert.Contains(t, sql, "WHERE LOWER(name) = LOWER($1)")
 	require.Len(t, args, 1)
 	assert.Equal(t, "Login", args[0])
+}
+
+func TestCompileArrayContains(t *testing.T) {
+	t.Parallel()
+
+	sql, args := compileFilterOnly(t,
+		database.ArrayContains(database.Col(domain.FlowDefinitionFieldPurposes), "login"),
+		flowdefinition.Schema,
+	)
+	assert.Equal(t, "$1::zitadel_nextgen.flow_definition_purposes = ANY(purposes)", sql)
+	require.Len(t, args, 1)
+	assert.Equal(t, "login", args[0])
+}
+
+func TestCompileStatusEqualParamCast(t *testing.T) {
+	t.Parallel()
+
+	sql, args := compileFilterOnly(t,
+		database.Equal(database.Col(domain.FlowDefinitionFieldStatus), "active"),
+		flowdefinition.Schema,
+	)
+	assert.Equal(t, "status = $1::zitadel_nextgen.flow_definition_states", sql)
+	require.Len(t, args, 1)
+	assert.Equal(t, "active", args[0])
 }
 
 func TestCompileReadCursorDesc(t *testing.T) {
@@ -603,7 +628,7 @@ func TestCompileStringFilter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			sql, args := compileFilterOnly(t, tt.filter, flowDefinitionSchema)
+			sql, args := compileFilterOnly(t, tt.filter, flowdefinition.Schema)
 			assert.Equal(t, tt.wantSQL, sql)
 			require.Len(t, args, 1)
 			assert.Equal(t, tt.wantArg, args[0])
@@ -703,7 +728,7 @@ func compileFlowDefinitionRead(t *testing.T, opts *database.ListOptions[domain.F
 	t.Helper()
 
 	var compiler statementCompiler
-	err := compileRead(&compiler, testFlowDefinitionQuery, opts, flowDefinitionSchema)
+	err := compileRead(&compiler, testFlowDefinitionQuery, opts, flowdefinition.Schema)
 	require.NoError(t, err)
 	return compiler.String(), compiler.args
 }

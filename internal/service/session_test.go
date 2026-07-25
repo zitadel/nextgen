@@ -51,12 +51,6 @@ func newMockedSessionService(t *testing.T, users service.UserIdentityReader, cfg
 	pool := servicemocks.NewMockStatementPool(ctrl)
 	statements := servicemocks.NewMockAllStatements(ctrl)
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
-	pool.EXPECT().
-		Transaction(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
-			return fn(ctx, pool)
-		}).
-		AnyTimes()
 	return service.NewSessionService(stubPool(), pool, users, cfg), statements
 }
 

@@ -148,7 +148,7 @@ func TestAuthAttemptService_Create(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		sessions := mocks.NewMockSessionResolver(ctrl)
 
-		sessions.EXPECT().Get(gomock.Any(), gomock.Any(), "proj", sessionID).
+		sessions.EXPECT().Get(gomock.Any(), "proj", sessionID).
 			Return(&domain.Session{Factors: []domain.AuthFactor{&domain.AuthFactorUser{UserID: "user-1"}}}, nil)
 		stmts := mocks.NewMockAllStatements(ctrl)
 		stmts.EXPECT().CreateAuthAttempt(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *domain.AuthAttempt) error { return nil })
@@ -171,7 +171,7 @@ func TestAuthAttemptService_Create(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		sessions := mocks.NewMockSessionResolver(ctrl)
 
-		sessions.EXPECT().Get(gomock.Any(), gomock.Any(), "proj", sessionID).
+		sessions.EXPECT().Get(gomock.Any(), "proj", sessionID).
 			Return(nil, domain.ErrSessionNotFound())
 
 		svc := newAuthAttemptSvc(ctrl, mocks.NewMockAllStatements(ctrl), sessions, nil, nil, nil)
@@ -204,7 +204,7 @@ func TestAuthAttemptService_Create(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		sessions := mocks.NewMockSessionResolver(ctrl)
 
-		sessions.EXPECT().Get(gomock.Any(), gomock.Any(), "proj", sessionID).
+		sessions.EXPECT().Get(gomock.Any(), "proj", sessionID).
 			Return(nil, unexpectedSessionErr)
 
 		svc := newAuthAttemptSvc(ctrl, mocks.NewMockAllStatements(ctrl), sessions, nil, nil, nil)

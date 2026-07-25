@@ -46,15 +46,19 @@ func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDef
 	}
 	svcReq := mapListRequestToService(params)
 
-	definitions, err := h.flowDefinitionService.List(ctx, svcReq)
+	listed, err := h.flowDefinitionService.List(ctx, svcReq)
 	if err != nil {
 		return nil, err
 	}
-	respDefinitions := make([]api.FlowDefinitionResponse, 0, len(definitions))
-	for _, def := range definitions {
+	respDefinitions := make([]api.FlowDefinitionResponse, 0, len(listed.Items))
+	for _, def := range listed.Items {
 		respDefinitions = append(respDefinitions, flowDefinitionResponse(def))
 	}
-	return &api.FlowDefinitionListResponse{FlowDefinitions: respDefinitions}, nil
+	resp := &api.FlowDefinitionListResponse{FlowDefinitions: respDefinitions}
+	if listed.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(listed.NextPageToken))
+	}
+	return resp, nil
 }
 
 func (h Handler) UpdateFlowDefinition(ctx context.Context, req *api.FlowDefinitionUpdateRequest, params api.UpdateFlowDefinitionParams) (api.UpdateFlowDefinitionRes, error) {

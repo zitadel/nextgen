@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -19,23 +20,23 @@ const passkeyRegistrationDefaultUsername = "Passkey account"
 // ceremony. It exposes [Begin] and [Finish] for direct callers and is wrapped by
 // [FlowPasskeyRegistrationAdapter] for the flow engine.
 type PasskeyRegistrationService struct {
-	pool          database.Pool
-	registrations domain.PasskeyRegistrationRepository
-	passkeys      domain.UserPasskeyRepository
-	ids           idgen.Generator
+	pool     database.Pool
+	v2Pool   StatementPool
+	passkeys domain.UserPasskeyRepository
+	ids      idgen.Generator
 }
 
 func NewPasskeyRegistrationService(
 	pool database.Pool,
-	registrations domain.PasskeyRegistrationRepository,
+	v2Pool StatementPool,
 	passkeys domain.UserPasskeyRepository,
 	ids idgen.Generator,
 ) *PasskeyRegistrationService {
 	return &PasskeyRegistrationService{
-		pool:          pool,
-		registrations: registrations,
-		passkeys:      passkeys,
-		ids:           ids,
+		pool:     pool,
+		v2Pool:   v2Pool,
+		passkeys: passkeys,
+		ids:      ids,
 	}
 }
 
@@ -84,7 +85,7 @@ func (s *PasskeyRegistrationService) Begin(ctx context.Context, in BeginRegistra
 		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: generate id: %w", err)
 	}
 
-	if err := s.registrations.Create(ctx, s.pool, &domain.CreatePasskeyRegistration{
+	if err := s.v2Pool.Statements().CreatePasskeyRegistration(ctx, &domain.CreatePasskeyRegistration{
 		ID:        regID,
 		ProjectID: in.ProjectID,
 		UserID:    in.UserID,
@@ -131,12 +132,16 @@ func (s *PasskeyRegistrationService) Finish(ctx context.Context, in FinishRegist
 	return s.FinishWith(ctx, s.pool, in)
 }
 
-// FinishWith is like [Finish] but uses the given QueryExecutor instead of the pool.
-// Used by [FlowPasskeyRegistrationAdapter] to run the credential write inside the
-// flow engine's transaction so the passkey save is atomic with user creation.
+// FinishWith is like [Finish] but writes the UserPasskey through client (v1 QueryExecutor).
+// Registration Get/Delete use client when it is a v2 Statementer so they join the caller
+// transaction; otherwise they use the v2 pool.
 func (s *PasskeyRegistrationService) FinishWith(ctx context.Context, client database.QueryExecutor, in FinishRegistrationInput) error {
-	reg, err := s.registrations.Get(ctx, client, in.ProjectID, in.RegistrationID)
+	stmts := s.passkeyRegistrationStmts(client)
+	reg, err := stmts.GetPasskeyRegistration(ctx, in.ProjectID, in.RegistrationID)
 	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return domain.ErrPasskeyRegistrationNotFound()
+		}
 		return err
 	}
 
@@ -152,8 +157,15 @@ func (s *PasskeyRegistrationService) FinishWith(ctx context.Context, client data
 	}
 
 	// Best-effort cleanup; don't shadow the success.
-	_ = s.registrations.Delete(ctx, client, in.ProjectID, in.RegistrationID)
+	_ = stmts.DeletePasskeyRegistration(ctx, in.ProjectID, in.RegistrationID)
 	return nil
+}
+
+func (s *PasskeyRegistrationService) passkeyRegistrationStmts(client database.QueryExecutor) PasskeyRegistrationStatements {
+	if tx, ok := client.(Statementer[AllStatements]); ok {
+		return tx.Statements()
+	}
+	return s.v2Pool.Statements()
 }
 
 func (s *PasskeyRegistrationService) listPasskeys(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error) {

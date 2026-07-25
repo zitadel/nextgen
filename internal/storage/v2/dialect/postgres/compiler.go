@@ -75,6 +75,8 @@ func compileFilter[F ~uint8, T any](c *statementCompiler, filter database.Filter
 		compileCompareFilter(c, f, schema)
 	case *database.StringFilter[F]:
 		compileStringFilter(c, f, schema)
+	case *database.ArrayContainsFilter[F]:
+		compileArrayContainsFilter(c, f, schema)
 	default:
 		panic("unknown filter type")
 	}
@@ -123,7 +125,7 @@ func compileCompareFilter[F ~uint8, T any](c *statementCompiler, filter *databas
 	if len(filter.Terms) == 1 {
 		c.WriteString(schema.SQLName(filter.Terms[0].Column))
 		c.WriteString(op)
-		writeArg(c, filter.Terms[0].Value)
+		writeArgWithParamCast(c, filter.Terms[0].Value, schema, filter.Terms[0].Column)
 		return
 	}
 
@@ -141,9 +143,23 @@ func compileCompareFilter[F ~uint8, T any](c *statementCompiler, filter *databas
 		if i > 0 {
 			c.WriteString(", ")
 		}
-		writeArg(c, term.Value)
+		writeArgWithParamCast(c, term.Value, schema, term.Column)
 	}
 	c.WriteString(")")
+}
+
+func compileArrayContainsFilter[F ~uint8, T any](c *statementCompiler, filter *database.ArrayContainsFilter[F], schema database.Schema[F, T]) {
+	writeArgWithParamCast(c, filter.Value, schema, filter.Column)
+	c.WriteString(" = ANY(")
+	c.WriteString(schema.SQLName(filter.Column))
+	c.WriteString(")")
+}
+
+func writeArgWithParamCast[F ~uint8, T any](c *statementCompiler, arg any, schema database.Schema[F, T], col database.Column[F]) {
+	writeArg(c, arg)
+	if cast := schema.ParamCast(col); cast != "" {
+		c.WriteString(cast)
+	}
 }
 
 func compareOpSQL(op database.CompareOp) string {

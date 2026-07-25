@@ -123,7 +123,9 @@ func (ts tokenStatements) ListTokens(ctx context.Context, filter *database.ListO
 	}
 
 	var nextCursor []byte
-	if filter.Pagination.Limit > 0 && len(tokens) == int(filter.Pagination.Limit) {
+	if filter.Pagination.Limit > 0 &&
+		len(tokens) == int(filter.Pagination.Limit) &&
+		len(filter.Pagination.OrderBy.Columns) > 0 {
 		cursor := &pagination.Cursor[domain.TokenField]{
 			Columns: filter.Pagination.OrderBy.Columns,
 			Values:  tokenSchema.ValuesFrom(tokens[len(tokens)-1], filter.Pagination.OrderBy.Columns),
@@ -199,6 +201,13 @@ func tokenSessionIDArg(sessionID *string) storagedb.Identity {
 	return storagedb.Identity(*sessionID)
 }
 
+func tokenOptionalIdentity(id *string) any {
+	if id == nil {
+		return nil
+	}
+	return storagedb.Identity(*id)
+}
+
 func coerceTokenType(v any) (any, error) {
 	switch t := v.(type) {
 	case domain.TokenType:
@@ -253,34 +262,19 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 		Coerce:   coerceTokenType,
 	},
 	domain.TokenFieldSessionID: {
-		SQLName: "session_id",
-		Accessor: func(t *domain.Token) any {
-			if t.SessionID == nil {
-				return storagedb.Identity("")
-			}
-			return storagedb.Identity(*t.SessionID)
-		},
-		Coerce: coerceTokenIdentity,
+		SQLName:  "session_id",
+		Accessor: func(t *domain.Token) any { return tokenOptionalIdentity(t.SessionID) },
+		Coerce:   coerceTokenIdentity,
 	},
 	domain.TokenFieldOIDCSessionID: {
-		SQLName: "oidc_session_id",
-		Accessor: func(t *domain.Token) any {
-			if t.OIDCSessionID == nil {
-				return storagedb.Identity("")
-			}
-			return storagedb.Identity(*t.OIDCSessionID)
-		},
-		Coerce: coerceTokenIdentity,
+		SQLName:  "oidc_session_id",
+		Accessor: func(t *domain.Token) any { return tokenOptionalIdentity(t.OIDCSessionID) },
+		Coerce:   coerceTokenIdentity,
 	},
 	domain.TokenFieldSAMLSessionID: {
-		SQLName: "saml_session_id",
-		Accessor: func(t *domain.Token) any {
-			if t.SAMLSessionID == nil {
-				return storagedb.Identity("")
-			}
-			return storagedb.Identity(*t.SAMLSessionID)
-		},
-		Coerce: coerceTokenIdentity,
+		SQLName:  "saml_session_id",
+		Accessor: func(t *domain.Token) any { return tokenOptionalIdentity(t.SAMLSessionID) },
+		Coerce:   coerceTokenIdentity,
 	},
 	domain.TokenFieldScope: {
 		SQLName:  "scope",
