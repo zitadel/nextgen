@@ -20,6 +20,7 @@ type statements struct {
 	cryptoKeyStatements
 	jsonSchemaStatements
 	teamStatements
+	teamMembershipStatements
 	tokenStatements
 	passkeyRegistrationStatements
 }
@@ -38,12 +39,14 @@ func newStatements(client queryExecutor) statements {
 		cryptoKeyStatements:           newCryptoKeyStatements(client),
 		jsonSchemaStatements:          newJSONSchemaStatements(client),
 		teamStatements:                newTeamStatements(client),
+		teamMembershipStatements:      newTeamMembershipStatements(client),
 		tokenStatements:               newTokenStatements(client),
 		passkeyRegistrationStatements: newPasskeyRegistrationStatements(client),
 	}
 }
 
 var _ service.Statements = (*statements)(nil)
+var _ service.AllStatements = (*statements)(nil)
 
 type statement struct {
 	client queryExecutor

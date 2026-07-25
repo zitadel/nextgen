@@ -7,7 +7,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TokenStatements,PasskeyRegistrationStatements
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements
 
 type StatementPool interface {
 	Statementer[AllStatements]
@@ -24,6 +24,7 @@ type AllStatements interface {
 	CryptoKeyStatements
 	JSONSchemaStatements
 	TeamStatements
+	TeamMembershipStatements
 	TokenStatements
 	PasskeyRegistrationStatements
 	Statements
@@ -93,6 +94,20 @@ type TeamStatements interface {
 	// updates. It wraps the multi-write steps in withTransaction (opens a tx
 	// via Statements(), joins an outer pool.Transaction when already nested).
 	DeactivateTeam(ctx context.Context, projectID, id string) error
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type TeamMembershipPool interface {
+// 	Statementer[TeamMembershipStatements]
+// 	Transactioner[TeamMembershipStatements]
+// }
+
+type TeamMembershipStatements interface {
+	Statements
+	CreateTeamMembership(ctx context.Context, membership *domain.TeamMembership) error
+	GetTeamMembership(ctx context.Context, projectID, teamID, userID string) (*domain.TeamMembership, error)
+	ListTeamMemberships(ctx context.Context, filter *database.ListOptions[domain.TeamMembershipField]) (*database.ListResult[*domain.TeamMembership], error)
+	UpdateTeamMembershipStatus(ctx context.Context, projectID, teamID, userID string, status domain.MembershipStatus) error
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods

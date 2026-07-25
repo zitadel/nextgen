@@ -3,6 +3,7 @@
 package repository_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -108,13 +109,7 @@ func ensureUser(t *testing.T, client database.QueryExecutor, projectID, teamID, 
 	if teamID == "" {
 		return
 	}
-	membershipRepo := repository.NewTeamMembershipRepository(client)
-	require.NoError(t, membershipRepo.Create(ctx, client, &domain.TeamMembership{
-		ProjectID: projectID,
-		TeamID:    teamID,
-		UserID:    userID,
-		Status:    domain.MembershipStatusActive,
-	}))
+	createTeamMembership(t, client, projectID, teamID, userID, domain.MembershipStatusActive)
 }
 
 func deleteUser(t *testing.T, client database.QueryExecutor, projectID, userID string) {
@@ -129,4 +124,24 @@ func deleteUser(t *testing.T, client database.QueryExecutor, projectID, userID s
 	}
 	userRepo := repository.NewUserRepository()
 	require.NoError(t, userRepo.Delete(ctx, client, userRepo.PrimaryKeyCondition(projectID, userID)))
+}
+
+func getTeamMembershipStatus(t *testing.T, client database.QueryExecutor, projectID, teamID, userID string) domain.MembershipStatus {
+	t.Helper()
+	row := client.QueryRow(t.Context(),
+		fmt.Sprintf(`SELECT status FROM %s WHERE project_id = $1 AND team_id = $2 AND user_id = $3`, dbTable("team_memberships")),
+		projectID, teamID, userID,
+	)
+	var status string
+	require.NoError(t, row.Scan(&status))
+	return domain.MembershipStatus(status)
+}
+
+func createTeamMembership(t *testing.T, client database.QueryExecutor, projectID, teamID, userID string, status domain.MembershipStatus) {
+	t.Helper()
+	_, err := client.Exec(t.Context(),
+		fmt.Sprintf(`INSERT INTO %s (project_id, team_id, user_id, status) VALUES ($1, $2, $3, $4)`, dbTable("team_memberships")),
+		projectID, teamID, userID, status.String(),
+	)
+	require.NoError(t, err)
 }
