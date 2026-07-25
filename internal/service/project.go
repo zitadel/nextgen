@@ -49,26 +49,23 @@ type ProjectService interface {
 // NewProjectService returns a [ProjectService] backed by the given repository.
 func NewProjectService(
 	v2Pool *DB,
-	flowDefinitionRepo domain.FlowDefinitionRepository,
 	serverURL string,
 	schemaValidator *domain.SchemaValidator,
 	keyService KeyService,
 ) ProjectService {
 	return &projectService{
-		v2Pool:             v2Pool,
-		flowDefinitionRepo: flowDefinitionRepo,
-		serverURL:          serverURL,
-		schemaValidator:    schemaValidator,
-		keyService:         keyService,
+		v2Pool:          v2Pool,
+		serverURL:       serverURL,
+		schemaValidator: schemaValidator,
+		keyService:      keyService,
 	}
 }
 
 type projectService struct {
-	v2Pool             *DB
-	flowDefinitionRepo domain.FlowDefinitionRepository
-	serverURL          string
-	schemaValidator    *domain.SchemaValidator
-	keyService         KeyService
+	v2Pool          *DB
+	serverURL       string
+	schemaValidator *domain.SchemaValidator
+	keyService      KeyService
 }
 
 var _ ProjectService = (*projectService)(nil)
@@ -115,7 +112,7 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to parse default user schema")
 		}
-		return s.createDefaultLoginFlowDefinitions(ctx, tx.(database.QueryExecutor), project.ID, userSchema)
+		return s.createDefaultLoginFlowDefinitions(ctx, tx.Statements(), project.ID, userSchema)
 	})
 
 	if err != nil {
@@ -146,7 +143,7 @@ func (s *projectService) createDefaultUserSchemas(ctx context.Context, stmts JSO
 	return schema, nil
 }
 
-func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, client database.QueryExecutor, projectID string, userSchema *jsonschema.Schema) error {
+func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, stmts FlowDefinitionStatements, projectID string, userSchema *jsonschema.Schema) error {
 	flowDefs, err := flow_definitions.DefaultLoginFlowDefinitions(
 		s.serverURL,
 		projectID,
@@ -161,7 +158,7 @@ func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, 
 			return domain.ErrInternal(err).WithMessage("default login flow definition is invalid")
 		}
 
-		err = s.flowDefinitionRepo.CreateFlowDefinition(ctx, client, flowDef)
+		err = stmts.CreateFlowDefinition(ctx, flowDef)
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to save default login flow definition to project")
 		}

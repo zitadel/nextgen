@@ -13,6 +13,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // actionNames returns the names of the given step actions in order, useful
@@ -136,16 +137,20 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, schemaURL, schema.URL)
 
-	flowDefs, err := harness.EnsureFlowDefinitionRepo(t).ListFlowDefinitions(
+	listed, err := harness.EnsureServiceDB(t).Statements().ListFlowDefinitions(
 		t.Context(),
-		harness.EnsureDBPool(t),
-		project.ID,
-		domain.WithFlowDefinitionName("default-login"),
+		&v2database.ListOptions[domain.FlowDefinitionField]{
+			Filter: v2database.And(
+				v2database.Equal(v2database.Col(domain.FlowDefinitionFieldProjectID), project.ID),
+				v2database.Equal(v2database.Col(domain.FlowDefinitionFieldName), "default-login"),
+			),
+		},
 	)
 	require.NoError(t, err)
-	require.Len(t, flowDefs, 1)
+	require.NotNil(t, listed)
+	require.Len(t, listed.Items, 1)
 
-	flowDef := flowDefs[0]
+	flowDef := listed.Items[0]
 	assert.Equal(t, schemaURL, flowDef.UserSchema)
 	assert.Equal(t, "identifier", flowDef.Purposes[domain.FlowDefinitionPurposeLogin])
 	assert.Equal(t, "register", flowDef.Purposes[domain.FlowDefinitionPurposeRegister])
@@ -203,14 +208,19 @@ func TestCreateProjectSkipsDefaultLoginFlow(t *testing.T) {
 	)
 	require.Error(t, err)
 
-	flowDefs, err := harness.EnsureFlowDefinitionRepo(t).ListFlowDefinitions(
+	listed, err := harness.EnsureServiceDB(t).Statements().ListFlowDefinitions(
 		t.Context(),
-		harness.EnsureDBPool(t),
-		projectID,
-		domain.WithFlowDefinitionName("default-login"),
+		&v2database.ListOptions[domain.FlowDefinitionField]{
+			Filter: v2database.And(
+				v2database.Equal(v2database.Col(domain.FlowDefinitionFieldProjectID), projectID),
+				v2database.Equal(v2database.Col(domain.FlowDefinitionFieldName), "default-login"),
+			),
+		},
 	)
 	require.NoError(t, err)
-	assert.Empty(t, flowDefs)
+	if listed != nil {
+		assert.Empty(t, listed.Items)
+	}
 }
 
 func TestGetProject(t *testing.T) {

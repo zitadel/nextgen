@@ -134,7 +134,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	userPasswordRepo := repository.NewUserPasswordRepository()
 	userPasskeyRepo := repository.NewUserPasskeyRepository()
 	sessionRepo := repository.NewSessionRepository(pool)
-	flowDefinitionRepo := repository.NewFlowDefinitionRepository(pool)
 	attemptRepo := repository.NewAuthAttemptRepository(pool)
 	brandingRepo := repository.NewBrandingRepository(pool)
 
@@ -181,18 +180,16 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	})
 	projectService := service.NewProjectService(
 		serviceDBPool,
-		flowDefinitionRepo,
 		builtinPublicBase.String(),
 		schemaValidator,
 		keyService,
 	)
 	schemaService := service.NewSchemaService(serviceDBPool, schemaResolverWithHTTP, schemaValidator)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
-		pool,
+		serviceDBPool,
 		schemaService,
 		schemaValidator,
 		nil,
-		flowDefinitionRepo,
 	)
 	teamService := service.NewTeamService(serviceDBPool)
 	brandingService := service.NewBrandingService(pool, brandingRepo)
@@ -230,7 +227,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		time.Now,
 	)
 
-	flowService := service.NewFlowService(pool, flowDefinitionRepo, stateMachine, ids)
+	flowService := service.NewFlowService(pool, serviceDBPool, stateMachine, ids)
 	tokenService := service.NewTokenService(keyService)
 
 	// ── HTTP Server ─────────────────
