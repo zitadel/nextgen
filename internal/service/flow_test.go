@@ -10,59 +10,94 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/service"
+	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-// stubPool returns nil typed as database.Pool. The mock repository does not
-// invoke any methods on it, so the value is opaque — it only satisfies the
-// service constructor signature.
 func stubPool() database.Pool { return nil }
 
 func stubV2Pool() *service.DB { return nil }
 
-type v2TestTx struct {
-	database.QueryExecutor
-	stmts service.AllStatements
-}
-
-func (t v2TestTx) Statements() service.AllStatements {
-	return t.stmts
-}
-
-// stubListFlowDefinitions wires the mock's ListFlowDefinitions to filter the
-// given slice in-memory the same way the storage layer does. Tests stay focused
-// on the Resolve algorithm without re-stating expected filter sets.
-// Returns the mock so the caller can attach additional expectations.
-func stubListFlowDefinitions(t *testing.T, defs []*domain.FlowDefinition) *domainmock.MockFlowDefinitionRepository {
+// stubListFlowDefinitions wires ListFlowDefinitions to filter the given slice
+// in-memory the same way the storage layer does. Optional times defaults to 1.
+func stubListFlowDefinitions(t *testing.T, defs []*domain.FlowDefinition, times ...int) *service.DB {
 	t.Helper()
+	n := 1
+	if len(times) > 0 {
+		n = times[0]
+	}
 	ctrl := gomock.NewController(t)
-	repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-	repo.EXPECT().
-		ListFlowDefinitions(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, _ database.QueryExecutor, _ string, opts ...domain.FlowDefinitionListOption) ([]*domain.FlowDefinition, error) {
-			o := domain.ApplyFlowDefinitionListOptions(opts)
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, opts *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
 			out := make([]*domain.FlowDefinition, 0, len(defs))
 			for _, def := range defs {
-				if o.Name != nil && def.Name != *o.Name {
-					continue
-				}
-				if o.Status != nil && def.Status != *o.Status {
-					continue
-				}
-				if o.Purpose != nil && !hasPurpose(def, *o.Purpose) {
-					continue
-				}
-				if o.SchemaVersion != nil && def.SchemaVersion != *o.SchemaVersion {
+				if !matchesFlowDefinitionFilter(def, opts) {
 					continue
 				}
 				out = append(out, def)
 			}
-			return out, nil
-		}).
-		AnyTimes()
-	return repo
+			return &v2database.ListResult[*domain.FlowDefinition]{Items: out}, nil
+		},
+	).Times(n)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	return service.NewPool(pool)
+}
+
+func matchesFlowDefinitionFilter(def *domain.FlowDefinition, opts *v2database.ListOptions[domain.FlowDefinitionField]) bool {
+	if opts == nil || opts.Filter == nil {
+		return true
+	}
+	return filterMatches(def, opts.Filter)
+}
+
+func filterMatches(def *domain.FlowDefinition, filter v2database.Filter[domain.FlowDefinitionField]) bool {
+	switch f := filter.(type) {
+	case v2database.AndFilter[domain.FlowDefinitionField]:
+		for _, child := range f.Filters {
+			if !filterMatches(def, child) {
+				return false
+			}
+		}
+		return true
+	case *v2database.CompareFilter[domain.FlowDefinitionField]:
+		if f.Op != v2database.OpEqual || len(f.Terms) != 1 {
+			return true
+		}
+		term := f.Terms[0]
+		switch term.Column.Field() {
+		case domain.FlowDefinitionFieldProjectID:
+			return def.ProjectID == term.Value.(string)
+		case domain.FlowDefinitionFieldID:
+			return def.ID == term.Value.(string)
+		case domain.FlowDefinitionFieldName:
+			return def.Name == term.Value.(string)
+		case domain.FlowDefinitionFieldSchemaVersion:
+			return def.SchemaVersion == term.Value.(string)
+		case domain.FlowDefinitionFieldStatus:
+			return def.Status.String() == term.Value.(string)
+		default:
+			return true
+		}
+	case *v2database.ArrayContainsFilter[domain.FlowDefinitionField]:
+		if f.Column.Field() != domain.FlowDefinitionFieldPurposes {
+			return true
+		}
+		s, ok := f.Value.(string)
+		if !ok {
+			return false
+		}
+		purpose, err := domain.FlowDefinitionPurposeString(s)
+		if err != nil {
+			return false
+		}
+		return hasPurpose(def, purpose)
+	default:
+		return true
+	}
 }
 
 func hasPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {
@@ -111,22 +146,31 @@ func TestResolve_ResolveByName_FiltersWithRequestedOptions(t *testing.T) {
 	def := newDef("login", "1.2.3", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 
 	ctrl := gomock.NewController(t)
-	repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-	repo.EXPECT().
-		ListFlowDefinitions(gomock.Any(), gomock.Any(), "proj", gomock.Any()).
-		DoAndReturn(func(_ context.Context, _ database.QueryExecutor, _ string, opts ...domain.FlowDefinitionListOption) ([]*domain.FlowDefinition, error) {
-			o := domain.ApplyFlowDefinitionListOptions(opts)
-			if o.Name == nil || *o.Name != "login" {
-				t.Errorf("expected Name=login, got %+v", o.Name)
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, opts *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
+			if opts == nil || opts.Filter == nil {
+				t.Fatal("expected filter")
 			}
-			if o.Status == nil || *o.Status != domain.FlowDefinitionStatusActive {
-				t.Errorf("expected Status=active, got %+v", o.Status)
+			if !filterMatches(def, opts.Filter) {
+				t.Errorf("filter did not match expected definition attributes")
 			}
-			if o.SchemaVersion == nil || *o.SchemaVersion != "1.2.3" {
-				t.Errorf("expected SchemaVersion=1.2.3, got %+v", o.SchemaVersion)
+			// assert required fields are restricted
+			if !opts.Filter.Restricts(v2database.Col(domain.FlowDefinitionFieldName)) {
+				t.Error("expected Name filter")
 			}
-			return []*domain.FlowDefinition{def}, nil
-		})
+			if !opts.Filter.Restricts(v2database.Col(domain.FlowDefinitionFieldStatus)) {
+				t.Error("expected Status filter")
+			}
+			if !opts.Filter.Restricts(v2database.Col(domain.FlowDefinitionFieldSchemaVersion)) {
+				t.Error("expected SchemaVersion filter")
+			}
+			return &v2database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{def}}, nil
+		},
+	)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	repo := service.NewPool(pool)
 
 	_, err := service.NewFlowService(stubPool(), repo, nil, nil).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID:     "proj",
@@ -236,10 +280,11 @@ func TestResolve_ResolveByAudience_ExactVersionFiltersOlder(t *testing.T) {
 func TestResolve_ResolveByAudience_RepoErrorPropagates(t *testing.T) {
 	sentinel := errors.New("boom")
 	ctrl := gomock.NewController(t)
-	repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-	repo.EXPECT().
-		ListFlowDefinitions(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(nil, sentinel)
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).Return(nil, sentinel)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	repo := service.NewPool(pool)
 
 	_, err := service.NewFlowService(stubPool(), repo, nil, nil).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
@@ -335,7 +380,7 @@ func TestResolve_ResolveByAudience_UserSchemaHintFilters(t *testing.T) {
 	machine := newDef("machine", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	machine.UserSchema = "https://tenant.com/schemas/machine.json"
 	machine.CreatedAt = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{human, machine})
+	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{human, machine}, 2)
 
 	svc := service.NewFlowService(stubPool(), repo, nil, nil)
 	got, err := svc.Resolve(t.Context(), service.ResolveFlowRequest{
@@ -447,16 +492,22 @@ func (s *stubIDGen) New(prefix string) (string, error) {
 	return prefix + "_" + strconv.Itoa(s.calls), nil
 }
 
-// stubGetFlowDefinition returns def for any GetFlowDefinition call.
-func stubGetFlowDefinition(t *testing.T, def *domain.FlowDefinition) *domainmock.MockFlowDefinitionRepository {
+// stubGetFlowDefinition returns def for any GetFlowDefinitionByID call.
+func stubGetFlowDefinition(t *testing.T, def *domain.FlowDefinition) *service.DB {
 	t.Helper()
 	ctrl := gomock.NewController(t)
-	repo := domainmock.NewMockFlowDefinitionRepository(ctrl)
-	repo.EXPECT().
-		GetFlowDefinition(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(def, nil).
-		AnyTimes()
-	return repo
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	stmts.EXPECT().GetFlowDefinitionByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, projectID, id string) (*domain.FlowDefinition, error) {
+			if def == nil || def.ProjectID != projectID || def.ID != id {
+				return nil, database.NewNoRowFoundError(nil)
+			}
+			return def, nil
+		},
+	).Times(1)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	return service.NewPool(pool)
 }
 
 func TestFlowService_Start_MintsFlowAndSessionIDs(t *testing.T) {
@@ -467,7 +518,7 @@ func TestFlowService_Start_MintsFlowAndSessionIDs(t *testing.T) {
 	sm := &fakeStateMachine{startResult: domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "start"}}}
 	ids := &stubIDGen{}
 
-	svc := service.NewFlowService(stubPool(), nil, sm, ids)
+	svc := service.NewFlowService(stubPool(), stubV2Pool(), sm, ids)
 
 	res, err := svc.Start(t.Context(), service.StartFlowRequest{
 		Definition: def,
@@ -492,7 +543,7 @@ func TestFlowService_Start_PassesRedirectURIThrough(t *testing.T) {
 	state := &domain.FlowState{ProjectID: def.ProjectID}
 	sm := &fakeStateMachine{startResult: domain.FlowStepResult{State: state, Step: &domain.FlowStep{}}}
 
-	svc := service.NewFlowService(stubPool(), nil, sm, &stubIDGen{})
+	svc := service.NewFlowService(stubPool(), stubV2Pool(), sm, &stubIDGen{})
 
 	redirect := "https://rp.example.com/cb"
 	if _, err := svc.Start(t.Context(), service.StartFlowRequest{
@@ -512,7 +563,7 @@ func TestFlowService_Start_PreservesProvidedSessionID(t *testing.T) {
 	state := &domain.FlowState{ProjectID: def.ProjectID}
 	sm := &fakeStateMachine{startResult: domain.FlowStepResult{State: state, Step: &domain.FlowStep{}}}
 
-	svc := service.NewFlowService(stubPool(), nil, sm, &stubIDGen{})
+	svc := service.NewFlowService(stubPool(), stubV2Pool(), sm, &stubIDGen{})
 
 	sessionID := "sess_explicit"
 	if _, err := svc.Start(t.Context(), service.StartFlowRequest{
@@ -531,7 +582,7 @@ func TestFlowService_Start_PropagatesStateMachineError(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	sm := &fakeStateMachine{startErr: errors.New("boom")}
 
-	svc := service.NewFlowService(stubPool(), nil, sm, &stubIDGen{})
+	svc := service.NewFlowService(stubPool(), stubV2Pool(), sm, &stubIDGen{})
 
 	_, err := svc.Start(t.Context(), service.StartFlowRequest{
 		Definition: def,
