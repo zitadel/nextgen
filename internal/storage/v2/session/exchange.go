@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -140,7 +139,7 @@ func DecodeAuthChecks(
 			checks = append(checks, passkeyCheck)
 		}
 	default:
-		slog.Error("unsupported auth check type", slog.Any("check_type", checkType))
+		return nil, fmt.Errorf("unsupported auth check type %v", checkType)
 	}
 	return checks, nil
 }

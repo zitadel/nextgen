@@ -145,3 +145,141 @@ func TestSessionStatements_Exchange_invalidToken(t *testing.T) {
 	_, err := testPool.ExchangeSession(t.Context(), projectID, "no-such-handoff", nil, 0)
 	require.ErrorIs(t, err, domain.ErrSessionInvalidHandoffToken())
 }
+
+func TestSessionStatements_Exchange_rotatesToken(t *testing.T) {
+	t.Run("new_session", func(t *testing.T) {
+		projectID := uniqueSessionFixtureIDs(t)
+		ensureSessionProject(t, projectID)
+		plain, _ := handoffCompletedAttemptForSession(t, projectID, nil)
+
+		exchanged, err := testPool.ExchangeSession(t.Context(), projectID, plain, nil, 0)
+		require.NoError(t, err)
+		assert.NotEmpty(t, exchanged.TokenID)
+		t.Cleanup(func() {
+			_ = testPool.DeleteSessionByID(context.Background(), projectID, exchanged.ID)
+		})
+
+		tok, err := testPool.GetTokenByID(t.Context(), projectID, exchanged.TokenID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.TokenTypeSessionToken, tok.Type)
+	})
+
+	t.Run("step_up_existing_session", func(t *testing.T) {
+		projectID := uniqueSessionFixtureIDs(t)
+		ensureSessionProject(t, projectID)
+
+		anonymous, err := domain.NewSession(projectID, nil)
+		require.NoError(t, err)
+		require.NoError(t, testPool.CreateSession(t.Context(), anonymous))
+		oldTokenID := anonymous.TokenID
+		t.Cleanup(func() {
+			_ = testPool.DeleteSessionByID(context.Background(), projectID, anonymous.ID)
+		})
+
+		plain, _ := handoffCompletedAttemptForSession(t, projectID, func(a *domain.AuthAttempt) {
+			a.SessionID = &anonymous.ID
+		})
+		exchanged, err := testPool.ExchangeSession(t.Context(), projectID, plain, nil, 0)
+		require.NoError(t, err)
+		assert.Equal(t, anonymous.ID, exchanged.ID)
+		assert.NotEqual(t, oldTokenID, exchanged.TokenID)
+
+		_, err = testPool.GetTokenByID(t.Context(), projectID, oldTokenID)
+		require.Error(t, err)
+
+		current, err := testPool.GetTokenByID(t.Context(), projectID, exchanged.TokenID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.TokenTypeSessionToken, current.Type)
+	})
+}
+
+func TestSessionStatements_Exchange_mergeChecks(t *testing.T) {
+	t.Run("no_checks_yet", func(t *testing.T) {
+		projectID := uniqueSessionFixtureIDs(t)
+		ensureSessionProject(t, projectID)
+		plain, attempt := handoffCompletedAttemptForSession(t, projectID, nil)
+
+		sess, err := testPool.ExchangeSession(t.Context(), projectID, plain, nil, 0)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = testPool.DeleteSessionByID(context.Background(), projectID, sess.ID)
+		})
+
+		factors := map[domain.AuthCheckType]domain.AuthFactor{}
+		for _, f := range sess.Factors {
+			factors[f.Type()] = f
+		}
+		require.Contains(t, factors, domain.AuthCheckTypePassword)
+
+		var n int64
+		require.NoError(t, testPool.pool.QueryRow(t.Context(),
+			`SELECT COUNT(*) FROM zitadel_nextgen.checks WHERE project_id = $1 AND session_id = $2`,
+			projectID, legacydb.Identity(sess.ID),
+		).Scan(&n))
+		assert.Equal(t, int64(1), n)
+
+		var authAttemptID *int64
+		require.NoError(t, testPool.pool.QueryRow(t.Context(),
+			`SELECT auth_attempt_id FROM zitadel_nextgen.checks WHERE project_id = $1 AND session_id = $2 LIMIT 1`,
+			projectID, legacydb.Identity(sess.ID),
+		).Scan(&authAttemptID))
+		assert.Nil(t, authAttemptID)
+
+		_, err = repository.NewAuthAttemptRepository(pgold.PGxPool(testPool.pool)).
+			GetByID(t.Context(), pgold.PGxPool(testPool.pool), projectID, attempt.ID)
+		require.ErrorIs(t, err, domain.ErrAuthAttemptNotFound())
+	})
+
+	t.Run("promote_multiple_types", func(t *testing.T) {
+		projectID := uniqueSessionFixtureIDs(t)
+		ensureSessionProject(t, projectID)
+		v1Pool := pgold.PGxPool(testPool.pool)
+		repo := repository.NewAuthAttemptRepository(v1Pool)
+		attempt := &domain.AuthAttempt{
+			ProjectID: projectID,
+			RequiredChecks: []domain.AuthCheckType{
+				domain.AuthCheckTypePassword,
+				domain.AuthCheckTypePasskey,
+			},
+			Checks: []domain.AuthCheck{
+				&domain.AuthFactorPassword{},
+				domain.SetAuthFactorPasskey(time.Now().UTC()),
+			},
+		}
+		require.NoError(t, repo.Create(t.Context(), v1Pool, attempt))
+		plain := "handoff_" + projectID
+		sum := sha256.Sum256([]byte(plain))
+		attempt.HandoffToken = &domain.HandoffToken{TokenHash: sum[:]}
+		require.NoError(t, repo.Handoff(t.Context(), v1Pool, attempt))
+		t.Cleanup(func() {
+			_, _ = testPool.pool.Exec(context.Background(),
+				`DELETE FROM zitadel_nextgen.auth_attempts WHERE project_id = $1 AND id = $2`,
+				projectID, legacydb.Identity(attempt.ID))
+		})
+
+		sess, err := testPool.ExchangeSession(t.Context(), projectID, plain, nil, 0)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = testPool.DeleteSessionByID(context.Background(), projectID, sess.ID)
+		})
+		factors := map[domain.AuthCheckType]struct{}{}
+		for _, f := range sess.Factors {
+			factors[f.Type()] = struct{}{}
+		}
+		assert.Len(t, factors, 2)
+	})
+}
+
+func TestSessionStatements_Exchange_explicitTTL(t *testing.T) {
+	projectID := uniqueSessionFixtureIDs(t)
+	ensureSessionProject(t, projectID)
+	plain, _ := handoffCompletedAttemptForSession(t, projectID, nil)
+	ttl := 2 * time.Hour
+
+	sess, err := testPool.ExchangeSession(t.Context(), projectID, plain, nil, ttl)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = testPool.DeleteSessionByID(context.Background(), projectID, sess.ID)
+	})
+	assert.Equal(t, ttl, sess.TimeToLive)
+}

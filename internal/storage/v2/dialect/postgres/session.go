@@ -3,7 +3,6 @@ package postgres
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -112,74 +111,48 @@ func (ss sessionStatements) ExchangeSession(ctx context.Context, projectID, hand
 	var refreshed *domain.Session
 	err := withTransaction(ctx, ss.client, func(ctx context.Context, tx queryExecutor) error {
 		var err error
-		refreshed, err = sessionStatements{statement: statement{client: tx}}.exchangeSessionTx(ctx, projectID, handoffToken, ttl)
+		refreshed, err = v2session.RunExchange(ctx, sessionStatements{statement: statement{client: tx}}, projectID, handoffToken, ttl)
 		return err
 	})
 	return refreshed, err
 }
 
-func (ss sessionStatements) exchangeSessionTx(ctx context.Context, projectID, handoffToken string, ttl time.Duration) (*domain.Session, error) {
-	attempt, err := ss.getAuthAttemptByHandoffToken(ctx, projectID, v2session.HashHandoffToken(handoffToken))
-	if err != nil {
-		if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
-			return nil, domain.ErrSessionInvalidHandoffToken()
-		}
-		return nil, err
-	}
-	if err := v2session.ValidateHandoffAttempt(attempt); err != nil {
-		return nil, err
-	}
-	if !attempt.IsCompleted() {
-		return nil, domain.ErrSessionInvalidHandoffToken()
-	}
+func (ss sessionStatements) InsertSession(ctx context.Context, session *domain.Session) error {
+	return ss.insertSession(ctx, session)
+}
 
-	var targetSession *domain.Session
-	if attempt.SessionID != nil {
-		targetSession, err = ss.GetSessionByID(ctx, projectID, *attempt.SessionID)
-		if err != nil {
-			if errors.Is(err, domain.ErrSessionNotFound()) {
-				return nil, domain.ErrSessionExchangeConflict()
-			}
-			return nil, err
-		}
-	} else {
-		targetSession = &domain.Session{ProjectID: projectID, TimeToLive: v2session.ExchangeTTL(ttl)}
-		if err := ss.insertSession(ctx, targetSession); err != nil {
-			return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
-		}
-	}
+func (ss sessionStatements) GetAuthAttemptByHandoffToken(ctx context.Context, projectID string, handoffTokenHash []byte) (*domain.AuthAttempt, error) {
+	return ss.getAuthAttemptByHandoffToken(ctx, projectID, handoffTokenHash)
+}
 
-	attemptChecks, err := ss.loadStoredChecks(ctx, loadAttemptChecksStmt, projectID, attempt.ID, true)
-	if err != nil {
-		return nil, err
+func (ss sessionStatements) LoadVerifiedChecks(ctx context.Context, projectID, id string, onAttempt bool) ([]v2session.StoredCheck, error) {
+	if onAttempt {
+		return ss.loadStoredChecks(ctx, loadAttemptChecksStmt, projectID, id, true)
 	}
-	sessionChecks, err := ss.loadStoredChecks(ctx, loadSessionChecksStmt, projectID, targetSession.ID, false)
-	if err != nil {
-		return nil, err
+	return ss.loadStoredChecks(ctx, loadSessionChecksStmt, projectID, id, false)
+}
+
+func (ss sessionStatements) ApplyExchange(ctx context.Context, projectID, sessionID string, last map[domain.AuthCheckType]v2session.StoredCheck) error {
+	return ss.applyExchange(ctx, projectID, sessionID, last)
+}
+
+func (ss sessionStatements) UserIDFromLastVerifiedChecks(ctx context.Context, projectID string, last map[domain.AuthCheckType]v2session.StoredCheck) (*string, error) {
+	return ss.userIDFromLastVerifiedChecks(ctx, projectID, last)
+}
+
+func (ss sessionStatements) UpdateSessionAfterExchange(ctx context.Context, projectID, sessionID string, userID *string, ttl time.Duration) error {
+	return ss.updateSessionAfterExchange(ctx, projectID, sessionID, userID, ttl)
+}
+
+func (ss sessionStatements) DeleteAuthAttempt(ctx context.Context, projectID, attemptID string) error {
+	if _, err := ss.client.Exec(ctx, deleteAuthAttemptStmt, projectID, storagedb.Identity(attemptID)); err != nil {
+		return wrapError(err)
 	}
-	lastVerifiedChecks := v2session.PickLastVerifiedByType(attemptChecks, sessionChecks)
-	if err := ss.applyExchange(ctx, projectID, targetSession.ID, lastVerifiedChecks); err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
-	}
-	userID, err := ss.userIDFromLastVerifiedChecks(ctx, projectID, lastVerifiedChecks)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
-	}
-	oldTokenID := targetSession.TokenID
-	if err := ss.updateSessionAfterExchange(ctx, projectID, targetSession.ID, userID, ttl); err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
-	}
-	if _, err := ss.client.Exec(ctx, deleteAuthAttemptStmt, projectID, storagedb.Identity(attempt.ID)); err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), wrapError(err))
-	}
-	refreshed, err := ss.GetSessionByID(ctx, projectID, targetSession.ID)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
-	}
-	if err := ss.createSessionToken(ctx, refreshed, oldTokenID); err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
-	}
-	return refreshed, nil
+	return nil
+}
+
+func (ss sessionStatements) CreateSessionToken(ctx context.Context, session *domain.Session, previousTokenID string) error {
+	return ss.createSessionToken(ctx, session, previousTokenID)
 }
 
 func (ss sessionStatements) querySessions(ctx context.Context, filter *database.ListOptions[domain.SessionField]) ([]*domain.Session, error) {
@@ -256,7 +229,7 @@ func (ss sessionStatements) createSessionToken(ctx context.Context, session *dom
 		return fmt.Errorf("failed to set session token_id: %w", wrapError(err))
 	}
 	session.TokenID = tok.TokenID
-	if previousTokenID != "" && previousTokenID != "0" {
+	if v2session.HasRealSessionToken(previousTokenID) {
 		if err := tokens.DeleteTokenByID(ctx, session.ProjectID, previousTokenID); err != nil {
 			return fmt.Errorf("failed to revoke previous session token: %w", err)
 		}
@@ -541,6 +514,7 @@ func coerceSessionDuration(v any) (any, error) {
 }
 
 var _ service.SessionStatements = (*sessionStatements)(nil)
+var _ v2session.ExchangeStore = sessionStatements{}
 
 var sessionSchema = database.NewSchema(map[domain.SessionField]database.FieldBinding[domain.Session]{
 	domain.SessionFieldProjectID:  {SQLName: "s.project_id", Accessor: func(s *domain.Session) any { return s.ProjectID }, Coerce: database.CoerceString},

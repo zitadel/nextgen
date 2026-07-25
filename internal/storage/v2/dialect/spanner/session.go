@@ -3,7 +3,6 @@ package spanner
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -31,7 +30,7 @@ func (ss sessionStatements) CreateSession(ctx context.Context, session *domain.S
 }
 
 func (ss sessionStatements) GetSessionByID(ctx context.Context, projectID, sessionID string) (*domain.Session, error) {
-	id, err := parseSessionIdentity(sessionID)
+	id, err := parseIdentity(sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +75,7 @@ func (ss sessionStatements) ListSessions(ctx context.Context, filter *database.L
 }
 
 func (ss sessionStatements) DeleteSessionByID(ctx context.Context, projectID, sessionID string) error {
-	id, err := parseSessionIdentity(sessionID)
+	id, err := parseIdentity(sessionID)
 	if err != nil {
 		return err
 	}
@@ -94,76 +93,49 @@ func (ss sessionStatements) ExchangeSession(ctx context.Context, projectID, hand
 	var refreshed *domain.Session
 	err := withTransaction(ctx, ss.db, func(ctx context.Context, tx queryExecutor) error {
 		var err error
-		refreshed, err = sessionStatements{statement: statement{db: tx}}.exchangeSessionTx(ctx, projectID, handoffToken, ttl)
+		refreshed, err = v2session.RunExchange(ctx, sessionStatements{statement: statement{db: tx}}, projectID, handoffToken, ttl)
 		return err
 	})
 	return refreshed, err
 }
 
-func (ss sessionStatements) exchangeSessionTx(ctx context.Context, projectID, handoffToken string, ttl time.Duration) (*domain.Session, error) {
-	attempt, err := ss.getAuthAttemptByHandoffToken(ctx, projectID, v2session.HashHandoffToken(handoffToken))
+func (ss sessionStatements) InsertSession(ctx context.Context, session *domain.Session) error {
+	return ss.insertSession(ctx, session)
+}
+
+func (ss sessionStatements) GetAuthAttemptByHandoffToken(ctx context.Context, projectID string, handoffTokenHash []byte) (*domain.AuthAttempt, error) {
+	return ss.getAuthAttemptByHandoffToken(ctx, projectID, handoffTokenHash)
+}
+
+func (ss sessionStatements) LoadVerifiedChecks(ctx context.Context, projectID, id string, onAttempt bool) ([]v2session.StoredCheck, error) {
+	return ss.loadStoredChecks(ctx, onAttempt, projectID, id)
+}
+
+func (ss sessionStatements) ApplyExchange(ctx context.Context, projectID, sessionID string, last map[domain.AuthCheckType]v2session.StoredCheck) error {
+	return ss.applyExchange(ctx, projectID, sessionID, last)
+}
+
+func (ss sessionStatements) UserIDFromLastVerifiedChecks(ctx context.Context, projectID string, last map[domain.AuthCheckType]v2session.StoredCheck) (*string, error) {
+	return ss.userIDFromLastVerifiedChecks(ctx, projectID, last)
+}
+
+func (ss sessionStatements) UpdateSessionAfterExchange(ctx context.Context, projectID, sessionID string, userID *string, ttl time.Duration) error {
+	return ss.updateSessionAfterExchange(ctx, projectID, sessionID, userID, ttl)
+}
+
+func (ss sessionStatements) DeleteAuthAttempt(ctx context.Context, projectID, attemptID string) error {
+	aid, err := parseIdentity(attemptID)
 	if err != nil {
-		if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
-			return nil, domain.ErrSessionInvalidHandoffToken()
-		}
-		return nil, err
-	}
-	if err := v2session.ValidateHandoffAttempt(attempt); err != nil {
-		return nil, err
-	}
-	if !attempt.IsCompleted() {
-		return nil, domain.ErrSessionInvalidHandoffToken()
-	}
-	var target *domain.Session
-	if attempt.SessionID != nil {
-		target, err = ss.GetSessionByID(ctx, projectID, *attempt.SessionID)
-		if err != nil {
-			if errors.Is(err, domain.ErrSessionNotFound()) {
-				return nil, domain.ErrSessionExchangeConflict()
-			}
-			return nil, err
-		}
-	} else {
-		target = &domain.Session{ProjectID: projectID, TimeToLive: v2session.ExchangeTTL(ttl)}
-		if err := ss.insertSession(ctx, target); err != nil {
-			return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
-		}
-	}
-	attemptChecks, err := ss.loadStoredChecks(ctx, true, projectID, attempt.ID)
-	if err != nil {
-		return nil, err
-	}
-	sessionChecks, err := ss.loadStoredChecks(ctx, false, projectID, target.ID)
-	if err != nil {
-		return nil, err
-	}
-	last := v2session.PickLastVerifiedByType(attemptChecks, sessionChecks)
-	if err := ss.applyExchange(ctx, projectID, target.ID, last); err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
-	}
-	userID, err := ss.userIDFromLastVerifiedChecks(ctx, projectID, last)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
-	}
-	oldTokenID := target.TokenID
-	if err := ss.updateSessionAfterExchange(ctx, projectID, target.ID, userID, ttl); err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
-	}
-	aid, err := parseSessionIdentity(attempt.ID)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
+		return err
 	}
 	if _, err := ss.db.Update(ctx, buildStatement(`DELETE FROM auth_attempts WHERE project_id = @p1 AND id = @p2`, projectID, aid).statement()); err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
+		return err
 	}
-	refreshed, err := ss.GetSessionByID(ctx, projectID, target.ID)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
-	}
-	if err := ss.createSessionToken(ctx, refreshed, oldTokenID); err != nil {
-		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
-	}
-	return refreshed, nil
+	return nil
+}
+
+func (ss sessionStatements) CreateSessionToken(ctx context.Context, session *domain.Session, previousTokenID string) error {
+	return ss.createSessionToken(ctx, session, previousTokenID)
 }
 
 const sessionQuery = `SELECT s.project_id, s.id, s.created_at, s.updated_at, s.expires_at, s.time_to_live, s.token_id, s.user_id,
@@ -214,7 +186,7 @@ func (ss sessionStatements) insertSession(ctx context.Context, session *domain.S
 				if err := row.Columns(&id); err != nil {
 					return struct{}{}, err
 				}
-				parsed, err := parseSessionIdentity(id.String())
+				parsed, err := parseIdentity(id.String())
 				if err != nil {
 					return struct{}{}, err
 				}
@@ -259,7 +231,7 @@ func (ss sessionStatements) createSessionToken(ctx context.Context, session *dom
 	if err := tokens.CreateToken(ctx, tok); err != nil {
 		return fmt.Errorf("failed to create session token: %w", err)
 	}
-	sessionID, err := parseSessionIdentity(session.ID)
+	sessionID, err := parseIdentity(session.ID)
 	if err != nil {
 		return err
 	}
@@ -271,7 +243,7 @@ func (ss sessionStatements) createSessionToken(ctx context.Context, session *dom
 		return fmt.Errorf("failed to set session token_id: %w", err)
 	}
 	session.TokenID = tok.TokenID
-	if previousTokenID != "" && previousTokenID != "0" {
+	if v2session.HasRealSessionToken(previousTokenID) {
 		if err := tokens.DeleteTokenByID(ctx, session.ProjectID, previousTokenID); err != nil {
 			return fmt.Errorf("failed to revoke previous session token: %w", err)
 		}
@@ -280,7 +252,7 @@ func (ss sessionStatements) createSessionToken(ctx context.Context, session *dom
 }
 
 func (ss sessionStatements) updateSessionAfterExchange(ctx context.Context, projectID, sessionID string, userID *string, ttl time.Duration) error {
-	id, err := parseSessionIdentity(sessionID)
+	id, err := parseIdentity(sessionID)
 	if err != nil {
 		return err
 	}
@@ -309,7 +281,7 @@ func (ss sessionStatements) updateSessionAfterExchange(ctx context.Context, proj
 }
 
 func (ss sessionStatements) applyExchange(ctx context.Context, projectID, sessionID string, last map[domain.AuthCheckType]v2session.StoredCheck) error {
-	sid, err := parseSessionIdentity(sessionID)
+	sid, err := parseIdentity(sessionID)
 	if err != nil {
 		return err
 	}
@@ -317,7 +289,7 @@ func (ss sessionStatements) applyExchange(ctx context.Context, projectID, sessio
 		if !c.OnAttempt {
 			continue
 		}
-		cid, err := parseSessionIdentity(c.ID)
+		cid, err := parseIdentity(c.ID)
 		if err != nil {
 			return err
 		}
@@ -330,7 +302,7 @@ func (ss sessionStatements) applyExchange(ctx context.Context, projectID, sessio
 		}
 	}
 	for _, c := range last {
-		cid, err := parseSessionIdentity(c.ID)
+		cid, err := parseIdentity(c.ID)
 		if err != nil {
 			return err
 		}
@@ -346,7 +318,7 @@ func (ss sessionStatements) userIDFromLastVerifiedChecks(ctx context.Context, pr
 	if !ok {
 		return nil, nil
 	}
-	cid, err := parseSessionIdentity(w.ID)
+	cid, err := parseIdentity(w.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -377,7 +349,7 @@ func (ss sessionStatements) userIDFromLastVerifiedChecks(ctx context.Context, pr
 }
 
 func (ss sessionStatements) loadStoredChecks(ctx context.Context, onAttempt bool, projectID, id string) ([]v2session.StoredCheck, error) {
-	parsed, err := parseSessionIdentity(id)
+	parsed, err := parseIdentity(id)
 	if err != nil {
 		return nil, err
 	}
@@ -568,10 +540,10 @@ func encodeSpannerJSON(b []byte) any {
 	}
 	return spanner.NullJSON{Value: v, Valid: true}
 }
-func parseSessionIdentity(id string) (int64, error) {
+func parseIdentity(id string) (int64, error) {
 	parsed, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("invalid session identity %q: %w", id, err)
+		return 0, fmt.Errorf("invalid identity %q: %w", id, err)
 	}
 	return parsed, nil
 }
@@ -611,6 +583,7 @@ func coerceSessionDuration(v any) (any, error) {
 }
 
 var _ service.SessionStatements = (*sessionStatements)(nil)
+var _ v2session.ExchangeStore = sessionStatements{}
 
 var sessionSchema = database.NewSchema(map[domain.SessionField]database.FieldBinding[domain.Session]{
 	domain.SessionFieldProjectID:  {SQLName: "s.project_id", Accessor: func(s *domain.Session) any { return s.ProjectID }, Coerce: database.CoerceString},
