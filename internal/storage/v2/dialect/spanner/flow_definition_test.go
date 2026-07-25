@@ -3,7 +3,7 @@
 package spanner
 
 import (
-	"database/sql"
+	"context"
 	"strconv"
 	"strings"
 	"testing"
@@ -14,9 +14,6 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
-	spannerdialect "github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
-	"github.com/zitadel/nextgen/internal/storage/database/dialect/spanner/migration"
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -57,38 +54,15 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 
 func TestFlowDefinitionStatements_CRUD(t *testing.T) {
 	ctx := t.Context()
+	stmts := testClient.Statements()
 
-	connector, stop, err := dbtest.Spanner(ctx)
-	require.NoError(t, err)
-	t.Cleanup(stop)
-
-	cfg, ok := connector.(*spannerdialect.Config)
-	require.True(t, ok)
-
-	db, err := sql.Open("spanner", cfg.DSN)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
-	require.NoError(t, migration.Migrate(ctx, db))
-
-	dialect, err := DecodeConfig(cfg.DSN)
-	require.NoError(t, err)
-	pool, err := dialect.Connect(ctx)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = pool.Close(ctx) })
-
-	client := pool.(*Client)
-	stmts := client.Statements()
-
-	project := &domain.Project{
-		ID:             "proj_v2_flowdef",
-		PreviewOrigins: []string{},
-	}
+	project := newTestProject(uniqueProjectID(t))
 	require.NoError(t, stmts.CreateProject(ctx, project))
-	t.Cleanup(func() { _ = stmts.DeleteProjectByID(ctx, project.ID) })
+	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
 
 	def := sampleFlowDefinition(project.ID, uniqueFlowDefinitionID(t))
 	require.NoError(t, stmts.CreateFlowDefinition(ctx, def))
-	t.Cleanup(func() { _ = stmts.DeleteFlowDefinitionByID(ctx, project.ID, def.ID) })
+	t.Cleanup(func() { _ = stmts.DeleteFlowDefinitionByID(context.Background(), project.ID, def.ID) })
 
 	got, err := stmts.GetFlowDefinitionByID(ctx, project.ID, def.ID)
 	require.NoError(t, err)
@@ -125,31 +99,9 @@ func TestFlowDefinitionStatements_CRUD(t *testing.T) {
 
 func TestFlowDefinitionStatements_DeleteProjectCascades(t *testing.T) {
 	ctx := t.Context()
+	stmts := testClient.Statements()
 
-	connector, stop, err := dbtest.Spanner(ctx)
-	require.NoError(t, err)
-	t.Cleanup(stop)
-
-	cfg, ok := connector.(*spannerdialect.Config)
-	require.True(t, ok)
-
-	db, err := sql.Open("spanner", cfg.DSN)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.Close() })
-	require.NoError(t, migration.Migrate(ctx, db))
-
-	dialect, err := DecodeConfig(cfg.DSN)
-	require.NoError(t, err)
-	pool, err := dialect.Connect(ctx)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = pool.Close(ctx) })
-
-	stmts := pool.(*Client).Statements()
-
-	project := &domain.Project{
-		ID:             "proj_v2_flowdef_cascade",
-		PreviewOrigins: []string{},
-	}
+	project := newTestProject(uniqueProjectID(t))
 	require.NoError(t, stmts.CreateProject(ctx, project))
 
 	def := sampleFlowDefinition(project.ID, uniqueFlowDefinitionID(t))
@@ -157,7 +109,7 @@ func TestFlowDefinitionStatements_DeleteProjectCascades(t *testing.T) {
 
 	require.NoError(t, stmts.DeleteProjectByID(ctx, project.ID))
 
-	_, err = stmts.GetFlowDefinitionByID(ctx, project.ID, def.ID)
+	_, err := stmts.GetFlowDefinitionByID(ctx, project.ID, def.ID)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }
