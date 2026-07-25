@@ -12,6 +12,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	legacydb "github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func seedTeamMembershipParents(t *testing.T, projectID, teamID, userID string) {
@@ -75,15 +76,25 @@ func TestTeamMembershipStatements_CreateGetListUpdate(t *testing.T) {
 	assert.Equal(t, userID, got.UserID)
 	assert.Equal(t, domain.MembershipStatusActive, got.Status)
 
-	byUser, err := testPool.ListTeamMembershipsByUser(t.Context(), projectID, userID)
+	byUser, err := testPool.ListTeamMemberships(t.Context(), &database.ListOptions[domain.TeamMembershipField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.TeamMembershipFieldProjectID), projectID),
+			database.Equal(database.Col(domain.TeamMembershipFieldUserID), userID),
+		),
+	})
 	require.NoError(t, err)
-	require.Len(t, byUser, 1)
-	assert.Equal(t, teamID, byUser[0].TeamID)
+	require.Len(t, byUser.Items, 1)
+	assert.Equal(t, teamID, byUser.Items[0].TeamID)
 
-	byTeam, err := testPool.ListTeamMembershipsByTeam(t.Context(), projectID, teamID)
+	byTeam, err := testPool.ListTeamMemberships(t.Context(), &database.ListOptions[domain.TeamMembershipField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.TeamMembershipFieldProjectID), projectID),
+			database.Equal(database.Col(domain.TeamMembershipFieldTeamID), teamID),
+		),
+	})
 	require.NoError(t, err)
-	require.Len(t, byTeam, 1)
-	assert.Equal(t, userID, byTeam[0].UserID)
+	require.Len(t, byTeam.Items, 1)
+	assert.Equal(t, userID, byTeam.Items[0].UserID)
 
 	require.NoError(t, testPool.UpdateTeamMembershipStatus(t.Context(), projectID, teamID, userID, domain.MembershipStatusRemoved))
 	updated, err := testPool.GetTeamMembership(t.Context(), projectID, teamID, userID)

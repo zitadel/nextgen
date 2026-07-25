@@ -12,6 +12,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func TestTeamMembershipStatements_CRUD(t *testing.T) {
@@ -60,13 +61,23 @@ func TestTeamMembershipStatements_CRUD(t *testing.T) {
 	assert.Equal(t, domain.MembershipStatusActive, got.Status)
 	assert.WithinDuration(t, membership.CreatedAt, got.CreatedAt, time.Second)
 
-	byUser, err := stmts.ListTeamMembershipsByUser(ctx, project.ID, userID)
+	byUser, err := stmts.ListTeamMemberships(ctx, &v2database.ListOptions[domain.TeamMembershipField]{
+		Filter: v2database.And(
+			v2database.Equal(v2database.Col(domain.TeamMembershipFieldProjectID), project.ID),
+			v2database.Equal(v2database.Col(domain.TeamMembershipFieldUserID), userID),
+		),
+	})
 	require.NoError(t, err)
-	require.Len(t, byUser, 1)
+	require.Len(t, byUser.Items, 1)
 
-	byTeam, err := stmts.ListTeamMembershipsByTeam(ctx, project.ID, teamID)
+	byTeam, err := stmts.ListTeamMemberships(ctx, &v2database.ListOptions[domain.TeamMembershipField]{
+		Filter: v2database.And(
+			v2database.Equal(v2database.Col(domain.TeamMembershipFieldProjectID), project.ID),
+			v2database.Equal(v2database.Col(domain.TeamMembershipFieldTeamID), teamID),
+		),
+	})
 	require.NoError(t, err)
-	require.Len(t, byTeam, 1)
+	require.Len(t, byTeam.Items, 1)
 
 	require.NoError(t, stmts.UpdateTeamMembershipStatus(ctx, project.ID, teamID, userID, domain.MembershipStatusRemoved))
 	updated, err := stmts.GetTeamMembership(ctx, project.ID, teamID, userID)

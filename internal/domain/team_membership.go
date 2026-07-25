@@ -23,3 +23,16 @@ type TeamMembership struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
+
+// TeamMembershipField enumerates the fields of TeamMembership which can be used for filtering and ordering in list operations.
+type TeamMembershipField uint8
+
+const (
+	TeamMembershipFieldUnspecified TeamMembershipField = iota
+	TeamMembershipFieldProjectID
+	TeamMembershipFieldTeamID
+	TeamMembershipFieldUserID
+	TeamMembershipFieldStatus
+	TeamMembershipFieldCreatedAt
+	TeamMembershipFieldUpdatedAt
+)

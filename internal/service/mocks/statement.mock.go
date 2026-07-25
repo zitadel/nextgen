@@ -1200,80 +1200,41 @@ func (c *MockAllStatementsListProjectsCall) DoAndReturn(f func(context.Context, 
 	return c
 }
 
-// ListTeamMembershipsByTeam mocks base method.
-func (m *MockAllStatements) ListTeamMembershipsByTeam(ctx context.Context, projectID, teamID string) ([]*domain.TeamMembership, error) {
+// ListTeamMemberships mocks base method.
+func (m *MockAllStatements) ListTeamMemberships(ctx context.Context, filter *database.ListOptions[domain.TeamMembershipField]) (*database.ListResult[*domain.TeamMembership], error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListTeamMembershipsByTeam", ctx, projectID, teamID)
-	ret0, _ := ret[0].([]*domain.TeamMembership)
+	ret := m.ctrl.Call(m, "ListTeamMemberships", ctx, filter)
+	ret0, _ := ret[0].(*database.ListResult[*domain.TeamMembership])
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListTeamMembershipsByTeam indicates an expected call of ListTeamMembershipsByTeam.
-func (mr *MockAllStatementsMockRecorder) ListTeamMembershipsByTeam(ctx, projectID, teamID any) *MockAllStatementsListTeamMembershipsByTeamCall {
+// ListTeamMemberships indicates an expected call of ListTeamMemberships.
+func (mr *MockAllStatementsMockRecorder) ListTeamMemberships(ctx, filter any) *MockAllStatementsListTeamMembershipsCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTeamMembershipsByTeam", reflect.TypeOf((*MockAllStatements)(nil).ListTeamMembershipsByTeam), ctx, projectID, teamID)
-	return &MockAllStatementsListTeamMembershipsByTeamCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTeamMemberships", reflect.TypeOf((*MockAllStatements)(nil).ListTeamMemberships), ctx, filter)
+	return &MockAllStatementsListTeamMembershipsCall{Call: call}
 }
 
-// MockAllStatementsListTeamMembershipsByTeamCall wrap *gomock.Call
-type MockAllStatementsListTeamMembershipsByTeamCall struct {
+// MockAllStatementsListTeamMembershipsCall wrap *gomock.Call
+type MockAllStatementsListTeamMembershipsCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsListTeamMembershipsByTeamCall) Return(arg0 []*domain.TeamMembership, arg1 error) *MockAllStatementsListTeamMembershipsByTeamCall {
+func (c *MockAllStatementsListTeamMembershipsCall) Return(arg0 *database.ListResult[*domain.TeamMembership], arg1 error) *MockAllStatementsListTeamMembershipsCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsListTeamMembershipsByTeamCall) Do(f func(context.Context, string, string) ([]*domain.TeamMembership, error)) *MockAllStatementsListTeamMembershipsByTeamCall {
+func (c *MockAllStatementsListTeamMembershipsCall) Do(f func(context.Context, *database.ListOptions[domain.TeamMembershipField]) (*database.ListResult[*domain.TeamMembership], error)) *MockAllStatementsListTeamMembershipsCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsListTeamMembershipsByTeamCall) DoAndReturn(f func(context.Context, string, string) ([]*domain.TeamMembership, error)) *MockAllStatementsListTeamMembershipsByTeamCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// ListTeamMembershipsByUser mocks base method.
-func (m *MockAllStatements) ListTeamMembershipsByUser(ctx context.Context, projectID, userID string) ([]*domain.TeamMembership, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListTeamMembershipsByUser", ctx, projectID, userID)
-	ret0, _ := ret[0].([]*domain.TeamMembership)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListTeamMembershipsByUser indicates an expected call of ListTeamMembershipsByUser.
-func (mr *MockAllStatementsMockRecorder) ListTeamMembershipsByUser(ctx, projectID, userID any) *MockAllStatementsListTeamMembershipsByUserCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTeamMembershipsByUser", reflect.TypeOf((*MockAllStatements)(nil).ListTeamMembershipsByUser), ctx, projectID, userID)
-	return &MockAllStatementsListTeamMembershipsByUserCall{Call: call}
-}
-
-// MockAllStatementsListTeamMembershipsByUserCall wrap *gomock.Call
-type MockAllStatementsListTeamMembershipsByUserCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsListTeamMembershipsByUserCall) Return(arg0 []*domain.TeamMembership, arg1 error) *MockAllStatementsListTeamMembershipsByUserCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsListTeamMembershipsByUserCall) Do(f func(context.Context, string, string) ([]*domain.TeamMembership, error)) *MockAllStatementsListTeamMembershipsByUserCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsListTeamMembershipsByUserCall) DoAndReturn(f func(context.Context, string, string) ([]*domain.TeamMembership, error)) *MockAllStatementsListTeamMembershipsByUserCall {
+func (c *MockAllStatementsListTeamMembershipsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.TeamMembershipField]) (*database.ListResult[*domain.TeamMembership], error)) *MockAllStatementsListTeamMembershipsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -2598,80 +2559,41 @@ func (c *MockTeamMembershipStatementsIsStatementsCall) DoAndReturn(f func()) *Mo
 	return c
 }
 
-// ListTeamMembershipsByTeam mocks base method.
-func (m *MockTeamMembershipStatements) ListTeamMembershipsByTeam(ctx context.Context, projectID, teamID string) ([]*domain.TeamMembership, error) {
+// ListTeamMemberships mocks base method.
+func (m *MockTeamMembershipStatements) ListTeamMemberships(ctx context.Context, filter *database.ListOptions[domain.TeamMembershipField]) (*database.ListResult[*domain.TeamMembership], error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListTeamMembershipsByTeam", ctx, projectID, teamID)
-	ret0, _ := ret[0].([]*domain.TeamMembership)
+	ret := m.ctrl.Call(m, "ListTeamMemberships", ctx, filter)
+	ret0, _ := ret[0].(*database.ListResult[*domain.TeamMembership])
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListTeamMembershipsByTeam indicates an expected call of ListTeamMembershipsByTeam.
-func (mr *MockTeamMembershipStatementsMockRecorder) ListTeamMembershipsByTeam(ctx, projectID, teamID any) *MockTeamMembershipStatementsListTeamMembershipsByTeamCall {
+// ListTeamMemberships indicates an expected call of ListTeamMemberships.
+func (mr *MockTeamMembershipStatementsMockRecorder) ListTeamMemberships(ctx, filter any) *MockTeamMembershipStatementsListTeamMembershipsCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTeamMembershipsByTeam", reflect.TypeOf((*MockTeamMembershipStatements)(nil).ListTeamMembershipsByTeam), ctx, projectID, teamID)
-	return &MockTeamMembershipStatementsListTeamMembershipsByTeamCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTeamMemberships", reflect.TypeOf((*MockTeamMembershipStatements)(nil).ListTeamMemberships), ctx, filter)
+	return &MockTeamMembershipStatementsListTeamMembershipsCall{Call: call}
 }
 
-// MockTeamMembershipStatementsListTeamMembershipsByTeamCall wrap *gomock.Call
-type MockTeamMembershipStatementsListTeamMembershipsByTeamCall struct {
+// MockTeamMembershipStatementsListTeamMembershipsCall wrap *gomock.Call
+type MockTeamMembershipStatementsListTeamMembershipsCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockTeamMembershipStatementsListTeamMembershipsByTeamCall) Return(arg0 []*domain.TeamMembership, arg1 error) *MockTeamMembershipStatementsListTeamMembershipsByTeamCall {
+func (c *MockTeamMembershipStatementsListTeamMembershipsCall) Return(arg0 *database.ListResult[*domain.TeamMembership], arg1 error) *MockTeamMembershipStatementsListTeamMembershipsCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockTeamMembershipStatementsListTeamMembershipsByTeamCall) Do(f func(context.Context, string, string) ([]*domain.TeamMembership, error)) *MockTeamMembershipStatementsListTeamMembershipsByTeamCall {
+func (c *MockTeamMembershipStatementsListTeamMembershipsCall) Do(f func(context.Context, *database.ListOptions[domain.TeamMembershipField]) (*database.ListResult[*domain.TeamMembership], error)) *MockTeamMembershipStatementsListTeamMembershipsCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockTeamMembershipStatementsListTeamMembershipsByTeamCall) DoAndReturn(f func(context.Context, string, string) ([]*domain.TeamMembership, error)) *MockTeamMembershipStatementsListTeamMembershipsByTeamCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// ListTeamMembershipsByUser mocks base method.
-func (m *MockTeamMembershipStatements) ListTeamMembershipsByUser(ctx context.Context, projectID, userID string) ([]*domain.TeamMembership, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListTeamMembershipsByUser", ctx, projectID, userID)
-	ret0, _ := ret[0].([]*domain.TeamMembership)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListTeamMembershipsByUser indicates an expected call of ListTeamMembershipsByUser.
-func (mr *MockTeamMembershipStatementsMockRecorder) ListTeamMembershipsByUser(ctx, projectID, userID any) *MockTeamMembershipStatementsListTeamMembershipsByUserCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTeamMembershipsByUser", reflect.TypeOf((*MockTeamMembershipStatements)(nil).ListTeamMembershipsByUser), ctx, projectID, userID)
-	return &MockTeamMembershipStatementsListTeamMembershipsByUserCall{Call: call}
-}
-
-// MockTeamMembershipStatementsListTeamMembershipsByUserCall wrap *gomock.Call
-type MockTeamMembershipStatementsListTeamMembershipsByUserCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockTeamMembershipStatementsListTeamMembershipsByUserCall) Return(arg0 []*domain.TeamMembership, arg1 error) *MockTeamMembershipStatementsListTeamMembershipsByUserCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockTeamMembershipStatementsListTeamMembershipsByUserCall) Do(f func(context.Context, string, string) ([]*domain.TeamMembership, error)) *MockTeamMembershipStatementsListTeamMembershipsByUserCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockTeamMembershipStatementsListTeamMembershipsByUserCall) DoAndReturn(f func(context.Context, string, string) ([]*domain.TeamMembership, error)) *MockTeamMembershipStatementsListTeamMembershipsByUserCall {
+func (c *MockTeamMembershipStatementsListTeamMembershipsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.TeamMembershipField]) (*database.ListResult[*domain.TeamMembership], error)) *MockTeamMembershipStatementsListTeamMembershipsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
