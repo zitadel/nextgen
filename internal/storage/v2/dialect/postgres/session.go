@@ -2,11 +2,9 @@ package postgres
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strconv"
 	"time"
 
@@ -17,11 +15,10 @@ import (
 	storagedb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
+	v2session "github.com/zitadel/nextgen/internal/storage/v2/session"
 )
 
 const (
-	userAgentFingerprintKey = "fingerprint"
-
 	insertUserAgentStmt = `INSERT INTO zitadel_nextgen.user_agents (project_id, info) VALUES ($1, $2) RETURNING id`
 	insertSessionStmt   = `INSERT INTO zitadel_nextgen.sessions (project_id, user_agent_id, time_to_live, token_id)
 VALUES ($1, $2, $3::INTERVAL, 0) RETURNING id, created_at, updated_at, expires_at`
@@ -122,14 +119,14 @@ func (ss sessionStatements) ExchangeSession(ctx context.Context, projectID, hand
 }
 
 func (ss sessionStatements) exchangeSessionTx(ctx context.Context, projectID, handoffToken string, ttl time.Duration) (*domain.Session, error) {
-	attempt, err := ss.getAuthAttemptByHandoffToken(ctx, projectID, hashHandoffToken(handoffToken))
+	attempt, err := ss.getAuthAttemptByHandoffToken(ctx, projectID, v2session.HashHandoffToken(handoffToken))
 	if err != nil {
 		if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
 			return nil, domain.ErrSessionInvalidHandoffToken()
 		}
 		return nil, err
 	}
-	if err := validateHandoffAttempt(attempt); err != nil {
+	if err := v2session.ValidateHandoffAttempt(attempt); err != nil {
 		return nil, err
 	}
 	if !attempt.IsCompleted() {
@@ -146,7 +143,7 @@ func (ss sessionStatements) exchangeSessionTx(ctx context.Context, projectID, ha
 			return nil, err
 		}
 	} else {
-		targetSession = &domain.Session{ProjectID: projectID, TimeToLive: exchangeTTL(ttl)}
+		targetSession = &domain.Session{ProjectID: projectID, TimeToLive: v2session.ExchangeTTL(ttl)}
 		if err := ss.insertSession(ctx, targetSession); err != nil {
 			return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
 		}
@@ -160,7 +157,7 @@ func (ss sessionStatements) exchangeSessionTx(ctx context.Context, projectID, ha
 	if err != nil {
 		return nil, err
 	}
-	lastVerifiedChecks := pickLastVerifiedChecksByType(attemptChecks, sessionChecks)
+	lastVerifiedChecks := v2session.PickLastVerifiedByType(attemptChecks, sessionChecks)
 	if err := ss.applyExchange(ctx, projectID, targetSession.ID, lastVerifiedChecks); err != nil {
 		return nil, fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
 	}
@@ -216,7 +213,7 @@ func (ss sessionStatements) insertSession(ctx context.Context, session *domain.S
 			info["ip"] = session.UserAgent.IP
 		}
 		if session.UserAgent.ID != "" {
-			info[userAgentFingerprintKey] = session.UserAgent.ID
+			info[v2session.UserAgentFingerprintKey] = session.UserAgent.ID
 		}
 		raw, err := json.Marshal(info)
 		if err != nil {
@@ -289,7 +286,7 @@ func (ss sessionStatements) updateSessionAfterExchange(ctx context.Context, proj
 	return nil
 }
 
-func (ss sessionStatements) applyExchange(ctx context.Context, projectID, sessionID string, lastVerifiedChecks map[domain.AuthCheckType]storedCheck) error {
+func (ss sessionStatements) applyExchange(ctx context.Context, projectID, sessionID string, lastVerifiedChecks map[domain.AuthCheckType]v2session.StoredCheck) error {
 	for _, c := range lastVerifiedChecks {
 		if !c.OnAttempt {
 			continue
@@ -310,7 +307,7 @@ func (ss sessionStatements) applyExchange(ctx context.Context, projectID, sessio
 	return nil
 }
 
-func (ss sessionStatements) userIDFromLastVerifiedChecks(ctx context.Context, projectID string, lastVerifiedChecks map[domain.AuthCheckType]storedCheck) (*string, error) {
+func (ss sessionStatements) userIDFromLastVerifiedChecks(ctx context.Context, projectID string, lastVerifiedChecks map[domain.AuthCheckType]v2session.StoredCheck) (*string, error) {
 	w, ok := lastVerifiedChecks[domain.AuthCheckTypeUser]
 	if !ok {
 		return nil, nil
@@ -331,13 +328,13 @@ func (ss sessionStatements) userIDFromLastVerifiedChecks(ctx context.Context, pr
 	return &payload.UserID, nil
 }
 
-func (ss sessionStatements) loadStoredChecks(ctx context.Context, query, projectID, id string, onAttempt bool) ([]storedCheck, error) {
+func (ss sessionStatements) loadStoredChecks(ctx context.Context, query, projectID, id string, onAttempt bool) ([]v2session.StoredCheck, error) {
 	rows, err := ss.client.Query(ctx, query, projectID, storagedb.Identity(id))
 	if err != nil {
 		return nil, wrapError(err)
 	}
 	defer rows.Close()
-	var out []storedCheck
+	var out []v2session.StoredCheck
 	for rows.Next() {
 		var checkID storagedb.Identity
 		var typ int64
@@ -345,7 +342,7 @@ func (ss sessionStatements) loadStoredChecks(ctx context.Context, query, project
 		if err := rows.Scan(&checkID, &typ, &lastVerifiedAt); err != nil {
 			return nil, err
 		}
-		out = append(out, storedCheck{ID: checkID.String(), Type: domain.AuthCheckType(typ), LastVerifiedAt: lastVerifiedAt, OnAttempt: onAttempt})
+		out = append(out, v2session.StoredCheck{ID: checkID.String(), Type: domain.AuthCheckType(typ), LastVerifiedAt: lastVerifiedAt, OnAttempt: onAttempt})
 	}
 	return out, rows.Err()
 }
@@ -361,13 +358,6 @@ func (ss sessionStatements) getAuthAttemptByHandoffToken(ctx context.Context, pr
 		return nil, err
 	}
 	return attempt, nil
-}
-
-type storedCheck struct {
-	ID             string
-	Type           domain.AuthCheckType
-	LastVerifiedAt time.Time
-	OnAttempt      bool
 }
 
 func scanSessions(rows pgx.Rows) ([]*domain.Session, error) {
@@ -402,7 +392,7 @@ func scanSessions(rows pgx.Rows) ([]*domain.Session, error) {
 						return nil, fmt.Errorf("failed to unmarshal user agent info: %w", err)
 					}
 				}
-				session.UserAgent = userAgentFromStoredInfo(info)
+				session.UserAgent = v2session.UserAgentFromStoredInfo(info)
 			}
 			byID[id] = session
 			order = append(order, id)
@@ -424,13 +414,13 @@ func scanSessions(rows pgx.Rows) ([]*domain.Session, error) {
 		if failureCount != nil {
 			failures = *failureCount
 		}
-		checks, err := newSessionAuthChecks(domain.AuthCheckType(*checkType), checkID.String(), challengedAt, failedAt, verifiedAt, failures, challenge, factor)
+		checks, err := v2session.DecodeAuthChecks(domain.AuthCheckType(*checkType), checkID.String(), challengedAt, failedAt, verifiedAt, failures, challenge, factor)
 		if err != nil {
 			return nil, err
 		}
 		for _, check := range checks {
 			if f, ok := check.(domain.AuthFactor); ok {
-				appendSessionFactor(session, f)
+				v2session.AppendFactor(session, f)
 			}
 		}
 	}
@@ -499,7 +489,7 @@ func scanAuthAttempt(rows pgx.Rows, attempt *domain.AuthAttempt) error {
 		if failureCount != nil {
 			failures = *failureCount
 		}
-		checks, err := newSessionAuthChecks(*checkType, cid, challengedAt, failedAt, verified, failures, challenge, factor)
+		checks, err := v2session.DecodeAuthChecks(*checkType, cid, challengedAt, failedAt, verified, failures, challenge, factor)
 		if err != nil {
 			return fmt.Errorf("failed to unmarshal auth check: %w", err)
 		}
@@ -513,104 +503,6 @@ func scanAuthAttempt(rows pgx.Rows, attempt *domain.AuthAttempt) error {
 	return rows.Err()
 }
 
-func newSessionAuthChecks(checkType domain.AuthCheckType, id string, lastChallengedAt, lastFailedAt, verifiedAt time.Time, failureCount uint16, challenge, factor json.RawMessage) (checks []domain.AuthCheck, err error) {
-	switch checkType {
-	case domain.AuthCheckTypeUser:
-		if !verifiedAt.IsZero() {
-			userFactor := domain.SetAuthFactorUser(verifiedAt)
-			if len(factor) > 0 {
-				if err = json.Unmarshal(factor, &userFactor); err != nil {
-					return nil, fmt.Errorf("failed to unmarshal user auth check factor payload: %w", err)
-				}
-			}
-			checks = append(checks, userFactor)
-		}
-		if !lastChallengedAt.IsZero() {
-			checks = append(checks, domain.SetAuthChallengeUser(id, lastChallengedAt, lastFailedAt, failureCount))
-		}
-	case domain.AuthCheckTypePassword:
-		if !verifiedAt.IsZero() {
-			checks = append(checks, domain.SetAuthFactorPassword(verifiedAt))
-		}
-		if !lastChallengedAt.IsZero() {
-			checks = append(checks, domain.SetAuthChallengePassword(id, lastChallengedAt, lastFailedAt, failureCount))
-		}
-	case domain.AuthCheckTypePasskey:
-		if !verifiedAt.IsZero() {
-			passkeyFactor := domain.SetAuthFactorPasskey(verifiedAt)
-			if len(factor) > 0 {
-				if err = json.Unmarshal(factor, passkeyFactor); err != nil {
-					return nil, fmt.Errorf("failed to unmarshal passkey auth check factor payload: %w", err)
-				}
-			}
-			checks = append(checks, passkeyFactor)
-		}
-		if !lastChallengedAt.IsZero() {
-			passkeyCheck := domain.SetAuthChallengePasskey(id, lastChallengedAt, lastFailedAt, failureCount)
-			if len(challenge) > 0 {
-				if err = json.Unmarshal(challenge, passkeyCheck); err != nil {
-					return nil, fmt.Errorf("failed to unmarshal passkey auth check challenge payload: %w", err)
-				}
-			}
-			checks = append(checks, passkeyCheck)
-		}
-	default:
-		slog.Error("unsupported auth check type", slog.Any("check_type", checkType))
-	}
-	return checks, nil
-}
-
-func hashHandoffToken(plain string) []byte { sum := sha256.Sum256([]byte(plain)); return sum[:] }
-func exchangeTTL(ttl time.Duration) time.Duration {
-	if ttl > 0 {
-		return ttl
-	}
-	return domain.SessionAnonymousTTL
-}
-func validateHandoffAttempt(attempt *domain.AuthAttempt) error {
-	if attempt.HandoffToken == nil || attempt.HandedOffAt == nil || attempt.HandedOffAt.IsZero() {
-		return domain.ErrSessionInvalidHandoffToken()
-	}
-	if time.Now().After(attempt.HandoffToken.ExpiresAt(attempt.HandedOffAt)) {
-		return domain.ErrSessionInvalidHandoffToken()
-	}
-	if attempt.IsExpired() {
-		return domain.ErrSessionInvalidHandoffToken()
-	}
-	return nil
-}
-func pickLastVerifiedChecksByType(attemptChecks, sessionChecks []storedCheck) map[domain.AuthCheckType]storedCheck {
-	out := map[domain.AuthCheckType]storedCheck{}
-	for _, c := range sessionChecks {
-		out[c.Type] = c
-	}
-	for _, c := range attemptChecks {
-		existing, ok := out[c.Type]
-		if !ok || c.LastVerifiedAt.After(existing.LastVerifiedAt) {
-			out[c.Type] = c
-		}
-	}
-	return out
-}
-func userAgentFromStoredInfo(info map[string]any) *domain.UserAgent {
-	ua := &domain.UserAgent{Info: info}
-	if ip, ok := info["ip"].(string); ok {
-		ua.IP = ip
-	}
-	if fp, ok := info[userAgentFingerprintKey].(string); ok {
-		ua.ID = fp
-	}
-	return ua
-}
-func appendSessionFactor(session *domain.Session, factor domain.AuthFactor) {
-	for i, f := range session.Factors {
-		if f.Type() == factor.Type() {
-			session.Factors[i] = factor
-			return
-		}
-	}
-	session.Factors = append(session.Factors, factor)
-}
 func coerceSessionIdentity(v any) (any, error) {
 	switch id := v.(type) {
 	case storagedb.Identity:

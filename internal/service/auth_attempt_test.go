@@ -139,7 +139,7 @@ func TestAuthAttemptService_Create(t *testing.T) {
 		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
 		sessions := mocks.NewMockSessionResolver(ctrl)
 
-		sessions.EXPECT().Get(gomock.Any(), gomock.Any(), "proj", sessionID).
+		sessions.EXPECT().Get(gomock.Any(), "proj", sessionID).
 			Return(&domain.Session{Factors: []domain.AuthFactor{&domain.AuthFactorUser{UserID: "user-1"}}}, nil)
 		repo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
@@ -162,7 +162,7 @@ func TestAuthAttemptService_Create(t *testing.T) {
 		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
 		sessions := mocks.NewMockSessionResolver(ctrl)
 
-		sessions.EXPECT().Get(gomock.Any(), gomock.Any(), "proj", sessionID).
+		sessions.EXPECT().Get(gomock.Any(), "proj", sessionID).
 			Return(nil, domain.ErrSessionNotFound())
 		// repo.Create has no expectation: gomock fails if it is called when session lookup fails.
 
@@ -198,7 +198,7 @@ func TestAuthAttemptService_Create(t *testing.T) {
 		repo := domainmock.NewMockAuthAttemptRepository(ctrl)
 		sessions := mocks.NewMockSessionResolver(ctrl)
 
-		sessions.EXPECT().Get(gomock.Any(), gomock.Any(), "proj", sessionID).
+		sessions.EXPECT().Get(gomock.Any(), "proj", sessionID).
 			Return(nil, unexpectedSessionErr)
 
 		svc := service.NewAuthAttemptService(nil, repo, sessions, nil, nil, nil, nil)

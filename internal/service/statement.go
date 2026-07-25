@@ -147,7 +147,13 @@ type PasskeyRegistrationStatements interface {
 
 type SessionStatements interface {
 	Statements
+	// CreateSession inserts user_agent (optional), session, and session token.
+	// It wraps the multi-write steps in withTransaction.
 	CreateSession(ctx context.Context, entity *domain.Session) error
+	// ExchangeSession promotes verified auth-attempt checks onto a session
+	// (create or upgrade), rotates the session token, and deletes the attempt.
+	// It wraps the multi-write steps in withTransaction.
+	// idempotencyKey is accepted for API compatibility and currently ignored.
 	ExchangeSession(ctx context.Context, projectID, handoffToken string, idempotencyKey *string, ttl time.Duration) (*domain.Session, error)
 	GetSessionByID(ctx context.Context, projectID, sessionID string) (*domain.Session, error)
 	ListSessions(ctx context.Context, filter *database.ListOptions[domain.SessionField]) (*database.ListResult[*domain.Session], error)
