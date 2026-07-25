@@ -4,11 +4,11 @@ package database
 // Dialects compile this differently (Postgres ANY / Spanner UNNEST).
 type ArrayContainsFilter[F ~uint8] struct {
 	Column Column[F]
-	Value  string
+	Value  any
 }
 
 // ArrayContains matches when the array column contains value.
-func ArrayContains[F ~uint8](col Column[F], value string) *ArrayContainsFilter[F] {
+func ArrayContains[F ~uint8](col Column[F], value any) *ArrayContainsFilter[F] {
 	return &ArrayContainsFilter[F]{
 		Column: col,
 		Value:  value,

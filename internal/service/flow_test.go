@@ -82,7 +82,11 @@ func filterMatches(def *domain.FlowDefinition, filter v2database.Filter[domain.F
 		if f.Column.Field() != domain.FlowDefinitionFieldPurposes {
 			return true
 		}
-		purpose, err := domain.FlowDefinitionPurposeString(f.Value)
+		s, ok := f.Value.(string)
+		if !ok {
+			return false
+		}
+		purpose, err := domain.FlowDefinitionPurposeString(s)
 		if err != nil {
 			return false
 		}
