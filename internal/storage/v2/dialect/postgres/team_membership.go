@@ -10,6 +10,7 @@ import (
 	storagedb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
+	"github.com/zitadel/nextgen/internal/storage/v2/teammembership"
 )
 
 const (
@@ -56,7 +57,7 @@ func (s teamMembershipStatements) GetTeamMembership(ctx context.Context, project
 // ListTeamMemberships implements [service.TeamMembershipStatements].
 func (s teamMembershipStatements) ListTeamMemberships(ctx context.Context, filter *database.ListOptions[domain.TeamMembershipField]) (*database.ListResult[*domain.TeamMembership], error) {
 	var compiler statementCompiler
-	if err := compileRead(&compiler, teamMembershipQuery, filter, teamMembershipSchema); err != nil {
+	if err := compileRead(&compiler, teamMembershipQuery, filter, teammembership.Schema); err != nil {
 		return nil, err
 	}
 
@@ -74,7 +75,7 @@ func (s teamMembershipStatements) ListTeamMemberships(ctx context.Context, filte
 	if filter.Pagination.Limit > 0 && len(memberships) == int(filter.Pagination.Limit) {
 		cursor := &pagination.Cursor[domain.TeamMembershipField]{
 			Columns: filter.Pagination.OrderBy.Columns,
-			Values:  teamMembershipSchema.ValuesFrom(memberships[len(memberships)-1], filter.Pagination.OrderBy.Columns),
+			Values:  teammembership.Schema.ValuesFrom(memberships[len(memberships)-1], filter.Pagination.OrderBy.Columns),
 		}
 		nextCursor = cursor.Marshal()
 	}
@@ -115,36 +116,3 @@ func (s teamMembershipStatements) scanTeamMembership(row pgx.CollectableRow) (*d
 }
 
 var _ service.TeamMembershipStatements = (*teamMembershipStatements)(nil)
-
-var teamMembershipSchema = database.NewSchema(map[domain.TeamMembershipField]database.FieldBinding[domain.TeamMembership]{
-	domain.TeamMembershipFieldProjectID: {
-		SQLName:  "project_id",
-		Accessor: func(m *domain.TeamMembership) any { return m.ProjectID },
-		Coerce:   database.CoerceString,
-	},
-	domain.TeamMembershipFieldTeamID: {
-		SQLName:  "team_id",
-		Accessor: func(m *domain.TeamMembership) any { return m.TeamID },
-		Coerce:   database.CoerceString,
-	},
-	domain.TeamMembershipFieldUserID: {
-		SQLName:  "user_id",
-		Accessor: func(m *domain.TeamMembership) any { return m.UserID },
-		Coerce:   database.CoerceString,
-	},
-	domain.TeamMembershipFieldStatus: {
-		SQLName:  "status",
-		Accessor: func(m *domain.TeamMembership) any { return m.Status.String() },
-		Coerce:   database.CoerceString,
-	},
-	domain.TeamMembershipFieldCreatedAt: {
-		SQLName:  "created_at",
-		Accessor: func(m *domain.TeamMembership) any { return m.CreatedAt },
-		Coerce:   database.CoerceTime,
-	},
-	domain.TeamMembershipFieldUpdatedAt: {
-		SQLName:  "updated_at",
-		Accessor: func(m *domain.TeamMembership) any { return m.UpdatedAt },
-		Coerce:   database.CoerceTime,
-	},
-})

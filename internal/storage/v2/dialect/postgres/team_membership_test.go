@@ -76,25 +76,34 @@ func TestTeamMembershipStatements_CreateGetListUpdate(t *testing.T) {
 	assert.Equal(t, userID, got.UserID)
 	assert.Equal(t, domain.MembershipStatusActive, got.Status)
 
-	byUser, err := testPool.ListTeamMemberships(t.Context(), &database.ListOptions[domain.TeamMembershipField]{
+	listedByUser, err := testPool.ListTeamMemberships(t.Context(), &database.ListOptions[domain.TeamMembershipField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.TeamMembershipFieldProjectID), projectID),
 			database.Equal(database.Col(domain.TeamMembershipFieldUserID), userID),
 		),
 	})
 	require.NoError(t, err)
-	require.Len(t, byUser.Items, 1)
-	assert.Equal(t, teamID, byUser.Items[0].TeamID)
+	require.Len(t, listedByUser.Items, 1)
+	assert.Equal(t, teamID, listedByUser.Items[0].TeamID)
 
-	byTeam, err := testPool.ListTeamMemberships(t.Context(), &database.ListOptions[domain.TeamMembershipField]{
+	listedByTeam, err := testPool.ListTeamMemberships(t.Context(), &database.ListOptions[domain.TeamMembershipField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.TeamMembershipFieldProjectID), projectID),
 			database.Equal(database.Col(domain.TeamMembershipFieldTeamID), teamID),
 		),
 	})
 	require.NoError(t, err)
-	require.Len(t, byTeam.Items, 1)
-	assert.Equal(t, userID, byTeam.Items[0].UserID)
+	require.Len(t, listedByTeam.Items, 1)
+	assert.Equal(t, userID, listedByTeam.Items[0].UserID)
+
+	empty, err := testPool.ListTeamMemberships(t.Context(), &database.ListOptions[domain.TeamMembershipField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.TeamMembershipFieldProjectID), projectID),
+			database.Equal(database.Col(domain.TeamMembershipFieldUserID), "missing-user"),
+		),
+	})
+	require.NoError(t, err)
+	assert.Empty(t, empty.Items)
 
 	require.NoError(t, testPool.UpdateTeamMembershipStatus(t.Context(), projectID, teamID, userID, domain.MembershipStatusRemoved))
 	updated, err := testPool.GetTeamMembership(t.Context(), projectID, teamID, userID)

@@ -61,23 +61,32 @@ func TestTeamMembershipStatements_CRUD(t *testing.T) {
 	assert.Equal(t, domain.MembershipStatusActive, got.Status)
 	assert.WithinDuration(t, membership.CreatedAt, got.CreatedAt, time.Second)
 
-	byUser, err := stmts.ListTeamMemberships(ctx, &v2database.ListOptions[domain.TeamMembershipField]{
+	listedByUser, err := stmts.ListTeamMemberships(ctx, &v2database.ListOptions[domain.TeamMembershipField]{
 		Filter: v2database.And(
 			v2database.Equal(v2database.Col(domain.TeamMembershipFieldProjectID), project.ID),
 			v2database.Equal(v2database.Col(domain.TeamMembershipFieldUserID), userID),
 		),
 	})
 	require.NoError(t, err)
-	require.Len(t, byUser.Items, 1)
+	require.Len(t, listedByUser.Items, 1)
 
-	byTeam, err := stmts.ListTeamMemberships(ctx, &v2database.ListOptions[domain.TeamMembershipField]{
+	listedByTeam, err := stmts.ListTeamMemberships(ctx, &v2database.ListOptions[domain.TeamMembershipField]{
 		Filter: v2database.And(
 			v2database.Equal(v2database.Col(domain.TeamMembershipFieldProjectID), project.ID),
 			v2database.Equal(v2database.Col(domain.TeamMembershipFieldTeamID), teamID),
 		),
 	})
 	require.NoError(t, err)
-	require.Len(t, byTeam.Items, 1)
+	require.Len(t, listedByTeam.Items, 1)
+
+	empty, err := stmts.ListTeamMemberships(ctx, &v2database.ListOptions[domain.TeamMembershipField]{
+		Filter: v2database.And(
+			v2database.Equal(v2database.Col(domain.TeamMembershipFieldProjectID), project.ID),
+			v2database.Equal(v2database.Col(domain.TeamMembershipFieldUserID), "missing-user"),
+		),
+	})
+	require.NoError(t, err)
+	assert.Empty(t, empty.Items)
 
 	require.NoError(t, stmts.UpdateTeamMembershipStatus(ctx, project.ID, teamID, userID, domain.MembershipStatusRemoved))
 	updated, err := stmts.GetTeamMembership(ctx, project.ID, teamID, userID)
