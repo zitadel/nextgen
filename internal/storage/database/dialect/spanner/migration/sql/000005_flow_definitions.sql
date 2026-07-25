@@ -11,6 +11,10 @@ CREATE TABLE flow_definitions (
     definition      JSON        NOT NULL,
     created_at      TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     updated_at      TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
+    CONSTRAINT fk_flow_definitions_project
+        FOREIGN KEY (project_id)
+        REFERENCES projects (id)
+        ON DELETE CASCADE,
 ) PRIMARY KEY (project_id, id)
 -- +goose StatementEnd
 -- +goose StatementBegin

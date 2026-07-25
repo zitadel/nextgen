@@ -26,6 +26,12 @@ CREATE TABLE zitadel_nextgen.team_memberships (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     PRIMARY KEY (project_id, team_id, user_id),
+    -- teams/users stay RESTRICT (ADR 024: team/user deletion goes through a
+    -- lifecycle service, not a raw cascade); project deletion gets its own path.
+    CONSTRAINT fk_team_memberships_project
+        FOREIGN KEY (project_id)
+        REFERENCES zitadel_nextgen.projects (id)
+        ON DELETE CASCADE,
     FOREIGN KEY (project_id, team_id)
         REFERENCES zitadel_nextgen.teams (project_id, id)
         ON DELETE RESTRICT,

@@ -3,6 +3,7 @@
 -- +goose StatementBegin
 CREATE TABLE projects (
     id              STRING(MAX) NOT NULL,
+    name            STRING(MAX) NOT NULL,
     created_at      TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     updated_at      TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     project_secret  STRING(MAX) NOT NULL DEFAULT (''),

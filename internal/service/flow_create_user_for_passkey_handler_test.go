@@ -30,7 +30,7 @@ const passkeyHandlerTestSchema = `{
 type passkeyHandlerFixture struct {
 	handler      *service.FlowCreateUserForPasskeyHandler
 	userRepo     *domainmock.MockUserRepository
-	schemaRepo   *domainmock.MockJSONSchemaRepository
+	schemaStore  *domainmock.MockJSONSchemaStore
 	pool         *dbmock.MockPool
 	tx           *dbmock.MockTransaction
 	passwordRepo *domainmock.MockUserPasswordRepository
@@ -41,17 +41,17 @@ func newPasskeyHandlerFixture(t *testing.T) *passkeyHandlerFixture {
 	ctrl := gomock.NewController(t)
 	userRepo := domainmock.NewMockUserRepository(ctrl)
 	passwordRepo := domainmock.NewMockUserPasswordRepository(ctrl)
-	schemaRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
+	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
 	pool := dbmock.NewMockPool(ctrl)
 	tx := dbmock.NewMockTransaction(ctrl)
 
-	userService := service.NewUserService(pool, userRepo, passwordRepo, schemaRepo, nil)
-	handler := service.NewFlowCreateUserForPasskeyHandler(userRepo, userService, schemaRepo)
+	userService := service.NewUserService(pool, schemaStore, userRepo, passwordRepo, nil)
+	handler := service.NewFlowCreateUserForPasskeyHandler(userRepo, userService, schemaStore)
 
 	return &passkeyHandlerFixture{
 		handler:      handler,
 		userRepo:     userRepo,
-		schemaRepo:   schemaRepo,
+		schemaStore:  schemaStore,
 		pool:         pool,
 		tx:           tx,
 		passwordRepo: passwordRepo,
@@ -71,8 +71,8 @@ func passkeyFlowState(collected map[string]any) *domain.FlowState {
 }
 
 func expectSchemaLookup(f *passkeyHandlerFixture) {
-	f.schemaRepo.EXPECT().
-		GetByID(gomock.Any(), gomock.Any(), "proj_1", "https://example.test/schema.json").
+	f.schemaStore.EXPECT().
+		GetJSONSchemaByID(gomock.Any(), "proj_1", "https://example.test/schema.json").
 		Return(&domain.JSONSchema{
 			ProjectID: "proj_1",
 			URL:       "https://example.test/schema.json",

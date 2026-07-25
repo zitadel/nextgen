@@ -7,7 +7,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,TeamMembershipStatements
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements
 
 type StatementPool interface {
 	Statementer[AllStatements]
@@ -22,7 +22,11 @@ type AllStatements interface {
 	ProjectStatements
 	FlowDefinitionStatements
 	CryptoKeyStatements
+	JSONSchemaStatements
+	TeamStatements
 	TeamMembershipStatements
+	TokenStatements
+	PasskeyRegistrationStatements
 	Statements
 }
 
@@ -50,15 +54,46 @@ type ProjectStatements interface {
 type FlowDefinitionStatements interface {
 	Statements
 	CreateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error
-	GetFlowDefinitionByID(ctx context.Context, id string) (*domain.FlowDefinition, error)
+	GetFlowDefinitionByID(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error)
+	UpdateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error
 	ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error)
-	DeleteFlowDefinitionByID(ctx context.Context, id string) error
+	DeleteFlowDefinitionByID(ctx context.Context, projectID, id string) error
 }
 
 type CryptoKeyStatements interface {
 	Statements
 	GetEncryptionKey(ctx context.Context, filter database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error)
 	CreateEncryptionKey(ctx context.Context, dek *domain.EncryptionKey) error
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type JSONSchemaPool interface {
+// 	Statementer[JSONSchemaStatements]
+// 	Transactioner[JSONSchemaStatements]
+// }
+
+type JSONSchemaStatements interface {
+	Statements
+	CreateJSONSchema(ctx context.Context, entity *domain.JSONSchema) error
+	GetJSONSchemaByID(ctx context.Context, projectID, schemaID string) (*domain.JSONSchema, error)
+	ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField]) (*database.ListResult[*domain.JSONSchema], error)
+	DeleteJSONSchemaByID(ctx context.Context, projectID, schemaID string) error
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type TeamPool interface {
+// 	Statementer[TeamStatements]
+// 	Transactioner[TeamStatements]
+// }
+
+type TeamStatements interface {
+	Statements
+	CreateTeam(ctx context.Context, entity *domain.Team) error
+	GetTeamByID(ctx context.Context, projectID, id string) (*domain.Team, error)
+	// DeactivateTeam tombs the team and cascades membership/user lifecycle
+	// updates. It wraps the multi-write steps in withTransaction (opens a tx
+	// via Statements(), joins an outer pool.Transaction when already nested).
+	DeactivateTeam(ctx context.Context, projectID, id string) error
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -74,4 +109,31 @@ type TeamMembershipStatements interface {
 	ListTeamMembershipsByUser(ctx context.Context, projectID, userID string) ([]*domain.TeamMembership, error)
 	ListTeamMembershipsByTeam(ctx context.Context, projectID, teamID string) ([]*domain.TeamMembership, error)
 	UpdateTeamMembershipStatus(ctx context.Context, projectID, teamID, userID string, status domain.MembershipStatus) error
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type TokenPool interface {
+// 	Statementer[TokenStatements]
+// 	Transactioner[TokenStatements]
+// }
+
+type TokenStatements interface {
+	Statements
+	CreateToken(ctx context.Context, entity *domain.Token) error
+	GetTokenByID(ctx context.Context, projectID, tokenID string) (*domain.Token, error)
+	ListTokens(ctx context.Context, filter *database.ListOptions[domain.TokenField]) (*database.ListResult[*domain.Token], error)
+	DeleteTokenByID(ctx context.Context, projectID, tokenID string) error
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type PasskeyRegistrationPool interface {
+// 	Statementer[PasskeyRegistrationStatements]
+// 	Transactioner[PasskeyRegistrationStatements]
+// }
+
+type PasskeyRegistrationStatements interface {
+	Statements
+	CreatePasskeyRegistration(ctx context.Context, entity *domain.CreatePasskeyRegistration) error
+	GetPasskeyRegistration(ctx context.Context, projectID, id string) (*domain.PasskeyRegistration, error)
+	DeletePasskeyRegistration(ctx context.Context, projectID, id string) error
 }
