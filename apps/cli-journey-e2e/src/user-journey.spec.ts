@@ -256,10 +256,13 @@ async function logout(page: Page): Promise<void> {
   // `<zitadel-session>` exposes Sign out directly; `<zitadel-logout>` hides it
   // behind an avatar menu. Wait for either surface, and only open the menu when
   // the direct logout control is not already visible.
-  await expect(logout.or(userMenu)).toBeVisible({ timeout: 30_000 });
+  await Promise.race([
+    logout.waitFor({ state: "visible", timeout: 30_000 }),
+    userMenu.waitFor({ state: "visible", timeout: 30_000 }),
+  ]);
   if (!(await logout.isVisible().catch(() => false))) {
     await userMenu.click();
-    await expect(logout).toBeVisible({ timeout: 5_000 });
+    await logout.waitFor({ state: "visible", timeout: 5_000 });
   }
   await logout.click();
   const loggedOutUrl = expectsProtectedRouteRedirect
@@ -417,8 +420,7 @@ function fieldControl(page: Page, fieldName: string, label: RegExp): Locator {
 
 function logoutLocator(page: Page) {
   return page
-    .getByTestId("zitadel-session-logout")
-    .or(page.locator("zitadel-logout .signout-btn"))
+    .locator("zitadel-logout .signout-btn")
     .or(actionLocator(page, "logout"))
     .or(page.getByRole("button", { name: /logout|sign out/i }))
     .or(page.getByRole("link", { name: /logout|sign out/i }));
