@@ -269,6 +269,7 @@ func mapPurposesToDomain(reqPurposes map[string]string) (map[domain.FlowDefiniti
 }
 
 func (fd *flowDefinitionService) Get(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error) {
+	// todo (grvijayan): get the project ID from the context when the functionality is implemented
 	if projectID == "" {
 		return nil, domain.ErrMissingProjectID()
 	}
@@ -293,6 +294,7 @@ type ListFlowDefinitionsRequest struct {
 }
 
 func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitionsRequest) ([]*domain.FlowDefinition, error) {
+	// todo (grvijayan): get the project ID from the context when the functionality is implemented
 	if req.ProjectID == "" {
 		return nil, domain.ErrMissingProjectID()
 	}

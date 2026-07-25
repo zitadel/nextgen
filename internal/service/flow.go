@@ -154,11 +154,9 @@ func (s *flowService) resolveByAudience(ctx context.Context, req ResolveFlowRequ
 	if err != nil {
 		return nil, err
 	}
-	defs := result.Items
-
 	var best *domain.FlowDefinition
 	bestScore := -1
-	for _, def := range defs {
+	for _, def := range result.Items {
 		if req.Hint.UserSchemaID != nil && def.UserSchema != *req.Hint.UserSchemaID {
 			continue
 		}

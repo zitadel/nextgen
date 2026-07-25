@@ -118,12 +118,27 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 	opts.Filter = remaining
 
 	var compiler statementCompiler
-	if err := compileFlowDefinitionList(&compiler, &opts, purposeValue); err != nil {
+	err := compileRead(&compiler, flowDefinitionQuery, &opts, flowdefinition.Schema,
+		func(c *statementCompiler, hasWhere bool) bool {
+			if purposeValue == "" {
+				return hasWhere
+			}
+			if hasWhere {
+				c.WriteString(" AND ")
+			} else {
+				c.WriteString(" WHERE ")
+			}
+			writeArg(c, purposeValue)
+			c.WriteString(" IN UNNEST(purposes)")
+			return true
+		},
+	)
+	if err != nil {
 		return nil, err
 	}
 
 	var defs []*domain.FlowDefinition
-	err := f.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+	err = f.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
 		var err error
 		defs, err = collectRows(iter, f.scanFlowDefinition)
 		return err
@@ -145,49 +160,6 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 		Items:      defs,
 		NextCursor: nextCursor,
 	}, nil
-}
-
-func compileFlowDefinitionList(c *statementCompiler, opt *database.ListOptions[domain.FlowDefinitionField], purposeValue string) error {
-	c.WriteString(flowDefinitionQuery)
-
-	filter := opt.Filter
-	if len(opt.Pagination.Cursor) != 0 {
-		cursor, err := pagination.CursorFromToken[domain.FlowDefinitionField](opt.Pagination.Cursor)
-		if err != nil {
-			return database.ErrInvalidCursor()
-		}
-		if !cursor.MatchesOrderBy(opt.Pagination.OrderBy.Columns) {
-			return database.ErrCursorOrderMismatch()
-		}
-		values, err := flowdefinition.Schema.CoerceCursorValues(cursor.Columns, cursor.Values)
-		if err != nil {
-			return database.ErrInvalidCursor().WithParent(err)
-		}
-		terms := compareTerms(cursor.Columns, values)
-		if opt.Pagination.OrderBy.Direction == database.OrderAsc {
-			filter = database.And(filter, database.CompareGreater(terms...))
-		} else {
-			filter = database.And(filter, database.CompareLess(terms...))
-		}
-	}
-
-	if filter != nil || purposeValue != "" {
-		c.WriteString(" WHERE ")
-		if filter != nil {
-			compileFilter(c, filter, flowdefinition.Schema)
-			if purposeValue != "" {
-				c.WriteString(" AND ")
-			}
-		}
-		if purposeValue != "" {
-			writeArg(c, purposeValue)
-			c.WriteString(" IN UNNEST(purposes)")
-		}
-	}
-
-	compileOrderBy(c, opt.Pagination.OrderBy, flowdefinition.Schema)
-	compileLimit(c, opt.Pagination.Limit)
-	return nil
 }
 
 func (f flowDefinitionStatements) DeleteFlowDefinitionByID(ctx context.Context, projectID, id string) error {

@@ -19,7 +19,13 @@ func (c *statementCompiler) Reset() {
 	c.args = nil
 }
 
-func compileRead[F ~uint8, T any](c *statementCompiler, stmt string, opt *database.ListOptions[F], schema database.Schema[F, T]) error {
+func compileRead[F ~uint8, T any](
+	c *statementCompiler,
+	stmt string,
+	opt *database.ListOptions[F],
+	schema database.Schema[F, T],
+	extraWhere ...func(*statementCompiler, bool) bool,
+) error {
 	c.WriteString(stmt)
 
 	filter := opt.Filter
@@ -42,9 +48,14 @@ func compileRead[F ~uint8, T any](c *statementCompiler, stmt string, opt *databa
 			filter = database.And(filter, database.CompareLess(terms...))
 		}
 	}
+	hasWhere := false
 	if filter != nil {
 		c.WriteString(" WHERE ")
 		compileFilter(c, filter, schema)
+		hasWhere = true
+	}
+	for _, extra := range extraWhere {
+		hasWhere = extra(c, hasWhere)
 	}
 
 	compileOrderBy(c, opt.Pagination.OrderBy, schema)

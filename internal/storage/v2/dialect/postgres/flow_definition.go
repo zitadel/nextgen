@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -125,7 +124,34 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 	opts.Filter = remaining
 
 	var compiler statementCompiler
-	if err := compileFlowDefinitionList(&compiler, &opts, statusValue, purposeValue); err != nil {
+	err := compileRead(&compiler, flowDefinitionQuery, &opts, flowdefinition.Schema,
+		func(c *statementCompiler, hasWhere bool) bool {
+			if statusValue != "" {
+				if hasWhere {
+					c.WriteString(" AND ")
+				} else {
+					c.WriteString(" WHERE ")
+				}
+				c.WriteString("status = ")
+				writeArg(c, statusValue)
+				c.WriteString(statusCast)
+				hasWhere = true
+			}
+			if purposeValue != "" {
+				if hasWhere {
+					c.WriteString(" AND ")
+				} else {
+					c.WriteString(" WHERE ")
+				}
+				writeArg(c, purposeValue)
+				c.WriteString(purposeElemCast)
+				c.WriteString(" = ANY(purposes)")
+				hasWhere = true
+			}
+			return hasWhere
+		},
+	)
+	if err != nil {
 		return nil, err
 	}
 
@@ -151,63 +177,6 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 		Items:      defs,
 		NextCursor: nextCursor,
 	}, nil
-}
-
-func compileFlowDefinitionList(c *statementCompiler, opt *database.ListOptions[domain.FlowDefinitionField], statusValue, purposeValue string) error {
-	c.WriteString(flowDefinitionQuery)
-
-	filter := opt.Filter
-	if len(opt.Pagination.Cursor) != 0 {
-		cursor, err := pagination.CursorFromToken[domain.FlowDefinitionField](opt.Pagination.Cursor)
-		if err != nil {
-			return database.ErrInvalidCursor()
-		}
-		if !cursor.MatchesOrderBy(opt.Pagination.OrderBy.Columns) {
-			return database.ErrCursorOrderMismatch()
-		}
-		values, err := flowdefinition.Schema.CoerceCursorValues(cursor.Columns, cursor.Values)
-		if err != nil {
-			return database.ErrInvalidCursor().WithParent(err)
-		}
-		terms := compareTerms(cursor.Columns, values)
-		if opt.Pagination.OrderBy.Direction == database.OrderAsc {
-			filter = database.And(filter, database.CompareGreater(terms...))
-		} else {
-			filter = database.And(filter, database.CompareLess(terms...))
-		}
-	}
-
-	if filter != nil || statusValue != "" || purposeValue != "" {
-		c.WriteString(" WHERE ")
-		needAnd := false
-		if filter != nil {
-			compileFilter(c, filter, flowdefinition.Schema)
-			needAnd = true
-		}
-		if statusValue != "" {
-			if needAnd {
-				c.WriteString(" AND ")
-			}
-			placeholder := "$" + strconv.Itoa(len(c.args)+1) + statusCast
-			c.args = append(c.args, statusValue)
-			c.WriteString("status = ")
-			c.WriteString(placeholder)
-			needAnd = true
-		}
-		if purposeValue != "" {
-			if needAnd {
-				c.WriteString(" AND ")
-			}
-			placeholder := "$" + strconv.Itoa(len(c.args)+1) + purposeElemCast
-			c.args = append(c.args, purposeValue)
-			c.WriteString(placeholder)
-			c.WriteString(" = ANY(purposes)")
-		}
-	}
-
-	compileOrderBy(c, opt.Pagination.OrderBy, flowdefinition.Schema)
-	compileLimit(c, opt.Pagination.Limit)
-	return nil
 }
 
 // DeleteFlowDefinitionByID implements [service.FlowDefinitionStatements].
