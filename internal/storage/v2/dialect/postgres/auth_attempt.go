@@ -13,6 +13,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	storagedb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/authattempt"
+	v2session "github.com/zitadel/nextgen/internal/storage/v2/session"
 )
 
 const authAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.session_id,` +
@@ -240,7 +241,7 @@ func (as authAttemptStatements) scan(rows pgx.Rows, attempt *domain.AuthAttempt)
 		if failureCount != nil {
 			failureCountV = *failureCount
 		}
-		checks, err := authattempt.NewAuthChecks(*checkType, challengeIDV, lastChallengedAtV, lastFailedAtV, verifiedAtV, failureCountV, challenge, factor)
+		checks, err := v2session.DecodeAuthChecks(*checkType, challengeIDV, lastChallengedAtV, lastFailedAtV, verifiedAtV, failureCountV, challenge, factor)
 		if err != nil {
 			return fmt.Errorf("failed to unmarshal auth check: %w", err)
 		}

@@ -4,8 +4,6 @@ package authattempt
 import (
 	"encoding/json"
 	"fmt"
-	"log/slog"
-	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
 )
@@ -50,63 +48,6 @@ func ChecksToJSON(checks []domain.AuthCheck) ([]byte, error) {
 	return checkRowsJSON, nil
 }
 
-// NewAuthChecks reconstructs domain checks from a stored check row.
-func NewAuthChecks(
-	checkType domain.AuthCheckType,
-	id string,
-	lastChallengedAt, lastFailedAt, verifiedAt time.Time,
-	failureCount uint16,
-	challenge, factor json.RawMessage,
-) (checks []domain.AuthCheck, err error) {
-	switch checkType {
-	case domain.AuthCheckTypeUser:
-		if !verifiedAt.IsZero() {
-			userFactor := domain.SetAuthFactorUser(verifiedAt)
-			if len(factor) > 0 {
-				err = json.Unmarshal(factor, &userFactor)
-				if err != nil {
-					return nil, fmt.Errorf("failed to unmarshal user auth check factor payload: %w", err)
-				}
-			}
-			checks = append(checks, userFactor)
-		}
-		if !lastChallengedAt.IsZero() {
-			checks = append(checks, domain.SetAuthChallengeUser(id, lastChallengedAt, lastFailedAt, failureCount))
-		}
-	case domain.AuthCheckTypePassword:
-		if !verifiedAt.IsZero() {
-			checks = append(checks, domain.SetAuthFactorPassword(verifiedAt))
-		}
-		if !lastChallengedAt.IsZero() {
-			checks = append(checks, domain.SetAuthChallengePassword(id, lastChallengedAt, lastFailedAt, failureCount))
-		}
-	case domain.AuthCheckTypePasskey:
-		if !verifiedAt.IsZero() {
-			passkeyFactor := domain.SetAuthFactorPasskey(verifiedAt)
-			if len(factor) > 0 {
-				err = json.Unmarshal(factor, passkeyFactor)
-				if err != nil {
-					return nil, fmt.Errorf("failed to unmarshal passkey auth check factor payload: %w", err)
-				}
-			}
-			checks = append(checks, passkeyFactor)
-		}
-		if !lastChallengedAt.IsZero() {
-			passkeyCheck := domain.SetAuthChallengePasskey(id, lastChallengedAt, lastFailedAt, failureCount)
-			if len(challenge) > 0 {
-				err = json.Unmarshal(challenge, passkeyCheck)
-				if err != nil {
-					return nil, fmt.Errorf("failed to unmarshal passkey auth check challenge payload: %w", err)
-				}
-			}
-			checks = append(checks, passkeyCheck)
-		}
-	default:
-		slog.Error("unsupported auth check type", slog.Any("check_type", checkType))
-	}
-	return checks, nil
-}
-
 // SessionIDArg converts an optional session ID string to a storage Identity string.
 func SessionIDArg(sessionID *string) string {
 	if sessionID == nil {
@@ -125,4 +66,17 @@ func MarshalPayloadJSON(payload any) (json.RawMessage, error) {
 		return nil, err
 	}
 	return b, nil
+}
+
+// MarshalPayloadString marshals a payload to a Spanner JSON string pointer.
+func MarshalPayloadString(payload any) (*string, error) {
+	b, err := MarshalPayloadJSON(payload)
+	if err != nil {
+		return nil, err
+	}
+	if b == nil {
+		return nil, nil
+	}
+	s := string(b)
+	return &s, nil
 }

@@ -3,6 +3,7 @@ package spanner
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	storagedb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/authattempt"
+	v2session "github.com/zitadel/nextgen/internal/storage/v2/session"
 )
 
 const (
@@ -32,8 +34,8 @@ const (
 	authAttemptChallengeSucceededStmt = `UPDATE checks SET last_verified_at = @p1, factor_payload = @p2, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0` +
 		` WHERE project_id = @p3 AND auth_attempt_id = @p4 AND type = @p5 AND id = @p6`
 	authAttemptChallengeFailedStmt = `UPDATE checks SET last_failed_at = @p1, failure_count = failure_count + 1` +
-		` WHERE project_id = @p2 AND auth_attempt_id = @p3 AND type = @p4 AND id = @p5`
-	authAttemptFailureSelectStmt = `SELECT failure_count, last_failed_at FROM checks WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3 AND id = @p4`
+		` WHERE project_id = @p2 AND auth_attempt_id = @p3 AND type = @p4 AND id = @p5` +
+		` THEN RETURN failure_count, last_failed_at`
 )
 
 type authAttemptStatements struct{ statement }
@@ -62,7 +64,7 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 
 	var sessionID any
 	if attempt.SessionID != nil {
-		id, err := parseAuthAttemptIdentity(*attempt.SessionID)
+		id, err := parseIdentity(*attempt.SessionID)
 		if err != nil {
 			return err
 		}
@@ -94,13 +96,9 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 			if isChallenge {
 				challengedAt = &now
 				challenge.SetLastChallengedAt(now)
-				if cp := challenge.Payload(); cp != nil {
-					b, err := json.Marshal(cp)
-					if err != nil {
-						return fmt.Errorf("failed to marshal challenge payload: %w", err)
-					}
-					s := string(b)
-					challengePayload = &s
+				challengePayload, err = authattempt.MarshalPayloadString(challenge.Payload())
+				if err != nil {
+					return fmt.Errorf("failed to marshal challenge payload: %w", err)
 				}
 			}
 			if isFactor {
@@ -108,13 +106,9 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 					verifiedAt = &now
 					factor.SetLastVerifiedAt(now)
 				}
-				if fp := factor.Payload(); fp != nil {
-					b, err := json.Marshal(fp)
-					if err != nil {
-						return fmt.Errorf("failed to marshal factor payload: %w", err)
-					}
-					s := string(b)
-					factorPayload = &s
+				factorPayload, err = authattempt.MarshalPayloadString(factor.Payload())
+				if err != nil {
+					return fmt.Errorf("failed to marshal factor payload: %w", err)
 				}
 			}
 
@@ -141,7 +135,7 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 
 // GetAuthAttemptByID implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) GetAuthAttemptByID(ctx context.Context, projectID, authAttemptID string) (*domain.AuthAttempt, error) {
-	id, err := parseAuthAttemptIdentity(authAttemptID)
+	id, err := parseIdentity(authAttemptID)
 	if err != nil {
 		return nil, err
 	}
@@ -217,8 +211,6 @@ func (as authAttemptStatements) scan(iter *spanner.RowIterator, attempt *domain.
 		if !checkType.Valid {
 			return nil
 		}
-		challengeRaw := json.RawMessage(nullJSONBytes(challenge))
-		factorRaw := json.RawMessage(nullJSONBytes(factor))
 		var (
 			lastChallengedAtV time.Time
 			lastFailedAtV     time.Time
@@ -237,11 +229,12 @@ func (as authAttemptStatements) scan(iter *spanner.RowIterator, attempt *domain.
 		if failureCount.Valid {
 			failureCountV = uint16(failureCount.Int64)
 		}
-		checks, err := authattempt.NewAuthChecks(
+		checks, err := v2session.DecodeAuthChecks(
 			domain.AuthCheckType(checkType.Int64),
 			challengeID.String(),
 			lastChallengedAtV, lastFailedAtV, verifiedAtV, failureCountV,
-			challengeRaw, factorRaw,
+			json.RawMessage(nullJSONBytes(challenge)),
+			json.RawMessage(nullJSONBytes(factor)),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to unmarshal auth check: %w", err)
@@ -262,7 +255,7 @@ func (as authAttemptStatements) scan(iter *spanner.RowIterator, attempt *domain.
 
 // DeleteAuthAttemptByID implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) DeleteAuthAttemptByID(ctx context.Context, projectID, authAttemptID string) error {
-	id, err := parseAuthAttemptIdentity(authAttemptID)
+	id, err := parseIdentity(authAttemptID)
 	if err != nil {
 		return err
 	}
@@ -276,7 +269,7 @@ func (as authAttemptStatements) HandoffAuthAttempt(ctx context.Context, attempt 
 	if attempt.HandoffToken == nil {
 		return fmt.Errorf("failed to handoff auth attempt: handoff token is required")
 	}
-	id, err := parseAuthAttemptIdentity(attempt.ID)
+	id, err := parseIdentity(attempt.ID)
 	if err != nil {
 		return err
 	}
@@ -293,16 +286,11 @@ func (as authAttemptStatements) HandoffAuthAttempt(ctx context.Context, attempt 
 // SetAuthAttemptChallenge implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) SetAuthAttemptChallenge(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error {
 	now := time.Now().UTC()
-	var payloadStr *string
-	if challenge.Payload() != nil {
-		b, err := json.Marshal(challenge.Payload())
-		if err != nil {
-			return fmt.Errorf("failed to marshal challenge payload: %w", err)
-		}
-		s := string(b)
-		payloadStr = &s
+	payloadStr, err := authattempt.MarshalPayloadString(challenge.Payload())
+	if err != nil {
+		return fmt.Errorf("failed to marshal challenge payload: %w", err)
 	}
-	id, err := parseAuthAttemptIdentity(authAttemptID)
+	id, err := parseIdentity(authAttemptID)
 	if err != nil {
 		return err
 	}
@@ -329,20 +317,15 @@ func (as authAttemptStatements) SetAuthAttemptChallenge(ctx context.Context, pro
 // AuthAttemptChallengeSucceeded implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) AuthAttemptChallengeSucceeded(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor, challengeID string) error {
 	now := time.Now().UTC()
-	var factorStr *string
-	if payload := factor.Payload(); payload != nil {
-		b, err := json.Marshal(payload)
-		if err != nil {
-			return fmt.Errorf("failed to marshal factor payload: %w", err)
-		}
-		s := string(b)
-		factorStr = &s
+	factorStr, err := authattempt.MarshalPayloadString(factor.Payload())
+	if err != nil {
+		return fmt.Errorf("failed to marshal factor payload: %w", err)
 	}
-	attemptID, err := parseAuthAttemptIdentity(authAttemptID)
+	attemptID, err := parseIdentity(authAttemptID)
 	if err != nil {
 		return err
 	}
-	checkID, err := parseAuthAttemptIdentity(challengeID)
+	checkID, err := parseIdentity(challengeID)
 	if err != nil {
 		return err
 	}
@@ -363,49 +346,35 @@ func (as authAttemptStatements) AuthAttemptChallengeSucceeded(ctx context.Contex
 // AuthAttemptChallengeFailed implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) AuthAttemptChallengeFailed(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error {
 	now := time.Now().UTC()
-	attemptID, err := parseAuthAttemptIdentity(authAttemptID)
+	attemptID, err := parseIdentity(authAttemptID)
 	if err != nil {
 		return err
 	}
-	checkID, err := parseAuthAttemptIdentity(challenge.GetID())
+	checkID, err := parseIdentity(challenge.GetID())
 	if err != nil {
 		return err
 	}
 
 	stmt := buildStatement(authAttemptChallengeFailedStmt,
 		now, projectID, attemptID, int64(challenge.Type()), checkID).statement()
-	n, err := as.db.Update(ctx, stmt)
-	if err != nil {
-		return fmt.Errorf("failed to update challenge failed: %w", err)
-	}
-	if n == 0 {
-		return domain.ErrAuthAttemptStaleChallenge()
-	}
-
 	var failureCount int64
 	var lastFailedAt time.Time
-	selectStmt := buildStatement(authAttemptFailureSelectStmt,
-		projectID, attemptID, int64(challenge.Type()), checkID).statement()
-	err = as.db.Query(ctx, selectStmt, func(iter *spanner.RowIterator) error {
+	err = as.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 			return struct{}{}, row.Columns(&failureCount, &lastFailedAt)
 		})
 		return err
 	})
 	if err != nil {
-		return fmt.Errorf("failed to read failure count: %w", err)
+		var noRow *storagedb.NoRowFoundError
+		if errors.As(err, &noRow) {
+			return domain.ErrAuthAttemptStaleChallenge()
+		}
+		return fmt.Errorf("failed to update challenge failed: %w", err)
 	}
 	challenge.SetFailureCount(uint16(failureCount))
 	challenge.SetLastFailedAt(lastFailedAt)
 	return nil
-}
-
-func parseAuthAttemptIdentity(id string) (int64, error) {
-	n, err := strconv.ParseInt(id, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("invalid auth attempt identity %q: %w", id, err)
-	}
-	return n, nil
 }
 
 var _ service.AuthAttemptStatements = (*authAttemptStatements)(nil)
