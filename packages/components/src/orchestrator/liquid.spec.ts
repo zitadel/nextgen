@@ -1,18 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
-import { TEMPLATE_NAMES } from "./template-names.js";
 import { en as fullLocale } from "./locales/en.js";
 import { mandatoryGatesMarkerComment } from "./mandatory-gates.js";
+import { TEMPLATE_NAMES } from "./template-names.js";
 
 /**
  * Convert author-friendly `{ name: {...}, ... }` dicts into the wire-shape
  * `[{ name, ... }, ...]` array. Keeps each test's context authoring concise
  * while matching the runtime contract.
  */
-function toArray<T extends object>(
-  entries: Record<string, T>,
-): ({ name: string } & T)[] {
+function toArray<T extends object>(entries: Record<string, T>): ({ name: string } & T)[] {
   return Object.entries(entries).map(([name, body]) => ({ name, ...body }));
 }
 
@@ -83,12 +81,12 @@ describe("LiquidJS engine", () => {
     // `<step>.field.<name>` label keys no catalog can enumerate — the
     // form must not render the raw key.
     const engine = createLiquidEngine({ locale });
-    expect(
-      engine.parseAndRenderSync("{{ key | t }}", { key: "register.field.department" }),
-    ).toBe("Department");
-    expect(
-      engine.parseAndRenderSync("{{ key | t }}", { key: "register.field.dateOfBirth" }),
-    ).toBe("Date of birth");
+    expect(engine.parseAndRenderSync("{{ key | t }}", { key: "register.field.department" })).toBe(
+      "Department",
+    );
+    expect(engine.parseAndRenderSync("{{ key | t }}", { key: "register.field.dateOfBirth" })).toBe(
+      "Date of birth",
+    );
     expect(
       engine.parseAndRenderSync("{{ key | t }}", { key: "register.field.emergency_contact" }),
     ).toBe("Emergency contact");
@@ -177,7 +175,7 @@ describe("LiquidJS engine", () => {
     expect(result).toContain("<zl-card");
     expect(result).toContain("<zl-field");
     expect(result).toContain('data-testid="zitadel-field-identifier"');
-    expect(result).toContain('<zl-button');
+    expect(result).toContain("<zl-button");
     expect(result).toContain('data-testid="zitadel-action-submit"');
     expect(result).toContain('hierarchy="primary"');
     expect(result).toContain(mandatoryGatesMarkerComment);
@@ -412,7 +410,11 @@ describe("LiquidJS engine", () => {
     expect(result).toContain("zl-card-title");
   });
 
-  it("renders combined sign-in (6593:141983): email+password, forgot link, sign-in CTA", () => {
+  // A template-capability test, not the default flow: the default flow splits
+  // email and credential across two steps. The template must still render
+  // whatever field set a tenant's flow definition declares on one step,
+  // including an email+password pair (Figma `6593:141983`).
+  it("renders an email+password step on one card: autocomplete, forgot link, sign-in CTA", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
     const f = toArray({
       email: { type: "email", text_key: "identifier.field.email", required: true },
@@ -705,9 +707,9 @@ describe("localiseFlowErrorKeys", () => {
     // error would render nowhere.
     // The label resolves through the step's catalog entry
     // (`register.field.email` → "Work email"), not the bare field name.
-    expect(
-      localiseFlowErrorKeys("error.email_required", { ...ctx, fields: ["password"] }),
-    ).toEqual([{ message: "Work email is required." }]);
+    expect(localiseFlowErrorKeys("error.email_required", { ...ctx, fields: ["password"] })).toEqual(
+      [{ message: "Work email is required." }],
+    );
     // Inline key without a recognised rule suffix: its catalog copy
     // becomes the banner message verbatim.
     expect(localiseFlowErrorKeys("error.email_exists", { ...ctx, fields: ["password"] })).toEqual([
@@ -744,8 +746,8 @@ describe("localiseFlowErrorKeys", () => {
       }),
     ).toEqual([{ field: "email", message: "Work email is too short." }]);
     // The same key with the field absent stays a fieldless banner message.
-    expect(
-      localiseFlowErrorKeys("error.country_required", { ...ctx, fields: ["email"] }),
-    ).toEqual([{ message: "Country is required." }]);
+    expect(localiseFlowErrorKeys("error.country_required", { ...ctx, fields: ["email"] })).toEqual([
+      { message: "Country is required." },
+    ]);
   });
 });

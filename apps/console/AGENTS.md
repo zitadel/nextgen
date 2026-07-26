@@ -60,15 +60,16 @@ The console manages an instance, so **use `console:dev-real`** — it boots a re
 ephemeral instance and seeds users, so list screens show real API responses.
 `@zitadel/api-mock` has no user store; a users list read from it is a fiction.
 
-Two mock traps to avoid:
+Two things to know:
 
 - `listUsers` requires `user.read`, which only the project secret carries — the
   publishable key is deliberately refused (`internal/api/user.go`). A signed-in
   console is not sufficient for real list data; the proxy secret is.
-- The mock's login flow is a **combined** email+password card. The real default
-  flow (`packages/config/defaults/default-login.json`) is a **split**
-  `identifier` → `password`. Never design or verify login screens against the
-  mock.
+- The mock's flow shape now mirrors the real default flow (split
+  `identifier` → `password`), so it is trustworthy for chrome — but it has no user
+  store and cannot prove authorization. Keep it that way: the authority is
+  `packages/config/defaults/default-login.json`, and a step fixture must be
+  diffed against it before being changed (`packages/api-mock/AGENTS.md`).
 
 See the Local development section of [`README.md`](README.md) for all three
 backends and when each applies.

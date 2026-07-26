@@ -139,13 +139,12 @@ VITE_CONSOLE_PROJECT_ID=proj_dev_mock \
 ```
 
 Fast and offline, and the full sign-in loop works (the mock serves
-`/sessions/exchange` and `/sessions/me`). Use it only for chrome that needs no
-real data. Two things to know: the mock serves no `/console/runtime.json`, so
-runtime discovery falls back to `standalone` and the project id must come from
-`VITE_CONSOLE_PROJECT_ID`; and **the mock's login flow does not match the real
-one** — it serves a single combined email+password card, where the real default
-flow is a split `identifier` → `password`. Do not design login screens against
-it.
+`/sessions/exchange` and `/sessions/me`), with the same split
+`identifier` → `password` flow the real server emits. Use it only for chrome that
+needs no real data: it has **no user store**, so list screens cannot be
+meaningful and nothing about authorization can be proven there. It also serves no
+`/console/runtime.json`, so runtime discovery falls back to `standalone` and the
+project id must come from `VITE_CONSOLE_PROJECT_ID`.
 
 ### Embedded build
 
