@@ -160,6 +160,46 @@ func TestUserRepository_Create_RollsBackWhenMembershipInsertFails(t *testing.T) 
 	require.Error(t, getErr)
 }
 
+// project deletion purges teams, users, and their
+// memberships together (unlike team/user deletion, which must not cascade).
+func TestUserTeamLifecycle_ProjectDeleteCascadesThroughMemberships(t *testing.T) {
+	skipIfSpanner(t)
+	tx, rollback := transactionForRollback(t)
+	defer rollback()
+	ctx := t.Context()
+
+	const (
+		pid       = "proj-lifecycle-project-delete"
+		teamID    = "team-lifecycle-project-delete"
+		userID    = "usr-lifecycle-project-delete"
+		schemaURL = "https://schemas.test/lifecycle-project-delete/v1.json"
+	)
+
+	userRepo := setupLifecycleFixture(t, tx, pid)
+	ensureTeam(t, tx, pid, teamID)
+
+	participation := teamID
+	createLifecycleUser(t, tx, userRepo, pid, schemaURL, userID, nil, &participation)
+
+	deleteProject(t, tx, pid)
+
+	_, err := userRepo.Get(ctx, tx, database.WithCondition(userRepo.PrimaryKeyCondition(pid, userID)))
+	require.ErrorIs(t, err, new(database.NoRowFoundError))
+
+	var teamCount int
+	require.NoError(t, tx.QueryRow(ctx,
+		`SELECT count(*) FROM zitadel_nextgen.teams WHERE project_id = $1 AND id = $2`,
+		pid, teamID).Scan(&teamCount))
+	require.Zero(t, teamCount, "team should be removed by project delete cascade")
+
+	row := tx.QueryRow(ctx,
+		fmt.Sprintf(`SELECT status FROM %s WHERE project_id = $1 AND team_id = $2 AND user_id = $3`, dbTable("team_memberships")),
+		pid, teamID, userID,
+	)
+	var status string
+	require.Error(t, row.Scan(&status), "membership should be removed with project delete cascade")
+}
+
 func TestUserRepository_DeactivateRemovesMemberships(t *testing.T) {
 	skipIfSpanner(t)
 	tx, rollback := transactionForRollback(t)
@@ -185,10 +225,7 @@ func TestUserRepository_DeactivateRemovesMemberships(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, domain.UserStatusDeactivated, got.Status)
 
-	membershipRepo := repository.NewTeamMembershipRepository(tx)
-	membership, err := membershipRepo.Get(ctx, tx, pid, teamID, userID)
-	require.NoError(t, err)
-	require.Equal(t, domain.MembershipStatusRemoved, membership.Status)
+	require.Equal(t, domain.MembershipStatusRemoved, getTeamMembershipStatus(t, tx, pid, teamID, userID))
 
 	team := getTeam(t, tx, pid, teamID)
 	require.Equal(t, teamID, team.ID, fmt.Sprintf("team %s should still exist after user deactivation", teamID))
