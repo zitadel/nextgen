@@ -67,9 +67,13 @@ What `<zitadel-login>` handles for you:
   `redirect` / `show` honoured automatically.
 - Native `<form>` semantics: Enter submits, password managers see the inputs,
   `<button type="submit">` works, browser autofill works.
-- Focus moved to the first field on every step change.
+- Focus moved to the first field on every step change (and on load in
+  `variant="page"`; an embedded widget deliberately leaves initial focus alone
+  so it can't scroll-jump the page it sits on).
 - Branding tokens mapped to CSS variables on the shadow root.
-- Light/dark theme via `prefers-color-scheme`, hot-swappable.
+- Light and dark theme, hot-swappable: the `theme` property, else the tenant's
+  `branding.theme.mode`, else the variant default (`page` dark, `widget`
+  follows `prefers-color-scheme`).
 - Mandatory gates (terms, captcha) enforced before submit.
 - Output sanitised with DOMPurify against a per-atom allowlist before injection.
 - Stateless server: the `_zflow` HttpOnly cookie is the source of truth
@@ -159,11 +163,13 @@ form-associated inputs.
 | Tier | Surface | Use when |
 | --- | --- | --- |
 | SDK config | `configureZitadel({ projectId, proxyPath })` from `@zitadel/api/config` | every consumer — sets the project + proxy path the element reads |
-| Tokens | branding payload returned from the server | tenant colour / logo / font |
-| CSS hooks | `zitadel-login::part(form)`, `zitadel-login::part(field-input)` | targeted overrides from the host page |
+| Tokens (server) | branding payload returned from the server | tenant colour / logo / font, managed centrally |
+| Tokens (host page) | `zitadel-login { --zl-color-…: … }` in your own stylesheet | matching the widget to the app you embedded it in |
+| Layout / placement | host CSS on `zitadel-login { ... }`, `variant`, `--zl-page-min-height` | sizing and positioning inside your layout |
+| CSS hooks | `zitadel-login::part(form)`, `zitadel-login::part(field-input)` | targeted overrides of atom internals |
 | Locale | `el.lang = 'de'` / `el.locales = { ... }` | i18n / custom copy |
 | MSW mocks | `setupWorker` / `setupServer` from `msw` | offline / staging / fixtures |
-| Custom template | (planned) | tenant-supplied Liquid layouts |
+| Custom template | `zitadel branding eject` → edit Liquid → `zitadel apply`, or `branding.liquid_template` on the payload | tenant-supplied layouts |
 | Atoms-only | hand-built form | non-standard flow shells |
 
 For styling, start with the generated `--zl-*` variables from
@@ -171,6 +177,26 @@ For styling, start with the generated `--zl-*` variables from
 placement and `::part(...)` hooks for targeted internals such as the form or
 field input. The design-token package README is the canonical token catalogue;
 the branding design notes explain the broader override ladder.
+
+**Your stylesheet is the strongest styling authority.** A plain rule in the
+embedding app wins:
+
+```css
+zitadel-login {
+  --zl-color-text-primary-white: #101828;
+  --zl-color-surface-default-primary-gray: #ffffff;
+  --zl-radius-m: 0.25rem;
+}
+```
+
+Those values reach the atoms' own shadow roots — custom properties inherit
+across shadow boundaries — and they outrank both the design-system defaults
+and the tenant's server-side branding, because the CSS cascade gives normal
+declarations from the outer tree precedence over the `:host` rules the
+orchestrator adopts internally. That ordering is deliberate: an app embedding
+its own login should be able to match its design system without a server
+round-trip. Leave the tokens alone and centrally-managed tenant branding
+applies as before. `customization.browser.spec.ts` pins this.
 
 **Sizing is a two-mode contract.** The default is `variant="widget"`:
 content-sized, transparent through every layer, no fonts injected into your
@@ -241,9 +267,11 @@ renders the bundled `default.liquid`. Tracked as a follow-up.
 | `resumeFlowId` / `resume-flow-id` | `string` | Resume an existing flow handle instead of starting fresh |
 
 Events: `zitadel-flow-input`, `zitadel-flow-step`, `zitadel-flow-complete`,
-`zitadel-flow-error`. The orchestrator exposes `::part(form)` for tenant-side
-CSS hooks. Adopts design tokens and `branding.font_url` into its shadow root
-on each update.
+`zitadel-flow-error`. `zitadel-flow-step` fires for every applied step
+including the first, so a host app can drive its own chrome (progress,
+headings, analytics) from mount onwards rather than from the first submit.
+The orchestrator exposes `::part(form)` for tenant-side CSS hooks. Adopts
+design tokens and `branding.font_url` into its shadow root on each update.
 
 ### `<zitadel-logout>`
 

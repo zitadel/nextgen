@@ -8,6 +8,7 @@ import type { ZitadelLogin } from "./zitadel-login.js";
 // Raw import via the liquidRaw Vite plugin — @zitadel/config/defaults reads
 // files with node:fs at call time, which cannot run inside Chromium.
 import splitTemplate from "../../../config/defaults/branding/split/login.liquid";
+import heroTemplate from "../../../config/defaults/branding/hero/login.liquid";
 
 /**
  * Real-browser checks for the widget-first embedding contract.
@@ -47,6 +48,25 @@ const splitHeroOnlyStep: CreateFlow201 = {
     layout: "split",
     liquid_template: splitTemplate,
     hero_url: "https://cdn.example.com/hero.png",
+  },
+} as unknown as CreateFlow201;
+
+/** The shipped split design with a logo: the compact fallback is a capped <img>. */
+const splitLogoStep: CreateFlow201 = {
+  ...identifierStep,
+  branding: {
+    layout: "split",
+    liquid_template: splitTemplate,
+    logo_url: "https://cdn.example.com/logo.png",
+  },
+} as unknown as CreateFlow201;
+
+/** The hero design, logo-less: its compact fallback is a <p>, not an <img>. */
+const heroNoLogoStep: CreateFlow201 = {
+  ...identifierStep,
+  branding: {
+    layout: "split",
+    liquid_template: heroTemplate,
   },
 } as unknown as CreateFlow201;
 
@@ -186,5 +206,36 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(getComputedStyle(compact).display).not.toBe("none");
     // hero_url-only tenants get the banner variant of the fallback.
     expect(compact.classList.contains("zl-split__compact--hero")).toBe(true);
+  });
+
+  it("the compact fallback height cap applies to images, never to text", async () => {
+    // The hero design's compact fallback is a <p>, and its copy is meant to
+    // be edited — a fixed height cap inherited from the <img> case would clip
+    // any brand name that wraps. Images keep the cap; text must not have one.
+    const element = await mount(heroNoLogoStep);
+    const compact = element.shadowRoot?.querySelector(".zl-split__compact") as HTMLElement;
+    expect(compact.tagName).toBe("P");
+    expect(getComputedStyle(compact).display).not.toBe("none");
+    expect(getComputedStyle(compact).maxHeight).toBe("none");
+
+    // Two lines of tenant copy must render in full, not be clipped.
+    compact.textContent = "A rather long tenant brand name that wraps";
+    await new Promise((resolve) => setTimeout(resolve, 32));
+    expect(compact.getBoundingClientRect().height).toBeGreaterThan(30);
+    expect(compact.scrollHeight).toBeLessThanOrEqual(compact.clientHeight + 1);
+
+    // Images keep their caps, and the two image cases stay distinct: a logo
+    // is held to 2.5rem, the hero banner to 6rem. Both rules are `img`-
+    // qualified so source order decides — an unqualified banner rule would
+    // lose to the qualified logo rule on specificity and silently shrink.
+    const withLogo = await mount(splitLogoStep);
+    const logo = withLogo.shadowRoot?.querySelector(".zl-split__compact") as HTMLElement;
+    expect(logo.tagName).toBe("IMG");
+    expect(getComputedStyle(logo).maxHeight).toBe("40px");
+
+    const withHero = await mount(splitHeroOnlyStep);
+    const banner = withHero.shadowRoot?.querySelector(".zl-split__compact") as HTMLElement;
+    expect(banner.tagName).toBe("IMG");
+    expect(getComputedStyle(banner).maxHeight).toBe("96px");
   });
 });

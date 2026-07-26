@@ -470,6 +470,11 @@ export class ZitadelLogin extends LitElement {
         });
       }
       this.applyResponse(wire);
+      // Symmetric with `submit()`: every applied step announces itself, the
+      // first one included. A host app driving its own chrome from the step
+      // (progress, headings, analytics) would otherwise see nothing until
+      // after the visitor's first submit.
+      emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
       this.handleTransportError(this.describeFlowSelectionError(error));
     } finally {

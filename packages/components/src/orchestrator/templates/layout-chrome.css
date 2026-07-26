@@ -169,12 +169,20 @@
    so collapsing the brand pane doesn't erase the tenant's identity. */
 .zl-split__compact {
   display: none;
-  max-height: 2.5rem;
   max-width: min(12rem, 60%);
+}
+/* The height cap is an image concern — it keeps a tall logo from crowding
+   out the card. The hero design's fallback is a <p> whose copy tenants are
+   meant to edit, and a shared cap would clip it the moment it wraps; the
+   `img` qualifier keeps the two cases from inheriting each other's limits.
+   Both rules are `img`-qualified so source order (not specificity) decides
+   between the logo cap and the hero banner cap. */
+img.zl-split__compact {
+  max-height: 2.5rem;
 }
 /* hero_url-only tenants: the compact fallback renders the hero image as a
    modest banner instead of vanishing with the brand pane. */
-.zl-split__compact--hero {
+img.zl-split__compact--hero {
   max-height: 6rem;
   max-width: 100%;
   width: 100%;
@@ -248,9 +256,14 @@
   );
 }
 /* Text fallback for the mobile compact header when no logo_url is set
-   (display is owned by .zl-split__compact; this only styles the text). */
+   (display is owned by .zl-split__compact; this only styles the text).
+   Overrides the logo-sized width the shared class assumes, resets the
+   paragraph margin, and lets a long unbroken brand name wrap instead of
+   pushing the form pane sideways. */
 .zl-hero__compact-brand {
   margin: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   font-size: 1.125rem;
   font-weight: 700;
   letter-spacing: -0.01em;
