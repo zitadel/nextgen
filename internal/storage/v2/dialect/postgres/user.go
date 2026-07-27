@@ -10,7 +10,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
-	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
+	v2user "github.com/zitadel/nextgen/internal/storage/v2/user"
 )
 
 const (
@@ -171,60 +171,27 @@ func (us userStatements) GetUser(ctx context.Context, filter database.Filter[dom
 
 // ListUsers implements [service.UserStatements].
 func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
-	if filter == nil {
-		filter = &database.ListOptions[domain.UserField]{}
-	}
-	if len(filter.Pagination.OrderBy.Columns) == 0 {
-		filter.Pagination.OrderBy = database.OrderBy[domain.UserField]{
-			Columns: []database.Column[domain.UserField]{
-				database.Col(domain.UserFieldCreatedAt),
-				database.Col(domain.UserFieldID),
-			},
-			Direction: database.OrderAsc,
-		}
+	filter = v2user.EnsureListOptions(filter)
+
+	readFilter, err := v2user.ApplyCursor(filter.Filter, filter.Pagination)
+	if err != nil {
+		return nil, err
 	}
 
 	var compiler statementCompiler
 	compiler.WriteString(userQuery)
 
-	readFilter := filter.Filter
-	if len(filter.Pagination.Cursor) != 0 {
-		cursor, err := pagination.CursorFromToken[domain.UserField](filter.Pagination.Cursor)
-		if err != nil {
-			return nil, database.ErrInvalidCursor()
-		}
-		if !cursor.MatchesOrderBy(filter.Pagination.OrderBy.Columns) {
-			return nil, database.ErrCursorOrderMismatch()
-		}
-		values, err := userSchema.CoerceCursorValues(cursor.Columns, cursor.Values)
-		if err != nil {
-			return nil, database.ErrInvalidCursor().WithParent(err)
-		}
-		terms := compareTerms(cursor.Columns, values)
-		if filter.Pagination.OrderBy.Direction == database.OrderAsc {
-			readFilter = database.And(readFilter, database.CompareGreater(terms...))
-		} else {
-			readFilter = database.And(readFilter, database.CompareLess(terms...))
-		}
-	}
-
 	hasWhere := false
 	if readFilter != nil {
-		compiler.WriteString(" WHERE ")
-		compileFilter(&compiler, readFilter, userSchema)
-		hasWhere = true
+		writeConjunct(&compiler, &hasWhere)
+		compileFilter(&compiler, readFilter, v2user.Schema)
 	}
 	for _, a := range opts.Attributes {
 		raw, err := json.Marshal(a.Value)
 		if err != nil {
 			return nil, fmt.Errorf("marshal attribute %q: %w", a.Key, err)
 		}
-		if hasWhere {
-			compiler.WriteString(" AND ")
-		} else {
-			compiler.WriteString(" WHERE ")
-			hasWhere = true
-		}
+		writeConjunct(&compiler, &hasWhere)
 		compiler.WriteString("EXISTS (SELECT 1 FROM ")
 		compiler.WriteString(userAttributesTable)
 		compiler.WriteString(" a WHERE a.project_id = zitadel_nextgen.users.project_id AND a.user_id = zitadel_nextgen.users.id AND a.key = ")
@@ -234,11 +201,7 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 		compiler.WriteString("::jsonb AND jsonb_typeof(a.value) IN ('string', 'number', 'boolean'))")
 	}
 	if opts.MembershipTeamID != nil {
-		if hasWhere {
-			compiler.WriteString(" AND ")
-		} else {
-			compiler.WriteString(" WHERE ")
-		}
+		writeConjunct(&compiler, &hasWhere)
 		compiler.WriteString("EXISTS (SELECT 1 FROM ")
 		compiler.WriteString(teamMembershipsTable)
 		compiler.WriteString(" m WHERE m.project_id = zitadel_nextgen.users.project_id AND m.user_id = zitadel_nextgen.users.id AND m.team_id = ")
@@ -248,7 +211,7 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 		compiler.WriteString(")")
 	}
 
-	compileOrderBy(&compiler, filter.Pagination.OrderBy, userSchema)
+	compileOrderBy(&compiler, filter.Pagination.OrderBy, v2user.Schema)
 	compileLimit(&compiler, filter.Pagination.Limit)
 
 	rows, err := us.client.Query(ctx, compiler.String(), compiler.args...)
@@ -263,19 +226,19 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 		return nil, err
 	}
 
-	var nextCursor []byte
-	if filter.Pagination.Limit > 0 && len(users) == int(filter.Pagination.Limit) {
-		cursor := &pagination.Cursor[domain.UserField]{
-			Columns: filter.Pagination.OrderBy.Columns,
-			Values:  userSchema.ValuesFrom(users[len(users)-1], filter.Pagination.OrderBy.Columns),
-		}
-		nextCursor = cursor.Marshal()
-	}
-
 	return &database.ListResult[*domain.User]{
 		Items:      users,
-		NextCursor: nextCursor,
+		NextCursor: v2user.NextCursor(users, filter.Pagination),
 	}, nil
+}
+
+func writeConjunct(c *statementCompiler, hasWhere *bool) {
+	if *hasWhere {
+		c.WriteString(" AND ")
+		return
+	}
+	c.WriteString(" WHERE ")
+	*hasWhere = true
 }
 
 // DeactivateUser implements [service.UserStatements].
@@ -315,26 +278,13 @@ func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User,
 		return nil
 	}
 
-	usersByProject := make(map[string][]*domain.User)
-	for _, user := range users {
-		user.Attributes = nil
-		usersByProject[user.ProjectID] = append(usersByProject[user.ProjectID], user)
-	}
-
 	attrKeys := opts.AttributeKeys
 	if attrKeys == nil {
 		attrKeys = []string{}
 	}
 
-	for projectID, projectUsers := range usersByProject {
-		userIDs := make([]string, 0, len(projectUsers))
-		usersByID := make(map[string]*domain.User, len(projectUsers))
-		for _, user := range projectUsers {
-			userIDs = append(userIDs, user.ID)
-			usersByID[user.ID] = user
-		}
-
-		rows, err := us.client.Query(ctx, userAttributesByIDsQuery, projectID, userIDs, attrKeys)
+	for _, group := range v2user.GroupByProject(users) {
+		rows, err := us.client.Query(ctx, userAttributesByIDsQuery, group.ProjectID, group.IDs, attrKeys)
 		if err != nil {
 			return wrapError(err)
 		}
@@ -344,7 +294,7 @@ func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User,
 			if err := row.Scan(&userID, &key, &value); err != nil {
 				return struct{}{}, err
 			}
-			user, ok := usersByID[userID]
+			user, ok := group.ByID[userID]
 			if !ok {
 				return struct{}{}, nil
 			}
@@ -397,58 +347,4 @@ func uniquenessScopeLiteral(scope domain.AttributeUniqueness) string {
 	}
 }
 
-func coerceUserStatus(v any) (any, error) {
-	switch t := v.(type) {
-	case domain.UserStatus:
-		return t.String(), nil
-	case string:
-		return t, nil
-	default:
-		return nil, database.ErrCoerceExpectedType("user status", v)
-	}
-}
-
 var _ service.UserStatements = (*userStatements)(nil)
-
-var userSchema = database.NewSchema(map[domain.UserField]database.FieldBinding[domain.User]{
-	domain.UserFieldProjectID: {
-		SQLName:  "project_id",
-		Accessor: func(u *domain.User) any { return u.ProjectID },
-		Coerce:   database.CoerceString,
-	},
-	domain.UserFieldID: {
-		SQLName:  "id",
-		Accessor: func(u *domain.User) any { return u.ID },
-		Coerce:   database.CoerceString,
-	},
-	domain.UserFieldSchemaURL: {
-		SQLName:  "schema_url",
-		Accessor: func(u *domain.User) any { return u.SchemaURL },
-		Coerce:   database.CoerceString,
-	},
-	domain.UserFieldLifecycleOwnerTeamID: {
-		SQLName: "lifecycle_owner_team_id",
-		Accessor: func(u *domain.User) any {
-			if u.LifecycleOwnerTeamID == nil {
-				return ""
-			}
-			return *u.LifecycleOwnerTeamID
-		},
-		Coerce: database.CoerceString,
-	},
-	domain.UserFieldStatus: {
-		SQLName:  "status",
-		Accessor: func(u *domain.User) any { return u.Status.String() },
-		Coerce:   coerceUserStatus,
-	},
-	domain.UserFieldCreatedAt: {
-		SQLName:  "created_at",
-		Accessor: func(u *domain.User) any { return u.CreatedAt },
-		Coerce:   database.CoerceTime,
-	},
-	domain.UserFieldUpdatedAt: {
-		SQLName:  "updated_at",
-		Accessor: func(u *domain.User) any { return u.UpdatedAt },
-		Coerce:   database.CoerceTime,
-	},
-})

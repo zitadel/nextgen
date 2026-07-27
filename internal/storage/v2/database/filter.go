@@ -7,33 +7,6 @@ type Filter[F ~uint8] interface {
 	Restricts(column Column[F]) bool
 }
 
-// EqualStringValue returns the string bound by an Equal filter on field,
-// searching nested And filters. Used when a dialect needs a concrete column
-// value that is not expressible as a portable Filter fragment (e.g. EAV CTEs).
-func EqualStringValue[F ~uint8](filter Filter[F], field F) (string, bool) {
-	if filter == nil {
-		return "", false
-	}
-	switch f := filter.(type) {
-	case AndFilter[F]:
-		for _, sub := range f.Filters {
-			if v, ok := EqualStringValue(sub, field); ok {
-				return v, true
-			}
-		}
-	case *CompareFilter[F]:
-		if f.Op != OpEqual || len(f.Terms) != 1 {
-			return "", false
-		}
-		if f.Terms[0].Column.Field() != field {
-			return "", false
-		}
-		s, ok := f.Terms[0].Value.(string)
-		return s, ok
-	}
-	return "", false
-}
-
 type AndFilter[F ~uint8] struct {
 	Filters []Filter[F]
 }
