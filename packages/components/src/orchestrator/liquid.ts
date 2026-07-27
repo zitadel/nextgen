@@ -83,15 +83,28 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
   //
   //   {{ "password.title" | t: identity.display_name }}
   //   -> "Welcome back, Alice"
+  //
+  // A key that misses the dictionary AND both fallbacks renders as the raw
+  // key (graceful degradation) — with a warn-once console signal so template
+  // authors see the miss instead of shipping `action.recover` to users.
+  const warnedMissingKeys = new Set<string>();
   engine.registerFilter(
     "t",
     function tFilter(this: { context: unknown }, key: unknown, ...args: unknown[]) {
       const lookupKey = stringify(key);
-      const template =
+      let template =
         options.locale[lookupKey] ??
         injectedKeyFallback(options.locale, lookupKey) ??
-        fieldLabelFallback(lookupKey) ??
-        lookupKey;
+        fieldLabelFallback(lookupKey);
+      if (template === undefined) {
+        template = lookupKey;
+        if (lookupKey !== "" && !warnedMissingKeys.has(lookupKey)) {
+          warnedMissingKeys.add(lookupKey);
+          console.warn(
+            `[zitadel-login] missing text key "${lookupKey}" — rendering the raw key`,
+          );
+        }
+      }
       return interpolate(template, args.map(stringify));
     },
   );
