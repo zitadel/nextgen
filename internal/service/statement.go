@@ -186,7 +186,6 @@ type UserQueryOptions struct {
 	// AttributeKeys limits hydrated EAV keys; empty means all attributes.
 	AttributeKeys []string
 	// Attributes, when non-empty, restricts to users matching all key/value pairs.
-	// May be combined with column filters, MembershipTeamID, Limit, and cursor.
 	Attributes []domain.Attribute
 	// MembershipTeamID, when set, requires an active team membership.
 	MembershipTeamID *string

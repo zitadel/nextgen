@@ -25,7 +25,7 @@ func EnsureListOptions(opts *database.ListOptions[domain.UserField]) *database.L
 	return &out
 }
 
-// ApplyCursor Ands a keyset cursor predicate onto filter when page.Cursor is set.
+// ApplyCursor adds a keyset cursor predicate to filter when page.Cursor is set.
 func ApplyCursor(filter database.Filter[domain.UserField], page database.Page[domain.UserField]) (database.Filter[domain.UserField], error) {
 	if len(page.Cursor) == 0 {
 		return filter, nil
@@ -66,15 +66,14 @@ func NextCursor(users []*domain.User, page database.Page[domain.UserField]) []by
 // ProjectGroup is one project's users prepared for attribute hydration.
 type ProjectGroup struct {
 	ProjectID string
-	Users     []*domain.User
 	IDs       []string
 	ByID      map[string]*domain.User
 }
 
 // GroupByProject clears Attributes and groups users by ProjectID for hydration.
 func GroupByProject(users []*domain.User) []ProjectGroup {
-	byProject := make(map[string]*ProjectGroup)
-	order := make([]string, 0)
+	byProject := make(map[string]*ProjectGroup, len(users))
+	order := make([]string, 0, len(users))
 	for _, u := range users {
 		u.Attributes = nil
 		g, ok := byProject[u.ProjectID]
@@ -86,7 +85,6 @@ func GroupByProject(users []*domain.User) []ProjectGroup {
 			byProject[u.ProjectID] = g
 			order = append(order, u.ProjectID)
 		}
-		g.Users = append(g.Users, u)
 		g.IDs = append(g.IDs, u.ID)
 		g.ByID[u.ID] = u
 	}
