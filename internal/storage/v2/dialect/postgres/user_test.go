@@ -93,6 +93,71 @@ func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
 	})
 }
 
+func TestUserStatements_ListUsersAttributesAndAttributeKeys(t *testing.T) {
+	ctx := t.Context()
+	projectID, schemaURL := ensureUserTestProject(t)
+
+	user1 := newTestUser(t, projectID, schemaURL, "user_attr_1", "alpha@example.com", "Alpha")
+	user2 := newTestUser(t, projectID, schemaURL, "user_attr_2", "beta@example.com", "Beta")
+	require.NoError(t, testPool.CreateUser(ctx, user1))
+	require.NoError(t, testPool.CreateUser(ctx, user2))
+
+	projectFilter := v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID)
+	orderByID := v2database.Page[domain.UserField]{
+		OrderBy: v2database.OrderBy[domain.UserField]{
+			Columns:   []v2database.Column[domain.UserField]{v2database.Col(domain.UserFieldID)},
+			Direction: v2database.OrderAsc,
+		},
+	}
+
+	t.Run("AttributesMatchOnly", func(t *testing.T) {
+		list, err := testPool.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
+			Filter: projectFilter,
+		}, service.UserQueryOptions{
+			Attributes: []domain.Attribute{{Key: "email", Value: "alpha@example.com"}},
+		})
+		require.NoError(t, err)
+		require.Len(t, list.Items, 1)
+		assert.Equal(t, user1.ID, list.Items[0].ID)
+		assertUserAttributes(t, list.Items[0], map[string]any{
+			"email": "alpha@example.com",
+			"name":  "Alpha",
+		})
+	})
+
+	t.Run("AttributesMatchWithSubsetAttributeKeys", func(t *testing.T) {
+		list, err := testPool.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
+			Filter: projectFilter,
+		}, service.UserQueryOptions{
+			Attributes: []domain.Attribute{
+				{Key: "email", Value: "alpha@example.com"},
+				{Key: "name", Value: "Alpha"},
+			},
+			AttributeKeys: []string{"email"},
+		})
+		require.NoError(t, err)
+		require.Len(t, list.Items, 1)
+		assert.Equal(t, user1.ID, list.Items[0].ID)
+		assertUserAttributes(t, list.Items[0], map[string]any{
+			"email": "alpha@example.com",
+		})
+	})
+
+	t.Run("AttributeKeysOnlyHydrate", func(t *testing.T) {
+		list, err := testPool.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
+			Filter:     projectFilter,
+			Pagination: orderByID,
+		}, service.UserQueryOptions{
+			AttributeKeys: []string{"name"},
+		})
+		require.NoError(t, err)
+		require.Len(t, list.Items, 2)
+		assert.Equal(t, []string{"user_attr_1", "user_attr_2"}, userIDs(list.Items))
+		assertUserAttributes(t, list.Items[0], map[string]any{"name": "Alpha"})
+		assertUserAttributes(t, list.Items[1], map[string]any{"name": "Beta"})
+	})
+}
+
 func TestUserStatements_ListUsersUnifiedFilters(t *testing.T) {
 	ctx := t.Context()
 	projectID, schemaURL := ensureUserTestProject(t)
