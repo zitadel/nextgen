@@ -2194,6 +2194,19 @@ type DeleteFlowDefinitionNoContent struct{}
 
 func (*DeleteFlowDefinitionNoContent) deleteFlowDefinitionRes() {}
 
+// DeleteUserByIDNoContent is response for DeleteUserByID operation.
+type DeleteUserByIDNoContent struct{}
+
+func (*DeleteUserByIDNoContent) deleteUserByIDRes() {}
+
+type DeleteUserByIDNotFound ErrorDetails
+
+func (*DeleteUserByIDNotFound) deleteUserByIDRes() {}
+
+type DeleteUserByIDUnauthorized ErrorDetails
+
+func (*DeleteUserByIDUnauthorized) deleteUserByIDRes() {}
+
 // Ref: #
 type DeviceAuthorizationResponse struct {
 	// The device code that the client will use to poll for authorization.
@@ -2387,6 +2400,7 @@ func (*ErrorDetailsStatusCode) createTeamRes()               {}
 func (*ErrorDetailsStatusCode) createUserRes()               {}
 func (*ErrorDetailsStatusCode) deactivateFlowDefinitionRes() {}
 func (*ErrorDetailsStatusCode) deleteFlowDefinitionRes()     {}
+func (*ErrorDetailsStatusCode) deleteUserByIDRes()           {}
 func (*ErrorDetailsStatusCode) endSessionRes()               {}
 func (*ErrorDetailsStatusCode) exchangeHandoffRes()          {}
 func (*ErrorDetailsStatusCode) getBrandingByIdRes()          {}

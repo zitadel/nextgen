@@ -203,6 +203,15 @@ func (UnimplementedHandler) DeleteFlowDefinition(ctx context.Context, params Del
 	return r, ht.ErrNotImplemented
 }
 
+// DeleteUserByID implements DeleteUserByID operation.
+//
+// Delete user by ID.
+//
+// DELETE /users/{user_id}
+func (UnimplementedHandler) DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (r DeleteUserByIDRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // EndSession implements endSession operation.
 //
 // End a session.

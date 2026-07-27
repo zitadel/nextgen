@@ -14,7 +14,7 @@ var (
 	rn7AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
-	rn24AllowedHeaders = map[string]string{
+	rn26AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
 	rn49AllowedHeaders = map[string]string{
@@ -23,7 +23,7 @@ var (
 	rn53AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type",
 	}
-	rn45AllowedHeaders = map[string]string{
+	rn47AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type",
 	}
 	rn48AllowedHeaders = map[string]string{
@@ -48,7 +48,7 @@ var (
 		"GET":  "Authorization",
 		"POST": "Authorization,Content-Type",
 	}
-	rn27AllowedHeaders = map[string]string{
+	rn29AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
 	rn11AllowedHeaders = map[string]string{
@@ -81,7 +81,7 @@ var (
 	rn52AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type",
 	}
-	rn38AllowedHeaders = map[string]string{
+	rn40AllowedHeaders = map[string]string{
 		"GET":   "Authorization",
 		"PATCH": "Authorization,Content-Type",
 	}
@@ -89,32 +89,33 @@ var (
 		"GET":  "Authorization",
 		"POST": "Authorization,Content-Type",
 	}
-	rn41AllowedHeaders = map[string]string{
+	rn43AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
 	rn19AllowedHeaders = map[string]string{
 		"GET":  "Authorization",
 		"POST": "Authorization,Content-Type",
 	}
-	rn25AllowedHeaders = map[string]string{
+	rn27AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type,Idempotency-Key",
 	}
-	rn42AllowedHeaders = map[string]string{
+	rn44AllowedHeaders = map[string]string{
 		"DELETE": "Authorization",
 		"GET":    "Authorization",
 	}
 	rn20AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type",
 	}
-	rn44AllowedHeaders = map[string]string{
+	rn46AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
 	rn21AllowedHeaders = map[string]string{
 		"GET":  "Authorization",
 		"POST": "Authorization,Content-Type",
 	}
-	rn47AllowedHeaders = map[string]string{
-		"GET": "Authorization",
+	rn25AllowedHeaders = map[string]string{
+		"DELETE": "Authorization",
+		"GET":    "Authorization",
 	}
 	rn54AllowedHeaders = map[string]string{
 		"PUT": "Authorization,Content-Type",
@@ -287,7 +288,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "GET",
-									allowedHeaders: rn24AllowedHeaders,
+									allowedHeaders: rn26AllowedHeaders,
 									acceptPost:     "",
 									acceptPatch:    "",
 								})
@@ -387,7 +388,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "POST",
-									allowedHeaders: rn45AllowedHeaders,
+									allowedHeaders: rn47AllowedHeaders,
 									acceptPost:     "application/x-www-form-urlencoded",
 									acceptPatch:    "",
 								})
@@ -661,7 +662,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						default:
 							s.notAllowed(w, r, notAllowedParams{
 								allowedMethods: "GET",
-								allowedHeaders: rn27AllowedHeaders,
+								allowedHeaders: rn29AllowedHeaders,
 								acceptPost:     "",
 								acceptPatch:    "",
 							})
@@ -1080,7 +1081,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						default:
 							s.notAllowed(w, r, notAllowedParams{
 								allowedMethods: "GET,PATCH",
-								allowedHeaders: rn38AllowedHeaders,
+								allowedHeaders: rn40AllowedHeaders,
 								acceptPost:     "",
 								acceptPatch:    "application/json",
 							})
@@ -1181,7 +1182,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "GET",
-									allowedHeaders: rn41AllowedHeaders,
+									allowedHeaders: rn43AllowedHeaders,
 									acceptPost:     "",
 									acceptPatch:    "",
 								})
@@ -1246,7 +1247,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 								default:
 									s.notAllowed(w, r, notAllowedParams{
 										allowedMethods: "POST",
-										allowedHeaders: rn25AllowedHeaders,
+										allowedHeaders: rn27AllowedHeaders,
 										acceptPost:     "application/json",
 										acceptPatch:    "",
 									})
@@ -1308,7 +1309,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "DELETE,GET",
-									allowedHeaders: rn42AllowedHeaders,
+									allowedHeaders: rn44AllowedHeaders,
 									acceptPost:     "",
 									acceptPatch:    "",
 								})
@@ -1372,7 +1373,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						default:
 							s.notAllowed(w, r, notAllowedParams{
 								allowedMethods: "GET",
-								allowedHeaders: rn44AllowedHeaders,
+								allowedHeaders: rn46AllowedHeaders,
 								acceptPost:     "",
 								acceptPatch:    "",
 							})
@@ -1459,14 +1460,18 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 					if len(elem) == 0 {
 						switch r.Method {
+						case "DELETE":
+							s.handleDeleteUserByIDRequest([1]string{
+								args[0],
+							}, elemIsEscaped, w, r)
 						case "GET":
 							s.handleGetUserByIDRequest([1]string{
 								args[0],
 							}, elemIsEscaped, w, r)
 						default:
 							s.notAllowed(w, r, notAllowedParams{
-								allowedMethods: "GET",
-								allowedHeaders: rn47AllowedHeaders,
+								allowedMethods: "DELETE,GET",
+								allowedHeaders: rn25AllowedHeaders,
 								acceptPost:     "",
 								acceptPatch:    "",
 							})
@@ -2924,6 +2929,15 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 
 					if len(elem) == 0 {
 						switch method {
+						case "DELETE":
+							r.name = DeleteUserByIDOperation
+							r.summary = "Delete user by ID"
+							r.operationID = "DeleteUserByID"
+							r.operationGroup = ""
+							r.pathPattern = "/users/{user_id}"
+							r.args = args
+							r.count = 1
+							return r, true
 						case "GET":
 							r.name = GetUserByIDOperation
 							r.summary = "Get user by ID"

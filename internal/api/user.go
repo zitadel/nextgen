@@ -35,6 +35,22 @@ func (h *Handler) CreateUser(ctx context.Context, req *api.User, params api.Crea
 	return convertUsingJson[api.CreateUserResponse](u)
 }
 
+func (h *Handler) DeleteUserByID(ctx context.Context, params api.DeleteUserByIDParams) (api.DeleteUserByIDRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), userAccess, opWrite); err != nil {
+		return nil, err
+	}
+
+	err := h.userService.DeleteUser(ctx, service.DeleteUserInput{
+		ProjectID: string(params.ProjectID),
+		UserID:    string(params.UserID),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &api.DeleteUserByIDNoContent{}, nil
+}
+
 // ListUsers scopes to the bearer's project: the operation carries no
 // project parameter, so the oauth2 principal (the project secret the
 // CLI's status probe sends) is the only authority. Spec defaults are
