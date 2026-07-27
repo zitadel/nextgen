@@ -437,7 +437,7 @@ func TestQueryProjects(t *testing.T) {
 		{
 			name: "filter value is not a timestamp",
 			req:  &api.QueryProjectsRequest{Filter: createdAtFilter(api.FilterOperationEquals, api.NewStringFilterValue("yesterday"))},
-			want: badRequest("createdAt filter value must be a valid RFC3339 timestamp"),
+			want: badRequest(`createdAt filter value "yesterday" is not a valid RFC3339 timestamp`),
 		},
 		{
 			name: "filter value is not a string",

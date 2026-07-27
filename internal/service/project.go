@@ -304,7 +304,8 @@ func projectFilter(f Filter) (v2database.Filter[domain.ProjectField], error) {
 	// does not specify a format for a timestamp); parse it into the time.Time needed for the comparison.
 	value, err := v2database.CoerceTimeValue(raw)
 	if err != nil {
-		return nil, domain.ErrRequestInvalid().WithDetails("createdAt filter value must be a valid RFC3339 timestamp")
+		return nil, domain.ErrRequestInvalid().WithDetails(
+			fmt.Sprintf("createdAt filter value %q is not a valid RFC3339 timestamp", raw))
 	}
 	return compareFilter(f.Operation, v2database.Col(field), value)
 }
