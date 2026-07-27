@@ -191,7 +191,7 @@ func (s *projectService) DefaultProject(ctx context.Context, cfgProjectID string
 		if err != nil {
 			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 				return nil, domain.ErrProjectNotFound().
-					WithMessage("configured platform project does not exist").
+					WithMessage("configured platform.project_id does not exist").
 					WithDetails(cfgProjectID)
 			}
 			return nil, err
