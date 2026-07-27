@@ -599,6 +599,7 @@ func TestProjectService_DefaultProject(t *testing.T) {
 			ListProjects(gomock.Any(), gomock.Any()).
 			DoAndReturn(func(_ context.Context, opts *v2database.ListOptions[domain.ProjectField]) (*v2database.ListResult[*domain.Project], error) {
 				assert.EqualValues(t, 1, opts.Pagination.Limit)
+				assert.Equal(t, []v2database.Column[domain.ProjectField]{v2database.Col(domain.ProjectFieldCreatedAt)}, opts.Pagination.OrderBy.Columns)
 				assert.Equal(t, v2database.OrderAsc, opts.Pagination.OrderBy.Direction)
 				return &v2database.ListResult[*domain.Project]{Items: []*domain.Project{first}}, nil
 			})
