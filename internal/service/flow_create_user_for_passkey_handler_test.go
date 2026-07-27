@@ -47,7 +47,7 @@ func newPasskeyHandlerFixture(t *testing.T) *passkeyHandlerFixture {
 	stmts := servicemocks.NewMockAllStatements(ctrl)
 
 	v2Pool.EXPECT().Statements().Return(stmts).AnyTimes()
-	userService := service.NewUserService(pool, service.NewPool(v2Pool), schemaStore, passwordRepo, nil)
+	userService := service.NewUserService(pool, service.NewPool(v2Pool), schemaStore, passwordRepo, nil, nil)
 	handler := service.NewFlowCreateUserForPasskeyHandler(userService, schemaStore)
 
 	return &passkeyHandlerFixture{

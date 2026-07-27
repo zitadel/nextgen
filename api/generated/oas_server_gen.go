@@ -346,6 +346,12 @@ type Handler interface {
 	//
 	// GET /sessions
 	ListSessions(ctx context.Context, params ListSessionsParams) (ListSessionsRes, error)
+	// ListUserPassKeys implements listUserPassKeys operation.
+	//
+	// List user passkeys.
+	//
+	// GET /users/{user_id}/passkeys
+	ListUserPassKeys(ctx context.Context, params ListUserPassKeysParams) (ListUserPassKeysRes, error)
 	// ListUsers implements listUsers operation.
 	//
 	// List users.

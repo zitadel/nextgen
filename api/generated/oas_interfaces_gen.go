@@ -165,6 +165,10 @@ type ListSessionsRes interface {
 	listSessionsRes()
 }
 
+type ListUserPassKeysRes interface {
+	listUserPassKeysRes()
+}
+
 type ListUsersRes interface {
 	listUsersRes()
 }

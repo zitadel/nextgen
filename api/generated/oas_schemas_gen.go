@@ -2409,6 +2409,7 @@ func (*ErrorDetailsStatusCode) listBrandingRes()             {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()      {}
 func (*ErrorDetailsStatusCode) listSchemasRes()              {}
 func (*ErrorDetailsStatusCode) listSessionsRes()             {}
+func (*ErrorDetailsStatusCode) listUserPassKeysRes()         {}
 func (*ErrorDetailsStatusCode) listUsersRes()                {}
 func (*ErrorDetailsStatusCode) patchProjectRes()             {}
 func (*ErrorDetailsStatusCode) queryProjectsRes()            {}
@@ -6342,6 +6343,83 @@ func (s *ListSessionsState) UnmarshalText(data []byte) error {
 type ListSessionsUnauthorized ErrorDetails
 
 func (*ListSessionsUnauthorized) listSessionsRes() {}
+
+type ListUserPassKeysBadRequest ErrorDetails
+
+func (*ListUserPassKeysBadRequest) listUserPassKeysRes() {}
+
+type ListUserPassKeysForbidden ErrorDetails
+
+func (*ListUserPassKeysForbidden) listUserPassKeysRes() {}
+
+type ListUserPassKeysInternalServerError ErrorDetails
+
+func (*ListUserPassKeysInternalServerError) listUserPassKeysRes() {}
+
+type ListUserPassKeysNotFound ErrorDetails
+
+func (*ListUserPassKeysNotFound) listUserPassKeysRes() {}
+
+type ListUserPassKeysUnauthorized ErrorDetails
+
+func (*ListUserPassKeysUnauthorized) listUserPassKeysRes() {}
+
+// Response containing the user's passkeys.
+// Ref: #
+type ListUserPasskeysResponse struct {
+	Passkeys []ListUserPasskeysResponsePasskeysItem `json:"passkeys"`
+}
+
+// GetPasskeys returns the value of Passkeys.
+func (s *ListUserPasskeysResponse) GetPasskeys() []ListUserPasskeysResponsePasskeysItem {
+	return s.Passkeys
+}
+
+// SetPasskeys sets the value of Passkeys.
+func (s *ListUserPasskeysResponse) SetPasskeys(val []ListUserPasskeysResponsePasskeysItem) {
+	s.Passkeys = val
+}
+
+func (*ListUserPasskeysResponse) listUserPassKeysRes() {}
+
+type ListUserPasskeysResponsePasskeysItem struct {
+	// The unique identifier of the passkey.
+	ID string `json:"id"`
+	// The name of the passkey.
+	Name string `json:"name"`
+	// The timestamp when the passkey was created.
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetID returns the value of ID.
+func (s *ListUserPasskeysResponsePasskeysItem) GetID() string {
+	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *ListUserPasskeysResponsePasskeysItem) GetName() string {
+	return s.Name
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ListUserPasskeysResponsePasskeysItem) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetID sets the value of ID.
+func (s *ListUserPasskeysResponsePasskeysItem) SetID(val string) {
+	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *ListUserPasskeysResponsePasskeysItem) SetName(val string) {
+	s.Name = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ListUserPasskeysResponsePasskeysItem) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
 
 type ListUsersBadRequest ErrorDetails
 

@@ -19,6 +19,7 @@ func (h *Harness) EnsureUserService(t *testing.T) *service.UserService {
 			h.EnsureServiceDB(t),
 			h.EnsureSchemaStore(t),
 			h.EnsureUserPasswordRepo(t),
+			h.EnsureUserPasskeyRepo(t),
 			h.EnsureHasher(t),
 		)
 	}

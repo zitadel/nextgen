@@ -47,6 +47,11 @@ type ListUsersInput struct {
 	Limit  uint32
 }
 
+type ListPasskeysInput struct {
+	ProjectID string
+	UserID    string
+}
+
 type GetMyUserInput struct {
 	// SessionToken is the parsed session token, already verified at the API
 	// security boundary.
@@ -60,6 +65,7 @@ type UserService struct {
 	v2Pool       StatementPool
 	schemaStore  domain.JSONSchemaStore
 	passwordRepo domain.UserPasswordRepository
+	passkeyRepo  domain.UserPasskeyRepository
 	hasher       crypto.Hasher
 }
 
@@ -68,6 +74,7 @@ func NewUserService(
 	v2Pool StatementPool,
 	schemaStore domain.JSONSchemaStore,
 	passwordRepo domain.UserPasswordRepository,
+	passkeyRepo domain.UserPasskeyRepository,
 	hasher crypto.Hasher,
 ) *UserService {
 	return &UserService{
@@ -75,6 +82,7 @@ func NewUserService(
 		v2Pool:       v2Pool,
 		schemaStore:  schemaStore,
 		passwordRepo: passwordRepo,
+		passkeyRepo:  passkeyRepo,
 		hasher:       hasher,
 	}
 }
@@ -170,6 +178,25 @@ func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) ([]ma
 		users = append(users, user)
 	}
 	return users, nil
+}
+
+func (s *UserService) ListPasskeys(ctx context.Context, input ListPasskeysInput) ([]*domain.UserPasskey, error) {
+	passkeys, err := s.passkeyRepo.List(ctx, s.pool,
+		database.WithCondition(
+			database.And(
+				s.passkeyRepo.ProjectIDCondition(input.ProjectID),
+				s.passkeyRepo.UserIDCondition(input.UserID),
+			),
+		),
+	)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil, domain.ErrUserNotFound()
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to get user passkeys from database")
+	}
+
+	return passkeys, nil
 }
 
 func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[string]any, error) {

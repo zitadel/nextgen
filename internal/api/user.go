@@ -3,7 +3,9 @@ package api
 import (
 	"context"
 	"net/http"
+	"strconv"
 
+	"github.com/muhlemmer/gu"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -70,6 +72,33 @@ func (h *Handler) ListUsers(ctx context.Context, params api.ListUsersParams) (ap
 	if err != nil {
 		return nil, err
 	}
+	return res, nil
+}
+
+func (h *Handler) ListUserPassKeys(ctx context.Context, params api.ListUserPassKeysParams) (api.ListUserPassKeysRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), userAccess, opRead); err != nil {
+		return nil, err
+	}
+
+	keys, err := h.userService.ListPasskeys(ctx, service.ListPasskeysInput{
+		ProjectID: string(params.ProjectID),
+		UserID:    string(params.UserID),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res := &api.ListUserPasskeysResponse{
+		Passkeys: make([]api.ListUserPasskeysResponsePasskeysItem, len(keys), len(keys)),
+	}
+	for i, key := range keys {
+		res.Passkeys[i] = api.ListUserPasskeysResponsePasskeysItem{
+			ID:        strconv.FormatInt(key.ID, 10),
+			Name:      key.Name,
+			CreatedAt: gu.Value(key.CreatedAt),
+		}
+	}
+
 	return res, nil
 }
 

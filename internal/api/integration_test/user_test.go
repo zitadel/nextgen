@@ -423,3 +423,37 @@ func TestGetMyUser(t *testing.T) {
 		)
 	})
 }
+
+func TestListPasskeys(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+		ProjectID: project.ID,
+		User:      harness.TestData.Generator.GenerateUser(t, "testgetuser@example.com"),
+	})
+	require.NoError(t, err)
+
+	userID := user["id"].(string)
+	harness.RegisterPasskey(t, project.ID, userID, "first passkey")
+	harness.RegisterPasskey(t, project.ID, userID, "second passkey")
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	params := api.ListUserPassKeysParams{
+		ProjectID: api.ProjectID(project.ID),
+		UserID:    api.UserID(user["id"].(string)),
+	}
+
+	resp, err := client.ListUserPassKeys(t.Context(), params)
+	assert.NoError(t, err)
+
+	if assert.IsType(t, &api.ListUserPasskeysResponse{}, resp, helpers.MustMarshal(t, resp)) {
+		passkeys := resp.(*api.ListUserPasskeysResponse)
+		assert.Len(t, passkeys.Passkeys, 2)
+	}
+}
