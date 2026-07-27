@@ -40,13 +40,56 @@ describe("users screen", () => {
   it("renders the page heading and a user row", async () => {
     server.use(
       http.get(USERS_URL, () =>
-        HttpResponse.json([{ id: "user_1", username: "Maya Patel", email: "maya.patel@acme.com" }]),
+        HttpResponse.json([
+          // The shipped `consumer`/`business` presets spell the name parts
+          // camelCase; `listUsers` returns the schema's attribute tree verbatim.
+          { id: "user_1", givenName: "Maya", familyName: "Patel", email: "maya.patel@acme.com" },
+        ]),
       ),
     );
     await renderUsers();
     expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
     expect(await screen.findByRole("link", { name: "Maya Patel" })).toBeInTheDocument();
     expect(screen.getByText("maya.patel@acme.com")).toBeInTheDocument();
+  });
+
+  it("derives the display name the way the platform does", async () => {
+    // Mirrors `User.DisplayName` (internal/domain/user.go): explicit `name`
+    // wins, else the given/family parts joined, with snake_case accepted for
+    // schemas authored that way. A partial name must not render a stray space.
+    server.use(
+      http.get(USERS_URL, () =>
+        HttpResponse.json([
+          {
+            id: "user_1",
+            name: "Ada L.",
+            givenName: "Ada",
+            familyName: "Lovelace",
+            email: "a@x.com",
+          },
+          { id: "user_2", given_name: "Grace", family_name: "Hopper", email: "g@x.com" },
+          { id: "user_3", givenName: "Radia", email: "r@x.com" },
+        ]),
+      ),
+    );
+    await renderUsers();
+    expect(await screen.findByRole("link", { name: "Ada L." })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Grace Hopper" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Radia" })).toBeInTheDocument();
+  });
+
+  it("ignores non-identity attributes when deriving the name", async () => {
+    // Regression: the screen used to read a `username` property that no shipped
+    // schema defines, so every row silently fell back to the email. Reading an
+    // unrelated attribute as the name is worse than having none.
+    server.use(
+      http.get(USERS_URL, () =>
+        HttpResponse.json([{ id: "user_1", username: "nope", email: "kenji@acme.com" }]),
+      ),
+    );
+    await renderUsers();
+    expect(await screen.findByRole("link", { name: "kenji@acme.com" })).toBeInTheDocument();
+    expect(screen.queryByText("nope")).not.toBeInTheDocument();
   });
 
   it("uses schema-defined email as the display name and shows the user id", async () => {
@@ -94,8 +137,8 @@ describe("users screen", () => {
     server.use(
       http.get(USERS_URL, () =>
         HttpResponse.json([
-          { id: "user_1", username: "Maya Patel", email: "maya@acme.com" },
-          { id: "user_2", username: "Sasha Kim", email: "sasha@acme.com" },
+          { id: "user_1", givenName: "Maya", familyName: "Patel", email: "maya@acme.com" },
+          { id: "user_2", givenName: "Sasha", familyName: "Kim", email: "sasha@acme.com" },
         ]),
       ),
     );
