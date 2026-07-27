@@ -4,7 +4,6 @@ package service_test
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -21,11 +20,12 @@ func seedIdentityUser(t *testing.T, pool database.QueryExecutor, projectID strin
 	ensureProject(t, pool, projectID)
 
 	schemaURL := "https://example.com/schemas/human-user"
-	_, err := pool.Exec(t.Context(),
-		`INSERT INTO zitadel_nextgen.json_schemas (project_id, url, payload) VALUES ($1, $2, '{}') ON CONFLICT DO NOTHING`,
-		projectID, schemaURL,
-	)
-	require.NoError(t, err)
+	stmts := integrationV2PoolOrFail(t).Statements()
+	require.NoError(t, stmts.CreateJSONSchema(t.Context(), &domain.JSONSchema{
+		ProjectID: projectID,
+		URL:       schemaURL,
+		Schema:    []byte(`{}`),
+	}))
 
 	// camelCase name parts: the shape the shipped presets actually collect
 	// (packages/config/defaults/*.json).
@@ -41,22 +41,12 @@ func seedIdentityUser(t *testing.T, pool database.QueryExecutor, projectID strin
 	}
 
 	userID := "user_ident-" + time.Now().Format("150405.000000")
-	_, err = pool.Exec(t.Context(),
-		`INSERT INTO zitadel_nextgen.users (project_id, schema_url, id, lifecycle_owner_team_id, status)
-		 VALUES ($1, $2, $3, NULL, $4)`,
-		projectID, schemaURL, userID, domain.UserStatusActive.String(),
-	)
-	require.NoError(t, err)
-	for _, attr := range attrs {
-		raw, err := json.Marshal(attr.Value)
-		require.NoError(t, err)
-		_, err = pool.Exec(t.Context(),
-			`INSERT INTO zitadel_nextgen.user_attributes (project_id, team_id, user_id, key, value)
-			 VALUES ($1, '', $2, $3, $4::jsonb)`,
-			projectID, userID, attr.Key, raw,
-		)
-		require.NoError(t, err)
-	}
+	require.NoError(t, stmts.CreateUser(t.Context(), &domain.CreateUser{
+		ProjectID:  projectID,
+		SchemaURL:  schemaURL,
+		ID:         userID,
+		Attributes: attrs,
+	}))
 	return userID
 }
 

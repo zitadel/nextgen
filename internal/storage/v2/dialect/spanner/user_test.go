@@ -53,7 +53,7 @@ func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
 				Direction: v2database.OrderAsc,
 			},
 		},
-	}, 0, service.UserReadOptions{
+	}, 0, service.UserQueryOptions{
 		AttributeKeys: []string{"email"},
 	})
 	require.NoError(t, err)
@@ -66,7 +66,10 @@ func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
 		{Key: "email", Value: "alpha@example.com"},
 		{Key: "name", Value: "Alpha"},
 	}
-	matches, err := stmts.ListUsersByAttributes(ctx, projectID, nil, attrs, service.UserReadOptions{
+	matches, err := stmts.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
+		Filter: v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
+	}, 0, service.UserQueryOptions{
+		Attributes:    attrs,
 		AttributeKeys: []string{"email", "name"},
 	})
 	require.NoError(t, err)
@@ -77,9 +80,13 @@ func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
 		"name":  "Alpha",
 	})
 
-	got, err := stmts.GetUserByAttributes(ctx, projectID, attrs, service.UserReadOptions{
-		AttributeKeys: []string{"email", "name"},
-	})
+	got, err := stmts.GetUser(ctx,
+		v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
+		service.UserQueryOptions{
+			Attributes:    attrs,
+			AttributeKeys: []string{"email", "name"},
+		},
+	)
 	require.NoError(t, err)
 	assert.Equal(t, user1.ID, got.ID)
 	assertUserAttributes(t, got, map[string]any{

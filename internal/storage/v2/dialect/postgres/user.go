@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 
 	"github.com/jackc/pgx/v5"
 
@@ -53,14 +52,54 @@ _attributes AS (
     )
     SELECT h.project_id, COALESCE($5::text, ''), h.id, d.key, d.value
     FROM _input_data d CROSS JOIN _user_header h
-)`
+)
+SELECT 1;
+`
 
-	userInsertMembershipCTE = `,
+	userInsertWithMembershipSQL = `
+WITH _input_data AS (
+    SELECT *,
+           unique_scope_txt::zitadel_nextgen.uniqueness_scope AS unique_scope
+    FROM unnest(
+        $6::text[],
+        $7::jsonb[],
+        $8::bytea[],
+        $9::text[]
+    ) AS t(key, value, value_hash, unique_scope_txt)
+),
+_user_header AS (
+    INSERT INTO zitadel_nextgen.users (project_id, schema_url, id, lifecycle_owner_team_id, status)
+    VALUES ($1, $2, $3, $4, 'active')
+    RETURNING project_id, id
+),
+_registry AS (
+    INSERT INTO zitadel_nextgen.user_unique_attributes (
+        project_id, user_id, team_id, key, value_hash
+    )
+    SELECT h.project_id, h.id,
+           CASE WHEN d.unique_scope = 'project'::zitadel_nextgen.uniqueness_scope
+                THEN ''
+                ELSE COALESCE($5::text, '')
+           END,
+           d.key, d.value_hash
+    FROM _input_data d CROSS JOIN _user_header h
+    WHERE d.unique_scope <> 'unspecified'::zitadel_nextgen.uniqueness_scope
+      AND d.value_hash IS NOT NULL
+),
+_attributes AS (
+    INSERT INTO zitadel_nextgen.user_attributes (
+        project_id, team_id, user_id, key, value
+    )
+    SELECT h.project_id, COALESCE($5::text, ''), h.id, d.key, d.value
+    FROM _input_data d CROSS JOIN _user_header h
+),
 _membership AS (
     INSERT INTO zitadel_nextgen.team_memberships (project_id, team_id, user_id, status)
     SELECT h.project_id, $10::text, h.id, 'active'
     FROM _user_header h
-)`
+)
+SELECT 1;
+`
 
 	userQuery = `SELECT project_id, schema_url, id, lifecycle_owner_team_id, status, created_at, updated_at FROM zitadel_nextgen.users`
 
@@ -165,44 +204,17 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 
 	sql := userInsertSQL
 	if user.InitialMembershipTeamID != nil && *user.InitialMembershipTeamID != "" {
-		sql += userInsertMembershipCTE
+		sql = userInsertWithMembershipSQL
 		args = append(args, *user.InitialMembershipTeamID)
 	}
-	sql += "\nSELECT 1;"
 
 	_, err := us.client.Exec(ctx, sql, args...)
 	return wrapError(err)
 }
 
-// GetUserByID implements [service.UserStatements].
-func (us userStatements) GetUserByID(ctx context.Context, projectID string, membershipTeamID *string, userID string, opts service.UserReadOptions) (*domain.User, error) {
-	args := []any{projectID, userID}
-	stmt := userQuery + " WHERE project_id = $1 AND id = $2"
-	if membershipTeamID != nil {
-		args = append(args, *membershipTeamID, domain.MembershipStatusActive.String())
-		stmt += fmt.Sprintf(
-			` AND EXISTS (SELECT 1 FROM %s m WHERE m.project_id = zitadel_nextgen.users.project_id AND m.user_id = zitadel_nextgen.users.id AND m.team_id = $%d AND m.status = $%d)`,
-			teamMembershipsTable, len(args)-1, len(args),
-		)
-	}
-
-	rows, err := us.client.Query(ctx, stmt, args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	user, err := pgx.CollectExactlyOneRow(rows, scanUserHeader)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	if err := us.hydrateUsers(ctx, []*domain.User{user}, opts); err != nil {
-		return nil, err
-	}
-	return user, nil
-}
-
-// GetUserByAttributes implements [service.UserStatements].
-func (us userStatements) GetUserByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute, opts service.UserReadOptions) (*domain.User, error) {
-	result, err := us.ListUsersByAttributes(ctx, projectID, nil, attrs, opts)
+// GetUser implements [service.UserStatements].
+func (us userStatements) GetUser(ctx context.Context, filter database.Filter[domain.UserField], opts service.UserQueryOptions) (*domain.User, error) {
+	result, err := us.ListUsers(ctx, &database.ListOptions[domain.UserField]{Filter: filter}, 0, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -217,10 +229,17 @@ func (us userStatements) GetUserByAttributes(ctx context.Context, projectID stri
 }
 
 // ListUsers implements [service.UserStatements].
-func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], offset uint32, opts service.UserReadOptions) (*database.ListResult[*domain.User], error) {
+func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], offset uint32, opts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
 	if filter == nil {
 		filter = &database.ListOptions[domain.UserField]{}
 	}
+	if len(opts.Attributes) > 0 {
+		return us.listUsersByAttributes(ctx, filter, opts)
+	}
+	return us.listUsersByColumns(ctx, filter, offset, opts)
+}
+
+func (us userStatements) listUsersByColumns(ctx context.Context, filter *database.ListOptions[domain.UserField], offset uint32, opts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
 	if len(filter.Pagination.OrderBy.Columns) == 0 {
 		filter.Pagination.OrderBy = database.OrderBy[domain.UserField]{
 			Columns: []database.Column[domain.UserField]{
@@ -232,17 +251,58 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 	}
 
 	var compiler statementCompiler
-	if err := compileRead(&compiler, userQuery, filter, userSchema); err != nil {
-		return nil, err
-	}
-	stmt := compiler.String()
-	args := append([]any(nil), compiler.args...)
-	if offset > 0 {
-		args = append(args, offset)
-		stmt += " OFFSET $" + strconv.Itoa(len(args))
+	compiler.WriteString(userQuery)
+
+	readFilter := filter.Filter
+	if len(filter.Pagination.Cursor) != 0 {
+		cursor, err := pagination.CursorFromToken[domain.UserField](filter.Pagination.Cursor)
+		if err != nil {
+			return nil, database.ErrInvalidCursor()
+		}
+		if !cursor.MatchesOrderBy(filter.Pagination.OrderBy.Columns) {
+			return nil, database.ErrCursorOrderMismatch()
+		}
+		values, err := userSchema.CoerceCursorValues(cursor.Columns, cursor.Values)
+		if err != nil {
+			return nil, database.ErrInvalidCursor().WithParent(err)
+		}
+		terms := compareTerms(cursor.Columns, values)
+		if filter.Pagination.OrderBy.Direction == database.OrderAsc {
+			readFilter = database.And(readFilter, database.CompareGreater(terms...))
+		} else {
+			readFilter = database.And(readFilter, database.CompareLess(terms...))
+		}
 	}
 
-	rows, err := us.client.Query(ctx, stmt, args...)
+	wroteWhere := false
+	if readFilter != nil {
+		compiler.WriteString(" WHERE ")
+		compileFilter(&compiler, readFilter, userSchema)
+		wroteWhere = true
+	}
+	if opts.MembershipTeamID != nil {
+		if wroteWhere {
+			compiler.WriteString(" AND ")
+		} else {
+			compiler.WriteString(" WHERE ")
+		}
+		compiler.WriteString("EXISTS (SELECT 1 FROM ")
+		compiler.WriteString(teamMembershipsTable)
+		compiler.WriteString(" m WHERE m.project_id = zitadel_nextgen.users.project_id AND m.user_id = zitadel_nextgen.users.id AND m.team_id = ")
+		compiler.WriteArg(*opts.MembershipTeamID)
+		compiler.WriteString(" AND m.status = ")
+		compiler.WriteArg(domain.MembershipStatusActive.String())
+		compiler.WriteString(")")
+	}
+
+	compileOrderBy(&compiler, filter.Pagination.OrderBy, userSchema)
+	compileLimit(&compiler, filter.Pagination.Limit)
+	if offset > 0 {
+		compiler.WriteString(" OFFSET ")
+		compiler.WriteArg(offset)
+	}
+
+	rows, err := us.client.Query(ctx, compiler.String(), compiler.args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}
@@ -269,14 +329,15 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 	}, nil
 }
 
-// ListUsersByAttributes implements [service.UserStatements].
-func (us userStatements) ListUsersByAttributes(ctx context.Context, projectID string, teamScope *string, attrs []domain.Attribute, opts service.UserReadOptions) (*database.ListResult[*domain.User], error) {
-	if len(attrs) == 0 {
-		return nil, fmt.Errorf("ListUsersByAttributes requires at least one attribute")
+func (us userStatements) listUsersByAttributes(ctx context.Context, filter *database.ListOptions[domain.UserField], opts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
+	projectID, ok := equalStringValue(filter.Filter, domain.UserFieldProjectID)
+	if !ok {
+		return nil, fmt.Errorf("ListUsers with Attributes requires an equal project_id filter")
 	}
-	keys := make([]string, 0, len(attrs))
-	jsonTexts := make([]string, 0, len(attrs))
-	for _, a := range attrs {
+
+	keys := make([]string, 0, len(opts.Attributes))
+	jsonTexts := make([]string, 0, len(opts.Attributes))
+	for _, a := range opts.Attributes {
 		raw, err := json.Marshal(a.Value)
 		if err != nil {
 			return nil, fmt.Errorf("marshal attribute %q: %w", a.Key, err)
@@ -285,7 +346,7 @@ func (us userStatements) ListUsersByAttributes(ctx context.Context, projectID st
 		jsonTexts = append(jsonTexts, string(raw))
 	}
 
-	rows, err := us.client.Query(ctx, userListByAttributesCTE, keys, jsonTexts, projectID, teamScope)
+	rows, err := us.client.Query(ctx, userListByAttributesCTE, keys, jsonTexts, projectID, opts.AttributeTeamScope)
 	if err != nil {
 		return nil, wrapError(err)
 	}
@@ -293,10 +354,52 @@ func (us userStatements) ListUsersByAttributes(ctx context.Context, projectID st
 	if err != nil {
 		return nil, wrapError(err)
 	}
+	if opts.MembershipTeamID != nil {
+		users, err = us.filterUsersByMembership(ctx, users, *opts.MembershipTeamID)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if err := us.hydrateUsers(ctx, users, opts); err != nil {
 		return nil, err
 	}
 	return &database.ListResult[*domain.User]{Items: users}, nil
+}
+
+func (us userStatements) filterUsersByMembership(ctx context.Context, users []*domain.User, teamID string) ([]*domain.User, error) {
+	out := make([]*domain.User, 0, len(users))
+	for _, user := range users {
+		ok, err := us.hasActiveMembership(ctx, user.ProjectID, teamID, user.ID)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			out = append(out, user)
+		}
+	}
+	return out, nil
+}
+
+func (us userStatements) hasActiveMembership(ctx context.Context, projectID, teamID, userID string) (bool, error) {
+	var compiler statementCompiler
+	compiler.WriteString("SELECT 1 FROM ")
+	compiler.WriteString(teamMembershipsTable)
+	compiler.WriteString(" WHERE project_id = ")
+	compiler.WriteArg(projectID)
+	compiler.WriteString(" AND team_id = ")
+	compiler.WriteArg(teamID)
+	compiler.WriteString(" AND user_id = ")
+	compiler.WriteArg(userID)
+	compiler.WriteString(" AND status = ")
+	compiler.WriteArg(domain.MembershipStatusActive.String())
+	compiler.WriteString(" LIMIT 1")
+
+	rows, err := us.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return false, wrapError(err)
+	}
+	defer rows.Close()
+	return rows.Next(), nil
 }
 
 // DeactivateUser implements [service.UserStatements].
@@ -331,7 +434,7 @@ func (us userStatements) DeleteUserByID(ctx context.Context, projectID, userID s
 	})
 }
 
-func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User, opts service.UserReadOptions) error {
+func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User, opts service.UserQueryOptions) error {
 	if len(users) == 0 {
 		return nil
 	}
@@ -381,6 +484,30 @@ func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User,
 		}
 	}
 	return nil
+}
+
+func equalStringValue[F ~uint8](filter database.Filter[F], field F) (string, bool) {
+	if filter == nil {
+		return "", false
+	}
+	switch f := filter.(type) {
+	case database.AndFilter[F]:
+		for _, sub := range f.Filters {
+			if v, ok := equalStringValue(sub, field); ok {
+				return v, true
+			}
+		}
+	case *database.CompareFilter[F]:
+		if f.Op != database.OpEqual || len(f.Terms) != 1 {
+			return "", false
+		}
+		if f.Terms[0].Column.Field() != field {
+			return "", false
+		}
+		s, ok := f.Terms[0].Value.(string)
+		return s, ok
+	}
+	return "", false
 }
 
 func scanUserHeader(row pgx.CollectableRow) (*domain.User, error) {

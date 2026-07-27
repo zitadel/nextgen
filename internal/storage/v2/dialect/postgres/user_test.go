@@ -50,7 +50,7 @@ func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
 				Direction: v2database.OrderAsc,
 			},
 		},
-	}, 0, service.UserReadOptions{
+	}, 0, service.UserQueryOptions{
 		AttributeKeys: []string{"email"},
 	})
 	require.NoError(t, err)
@@ -63,7 +63,10 @@ func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
 		{Key: "email", Value: "alpha@example.com"},
 		{Key: "name", Value: "Alpha"},
 	}
-	matches, err := testPool.ListUsersByAttributes(ctx, projectID, nil, attrs, service.UserReadOptions{
+	matches, err := testPool.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
+		Filter: v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
+	}, 0, service.UserQueryOptions{
+		Attributes:    attrs,
 		AttributeKeys: []string{"email", "name"},
 	})
 	require.NoError(t, err)
@@ -74,9 +77,13 @@ func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
 		"name":  "Alpha",
 	})
 
-	got, err := testPool.GetUserByAttributes(ctx, projectID, attrs, service.UserReadOptions{
-		AttributeKeys: []string{"email", "name"},
-	})
+	got, err := testPool.GetUser(ctx,
+		v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
+		service.UserQueryOptions{
+			Attributes:    attrs,
+			AttributeKeys: []string{"email", "name"},
+		},
+	)
 	require.NoError(t, err)
 	assert.Equal(t, user1.ID, got.ID)
 	assertUserAttributes(t, got, map[string]any{
@@ -102,7 +109,7 @@ func TestUserStatements_ListUsersOffset(t *testing.T) {
 				Direction: v2database.OrderAsc,
 			},
 		},
-	}, 1, service.UserReadOptions{AttributeKeys: []string{"email"}})
+	}, 1, service.UserQueryOptions{AttributeKeys: []string{"email"}})
 	require.NoError(t, err)
 	require.Len(t, list.Items, 2)
 	assert.Equal(t, []string{"user_v2_off_2", "user_v2_off_3"}, userIDs(list.Items))

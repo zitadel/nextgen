@@ -180,9 +180,17 @@ type AuthAttemptStatements interface {
 	AuthAttemptChallengeFailed(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error
 }
 
-type UserReadOptions struct {
+// UserQueryOptions carries EAV match/hydrate options for GetUser / ListUsers.
+// Column predicates stay in Filter / ListOptions.
+type UserQueryOptions struct {
 	// AttributeKeys limits hydrated EAV keys; empty means all attributes.
 	AttributeKeys []string
+	// Attributes, when non-empty, restricts to users matching all key/value pairs.
+	Attributes []domain.Attribute
+	// AttributeTeamScope scopes attribute matching to a team (or project-wide when nil).
+	AttributeTeamScope *string
+	// MembershipTeamID, when set, requires an active team membership.
+	MembershipTeamID *string
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -194,10 +202,8 @@ type UserReadOptions struct {
 type UserStatements interface {
 	Statements
 	CreateUser(ctx context.Context, user *domain.CreateUser) error
-	GetUserByID(ctx context.Context, projectID string, membershipTeamID *string, userID string, opts UserReadOptions) (*domain.User, error)
-	GetUserByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute, opts UserReadOptions) (*domain.User, error)
-	ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], offset uint32, opts UserReadOptions) (*database.ListResult[*domain.User], error)
-	ListUsersByAttributes(ctx context.Context, projectID string, teamScope *string, attrs []domain.Attribute, opts UserReadOptions) (*database.ListResult[*domain.User], error)
+	GetUser(ctx context.Context, filter database.Filter[domain.UserField], opts UserQueryOptions) (*domain.User, error)
+	ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], offset uint32, opts UserQueryOptions) (*database.ListResult[*domain.User], error)
 	DeactivateUser(ctx context.Context, projectID, userID string) error
 	DeleteUserByID(ctx context.Context, projectID, userID string) error
 }

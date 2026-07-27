@@ -23,7 +23,7 @@ type CreateUserInput struct {
 
 type UserAction interface {
 	Prepare(ctx context.Context, db database.QueryExecutor) error
-	Apply(ctx context.Context, tx Statementer[AllStatements]) error
+	Apply(ctx context.Context, tx StatementerWithQueryExecutor[AllStatements]) error
 }
 
 type SetPasswordInput struct {
@@ -88,16 +88,19 @@ func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (
 	}
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		qtx, ok := tx.(StatementerWithQueryExecutor[AllStatements])
+		if !ok {
+			return domain.ErrInternal(nil).WithMessage("transaction does not support query execution")
+		}
 		for _, action := range actions {
-			if err := action.Apply(ctx, tx); err != nil {
+			if err := action.Apply(ctx, qtx); err != nil {
 				return err
 			}
 		}
 		return nil
 	})
 	if err != nil {
-		var de domain.Error
-		if errors.As(err, &de) {
+		if de, ok := errors.AsType[domain.Error](err); ok {
 			return de
 		}
 		return domain.ErrInternal(err).WithMessage("failed to commit transaction")
@@ -113,10 +116,9 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 		return nil, err
 	}
 
-	err = action.Apply(ctx, s.v2Pool)
+	err = applyCreateUser(ctx, s.v2Pool.Statements(), action.CreateUser)
 	if err != nil {
-		var de domain.Error
-		if errors.As(err, &de) {
+		if de, ok := errors.AsType[domain.Error](err); ok {
 			return nil, de
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to create user")
@@ -141,7 +143,7 @@ func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) ([]ma
 				Direction: v2database.OrderAsc,
 			},
 		},
-	}, input.Offset, UserReadOptions{})
+	}, input.Offset, UserQueryOptions{})
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to list users from database")
 	}
@@ -159,7 +161,10 @@ func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) ([]ma
 }
 
 func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[string]any, error) {
-	flatUser, err := s.v2Pool.Statements().GetUserByID(ctx, input.ProjectID, input.TeamID, input.UserID, UserReadOptions{})
+	flatUser, err := s.v2Pool.Statements().GetUser(ctx, v2database.And(
+		v2database.Equal(v2database.Col(domain.UserFieldProjectID), input.ProjectID),
+		v2database.Equal(v2database.Col(domain.UserFieldID), input.UserID),
+	), UserQueryOptions{MembershipTeamID: input.TeamID})
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrUserNotFound()
@@ -190,7 +195,10 @@ func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]by
 		return nil, domain.ErrSessionTokenInvalid()
 	}
 
-	user, err := s.v2Pool.Statements().GetUserByID(ctx, sessionToken.ProjectID, nil, sessionToken.UserID, UserReadOptions{})
+	user, err := s.v2Pool.Statements().GetUser(ctx, v2database.And(
+		v2database.Equal(v2database.Col(domain.UserFieldProjectID), sessionToken.ProjectID),
+		v2database.Equal(v2database.Col(domain.UserFieldID), sessionToken.UserID),
+	), UserQueryOptions{})
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrUserNotFound()
@@ -246,15 +254,18 @@ func (o *CreateUserAction) Prepare(ctx context.Context, db database.QueryExecuto
 	return nil
 }
 
-func (o *CreateUserAction) Apply(ctx context.Context, tx Statementer[AllStatements]) error {
-	err := tx.Statements().CreateUser(ctx, o.CreateUser)
+func (o *CreateUserAction) Apply(ctx context.Context, tx StatementerWithQueryExecutor[AllStatements]) error {
+	return applyCreateUser(ctx, tx.Statements(), o.CreateUser)
+}
+
+func applyCreateUser(ctx context.Context, stmts UserStatements, user *domain.CreateUser) error {
+	err := stmts.CreateUser(ctx, user)
 	if err != nil {
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
 			return domain.ErrUserAlreadyExists().WithParent(err)
 		}
 		return domain.ErrInternal(err).WithMessage("failed to create user in the database")
 	}
-
 	return nil
 }
 
@@ -282,12 +293,8 @@ func (o *SetPasswordUserAction) Prepare(_ context.Context, _ database.QueryExecu
 	return err
 }
 
-func (o *SetPasswordUserAction) Apply(ctx context.Context, tx Statementer[AllStatements]) error {
-	db, ok := tx.(database.QueryExecutor)
-	if !ok {
-		return domain.ErrInternal(nil).WithMessage("transaction does not support password repository writes")
-	}
-	err := o.passwordRepo.Set(ctx, db, &domain.SetUserPassword{
+func (o *SetPasswordUserAction) Apply(ctx context.Context, tx StatementerWithQueryExecutor[AllStatements]) error {
+	err := o.passwordRepo.Set(ctx, tx, &domain.SetUserPassword{
 		ProjectID:      o.ProjectID,
 		UserID:         o.UserID,
 		EncodedHash:    o.hash,
@@ -332,12 +339,8 @@ func (o *LazyUserAction) Prepare(ctx context.Context, db database.QueryExecutor)
 	return action.Prepare(ctx, db)
 }
 
-func (o *LazyUserAction) Apply(ctx context.Context, tx Statementer[AllStatements]) error {
-	db, ok := tx.(database.QueryExecutor)
-	if !ok {
-		return domain.ErrInternal(nil).WithMessage("transaction does not support lazy user action")
-	}
-	action, err := o.Action(ctx, db)
+func (o *LazyUserAction) Apply(ctx context.Context, tx StatementerWithQueryExecutor[AllStatements]) error {
+	action, err := o.Action(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -361,7 +364,10 @@ type UserStatementsLookup struct {
 }
 
 func (l UserStatementsLookup) GetByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute) (*domain.User, error) {
-	return l.Pool.Statements().GetUserByAttributes(ctx, projectID, attrs, UserReadOptions{})
+	return l.Pool.Statements().GetUser(ctx,
+		v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
+		UserQueryOptions{Attributes: attrs},
+	)
 }
 
 // UserStatementsIdentityReader adapts [UserStatements] to [UserIdentityReader].
@@ -370,7 +376,8 @@ type UserStatementsIdentityReader struct {
 }
 
 func (r UserStatementsIdentityReader) GetIdentity(ctx context.Context, projectID, userID string, attributeKeys ...string) (*domain.User, error) {
-	return r.Pool.Statements().GetUserByID(ctx, projectID, nil, userID, UserReadOptions{
-		AttributeKeys: attributeKeys,
-	})
+	return r.Pool.Statements().GetUser(ctx, v2database.And(
+		v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
+		v2database.Equal(v2database.Col(domain.UserFieldID), userID),
+	), UserQueryOptions{AttributeKeys: attributeKeys})
 }
