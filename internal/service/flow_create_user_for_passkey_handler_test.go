@@ -29,31 +29,34 @@ const passkeyHandlerTestSchema = `{
 }`
 
 type passkeyHandlerFixture struct {
-	handler    *service.FlowCreateUserForPasskeyHandler
-	schemaRepo *domainmock.MockJSONSchemaRepository
-	pool       *dbmock.MockPool
-	v2Pool     *servicemocks.MockPool
-	stmts      *servicemocks.MockAllStatements
+	handler      *service.FlowCreateUserForPasskeyHandler
+	schemaStore  *domainmock.MockJSONSchemaStore
+	pool         *dbmock.MockPool
+	v2Pool       *servicemocks.MockPool
+	stmts        *servicemocks.MockAllStatements
+	passwordRepo *domainmock.MockUserPasswordRepository
 }
 
 func newPasskeyHandlerFixture(t *testing.T) *passkeyHandlerFixture {
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	passwordRepo := domainmock.NewMockUserPasswordRepository(ctrl)
-	schemaRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
+	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
 	pool := dbmock.NewMockPool(ctrl)
 	v2Pool := servicemocks.NewMockPool(ctrl)
 	stmts := servicemocks.NewMockAllStatements(ctrl)
 
-	userService := service.NewUserService(pool, service.NewPool(v2Pool), passwordRepo, schemaRepo, nil)
-	handler := service.NewFlowCreateUserForPasskeyHandler(userService, schemaRepo)
+	v2Pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	userService := service.NewUserService(pool, service.NewPool(v2Pool), schemaStore, passwordRepo, nil)
+	handler := service.NewFlowCreateUserForPasskeyHandler(userService, schemaStore)
 
 	return &passkeyHandlerFixture{
-		handler:    handler,
-		schemaRepo: schemaRepo,
-		pool:       pool,
-		v2Pool:     v2Pool,
-		stmts:      stmts,
+		handler:      handler,
+		schemaStore:  schemaStore,
+		pool:         pool,
+		v2Pool:       v2Pool,
+		stmts:        stmts,
+		passwordRepo: passwordRepo,
 	}
 }
 
@@ -69,9 +72,18 @@ func passkeyFlowState(collected map[string]any) *domain.FlowState {
 	}
 }
 
+type v2TestTx struct {
+	database.QueryExecutor
+	stmts service.AllStatements
+}
+
+func (t v2TestTx) Statements() service.AllStatements {
+	return t.stmts
+}
+
 func expectSchemaLookup(f *passkeyHandlerFixture) {
-	f.schemaRepo.EXPECT().
-		GetByID(gomock.Any(), gomock.Any(), "proj_1", "https://example.test/schema.json").
+	f.schemaStore.EXPECT().
+		GetJSONSchemaByID(gomock.Any(), "proj_1", "https://example.test/schema.json").
 		Return(&domain.JSONSchema{
 			ProjectID: "proj_1",
 			URL:       "https://example.test/schema.json",

@@ -58,23 +58,23 @@ type GetMyUserInput struct {
 type UserService struct {
 	pool         database.Pool
 	v2Pool       StatementPool
+	schemaStore  domain.JSONSchemaStore
 	passwordRepo domain.UserPasswordRepository
-	schemaRepo   domain.JSONSchemaRepository
 	hasher       crypto.Hasher
 }
 
 func NewUserService(
 	pool database.Pool,
 	v2Pool StatementPool,
+	schemaStore domain.JSONSchemaStore,
 	passwordRepo domain.UserPasswordRepository,
-	schemaRepo domain.JSONSchemaRepository,
 	hasher crypto.Hasher,
 ) *UserService {
 	return &UserService{
 		pool:         pool,
 		v2Pool:       v2Pool,
+		schemaStore:  schemaStore,
 		passwordRepo: passwordRepo,
-		schemaRepo:   schemaRepo,
 		hasher:       hasher,
 	}
 }
@@ -106,7 +106,9 @@ func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (
 }
 
 func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ map[string]any, err error) {
-	action := NewCreateUserAction(input, s.schemaRepo)
+	// CreateUser does not need a transaction, so we don't wrap it in an `ApplyActions` call
+
+	action := NewCreateUserAction(input, s.schemaStore)
 	err = action.Prepare(ctx, s.pool)
 	if err != nil {
 		return nil, err
@@ -212,15 +214,15 @@ func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]by
 type CreateUserAction struct {
 	CreateUserInput
 
-	schemaRepo domain.JSONSchemaRepository
+	schemaStore domain.JSONSchemaStore
 
 	CreateUser *domain.CreateUser
 }
 
-func NewCreateUserAction(input CreateUserInput, schemaRepo domain.JSONSchemaRepository) *CreateUserAction {
+func NewCreateUserAction(input CreateUserInput, schemaStore domain.JSONSchemaStore) *CreateUserAction {
 	return &CreateUserAction{
 		CreateUserInput: input,
-		schemaRepo:      schemaRepo,
+		schemaStore:     schemaStore,
 	}
 }
 
@@ -230,7 +232,7 @@ func (o *CreateUserAction) Prepare(ctx context.Context, db database.QueryExecuto
 		return err
 	}
 
-	schemaEntity, err := o.schemaRepo.GetByID(ctx, db, o.ProjectID, schemaURL)
+	schemaEntity, err := o.schemaStore.GetJSONSchemaByID(ctx, o.ProjectID, schemaURL)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return domain.ErrUserInvalid().WithDetails("$schema is not known to the system. First create a schema, then create users.")
