@@ -458,6 +458,35 @@ func TestQueryProjects(t *testing.T) {
 	}
 }
 
+func TestQueryProjectsPageTokenRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	req := &api.QueryProjectsRequest{Limit: api.NewOptLimit(1)}
+	first, err := client.QueryProjects(t.Context(), req)
+	require.NoError(t, err)
+	firstPage, ok := first.(*api.QueryProjectsResponse)
+	require.True(t, ok, helpers.MustMarshal(t, first))
+	require.Len(t, firstPage.Projects, 1)
+
+	pageToken, ok := firstPage.NextPageToken.Get()
+	require.True(t, ok, "a full page carries a cursor")
+
+	req.PageToken = api.NewOptNilPageToken(pageToken)
+	second, err := client.QueryProjects(t.Context(), req)
+	require.NoError(t, err)
+	secondPage, ok := second.(*api.QueryProjectsResponse)
+	require.True(t, ok, helpers.MustMarshal(t, second))
+	assert.Empty(t, secondPage.Projects)
+	assert.False(t, secondPage.NextPageToken.IsSet())
+}
+
 // assertProjectResponse covers every operation answering with the shared
 // project body: getProject, patchProject, and each item of queryProjects.
 func assertProjectResponse(t *testing.T, want, got any) {
