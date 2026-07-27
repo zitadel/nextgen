@@ -103,26 +103,7 @@ SELECT 1;
 
 	userQuery = `SELECT project_id, schema_url, id, lifecycle_owner_team_id, status, created_at, updated_at FROM zitadel_nextgen.users`
 
-	userListByAttributesCTE = `
-WITH unique_filters AS (
-    SELECT DISTINCT key, value_text
-    FROM unnest($1::text[], $2::text[]) AS f(key, value_text)
-),
-matching_ids AS (
-    SELECT p.user_id
-    FROM unique_filters f
-    JOIN zitadel_nextgen.user_attributes p
-      ON p.project_id = $3
-     AND p.key = f.key
-     AND p.value = f.value_text::jsonb
-    WHERE jsonb_typeof(p.value) IN ('string', 'number', 'boolean')
-    GROUP BY p.user_id
-    HAVING COUNT(*) = (SELECT COUNT(*) FROM unique_filters)
-)
-SELECT u.project_id, u.schema_url, u.id, u.lifecycle_owner_team_id, u.status, u.created_at, u.updated_at
-FROM matching_ids m
-JOIN zitadel_nextgen.users u ON u.project_id = $3 AND u.id = m.user_id
-`
+	userAttributesTable = "zitadel_nextgen.user_attributes"
 
 	userAttributesByIDsQuery = `
 SELECT user_id, key, value
@@ -232,13 +213,6 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 	if filter == nil {
 		filter = &database.ListOptions[domain.UserField]{}
 	}
-	if len(opts.Attributes) > 0 {
-		return us.listUsersByAttributes(ctx, filter, opts)
-	}
-	return us.listUsersByColumns(ctx, filter, opts)
-}
-
-func (us userStatements) listUsersByColumns(ctx context.Context, filter *database.ListOptions[domain.UserField], opts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
 	if len(filter.Pagination.OrderBy.Columns) == 0 {
 		filter.Pagination.OrderBy = database.OrderBy[domain.UserField]{
 			Columns: []database.Column[domain.UserField]{
@@ -273,12 +247,33 @@ func (us userStatements) listUsersByColumns(ctx context.Context, filter *databas
 		}
 	}
 
+	hasWhere := false
 	if readFilter != nil {
 		compiler.WriteString(" WHERE ")
 		compileFilter(&compiler, readFilter, userSchema)
+		hasWhere = true
+	}
+	for _, a := range opts.Attributes {
+		raw, err := json.Marshal(a.Value)
+		if err != nil {
+			return nil, fmt.Errorf("marshal attribute %q: %w", a.Key, err)
+		}
+		if hasWhere {
+			compiler.WriteString(" AND ")
+		} else {
+			compiler.WriteString(" WHERE ")
+			hasWhere = true
+		}
+		compiler.WriteString("EXISTS (SELECT 1 FROM ")
+		compiler.WriteString(userAttributesTable)
+		compiler.WriteString(" a WHERE a.project_id = zitadel_nextgen.users.project_id AND a.user_id = zitadel_nextgen.users.id AND a.key = ")
+		compiler.WriteArg(a.Key)
+		compiler.WriteString(" AND a.value = ")
+		compiler.WriteArg(string(raw))
+		compiler.WriteString("::jsonb AND jsonb_typeof(a.value) IN ('string', 'number', 'boolean'))")
 	}
 	if opts.MembershipTeamID != nil {
-		if readFilter != nil {
+		if hasWhere {
 			compiler.WriteString(" AND ")
 		} else {
 			compiler.WriteString(" WHERE ")
@@ -320,43 +315,6 @@ func (us userStatements) listUsersByColumns(ctx context.Context, filter *databas
 		Items:      users,
 		NextCursor: nextCursor,
 	}, nil
-}
-
-func (us userStatements) listUsersByAttributes(ctx context.Context, filter *database.ListOptions[domain.UserField], opts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
-	if opts.MembershipTeamID != nil {
-		return nil, fmt.Errorf("ListUsers Attributes cannot be combined with MembershipTeamID")
-	}
-	if filter.Pagination.Limit > 0 || len(filter.Pagination.Cursor) > 0 {
-		return nil, fmt.Errorf("ListUsers Attributes does not support pagination")
-	}
-	projectID, ok := database.EqualStringValue(filter.Filter, domain.UserFieldProjectID)
-	if !ok {
-		return nil, fmt.Errorf("ListUsers with Attributes requires an equal project_id filter")
-	}
-
-	keys := make([]string, 0, len(opts.Attributes))
-	jsonTexts := make([]string, 0, len(opts.Attributes))
-	for _, a := range opts.Attributes {
-		raw, err := json.Marshal(a.Value)
-		if err != nil {
-			return nil, fmt.Errorf("marshal attribute %q: %w", a.Key, err)
-		}
-		keys = append(keys, a.Key)
-		jsonTexts = append(jsonTexts, string(raw))
-	}
-
-	rows, err := us.client.Query(ctx, userListByAttributesCTE, keys, jsonTexts, projectID)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	users, err := pgx.CollectRows(rows, scanUserHeader)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	if err := us.hydrateUsers(ctx, users, opts); err != nil {
-		return nil, err
-	}
-	return &database.ListResult[*domain.User]{Items: users}, nil
 }
 
 // DeactivateUser implements [service.UserStatements].

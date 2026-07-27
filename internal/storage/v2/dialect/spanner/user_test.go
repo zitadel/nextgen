@@ -4,6 +4,7 @@ package spanner
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -93,6 +94,128 @@ func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
 		"email": "alpha@example.com",
 		"name":  "Alpha",
 	})
+}
+
+func TestUserStatements_ListUsersUnifiedFilters(t *testing.T) {
+	ctx := t.Context()
+	stmts := testClient.Statements()
+	projectID, schemaURL := ensureUserTestProject(t)
+	teamID := "team_unified_filters"
+
+	require.NoError(t, stmts.CreateTeam(ctx, &domain.Team{ProjectID: projectID, ID: teamID}))
+
+	orderByID := v2database.Page[domain.UserField]{
+		OrderBy: v2database.OrderBy[domain.UserField]{
+			Columns:   []v2database.Column[domain.UserField]{v2database.Col(domain.UserFieldID)},
+			Direction: v2database.OrderAsc,
+		},
+	}
+	projectFilter := v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID)
+
+	t.Run("AttributesAndLimit", func(t *testing.T) {
+		for _, spec := range []struct {
+			id, email, name string
+		}{
+			{"user_unified_1", "u1@example.com", "User One"},
+			{"user_unified_2", "u2@example.com", "User Two"},
+			{"user_unified_3", "u3@example.com", "User Three"},
+		} {
+			user := newTestUserWithRole(t, projectID, schemaURL, spec.id, spec.email, spec.name, "member")
+			require.NoError(t, stmts.CreateUser(ctx, user))
+		}
+
+		page, err := stmts.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
+			Filter: projectFilter,
+			Pagination: v2database.Page[domain.UserField]{
+				OrderBy: orderByID.OrderBy,
+				Limit:   2,
+			},
+		}, service.UserQueryOptions{
+			Attributes: []domain.Attribute{{Key: "role", Value: "member"}},
+		})
+		require.NoError(t, err)
+		require.Len(t, page.Items, 2)
+		assert.NotEmpty(t, page.NextCursor)
+		assert.Equal(t, []string{"user_unified_1", "user_unified_2"}, userIDs(page.Items))
+
+		page2, err := stmts.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
+			Filter: projectFilter,
+			Pagination: v2database.Page[domain.UserField]{
+				OrderBy: orderByID.OrderBy,
+				Limit:   2,
+				Cursor:  page.NextCursor,
+			},
+		}, service.UserQueryOptions{
+			Attributes: []domain.Attribute{{Key: "role", Value: "member"}},
+		})
+		require.NoError(t, err)
+		require.Len(t, page2.Items, 1)
+		assert.Equal(t, "user_unified_3", page2.Items[0].ID)
+	})
+
+	t.Run("AttributesAndMembershipTeamID", func(t *testing.T) {
+		member := newTestUserWithRole(t, projectID, schemaURL, "user_member", "member@example.com", "Member", "worker")
+		nonMember := newTestUserWithRole(t, projectID, schemaURL, "user_non_member", "nonmember@example.com", "Non Member", "worker")
+		require.NoError(t, stmts.CreateUser(ctx, member))
+		require.NoError(t, stmts.CreateUser(ctx, nonMember))
+		require.NoError(t, stmts.CreateTeamMembership(ctx, &domain.TeamMembership{
+			ProjectID: projectID,
+			TeamID:    teamID,
+			UserID:    member.ID,
+			Status:    domain.MembershipStatusActive,
+		}))
+
+		list, err := stmts.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
+			Filter: projectFilter,
+			Pagination: v2database.Page[domain.UserField]{
+				OrderBy: orderByID.OrderBy,
+			},
+		}, service.UserQueryOptions{
+			Attributes:       []domain.Attribute{{Key: "role", Value: "worker"}},
+			MembershipTeamID: &teamID,
+		})
+		require.NoError(t, err)
+		require.Len(t, list.Items, 1)
+		assert.Equal(t, member.ID, list.Items[0].ID)
+	})
+
+	t.Run("MembershipTeamIDAndLimit", func(t *testing.T) {
+		for i, id := range []string{"user_limit_1", "user_limit_2", "user_limit_3", "user_limit_4"} {
+			user := newTestUser(t, projectID, schemaURL, id, fmt.Sprintf("limit%d@example.com", i+1), fmt.Sprintf("Limit %d", i+1))
+			require.NoError(t, stmts.CreateUser(ctx, user))
+			if id != "user_limit_4" {
+				require.NoError(t, stmts.CreateTeamMembership(ctx, &domain.TeamMembership{
+					ProjectID: projectID,
+					TeamID:    teamID,
+					UserID:    id,
+					Status:    domain.MembershipStatusActive,
+				}))
+			}
+		}
+
+		list, err := stmts.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
+			Filter: projectFilter,
+			Pagination: v2database.Page[domain.UserField]{
+				OrderBy: orderByID.OrderBy,
+				Limit:   2,
+			},
+		}, service.UserQueryOptions{
+			MembershipTeamID: &teamID,
+		})
+		require.NoError(t, err)
+		require.Len(t, list.Items, 2)
+		assert.Equal(t, []string{"user_limit_1", "user_limit_2"}, userIDs(list.Items))
+	})
+}
+
+func newTestUserWithRole(t *testing.T, projectID, schemaURL, userID, email, name, role string) *domain.CreateUser {
+	t.Helper()
+
+	user := newTestUser(t, projectID, schemaURL, userID, email, name)
+	roleAttr, err := domain.NewCreateAttribute("role", role, domain.AttributeUniquenessUnspecified)
+	require.NoError(t, err)
+	user.Attributes = append(user.Attributes, roleAttr)
+	return user
 }
 
 func newTestUser(t *testing.T, projectID, schemaURL, userID, email, name string) *domain.CreateUser {
