@@ -623,7 +623,7 @@ func TestProjectService_DefaultProject(t *testing.T) {
 			PreviewOrigins: []string{},
 		}
 
-		svc, _, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 
 		statements.EXPECT().
 			ListProjects(gomock.Any(), gomock.Any()).
@@ -643,7 +643,7 @@ func TestProjectService_DefaultProject(t *testing.T) {
 	t.Run("returns nil while no project exists yet — the server never creates one", func(t *testing.T) {
 		t.Parallel()
 
-		svc, _, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 
 		statements.EXPECT().
 			ListProjects(gomock.Any(), gomock.Any()).
@@ -661,7 +661,7 @@ func TestProjectService_DefaultProject(t *testing.T) {
 
 		configured := &domain.Project{ID: "proj_custom", PreviewOrigins: []string{}}
 
-		svc, _, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 
 		statements.EXPECT().GetProjectByID(gomock.Any(), "proj_custom").Return(configured, nil)
 		statements.EXPECT().ListProjects(gomock.Any(), gomock.Any()).Times(0)
@@ -675,7 +675,7 @@ func TestProjectService_DefaultProject(t *testing.T) {
 	t.Run("a configured but missing project is a configuration error", func(t *testing.T) {
 		t.Parallel()
 
-		svc, _, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 
 		statements.EXPECT().
 			GetProjectByID(gomock.Any(), "proj_gone").
