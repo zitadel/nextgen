@@ -105,7 +105,7 @@ func ensureServerKEK(cfg *ServerConfig) error {
 				UseForEncryption: true,
 			},
 		}
-		fmt.Fprintf(os.Stderr, "created server KEK file at %s\n", filePath)
+		fmt.Fprintf(os.Stderr, "created server KEK file at %s (generated for local/dev only; configure server.encryption_keys for production)\n", filePath)
 	}
 
 	return nil
