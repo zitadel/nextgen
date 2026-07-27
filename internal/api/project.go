@@ -60,8 +60,8 @@ func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (
 
 // projectResponse is the shared project body: getProject, patchProject, and
 // every item in queryProjects answer with it.
-func projectResponse(project *domain.Project) *api.GetProjectResponse {
-	return &api.GetProjectResponse{
+func projectResponse(project *domain.Project) *api.ProjectResponse {
+	return &api.ProjectResponse{
 		ID:             project.ID,
 		Name:           project.Name,
 		PreviewOrigins: project.PreviewOrigins,

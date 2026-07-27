@@ -244,8 +244,8 @@ func TestGetProject(t *testing.T) {
 		resp, err := client.GetProject(t.Context(), params)
 
 		assert.NoError(t, err)
-		if assert.IsType(t, &api.GetProjectResponse{}, resp, helpers.MustMarshal(t, resp)) {
-			got := resp.(*api.GetProjectResponse)
+		if assert.IsType(t, &api.ProjectResponse{}, resp, helpers.MustMarshal(t, resp)) {
+			got := resp.(*api.ProjectResponse)
 			assert.NotEmpty(t, got.CreatedAt)
 			assert.NotEmpty(t, got.UpdatedAt)
 			assert.Equal(t, project.ID, got.ID)
