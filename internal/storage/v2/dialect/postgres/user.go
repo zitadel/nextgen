@@ -52,51 +52,12 @@ _attributes AS (
     )
     SELECT h.project_id, COALESCE($5::text, ''), h.id, d.key, d.value
     FROM _input_data d CROSS JOIN _user_header h
-)
-SELECT 1;
-`
-
-	userInsertWithMembershipSQL = `
-WITH _input_data AS (
-    SELECT *,
-           unique_scope_txt::zitadel_nextgen.uniqueness_scope AS unique_scope
-    FROM unnest(
-        $6::text[],
-        $7::jsonb[],
-        $8::bytea[],
-        $9::text[]
-    ) AS t(key, value, value_hash, unique_scope_txt)
-),
-_user_header AS (
-    INSERT INTO zitadel_nextgen.users (project_id, schema_url, id, lifecycle_owner_team_id, status)
-    VALUES ($1, $2, $3, $4, 'active')
-    RETURNING project_id, id
-),
-_registry AS (
-    INSERT INTO zitadel_nextgen.user_unique_attributes (
-        project_id, user_id, team_id, key, value_hash
-    )
-    SELECT h.project_id, h.id,
-           CASE WHEN d.unique_scope = 'project'::zitadel_nextgen.uniqueness_scope
-                THEN ''
-                ELSE COALESCE($5::text, '')
-           END,
-           d.key, d.value_hash
-    FROM _input_data d CROSS JOIN _user_header h
-    WHERE d.unique_scope <> 'unspecified'::zitadel_nextgen.uniqueness_scope
-      AND d.value_hash IS NOT NULL
-),
-_attributes AS (
-    INSERT INTO zitadel_nextgen.user_attributes (
-        project_id, team_id, user_id, key, value
-    )
-    SELECT h.project_id, COALESCE($5::text, ''), h.id, d.key, d.value
-    FROM _input_data d CROSS JOIN _user_header h
 ),
 _membership AS (
     INSERT INTO zitadel_nextgen.team_memberships (project_id, team_id, user_id, status)
     SELECT h.project_id, $10::text, h.id, 'active'
     FROM _user_header h
+    WHERE $10::text IS NOT NULL AND $10::text <> ''
 )
 SELECT 1;
 `
@@ -182,13 +143,13 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 		keys, values, hashes, scopes,
 	}
 
-	sql := userInsertSQL
+	var membershipTeamID any
 	if user.InitialMembershipTeamID != nil && *user.InitialMembershipTeamID != "" {
-		sql = userInsertWithMembershipSQL
-		args = append(args, *user.InitialMembershipTeamID)
+		membershipTeamID = *user.InitialMembershipTeamID
 	}
+	args = append(args, membershipTeamID)
 
-	_, err := us.client.Exec(ctx, sql, args...)
+	_, err := us.client.Exec(ctx, userInsertSQL, args...)
 	return wrapError(err)
 }
 
