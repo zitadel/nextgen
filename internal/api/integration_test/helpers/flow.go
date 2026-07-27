@@ -7,7 +7,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
 func (h *Harness) EnsureCreateUserHandler(t *testing.T) *service.FlowCreateUserWithPasswordHandler {
@@ -35,7 +34,7 @@ func (h *Harness) EnsureFlowService(t *testing.T) service.FlowService {
 	if h.FlowService == nil {
 		h.FlowService = service.NewFlowService(
 			h.EnsureDBPool(t),
-			h.EnsureFlowDefinitionRepo(t),
+			h.EnsureServiceDB(t),
 			h.EnsureFlowStateMachine(t),
 			idgen.NewULID(),
 		)
@@ -68,14 +67,4 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 		)
 	}
 	return h.FlowStateMachine
-}
-
-func (h *Harness) EnsureFlowDefinitionRepo(t *testing.T) domain.FlowDefinitionRepository {
-	t.Helper()
-	if h.FlowDefinitionRepo == nil {
-		h.FlowDefinitionRepo = repository.NewFlowDefinitionRepository(
-			h.EnsureDBPool(t),
-		)
-	}
-	return h.FlowDefinitionRepo
 }
