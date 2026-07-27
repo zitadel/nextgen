@@ -192,9 +192,12 @@ func TestUserTeamLifecycle_ProjectDeleteCascadesThroughMemberships(t *testing.T)
 		pid, teamID).Scan(&teamCount))
 	require.Zero(t, teamCount, "team should be removed by project delete cascade")
 
-	membershipRepo := repository.NewTeamMembershipRepository(tx)
-	_, err = membershipRepo.Get(ctx, tx, pid, teamID, userID)
-	require.ErrorIs(t, err, new(database.NoRowFoundError))
+	row := tx.QueryRow(ctx,
+		fmt.Sprintf(`SELECT status FROM %s WHERE project_id = $1 AND team_id = $2 AND user_id = $3`, dbTable("team_memberships")),
+		pid, teamID, userID,
+	)
+	var status string
+	require.Error(t, row.Scan(&status), "membership should be removed with project delete cascade")
 }
 
 func TestUserRepository_DeactivateRemovesMemberships(t *testing.T) {
@@ -222,10 +225,7 @@ func TestUserRepository_DeactivateRemovesMemberships(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, domain.UserStatusDeactivated, got.Status)
 
-	membershipRepo := repository.NewTeamMembershipRepository(tx)
-	membership, err := membershipRepo.Get(ctx, tx, pid, teamID, userID)
-	require.NoError(t, err)
-	require.Equal(t, domain.MembershipStatusRemoved, membership.Status)
+	require.Equal(t, domain.MembershipStatusRemoved, getTeamMembershipStatus(t, tx, pid, teamID, userID))
 
 	team := getTeam(t, tx, pid, teamID)
 	require.Equal(t, teamID, team.ID, fmt.Sprintf("team %s should still exist after user deactivation", teamID))

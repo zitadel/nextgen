@@ -67,12 +67,12 @@ func TestGetMySession_Identity(t *testing.T) {
 		RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
 		Checks:         []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}},
 	}
-	attemptRepo := harness.EnsureAuthAttemptRepo(t)
-	require.NoError(t, attemptRepo.Create(t.Context(), db, attempt))
+	stmts := harness.EnsureServiceDB(t)
+	require.NoError(t, stmts.Statements().CreateAuthAttempt(t.Context(), attempt))
 	const plainToken = "handoff_session_me_test"
 	sum := sha256.Sum256([]byte(plainToken))
 	attempt.HandoffToken = &domain.HandoffToken{TokenHash: sum[:]}
-	require.NoError(t, attemptRepo.Handoff(t.Context(), db, attempt))
+	require.NoError(t, stmts.Statements().HandoffAuthAttempt(t.Context(), attempt))
 
 	exchangeBody, err := json.Marshal(map[string]string{"handoff_token": plainToken})
 	require.NoError(t, err)
