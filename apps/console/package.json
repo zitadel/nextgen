@@ -7,7 +7,8 @@
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dev:real": "tsx --conditions=@zitadel/source scripts/dev-real.mts"
   },
   "dependencies": {
     "@fontsource/arimo": "catalog:",
@@ -16,6 +17,7 @@
     "@tanstack/react-router-devtools": "catalog:",
     "@zitadel/api": "workspace:*",
     "@zitadel/design-tokens": "workspace:*",
+    "@zitadel/sdk-react": "workspace:*",
     "@zitadel/ui-react": "workspace:*",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
@@ -39,8 +41,10 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
+    "@zitadel/testing": "workspace:*",
     "jsdom": "catalog:",
     "msw": "catalog:",
+    "tsx": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"

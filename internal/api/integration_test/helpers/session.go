@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
 func (h *Harness) EnsureSessionService(t *testing.T) service.SessionService {
@@ -14,7 +13,7 @@ func (h *Harness) EnsureSessionService(t *testing.T) service.SessionService {
 		h.SessionService = service.NewSessionService(
 			h.EnsureDBPool(t),
 			h.EnsureServiceDB(t),
-			repository.NewUserRepository(),
+			service.UserStatementsIdentityReader{Pool: h.EnsureServiceDB(t)},
 			service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour},
 		)
 	}

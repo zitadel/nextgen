@@ -105,13 +105,8 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 
 	// User is now in the DB (create_user fired).
 	db := harness.EnsureDBPool(t)
-	userRepo := harness.EnsureUserRepo(t)
-	user, err := userRepo.Get(t.Context(), db,
-		database.WithCondition(database.And(
-			userRepo.ProjectIDCondition(project.ID),
-			userRepo.AttributesCondition([]domain.Attribute{{Key: "email", Value: newEmail}}),
-		)),
-	)
+	users := harness.EnsureUserFixture(t)
+	user, err := users.GetByAttributes(t.Context(), project.ID, []domain.Attribute{{Key: "email", Value: newEmail}})
 	require.NoError(t, err, "create_user must persist exactly one user before the upsell")
 
 	// passkey-upsell: issue passkey_register challenge for the just-created user.

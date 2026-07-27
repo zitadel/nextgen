@@ -490,6 +490,9 @@ importers:
       '@zitadel/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens
+      '@zitadel/sdk-react':
+        specifier: workspace:*
+        version: link:../../packages/sdk-react
       '@zitadel/ui-react':
         specifier: workspace:*
         version: link:../../packages/ui-react
@@ -554,12 +557,18 @@ importers:
       '@vitejs/plugin-react':
         specifier: 'catalog:'
         version: 6.0.1(vite@8.0.16(@types/node@25.6.0)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(sass@1.100.0)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.0))
+      '@zitadel/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
       jsdom:
         specifier: 'catalog:'
         version: 29.0.2
       msw:
         specifier: 'catalog:'
         version: 2.14.6(@types/node@25.6.0)(typescript@6.0.3)
+      tsx:
+        specifier: 'catalog:'
+        version: 4.21.0
       typescript:
         specifier: 'catalog:'
         version: 6.0.3

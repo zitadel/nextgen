@@ -12,13 +12,22 @@ import { configureZitadel, getApi } from "@zitadel/api/config";
  * calls that require a `project_id` query param) and is read from a public
  * `VITE_`-prefixed env var.
  */
-const project = configureZitadel({
-  proxyPath: import.meta.env.VITE_CONSOLE_API_BASE ?? "/api",
+/** The same-origin API base every console request targets (Console ADR 0002). */
+export const apiBase = import.meta.env.VITE_CONSOLE_API_BASE ?? "/api";
+
+/**
+ * The app-wide `ZitadelProject` handle — root ADR 016: configure once,
+ * derive everywhere. The `projectId` recorded here is only the build-time
+ * env override; the *effective* project id is resolved through
+ * `getConsoleProjectId()` in `src/runtime/runtime.ts`, which prefers this
+ * override and falls back to the runtime-discovered `console_project_id`
+ * (Console ADR 0004 §5). Callers needing a project id must use that helper
+ * rather than this handle's field.
+ */
+export const project = configureZitadel({
+  proxyPath: apiBase,
   projectId: import.meta.env.VITE_CONSOLE_PROJECT_ID ?? "",
 });
 
 /** Typed Zitadel API client, base URL pre-bound, no client-held token. */
 export const api = getApi(project);
-
-/** The configured project id, passed to operations that require `project_id`. */
-export const projectId = project.projectId;

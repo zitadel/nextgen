@@ -1,10 +1,8 @@
-import { applyBranding, clearBranding, setupMockHandlers } from "@zitadel/api-mock";
 import type { Meta, StoryObj } from "@storybook/web-components-vite";
+import { applyBranding, clearBranding, setupMockHandlers } from "@zitadel/api-mock";
 import { html } from "lit";
 import { initialize, mswLoader } from "msw-storybook-addon";
-
 import "@zitadel/components";
-
 import { brandingPresets, type BrandingPresetId } from "./branding-presets.js";
 
 // MSW lives only on the orchestrator (the atoms make no requests), so the
@@ -17,14 +15,15 @@ initialize({ onUnhandledRequest: "bypass" });
  * flow machine + orval-typed fixtures), wired through `msw-storybook-addon`.
  *
  * One component, knobs for the rest:
- * - `purpose` switches the flow (Sign in -> email + password; Sign up ->
- *   email, given name, family name, date of birth), so the rendered fields
- *   change without a separate component.
+ * - `purpose` switches the flow (Sign in -> email, then the credential on its
+ *   own step; Sign up -> email, given name, family name, date of birth), so the
+ *   rendered fields change without a separate component.
  * - `branding` swaps the tenant payload the mock overlays on every response.
  *
  * Interactive fixture emails (typed live in the rendered form):
- * - `wrong@example.com` -> inline "Wrong email or password." on Sign in
- * - `server@example.com` -> form alert on Sign in
+ * - `wrong@example.com` -> inline "Wrong email or password." on the password
+ *   step (credential failures surface there, not on the identifier)
+ * - `server@example.com` -> form alert on the password step
  * - `exists@example.com` -> inline "account already exists" on Sign up
  * - any other email -> happy path to signed-in
  *
@@ -65,14 +64,40 @@ const meta: Meta<OrchestratorArgs> = {
     clearBranding();
     applyBranding(brandingPresets[args.branding]);
   },
-  render: ({ purpose }) => html`<zitadel-login .purpose=${purpose}></zitadel-login>`,
+  render: ({ purpose }) =>
+    html`<zitadel-login variant="page" .purpose=${purpose}></zitadel-login>`,
 };
 
 export default meta;
 type Story = StoryObj<OrchestratorArgs>;
 
-/** Combined sign-in step: email + password. */
+/**
+ * Sign-in, first step: the identifier collects the email only. Submitting
+ * advances to the password step — the split shape the real default flow
+ * defines (`packages/config/defaults/default-login.json`).
+ */
 export const SignIn: Story = {};
+
+/**
+ * The widget default: no `variant` means content-sized and transparent —
+ * the embedding page owns layout, background, and typography. Rendered
+ * here inside a constrained light-page card, with `theme="light"` pinning
+ * the colour mode the way an app with a fixed light surface would (the
+ * unset default follows the visitor's `prefers-color-scheme`).
+ */
+export const WidgetEmbed: Story = {
+  parameters: { layout: "padded" },
+  render: () => html`
+    <div
+      style="max-width: 420px; margin: 2rem auto; padding: 1.5rem; border: 1px solid #d7d7e0; border-radius: 12px; background: #ffffff;"
+    >
+      <p style="margin: 0 0 1rem; font-family: sans-serif; color: #333;">
+        Your app's own page content around the login widget:
+      </p>
+      <zitadel-login theme="light"></zitadel-login>
+    </div>
+  `,
+};
 
 /** Sign-up step: a different field set (email, given name, family name, DOB). */
 export const SignUp: Story = { args: { purpose: "register" } };

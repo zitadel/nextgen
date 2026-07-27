@@ -12,7 +12,6 @@ import (
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // TestPasswordLoginFlow exercises the example 01 (password-login) JSON
@@ -44,8 +43,8 @@ func TestPasswordLoginFlow(t *testing.T) {
 	emailAttr, err := domain.NewCreateAttribute("email", userEmail, domain.AttributeUniquenessProject)
 	require.NoError(t, err)
 
-	userRepo := harness.EnsureUserRepo(t)
-	require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
+	users := harness.EnsureUserFixture(t)
+	require.NoError(t, users.Create(t.Context(), &domain.CreateUser{
 		ProjectID:               project.ID,
 		SchemaURL:               schemaURL,
 		ID:                      userID,
@@ -234,13 +233,8 @@ func TestPasswordRegisterFlow(t *testing.T) {
 
 	// User row exists with the submitted email.
 	db := harness.EnsureDBPool(t)
-	userRepo := harness.EnsureUserRepo(t)
-	user, err := userRepo.Get(t.Context(), db,
-		database.WithCondition(database.And(
-			userRepo.ProjectIDCondition(project.ID),
-			userRepo.AttributesCondition([]domain.Attribute{{Key: "email", Value: newEmail}}),
-		)),
-	)
+	users := harness.EnsureUserFixture(t)
+	user, err := users.GetByAttributes(t.Context(), project.ID, []domain.Attribute{{Key: "email", Value: newEmail}})
 	require.NoError(t, err, "create_user must persist exactly one user")
 
 	// Password hash exists for that user and verifies the submitted password.
@@ -269,7 +263,7 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 	const conflictEmail = "pwregister-conflict@example.com"
 	emailAttr, err := domain.NewCreateAttribute("email", conflictEmail, domain.AttributeUniquenessProject)
 	require.NoError(t, err)
-	require.NoError(t, harness.EnsureUserRepo(t).Create(t.Context(), harness.EnsureDBPool(t), &domain.CreateUser{
+	require.NoError(t, harness.EnsureUserFixture(t).Create(t.Context(), &domain.CreateUser{
 		ProjectID:               project.ID,
 		SchemaURL:               schemaURL,
 		ID:                      "pwregister-conflict-seed",
