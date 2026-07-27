@@ -93,6 +93,31 @@ func TestUserRecoveryCodesStatements_CRUD(t *testing.T) {
 	require.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 }
 
+func TestUserRecoveryCodesStatements_CreateEmptyRejected(t *testing.T) {
+	ctx := t.Context()
+	pid := uniqueProjectID(t)
+	const (
+		tid       = "team-cred-rc-empty"
+		schemaURL = "https://schemas.test/cred-rc-empty.json"
+		userID    = "usr_rc_empty"
+	)
+	insertUserRecoveryCodesFixtures(t, ctx, pid, tid, schemaURL, userID)
+
+	err := testPool.CreateUserRecoveryCodes(ctx, &domain.CreateRecoveryCodes{
+		ProjectID:     pid,
+		UserID:        userID,
+		RecoveryCodes: nil,
+	})
+	assert.ErrorIs(t, err, domain.ErrEmptyRecoveryCodes)
+
+	err = testPool.CreateUserRecoveryCodes(ctx, &domain.CreateRecoveryCodes{
+		ProjectID:     pid,
+		UserID:        userID,
+		RecoveryCodes: []string{},
+	})
+	assert.ErrorIs(t, err, domain.ErrEmptyRecoveryCodes)
+}
+
 func TestUserRecoveryCodesStatements_Update(t *testing.T) {
 	ctx := t.Context()
 	pid := uniqueProjectID(t)
@@ -113,15 +138,25 @@ func TestUserRecoveryCodesStatements_Update(t *testing.T) {
 	assert.ErrorIs(t, err, v2database.ErrNoChanges)
 
 	err = testPool.UpdateUserRecoveryCodes(ctx, pid, "missing-user",
-		domain.UserRecoveryCodesIncrementFailedAttempts(),
+		domain.WithUserRecoveryCodesIncrementFailedAttempts(),
 	)
 	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 
+	err = testPool.UpdateUserRecoveryCodes(ctx, pid, userID,
+		domain.WithUserRecoveryCodesCodes(nil),
+	)
+	assert.ErrorIs(t, err, domain.ErrEmptyRecoveryCodes)
+
+	err = testPool.UpdateUserRecoveryCodes(ctx, pid, userID,
+		domain.WithUserRecoveryCodesCodes([]string{}),
+	)
+	assert.ErrorIs(t, err, domain.ErrEmptyRecoveryCodes)
+
 	now := time.Now().UTC().Truncate(time.Millisecond)
 	require.NoError(t, testPool.UpdateUserRecoveryCodes(ctx, pid, userID,
-		domain.UserRecoveryCodesSetCodes([]string{"new-a", "new-b"}),
-		domain.UserRecoveryCodesSetLastSuccessfulCheck(&now),
-		domain.UserRecoveryCodesResetFailedAttempts(),
+		domain.WithUserRecoveryCodesCodes([]string{"new-a", "new-b"}),
+		domain.WithUserRecoveryCodesLastSuccessfulCheck(&now),
+		domain.WithUserRecoveryCodesResetFailedAttempts(),
 	))
 
 	got, err := testPool.GetUserRecoveryCodesByUserID(ctx, pid, userID)
@@ -132,15 +167,15 @@ func TestUserRecoveryCodesStatements_Update(t *testing.T) {
 	assert.Zero(t, got.FailedAttempts)
 
 	require.NoError(t, testPool.UpdateUserRecoveryCodes(ctx, pid, userID,
-		domain.UserRecoveryCodesIncrementFailedAttempts(),
-		domain.UserRecoveryCodesIncrementFailedAttempts(),
+		domain.WithUserRecoveryCodesIncrementFailedAttempts(),
+		domain.WithUserRecoveryCodesIncrementFailedAttempts(),
 	))
 	got, err = testPool.GetUserRecoveryCodesByUserID(ctx, pid, userID)
 	require.NoError(t, err)
 	assert.Equal(t, int16(2), got.FailedAttempts)
 
 	require.NoError(t, testPool.UpdateUserRecoveryCodes(ctx, pid, userID,
-		domain.UserRecoveryCodesSetLastSuccessfulCheck(nil),
+		domain.WithUserRecoveryCodesLastSuccessfulCheck(nil),
 	))
 	got, err = testPool.GetUserRecoveryCodesByUserID(ctx, pid, userID)
 	require.NoError(t, err)

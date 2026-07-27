@@ -98,7 +98,7 @@ type UserRecoveryCodesStatements interface {
 	GetUserRecoveryCodesByID(ctx context.Context, id int64) (*domain.UserRecoveryCodes, error)
 	GetUserRecoveryCodesByUserID(ctx context.Context, projectID, userID string) (*domain.UserRecoveryCodes, error)
 	ListUserRecoveryCodes(ctx context.Context, filter *database.ListOptions[domain.UserRecoveryCodesField]) (*database.ListResult[*domain.UserRecoveryCodes], error)
-	UpdateUserRecoveryCodes(ctx context.Context, projectID, userID string, changes ...domain.UserRecoveryCodesChange) error
+	UpdateUserRecoveryCodes(ctx context.Context, projectID, userID string, updates ...domain.UserRecoveryCodesUpdate) error
 	DeleteUserRecoveryCodesByID(ctx context.Context, id int64) error
 	DeleteUserRecoveryCodesByUserID(ctx context.Context, projectID, userID string) error
 }

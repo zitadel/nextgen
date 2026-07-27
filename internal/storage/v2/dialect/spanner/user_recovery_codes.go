@@ -2,8 +2,7 @@ package spanner
 
 import (
 	"context"
-	"strconv"
-	"strings"
+	"fmt"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -12,7 +11,6 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
-	"github.com/zitadel/nextgen/internal/storage/v2/userrecoverycodes"
 )
 
 const (
@@ -42,14 +40,13 @@ func newUserRecoveryCodesStatements(db queryExecutor) userRecoveryCodesStatement
 
 // CreateUserRecoveryCodes implements [service.UserRecoveryCodesStatements].
 func (s userRecoveryCodesStatements) CreateUserRecoveryCodes(ctx context.Context, codes *domain.CreateRecoveryCodes) error {
-	recoveryCodes := codes.RecoveryCodes
-	if recoveryCodes == nil {
-		recoveryCodes = []string{}
+	if err := domain.RequireNonEmptyRecoveryCodes(codes.RecoveryCodes); err != nil {
+		return err
 	}
 	_, err := s.db.Update(ctx, buildStatement(createUserRecoveryCodesStmt,
 		codes.ProjectID,
 		codes.UserID,
-		recoveryCodes,
+		codes.RecoveryCodes,
 	).statement())
 	return err
 }
@@ -67,29 +64,59 @@ func (s userRecoveryCodesStatements) DeleteUserRecoveryCodesByUserID(ctx context
 }
 
 // UpdateUserRecoveryCodes implements [service.UserRecoveryCodesStatements].
-func (s userRecoveryCodesStatements) UpdateUserRecoveryCodes(ctx context.Context, projectID, userID string, changes ...domain.UserRecoveryCodesChange) error {
-	assignments, err := userrecoverycodes.Assignments(changes)
-	if err != nil {
-		return err
+func (s userRecoveryCodesStatements) UpdateUserRecoveryCodes(ctx context.Context, projectID, userID string, updates ...domain.UserRecoveryCodesUpdate) error {
+	applied := domain.NewUserRecoveryCodesUpdates(updates...)
+	if applied.Empty() {
+		return database.ErrNoChanges
 	}
-	setClause, setArgs, next, err := database.BuildSetClause(assignments, 1)
-	if err != nil {
-		return err
+
+	var c statementCompiler
+	c.WriteString("UPDATE user_recovery_codes SET ")
+	for i, op := range applied.Ops() {
+		if i > 0 {
+			c.WriteString(", ")
+		}
+		if err := writeUserRecoveryCodesOp(&c, op); err != nil {
+			return err
+		}
 	}
-	var b strings.Builder
-	b.WriteString("UPDATE user_recovery_codes SET ")
-	b.WriteString(setClause)
-	b.WriteString(", updated_at = CURRENT_TIMESTAMP() WHERE project_id = $")
-	b.WriteString(strconv.Itoa(next))
-	b.WriteString(" AND user_id = $")
-	b.WriteString(strconv.Itoa(next + 1))
-	args := append(setArgs, projectID, userID)
-	n, err := s.db.Update(ctx, buildStatementFromPostgresSQL(b.String(), args...).statement())
+	c.WriteString(", updated_at = CURRENT_TIMESTAMP() WHERE project_id = ")
+	c.WriteArg(projectID)
+	c.WriteString(" AND user_id = ")
+	c.WriteArg(userID)
+
+	n, err := s.db.Update(ctx, c.statement())
 	if err != nil {
 		return wrapError(err)
 	}
 	if n == 0 {
 		return wrapError(spanner.ErrRowNotFound)
+	}
+	return nil
+}
+
+func writeUserRecoveryCodesOp(c *statementCompiler, op domain.UserRecoveryCodesOp) error {
+	switch op.Kind {
+	case domain.UserRecoveryCodesOpSetCodes:
+		if err := domain.RequireNonEmptyRecoveryCodes(op.Codes); err != nil {
+			return err
+		}
+		c.WriteString("recovery_codes = ")
+		c.WriteArg(op.Codes)
+	case domain.UserRecoveryCodesOpSetLastSuccessfulCheck:
+		c.WriteString("last_successful_check = ")
+		if op.Time == nil {
+			c.WriteString("NULL")
+		} else {
+			c.WriteArg(*op.Time)
+		}
+	case domain.UserRecoveryCodesOpIncrementFailedAttempts:
+		c.WriteString("failed_attempts = failed_attempts + 1")
+	case domain.UserRecoveryCodesOpResetFailedAttempts:
+		c.WriteString("failed_attempts = ")
+		c.WriteArg(int16(0))
+	default:
+		return fmt.Errorf("unknown UserRecoveryCodesOp kind %d", op.Kind)
 	}
 	return nil
 }
