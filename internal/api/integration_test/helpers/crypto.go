@@ -12,44 +12,52 @@ import (
 
 func (h *Harness) EnsureKek(t *testing.T) [32]byte {
 	t.Helper()
-	if h.EncryptionKey == nil {
-		h.EncryptionKey = []byte("MasterkeyNeedsToHave32Characters")
+	h.encryptionKey.mutex.Lock()
+	defer h.encryptionKey.mutex.Unlock()
+
+	if h.encryptionKey.value == nil {
+		h.encryptionKey.value = []byte("MasterkeyNeedsToHave32Characters")
 	}
-	return [32]byte(h.EncryptionKey)
+	return [32]byte(h.encryptionKey.value)
 }
 
 func (h *Harness) EnsureSigningKey(t *testing.T) *rsa.PrivateKey {
 	t.Helper()
-	if h.SigningKey == nil {
+	h.signingKey.mutex.Lock()
+	defer h.signingKey.mutex.Unlock()
+
+	if h.signingKey.value == nil {
 		signingKey, err := rsa.GenerateKey(rand.Reader, 2048)
 		require.NoError(t, err)
-		h.SigningKey = signingKey
+		h.signingKey.value = signingKey
 	}
-	return h.SigningKey
+	return h.signingKey.value
 }
 
 func (h *Harness) EnsureHasher(t *testing.T) crypto.Hasher {
 	t.Helper()
-	if h.Hasher == nil {
-		h.Hasher = createNewHasher(t)
-	}
-	return h.Hasher
+	return h.ensureHasher(t)
 }
 
 func (h *Harness) EnsureHashVerifier(t *testing.T) crypto.HashVerifier {
 	t.Helper()
-	if h.Hasher == nil {
-		h.Hasher = createNewHasher(t)
-	}
-	return h.Hasher
+	return h.ensureHasher(t)
 }
 
 func (h *Harness) EnsureHashValidator(t *testing.T) crypto.HashValidator {
 	t.Helper()
-	if h.Hasher == nil {
-		h.Hasher = createNewHasher(t)
+	return h.ensureHasher(t)
+}
+
+func (h *Harness) ensureHasher(t *testing.T) *crypto.PasswapHasher {
+	t.Helper()
+	h.hasher.mutex.Lock()
+	defer h.hasher.mutex.Unlock()
+
+	if h.hasher.value == nil {
+		h.hasher.value = createNewHasher(t)
 	}
-	return h.Hasher
+	return h.hasher.value
 }
 
 func createNewHasher(t *testing.T) *crypto.PasswapHasher {
@@ -75,10 +83,13 @@ func createNewHasher(t *testing.T) *crypto.PasswapHasher {
 
 func (h *Harness) EnsureRootKEK(t *testing.T) *domain.RootKEKs {
 	t.Helper()
-	if h.RootKEKs == nil {
+	h.rootKEKs.mutex.Lock()
+	defer h.rootKEKs.mutex.Unlock()
+
+	if h.rootKEKs.value == nil {
 		key, err := rsa.GenerateKey(rand.Reader, 4096)
 		require.NoError(t, err)
-		h.RootKEKs, err = domain.NewRootKEKs([]domain.RootKEK{
+		h.rootKEKs.value, err = domain.NewRootKEKs([]domain.RootKEK{
 			domain.NewRootKEK(
 				"root-kek",
 				*key,
@@ -87,5 +98,5 @@ func (h *Harness) EnsureRootKEK(t *testing.T) *domain.RootKEKs {
 		})
 		require.NoError(t, err)
 	}
-	return h.RootKEKs
+	return h.rootKEKs.value
 }

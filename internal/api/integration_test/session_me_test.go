@@ -32,7 +32,7 @@ func TestGetMySession_Identity(t *testing.T) {
 	projectSecret, err := project.ProjectSecret(dek)
 	require.NoError(t, err)
 
-	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 	userSchemaURL := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 
 	db := harness.EnsureDBPool(t)

@@ -12,8 +12,11 @@ import (
 
 func (h *Harness) EnsureUserService(t *testing.T) *service.UserService {
 	t.Helper()
-	if h.UserService == nil {
-		h.UserService = service.NewUserService(
+	h.userService.mutex.Lock()
+	defer h.userService.mutex.Unlock()
+
+	if h.userService.value == nil {
+		h.userService.value = service.NewUserService(
 			h.EnsureDBPool(t),
 			h.EnsureSchemaStore(t),
 			h.EnsureUserRepo(t),
@@ -21,16 +24,19 @@ func (h *Harness) EnsureUserService(t *testing.T) *service.UserService {
 			h.EnsureHasher(t),
 		)
 	}
-	return h.UserService
+	return h.userService.value
 }
 
 func (h *Harness) EnsureUserRepo(t *testing.T) domain.UserRepository {
 	t.Helper()
-	if h.UserRepo == nil {
-		h.UserRepo = repository.NewUserRepository()
+	h.userRepo.mutex.Lock()
+	defer h.userRepo.mutex.Unlock()
+
+	if h.userRepo.value == nil {
+		h.userRepo.value = repository.NewUserRepository()
 	}
 
-	return h.UserRepo
+	return h.userRepo.value
 }
 
 func CreateSessionUsingPassword(t *testing.T,

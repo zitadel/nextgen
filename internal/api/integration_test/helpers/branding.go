@@ -10,21 +10,27 @@ import (
 
 func (h *Harness) EnsureBrandingRepo(t *testing.T) domain.BrandingRepository {
 	t.Helper()
-	if h.BrandingRepo == nil {
-		h.BrandingRepo = repository.NewBrandingRepository(
+	h.brandingRepo.mutex.Lock()
+	defer h.brandingRepo.mutex.Unlock()
+
+	if h.brandingRepo.value == nil {
+		h.brandingRepo.value = repository.NewBrandingRepository(
 			h.EnsureDBPool(t),
 		)
 	}
-	return h.BrandingRepo
+	return h.brandingRepo.value
 }
 
 func (h *Harness) EnsureBrandingService(t *testing.T) *service.BrandingService {
 	t.Helper()
-	if h.BrandingService == nil {
-		h.BrandingService = service.NewBrandingService(
+	h.brandingService.mutex.Lock()
+	defer h.brandingService.mutex.Unlock()
+
+	if h.brandingService.value == nil {
+		h.brandingService.value = service.NewBrandingService(
 			h.EnsureDBPool(t),
 			h.EnsureBrandingRepo(t),
 		)
 	}
-	return h.BrandingService
+	return h.brandingService.value
 }

@@ -16,26 +16,30 @@ var Connector database.Connector
 
 func (h *Harness) EnsureDBPool(t *testing.T) database.Pool {
 	t.Helper()
+	h.dBPool.mutex.Lock()
+	defer h.dBPool.mutex.Unlock()
 
-	if h.DBPool == nil {
+	if h.dBPool.value == nil {
 		var err error
-		h.DBPool, err = Connector.Connect(t.Context())
+		h.dBPool.value, err = Connector.Connect(t.Context())
 		require.NoError(t, err)
 	}
-	return h.DBPool
+	return h.dBPool.value
 }
 
 func (h *Harness) EnsureServiceDB(t *testing.T) *service.DB {
 	t.Helper()
+	h.dB.mutex.Lock()
+	defer h.dB.mutex.Unlock()
 
-	if h.DB == nil {
+	if h.dB.value == nil {
 		cfg, ok := Connector.(*spannerdialect.Config)
 		require.True(t, ok)
 		dialect, err := spannerv2.DecodeConfig(cfg.DSN)
 		require.NoError(t, err)
 		pool, err := dialect.Connect(t.Context())
 		require.NoError(t, err)
-		h.DB = service.NewPool(pool.(service.Pool))
+		h.dB.value = service.NewPool(pool.(service.Pool))
 	}
-	return h.DB
+	return h.dB.value
 }

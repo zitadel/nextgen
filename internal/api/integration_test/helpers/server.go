@@ -11,32 +11,41 @@ import (
 
 func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
-	if h.TestServer == nil {
-		h.TestServer = httptest.NewServer(
+	h.testServer.mutex.Lock()
+	defer h.testServer.mutex.Unlock()
+
+	if h.testServer.value == nil {
+		h.testServer.value = httptest.NewServer(
 			h.EnsureGeneratedServer(t),
 		)
 	}
-	return h.TestServer
+	return h.testServer.value
 }
 
 func (h *Harness) EnsureGeneratedServer(t *testing.T) *generated.Server {
 	t.Helper()
-	if h.GeneratedServer == nil {
+	h.generatedServer.mutex.Lock()
+	defer h.generatedServer.mutex.Unlock()
+
+	if h.generatedServer.value == nil {
 		var err error
-		h.GeneratedServer, err = generated.NewServer(
+		h.generatedServer.value, err = generated.NewServer(
 			h.EnsureHandler(t),
 			h.EnsureSecurityHandler(t),
 			generated.WithErrorHandler(api.OgenErrorHandler),
 		)
 		require.NoError(t, err)
 	}
-	return h.GeneratedServer
+	return h.generatedServer.value
 }
 
 func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 	t.Helper()
-	if h.Handler == nil {
-		h.Handler = api.NewHandler(
+	h.handler.mutex.Lock()
+	defer h.handler.mutex.Unlock()
+
+	if h.handler.value == nil {
+		h.handler.value = api.NewHandler(
 			h.EnsureFlowService(t),
 			h.EnsureAuthAttemptService(t),
 			h.EnsureSessionService(t),
@@ -50,15 +59,18 @@ func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 			h.EnsureKeyService(t),
 		)
 	}
-	return h.Handler
+	return h.handler.value
 }
 
 func (h *Harness) EnsureSecurityHandler(t *testing.T) *api.SecurityHandler {
 	t.Helper()
-	if h.SecurityHandler == nil {
-		h.SecurityHandler = api.NewSecurityHandler(
+	h.securityHandler.mutex.Lock()
+	defer h.securityHandler.mutex.Unlock()
+
+	if h.securityHandler.value == nil {
+		h.securityHandler.value = api.NewSecurityHandler(
 			h.EnsureTokenService(t),
 		)
 	}
-	return h.SecurityHandler
+	return h.securityHandler.value
 }

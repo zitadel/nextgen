@@ -31,20 +31,26 @@ func (h *Harness) EnsureFlowCreateUserForPasskeyHandler(t *testing.T) *service.F
 
 func (h *Harness) EnsureFlowService(t *testing.T) service.FlowService {
 	t.Helper()
-	if h.FlowService == nil {
-		h.FlowService = service.NewFlowService(
+	h.flowService.mutex.Lock()
+	defer h.flowService.mutex.Unlock()
+
+	if h.flowService.value == nil {
+		h.flowService.value = service.NewFlowService(
 			h.EnsureDBPool(t),
 			h.EnsureServiceDB(t),
 			h.EnsureFlowStateMachine(t),
 			idgen.NewULID(),
 		)
 	}
-	return h.FlowService
+	return h.flowService.value
 }
 
 func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineRuntime {
 	t.Helper()
-	if h.FlowStateMachine == nil {
+	h.flowStateMachine.mutex.Lock()
+	defer h.flowStateMachine.mutex.Unlock()
+
+	if h.flowStateMachine.value == nil {
 		fields := domain.NewSchemaFieldResolver()
 		authAdapter := service.NewFlowAuthAttemptAdapter(h.EnsureAuthAttemptService(t))
 		passkeyRegSvc := service.NewPasskeyRegistrationService(
@@ -54,7 +60,7 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 			idgen.NewULID(),
 		)
 		passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
-		h.FlowStateMachine = domain.NewFlowStateMachine(
+		h.flowStateMachine.value = domain.NewFlowStateMachine(
 			h.EnsureSchemaResolver(t),
 			h.EnsureSchemaStore(t),
 			fields,
@@ -66,5 +72,5 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 			time.Now,
 		)
 	}
-	return h.FlowStateMachine
+	return h.flowStateMachine.value
 }
