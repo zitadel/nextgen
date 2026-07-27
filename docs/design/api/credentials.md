@@ -37,30 +37,44 @@ All three variants carry the same prefix and differ only by metadata bound at cr
 
 ## `sk_team_…` narrow permission model — LOCKED
 
-`sk_team_…` is not just "a project token with team scope." It is a constrained credential class with an explicit allowlist. Lateral movement from a team token to project administration must be mechanically impossible.
+`sk_team_…` is not just "a project token with team scope." It is a constrained credential class with an explicit allowlist. Anything not listed under **MAY** is denied; **MUST NEVER** emphasizes high-risk names. Lateral movement from a team token to project administration must be mechanically impossible.
 
 ```text
 sk_team_… MAY:
-  team.users.read
-  team.users.write            (within this team only)
-  team.memberships.read
-  team.memberships.write
-  team.roles.assign
-  team.scim.sync
-  team.events.read            (filtered to this team)
+  user.read, user.write              (within this team only; profile edits only,
+                                      NOT user.set_password)
+  team_membership.read, team_membership.write
+                                     (not .create / .delete — roster add/remove
+                                      and invitations require a user token)
+  api_key.create, api_key.read, api_key.delete, api_key.rotate, api_key.revoke
+                                     (within this team only)
+  event.read                         (filtered to this team)
 
 sk_team_… MUST NEVER:
-  project.settings.write
-  projects.*.write outside its own project
-  idps.write                  (project-level resource)
-  apps.write                  (project-level resource)
-  signing_keys.*              (project-level resource)
-  allowed_origins.write       (project-level resource)
-  api_keys.* outside its own team scope
-  platform.*                  (cross-project — note: the platform itself is a project)
+  user.set_password                  (account takeover — human/owner op only)
+  project.*
+  team.*
+  billing.*
+  idp.*
+  app.*
+  app_group.*
+  grant.*
+  schema.*
+  flow_definition.*
+  session.*
+  auth_attempt.*
+  audit_event.read
+  import.*
+  platform.*                         (cross-project — note: the platform itself is a project)
 ```
 
-Enforced at the **permission-check layer** (`credential × operation → decision`), not at the endpoint layer. A team token hitting `PATCH /projects/{id}` gets 404 regardless of path — the permission check sees "team token + project.settings.write" and rejects before any resource resolution happens.
+Permission names follow the flat `{resource}.{verb}` convention in [`system-permission-catalog.md`](system-permission-catalog.md). Multi-word types use `_` (`team_membership`, not `team.membership`). Project-level sub-resources such as allowed origins and signing keys fold into `project.read` / `project.write`; they are denied here because `project.*` is denied.
+
+SCIM sync (`scim.sync`) is not listed yet — SCIM is a hosted interop surface
+(`/scim/v2/Users`, `/scim/v2/Groups` in [`resource-map.md`](resource-map.md))
+with no **management-permission** mapping yet. Park until that is designed.
+
+Enforced at the **permission-check layer** (`credential × operation → decision`), not at the endpoint layer. A team token hitting `PATCH /projects/{id}` gets 404 regardless of path — the permission check sees "team token + project.write" and rejects before any resource resolution happens.
 
 > **Note:** A single bug that lets an `sk_team_` call `PATCH /projects/{id}` is a cross-tenant admin escalation. Warrants dedicated threat modelling and a test suite that enumerates every entry in the deny list.
 
@@ -129,5 +143,6 @@ Detail in [`authn-and-auth-flows.md`](authn-and-auth-flows.md).
 - [`../glossary.md`](../glossary.md) — canonical terms
 - [`authn-and-auth-flows.md`](authn-and-auth-flows.md) — bootstrap challenge flow, handoff exchange
 - [`authz.md`](authz.md) — credential × scope × permission matrix
+- [`system-permission-catalog.md`](system-permission-catalog.md) — canonical system permission names and `sk_team_` constraints
 - [`../platform/claim-flow.md`](../platform/claim-flow.md) — pre-claim → claimed `sk_proj_` transition
 - [`../platform/secret.md`](../platform/secret.md) — on-disk storage of `sk_proj_` in the setup CLI flow

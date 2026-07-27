@@ -97,6 +97,30 @@ relationship and policy requires deprovisioning.
 
 ---
 
+## User schemas
+
+User profile / directory schema definitions — the field structure that user
+records follow. Only user schemas exist today; the collection is project-scoped.
+
+```http
+/schemas
+/schemas/{id}
+```
+
+Create/list with explicit scope:
+
+```http
+POST /schemas                   # create a user schema
+GET  /schemas?project_id=…&object_type=…
+GET  /schemas/{id}
+```
+
+`PATCH`/`DELETE /schemas/{id}` are **not yet exposed** — create, list, and get
+only. Permission names in
+[`system-permission-catalog.md`](system-permission-catalog.md#schemas-user-schemas).
+
+---
+
 ## Credentials (globally addressable)
 
 API keys are first-class resources with their own URL. Listing happens under the scope that owns them (`/projects/{id}/api_keys`, `/teams/{id}/api_keys`).
