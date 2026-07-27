@@ -2,6 +2,8 @@ package postgres
 
 import (
 	"context"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -10,6 +12,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
+	"github.com/zitadel/nextgen/internal/storage/v2/userrecoverycodes"
 )
 
 const createUserRecoveryCodesStmt = `INSERT INTO zitadel_nextgen.user_recovery_codes (
@@ -54,6 +57,34 @@ func (s userRecoveryCodesStatements) DeleteUserRecoveryCodesByID(ctx context.Con
 func (s userRecoveryCodesStatements) DeleteUserRecoveryCodesByUserID(ctx context.Context, projectID, userID string) error {
 	_, err := s.client.Exec(ctx, deleteUserRecoveryCodesByUserIDStmt, projectID, userID)
 	return wrapError(err)
+}
+
+// UpdateUserRecoveryCodes implements [service.UserRecoveryCodesStatements].
+func (s userRecoveryCodesStatements) UpdateUserRecoveryCodes(ctx context.Context, projectID, userID string, changes ...domain.UserRecoveryCodesChange) error {
+	assignments, err := userrecoverycodes.Assignments(changes)
+	if err != nil {
+		return err
+	}
+	setClause, setArgs, next, err := database.BuildSetClause(assignments, 1)
+	if err != nil {
+		return err
+	}
+	var b strings.Builder
+	b.WriteString("UPDATE zitadel_nextgen.user_recovery_codes SET ")
+	b.WriteString(setClause)
+	b.WriteString(", updated_at = NOW() WHERE project_id = $")
+	b.WriteString(strconv.Itoa(next))
+	b.WriteString(" AND user_id = $")
+	b.WriteString(strconv.Itoa(next + 1))
+	args := append(setArgs, projectID, userID)
+	tag, err := s.client.Exec(ctx, b.String(), args...)
+	if err != nil {
+		return wrapError(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return wrapError(pgx.ErrNoRows)
+	}
+	return nil
 }
 
 // GetUserRecoveryCodesByID implements [service.UserRecoveryCodesStatements].

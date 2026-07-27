@@ -5,7 +5,9 @@ package postgres
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -89,4 +91,58 @@ func TestUserRecoveryCodesStatements_CRUD(t *testing.T) {
 	require.NoError(t, testPool.DeleteUserRecoveryCodesByUserID(ctx, pid, userID))
 	_, err = testPool.GetUserRecoveryCodesByUserID(ctx, pid, userID)
 	require.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+}
+
+func TestUserRecoveryCodesStatements_Update(t *testing.T) {
+	ctx := t.Context()
+	pid := uniqueProjectID(t)
+	const (
+		tid       = "team-cred-rc-upd"
+		schemaURL = "https://schemas.test/cred-rc-upd.json"
+		userID    = "usr_rc_upd"
+	)
+	insertUserRecoveryCodesFixtures(t, ctx, pid, tid, schemaURL, userID)
+
+	require.NoError(t, testPool.CreateUserRecoveryCodes(ctx, &domain.CreateRecoveryCodes{
+		ProjectID:     pid,
+		UserID:        userID,
+		RecoveryCodes: []string{"old-code-1"},
+	}))
+
+	err := testPool.UpdateUserRecoveryCodes(ctx, pid, userID)
+	assert.ErrorIs(t, err, v2database.ErrNoChanges)
+
+	err = testPool.UpdateUserRecoveryCodes(ctx, pid, "missing-user",
+		domain.UserRecoveryCodesIncrementFailedAttempts(),
+	)
+	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	require.NoError(t, testPool.UpdateUserRecoveryCodes(ctx, pid, userID,
+		domain.UserRecoveryCodesSetCodes([]string{"new-a", "new-b"}),
+		domain.UserRecoveryCodesSetLastSuccessfulCheck(&now),
+		domain.UserRecoveryCodesResetFailedAttempts(),
+	))
+
+	got, err := testPool.GetUserRecoveryCodesByUserID(ctx, pid, userID)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"new-a", "new-b"}, got.RecoveryCodes)
+	require.NotNil(t, got.LastSuccessfulCheck)
+	assert.WithinDuration(t, now, *got.LastSuccessfulCheck, time.Second)
+	assert.Zero(t, got.FailedAttempts)
+
+	require.NoError(t, testPool.UpdateUserRecoveryCodes(ctx, pid, userID,
+		domain.UserRecoveryCodesIncrementFailedAttempts(),
+		domain.UserRecoveryCodesIncrementFailedAttempts(),
+	))
+	got, err = testPool.GetUserRecoveryCodesByUserID(ctx, pid, userID)
+	require.NoError(t, err)
+	assert.Equal(t, int16(2), got.FailedAttempts)
+
+	require.NoError(t, testPool.UpdateUserRecoveryCodes(ctx, pid, userID,
+		domain.UserRecoveryCodesSetLastSuccessfulCheck(nil),
+	))
+	got, err = testPool.GetUserRecoveryCodesByUserID(ctx, pid, userID)
+	require.NoError(t, err)
+	assert.Nil(t, got.LastSuccessfulCheck)
 }
