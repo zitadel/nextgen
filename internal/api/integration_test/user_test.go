@@ -201,7 +201,7 @@ func TestDeleteUser(t *testing.T) {
 	require.NoError(t, err)
 	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
 		ProjectID: project.ID,
-		User:      harness.EnsureTestData(t).Generator.GenerateUser(t, "testdeleteuser@example.com"),
+		User:      harness.TestData.Generator.GenerateUser(t, "testdeleteuser@example.com"),
 	})
 	require.NoError(t, err)
 
