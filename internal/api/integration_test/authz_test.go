@@ -255,6 +255,17 @@ func TestManagementAuthz(t *testing.T) {
 			assertAuthzStatus(t, resp, 403, "proj.permission_denied")
 		})
 
+		t.Run("preview secret cannot patch", func(t *testing.T) {
+			t.Parallel()
+
+			resp, err := preview.PatchProject(t.Context(),
+				&api.PatchProjectRequest{Name: api.NewOptNilString(helpers.ProjectName())},
+				api.PatchProjectParams{ProjectID: victimID},
+			)
+			require.NoError(t, err)
+			assertAuthzStatus(t, resp, 403, "proj.permission_denied")
+		})
+
 		// queryProjects has no handler yet; until then it always
 		// answers ht.ErrNotImplemented regardless of caller, so there is no authz
 		// signal to probe. #410 implements the handler and un-skips this.

@@ -56,6 +56,19 @@ func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (
 	return projectResponse(project), nil
 }
 
+func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest, params api.PatchProjectParams) (api.PatchProjectRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), projectAccess, opWrite); err != nil {
+		return nil, err
+	}
+	// An absent or null name leaves nothing to write; Update rejects the empty
+	// string with proj.name_invalid, the 400 the contract declares.
+	project, err := h.projectService.Update(ctx, string(params.ProjectID), req.Name.Or(""))
+	if err != nil {
+		return nil, err
+	}
+	return projectResponse(project), nil
+}
+
 // ------------------ Converters ---------------
 
 // projectResponse is the shared project body: getProject, patchProject, and

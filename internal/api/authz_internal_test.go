@@ -64,6 +64,8 @@ func TestResourceAccessScopes(t *testing.T) {
 		{"team.read cannot write", teamAccess, opWrite, "team.read", false},
 
 		{"project.read does not read project management state", projectAccess, opRead, "project.read", false},
+		{"project.read cannot write project state", projectAccess, opWrite, "project.read", false},
+		{"project.write reaches patchProject", projectAccess, opWrite, "project.write", true},
 		// queryProjects has no project parameter of its own and binds to the
 		// token's project like getProject: only project.write reaches it.
 		{"project.write reaches queryProjects (opRead)", projectAccess, opRead, "project.write", true},

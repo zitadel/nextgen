@@ -3,6 +3,7 @@
 package integration_test
 
 import (
+	"cmp"
 	"context"
 	"testing"
 
@@ -234,40 +235,160 @@ func TestGetProject(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	t.Run("ok", func(t *testing.T) {
-		t.Parallel()
+	notFound := domain.ErrProjectNotFound()
 
-		params := api.GetProjectParams{
-			ProjectID: api.ProjectID(project.ID),
-		}
+	tcs := []struct {
+		name string
+		// projectID targets a project other than the caller's own.
+		projectID api.ProjectID
+		want      api.GetProjectRes
+	}{
+		{
+			name: "ok",
+			want: &api.ProjectResponse{Name: project.Name, PreviewOrigins: previewOrigins},
+		},
+		{
+			name:      "not found",
+			projectID: "does_not_exist",
+			want:      &api.GetProjectNotFound{Code: api.ErrorCode(notFound.Code), Message: notFound.Message},
+		},
+	}
 
-		resp, err := client.GetProject(t.Context(), params)
-
-		assert.NoError(t, err)
-		if assert.IsType(t, &api.ProjectResponse{}, resp, helpers.MustMarshal(t, resp)) {
-			got := resp.(*api.ProjectResponse)
-			assert.NotEmpty(t, got.CreatedAt)
-			assert.NotEmpty(t, got.UpdatedAt)
-			assert.Equal(t, project.ID, got.ID)
-			assert.Equal(t, project.Name, got.Name)
-			assert.Equal(t, previewOrigins, got.PreviewOrigins)
-		}
-	})
-
-	t.Run("error", func(t *testing.T) {
-		t.Parallel()
-
-		t.Run("not found", func(t *testing.T) {
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			params := api.GetProjectParams{
-				ProjectID: "does_not_exist",
-			}
-
-			resp, err := client.GetProject(t.Context(), params)
+			resp, err := client.GetProject(t.Context(), api.GetProjectParams{
+				ProjectID: cmp.Or(tc.projectID, api.ProjectID(project.ID)),
+			})
 
 			assert.NoError(t, err)
-			assert.IsType(t, &api.GetProjectNotFound{}, resp, helpers.MustMarshal(t, resp))
+			assertProjectResponse(t, tc.want, resp)
 		})
-	})
+	}
+}
+
+func TestPatchProject(t *testing.T) {
+	t.Parallel()
+
+	foreign, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	var (
+		renamed       = helpers.ProjectName()
+		renamedKeep   = helpers.ProjectName()
+		keptOrigins   = []string{"*.example.com", "localhost:3000"}
+		nameInvalid   = domain.ErrProjectNameInvalid()
+		notFound      = domain.ErrProjectNotFound()
+		validRenameTo = &api.PatchProjectRequest{Name: api.NewOptNilString(helpers.ProjectName())}
+	)
+
+	tcs := []struct {
+		name           string
+		previewOrigins []string
+		projectID      api.ProjectID
+		req            *api.PatchProjectRequest
+		want           api.PatchProjectRes
+	}{
+		{
+			name: "rename",
+			req:  &api.PatchProjectRequest{Name: api.NewOptNilString(renamed)},
+			want: &api.ProjectResponse{Name: renamed, PreviewOrigins: []string{}},
+		},
+		{
+			name:           "preview origins are left untouched",
+			previewOrigins: keptOrigins,
+			req:            &api.PatchProjectRequest{Name: api.NewOptNilString(renamedKeep)},
+			want:           &api.ProjectResponse{Name: renamedKeep, PreviewOrigins: keptOrigins},
+		},
+		{
+			name: "absent name",
+			req:  &api.PatchProjectRequest{},
+			want: &api.PatchProjectBadRequest{Code: api.ErrorCode(nameInvalid.Code), Message: nameInvalid.Message},
+		},
+		{
+			name: "null name",
+			req:  &api.PatchProjectRequest{Name: api.OptNilString{Set: true, Null: true}},
+			want: &api.PatchProjectBadRequest{Code: api.ErrorCode(nameInvalid.Code), Message: nameInvalid.Message},
+		},
+		{
+			name: "empty name",
+			req:  &api.PatchProjectRequest{Name: api.NewOptNilString("")},
+			want: &api.PatchProjectBadRequest{Code: api.ErrorCode(nameInvalid.Code), Message: nameInvalid.Message},
+		},
+		{
+			name:      "nonexistent project",
+			projectID: "does_not_exist",
+			req:       validRenameTo,
+			want:      &api.PatchProjectNotFound{Code: api.ErrorCode(notFound.Code), Message: notFound.Message},
+		},
+		{
+			name:      "foreign project",
+			projectID: api.ProjectID(foreign.ID),
+			req:       validRenameTo,
+			want:      &api.PatchProjectNotFound{Code: api.ErrorCode(notFound.Code), Message: notFound.Message},
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), tc.previewOrigins, true)
+			require.NoError(t, err)
+
+			client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+			require.NoError(t, err)
+			harness.SetProjectSecretOnApiClient(t, client, project)
+
+			projectID := cmp.Or(tc.projectID, api.ProjectID(project.ID))
+
+			resp, err := client.PatchProject(t.Context(), tc.req,
+				api.PatchProjectParams{ProjectID: projectID},
+			)
+			assert.NoError(t, err)
+			assertProjectResponse(t, tc.want, resp)
+		})
+	}
+}
+
+// assertProjectResponse covers every operation answering with the shared
+// project body: getProject, patchProject, and each item of queryProjects.
+func assertProjectResponse(t *testing.T, want, got any) {
+	t.Helper()
+	if !assert.IsType(t, want, got, helpers.MustMarshal(t, got)) {
+		return
+	}
+
+	switch expected := want.(type) {
+	case *api.ProjectResponse:
+		actual, ok := got.(*api.ProjectResponse)
+		require.True(t, ok)
+
+		assert.NotEmpty(t, actual.ID)
+		assert.Equal(t, expected.Name, actual.Name)
+		assert.Equal(t, expected.PreviewOrigins, actual.PreviewOrigins)
+		assert.NotEmpty(t, actual.CreatedAt)
+		assert.False(t, actual.UpdatedAt.Before(actual.CreatedAt))
+	case *api.GetProjectNotFound:
+		actual, ok := got.(*api.GetProjectNotFound)
+		require.True(t, ok)
+
+		assert.Equal(t, expected.Code, actual.Code)
+		assert.Equal(t, expected.Message, actual.Message)
+	case *api.PatchProjectBadRequest:
+		actual, ok := got.(*api.PatchProjectBadRequest)
+		require.True(t, ok)
+
+		assert.Equal(t, expected.Code, actual.Code)
+		assert.Equal(t, expected.Message, actual.Message)
+	case *api.PatchProjectNotFound:
+		actual, ok := got.(*api.PatchProjectNotFound)
+		require.True(t, ok)
+
+		assert.Equal(t, expected.Code, actual.Code)
+		assert.Equal(t, expected.Message, actual.Message)
+	default:
+		assert.Fail(t, "unexpected response type", helpers.MustMarshal(t, got))
+	}
 }
