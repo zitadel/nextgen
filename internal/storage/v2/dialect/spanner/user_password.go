@@ -2,6 +2,8 @@ package spanner
 
 import (
 	"context"
+	"strconv"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -10,6 +12,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
+	"github.com/zitadel/nextgen/internal/storage/v2/userpassword"
 )
 
 const (
@@ -95,6 +98,34 @@ func (ps userPasswordStatements) GetUserPasswordByUserID(ctx context.Context, pr
 func (ps userPasswordStatements) DeleteUserPasswordByUserID(ctx context.Context, projectID, userID string) error {
 	_, err := ps.db.Update(ctx, buildStatement(deleteUserPasswordByUserIDStmt, projectID, userID).statement())
 	return wrapError(err)
+}
+
+// UpdateUserPassword implements [service.UserPasswordStatements].
+func (ps userPasswordStatements) UpdateUserPassword(ctx context.Context, projectID, userID string, changes ...domain.UserPasswordChange) error {
+	assignments, err := userpassword.Assignments(changes)
+	if err != nil {
+		return err
+	}
+	setClause, setArgs, next, err := database.BuildSetClause(assignments, 1)
+	if err != nil {
+		return err
+	}
+	var b strings.Builder
+	b.WriteString("UPDATE user_passwords SET ")
+	b.WriteString(setClause)
+	b.WriteString(", updated_at = CURRENT_TIMESTAMP() WHERE project_id = $")
+	b.WriteString(strconv.Itoa(next))
+	b.WriteString(" AND user_id = $")
+	b.WriteString(strconv.Itoa(next + 1))
+	args := append(setArgs, projectID, userID)
+	n, err := ps.db.Update(ctx, buildStatementFromPostgresSQL(b.String(), args...).statement())
+	if err != nil {
+		return wrapError(err)
+	}
+	if n == 0 {
+		return wrapError(spanner.ErrRowNotFound)
+	}
+	return nil
 }
 
 // ListUserPasswords implements [service.UserPasswordStatements].

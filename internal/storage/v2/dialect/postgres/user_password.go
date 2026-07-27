@@ -3,6 +3,8 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -11,6 +13,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
+	"github.com/zitadel/nextgen/internal/storage/v2/userpassword"
 )
 
 const setUserPasswordStmt = `INSERT INTO zitadel_nextgen.user_passwords (
@@ -72,6 +75,34 @@ func (ps userPasswordStatements) GetUserPasswordByUserID(ctx context.Context, pr
 func (ps userPasswordStatements) DeleteUserPasswordByUserID(ctx context.Context, projectID, userID string) error {
 	_, err := ps.client.Exec(ctx, deleteUserPasswordByUserIDStmt, projectID, userID)
 	return wrapError(err)
+}
+
+// UpdateUserPassword implements [service.UserPasswordStatements].
+func (ps userPasswordStatements) UpdateUserPassword(ctx context.Context, projectID, userID string, changes ...domain.UserPasswordChange) error {
+	assignments, err := userpassword.Assignments(changes)
+	if err != nil {
+		return err
+	}
+	setClause, setArgs, next, err := database.BuildSetClause(assignments, 1)
+	if err != nil {
+		return err
+	}
+	var b strings.Builder
+	b.WriteString("UPDATE zitadel_nextgen.user_passwords SET ")
+	b.WriteString(setClause)
+	b.WriteString(", updated_at = NOW() WHERE project_id = $")
+	b.WriteString(strconv.Itoa(next))
+	b.WriteString(" AND user_id = $")
+	b.WriteString(strconv.Itoa(next + 1))
+	args := append(setArgs, projectID, userID)
+	tag, err := ps.client.Exec(ctx, b.String(), args...)
+	if err != nil {
+		return wrapError(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return wrapError(pgx.ErrNoRows)
+	}
+	return nil
 }
 
 // ListUserPasswords implements [service.UserPasswordStatements].

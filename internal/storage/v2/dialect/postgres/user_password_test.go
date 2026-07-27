@@ -124,3 +124,55 @@ func TestUserPasswordStatements_SetMissingUser(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, new(legacydb.ForeignKeyError))
 }
+
+func TestUserPasswordStatements_Update(t *testing.T) {
+	projectID := uniqueProjectID(t)
+	teamID := "team-" + projectID
+	schemaURL := "https://schemas.test/" + projectID + "-upd.json"
+	userID := "usr_pw_upd_" + projectID
+	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
+
+	seedUserForPassword(t, projectID, teamID, schemaURL, userID)
+	require.NoError(t, testPool.SetUserPassword(t.Context(), &domain.SetUserPassword{
+		ProjectID:   projectID,
+		UserID:      userID,
+		EncodedHash: "argon2id$v=19$m=65536,t=3,p=4$initial",
+	}))
+
+	err := testPool.UpdateUserPassword(t.Context(), projectID, userID)
+	assert.ErrorIs(t, err, database.ErrNoChanges)
+
+	err = testPool.UpdateUserPassword(t.Context(), projectID, "missing-user",
+		domain.UserPasswordIncrementFailedAttempts(),
+	)
+	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	require.NoError(t, testPool.UpdateUserPassword(t.Context(), projectID, userID,
+		domain.UserPasswordSetEncodedHash("argon2id$v=19$m=65536,t=3,p=4$rotated"),
+		domain.UserPasswordSetChangeRequired(true),
+		domain.UserPasswordSetChangedAt(now),
+		domain.UserPasswordSetVerificationID("verif-upd"),
+		domain.UserPasswordSetLastSuccessfulCheck(now),
+		domain.UserPasswordResetFailedAttempts(),
+	))
+
+	got, err := testPool.GetUserPasswordByUserID(t.Context(), projectID, userID)
+	require.NoError(t, err)
+	assert.Equal(t, "argon2id$v=19$m=65536,t=3,p=4$rotated", got.EncodedHash)
+	assert.True(t, got.ChangeRequired)
+	assert.WithinDuration(t, now, got.ChangedAt, time.Second)
+	require.NotNil(t, got.VerificationID)
+	assert.Equal(t, "verif-upd", *got.VerificationID)
+	require.NotNil(t, got.LastSuccessfulCheck)
+	assert.WithinDuration(t, now, *got.LastSuccessfulCheck, time.Second)
+	assert.Zero(t, got.FailedAttempts)
+
+	require.NoError(t, testPool.UpdateUserPassword(t.Context(), projectID, userID,
+		domain.UserPasswordIncrementFailedAttempts(),
+		domain.UserPasswordIncrementFailedAttempts(),
+	))
+	got, err = testPool.GetUserPasswordByUserID(t.Context(), projectID, userID)
+	require.NoError(t, err)
+	assert.Equal(t, int16(2), got.FailedAttempts)
+}
