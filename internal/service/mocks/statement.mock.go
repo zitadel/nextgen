@@ -1087,10 +1087,10 @@ func (c *MockAllStatementsUpdateProjectCall) DoAndReturn(f func(context.Context,
 }
 
 // UpdateUserPasskey mocks base method.
-func (m *MockAllStatements) UpdateUserPasskey(ctx context.Context, projectID, userID, credentialID string, changes ...domain.UserPasskeyChange) error {
+func (m *MockAllStatements) UpdateUserPasskey(ctx context.Context, projectID, userID, credentialID string, updates ...domain.UserPasskeyUpdate) error {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, projectID, userID, credentialID}
-	for _, a := range changes {
+	for _, a := range updates {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "UpdateUserPasskey", varargs...)
@@ -1099,9 +1099,9 @@ func (m *MockAllStatements) UpdateUserPasskey(ctx context.Context, projectID, us
 }
 
 // UpdateUserPasskey indicates an expected call of UpdateUserPasskey.
-func (mr *MockAllStatementsMockRecorder) UpdateUserPasskey(ctx, projectID, userID, credentialID any, changes ...any) *MockAllStatementsUpdateUserPasskeyCall {
+func (mr *MockAllStatementsMockRecorder) UpdateUserPasskey(ctx, projectID, userID, credentialID any, updates ...any) *MockAllStatementsUpdateUserPasskeyCall {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, userID, credentialID}, changes...)
+	varargs := append([]any{ctx, projectID, userID, credentialID}, updates...)
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateUserPasskey", reflect.TypeOf((*MockAllStatements)(nil).UpdateUserPasskey), varargs...)
 	return &MockAllStatementsUpdateUserPasskeyCall{Call: call}
 }
@@ -1118,13 +1118,13 @@ func (c *MockAllStatementsUpdateUserPasskeyCall) Return(arg0 error) *MockAllStat
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsUpdateUserPasskeyCall) Do(f func(context.Context, string, string, string, ...domain.UserPasskeyChange) error) *MockAllStatementsUpdateUserPasskeyCall {
+func (c *MockAllStatementsUpdateUserPasskeyCall) Do(f func(context.Context, string, string, string, ...domain.UserPasskeyUpdate) error) *MockAllStatementsUpdateUserPasskeyCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsUpdateUserPasskeyCall) DoAndReturn(f func(context.Context, string, string, string, ...domain.UserPasskeyChange) error) *MockAllStatementsUpdateUserPasskeyCall {
+func (c *MockAllStatementsUpdateUserPasskeyCall) DoAndReturn(f func(context.Context, string, string, string, ...domain.UserPasskeyUpdate) error) *MockAllStatementsUpdateUserPasskeyCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -2277,10 +2277,10 @@ func (c *MockUserPasskeyStatementsListUserPasskeysCall) DoAndReturn(f func(conte
 }
 
 // UpdateUserPasskey mocks base method.
-func (m *MockUserPasskeyStatements) UpdateUserPasskey(ctx context.Context, projectID, userID, credentialID string, changes ...domain.UserPasskeyChange) error {
+func (m *MockUserPasskeyStatements) UpdateUserPasskey(ctx context.Context, projectID, userID, credentialID string, updates ...domain.UserPasskeyUpdate) error {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, projectID, userID, credentialID}
-	for _, a := range changes {
+	for _, a := range updates {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "UpdateUserPasskey", varargs...)
@@ -2289,9 +2289,9 @@ func (m *MockUserPasskeyStatements) UpdateUserPasskey(ctx context.Context, proje
 }
 
 // UpdateUserPasskey indicates an expected call of UpdateUserPasskey.
-func (mr *MockUserPasskeyStatementsMockRecorder) UpdateUserPasskey(ctx, projectID, userID, credentialID any, changes ...any) *MockUserPasskeyStatementsUpdateUserPasskeyCall {
+func (mr *MockUserPasskeyStatementsMockRecorder) UpdateUserPasskey(ctx, projectID, userID, credentialID any, updates ...any) *MockUserPasskeyStatementsUpdateUserPasskeyCall {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, userID, credentialID}, changes...)
+	varargs := append([]any{ctx, projectID, userID, credentialID}, updates...)
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateUserPasskey", reflect.TypeOf((*MockUserPasskeyStatements)(nil).UpdateUserPasskey), varargs...)
 	return &MockUserPasskeyStatementsUpdateUserPasskeyCall{Call: call}
 }
@@ -2308,13 +2308,13 @@ func (c *MockUserPasskeyStatementsUpdateUserPasskeyCall) Return(arg0 error) *Moc
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockUserPasskeyStatementsUpdateUserPasskeyCall) Do(f func(context.Context, string, string, string, ...domain.UserPasskeyChange) error) *MockUserPasskeyStatementsUpdateUserPasskeyCall {
+func (c *MockUserPasskeyStatementsUpdateUserPasskeyCall) Do(f func(context.Context, string, string, string, ...domain.UserPasskeyUpdate) error) *MockUserPasskeyStatementsUpdateUserPasskeyCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserPasskeyStatementsUpdateUserPasskeyCall) DoAndReturn(f func(context.Context, string, string, string, ...domain.UserPasskeyChange) error) *MockUserPasskeyStatementsUpdateUserPasskeyCall {
+func (c *MockUserPasskeyStatementsUpdateUserPasskeyCall) DoAndReturn(f func(context.Context, string, string, string, ...domain.UserPasskeyUpdate) error) *MockUserPasskeyStatementsUpdateUserPasskeyCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

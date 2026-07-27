@@ -72,19 +72,19 @@ func TestUserPasskeyStatements_Update(t *testing.T) {
 	assert.ErrorIs(t, err, database.ErrNoChanges)
 
 	err = testPool.UpdateUserPasskey(ctx, projectID, userID, "missing-cred",
-		domain.UserPasskeySetSignCount(2),
+		domain.WithUserPasskeySignCount(2),
 	)
 	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 
 	now := time.Now().UTC().Truncate(time.Millisecond)
 	require.NoError(t, testPool.UpdateUserPasskey(ctx, projectID, userID, credentialID,
-		domain.UserPasskeySetAttestationType("direct"),
-		domain.UserPasskeySetTransports([]string{"usb", "nfc"}),
-		domain.UserPasskeySetSignCount(5),
-		domain.UserPasskeySetBackupEligible(false),
-		domain.UserPasskeySetBackupState(true),
-		domain.UserPasskeySetVerifiedAt(now),
-		domain.UserPasskeySetLastUsedAt(now),
+		domain.WithUserPasskeyAttestationType("direct"),
+		domain.WithUserPasskeyTransports([]string{"usb", "nfc"}),
+		domain.WithUserPasskeySignCount(5),
+		domain.WithUserPasskeyBackupEligible(false),
+		domain.WithUserPasskeyBackupState(true),
+		domain.WithUserPasskeyVerifiedAt(now),
+		domain.WithUserPasskeyLastUsedAt(now),
 	))
 
 	got, err := testPool.GetUserPasskey(ctx, projectID, userID, credentialID)
@@ -101,14 +101,14 @@ func TestUserPasskeyStatements_Update(t *testing.T) {
 	assert.WithinDuration(t, now, *got.LastUsedAt, time.Second)
 
 	require.NoError(t, testPool.UpdateUserPasskey(ctx, projectID, userID, credentialID,
-		domain.UserPasskeyIncrementSignCount(3),
+		domain.WithUserPasskeyIncrementSignCount(3),
 	))
 	got, err = testPool.GetUserPasskey(ctx, projectID, userID, credentialID)
 	require.NoError(t, err)
 	assert.Equal(t, int64(8), got.SignCount)
 
 	require.NoError(t, testPool.UpdateUserPasskey(ctx, projectID, userID, credentialID,
-		domain.UserPasskeySetTransports(nil),
+		domain.WithUserPasskeyTransports(nil),
 	))
 	got, err = testPool.GetUserPasskey(ctx, projectID, userID, credentialID)
 	require.NoError(t, err)

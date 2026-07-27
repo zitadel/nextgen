@@ -2,8 +2,7 @@ package postgres
 
 import (
 	"context"
-	"strconv"
-	"strings"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -13,7 +12,6 @@ import (
 	storagedb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
-	"github.com/zitadel/nextgen/internal/storage/v2/userpasskey"
 )
 
 const createUserPasskeyStmt = `INSERT INTO zitadel_nextgen.user_passkeys (
@@ -121,31 +119,67 @@ func (ps userPasskeyStatements) ListUserPasskeys(ctx context.Context, filter *da
 }
 
 // UpdateUserPasskey implements [service.UserPasskeyStatements].
-func (ps userPasskeyStatements) UpdateUserPasskey(ctx context.Context, projectID, userID, credentialID string, changes ...domain.UserPasskeyChange) error {
-	assignments, err := userpasskey.Assignments(changes)
-	if err != nil {
-		return err
+func (ps userPasskeyStatements) UpdateUserPasskey(ctx context.Context, projectID, userID, credentialID string, updates ...domain.UserPasskeyUpdate) error {
+	applied := domain.NewUserPasskeyUpdates(updates...)
+	if applied.Empty() {
+		return database.ErrNoChanges
 	}
-	setClause, setArgs, next, err := database.BuildSetClause(assignments, 1)
-	if err != nil {
-		return err
+
+	var c statementCompiler
+	c.WriteString("UPDATE zitadel_nextgen.user_passkeys SET ")
+	for i, op := range applied.Ops() {
+		if i > 0 {
+			c.WriteString(", ")
+		}
+		if err := writeUserPasskeyOp(&c, op); err != nil {
+			return err
+		}
 	}
-	var b strings.Builder
-	b.WriteString("UPDATE zitadel_nextgen.user_passkeys SET ")
-	b.WriteString(setClause)
-	b.WriteString(", updated_at = NOW() WHERE project_id = $")
-	b.WriteString(strconv.Itoa(next))
-	b.WriteString(" AND user_id = $")
-	b.WriteString(strconv.Itoa(next + 1))
-	b.WriteString(" AND credential_id = $")
-	b.WriteString(strconv.Itoa(next + 2))
-	args := append(setArgs, projectID, userID, credentialID)
-	tag, err := ps.client.Exec(ctx, b.String(), args...)
+	c.WriteString(", updated_at = NOW() WHERE project_id = ")
+	c.WriteArg(projectID)
+	c.WriteString(" AND user_id = ")
+	c.WriteArg(userID)
+	c.WriteString(" AND credential_id = ")
+	c.WriteArg(credentialID)
+
+	tag, err := ps.client.Exec(ctx, c.String(), c.args...)
 	if err != nil {
 		return wrapError(err)
 	}
 	if tag.RowsAffected() == 0 {
 		return wrapError(pgx.ErrNoRows)
+	}
+	return nil
+}
+
+func writeUserPasskeyOp(c *statementCompiler, op domain.UserPasskeyOp) error {
+	switch op.Kind {
+	case domain.UserPasskeyOpSetAttestationType:
+		c.WriteString("attestation_type = ")
+		c.WriteArg(op.AttestationType)
+	case domain.UserPasskeyOpSetTransports:
+		c.WriteString("transports = ")
+		c.WriteArg(op.Transports)
+	case domain.UserPasskeyOpSetSignCount:
+		c.WriteString("sign_count = ")
+		c.WriteArg(op.SignCount)
+	case domain.UserPasskeyOpIncrementSignCount:
+		c.WriteString("sign_count = sign_count + ")
+		c.WriteArg(op.SignCount)
+	case domain.UserPasskeyOpSetBackupEligible:
+		c.WriteString("backup_eligible = ")
+		c.WriteArg(op.Bool)
+	case domain.UserPasskeyOpSetBackupState:
+		c.WriteString("backup_state = ")
+		c.WriteArg(op.Bool)
+	case domain.UserPasskeyOpSetVerifiedAt:
+		c.WriteString("verified_at = ")
+		c.WriteArg(op.Time)
+	case domain.UserPasskeyOpSetLastUsedAt:
+		c.WriteString("last_used_at = ")
+		c.WriteArg(op.Time)
+	default:
+		return fmt.Errorf("unknown UserPasskeyOp kind %d", op.Kind)
 	}
 	return nil
 }

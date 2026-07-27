@@ -97,6 +97,6 @@ type UserPasskeyStatements interface {
 	CreateUserPasskey(ctx context.Context, passkey *domain.CreateUserPasskey) error
 	GetUserPasskey(ctx context.Context, projectID, userID, credentialID string) (*domain.UserPasskey, error)
 	ListUserPasskeys(ctx context.Context, filter *database.ListOptions[domain.UserPasskeyField]) (*database.ListResult[*domain.UserPasskey], error)
-	UpdateUserPasskey(ctx context.Context, projectID, userID, credentialID string, changes ...domain.UserPasskeyChange) error
+	UpdateUserPasskey(ctx context.Context, projectID, userID, credentialID string, updates ...domain.UserPasskeyUpdate) error
 	DeleteUserPasskey(ctx context.Context, projectID, userID, credentialID string) error
 }

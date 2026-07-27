@@ -574,10 +574,10 @@ func TestAuthAttemptService_VerifyPasskeyProof(t *testing.T) {
 			gomock.Any(),
 			gomock.Any(),
 			gomock.Any(),
-		).DoAndReturn(func(_ context.Context, _, _, _ string, changes ...domain.UserPasskeyChange) error {
-			for _, c := range changes {
-				if c.Kind() == domain.UserPasskeyChangeSetSignCount {
-					persistedSignCount = c.SignCount()
+		).DoAndReturn(func(_ context.Context, _, _, _ string, updates ...domain.UserPasskeyUpdate) error {
+			for _, op := range domain.NewUserPasskeyUpdates(updates...).Ops() {
+				if op.Kind == domain.UserPasskeyOpSetSignCount {
+					persistedSignCount = op.SignCount
 				}
 			}
 			return nil

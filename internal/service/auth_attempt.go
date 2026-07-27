@@ -188,7 +188,7 @@ type UserPasswords interface {
 type UserPasskeys interface {
 	ListByUser(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error)
 	Get(ctx context.Context, projectID, userID, credentialID string) (*domain.UserPasskey, error)
-	Update(ctx context.Context, projectID, userID, credentialID string, changes ...domain.UserPasskeyChange) error
+	Update(ctx context.Context, projectID, userID, credentialID string, updates ...domain.UserPasskeyUpdate) error
 }
 
 // UserPasskeyStatementsStore adapts [UserPasskeyStatements] to [UserPasskeys].
@@ -215,8 +215,8 @@ func (s UserPasskeyStatementsStore) Get(ctx context.Context, projectID, userID, 
 	return s.Pool.Statements().GetUserPasskey(ctx, projectID, userID, credentialID)
 }
 
-func (s UserPasskeyStatementsStore) Update(ctx context.Context, projectID, userID, credentialID string, changes ...domain.UserPasskeyChange) error {
-	return s.Pool.Statements().UpdateUserPasskey(ctx, projectID, userID, credentialID, changes...)
+func (s UserPasskeyStatementsStore) Update(ctx context.Context, projectID, userID, credentialID string, updates ...domain.UserPasskeyUpdate) error {
+	return s.Pool.Statements().UpdateUserPasskey(ctx, projectID, userID, credentialID, updates...)
 }
 
 // ---- Implementation ----------------------------------------------------------
@@ -507,16 +507,16 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 // last-used time after a successful assertion. It is best-effort: a write failure must not
 // turn an otherwise valid proof into a rejection (the verify dispatch treats post-challenge
 // errors as proof rejections), and the stored sign count is a clone-detection signal rather
-// than an auth gate. Sign count is absolute from verification (SetSignCount, not Increment).
+// than an auth gate. Sign count is absolute from verification (WithUserPasskeySignCount, not Increment).
 func (s *authAttemptService) recordPasskeyUsage(ctx context.Context, projectID string, v *domain.PasskeyVerification) {
 	_ = s.userPasskeys.Update(
 		ctx,
 		projectID,
 		v.UserID,
 		domain.EncodePasskeyCredentialID(v.CredentialID),
-		domain.UserPasskeySetSignCount(int64(v.SignCount)),
-		domain.UserPasskeySetBackupState(v.BackupState),
-		domain.UserPasskeySetLastUsedAt(time.Now()),
+		domain.WithUserPasskeySignCount(int64(v.SignCount)),
+		domain.WithUserPasskeyBackupState(v.BackupState),
+		domain.WithUserPasskeyLastUsedAt(time.Now()),
 	)
 }
 
