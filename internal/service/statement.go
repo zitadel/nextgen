@@ -8,7 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements,AuthAttemptStatements
 
 type StatementPool interface {
 	Statementer[AllStatements]
@@ -29,6 +29,7 @@ type AllStatements interface {
 	TokenStatements
 	PasskeyRegistrationStatements
 	SessionStatements
+	AuthAttemptStatements
 	Statements
 }
 
@@ -158,4 +159,22 @@ type SessionStatements interface {
 	GetSessionByID(ctx context.Context, projectID, sessionID string) (*domain.Session, error)
 	ListSessions(ctx context.Context, filter *database.ListOptions[domain.SessionField]) (*database.ListResult[*domain.Session], error)
 	DeleteSessionByID(ctx context.Context, projectID, sessionID string) error
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type AuthAttemptPool interface {
+// 	Statementer[AuthAttemptStatements]
+// 	Transactioner[AuthAttemptStatements]
+// }
+
+type AuthAttemptStatements interface {
+	Statements
+	CreateAuthAttempt(ctx context.Context, entity *domain.AuthAttempt) error
+	GetAuthAttemptByID(ctx context.Context, projectID, authAttemptID string) (*domain.AuthAttempt, error)
+	GetAuthAttemptByHandoffToken(ctx context.Context, projectID string, handoffToken []byte) (*domain.AuthAttempt, error)
+	DeleteAuthAttemptByID(ctx context.Context, projectID, authAttemptID string) error
+	HandoffAuthAttempt(ctx context.Context, attempt *domain.AuthAttempt) error
+	SetAuthAttemptChallenge(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error
+	AuthAttemptChallengeSucceeded(ctx context.Context, projectID, authAttemptID string, factor domain.AuthFactor, challengeID string) error
+	AuthAttemptChallengeFailed(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error
 }

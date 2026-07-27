@@ -133,7 +133,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	userRepo := repository.NewUserRepository()
 	userPasswordRepo := repository.NewUserPasswordRepository()
 	userPasskeyRepo := repository.NewUserPasskeyRepository()
-	attemptRepo := repository.NewAuthAttemptRepository(pool)
 	brandingRepo := repository.NewBrandingRepository(pool)
 
 	serviceDBPool := service.NewPool(v2Pool.(service.Pool))
@@ -167,7 +166,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 
 	authAttemptSvc := service.NewAuthAttemptService(
 		pool,
-		attemptRepo,
+		serviceDBPool,
 		sessionResolver,
 		userRepo,
 		userPasswordRepo,

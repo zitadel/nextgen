@@ -15,8 +15,6 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	legacydb "github.com/zitadel/nextgen/internal/storage/database"
-	pgold "github.com/zitadel/nextgen/internal/storage/database/dialect/postgres"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
 func uniqueSessionFixtureIDs(t *testing.T) string {
@@ -46,17 +44,12 @@ func handoffCompletedAttemptForSession(
 	if mutate != nil {
 		mutate(attempt)
 	}
-	// Auth attempts remain on the v1 repository until their statements migration.
-	v1Pool := pgold.PGxPool(testPool.pool)
-	repo := repository.NewAuthAttemptRepository(v1Pool)
-	require.NoError(t, repo.Create(t.Context(), v1Pool, attempt))
+	require.NoError(t, testPool.CreateAuthAttempt(t.Context(), attempt))
 	sum := sha256.Sum256([]byte(plainToken))
 	attempt.HandoffToken = &domain.HandoffToken{TokenHash: sum[:]}
-	require.NoError(t, repo.Handoff(t.Context(), v1Pool, attempt))
+	require.NoError(t, testPool.HandoffAuthAttempt(t.Context(), attempt))
 	t.Cleanup(func() {
-		_, _ = testPool.pool.Exec(context.Background(),
-			`DELETE FROM zitadel_nextgen.auth_attempts WHERE project_id = $1 AND id = $2`,
-			projectID, legacydb.Identity(attempt.ID))
+		_ = testPool.DeleteAuthAttemptByID(context.Background(), projectID, attempt.ID)
 	})
 	return plainToken, attempt
 }
@@ -121,8 +114,7 @@ func TestSessionStatements_Exchange_deletesAttempt(t *testing.T) {
 		_ = testPool.DeleteSessionByID(context.Background(), projectID, exchanged.ID)
 	})
 
-	_, err = repository.NewAuthAttemptRepository(pgold.PGxPool(testPool.pool)).
-		GetByID(t.Context(), pgold.PGxPool(testPool.pool), projectID, attempt.ID)
+	_, err = testPool.GetAuthAttemptByID(t.Context(), projectID, attempt.ID)
 	require.ErrorIs(t, err, domain.ErrAuthAttemptNotFound())
 }
 
@@ -225,16 +217,13 @@ func TestSessionStatements_Exchange_mergeChecks(t *testing.T) {
 		).Scan(&authAttemptID))
 		assert.Nil(t, authAttemptID)
 
-		_, err = repository.NewAuthAttemptRepository(pgold.PGxPool(testPool.pool)).
-			GetByID(t.Context(), pgold.PGxPool(testPool.pool), projectID, attempt.ID)
+		_, err = testPool.GetAuthAttemptByID(t.Context(), projectID, attempt.ID)
 		require.ErrorIs(t, err, domain.ErrAuthAttemptNotFound())
 	})
 
 	t.Run("promote_multiple_types", func(t *testing.T) {
 		projectID := uniqueSessionFixtureIDs(t)
 		ensureSessionProject(t, projectID)
-		v1Pool := pgold.PGxPool(testPool.pool)
-		repo := repository.NewAuthAttemptRepository(v1Pool)
 		attempt := &domain.AuthAttempt{
 			ProjectID: projectID,
 			RequiredChecks: []domain.AuthCheckType{
@@ -246,15 +235,13 @@ func TestSessionStatements_Exchange_mergeChecks(t *testing.T) {
 				domain.SetAuthFactorPasskey(time.Now().UTC()),
 			},
 		}
-		require.NoError(t, repo.Create(t.Context(), v1Pool, attempt))
+		require.NoError(t, testPool.CreateAuthAttempt(t.Context(), attempt))
 		plain := "handoff_" + projectID
 		sum := sha256.Sum256([]byte(plain))
 		attempt.HandoffToken = &domain.HandoffToken{TokenHash: sum[:]}
-		require.NoError(t, repo.Handoff(t.Context(), v1Pool, attempt))
+		require.NoError(t, testPool.HandoffAuthAttempt(t.Context(), attempt))
 		t.Cleanup(func() {
-			_, _ = testPool.pool.Exec(context.Background(),
-				`DELETE FROM zitadel_nextgen.auth_attempts WHERE project_id = $1 AND id = $2`,
-				projectID, legacydb.Identity(attempt.ID))
+			_ = testPool.DeleteAuthAttemptByID(context.Background(), projectID, attempt.ID)
 		})
 
 		sess, err := testPool.ExchangeSession(t.Context(), projectID, plain, nil, 0)
