@@ -2,6 +2,8 @@ package postgres
 
 import (
 	"context"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -11,6 +13,7 @@ import (
 	storagedb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
+	"github.com/zitadel/nextgen/internal/storage/v2/userpasskey"
 )
 
 const createUserPasskeyStmt = `INSERT INTO zitadel_nextgen.user_passkeys (
@@ -23,18 +26,6 @@ const createUserPasskeyStmt = `INSERT INTO zitadel_nextgen.user_passkeys (
 
 const deleteUserPasskeyStmt = `DELETE FROM zitadel_nextgen.user_passkeys
 WHERE project_id = $1 AND user_id = $2 AND credential_id = $3`
-
-const updateUserPasskeyStmt = `UPDATE zitadel_nextgen.user_passkeys SET
-	attestation_type = $1,
-	transports = $2,
-	sign_count = $3,
-	backup_eligible = $4,
-	backup_state = $5,
-	name = $6,
-	verified_at = $7,
-	last_used_at = $8,
-	updated_at = now()
-WHERE project_id = $9 AND user_id = $10 AND credential_id = $11`
 
 const userPasskeyQuery = `SELECT id, project_id, user_id, credential_id, public_key, aaguid, attestation_type, transports,
 	sign_count, backup_eligible, backup_state, name, verified_at, last_used_at, created_at, updated_at
@@ -130,32 +121,31 @@ func (ps userPasskeyStatements) ListUserPasskeys(ctx context.Context, filter *da
 }
 
 // UpdateUserPasskey implements [service.UserPasskeyStatements].
-func (ps userPasskeyStatements) UpdateUserPasskey(ctx context.Context, p *domain.UserPasskey) error {
-	transports := p.Transports
-	if transports == nil {
-		transports = []string{}
+func (ps userPasskeyStatements) UpdateUserPasskey(ctx context.Context, projectID, userID, credentialID string, changes ...domain.UserPasskeyChange) error {
+	assignments, err := userpasskey.Assignments(changes)
+	if err != nil {
+		return err
 	}
-	tag, err := ps.client.Exec(ctx, updateUserPasskeyStmt,
-		p.AttestationType,
-		transports,
-		p.SignCount,
-		p.BackupEligible,
-		p.BackupState,
-		nullStringArg(p.Name),
-		p.VerifiedAt,
-		p.LastUsedAt,
-		p.ProjectID,
-		p.UserID,
-		p.CredentialID,
-	)
+	setClause, setArgs, next, err := database.BuildSetClause(assignments, 1)
+	if err != nil {
+		return err
+	}
+	var b strings.Builder
+	b.WriteString("UPDATE zitadel_nextgen.user_passkeys SET ")
+	b.WriteString(setClause)
+	b.WriteString(", updated_at = NOW() WHERE project_id = $")
+	b.WriteString(strconv.Itoa(next))
+	b.WriteString(" AND user_id = $")
+	b.WriteString(strconv.Itoa(next + 1))
+	b.WriteString(" AND credential_id = $")
+	b.WriteString(strconv.Itoa(next + 2))
+	args := append(setArgs, projectID, userID, credentialID)
+	tag, err := ps.client.Exec(ctx, b.String(), args...)
 	if err != nil {
 		return wrapError(err)
 	}
 	if tag.RowsAffected() == 0 {
-		return storagedb.NewNoRowFoundError(nil)
-	}
-	if tag.RowsAffected() > 1 {
-		return storagedb.NewMultipleRowsFoundError(nil)
+		return wrapError(pgx.ErrNoRows)
 	}
 	return nil
 }

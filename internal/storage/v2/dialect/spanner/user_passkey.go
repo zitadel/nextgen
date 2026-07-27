@@ -2,6 +2,8 @@ package spanner
 
 import (
 	"context"
+	"strconv"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -11,6 +13,7 @@ import (
 	storagedb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
+	"github.com/zitadel/nextgen/internal/storage/v2/userpasskey"
 )
 
 const (
@@ -23,17 +26,6 @@ const (
 ) THEN RETURN id, created_at, updated_at`
 	deleteUserPasskeyStmt = `DELETE FROM user_passkeys
 WHERE project_id = @p1 AND user_id = @p2 AND credential_id = @p3`
-	updateUserPasskeyStmt = `UPDATE user_passkeys SET
-	attestation_type = @p1,
-	transports = @p2,
-	sign_count = @p3,
-	backup_eligible = @p4,
-	backup_state = @p5,
-	name = @p6,
-	verified_at = @p7,
-	last_used_at = @p8,
-	updated_at = PENDING_COMMIT_TIMESTAMP()
-WHERE project_id = @p9 AND user_id = @p10 AND credential_id = @p11`
 	userPasskeyQuery = `SELECT id, project_id, user_id, credential_id, public_key, aaguid, attestation_type, transports,
 	sign_count, backup_eligible, backup_state, name, verified_at, last_used_at, created_at, updated_at
 FROM user_passkeys`
@@ -140,33 +132,31 @@ func (ps userPasskeyStatements) ListUserPasskeys(ctx context.Context, filter *da
 }
 
 // UpdateUserPasskey implements [service.UserPasskeyStatements].
-func (ps userPasskeyStatements) UpdateUserPasskey(ctx context.Context, p *domain.UserPasskey) error {
-	transports := p.Transports
-	if transports == nil {
-		transports = []string{}
-	}
-	stmt := buildStatement(updateUserPasskeyStmt,
-		p.AttestationType,
-		transports,
-		p.SignCount,
-		p.BackupEligible,
-		p.BackupState,
-		nullStringArg(p.Name),
-		p.VerifiedAt,
-		p.LastUsedAt,
-		p.ProjectID,
-		p.UserID,
-		p.CredentialID,
-	).statement()
-	n, err := ps.db.Update(ctx, stmt)
+func (ps userPasskeyStatements) UpdateUserPasskey(ctx context.Context, projectID, userID, credentialID string, changes ...domain.UserPasskeyChange) error {
+	assignments, err := userpasskey.Assignments(changes)
 	if err != nil {
 		return err
 	}
-	if n == 0 {
-		return storagedb.NewNoRowFoundError(nil)
+	setClause, setArgs, next, err := database.BuildSetClause(assignments, 1)
+	if err != nil {
+		return err
 	}
-	if n > 1 {
-		return storagedb.NewMultipleRowsFoundError(nil)
+	var b strings.Builder
+	b.WriteString("UPDATE user_passkeys SET ")
+	b.WriteString(setClause)
+	b.WriteString(", updated_at = CURRENT_TIMESTAMP() WHERE project_id = $")
+	b.WriteString(strconv.Itoa(next))
+	b.WriteString(" AND user_id = $")
+	b.WriteString(strconv.Itoa(next + 1))
+	b.WriteString(" AND credential_id = $")
+	b.WriteString(strconv.Itoa(next + 2))
+	args := append(setArgs, projectID, userID, credentialID)
+	n, err := ps.db.Update(ctx, buildStatementFromPostgresSQL(b.String(), args...).statement())
+	if err != nil {
+		return wrapError(err)
+	}
+	if n == 0 {
+		return wrapError(spanner.ErrRowNotFound)
 	}
 	return nil
 }
