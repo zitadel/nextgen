@@ -23,9 +23,11 @@ func ensureDependencies(ctx context.Context, client database.QueryExecutor, h He
 }
 
 func ensureProject(ctx context.Context, client database.QueryExecutor, projectID string) error {
+	// The bootstrap header carries no project name, so derive a placeholder
+	// name from the project ID to satisfy the NOT NULL name column.
 	_, err := client.Exec(ctx,
-		`INSERT INTO zitadel_nextgen.projects (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`,
-		projectID,
+		`INSERT INTO zitadel_nextgen.projects (id, name) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING`,
+		projectID, "project-"+projectID,
 	)
 	if err != nil {
 		return fmt.Errorf("ensure project %q: %w", projectID, err)

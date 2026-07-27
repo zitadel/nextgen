@@ -121,9 +121,28 @@ The `layout` enum stays this small on purpose. Richer starting points ship as **
 | `centered`    | `centered`          | The bundled default, ejected verbatim.                                  |
 | `split`       | `split`             | Brand panel left (logo, `hero_url`), form right.                        |
 | `split-right` | `split`             | Mirrored: form left, brand panel right.                                 |
+| `hero`        | `split`             | Landing-style brand pane left (nav, headline, feature bullets — editable copy on token-styled `zl-hero__*` classes), form right. |
 | `minimal`     | `centered`          | Chrome stripped to heading, fields, and actions.                        |
 
 A design is delivered *as a template* (the escape hatch this doc always reserved for ADR-033's `muted`/`minimal`), with the descriptor's `layout` set to the nearest built-in so an invalid template degrades to sane chrome. Every shipped design passes the authoring validator and a component-level render test.
+
+### Split chrome: mobile fallback and knobs
+
+On viewports ≤48rem the chrome collapses `.zl-split` to one column and hides `.zl-split__brand`; the shipped split-family designs render a `.zl-split__compact` node inside the form pane (logo, or a text brand line in `hero`) that only shows there, so the tenant's identity survives the collapse. Three custom properties tune the chrome — set them on the template's root element via its `style` attribute (inline `style=""` passes the sanitiser; the values cascade into the orchestrator's shadow chrome):
+
+| Property                  | Default                            | Effect                                                     |
+| ------------------------- | ---------------------------------- | ---------------------------------------------------------- |
+| `--zl-split-columns`      | `minmax(0, 1fr) minmax(0, 1fr)`    | Grid template — e.g. `7fr 5fr` for a wider brand pane.      |
+| `--zl-split-align`        | `center`                           | Vertical alignment of the two panes (`start` for tall brand content). |
+| `--zl-split-brand-mobile` | `none`                             | `flex` keeps the full brand pane on mobile, stacked above the form. |
+
+Widget-level sizing belongs to the **embedding page**, not the template:
+`<zitadel-login>` defaults to `variant="widget"` (content-sized, no page
+chrome) and dedicated login routes set `variant="page"` for the full-page
+shape. `--zl-page-min-height` remains the fine-grained height override in
+both modes, and the split-family collapse responds to the widget's own width
+(container queries), not the viewport — see the embedding section in the
+`@zitadel/components` README.
 
 ## Authoring workflow (eject → edit → plan → apply)
 

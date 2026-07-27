@@ -25,6 +25,7 @@ import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
 import type { Branding } from "./branding.js";
 import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { validateBranding } from "./branding-validator.js";
+import { stampExportparts } from "./exportparts.js";
 import { applyDefaultFont, applyFontUrl } from "./font-loader.js";
 import { emit } from "../internal/emit.js";
 import { escapeHtml } from "../internal/escape-html.js";
@@ -36,7 +37,7 @@ import { zitadelAttributionPillInnerHtml } from "@zitadel/shared-component-style
 import { createSanitiser } from "./sanitiser.js";
 import type { FlowError, FlowIdentity, LiquidContext } from "./template-context.js";
 import layoutChromeCss from "./templates/layout-chrome.css?inline";
-import { ThemeController } from "./theme-controller.js";
+import { ThemeController, type ThemeMode } from "./theme-controller.js";
 
 /**
  * The uniform value contract every input atom exposes (`<zl-field>`,
@@ -100,9 +101,31 @@ export class ZitadelLogin extends LitElement {
     :host {
       display: block;
       width: 100%;
-      min-height: 100vh;
     }
   `;
+
+  /**
+   * Sizing/chrome mode. Components size to content; pages compose them —
+   * so the default is `widget`: content-sized, transparent host, no
+   * document-level default-font injection, no initial focus grab (matching
+   * the polarity of `<zitadel-logout>`). Dedicated login routes — the
+   * hosted shell and the scaffolded pages — opt into `page`, which claims
+   * the viewport, paints the surface background, ships the brand font, and
+   * focuses the first field on load. Fine-grained height override in both
+   * modes: `--zl-page-min-height`.
+   */
+  @property({ type: String, reflect: true }) accessor variant: "widget" | "page" = "widget";
+
+  /**
+   * Colour mode: `light`, `dark`, or `auto` (follow `prefers-color-scheme`).
+   * Empty means "not stated", and resolution falls through to the tenant's
+   * `branding.theme.mode`, then to a variant-derived default — `dark` for
+   * `page` (the hosted design system surface) and `auto` for `widget`, so an
+   * embedded widget matches the visitor's preference instead of forcing a
+   * dark card onto a light page. Set it explicitly when your app's surface
+   * is fixed: `<zitadel-login theme="light">`.
+   */
+  @property({ type: String }) accessor theme: "" | ThemeMode = "";
 
   @property({ type: String }) accessor purpose: CreateFlowBodyPurpose = "login";
 
@@ -307,14 +330,24 @@ export class ZitadelLogin extends LitElement {
     if (!this.engine || changed.has("locales") || changed.has("lang")) {
       this.engine = createLiquidEngine({ locale: this.resolveLocale() });
     }
+    // Resolve before reading `themeController.theme` below: a page owns its
+    // surface (dark), a widget defers to the visitor's preference (auto).
+    this.themeController.setModePreference(
+      this.theme === "" ? undefined : this.theme,
+      this.variant === "page" ? "dark" : "auto",
+    );
     const root = this.shadowRoot;
     if (root) {
       applyBaseTokens(root);
       applyBrandingTokens(root, this.branding, this.themeController.theme);
-      // Ship the design-system brand face by default; drop it when a tenant
-      // font takes over so we don't fire a redundant request.
+      // Ship the design-system brand face by default on dedicated login
+      // pages; drop it when a tenant font takes over so we don't fire a
+      // redundant request. Widget mode never injects the default into the
+      // host document — the embedding app owns its typography (and its
+      // visitors' font-CDN connections). Tenant `font_url` is explicit
+      // server-side branding state, so it applies in both modes.
       const tenantFontUrl = this.branding?.font_url ?? null;
-      applyDefaultFont(root, tenantFontUrl ? null : undefined);
+      applyDefaultFont(root, this.variant === "page" && !tenantFontUrl ? undefined : null);
       applyFontUrl(root, tenantFontUrl);
     }
     this.dataset.theme = this.themeController.theme;
@@ -323,9 +356,26 @@ export class ZitadelLogin extends LitElement {
   }
 
   override updated(changed: PropertyValues<this>): void {
+    // Re-stamp part forwarding and widget-mode chrome on every commit:
+    // `unsafeHTML` re-parses whenever the rendered string changes (step
+    // swap, loading toggle, error dismiss), replacing previously stamped
+    // nodes. The template's `zl-page-shell` sits in a different shadow
+    // scope, so the variant reaches it as a stamped attribute, not a
+    // `:host([variant])` selector.
+    if (this.shadowRoot) {
+      stampExportparts(this.shadowRoot);
+      const widget = this.variant !== "page";
+      for (const shell of this.shadowRoot.querySelectorAll("zl-page-shell")) {
+        shell.toggleAttribute("data-widget", widget);
+      }
+    }
     const props = changed as Map<string, unknown>;
     if (!props.has("response")) return;
-    void this.hydrateStepAfterRender();
+    // `changed` holds the OLD value: nullish (`null` initializer, or
+    // undefined when the property never changed before) means this commit
+    // applied the first response — the initial paint, not a user-driven
+    // step swap.
+    void this.hydrateStepAfterRender(props.get("response") == null);
   }
 
   /**
@@ -334,15 +384,22 @@ export class ZitadelLogin extends LitElement {
    * but those render their own shadow DOM on a later microtask — so await
    * this element's update *and* the child atoms' first render before touching
    * them, rather than guessing a frame with `requestAnimationFrame`.
+   *
+   * Focus on the *initial* response is page-mode-only: a dedicated login
+   * route should focus its first field, but a widget embedded further down
+   * an arbitrary page must not steal focus and scroll-jump on load. Step
+   * swaps are user-initiated, so focus moves in both modes.
    */
-  private async hydrateStepAfterRender(): Promise<void> {
+  private async hydrateStepAfterRender(initial = false): Promise<void> {
     await this.updateComplete;
     const atoms = this.shadowRoot?.querySelectorAll<LitElement>("zl-field, zl-button");
     if (atoms) {
       await Promise.all(Array.from(atoms).map((atom) => atom.updateComplete));
     }
     this.applyValuesToFields();
-    this.moveFocusToFirstField();
+    if (!initial || this.variant === "page") {
+      this.moveFocusToFirstField();
+    }
   }
 
   override render() {
@@ -438,6 +495,11 @@ export class ZitadelLogin extends LitElement {
         });
       }
       this.applyResponse(wire);
+      // Symmetric with `submit()`: every applied step announces itself, the
+      // first one included. A host app driving its own chrome from the step
+      // (progress, headings, analytics) would otherwise see nothing until
+      // after the visitor's first submit.
+      emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
       this.handleTransportError(this.describeFlowSelectionError(error));
     } finally {

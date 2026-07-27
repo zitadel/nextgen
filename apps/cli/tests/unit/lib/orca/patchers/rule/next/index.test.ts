@@ -55,14 +55,18 @@ describe("NextPatcher.plan", () => {
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('href="/register"');
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain("next/link");
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('href="/profile"');
-    expect(writeContents(plan, "app/login/page.tsx")).toContain('background: "#0f0f11"');
+    // Page chrome comes from the widget itself now — the wrapper only pins
+    // the color scheme, and no token hex is duplicated into generated code.
+    expect(writeContents(plan, "app/login/page.tsx")).toContain('variant="page"');
+    expect(writeContents(plan, "app/login/page.tsx")).not.toContain("#0f0f11");
     expect(writeContents(plan, "app/login/page.tsx")).toContain('colorScheme: "dark"');
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('alignItems: "center"');
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('padding: "48px 24px"');
     expect(writeContents(plan, "app/register/page.tsx")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "app/register/page.tsx")).not.toContain('href="/login"');
     expect(writeContents(plan, "app/register/page.tsx")).not.toContain('href="/profile"');
-    expect(writeContents(plan, "app/register/page.tsx")).toContain('background: "#0f0f11"');
+    expect(writeContents(plan, "app/register/page.tsx")).toContain('variant="page"');
+    expect(writeContents(plan, "app/register/page.tsx")).not.toContain("#0f0f11");
     expect(writeContents(plan, "app/register/page.tsx")).toContain('colorScheme: "dark"');
     expect(writeContents(plan, "middleware.ts")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "middleware.ts")).toContain("export function middleware(");

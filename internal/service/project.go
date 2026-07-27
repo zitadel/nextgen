@@ -31,6 +31,15 @@ type ProjectService interface {
 	// Returns [database.NoRowFoundError] when no project with the given ID exists.
 	Get(ctx context.Context, id string) (*domain.Project, error)
 
+	// DefaultProject resolves the project a standalone deployment tracks
+	// (Console ADR 0004 §3): the configured project when cfgProjectID is
+	// set — which must exist; a missing configured project is a
+	// configuration error — otherwise the deployment's first-created
+	// project. Returns (nil, nil) while no project exists yet: the server
+	// never creates the default project, the customer's integration
+	// (`zitadel setup` → POST /projects) does.
+	DefaultProject(ctx context.Context, cfgProjectID string) (*domain.Project, error)
+
 	// Update updates the name of a project.
 	// Returns domain.ErrMissingProjectID or domain.ErrProjectNameInvalid for validation failures.
 	// Returns domain.ErrProjectNotFound when no project with the given ID exists; other failures return domain.ErrInternal.
@@ -49,26 +58,23 @@ type ProjectService interface {
 // NewProjectService returns a [ProjectService] backed by the given repository.
 func NewProjectService(
 	v2Pool *DB,
-	flowDefinitionRepo domain.FlowDefinitionRepository,
 	serverURL string,
 	schemaValidator *domain.SchemaValidator,
 	keyService KeyService,
 ) ProjectService {
 	return &projectService{
-		v2Pool:             v2Pool,
-		flowDefinitionRepo: flowDefinitionRepo,
-		serverURL:          serverURL,
-		schemaValidator:    schemaValidator,
-		keyService:         keyService,
+		v2Pool:          v2Pool,
+		serverURL:       serverURL,
+		schemaValidator: schemaValidator,
+		keyService:      keyService,
 	}
 }
 
 type projectService struct {
-	v2Pool             *DB
-	flowDefinitionRepo domain.FlowDefinitionRepository
-	serverURL          string
-	schemaValidator    *domain.SchemaValidator
-	keyService         KeyService
+	v2Pool          *DB
+	serverURL       string
+	schemaValidator *domain.SchemaValidator
+	keyService      KeyService
 }
 
 var _ ProjectService = (*projectService)(nil)
@@ -115,7 +121,7 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to parse default user schema")
 		}
-		return s.createDefaultLoginFlowDefinitions(ctx, tx.(database.QueryExecutor), project.ID, userSchema)
+		return s.createDefaultLoginFlowDefinitions(ctx, tx.Statements(), project.ID, userSchema)
 	})
 
 	if err != nil {
@@ -146,7 +152,7 @@ func (s *projectService) createDefaultUserSchemas(ctx context.Context, stmts JSO
 	return schema, nil
 }
 
-func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, client database.QueryExecutor, projectID string, userSchema *jsonschema.Schema) error {
+func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, stmts FlowDefinitionStatements, projectID string, userSchema *jsonschema.Schema) error {
 	flowDefs, err := flow_definitions.DefaultLoginFlowDefinitions(
 		s.serverURL,
 		projectID,
@@ -161,7 +167,7 @@ func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, 
 			return domain.ErrInternal(err).WithMessage("default login flow definition is invalid")
 		}
 
-		err = s.flowDefinitionRepo.CreateFlowDefinition(ctx, client, flowDef)
+		err = stmts.CreateFlowDefinition(ctx, flowDef)
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to save default login flow definition to project")
 		}
@@ -174,6 +180,42 @@ func (s *projectService) Get(ctx context.Context, id string) (*domain.Project, e
 	logger.Info("getting project", slog.String("project_id", id))
 	project, err := s.v2Pool.Statements().GetProjectByID(ctx, id)
 	return project, mapStorageError(err)
+}
+
+func (s *projectService) DefaultProject(ctx context.Context, cfgProjectID string) (*domain.Project, error) {
+	if cfgProjectID != "" {
+		project, err := s.Get(ctx, cfgProjectID)
+		if err != nil {
+			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+				return nil, domain.ErrProjectNotFound().
+					WithMessage("configured platform.project_id does not exist").
+					WithDetails(cfgProjectID)
+			}
+			return nil, err
+		}
+		return project, nil
+	}
+
+	// The deployment's first-created project is the default. Deterministic
+	// (created_at ascending) so every replica answers the same, and cheap
+	// enough to resolve per runtime.json request — no cached state to
+	// invalidate when `zitadel setup` creates the first project.
+	result, err := s.v2Pool.Statements().ListProjects(ctx, &v2database.ListOptions[domain.ProjectField]{
+		Pagination: v2database.Page[domain.ProjectField]{
+			Limit: 1,
+			OrderBy: v2database.OrderBy[domain.ProjectField]{
+				Columns:   []v2database.Column[domain.ProjectField]{v2database.Col(domain.ProjectFieldCreatedAt)},
+				Direction: v2database.OrderAsc,
+			},
+		},
+	})
+	if err != nil {
+		return nil, mapStorageError(err)
+	}
+	if result == nil || len(result.Items) == 0 {
+		return nil, nil
+	}
+	return result.Items[0], nil
 }
 
 func (s *projectService) Update(ctx context.Context, id, name string) (*domain.Project, error) {

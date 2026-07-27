@@ -7,6 +7,10 @@ type FieldBinding[T any] struct {
 	SQLName  string
 	Accessor func(*T) any
 	Coerce   func(any) (any, error)
+	// ParamCast is an optional Postgres type cast appended after bound
+	// placeholders for this column (e.g. "::myschema.my_enum"). Empty means
+	// no cast. Spanner ignores this field.
+	ParamCast string
 }
 
 // Schema resolves domain fields to SQL names and entity values for one entity type.
@@ -31,6 +35,11 @@ func (s Schema[F, T]) binding(field F) FieldBinding[T] {
 // SQLName returns the SQL column name for col.
 func (s Schema[F, T]) SQLName(col Column[F]) string {
 	return s.binding(col.Field()).SQLName
+}
+
+// ParamCast returns the optional Postgres parameter cast for col.
+func (s Schema[F, T]) ParamCast(col Column[F]) string {
+	return s.binding(col.Field()).ParamCast
 }
 
 // MustSQLName returns the SQL column name for field.

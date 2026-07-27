@@ -17,7 +17,7 @@ import (
 func insertProjectTeamSchemaUser(t *testing.T, tx database.Transaction, pid, tid, schemaURL, userID string) {
 	t.Helper()
 	ctx := t.Context()
-	_, err := tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s (id) VALUES ($1)`, dbTable("projects")), pid)
+	_, err := tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s (id, name) VALUES ($1, $2)`, dbTable("projects")), pid, "project-"+pid)
 	require.NoError(t, err)
 	_, err = tx.Exec(ctx, fmt.Sprintf(`INSERT INTO %s (project_id, id) VALUES ($1,$2)`, dbTable("teams")), pid, tid)
 	require.NoError(t, err)

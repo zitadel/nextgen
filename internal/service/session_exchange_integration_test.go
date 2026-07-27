@@ -3,6 +3,7 @@
 package service_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -11,20 +12,20 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
 func newSessionServiceForIntegration(t *testing.T) (service.SessionService, service.SessionConfig) {
 	t.Helper()
 	pool := integrationPoolOrFail(t)
-	sessRepo := repository.NewSessionRepository(pool)
 	cfg := service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour}
-	return service.NewSessionService(pool, sessRepo, repository.NewUserRepository(), cfg), cfg
+	v2Pool := integrationV2PoolOrFail(t)
+	return service.NewSessionService(pool, v2Pool, service.UserStatementsIdentityReader{Pool: v2Pool}, cfg), cfg
 }
 
 func TestSessionService_Exchange_integration(t *testing.T) {
 	pool := integrationPoolOrFail(t)
 	svc, cfg := newSessionServiceForIntegration(t)
+	v2 := integrationV2PoolOrFail(t)
 
 	t.Run("new_session_promotes_password", func(t *testing.T) {
 		projectID := "p-svc-ex-new-" + time.Now().Format("150405.000000")
@@ -75,7 +76,9 @@ func TestSessionService_Exchange_integration(t *testing.T) {
 
 		anonymous, err := domain.NewSession(projectID, nil)
 		require.NoError(t, err)
-		require.NoError(t, repository.NewSessionRepository(pool).Create(t.Context(), pool, anonymous))
+		require.NoError(t, v2.Transaction(t.Context(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+			return tx.Statements().CreateSession(ctx, anonymous)
+		}))
 
 		plain, _ := handoffCompletedAttempt(t, pool, projectID, func(a *domain.AuthAttempt) {
 			a.SessionID = &anonymous.ID
