@@ -6,7 +6,9 @@ import (
 	"cmp"
 	"context"
 	"testing"
+	"time"
 
+	"github.com/go-faster/jx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
@@ -352,6 +354,110 @@ func TestPatchProject(t *testing.T) {
 	}
 }
 
+func TestQueryProjects(t *testing.T) {
+	t.Parallel()
+
+	previewOrigins := []string{"*.example.com", "localhost:3000"}
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), previewOrigins, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	var (
+		own            = api.ProjectResponse{Name: project.Name, PreviewOrigins: previewOrigins}
+		requestInvalid = domain.ErrRequestInvalid()
+		// A minute of slack absorbs the whole-second truncation RFC3339 applies.
+		before = project.CreatedAt.Add(-time.Minute).Format(time.RFC3339)
+		after  = project.CreatedAt.Add(time.Minute).Format(time.RFC3339)
+	)
+
+	createdAtFilter := func(op api.FilterOperation, value api.FilterValue) []api.QueryProjectsRequestFilterItem {
+		return []api.QueryProjectsRequestFilterItem{{
+			Field:     api.FilterFieldCreatedAt,
+			Operation: op,
+			Value:     api.NewOptFilterValue(value),
+		}}
+	}
+
+	badRequest := func(details string) *api.QueryProjectsBadRequest {
+		return &api.QueryProjectsBadRequest{
+			Code:    api.ErrorCode(requestInvalid.Code),
+			Message: requestInvalid.Message,
+			Details: api.NewOptErrorDetailsDetails(api.ErrorDetailsDetails{
+				"details": jx.Raw(helpers.MustMarshal(t, details)),
+			}),
+		}
+	}
+
+	tcs := []struct {
+		name string
+		req  *api.QueryProjectsRequest
+		want api.QueryProjectsRes
+	}{
+		{
+			name: "empty request returns the caller's project",
+			req:  &api.QueryProjectsRequest{},
+			want: &api.QueryProjectsResponse{Projects: []api.ProjectResponse{own}},
+		},
+		{
+			name: "createdAt filter matches",
+			req:  &api.QueryProjectsRequest{Filter: createdAtFilter(api.FilterOperationGreaterThan, api.NewStringFilterValue(before))},
+			want: &api.QueryProjectsResponse{Projects: []api.ProjectResponse{own}},
+		},
+		{
+			name: "createdAt filter excludes",
+			req:  &api.QueryProjectsRequest{Filter: createdAtFilter(api.FilterOperationGreaterThan, api.NewStringFilterValue(after))},
+			want: &api.QueryProjectsResponse{Projects: []api.ProjectResponse{}},
+		},
+		{
+			name: "sorting",
+			req: &api.QueryProjectsRequest{Sorting: api.NewOptQueryProjectsRequestSorting(api.QueryProjectsRequestSorting{
+				Field:     api.FilterFieldCreatedAt,
+				Direction: api.SortDirectionDesc,
+			})},
+			want: &api.QueryProjectsResponse{Projects: []api.ProjectResponse{own}},
+		},
+		{
+			// A full page always carries a cursor: the store cannot know the
+			// next one is empty without reading it.
+			name: "limit fills the page",
+			req:  &api.QueryProjectsRequest{Limit: api.NewOptLimit(1)},
+			want: &api.QueryProjectsResponse{
+				Projects:      []api.ProjectResponse{own},
+				NextPageToken: api.NewOptNilPageToken("opaque, only its presence is asserted"),
+			},
+		},
+		{
+			name: "malformed page token",
+			req:  &api.QueryProjectsRequest{PageToken: api.NewOptNilPageToken("not-a-cursor")},
+			want: badRequest("invalid page token"),
+		},
+		{
+			name: "filter value is not a timestamp",
+			req:  &api.QueryProjectsRequest{Filter: createdAtFilter(api.FilterOperationEquals, api.NewStringFilterValue("yesterday"))},
+			want: badRequest("createdAt filter value must be a valid RFC3339 timestamp"),
+		},
+		{
+			name: "filter value is not a string",
+			req:  &api.QueryProjectsRequest{Filter: createdAtFilter(api.FilterOperationEquals, api.NewBoolFilterValue(true))},
+			want: badRequest("createdAt filter value must be an RFC3339 string"),
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			resp, err := client.QueryProjects(t.Context(), tc.req)
+
+			assert.NoError(t, err)
+			assertProjectResponse(t, tc.want, resp)
+		})
+	}
+}
+
 // assertProjectResponse covers every operation answering with the shared
 // project body: getProject, patchProject, and each item of queryProjects.
 func assertProjectResponse(t *testing.T, want, got any) {
@@ -370,6 +476,26 @@ func assertProjectResponse(t *testing.T, want, got any) {
 		assert.Equal(t, expected.PreviewOrigins, actual.PreviewOrigins)
 		assert.NotEmpty(t, actual.CreatedAt)
 		assert.False(t, actual.UpdatedAt.Before(actual.CreatedAt))
+	case *api.QueryProjectsResponse:
+		actual, ok := got.(*api.QueryProjectsResponse)
+		require.True(t, ok)
+
+		if !assert.Len(t, actual.Projects, len(expected.Projects), helpers.MustMarshal(t, got)) {
+			return
+		}
+		for i := range expected.Projects {
+			assertProjectResponse(t, &expected.Projects[i], &actual.Projects[i])
+		}
+		// The token is an opaque cursor; only whether a next page exists is
+		// worth pinning.
+		assert.Equal(t, expected.NextPageToken.IsSet(), actual.NextPageToken.IsSet())
+	case *api.QueryProjectsBadRequest:
+		actual, ok := got.(*api.QueryProjectsBadRequest)
+		require.True(t, ok)
+
+		assert.Equal(t, expected.Code, actual.Code)
+		assert.Equal(t, expected.Message, actual.Message)
+		assert.Equal(t, expected.Details, actual.Details)
 	case *api.GetProjectNotFound:
 		actual, ok := got.(*api.GetProjectNotFound)
 		require.True(t, ok)

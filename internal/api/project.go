@@ -7,6 +7,7 @@ import (
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -69,7 +70,74 @@ func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest
 	return projectResponse(project), nil
 }
 
+// QueryProjects has no project parameter: results are scoped by the caller's
+// scope, which today is always bound to a single project. A broader scope
+// would leave ProjectID empty and span every project it reaches.
+func (h *Handler) QueryProjects(ctx context.Context, req *api.QueryProjectsRequest) (api.QueryProjectsRes, error) {
+	scopeCtx, _ := GetScopeContext(ctx)
+	if err := requireProjectAccess(ctx, scopeCtx.ProjectID, projectAccess, opRead); err != nil {
+		return nil, err
+	}
+
+	listed, err := h.projectService.List(ctx, mapQueryProjectsToService(scopeCtx.ProjectID, req))
+	if err != nil {
+		return nil, err
+	}
+
+	projects := make([]api.ProjectResponse, 0, len(listed.Projects))
+	for _, project := range listed.Projects {
+		projects = append(projects, *projectResponse(project))
+	}
+	resp := &api.QueryProjectsResponse{Projects: projects}
+	if listed.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(listed.NextPageToken))
+	}
+	return resp, nil
+}
+
 // ------------------ Converters ---------------
+
+func mapQueryProjectsToService(projectID string, req *api.QueryProjectsRequest) service.ListProjectsRequest {
+	svcReq := service.ListProjectsRequest{
+		ProjectID: projectID,
+		// Left at 0 when unset: the service applies the spec's default and cap.
+		Limit:     int(req.Limit.Or(0)),
+		PageToken: string(req.PageToken.Or("")),
+	}
+	if sorting, ok := req.Sorting.Get(); ok {
+		svcReq.Sorting = &service.Sorting{
+			Field:     string(sorting.Field),
+			Direction: string(sorting.Direction),
+		}
+	}
+	for _, filter := range req.Filter {
+		svcReq.Filters = append(svcReq.Filters, service.Filter{
+			Field:     string(filter.Field),
+			Operation: string(filter.Operation),
+			Value:     filterValue(filter.Value),
+		})
+	}
+	return svcReq
+}
+
+// filterValue unwraps the filter-value union. An absent or null value stays
+// nil; the service rejects whatever the filtered field cannot take.
+func filterValue(value api.OptFilterValue) any {
+	v, ok := value.Get()
+	if !ok {
+		return nil
+	}
+	switch v.Type {
+	case api.StringFilterValue:
+		return v.String
+	case api.Float64FilterValue:
+		return v.Float64
+	case api.BoolFilterValue:
+		return v.Bool
+	default:
+		return nil
+	}
+}
 
 // projectResponse is the shared project body: getProject, patchProject, and
 // every item in queryProjects answer with it.
