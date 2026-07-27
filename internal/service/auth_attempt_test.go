@@ -393,9 +393,7 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 			succeededFactor = factor
 			return nil
 		})
-		users.EXPECT().ProjectIDCondition(gomock.Any()).Return(nil).AnyTimes()
-		users.EXPECT().AttributesCondition(gomock.Any()).Return(nil).AnyTimes()
-		users.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{ID: "user-1"}, nil)
+		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any()).Return(&domain.User{ID: "user-1"}, nil)
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, users, nil, nil)
 		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
@@ -439,9 +437,7 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 			failedChallenge = c
 			return nil
 		})
-		users.EXPECT().ProjectIDCondition(gomock.Any()).Return(nil).AnyTimes()
-		users.EXPECT().AttributesCondition(gomock.Any()).Return(nil).AnyTimes()
-		users.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, rejectErr)
+		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any()).Return(nil, rejectErr)
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, users, nil, nil)
 		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
@@ -460,12 +456,11 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
 			return newUserChallengeAttempt(), nil
 		})
+		// ChallengeFailed must not be called: a persistence failure is not a proof rejection.
 		stmts.EXPECT().AuthAttemptChallengeSucceeded(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string, domain.AuthFactor, string) error {
 			return succeedErr
 		})
-		users.EXPECT().ProjectIDCondition(gomock.Any()).Return(nil).AnyTimes()
-		users.EXPECT().AttributesCondition(gomock.Any()).Return(nil).AnyTimes()
-		users.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{ID: "user-1"}, nil)
+		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any()).Return(&domain.User{ID: "user-1"}, nil)
 
 		svc := newAuthAttemptSvc(ctrl, stmts, nil, users, nil, nil)
 		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{

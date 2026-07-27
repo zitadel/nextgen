@@ -22,11 +22,9 @@ type SessionService interface {
 }
 
 // UserIdentityReader is the secondary port Get uses to hydrate the identity
-// attributes of a session's linked user. *repository.UserRepository satisfies it.
+// attributes of a session's linked user.
 type UserIdentityReader interface {
-	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.User, error)
-	PrimaryKeyCondition(projectID, id string) database.Condition
-	WithAttributes(filterKeys ...string) database.QueryOption
+	GetIdentity(ctx context.Context, projectID, userID string, attributeKeys ...string) (*domain.User, error)
 }
 
 type CreateSessionInput struct {
@@ -104,10 +102,7 @@ func (s *sessionService) Get(ctx context.Context, input GetSessionInput) (*domai
 	if !input.WithUserIdentity || session.UserID == nil {
 		return session, nil
 	}
-	user, err := s.users.Get(ctx, s.pool,
-		database.WithCondition(s.users.PrimaryKeyCondition(input.ProjectID, *session.UserID)),
-		s.users.WithAttributes(domain.IdentityAttributeKeys...),
-	)
+	user, err := s.users.GetIdentity(ctx, input.ProjectID, *session.UserID, domain.IdentityAttributeKeys...)
 	if err != nil {
 		// A session may outlive its user; render it without an identity then.
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
