@@ -18,7 +18,7 @@ type transaction struct {
 func (t transaction) Exec(ctx context.Context, stmt string, args ...any) (int64, error) {
 	tag, err := t.tx.Exec(ctx, stmt, args...)
 	if err != nil {
-		return 0, err
+		return 0, wrapError(err)
 	}
 	return tag.RowsAffected(), nil
 }
@@ -27,7 +27,7 @@ func (t transaction) Exec(ctx context.Context, stmt string, args ...any) (int64,
 func (t transaction) Query(ctx context.Context, stmt string, args ...any) (dbold.Rows, error) {
 	r, err := t.tx.Query(ctx, stmt, args...)
 	if err != nil {
-		return nil, err
+		return nil, wrapError(err)
 	}
 	// TODO: wrap rows to implement dbold.Rows
 	return &rows{Rows: r}, nil

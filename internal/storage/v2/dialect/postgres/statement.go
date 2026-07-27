@@ -25,6 +25,7 @@ type statements struct {
 	passkeyRegistrationStatements
 	sessionStatements
 	authAttemptStatements
+	userStatements
 }
 
 func (s statements) Statements() service.AllStatements {
@@ -46,6 +47,7 @@ func newStatements(client queryExecutor) statements {
 		passkeyRegistrationStatements: newPasskeyRegistrationStatements(client),
 		sessionStatements:             newSessionStatements(client),
 		authAttemptStatements:         newAuthAttemptStatements(client),
+		userStatements:                newUserStatements(client),
 	}
 }
 

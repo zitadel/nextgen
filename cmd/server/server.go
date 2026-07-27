@@ -125,12 +125,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		return fmt.Errorf("failed to build password hasher: %w", err)
 	}
 
-	if err := users.Import(ctx, pool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), userFiles); err != nil {
-		return fmt.Errorf("failed to bootstrap users: %w", err)
-	}
-
 	// ── Repositories ─────────────────
-	userRepo := repository.NewUserRepository()
 	userPasswordRepo := repository.NewUserPasswordRepository()
 	userPasskeyRepo := repository.NewUserPasskeyRepository()
 	brandingRepo := repository.NewBrandingRepository(pool)
@@ -138,6 +133,10 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	serviceDBPool := service.NewPool(v2Pool.(service.Pool))
 	schemaStore := serviceDBPool.Statements()
 	sessionResolver := service.SessionStatementsResolver{Pool: serviceDBPool}
+
+	if err := users.Import(ctx, pool, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), userFiles); err != nil {
+		return fmt.Errorf("failed to bootstrap users: %w", err)
+	}
 
 	// ── Schema Stuff ─────────────────
 	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](cfg.Schema.LRUCacheSize)
@@ -161,6 +160,9 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		return fmt.Errorf("failed to build schema validator: %w", err)
 	}
 
+	userLookup := service.UserStatementsLookup{Pool: serviceDBPool}
+	userIdentity := service.UserStatementsIdentityReader{Pool: serviceDBPool}
+
 	// ── Services ─────────────────────
 	keyService := service.NewKeyService(serviceDBPool, kek)
 
@@ -168,12 +170,12 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		pool,
 		serviceDBPool,
 		sessionResolver,
-		userRepo,
+		userLookup,
 		userPasswordRepo,
 		userPasskeyRepo,
 		passwordHasher,
 	)
-	sessionService := service.NewSessionService(pool, serviceDBPool, userRepo, service.SessionConfig{
+	sessionService := service.NewSessionService(pool, serviceDBPool, userIdentity, service.SessionConfig{
 		DefaultTTL: cfg.Session.DefaultTTL,
 		MaxTTL:     cfg.Session.MaxTTL,
 	})
@@ -194,8 +196,8 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	brandingService := service.NewBrandingService(pool, brandingRepo)
 	userService := service.NewUserService(
 		pool,
+		serviceDBPool,
 		schemaStore,
-		userRepo,
 		userPasswordRepo,
 		passwordHasher,
 	)
@@ -205,13 +207,12 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	fields := domain.NewSchemaFieldResolver()
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
 	createUserHandler := service.NewFlowCreateUserHandler(
-		userRepo,
 		userPasswordRepo,
 		passwordHasher,
 		userService,
 		schemaStore,
 	)
-	createUserForPasskeyHandler := service.NewFlowCreateUserForPasskeyHandler(userRepo, userService, schemaStore)
+	createUserForPasskeyHandler := service.NewFlowCreateUserForPasskeyHandler(userService, schemaStore)
 	passkeyRegSvc := service.NewPasskeyRegistrationService(pool, serviceDBPool, userPasskeyRepo, ids)
 	passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
 	stateMachine := domain.NewFlowStateMachine(

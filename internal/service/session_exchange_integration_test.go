@@ -8,39 +8,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	pgold "github.com/zitadel/nextgen/internal/storage/database/dialect/postgres"
-	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/embedded"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
-	v2postgres "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres"
 )
-
-func integrationV2PoolOrFail(t *testing.T) service.StatementPool {
-	t.Helper()
-	pool := integrationPoolOrFail(t)
-	var pgxPool *pgxpool.Pool
-	switch p := pool.(type) {
-	case *embedded.Pool:
-		pgxPool = p.Pool.Pool
-	case *pgold.Pool:
-		pgxPool = p.Pool
-	default:
-		t.Fatalf("unsupported pool type %T", pool)
-	}
-	v2, err := (&v2postgres.PoolConfig{Pool: pgxPool}).Connect(t.Context())
-	require.NoError(t, err)
-	return service.NewPool(v2.(service.Pool))
-}
 
 func newSessionServiceForIntegration(t *testing.T) (service.SessionService, service.SessionConfig) {
 	t.Helper()
 	pool := integrationPoolOrFail(t)
 	cfg := service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour}
-	return service.NewSessionService(pool, integrationV2PoolOrFail(t), repository.NewUserRepository(), cfg), cfg
+	v2Pool := integrationV2PoolOrFail(t)
+	return service.NewSessionService(pool, v2Pool, service.UserStatementsIdentityReader{Pool: v2Pool}, cfg), cfg
 }
 
 func TestSessionService_Exchange_integration(t *testing.T) {
