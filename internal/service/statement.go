@@ -97,6 +97,6 @@ type UserPasswordStatements interface {
 	SetUserPassword(ctx context.Context, pw *domain.SetUserPassword) error
 	GetUserPasswordByUserID(ctx context.Context, projectID, userID string) (*domain.UserPassword, error)
 	ListUserPasswords(ctx context.Context, filter *database.ListOptions[domain.UserPasswordField]) (*database.ListResult[*domain.UserPassword], error)
-	UpdateUserPassword(ctx context.Context, projectID, userID string, changes ...domain.UserPasswordChange) error
+	UpdateUserPassword(ctx context.Context, projectID, userID string, updates ...domain.UserPasswordUpdate) error
 	DeleteUserPasswordByUserID(ctx context.Context, projectID, userID string) error
 }
