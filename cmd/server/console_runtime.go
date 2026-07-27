@@ -3,8 +3,10 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -82,13 +84,29 @@ func newConsoleRuntimeHandler(resolve runtimeResolver) http.Handler {
 			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 			return
 		}
-		meta, err := resolve(r.Context())
+		ctx := r.Context()
+		meta, err := resolve(ctx)
 		if err != nil {
+			// This endpoint bootstraps the console: a failure here surfaces in
+			// the browser as a blank sign-in screen with nothing to explain it,
+			// and the causes are all server-side (default-project lookup, DEK
+			// access, key derivation). Without this line the only signal is a
+			// bare 500 in the access log.
+			runtimeLogger(ctx).Error(
+				"console runtime resolution failed",
+				"path", consoleRuntimePath,
+				"err", err,
+			)
 			http.Error(w, "failed to resolve console runtime metadata", http.StatusInternalServerError)
 			return
 		}
 		body, err := json.Marshal(meta)
 		if err != nil {
+			runtimeLogger(ctx).Error(
+				"console runtime encoding failed",
+				"path", consoleRuntimePath,
+				"err", err,
+			)
 			http.Error(w, "failed to encode console runtime metadata", http.StatusInternalServerError)
 			return
 		}
@@ -101,4 +119,13 @@ func newConsoleRuntimeHandler(resolve runtimeResolver) http.Handler {
 		}
 		_, _ = w.Write(body)
 	})
+}
+
+// runtimeLogger is the request-scoped logger for the runtime endpoint. The
+// handler is mounted on the bare mux (outside the API middleware chain), so
+// the context carries no request id and this falls back to the default
+// logger — the stream tag keeps the records grouped with request logging
+// either way.
+func runtimeLogger(ctx context.Context) *slog.Logger {
+	return zlog.WithStream(zlog.GetLoggingContext(ctx), zlog.StreamRequest)
 }

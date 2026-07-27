@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"go.uber.org/mock/gomock"
@@ -58,13 +60,48 @@ func TestConsoleRuntimeHandlerOmitsAbsentProject(t *testing.T) {
 	assert.JSONEq(t, `{"mode":"standalone"}`, rec.Body.String())
 }
 
+// The 500 body is deliberately opaque, so the underlying cause has to reach
+// the log or a broken deployment is undiagnosable from the server side.
 func TestConsoleRuntimeHandlerAnswers500OnResolverError(t *testing.T) {
 	handler := newConsoleRuntimeHandler(staticResolver(consoleRuntime{}, errors.New("db down")))
+	records := &recordingHandler{}
 
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, consoleRuntimePath, nil))
+	req := httptest.NewRequest(http.MethodGet, consoleRuntimePath, nil)
+	req = req.WithContext(zlog.WithLoggingContext(req.Context(), slog.New(records)))
+	handler.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+	require.Len(t, records.records, 1)
+	logged := records.records[0]
+	assert.Equal(t, slog.LevelError, logged.Level)
+	assert.Equal(t, "console runtime resolution failed", logged.Message)
+	assert.Contains(t, recordAttrs(logged), "err=db down")
+}
+
+// recordingHandler captures emitted records so tests can assert on them.
+type recordingHandler struct {
+	records []slog.Record
+}
+
+func (h *recordingHandler) Enabled(context.Context, slog.Level) bool { return true }
+
+func (h *recordingHandler) Handle(_ context.Context, r slog.Record) error {
+	h.records = append(h.records, r)
+	return nil
+}
+
+func (h *recordingHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
+
+func (h *recordingHandler) WithGroup(string) slog.Handler { return h }
+
+func recordAttrs(r slog.Record) []string {
+	var attrs []string
+	r.Attrs(func(attr slog.Attr) bool {
+		attrs = append(attrs, attr.Key+"="+attr.Value.String())
+		return true
+	})
+	return attrs
 }
 
 func TestConsoleRuntimeHandlerHeadHasNoBody(t *testing.T) {
