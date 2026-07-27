@@ -3,6 +3,14 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+// The `_authed` layout guards every screen behind `GET /sessions/me`
+// (Console ADR 0003); mock the auth module so routes render as signed in.
+vi.mock("@/auth/session", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/auth/session")>();
+  const { makeTestSession } = await import("@/auth/session.fixture");
+  return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
+});
+
 // Absolute base so requests parse under jsdom/undici and MSW can intercept.
 vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
@@ -20,7 +28,7 @@ afterAll(() => {
 async function renderAt(path: string) {
   const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
     import("@tanstack/react-router"),
-    import("../../router"),
+    import("../../../router"),
   ]);
   const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [path] }) });
   render(<RouterProvider router={router} />);
@@ -49,12 +57,21 @@ describe("login flows list states", () => {
   });
 
   it("renders the error boundary when the request fails", async () => {
-    server.use(
-      http.get(FLOWS_URL, () =>
-        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
-      ),
-    );
-    await renderAt("/flow-definitions");
-    expect(await screen.findByText("Request failed (500)")).toBeInTheDocument();
+    // The loader error is *expected* here; silence React's error-boundary
+    // dump and the router's route-match warning so passing runs stay quiet.
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      server.use(
+        http.get(FLOWS_URL, () =>
+          HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+        ),
+      );
+      await renderAt("/flow-definitions");
+      expect(await screen.findByText("Request failed (500)")).toBeInTheDocument();
+    } finally {
+      errorSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
   });
 });

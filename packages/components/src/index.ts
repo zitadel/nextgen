@@ -77,4 +77,5 @@ export {
   type LiquidContext,
   type Locale,
   type ResolvedTheme,
+  type ThemeMode,
 } from "./orchestrator/index.js";

@@ -4,13 +4,14 @@ import { Button, Pill } from "@zitadel/ui-react";
 import { KeyRound } from "lucide-react";
 import { useState } from "react";
 
-import { api, projectId } from "../../api/zitadel";
-import { Page } from "../../components/layout";
-import { DataTable, PageHeader } from "../../components/resource-page";
+import { api } from "../../../api/zitadel";
+import { getConsoleProjectId } from "../../../runtime/runtime";
+import { Page } from "../../../components/layout";
+import { DataTable, PageHeader } from "../../../components/resource-page";
 
-export const Route = createFileRoute("/sessions/")({
+export const Route = createFileRoute("/_authed/sessions/")({
   staticData: { nav: { label: "Sessions", order: 6, icon: KeyRound } },
-  loader: () => api.listSessions({ project_id: projectId }),
+  loader: () => api.listSessions({ project_id: getConsoleProjectId() }),
   component: SessionsList,
 });
 
@@ -22,7 +23,7 @@ function SessionsList() {
   async function revoke(sessionId: string) {
     setRevoking(sessionId);
     try {
-      await api.revokeSession(sessionId, { project_id: projectId });
+      await api.revokeSession(sessionId, { project_id: getConsoleProjectId() });
       await router.invalidate();
     } catch (error) {
       console.error("Failed to revoke session", error);
