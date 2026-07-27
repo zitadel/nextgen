@@ -66,7 +66,7 @@ delete:
             schema:
               $ref: ../../../components/error-details.yaml
       '404':
-        description: User referenced by the current session was not found.
+        description: User not found.
         content:
           application/json:
             schema:
