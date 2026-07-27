@@ -28,6 +28,12 @@ type FlowFieldResolver interface {
 	// Validate checks submitted values against the rules carried by a
 	// previously resolved field set.
 	Validate(fields FlowResolvedFields, values map[string]any) error
+
+	// MissingRequired reports the required fields absent from values.
+	// Applied only on field-collecting actions (the submit action and the
+	// passkey-register issue leg); other actions legitimately submit a
+	// subset of fields or none.
+	MissingRequired(fields FlowResolvedFields, values map[string]any) FlowFieldValidationErrors
 }
 
 // FlowResolvedFields is the output of [FlowFieldResolver.Resolve].
@@ -123,6 +129,7 @@ const (
 //   - MinLength ↔ `minLength`
 //   - MaxLength ↔ `maxLength`
 //   - Enum      ↔ `enum` (closed set of allowed string values)
+//   - Const     ↔ `const` (property pinned to a fixed value)
 //
 // Zero values mean "no rule". JSON Schema's `pattern` keyword is not
 // part of the user meta-schema and is intentionally not surfaced.
@@ -131,6 +138,12 @@ type FlowFieldValidation struct {
 	MinLength int
 	MaxLength int
 	Enum      []string
+
+	// Const, when non-nil, pins the property to a fixed value (JSON
+	// Schema `const`) of any type — e.g. a must-accept checkbox uses
+	// `const: true`. A differing submission is reported as
+	// [FlowFieldValidationRuleFormat].
+	Const any
 }
 
 // FlowFieldType names the input kind the client should render. Mirrors
@@ -153,7 +166,11 @@ const (
 )
 
 // FlowFieldValidationRule names a schema-derived validation rule the
-// resolver enforces.
+// resolver enforces. Each rule doubles as the key suffix of the wire
+// dialect (see [FlowFieldValidationError.TextKey]), so a new rule also
+// needs a generic `error.field_<rule>` catalog entry and a suffix
+// mapping in the client's `localiseFlowErrorKeys`
+// (packages/components/src/orchestrator/liquid.ts).
 type FlowFieldValidationRule string
 
 const (
@@ -175,6 +192,23 @@ func (e FlowFieldValidationError) Error() string {
 	return "flow field " + e.Field + ": " + string(e.Rule)
 }
 
+// TextKey returns the client-facing localisation key for the violation:
+// `error.<field>_<rule>`, with the format rule aliased to `_invalid` —
+// the text catalog's existing spelling (`error.email_invalid`). Field
+// names are used verbatim, credential shape included
+// (`error.x-auth-methods#password_required`): tenant schemas keep field
+// naming open, so clients resolve unknown keys through generic
+// `error.field_<rule>` fallbacks instead of a closed catalog — see
+// `localiseFlowErrorKeys` in
+// packages/components/src/orchestrator/liquid.ts.
+func (e FlowFieldValidationError) TextKey() string {
+	suffix := string(e.Rule)
+	if e.Rule == FlowFieldValidationRuleFormat {
+		suffix = "invalid"
+	}
+	return "error." + e.Field + "_" + suffix
+}
+
 // FlowFieldValidationErrors collects rule violations. Returned as
 // `error` by [FlowFieldResolver.Validate].
 type FlowFieldValidationErrors []FlowFieldValidationError
@@ -183,6 +217,19 @@ func (e FlowFieldValidationErrors) Error() string {
 	parts := make([]string, len(e))
 	for i, err := range e {
 		parts[i] = err.Error()
+	}
+	return strings.Join(parts, "; ")
+}
+
+// StepError renders the violations for the wire `step.error` field: one
+// [FlowFieldValidationError.TextKey] per violation, joined with "; ".
+// Clients split on the joiner and localise each key. Error() stays the
+// Go-side diagnostic ("flow field email: required") for logs and
+// wrapped errors.
+func (e FlowFieldValidationErrors) StepError() string {
+	parts := make([]string, len(e))
+	for i, err := range e {
+		parts[i] = err.TextKey()
 	}
 	return strings.Join(parts, "; ")
 }

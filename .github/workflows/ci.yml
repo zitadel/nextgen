@@ -14,7 +14,9 @@ concurrency:
 
 jobs:
   full-pr:
-    runs-on: depot-ubuntu-24.04-16
+    # Fork PRs execute untrusted repository code. Keep them off Depot runners,
+    # which inject DEPOT_CACHE_TOKEN independently of GitHub secret filtering.
+    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || 'depot-ubuntu-24.04-16' }}
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v6
@@ -48,9 +50,20 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: moon run server:check-generate
 
+      - name: Cache Playwright browsers
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright Chromium
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: corepack pnpm --filter @zitadel/components exec playwright install chromium
+
       - name: Run Moon build and test graph
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: moon ci :lint :typecheck :build :test
+        run: moon ci :lint :typecheck :build :test :test-browser
 
       - name: Run Go tests
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
@@ -60,9 +73,9 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: moon run server:test-postgres
 
-      # Spanner integration tests are not run in CI yet: the v2 spanner statement
-      # layer is unimplemented (see zitadel/nextgen#457). Re-enable via
-      # `moon run server:test-spanner` once that lands.
+      - name: Run Go integration tests (spanner)
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: moon run server:test-spanner
 
       - name: Build release snapshot without container
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
@@ -90,6 +103,19 @@ jobs:
             --preset passkey-first \
             --work-dir "${RUNNER_TEMP}/ci-journey-passkey-first" \
             --tarballs-dir "dist/release/${version}/npm"
+
+      # Gates the test-kit's central promise: boot a real seeded instance,
+      # then drive the real browser login with per-test users. Reuses the Go
+      # build cache and Playwright Chromium installed above.
+      - name: Run @zitadel/testing real-instance suites
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: env -u CI -u GITHUB_ACTIONS moon run testing:test-integration demo-next-e2e:e2e-real
+
+      # Dogfoods @zitadel/testing through a second consumer. Keep this separate
+      # from the demo suite so two embedded-Postgres instances do not contend.
+      - name: Run console real-instance suite
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: env -u CI -u GITHUB_ACTIONS moon run console-e2e:e2e-real
 
       - name: Validate version PR
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
@@ -122,5 +148,17 @@ jobs:
           path: |
             ${{ runner.temp }}/ci-journey/diagnostics
             ${{ runner.temp }}/ci-journey-passkey-first/diagnostics
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # The handshake is deliberately excluded: it carries the project secret.
+      - name: Upload console e2e diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: console-e2e-diagnostics
+          path: |
+            apps/console-e2e/test-results
+            apps/console-e2e/playwright-report
           if-no-files-found: ignore
           retention-days: 7

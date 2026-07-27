@@ -17,7 +17,7 @@ import (
 // the fallback so the response is always well-formed.
 //
 // Only Code, Message, and explicitly attached Details cross the wire.
-// Parent and Location are diagnostics for logs and must never be serialized
+// Parent and Origin metadata are diagnostics for logs and must never be serialized
 // into API responses (ADR 030).
 func domainErrorDetails(err error) api.ErrorDetails {
 	var domErr domain.Error
@@ -48,16 +48,22 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 	switch {
 	case strings.HasPrefix(e.Code, domain.PrefixAuthAttempt.ErrorCodePrefix("")):
 		return authAttemptErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixFlow.ErrorCodePrefix("")):
+		return flowErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixFlowDefinition.ErrorCodePrefix("")):
 		return flowDefinitionErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixSession.ErrorCodePrefix("")):
 		return sessionErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixJSONSchema.ErrorCodePrefix("")):
 		return schemaErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixBranding.ErrorCodePrefix("")):
+		return brandingErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixUser.ErrorCodePrefix("")):
 		return userErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixTeam.ErrorCodePrefix("")):
 		return teamErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixProject.ErrorCodePrefix("")):
+		return projectErrorResponse(e)
 	case e.Code == domain.ErrNotImplemented().Code:
 		return errorResponseWithStatusCode(http.StatusNotImplemented, e)
 	default:
@@ -95,9 +101,9 @@ func OgenErrorHandler(_ context.Context, w http.ResponseWriter, _ *http.Request,
 
 	case isDecodeError(err):
 		status = http.StatusBadRequest
-		d := domainErrorDetails(domain.ErrRequestInvalid())
-		d.Message = err.Error()
-		details = d
+		// Use the stable domain message — do not echo ogen/framework
+		// decode text into the client envelope (ADR 030).
+		details = domainErrorDetails(domain.ErrRequestInvalid())
 
 	default:
 		resp := errorResponse(err)

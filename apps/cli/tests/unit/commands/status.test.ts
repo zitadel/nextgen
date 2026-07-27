@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 
@@ -140,7 +140,18 @@ describe("status command", () => {
     const cwd = await makeProject();
     await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
 
-    const res = await status(relative(process.cwd(), cwd));
+    // The docker-backend fixture makes status spawn `docker inspect`; a fake
+    // on PATH keeps the test hermetic — with a wedged Docker daemon the real
+    // CLI blocks on the socket forever instead of failing fast.
+    const binDir = await mkdtemp(join(tmpdir(), "zitadel-status-fake-docker-"));
+    tempDirs.push(binDir);
+    await writeFile(join(binDir, "docker"), "#!/usr/bin/env node\nprocess.exit(1);\n");
+    await chmod(join(binDir, "docker"), 0o755);
+
+    const res = await runCliForTest(
+      ["status", "--cwd", relative(process.cwd(), cwd), "--json", "--server", "https://api.zitadel.cloud"],
+      { PATH: `${binDir}:${process.env.PATH ?? ""}` },
+    );
 
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as {

@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/components",
-  "version": "0.1.0-alpha.15",
+  "version": "0.1.0-alpha.17",
   "description": "Lit-based atomic web components and the <zitadel-login> orchestrator for the Zitadel auth UI.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/components#readme",
   "bugs": {
@@ -59,6 +59,7 @@
     "test:all": "vitest run"
   },
   "dependencies": {
+    "@zitadel/config": "workspace:*",
     "dompurify": "catalog:",
     "liquidjs": "catalog:",
     "lit": "catalog:",
@@ -69,7 +70,6 @@
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "@zitadel/api-mock": "workspace:*",
-    "@zitadel/config": "workspace:*",
     "jsdom": "catalog:",
     "msw": "catalog:",
     "playwright": "catalog:",

@@ -28,7 +28,7 @@ import (
 func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	testServer := harness.EnsureTestServer(t)
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
@@ -45,7 +45,7 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 
 	client, err := helpers.NewApiClient(testServer.URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
@@ -74,8 +74,7 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	regResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
-			"email":     jx.Raw(`"` + newEmail + `"`),
-			"givenName": jx.Raw(`"Upsell"`),
+			"email": jx.Raw(`"` + newEmail + `"`),
 		}),
 	}, api.SubmitFlowStepParams{
 		ID:    flowID,
@@ -188,7 +187,7 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 // the upsell still terminates cleanly: after create_user, action=skip
 // transitions to `done` without enrolling a passkey.
 func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
@@ -196,7 +195,7 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 	server := harness.EnsureTestServer(t)
 	client, err := helpers.NewApiClient(server.URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
@@ -223,8 +222,7 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 	regResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
-			"email":     jx.Raw(`"` + newEmail + `"`),
-			"givenName": jx.Raw(`"Skip"`),
+			"email": jx.Raw(`"` + newEmail + `"`),
 		}),
 	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
 	require.NoError(t, err)
@@ -267,7 +265,7 @@ func passkeyUpsellFlowDefinition(userSchemaURL string) api.FlowDefinition {
 		Steps: []api.FlowDefinitionStep{
 			{
 				Name:   "register",
-				Fields: []string{"email", "givenName"},
+				Fields: []string{"email"},
 				Actions: []api.StepAction{
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},

@@ -14,5 +14,5 @@ test("console shell mounts under the embed base", async ({ page }) => {
   // The console build is served under `/ui/console/` (it embeds in the Go
   // server), so the app only mounts there — not at the origin root.
   await page.goto("/ui/console/");
-  await expect(page.getByRole("heading", { name: "Console" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "General", level: 1 })).toBeVisible();
 });

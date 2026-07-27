@@ -17,6 +17,10 @@ type queryExecutor interface {
 type statements struct {
 	projectStatements
 	flowDefinitionStatements
+	cryptoKeyStatements
+	jsonSchemaStatements
+	teamStatements
+	tokenStatements
 }
 
 func (s statements) Statements() service.AllStatements {
@@ -30,6 +34,10 @@ func newStatements(client queryExecutor) statements {
 	return statements{
 		projectStatements:        newProjectStatements(client),
 		flowDefinitionStatements: newFlowDefinitionStatements(client),
+		cryptoKeyStatements:      newCryptoKeyStatements(client),
+		jsonSchemaStatements:     newJSONSchemaStatements(client),
+		teamStatements:           newTeamStatements(client),
+		tokenStatements:          newTokenStatements(client),
 	}
 }
 

@@ -22,10 +22,25 @@ WITH _header AS (
     RETURNING
         u.project_id
         , u.id
-        , u.team_id
+        , u.lifecycle_owner_team_id
+        , u.status
         , u.schema_url
         , u.created_at
         , u.updated_at
+)
+, _scope AS (
+    SELECT
+        h.*
+        , COALESCE((
+            SELECT m.team_id
+            FROM zitadel_nextgen.team_memberships m
+            WHERE m.project_id = h.project_id
+              AND m.user_id = h.id
+              AND m.status = 'active'
+            ORDER BY m.created_at
+            LIMIT 1
+        ), '')::text AS attr_team_id
+    FROM _header h
 )
 , _input_data AS (
     SELECT
@@ -41,12 +56,12 @@ WITH _header AS (
         , h.id AS user_id
         , CASE
             WHEN d.unique_scope = 'project'::zitadel_nextgen.uniqueness_scope THEN ''::text
-            ELSE COALESCE(h.team_id, '')::text
+            ELSE h.attr_team_id
           END AS team_id
         , d.key
         , d.value_hash
     FROM _input_data d
-    CROSS JOIN _header h
+    CROSS JOIN _scope h
     WHERE d.unique_scope IN (
             'team'::zitadel_nextgen.uniqueness_scope
             , 'project'::zitadel_nextgen.uniqueness_scope
@@ -120,12 +135,12 @@ WITH _header AS (
     FROM (
         SELECT
             h.project_id
-            , h.team_id
+            , h.attr_team_id AS team_id
             , h.id AS user_id
             , d.key
             , d.value
         FROM _input_data d
-        CROSS JOIN _header h
+        CROSS JOIN _scope h
     ) AS s
     WHERE NOT EXISTS (
             SELECT 1
@@ -154,7 +169,8 @@ WITH _header AS (
 SELECT
     h.schema_url
     , h.id
-    , h.team_id
+    , h.lifecycle_owner_team_id
+    , h.status
     , h.created_at
     , h.updated_at
     , (
@@ -163,7 +179,7 @@ SELECT
     ) AS attributes
     , dac.deleted_attributes
     , uac.upserted_attributes
-FROM _header h
+FROM _scope h
 CROSS JOIN _del_attrs_count dac
 CROSS JOIN _upsert_attrs_count uac;
 

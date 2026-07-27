@@ -76,14 +76,6 @@ enters login on a fields-less passkey step with an email → password
 fallback path. The preset only decides the starting point — edit
 anything here afterwards.
 
-## Presets
-
-`zitadel setup` scaffolds this folder from a preset (`--preset
-password-first` or `--preset passkey-first`). The passkey-first flow
-enters login on a fields-less passkey step with an email → password
-fallback path. The preset only decides the starting point — edit
-anything here afterwards.
-
 ## Schema revisions
 
 Editing a schema publishes a new immutable revision. When you `apply` a

@@ -1,8 +1,10 @@
 # ADR 007: GitOps Configuration Surface
 
-> **Status:** Proposed
+> **Status:** Proposed (superseded in part by ADR 035)
 > **Date:** 2026-04-26
 > **Context:** Local Zitadel project configuration
+
+> **Superseded in part.** ADR 035 (Environment Releases for Configuration Resources) replaces the per-resource `plan` / `apply` orchestration described here with atomic release construction (`POST /configuration-releases`) and a separate deployment step (`POST /environments/{env}/deployments`). `zitadel apply` becomes `zitadel deploy`; `zitadel plan` is removed. The higher-level premise — repo files describe configuration, secrets stay out of VCS — is unchanged.
 
 ## Decision
 

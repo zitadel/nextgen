@@ -2,10 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Alert } from "@zitadel/ui-react";
 
 import { api } from "../../api/zitadel";
+import { Page } from "../../components/layout";
 import { PageHeader } from "../../components/resource-page";
 
 export const Route = createFileRoute("/system/")({
-  staticData: { nav: { group: "Configuration", label: "System", order: 4 } },
   loader: async () => {
     // `getHealth` resolves on a healthy server and throws ApiError otherwise;
     // the error boundary renders the unhealthy state.
@@ -17,11 +17,11 @@ export const Route = createFileRoute("/system/")({
 
 function SystemHealth() {
   return (
-    <>
+    <Page>
       <PageHeader title="System" description="Server health" />
       <Alert severity="success" heading="Healthy">
         The Zitadel server is responding to health checks.
       </Alert>
-    </>
+    </Page>
   );
 }

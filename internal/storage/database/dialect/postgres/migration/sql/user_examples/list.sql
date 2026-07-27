@@ -18,7 +18,7 @@ matching_ids AS (
     HAVING COUNT(*) = (SELECT COUNT(*) FROM unique_filters)
 )
 SELECT
-    u.schema_url, u.id, u.team_id, u.created_at, u.updated_at,
+    u.schema_url, u.id, u.lifecycle_owner_team_id, u.status, u.created_at, u.updated_at,
     (
       SELECT array_agg(ROW(a.key, a.value))
       FROM zitadel_nextgen.user_attributes a

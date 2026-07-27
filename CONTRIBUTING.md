@@ -16,6 +16,22 @@ If you want to add Zitadel to your own app rather than contribute here, see the
 - pnpm 10 from [`package.json`](package.json) (`corepack enable`)
 - [Moon](https://moonrepo.dev/moon)
 
+### Using the devcontainer
+
+The devcontainer at [.devcontainer/](.devcontainer/) pins Go 1.26 and a
+PostgreSQL sidecar. After changing devcontainer configuration, use
+**Dev Containers: Rebuild Container** so features and volume mounts apply.
+
+The devcontainer reuses the host Docker daemon (Docker-outside-of-Docker), so
+container-backed workflows such as the
+[database integration tests](#go-database-integration-tests) work inside it —
+verify with `docker info`. If `docker info` fails and the host uses
+**rootless Docker**, override the socket mount in
+[`.devcontainer/devcontainer.json`](.devcontainer/devcontainer.json) per the
+[docker-outside-of-docker feature docs](https://github.com/devcontainers/features/tree/main/src/docker-outside-of-docker#rootless-docker-support),
+for example bind `/run/user/<uid>/docker.sock` to `/var/run/docker-host.sock`
+(use `id -u` on the host for `<uid>`).
+
 ## I want to contribute to the backend
 
 For changes to the Go server, APIs, or database layer.
@@ -155,7 +171,7 @@ This skips the embedded UI dist checks, so it works before you have built
 ```sh
 curl -s -X POST http://localhost:8080/projects \
   -H "Content-Type: application/json" \
-  -d '{}'
+  -d '{"name": "dev"}'
 ```
 
 The response contains an `id` field — that is your project ID. If you have
@@ -214,13 +230,79 @@ get an informational Changesets comment; maintainers use that and the
 [changeset decision table](.changeset/README.md#decision-table) to review release
 intent.
 
-To run the full CI-parity suite locally — including integration tests, demo
-end-to-end tests, and the fresh-app journey — run
-`moon run workspace:check -- --full`. To re-run a single failing task, use
-`moon run <project>:<task>`. To re-run one legacy check phase:
+Task runs are accelerated by Moon's remote cache, configured under `remote` in
+[`.moon/workspace.yml`](.moon/workspace.yml); Depot CI runners authenticate
+automatically. Local runs skip the remote cache unless you export a Depot API
+token as `DEPOT_CACHE_TOKEN` — with one set, your machine downloads shared task
+outputs but never uploads (uploads happen only in CI). Pull requests from forks
+run on GitHub-hosted runners without the Depot cache credential.
+
+To run the full CI-parity suite locally — including database integration
+tests, package checks, and the fresh-app journey — run
+`moon run workspace:check -- --full`. The demo end-to-end suites are not part
+of `--full`; run them with `moon run workspace:check -- --only node:e2e` or
+the Moon tasks below. To re-run a single failing task, use
+`moon run <project>:<task>`. To re-run one check phase:
 `moon run workspace:check -- --only <phase>`.
 
+### What CI runs
+
+Branch protection requires the GitHub Actions context `full-pr`, shown in the
+pull request UI as `ci / full-pr` and defined in
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml). The job installs
+dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
+
+**Full mode** (normal PRs) runs, in order:
+
+- `moon run server:check-generate` — Go generated-file drift check.
+- Playwright Chromium install for `@zitadel/components`.
+- `moon ci :lint :typecheck :build :test :test-browser`.
+- `moon run server:test`, then `moon run server:test-postgres` (Spanner
+  integration is not run in CI yet; see the note in the workflow).
+- `moon run release:snapshot -- --skip-container` — a non-publishing release
+  snapshot.
+- The fresh-app consumer journey (`cli-journey-e2e:e2e-local`) with the npm
+  binary runtime against the snapshot's packed tarballs, plus one
+  passkey-first preset journey run.
+
+**Version-only mode** (Changesets version PRs) runs `release:version`,
+`release:pack`, and tarball verification instead.
+
+CI consumes the workflow's packed npm tarballs, not public Zitadel packages.
+Changesets PR comments are informational release-intent feedback, not a
+blocking gate. Workflow artifacts (the release snapshot always, journey
+diagnostics on failure) expire after 7 days. The demo end-to-end suites and
+the Docker-fallback journey do not run in CI; they stay opt-in local checks
+(see below).
+
 ## Running integration and end-to-end tests
+
+### Go database integration tests
+
+Both the Postgres and Spanner integration tests use
+[testcontainers](https://golang.testcontainers.org/) to start their databases
+(a Postgres container and the Cloud Spanner emulator), so a running Docker
+daemon is required — see
+[Using the devcontainer](#using-the-devcontainer) for the
+Docker-outside-of-Docker setup. Run them with the same commands CI's
+`server:test-postgres` task wraps:
+
+```sh
+# Postgres
+go test -v -tags postgres_integration -timeout=10m ./...
+
+# Spanner
+go test -v -tags spanner_integration -timeout=10m ./...
+```
+
+To run the integration tests against a database you manage instead of
+testcontainers, set `ZITADEL_TEST_POSTGRES_URL` (Postgres DSN) or
+`ZITADEL_TEST_SPANNER_URL` (Spanner DSN); every integration suite honors
+these and connects to your database instead of starting a container, so
+`go test -tags … ./...` needs no Docker. Point it at a throwaway database —
+the suites run migrations that create the `zitadel_nextgen` schema.
+
+### Demo end-to-end suites
 
 These tests start real servers and require a browser install, so they are opt-in
 locally. The demo suites exercise the checked-in framework demos:
@@ -230,6 +312,8 @@ corepack pnpm --filter @zitadel/demo-next-e2e exec playwright install
 moon run demo-next-e2e:e2e
 moon run demo-nuxt-e2e:e2e
 ```
+
+### Fresh-app journey
 
 The journey test creates one fresh app directory per selected framework outside
 the repo, runs the full CLI setup flow against local workspace packages, starts
@@ -261,6 +345,13 @@ moon run release:snapshot
 
 The release task builds the embedded UI surfaces (console and login-ui)
 automatically.
+
+To cut or recover a release, follow the
+[release runbook](docs/runbooks/manual-release.md). Moon builds the artifacts
+and the draft GitHub Release; Changesets owns versions, npm publishing, and
+release notes — see
+[ADR 002](docs/adrs/002-multi-package-release-strategy.md) and
+[`.changeset/README.md`](.changeset/README.md).
 
 ### Building a Docker image from source
 

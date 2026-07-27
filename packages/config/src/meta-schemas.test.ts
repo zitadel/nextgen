@@ -5,8 +5,18 @@ import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020";
 import { describe, expect, it } from "vitest";
 
-import { getDefaultLoginFlow, SETUP_PRESETS } from "./defaults.js";
-import { FLOW_FILE_SCHEMA_REF, META_SCHEMA_DIR, metaSchemaFiles } from "./meta-schemas.js";
+import {
+  BRANDING_DESIGNS,
+  getDefaultBrandingConfig,
+  getDefaultLoginFlow,
+  SETUP_PRESETS,
+} from "./defaults.js";
+import {
+  BRANDING_FILE_SCHEMA_REF,
+  FLOW_FILE_SCHEMA_REF,
+  META_SCHEMA_DIR,
+  metaSchemaFiles,
+} from "./meta-schemas.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const upstreamDir = join(packageRoot, "../..", "api/openapi/endpoints/schemas");
@@ -32,6 +42,7 @@ describe("meta-schemas", () => {
       "user-property.json",
       "auth-methods.json",
       "auth-method.json",
+      "branding.json",
     ]);
   });
 
@@ -100,6 +111,35 @@ describe("meta-schemas", () => {
     // The enum still constrains real values.
     (transition as { action: unknown }).action = "warp";
     expect(check(flow)).toBe(false);
+  });
+
+  it("validates every scaffolded branding design descriptor", () => {
+    // validateFormats off: the branding dialect uses `format: uri`, which
+    // plain Ajv (no ajv-formats) would reject at compile time.
+    const ajv = new Ajv2020({ strict: false, validateFormats: false });
+    const brandingSchema = metaSchemaFiles().find((f) => f.name === "branding.json");
+    const check = ajv.compile(brandingSchema?.body as object);
+    for (const design of BRANDING_DESIGNS) {
+      const { branding } = getDefaultBrandingConfig(design);
+      const file = { $schema: BRANDING_FILE_SCHEMA_REF, ...branding };
+      expect(check(file), `${design}: ${JSON.stringify(check.errors)}`).toBe(true);
+    }
+    // The two template carriers are mutually exclusive.
+    expect(check({ liquid_template: "x", liquid_template_file: "./login.liquid" })).toBe(false);
+    // Unknown keys are dialect errors, like the flow dialect.
+    expect(check({ not_a_branding_key: true })).toBe(false);
+    // Asset URLs must be https at the dialect level too — editors flag what
+    // the server's save gate would reject. Scheme matching is
+    // case-insensitive, like the zod and Go validators.
+    expect(check({ logo_url: "http://cdn.example.com/logo.svg" })).toBe(false);
+    expect(check({ hero_url: "https://cdn.example.com/hero.png" })).toBe(true);
+    expect(check({ hero_url: "HTTPS://cdn.example.com/hero.png" })).toBe(true);
+  });
+
+  it("the branding $schema ref resolves from .zitadel/branding/ into the meta dir", () => {
+    expect(join(".zitadel/branding", BRANDING_FILE_SCHEMA_REF)).toBe(
+      join(META_SCHEMA_DIR, "branding.json"),
+    );
   });
 
   it("rejects the pre-array actions dialect and unknown keys", () => {

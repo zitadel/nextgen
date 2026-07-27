@@ -17,7 +17,7 @@ type FlowCreateUserWithPasswordHandler struct {
 	passwordRepo domain.UserPasswordRepository
 	hasher       crypto.Hasher
 	userService  *UserService
-	schemaRepo   domain.JSONSchemaRepository
+	schemaStore  domain.JSONSchemaStore
 }
 
 func NewFlowCreateUserHandler(
@@ -25,12 +25,12 @@ func NewFlowCreateUserHandler(
 	passwordRepo domain.UserPasswordRepository,
 	hasher crypto.Hasher,
 	userService *UserService,
-	schemaRepo domain.JSONSchemaRepository,
+	schemaStore domain.JSONSchemaStore,
 ) *FlowCreateUserWithPasswordHandler {
 	return &FlowCreateUserWithPasswordHandler{
 		userService:  userService,
 		userRepo:     userRepo,
-		schemaRepo:   schemaRepo,
+		schemaStore:  schemaStore,
 		hasher:       hasher,
 		passwordRepo: passwordRepo,
 	}
@@ -46,11 +46,11 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 			User:      in.State.CollectedData.UserData,
 		},
 		h.userRepo,
-		h.schemaRepo,
+		h.schemaStore,
 	)
 
 	if in.State.CollectedData.AuthMethods.Password == "" {
-		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", domain.ErrIntegrity)
+		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", domain.ErrFlowIntegrity())
 	}
 
 	setPasswordAction := NewLazyUserAction(func(ctx context.Context, db database.QueryExecutor) (UserAction, error) {

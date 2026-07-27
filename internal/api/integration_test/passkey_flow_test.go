@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/descope/virtualwebauthn"
 	"github.com/stretchr/testify/require"
@@ -30,7 +31,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	testServer := harness.EnsureTestServer(t)
 
 	// --- Seed project ---------------------------------------------------------
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	// Create the user schema so the resolver can look it up from the DB.  The
@@ -47,14 +48,18 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	require.NoError(t, err)
 	rpIDStr := rpOriginURL.Hostname() // "127.0.0.1"
 
-	const userID = "pk-flow-test-user"
+	// Suffix user and credential IDs per run so the test stays re-runnable
+	// against a persistent database (ZITADEL_TEST_POSTGRES_URL): earlier runs
+	// leave their rows behind, and fixed IDs would collide with them.
+	suffix := time.Now().Format("150405.000000")
+	userID := "pk-flow-test-user-" + suffix
 	rp := virtualwebauthn.RelyingParty{ID: rpIDStr, Name: "Test", Origin: rpOriginStr}
 	auth := virtualwebauthn.NewAuthenticatorWithOptions(virtualwebauthn.AuthenticatorOptions{
 		UserHandle: []byte(userID),
 	})
 	cred := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
 	// Use an ASCII credential ID so string(cred.ID) is valid UTF-8 for Postgres TEXT.
-	cred.ID = []byte("pk-flow-test-cred-01")
+	cred.ID = []byte("pk-flow-test-cred-" + suffix)
 	cred.Counter = 1
 	auth.AddCredential(cred)
 
@@ -66,20 +71,52 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	require.NoError(t, err)
 
 	db := harness.EnsureDBPool(t)
+	userRepo := harness.EnsureUserRepo(t)
+	passkeyRepo := harness.EnsureUserPasskeyRepo(t)
+
+	// Decoy: another project holding the SAME user id and credential id but a
+	// different key pair. Credential resolution must stay project-scoped —
+	// with an unscoped lookup the decoy row (seeded first, so surfaced first)
+	// would win the credential-id match and the assertion signature would
+	// fail against its foreign public key.
+	decoyProject, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	harness.CreateUserSchema(t, decoyProject, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	decoyTeam, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
+		ProjectID: decoyProject.ID,
+	})
+	require.NoError(t, err)
+	decoyEmailAttr, err := domain.NewCreateAttribute("email", "pk-flow-test@example.com", domain.AttributeUniquenessUnspecified)
+	require.NoError(t, err)
+	require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
+		ProjectID:               decoyProject.ID,
+		SchemaURL:               userSchemaURL,
+		ID:                      userID,
+		InitialMembershipTeamID: &decoyTeam.ID,
+		Attributes:              []*domain.CreateAttribute{decoyEmailAttr},
+	}))
+	decoyCred := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
+	require.NoError(t, passkeyRepo.Create(t.Context(), db, &domain.CreateUserPasskey{
+		ProjectID:    decoyProject.ID,
+		UserID:       userID,
+		CredentialID: base64.RawURLEncoding.EncodeToString(cred.ID),
+		PublicKey:    decoyCred.Key.AttestationData(),
+		AAGUID:       auth.Aaguid[:],
+		Transports:   []string{},
+		SignCount:    1,
+	}))
 
 	emailAttr, err := domain.NewCreateAttribute("email", "pk-flow-test@example.com", domain.AttributeUniquenessUnspecified)
 	require.NoError(t, err)
 
-	userRepo := harness.EnsureUserRepo(t)
 	require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
-		ProjectID:  project.ID,
-		SchemaURL:  userSchemaURL,
-		ID:         userID,
-		TeamID:     &team.ID,
-		Attributes: []*domain.CreateAttribute{emailAttr},
+		ProjectID:               project.ID,
+		SchemaURL:               userSchemaURL,
+		ID:                      userID,
+		InitialMembershipTeamID: &team.ID,
+		Attributes:              []*domain.CreateAttribute{emailAttr},
 	}))
 
-	passkeyRepo := harness.EnsureUserPasskeyRepo(t)
 	require.NoError(t, passkeyRepo.Create(t.Context(), db, &domain.CreateUserPasskey{
 		ProjectID:    project.ID,
 		UserID:       userID,
@@ -93,7 +130,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	// --- Create passkey login flow definition ---------------------------------
 	client, err := helpers.NewApiClient(testServer.URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID: api.ProjectID(project.ID),

@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/config",
-  "version": "0.1.0-alpha.15",
+  "version": "0.1.0-alpha.17",
   "description": "Versioned Zitadel local config schemas and defaults",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/config#readme",
   "bugs": {
@@ -17,6 +17,7 @@
     "defaults/*.json",
     "defaults/*.md",
     "defaults/presets/*/*.json",
+    "defaults/branding/*/*.liquid",
     "meta-schemas/*.json",
     "LICENSE"
   ],
@@ -52,6 +53,11 @@
       "types": "./dist/meta-schemas.d.mts",
       "import": "./dist/meta-schemas.mjs"
     },
+    "./template": {
+      "@zitadel/source": "./src/template.ts",
+      "types": "./dist/template.d.mts",
+      "import": "./dist/template.mjs"
+    },
     "./defaults/default-human-user.json": "./defaults/default-human-user.json",
     "./defaults/default-login.json": "./defaults/default-login.json",
     "./package.json": "./package.json"
@@ -66,13 +72,14 @@
     "lint": "oxlint ."
   },
   "dependencies": {
-    "@zitadel/api": "workspace:*"
+    "@zitadel/api": "workspace:*",
+    "liquidjs": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "ajv": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",
-    "vitest": "catalog:",
-    "ajv": "catalog:"
+    "vitest": "catalog:"
   }
 }
