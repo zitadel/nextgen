@@ -16,29 +16,21 @@ import (
 )
 
 // userReaderStub implements service.UserIdentityReader and records the
-// condition/option inputs so tests can assert which user was hydrated.
+// identity lookup inputs so tests can assert which user was hydrated.
 type userReaderStub struct {
-	getFunc          func(context.Context, database.QueryExecutor, ...database.QueryOption) (*domain.User, error)
+	getFunc          func(context.Context, string, string, ...string) (*domain.User, error)
 	gotProjectID     string
 	gotUserID        string
 	gotAttributeKeys []string
 }
 
-func (s *userReaderStub) Get(ctx context.Context, q database.QueryExecutor, opts ...database.QueryOption) (*domain.User, error) {
+func (s *userReaderStub) GetIdentity(ctx context.Context, projectID, userID string, attributeKeys ...string) (*domain.User, error) {
+	s.gotProjectID, s.gotUserID = projectID, userID
+	s.gotAttributeKeys = attributeKeys
 	if s.getFunc == nil {
-		panic("unexpected users.Get call")
+		panic("unexpected users.GetIdentity call")
 	}
-	return s.getFunc(ctx, q, opts...)
-}
-
-func (s *userReaderStub) PrimaryKeyCondition(projectID, id string) database.Condition {
-	s.gotProjectID, s.gotUserID = projectID, id
-	return nil
-}
-
-func (s *userReaderStub) WithAttributes(keys ...string) database.QueryOption {
-	s.gotAttributeKeys = keys
-	return func(*database.QueryOpts) {}
+	return s.getFunc(ctx, projectID, userID, attributeKeys...)
 }
 
 func sessionConfigForTest() service.SessionConfig {
@@ -340,10 +332,7 @@ func TestSessionService_Get_UserIdentity(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			users := &userReaderStub{}
 			if tt.sessionUserID != nil {
-				users.getFunc = func(_ context.Context, q database.QueryExecutor, _ ...database.QueryOption) (*domain.User, error) {
-					if q != stubPool() {
-						t.Fatalf("users.Get q = %v, want service pool", q)
-					}
+				users.getFunc = func(_ context.Context, projectID, uid string, keys ...string) (*domain.User, error) {
 					return tt.userResult, tt.userErr
 				}
 			}
@@ -374,7 +363,7 @@ func TestSessionService_Get_UserIdentity(t *testing.T) {
 				t.Fatalf("users queried with (%q, %q), want (%q, %q)", users.gotProjectID, users.gotUserID, "proj", userID)
 			}
 			if !slices.Equal(users.gotAttributeKeys, domain.IdentityAttributeKeys) {
-				t.Fatalf("users.WithAttributes keys = %v, want %v", users.gotAttributeKeys, domain.IdentityAttributeKeys)
+				t.Fatalf("users.GetIdentity keys = %v, want %v", users.gotAttributeKeys, domain.IdentityAttributeKeys)
 			}
 		})
 	}

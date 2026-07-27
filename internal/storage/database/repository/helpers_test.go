@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
 // skipIfSpanner skips the test when the suite runs against Spanner. Use for repositories
@@ -122,8 +121,10 @@ func deleteUser(t *testing.T, client database.QueryExecutor, projectID, userID s
 		require.NoError(t, err)
 		return
 	}
-	userRepo := repository.NewUserRepository()
-	require.NoError(t, userRepo.Delete(ctx, client, userRepo.PrimaryKeyCondition(projectID, userID)))
+	_, err := client.Exec(ctx, `DELETE FROM zitadel_nextgen.team_memberships WHERE project_id = $1 AND user_id = $2`, projectID, userID)
+	require.NoError(t, err)
+	_, err = client.Exec(ctx, `DELETE FROM zitadel_nextgen.users WHERE project_id = $1 AND id = $2`, projectID, userID)
+	require.NoError(t, err)
 }
 
 func getTeamMembershipStatus(t *testing.T, client database.QueryExecutor, projectID, teamID, userID string) domain.MembershipStatus {

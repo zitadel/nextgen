@@ -14,16 +14,15 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
-// newAuthAttemptServiceForIntegration wires the service with real repos.
+// newAuthAttemptServiceForIntegration wires the service with real statement pools.
 // The password verifier is nil because these tests exercise only the
 // user-proof path, which never touches it.
-func newAuthAttemptServiceForIntegration(t *testing.T, pool database.Pool) service.AuthAttemptService {
-	t.Helper()
+func newAuthAttemptServiceForIntegration(pool database.Pool, v2Pool service.StatementPool) service.AuthAttemptService {
 	return service.NewAuthAttemptService(
 		pool,
-		repository.NewAuthAttemptRepository(pool),
-		service.SessionStatementsResolver{Pool: integrationV2PoolOrFail(t)},
-		repository.NewUserRepository(),
+		v2Pool,
+		service.SessionStatementsResolver{Pool: v2Pool},
+		service.UserStatementsLookup{Pool: v2Pool},
 		repository.NewUserPasswordRepository(),
 		repository.NewUserPasskeyRepository(),
 		nil,
@@ -50,7 +49,7 @@ func issueUserChallenge(t *testing.T, svc service.AuthAttemptService, projectID 
 
 func TestAuthAttemptService_VerifyProof_integration(t *testing.T) {
 	pool := integrationPoolOrFail(t)
-	svc := newAuthAttemptServiceForIntegration(t, pool)
+	svc := newAuthAttemptServiceForIntegration(pool, integrationV2PoolOrFail(t))
 
 	t.Run("user_not_found_records_failure_on_bound_challenge", func(t *testing.T) {
 		projectID := "p-aa-not-found-" + time.Now().Format("150405.000000")

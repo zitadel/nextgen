@@ -175,10 +175,7 @@ type ProjectLoader interface {
 }
 
 type UserLookup interface {
-	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.User, error)
-	ProjectIDCondition(projectID string) database.Condition
-	IDCondition(id string) database.Condition
-	AttributesCondition(attributes []domain.Attribute) database.Condition
+	GetByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute) (*domain.User, error)
 }
 
 type UserPasswords interface {
@@ -208,7 +205,7 @@ type userPasskeyConditions interface {
 
 type authAttemptService struct {
 	pool             database.Pool
-	attempts         domain.AuthAttemptRepository
+	stmts            StatementPool
 	sessions         SessionResolver
 	users            UserLookup
 	userPasswords    UserPasswords
@@ -218,7 +215,7 @@ type authAttemptService struct {
 
 func NewAuthAttemptService(
 	pool database.Pool,
-	attempts domain.AuthAttemptRepository,
+	stmts StatementPool,
 	sessions SessionResolver,
 	users UserLookup,
 	userPasswords UserPasswords,
@@ -227,7 +224,7 @@ func NewAuthAttemptService(
 ) AuthAttemptService {
 	return &authAttemptService{
 		pool:             pool,
-		attempts:         attempts,
+		stmts:            stmts,
 		sessions:         sessions,
 		users:            users,
 		userPasswords:    userPasswords,
@@ -267,7 +264,7 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 		return nil, err
 	}
 
-	if err = s.attempts.Create(ctx, s.pool, attempt); err != nil {
+	if err = s.stmts.Statements().CreateAuthAttempt(ctx, attempt); err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("Failed to create the auth attempt.")
 	}
 	return attempt, nil
@@ -275,7 +272,7 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 
 // GetByID retrieves an auth attempt by its ID and all its factors and challenges.
 func (s *authAttemptService) GetByID(ctx context.Context, projectID, attemptID string) (*domain.AuthAttempt, error) {
-	attempt, err := s.attempts.GetByID(ctx, s.pool, projectID, attemptID)
+	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, projectID, attemptID)
 	if err != nil {
 		if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
 			return nil, err
@@ -288,7 +285,7 @@ func (s *authAttemptService) GetByID(ctx context.Context, projectID, attemptID s
 // IssueChallenge issues a challenge for the given check type on an existing attempt.
 // For passkey, the user check must already be verified so the user ID is known.
 func (s *authAttemptService) IssueChallenge(ctx context.Context, input IssueChallengeInput) (*domain.AuthAttempt, error) {
-	attempt, err := s.attempts.GetByID(ctx, s.pool, input.ProjectID, input.AttemptID)
+	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.AttemptID)
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +295,7 @@ func (s *authAttemptService) IssueChallenge(ctx context.Context, input IssueChal
 		return nil, err
 	}
 
-	if err := s.attempts.SetChallenge(ctx, s.pool, input.ProjectID, input.AttemptID, challenge); err != nil {
+	if err := s.stmts.Statements().SetAuthAttemptChallenge(ctx, input.ProjectID, input.AttemptID, challenge); err != nil {
 		return nil, err
 	}
 
@@ -310,7 +307,7 @@ func (s *authAttemptService) IssueChallenge(ctx context.Context, input IssueChal
 // required checks are now satisfied.
 // On failure, it records the failed attempt for rate-limiting purposes.
 func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofInput) (res *domain.AuthAttempt, err error) {
-	attempt, err := s.attempts.GetByID(ctx, s.pool, input.ProjectID, input.AttemptID)
+	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.AttemptID)
 	if err != nil {
 		return nil, err
 	}
@@ -320,12 +317,12 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 		// Record the failure for rate-limiting — best effort, don't shadow
 		// the original error. Skip when verify couldn't identify a challenge row.
 		if challenge != nil {
-			_ = s.attempts.ChallengeFailed(ctx, s.pool, input.ProjectID, input.AttemptID, challenge)
+			_ = s.stmts.Statements().AuthAttemptChallengeFailed(ctx, input.ProjectID, input.AttemptID, challenge)
 		}
 		return nil, err
 	}
 
-	if err = s.attempts.ChallengeSucceeded(ctx, s.pool, input.ProjectID, input.AttemptID, factor, challenge.GetID()); err != nil {
+	if err = s.stmts.Statements().AuthAttemptChallengeSucceeded(ctx, input.ProjectID, input.AttemptID, factor, challenge.GetID()); err != nil {
 		return nil, err
 	}
 	attempt.SetCheck(factor) // Update the attempt with the successful factor for accurate state in the response
@@ -336,7 +333,7 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 // Handoff mints a single-use handoff token for a completed attempt.
 // The client exchanges the token at POST /sessions/exchange.
 func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*domain.AuthAttempt, error) {
-	attempt, err := s.attempts.GetByID(ctx, s.pool, input.ProjectID, input.AttemptID)
+	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.AttemptID)
 	if err != nil {
 		return nil, err
 	}
@@ -345,7 +342,7 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 		return nil, err
 	}
 
-	if err := s.attempts.Handoff(ctx, s.pool, attempt); err != nil {
+	if err := s.stmts.Statements().HandoffAuthAttempt(ctx, attempt); err != nil {
 		return nil, err
 	}
 	return attempt, nil
@@ -357,11 +354,11 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 // can promote the user_id to the session.
 func (s *authAttemptService) RegisterCreatedUser(ctx context.Context, projectID, attemptID, userID string) error {
 	challenge := &domain.AuthChallengeUser{}
-	if err := s.attempts.SetChallenge(ctx, s.pool, projectID, attemptID, challenge); err != nil {
+	if err := s.stmts.Statements().SetAuthAttemptChallenge(ctx, projectID, attemptID, challenge); err != nil {
 		return err
 	}
 	factor := &domain.AuthFactorUser{UserID: userID}
-	return s.attempts.ChallengeSucceeded(ctx, s.pool, projectID, attemptID, factor, challenge.GetID())
+	return s.stmts.Statements().AuthAttemptChallengeSucceeded(ctx, projectID, attemptID, factor, challenge.GetID())
 }
 
 // buildChallenge constructs the challenge for the given check type.
@@ -411,17 +408,10 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return nil, nil, err
 		}
-		user, err := s.users.Get(
-			ctx,
-			s.pool,
-			database.WithCondition(database.And(
-				s.users.ProjectIDCondition(attempt.ProjectID),
-				s.users.AttributesCondition([]domain.Attribute{{
-					Key:   p.AttributeName,
-					Value: p.LoginName,
-				}}),
-			)),
-		)
+		user, err := s.users.GetByAttributes(ctx, attempt.ProjectID, []domain.Attribute{{
+			Key:   p.AttributeName,
+			Value: p.LoginName,
+		}})
 		if err != nil {
 			return userChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
