@@ -186,9 +186,8 @@ type UserQueryOptions struct {
 	// AttributeKeys limits hydrated EAV keys; empty means all attributes.
 	AttributeKeys []string
 	// Attributes, when non-empty, restricts to users matching all key/value pairs.
+	// Incompatible with pagination and MembershipTeamID.
 	Attributes []domain.Attribute
-	// AttributeTeamScope scopes attribute matching to a team (or project-wide when nil).
-	AttributeTeamScope *string
 	// MembershipTeamID, when set, requires an active team membership.
 	MembershipTeamID *string
 }
@@ -203,7 +202,7 @@ type UserStatements interface {
 	Statements
 	CreateUser(ctx context.Context, user *domain.CreateUser) error
 	GetUser(ctx context.Context, filter database.Filter[domain.UserField], opts UserQueryOptions) (*domain.User, error)
-	ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], offset uint32, opts UserQueryOptions) (*database.ListResult[*domain.User], error)
+	ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts UserQueryOptions) (*database.ListResult[*domain.User], error)
 	DeactivateUser(ctx context.Context, projectID, userID string) error
 	DeleteUserByID(ctx context.Context, projectID, userID string) error
 }

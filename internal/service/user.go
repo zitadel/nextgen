@@ -109,7 +109,6 @@ func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (
 }
 
 func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ map[string]any, err error) {
-	// Dialect CreateUser is already atomic; no outer transaction wrapper.
 	action := NewCreateUserAction(input, s.schemaStore)
 	err = action.Prepare(ctx, s.pool)
 	if err != nil {
@@ -131,10 +130,14 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 // shape CreateUser returns and GET /users/{id} serves), ordered by
 // creation time so pagination windows are stable.
 func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) ([]map[string]any, error) {
+	limit := input.Limit
+	if input.Offset > 0 {
+		limit = input.Offset + input.Limit
+	}
 	result, err := s.v2Pool.Statements().ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
 		Filter: v2database.Equal(v2database.Col(domain.UserFieldProjectID), input.ProjectID),
 		Pagination: v2database.Page[domain.UserField]{
-			Limit: input.Limit,
+			Limit: limit,
 			OrderBy: v2database.OrderBy[domain.UserField]{
 				Columns: []v2database.Column[domain.UserField]{
 					v2database.Col(domain.UserFieldCreatedAt),
@@ -143,13 +146,22 @@ func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) ([]ma
 				Direction: v2database.OrderAsc,
 			},
 		},
-	}, input.Offset, UserQueryOptions{})
+	}, UserQueryOptions{})
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to list users from database")
 	}
 
-	users := make([]map[string]any, 0, len(result.Items))
-	for _, flatUser := range result.Items {
+	items := result.Items
+	if input.Offset > 0 {
+		if int(input.Offset) >= len(items) {
+			items = nil
+		} else {
+			items = items[input.Offset:]
+		}
+	}
+
+	users := make([]map[string]any, 0, len(items))
+	for _, flatUser := range items {
 		user, err := domain.BuildAttributeTree(flatUser.Attributes)
 		if err != nil {
 			return nil, domain.ErrInternal(err).WithMessage("failed to parse user attributes")

@@ -116,7 +116,7 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 
 // GetUser implements [service.UserStatements].
 func (us userStatements) GetUser(ctx context.Context, filter database.Filter[domain.UserField], opts service.UserQueryOptions) (*domain.User, error) {
-	result, err := us.ListUsers(ctx, &database.ListOptions[domain.UserField]{Filter: filter}, 0, opts)
+	result, err := us.ListUsers(ctx, &database.ListOptions[domain.UserField]{Filter: filter}, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -131,17 +131,17 @@ func (us userStatements) GetUser(ctx context.Context, filter database.Filter[dom
 }
 
 // ListUsers implements [service.UserStatements].
-func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], offset uint32, opts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
+func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
 	if filter == nil {
 		filter = &database.ListOptions[domain.UserField]{}
 	}
 	if len(opts.Attributes) > 0 {
 		return us.listUsersByAttributes(ctx, filter, opts)
 	}
-	return us.listUsersByColumns(ctx, filter, offset, opts)
+	return us.listUsersByColumns(ctx, filter, opts)
 }
 
-func (us userStatements) listUsersByColumns(ctx context.Context, filter *database.ListOptions[domain.UserField], offset uint32, opts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
+func (us userStatements) listUsersByColumns(ctx context.Context, filter *database.ListOptions[domain.UserField], opts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
 	if len(filter.Pagination.OrderBy.Columns) == 0 {
 		filter.Pagination.OrderBy = database.OrderBy[domain.UserField]{
 			Columns: []database.Column[domain.UserField]{
@@ -153,11 +153,10 @@ func (us userStatements) listUsersByColumns(ctx context.Context, filter *databas
 	}
 
 	listOpts := *filter
-	if offset > 0 && listOpts.Pagination.Limit > 0 {
-		listOpts.Pagination.Limit = offset + listOpts.Pagination.Limit
-	} else if offset > 0 {
-		// Spanner GoogleSQL has no OFFSET; fetch a bounded window then skip in process.
-		listOpts.Pagination.Limit = offset + 100
+	// Membership is applied in process; fetch without LIMIT so the page is
+	// filled after the membership gate (Postgres applies EXISTS before LIMIT).
+	if opts.MembershipTeamID != nil {
+		listOpts.Pagination.Limit = 0
 	}
 
 	var compiler statementCompiler
@@ -174,41 +173,39 @@ func (us userStatements) listUsersByColumns(ctx context.Context, filter *databas
 	if err != nil {
 		return nil, err
 	}
-	if offset > 0 {
-		if int(offset) >= len(headers) {
-			headers = nil
-		} else {
-			headers = headers[offset:]
-		}
-		if filter.Pagination.Limit > 0 && len(headers) > int(filter.Pagination.Limit) {
-			headers = headers[:filter.Pagination.Limit]
-		}
-	}
 	if opts.MembershipTeamID != nil {
 		headers, err = us.filterUsersByMembership(ctx, headers, *opts.MembershipTeamID)
 		if err != nil {
 			return nil, err
+		}
+		if filter.Pagination.Limit > 0 && len(headers) > int(filter.Pagination.Limit) {
+			headers = headers[:filter.Pagination.Limit]
 		}
 	}
 
 	if err := us.hydrateUsers(ctx, headers, opts); err != nil {
 		return nil, err
 	}
-	users := append([]*domain.User(nil), headers...)
 
 	var nextCursor []byte
-	if filter.Pagination.Limit > 0 && len(users) == int(filter.Pagination.Limit) {
+	if filter.Pagination.Limit > 0 && len(headers) == int(filter.Pagination.Limit) {
 		cursor := &pagination.Cursor[domain.UserField]{
 			Columns: filter.Pagination.OrderBy.Columns,
-			Values:  userSchema.ValuesFrom(users[len(users)-1], filter.Pagination.OrderBy.Columns),
+			Values:  userSchema.ValuesFrom(headers[len(headers)-1], filter.Pagination.OrderBy.Columns),
 		}
 		nextCursor = cursor.Marshal()
 	}
-	return &database.ListResult[*domain.User]{Items: users, NextCursor: nextCursor}, nil
+	return &database.ListResult[*domain.User]{Items: headers, NextCursor: nextCursor}, nil
 }
 
 func (us userStatements) listUsersByAttributes(ctx context.Context, filter *database.ListOptions[domain.UserField], opts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
-	projectID, ok := equalStringValue(filter.Filter, domain.UserFieldProjectID)
+	if opts.MembershipTeamID != nil {
+		return nil, fmt.Errorf("ListUsers Attributes cannot be combined with MembershipTeamID")
+	}
+	if filter.Pagination.Limit > 0 || len(filter.Pagination.Cursor) > 0 {
+		return nil, fmt.Errorf("ListUsers Attributes does not support pagination")
+	}
+	projectID, ok := database.EqualStringValue(filter.Filter, domain.UserFieldProjectID)
 	if !ok {
 		return nil, fmt.Errorf("ListUsers with Attributes requires an equal project_id filter")
 	}
@@ -219,15 +216,12 @@ func (us userStatements) listUsersByAttributes(ctx context.Context, filter *data
 		if err != nil {
 			return nil, fmt.Errorf("marshal attribute %q: %w", a.Key, err)
 		}
-		sql := `SELECT user_id FROM user_attributes
-WHERE project_id = @p1 AND key = @p2 AND TO_JSON_STRING(value) = @p3`
-		args := []any{projectID, a.Key, string(raw)}
-		if opts.AttributeTeamScope != nil {
-			sql += ` AND team_id IS NOT DISTINCT FROM @p4`
-			args = append(args, *opts.AttributeTeamScope)
-		}
 		ids := make(map[string]struct{})
-		err = us.db.Query(ctx, buildStatement(sql, args...).statement(), func(iter *spanner.RowIterator) error {
+		err = us.db.Query(ctx, buildStatement(
+			`SELECT user_id FROM user_attributes
+WHERE project_id = @p1 AND key = @p2 AND TO_JSON_STRING(value) = @p3`,
+			projectID, a.Key, string(raw),
+		).statement(), func(iter *spanner.RowIterator) error {
 			return iter.Do(func(row *spanner.Row) error {
 				var userID string
 				if err := row.Columns(&userID); err != nil {
@@ -249,6 +243,9 @@ WHERE project_id = @p1 AND key = @p2 AND TO_JSON_STRING(value) = @p3`
 				delete(matchedIDs, id)
 			}
 		}
+		if len(matchedIDs) == 0 {
+			break
+		}
 	}
 
 	if len(matchedIDs) == 0 {
@@ -263,12 +260,6 @@ WHERE project_id = @p1 AND key = @p2 AND TO_JSON_STRING(value) = @p3`
 	users, err := us.loadUserHeadersByIDs(ctx, projectID, userIDs)
 	if err != nil {
 		return nil, err
-	}
-	if opts.MembershipTeamID != nil {
-		users, err = us.filterUsersByMembership(ctx, users, *opts.MembershipTeamID)
-		if err != nil {
-			return nil, err
-		}
 	}
 	if err := us.hydrateUsers(ctx, users, opts); err != nil {
 		return nil, err
@@ -355,30 +346,6 @@ func (us userStatements) loadUserHeadersByIDs(ctx context.Context, projectID str
 		return nil, wrapError(spanner.ErrRowNotFound)
 	}
 	return users, nil
-}
-
-func equalStringValue[F ~uint8](filter database.Filter[F], field F) (string, bool) {
-	if filter == nil {
-		return "", false
-	}
-	switch f := filter.(type) {
-	case database.AndFilter[F]:
-		for _, sub := range f.Filters {
-			if v, ok := equalStringValue(sub, field); ok {
-				return v, true
-			}
-		}
-	case *database.CompareFilter[F]:
-		if f.Op != database.OpEqual || len(f.Terms) != 1 {
-			return "", false
-		}
-		if f.Terms[0].Column.Field() != field {
-			return "", false
-		}
-		s, ok := f.Terms[0].Value.(string)
-		return s, ok
-	}
-	return "", false
 }
 
 func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User, opts service.UserQueryOptions) error {

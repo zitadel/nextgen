@@ -1894,18 +1894,18 @@ func (c *MockAllStatementsListTokensCall) DoAndReturn(f func(context.Context, *d
 }
 
 // ListUsers mocks base method.
-func (m *MockAllStatements) ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], offset uint32, opts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
+func (m *MockAllStatements) ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListUsers", ctx, filter, offset, opts)
+	ret := m.ctrl.Call(m, "ListUsers", ctx, filter, opts)
 	ret0, _ := ret[0].(*database.ListResult[*domain.User])
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListUsers indicates an expected call of ListUsers.
-func (mr *MockAllStatementsMockRecorder) ListUsers(ctx, filter, offset, opts any) *MockAllStatementsListUsersCall {
+func (mr *MockAllStatementsMockRecorder) ListUsers(ctx, filter, opts any) *MockAllStatementsListUsersCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUsers", reflect.TypeOf((*MockAllStatements)(nil).ListUsers), ctx, filter, offset, opts)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUsers", reflect.TypeOf((*MockAllStatements)(nil).ListUsers), ctx, filter, opts)
 	return &MockAllStatementsListUsersCall{Call: call}
 }
 
@@ -1921,13 +1921,13 @@ func (c *MockAllStatementsListUsersCall) Return(arg0 *database.ListResult[*domai
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsListUsersCall) Do(f func(context.Context, *database.ListOptions[domain.UserField], uint32, service.UserQueryOptions) (*database.ListResult[*domain.User], error)) *MockAllStatementsListUsersCall {
+func (c *MockAllStatementsListUsersCall) Do(f func(context.Context, *database.ListOptions[domain.UserField], service.UserQueryOptions) (*database.ListResult[*domain.User], error)) *MockAllStatementsListUsersCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsListUsersCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.UserField], uint32, service.UserQueryOptions) (*database.ListResult[*domain.User], error)) *MockAllStatementsListUsersCall {
+func (c *MockAllStatementsListUsersCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.UserField], service.UserQueryOptions) (*database.ListResult[*domain.User], error)) *MockAllStatementsListUsersCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -4550,18 +4550,18 @@ func (c *MockUserStatementsIsStatementsCall) DoAndReturn(f func()) *MockUserStat
 }
 
 // ListUsers mocks base method.
-func (m *MockUserStatements) ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], offset uint32, opts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
+func (m *MockUserStatements) ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListUsers", ctx, filter, offset, opts)
+	ret := m.ctrl.Call(m, "ListUsers", ctx, filter, opts)
 	ret0, _ := ret[0].(*database.ListResult[*domain.User])
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListUsers indicates an expected call of ListUsers.
-func (mr *MockUserStatementsMockRecorder) ListUsers(ctx, filter, offset, opts any) *MockUserStatementsListUsersCall {
+func (mr *MockUserStatementsMockRecorder) ListUsers(ctx, filter, opts any) *MockUserStatementsListUsersCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUsers", reflect.TypeOf((*MockUserStatements)(nil).ListUsers), ctx, filter, offset, opts)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUsers", reflect.TypeOf((*MockUserStatements)(nil).ListUsers), ctx, filter, opts)
 	return &MockUserStatementsListUsersCall{Call: call}
 }
 
@@ -4577,13 +4577,13 @@ func (c *MockUserStatementsListUsersCall) Return(arg0 *database.ListResult[*doma
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockUserStatementsListUsersCall) Do(f func(context.Context, *database.ListOptions[domain.UserField], uint32, service.UserQueryOptions) (*database.ListResult[*domain.User], error)) *MockUserStatementsListUsersCall {
+func (c *MockUserStatementsListUsersCall) Do(f func(context.Context, *database.ListOptions[domain.UserField], service.UserQueryOptions) (*database.ListResult[*domain.User], error)) *MockUserStatementsListUsersCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserStatementsListUsersCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.UserField], uint32, service.UserQueryOptions) (*database.ListResult[*domain.User], error)) *MockUserStatementsListUsersCall {
+func (c *MockUserStatementsListUsersCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.UserField], service.UserQueryOptions) (*database.ListResult[*domain.User], error)) *MockUserStatementsListUsersCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

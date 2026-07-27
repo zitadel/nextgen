@@ -51,8 +51,7 @@ type User struct {
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
 
-	// Attributes are populated by user read statements; AttributeKeys on
-	// UserQueryOptions can limit which keys are hydrated.
+	// Attributes are populated by user read statements.
 	Attributes []Attribute
 }
 

@@ -53,7 +53,7 @@ func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
 				Direction: v2database.OrderAsc,
 			},
 		},
-	}, 0, service.UserQueryOptions{
+	}, service.UserQueryOptions{
 		AttributeKeys: []string{"email"},
 	})
 	require.NoError(t, err)
@@ -68,7 +68,7 @@ func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
 	}
 	matches, err := stmts.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
 		Filter: v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
-	}, 0, service.UserQueryOptions{
+	}, service.UserQueryOptions{
 		Attributes:    attrs,
 		AttributeKeys: []string{"email", "name"},
 	})

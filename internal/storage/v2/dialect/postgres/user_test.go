@@ -50,7 +50,7 @@ func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
 				Direction: v2database.OrderAsc,
 			},
 		},
-	}, 0, service.UserQueryOptions{
+	}, service.UserQueryOptions{
 		AttributeKeys: []string{"email"},
 	})
 	require.NoError(t, err)
@@ -65,7 +65,7 @@ func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
 	}
 	matches, err := testPool.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
 		Filter: v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
-	}, 0, service.UserQueryOptions{
+	}, service.UserQueryOptions{
 		Attributes:    attrs,
 		AttributeKeys: []string{"email", "name"},
 	})
@@ -90,29 +90,6 @@ func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
 		"email": "alpha@example.com",
 		"name":  "Alpha",
 	})
-}
-
-func TestUserStatements_ListUsersOffset(t *testing.T) {
-	ctx := t.Context()
-	projectID, schemaURL := ensureUserTestProject(t)
-
-	for _, id := range []string{"user_v2_off_1", "user_v2_off_2", "user_v2_off_3"} {
-		require.NoError(t, testPool.CreateUser(ctx, newTestUser(t, projectID, schemaURL, id, id+"@example.com", id)))
-	}
-
-	list, err := testPool.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
-		Filter: v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
-		Pagination: v2database.Page[domain.UserField]{
-			Limit: 2,
-			OrderBy: v2database.OrderBy[domain.UserField]{
-				Columns:   []v2database.Column[domain.UserField]{v2database.Col(domain.UserFieldID)},
-				Direction: v2database.OrderAsc,
-			},
-		},
-	}, 1, service.UserQueryOptions{AttributeKeys: []string{"email"}})
-	require.NoError(t, err)
-	require.Len(t, list.Items, 2)
-	assert.Equal(t, []string{"user_v2_off_2", "user_v2_off_3"}, userIDs(list.Items))
 }
 
 func newTestUser(t *testing.T, projectID, schemaURL, userID, email, name string) *domain.CreateUser {
