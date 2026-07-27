@@ -75,14 +75,18 @@ func TestProjectStatements_Update(t *testing.T) {
 
 	t.Run("updates name and refreshes updated_at", func(t *testing.T) {
 		project := newTestProject(uniqueProjectID(t))
+		project.PreviewOrigins = []string{"*.example.com", "localhost:3000"}
 		t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
 		require.NoError(t, stmts.CreateProject(t.Context(), project))
 		createdUpdatedAt := project.UpdatedAt
+		createdAt := project.CreatedAt
 
 		projectName := "project-" + rand.Text()
 		project.Name = projectName
 		require.NoError(t, stmts.UpdateProject(t.Context(), project))
-		assert.False(t, project.UpdatedAt.Before(createdUpdatedAt))
+		assert.True(t, project.UpdatedAt.After(createdUpdatedAt))
+		assert.Equal(t, createdAt.UTC(), project.CreatedAt.UTC())
+		assert.Equal(t, []string{"*.example.com", "localhost:3000"}, project.PreviewOrigins)
 
 		got, err := stmts.GetProjectByID(t.Context(), project.ID)
 		require.NoError(t, err)

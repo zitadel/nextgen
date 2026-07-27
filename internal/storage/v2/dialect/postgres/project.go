@@ -37,7 +37,7 @@ func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) er
 	return err
 }
 
-const projectQuery = "SELECT id, name, created_at, updated_at, preview_origins FROM zitadel_nextgen.projects"
+const projectQuery = "SELECT id, name, preview_origins, created_at, updated_at FROM zitadel_nextgen.projects"
 
 // GetProjectByID implements [service.ProjectStatements].
 func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*domain.Project, error) {
@@ -59,14 +59,14 @@ func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*dom
 	return project, nil
 }
 
-const updateProjectStmt = `UPDATE zitadel_nextgen.projects SET name = $2, updated_at = now() WHERE id = $1 RETURNING updated_at`
+const updateProjectStmt = `UPDATE zitadel_nextgen.projects SET name = $2, updated_at = now() WHERE id = $1 RETURNING id, name, preview_origins, created_at, updated_at`
 
 // UpdateProject implements [service.ProjectStatements].
-// Only name is updated; preview origins are left untouched.
-// updated_at is refreshed and read back onto project.
+// Only the name is updated; preview origins are left untouched. The whole row is
+// read back onto the project.
 func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.Project) error {
 	return wrapError(ps.client.QueryRow(ctx, updateProjectStmt, project.ID, project.Name).
-		Scan(&project.UpdatedAt))
+		Scan(&project.ID, &project.Name, &project.PreviewOrigins, &project.CreatedAt, &project.UpdatedAt))
 }
 
 // ListProjects implements [service.ProjectStatements].
@@ -103,7 +103,7 @@ func (ps projectStatements) ListProjects(ctx context.Context, filter *database.L
 
 func (ps projectStatements) scanProject(row pgx.CollectableRow) (*domain.Project, error) {
 	project := new(domain.Project)
-	if err := row.Scan(&project.ID, &project.Name, &project.CreatedAt, &project.UpdatedAt, &project.PreviewOrigins); err != nil {
+	if err := row.Scan(&project.ID, &project.Name, &project.PreviewOrigins, &project.CreatedAt, &project.UpdatedAt); err != nil {
 		return nil, err
 	}
 	return project, nil
