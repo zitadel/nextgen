@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
 import { en as fullLocale } from "./locales/en.js";
@@ -46,6 +46,28 @@ describe("LiquidJS engine", () => {
     const engine = createLiquidEngine({ locale });
     const result = engine.parseAndRenderSync("{{ key | t }}", { key: "unknown.key" });
     expect(result).toBe("unknown.key");
+  });
+
+  it("warns once per missing key, and never for fallback-served or empty keys", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const engine = createLiquidEngine({ locale: { ...locale, "action.back": "Back" } });
+      // Raw-key miss: warns on first render only.
+      engine.parseAndRenderSync("{{ key | t }}", { key: "unknown.key" });
+      engine.parseAndRenderSync("{{ key | t }}", { key: "unknown.key" });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        '[zitadel-login] missing text key "unknown.key" — rendering the raw key',
+      );
+      // Served by the injected-key and field-label fallbacks: no warning.
+      engine.parseAndRenderSync("{{ key | t }}", { key: "custom-step.action.back" });
+      engine.parseAndRenderSync("{{ key | t }}", { key: "register.field.givenName" });
+      // Undefined text_key stringifies to "": no warning.
+      engine.parseAndRenderSync("{{ key | t }}", { key: undefined });
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("the | t filter falls back to the generic action.back for custom step names", () => {

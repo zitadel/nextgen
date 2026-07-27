@@ -125,6 +125,21 @@ export interface ZitadelLoginConfig {
   readonly projectId?: string;
   /** Reverse-proxy path prefix the widget calls. */
   readonly proxyPath?: string;
+  /**
+   * Sizing/chrome mode. `widget` (default) is content-sized and paints no
+   * page chrome — for embedding inside an existing layout. `page` claims
+   * the viewport, paints the surface background, loads the brand font, and
+   * focuses the first field — for dedicated login routes.
+   * @default "widget"
+   */
+  readonly variant?: "widget" | "page";
+  /**
+   * Colour mode. Unset defers to the tenant's `branding.theme.mode`, then to
+   * the variant default — `dark` for `page`, `auto` (follow
+   * `prefers-color-scheme`) for `widget`. Set it when your app's surface is
+   * fixed so the widget doesn't render a dark card on a light page.
+   */
+  readonly theme?: "light" | "dark" | "auto";
   /** Flow purpose. @default "login" */
   readonly purpose?: CreateFlowBodyPurpose;
   /**

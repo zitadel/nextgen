@@ -64,7 +64,8 @@ const meta: Meta<OrchestratorArgs> = {
     clearBranding();
     applyBranding(brandingPresets[args.branding]);
   },
-  render: ({ purpose }) => html`<zitadel-login .purpose=${purpose}></zitadel-login>`,
+  render: ({ purpose }) =>
+    html`<zitadel-login variant="page" .purpose=${purpose}></zitadel-login>`,
 };
 
 export default meta;
@@ -76,6 +77,27 @@ type Story = StoryObj<OrchestratorArgs>;
  * defines (`packages/config/defaults/default-login.json`).
  */
 export const SignIn: Story = {};
+
+/**
+ * The widget default: no `variant` means content-sized and transparent —
+ * the embedding page owns layout, background, and typography. Rendered
+ * here inside a constrained light-page card, with `theme="light"` pinning
+ * the colour mode the way an app with a fixed light surface would (the
+ * unset default follows the visitor's `prefers-color-scheme`).
+ */
+export const WidgetEmbed: Story = {
+  parameters: { layout: "padded" },
+  render: () => html`
+    <div
+      style="max-width: 420px; margin: 2rem auto; padding: 1.5rem; border: 1px solid #d7d7e0; border-radius: 12px; background: #ffffff;"
+    >
+      <p style="margin: 0 0 1rem; font-family: sans-serif; color: #333;">
+        Your app's own page content around the login widget:
+      </p>
+      <zitadel-login theme="light"></zitadel-login>
+    </div>
+  `,
+};
 
 /** Sign-up step: a different field set (email, given name, family name, DOB). */
 export const SignUp: Story = { args: { purpose: "register" } };
