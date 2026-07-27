@@ -30,8 +30,14 @@ VALUES (@p1, @p2, @p3, @p4)`
 
 	userQuery = `SELECT project_id, schema_url, id, lifecycle_owner_team_id, status, created_at, updated_at FROM users`
 
-	userAttributesQuery = `SELECT key, TO_JSON_STRING(value) FROM user_attributes
-WHERE project_id = @p1 AND user_id = @p2`
+	userHeadersByIDsQuery = userQuery + `
+WHERE project_id = @p1 AND id IN UNNEST(@p2)`
+
+	userAttributesByIDsQuery = `SELECT user_id, key, TO_JSON_STRING(value) FROM user_attributes
+WHERE project_id = @p1 AND user_id IN UNNEST(@p2)`
+
+	userAttributesByIDsAndKeysQuery = userAttributesByIDsQuery + `
+AND key IN UNNEST(@p3)`
 
 	deactivateUserStmt = `UPDATE users SET status = @p1, updated_at = CURRENT_TIMESTAMP()
 WHERE project_id = @p2 AND id = @p3`
@@ -42,11 +48,6 @@ WHERE project_id = @p2 AND user_id = @p3 AND status <> @p1`
 	deleteUserMembershipsStmt = `DELETE FROM team_memberships WHERE project_id = @p1 AND user_id = @p2`
 
 	deleteUserStmt = `DELETE FROM users WHERE project_id = @p1 AND id = @p2`
-
-	authPasswordExistsStmt = `SELECT 1 FROM user_passwords WHERE project_id = @p1 AND user_id = @p2 LIMIT 1`
-	authTOTPExistsStmt     = `SELECT 1 FROM user_totp WHERE project_id = @p1 AND user_id = @p2 LIMIT 1`
-	authRCExistsStmt       = `SELECT 1 FROM user_recovery_codes WHERE project_id = @p1 AND user_id = @p2 LIMIT 1`
-	authPasskeyExistsStmt  = `SELECT 1 FROM user_passkeys WHERE project_id = @p1 AND user_id = @p2 LIMIT 1`
 )
 
 var userColumns = []string{
@@ -135,7 +136,7 @@ func (us userStatements) GetUserByID(ctx context.Context, projectID string, memb
 			return nil, wrapError(spanner.ErrRowNotFound)
 		}
 	}
-	if err := us.hydrateUser(ctx, user, opts); err != nil {
+	if err := us.hydrateUsers(ctx, []*domain.User{user}, opts); err != nil {
 		return nil, err
 	}
 	return user, nil
@@ -205,13 +206,10 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 		}
 	}
 
-	users := make([]*domain.User, 0, len(headers))
-	for _, header := range headers {
-		if err := us.hydrateUser(ctx, header, opts); err != nil {
-			return nil, err
-		}
-		users = append(users, header)
+	if err := us.hydrateUsers(ctx, headers, opts); err != nil {
+		return nil, err
 	}
+	users := append([]*domain.User(nil), headers...)
 
 	var nextCursor []byte
 	if filter.Pagination.Limit > 0 && len(users) == int(filter.Pagination.Limit) {
@@ -268,13 +266,21 @@ WHERE project_id = @p1 AND key = @p2 AND TO_JSON_STRING(value) = @p3`
 		}
 	}
 
-	users := make([]*domain.User, 0, len(matchedIDs))
+	if len(matchedIDs) == 0 {
+		return &database.ListResult[*domain.User]{Items: nil}, nil
+	}
+
+	userIDs := make([]string, 0, len(matchedIDs))
 	for userID := range matchedIDs {
-		user, err := us.GetUserByID(ctx, projectID, nil, userID, opts)
-		if err != nil {
-			return nil, err
-		}
-		users = append(users, user)
+		userIDs = append(userIDs, userID)
+	}
+
+	users, err := us.loadUserHeadersByIDs(ctx, projectID, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	if err := us.hydrateUsers(ctx, users, opts); err != nil {
+		return nil, err
 	}
 	return &database.ListResult[*domain.User]{Items: users}, nil
 }
@@ -328,93 +334,71 @@ WHERE project_id = @p1 AND team_id = @p2 AND user_id = @p3 AND status = @p4 LIMI
 	return found, err
 }
 
-func (us userStatements) hydrateUser(ctx context.Context, user *domain.User, opts service.UserReadOptions) error {
-	keyFilter := make(map[string]struct{}, len(opts.AttributeKeys))
-	for _, k := range opts.AttributeKeys {
-		keyFilter[k] = struct{}{}
+func (us userStatements) loadUserHeadersByIDs(ctx context.Context, projectID string, userIDs []string) ([]*domain.User, error) {
+	if len(userIDs) == 0 {
+		return nil, nil
 	}
 
-	err := us.db.Query(ctx, buildStatement(userAttributesQuery, user.ProjectID, user.ID).statement(), func(iter *spanner.RowIterator) error {
-		return iter.Do(func(row *spanner.Row) error {
-			var key, valueJSON string
-			if err := row.Columns(&key, &valueJSON); err != nil {
-				return err
-			}
-			if len(keyFilter) > 0 {
-				if _, ok := keyFilter[key]; !ok {
-					return nil
-				}
-			}
-			var val any
-			if err := json.Unmarshal([]byte(valueJSON), &val); err != nil {
-				return fmt.Errorf("decode attribute value for %q: %w", key, err)
-			}
-			user.Attributes = append(user.Attributes, domain.Attribute{Key: key, Value: val})
-			return nil
-		})
+	var users []*domain.User
+	err := us.db.Query(ctx, buildStatement(userHeadersByIDsQuery, projectID, userIDs).statement(), func(iter *spanner.RowIterator) error {
+		var qErr error
+		users, qErr = collectRows(iter, us.scanUserHeader)
+		return qErr
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
+	if len(users) != len(userIDs) {
+		return nil, wrapError(spanner.ErrRowNotFound)
+	}
+	return users, nil
+}
 
-	if !opts.WithAuthMethods {
+func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User, opts service.UserReadOptions) error {
+	if len(users) == 0 {
 		return nil
 	}
-	flags, err := us.loadAuthPresence(ctx, user.ProjectID, user.ID)
-	if err != nil {
-		return err
+
+	usersByProject := make(map[string][]*domain.User)
+	for _, user := range users {
+		user.Attributes = nil
+		usersByProject[user.ProjectID] = append(usersByProject[user.ProjectID], user)
 	}
-	user.AvailableAuthMethods = authMethodsFromFlags(flags)
-	return nil
-}
 
-type userAuthPresence struct {
-	hasPassword bool
-	hasTOTP     bool
-	hasRC       bool
-	hasPasskeys bool
-}
+	for projectID, projectUsers := range usersByProject {
+		userIDs := make([]string, 0, len(projectUsers))
+		usersByID := make(map[string]*domain.User, len(projectUsers))
+		for _, user := range projectUsers {
+			userIDs = append(userIDs, user.ID)
+			usersByID[user.ID] = user
+		}
 
-func (us userStatements) loadAuthPresence(ctx context.Context, projectID, userID string) (userAuthPresence, error) {
-	var flags userAuthPresence
-	check := func(sql string, set *bool) error {
-		return us.db.Query(ctx, buildStatement(sql, projectID, userID).statement(), func(iter *spanner.RowIterator) error {
+		stmt := buildStatement(userAttributesByIDsQuery, projectID, userIDs).statement()
+		if len(opts.AttributeKeys) > 0 {
+			stmt = buildStatement(userAttributesByIDsAndKeysQuery, projectID, userIDs, opts.AttributeKeys).statement()
+		}
+		if err := us.db.Query(ctx, stmt, func(iter *spanner.RowIterator) error {
 			return iter.Do(func(row *spanner.Row) error {
-				*set = true
+				var userID, key, valueJSON string
+				if err := row.Columns(&userID, &key, &valueJSON); err != nil {
+					return err
+				}
+				var val any
+				if err := json.Unmarshal([]byte(valueJSON), &val); err != nil {
+					return fmt.Errorf("decode attribute value for %q: %w", key, err)
+				}
+				user, ok := usersByID[userID]
+				if !ok {
+					return nil
+				}
+				user.Attributes = append(user.Attributes, domain.Attribute{Key: key, Value: val})
 				return nil
 			})
-		})
+		}); err != nil {
+			return err
+		}
 	}
-	if err := check(authPasswordExistsStmt, &flags.hasPassword); err != nil {
-		return flags, err
-	}
-	if err := check(authTOTPExistsStmt, &flags.hasTOTP); err != nil {
-		return flags, err
-	}
-	if err := check(authRCExistsStmt, &flags.hasRC); err != nil {
-		return flags, err
-	}
-	if err := check(authPasskeyExistsStmt, &flags.hasPasskeys); err != nil {
-		return flags, err
-	}
-	return flags, nil
-}
-
-func authMethodsFromFlags(f userAuthPresence) []domain.AuthMethod {
-	out := make([]domain.AuthMethod, 0, 4)
-	if f.hasPassword {
-		out = append(out, domain.AuthMethodPassword)
-	}
-	if f.hasPasskeys {
-		out = append(out, domain.AuthMethodPasskey)
-	}
-	if f.hasTOTP {
-		out = append(out, domain.AuthMethodTOTP)
-	}
-	if f.hasRC {
-		out = append(out, domain.AuthMethodRecoveryCodes)
-	}
-	return out
+	return nil
 }
 
 func (us userStatements) scanUserHeader(row *spanner.Row) (*domain.User, error) {

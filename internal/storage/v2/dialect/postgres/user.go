@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -54,54 +53,16 @@ _attributes AS (
     )
     SELECT h.project_id, COALESCE($5::text, ''), h.id, d.key, d.value
     FROM _input_data d CROSS JOIN _user_header h
-)
-SELECT 1;
-`
+)`
 
-	userInsertWithMembershipSQL = `
-WITH _input_data AS (
-    SELECT *,
-           unique_scope_txt::zitadel_nextgen.uniqueness_scope AS unique_scope
-    FROM unnest(
-        $6::text[],
-        $7::jsonb[],
-        $8::bytea[],
-        $9::text[]
-    ) AS t(key, value, value_hash, unique_scope_txt)
-),
-_user_header AS (
-    INSERT INTO zitadel_nextgen.users (project_id, schema_url, id, lifecycle_owner_team_id, status)
-    VALUES ($1, $2, $3, $4, 'active')
-    RETURNING project_id, id
-),
-_registry AS (
-    INSERT INTO zitadel_nextgen.user_unique_attributes (
-        project_id, user_id, team_id, key, value_hash
-    )
-    SELECT h.project_id, h.id,
-           CASE WHEN d.unique_scope = 'project'::zitadel_nextgen.uniqueness_scope
-                THEN ''
-                ELSE COALESCE($5::text, '')
-           END,
-           d.key, d.value_hash
-    FROM _input_data d CROSS JOIN _user_header h
-    WHERE d.unique_scope <> 'unspecified'::zitadel_nextgen.uniqueness_scope
-      AND d.value_hash IS NOT NULL
-),
-_attributes AS (
-    INSERT INTO zitadel_nextgen.user_attributes (
-        project_id, team_id, user_id, key, value
-    )
-    SELECT h.project_id, COALESCE($5::text, ''), h.id, d.key, d.value
-    FROM _input_data d CROSS JOIN _user_header h
-),
+	userInsertMembershipCTE = `,
 _membership AS (
     INSERT INTO zitadel_nextgen.team_memberships (project_id, team_id, user_id, status)
     SELECT h.project_id, $10::text, h.id, 'active'
     FROM _user_header h
-)
-SELECT 1;
-`
+)`
+
+	userQuery = `SELECT project_id, schema_url, id, lifecycle_owner_team_id, status, created_at, updated_at FROM zitadel_nextgen.users`
 
 	userListByAttributesCTE = `
 WITH unique_filters AS (
@@ -120,6 +81,17 @@ matching_ids AS (
     GROUP BY p.user_id
     HAVING COUNT(*) = (SELECT COUNT(*) FROM unique_filters)
 )
+SELECT u.project_id, u.schema_url, u.id, u.lifecycle_owner_team_id, u.status, u.created_at, u.updated_at
+FROM matching_ids m
+JOIN zitadel_nextgen.users u ON u.project_id = $3 AND u.id = m.user_id
+`
+
+	userAttributesByIDsQuery = `
+SELECT user_id, key, value
+FROM zitadel_nextgen.user_attributes
+WHERE project_id = $1
+  AND user_id = ANY ($2::text[])
+  AND (cardinality($3::text[]) = 0 OR key = ANY ($3::text[]))
 `
 
 	deactivateUserStmt = `
@@ -193,9 +165,10 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 
 	sql := userInsertSQL
 	if user.InitialMembershipTeamID != nil && *user.InitialMembershipTeamID != "" {
-		sql = userInsertWithMembershipSQL
+		sql += userInsertMembershipCTE
 		args = append(args, *user.InitialMembershipTeamID)
 	}
+	sql += "\nSELECT 1;"
 
 	_, err := us.client.Exec(ctx, sql, args...)
 	return wrapError(err)
@@ -204,39 +177,25 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 // GetUserByID implements [service.UserStatements].
 func (us userStatements) GetUserByID(ctx context.Context, projectID string, membershipTeamID *string, userID string, opts service.UserReadOptions) (*domain.User, error) {
 	args := []any{projectID, userID}
-	where := " WHERE zitadel_nextgen.users.project_id = $1 AND zitadel_nextgen.users.id = $2"
+	stmt := userQuery + " WHERE project_id = $1 AND id = $2"
 	if membershipTeamID != nil {
 		args = append(args, *membershipTeamID, domain.MembershipStatusActive.String())
-		where += fmt.Sprintf(
+		stmt += fmt.Sprintf(
 			` AND EXISTS (SELECT 1 FROM %s m WHERE m.project_id = zitadel_nextgen.users.project_id AND m.user_id = zitadel_nextgen.users.id AND m.team_id = $%d AND m.status = $%d)`,
 			teamMembershipsTable, len(args)-1, len(args),
 		)
 	}
 
-	attrKeys := opts.AttributeKeys
-	if attrKeys == nil {
-		attrKeys = []string{}
-	}
-	attrPh := "$" + strconv.Itoa(len(args)+1)
-	authPh := "$" + strconv.Itoa(len(args)+2)
-	args = append(args, attrKeys, opts.WithAuthMethods)
-
-	stmt := strings.TrimSpace(fmt.Sprintf(`
-SELECT zitadel_nextgen.users.project_id, zitadel_nextgen.users.schema_url, zitadel_nextgen.users.id, zitadel_nextgen.users.lifecycle_owner_team_id, zitadel_nextgen.users.status, zitadel_nextgen.users.created_at, zitadel_nextgen.users.updated_at,%s
-FROM zitadel_nextgen.users%s`,
-		userHydrationExpressions("zitadel_nextgen.users", attrPh, authPh),
-		where,
-	))
-
 	rows, err := us.client.Query(ctx, stmt, args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	user, err := pgx.CollectExactlyOneRow(rows, func(row pgx.CollectableRow) (*domain.User, error) {
-		return scanUserHydrationRow(row, opts.WithAuthMethods)
-	})
+	user, err := pgx.CollectExactlyOneRow(rows, scanUserHeader)
 	if err != nil {
 		return nil, wrapError(err)
+	}
+	if err := us.hydrateUsers(ctx, []*domain.User{user}, opts); err != nil {
+		return nil, err
 	}
 	return user, nil
 }
@@ -272,65 +231,12 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 		}
 	}
 
-	var filterCompiler statementCompiler
-	if filter.Filter != nil {
-		filterCompiler.WriteString(" WHERE ")
-		compileFilter(&filterCompiler, filter.Filter, userSchema)
+	var compiler statementCompiler
+	if err := compileRead(&compiler, userQuery, filter, userSchema); err != nil {
+		return nil, err
 	}
-	if len(filter.Pagination.Cursor) != 0 {
-		cursor, err := pagination.CursorFromToken[domain.UserField](filter.Pagination.Cursor)
-		if err != nil {
-			return nil, database.ErrInvalidCursor()
-		}
-		if !cursor.MatchesOrderBy(filter.Pagination.OrderBy.Columns) {
-			return nil, database.ErrCursorOrderMismatch()
-		}
-		values, err := userSchema.CoerceCursorValues(cursor.Columns, cursor.Values)
-		if err != nil {
-			return nil, database.ErrInvalidCursor().WithParent(err)
-		}
-		terms := compareTerms(cursor.Columns, values)
-		var cursorFilter database.Filter[domain.UserField]
-		if filter.Pagination.OrderBy.Direction == database.OrderAsc {
-			cursorFilter = database.CompareGreater(terms...)
-		} else {
-			cursorFilter = database.CompareLess(terms...)
-		}
-		if filter.Filter != nil {
-			filterCompiler.Reset()
-			filterCompiler.WriteString(" WHERE ")
-			compileFilter(&filterCompiler, database.And(filter.Filter, cursorFilter), userSchema)
-		} else {
-			filterCompiler.Reset()
-			filterCompiler.WriteString(" WHERE ")
-			compileFilter(&filterCompiler, cursorFilter, userSchema)
-		}
-	}
-
-	args := append([]any(nil), filterCompiler.args...)
-	attrKeys := opts.AttributeKeys
-	if attrKeys == nil {
-		attrKeys = []string{}
-	}
-	attrPh := "$" + strconv.Itoa(len(args)+1)
-	authPh := "$" + strconv.Itoa(len(args)+2)
-	args = append(args, attrKeys, opts.WithAuthMethods)
-
-	stmt := strings.TrimSpace(fmt.Sprintf(`
-SELECT zitadel_nextgen.users.project_id, zitadel_nextgen.users.schema_url, zitadel_nextgen.users.id, zitadel_nextgen.users.lifecycle_owner_team_id, zitadel_nextgen.users.status, zitadel_nextgen.users.created_at, zitadel_nextgen.users.updated_at,%s
-FROM zitadel_nextgen.users%s`,
-		userHydrationExpressions("zitadel_nextgen.users", attrPh, authPh),
-		filterCompiler.String(),
-	))
-
-	var orderCompiler statementCompiler
-	compileOrderBy(&orderCompiler, filter.Pagination.OrderBy, userSchema)
-	stmt += orderCompiler.String()
-
-	if filter.Pagination.Limit > 0 {
-		args = append(args, filter.Pagination.Limit)
-		stmt += " LIMIT $" + strconv.Itoa(len(args))
-	}
+	stmt := compiler.String()
+	args := append([]any(nil), compiler.args...)
 	if offset > 0 {
 		args = append(args, offset)
 		stmt += " OFFSET $" + strconv.Itoa(len(args))
@@ -340,11 +246,12 @@ FROM zitadel_nextgen.users%s`,
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	users, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (*domain.User, error) {
-		return scanUserHydrationRow(row, opts.WithAuthMethods)
-	})
+	users, err := pgx.CollectRows(rows, scanUserHeader)
 	if err != nil {
 		return nil, wrapError(err)
+	}
+	if err := us.hydrateUsers(ctx, users, opts); err != nil {
+		return nil, err
 	}
 
 	var nextCursor []byte
@@ -378,29 +285,16 @@ func (us userStatements) ListUsersByAttributes(ctx context.Context, projectID st
 		jsonTexts = append(jsonTexts, string(raw))
 	}
 
-	attrKeys := opts.AttributeKeys
-	if attrKeys == nil {
-		attrKeys = []string{}
-	}
-	attrPlaceholder := "$5"
-	authPlaceholder := "$6"
-	stmt := userListByAttributesCTE + fmt.Sprintf(`
-SELECT u.project_id, u.schema_url, u.id, u.lifecycle_owner_team_id, u.status, u.created_at, u.updated_at,%s
-FROM matching_ids m
-JOIN zitadel_nextgen.users u ON u.project_id = $3 AND u.id = m.user_id`,
-		userHydrationExpressions("u", attrPlaceholder, authPlaceholder),
-	)
-	args := []any{keys, jsonTexts, projectID, teamScope, attrKeys, opts.WithAuthMethods}
-
-	rows, err := us.client.Query(ctx, stmt, args...)
+	rows, err := us.client.Query(ctx, userListByAttributesCTE, keys, jsonTexts, projectID, teamScope)
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	users, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (*domain.User, error) {
-		return scanUserHydrationRow(row, opts.WithAuthMethods)
-	})
+	users, err := pgx.CollectRows(rows, scanUserHeader)
 	if err != nil {
 		return nil, wrapError(err)
+	}
+	if err := us.hydrateUsers(ctx, users, opts); err != nil {
+		return nil, err
 	}
 	return &database.ListResult[*domain.User]{Items: users}, nil
 }
@@ -437,30 +331,78 @@ func (us userStatements) DeleteUserByID(ctx context.Context, projectID, userID s
 	})
 }
 
-func userHydrationExpressions(rowQualifier, attrKeysPlaceholder, authPlaceholder string) string {
-	keyPred := "(cardinality(" + attrKeysPlaceholder + "::text[]) = 0 OR a.key = ANY (" + attrKeysPlaceholder + "::text[]))"
-	subWhere := "a.project_id = " + rowQualifier + ".project_id AND a.user_id = " + rowQualifier + ".id AND " + keyPred
-	return `
-    (
-      SELECT COALESCE(array_agg(s.k ORDER BY s.k), ARRAY[]::text[])
-      FROM (
-        SELECT a.key AS k
-        FROM zitadel_nextgen.user_attributes a
-        WHERE ` + subWhere + `
-      ) s
-    ) AS attr_keys,
-    (
-      SELECT COALESCE(array_agg(s.v ORDER BY s.k), ARRAY[]::jsonb[])
-      FROM (
-        SELECT a.key AS k, a.value AS v
-        FROM zitadel_nextgen.user_attributes a
-        WHERE ` + subWhere + `
-      ) s
-    ) AS attr_vals,
-    CASE WHEN ` + authPlaceholder + ` THEN EXISTS(SELECT 1 FROM zitadel_nextgen.user_passwords p WHERE p.project_id = ` + rowQualifier + `.project_id AND p.user_id = ` + rowQualifier + `.id) ELSE FALSE END AS has_pw,
-    CASE WHEN ` + authPlaceholder + ` THEN EXISTS(SELECT 1 FROM zitadel_nextgen.user_totp p WHERE p.project_id = ` + rowQualifier + `.project_id AND p.user_id = ` + rowQualifier + `.id) ELSE FALSE END AS has_totp,
-    CASE WHEN ` + authPlaceholder + ` THEN EXISTS(SELECT 1 FROM zitadel_nextgen.user_recovery_codes p WHERE p.project_id = ` + rowQualifier + `.project_id AND p.user_id = ` + rowQualifier + `.id) ELSE FALSE END AS has_rc,
-    CASE WHEN ` + authPlaceholder + ` THEN EXISTS(SELECT 1 FROM zitadel_nextgen.user_passkeys p WHERE p.project_id = ` + rowQualifier + `.project_id AND p.user_id = ` + rowQualifier + `.id) ELSE FALSE END AS has_pk`
+func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User, opts service.UserReadOptions) error {
+	if len(users) == 0 {
+		return nil
+	}
+
+	usersByProject := make(map[string][]*domain.User)
+	for _, user := range users {
+		user.Attributes = nil
+		usersByProject[user.ProjectID] = append(usersByProject[user.ProjectID], user)
+	}
+
+	attrKeys := opts.AttributeKeys
+	if attrKeys == nil {
+		attrKeys = []string{}
+	}
+
+	for projectID, projectUsers := range usersByProject {
+		userIDs := make([]string, 0, len(projectUsers))
+		usersByID := make(map[string]*domain.User, len(projectUsers))
+		for _, user := range projectUsers {
+			userIDs = append(userIDs, user.ID)
+			usersByID[user.ID] = user
+		}
+
+		rows, err := us.client.Query(ctx, userAttributesByIDsQuery, projectID, userIDs, attrKeys)
+		if err != nil {
+			return wrapError(err)
+		}
+		_, err = pgx.CollectRows(rows, func(row pgx.CollectableRow) (struct{}, error) {
+			var userID, key string
+			var value []byte
+			if err := row.Scan(&userID, &key, &value); err != nil {
+				return struct{}{}, err
+			}
+			user, ok := usersByID[userID]
+			if !ok {
+				return struct{}{}, nil
+			}
+			var val any
+			if err := json.Unmarshal(value, &val); err != nil {
+				return struct{}{}, fmt.Errorf("decode attribute value for %q: %w", key, err)
+			}
+			user.Attributes = append(user.Attributes, domain.Attribute{Key: key, Value: val})
+			return struct{}{}, nil
+		})
+		if err != nil {
+			return wrapError(err)
+		}
+	}
+	return nil
+}
+
+func scanUserHeader(row pgx.CollectableRow) (*domain.User, error) {
+	u := new(domain.User)
+	var (
+		lifecycleOwnerTeamID *string
+		status               string
+	)
+	if err := row.Scan(
+		&u.ProjectID,
+		&u.SchemaURL,
+		&u.ID,
+		&lifecycleOwnerTeamID,
+		&status,
+		&u.CreatedAt,
+		&u.UpdatedAt,
+	); err != nil {
+		return nil, err
+	}
+	u.Status = domain.UserStatus(status)
+	u.LifecycleOwnerTeamID = lifecycleOwnerTeamID
+	return u, nil
 }
 
 func uniquenessScopeLiteral(scope domain.AttributeUniqueness) string {
@@ -474,75 +416,6 @@ func uniquenessScopeLiteral(scope domain.AttributeUniqueness) string {
 	default:
 		return "unspecified"
 	}
-}
-
-type userAuthPresence struct {
-	hasPassword bool
-	hasTOTP     bool
-	hasRC       bool
-	hasPasskeys bool
-}
-
-func scanUserHydrationRow(row pgx.CollectableRow, withAuth bool) (*domain.User, error) {
-	u := new(domain.User)
-	var (
-		lifecycleOwnerTeamID *string
-		status               string
-		attrKeys             []string
-		attrVals             [][]byte
-		flags                userAuthPresence
-	)
-	if err := row.Scan(
-		&u.ProjectID,
-		&u.SchemaURL,
-		&u.ID,
-		&lifecycleOwnerTeamID,
-		&status,
-		&u.CreatedAt,
-		&u.UpdatedAt,
-		&attrKeys,
-		&attrVals,
-		&flags.hasPassword,
-		&flags.hasTOTP,
-		&flags.hasRC,
-		&flags.hasPasskeys,
-	); err != nil {
-		return nil, err
-	}
-	u.Status = domain.UserStatus(status)
-	u.LifecycleOwnerTeamID = lifecycleOwnerTeamID
-
-	if len(attrKeys) != len(attrVals) {
-		return nil, fmt.Errorf("attribute key/value length mismatch: %d keys, %d values", len(attrKeys), len(attrVals))
-	}
-	for i, k := range attrKeys {
-		var val any
-		if err := json.Unmarshal(attrVals[i], &val); err != nil {
-			return nil, fmt.Errorf("decode attribute value for %q: %w", k, err)
-		}
-		u.Attributes = append(u.Attributes, domain.Attribute{Key: k, Value: val})
-	}
-	if withAuth {
-		u.AvailableAuthMethods = authMethodsFromFlags(flags)
-	}
-	return u, nil
-}
-
-func authMethodsFromFlags(f userAuthPresence) []domain.AuthMethod {
-	out := make([]domain.AuthMethod, 0, 4)
-	if f.hasPassword {
-		out = append(out, domain.AuthMethodPassword)
-	}
-	if f.hasPasskeys {
-		out = append(out, domain.AuthMethodPasskey)
-	}
-	if f.hasTOTP {
-		out = append(out, domain.AuthMethodTOTP)
-	}
-	if f.hasRC {
-		out = append(out, domain.AuthMethodRecoveryCodes)
-	}
-	return out
 }
 
 func coerceUserStatus(v any) (any, error) {

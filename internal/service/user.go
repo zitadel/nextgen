@@ -106,17 +106,14 @@ func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (
 }
 
 func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ map[string]any, err error) {
-	// CreateUser does not need a transaction, so we don't wrap it in an `ApplyActions` call
-
+	// Dialect CreateUser is already atomic; no outer transaction wrapper.
 	action := NewCreateUserAction(input, s.schemaStore)
 	err = action.Prepare(ctx, s.pool)
 	if err != nil {
 		return nil, err
 	}
 
-	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		return action.Apply(ctx, tx)
-	})
+	err = action.Apply(ctx, s.v2Pool)
 	if err != nil {
 		var de domain.Error
 		if errors.As(err, &de) {

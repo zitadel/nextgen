@@ -183,8 +183,6 @@ type AuthAttemptStatements interface {
 type UserReadOptions struct {
 	// AttributeKeys limits hydrated EAV keys; empty means all attributes.
 	AttributeKeys []string
-	// WithAuthMethods loads AvailableAuthMethods from credential tables.
-	WithAuthMethods bool
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods

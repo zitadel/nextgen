@@ -8,15 +8,6 @@ import (
 	"github.com/zitadel/nextgen/internal/maputil"
 )
 
-type AuthMethod int
-
-const (
-	AuthMethodPassword AuthMethod = iota
-	AuthMethodPasskey
-	AuthMethodTOTP
-	AuthMethodRecoveryCodes
-)
-
 const (
 	PrefixUser ResourcePrefix = "user"
 )
@@ -60,9 +51,9 @@ type User struct {
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
 
-	// The following fields are only populated when corresponding query options are set.
-	Attributes           []Attribute
-	AvailableAuthMethods []AuthMethod
+	// Attributes are populated by user read statements; AttributeKeys on
+	// UserReadOptions can limit which keys are hydrated.
+	Attributes []Attribute
 }
 
 // IsSelfOwned reports whether the user owns their own lifecycle.
