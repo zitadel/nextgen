@@ -5,7 +5,25 @@ const ERROR_HEADINGS = ["Not authorized", "Something went wrong"];
 
 test.describe.configure({ mode: "parallel" });
 
-test("shows the bootstrapped project", async ({ page, zitadel }) => {
+/**
+ * Completes the console's login screen (Console ADR 0003) with a seeded
+ * user: the default-login flow's identifier step ("Work email" + "Sign in"),
+ * then the password step ("Password" + "Sign in"). The widget exchanges the
+ * handoff for the `__nextgen_session` cookie and performs a full-document
+ * navigation away from /login.
+ */
+async function signIn(page: Page, user: { email: string; password: string }): Promise<void> {
+  await page.goto("/login");
+  await page.getByLabel("Work email").fill(user.email);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("Password").fill(user.password);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
+}
+
+test("shows the bootstrapped project", async ({ page, zitadel, seed }) => {
+  await signIn(page, await seed.user());
+
   await page.goto("/projects");
 
   await expect(page.getByRole("heading", { name: "Projects", exact: true })).toBeVisible();
@@ -15,6 +33,7 @@ test("shows the bootstrapped project", async ({ page, zitadel }) => {
 
 test("shows a seeded user in the list and detail views", async ({ page, seed }) => {
   const user = await seed.user();
+  await signIn(page, user);
 
   await page.goto("/users");
   await expect(page.getByRole("heading", { name: "Users", exact: true })).toBeVisible();
@@ -32,7 +51,13 @@ test("shows a seeded user in the list and detail views", async ({ page, seed }) 
 test("keeps the project credential out of browser requests and resources", async ({
   page,
   zitadel,
+  seed,
 }) => {
+  // Sign in first (Console ADR 0003): the resource pages sit behind the auth
+  // guard, and the login exchange itself must not leak the project secret
+  // either — the listener below starts before any navigation under test.
+  await signIn(page, await seed.user());
+
   const inspectedResponses: Array<Promise<string | undefined>> = [];
   page.on("response", (response) => {
     const contentType = response.headers()["content-type"] ?? "";

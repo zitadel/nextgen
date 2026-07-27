@@ -11,7 +11,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
 // seedIdentityUser creates a schema row and a user carrying the conventional
@@ -21,11 +20,12 @@ func seedIdentityUser(t *testing.T, pool database.QueryExecutor, projectID strin
 	ensureProject(t, pool, projectID)
 
 	schemaURL := "https://example.com/schemas/human-user"
-	_, err := pool.Exec(t.Context(),
-		`INSERT INTO zitadel_nextgen.json_schemas (project_id, url, payload) VALUES ($1, $2, '{}') ON CONFLICT DO NOTHING`,
-		projectID, schemaURL,
-	)
-	require.NoError(t, err)
+	stmts := integrationV2PoolOrFail(t).Statements()
+	require.NoError(t, stmts.CreateJSONSchema(t.Context(), &domain.JSONSchema{
+		ProjectID: projectID,
+		URL:       schemaURL,
+		Schema:    []byte(`{}`),
+	}))
 
 	// camelCase name parts: the shape the shipped presets actually collect
 	// (packages/config/defaults/*.json).
@@ -41,7 +41,7 @@ func seedIdentityUser(t *testing.T, pool database.QueryExecutor, projectID strin
 	}
 
 	userID := "user_ident-" + time.Now().Format("150405.000000")
-	require.NoError(t, repository.NewUserRepository().Create(t.Context(), pool, &domain.CreateUser{
+	require.NoError(t, stmts.CreateUser(t.Context(), &domain.CreateUser{
 		ProjectID:  projectID,
 		SchemaURL:  schemaURL,
 		ID:         userID,

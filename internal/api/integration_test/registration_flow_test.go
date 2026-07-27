@@ -76,8 +76,8 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 	emailAttr, err := domain.NewCreateAttribute("email", "pkreg-flow@example.com", domain.AttributeUniquenessUnspecified)
 	require.NoError(t, err)
 
-	userRepo := harness.EnsureUserRepo(t)
-	require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
+	users := harness.EnsureUserFixture(t)
+	require.NoError(t, users.Create(t.Context(), &domain.CreateUser{
 		ProjectID:               project.ID,
 		SchemaURL:               userSchemaURL,
 		ID:                      userID,
