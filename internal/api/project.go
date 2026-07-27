@@ -53,11 +53,21 @@ func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (
 		}
 		return h.NewError(ctx, err), nil
 	}
+	return projectResponse(project), nil
+}
+
+// ------------------ Converters ---------------
+
+// projectResponse is the shared project body: getProject, patchProject, and
+// every item in queryProjects answer with it.
+func projectResponse(project *domain.Project) *api.GetProjectResponse {
 	return &api.GetProjectResponse{
-		ID:        project.ID,
-		CreatedAt: project.CreatedAt,
-		UpdatedAt: project.UpdatedAt,
-	}, nil
+		ID:             project.ID,
+		Name:           project.Name,
+		PreviewOrigins: project.PreviewOrigins,
+		CreatedAt:      project.CreatedAt,
+		UpdatedAt:      project.UpdatedAt,
+	}
 }
 
 // ------------------ Errors ---------------

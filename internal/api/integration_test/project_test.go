@@ -226,7 +226,8 @@ func TestCreateProjectSkipsDefaultLoginFlow(t *testing.T) {
 func TestGetProject(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	previewOrigins := []string{"*.example.com", "localhost:3000"}
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), previewOrigins, true)
 	require.NoError(t, err)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
@@ -248,6 +249,8 @@ func TestGetProject(t *testing.T) {
 			assert.NotEmpty(t, got.CreatedAt)
 			assert.NotEmpty(t, got.UpdatedAt)
 			assert.Equal(t, project.ID, got.ID)
+			assert.Equal(t, project.Name, got.Name)
+			assert.Equal(t, previewOrigins, got.PreviewOrigins)
 		}
 	})
 
