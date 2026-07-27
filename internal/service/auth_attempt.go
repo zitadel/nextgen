@@ -175,10 +175,7 @@ type ProjectLoader interface {
 }
 
 type UserLookup interface {
-	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.User, error)
-	ProjectIDCondition(projectID string) database.Condition
-	IDCondition(id string) database.Condition
-	AttributesCondition(attributes []domain.Attribute) database.Condition
+	GetByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute) (*domain.User, error)
 }
 
 type UserPasswords interface {
@@ -411,17 +408,10 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return nil, nil, err
 		}
-		user, err := s.users.Get(
-			ctx,
-			s.pool,
-			database.WithCondition(database.And(
-				s.users.ProjectIDCondition(attempt.ProjectID),
-				s.users.AttributesCondition([]domain.Attribute{{
-					Key:   p.AttributeName,
-					Value: p.LoginName,
-				}}),
-			)),
-		)
+		user, err := s.users.GetByAttributes(ctx, attempt.ProjectID, []domain.Attribute{{
+			Key:   p.AttributeName,
+			Value: p.LoginName,
+		}})
 		if err != nil {
 			return userChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
 		}

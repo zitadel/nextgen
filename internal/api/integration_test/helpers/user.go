@@ -1,13 +1,14 @@
 package helpers
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func (h *Harness) EnsureUserService(t *testing.T) *service.UserService {
@@ -18,8 +19,8 @@ func (h *Harness) EnsureUserService(t *testing.T) *service.UserService {
 	if h.userService.value == nil {
 		h.userService.value = service.NewUserService(
 			h.EnsureDBPool(t),
+			h.EnsureServiceDB(t),
 			h.EnsureSchemaStore(t),
-			h.EnsureUserRepo(t),
 			h.EnsureUserPasswordRepo(t),
 			h.EnsureHasher(t),
 		)
@@ -27,16 +28,34 @@ func (h *Harness) EnsureUserService(t *testing.T) *service.UserService {
 	return h.userService.value
 }
 
-func (h *Harness) EnsureUserRepo(t *testing.T) domain.UserRepository {
+// UserFixture exposes UserStatements helpers for integration tests.
+type UserFixture struct {
+	Pool *service.DB
+}
+
+func (h *Harness) EnsureUserFixture(t *testing.T) UserFixture {
 	t.Helper()
-	h.userRepo.mutex.Lock()
-	defer h.userRepo.mutex.Unlock()
+	return UserFixture{Pool: h.EnsureServiceDB(t)}
+}
 
-	if h.userRepo.value == nil {
-		h.userRepo.value = repository.NewUserRepository()
-	}
+func (f UserFixture) Create(ctx context.Context, user *domain.CreateUser) error {
+	return f.Pool.Transaction(ctx, func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+		return tx.Statements().CreateUser(ctx, user)
+	})
+}
 
-	return h.userRepo.value
+func (f UserFixture) GetByID(ctx context.Context, projectID, userID string) (*domain.User, error) {
+	return f.Pool.Statements().GetUser(ctx, v2database.And(
+		v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
+		v2database.Equal(v2database.Col(domain.UserFieldID), userID),
+	), service.UserQueryOptions{})
+}
+
+func (f UserFixture) GetByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute) (*domain.User, error) {
+	return f.Pool.Statements().GetUser(ctx,
+		v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
+		service.UserQueryOptions{Attributes: attrs},
+	)
 }
 
 func CreateSessionUsingPassword(t *testing.T,

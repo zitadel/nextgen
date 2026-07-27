@@ -11,18 +11,15 @@ import (
 // verify leg using the userID bound to the WebAuthn challenge at issue time.
 // NOTE: user creation currently runs in a separate transaction from passkey registration persistence.
 type FlowCreateUserForPasskeyHandler struct {
-	userRepo    domain.UserRepository
 	userService *UserService
 	schemaStore domain.JSONSchemaStore
 }
 
 func NewFlowCreateUserForPasskeyHandler(
-	userRepo domain.UserRepository,
 	userService *UserService,
 	schemaStore domain.JSONSchemaStore,
 ) *FlowCreateUserForPasskeyHandler {
 	return &FlowCreateUserForPasskeyHandler{
-		userRepo:    userRepo,
 		userService: userService,
 		schemaStore: schemaStore,
 	}
@@ -36,7 +33,6 @@ func (h *FlowCreateUserForPasskeyHandler) CreateProvisionalUser(ctx context.Cont
 			User:      state.CollectedData.UserData,
 			ID:        userID,
 		},
-		h.userRepo,
 		h.schemaStore,
 	)
 	err := h.userService.ApplyActions(ctx, action)

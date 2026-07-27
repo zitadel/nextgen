@@ -35,8 +35,6 @@ func TestGetMySession_Identity(t *testing.T) {
 	harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 	userSchemaURL := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 
-	db := harness.EnsureDBPool(t)
-
 	// The user-id schema (components/schemas/user-id.yaml) requires the
 	// `user_` prefix; ogen response validation enforces it.
 	const userID = "user_session-me-test"
@@ -53,7 +51,7 @@ func TestGetMySession_Identity(t *testing.T) {
 		require.NoError(t, err)
 		attrs = append(attrs, attr)
 	}
-	require.NoError(t, harness.EnsureUserRepo(t).Create(t.Context(), db, &domain.CreateUser{
+	require.NoError(t, harness.EnsureUserFixture(t).Create(t.Context(), &domain.CreateUser{
 		ProjectID:  project.ID,
 		SchemaURL:  userSchemaURL,
 		ID:         userID,

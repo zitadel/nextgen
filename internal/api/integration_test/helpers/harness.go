@@ -50,7 +50,6 @@ type Harness struct {
 	schemaStore      dependency[domain.JSONSchemaStore]
 	schemaResolver   dependency[*domain.JSONSchemaResolver]
 	schemaValidator  dependency[*domain.SchemaValidator]
-	userRepo         dependency[domain.UserRepository]
 	userPasswordRepo dependency[domain.UserPasswordRepository]
 	userPasskeyRepo  dependency[domain.UserPasskeyRepository]
 	brandingRepo     dependency[domain.BrandingRepository]

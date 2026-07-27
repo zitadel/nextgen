@@ -71,7 +71,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	require.NoError(t, err)
 
 	db := harness.EnsureDBPool(t)
-	userRepo := harness.EnsureUserRepo(t)
+	users := harness.EnsureUserFixture(t)
 	passkeyRepo := harness.EnsureUserPasskeyRepo(t)
 
 	// Decoy: another project holding the SAME user id and credential id but a
@@ -88,7 +88,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	require.NoError(t, err)
 	decoyEmailAttr, err := domain.NewCreateAttribute("email", "pk-flow-test@example.com", domain.AttributeUniquenessUnspecified)
 	require.NoError(t, err)
-	require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
+	require.NoError(t, users.Create(t.Context(), &domain.CreateUser{
 		ProjectID:               decoyProject.ID,
 		SchemaURL:               userSchemaURL,
 		ID:                      userID,
@@ -109,7 +109,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	emailAttr, err := domain.NewCreateAttribute("email", "pk-flow-test@example.com", domain.AttributeUniquenessUnspecified)
 	require.NoError(t, err)
 
-	require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
+	require.NoError(t, users.Create(t.Context(), &domain.CreateUser{
 		ProjectID:               project.ID,
 		SchemaURL:               userSchemaURL,
 		ID:                      userID,
