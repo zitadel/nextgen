@@ -14,20 +14,36 @@ import (
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
-	ctx := t.Context()
+func ensureUserTestProject(t *testing.T) (projectID, schemaURL string) {
+	t.Helper()
 
 	project := newTestProject(uniqueProjectID(t))
-	require.NoError(t, testPool.CreateProject(ctx, project))
+	require.NoError(t, testPool.CreateProject(t.Context(), project))
 	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), project.ID) })
 
-	user1 := newTestUser(t, project.ID, "user_v2_lookup_1", "alpha@example.com", "Alpha")
-	user2 := newTestUser(t, project.ID, "user_v2_lookup_2", "beta@example.com", "Beta")
+	schemaURL = "https://example.com/schemas/test-user"
+	require.NoError(t, testPool.CreateJSONSchema(t.Context(), &domain.JSONSchema{
+		ProjectID: project.ID,
+		URL:       schemaURL,
+		Schema:    []byte(`{"type":"object"}`),
+	}))
+	t.Cleanup(func() {
+		_ = testPool.DeleteJSONSchemaByID(context.Background(), project.ID, schemaURL)
+	})
+	return project.ID, schemaURL
+}
+
+func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
+	ctx := t.Context()
+	projectID, schemaURL := ensureUserTestProject(t)
+
+	user1 := newTestUser(t, projectID, schemaURL, "user_v2_lookup_1", "alpha@example.com", "Alpha")
+	user2 := newTestUser(t, projectID, schemaURL, "user_v2_lookup_2", "beta@example.com", "Beta")
 	require.NoError(t, testPool.CreateUser(ctx, user1))
 	require.NoError(t, testPool.CreateUser(ctx, user2))
 
 	list, err := testPool.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
-		Filter: v2database.Equal(v2database.Col(domain.UserFieldProjectID), project.ID),
+		Filter: v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
 		Pagination: v2database.Page[domain.UserField]{
 			OrderBy: v2database.OrderBy[domain.UserField]{
 				Columns:   []v2database.Column[domain.UserField]{v2database.Col(domain.UserFieldID)},
@@ -47,7 +63,7 @@ func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
 		{Key: "email", Value: "alpha@example.com"},
 		{Key: "name", Value: "Alpha"},
 	}
-	matches, err := testPool.ListUsersByAttributes(ctx, project.ID, nil, attrs, service.UserReadOptions{
+	matches, err := testPool.ListUsersByAttributes(ctx, projectID, nil, attrs, service.UserReadOptions{
 		AttributeKeys: []string{"email", "name"},
 	})
 	require.NoError(t, err)
@@ -58,7 +74,7 @@ func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
 		"name":  "Alpha",
 	})
 
-	got, err := testPool.GetUserByAttributes(ctx, project.ID, attrs, service.UserReadOptions{
+	got, err := testPool.GetUserByAttributes(ctx, projectID, attrs, service.UserReadOptions{
 		AttributeKeys: []string{"email", "name"},
 	})
 	require.NoError(t, err)
@@ -71,17 +87,14 @@ func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
 
 func TestUserStatements_ListUsersOffset(t *testing.T) {
 	ctx := t.Context()
-
-	project := newTestProject(uniqueProjectID(t))
-	require.NoError(t, testPool.CreateProject(ctx, project))
-	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), project.ID) })
+	projectID, schemaURL := ensureUserTestProject(t)
 
 	for _, id := range []string{"user_v2_off_1", "user_v2_off_2", "user_v2_off_3"} {
-		require.NoError(t, testPool.CreateUser(ctx, newTestUser(t, project.ID, id, id+"@example.com", id)))
+		require.NoError(t, testPool.CreateUser(ctx, newTestUser(t, projectID, schemaURL, id, id+"@example.com", id)))
 	}
 
 	list, err := testPool.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
-		Filter: v2database.Equal(v2database.Col(domain.UserFieldProjectID), project.ID),
+		Filter: v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
 		Pagination: v2database.Page[domain.UserField]{
 			Limit: 2,
 			OrderBy: v2database.OrderBy[domain.UserField]{
@@ -95,7 +108,7 @@ func TestUserStatements_ListUsersOffset(t *testing.T) {
 	assert.Equal(t, []string{"user_v2_off_2", "user_v2_off_3"}, userIDs(list.Items))
 }
 
-func newTestUser(t *testing.T, projectID, userID, email, name string) *domain.CreateUser {
+func newTestUser(t *testing.T, projectID, schemaURL, userID, email, name string) *domain.CreateUser {
 	t.Helper()
 
 	emailAttr, err := domain.NewCreateAttribute("email", email, domain.AttributeUniquenessProject)
@@ -105,7 +118,7 @@ func newTestUser(t *testing.T, projectID, userID, email, name string) *domain.Cr
 
 	return &domain.CreateUser{
 		ProjectID: projectID,
-		SchemaURL: "https://example.com/schemas/test-user",
+		SchemaURL: schemaURL,
 		ID:        userID,
 		Attributes: []*domain.CreateAttribute{
 			emailAttr,
