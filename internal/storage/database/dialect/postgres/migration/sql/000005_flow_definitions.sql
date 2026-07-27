@@ -27,6 +27,9 @@ CREATE TABLE zitadel_nextgen.flow_definitions (
     , updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 
     , PRIMARY KEY (project_id, id)
+    , CONSTRAINT fk_flow_definitions_project
+        FOREIGN KEY (project_id) REFERENCES zitadel_nextgen.projects (id)
+        ON DELETE CASCADE
 );
 
 CREATE INDEX idx_flow_definitions_project_status

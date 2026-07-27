@@ -58,26 +58,23 @@ type ProjectService interface {
 // NewProjectService returns a [ProjectService] backed by the given repository.
 func NewProjectService(
 	v2Pool *DB,
-	flowDefinitionRepo domain.FlowDefinitionRepository,
 	serverURL string,
 	schemaValidator *domain.SchemaValidator,
 	keyService KeyService,
 ) ProjectService {
 	return &projectService{
-		v2Pool:             v2Pool,
-		flowDefinitionRepo: flowDefinitionRepo,
-		serverURL:          serverURL,
-		schemaValidator:    schemaValidator,
-		keyService:         keyService,
+		v2Pool:          v2Pool,
+		serverURL:       serverURL,
+		schemaValidator: schemaValidator,
+		keyService:      keyService,
 	}
 }
 
 type projectService struct {
-	v2Pool             *DB
-	flowDefinitionRepo domain.FlowDefinitionRepository
-	serverURL          string
-	schemaValidator    *domain.SchemaValidator
-	keyService         KeyService
+	v2Pool          *DB
+	serverURL       string
+	schemaValidator *domain.SchemaValidator
+	keyService      KeyService
 }
 
 var _ ProjectService = (*projectService)(nil)
@@ -124,7 +121,7 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to parse default user schema")
 		}
-		return s.createDefaultLoginFlowDefinitions(ctx, tx.(database.QueryExecutor), project.ID, userSchema)
+		return s.createDefaultLoginFlowDefinitions(ctx, tx.Statements(), project.ID, userSchema)
 	})
 
 	if err != nil {
@@ -155,7 +152,7 @@ func (s *projectService) createDefaultUserSchemas(ctx context.Context, stmts JSO
 	return schema, nil
 }
 
-func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, client database.QueryExecutor, projectID string, userSchema *jsonschema.Schema) error {
+func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, stmts FlowDefinitionStatements, projectID string, userSchema *jsonschema.Schema) error {
 	flowDefs, err := flow_definitions.DefaultLoginFlowDefinitions(
 		s.serverURL,
 		projectID,
@@ -170,7 +167,7 @@ func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, 
 			return domain.ErrInternal(err).WithMessage("default login flow definition is invalid")
 		}
 
-		err = s.flowDefinitionRepo.CreateFlowDefinition(ctx, client, flowDef)
+		err = stmts.CreateFlowDefinition(ctx, flowDef)
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to save default login flow definition to project")
 		}
@@ -243,6 +240,12 @@ func (s *projectService) Update(ctx context.Context, id, name string) (*domain.P
 
 // ListProjectsRequest is the input for listing projects.
 type ListProjectsRequest struct {
+	// ProjectID, if set, restricts results to that single project.
+	// It is set based on the scope of the caller.
+	// If it's bound to a single project, the ProjectID should be set by the handler.
+	// Left empty, the list spans all projects: the handler need not pass a ProjectID
+	// if the caller has broader access (e.g., system-level read access).
+	ProjectID string
 	Limit     int
 	PageToken string
 	Sorting   *Sorting // optional; defaults to createdAt asc
@@ -256,7 +259,10 @@ type ListProjectsResponse struct {
 }
 
 func (s *projectService) List(ctx context.Context, req ListProjectsRequest) (*ListProjectsResponse, error) {
-	filters := make([]v2database.Filter[domain.ProjectField], 0, len(req.Filters))
+	filters := make([]v2database.Filter[domain.ProjectField], 0, len(req.Filters)+1)
+	if req.ProjectID != "" {
+		filters = append(filters, v2database.Equal(v2database.Col(domain.ProjectFieldID), req.ProjectID))
+	}
 	for _, f := range req.Filters {
 		filter, err := projectFilter(f)
 		if err != nil {

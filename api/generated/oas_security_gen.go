@@ -154,7 +154,7 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"project.write",
 	},
 	QueryProjectsOperation: []string{
-		"project.read",
+		"project.write",
 	},
 	RevokeSessionOperation: []string{
 		"session.delete",
