@@ -490,6 +490,9 @@ importers:
       '@zitadel/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens
+      '@zitadel/sdk-react':
+        specifier: workspace:*
+        version: link:../../packages/sdk-react
       '@zitadel/ui-react':
         specifier: workspace:*
         version: link:../../packages/ui-react

@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -607,4 +608,85 @@ func TestProjectService_List_ValidationErrors(t *testing.T) {
 			require.ErrorIs(t, err, tc.wantErr)
 		})
 	}
+}
+
+func TestProjectService_DefaultProject(t *testing.T) {
+	t.Parallel()
+
+	t.Run("resolves the first-created project when nothing is configured", func(t *testing.T) {
+		t.Parallel()
+
+		first := &domain.Project{
+			ID:             "proj_first",
+			CreatedAt:      time.Now().UTC(),
+			UpdatedAt:      time.Now().UTC(),
+			PreviewOrigins: []string{},
+		}
+
+		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+
+		statements.EXPECT().
+			ListProjects(gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, opts *v2database.ListOptions[domain.ProjectField]) (*v2database.ListResult[*domain.Project], error) {
+				assert.EqualValues(t, 1, opts.Pagination.Limit)
+				assert.Equal(t, []v2database.Column[domain.ProjectField]{v2database.Col(domain.ProjectFieldCreatedAt)}, opts.Pagination.OrderBy.Columns)
+				assert.Equal(t, v2database.OrderAsc, opts.Pagination.OrderBy.Direction)
+				return &v2database.ListResult[*domain.Project]{Items: []*domain.Project{first}}, nil
+			})
+
+		got, err := svc.DefaultProject(context.Background(), "")
+
+		assert.NoError(t, err)
+		assert.Equal(t, first, got)
+	})
+
+	t.Run("returns nil while no project exists yet — the server never creates one", func(t *testing.T) {
+		t.Parallel()
+
+		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+
+		statements.EXPECT().
+			ListProjects(gomock.Any(), gomock.Any()).
+			Return(&v2database.ListResult[*domain.Project]{}, nil)
+		statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).Times(0)
+
+		got, err := svc.DefaultProject(context.Background(), "")
+
+		assert.NoError(t, err)
+		assert.Nil(t, got)
+	})
+
+	t.Run("returns the configured project when it exists", func(t *testing.T) {
+		t.Parallel()
+
+		configured := &domain.Project{ID: "proj_custom", PreviewOrigins: []string{}}
+
+		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+
+		statements.EXPECT().GetProjectByID(gomock.Any(), "proj_custom").Return(configured, nil)
+		statements.EXPECT().ListProjects(gomock.Any(), gomock.Any()).Times(0)
+
+		got, err := svc.DefaultProject(context.Background(), "proj_custom")
+
+		assert.NoError(t, err)
+		assert.Equal(t, configured, got)
+	})
+
+	t.Run("a configured but missing project is a configuration error", func(t *testing.T) {
+		t.Parallel()
+
+		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+
+		statements.EXPECT().
+			GetProjectByID(gomock.Any(), "proj_gone").
+			Return(nil, database.NewNoRowFoundError(errors.New("no rows")))
+		statements.EXPECT().ListProjects(gomock.Any(), gomock.Any()).Times(0)
+
+		got, err := svc.DefaultProject(context.Background(), "proj_gone")
+
+		assert.Nil(t, got)
+		var de domain.Error
+		require.ErrorAs(t, err, &de)
+		assert.Equal(t, domain.ErrProjectNotFound().Code, de.Code)
+	})
 }

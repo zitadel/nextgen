@@ -19,6 +19,20 @@ are the agreed direction for upcoming work (issue
   — server-side proxy injects the project secret; the console holds no
   credential; reuse `configureZitadel()` / `getApi()` rather than a bespoke
   client.
+- [ADR 0003: Console authentication](docs/adrs/0003-console-authentication.md)
+  — `/login` embeds the login widget (`@zitadel/sdk-react`); the pathless
+  `_authed` layout owns the session guard (`GET /sessions/me`) and the app
+  shell; the session cookie authenticates the UI while management calls stay
+  on the server-held secret until session-derived permissions exist.
+- [ADR 0004: Deployment modes](docs/adrs/0004-console-deployment-modes.md)
+  — one build serves cloud and self-host; standalone tracks exactly one
+  project (the first-created — `zitadel setup`'s — becomes the default; the
+  server never creates it). A minimal per-request runtime document carries
+  `mode` + the sign-in project id, and portal surfaces (billing,
+  multi-project, support) render from **effective permissions** (user
+  grants ∩ deployment profile, computed server-side) via
+  `staticData.permission` — never build-time flags, never a parallel
+  console-facing feature array.
 
 If an implementation needs to diverge from an ADR, update the ADR in the same
 change rather than letting code and decision drift.
