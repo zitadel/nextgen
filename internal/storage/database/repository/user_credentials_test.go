@@ -33,8 +33,6 @@ func insertProjectTeamSchemaUser(t *testing.T, tx database.Transaction, pid, tid
 	require.NoError(t, err)
 }
 
-
-
 func TestUserPasskeyRepository_CRUD(t *testing.T) {
 	skipIfSpanner(t)
 	repo := repository.NewUserPasskeyRepository()
