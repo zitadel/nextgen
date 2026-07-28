@@ -444,16 +444,34 @@ func TestListPasskeys(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	params := api.ListUserPassKeysParams{
-		ProjectID: api.ProjectID(project.ID),
-		UserID:    api.UserID(user["id"].(string)),
-	}
+	t.Run("lists registered passkeys", func(t *testing.T) {
+		params := api.ListUserPassKeysParams{
+			ProjectID: api.ProjectID(project.ID),
+			UserID:    api.UserID(userID),
+		}
 
-	resp, err := client.ListUserPassKeys(t.Context(), params)
-	assert.NoError(t, err)
+		resp, err := client.ListUserPassKeys(t.Context(), params)
+		require.NoError(t, err)
 
-	if assert.IsType(t, &api.ListUserPasskeysResponse{}, resp, helpers.MustMarshal(t, resp)) {
-		passkeys := resp.(*api.ListUserPasskeysResponse)
-		assert.Len(t, passkeys.Passkeys, 2)
-	}
-}
+		if assert.IsType(t, &api.ListUserPasskeysResponse{}, resp, helpers.MustMarshal(t, resp)) {
+			passkeys := resp.(*api.ListUserPasskeysResponse)
+			require.Len(t, passkeys.Passkeys, 2)
+
+			names := []string{passkeys.Passkeys[0].Name, passkeys.Passkeys[1].Name}
+			assert.ElementsMatch(t, []string{"first passkey", "second passkey"}, names)
+
+			for _, pk := range passkeys.Passkeys {
+				assert.NotEmpty(t, pk.ID)
+				assert.False(t, pk.CreatedAt.IsZero())
+			}
+		}
+	})
+
+	t.Run("unknown user returns 404", func(t *testing.T) {
+		resp, err := client.ListUserPassKeys(t.Context(), api.ListUserPassKeysParams{
+			ProjectID: api.ProjectID(project.ID),
+			UserID:    api.UserID("user_does_not_exist"),
+		})
+		require.NoError(t, err)
+		assert.IsType(t, &api.ListUserPassKeysNotFound{}, resp, helpers.MustMarshal(t, resp))
+	})
