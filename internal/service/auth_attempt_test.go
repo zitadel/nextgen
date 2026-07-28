@@ -11,6 +11,8 @@ import (
 	"github.com/descope/virtualwebauthn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/internal/crypto"
+	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
@@ -111,9 +113,20 @@ func newAuthAttemptSvc(
 	users service.UserLookup,
 	userPasskeys service.UserPasskeys,
 ) service.AuthAttemptService {
+	return newAuthAttemptSvcWithVerifier(ctrl, stmts, sessions, users, userPasskeys, nil)
+}
+
+func newAuthAttemptSvcWithVerifier(
+	ctrl *gomock.Controller,
+	stmts *mocks.MockAllStatements,
+	sessions service.SessionResolver,
+	users service.UserLookup,
+	userPasskeys service.UserPasskeys,
+	verifier crypto.HashVerifier,
+) service.AuthAttemptService {
 	pool := mocks.NewMockPool(ctrl)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
-	return service.NewAuthAttemptService(nil, service.NewPool(pool), sessions, users, userPasskeys, nil)
+	return service.NewAuthAttemptService(nil, service.NewPool(pool), sessions, users, userPasskeys, verifier)
 }
 
 func TestAuthAttemptService_Create(t *testing.T) {
@@ -468,6 +481,75 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 
 		assert.Nil(t, got)
 		assert.ErrorIs(t, err, succeedErr)
+	})
+}
+
+func TestAuthAttemptService_VerifyProof_Password(t *testing.T) {
+	lookupErr := errors.New("password missing")
+
+	newPasswordChallengeAttempt := func() *domain.AuthAttempt {
+		return &domain.AuthAttempt{
+			ProjectID: "proj",
+			ID:        "att-1",
+			Checks: []domain.AuthCheck{
+				&domain.AuthFactorUser{UserID: "user-1"},
+				domain.SetAuthChallengePassword("ch-pass", time.Now(), time.Time{}, 0),
+			},
+		}
+	}
+
+	t.Run("loads password via stmts and persists success", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		verifier := cryptomock.NewMockHashVerifier(ctrl)
+		var succeededFactor domain.AuthFactor
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return newPasswordChallengeAttempt(), nil
+		})
+		stmts.EXPECT().GetUserPassword(gomock.Any(), gomock.Any()).Return(&domain.UserPassword{
+			ProjectID:   "proj",
+			UserID:      "user-1",
+			EncodedHash: "encoded",
+		}, nil)
+		verifier.EXPECT().VerifyHash("encoded", "secret").Return(nil)
+		stmts.EXPECT().AuthAttemptChallengeSucceeded(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, factor domain.AuthFactor, _ string) error {
+			succeededFactor = factor
+			return nil
+		})
+
+		svc := newAuthAttemptSvcWithVerifier(ctrl, stmts, nil, nil, nil, verifier)
+		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
+			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-pass",
+			Proof: service.PasswordProof{Password: "secret"},
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.IsType(t, &domain.AuthFactorPassword{}, succeededFactor)
+	})
+
+	t.Run("missing password returns proof rejected and records failure", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		var failedChallenge domain.AuthChallenge
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+			return newPasswordChallengeAttempt(), nil
+		})
+		stmts.EXPECT().GetUserPassword(gomock.Any(), gomock.Any()).Return(nil, lookupErr)
+		stmts.EXPECT().AuthAttemptChallengeFailed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, c domain.AuthChallenge) error {
+			failedChallenge = c
+			return nil
+		})
+
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil)
+		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
+			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-pass",
+			Proof: service.PasswordProof{Password: "secret"},
+		})
+
+		assert.Nil(t, got)
+		assert.ErrorIs(t, err, domain.ErrAuthAttemptProofRejected(lookupErr))
+		assert.IsType(t, &domain.AuthChallengePassword{}, failedChallenge)
 	})
 }
 
