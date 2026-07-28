@@ -136,10 +136,18 @@ func TestProjectStatements_List(t *testing.T) {
 	}
 
 	createdAtCol := v2database.Col(domain.ProjectFieldCreatedAt)
+	// The table is shared with the rest of the package, so every query starts at
+	// the first fixture. Older rows would otherwise break the assertions below.
+	// There is no >= filter, hence the Or.
+	sinceFirst := v2database.Or(
+		v2database.Equal(createdAtCol, projects[0].CreatedAt),
+		v2database.GreaterThan(createdAtCol, projects[0].CreatedAt),
+	)
+
 	list := func(t *testing.T, filter v2database.Filter[domain.ProjectField], dir v2database.OrderDirection) []string {
 		t.Helper()
 		res, err := stmts.ListProjects(t.Context(), &v2database.ListOptions[domain.ProjectField]{
-			Filter: filter,
+			Filter: v2database.And(sinceFirst, filter),
 			Pagination: v2database.Page[domain.ProjectField]{
 				OrderBy: v2database.OrderBy[domain.ProjectField]{
 					Columns:   []v2database.Column[domain.ProjectField]{createdAtCol},
@@ -180,13 +188,13 @@ func TestProjectStatements_List(t *testing.T) {
 			},
 		}
 
-		first, err := stmts.ListProjects(t.Context(), &v2database.ListOptions[domain.ProjectField]{Pagination: page})
+		first, err := stmts.ListProjects(t.Context(), &v2database.ListOptions[domain.ProjectField]{Filter: sinceFirst, Pagination: page})
 		require.NoError(t, err)
 		assert.Equal(t, []string{ids[0], ids[1]}, projectIDs(first.Items))
 		require.NotEmpty(t, first.NextCursor)
 
 		page.Cursor = first.NextCursor
-		second, err := stmts.ListProjects(t.Context(), &v2database.ListOptions[domain.ProjectField]{Pagination: page})
+		second, err := stmts.ListProjects(t.Context(), &v2database.ListOptions[domain.ProjectField]{Filter: sinceFirst, Pagination: page})
 		require.NoError(t, err)
 		assert.Equal(t, []string{ids[2]}, projectIDs(second.Items))
 		assert.Empty(t, second.NextCursor)

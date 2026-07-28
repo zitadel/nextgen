@@ -125,10 +125,18 @@ func TestProjectStatements_List(t *testing.T) {
 	ids := projectIDs(projects)
 
 	createdAtCol := database.Col(domain.ProjectFieldCreatedAt)
+	// The table is shared with the rest of the package, so every query starts at
+	// the first fixture. Older rows would otherwise break the assertions below.
+	// There is no >= filter, hence the Or.
+	sinceFirst := database.Or(
+		database.Equal(createdAtCol, projects[0].CreatedAt),
+		database.GreaterThan(createdAtCol, projects[0].CreatedAt),
+	)
+
 	list := func(t *testing.T, filter database.Filter[domain.ProjectField], dir database.OrderDirection) []string {
 		t.Helper()
 		res, err := testPool.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{
-			Filter: filter,
+			Filter: database.And(sinceFirst, filter),
 			Pagination: database.Page[domain.ProjectField]{
 				OrderBy: database.OrderBy[domain.ProjectField]{
 					Columns:   []database.Column[domain.ProjectField]{createdAtCol},
@@ -169,13 +177,13 @@ func TestProjectStatements_List(t *testing.T) {
 			},
 		}
 
-		first, err := testPool.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Pagination: page})
+		first, err := testPool.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: sinceFirst, Pagination: page})
 		require.NoError(t, err)
 		assert.Equal(t, []string{ids[0], ids[1]}, projectIDs(first.Items))
 		require.NotEmpty(t, first.NextCursor)
 
 		page.Cursor = first.NextCursor
-		second, err := testPool.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Pagination: page})
+		second, err := testPool.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: sinceFirst, Pagination: page})
 		require.NoError(t, err)
 		assert.Equal(t, []string{ids[2]}, projectIDs(second.Items))
 		assert.Empty(t, second.NextCursor)
