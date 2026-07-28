@@ -20,6 +20,20 @@ func TestCoerceStringValue(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestCoerceBytesValue(t *testing.T) {
+	t.Parallel()
+	got, err := database.CoerceBytesValue([]byte{0x01, 0x02})
+	require.NoError(t, err)
+	assert.Equal(t, []byte{0x01, 0x02}, got)
+
+	got, err = database.CoerceBytesValue("ab")
+	require.NoError(t, err)
+	assert.Equal(t, []byte("ab"), got)
+
+	_, err = database.CoerceBytesValue(1)
+	assert.Error(t, err)
+}
+
 func TestCoerceBoolValue(t *testing.T) {
 	t.Parallel()
 	got, err := database.CoerceBoolValue(true)
