@@ -26,6 +26,7 @@ type statements struct {
 	sessionStatements
 	authAttemptStatements
 	userStatements
+	userPasswordStatements
 	userTOTPStatements
 	userRecoveryCodesStatements
 }
@@ -50,6 +51,7 @@ func newStatements(client queryExecutor) statements {
 		sessionStatements:             newSessionStatements(client),
 		authAttemptStatements:         newAuthAttemptStatements(client),
 		userStatements:                newUserStatements(client),
+		userPasswordStatements:        newUserPasswordStatements(client),
 		userTOTPStatements:            newUserTOTPStatements(client),
 		userRecoveryCodesStatements:   newUserRecoveryCodesStatements(client),
 	}
