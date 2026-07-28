@@ -18,7 +18,6 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
 	pgold "github.com/zitadel/nextgen/internal/storage/database/dialect/postgres"
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/embedded"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 	v2postgres "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres"
 )
