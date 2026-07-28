@@ -27,7 +27,7 @@ type UserPasskeySignCountUpdate struct {
 func (*UserPasskeySignCountUpdate) userPasskeyUpdate() {}
 
 type UserPasskeyIncrementSignCountUpdate struct {
-	Delta int64
+	Delta uint32
 }
 
 func (*UserPasskeyIncrementSignCountUpdate) userPasskeyUpdate() {}
