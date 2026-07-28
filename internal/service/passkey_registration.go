@@ -11,6 +11,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 const passkeyRegistrationTTL = 5 * time.Minute
@@ -59,7 +60,12 @@ func (s *PasskeyRegistrationService) Begin(ctx context.Context, in BeginRegistra
 		return BeginRegistrationOutput{}, err
 	}
 
-	existing, err := s.listPasskeys(ctx, in.ProjectID, in.UserID)
+	listed, err := s.v2Pool.Statements().ListUserPasskeys(ctx, &v2database.ListOptions[domain.UserPasskeyField]{
+		Filter: v2database.And(
+			v2database.Equal(v2database.Col(domain.UserPasskeyFieldProjectID), in.ProjectID),
+			v2database.Equal(v2database.Col(domain.UserPasskeyFieldUserID), in.UserID),
+		),
+	})
 	if err != nil {
 		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: list passkeys: %w", err)
 	}
@@ -67,7 +73,7 @@ func (s *PasskeyRegistrationService) Begin(ctx context.Context, in BeginRegistra
 	username, displayName := passkeyRegistrationLabels(in.Username, in.DisplayName)
 	challenge, err := domain.CreatePasskeyRegistrationChallenge(
 		in.UserID, username, displayName,
-		existing,
+		listed.Items,
 		in.RPID, origins,
 	)
 	if err != nil {
@@ -123,16 +129,7 @@ type FinishRegistrationInput struct {
 // credential. The user identity is authoritative from the stored challenge record.
 // Rejection surfaces as [domain.ErrAuthAttemptProofRejected].
 func (s *PasskeyRegistrationService) Finish(ctx context.Context, in FinishRegistrationInput) error {
-	return s.FinishWith(ctx, s.v2Pool.Statements(), in)
-}
-
-// FinishWith is like [Finish] but runs registration Get/Delete and UserPasskey Create
-// through the provided statements (typically a v2 transaction). When stmts is nil,
-// the service pool is used.
-func (s *PasskeyRegistrationService) FinishWith(ctx context.Context, stmts AllStatements, in FinishRegistrationInput) error {
-	if stmts == nil {
-		stmts = s.v2Pool.Statements()
-	}
+	stmts := s.v2Pool.Statements()
 	reg, err := stmts.GetPasskeyRegistration(ctx, in.ProjectID, in.RegistrationID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -155,10 +152,6 @@ func (s *PasskeyRegistrationService) FinishWith(ctx context.Context, stmts AllSt
 	// Best-effort cleanup; don't shadow the success.
 	_ = stmts.DeletePasskeyRegistration(ctx, in.ProjectID, in.RegistrationID)
 	return nil
-}
-
-func (s *PasskeyRegistrationService) listPasskeys(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error) {
-	return UserPasskeyStatementsStore{Pool: s.v2Pool}.ListByUser(ctx, projectID, userID)
 }
 
 func parseOrigins(raw []string) ([]url.URL, error) {

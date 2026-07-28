@@ -16,14 +16,12 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 	"go.uber.org/mock/gomock"
 )
 
-// newUserPasskeysMock returns a mock that resolves a passkey ListByUser lookup to the given keys.
-func newUserPasskeysMock(ctrl *gomock.Controller, keys []*domain.UserPasskey) *mocks.MockUserPasskeys {
-	m := mocks.NewMockUserPasskeys(ctrl)
-	m.EXPECT().ListByUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(keys, nil)
-	return m
+func expectListUserPasskeys(stmts *mocks.MockAllStatements, keys []*domain.UserPasskey) {
+	stmts.EXPECT().ListUserPasskeys(gomock.Any(), gomock.Any()).Return(&v2database.ListResult[*domain.UserPasskey]{Items: keys}, nil)
 }
 
 const (
@@ -106,9 +104,8 @@ func newAuthAttemptSvc(
 	stmts *mocks.MockAllStatements,
 	sessions service.SessionResolver,
 	users service.UserLookup,
-	userPasskeys service.UserPasskeys,
 ) service.AuthAttemptService {
-	return newAuthAttemptSvcWithVerifier(ctrl, stmts, sessions, users, userPasskeys, nil)
+	return newAuthAttemptSvcWithVerifier(ctrl, stmts, sessions, users, nil)
 }
 
 func newAuthAttemptSvcWithVerifier(
@@ -116,12 +113,11 @@ func newAuthAttemptSvcWithVerifier(
 	stmts *mocks.MockAllStatements,
 	sessions service.SessionResolver,
 	users service.UserLookup,
-	userPasskeys service.UserPasskeys,
 	verifier crypto.HashVerifier,
 ) service.AuthAttemptService {
 	pool := mocks.NewMockPool(ctrl)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
-	return service.NewAuthAttemptService(nil, service.NewPool(pool), sessions, users, userPasskeys, verifier)
+	return service.NewAuthAttemptService(service.NewPool(pool), sessions, users, verifier)
 }
 
 func TestAuthAttemptService_Create(t *testing.T) {
@@ -140,7 +136,7 @@ func TestAuthAttemptService_Create(t *testing.T) {
 			return nil
 		})
 
-		svc := newAuthAttemptSvc(ctrl, stmts, sessions, nil, nil)
+		svc := newAuthAttemptSvc(ctrl, stmts, sessions, nil)
 		got, err := svc.Create(t.Context(), service.CreateAuthAttemptInput{
 			ProjectID:      "proj",
 			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
@@ -160,7 +156,7 @@ func TestAuthAttemptService_Create(t *testing.T) {
 		stmts := mocks.NewMockAllStatements(ctrl)
 		stmts.EXPECT().CreateAuthAttempt(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *domain.AuthAttempt) error { return nil })
 
-		svc := newAuthAttemptSvc(ctrl, stmts, sessions, nil, nil)
+		svc := newAuthAttemptSvc(ctrl, stmts, sessions, nil)
 		got, err := svc.Create(t.Context(), service.CreateAuthAttemptInput{
 			ProjectID:      "proj",
 			SessionID:      &sessionID,
@@ -181,7 +177,7 @@ func TestAuthAttemptService_Create(t *testing.T) {
 		sessions.EXPECT().Get(gomock.Any(), "proj", sessionID).
 			Return(nil, domain.ErrSessionNotFound())
 
-		svc := newAuthAttemptSvc(ctrl, mocks.NewMockAllStatements(ctrl), sessions, nil, nil)
+		svc := newAuthAttemptSvc(ctrl, mocks.NewMockAllStatements(ctrl), sessions, nil)
 		got, err := svc.Create(t.Context(), service.CreateAuthAttemptInput{
 			ProjectID:      "proj",
 			SessionID:      &sessionID,
@@ -197,7 +193,7 @@ func TestAuthAttemptService_Create(t *testing.T) {
 		stmts := mocks.NewMockAllStatements(ctrl)
 		stmts.EXPECT().CreateAuthAttempt(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *domain.AuthAttempt) error { return createErr })
 
-		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil)
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
 		got, err := svc.Create(t.Context(), service.CreateAuthAttemptInput{
 			ProjectID:      "proj",
 			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
@@ -214,7 +210,7 @@ func TestAuthAttemptService_Create(t *testing.T) {
 		sessions.EXPECT().Get(gomock.Any(), "proj", sessionID).
 			Return(nil, unexpectedSessionErr)
 
-		svc := newAuthAttemptSvc(ctrl, mocks.NewMockAllStatements(ctrl), sessions, nil, nil)
+		svc := newAuthAttemptSvc(ctrl, mocks.NewMockAllStatements(ctrl), sessions, nil)
 		got, err := svc.Create(t.Context(), service.CreateAuthAttemptInput{
 			ProjectID:      "proj",
 			SessionID:      &sessionID,
@@ -239,7 +235,7 @@ func TestAuthAttemptService_GetByID(t *testing.T) {
 			return attempt, nil
 		})
 
-		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil)
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
 		got, err := svc.GetByID(t.Context(), "proj", "att-1")
 
 		require.NoError(t, err)
@@ -253,7 +249,7 @@ func TestAuthAttemptService_GetByID(t *testing.T) {
 			return nil, domain.ErrAuthAttemptNotFound()
 		})
 
-		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil)
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
 		got, err := svc.GetByID(t.Context(), "proj", "att-1")
 
 		assert.Nil(t, got)
@@ -267,7 +263,7 @@ func TestAuthAttemptService_GetByID(t *testing.T) {
 			return nil, repoErr
 		})
 
-		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil)
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
 		got, err := svc.GetByID(t.Context(), "proj", "att-1")
 
 		assert.Nil(t, got)
@@ -297,7 +293,7 @@ func TestAuthAttemptService_IssueChallenge(t *testing.T) {
 			return nil
 		})
 
-		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil)
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
 		got, err := svc.IssueChallenge(t.Context(), service.IssueChallengeInput{
 			ProjectID: "proj", AttemptID: "att-1", Challenge: service.UserChallenge{},
 		})
@@ -324,7 +320,7 @@ func TestAuthAttemptService_IssueChallenge(t *testing.T) {
 			return nil
 		})
 
-		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil)
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
 		got, err := svc.IssueChallenge(t.Context(), service.IssueChallengeInput{
 			ProjectID: "proj", AttemptID: "att-1", Challenge: service.PasswordChallenge{},
 		})
@@ -342,7 +338,7 @@ func TestAuthAttemptService_IssueChallenge(t *testing.T) {
 			return attempt, nil
 		})
 
-		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil)
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
 		got, err := svc.IssueChallenge(t.Context(), service.IssueChallengeInput{
 			ProjectID: "proj", AttemptID: "att-1", Challenge: unsupportedChallenge{},
 		})
@@ -362,7 +358,7 @@ func TestAuthAttemptService_IssueChallenge(t *testing.T) {
 			return repoErr
 		})
 
-		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil)
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
 		got, err := svc.IssueChallenge(t.Context(), service.IssueChallengeInput{
 			ProjectID: "proj", AttemptID: "att-1", Challenge: service.UserChallenge{},
 		})
@@ -402,7 +398,7 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 		})
 		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any()).Return(&domain.User{ID: "user-1"}, nil)
 
-		svc := newAuthAttemptSvc(ctrl, stmts, nil, users, nil)
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, users)
 		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
 			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-1", Proof: userProof,
 		})
@@ -422,7 +418,7 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 			return newUserChallengeAttempt(), nil
 		})
 
-		svc := newAuthAttemptSvc(ctrl, stmts, nil, users, nil)
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, users)
 		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
 			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "different", Proof: userProof,
 		})
@@ -446,7 +442,7 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 		})
 		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any()).Return(nil, rejectErr)
 
-		svc := newAuthAttemptSvc(ctrl, stmts, nil, users, nil)
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, users)
 		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
 			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-1", Proof: userProof,
 		})
@@ -469,7 +465,7 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 		})
 		users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any()).Return(&domain.User{ID: "user-1"}, nil)
 
-		svc := newAuthAttemptSvc(ctrl, stmts, nil, users, nil)
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, users)
 		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
 			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-1", Proof: userProof,
 		})
@@ -512,7 +508,7 @@ func TestAuthAttemptService_VerifyProof_Password(t *testing.T) {
 			return nil
 		})
 
-		svc := newAuthAttemptSvcWithVerifier(ctrl, stmts, nil, nil, nil, verifier)
+		svc := newAuthAttemptSvcWithVerifier(ctrl, stmts, nil, nil, verifier)
 		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
 			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-pass",
 			Proof: service.PasswordProof{Password: "secret"},
@@ -536,7 +532,7 @@ func TestAuthAttemptService_VerifyProof_Password(t *testing.T) {
 			return nil
 		})
 
-		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil)
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
 		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
 			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-pass",
 			Proof: service.PasswordProof{Password: "secret"},
@@ -572,7 +568,7 @@ func TestAuthAttemptService_Handoff(t *testing.T) {
 			return nil
 		})
 
-		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil)
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
 		got, err := svc.Handoff(t.Context(), service.HandoffInput{ProjectID: "proj", AttemptID: "att-1"})
 
 		require.NoError(t, err)
@@ -592,7 +588,7 @@ func TestAuthAttemptService_Handoff(t *testing.T) {
 			}, nil
 		})
 
-		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil)
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
 		got, err := svc.Handoff(t.Context(), service.HandoffInput{ProjectID: "proj", AttemptID: "att-1"})
 
 		assert.Nil(t, got)
@@ -609,7 +605,7 @@ func TestAuthAttemptService_Handoff(t *testing.T) {
 			return repoErr
 		})
 
-		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, nil)
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
 		got, err := svc.Handoff(t.Context(), service.HandoffInput{ProjectID: "proj", AttemptID: "att-1"})
 
 		assert.Nil(t, got)
@@ -635,9 +631,9 @@ func TestAuthAttemptService_IssuePasskeyChallenge(t *testing.T) {
 		setChallenge = c
 		return nil
 	})
-	passkeys := newUserPasskeysMock(ctrl, []*domain.UserPasskey{f.passkey})
+	expectListUserPasskeys(stmts, []*domain.UserPasskey{f.passkey})
 
-	svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, passkeys)
+	svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
 	_, err := svc.IssueChallenge(t.Context(), service.IssueChallengeInput{
 		ProjectID: "proj",
 		AttemptID: "att-1",
@@ -667,17 +663,15 @@ func TestAuthAttemptService_VerifyPasskeyProof(t *testing.T) {
 			return nil
 		})
 
-		passkeys := newUserPasskeysMock(ctrl, []*domain.UserPasskey{f.passkey})
+		expectListUserPasskeys(stmts, []*domain.UserPasskey{f.passkey})
 		var persistedSignCount int64
-		passkeys.EXPECT().Update(
-			gomock.Any(),
-			"proj",
-			passkeyUserID,
-			domain.EncodePasskeyCredentialID(f.cred.ID),
+		stmts.EXPECT().UpdateUserPasskey(
 			gomock.Any(),
 			gomock.Any(),
 			gomock.Any(),
-		).DoAndReturn(func(_ context.Context, _, _, _ string, updates ...domain.UserPasskeyUpdate) error {
+			gomock.Any(),
+			gomock.Any(),
+		).DoAndReturn(func(_ context.Context, _ v2database.Filter[domain.UserPasskeyField], updates ...domain.UserPasskeyUpdate) error {
 			for _, u := range updates {
 				if sc, ok := u.(*domain.UserPasskeySignCountUpdate); ok {
 					persistedSignCount = sc.SignCount
@@ -686,7 +680,7 @@ func TestAuthAttemptService_VerifyPasskeyProof(t *testing.T) {
 			return nil
 		})
 
-		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, passkeys)
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
 		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
 			ProjectID:   "proj",
 			AttemptID:   "att-1",
@@ -715,9 +709,9 @@ func TestAuthAttemptService_VerifyPasskeyProof(t *testing.T) {
 		stmts.EXPECT().AuthAttemptChallengeFailed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string, domain.AuthChallenge) error {
 			return nil
 		})
-		passkeys := newUserPasskeysMock(ctrl, []*domain.UserPasskey{f.passkey})
+		expectListUserPasskeys(stmts, []*domain.UserPasskey{f.passkey})
 
-		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil, passkeys)
+		svc := newAuthAttemptSvc(ctrl, stmts, nil, nil)
 		_, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
 			ProjectID:   "proj",
 			AttemptID:   "att-1",

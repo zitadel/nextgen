@@ -109,7 +109,7 @@ func TestUserPasskeyStatements_Update(t *testing.T) {
 
 	require.NoError(t, stmts.UpdateUserPasskey(ctx, byKey,
 		&domain.UserPasskeyAttestationTypeUpdate{AttestationType: "direct"},
-		domain.NewUserPasskeyTransportsUpdate([]string{"usb", "nfc"}),
+		&domain.UserPasskeyTransportsUpdate{Transports: []string{"usb", "nfc"}},
 		&domain.UserPasskeySignCountUpdate{SignCount: 5},
 		&domain.UserPasskeyBackupEligibleUpdate{BackupEligible: false},
 		&domain.UserPasskeyBackupStateUpdate{BackupState: true},
@@ -131,14 +131,7 @@ func TestUserPasskeyStatements_Update(t *testing.T) {
 	assert.WithinDuration(t, now, *got.LastUsedAt, time.Second)
 
 	require.NoError(t, stmts.UpdateUserPasskey(ctx, byKey,
-		&domain.UserPasskeyIncrementSignCountUpdate{Delta: 3},
-	))
-	got, err = stmts.GetUserPasskey(ctx, byKey)
-	require.NoError(t, err)
-	assert.Equal(t, int64(8), got.SignCount)
-
-	require.NoError(t, stmts.UpdateUserPasskey(ctx, byKey,
-		domain.NewUserPasskeyTransportsUpdate(nil),
+		&domain.UserPasskeyTransportsUpdate{Transports: nil},
 	))
 	got, err = stmts.GetUserPasskey(ctx, byKey)
 	require.NoError(t, err)

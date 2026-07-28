@@ -19,22 +19,19 @@ func (h *Harness) EnsureUserPasskeyFixture(t *testing.T) UserPasskeyFixture {
 	return UserPasskeyFixture{Pool: h.EnsureServiceDB(t)}
 }
 
-func userPasskeyKeyFilter(projectID, userID, credentialID string) database.Filter[domain.UserPasskeyField] {
-	return database.And(
-		database.Equal(database.Col(domain.UserPasskeyFieldProjectID), projectID),
-		database.Equal(database.Col(domain.UserPasskeyFieldUserID), userID),
-		database.Equal(database.Col(domain.UserPasskeyFieldCredentialID), credentialID),
-	)
-}
-
 func (f UserPasskeyFixture) Create(ctx context.Context, passkey *domain.CreateUserPasskey) error {
 	return f.Pool.Statements().CreateUserPasskey(ctx, passkey)
 }
 
-func (f UserPasskeyFixture) Get(ctx context.Context, projectID, userID, credentialID string) (*domain.UserPasskey, error) {
-	return f.Pool.Statements().GetUserPasskey(ctx, userPasskeyKeyFilter(projectID, userID, credentialID))
-}
-
 func (f UserPasskeyFixture) ListByUser(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error) {
-	return service.UserPasskeyStatementsStore{Pool: f.Pool}.ListByUser(ctx, projectID, userID)
+	result, err := f.Pool.Statements().ListUserPasskeys(ctx, &database.ListOptions[domain.UserPasskeyField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.UserPasskeyFieldProjectID), projectID),
+			database.Equal(database.Col(domain.UserPasskeyFieldUserID), userID),
+		),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result.Items, nil
 }

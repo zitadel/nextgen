@@ -165,11 +165,9 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	keyService := service.NewKeyService(serviceDBPool, kek)
 
 	authAttemptSvc := service.NewAuthAttemptService(
-		pool,
 		serviceDBPool,
 		sessionResolver,
 		userLookup,
-		service.UserPasskeyStatementsStore{Pool: serviceDBPool},
 		passwordHasher,
 	)
 	sessionService := service.NewSessionService(pool, serviceDBPool, userIdentity, service.SessionConfig{

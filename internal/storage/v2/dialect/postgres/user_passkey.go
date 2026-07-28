@@ -132,14 +132,13 @@ func (ps userPasskeyStatements) UpdateUserPasskey(ctx context.Context, filter da
 		case *domain.UserPasskeyAttestationTypeUpdate:
 			writeAssign("attestation_type", u.AttestationType)
 		case *domain.UserPasskeyTransportsUpdate:
-			writeAssign("transports", u.Transports)
+			transports := u.Transports
+			if transports == nil {
+				transports = []string{}
+			}
+			writeAssign("transports", transports)
 		case *domain.UserPasskeySignCountUpdate:
 			writeAssign("sign_count", u.SignCount)
-		case *domain.UserPasskeyIncrementSignCountUpdate:
-			c.WriteString(sep)
-			sep = ", "
-			c.WriteString("sign_count = sign_count + ")
-			c.WriteArg(u.Delta)
 		case *domain.UserPasskeyBackupEligibleUpdate:
 			writeAssign("backup_eligible", u.BackupEligible)
 		case *domain.UserPasskeyBackupStateUpdate:

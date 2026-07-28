@@ -2,8 +2,6 @@ package domain
 
 import "time"
 
-// UserPasskeyUpdate is one typed mid-lifecycle change for user_passkeys rows.
-// Callers must pass pointers.
 type UserPasskeyUpdate interface {
 	userPasskeyUpdate()
 }
@@ -25,12 +23,6 @@ type UserPasskeySignCountUpdate struct {
 }
 
 func (*UserPasskeySignCountUpdate) userPasskeyUpdate() {}
-
-type UserPasskeyIncrementSignCountUpdate struct {
-	Delta uint32
-}
-
-func (*UserPasskeyIncrementSignCountUpdate) userPasskeyUpdate() {}
 
 type UserPasskeyBackupEligibleUpdate struct {
 	BackupEligible bool
@@ -55,11 +47,3 @@ type UserPasskeyLastUsedAtUpdate struct {
 }
 
 func (*UserPasskeyLastUsedAtUpdate) userPasskeyUpdate() {}
-
-// NewUserPasskeyTransportsUpdate copies transports; nil becomes an empty slice.
-func NewUserPasskeyTransportsUpdate(transports []string) *UserPasskeyTransportsUpdate {
-	if transports == nil {
-		return &UserPasskeyTransportsUpdate{Transports: []string{}}
-	}
-	return &UserPasskeyTransportsUpdate{Transports: append([]string(nil), transports...)}
-}

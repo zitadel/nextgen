@@ -7,15 +7,6 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-func optionalTimeAccessor(get func(*domain.UserPasskey) *time.Time) func(*domain.UserPasskey) any {
-	return func(p *domain.UserPasskey) any {
-		if v := get(p); v != nil {
-			return *v
-		}
-		return time.Time{}
-	}
-}
-
 // Schema binds user passkey list/filter/order fields for both dialects.
 var Schema = database.NewSchema(map[domain.UserPasskeyField]database.FieldBinding[domain.UserPasskey]{
 	domain.UserPasskeyFieldID: {
@@ -59,14 +50,24 @@ var Schema = database.NewSchema(map[domain.UserPasskeyField]database.FieldBindin
 		Coerce:   database.CoerceString,
 	},
 	domain.UserPasskeyFieldVerifiedAt: {
-		SQLName:  "verified_at",
-		Accessor: optionalTimeAccessor(func(p *domain.UserPasskey) *time.Time { return p.VerifiedAt }),
-		Coerce:   database.CoerceTime,
+		SQLName: "verified_at",
+		Accessor: func(p *domain.UserPasskey) any {
+			if p.VerifiedAt == nil {
+				return time.Time{}
+			}
+			return *p.VerifiedAt
+		},
+		Coerce: database.CoerceTime,
 	},
 	domain.UserPasskeyFieldLastUsedAt: {
-		SQLName:  "last_used_at",
-		Accessor: optionalTimeAccessor(func(p *domain.UserPasskey) *time.Time { return p.LastUsedAt }),
-		Coerce:   database.CoerceTime,
+		SQLName: "last_used_at",
+		Accessor: func(p *domain.UserPasskey) any {
+			if p.LastUsedAt == nil {
+				return time.Time{}
+			}
+			return *p.LastUsedAt
+		},
+		Coerce: database.CoerceTime,
 	},
 	domain.UserPasskeyFieldCreatedAt: {
 		SQLName: "created_at",

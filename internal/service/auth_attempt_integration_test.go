@@ -18,11 +18,9 @@ import (
 // user-proof path, which never touches it.
 func newAuthAttemptServiceForIntegration(pool database.Pool, v2Pool service.StatementPool) service.AuthAttemptService {
 	return service.NewAuthAttemptService(
-		pool,
 		v2Pool,
 		service.SessionStatementsResolver{Pool: v2Pool},
 		service.UserStatementsLookup{Pool: v2Pool},
-		service.UserPasskeyStatementsStore{Pool: v2Pool},
 		nil,
 	)
 }

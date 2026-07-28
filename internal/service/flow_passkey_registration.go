@@ -41,16 +41,12 @@ func (a *FlowPasskeyRegistrationAdapter) IssuePasskeyRegistrationChallenge(ctx c
 }
 
 // SubmitPasskeyRegistration implements [domain.FlowPasskeyRegistrationService].
-// When client is a v2 Statementer, credential writes join that transaction;
-// otherwise the service pool is used.
-func (a *FlowPasskeyRegistrationAdapter) SubmitPasskeyRegistration(ctx context.Context, client database.QueryExecutor, in domain.FlowSubmitPasskeyRegistrationInput) error {
-	finishIn := FinishRegistrationInput{
+// The flow engine still passes a v1 QueryExecutor; passkey persistence uses the
+// service's v2 statement pool (provisional user creation is a separate ApplyActions txn).
+func (a *FlowPasskeyRegistrationAdapter) SubmitPasskeyRegistration(ctx context.Context, _ database.QueryExecutor, in domain.FlowSubmitPasskeyRegistrationInput) error {
+	return a.svc.Finish(ctx, FinishRegistrationInput{
 		ProjectID:      in.ProjectID,
 		RegistrationID: in.ChallengeID,
 		Attestation:    in.Attestation,
-	}
-	if tx, ok := client.(Statementer[AllStatements]); ok {
-		return a.svc.FinishWith(ctx, tx.Statements(), finishIn)
-	}
-	return a.svc.Finish(ctx, finishIn)
+	})
 }
