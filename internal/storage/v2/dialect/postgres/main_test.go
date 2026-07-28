@@ -105,6 +105,11 @@ func newTestProject(id string) *domain.Project {
 	return &domain.Project{ID: id, Name: "project-" + rand.Text(), PreviewOrigins: []string{}}
 }
 
+// newTestTeam builds a persistable team.
+func newTestTeam(projectID, id string) *domain.Team {
+	return &domain.Team{ProjectID: projectID, ID: id, Name: "team-" + rand.Text()}
+}
+
 func projectIDs(projects []*domain.Project) []string {
 	ids := make([]string, len(projects))
 	for i, p := range projects {

@@ -168,7 +168,7 @@ func TestUserStatements_ListUsersUnifiedFilters(t *testing.T) {
 	projectID, schemaURL := ensureUserTestProject(t)
 	teamID := "team_unified_filters"
 
-	require.NoError(t, stmts.CreateTeam(ctx, &domain.Team{ProjectID: projectID, ID: teamID}))
+	require.NoError(t, stmts.CreateTeam(ctx, newTestTeam(projectID, teamID)))
 
 	orderByID := v2database.Page[domain.UserField]{
 		OrderBy: v2database.OrderBy[domain.UserField]{

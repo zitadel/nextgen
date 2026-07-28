@@ -4,6 +4,7 @@
 CREATE TABLE teams (
     project_id  STRING(MAX) NOT NULL,
     id          STRING(MAX) NOT NULL,
+    name        STRING(MAX) NOT NULL,
     created_at  TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     updated_at  TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     CONSTRAINT fk_teams_project

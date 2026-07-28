@@ -30,8 +30,8 @@ func seedTeamMembershipParents(t *testing.T, projectID, teamID, userID string) {
 	require.NoError(t, err)
 
 	_, err = testPool.pool.Exec(ctx,
-		`INSERT INTO zitadel_nextgen.teams (project_id, id) VALUES ($1, $2)`,
-		projectID, teamID,
+		`INSERT INTO zitadel_nextgen.teams (project_id, id, name) VALUES ($1, $2, $3)`,
+		projectID, teamID, "team-"+teamID,
 	)
 	require.NoError(t, err)
 	t.Cleanup(func() {

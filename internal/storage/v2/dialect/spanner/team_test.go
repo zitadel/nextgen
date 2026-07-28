@@ -21,7 +21,7 @@ func TestTeamStatements_CRUD(t *testing.T) {
 	require.NoError(t, stmts.CreateProject(ctx, project))
 	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
 
-	team := &domain.Team{ProjectID: project.ID, ID: "team_v2_crud"}
+	team := newTestTeam(project.ID, "team_v2_crud")
 	require.NoError(t, stmts.CreateTeam(ctx, team))
 	assert.Equal(t, domain.TeamStatusActive, team.Status)
 	assert.False(t, team.CreatedAt.IsZero())
@@ -31,6 +31,7 @@ func TestTeamStatements_CRUD(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, team.ID, got.ID)
 	assert.Equal(t, project.ID, got.ProjectID)
+	assert.Equal(t, team.Name, got.Name)
 	assert.Equal(t, domain.TeamStatusActive, got.Status)
 
 	require.NoError(t, stmts.DeactivateTeam(ctx, project.ID, team.ID))

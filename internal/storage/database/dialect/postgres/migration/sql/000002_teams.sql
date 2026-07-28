@@ -4,6 +4,7 @@ CREATE TABLE zitadel_nextgen.teams(
     REFERENCES zitadel_nextgen.projects (id)
     ON DELETE CASCADE
     , id TEXT COLLATE "C" NOT NULL CHECK (id <> '')
+    , name TEXT NOT NULL
     , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     , updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 
