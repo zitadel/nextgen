@@ -40,13 +40,14 @@ Facts that constrain the design:
    reasoning that made ADR 0001 derive `basepath` from the Vite base instead
    of hardcoding it. A `VITE_*` build-time mode flag is therefore the wrong
    tool.
-2. **A self-hosted deployment tracks one project.** The platform design
+2. **The initial self-hosted Console operates within one default project context.** The platform design
    ([`docs/design/platform/project-team-modeling.md`](../../../../docs/design/platform/project-team-modeling.md))
    sketches a reserved platform project for every deployment; this ADR
    **narrows that reservation to platform (cloud) mode**, where ownership,
-   claim, and billing need somewhere to live. A standalone deployment's
-   whole world is the customer's own application project — the one their
-   integration (`zitadel setup` → `POST /projects`) created. An extra,
+   claim, and billing need somewhere to live. The initial standalone experience opens the customer's own application
+   project — the one their integration (`zitadel setup` → `POST /projects`)
+   created. Multi-project navigation and management are outside the initial
+   scope, but the deployment model should allow them to be added later. An extra,
    empty bootstrap project alongside it would mean the console signs into a
    project holding none of the deployment's real users.
 3. **The server creates no project — and keeps it that way.** `POST
@@ -164,13 +165,15 @@ Alternatives rejected:
   second, pre-session vocabulary that the permission set would then have to
   agree with. See §4.
 
-### 3. Standalone: the first-created project *is* the default
+### 3. Standalone: the first-created project is the initial default
 
-A standalone deployment tracks exactly one project, and the server never
-creates it. The project the customer's integration bootstrapped —
+The initial standalone Console manages one default project, and the server
+never creates it. The project the customer's integration bootstrapped —
 `zitadel setup`'s `POST /projects`, the first project in the deployment —
-**becomes the default**: the project the runtime document names, the console
-signs into, and the console manages.
+**becomes the initial default**: the project the runtime document names, the
+console signs into, and the console manages. The Console initially operates on
+one project at a time; project switching and multi-project management can be
+added later without requiring a separate Console deployment for each project.
 
 Implemented (`ProjectService.DefaultProject`,
 `internal/service/project.go`):
@@ -245,11 +248,11 @@ one; per-user narrowing arrives entirely server-side when the catalogs land.
 
 ADR 0003's guard signs into one project. This ADR defines which:
 
-`console_project_id` is deliberately the document's only project id — the
-console always operates on exactly one project, and what that project *is*
-follows from the mode:
+`console_project_id` is deliberately the document's only sign-in project id —
+the Console initially operates on one project at a time, and what that project
+*is* follows from the mode:
 
-- **`standalone`** — the deployment's single tracked project (§3 —
+- **`standalone`** — the deployment's default Console project (§3 —
   first-created, or the configured pin). `VITE_CONSOLE_PROJECT_ID` becomes
   a dev-only override and is eventually retired in favor of the runtime
   document.
@@ -281,10 +284,11 @@ contracts, never a security boundary.
   context) and a `permission` field on route `staticData`; billing /
   multi-project / support screens then land as ordinary gated routes under
   `_authed` (#555 sub-issues). No console-side feature flags.
-- Self-host stays a one-project world: the console manages the same project
-  the customer's app authenticates against — no orphan bootstrap project.
-  Before the first `zitadel setup`, the console shows a setup hint instead
-  of a login widget.
+- Self-host starts with a single-project Console experience: the Console
+  manages the same project the customer's app authenticates against — no orphan
+  bootstrap project. The deployment model leaves room for project switching and
+  multi-project management later. Before the first `zitadel setup`, the Console
+  shows a setup hint instead of a login widget.
 - **Dependencies to track (server-owned):** platform-mode provisioning of a
   dedicated platform project (#527, future) and the effective-permission
   exposure on the session surface (§4, an ADR 033 implementation concern).
