@@ -129,23 +129,86 @@ func (ps userPasskeyStatements) ListUserPasskeys(ctx context.Context, filter *da
 	}, nil
 }
 
+type userPasskeyPatch struct {
+	attestationType *string
+	transports      *[]string
+	signCount       *int64
+	signDelta       int64
+	backupEligible  *bool
+	backupState     *bool
+	verifiedAt      *time.Time
+	lastUsedAt      *time.Time
+}
+
+func coalesceUserPasskeyUpdates(updates []domain.UserPasskeyUpdate) (userPasskeyPatch, error) {
+	var patch userPasskeyPatch
+	for _, u := range updates {
+		switch v := u.(type) {
+		case *domain.UserPasskeyAttestationTypeUpdate:
+			s := v.AttestationType
+			patch.attestationType = &s
+		case *domain.UserPasskeyTransportsUpdate:
+			t := append([]string(nil), v.Transports...)
+			patch.transports = &t
+		case *domain.UserPasskeySignCountUpdate:
+			sc := v.SignCount
+			patch.signCount = &sc
+			patch.signDelta = 0
+		case *domain.UserPasskeyIncrementSignCountUpdate:
+			if v.Delta <= 0 {
+				return userPasskeyPatch{}, fmt.Errorf("UserPasskeyIncrementSignCountUpdate.Delta must be > 0, got %d", v.Delta)
+			}
+			if patch.signCount != nil {
+				*patch.signCount += v.Delta
+			} else {
+				patch.signDelta += v.Delta
+			}
+		case *domain.UserPasskeyBackupEligibleUpdate:
+			b := v.BackupEligible
+			patch.backupEligible = &b
+		case *domain.UserPasskeyBackupStateUpdate:
+			b := v.BackupState
+			patch.backupState = &b
+		case *domain.UserPasskeyVerifiedAtUpdate:
+			t := v.VerifiedAt
+			patch.verifiedAt = &t
+		case *domain.UserPasskeyLastUsedAtUpdate:
+			t := v.LastUsedAt
+			patch.lastUsedAt = &t
+		default:
+			return userPasskeyPatch{}, fmt.Errorf("unknown UserPasskeyUpdate %T", u)
+		}
+	}
+	return patch, nil
+}
+
+func (p userPasskeyPatch) empty() bool {
+	return p.attestationType == nil &&
+		p.transports == nil &&
+		p.signCount == nil &&
+		p.signDelta == 0 &&
+		p.backupEligible == nil &&
+		p.backupState == nil &&
+		p.verifiedAt == nil &&
+		p.lastUsedAt == nil
+}
+
 // UpdateUserPasskey implements [service.UserPasskeyStatements].
 func (ps userPasskeyStatements) UpdateUserPasskey(ctx context.Context, projectID, userID, credentialID string, updates ...domain.UserPasskeyUpdate) error {
-	applied := domain.NewUserPasskeyUpdates(updates...)
-	if applied.Empty() {
+	if len(updates) == 0 {
+		return database.ErrNoChanges
+	}
+	patch, err := coalesceUserPasskeyUpdates(updates)
+	if err != nil {
+		return err
+	}
+	if patch.empty() {
 		return database.ErrNoChanges
 	}
 
 	var c statementCompiler
 	c.WriteString("UPDATE user_passkeys SET ")
-	for i, op := range applied.Ops() {
-		if i > 0 {
-			c.WriteString(", ")
-		}
-		if err := writeUserPasskeyOp(&c, op); err != nil {
-			return err
-		}
-	}
+	writeUserPasskeyPatch(&c, patch)
 	c.WriteString(", updated_at = CURRENT_TIMESTAMP() WHERE project_id = ")
 	c.WriteArg(projectID)
 	c.WriteString(" AND user_id = ")
@@ -163,36 +226,42 @@ func (ps userPasskeyStatements) UpdateUserPasskey(ctx context.Context, projectID
 	return nil
 }
 
-func writeUserPasskeyOp(c *statementCompiler, op domain.UserPasskeyOp) error {
-	switch op.Kind {
-	case domain.UserPasskeyOpSetAttestationType:
-		c.WriteString("attestation_type = ")
-		c.WriteArg(op.AttestationType)
-	case domain.UserPasskeyOpSetTransports:
-		c.WriteString("transports = ")
-		c.WriteArg(op.Transports)
-	case domain.UserPasskeyOpSetSignCount:
-		c.WriteString("sign_count = ")
-		c.WriteArg(op.SignCount)
-	case domain.UserPasskeyOpIncrementSignCount:
-		c.WriteString("sign_count = sign_count + ")
-		c.WriteArg(op.SignCount)
-	case domain.UserPasskeyOpSetBackupEligible:
-		c.WriteString("backup_eligible = ")
-		c.WriteArg(op.Bool)
-	case domain.UserPasskeyOpSetBackupState:
-		c.WriteString("backup_state = ")
-		c.WriteArg(op.Bool)
-	case domain.UserPasskeyOpSetVerifiedAt:
-		c.WriteString("verified_at = ")
-		c.WriteArg(op.Time)
-	case domain.UserPasskeyOpSetLastUsedAt:
-		c.WriteString("last_used_at = ")
-		c.WriteArg(op.Time)
-	default:
-		return fmt.Errorf("unknown UserPasskeyOp kind %d", op.Kind)
+func writeUserPasskeyPatch(c *statementCompiler, patch userPasskeyPatch) {
+	sep := ""
+	writeAssign := func(col string, arg any) {
+		c.WriteString(sep)
+		sep = ", "
+		c.WriteString(col)
+		c.WriteString(" = ")
+		c.WriteArg(arg)
 	}
-	return nil
+	if patch.attestationType != nil {
+		writeAssign("attestation_type", *patch.attestationType)
+	}
+	if patch.transports != nil {
+		writeAssign("transports", *patch.transports)
+	}
+	switch {
+	case patch.signCount != nil:
+		writeAssign("sign_count", *patch.signCount)
+	case patch.signDelta > 0:
+		c.WriteString(sep)
+		sep = ", "
+		c.WriteString("sign_count = sign_count + ")
+		c.WriteArg(patch.signDelta)
+	}
+	if patch.backupEligible != nil {
+		writeAssign("backup_eligible", *patch.backupEligible)
+	}
+	if patch.backupState != nil {
+		writeAssign("backup_state", *patch.backupState)
+	}
+	if patch.verifiedAt != nil {
+		writeAssign("verified_at", *patch.verifiedAt)
+	}
+	if patch.lastUsedAt != nil {
+		writeAssign("last_used_at", *patch.lastUsedAt)
+	}
 }
 
 // DeleteUserPasskey implements [service.UserPasskeyStatements].

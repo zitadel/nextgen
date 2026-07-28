@@ -507,16 +507,16 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 // last-used time after a successful assertion. It is best-effort: a write failure must not
 // turn an otherwise valid proof into a rejection (the verify dispatch treats post-challenge
 // errors as proof rejections), and the stored sign count is a clone-detection signal rather
-// than an auth gate. Sign count is absolute from verification (WithUserPasskeySignCount, not Increment).
+// than an auth gate. Sign count is absolute from verification (UserPasskeySignCountUpdate, not Increment).
 func (s *authAttemptService) recordPasskeyUsage(ctx context.Context, projectID string, v *domain.PasskeyVerification) {
 	_ = s.userPasskeys.Update(
 		ctx,
 		projectID,
 		v.UserID,
 		domain.EncodePasskeyCredentialID(v.CredentialID),
-		domain.WithUserPasskeySignCount(int64(v.SignCount)),
-		domain.WithUserPasskeyBackupState(v.BackupState),
-		domain.WithUserPasskeyLastUsedAt(time.Now()),
+		&domain.UserPasskeySignCountUpdate{SignCount: int64(v.SignCount)},
+		&domain.UserPasskeyBackupStateUpdate{BackupState: v.BackupState},
+		&domain.UserPasskeyLastUsedAtUpdate{LastUsedAt: time.Now()},
 	)
 }
 

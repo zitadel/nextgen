@@ -575,9 +575,9 @@ func TestAuthAttemptService_VerifyPasskeyProof(t *testing.T) {
 			gomock.Any(),
 			gomock.Any(),
 		).DoAndReturn(func(_ context.Context, _, _, _ string, updates ...domain.UserPasskeyUpdate) error {
-			for _, op := range domain.NewUserPasskeyUpdates(updates...).Ops() {
-				if op.Kind == domain.UserPasskeyOpSetSignCount {
-					persistedSignCount = op.SignCount
+			for _, u := range updates {
+				if sc, ok := u.(*domain.UserPasskeySignCountUpdate); ok {
+					persistedSignCount = sc.SignCount
 				}
 			}
 			return nil
