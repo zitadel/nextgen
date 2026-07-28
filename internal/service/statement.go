@@ -8,7 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements,AuthAttemptStatements,UserStatements,UserTOTPStatements
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements,AuthAttemptStatements,UserStatements,UserTOTPStatements,UserRecoveryCodesStatements
 
 type StatementPool interface {
 	Statementer[AllStatements]
@@ -32,6 +32,7 @@ type AllStatements interface {
 	AuthAttemptStatements
 	UserStatements
 	UserTOTPStatements
+	UserRecoveryCodesStatements
 	Statements
 }
 
@@ -219,4 +220,19 @@ type UserTOTPStatements interface {
 	GetUserTOTPByUserID(ctx context.Context, projectID, userID string) (*domain.UserTOTP, error)
 	UpdateUserTOTP(ctx context.Context, projectID, userID string, updates ...domain.UserTOTPUpdate) error
 	DeleteUserTOTPByUserID(ctx context.Context, projectID, userID string) error
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type UserRecoveryCodesPool interface {
+// 	Statementer[UserRecoveryCodesStatements]
+// 	Transactioner[UserRecoveryCodesStatements]
+// }
+
+type UserRecoveryCodesStatements interface {
+	Statements
+	CreateUserRecoveryCodes(ctx context.Context, codes *domain.CreateRecoveryCodes) error
+	GetUserRecoveryCodes(ctx context.Context, filter database.Filter[domain.UserRecoveryCodesField]) (*domain.UserRecoveryCodes, error)
+	ListUserRecoveryCodes(ctx context.Context, filter *database.ListOptions[domain.UserRecoveryCodesField]) (*database.ListResult[*domain.UserRecoveryCodes], error)
+	UpdateUserRecoveryCodes(ctx context.Context, filter database.Filter[domain.UserRecoveryCodesField], updates ...domain.UserRecoveryCodesUpdate) error
+	DeleteUserRecoveryCodes(ctx context.Context, filter database.Filter[domain.UserRecoveryCodesField]) error
 }

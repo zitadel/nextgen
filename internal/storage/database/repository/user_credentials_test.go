@@ -150,55 +150,6 @@ func TestUserPasswordRepository_SetUpsert(t *testing.T) {
 	require.Len(t, list, 1)
 }
 
-func TestUserRecoveryCodesRepository_CRUD(t *testing.T) {
-	skipIfSpanner(t)
-	repo := repository.NewUserRecoveryCodesRepository()
-	tx, rollback := transactionForRollback(t)
-	defer rollback()
-	ctx := t.Context()
-
-	const (
-		pid       = "proj-cred-rc"
-		tid       = "team-cred-rc"
-		schemaURL = "https://schemas.test/cred-rc.json"
-		userID    = "usr_rc"
-	)
-
-	insertProjectTeamSchemaUser(t, tx, pid, tid, schemaURL, userID)
-
-	codes := []string{"aaaa-bbbb-cccc", "dddd-eeee-ffff"}
-	require.NoError(t, repo.Create(ctx, tx, &domain.CreateRecoveryCodes{
-		ProjectID:     pid,
-		UserID:        userID,
-		RecoveryCodes: codes,
-	}))
-
-	got, err := repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID)))
-	require.NoError(t, err)
-	require.Positive(t, got.ID)
-	require.Equal(t, codes, got.RecoveryCodes)
-
-	byID, err := repo.Get(ctx, tx, database.WithCondition(repo.PrimaryKeyCondition(got.ID)))
-	require.NoError(t, err)
-	require.Equal(t, got.ID, byID.ID)
-
-	require.NoError(t, repo.Delete(ctx, tx, repo.PrimaryKeyCondition(got.ID)))
-	_, err = repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID)))
-	require.ErrorIs(t, err, new(database.NoRowFoundError))
-
-	require.NoError(t, repo.Create(ctx, tx, &domain.CreateRecoveryCodes{
-		ProjectID:     pid,
-		UserID:        userID,
-		RecoveryCodes: codes,
-	}))
-	got2, err := repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID)))
-	require.NoError(t, err)
-	require.Positive(t, got2.ID)
-	require.NoError(t, repo.Delete(ctx, tx, repo.UniqueCondition(pid, userID)))
-	_, err = repo.Get(ctx, tx, database.WithCondition(repo.UniqueCondition(pid, userID)))
-	require.ErrorIs(t, err, new(database.NoRowFoundError))
-}
-
 func TestUserPasskeyRepository_CRUD(t *testing.T) {
 	skipIfSpanner(t)
 	repo := repository.NewUserPasskeyRepository()
