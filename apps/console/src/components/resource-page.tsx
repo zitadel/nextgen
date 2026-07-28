@@ -1,8 +1,14 @@
 import { Link, type LinkProps } from "@tanstack/react-router";
-import { Button } from "@zitadel/ui-react";
+import type { LucideIcon } from "lucide-react";
+import { Construction } from "lucide-react";
 import type { ReactNode } from "react";
 
-/** Page title row with an optional trailing action (e.g. a Create button). */
+import { cn } from "@/lib/utils";
+
+/**
+ * Page hero: title + optional sub-headline on the left, optional trailing
+ * action on the right. For filter tabs use shadcn `Tabs` (see Users).
+ */
 export function PageHeader({
   title,
   description,
@@ -13,45 +19,67 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-6 flex items-start justify-between gap-4">
-      <div>
-        <h1 className="text-2xl font-semibold">{title}</h1>
-        {description && (
-          <p className="mt-1 text-sm text-zl-text-secondary-gray">{description}</p>
-        )}
+    <div className="mb-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-serif text-2xl tracking-tight text-foreground">{title}</h1>
+          {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+        </div>
+        {action && <div className="shrink-0">{action}</div>}
       </div>
-      {action && <div>{action}</div>}
     </div>
   );
 }
 
-/** A stubbed "create" action (forms land per-resource in a later issue). */
-export function CreateButtonStub({ label }: { label: string }) {
+/** Underlined in-table link to a detail route. */
+export function TableLink({
+  className,
+  children,
+  ...props
+}: LinkProps & { children: ReactNode; className?: string }) {
   return (
-    <Button hierarchy="primary" size="small" disabled leading={<span aria-hidden>+</span>}>
-      {label}
-    </Button>
+    <Link {...props} className={cn("text-foreground underline underline-offset-2", className)}>
+      {children}
+    </Link>
   );
 }
 
-/** Underlined in-table link to a detail route. */
-export function TableLink(props: LinkProps & { children: ReactNode }) {
+/**
+ * "Coming soon" placeholder for screens whose backing API endpoint does not
+ * exist yet (see the console-figma-api-buildability assessment). Honest empty
+ * state rather than a fake list.
+ */
+export function EmptyState({
+  title,
+  description,
+  icon: Icon = Construction,
+  action,
+}: {
+  title: string;
+  description: ReactNode;
+  icon?: LucideIcon;
+  action?: ReactNode;
+}) {
   return (
-    <Link
-      {...props}
-      className="text-zl-text-primary-white underline underline-offset-2"
-    />
+    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border bg-card px-6 py-16 text-center">
+      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+        <Icon size={22} aria-hidden />
+      </span>
+      <h2 className="text-base font-medium text-foreground">{title}</h2>
+      <div className="max-w-md text-sm text-muted-foreground">{description}</div>
+      {action && <div className="mt-1">{action}</div>}
+    </div>
   );
 }
 
 // Shared table look. Kept as named constants so the (verbose) utility strings
 // live in one place and Tailwind's scanner still sees full literals.
-const TABLE_WRAP = "overflow-hidden rounded-lg border border-zl-border-default-gray-100";
+const TABLE_WRAP = "overflow-hidden rounded-xl border border-border bg-card";
 const TABLE =
   "w-full border-collapse text-sm [&_tbody_tr:last-child_td]:border-0 [&_tbody_tr:last-child_th]:border-0";
-const CELL = "border-b border-zl-border-default-gray-100 px-4 py-3 text-left";
-const HEAD_CELL = `${CELL} bg-zl-surface-default-primary-gray text-xs font-normal uppercase tracking-wide text-zl-text-secondary-gray`;
-const ROW_LABEL = `${CELL} font-normal text-zl-text-secondary-gray`;
+const CELL = "border-b border-border px-4 py-3 text-left";
+const HEAD_CELL = `${CELL} text-xs font-normal uppercase tracking-wide text-muted-foreground`;
+const ROW_LABEL = `${CELL} font-normal text-muted-foreground`;
 
 export interface Column<TRow> {
   header: string;
@@ -75,7 +103,7 @@ export function DataTable<TRow>({
   emptyMessage?: string;
 }) {
   if (rows.length === 0) {
-    return <p className="text-sm text-zl-text-secondary-gray">{emptyMessage}</p>;
+    return <p className="text-sm text-muted-foreground">{emptyMessage}</p>;
   }
 
   return (

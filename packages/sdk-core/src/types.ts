@@ -125,10 +125,43 @@ export interface ZitadelLoginConfig {
   readonly projectId?: string;
   /** Reverse-proxy path prefix the widget calls. */
   readonly proxyPath?: string;
+  /**
+   * Sizing/chrome mode. `widget` (default) is content-sized and paints no
+   * page chrome — for embedding inside an existing layout. `page` claims
+   * the viewport, paints the surface background, loads the brand font, and
+   * focuses the first field — for dedicated login routes.
+   * @default "widget"
+   */
+  readonly variant?: "widget" | "page";
+  /**
+   * Colour mode. Unset defers to the tenant's `branding.theme.mode`, then to
+   * the variant default — `dark` for `page`, `auto` (follow
+   * `prefers-color-scheme`) for `widget`. Set it when your app's surface is
+   * fixed so the widget doesn't render a dark card on a light page.
+   */
+  readonly theme?: "light" | "dark" | "auto";
   /** Flow purpose. @default "login" */
   readonly purpose?: CreateFlowBodyPurpose;
+  /**
+   * Selects a specific flow definition by its `name` (the `name` field in
+   * the flow file). Omit to run the project's default flow for the purpose.
+   */
+  readonly flowName?: string;
   /** Where to navigate after a completed sign-in. */
   readonly postSignInUrl?: string;
+  /**
+   * Copy overrides merged over the builtin locale dictionaries, keyed by
+   * primary language subtag. This is how custom flow steps and actions get
+   * labels (keys follow `<step>.title`, `<step>.action.<name>`,
+   * `<step>.field.<field>`):
+   *
+   * ```tsx
+   * <ZitadelLogin locales={{ en: { "identifier.title": "Welcome back" } }} />
+   * ```
+   */
+  readonly locales?: Record<string, Record<string, string>>;
+  /** BCP-47 language override; defaults to the browser language. */
+  readonly lang?: string;
 }
 
 /** Configuration props shared by every `ZitadelLogout` wrapper. */

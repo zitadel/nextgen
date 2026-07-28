@@ -3,6 +3,7 @@ package middleware
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
@@ -44,7 +45,7 @@ func WithLogging(next http.Handler) http.Handler {
 
 		lrw := &loggingResponseWriter{
 			ResponseWriter: w,
-			body:           bytes.NewBuffer(nil),
+			errorBody:      bytes.NewBuffer(nil),
 		}
 		next.ServeHTTP(lrw, r.WithContext(ctx))
 
@@ -53,32 +54,61 @@ func WithLogging(next http.Handler) http.Handler {
 		}
 
 		operationID, _ := GetOperationIDContext(ctx)
+		duration := time.Since(start)
 
-		if lrw.statusCode >= 400 {
-			logger.Error("error while handling request",
-				slog.Int("status_code", lrw.statusCode),
-				slog.Duration("duration", time.Since(start)),
-				slog.String("response", lrw.body.String()),
-				slog.String("operation_id", operationID),
-			)
-		} else {
+		if lrw.statusCode < http.StatusBadRequest {
 			logger.Info("handled request",
 				slog.Int("status_code", lrw.statusCode),
-				slog.Duration("duration", time.Since(start)),
+				slog.Duration("duration", duration),
 				slog.String("operation_id", operationID),
 			)
+			return
 		}
+
+		// Only buffer+parse error responses (≥400). Success bodies are never
+		// buffered, so JSON decode cannot run on the hot 2xx path.
+		attrs := []any{
+			slog.Int("status_code", lrw.statusCode),
+			slog.Duration("duration", duration),
+			slog.String("operation_id", operationID),
+		}
+		if code := extractWireErrorCode(lrw.errorBody.Bytes()); code != "" {
+			attrs = append(attrs, slog.String("error_code", code))
+		}
+		if lrw.statusCode >= http.StatusInternalServerError {
+			logger.Error("request failed", attrs...)
+			return
+		}
+		logger.Warn("request rejected", attrs...)
 	})
+}
+
+// wireErrorCode is the minimal API error envelope shape for request logging.
+// Only the code field is extracted; the body is never logged (ADR 030).
+type wireErrorCode struct {
+	Code string `json:"code"`
+}
+
+func extractWireErrorCode(body []byte) string {
+	if len(body) == 0 {
+		return ""
+	}
+	var envelope wireErrorCode
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return ""
+	}
+	return envelope.Code
 }
 
 // ---------------------- LOGGING RESPONSE WRITER -----------------------------
 
 // loggingResponseWriter is a wrapper around an http.ResponseWriter which caches
-// the status-code. It also caches the body if the status-code is an error code.
+// the status-code. For error responses it buffers the body only so the wire
+// error code can be extracted for structured logs without logging the payload.
 type loggingResponseWriter struct {
 	http.ResponseWriter
 	statusCode int
-	body       *bytes.Buffer
+	errorBody  *bytes.Buffer
 }
 
 func (w *loggingResponseWriter) WriteHeader(code int) {
@@ -90,8 +120,8 @@ func (w *loggingResponseWriter) Write(b []byte) (int, error) {
 	switch {
 	case w.statusCode == 0:
 		w.statusCode = http.StatusOK
-	case w.statusCode >= 400:
-		w.body.Write(b)
+	case w.statusCode >= http.StatusBadRequest:
+		w.errorBody.Write(b)
 	}
 	return w.ResponseWriter.Write(b)
 }

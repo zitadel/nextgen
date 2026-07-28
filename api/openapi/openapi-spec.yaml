@@ -39,6 +39,8 @@ tags:
     description: User creation, lookup, current-user, and password endpoints.
   - name: Schemas
     description: User schema creation and lookup endpoints.
+  - name: Branding
+    description: Branding revision publication and lookup endpoints for the login UI (layout, asset URLs, Liquid template).
 
 paths:
   /.well-known/openid-configuration:
@@ -93,6 +95,8 @@ paths:
     $ref: endpoints/auth_attempts/by_id/handoff/methods.yaml
   /projects:
     $ref: endpoints/projects/methods.yaml
+  /projects/query:
+    $ref: endpoints/projects/query/methods.yaml
   /projects/{project_id}:
     $ref: endpoints/projects/by_id/methods.yaml
   /sessions:
@@ -119,6 +123,10 @@ paths:
     $ref: endpoints/teams/methods.yaml
   /teams/{team_id}:
     $ref: endpoints/teams/by_id/methods.yaml
+  /branding:
+    $ref: endpoints/branding/methods.yaml
+  /branding/{id}:
+    $ref: endpoints/branding/by_id/methods.yaml
 
 components:
   securitySchemes:
@@ -126,3 +134,5 @@ components:
       $ref: security/oauth2.yaml
     usernamePassword:
       $ref: security/username-password.yaml
+    nextgenSession:
+      $ref: security/session-cookie.yaml

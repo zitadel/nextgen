@@ -11,7 +11,6 @@ import (
 	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // TestCombinedFlowLoginFlipToRegister exercises example 05 (combined password
@@ -24,7 +23,7 @@ import (
 // drives the same behavior through the real HTTP service so the cookie
 // rotation + service-layer dispatch don't regress.
 func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
@@ -32,7 +31,7 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	server := harness.EnsureTestServer(t)
 	client, err := helpers.NewApiClient(server.URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
@@ -73,13 +72,12 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	require.Equal(t, "register-identifier", flipOK.Response.Step.Name, "user_not_found must flip to register-identifier")
 	zflow = mustExtractZflow(t, flipOK.SetCookie.Value)
 
-	// Complete the register-identifier step with additional profile fields.
+	// Complete the register-identifier step. The default schema collects only
+	// email (the minimal use case), so that is all the register step carries.
 	idResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
-			"email":      jx.Raw(`"` + newEmail + `"`),
-			"givenName":  jx.Raw(`"Flip"`),
-			"familyName": jx.Raw(`"User"`),
+			"email": jx.Raw(`"` + newEmail + `"`),
 		}),
 	}, api.SubmitFlowStepParams{
 		ID:    flowID,
@@ -112,14 +110,8 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	require.NotEmpty(t, handoffToken)
 
 	// User row landed in the DB with the flipped-into email.
-	db := harness.EnsureDBPool(t)
-	userRepo := harness.EnsureUserRepo(t)
-	_, err = userRepo.Get(t.Context(), db,
-		database.WithCondition(database.And(
-			userRepo.ProjectIDCondition(project.ID),
-			userRepo.AttributesCondition([]domain.Attribute{{Key: "email", Value: newEmail}}),
-		)),
-	)
+	users := harness.EnsureUserFixture(t)
+	_, err = users.GetByAttributes(t.Context(), project.ID, []domain.Attribute{{Key: "email", Value: newEmail}})
 	require.NoError(t, err, "flip-into-register must persist exactly one user")
 }
 
@@ -161,7 +153,7 @@ func combinedPasswordFlowDefinition(userSchema string) api.FlowDefinition {
 			},
 			{
 				Name:   "register-identifier",
-				Fields: []string{"email", "givenName", "familyName"},
+				Fields: []string{"email"},
 				Actions: []api.StepAction{
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 					{Name: "login", Kind: api.StepActionKindSubmit},

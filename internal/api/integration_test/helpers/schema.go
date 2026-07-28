@@ -10,7 +10,6 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
 const BuiltinSchemaBaseURL = "https://test.example.schemas.com/schemas"
@@ -19,8 +18,7 @@ func (h *Harness) EnsureSchemaService(t *testing.T) *service.SchemaService {
 	t.Helper()
 	if h.SchemaService == nil {
 		h.SchemaService = service.NewSchemaService(
-			h.EnsureDBPool(t),
-			h.EnsureSchemaRepo(t),
+			h.EnsureServiceDB(t),
 			h.EnsureSchemaResolver(t),
 			h.EnsureSchemaValidator(t),
 		)
@@ -28,14 +26,12 @@ func (h *Harness) EnsureSchemaService(t *testing.T) *service.SchemaService {
 	return h.SchemaService
 }
 
-func (h *Harness) EnsureSchemaRepo(t *testing.T) domain.JSONSchemaRepository {
+func (h *Harness) EnsureSchemaStore(t *testing.T) domain.JSONSchemaStore {
 	t.Helper()
-	if h.SchemaRepo == nil {
-		h.SchemaRepo = repository.NewJSONSchemaRepository(
-			h.EnsureDBPool(t),
-		)
+	if h.SchemaStore == nil {
+		h.SchemaStore = h.EnsureServiceDB(t).Statements()
 	}
-	return h.SchemaRepo
+	return h.SchemaStore
 }
 
 func (h *Harness) EnsureSchemaResolver(t *testing.T) *domain.JSONSchemaResolver {
@@ -45,7 +41,6 @@ func (h *Harness) EnsureSchemaResolver(t *testing.T) *domain.JSONSchemaResolver 
 		require.NoError(t, err)
 
 		h.SchemaResolver = domain.NewJSONSchemaResolver(
-			h.EnsureSchemaRepo(t),
 			cache,
 			0,
 			0,
@@ -71,7 +66,7 @@ func (h *Harness) CreateUserSchema(t *testing.T, project *domain.Project, schema
 	t.Helper()
 	client, err := NewApiClient(h.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	h.SetProjectSecretOnApiClient(t, client, project)
 
 	apiSchema := api.UserSchema{}
 	err = apiSchema.UnmarshalJSON([]byte(schema))

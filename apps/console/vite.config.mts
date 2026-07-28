@@ -1,9 +1,10 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import tailwindcss from "@tailwindcss/vite";
 import { devtools } from "@tanstack/devtools-vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { defineConfig, loadEnv, type ProxyOptions } from "vite";
 
 const consoleBase = "/ui/console/";
@@ -26,9 +27,13 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     // proxy injects the project secret before forwarding to the Go server, so
     // the secret never reaches the browser bundle. Attaching the bearer is
     // always the console proxy's job (mirroring our SDKs), never a Go-server
-    // feature. The project secret is a temporary pre-login workaround: once the
-    // console has a login, a proxy forwards the auth cookie as the bearer and the
-    // secret is dropped. `vite preview` is deliberately left un-proxied so it
+    // feature. Since Console ADR 0003 the console user signs in through the
+    // embedded login widget and the `__nextgen_session` cookie rides along on
+    // these same-origin requests (the proxy forwards it untouched) — the
+    // cookie authenticates the session operations, while the injected secret
+    // still authorizes the management operations until session-derived
+    // permissions land server-side (root ADRs 032/033/036); then the secret
+    // is dropped here. `vite preview` is deliberately left un-proxied so it
     // can't be mistaken for the production path.
     proxy: command === "serve" && !isPreview ? devApiProxy(mode) : undefined,
     watch: {
@@ -40,7 +45,11 @@ export default defineConfig(({ command, mode, isPreview }) => ({
   // Resolve workspace `@zitadel/*` packages straight from `.ts`
   // source for hot dev iteration. Production builds pick up pre-built
   // `dist/*.mjs` via the default `import` condition instead.
-  resolve: { conditions: ["@zitadel/source"] },
+  // `@/*` → `src/*` is the shadcn/ui convention used across the console.
+  resolve: {
+    conditions: ["@zitadel/source"],
+    alias: { "@": resolve(import.meta.dirname, "src") },
+  },
   plugins: [
     tailwindcss(),
     devtools(),
@@ -83,16 +92,28 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
   // targets (`VITE_CONSOLE_API_BASE`, default `/api`).
   const env = loadEnv(mode, import.meta.dirname, "VITE_");
   const apiBase = env.VITE_CONSOLE_API_BASE || defaultApiBase;
-  // Node-only vars — deliberately NOT VITE_ prefixed, so they are never inlined
-  // into the client bundle. Read straight from the process environment.
-  const backendUrl = process.env.CONSOLE_BACKEND_URL || defaultBackendUrl;
-  const projectSecret = process.env.CONSOLE_PROJECT_SECRET ?? "";
+  // Node-only vars — deliberately NOT VITE_ prefixed, so they are never
+  // inlined into the client bundle. Vite only exposes VITE_-prefixed env-file
+  // vars to the client; loading with an empty prefix here stays config-time
+  // and server-side only, so `.env.local` works without exporting the vars in
+  // the shell. The process environment still wins for CI/one-off overrides.
+  const nodeEnv = loadEnv(mode, import.meta.dirname, "");
+  const backendUrl =
+    process.env.CONSOLE_BACKEND_URL || nodeEnv.CONSOLE_BACKEND_URL || defaultBackendUrl;
+  const projectSecret = process.env.CONSOLE_PROJECT_SECRET ?? nodeEnv.CONSOLE_PROJECT_SECRET ?? "";
 
   // Anchor the context to a path segment so a similarly-prefixed path (e.g.
   // `/api2/...`) is not accidentally proxied and rewritten.
   const escaped = apiBase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
   return {
+    // Console ADR 0004 §2: the pre-session runtime-metadata document lives
+    // at a root path served by the Go mux; forward it as-is (public, no
+    // bearer to inject).
+    "/console/runtime.json": {
+      target: backendUrl,
+      changeOrigin: true,
+    },
     [`^${escaped}(/|$)`]: {
       target: backendUrl,
       changeOrigin: true,

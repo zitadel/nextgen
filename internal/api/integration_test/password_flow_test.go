@@ -12,7 +12,6 @@ import (
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // TestPasswordLoginFlow exercises the example 01 (password-login) JSON
@@ -24,7 +23,7 @@ import (
 // shape so neither the dispatch nor the password challenge can regress
 // behind the unit suite.
 func TestPasswordLoginFlow(t *testing.T) {
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
@@ -44,13 +43,13 @@ func TestPasswordLoginFlow(t *testing.T) {
 	emailAttr, err := domain.NewCreateAttribute("email", userEmail, domain.AttributeUniquenessProject)
 	require.NoError(t, err)
 
-	userRepo := harness.EnsureUserRepo(t)
-	require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
-		ProjectID:  project.ID,
-		SchemaURL:  schemaURL,
-		ID:         userID,
-		TeamID:     &team.ID,
-		Attributes: []*domain.CreateAttribute{emailAttr},
+	users := harness.EnsureUserFixture(t)
+	require.NoError(t, users.Create(t.Context(), &domain.CreateUser{
+		ProjectID:               project.ID,
+		SchemaURL:               schemaURL,
+		ID:                      userID,
+		InitialMembershipTeamID: &team.ID,
+		Attributes:              []*domain.CreateAttribute{emailAttr},
 	}))
 
 	hasher := harness.EnsureHasher(t)
@@ -67,7 +66,7 @@ func TestPasswordLoginFlow(t *testing.T) {
 	server := harness.EnsureTestServer(t)
 	client, err := helpers.NewApiClient(server.URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
@@ -128,7 +127,7 @@ func TestPasswordLoginFlow(t *testing.T) {
 // TestPasswordLoginFlow_UnknownEmail confirms an unknown identifier routes to
 // the `user_not_found` outcome without ever attempting password verification.
 func TestPasswordLoginFlow_UnknownEmail(t *testing.T) {
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
@@ -136,7 +135,7 @@ func TestPasswordLoginFlow_UnknownEmail(t *testing.T) {
 	server := harness.EnsureTestServer(t)
 	client, err := helpers.NewApiClient(server.URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
@@ -179,7 +178,7 @@ func TestPasswordLoginFlow_UnknownEmail(t *testing.T) {
 // the user + password row land in the database and a handoff token is issued
 // so the new user is auto-signed-in.
 func TestPasswordRegisterFlow(t *testing.T) {
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
@@ -187,7 +186,7 @@ func TestPasswordRegisterFlow(t *testing.T) {
 	server := harness.EnsureTestServer(t)
 	client, err := helpers.NewApiClient(server.URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
@@ -234,13 +233,8 @@ func TestPasswordRegisterFlow(t *testing.T) {
 
 	// User row exists with the submitted email.
 	db := harness.EnsureDBPool(t)
-	userRepo := harness.EnsureUserRepo(t)
-	user, err := userRepo.Get(t.Context(), db,
-		database.WithCondition(database.And(
-			userRepo.ProjectIDCondition(project.ID),
-			userRepo.AttributesCondition([]domain.Attribute{{Key: "email", Value: newEmail}}),
-		)),
-	)
+	users := harness.EnsureUserFixture(t)
+	user, err := users.GetByAttributes(t.Context(), project.ID, []domain.Attribute{{Key: "email", Value: newEmail}})
 	require.NoError(t, err, "create_user must persist exactly one user")
 
 	// Password hash exists for that user and verifies the submitted password.
@@ -255,7 +249,7 @@ func TestPasswordRegisterFlow(t *testing.T) {
 // the same email surfaces user_already_exists via the create_user writer
 // (UniqueError → StepError handled by the flow engine).
 func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
@@ -269,18 +263,18 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 	const conflictEmail = "pwregister-conflict@example.com"
 	emailAttr, err := domain.NewCreateAttribute("email", conflictEmail, domain.AttributeUniquenessProject)
 	require.NoError(t, err)
-	require.NoError(t, harness.EnsureUserRepo(t).Create(t.Context(), harness.EnsureDBPool(t), &domain.CreateUser{
-		ProjectID:  project.ID,
-		SchemaURL:  schemaURL,
-		ID:         "pwregister-conflict-seed",
-		TeamID:     &team.ID,
-		Attributes: []*domain.CreateAttribute{emailAttr},
+	require.NoError(t, harness.EnsureUserFixture(t).Create(t.Context(), &domain.CreateUser{
+		ProjectID:               project.ID,
+		SchemaURL:               schemaURL,
+		ID:                      "pwregister-conflict-seed",
+		InitialMembershipTeamID: &team.ID,
+		Attributes:              []*domain.CreateAttribute{emailAttr},
 	}))
 
 	server := harness.EnsureTestServer(t)
 	client, err := helpers.NewApiClient(server.URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),

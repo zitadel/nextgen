@@ -28,6 +28,20 @@ func encodeCreateAuthAttemptRequest(
 	return nil
 }
 
+func encodeCreateBrandingRequest(
+	req *Branding,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeCreateFlowRequest(
 	req *CreateFlowRequest,
 	r *http.Request,
@@ -327,6 +341,34 @@ func encodeIntrospectRequest(
 
 func encodeIssueChallengeRequest(
 	req *IssueChallengeRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodePatchProjectRequest(
+	req *PatchProjectRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeQueryProjectsRequest(
+	req *QueryProjectsRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

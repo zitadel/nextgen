@@ -10,6 +10,9 @@ import (
 )
 
 func (h *Handler) CreateUser(ctx context.Context, req *api.User, params api.CreateUserParams) (api.CreateUserRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), userAccess, opWrite); err != nil {
+		return nil, err
+	}
 	var teamID *string
 	if params.TeamID.IsSet() {
 		teamID = new(string(params.TeamID.Value))
@@ -32,7 +35,48 @@ func (h *Handler) CreateUser(ctx context.Context, req *api.User, params api.Crea
 	return convertUsingJson[api.CreateUserResponse](u)
 }
 
+// ListUsers scopes to the bearer's project: the operation carries no
+// project parameter, so the oauth2 principal (the project secret the
+// CLI's status probe sends) is the only authority. Spec defaults are
+// applied here: limit 20 (max 100 enforced by decode), offset 0.
+func (h *Handler) ListUsers(ctx context.Context, params api.ListUsersParams) (api.ListUsersRes, error) {
+	scopeCtx, _ := GetScopeContext(ctx)
+	// No project parameter: the operation is bound to the token's own project
+	// by construction, so only the scope check is live — it keeps the
+	// browser-plane preview secret from listing the project's users.
+	if err := requireProjectAccess(ctx, scopeCtx.ProjectID, userAccess, opRead); err != nil {
+		return nil, err
+	}
+
+	limit := uint32(20)
+	if params.Limit.IsSet() {
+		limit = uint32(params.Limit.Value)
+	}
+	var offset uint32
+	if params.Offset.IsSet() && params.Offset.Value > 0 {
+		offset = uint32(params.Offset.Value)
+	}
+
+	users, err := h.userService.ListUsers(ctx, service.ListUsersInput{
+		ProjectID: scopeCtx.ProjectID,
+		Offset:    offset,
+		Limit:     limit,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := convertUsingJson[api.ListUsersOKApplicationJSON](users)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
 func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams) (api.GetUserByIDRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), userAccess, opRead); err != nil {
+		return nil, err
+	}
 	var teamID *string
 	if params.TeamID.IsSet() {
 		teamID = new(string(params.TeamID.Value))
@@ -51,6 +95,9 @@ func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams)
 }
 
 func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordRequest, params api.SetUserPasswordParams) (api.SetUserPasswordRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), userAccess, opWrite); err != nil {
+		return nil, err
+	}
 	err := h.userService.SetPassword(ctx, service.SetPasswordInput{
 		ProjectID:                string(params.ProjectID),
 		UserID:                   string(params.UserID),
@@ -64,9 +111,13 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 	return &api.SetUserPasswordNoContent{}, nil
 }
 
-func (h *Handler) GetMyUser(ctx context.Context, params api.GetMyUserParams) (api.GetMyUserRes, error) {
+func (h *Handler) GetMyUser(ctx context.Context) (api.GetMyUserRes, error) {
+	sessionToken, ok := sessionTokenFromContext(ctx)
+	if !ok {
+		return nil, domain.ErrSessionTokenInvalid()
+	}
 	input := service.GetMyUserInput{
-		SessionToken: params.NextgenSession,
+		SessionToken: sessionToken,
 	}
 
 	userbs, err := h.userService.GetMyUser(ctx, input)
@@ -92,6 +143,8 @@ func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrUserAlreadyExists().Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
+	case domain.ErrUserPermissionDenied().Code:
+		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	default:
 		return internalErrorResponse(err)
 	}

@@ -10,7 +10,7 @@ import (
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
-func (h *Harness) EnsureEncryptionKey(t *testing.T) [32]byte {
+func (h *Harness) EnsureKek(t *testing.T) [32]byte {
 	t.Helper()
 	if h.EncryptionKey == nil {
 		h.EncryptionKey = []byte("MasterkeyNeedsToHave32Characters")
@@ -73,20 +73,13 @@ func createNewHasher(t *testing.T) *crypto.PasswapHasher {
 	return hasher
 }
 
-func (h *Harness) EnsureCrypter(t *testing.T) crypto.Crypter {
+func (h *Harness) EnsureKekCrypter(t *testing.T) crypto.Crypter {
 	t.Helper()
 	if h.Crypter == nil {
 		h.Crypter = op.NewAES256GCMCrypto(
-			h.EnsureEncryptionKey(t),
-			"",
+			h.EnsureKek(t),
+			"", // TODO: must be empty to match the kek id for now
 		)
 	}
 	return h.Crypter
-}
-
-func (h *Harness) EnsureEncrypter(t *testing.T) crypto.Encrypter {
-	return h.EnsureCrypter(t)
-}
-func (h *Harness) EnsureDecrypter(t *testing.T) crypto.Decrypter {
-	return h.EnsureCrypter(t)
 }

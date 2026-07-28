@@ -40,7 +40,6 @@ export const reactRenderer: RendererSpec = {
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
 
 const ${elementName} = dynamic(
   async () => {
@@ -57,6 +56,7 @@ const ${elementName} = dynamic(
     return function ${elementName}Element() {
       return (
         <zitadel-login
+          variant="page"
           project={project}
           purpose="${mode}"
           post-sign-in-url="/profile"
@@ -68,13 +68,10 @@ const ${elementName} = dynamic(
 );
 
 export default function ${componentName}() {
+  // variant="page" makes the widget paint the full-page chrome itself
+  // (viewport height, surface background) from design tokens.
   return (
-    <main style={{ minHeight: "100vh", position: "relative", colorScheme: "dark", background: "#0f0f11" }}>
-      <nav aria-label="Authentication" style={{ position: "absolute", top: "24px", right: "24px", zIndex: 1, display: "flex", gap: "12px" }}>
-        <Link href="${mode === "login" ? "/register" : "/login"}" style={{ color: "#f4f4f6", fontWeight: 700, textDecoration: "none" }}>
-          ${mode === "login" ? "Create account" : "Sign in"}
-        </Link>
-      </nav>
+    <main style={{ colorScheme: "dark" }}>
       <${elementName} />
     </main>
   );
@@ -135,6 +132,8 @@ declare module "react" {
         "session-exchange-path"?: string;
         "post-sign-in-url"?: string;
         purpose?: string;
+        "flow-name"?: string;
+        variant?: "widget" | "page";
       };
       "zitadel-logout": React.HTMLAttributes<HTMLElement> & {
         project?: ZitadelProject;

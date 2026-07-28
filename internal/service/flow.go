@@ -3,10 +3,12 @@ package service
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // FlowService is the flow engine's use-case surface. The API handler
@@ -56,7 +58,8 @@ type ResolveFlowRequest struct {
 	Name          *string // direct-lookup slug
 	SchemaVersion *string // nil = latest active
 	AuthRequestID *string
-	// Hint is plumbed through but not yet honored — see TODO on resolveByAudience.
+	// Hint scopes audience resolution (ignored when Name is set) — see
+	// resolveByAudience for the scoring rules.
 	Hint ResolveFlowHint
 }
 
@@ -68,13 +71,13 @@ type ResolveFlowHint struct {
 
 func NewFlowService(
 	pool database.Pool,
-	flowDefs domain.FlowDefinitionRepository,
+	v2Pool *DB,
 	stateMachine domain.FlowStateMachine,
 	ids idgen.Generator,
 ) FlowService {
 	return &flowService{
 		pool:         pool,
-		flowDefs:     flowDefs,
+		v2Pool:       v2Pool,
 		stateMachine: stateMachine,
 		ids:          ids,
 	}
@@ -82,7 +85,7 @@ func NewFlowService(
 
 type flowService struct {
 	pool         database.Pool
-	flowDefs     domain.FlowDefinitionRepository
+	v2Pool       *DB
 	stateMachine domain.FlowStateMachine
 	ids          idgen.Generator
 }
@@ -97,48 +100,101 @@ func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (*dom
 }
 
 func (s *flowService) resolveByName(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error) {
-	opts := []domain.FlowDefinitionListOption{
-		domain.WithFlowDefinitionName(*req.Name),
-		domain.WithFlowDefinitionStatus(domain.FlowDefinitionStatusActive),
+	filters := []v2database.Filter[domain.FlowDefinitionField]{
+		v2database.Equal(v2database.Col(domain.FlowDefinitionFieldProjectID), req.ProjectID),
+		v2database.Equal(v2database.Col(domain.FlowDefinitionFieldName), *req.Name),
+		v2database.Equal(v2database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
 	}
 	if req.SchemaVersion != nil {
-		opts = append(opts, domain.WithSchemaVersion(*req.SchemaVersion))
+		filters = append(filters, v2database.Equal(v2database.Col(domain.FlowDefinitionFieldSchemaVersion), *req.SchemaVersion))
 	}
 
-	defs, err := s.flowDefs.ListFlowDefinitions(ctx, s.pool, req.ProjectID, opts...)
+	result, err := s.v2Pool.Statements().ListFlowDefinitions(ctx, &v2database.ListOptions[domain.FlowDefinitionField]{
+		Filter: v2database.And(filters...),
+	})
 	if err != nil {
 		return nil, err
 	}
-	if len(defs) == 0 {
+	if len(result.Items) == 0 {
 		return nil, domain.ErrFlowDefinitionNotFound()
 	}
 
-	def := pickLatestFlowVersion(defs)
+	def := pickLatestFlowVersion(result.Items)
 	if !flowServesPurpose(def, req.Purpose) {
 		return nil, domain.ErrFlowDefinitionPurposeMismatch()
 	}
 	return def, nil
 }
 
-// TODO: honor ResolveFlowRequest.Hint — score by AppIDs > TeamIDs > project-wide,
-// tie-break by created_at DESC.
+// resolveByAudience picks the active definition whose audience most
+// specifically matches the request hint.
+//
+// A user_schema_id hint is a hard filter: only definitions operating on
+// that schema stay candidates. The remaining candidates are scored
+// app match > team match > project-wide (unscoped); definitions scoped
+// to other apps/teams rank below unscoped so a targeted flow never
+// captures the project default. Hints are client-supplied routing
+// suggestions, not a security boundary — with no eligible tier above
+// them, scoped definitions still resolve rather than failing the login.
+// Ties break newest-first (created_at, then id, so one bulk apply with
+// colliding timestamps still yields a stable pick).
 func (s *flowService) resolveByAudience(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error) {
-	opts := []domain.FlowDefinitionListOption{
-		domain.WithFlowDefinitionStatus(domain.FlowDefinitionStatusActive),
-		domain.WithFlowDefinitionPurpose(req.Purpose),
+	filters := []v2database.Filter[domain.FlowDefinitionField]{
+		v2database.Equal(v2database.Col(domain.FlowDefinitionFieldProjectID), req.ProjectID),
+		v2database.Equal(v2database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
+		v2database.ArrayContains(v2database.Col(domain.FlowDefinitionFieldPurposes), req.Purpose.String()),
 	}
 	if req.SchemaVersion != nil {
-		opts = append(opts, domain.WithSchemaVersion(*req.SchemaVersion))
+		filters = append(filters, v2database.Equal(v2database.Col(domain.FlowDefinitionFieldSchemaVersion), *req.SchemaVersion))
 	}
 
-	defs, err := s.flowDefs.ListFlowDefinitions(ctx, s.pool, req.ProjectID, opts...)
+	result, err := s.v2Pool.Statements().ListFlowDefinitions(ctx, &v2database.ListOptions[domain.FlowDefinitionField]{
+		Filter: v2database.And(filters...),
+	})
 	if err != nil {
 		return nil, err
 	}
-	if len(defs) == 0 {
+	var best *domain.FlowDefinition
+	bestScore := -1
+	for _, def := range result.Items {
+		if req.Hint.UserSchemaID != nil && def.UserSchema != *req.Hint.UserSchemaID {
+			continue
+		}
+		score := flowAudienceScore(def, req.Hint)
+		if score > bestScore || (score == bestScore && flowCreatedAfter(def, best)) {
+			best, bestScore = def, score
+		}
+	}
+	if best == nil {
 		return nil, domain.ErrFlowDefinitionNotFound()
 	}
-	return defs[0], nil
+	return best, nil
+}
+
+// flowAudienceScore ranks def for the hinted request: 3 for a hinted-app
+// match, 2 for a hinted-team match, 1 for an unscoped (project-wide)
+// definition, 0 for a definition scoped to apps/teams the hint does not
+// identify.
+func flowAudienceScore(def *domain.FlowDefinition, hint ResolveFlowHint) int {
+	switch {
+	case hint.AppID != nil && slices.Contains(def.Audience.AppIDs, *hint.AppID):
+		return 3
+	case hint.TeamID != nil && slices.Contains(def.Audience.TeamIDs, *hint.TeamID):
+		return 2
+	case len(def.Audience.AppIDs) == 0 && len(def.Audience.TeamIDs) == 0:
+		return 1
+	default:
+		return 0
+	}
+}
+
+// flowCreatedAfter reports whether a was created after b (id as the
+// timestamp tie-break).
+func flowCreatedAfter(a, b *domain.FlowDefinition) bool {
+	if !a.CreatedAt.Equal(b.CreatedAt) {
+		return a.CreatedAt.After(b.CreatedAt)
+	}
+	return a.ID > b.ID
 }
 
 func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.FlowStepResult, error) {
@@ -188,7 +244,7 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (domain
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: submit without state")
 	}
 	// todo: gracefully handle when the definition was updated (status, steps, etc.,) since the flow started
-	def, err := s.flowDefs.GetFlowDefinition(ctx, s.pool, req.State.ProjectID, req.State.DefinitionID)
+	def, err := s.v2Pool.Statements().GetFlowDefinitionByID(ctx, req.State.ProjectID, req.State.DefinitionID)
 	if err != nil {
 		return domain.FlowStepResult{}, err
 	}
@@ -218,7 +274,7 @@ func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (doma
 	if req.State == nil {
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: get step without state")
 	}
-	def, err := s.flowDefs.GetFlowDefinition(ctx, s.pool, req.State.ProjectID, req.State.DefinitionID)
+	def, err := s.v2Pool.Statements().GetFlowDefinitionByID(ctx, req.State.ProjectID, req.State.DefinitionID)
 	if err != nil {
 		return domain.FlowStepResult{}, err
 	}

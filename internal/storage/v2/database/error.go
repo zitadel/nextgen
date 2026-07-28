@@ -1,22 +1,27 @@
 package database
 
 import (
+	"errors"
 	"fmt"
-	"path/filepath"
-	"runtime"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/errreport"
 )
+
+// ErrNoChanges is returned when an Update is called with no updates.
+var ErrNoChanges = errors.New("update must contain a change")
 
 // NewError constructs a storage v2 database error.
 func NewError(code string, message string, details any, parent error) domain.Error {
-	_, file, line, _ := runtime.Caller(1)
+	if details == "" {
+		details = nil
+	}
 	return domain.Error{
-		Code:     code,
-		Message:  message,
-		Details:  details,
-		Parent:   parent,
-		Location: fmt.Sprintf("%s:%d", filepath.Base(file), line),
+		Code:    code,
+		Message: message,
+		Details: details,
+		Parent:  parent,
+		Origin:  errreport.Capture(parent, 1),
 	}
 }
 

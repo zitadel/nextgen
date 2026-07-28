@@ -16,12 +16,12 @@ import (
 func TestCreateSchema(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()
@@ -122,7 +122,7 @@ func TestCreateSchema(t *testing.T) {
                 }
                 `, helpers.BuiltinSchemaBaseURL)
 
-			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+			project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 			require.NoError(t, err)
 			harness.CreateUserSchema(t, project, schema)
 
@@ -132,7 +132,7 @@ func TestCreateSchema(t *testing.T) {
 
 			client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 			require.NoError(t, err)
-			client.SetToken(project.ProjectSecret)
+			harness.SetProjectSecretOnApiClient(t, client, project)
 
 			req := api.CreateSchemaReq{
 				Type:       api.UserSchemaCreateSchemaReq,
@@ -153,12 +153,12 @@ func TestCreateSchema(t *testing.T) {
 func TestGetSchema(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()
@@ -198,12 +198,12 @@ func TestGetSchema(t *testing.T) {
 func TestSchemaRevisions(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	testCases := []struct {
 		name            string

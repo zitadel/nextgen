@@ -44,18 +44,18 @@ func (m *MockSessionResolver) EXPECT() *MockSessionResolverMockRecorder {
 }
 
 // Get mocks base method.
-func (m *MockSessionResolver) Get(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) (*domain.Session, error) {
+func (m *MockSessionResolver) Get(ctx context.Context, projectID, sessionID string) (*domain.Session, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", ctx, q, projectID, sessionID)
+	ret := m.ctrl.Call(m, "Get", ctx, projectID, sessionID)
 	ret0, _ := ret[0].(*domain.Session)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Get indicates an expected call of Get.
-func (mr *MockSessionResolverMockRecorder) Get(ctx, q, projectID, sessionID any) *MockSessionResolverGetCall {
+func (mr *MockSessionResolverMockRecorder) Get(ctx, projectID, sessionID any) *MockSessionResolverGetCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockSessionResolver)(nil).Get), ctx, q, projectID, sessionID)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockSessionResolver)(nil).Get), ctx, projectID, sessionID)
 	return &MockSessionResolverGetCall{Call: call}
 }
 
@@ -71,13 +71,13 @@ func (c *MockSessionResolverGetCall) Return(arg0 *domain.Session, arg1 error) *M
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockSessionResolverGetCall) Do(f func(context.Context, database.QueryExecutor, string, string) (*domain.Session, error)) *MockSessionResolverGetCall {
+func (c *MockSessionResolverGetCall) Do(f func(context.Context, string, string) (*domain.Session, error)) *MockSessionResolverGetCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockSessionResolverGetCall) DoAndReturn(f func(context.Context, database.QueryExecutor, string, string) (*domain.Session, error)) *MockSessionResolverGetCall {
+func (c *MockSessionResolverGetCall) DoAndReturn(f func(context.Context, string, string) (*domain.Session, error)) *MockSessionResolverGetCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -169,160 +169,41 @@ func (m *MockUserLookup) EXPECT() *MockUserLookupMockRecorder {
 	return m.recorder
 }
 
-// AttributesCondition mocks base method.
-func (m *MockUserLookup) AttributesCondition(attributes []domain.Attribute) database.Condition {
+// GetByAttributes mocks base method.
+func (m *MockUserLookup) GetByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute) (*domain.User, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AttributesCondition", attributes)
-	ret0, _ := ret[0].(database.Condition)
-	return ret0
-}
-
-// AttributesCondition indicates an expected call of AttributesCondition.
-func (mr *MockUserLookupMockRecorder) AttributesCondition(attributes any) *MockUserLookupAttributesConditionCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AttributesCondition", reflect.TypeOf((*MockUserLookup)(nil).AttributesCondition), attributes)
-	return &MockUserLookupAttributesConditionCall{Call: call}
-}
-
-// MockUserLookupAttributesConditionCall wrap *gomock.Call
-type MockUserLookupAttributesConditionCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockUserLookupAttributesConditionCall) Return(arg0 database.Condition) *MockUserLookupAttributesConditionCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockUserLookupAttributesConditionCall) Do(f func([]domain.Attribute) database.Condition) *MockUserLookupAttributesConditionCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserLookupAttributesConditionCall) DoAndReturn(f func([]domain.Attribute) database.Condition) *MockUserLookupAttributesConditionCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// Get mocks base method.
-func (m *MockUserLookup) Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.User, error) {
-	m.ctrl.T.Helper()
-	varargs := []any{ctx, client}
-	for _, a := range opts {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "Get", varargs...)
+	ret := m.ctrl.Call(m, "GetByAttributes", ctx, projectID, attrs)
 	ret0, _ := ret[0].(*domain.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// Get indicates an expected call of Get.
-func (mr *MockUserLookupMockRecorder) Get(ctx, client any, opts ...any) *MockUserLookupGetCall {
+// GetByAttributes indicates an expected call of GetByAttributes.
+func (mr *MockUserLookupMockRecorder) GetByAttributes(ctx, projectID, attrs any) *MockUserLookupGetByAttributesCall {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, client}, opts...)
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockUserLookup)(nil).Get), varargs...)
-	return &MockUserLookupGetCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByAttributes", reflect.TypeOf((*MockUserLookup)(nil).GetByAttributes), ctx, projectID, attrs)
+	return &MockUserLookupGetByAttributesCall{Call: call}
 }
 
-// MockUserLookupGetCall wrap *gomock.Call
-type MockUserLookupGetCall struct {
+// MockUserLookupGetByAttributesCall wrap *gomock.Call
+type MockUserLookupGetByAttributesCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockUserLookupGetCall) Return(arg0 *domain.User, arg1 error) *MockUserLookupGetCall {
+func (c *MockUserLookupGetByAttributesCall) Return(arg0 *domain.User, arg1 error) *MockUserLookupGetByAttributesCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockUserLookupGetCall) Do(f func(context.Context, database.QueryExecutor, ...database.QueryOption) (*domain.User, error)) *MockUserLookupGetCall {
+func (c *MockUserLookupGetByAttributesCall) Do(f func(context.Context, string, []domain.Attribute) (*domain.User, error)) *MockUserLookupGetByAttributesCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserLookupGetCall) DoAndReturn(f func(context.Context, database.QueryExecutor, ...database.QueryOption) (*domain.User, error)) *MockUserLookupGetCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// IDCondition mocks base method.
-func (m *MockUserLookup) IDCondition(id string) database.Condition {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IDCondition", id)
-	ret0, _ := ret[0].(database.Condition)
-	return ret0
-}
-
-// IDCondition indicates an expected call of IDCondition.
-func (mr *MockUserLookupMockRecorder) IDCondition(id any) *MockUserLookupIDConditionCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IDCondition", reflect.TypeOf((*MockUserLookup)(nil).IDCondition), id)
-	return &MockUserLookupIDConditionCall{Call: call}
-}
-
-// MockUserLookupIDConditionCall wrap *gomock.Call
-type MockUserLookupIDConditionCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockUserLookupIDConditionCall) Return(arg0 database.Condition) *MockUserLookupIDConditionCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockUserLookupIDConditionCall) Do(f func(string) database.Condition) *MockUserLookupIDConditionCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserLookupIDConditionCall) DoAndReturn(f func(string) database.Condition) *MockUserLookupIDConditionCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// ProjectIDCondition mocks base method.
-func (m *MockUserLookup) ProjectIDCondition(projectID string) database.Condition {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ProjectIDCondition", projectID)
-	ret0, _ := ret[0].(database.Condition)
-	return ret0
-}
-
-// ProjectIDCondition indicates an expected call of ProjectIDCondition.
-func (mr *MockUserLookupMockRecorder) ProjectIDCondition(projectID any) *MockUserLookupProjectIDConditionCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProjectIDCondition", reflect.TypeOf((*MockUserLookup)(nil).ProjectIDCondition), projectID)
-	return &MockUserLookupProjectIDConditionCall{Call: call}
-}
-
-// MockUserLookupProjectIDConditionCall wrap *gomock.Call
-type MockUserLookupProjectIDConditionCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockUserLookupProjectIDConditionCall) Return(arg0 database.Condition) *MockUserLookupProjectIDConditionCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockUserLookupProjectIDConditionCall) Do(f func(string) database.Condition) *MockUserLookupProjectIDConditionCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserLookupProjectIDConditionCall) DoAndReturn(f func(string) database.Condition) *MockUserLookupProjectIDConditionCall {
+func (c *MockUserLookupGetByAttributesCall) DoAndReturn(f func(context.Context, string, []domain.Attribute) (*domain.User, error)) *MockUserLookupGetByAttributesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

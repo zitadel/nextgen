@@ -13,6 +13,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // actionNames returns the names of the given step actions in order, useful
@@ -80,74 +81,76 @@ var _ service.AuthAttemptService = (*stubAuthAttemptService)(nil)
 
 func TestCreateProject(t *testing.T) {
 	t.Parallel()
-	t.Run("ok", func(t *testing.T) {
-		t.Parallel()
-		tcs := []struct {
-			name string
-			req  *api.CreateProjectRequest
-		}{
-			{
-				name: "no optional fields",
-				req: &api.CreateProjectRequest{
-					PreviewOrigins: make([]string, 0),
-				},
+
+	tcs := []struct {
+		name string
+		req  *api.CreateProjectRequest
+	}{
+		{
+			name: "no optional fields",
+			req: &api.CreateProjectRequest{
+				Name:           helpers.ProjectName(),
+				PreviewOrigins: make([]string, 0),
 			},
-			{
-				name: "with optional fields",
-				req: &api.CreateProjectRequest{
-					PreviewOrigins: []string{"*.vercel.app", "*.netlify.app"},
-				},
+		},
+		{
+			name: "with optional fields",
+			req: &api.CreateProjectRequest{
+				Name:           helpers.ProjectName(),
+				PreviewOrigins: []string{"*.vercel.app", "*.netlify.app"},
 			},
-		}
+		},
+	}
 
-		for _, tc := range tcs {
-			t.Run(tc.name, func(t *testing.T) {
-				t.Parallel()
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-				client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
-				require.NoError(t, err)
+			client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+			require.NoError(t, err)
 
-				resp, err := client.CreateProject(t.Context(), tc.req)
+			resp, err := client.CreateProject(t.Context(), tc.req)
+			require.NoError(t, err)
 
-				assert.NoError(t, err)
-				if (assert.IsType(t, &api.CreateProjectResponse{}, resp, helpers.MustMarshal(t, resp))) {
-					got := resp.(*api.CreateProjectResponse)
-					assert.NotEmpty(t, got.ID)
-					assert.NotEmpty(t, got.ProjectSecret)
-					assert.NotEmpty(t, got.PreviewSecret)
-					assert.Equal(t, tc.req.PreviewOrigins, got.PreviewOrigins)
-				}
-			})
-		}
-	})
+			got, ok := resp.(*api.CreateProjectResponse)
+			require.True(t, ok, helpers.MustMarshal(t, resp))
+			assert.NotEmpty(t, got.ID)
+			assert.NotEmpty(t, got.ProjectSecret)
+			assert.NotEmpty(t, got.PreviewSecret)
+			assert.Equal(t, tc.req.PreviewOrigins, got.PreviewOrigins)
+		})
+	}
 }
 
 func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
-	schema, err := harness.EnsureSchemaRepo(t).GetByID(
+	schema, err := harness.EnsureSchemaStore(t).GetJSONSchemaByID(
 		t.Context(),
-		harness.EnsureDBPool(t),
 		project.ID,
 		schemaURL,
 	)
 	require.NoError(t, err)
 	assert.Equal(t, schemaURL, schema.URL)
 
-	flowDefs, err := harness.EnsureFlowDefinitionRepo(t).ListFlowDefinitions(
+	listed, err := harness.EnsureServiceDB(t).Statements().ListFlowDefinitions(
 		t.Context(),
-		harness.EnsureDBPool(t),
-		project.ID,
-		domain.WithFlowDefinitionName("default-login"),
+		&v2database.ListOptions[domain.FlowDefinitionField]{
+			Filter: v2database.And(
+				v2database.Equal(v2database.Col(domain.FlowDefinitionFieldProjectID), project.ID),
+				v2database.Equal(v2database.Col(domain.FlowDefinitionFieldName), "default-login"),
+			),
+		},
 	)
 	require.NoError(t, err)
-	require.Len(t, flowDefs, 1)
+	require.NotNil(t, listed)
+	require.Len(t, listed.Items, 1)
 
-	flowDef := flowDefs[0]
+	flowDef := listed.Items[0]
 	assert.Equal(t, schemaURL, flowDef.UserSchema)
 	assert.Equal(t, "identifier", flowDef.Purposes[domain.FlowDefinitionPurposeLogin])
 	assert.Equal(t, "register", flowDef.Purposes[domain.FlowDefinitionPurposeRegister])
@@ -165,7 +168,7 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 
 	registerStep, ok := flowDef.FindStep("register")
 	require.True(t, ok)
-	assert.Equal(t, []domain.Field{"email", "givenName", "familyName", "dateOfBirth"}, registerStep.Fields)
+	assert.Equal(t, []domain.Field{"email"}, registerStep.Fields)
 	assert.Contains(t, actionNames(registerStep.Actions), domain.FlowActionPasskeyRegister)
 	assert.Equal(t, "done", registerStep.Transitions[domain.FlowActionPasskeyRegister].Target)
 
@@ -189,6 +192,7 @@ func TestCreateProjectSkipsDefaultLoginFlow(t *testing.T) {
 	require.NoError(t, err)
 
 	resp, err := client.CreateProject(t.Context(), &api.CreateProjectRequest{
+		Name:           helpers.ProjectName(),
 		PreviewOrigins: make([]string, 0),
 		SeedDefaults:   api.NewOptBool(false),
 	})
@@ -197,33 +201,37 @@ func TestCreateProjectSkipsDefaultLoginFlow(t *testing.T) {
 	projectID := resp.(*api.CreateProjectResponse).ID
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
-	_, err = harness.EnsureSchemaRepo(t).GetByID(
+	_, err = harness.EnsureSchemaStore(t).GetJSONSchemaByID(
 		t.Context(),
-		harness.EnsureDBPool(t),
 		projectID,
 		schemaURL,
 	)
 	require.Error(t, err)
 
-	flowDefs, err := harness.EnsureFlowDefinitionRepo(t).ListFlowDefinitions(
+	listed, err := harness.EnsureServiceDB(t).Statements().ListFlowDefinitions(
 		t.Context(),
-		harness.EnsureDBPool(t),
-		projectID,
-		domain.WithFlowDefinitionName("default-login"),
+		&v2database.ListOptions[domain.FlowDefinitionField]{
+			Filter: v2database.And(
+				v2database.Equal(v2database.Col(domain.FlowDefinitionFieldProjectID), projectID),
+				v2database.Equal(v2database.Col(domain.FlowDefinitionFieldName), "default-login"),
+			),
+		},
 	)
 	require.NoError(t, err)
-	assert.Empty(t, flowDefs)
+	if listed != nil {
+		assert.Empty(t, listed.Items)
+	}
 }
 
 func TestGetProject(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()

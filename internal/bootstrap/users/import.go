@@ -9,13 +9,15 @@ import (
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // Import loads bootstrap users from JSON files into the database.
 // dialect is the configured database dialect name (e.g. "postgres"); used to reject unsupported backends.
-func Import(ctx context.Context, pool database.Pool, hashValidator crypto.HashValidator, dialect string, paths []string) error {
+func Import(ctx context.Context, pool database.Pool, v2Pool service.StatementPool, hashValidator crypto.HashValidator, dialect string, paths []string) error {
 	if len(paths) == 0 {
 		return nil
 	}
@@ -23,11 +25,10 @@ func Import(ctx context.Context, pool database.Pool, hashValidator crypto.HashVa
 		return err
 	}
 
-	userRepo := repository.NewUserRepository()
 	passwordRepo := repository.NewUserPasswordRepository()
 
 	for _, path := range paths {
-		if err := importFile(ctx, pool, hashValidator, userRepo, passwordRepo, path); err != nil {
+		if err := importFile(ctx, pool, v2Pool, hashValidator, passwordRepo, path); err != nil {
 			return fmt.Errorf("user file %q: %w", path, err)
 		}
 	}
@@ -37,8 +38,8 @@ func Import(ctx context.Context, pool database.Pool, hashValidator crypto.HashVa
 func importFile(
 	ctx context.Context,
 	pool database.Pool,
+	v2Pool service.StatementPool,
 	hashValidator crypto.HashValidator,
-	userRepo *repository.UserRepository,
 	passwordRepo *repository.UserPasswordRepository,
 	path string,
 ) error {
@@ -58,9 +59,10 @@ func importFile(
 		return err
 	}
 
-	_, err = userRepo.Get(ctx, pool,
-		database.WithCondition(userRepo.PrimaryKeyCondition(doc.Header.ProjectID, doc.Header.ID)),
-	)
+	_, err = v2Pool.Statements().GetUser(ctx, v2database.And(
+		v2database.Equal(v2database.Col(domain.UserFieldProjectID), doc.Header.ProjectID),
+		v2database.Equal(v2database.Col(domain.UserFieldID), doc.Header.ID),
+	), service.UserQueryOptions{})
 	if err == nil {
 		slog.Info("bootstrap user: skipped user because they already exists)", slog.String("path", path), slog.String("id", doc.Header.ID))
 		return nil
@@ -74,29 +76,37 @@ func importFile(
 		return err
 	}
 
-	var teamID *string
+	var participationTeamID *string
 	if doc.Header.TeamID != "" {
 		tid := doc.Header.TeamID
-		teamID = &tid
+		participationTeamID = &tid
 	}
 
-	if err := userRepo.Create(ctx, pool, &domain.CreateUser{
-		ProjectID:  doc.Header.ProjectID,
-		SchemaURL:  doc.Header.SchemaURL,
-		ID:         doc.Header.ID,
-		TeamID:     teamID,
-		Attributes: attrs,
+	if err := v2Pool.Transaction(ctx, func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+		if err := tx.Statements().CreateUser(ctx, &domain.CreateUser{
+			ProjectID:               doc.Header.ProjectID,
+			SchemaURL:               doc.Header.SchemaURL,
+			ID:                      doc.Header.ID,
+			InitialMembershipTeamID: participationTeamID,
+			Attributes:              attrs,
+		}); err != nil {
+			return fmt.Errorf("create user: %w", err)
+		}
+		db, ok := tx.(database.QueryExecutor)
+		if !ok {
+			return fmt.Errorf("set password: transaction does not support password repository writes")
+		}
+		if err := passwordRepo.Set(ctx, db, &domain.SetUserPassword{
+			ProjectID:      doc.Header.ProjectID,
+			UserID:         doc.Header.ID,
+			EncodedHash:    pw.EncodedHash,
+			ChangeRequired: pw.ChangeRequired,
+		}); err != nil {
+			return fmt.Errorf("set password: %w", err)
+		}
+		return nil
 	}); err != nil {
-		return fmt.Errorf("create user: %w", err)
-	}
-
-	if err := passwordRepo.Set(ctx, pool, &domain.SetUserPassword{
-		ProjectID:      doc.Header.ProjectID,
-		UserID:         doc.Header.ID,
-		EncodedHash:    pw.EncodedHash,
-		ChangeRequired: pw.ChangeRequired,
-	}); err != nil {
-		return fmt.Errorf("set password: %w", err)
+		return err
 	}
 
 	slog.Info("bootstrap user: loaded user", slog.String("path", path), slog.String("id", doc.Header.ID))

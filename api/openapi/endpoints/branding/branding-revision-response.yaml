@@ -1,0 +1,19 @@
+type: object
+description: |
+  A stored branding revision. `branding` echoes the canonical stored
+  configuration so clients (e.g. the CLI sync engine) can reconcile local
+  files with the server's stored state.
+required:
+  - id
+  - created_at
+  - branding
+properties:
+  id:
+    type: string
+    description: The unique identifier of this branding revision.
+  created_at:
+    type: string
+    format: date-time
+    description: When this revision was published.
+  branding:
+    $ref: ../../components/flows/branding.yaml

@@ -27,7 +27,7 @@ import (
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
-	"github.com/zitadel/nextgen/internal/domain/tokengen"
+	"github.com/zitadel/nextgen/internal/errreport"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
@@ -115,7 +115,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		return nil
 	})
 
-	crypter, err := buildCrypter(cfg.Server.EncryptionKey)
+	kek, err := buildCrypter(cfg.Server.EncryptionKey)
 	if err != nil {
 		return fmt.Errorf("failed to create Crypter: %w", err)
 	}
@@ -125,24 +125,18 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		return fmt.Errorf("failed to build password hasher: %w", err)
 	}
 
-	if err := users.Import(ctx, pool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), userFiles); err != nil {
-		return fmt.Errorf("failed to bootstrap users: %w", err)
-	}
-
-	opaqueTokenGenerator := tokengen.NewOpaqueTokenGenerator(crypter)
-
 	// ── Repositories ─────────────────
-	userRepo := repository.NewUserRepository()
 	userPasswordRepo := repository.NewUserPasswordRepository()
 	userPasskeyRepo := repository.NewUserPasskeyRepository()
-	passkeyRegRepo := repository.NewPasskeyRegistrationRepository()
-	sessionRepo := repository.NewSessionRepository(pool)
-	flowDefinitionRepo := repository.NewFlowDefinitionRepository(pool)
-	attemptRepo := repository.NewAuthAttemptRepository(pool)
-	schemaRepo := repository.NewJSONSchemaRepository(pool)
-	teamRepo := repository.NewTeamRepository(pool)
+	brandingRepo := repository.NewBrandingRepository(pool)
 
 	serviceDBPool := service.NewPool(v2Pool.(service.Pool))
+	schemaStore := serviceDBPool.Statements()
+	sessionResolver := service.SessionStatementsResolver{Pool: serviceDBPool}
+
+	if err := users.Import(ctx, pool, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), userFiles); err != nil {
+		return fmt.Errorf("failed to bootstrap users: %w", err)
+	}
 
 	// ── Schema Stuff ─────────────────
 	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](cfg.Schema.LRUCacheSize)
@@ -158,53 +152,54 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		}
 	}
 
-	schemaResolverWithHTTP := domain.NewJSONSchemaResolver(schemaRepo, schemaCache, 10, 1000_000, &http.Client{}, builtinPublicBase)
+	schemaResolverWithHTTP := domain.NewJSONSchemaResolver(schemaCache, 10, 1000_000, &http.Client{}, builtinPublicBase)
 	// storageSchemaResolver without an HTTP client to fetch tenant schemas from the cache/storage
-	storageSchemaResolver := domain.NewJSONSchemaResolver(schemaRepo, schemaCache, 10, 1000_000, nil, builtinPublicBase)
+	storageSchemaResolver := domain.NewJSONSchemaResolver(schemaCache, 10, 1000_000, nil, builtinPublicBase)
 	schemaValidator, err := domain.NewSchemaValidator(builtinPublicBase.String())
 	if err != nil {
 		return fmt.Errorf("failed to build schema validator: %w", err)
 	}
 
+	userLookup := service.UserStatementsLookup{Pool: serviceDBPool}
+	userIdentity := service.UserStatementsIdentityReader{Pool: serviceDBPool}
+
 	// ── Services ─────────────────────
+	keyService := service.NewKeyService(serviceDBPool, kek)
+
 	authAttemptSvc := service.NewAuthAttemptService(
 		pool,
-		attemptRepo,
-		sessionRepo,
-		userRepo,
+		serviceDBPool,
+		sessionResolver,
+		userLookup,
 		userPasswordRepo,
 		userPasskeyRepo,
 		passwordHasher,
 	)
-	sessionService := service.NewSessionService(pool, sessionRepo, service.SessionConfig{
+	sessionService := service.NewSessionService(pool, serviceDBPool, userIdentity, service.SessionConfig{
 		DefaultTTL: cfg.Session.DefaultTTL,
 		MaxTTL:     cfg.Session.MaxTTL,
 	})
 	projectService := service.NewProjectService(
-		pool,
 		serviceDBPool,
-		schemaRepo,
-		flowDefinitionRepo,
-		opaqueTokenGenerator,
 		builtinPublicBase.String(),
 		schemaValidator,
+		keyService,
 	)
-	schemaService := service.NewSchemaService(pool, schemaRepo, schemaResolverWithHTTP, schemaValidator)
+	schemaService := service.NewSchemaService(serviceDBPool, schemaResolverWithHTTP, schemaValidator)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
-		pool,
+		serviceDBPool,
 		schemaService,
 		schemaValidator,
 		nil,
-		flowDefinitionRepo,
 	)
-	teamService := service.NewTeamService(pool, teamRepo)
+	teamService := service.NewTeamService(serviceDBPool)
+	brandingService := service.NewBrandingService(pool, brandingRepo)
 	userService := service.NewUserService(
 		pool,
-		userRepo,
+		serviceDBPool,
+		schemaStore,
 		userPasswordRepo,
-		schemaRepo,
 		passwordHasher,
-		opaqueTokenGenerator,
 	)
 
 	// ── Flow engine ──────────────────
@@ -212,17 +207,17 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	fields := domain.NewSchemaFieldResolver()
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
 	createUserHandler := service.NewFlowCreateUserHandler(
-		userRepo,
 		userPasswordRepo,
 		passwordHasher,
 		userService,
-		schemaRepo,
+		schemaStore,
 	)
-	createUserForPasskeyHandler := service.NewFlowCreateUserForPasskeyHandler(userRepo, userService, schemaRepo)
-	passkeyRegSvc := service.NewPasskeyRegistrationService(pool, passkeyRegRepo, userPasskeyRepo, ids)
+	createUserForPasskeyHandler := service.NewFlowCreateUserForPasskeyHandler(userService, schemaStore)
+	passkeyRegSvc := service.NewPasskeyRegistrationService(pool, serviceDBPool, userPasskeyRepo, ids)
 	passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
 	stateMachine := domain.NewFlowStateMachine(
 		storageSchemaResolver,
+		schemaStore,
 		fields,
 		createUserHandler,
 		createUserForPasskeyHandler,
@@ -232,7 +227,23 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		time.Now,
 	)
 
-	flowService := service.NewFlowService(pool, flowDefinitionRepo, stateMachine, ids)
+	flowService := service.NewFlowService(pool, serviceDBPool, stateMachine, ids)
+	tokenService := service.NewTokenService(keyService)
+
+	// ── Default project resolution ──
+	// Console ADR 0004 §3 (standalone): the deployment tracks exactly one
+	// project — the one the customer's integration (`zitadel setup`) created
+	// first. The server never creates it; it validates an explicitly pinned
+	// id up front and otherwise reports the current state for operators.
+	defaultProject, err := projectService.DefaultProject(ctx, cfg.Platform.ProjectID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve the default project: %w", err)
+	}
+	if defaultProject != nil {
+		slog.Info("default project resolved", slog.String("project_id", defaultProject.ID))
+	} else {
+		slog.Info("no project exists yet; the first project created (e.g. by `zitadel setup`) becomes the default")
+	}
 
 	// ── HTTP Server ─────────────────
 
@@ -241,9 +252,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 
 	oasServer, err := oasapi.NewServer(
 		api.NewHandler(
-			crypter,
-			opaqueTokenGenerator,
-			opaqueTokenGenerator,
 			flowService,
 			authAttemptSvc,
 			sessionService,
@@ -252,8 +260,11 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			schemaService,
 			flowDefinitionSvc,
 			teamService,
+			brandingService,
+			tokenService,
+			keyService,
 		),
-		api.NewSecurityHandler(opaqueTokenGenerator),
+		api.NewSecurityHandler(tokenService),
 		oasapi.WithMiddleware(
 			middleware.AddOperationIdToContext(),
 			// logging is done at net/http level
@@ -265,7 +276,8 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		return fmt.Errorf("failed to build api server: %w", err)
 	}
 
-	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer)
+	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer,
+		standaloneRuntimeResolver(projectService, keyService, cfg.Platform.ProjectID))
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)
 	}
@@ -321,15 +333,41 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("server.console_path", "/ui/console")
 	v.SetDefault("server.login_enabled", true)
 	v.SetDefault("server.login_path", "/ui/login")
-	v.SetDefault("password_hasher.hasher.algorithm", crypto.HashNameBcrypt)
-	v.SetDefault("password_hasher.hasher.cost", 10)
+	// Default to argon2id (per ADR 029). Params follow the RFC 9106 second
+	// recommended option (t=3, m=64 MiB, p=4), a good balance for servers.
+	v.SetDefault("password_hasher.hasher.algorithm", crypto.HashNameArgon2id)
+	v.SetDefault("password_hasher.hasher.time", 3)
+	v.SetDefault("password_hasher.hasher.memory", 64*1024)
+	v.SetDefault("password_hasher.hasher.threads", 4)
+	// Keep bcrypt and legacy verifiers registered so pre-existing hashes still
+	// validate and transparently rehash to argon2id on the next successful login.
+	v.SetDefault("password_hasher.verifiers", []crypto.HashName{
+		crypto.HashNameArgon2,
+		crypto.HashNameBcrypt,
+		crypto.HashNameScrypt,
+		crypto.HashNamePBKDF2,
+		crypto.HashNameSha2,
+		crypto.HashNameMd5,
+		crypto.HashNameMd5Salted,
+		crypto.HashNamePHPass,
+		crypto.HashNameDrupal7,
+	})
 	v.SetDefault("password_hasher.limits", crypto.HashLimitsConfig{
 		Bcrypt: crypto.BcryptLimitsConfig{MinCost: 10, MaxCost: 16},
+		Argon2: crypto.Argon2LimitsConfig{
+			MinTime: 1, MaxTime: 10,
+			MinMemory: 8 * 1024, MaxMemory: 512 * 1024,
+			MinThreads: 1, MaxThreads: 16,
+		},
 	})
 	v.SetDefault("schema.lru_cache_size", 1000)                                   // todo: temp, review
 	v.SetDefault("schema.builtin_public_base", "https://nextgen.com/api/schemas") // todo: temp, review
 	v.SetDefault("session.default_ttl", domain.SessionAnonymousTTL)
 	v.SetDefault("session.max_ttl", 720*time.Hour)
+	// Empty means "the deployment's first-created project is the default"
+	// (Console ADR 0004 §3); set NEXTGEN_PLATFORM_PROJECT_ID to pin an
+	// existing project instead. The server never creates a project itself.
+	v.SetDefault("platform.project_id", "")
 	v.SetDefault("instrumentation.service_name", "Zitadel")
 	v.SetDefault("instrumentation.log.level", zlog.LevelInfo)
 	v.SetDefault("instrumentation.log.streams", []zlog.Stream{
@@ -390,7 +428,7 @@ func mustBindEnv(v *viper.Viper, key string) {
 
 // ----------------------------- HTTP --------------------------------------
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen idgen.Generator, apiHandler http.Handler) (*http.ServeMux, error) {
+func buildHTTPMux(cfg ServerConfig, reqIdGen idgen.Generator, apiHandler http.Handler, runtime runtimeResolver) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 
 	if cfg.LoginEnabled {
@@ -415,6 +453,11 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen idgen.Generator, apiHandler http.Ha
 		}
 		mux.Handle(cfg.ConsolePath, consoleHandler)
 		mux.Handle(cfg.ConsolePath+"/", consoleHandler)
+
+		// Pre-session runtime metadata for the embedded console (Console
+		// ADR 0004 §2). Registered as an exact path, so it wins over the
+		// catch-all API mount below.
+		mux.Handle(consoleRuntimePath, newConsoleRuntimeHandler(runtime))
 	}
 
 	mux.Handle("/",
@@ -498,13 +541,17 @@ func buildCrypter(hexKey string) (crypto.Crypter, error) {
 	if len(key) != 32 {
 		return nil, fmt.Errorf("server: encryption_key must decode to %d bytes, got %d", 32, len(key))
 	}
-	crypter := op.NewAES256GCMCrypto([32]byte(key), "")
+	crypter := op.NewAES256GCMCrypto([32]byte(key), "") // TODO: key id must be empty to match kek for now
 	return crypter, nil
 }
 
 // ----------------------------- INSTRUMENTATION --------------------------------------
 
 func setUpLogging(cfg instrumentation.LogConfig, otelProvider log.LoggerProvider) {
+	errreport.EnableLocation(cfg.Errors.ReportLocation)
+	errreport.EnableStack(cfg.Errors.StackTrace)
+	errreport.GCPReporting(cfg.Format == instrumentation.LogFormatGCPErrorReporting)
+
 	otelHandler := otelslog.NewHandler(
 		Name,
 		otelslog.WithLoggerProvider(otelProvider),
