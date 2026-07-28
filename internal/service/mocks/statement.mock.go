@@ -1737,6 +1737,45 @@ func (c *MockAllStatementsGetUserCall) DoAndReturn(f func(context.Context, datab
 	return c
 }
 
+// GetUserMetadata mocks base method.
+func (m *MockAllStatements) GetUserMetadata(ctx context.Context, projectID, userID string) (*domain.UserMetadata, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUserMetadata", ctx, projectID, userID)
+	ret0, _ := ret[0].(*domain.UserMetadata)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetUserMetadata indicates an expected call of GetUserMetadata.
+func (mr *MockAllStatementsMockRecorder) GetUserMetadata(ctx, projectID, userID any) *MockAllStatementsGetUserMetadataCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserMetadata", reflect.TypeOf((*MockAllStatements)(nil).GetUserMetadata), ctx, projectID, userID)
+	return &MockAllStatementsGetUserMetadataCall{Call: call}
+}
+
+// MockAllStatementsGetUserMetadataCall wrap *gomock.Call
+type MockAllStatementsGetUserMetadataCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsGetUserMetadataCall) Return(arg0 *domain.UserMetadata, arg1 error) *MockAllStatementsGetUserMetadataCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsGetUserMetadataCall) Do(f func(context.Context, string, string) (*domain.UserMetadata, error)) *MockAllStatementsGetUserMetadataCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsGetUserMetadataCall) DoAndReturn(f func(context.Context, string, string) (*domain.UserMetadata, error)) *MockAllStatementsGetUserMetadataCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetUserRecoveryCodes mocks base method.
 func (m *MockAllStatements) GetUserRecoveryCodes(ctx context.Context, filter database.Filter[domain.UserRecoveryCodesField]) (*domain.UserRecoveryCodes, error) {
 	m.ctrl.T.Helper()
@@ -4864,6 +4903,45 @@ func (c *MockUserStatementsGetUserCall) Do(f func(context.Context, database.Filt
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockUserStatementsGetUserCall) DoAndReturn(f func(context.Context, database.Filter[domain.UserField], service.UserQueryOptions) (*domain.User, error)) *MockUserStatementsGetUserCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetUserMetadata mocks base method.
+func (m *MockUserStatements) GetUserMetadata(ctx context.Context, projectID, userID string) (*domain.UserMetadata, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUserMetadata", ctx, projectID, userID)
+	ret0, _ := ret[0].(*domain.UserMetadata)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetUserMetadata indicates an expected call of GetUserMetadata.
+func (mr *MockUserStatementsMockRecorder) GetUserMetadata(ctx, projectID, userID any) *MockUserStatementsGetUserMetadataCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserMetadata", reflect.TypeOf((*MockUserStatements)(nil).GetUserMetadata), ctx, projectID, userID)
+	return &MockUserStatementsGetUserMetadataCall{Call: call}
+}
+
+// MockUserStatementsGetUserMetadataCall wrap *gomock.Call
+type MockUserStatementsGetUserMetadataCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockUserStatementsGetUserMetadataCall) Return(arg0 *domain.UserMetadata, arg1 error) *MockUserStatementsGetUserMetadataCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockUserStatementsGetUserMetadataCall) Do(f func(context.Context, string, string) (*domain.UserMetadata, error)) *MockUserStatementsGetUserMetadataCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockUserStatementsGetUserMetadataCall) DoAndReturn(f func(context.Context, string, string) (*domain.UserMetadata, error)) *MockUserStatementsGetUserMetadataCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

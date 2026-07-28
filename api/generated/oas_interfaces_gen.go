@@ -141,6 +141,10 @@ type GetUserInfoRes interface {
 	getUserInfoRes()
 }
 
+type GetUserMetadataRes interface {
+	getUserMetadataRes()
+}
+
 type IntrospectRes interface {
 	introspectRes()
 }

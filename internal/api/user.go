@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	api "github.com/zitadel/nextgen/api/generated"
@@ -131,6 +132,44 @@ func (h *Handler) GetMyUser(ctx context.Context) (api.GetMyUserRes, error) {
 		return nil, err
 	}
 	return user, nil
+}
+
+func (h *Handler) GetUserMetadata(ctx context.Context, params api.GetUserMetadataParams) (api.GetUserMetadataRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), userAccess, opWrite); err != nil {
+		return nil, err
+	}
+
+	user, err := h.userService.GetUserMetadata(ctx, service.GetUserMetadataInput{
+		ProjectID: string(params.ProjectID),
+		UserID:    string(params.UserID),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return mapUserMetadata(user)
+}
+
+func mapUserMetadata(user *domain.UserMetadata) (*api.UserMetadata, error) {
+	var status api.UserMetadataStatus
+	switch user.Status {
+	case domain.UserStatusActive:
+		status = api.UserMetadataStatusActive
+	case domain.UserStatusDeactivated:
+		status = api.UserMetadataStatusActive
+	case domain.UserStatusSuspended:
+		status = api.UserMetadataStatusSuspended
+	case domain.UserStatusPendingPurge:
+		status = api.UserMetadataStatusPendingPurge
+	default:
+		return nil, errors.New("unknown user status")
+	}
+
+	return &api.UserMetadata{
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+		Status:    status,
+	}, nil
 }
 
 // ------------------ Errors ---------------

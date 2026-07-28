@@ -409,6 +409,15 @@ func (UnimplementedHandler) GetUserInfo(ctx context.Context) (r GetUserInfoRes, 
 	return r, ht.ErrNotImplemented
 }
 
+// GetUserMetadata implements getUserMetadata operation.
+//
+// Get user metadata.
+//
+// GET /users/{user_id}/metadata
+func (UnimplementedHandler) GetUserMetadata(ctx context.Context, params GetUserMetadataParams) (r GetUserMetadataRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // Introspect implements introspect operation.
 //
 // Introspect a token.

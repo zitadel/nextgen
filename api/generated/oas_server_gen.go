@@ -299,6 +299,12 @@ type Handler interface {
 	//
 	// GET /auth/userinfo
 	GetUserInfo(ctx context.Context) (GetUserInfoRes, error)
+	// GetUserMetadata implements getUserMetadata operation.
+	//
+	// Get user metadata.
+	//
+	// GET /users/{user_id}/metadata
+	GetUserMetadata(ctx context.Context, params GetUserMetadataParams) (GetUserMetadataRes, error)
 	// Introspect implements introspect operation.
 	//
 	// Introspect a token.

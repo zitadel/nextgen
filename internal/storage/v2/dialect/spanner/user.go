@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/spanner"
-
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
@@ -124,6 +123,36 @@ func (us userStatements) GetUser(ctx context.Context, filter database.Filter[dom
 	default:
 		return nil, wrapError(errTooManyRows)
 	}
+}
+
+// GetUserMetadata implements [service.UserStatements].
+func (us userStatements) GetUserMetadata(ctx context.Context, projectID string, userID string) (*domain.UserMetadata, error) {
+	var compiler statementCompiler
+	err := compileRead(&compiler, userQuery, &database.ListOptions[domain.UserField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+			database.Equal(database.Col(domain.UserFieldID), userID),
+		),
+	}, v2user.Schema)
+	if err != nil {
+		return nil, err
+	}
+
+	var user *domain.User
+	err = us.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+		var qErr error
+		user, qErr = collectOneRow(iter, us.scanUserHeader)
+		return qErr
+	})
+	if err != nil {
+		return nil, wrapError(err)
+	}
+
+	return &domain.UserMetadata{
+		Status:    user.Status,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+	}, nil
 }
 
 // ListUsers implements [service.UserStatements].

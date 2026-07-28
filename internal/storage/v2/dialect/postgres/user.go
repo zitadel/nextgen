@@ -169,6 +169,33 @@ func (us userStatements) GetUser(ctx context.Context, filter database.Filter[dom
 	}
 }
 
+func (us userStatements) GetUserMetadata(ctx context.Context, projectID string, userID string) (*domain.UserMetadata, error) {
+	var compiler statementCompiler
+	err := compileRead(&compiler, userQuery, &database.ListOptions[domain.UserField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+			database.Equal(database.Col(domain.UserFieldID), userID),
+		),
+	}, v2user.Schema)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := us.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	user, err := pgx.CollectExactlyOneRow(rows, scanUserHeader)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return &domain.UserMetadata{
+		Status:    user.Status,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+	}, nil
+}
+
 // ListUsers implements [service.UserStatements].
 func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
 	filter = v2user.EnsureListOptions(filter)

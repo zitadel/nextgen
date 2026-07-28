@@ -12,6 +12,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/database"
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -271,6 +272,36 @@ func TestUserStatements_ListUsersUnifiedFilters(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, list.Items, 2)
 		assert.Equal(t, []string{"user_limit_1", "user_limit_2"}, userIDs(list.Items))
+	})
+}
+
+func TestUserStatements_GetUserMetadata(t *testing.T) {
+	ctx := t.Context()
+	stmts := testClient.Statements()
+	projectID, schemaURL := ensureUserTestProject(t)
+
+	user := newTestUser(t, projectID, schemaURL, "user_v2_metadata_1", "metadata@example.com", "Metadata")
+	require.NoError(t, stmts.CreateUser(ctx, user))
+
+	t.Run("returns the header fields", func(t *testing.T) {
+		metadata, err := stmts.GetUserMetadata(ctx, projectID, user.ID)
+		require.NoError(t, err)
+
+		assert.Equal(t, domain.UserStatusActive, metadata.Status)
+		assert.False(t, metadata.CreatedAt.IsZero())
+		assert.False(t, metadata.UpdatedAt.IsZero())
+	})
+
+	t.Run("unknown user returns NoRowFoundError", func(t *testing.T) {
+		_, err := stmts.GetUserMetadata(ctx, projectID, "user_v2_metadata_missing")
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+	})
+
+	t.Run("user of another project returns NoRowFoundError", func(t *testing.T) {
+		otherProjectID, _ := ensureUserTestProject(t)
+
+		_, err := stmts.GetUserMetadata(ctx, otherProjectID, user.ID)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }
 

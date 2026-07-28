@@ -131,7 +131,10 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"user.read",
 	},
 	GetUserInfoOperation: []string{},
-	IntrospectOperation:  []string{},
+	GetUserMetadataOperation: []string{
+		"user.read",
+	},
+	IntrospectOperation: []string{},
 	IssueChallengeOperation: []string{
 		"auth_attempts.write",
 	},

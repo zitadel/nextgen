@@ -41,6 +41,7 @@ const (
 	GetTokenOperation                 OperationName = "GetToken"
 	GetUserByIDOperation              OperationName = "GetUserByID"
 	GetUserInfoOperation              OperationName = "GetUserInfo"
+	GetUserMetadataOperation          OperationName = "GetUserMetadata"
 	IntrospectOperation               OperationName = "Introspect"
 	IssueChallengeOperation           OperationName = "IssueChallenge"
 	ListBrandingOperation             OperationName = "ListBranding"

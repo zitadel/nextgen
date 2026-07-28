@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -422,4 +423,41 @@ func TestGetMyUser(t *testing.T) {
 			string(body),
 		)
 	})
+}
+
+func TestGetUserMetadata(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	before := time.Now().UTC()
+	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+		ProjectID: project.ID,
+		User:      harness.TestData.Generator.GenerateUser(t, "testgetuser@example.com"),
+	})
+	require.NoError(t, err)
+	after := time.Now().UTC()
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	params := api.GetUserMetadataParams{
+		ProjectID: api.ProjectID(project.ID),
+		UserID:    api.UserID(user["id"].(string)),
+	}
+
+	resp, err := client.GetUserMetadata(t.Context(), params)
+	assert.NoError(t, err)
+
+	if assert.IsType(t, &api.UserMetadata{}, resp, helpers.MustMarshal(t, resp)) {
+		got := resp.(*api.UserMetadata)
+		// ogen encodes `format: date-time` as RFC3339, which drops sub-second
+		// precision, so the response can only be bracketed to the second: the
+		// lower bound is truncated to match, the upper bound needs no slack
+		// because truncation never moves a timestamp forward.
+		assert.WithinRange(t, got.UpdatedAt, before.Truncate(time.Second), after)
+		assert.WithinRange(t, got.CreatedAt, before.Truncate(time.Second), after)
+	}
 }

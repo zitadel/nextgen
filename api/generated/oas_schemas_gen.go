@@ -2404,6 +2404,7 @@ func (*ErrorDetailsStatusCode) getTeamRes()                  {}
 func (*ErrorDetailsStatusCode) getTokenRes()                 {}
 func (*ErrorDetailsStatusCode) getUserByIDRes()              {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()              {}
+func (*ErrorDetailsStatusCode) getUserMetadataRes()          {}
 func (*ErrorDetailsStatusCode) introspectRes()               {}
 func (*ErrorDetailsStatusCode) listBrandingRes()             {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()      {}
@@ -5292,6 +5293,26 @@ func (s *GetUserInfoOK) SetFamilyName(val OptString) {
 }
 
 func (*GetUserInfoOK) getUserInfoRes() {}
+
+type GetUserMetadataBadRequest ErrorDetails
+
+func (*GetUserMetadataBadRequest) getUserMetadataRes() {}
+
+type GetUserMetadataForbidden ErrorDetails
+
+func (*GetUserMetadataForbidden) getUserMetadataRes() {}
+
+type GetUserMetadataInternalServerError ErrorDetails
+
+func (*GetUserMetadataInternalServerError) getUserMetadataRes() {}
+
+type GetUserMetadataNotFound ErrorDetails
+
+func (*GetUserMetadataNotFound) getUserMetadataRes() {}
+
+type GetUserMetadataUnauthorized ErrorDetails
+
+func (*GetUserMetadataUnauthorized) getUserMetadataRes() {}
 
 // The handoff token and metadata for session exchange.
 // This is a short-lived credential (TTL ≤ 60 seconds) that the client must exchange
@@ -12065,6 +12086,104 @@ func (s *UserAdditional) init() UserAdditional {
 }
 
 type UserID string
+
+// Ref: #
+type UserMetadata struct {
+	// The time when the user was created.
+	CreatedAt time.Time `json:"createdAt"`
+	// The time when the user was last updated.
+	UpdatedAt time.Time `json:"updatedAt"`
+	// The status of the user.
+	Status UserMetadataStatus `json:"status"`
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *UserMetadata) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *UserMetadata) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// GetStatus returns the value of Status.
+func (s *UserMetadata) GetStatus() UserMetadataStatus {
+	return s.Status
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *UserMetadata) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *UserMetadata) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+// SetStatus sets the value of Status.
+func (s *UserMetadata) SetStatus(val UserMetadataStatus) {
+	s.Status = val
+}
+
+func (*UserMetadata) getUserMetadataRes() {}
+
+// The status of the user.
+type UserMetadataStatus string
+
+const (
+	UserMetadataStatusActive       UserMetadataStatus = "active"
+	UserMetadataStatusSuspended    UserMetadataStatus = "suspended"
+	UserMetadataStatusDeactivated  UserMetadataStatus = "deactivated"
+	UserMetadataStatusPendingPurge UserMetadataStatus = "pending_purge"
+)
+
+// AllValues returns all UserMetadataStatus values.
+func (UserMetadataStatus) AllValues() []UserMetadataStatus {
+	return []UserMetadataStatus{
+		UserMetadataStatusActive,
+		UserMetadataStatusSuspended,
+		UserMetadataStatusDeactivated,
+		UserMetadataStatusPendingPurge,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserMetadataStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case UserMetadataStatusActive:
+		return []byte(s), nil
+	case UserMetadataStatusSuspended:
+		return []byte(s), nil
+	case UserMetadataStatusDeactivated:
+		return []byte(s), nil
+	case UserMetadataStatusPendingPurge:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserMetadataStatus) UnmarshalText(data []byte) error {
+	switch UserMetadataStatus(data) {
+	case UserMetadataStatusActive:
+		*s = UserMetadataStatusActive
+		return nil
+	case UserMetadataStatusSuspended:
+		*s = UserMetadataStatusSuspended
+		return nil
+	case UserMetadataStatusDeactivated:
+		*s = UserMetadataStatusDeactivated
+		return nil
+	case UserMetadataStatusPendingPurge:
+		*s = UserMetadataStatusPendingPurge
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // Merged schema.
 // Ref: #

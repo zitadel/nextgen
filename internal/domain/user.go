@@ -55,6 +55,12 @@ type User struct {
 	Attributes []Attribute
 }
 
+type UserMetadata struct {
+	Status    UserStatus
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 // IsSelfOwned reports whether the user owns their own lifecycle.
 func (u *User) IsSelfOwned() bool { return u.LifecycleOwnerTeamID == nil }
 

@@ -53,6 +53,11 @@ type GetMyUserInput struct {
 	SessionToken *domain.Token
 }
 
+type GetUserMetadataInput struct {
+	ProjectID string
+	UserID    string
+}
+
 // ---- Implementation -------------------------------------------------------------
 
 type UserService struct {
@@ -224,6 +229,17 @@ func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]by
 	}
 
 	return userbs, nil
+}
+
+func (s *UserService) GetUserMetadata(ctx context.Context, input GetUserMetadataInput) (*domain.UserMetadata, error) {
+	user, err := s.v2Pool.Statements().GetUserMetadata(ctx, input.ProjectID, input.UserID)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil, domain.ErrUserNotFound()
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
+	}
+	return user, nil
 }
 
 // ---- Create User ACTION -------------------------------------------------------------
